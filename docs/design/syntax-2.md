@@ -48,8 +48,8 @@ Read in the required order: spec §§1–7 and the affected effect/runtime claus
 `syntax.md`, especially its replacement §§1.7, 3, 6 and 7; records §§7–8,
 12–16 and the accepted amendments; meta §§1–3; the plan's “已定的设计” and
 A1/A2 track; then the ledger. The spec at this base already uses the first
-migration's syntax (`spec.md:97`, `:147`, `:824`). The old migration status
-paragraph in `syntax.md:3` is historical, not evidence of an old parser.
+migration's syntax (`spec.md : 97`, `:147`, `:824`). The old migration status
+paragraph in `syntax.md : 3` is historical, not evidence of an old parser.
 
 The lane's `records.md` is older than the accepted T3 contract. I read
 `git show 0d0ce19:docs/design/records.md`, the revision accepted by the ledger,
@@ -132,17 +132,17 @@ upstream snapshots read on 2026-11-11, not pinned historical evidence.
 
 ### Pipes, alternatives and unions
 
-- **Gleam.** `gleam/compiler-core/src/parse/token.rs:77` has a distinct `Pipe`
+- **Gleam.** `gleam/compiler-core/src/parse/token.rs : 77` has a distinct `Pipe`
   token for the two-character operator. `parse.rs`, `parse_case_clause`
   (:1731), loops on `Vbar` for alternatives, then reads the guard, arrow and
   expression. Take this separation of head and body. i can share a token only
   after fixing its brace probe; Gleam's distinct token avoids that cost.
-- **Elixir.** `elixir/lib/elixir/src/elixir_parser.yrl:75,84` gives bare bar and
+- **Elixir.** `elixir/lib/elixir/src/elixir_parser.yrl : 75,84` gives bare bar and
   arrow operators separate precedence; :206–209 explicitly warns about pipe
   precedence with calls without parentheses. Take the dedicated diagnostic
   approach. i's required call parentheses avoid that particular ambiguity,
   but a bare bar still needs the context rules in §4.2.
-- **OCaml.** `ocaml/stdlib/stdlib.ml:48` declares the two-character pipe as
+- **OCaml.** `ocaml/stdlib/stdlib.ml : 48` declares the two-character pipe as
   `%revapply`. It is ordinary reverse application, not shell stream wiring.
   i retains its existing first-argument insertion and evaluation order rather
   than importing OCaml's operator implementation or all of its precedence.
@@ -172,12 +172,12 @@ references remove one ambiguity; they do not dictate i's choice.
 
 ### Named record top and error slots
 
-- **Dart.** `dart-sdk/sdk/lib/core/record.dart:7–16,58–69` describes `Record` as
+- **Dart.** `dart-sdk/sdk/lib/core/record.dart : 7–16,58–69` describes `Record` as
   the supertype of record shapes and records field-name conflicts with Object
   members and positional getters. Take the named set of record values.
   i has no Object methods on records, and its labels remain ordinary strings;
   no Dart exclusions are needed.
-- **TypeScript.** `typescript-5.9.3/src/compiler/checker.ts:2101` creates the
+- **TypeScript.** `typescript-5.9.3/src/compiler/checker.ts : 2101` creates the
   intrinsic nonprimitive `object`; :6827–6829 prints it as an ObjectKeyword.
   Take the distinction between a top name and an empty value. Leave its
   broader nonprimitive set and keyword status: i's `Record` excludes tuples,
@@ -186,7 +186,7 @@ references remove one ambiguity; they do not dictate i's choice.
   a suffix expression, an optional bang, and a type expression. Take a
   dedicated effect/error slot rather than overload the guard marker. i cannot
   copy bang because bang already identifies its independent environment axis.
-- **Swift typed throws.** `swift/lib/Parse/ParseExpr.cpp:132–157` parses effect
+- **Swift typed throws.** `swift/lib/Parse/ParseExpr.cpp : 132–157` parses effect
   specifiers around function arrows; `ParseStmt.cpp`, `parseStmtDo`
   (:2177–2201), parses the thrown type inside a matching parenthesis pair.
   Take explicit effect boundaries and misplaced-marker errors; do not add
@@ -217,10 +217,10 @@ Construct the existing `ExprKind::Case { subject, clauses }`. A single
 unguarded clause keeps the binding/Assert rule, including choices. The result
 can take another call, field, tuple projection, or match suffix.
 
-Reason and code: `parser.rs:977–1027` already turns the old pipe/clause pair
+Reason and code: `parser.rs : 977–1027` already turns the old pipe/clause pair
 into `Case`; `:1044–1072` is the existing suffix loop. The resolver's one-clause
-path is `resolve.rs:2515`, its other-case path :2547; standalone clause blocks
-use `clause_function` at :2514. `lower.rs:1580` lowers `Case`. Moving construction
+path is `resolve.rs : 2515`, its other-case path :2547; standalone clause blocks
+use `clause_function` at :2514. `lower.rs : 1580` lowers `Case`. Moving construction
 of that same AST node preserves these paths; it does not add a call frame.
 
 **M2.** Postfix binds above unary, above every binary level. Consequently:
@@ -243,12 +243,12 @@ exception. `1.{ ... }` starts with Float `1.` and fails as a match. `1 .{ ... }`
 and `{ 1 }.{ ... }` work. `1.0.{ ... }`, a string, a call, or a closing
 parenthesis can take the suffix directly. `1..{ ... }` would use Float `1.` as
 the subject; it is not a spelling for matching Int `1`. Format integer subjects
-as `{ 1 }.{ ... }`. Source: `lexer.rs:371–417`, especially :387–397. No numeric
+as `{ 1 }.{ ... }`. Source: `lexer.rs : 371–417`, especially :387–397. No numeric
 literal semantics change is needed.
 
 **M4.** A line-leading dot continues the previous expression, exactly as a
 field dot does. It cannot begin a new match without a subject. Comments are
-ignored for break classification. This follows `token.rs:87–110` and spec
+ignored for break classification. This follows `token.rs : 87–110` and spec
 §1.7, not a new indentation rule. Space between dot and brace is immaterial.
 
 ### 4.2 Bar in three contexts
@@ -267,10 +267,10 @@ well as after a function arrow. The relayed explanation “left of arrow means
 alternatives” and “types only after colon/arrow” is therefore not exact.
 
 Examples: `n.{ p ? p | ready -> 1 _ -> 0 }` has a pipe in a guard.
-`n.{ x: Int | y -> x _ -> 0 }` has the value type `y` in a union; it does not
+`n.{ x : Int | y -> x _ -> 0 }` has the value type `y` in a union; it does not
 bind an alternative `y`. The same holds for literal types. This preserves
 spec §7.1's no-backtracking type rule and T2; capitalization is not a parser
-oracle (`parser.rs:1494–1508`, `:1653–1687`, `:1760–1878`).
+oracle (`parser.rs : 1494–1508`, `:1653–1687`, `:1760–1878`).
 
 **P3.** Change the first-statement brace probe. A bare bar after a successfully
 read pattern is not enough to decide a clause block. Continue reading pattern
@@ -282,7 +282,7 @@ a pipe when a type parse fails. Direct `.{` calls the clause parser without
 this probe.
 
 This fixes `{ x | f }` and `{ (a: b) | f }`. The old early return is
-`parser.rs:1404–1415`. The prototype changes that branch and removes the obsolete
+`parser.rs : 1404–1415`. The prototype changes that branch and removes the obsolete
 brace-record reservation at :1425–1428. It does not replace the parser.
 
 **P4.** Line-leading bar always continues the current construct; it does not
@@ -290,7 +290,7 @@ start a new clause. Thus a clause body ending in `x` followed by `| f` continues
 that body. To start the next clause, start with its first pattern on a new
 line, then any alternatives. A line `| 1 -> y` after a body is an error, not
 an alternative attached retroactively to a previous head. This follows the
-unchanged break sets (`token.rs:87–110`). No comma is required or permitted as
+unchanged break sets (`token.rs : 87–110`). No comma is required or permitted as
 a clause separator.
 
 **P5.** Diagnose the bar/or confusion in checking when there is evidence.
@@ -299,7 +299,7 @@ is Bool and is not callable, point at `|` and suggest `||` for Boolean or.
 Do not reject every `a | b`: `b` may be an ordinary function returning Bool.
 A non-Bool, noncallable target keeps the ordinary call error, with pipe context.
 The current parser's `PipeTarget` check concerns syntactic target shapes
-(`parser.rs:1002–1015`); it cannot make the Bool decision. Allocate any new
+(`parser.rs : 1002–1015`); it cannot make the Bool decision. Allocate any new
 checker diagnostic through the coordinator.
 
 **P6, unresolved.** The existing spec permits a literal clause block as a pipe
@@ -322,9 +322,9 @@ line; it cannot begin a statement.
 **E2.** Error and environment slots belong to the nearest arrow, in that order;
 missing slots mean `Never`. A duplicate caret or caret after the nearest
 arrow's environment is an error. Group the inner function type to give an
-outer arrow its own effect slot. Source: `parser.rs:1689–1711`; the prototype
+outer arrow its own effect slot. Source: `parser.rs : 1689–1711`; the prototype
 changes its error-token tests only. The lexer currently has no caret token
-(`token.rs:13–70`, `lexer.rs:245–278`); it does not displace an existing
+(`token.rs : 13–70`, `lexer.rs : 245–278`); it does not displace an existing
 operator. A future XOR operator would have to choose another syntax or a
 separately specified expression context; do not reserve it twice by accident.
 
@@ -348,7 +348,7 @@ is a header under §2.2; following an expression on the same line it is a call;
 in a pattern it is a tuple pattern; in an attribute/constructor/function
 header it is that construct's argument/field/parameter list. Only otherwise
 apply datum-versus-function lookahead. `at_header_group` uses `close[]` and the
-token after the close (`parser.rs:460`); `postfix` uses `at_joined(LParen)`
+token after the close (`parser.rs : 460`); `postfix` uses `at_joined(LParen)`
 (:1048); neither should be replaced by record detection.
 
 **D2.** At the start of an expression, a matching `)` followed by a same-line
@@ -358,15 +358,15 @@ function. Otherwise, zero items select a record; first `..` or a label-colon
 selects a record; any other first item selects a nonempty positional tuple.
 The rest of the items must fit the chosen form. A comma or newline separates
 items but never chooses the form. Existing `paren` already does suffix
-lookahead and the guard exception (`parser.rs:1216–1233`).
+lookahead and the guard exception (`parser.rs : 1216–1233`).
 
 **D3.** In a type, a matching `)` followed by `->` selects a function type.
 Otherwise `..` or label-colon selects a record type; other nonempty contents
 select a positional tuple type. Empty contents are an error suggesting
 `Record`. Function type parameter lists may still be empty and may have labels
-(`parser.rs:1782–1816`). A parenthesised record used as a function parameter
-type needs its own nesting: `((a: Int)) -> T` takes one record argument;
-`(a: Int) -> T` takes one Int argument labelled `a`.
+(`parser.rs : 1782–1816`). A parenthesised record used as a function parameter
+type needs its own nesting: `((a : Int)) -> T` takes one record argument;
+`(a : Int) -> T` takes one Int argument labelled `a`.
 
 **D4.** Record values have name or noninterpolated string labels. Record types
 also have declared uppercase label parameters. Preserve duplicate-label,
@@ -379,7 +379,7 @@ that pattern; it is not a record field.
 |---|---|
 | `(a: b)` in an expression | Record whose field value is `b`. |
 | `(a: b) { a }` | Function whose parameter has value type `b`; then checking decides whether `b` is in scope. |
-| `(a: Int)` in a pattern | One-item tuple pattern containing a type test/annotation. |
+| `(a : Int)` in a pattern | One-item tuple pattern containing a type test/annotation. |
 | `f(a: b)` and `f (a: b)` | Labelled call, not a record argument. Use `f((a: b))` for that. |
 | `f` then `(a: b)` on the next line in a block | Two expressions; the second is a record. A break inside an enclosing parenthesis instead separates items. |
 | `(name: path)` at file start | Invalid header, not a record expression statement. Top-level expression statements are not permitted. Imports use `name = package/module`, not colon. |
@@ -389,18 +389,18 @@ that pattern; it is not a record field.
 | `(n) { (name: n) }` | Function returning a record; function bodies remain blocks. |
 | `()` as call argument, tuple/list part, RHS, guard or clause body | Empty record, except where a following function suffix or a pattern context decides otherwise. A record guard subsequently fails Bool checking. |
 | `() { ... }`, `() -> Nil { ... }`, `() -> Nil` in a type | Empty parameter lists. |
-| `List((a: Int))`, `List((a: Int) -> T)` | Record argument type versus function argument type. |
-| `x: (a: Int) -> 1` in a clause | The type parser takes the arrow; no clause arrow remains. Error. Use `x: { (a: Int) } -> 1`. This is the old tuple/function-type boundary applied to records. |
-| `(f: (x) -> Int { x })` | One-field record, with no extra comma. |
-| `(1, name: "ada")`, `(name: "ada", 1)` | Errors, in either order; type counterparts also fail. |
-| `retry(3, body: f)`, `User(String, age: Int)` in a constructor declaration | Existing mixed argument/field lists, pending confirmation. |
+| `List((a : Int))`, `List((a : Int) -> T)` | Record argument type versus function argument type. |
+| `x : (a : Int) -> 1` in a clause | The type parser takes the arrow; no clause arrow remains. Error. Use `x : { (a : Int) } -> 1`. This is the old tuple/function-type boundary applied to records. |
+| `(f : (x) -> Int { x })` | One-field record, with no extra comma. |
+| `(1, name : "ada")`, `(name : "ada", 1)` | Errors, in either order; type counterparts also fail. |
+| `retry(3, body: f)`, `User(String, age : Int)` in a constructor declaration | Existing mixed argument/field lists, pending confirmation. |
 
 A naked typed function at the start of an ordinary brace group still hits the
 existing clause/function ambiguity: `{ (x) -> Int { x } }` is rejected after
 being read as clauses. Bind it to a name first when a group is required.
 Function bodies remain forced blocks, so returning a function from a function
 body works. The proposal does not remove this unrelated ambiguity
-(spec §6.1; `parser.rs:1350–1441`).
+(spec §6.1; `parser.rs : 1350–1441`).
 
 **D5.** Keep `{ T }` for type grouping, including nearest-arrow attachment and
 record type tests. “Braces hold only code” must mean “records do not use
@@ -422,15 +422,15 @@ rules. It does not become unconstrained `R`.
 irrefutable unit pattern or a test of all records. Those would contradict
 “records have no pattern” or change matching silently. The diagnostic can
 suggest a binder/discard if the value is unused; it must not promise that
-`_: Record` tests emptiness. Existing record tests remain head-based and must
+`_ : Record` tests emptiness. Existing record tests remain head-based and must
 satisfy spec §4.8 rule 11 (records@0d0ce19:482–488).
 
 **N3.** Add `Record` as a normal built-in type name with no type arguments,
 following `Int`'s lookup rules. Do not lex it as a keyword. A module-defined,
 imported or declared type variable named `Record` covers it by the ordinary
 scope rules. `lookup_type` checks module scope before builtins
-(`resolve.rs:1468–1473`); `builtins` populates the fallback table (:810–835);
-the built-in inventory is `hir.rs:221–260`. No source word `Record` occurs in
+(`resolve.rs : 1468–1473`); `builtins` populates the fallback table (:810–835);
+the built-in inventory is `hir.rs : 221–260`. No source word `Record` occurs in
 any of the 2,508 tracked `.i` files, including std, lib, examples and tests.
 The same word search over all 3,548 extracted snippet sources has no hits.
 The spec's substring hits are the grammar identifier `RecordUpdate`, not a
@@ -442,7 +442,7 @@ needs a fresh, ordinary alias/import supplied from a scope that can name the
 built-in. A formatter must never print a capture-prone type and claim it reads
 back identically. Do not assume `core.Record` already works: qualified lookup
 currently finds exported custom types, not built-in table entries
-(`resolve.rs:1441–1465`). An ordinary exported alias can provide a qualified
+(`resolve.rs : 1441–1465`). An ordinary exported alias can provide a qualified
 route, without giving `i/record` a parser rule. That library/API addition is
 not necessary to parse the proposal, but its exact name should be settled
 before a public migration tool promises capture-free rewriting. `Record` is
@@ -452,7 +452,7 @@ the only new source name proposed here.
 type in a record spread. Bare `..` remains in constructor patterns, list-rest
 patterns such as `[..]` and `[x, ..]`, and constructor export groups such as
 `(User(..))`. Removing the latter two would change features outside this task
-(spec §§2.4,7.1; `parser.rs:519–544`, `:1584–1651`).
+(spec §§2.4,7.1; `parser.rs : 519–544`, `:1584–1651`).
 
 ## 5. Replacement spec text, section by section
 
@@ -608,7 +608,7 @@ same-frame semantics explicitly. §11.6's match references use this definition.
 Change the tuple-pattern production to require at least one pattern. Keep
 constructor field/rest and list/rest patterns, string-prefix patterns, choices
 and literal patterns. Add N2's empty-pattern error. There is still no record
-pattern. `(x: Int)` still tests/annotates the single tuple part.
+pattern. `(x : Int)` still tests/annotates the single tuple part.
 
 In §7.1's longest-type paragraph delete the sentence saying that a question
 marker after a function type is part of that type and requires grouping before
@@ -639,7 +639,7 @@ reports or expected-error fixtures indiscriminately.
 
 | Source region | Sentences/rules to remove or replace |
 |---|---|
-| `syntax.md:9,13` summary; §6.12 at :376 | Old match spelling and brace record reservation. Use M1 and D2. |
+| `syntax.md : 9,13` summary; §6.12 at :376 | Old match spelling and brace record reservation. Use M1 and D2. |
 | `syntax.md` opening replacement (:36–42) and §6.1 (:288–340) | Its record reservation, early clause decision at bare bar, and function arrow-tail error marker. Existing first-function clause ambiguity stays. |
 | `syntax.md` §1.7 (:71–97) | Old pipe continuation token and question marker in the type-tail brace rule. Parenthesis/newline rules stay. |
 | `syntax.md` §§2.3,3 (:148,206) | Headers called tuples; parenthesised nonfunction forms described only as tuples; old effect slots. T2's supersession of reserved value types remains in force. |
@@ -684,7 +684,7 @@ normal-surface printing. They are already structural data in a deliberately
 different surface. Then bare `.is` `()` remains a parameter list, not the
 normal surface's empty value; `(,)` is removed in expression, type and pattern
 positions. The comma round-trip justification disappears: the normal surface
-prints `(f: (x) -> Int { x })` without a comma. Do not independently invent a
+prints `(f : (x) -> Int { x })` without a comma. Do not independently invent a
 second parenthesised `.is` record grammar. Ask M1/coordinator to confirm this
 mapping, particularly if “braces hold only code” was meant for both surfaces.
 
@@ -735,7 +735,7 @@ Migration uses AST spans to identify `Case`, ordinary pipe, and function error
 slots. It changes only those operator tokens. A match subject is grouped if
 it is binary, unary or numeric, so its precedence and integer token survive.
 The subject is evaluated once. The result is compared using `shape::canon`
-(`shape.rs:29–54`), which removes spans and transparent expression groups,
+(`shape.rs : 29–54`), which removes spans and transparent expression groups,
 while preserving names, literals, effects, parameters and clause structure.
 It is not a comparison of printed Debug strings with regex-deleted content.
 It deliberately leaves empty tuple uses in place to expose the semantic gap.
@@ -803,8 +803,8 @@ by a clause brace. The other five lines are documentation examples of ordinary
 pipes. `rg -o '\|>' std/src --glob '*.i'` counts occurrences instead and gives
 739, because two comment lines have two pipes each. AST traversal finds 730
 executable matches and zero ordinary pipes. The nine documentation occurrences
-are two matches (`std/src/dict.i:327`, `std/src/list.i:519`) and seven pipes
-(`std/src/dict.i:82,134,353,433`, `std/src/set.i:82`).
+are two matches (`std/src/dict.i : 327`, `std/src/list.i : 519`) and seven pipes
+(`std/src/dict.i : 82,134,353,433`, `std/src/set.i : 82`).
 The source file list for executable edits is kept locally in
 `target/syn2/files-to-migrate.txt`; this is a lower bound for a full migration.
 
@@ -829,7 +829,7 @@ record counts or instructions to replace braces automatically.
 
 The no-mixing rule removes no previously valid labelled tuple data: the old
 value/type tuple productions already have only expressions/types, not labels
-(`spec.md:549,838`; `parser.rs:1216–1230,1782–1816`). The new error is needed
+(`spec.md : 549,838`; `parser.rs : 1216–1230,1782–1816`). The new error is needed
 because records now share their delimiters. Reclassifying future record
 examples needs the accepted record grammar in the migration reader; simple
 text counts cannot distinguish a record type, record value and typed clause.
@@ -843,8 +843,8 @@ The ten affected files with real empty tuples are:
 - `crates/ilang-syntax/tests/golden/types.i` (one type).
 - `std/test/string_test.i` and its review-corpus copy under
   `tests/review/cases/review-k4s/std/test/string_test.i` (one value each).
-- `tests/spec/11/text_form.i:83` and `tests/spec/6/data.i:42` (one value each).
-- `tests/spec/7/patterns.i:153–154` (one value and one nested pattern).
+- `tests/spec/11/text_form.i : 83` and `tests/spec/6/data.i : 42` (one value each).
+- `tests/spec/7/patterns.i : 153–154` (one value and one nested pattern).
 
 These need reviewed expectation/meaning changes, not blind substitution of
 `Record` for every `()` and not a regex replacement by `Nil`.
@@ -871,10 +871,10 @@ prototype:
 | `3 \| (n) { n + 1 }` | `4`, P1. |
 | `False \|\| True` | `True`; Bool short circuit unchanged, P1. |
 | `False \| True` | Callability error with Boolean-or hint, P5. |
-| `(name: "ada").name` | `"ada"`, D4 and existing record field rule. |
-| `(..(a: 1), a: "x").a` | `"x"`; Without plus replacement, not intersection, D4/N1. |
+| `(name : "ada").name` | `"ada"`, D4 and existing record field rule. |
+| `(..(a : 1), a : "x").a` | `"x"`; Without plus replacement, not intersection, D4/N1. |
 | `() == ()` | `True`; existing structural record equality, N1. |
-| Function taking `(a: Int)` called with `()` | Type error: record top does not guarantee field `a`, N1. |
+| Function taking `(a : Int)` called with `()` | Type error: record top does not guarantee field `a`, N1. |
 | A record field containing a function, with no trailing comma | Parses as a record; calling its field gives that function's result, D2. |
 | `() -> Nil` as annotation and `() { Nil }` as value | Both accepted; zero function parameters are not empty tuples, D2/D3. |
 | Empty tuple pattern | Syntax error, N2. |
@@ -891,8 +891,8 @@ reuse of `Case`, not just parse acceptance.
 
 At the observed `lane/a` head `31444065`, the diff against this lane contains
 only the record kernel under `crates/ilang-check/src/types/records/` and its
-module wiring. `bdd.rs:7–56` defines handles, operations and the demand budget;
-`graph.rs:14–18,53–62` has record-domain identity and record/union/intersection
+module wiring. `bdd.rs : 7–56` defines handles, operations and the demand budget;
+`graph.rs : 14–18,53–62` has record-domain identity and record/union/intersection
 nodes. There is no syntax-crate diff. This is a read of a branch snapshot,
 not a claim about another worker's uncommitted files or later progress.
 
@@ -910,25 +910,25 @@ record formatter must land together with T3's syntax consumers.
 
 | File/region at baseline | Required work |
 |---|---|
-| `crates/ilang-syntax/src/token.rs:13–70,87–147`; `lexer.rs:245–278,371–417` | Caret token; remove valid old pipe; preserve break sets and number tokenization; dedicated removed-token guidance. |
-| `parser.rs:119–135,977–1072` | Bare pipe and postfix `Case`; settle P6; remove obsolete level-6 match-operand diagnostic. |
-| `parser.rs:1216–1264,1350–1441,1494–1651,1689–1878` | Datum/function split; revised brace probe; nonempty tuple patterns; caret error slot; record/function/tuple type split and empty-type hint. |
-| `parser.rs:381–481,1074–1135` | Retain header and call contexts; add regression tests for records beside them, not a new classifier shared indiscriminately across contexts. |
-| `ast.rs:202–304,408–443`; `walk.rs:64–81,159–209,250–282`; `shape.rs:29–54` | T3 record nodes/visitors, preserving label/base order and distinct tuple nodes. `Case` and pipe nodes stay. |
-| `format.rs:458–480,1164,1205,1290–1335,1379–1445,1605–1690` | Record delimiters and field lines; match subject precedence/number spacing; bar continuation and comments; caret printing; type-test grouping. |
-| `print.rs:29–38,530–572,650–670,796–900` | Same rules without source comments; remove obsolete match grouping helpers where no longer needed; print only parseable records. |
-| `ilang-syntax/tests/{lex,parse,golden,format,spec}.rs` and fixture directories | New boundary matrix; reparse/canonical-tree and idempotence properties; reviewed new diagnostic goldens. Current properties are in `tests/format.rs:1–9` and `tests/spec.rs:29–54`. |
-| `crates/ilang-check/src/hir.rs:221–260`, `resolve.rs:810,1418,1795,2514`; `types/display.rs:1357` and T3's shown types | Normal `Record` name, no empty tuple surface, record display, preserved single-clause lowering, and scoped pipe/or diagnostic. Use T3's existing structural type representation. |
-| `crates/ilang-wasm/src/lower.rs:1562–1580,2289,2342`; T3 runtime record inspector | Verify tuple arity removal at the source boundary; retain existing Case lowering; print record delimiters. Existing nominal `Record` names are unrelated. |
-| `scripts/old-syntax-check:105–125,143–185`, its JSON, tests and docs; `scripts/a2-meaning`; `scripts/wat-diff:67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
+| `crates/ilang-syntax/src/token.rs : 13–70,87–147`; `lexer.rs : 245–278,371–417` | Caret token; remove valid old pipe; preserve break sets and number tokenization; dedicated removed-token guidance. |
+| `parser.rs : 119–135,977–1072` | Bare pipe and postfix `Case`; settle P6; remove obsolete level-6 match-operand diagnostic. |
+| `parser.rs : 1216–1264,1350–1441,1494–1651,1689–1878` | Datum/function split; revised brace probe; nonempty tuple patterns; caret error slot; record/function/tuple type split and empty-type hint. |
+| `parser.rs : 381–481,1074–1135` | Retain header and call contexts; add regression tests for records beside them, not a new classifier shared indiscriminately across contexts. |
+| `ast.rs : 202–304,408–443`; `walk.rs : 64–81,159–209,250–282`; `shape.rs : 29–54` | T3 record nodes/visitors, preserving label/base order and distinct tuple nodes. `Case` and pipe nodes stay. |
+| `format.rs : 458–480,1164,1205,1290–1335,1379–1445,1605–1690` | Record delimiters and field lines; match subject precedence/number spacing; bar continuation and comments; caret printing; type-test grouping. |
+| `print.rs : 29–38,530–572,650–670,796–900` | Same rules without source comments; remove obsolete match grouping helpers where no longer needed; print only parseable records. |
+| `ilang-syntax/tests/{lex,parse,golden,format,spec}.rs` and fixture directories | New boundary matrix; reparse/canonical-tree and idempotence properties; reviewed new diagnostic goldens. Current properties are in `tests/format.rs : 1–9` and `tests/spec.rs : 29–54`. |
+| `crates/ilang-check/src/hir.rs : 221–260`, `resolve.rs : 810,1418,1795,2514`; `types/display.rs : 1357` and T3's shown types | Normal `Record` name, no empty tuple surface, record display, preserved single-clause lowering, and scoped pipe/or diagnostic. Use T3's existing structural type representation. |
+| `crates/ilang-wasm/src/lower.rs : 1562–1580,2289,2342`; T3 runtime record inspector | Verify tuple arity removal at the source boundary; retain existing Case lowering; print record delimiters. Existing nominal `Record` names are unrelated. |
+| `scripts/old-syntax-check : 105–125,143–185`, its JSON, tests and docs; `scripts/a2-meaning`; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
 | `docs/spec.md`, `docs/design/{syntax,records,meta}.md` | Apply §5 together. Do not leave two accepted contradictory grammars. |
 | `editors/vscode`, package templates, Rust/JS embedded sources, all changed `.i`, comments and text/type expectations | Inventory by source role; update highlighting for caret, bar and match dot; preserve CR/CRLF and layout-sensitive tests. |
 
 The plan locates the first migration's one-off A2 programs in the shared cache,
 not `scripts/`, and at :411–429 says only two partitions were replayable. The checked-in
-`scripts/a2-meaning:1–80` is an audit of changed one-clause semantics that calls
+`scripts/a2-meaning : 1–80` is an audit of changed one-clause semantics that calls
 an old formatter-report interface; it is not a general second migrator. The current formatter command takes only project, check and paths
-(`crates/ilang-cli/src/commands/fmt.rs:15–43`), with no old-source conversion
+(`crates/ilang-cli/src/commands/fmt.rs : 15–43`), with no old-source conversion
 mode to reuse.
 Use the extractor and AST-edit method as a new migration pass rather than
 claiming the old commands can simply be rerun.
@@ -963,11 +963,11 @@ claiming the old commands can simply be rerun.
    metadata is preserved. If new source spans change `$site_data`, use the
    existing **separate** `wat-diff` site-masked mode with the same site count;
    label this normalized equality, not byte equality. Its `--byte-equal` mode
-   explicitly forbids masking (`scripts/wat-diff:419–422`). Do not authorize
+   explicitly forbids masking (`scripts/wat-diff : 419–422`). Do not authorize
    nominal renumbering or broad allowed-difference lists for this task.
 7. Empty-tuple removal is an explicit exception to both AST and WAT equality.
    Record allocation and tuple allocation are different lowering paths
-   (`lower.rs:1562`; records@0d0ce19 §9.4). Give each migrated fixture an
+   (`lower.rs : 1562`; records@0d0ce19 §9.4). Give each migrated fixture an
    approved new value/type/diagnostic expectation. A global “all WAT equal”
    claim for all six changes would be false. If strict equality for every
    existing program is mandatory, the smallest proposal change is to retain
@@ -980,7 +980,7 @@ claiming the old commands can simply be rerun.
 The 1,855-project corpus includes historical sources and host/generator tools;
 parsing its files is not enough. Preserve `expected.json`, known-failure
 status and origin metadata. The corpus importer explicitly treats host tools
-as data (`scripts/qa/corpus.py:63–85`). Do not execute or mass-rewrite those
+as data (`scripts/qa/corpus.py : 63–85`). Do not execute or mass-rewrite those
 historical tools merely because they contain old symbols.
 
 ## 9. Self-attack and corrections
@@ -1014,12 +1014,12 @@ I attacked soundness, implementability and source agreement separately.
 
 **Soundness counterexamples retained for the implementation.**
 
-- A function requiring field `a: Int` must reject an empty record. Do not read
+- A function requiring field `a : Int` must reject an empty record. Do not read
   the name `Record` as an exact zero-field shape, and do not erase a required
   field during parenthesis disambiguation.
-- Replacing `a: Int` by `a: String` with a spread must give the String field,
+- Replacing `a : Int` by `a : String` with a spread must give the String field,
   not the impossible intersection. Parenthesis parsing cannot alter Without.
-- A union of `(a: Int)` and `(b: String)` cannot be distinguished at runtime
+- A union of `(a : Int)` and `(b : String)` cannot be distinguished at runtime
   merely by a typed record clause. The existing head-test obligation remains;
   the syntax probe's acceptance of a type is not proof of a valid program.
 - `Record { Record }` must still declare an ordinary nominal type. Parser

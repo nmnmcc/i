@@ -10,7 +10,7 @@ a server handshake using the identity's PEM certificate chain and private key.
 name. An upgrade consumes the plain stream; it must acquire both directions and
 fails with `busy` if either has an operation in progress.
 
-`options()` returns `(alpn: [], roots: <<>>, cert: <<>>, key: <<>>)`.
+`options()` returns `(alpn : [], roots : <<>>, cert : <<>>, key : <<>>)`.
 Set `alpn` to an ordered list of protocol strings, `roots` to extra PEM trust
 roots, and `cert` and `key` to an optional PEM client identity.
 `identity(cert, key)` constructs a server identity. The system roots are included by default. The

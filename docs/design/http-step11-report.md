@@ -78,7 +78,7 @@ All cargo commands used `/home/agent/Programming/i/.rd/cache/heavy direnv exec
   E0501 above before the solver fix; passed afterward.
 - During implementation `i check --project std` reported omitted effects on
   `dial` (`HttpError is not a subtype of Never`) and the inferred head's
-  nominal-field requirement (`Request is not a subtype of (headers: _)`).
+  nominal-field requirement (`Request is not a subtype of (headers : _)`).
   Removed the closed dial result annotation and annotated `Progress(Request)`;
   the final standard-library check passes.
 - Targeted `http_timeout` and `http_reuse`: passed.

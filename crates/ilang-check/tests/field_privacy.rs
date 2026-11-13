@@ -12,24 +12,24 @@ fn private_fields_cannot_be_selected_through_other_names_or_values() {
     // Each selection takes apart the same nominal value. Aliases and
     // forwarded values do not change its defining module (§2.4, §6.7).
     for source in [
-        "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) { v.value }\n",
-        "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) { v.missing }\n",
-        "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) { v.parts.0 }\n",
-        "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) { v.read() }\n",
-        "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) { v.read }\n",
-        "(app/secret)\nf = (v: secret.Choice) { v.value }\n",
-        "(app/secret)\nf = (v: { secret.Secret(Int) | secret.Open }) { v.value }\n",
-        "(\n\tapp/secret\n)\nAlias(A) = secret.Secret(A)\nf = <A>(v: Alias(A)) { v.value }\n",
-        "(\n\tapp/secret\n)\n\n(\n\tAlias(..)\n)\nAlias(A) = secret.Secret(A)\nf = <A>(v: Alias(A)) { v.value }\n",
-        "(\n\t(Secret) = app/secret\n)\nf = <A>(v: Secret(A)) { v.value }\n",
-        "(\n\trenamed = app/secret\n)\nf = <A>(v: renamed.Secret(A)) { v.value }\n",
-        "(\n\tapp/facade\n)\nf = <A>(v: facade.Alias(A)) { v.value }\n",
+        "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) { v.value }\n",
+        "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) { v.missing }\n",
+        "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) { v.parts.0 }\n",
+        "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) { v.read() }\n",
+        "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) { v.read }\n",
+        "(app/secret)\nf = (v : secret.Choice) { v.value }\n",
+        "(app/secret)\nf = (v : { secret.Secret(Int) | secret.Open }) { v.value }\n",
+        "(\n\tapp/secret\n)\nAlias(A) = secret.Secret(A)\nf = <A>(v : Alias(A)) { v.value }\n",
+        "(\n\tapp/secret\n)\n\n(\n\tAlias(..)\n)\nAlias(A) = secret.Secret(A)\nf = <A>(v : Alias(A)) { v.value }\n",
+        "(\n\t(Secret) = app/secret\n)\nf = <A>(v : Secret(A)) { v.value }\n",
+        "(\n\trenamed = app/secret\n)\nf = <A>(v : renamed.Secret(A)) { v.value }\n",
+        "(\n\tapp/facade\n)\nf = <A>(v : facade.Alias(A)) { v.value }\n",
         "(app/facade)\nx = facade.value.value\n",
         "(app/facade)\nx = facade.raw.read\n",
-        "(\n\tapp/secret\n)\nWrapper(A) = (inner = secret.Secret(A))\nf = <A>(v: Wrapper(A)) { v.inner.value }\n",
+        "(\n\tapp/secret\n)\nWrapper(A) = (inner = secret.Secret(A))\nf = <A>(v : Wrapper(A)) { v.inner.value }\n",
         "(app/facade)\nx = facade.constructor(42).value\n",
-        "(\n\tapp/facade\n)\nf = () <- (raw: facade.Alias(Int)) { raw.value }\n",
-        "(\n\tapp/secret\n)\nf = () <- (raw: secret.Raw) { raw.read() }\n",
+        "(\n\tapp/facade\n)\nf = () <- (raw : facade.Alias(Int)) { raw.value }\n",
+        "(\n\tapp/secret\n)\nf = () <- (raw : secret.Raw) { raw.read() }\n",
     ] {
         let (graph, _, diags) = common::check_files(&[
             ("src/secret.i", SECRET),
@@ -82,15 +82,15 @@ fn constructor_forms_and_numeric_projection_do_not_bypass_privacy() {
             "E0204",
         ),
         (
-            "(\n\t(Secret) = app/secret\n)\nf = <A>(v: Secret(A)) { Pack(..v, value = 2) }\n",
+            "(\n\t(Secret) = app/secret\n)\nf = <A>(v : Secret(A)) { Pack(..v, value = 2) }\n",
             "E0201",
         ),
         (
-            "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) { v.0 }\n",
+            "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) { v.0 }\n",
             "E0512",
         ),
         (
-            "(\n\tapp/secret\n)\nf = <A>(v: secret.Secret(A)) {\n\t(a, b, c) = v\n\ta\n}\n",
+            "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) {\n\t(a, b, c) = v\n\ta\n}\n",
             "E0501",
         ),
     ] {

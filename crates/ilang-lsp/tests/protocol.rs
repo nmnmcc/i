@@ -234,9 +234,9 @@ fn file_uri(path: &Path) -> String {
         .to_string()
 }
 
-const MAIN: &str = "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n";
+const MAIN: &str = "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u : User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n";
 
-const UTIL: &str = " (double)\n\ndouble = (n: Int) -> Int { n * 2 }\n";
+const UTIL: &str = " (double)\n\ndouble = (n : Int) -> Int { n * 2 }\n";
 
 #[test]
 fn an_editor_session() {
@@ -254,14 +254,14 @@ fn an_editor_session() {
     let (l, ch) = find(MAIN, "add(1", 0);
     let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch + 1));
     let value = h["contents"]["value"].as_str().unwrap();
-    assert!(value.contains("add: (Int, Int) -> Int"), "{value}");
+    assert!(value.contains("add : (Int, Int) -> Int"), "{value}");
     assert!(value.contains("Adds two numbers."), "{value}");
     assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
 
     // After characters that take 2 and 4 bytes, and 1 and 2 UTF-16 units.
     let (l, ch) = find(MAIN, "u.name", 0);
     let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch));
-    assert_eq!(h["contents"]["value"], "```i\nu: User\n```");
+    assert_eq!(h["contents"]["value"], "```i\nu : User\n```");
     assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
 
     // Go to definition, in this file and in another.
@@ -532,7 +532,7 @@ fn a_new_document() {
         "{diags:?}"
     );
     let h = c.request::<lsp::request::HoverRequest>(position_params(&new, 0, 0));
-    assert_eq!(h["contents"]["value"], "```i\ny: 2\n```");
+    assert_eq!(h["contents"]["value"], "```i\ny : 2\n```");
     // Fixed: the problems are cleared.
     c.change(&new, 2, "y = 2\nz = y + 1\n");
     assert_eq!(
@@ -546,14 +546,7 @@ fn a_new_document() {
 #[test]
 fn completion_after_an_expression() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Point = (x = Int, y = Int)\n\
-                make = () -> Point { Point(x = 1, y = 2) }\n\
-                f = (t: Point) {\n\
-                \ta = make().x\n\
-                \tb = { t }.y\n\
-                \ta + b\n\
-                }\n\
-                ";
+    let text = "Point = (x = Int, y = Int)\nmake = () -> Point { Point(x = 1, y = 2) }\nf = (t : Point) {\n\ta = make().x\n\tb = { t }.y\n\ta + b\n}\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -649,7 +642,7 @@ fn answers_from_the_last_check() {
     let (l, ch) = find(&edited, "add(1", 0);
     let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch + 1));
     let value = h["contents"]["value"].as_str().unwrap();
-    assert!(value.contains("add: (Int, Int) -> Int"), "{value}");
+    assert!(value.contains("add : (Int, Int) -> Int"), "{value}");
     assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
     let d = c.request::<lsp::request::GotoDefinition>(position_params(&main, l, ch));
     let (dl, dch) = find(&edited, "add =", 0);
@@ -665,7 +658,7 @@ fn answers_from_the_last_check() {
     c.change(&main, 3, &edited);
     let (l, ch) = find(&edited, "extra", 0);
     let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch));
-    assert_eq!(h["contents"]["value"], "```i\nextra: Int\n```");
+    assert_eq!(h["contents"]["value"], "```i\nextra : Int\n```");
     let diags = c.diagnostics(&main);
     assert_eq!(diags.len(), 1, "{diags:?}");
     assert_eq!(
@@ -760,15 +753,15 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
     };
     assert_eq!(
         hover("k ="),
-        "k: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B"
+        "k : ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B"
     );
-    assert_eq!(hover("y ="), "y: B");
-    assert_eq!(hover("f, x"), "f: (A) <- (Fail(E), ..N) -> B");
-    assert_eq!(hover("g) {"), "g: (B) <- (Fail(E2), ..N2) -> C");
-    assert_eq!(hover("f, g"), "f: (A) <- (Fail(E), ..N) -> B");
-    assert_eq!(hover("x) { g"), "x: A");
-    assert_eq!(hover("b) {"), "b: B");
-    assert_eq!(hover("a, b"), "a: A");
+    assert_eq!(hover("y ="), "y : B");
+    assert_eq!(hover("f, x"), "f : (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(hover("g) {"), "g : (B) <- (Fail(E2), ..N2) -> C");
+    assert_eq!(hover("f, g"), "f : (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(hover("x) { g"), "x : A");
+    assert_eq!(hover("b) {"), "b : B");
+    assert_eq!(hover("a, b"), "a : A");
     c.shutdown();
 }
 
@@ -800,22 +793,22 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("one"), "one: (A) -> 1");
-    assert_eq!(hover("x) {\n  y = x"), "x: A");
-    assert_eq!(hover("y = x"), "y: A");
+    assert_eq!(hover("one"), "one : (A) -> 1");
+    assert_eq!(hover("x) {\n  y = x"), "x : A");
+    assert_eq!(hover("y = x"), "y : A");
     assert_eq!(
         hover("drop2"),
-        "drop2: (A, (1) <- (Fail(E), ..N) -> B, C) <- (Fail(E), ..N) -> B"
+        "drop2 : (A, (1) <- (Fail(E), ..N) -> B, C) <- (Fail(E), ..N) -> B"
     );
-    assert_eq!(hover("x, g, h"), "x: A");
-    assert_eq!(hover("h) {"), "h: C");
-    assert_eq!(hover("y = (x, h)"), "y: (A, C)");
+    assert_eq!(hover("x, g, h"), "x : A");
+    assert_eq!(hover("h) {"), "h : C");
+    assert_eq!(hover("y = (x, h)"), "y : (A, C)");
     assert_eq!(
         hover("effonly"),
-        "effonly: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> Nil"
+        "effonly : ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> Nil"
     );
-    assert_eq!(hover("f, x) {\n  r"), "f: (A) <- (Fail(E), ..N) -> B");
-    assert_eq!(hover("r = "), "r: B");
+    assert_eq!(hover("f, x) {\n  r"), "f : (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(hover("r = "), "r : B");
     c.shutdown();
 }
 
@@ -823,7 +816,7 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
 fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
     // Every pattern head targets its existing type, at every depth.
     let source = include_str!("../../ilang-check/tests/value_type_review/nested/src/main.i")
-        .replace("x: Item = 2", "x: Item = 1");
+        .replace("x : Item = 2", "x : Item = 1");
     let source = source.as_str();
     let dir = tempfile::tempdir().unwrap();
     package(dir.path(), &[("src/main.i", source)]);
@@ -832,7 +825,7 @@ fn t2_nested_pattern_heads_support_hover_and_definition_in_recovery() {
     c.open(&main, source);
     assert_eq!(
         c.diagnostics(&main),
-        vec![unused_diagnostic(source, "x", "x: Item")]
+        vec![unused_diagnostic(source, "x", "x : Item")]
     );
     let broken = source.replace("= v\n", "= missing\n");
     for (i, text) in [source, &broken].into_iter().enumerate() {
@@ -911,7 +904,7 @@ fn macro_expansion_preserves_hover_on_user_argument() {
     assert!(
         hover["contents"]["value"]
             .as_str()
-            .is_some_and(|value| value.contains("x: 42")),
+            .is_some_and(|value| value.contains("x : 42")),
         "{hover:?}"
     );
 }
@@ -970,7 +963,7 @@ fn typed_macro_hover_and_definition_through_call() {
     assert!(
         hover["contents"]["value"]
             .as_str()
-            .is_some_and(|s| s.contains("x: 42")),
+            .is_some_and(|s| s.contains("x : 42")),
         "{hover:?}"
     );
     let definition =
@@ -982,11 +975,11 @@ fn typed_macro_hover_and_definition_through_call() {
 
 // ---- Features over a package with modules, tests, and a dependency ----
 
-const LIB_TEXT: &str = "(\n\tshout\n\tTone(..)\n)\n\nLoud = ()\nQuiet = ()\n/// A tone of voice.\nTone = Loud | Quiet\n\n/// Makes a text louder.\nshout = (s: String) -> String { s <> \"!\" }\n";
+const LIB_TEXT: &str = "(\n\tshout\n\tTone(..)\n)\n\nLoud = ()\nQuiet = ()\n/// A tone of voice.\nTone = Loud | Quiet\n\n/// Makes a text louder.\nshout = (s : String) -> String { s <> \"!\" }\n";
 
-const SHAPES: &str = "(\n\tShape(..)\n\tarea\n\torigin\n\tClock(..)\n\tBox(..)\n)\n\nCircle = (radius = Int)\nRect = (width = Int, height = Int)\n/// A shape in the plane.\nShape = Circle | Rect\n\n/// A box of a value.\nBox(A) = (item = A)\n\n/// A clock service.\nClock = (now = () -> Int)\n\n/// The area of a shape.\narea = (s: Shape) -> Int {\n\ts |>\n\t\t(Circle(radius = radius)) { radius * radius * 3 }\n\t\t| (Rect(width = width, height = height)) { width * height }\n}\n\n/// The place where shapes start.\norigin: Int = 0\n";
+const SHAPES: &str = "(\n\tShape(..)\n\tarea\n\torigin\n\tClock(..)\n\tBox(..)\n)\n\nCircle = (radius = Int)\nRect = (width = Int, height = Int)\n/// A shape in the plane.\nShape = Circle | Rect\n\n/// A box of a value.\nBox(A) = (item = A)\n\n/// A clock service.\nClock = (now = () -> Int)\n\n/// The area of a shape.\narea = (s : Shape) -> Int {\n\ts |>\n\t\t(Circle(radius = radius)) { radius * radius * 3 }\n\t\t| (Rect(width = width, height = height)) { width * height }\n}\n\n/// The place where shapes start.\norigin : Int = 0\n";
 
-const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(\n\tmain\n)\n\n/// How big a shape is.\nsize = (s: Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius = 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
+const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(\n\tmain\n)\n\n/// How big a shape is.\nsize = (s : Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius = 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
 
 const APP_TEST: &str =
     "(\n\tapp/shapes\n)\n\n_check = () { shapes.area(shapes.Circle(radius = 1)) }\n";
@@ -1703,7 +1696,7 @@ fn lsp_definition_implementation_of_a_type() {
 #[test]
 fn lsp_definition_implementation_of_a_service() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nfixed = () { elapsed(40) <- (Clock(now = () { 42 })) }\n";
+    let text = "Clock = (now = () -> Int)\n\nelapsed = (start : Int) <- (clock : Clock) { clock.now() - start }\n\nfixed = () { elapsed(40) <- (Clock(now = () { 42 })) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1849,7 +1842,7 @@ fn lsp_completion_module_members() {
 #[test]
 fn lsp_completion_fields_of_a_value() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Point = (x = Int, y = Int)\n\nf = (p: Point) { p.x }\n";
+    let text = "Point = (x = Int, y = Int)\n\nf = (p : Point) { p.x }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1867,7 +1860,7 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
+    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1948,7 +1941,7 @@ fn lsp_completion_import_names() {
 #[test]
 fn lsp_completion_services_in_an_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock = (now = () -> Int)\nPoint = (x = Int)\nTimer = (wait = () <- (Clock) -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nrun = (c: Clock) { elapsed(1) <- (c) }\n";
+    let text = "Clock = (now = () -> Int)\nPoint = (x = Int)\nTimer = (wait = () <- (Clock) -> Int)\n\nelapsed = (start : Int) <- (clock : Clock) { clock.now() - start }\n\nrun = (c : Clock) { elapsed(1) <- (c) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2062,7 +2055,7 @@ fn signature(c: &mut Client, p: Value) -> lsp::SignatureHelp {
 #[test]
 fn lsp_signature_of_a_function() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "/// Adds.\nadd = (x: Int, y: Int) -> Int { x + y }\n\nmain = () { add(1, 2) }\n";
+    let text = "/// Adds.\nadd = (x : Int, y : Int) -> Int { x + y }\n\nmain = () { add(1, 2) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2084,7 +2077,8 @@ fn lsp_signature_of_a_function() {
 #[test]
 fn lsp_signature_with_labels() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "make = (name: String, age: Int) { (name, age) }\n\nmain = () { make(\"a\", 3) }\n";
+    let text =
+        "make = (name : String, age : Int) { (name, age) }\n\nmain = () { make(\"a\", 3) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2125,12 +2119,12 @@ fn lsp_hover_type_and_documentation() {
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "area(s)", 0, 1));
     assert!(
-        h.contains("area: (Shape) -> Int") && h.contains("The area of a shape."),
+        h.contains("area : (Shape) -> Int") && h.contains("The area of a shape."),
         "{h}"
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "Circle(radius", 0, 1));
     assert!(
-        h.contains("Circle: (radius: Int) -> Shape") && h.contains("A shape in the plane."),
+        h.contains("Circle : (radius : Int) -> Shape") && h.contains("A shape in the plane."),
         "{h}"
     );
     c.shutdown();
@@ -2141,7 +2135,7 @@ fn lsp_hover_value_of_a_constant() {
     let ws = workspace(false);
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "origin", 0, 1));
-    assert!(h.contains("origin: Int"), "{h}");
+    assert!(h.contains("origin : Int"), "{h}");
     assert!(h.contains("Value: `0`"), "{h}");
     assert!(h.contains("The place where shapes start."), "{h}");
     c.shutdown();
@@ -2150,7 +2144,7 @@ fn lsp_hover_value_of_a_constant() {
 #[test]
 fn lsp_hover_errors_and_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nparse = (s: String) <- (clock: Clock, fail: Fail(String)) -> Int { 0 }\n";
+    let text = "Clock = (now = () -> Int)\n\nelapsed = (start : Int) <- (clock : Clock) { clock.now() - start }\n\nparse = (s : String) <- (clock : Clock, fail : Fail(String)) -> Int { 0 }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2170,7 +2164,7 @@ fn lsp_hover_errors_and_environment() {
 #[test]
 fn lsp_hover_declared_type_of_a_union() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Answer = \"yes\" | \"no\"\n\nmain = () {\n\tx: Answer = \"yes\"\n\tx\n}\n";
+    let text = "Answer = \"yes\" | \"no\"\n\nmain = () {\n\tx : Answer = \"yes\"\n\tx\n}\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2207,11 +2201,11 @@ fn lsp_hover_lisp_surface() {
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "area s", 0, 1));
     assert!(
-        h.contains("area: (Shape) -> Int") && h.contains("The area of a shape."),
+        h.contains("area : (Shape) -> Int") && h.contains("The area of a shape."),
         "{h}"
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "(= a ", 0, 3));
-    assert!(h.contains("a: Int"), "{h}");
+    assert!(h.contains("a : Int"), "{h}");
     c.shutdown();
 }
 
@@ -2287,7 +2281,7 @@ fn lsp_code_action_adds_a_missing_import() {
 #[test]
 fn lsp_code_action_imports_a_module() {
     let dir = tempfile::tempdir().unwrap();
-    let util = "(double)\n\ndouble = (n: Int) -> Int { n * 2 }\n";
+    let util = "(double)\n\ndouble = (n : Int) -> Int { n * 2 }\n";
     let text = "main = () { util.double(2) }\n";
     package(dir.path(), &[("src/main.i", text), ("src/util.i", util)]);
     let main = file_uri(&dir.path().join("src/main.i"));
@@ -2307,7 +2301,7 @@ fn lsp_code_action_imports_a_module() {
 #[test]
 fn lsp_code_action_removes_an_unused_binding() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "/// Not used.\nhelper = (n: Int) { n }\n\nmain = () { 1 }\n";
+    let text = "/// Not used.\nhelper = (n : Int) { n }\n\nmain = () { 1 }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2358,7 +2352,7 @@ fn lsp_code_action_removes_an_unused_import() {
 #[test]
 fn lsp_code_action_adds_the_missing_clauses() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2399,12 +2393,12 @@ fn lsp_code_action_adds_a_type_annotation() {
     let a = action(&actions, "Add the type annotation `Int`");
     assert_eq!(a.kind, Some(lsp::CodeActionKind::REFACTOR_REWRITE));
     let after = applied(a, &ws.main_text, &ws.main);
-    assert!(after.contains("\ta: Int = area(s)"), "{after}");
+    assert!(after.contains("\ta : Int = area(s)"), "{after}");
     // Annotated already: no action.
     let actions = code_actions(
         &mut c,
         &ws.main,
-        range_of(&ws.main_text, "s: Shape", 0).with_len(1),
+        range_of(&ws.main_text, "s : Shape", 0).with_len(1),
     );
     assert!(!actions.iter().any(|a| a.title.contains("type annotation")));
     c.shutdown();
@@ -2474,7 +2468,8 @@ fn label(h: &lsp::InlayHint) -> String {
 #[test]
 fn lsp_inlay_types_of_bindings_and_parameters() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "add = (x: Int, y) { x + y }\n\nmain = () {\n\tn = add(1, 2)\n\tk = 3\n\tn + k\n}\n";
+    let text =
+        "add = (x : Int, y) { x + y }\n\nmain = () {\n\tn = add(1, 2)\n\tk = 3\n\tn + k\n}\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2485,13 +2480,13 @@ fn lsp_inlay_types_of_bindings_and_parameters() {
         .iter()
         .find(|h| h.position == range_of(text, "\tn =", 0).with_len(2).end)
         .unwrap();
-    assert_eq!(label(n), ": Int");
+    assert_eq!(label(n), " : Int");
     assert_eq!(n.kind, Some(lsp::InlayHintKind::TYPE));
     let y = hints
         .iter()
         .find(|h| h.position == range_of(text, "y)", 0).with_len(1).end)
         .unwrap();
-    assert_eq!(label(y), ": Int");
+    assert_eq!(label(y), " : Int");
     assert_eq!(y.kind, Some(lsp::InlayHintKind::PARAMETER));
     // Not for a literal, and not for an annotated name.
     assert!(
@@ -2512,7 +2507,7 @@ fn lsp_inlay_lisp_surface() {
     let ws = workspace(true);
     let mut c = ws.open();
     let hints = inlay(&mut c, &ws.main, &ws.main_text);
-    assert!(hints.iter().any(|h| label(h) == ": Int"), "{hints:?}");
+    assert!(hints.iter().any(|h| label(h) == " : Int"), "{hints:?}");
     c.shutdown();
 }
 
@@ -2819,7 +2814,7 @@ fn lsp_diagnostics_superseded_requests_are_cancelled() {
         r2.response_result.as_ref().unwrap()["contents"]["value"]
             .as_str()
             .unwrap()
-            .contains("extra: 1")
+            .contains("extra : 1")
     );
     c.shutdown();
 }
@@ -2947,7 +2942,7 @@ fn raw_request(c: &mut Client, method: &str, params: Value) {
 }
 
 const BROKEN: &str = /* old-syntax-check: E0010,E0101,E0010,E0010,E0101,E0010,E0002 */
-    "(\n\tutil = app/util\n)\n\nShape { Circle(Int) Rect(\n\nf = (s: Shape, ) {\n\ts |> {\n\t\tCircle(r) -> r +\n\t}\n\tutil.\n}\n\nmain = () { f(Circle(1) \"x\n";
+    "(\n\tutil = app/util\n)\n\nShape { Circle(Int) Rect(\n\nf = (s : Shape, ) {\n\ts |> {\n\t\tCircle(r) -> r +\n\t}\n\tutil.\n}\n\nmain = () { f(Circle(1) \"x\n";
 
 #[test]
 fn lsp_every_offset_of_correct_files() {
@@ -2970,7 +2965,7 @@ fn lsp_every_offset_of_lisp_files() {
 #[test]
 fn lsp_every_offset_of_broken_files() {
     let dir = tempfile::tempdir().unwrap();
-    let util = "(double)\n\ndouble = (n: Int) -> Int { n * 2 }\n";
+    let util = "(double)\n\ndouble = (n : Int) -> Int { n * 2 }\n";
     package(
         dir.path(),
         &[
@@ -3098,7 +3093,7 @@ fn lsp_capabilities_are_advertised() {
     c.shutdown();
 }
 
-const MATCH: &str = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
+const MATCH: &str = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
 
 #[test]
 fn lsp_code_action_missing_clauses_lisp_surface() {
@@ -3185,7 +3180,7 @@ fn formats_lisp_documents_with_the_source_formatter() {
 #[test]
 fn core_builtin_type_hover_and_definition() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "(core = i/core)\nf = (x: core.Int) -> Int { x }\nmain = () { Nil }\n";
+    let text = "(core = i/core)\nf = (x : core.Int) -> Int { x }\nmain = () { Nil }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();

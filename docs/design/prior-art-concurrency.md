@@ -26,19 +26,19 @@ Eio was missing and was shallow-cloned from `https://github.com/ocaml-multicore/
 
 The controlling sources are `docs/spec.md` §§2.6.2, 9.2–9.5; accepted `syntax.md`; `runtime.md`, `multicore.md`, `native.md`, `lazy-reentry.md`, and `host-concurrency.md`; the settled design and B/C/R2 tracks in `/home/agent/.claude/plans/twinkling-swinging-perlis.md`; and `/home/agent/Programming/i/.rd/cache/ledger.md`. In particular:
 
-- Effects remain functions, errors, services, and general control. A service is not necessarily a captured continuation (`spec.md:1123`, `spec.md:1145`). Types remain sets of values. No new type feature or inference rule is proposed.
-- A suspended handler runs at the boundary environment; resumption combines retained inner bindings with the resumer environment. Continuations have one use; abandonment alone does not run finals (`spec.md:1217`). Normal/error/cancel unwinding runs finals; program stop does not (`spec.md:1251`).
-- Task creation keeps all services, including unused ones, apart from the named routing detach/rebind protocol. State is threaded through one loop outside task continuations (`runtime.md:800`). One host root continuation prevents independently resumed copies of an immutable scheduler snapshot (`host-concurrency.md:429`).
-- FIFO turns, parent continuation after `go`, scheduling even on ready `sync`/`join`, cancellation priority, prevalidation of every event leaf, ordered alternatives, and absence of implicit preemption are accepted rules (`runtime.md:867`). They are constraints here, not bugs to erase for a benchmark.
-- Native workers have separate Stores. Started tasks stay on their worker; only complete, portable, unstarted records travel. Shared operations use the accepted transaction lock, with no user callback or codec under it (`native.md:88`). `portable` is observable even with one worker (`multicore.md:25`).
+- Effects remain functions, errors, services, and general control. A service is not necessarily a captured continuation (`spec.md : 1123`, `spec.md : 1145`). Types remain sets of values. No new type feature or inference rule is proposed.
+- A suspended handler runs at the boundary environment; resumption combines retained inner bindings with the resumer environment. Continuations have one use; abandonment alone does not run finals (`spec.md : 1217`). Normal/error/cancel unwinding runs finals; program stop does not (`spec.md : 1251`).
+- Task creation keeps all services, including unused ones, apart from the named routing detach/rebind protocol. State is threaded through one loop outside task continuations (`runtime.md : 800`). One host root continuation prevents independently resumed copies of an immutable scheduler snapshot (`host-concurrency.md : 429`).
+- FIFO turns, parent continuation after `go`, scheduling even on ready `sync`/`join`, cancellation priority, prevalidation of every event leaf, ordered alternatives, and absence of implicit preemption are accepted rules (`runtime.md : 867`). They are constraints here, not bugs to erase for a benchmark.
+- Native workers have separate Stores. Started tasks stay on their worker; only complete, portable, unstarted records travel. Shared operations use the accepted transaction lock, with no user callback or codec under it (`native.md : 88`). `portable` is observable even with one worker (`multicore.md : 25`).
 
 The ledger reports R2 as a default-plan implementation; it does not establish that every accepted provider combination is implemented. This study compares actual B code where possible and names accepted rules separately.
 
 ## What the timings do and do not say
 
-The supplied initial busy-machine results are 543 microseconds for a spawn/scope/join cycle, 16 microseconds for a switch, and 57 microseconds for a channel transfer. A later report in the pinned B `tests/r2-stages.md:618` gives five-run medians of 602, 15, and 52 microseconds respectively, also on a busy machine. These are two reports, not a regression measurement.
+The supplied initial busy-machine results are 543 microseconds for a spawn/scope/join cycle, 16 microseconds for a switch, and 57 microseconds for a channel transfer. A later report in the pinned B `tests/r2-stages.md : 618` gives five-run medians of 602, 15, and 52 microseconds respectively, also on a busy machine. These are two reports, not a regression measurement.
 
-B `bench/test/r2_task_test.i:10` performs 1,000 whole scope/spawn/join cycles and expects 1,000. Its switch case at line 20 yields 1,000 times. The channel case at line 30 transfers 1,000 integers and expects 500,500; it includes scheduling and scope work. They do not isolate allocation of one dormant task, register-only switching, or a channel payload copy. B `tests/r2-bench.sh` runs the timed tests five times. I read these sources and reports; I did not run them.
+B `bench/test/r2_task_test.i : 10` performs 1,000 whole scope/spawn/join cycles and expects 1,000. Its switch case at line 20 yields 1,000 times. The channel case at line 30 transfers 1,000 integers and expects 500,500; it includes scheduling and scope work. They do not isolate allocation of one dormant task, register-only switching, or a channel payload copy. B `tests/r2-bench.sh` runs the timed tests five times. I read these sources and reports; I did not run them.
 
 There is no new timing comparison in this study, and no verified claim that all reference task operations cost less than one microsecond. Their code explains how small common-case costs are possible, not a portable latency bound. Reported native Go or Tokio numbers would not alone identify the cost of WasmGC, compiler continuations, portable capture checking, or i scope cleanup.
 
@@ -70,7 +70,7 @@ The G/M/P division is stated at `go/src/runtime/proc.go` in the scheduler introd
 
 `go/src/runtime/chan.go:hchan`, `chansend`, and `send` check a waiting receiver or buffer capacity before allocating a blocked waiter. `waitq.enqueue`/`dequeue` maintain per-channel waiter queues; dequeue skips a select waiter whose other arm already won. `send` transfers the value before readying the peer. The useful baseline is a channel-local queue and a single committed transfer, with suspension only when execution must stop.
 
-`go/src/runtime/select.go:selectgo` randomizes poll order, sorts channel locks, probes ready cases, registers blocked cases, parks, and then removes losing registrations. `selparkcommit` releases locks only after registration. Take the registration/commit/loser-removal structure. Leave randomized alternative priority and multi-lock acquisition: i chooses alternatives in source order and has the accepted native shared transaction lock (`runtime.md:867`; `native.md:117`). An i ready `sync` still has to schedule; the Go direct return is not permission to remove that point.
+`go/src/runtime/select.go:selectgo` randomizes poll order, sorts channel locks, probes ready cases, registers blocked cases, parks, and then removes losing registrations. `selparkcommit` releases locks only after registration. Take the registration/commit/loser-removal structure. Leave randomized alternative priority and multi-lock acquisition: i chooses alternatives in source order and has the accepted native shared transaction lock (`runtime.md : 867`; `native.md : 117`). An i ready `sync` still has to schedule; the Go direct return is not permission to remove that point.
 
 ### Network readiness, timers, and the one-thread Wasm port
 
@@ -82,20 +82,20 @@ The port does not rely on native stack switching. The ABI explanation in `go/src
 
 ### Comparison and recommendations, in gain/effort order
 
-**Already alike:** i captures live locals lazily only when `$capture` crosses a frame, and tail calls need no frame (`crates/ilang-wasm/src/control.rs:1`; `emit/control.rs:619`, under the same crate). Its one-shot consumption is checked by `$continuation_take` (`emit/control.rs:527`). The accepted lazy-reentry bound is resume O(1 + D + E), with delimiters D and environment records E; it is not O(1) for arbitrary nesting (`lazy-reentry.md:493`).
+**Already alike:** i captures live locals lazily only when `$capture` crosses a frame, and tail calls need no frame (`crates/ilang-wasm/src/control.rs : 1`; `emit/control.rs : 619`, under the same crate). Its one-shot consumption is checked by `$continuation_take` (`emit/control.rs : 527`). The accepted lazy-reentry bound is resume O(1 + D + E), with delimiters D and environment records E; it is not O(1) for arbitrary nesting (`lazy-reentry.md : 493`).
 
-**Different:** B uses lists for ready work and task lookup (`lib/i/task.i:297`, `452`, `476`, `869`). This is an implementation choice, not required by immutability. Go-style `runnext` is also a policy difference: i explicitly keeps the parent in its turn after spawn and queues the child (`runtime.md` §6.4; B `task.i:1516`). Copying Go or Tokio execution preference would change traces.
+**Different:** B uses lists for ready work and task lookup (`lib/i/task.i : 297`, `452`, `476`, `869`). This is an implementation choice, not required by immutability. Go-style `runnext` is also a policy difference: i explicitly keeps the parent in its turn after spawn and queues the child (`runtime.md` §6.4; B `task.i : 1516`). Copying Go or Tokio execution preference would change traces.
 
-1. Replace `append`/`contains` ready insertion with a two-list FIFO and indexed queued state; replace linear task/scope lookup with a private persistent integer/radix index (B `task.i:452–514`, `869–889`, `1881–1961`). Preserve scripted scheduling as well as FIFO. A stale queue entry must carry a generation or an identity that is never reused. This is the simplest direct transfer of the queue lesson.
-2. Index registrations by channel and direction, retaining FIFO sequence and per-choice membership (B `task.i:863`, `1076–1127`, `1200–1238`). Keep source-order probing and remove all losing arms before user callbacks. A doubly linked mutable Go waiter is not directly expressible as ordinary immutable i data; use indexed persistent records, not a new mutation privilege.
-3. Count environment and saved-frame allocation before changing reentry (`emit/control.rs:692`; B `emit/control.rs:586`). The compiler already performs liveness analysis (`control.rs:495`); “add liveness” is not a new proposal.
-4. Keep the one-root IO handoff (`host-concurrency.md:429`). The host already has `FuturesUnordered` and per-request wakers (`crates/ilang-host/src/requests.rs:28–149`); first optimize B `task.i:1829` interest discovery rather than add a second network poller.
+1. Replace `append`/`contains` ready insertion with a two-list FIFO and indexed queued state; replace linear task/scope lookup with a private persistent integer/radix index (B `task.i : 452–514`, `869–889`, `1881–1961`). Preserve scripted scheduling as well as FIFO. A stale queue entry must carry a generation or an identity that is never reused. This is the simplest direct transfer of the queue lesson.
+2. Index registrations by channel and direction, retaining FIFO sequence and per-choice membership (B `task.i : 863`, `1076–1127`, `1200–1238`). Keep source-order probing and remove all losing arms before user callbacks. A doubly linked mutable Go waiter is not directly expressible as ordinary immutable i data; use indexed persistent records, not a new mutation privilege.
+3. Count environment and saved-frame allocation before changing reentry (`emit/control.rs : 692`; B `emit/control.rs : 586`). The compiler already performs liveness analysis (`control.rs : 495`); “add liveness” is not a new proposal.
+4. Keep the one-root IO handoff (`host-concurrency.md : 429`). The host already has `FuturesUnordered` and per-request wakers (`crates/ilang-host/src/requests.rs : 28–149`); first optimize B `task.i : 1829` interest discovery rather than add a second network poller.
 
 ## 2. BEAM and Elixir: isolated starts, explicit fairness, and failure relationships
 
 `otp/erts/emulator/beam/erl_process.c:erl_create_process` allocates a process and heap, sizes/copies its arguments, initializes execution registers and a termination continuation, and sets up links, monitors, and message queues. Its cost depends on the argument graph and heap requirements; “cheap process” does not mean zero copying or constant time. There is no caller-stack copy in this creation path.
 
-`erl_process.c:erts_schedule` accounts for consumed reductions and selects the next execution budget. The interpreter dispatch macros in `otp/erts/emulator/beam/emu/macros.tab:DISPATCH`, `DISPATCH_EXPORT`, `DISPATCH_FUN`, and `DISPATCH_RETURN` decrement `FCALLS` and transfer to `context_switch` when the budget is exhausted. This is compiler/runtime cooperation for preemption at dispatch points. It is not proof that an arbitrary long native function is preemptible; JIT and dirty-NIF scheduling were not audited here.
+`erl_process.c:erts_schedule` accounts for consumed reductions and selects the next execution budget. The interpreter dispatch macros in `otp/erts/emulator/beam/emu/macros.tab : DISPATCH`, `DISPATCH_EXPORT`, `DISPATCH_FUN`, and `DISPATCH_RETURN` decrement `FCALLS` and transfer to `context_switch` when the budget is exhausted. This is compiler/runtime cooperation for preemption at dispatch points. It is not proof that an arbitrary long native function is preemptible; JIT and dirty-NIF scheduling were not audited here.
 
 `otp/erts/emulator/beam/erl_message.c:erts_send_message` sizes and copies terms to receiver-owned storage or message fragments, with a self-send shortcut under the appropriate heap mode; `erts_queue_message` publishes a message. This is asynchronous mailbox delivery, not an unbuffered rendezvous. An i channel can borrow explicit wait queues but should not acquire an unbounded mailbox merely because processes are small.
 
@@ -107,18 +107,18 @@ There is a second useful BEAM lesson for i capture costs. `otp/erts/emulator/bea
 
 ### Comparison and recommendations, in gain/effort order
 
-**Already alike:** B stores a dormant start, not a copied parent continuation, for a new task (`task.i:199`, `1516–1564`). Cancellation has an explicit cause and task state (`task.i:210`, `980–1010`). i goes further in requiring structured cleanup (`runtime.md:699`).
+**Already alike:** B stores a dormant start, not a copied parent continuation, for a new task (`task.i : 199`, `1516–1564`). Cancellation has an explicit cause and task state (`task.i : 210`, `980–1010`). i goes further in requiring structured cleanup (`runtime.md : 699`).
 
-**Different:** i does not promise BEAM reductions or process heap isolation. Cooperative scheduling is an accepted policy; it is not a consequence of types being sets. B classifies unstarted records even on one worker; a nonportable record stays local without rejecting `go`. Portable sends/results/shares still enforce their checks on every worker count, and live continuations cannot migrate (`multicore.md:25`; `native.md:88`). Links and supervisors cannot replace scope joins.
+**Different:** i does not promise BEAM reductions or process heap isolation. Cooperative scheduling is an accepted policy; it is not a consequence of types being sets. B classifies unstarted records even on one worker; a nonportable record stays local without rejecting `go`. Portable sends/results/shares still enforce their checks on every worker count, and live continuations cannot migrate (`multicore.md : 25`; `native.md : 88`). Links and supervisors cannot replace scope joins.
 
-1. Add portability graph-visit counters and a shared-DAG regression case to the task baseline. B `$core_portable` uses a work array and visitation token, but stamps only recursive closure capture arrays, not ordinary shared constructor/tuple nodes (`crates/ilang-wasm/src/runtime/values.rs:409–467`). B spawn calls it on `(start, info, scope.chain)` (`task.i:1530`). Repeated traversal of a shared constructor DAG can therefore be exponential in its depth; this is a code-derived inference, not a run result. This is also an explicit accepted cost in `multicore.md` §3.6, not a newly discovered semantic bug. See attack A below.
-2. Bring forward the sharing-aware traversal anticipated by `multicore.md` D9/§3.6, or cache a valid summary for immutable objects. Change `runtime/values.rs:409`, with representation support chosen by that track. Do not assume WasmGC exposes a pointer hash, do not cache partially constructed recursive closures, and do not change `portable` answers or omit unused services. The BEAM method establishes the problem and goal, not a drop-in implementation.
-3. Replace whole-task cancellation/cleanup scans with affected-scope worklists and child counters (B `task.i:980–1010`, `1295–1398`). Keep cause identity, deterministic error selection, and the distinction between outcome known and cleanup complete (`runtime.md:699`).
+1. Add portability graph-visit counters and a shared-DAG regression case to the task baseline. B `$core_portable` uses a work array and visitation token, but stamps only recursive closure capture arrays, not ordinary shared constructor/tuple nodes (`crates/ilang-wasm/src/runtime/values.rs : 409–467`). B spawn calls it on `(start, info, scope.chain)` (`task.i : 1530`). Repeated traversal of a shared constructor DAG can therefore be exponential in its depth; this is a code-derived inference, not a run result. This is also an explicit accepted cost in `multicore.md` §3.6, not a newly discovered semantic bug. See attack A below.
+2. Bring forward the sharing-aware traversal anticipated by `multicore.md` D9/§3.6, or cache a valid summary for immutable objects. Change `runtime/values.rs : 409`, with representation support chosen by that track. Do not assume WasmGC exposes a pointer hash, do not cache partially constructed recursive closures, and do not change `portable` answers or omit unused services. The BEAM method establishes the problem and goal, not a drop-in implementation.
+3. Replace whole-task cancellation/cleanup scans with affected-scope worklists and child counters (B `task.i : 980–1010`, `1295–1398`). Keep cause identity, deterministic error selection, and the distinction between outcome known and cleanup complete (`runtime.md : 699`).
 4. Keep preemption as a separate coordinator decision, with a starvation test and explicit latency budget. Do not silently add reductions in a performance patch. A general compiler safe-point feature would need separate rules for tight loops, cancellation, and host fairness; this study recommends no such feature now.
 
 ## 3. OCaml 5 and Eio: one-shot fibers and structured lifetime
 
-`ocaml/runtime/fiber.c:alloc_size_class_stack_noexc`, `caml_alloc_stack`, and `caml_free_stack` allocate fiber stacks with per-domain size-class reuse. `caml_continuation_use_noexc` removes the stack pointer from a continuation, using a direct store in the single-domain case and a CAS where required; `caml_continuation_use` rejects a second use. `ocaml/stdlib/effect.ml:Deep.continue`, `Deep.discontinue`, and `Deep.match_with` connect this representation to continuation resume, exceptional resume, and handler execution. Take one-shot ownership transfer and the separation of storage reuse from language semantics. OCaml stack chunks are not the same representation as i heap frames.
+`ocaml/runtime/fiber.c:alloc_size_class_stack_noexc`, `caml_alloc_stack`, and `caml_free_stack` allocate fiber stacks with per-domain size-class reuse. `caml_continuation_use_noexc` removes the stack pointer from a continuation, using a direct store in the single-domain case and a CAS where required; `caml_continuation_use` rejects a second use. `ocaml/stdlib/effect.ml : Deep.continue`, `Deep.discontinue`, and `Deep.match_with` connect this representation to continuation resume, exceptional resume, and handler execution. Take one-shot ownership transfer and the separation of storage reuse from language semantics. OCaml stack chunks are not the same representation as i heap frames.
 
 `ocaml/runtime/domain.c:caml_domain_spawn` creates a platform thread and performs a startup handshake. A domain is not a cheap fiber. This distinction matters when comparing i worker creation with task creation: the former can be expensive without explaining every task switch.
 
@@ -128,13 +128,13 @@ Eio was read rather than described from memory. `eio/lib_eio/core/suspend.ml:ent
 
 ### Comparison and recommendations, in gain/effort order
 
-**Already alike:** one-shot continuation use is checked in i (`emit/control.rs:527`). The accepted scope rules wait for cleanup and shield final work (`runtime.md:699`). B already distinguishes `outcome` from `clean` (`task.i:210–231`).
+**Already alike:** one-shot continuation use is checked in i (`emit/control.rs : 527`). The accepted scope rules wait for cleanup and shield final work (`runtime.md : 699`). B already distinguishes `outcome` from `clean` (`task.i : 210–231`).
 
-**Different:** Eio has mutable fiber/switch context records; i B threads immutable scheduler state outside task boundaries (`task.i:297`, `1904`; `runtime.md:800`). Copying an Eio callback that mutates the switch into i would not implement the same operation. i also has explicit service retention and portable capture semantics beyond the particular Eio operations read.
+**Different:** Eio has mutable fiber/switch context records; i B threads immutable scheduler state outside task boundaries (`task.i : 297`, `1904`; `runtime.md : 800`). Copying an Eio callback that mutates the switch into i would not implement the same operation. i also has explicit service retention and portable capture semantics beyond the particular Eio operations read.
 
-1. Use active-child/cleanup counters and dirty scopes to avoid repeated `refresh_clean`, `scopes_of`, and retirement scans (B `task.i:1295–1398`). Ensure a finalizer-created cleanup scope increments accounting before the parent can become clean. Start with a trace-equivalent index; measure before making more complex incremental propagation.
-2. Separate a published cancellation state from callbacks/wakeups, following Eio and channel commit practice. Audit B `propagate`, `recheck_events`, and retirement together (`task.i:980`, `1200`, `1318`). No callback may observe half-removed choice registrations.
-3. Consider shared immutable environment snapshots, not service pruning (B `emit/control.rs:586–641`). `keep_env` copies slots to a values array and `keep_call` copies them back to a new environment. Audit all environment writes and construction first; this is a compiler/runtime representation proposal, not an assertion that replacing those copies with one pointer is already sound.
+1. Use active-child/cleanup counters and dirty scopes to avoid repeated `refresh_clean`, `scopes_of`, and retirement scans (B `task.i : 1295–1398`). Ensure a finalizer-created cleanup scope increments accounting before the parent can become clean. Start with a trace-equivalent index; measure before making more complex incremental propagation.
+2. Separate a published cancellation state from callbacks/wakeups, following Eio and channel commit practice. Audit B `propagate`, `recheck_events`, and retirement together (`task.i : 980`, `1200`, `1318`). No callback may observe half-removed choice registrations.
+3. Consider shared immutable environment snapshots, not service pruning (B `emit/control.rs : 586–641`). `keep_env` copies slots to a values array and `keep_call` copies them back to a new environment. Audit all environment writes and construction first; this is a compiler/runtime representation proposal, not an assertion that replacing those copies with one pointer is already sound.
 
 ## 4. GHC: cancellation is a protocol, and blocking owns its registration
 
@@ -148,59 +148,59 @@ Eio was read rather than described from memory. `eio/lib_eio/core/suspend.ml:ent
 
 ### Comparison and recommendations, in gain/effort order
 
-**Already alike:** i distinguishes cancel, errors, and terminal stop, and requires structured finalization (`spec.md:1217`, `1251`; `runtime.md:699`). Its native design puts shared matching and cancellation under one transaction lock, with callbacks outside (`native.md:117`).
+**Already alike:** i distinguishes cancel, errors, and terminal stop, and requires structured finalization (`spec.md : 1217`, `1251`; `runtime.md : 699`). Its native design puts shared matching and cancellation under one transaction lock, with callbacks outside (`native.md : 117`).
 
 **Different:** i cancellation uses explicit task/scope causes and cooperative observation, rather than arbitrary asynchronous exceptions delivered by an RTS. The difference follows accepted cancellation and scheduling rules; it is not necessary to weaken those rules for speed. `throwTo` blocking is not automatically the right public `cancel` contract.
 
-1. Make waiter ownership explicit in any channel/index optimization. Generation-tag registrations and retain one commit authority; cancelling a waiter removes every choice arm before it can be run (B `task.i:863–889`, `1110–1127`, `1200–1238`). Test completion racing cancellation in the native protocol; test both serial orders in M:1.
-2. Preserve the independent outcome and cleanup states while replacing scans with counters (B `task.i:210`, `1299`; `runtime.md:699`). A successful wait on cleanup is not inferred from an already-present result.
-3. Keep shield restoration lexical and nested; do not replace cancellation with dropping a continuation. The spec explicitly says abandonment does not run finals (`spec.md:1237`). Retain tests for finalizers that suspend and for cancelled joins inside shielding (`runtime.md:699–798`).
+1. Make waiter ownership explicit in any channel/index optimization. Generation-tag registrations and retain one commit authority; cancelling a waiter removes every choice arm before it can be run (B `task.i : 863–889`, `1110–1127`, `1200–1238`). Test completion racing cancellation in the native protocol; test both serial orders in M:1.
+2. Preserve the independent outcome and cleanup states while replacing scans with counters (B `task.i : 210`, `1299`; `runtime.md : 699`). A successful wait on cleanup is not inferred from an already-present result.
+3. Keep shield restoration lexical and nested; do not replace cancellation with dropping a continuation. The spec explicitly says abandonment does not run finals (`spec.md : 1237`). Retain tests for finalizers that suspend and for cancelled joins inside shielding (`runtime.md : 699–798`).
 
 ## 5. Tokio and Effect: deduplicated readiness, cold fields, and scopes
 
 ### Tokio
 
-`tokio/tokio/src/runtime/task/core.rs:Cell`, `Header`, `Core`, and `Trailer` separate task scheduling state and links, the future/result, and colder completion/ownership information. `tokio/tokio/src/runtime/task/state.rs:transition_to_notified_by_ref` coalesces repeated notifications and handles running versus sleeping tasks. `transition_to_notified_and_cancel` combines cancellation with the wake protocol. The lesson is not “use atomics on one worker”; it is “one runnable entry per task, with explicit state transitions.”
+`tokio/tokio/src/runtime/task/core.rs : Cell`, `Header`, `Core`, and `Trailer` separate task scheduling state and links, the future/result, and colder completion/ownership information. `tokio/tokio/src/runtime/task/state.rs:transition_to_notified_by_ref` coalesces repeated notifications and handles running versus sleeping tasks. `transition_to_notified_and_cancel` combines cancellation with the wake protocol. The lesson is not “use atomics on one worker”; it is “one runnable entry per task, with explicit state transitions.”
 
-`tokio/tokio/src/runtime/scheduler/current_thread/mod.rs:next_task` selects between a local FIFO and remote work; its scheduler loop periodically services IO (`CoreGuard::block_on` in this file). `tokio/tokio/src/runtime/scheduler/multi_thread/worker.rs:run_task` limits repeated LIFO-slot use, and `steal_work` probes other workers. Take local readiness and a fairness budget. Do not copy either LIFO preference or arbitrary live-future stealing into i: i has FIFO rules and Store-local continuations (`runtime.md` §6.4; `native.md:88`).
+`tokio/tokio/src/runtime/scheduler/current_thread/mod.rs:next_task` selects between a local FIFO and remote work; its scheduler loop periodically services IO (`CoreGuard::block_on` in this file). `tokio/tokio/src/runtime/scheduler/multi_thread/worker.rs:run_task` limits repeated LIFO-slot use, and `steal_work` probes other workers. Take local readiness and a fairness budget. Do not copy either LIFO preference or arbitrary live-future stealing into i: i has FIFO rules and Store-local continuations (`runtime.md` §6.4; `native.md : 88`).
 
 `tokio/tokio/src/runtime/task/harness.rs:remote_abort`, `poll_inner`, and `cancel_task` arrange notification, observe cancellation, and drop the future while producing a cancellation result. `tokio/tokio/src/task/join_set.rs:shutdown` aborts and then waits for joins; its `Drop` aborts without the same asynchronous wait loop. Dropping a future is not an implementation of arbitrary suspending i finalizers. Take coalesced notification and explicit shutdown-and-wait; leave drop-as-cleanup semantics.
 
 ### Effect
 
-`effect/packages/effect/src/internal/effect.ts:FiberImpl` stores context, interpreter stack, and lazily present children/observers. `forkUnsafe` constructs the child with the parent context and, unless using its daemon path, records the child relation. This is evidence that a task can share context and avoid eagerly allocating every optional collection; it is not a claim that Effect forbids detached fibers.
+`effect/packages/effect/src/internal/effect.ts : FiberImpl` stores context, interpreter stack, and lazily present children/observers. `forkUnsafe` constructs the child with the parent context and, unless using its daemon path, records the child relation. This is evidence that a task can share context and avoid eagerly allocating every optional collection; it is not a claim that Effect forbids detached fibers.
 
-`FiberImpl.runLoop` counts interpreter operations and consults the scheduler; `yieldNow` schedules a guarded resumption. `effect/packages/effect/src/Scheduler.ts:MixedScheduler.shouldYield` checks the operation count, and `Dispatcher` batches callbacks. This cooperates between interpreted effects; it cannot preempt arbitrary synchronous JavaScript inside one operation.
+`FiberImpl.runLoop` counts interpreter operations and consults the scheduler; `yieldNow` schedules a guarded resumption. `effect/packages/effect/src/Scheduler.ts : MixedScheduler.shouldYield` checks the operation count, and `Dispatcher` batches callbacks. This cooperates between interpreted effects; it cannot preempt arbitrary synchronous JavaScript inside one operation.
 
 `FiberImpl.interruptUnsafe` records interruption and defers action if running; `evaluate` processes child interruption before publishing its final exit. `forkIn` attaches an interrupting finalizer to a scope; `forkScoped` uses that route. `scopeClose` marks the scope closed before invoking finalizers and has empty/single-finalizer cases; `scopeCloseFinalizers` handles reverse-order sequential cleanup or a parallel fork-and-wait path. `asyncFinalizer` and `uninterruptibleMask` preserve the intended interruption state during cleanup. Take explicit closure state, cheap empty scopes, context sharing, and completion after cleanup. Leave its alternate concurrency policies unless i adopts them deliberately.
 
 ### Comparison and recommendations, in gain/effort order
 
-**Already alike:** B has dormant/runnable/waiting/running/ended states and distinct completion information (`task.i:199–231`). The host uses a request map, a `FuturesUnordered`, and epoch-aware wakers; stale sequence numbers are rejected (`crates/ilang-host/src/requests.rs:28–149`). Its per-run OS thread builds a current-thread Tokio runtime, not one OS thread per i task (`crates/ilang-host/src/run.rs:41–68`).
+**Already alike:** B has dormant/runnable/waiting/running/ended states and distinct completion information (`task.i : 199–231`). The host uses a request map, a `FuturesUnordered`, and epoch-aware wakers; stale sequence numbers are rejected (`crates/ilang-host/src/requests.rs : 28–149`). Its per-run OS thread builds a current-thread Tokio runtime, not one OS thread per i task (`crates/ilang-host/src/run.rs : 41–68`).
 
-**Different:** the i scheduler is ordinary persistent code, not a Rust future executor or an effect bytecode interpreter. B `maintain` runs cancellation, message, ticket, event, and cleanup passes, and `loop` invokes maintenance repeatedly (`task.i:1393`, `1904–1932`). i polling is tied to accepted interests/turn rules, not a tunable Tokio event interval (`runtime.md` §6.4).
+**Different:** the i scheduler is ordinary persistent code, not a Rust future executor or an effect bytecode interpreter. B `maintain` runs cancellation, message, ticket, event, and cleanup passes, and `loop` invokes maintenance repeatedly (`task.i : 1393`, `1904–1932`). i polling is tied to accepted interests/turn rules, not a tunable Tokio event interval (`runtime.md` §6.4).
 
-1. Add a queued-state index and generation check, then make repeated wakeups idempotent without `contains` over the ready list (B `task.i:869`). Do this together with recommendation 1 under Go.
-2. Maintain explicit pending interests and dirty registration sets, rather than scanning all tasks and all registrations per turn (B `task.i:1200–1263`, `1393`, `1829`). Keep the required cancellation-before-ordinary-work and poll cadence. Owned root producers, borrowed waits, and control-only wakes retain their different liveness roles (`runtime.md` §6.4; `host-concurrency.md:429`).
-3. Measure the hot/cold split of `TaskState` and scope creation (B `task.i:210–231`, `297–319`). Move rarely used foreign/driver/cleanup metadata into optional records only if total allocations/field accesses improve. Effect offers a model for lazy collections, but WasmGC layouts and immutable record reconstruction must be measured.
-4. Keep a separate “abort requested” and “cleanup joined” path. Use the existing spec finalization rules, not Tokio future-drop behavior, and retain the single host continuation. Dropping host work remains the host request cancellation mechanism (`crates/ilang-host/src/requests.rs:160–183`); it does not prove that an i task has finished its finals.
+1. Add a queued-state index and generation check, then make repeated wakeups idempotent without `contains` over the ready list (B `task.i : 869`). Do this together with recommendation 1 under Go.
+2. Maintain explicit pending interests and dirty registration sets, rather than scanning all tasks and all registrations per turn (B `task.i : 1200–1263`, `1393`, `1829`). Keep the required cancellation-before-ordinary-work and poll cadence. Owned root producers, borrowed waits, and control-only wakes retain their different liveness roles (`runtime.md` §6.4; `host-concurrency.md : 429`).
+3. Measure the hot/cold split of `TaskState` and scope creation (B `task.i : 210–231`, `297–319`). Move rarely used foreign/driver/cleanup metadata into optional records only if total allocations/field accesses improve. Effect offers a model for lazy collections, but WasmGC layouts and immutable record reconstruction must be measured.
+4. Keep a separate “abort requested” and “cleanup joined” path. Use the existing spec finalization rules, not Tokio future-drop behavior, and retain the single host continuation. Dropping host work remains the host request cancellation mechanism (`crates/ilang-host/src/requests.rs : 160–183`); it does not prove that an i task has finished its finals.
 
 ## 6. Koka: avoid capturing a resumption when a direct call suffices
 
-`koka/lib/std/core/hnd.kk:Ev` carries a handler, marker, and handler evidence vector. `@perform1` selects the clause through the supplied evidence. `@evv-index` documents static indexing when the effect type permits it. `clause-control1` yields to the marker and protects the resumption; `clause-tail1` calls `under1` directly; `clause-tail-noop1` calls the operation directly without changing evidence. `under1` swaps to the handler evidence, restores it after the call, and extends a continuation only if the operation itself yields. The known solution is a direct operation call when resumption is exactly the tail return, while preserving the handler execution context.
+`koka/lib/std/core/hnd.kk : Ev` carries a handler, marker, and handler evidence vector. `@perform1` selects the clause through the supplied evidence. `@evv-index` documents static indexing when the effect type permits it. `clause-control1` yields to the marker and protects the resumption; `clause-tail1` calls `under1` directly; `clause-tail-noop1` calls the operation directly without changing evidence. `under1` swaps to the handler evidence, restores it after the call, and extends a continuation only if the operation itself yields. The known solution is a direct operation call when resumption is exactly the tail return, while preserving the handler execution context.
 
 This is not just an optimizer guessing from a function body. `koka/src/Type/Infer.hs:inferHandler` constructs tail clauses for `OpVal`/`OpFun` and control clauses for `OpControl`; it explicitly avoids an apparently tempting conversion from a nonresuming control clause to an exception clause because finalizer order differs. Take context-aware specialization and respect for finalizer order. Do not add Koka keywords, effect-row semantics, or multi-use resumption to i.
 
 ### Comparison and recommendations, in gain/effort order
 
-**Already alike:** ordinary i service operations are functions (`spec.md:1123–1185`). They do not inherently require a scheduler continuation. The compiler propagates `may_suspend` through known callees and conservatively treats unknown value calls as possibly suspending (`crates/ilang-wasm/src/control.rs:245–285`). Captured frames contain saved live values, with environment handling kept separate (`emit/control.rs:692–735`; `ir.rs:565–570`).
+**Already alike:** ordinary i service operations are functions (`spec.md : 1123–1185`). They do not inherently require a scheduler continuation. The compiler propagates `may_suspend` through known callees and conservatively treats unknown value calls as possibly suspending (`crates/ilang-wasm/src/control.rs : 245–285`). Captured frames contain saved live values, with environment handling kept separate (`emit/control.rs : 692–735`; `ir.rs : 565–570`).
 
-**Different:** B `make_scheduler.route` calls `control.suspend` for every routed command (`task.i:668–745`), including commands whose reply keeps the parent in the same turn (`task.i:876–889`, `1516–1564`). This is not merely a missed Koka-style tail call: the updated immutable `State` lives in the scheduler loop outside the task boundary. A direct service closure cannot mutate that state in ordinary i. Further, `suspend` changes the handler environment (`spec.md:1229`). The source architecture, not the surface effect label, explains why a capture currently occurs.
+**Different:** B `make_scheduler.route` calls `control.suspend` for every routed command (`task.i : 668–745`), including commands whose reply keeps the parent in the same turn (`task.i : 876–889`, `1516–1564`). This is not merely a missed Koka-style tail call: the updated immutable `State` lives in the scheduler loop outside the task boundary. A direct service closure cannot mutate that state in ordinary i. Further, `suspend` changes the handler environment (`spec.md : 1229`). The source architecture, not the surface effect label, explains why a capture currently occurs.
 
-1. Improve general indirect-call specialization/devirtualization, then remeasure frame captures at service call sites (`control.rs:245–285`, `emit/control.rs:619`). Prove the callee, not “no error/service annotation implies no suspend.” A function can close over a boundary and suspend with no service requirement.
-2. Classify actual command cost: query only, state transition without a different turn, blocking transition, and host handoff. Use this for counters and optimization proofs, not as a new public effect taxonomy. B already returns some local information without `route` (`task.i:589–601`); preserve that useful distinction. Keep suspension for a blocked task and the single root host handoff.
+1. Improve general indirect-call specialization/devirtualization, then remeasure frame captures at service call sites (`control.rs : 245–285`, `emit/control.rs : 619`). Prove the callee, not “no error/service annotation implies no suspend.” A function can close over a boundary and suspend with no service requirement.
+2. Classify actual command cost: query only, state transition without a different turn, blocking transition, and host handoff. Use this for counters and optimization proofs, not as a new public effect taxonomy. B already returns some local information without `route` (`task.i : 589–601`); preserve that useful distinction. Keep suspension for a blocked task and the single root host handoff.
 3. Study a general state-threading/CPS specialization capable of keeping ordinary state in the caller path without capturing to the scheduler. No implementation is claimed here. It must preserve scheduler ownership, poll/cancel points, dynamic environments, one-use checks, and finalizer order. Do not special-case `task.go`, or merely replace `suspend(b, (k) { resume(k, v) })` with `v`.
-4. Share immutable service environments where representation permits (B `emit/control.rs:586–641`); retain every source-required capture. This may reduce creation cost before more difficult control specialization. Any unused-service pruning would contradict `runtime.md:800` and `multicore.md:25` even if it made the microbenchmark faster.
+4. Share immutable service environments where representation permits (B `emit/control.rs : 586–641`); retain every source-required capture. This may reduce creation cost before more difficult control specialization. Any unused-service pruning would contradict `runtime.md : 800` and `multicore.md : 25` even if it made the microbenchmark faster.
 
 ## Concrete change map and proposed documentation text
 
@@ -208,16 +208,16 @@ These are coordinator proposals, ordered approximately by gain per effort. The o
 
 | Priority | Files/regions to change | Exact constraint and evidence to add |
 | --- | --- | --- |
-| 1 | B `bench/test/r2_task_test.i:10–63`, `tests/r2-bench.sh`, `tests/r2-stages.md:618` | Separate full cycle from primitive costs; retain expected sums; add queue-size/capture-size slopes and allocation/visit counters |
-| 2 | B `lib/i/task.i:452–514`, `869–889`, `1881–1961` | Two-list FIFO plus indexed task/queued state; one runnable entry; preserve scripted picks, FIFO, and parent-after-spawn behavior |
-| 3 | B `lib/i/task.i:863`, `1076–1263` | Channel-local wait queues and choice index; validate all leaves first; commit once; remove losers before callbacks; no self-rendezvous |
-| 4 | B `lib/i/task.i:980–1010`, `1295–1398`, `1829–1849` | Dirty scopes/tasks/interests and explicit child cleanup counts; preserve cancellation priority and host polling semantics |
-| 5 | B `crates/ilang-wasm/src/runtime/values.rs:409–467` and object representation | Diagnose shared-DAG traversal, then add safe memoization/identity support; same `portable` result and same captured graph |
-| 6 | B `crates/ilang-wasm/src/emit/control.rs:586–641` | Audit environment writes, then share immutable snapshots where valid; retain environment overlays and routing detach/rebind |
-| 7 | `crates/ilang-wasm/src/control.rs:245–285`, `emit/control.rs:619–735` | General callee specialization and proven direct paths; no suspension annotation inferred solely from effect rows |
-| 8 | B `lib/i/task.i:210–231`, `297–319`, `545–587` | Profile cold metadata and empty scopes; do not remove portable-record/cancellation fields just because a local benchmark does not use them |
+| 1 | B `bench/test/r2_task_test.i : 10–63`, `tests/r2-bench.sh`, `tests/r2-stages.md : 618` | Separate full cycle from primitive costs; retain expected sums; add queue-size/capture-size slopes and allocation/visit counters |
+| 2 | B `lib/i/task.i : 452–514`, `869–889`, `1881–1961` | Two-list FIFO plus indexed task/queued state; one runnable entry; preserve scripted picks, FIFO, and parent-after-spawn behavior |
+| 3 | B `lib/i/task.i : 863`, `1076–1263` | Channel-local wait queues and choice index; validate all leaves first; commit once; remove losers before callbacks; no self-rendezvous |
+| 4 | B `lib/i/task.i : 980–1010`, `1295–1398`, `1829–1849` | Dirty scopes/tasks/interests and explicit child cleanup counts; preserve cancellation priority and host polling semantics |
+| 5 | B `crates/ilang-wasm/src/runtime/values.rs : 409–467` and object representation | Diagnose shared-DAG traversal, then add safe memoization/identity support; same `portable` result and same captured graph |
+| 6 | B `crates/ilang-wasm/src/emit/control.rs : 586–641` | Audit environment writes, then share immutable snapshots where valid; retain environment overlays and routing detach/rebind |
+| 7 | `crates/ilang-wasm/src/control.rs : 245–285`, `emit/control.rs : 619–735` | General callee specialization and proven direct paths; no suspension annotation inferred solely from effect rows |
+| 8 | B `lib/i/task.i : 210–231`, `297–319`, `545–587` | Profile cold metadata and empty scopes; do not remove portable-record/cancellation fields just because a local benchmark does not use them |
 
-Keep semantic spawn paths for `task.path`, error ordering, and scripted scheduling; any compact internal integer slot is additional bookkeeping, with a stable path-to-entry mapping and a generation if slots are reused. A two-list queue is amortized O(1) only along the single threaded sequence of queue versions; do not promise that bound for arbitrary reuse of old snapshots or scripted arbitrary removal. A private radix index can stay in `lib/i/task.i` or an ordinary `lib/i` support module. The existing standard dictionary illustrates path-copying (`std/src/dict.i:55–59`, `89–119`, `145–187`), including a collision-list case; it is not an unconditional logarithmic bound. Embedded core modules are enumerated in `crates/ilang-package/src/library.rs:7–26`; this study does not assume `lib/i/task.i` can simply import an arbitrary standard package. No dependency or support module is changed in this lane.
+Keep semantic spawn paths for `task.path`, error ordering, and scripted scheduling; any compact internal integer slot is additional bookkeeping, with a stable path-to-entry mapping and a generation if slots are reused. A two-list queue is amortized O(1) only along the single threaded sequence of queue versions; do not promise that bound for arbitrary reuse of old snapshots or scripted arbitrary removal. A private radix index can stay in `lib/i/task.i` or an ordinary `lib/i` support module. The existing standard dictionary illustrates path-copying (`std/src/dict.i : 55–59`, `89–119`, `145–187`), including a collision-list case; it is not an unconditional logarithmic bound. Embedded core modules are enumerated in `crates/ilang-package/src/library.rs : 7–26`; this study does not assume `lib/i/task.i` can simply import an arbitrary standard package. No dependency or support module is changed in this lane.
 
 Replacement-spec disposition, section by section:
 
@@ -249,7 +249,7 @@ End = ()
 Fork = (D, D)
 D = End | Fork
 
-shared = (n: Int) -> D {
+shared = (n : Int) -> D {
 	n |>
 		(0) { End }
 		| (_) {
@@ -259,7 +259,7 @@ shared = (n: Int) -> D {
 }
 ```
 
-`core.portable(shared(16))` must be `True`: all leaves and constructors are portable. There are only linearly many distinct constructed nodes, but B `$core_portable` pushes both children on every visit without marking these nodes (`runtime/values.rs:409–467`). Inference: its visits obey a doubling recurrence. Count visits on small inputs before testing large depths. After a sharing-aware change, require visits proportional to distinct reachable nodes/edges; the public Boolean remains unchanged. Also capture this graph in a task and verify the same outcome. Do not “fix” the cost by dropping unused captured services or rejecting the graph.
+`core.portable(shared(16))` must be `True`: all leaves and constructors are portable. There are only linearly many distinct constructed nodes, but B `$core_portable` pushes both children on every visit without marking these nodes (`runtime/values.rs : 409–467`). Inference: its visits obey a doubling recurrence. Count visits on small inputs before testing large depths. After a sharing-aware change, require visits proportional to distinct reachable nodes/edges; the public Boolean remains unchanged. Also capture this graph in a task and verify the same outcome. Do not “fix” the cost by dropping unused captured services or rejecting the graph.
 
 First attack found a real omission in an initial optimization direction: reducing continuation frames alone leaves this possible capture-time blowup. The recommendation now profiles and fixes graph traversal separately. It does not copy BEAM header tagging or pretend an identity hash is already available.
 
@@ -268,7 +268,7 @@ First attack found a real omission in an initial optimization direction: reducin
 ```i
 Read = (get = () -> Int)
 
-read = () <- (r: Read) { r.get() }
+read = () <- (r : Read) { r.get() }
 
 probe = () {
 	control.boundary((b) {
@@ -280,23 +280,23 @@ probe = () {
 }
 ```
 
-Expected result: `1`, because the suspend handler runs at the boundary environment (`spec.md:1229`); the resumed inner binding remains `2` if the resumed body reads it. A naive direct call to `read()` in the inner body gives `2`. The non-tail `x` binding also keeps the inner frame explicit in this probe; implementation fixtures should retain the accepted D16 environment tests (`runtime.md:800`). Koka `under1` is evidence that context restoration is part of the fast path, not optional overhead.
+Expected result: `1`, because the suspend handler runs at the boundary environment (`spec.md : 1229`); the resumed inner binding remains `2` if the resumed body reads it. A naive direct call to `read()` in the inner body gives `2`. The non-tail `x` binding also keeps the inner frame explicit in this probe; implementation fixtures should retain the accepted D16 environment tests (`runtime.md : 800`). Koka `under1` is evidence that context restoration is part of the fast path, not optional overhead.
 
 First attack rejected blanket tail-resume elimination. Only a proven transformation preserving handler and resumer environments, active-boundary checks, and one-use behavior is recommended.
 
 ### C. An apparently pure closure can still suspend
 
 ```i
-call = (f: () -> Int) { f() }
+call = (f : () -> Int) { f() }
 
 probe = () {
-  control.boundary((b) {
-    call(() { control.suspend(b, (k) { control.resume(k, 7) }) })
-  })
+	control.boundary((b) {
+		call(() { control.suspend(b, (k) { control.resume(k, 7) }) })
+	})
 }
 ```
 
-Expected result: `7`, with a real control transfer under §9.4. The function type need not expose an error or service row for `suspend`; its boundary is captured. Therefore an effect-row-only no-suspend inference is unsound. The compiler conservative unknown-callee rule is justified (`control.rs:245–285`). A direct-callee proof can improve it; deleting that conservatism globally cannot.
+Expected result: `7`, with a real control transfer under §9.4. The function type need not expose an error or service row for `suspend`; its boundary is captured. Therefore an effect-row-only no-suspend inference is unsound. The compiler conservative unknown-callee rule is justified (`control.rs : 245–285`). A direct-callee proof can improve it; deleting that conservatism globally cannot.
 
 A related negative probe resumes an aliased continuation a second time. Expected: program stop, from §9.4 rule 5, even if the first resume is optimized. A ready-path optimization must not make the second use succeed.
 
@@ -304,32 +304,32 @@ A related negative probe resumes an aliased continuation a second time. Expected
 
 ```i
 probe = () {
-  task.scope((s) {
-    t = task.go(s, () { 1 })
-    task.join(t)
-  })
+	task.scope((s) {
+		t = task.go(s, () { 1 })
+		task.join(t)
+	})
 }
 ```
 
-Expected result: `1`, and the child enters the ready queue while the parent retains its turn until the join rule schedules (`runtime.md` §6.4). In B, `route` suspends to return a `Switched` command to the outside loop (`task.i:677–679`, `1904`). Replacing it with a direct reply creates no new scheduler State containing the child. This is a concrete “cannot be built by that local edit” counterexample. The proposal now explicitly defers capture-free state transitions to a general state-threading/control specialization, rather than claiming a one-line Koka optimization.
+Expected result: `1`, and the child enters the ready queue while the parent retains its turn until the join rule schedules (`runtime.md` §6.4). In B, `route` suspends to return a `Switched` command to the outside loop (`task.i : 677–679`, `1904`). Replacing it with a direct reply creates no new scheduler State containing the child. This is a concrete “cannot be built by that local edit” counterexample. The proposal now explicitly defers capture-free state transitions to a general state-threading/control specialization, rather than claiming a one-line Koka optimization.
 
 ### E. Choice and cancellation must own every registration
 
-Build a choice with a send and receive on the same otherwise-unused unbuffered channel. Expected: no self-transfer; absent another producer or waiter, the task deadlocks. Add an always-ready alternative before an invalid channel leaf. Expected: validation failure before choosing the ready arm. Add two waiting peer tasks, then cancel the oldest before transfer. Expected: the next eligible FIFO peer receives exactly once. After any choice wins, invoke the losing channel from another task. Expected: no stale arm consumes its value. All expectations follow `runtime.md:867–945`.
+Build a choice with a send and receive on the same otherwise-unused unbuffered channel. Expected: no self-transfer; absent another producer or waiter, the task deadlocks. Add an always-ready alternative before an invalid channel leaf. Expected: validation failure before choosing the ready arm. Add two waiting peer tasks, then cancel the oldest before transfer. Expected: the next eligible FIFO peer receives exactly once. After any choice wins, invoke the losing channel from another task. Expected: no stale arm consumes its value. All expectations follow `runtime.md : 867–945`.
 
 For a send/receive event mapper that raises after commitment, the transfer remains committed and the mapper error is propagated; it cannot roll back a value another task already received. Check exactly one receive, not merely that the sender failed. These scenarios attack registration indexing, callback order, and cancellation removal together. A queue tombstone is safe only if generation/commit checks make it ineligible and cleanup bounds retained garbage.
 
 ### F. A result is not a clean task
 
-Run a child whose finalizer yields once and starts then joins a fresh cleanup child. Cancel the parent scope while the child waits. Expected: finalizers finish and cleanup children join before scope exit; cancellation must not keep restarting the same finalizer. Separately, join a cancelled handle from a shielded region. Expected: the accepted cancelled-join stop behavior, not a fabricated successful result (`runtime.md:699–798`). Repeat cancellation with the same cause: no duplicated cleanup. Reuse a task-table slot only with a new identity/generation: an old ready entry must not execute the replacement task.
+Run a child whose finalizer yields once and starts then joins a fresh cleanup child. Cancel the parent scope while the child waits. Expected: finalizers finish and cleanup children join before scope exit; cancellation must not keep restarting the same finalizer. Separately, join a cancelled handle from a shielded region. Expected: the accepted cancelled-join stop behavior, not a fabricated successful result (`runtime.md : 699–798`). Repeat cancellation with the same cause: no duplicated cleanup. Reuse a task-table slot only with a new identity/generation: an old ready entry must not execute the replacement task.
 
-These tests rule out replacing `outcome`/`clean` with one bit, replacing structured cancellation with continuation abandonment, or making counters reach zero before finalizer-created work is registered. They preserve the cause-sensitive behavior already present in B `task.i:980–1010` and `cleanup_chain`/`cause_allowed` at `2461` onward.
+These tests rule out replacing `outcome`/`clean` with one bit, replacing structured cancellation with continuation abandonment, or making counters reach zero before finalizer-created work is registered. They preserve the cause-sensitive behavior already present in B `task.i : 980–1010` and `cleanup_chain`/`cause_allowed` at `2461` onward.
 
 ### G. An already-ready operation can still be a scheduling point
 
-Cancel a task just before it awaits a settled request, performs an immediately ready channel choice, or joins a completed handle. Expected: accepted cancellation priority is observed; ready operations do not bypass required scheduling. B `lib/i/request.i:152–159` deliberately invokes `Await` even for a settled request. Conversely, a pure task program must not acquire host polling/handoffs merely because a global host runtime exists (`runtime.md` §6.4). A control wake without an owned root producer or borrowed waiter must not conceal deadlock.
+Cancel a task just before it awaits a settled request, performs an immediately ready channel choice, or joins a completed handle. Expected: accepted cancellation priority is observed; ready operations do not bypass required scheduling. B `lib/i/request.i : 152–159` deliberately invokes `Await` even for a settled request. Conversely, a pure task program must not acquire host polling/handoffs merely because a global host runtime exists (`runtime.md` §6.4). A control wake without an owned root producer or borrowed waiter must not conceal deadlock.
 
-For multi-worker transport, capture a nonportable service which is unused by a child returning `1`. Expected: `go` succeeds and the complete record is silently pinned to its home worker; joining gives `1` on every worker count (`multicore.md` D2/D4/P1; `native.md` N7). Separately send a nonportable value over a portable channel: expected stop on every worker count, under D2/P3. `core.portable` of a kept function retaining the nonportable service remains `False`. A worker may steal an unstarted complete record; it must never move a live one-shot continuation (`native.md:88`). These cases reject capture pruning and unrestricted work stealing.
+For multi-worker transport, capture a nonportable service which is unused by a child returning `1`. Expected: `go` succeeds and the complete record is silently pinned to its home worker; joining gives `1` on every worker count (`multicore.md` D2/D4/P1; `native.md` N7). Separately send a nonportable value over a portable channel: expected stop on every worker count, under D2/P3. `core.portable` of a kept function retaining the nonportable service remains `False`. A worker may steal an unstarted complete record; it must never move a live one-shot continuation (`native.md : 88`). These cases reject capture pruning and unrestricted work stealing.
 
 ### Review passes
 

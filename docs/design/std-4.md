@@ -65,7 +65,7 @@ SHA-2 round constants and IVs are the standard's mathematical constants.
 
 | Function | Result/contract |
 |---|---|
-| `compile(pattern: String)` | `Result(Regex, RegexError)`; literals, dot, classes/ranges/negation, Unicode Perl classes and negations, boundaries, greedy/lazy `* + ? {m} {m,n} {m,}`, alternatives, captures/named/noncapturing groups, anchors, `i m s` flags. Scoped/unset flags, scalar hex escapes, `\A` and `\z` also work. |
+| `compile(pattern : String)` | `Result(Regex, RegexError)`; literals, dot, classes/ranges/negation, Unicode Perl classes and negations, boundaries, greedy/lazy `* + ? {m} {m,n} {m,}`, alternatives, captures/named/noncapturing groups, anchors, `i m s` flags. Scoped/unset flags, scalar hex escapes, `\A` and `\z` also work. |
 | `is_match(regex, input)` | `Bool`, including empty matches. |
 | `find(regex, input)` | `Option(Match)`, leftmost first, then branch/greediness priority. |
 | `find_all(regex, input)` | Non-overlapping `List(Match)`; empty matches advance a scalar, and an empty match immediately following a nonempty one is suppressed. |
@@ -97,7 +97,7 @@ split, not a single `find`/`captures`/`is_match`. There is no lazy DFA cache.
 | Function | Result/contract |
 |---|---|
 | `defaults()` | Comma, infer field count, LF. |
-| `options(delimiter: String, fields: Int, crlf: Bool)` | `Result(Options, CsvError)`. Delimiter must be one scalar, excluding NUL, quote, CR, LF, U+FFFD. Fields: 0 infer, positive fixed, negative variable. |
+| `options(delimiter : String, fields : Int, crlf : Bool)` | `Result(Options, CsvError)`. Delimiter must be one scalar, excluding NUL, quote, CR, LF, U+FFFD. Fields: 0 infer, positive fixed, negative variable. |
 | `parse(input)` | `Result(List(List(String)), CsvError)`, default options. |
 | `parse_with(input, config)` | The same with explicit options. |
 | `parse_header(input, config)` | `Result(List(dict.Dict(String,String)), CsvError)` using the first row as column names. |
@@ -200,7 +200,7 @@ were regex 130, CSV 107, crypto 88; std O0 and O2 each reported 2170 passed,
 new modules. The smallest reproduction is
 `cargo test -p ilang-package --test load standard_library_modules`; actual
 paths include `std/crypto`, `std/csv`, and `std/regex`, while the expected
-list in `crates/ilang-package/tests/load.rs:201` does not. Updating that
+list in `crates/ilang-package/tests/load.rs : 201` does not. Updating that
 assertion conflicts with the task's acceptance rule forbidding any `crates/`
 diff, so the assertion is unchanged. The full acceptance gate cannot pass
 under both requirements until the coordinator updates that upstream test.

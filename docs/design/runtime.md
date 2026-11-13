@@ -33,31 +33,31 @@ Read facts at the base commit (line references below always mean this commit):
 
 | Fact read in code | Evidence |
 |---|---|
-| Seven runtime modules are reserved, included, and empty | `crates/ilang-package/src/library.rs:14–23`; `lib/i/task.i:1`, and the single reservation comment at line 1 of each of `lib/i/{random,clock,fs,net,process,stdio}.i` |
-| Libraries are compiled into the package loader | `crates/ilang-package/src/library.rs:7–26` |
-| Entry environments currently allow host services and Assert only | `crates/ilang-check/src/types/infer.rs:376–429` |
-| Async metadata currently follows entry host-service needs | `crates/ilang-wasm/src/lower.rs:916–938` |
-| Async imports currently start, suspend to the root, then read a reply | `crates/ilang-wasm/src/lower.rs:1140–1202` |
-| The compiler table still has one slot; the hand-off identifies everything R2 must replace | `crates/ilang-wasm/src/emit/host.rs:23–52`, `:58–64`, `:90–121` |
-| Results still use per-import globals; resumes write them before resuming the root | `crates/ilang-wasm/src/emit/host.rs:228–246`, `:335–358` |
-| The async-live check is separate from outstanding work | `crates/ilang-wasm/src/emit/host.rs:123–165` |
-| Root initialization gives Assert and the needed host services | `crates/ilang-wasm/src/emit/mod.rs:805–836` |
-| Resume activates a task boundary; cancel does not | `crates/ilang-wasm/src/emit/control.rs:260–295` |
-| The host already stores many requests, with immediate cancellation and stale-wrapper rejection | `crates/ilang-host/src/requests.rs:72–192` |
-| Status 2 gives the reactor a turn and uses continue if no answer is ready | `crates/ilang-host/src/lib.rs:1137–1183` |
-| One big-stack thread owns an enabled current-thread reactor | `crates/ilang-host/src/run.rs:28–68`; tokio production features are currently rt/time, `crates/ilang-host/Cargo.toml:15` |
-| Only the old text printer is currently standard IO | `crates/ilang-host/src/services.rs:44–70`; `lib/i/io.i:8–14` |
-| Integer bit operations and bit-array operations needed by R1 and wire codecs exist | `lib/i/core.i:67–89`, `:131–141` |
-| A final function cannot raise; acquire is already ordinary i over ensure | `lib/i/resource.i:8–20` |
+| Seven runtime modules are reserved, included, and empty | `crates/ilang-package/src/library.rs : 14–23`; `lib/i/task.i : 1`, and the single reservation comment at line 1 of each of `lib/i/{random,clock,fs,net,process,stdio}.i` |
+| Libraries are compiled into the package loader | `crates/ilang-package/src/library.rs : 7–26` |
+| Entry environments currently allow host services and Assert only | `crates/ilang-check/src/types/infer.rs : 376–429` |
+| Async metadata currently follows entry host-service needs | `crates/ilang-wasm/src/lower.rs : 916–938` |
+| Async imports currently start, suspend to the root, then read a reply | `crates/ilang-wasm/src/lower.rs : 1140–1202` |
+| The compiler table still has one slot; the hand-off identifies everything R2 must replace | `crates/ilang-wasm/src/emit/host.rs : 23–52`, `:58–64`, `:90–121` |
+| Results still use per-import globals; resumes write them before resuming the root | `crates/ilang-wasm/src/emit/host.rs : 228–246`, `:335–358` |
+| The async-live check is separate from outstanding work | `crates/ilang-wasm/src/emit/host.rs : 123–165` |
+| Root initialization gives Assert and the needed host services | `crates/ilang-wasm/src/emit/mod.rs : 805–836` |
+| Resume activates a task boundary; cancel does not | `crates/ilang-wasm/src/emit/control.rs : 260–295` |
+| The host already stores many requests, with immediate cancellation and stale-wrapper rejection | `crates/ilang-host/src/requests.rs : 72–192` |
+| Status 2 gives the reactor a turn and uses continue if no answer is ready | `crates/ilang-host/src/lib.rs : 1137–1183` |
+| One big-stack thread owns an enabled current-thread reactor | `crates/ilang-host/src/run.rs : 28–68`; tokio production features are currently rt/time, `crates/ilang-host/Cargo.toml : 15` |
+| Only the old text printer is currently standard IO | `crates/ilang-host/src/services.rs : 44–70`; `lib/i/io.i : 8–14` |
+| Integer bit operations and bit-array operations needed by R1 and wire codecs exist | `lib/i/core.i : 67–89`, `:131–141` |
+| A final function cannot raise; acquire is already ordinary i over ensure | `lib/i/resource.i : 8–20` |
 
 These are reading results, not claims that the proposed APIs already compile.
 The scheduler, request-value representation, new service implementations, and
 examples below have not been run. K1 has landed on redesign at `578a17d`.
-I read its first-parent patch: `crates/ilang-check/src/types/display.rs:993–1040`
+I read its first-parent patch: `crates/ilang-check/src/types/display.rs : 993–1040`
 now counts invariant arguments on both sides during normalization. This lane
 still has the older compiler; R2 must consume K1 rather than weaken key
-invariance. The old generalization path is `types/infer.rs:2104–2120` and
-`types/display.rs:558–575`. K1's coordinator-run tests are not tests run here.
+invariance. The old generalization path is `types/infer.rs : 2104–2120` and
+`types/display.rs : 558–575`. K1's coordinator-run tests are not tests run here.
 Section 12 separates model checks from implementation evidence.
 
 ## 2. Alternatives and choice
@@ -106,7 +106,7 @@ A. Cancellation changes the host work associated with a handle, as using a
 continuation changes whether it is usable; it does not mutate an i value.
 
 **D3. Await is an ordinary public service, not a task hook.** Its definition is
-`Await { Await(wait: (ticket: Ticket) -> Nil) }`. `request.await` asks this
+`Await { Await(wait : (ticket : Ticket) -> Nil) }`. `request.await` asks this
 service to wait, then reads the typed result. The compiler's async-host adapter
 uses exactly this route. The general async-host declaration rule adds `Await | Owner`
 to the callable field's environment before inference; the wire signature has
@@ -120,7 +120,7 @@ returns early causes a defined stop, never an ill-typed answer.
 **D4. One root hand-off, with typed answers stored per request.** Each task owns
 its ordinary control continuation. Root wait/poll pauses the loop once, and a
 resume updates one request cell before resuming that one loop. Reason: C §6.4
-and `emit/host.rs:23–48`. A slot index alone is not a language handle: cells
+and `emit/host.rs : 23–48`. A slot index alone is not a language handle: cells
 have identity and a fresh GC identity token for their generation, so an old alias cannot cancel a reused slot.
 
 **D5. Provision and classify entries by the complete provider plan.**
@@ -208,7 +208,7 @@ portable scopes constrain their children. Reason: S7 §3.3, §6–8, §18 rules 
 unwinds its own inner boundary, leaving its scheduling boundary active. Finals
 may yield, await IO, and open scopes; they cannot raise, and they are shielded
 from a second cancellation. Reason: S7 §6 and the active-boundary behavior read
-at `emit/control.rs:260–295`. There is no public cancel-one-task operation in v1.
+at `emit/control.rs : 260–295`. There is no public cancel-one-task operation in v1.
 join keeps its type: cancellation takes priority for a joiner it can unwind; a
 shielded joiner of a dropped/cancelled child stops with
 `panic("task: join of a cancelled task")` as soon as cancellation is accepted.
@@ -245,12 +245,12 @@ is ordinary structural equality. No service or i/task import is needed.
 
 | Name | Type |
 |---|---|
-| `from_seed` | `(seed: Int) -> Generator` |
-| `word` | `(g: Generator) -> (Int, Generator)` |
-| `int` | `(g: Generator, below: Int) -> (Int, Generator) ^ RandomError` |
-| `float` | `(g: Generator) -> (Float, Generator)` |
-| `split` | `(g: Generator) -> (Generator, Generator)` |
-| `at_path` | `(g: Generator, path: List(Int)) -> Generator ^ RandomError` |
+| `from_seed` | `(seed : Int) -> Generator` |
+| `word` | `(g : Generator) -> (Int, Generator)` |
+| `int` | `(g : Generator, below : Int) -> (Int, Generator) ^ RandomError` |
+| `float` | `(g : Generator) -> (Float, Generator)` |
+| `split` | `(g : Generator) -> (Generator, Generator)` |
+| `at_path` | `(g : Generator, path : List(Int)) -> Generator ^ RandomError` |
 
 `RandomError { InvalidBound(Int) InvalidPath(List(Int)) }` is exported with its
 constructors. int requires below > 0, including arbitrarily large bounds;
@@ -344,27 +344,27 @@ RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 | Function | Type | Rule |
 |---|---|---|
 | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
-| `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+| `close_root` | `(root : Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
 | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
-| `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
-| `count` | `(owner: Owner) -> Int` | Number of outstanding requests in this group |
-| `count_root` | `(root: Root) -> Int` | Number of outstanding requests in all groups of this root |
-| `settled_owner` | `(owner: Owner) -> Bool` | True exactly when count(owner) is zero |
-| `settled_root` | `(root: Root) -> Bool` | True exactly when count_root(root) is zero |
-| `cancel_all` | `(owner: Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
-| `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
-| `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
-| `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
-| `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
-| `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
-| `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
-| `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
-| `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
-| `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-| `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
-| `await(A)` | `(r: Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
-| `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
-| `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+| `close_owner` | `(owner : Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+| `count` | `(owner : Owner) -> Int` | Number of outstanding requests in this group |
+| `count_root` | `(root : Root) -> Int` | Number of outstanding requests in all groups of this root |
+| `settled_owner` | `(owner : Owner) -> Bool` | True exactly when count(owner) is zero |
+| `settled_root` | `(root : Root) -> Bool` | True exactly when count_root(root) is zero |
+| `cancel_all` | `(owner : Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+| `cancel_all_root` | `(root : Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+| `wait_none` | `(owner : Owner) -> Nil ! Await` | Await until this group's count is zero |
+| `wait_none_root` | `(root : Root) -> Nil ! Await` | Await until this root's count is zero |
+| `within(A,E,N)` | `(body : () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+| `ready(A)` | `(value : A) -> Request(A)` | A fresh completed request; available in pure fakes |
+| `ticket(A)` | `(r : Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+| `state(A)` | `(r : Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+| `take(A)` | `(r : Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+| `settled` | `(r : Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+| `cancel` | `(r : Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+| `await(A)` | `(r : Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
+| `await_owned(A)` | `(r : Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
+| `wait_any` | `(rs : List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
 | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
 
 `cancel` makes every alias observe Cancelled, even for a previously Ready cell.
@@ -467,7 +467,7 @@ structured tasks/finals end cancels any still-outstanding unowned raw work.
 Root wait/poll require an active async entry context when they must hand off;
 otherwise they stop with `panic("request: no active entry")`. Test async-live,
 not only the non-null host-root pointer: the old pointer can survive a completed
-async call (`emit/host.rs:78–80`, `:125–165`). A later synchronous export must
+async call (`emit/host.rs : 78–80`, `:125–165`). A later synchronous export must
 not hand off through that stale boundary. An immediate wait
 on completed fake requests works without that context. They are public primitives
 for writing dispatchers, batch IO, or request races. Direct use inside a task
@@ -520,7 +520,7 @@ behavior, with Await and Owner now visible in their inferred service requirement
 ### 5.3 Replacing the compiler request table
 
 Replace the C region as one change, including every caller identified in
-`emit/host.rs:23–52`. The module keeps a growable table and a free list. Each
+`emit/host.rs : 23–52`. The module keeps a growable table and a free list. Each
 outstanding slot contains import index, ABI id, a fresh GC generation token,
 Owner group key, immutable Root key, and a reference to its request cell.
 Root/group indexes must remove a request on answer or cancel; completed cells
@@ -570,7 +570,7 @@ unlisted request is decoded and retained; the resumed wait scans its requested
 set and hands off again if necessary. `$req_clear` detaches remaining cells as
 Cancelled at status 0 and clears outstanding roots; the host drops remaining
 work under H7. Structured entry wrapping normally leaves none. Keep the
-async-live guards of `emit/host.rs:123–165`; zero outstanding does not mean ended.
+async-live guards of `emit/host.rs : 123–165`; zero outstanding does not mean ended.
 No ABI version bump, new import, or new host-called export is needed: continue,
 cancel, and typed resume exports are already v3.
 
@@ -596,7 +596,7 @@ separate ownership transfers, not a promise that all raw results are resources.
 The ordinary helper for an owned operation that produces no resource is:
 
 ```i
-await_owned = <A>(r: Request(A)) -> A {
+await_owned = <A>(r : Request(A)) -> A {
 	resource.ensure(() { await(r) }, () { cancel(ticket(r)) })
 }
 ```
@@ -634,35 +634,35 @@ Assert and user host services remain in N where the body needs them.
 | Binding | Type |
 |---|---|
 | `top` | `(seed: random.Generator) -> Runner ! Runner` |
-| `run(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
-| `test(A,E,N)` | `(seed: random.Generator, choices: List(List(Int)), body: () -> A ^ E ! N) -> A ^ E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
-| `scope(A,E,N)` | `(body: (s: Scope(E)) -> A ^ E ! N) -> A ^ E ! N \| Scheduler` |
+| `run(A,E,N)` | `(body : () -> A ^ E ! N) -> A ^ E ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `test(A,E,N)` | `(seed : random.Generator, choices : List(List(Int)), body : () -> A ^ E ! N) -> A ^ E \| ScheduleError ! Runner \| N - Scheduler - Runner - request.Await - request.Owner - request.Root` |
+| `scope(A,E,N)` | `(body : (s : Scope(E)) -> A ^ E ! N) -> A ^ E ! N \| Scheduler` |
 | `local_scope(A,E,N)` | Same scheme as scope |
-| `go(A,E,N)` | `(s: Scope(E), body: () -> A ^ E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `join(A,E)` | `(t: Task(A,E)) -> A ^ E ! Scheduler` |
+| `go(A,E,N)` | `(s : Scope(E), body : () -> A ^ E ! N) -> Task(A,E) ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `join(A,E)` | `(t : Task(A,E)) -> A ^ E ! Scheduler` |
 | `yield` | `() -> Nil ! Scheduler` |
 | `path` | `() -> List(Int) ! Scheduler` |
 | `random` | `() -> random.Generator ! Scheduler` |
-| `keep(S,A,E,N)` | `(f: (S) -> A ^ E ! N) -> { (S) -> A ^ E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `keep(S,A,E,N)` | `(f : (S) -> A ^ E ! N) -> { (S) -> A ^ E ! Scheduler } ! Scheduler \| N - Scheduler - Runner - request.Await` |
 | `channel(A)` | `() -> Channel(A) ! Scheduler` |
 | `local_channel(A)` | `() -> Channel(A) ! Scheduler` |
-| `send(A)` | `(c: Channel(A), value: A) -> Nil ! Scheduler` |
-| `receive(A)` | `(c: Channel(A)) -> A ! Scheduler` |
-| `send_event(A)` | `(c: Channel(A), value: A) -> Event(Nil,Never,Never)` |
-| `receive_event(A)` | `(c: Channel(A)) -> Event(A,Never,Never)` |
-| `join_event(A,E)` | `(t: Task(A,E)) -> Event(A,E,Never)` |
-| `always(A)` | `(value: A) -> Event(A,Never,Never)` |
+| `send(A)` | `(c : Channel(A), value : A) -> Nil ! Scheduler` |
+| `receive(A)` | `(c : Channel(A)) -> A ! Scheduler` |
+| `send_event(A)` | `(c : Channel(A), value : A) -> Event(Nil,Never,Never)` |
+| `receive_event(A)` | `(c : Channel(A)) -> Event(A,Never,Never)` |
+| `join_event(A,E)` | `(t : Task(A,E)) -> Event(A,E,Never)` |
+| `always(A)` | `(value : A) -> Event(A,Never,Never)` |
 | `never` | `() -> Event(Never,Never,Never)` |
-| `choose(A,E,N)` | `(events: List(Event(A,E,N))) -> Event(A,E,N)` |
-| `map(A,B,E,F,N,M)` | `(e: Event(A,E,N), f: (A) -> B ^ F ! M) -> Event(B,E \| F,N \| M)` |
-| `sync(A,E,N)` | `(e: Event(A,E,N)) -> A ^ E ! N \| Scheduler` |
-| `share(A,E)` | `(s: Scope(E), value: A) -> Shared(A) ! Scheduler` |
-| `get(A)` | `(s: Shared(A)) -> A ! Scheduler` |
-| `ref(A)` | `(value: A) -> Ref(A) ! Scheduler` |
-| `update(A,B)` | `(ref: Ref(A), change: (A) -> (A, B)) -> B ! Scheduler` |
-| `both(A,B,E,N)` | `(left: () -> A ^ E ! N, right: () -> B ^ E ! N) -> (A,B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `race(A,E,N)` | `(left: () -> A ^ E ! N, right: () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
-| `map_concurrently(A,B,E,N)` | `(xs: List(A), f: (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `choose(A,E,N)` | `(events : List(Event(A,E,N))) -> Event(A,E,N)` |
+| `map(A,B,E,F,N,M)` | `(e : Event(A,E,N), f : (A) -> B ^ F ! M) -> Event(B,E \| F,N \| M)` |
+| `sync(A,E,N)` | `(e : Event(A,E,N)) -> A ^ E ! N \| Scheduler` |
+| `share(A,E)` | `(s : Scope(E), value : A) -> Shared(A) ! Scheduler` |
+| `get(A)` | `(s : Shared(A)) -> A ! Scheduler` |
+| `ref(A)` | `(value : A) -> Ref(A) ! Scheduler` |
+| `update(A,B)` | `(ref : Ref(A), change : (A) -> (A, B)) -> B ! Scheduler` |
+| `both(A,B,E,N)` | `(left : () -> A ^ E ! N, right : () -> B ^ E ! N) -> (A,B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `race(A,E,N)` | `(left : () -> A ^ E ! N, right : () -> A ^ E ! N) -> A ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
+| `map_concurrently(A,B,E,N)` | `(xs : List(A), f : (A) -> B ^ E ! N) -> List(B) ^ E ! Scheduler \| N - Scheduler - Runner - request.Await` |
 
 In tables, `\|` is only Markdown escaping; the i operator is `|`. The schemes
 for combinators use one common E and N; subtyping admits either child's error
@@ -1014,7 +1014,7 @@ cross run identities.
 
 `task.test(seed, choices, body)` supplies a Runner for a fresh nested run. Before
 a turn, take the next script path, if any; it must be runnable, otherwise raise
-`ScheduleError { NotRunnable(path: List(Int)) }` after structured cleanup. When
+`ScheduleError { NotRunnable(path : List(Int)) }` after structured cleanup. When
 the script ends choose FIFO. Do not root-poll or use real clocks. Completed fake
 requests are allowed; reaching a required wait on an unsettled host request stops
 with `panic("task: test needs fake IO")`. Fixed inputs and script give the same
@@ -1075,11 +1075,11 @@ public raw test APIs. No language rule forbids constructing or replacing service
 
 | Module/service/namespace | Public resource types and errors |
 |---|---|
-| clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation: String, code: String) }` |
-| fs / Fs (type only) / `i:fs/v1` | File, constructor private; `FsError { FsError(operation: String, path: String, code: String) }` |
-| net / Net (type only) / `i:net/v1` | Listener and Stream, constructors private; `NetError { NetError(operation: String, endpoint: String, code: String) }` |
-| process / Process (type only) / `i:process/v1`; Entropy, Arguments, Environment, WorkingDirectory (§7.4) | Child, constructor private; `ProcessError { ProcessError(operation: String, code: String) }` |
-| stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation: String, code: String) }` |
+| clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation : String, code : String) }` |
+| fs / Fs (type only) / `i:fs/v1` | File, constructor private; `FsError { FsError(operation : String, path : String, code : String) }` |
+| net / Net (type only) / `i:net/v1` | Listener and Stream, constructors private; `NetError { NetError(operation : String, endpoint : String, code : String) }` |
+| process / Process (type only) / `i:process/v1`; Entropy, Arguments, Environment, WorkingDirectory (§7.4) | Child, constructor private; `ProcessError { ProcessError(operation : String, code : String) }` |
+| stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation : String, code : String) }` |
 
 The common stable wire error codes are `invalid`, `not_found`, `denied`,
 `exists`, `closed`, `busy`, `interrupted`, `unsupported`, `io`. Net additionally
@@ -1098,7 +1098,7 @@ Raw fields of Clock:
 |---|---|
 | `monotonic_ns` | `() -> Request(Result(Int,String))` |
 | `unix_ns` | `() -> Request(Result(Int,String))` |
-| `sleep_ns` | `(duration: Int) -> Request(Result(Nil,String))` |
+| `sleep_ns` | `(duration : Int) -> Request(Result(Nil,String))` |
 
 Wrappers have those parameter/result types without Request/Result and with
 `^ ClockError ! Clock | request.Await | request.Owner`. monotonic_ns measures nanoseconds since
@@ -1122,15 +1122,15 @@ OpenMode = ReadOnly | WriteTruncate | Append | ReadWrite
 
 | Raw Fs field | Type |
 |---|---|
-| `open` | `(path: String, mode: String) -> Request(Result(Int,String))` |
-| `read` | `(file: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
-| `write` | `(file: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
-| `flush` | `(file: Int) -> Request(Result(Nil,String))` |
-| `close` | `(file: Int) -> Request(Nil)` |
-| `remove` | `(path: String) -> Request(Result(Nil,String))` |
-| `rename` | `(from: String, to: String) -> Request(Result(Nil,String))` |
-| `read_file` | `(path: String) -> Request(Result(BitArray,String))` |
-| `write_file` | `(path: String, bytes: BitArray) -> Request(Result(Nil,String))` |
+| `open` | `(path : String, mode : String) -> Request(Result(Int,String))` |
+| `read` | `(file : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
+| `write` | `(file : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
+| `flush` | `(file : Int) -> Request(Result(Nil,String))` |
+| `close` | `(file : Int) -> Request(Nil)` |
+| `remove` | `(path : String) -> Request(Result(Nil,String))` |
+| `rename` | `(from : String, to : String) -> Request(Result(Nil,String))` |
+| `read_file` | `(path : String) -> Request(Result(BitArray,String))` |
+| `write_file` | `(path : String, bytes : BitArray) -> Request(Result(Nil,String))` |
 
 Public open returns File by wrapping the successful Int, takes OpenMode and encodes `read`, `truncate`, `append`, or
 `read_write`; write modes create the file if absent, read_write does not
@@ -1160,7 +1160,7 @@ mode_string =
 	| (Append) { "append" }
 	| (ReadWrite) { "read_write" }
 
-open = (path, mode) <- (raw: Fs) {
+open = (path, mode) <- (raw : Fs) {
 	File(
 		fail.map_error(
 			() {
@@ -1174,7 +1174,7 @@ open = (path, mode) <- (raw: Fs) {
 	)
 }
 
-read = (File(number), max_bytes) <- (raw: Fs) {
+read = (File(number), max_bytes) <- (raw : Fs) {
 	request.await_owned(raw.read(number, max_bytes)) |>
 		(Ok(bytes)) { bytes }
 		| (Error(code)) {
@@ -1182,22 +1182,22 @@ read = (File(number), max_bytes) <- (raw: Fs) {
 		}
 }
 
-close = (File(number)) <- (raw: Fs) { request.await_owned(raw.close(number)) }
+close = (File(number)) <- (raw : Fs) { request.await_owned(raw.close(number)) }
 ```
 
 ### 7.3 TCP and UDP networking
 
 | Raw Net field | Type |
 |---|---|
-| `listen` | `(address: String, port: Int) -> Request(Result(Int,String))` |
-| `local_port` | `(listener: Int) -> Request(Result(Int,String))` |
-| `accept` | `(listener: Int) -> Request(Result(Int,String))` |
-| `connect` | `(address: String, port: Int) -> Request(Result(Int,String))` |
-| `read` | `(stream: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
-| `write` | `(stream: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
-| `shutdown_write` | `(stream: Int) -> Request(Result(Nil,String))` |
-| `close_stream` | `(stream: Int) -> Request(Nil)` |
-| `close_listener` | `(listener: Int) -> Request(Nil)` |
+| `listen` | `(address : String, port : Int) -> Request(Result(Int,String))` |
+| `local_port` | `(listener : Int) -> Request(Result(Int,String))` |
+| `accept` | `(listener : Int) -> Request(Result(Int,String))` |
+| `connect` | `(address : String, port : Int) -> Request(Result(Int,String))` |
+| `read` | `(stream : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
+| `write` | `(stream : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
+| `shutdown_write` | `(stream : Int) -> Request(Result(Nil,String))` |
+| `close_stream` | `(stream : Int) -> Request(Nil)` |
+| `close_listener` | `(listener : Int) -> Request(Nil)` |
 
 Public listen returns Listener; accept/connect return Stream. Public resource
 parameters use Listener or Stream as appropriate. Other result types stay the
@@ -1205,7 +1205,7 @@ same, with NetError, except the error-free close functions. Explicit wrappers
 inside i/net include (await_resource is defined in §8.1):
 
 ```i
-accept = (Listener(number)) <- (raw: Net) {
+accept = (Listener(number)) <- (raw : Net) {
 	Stream(
 		fail.map_error(
 			() {
@@ -1220,7 +1220,7 @@ accept = (Listener(number)) <- (raw: Net) {
 	)
 }
 
-read = (Stream(number), max_bytes) <- (raw: Net) {
+read = (Stream(number), max_bytes) <- (raw : Net) {
 	request.await_owned(raw.read(number, max_bytes)) |>
 		(Ok(bytes)) { bytes }
 		| (Error(code)) {
@@ -1228,7 +1228,7 @@ read = (Stream(number), max_bytes) <- (raw: Net) {
 		}
 }
 
-close_stream = (Stream(number)) <- (raw: Net) {
+close_stream = (Stream(number)) <- (raw : Net) {
 	request.await_owned(raw.close_stream(number))
 }
 ```
@@ -1257,12 +1257,12 @@ UDP uses the same private raw Net service and the private nominal
 
 | Raw Net field | Type |
 |---|---|
-| `bind` | `(address: String, port: Int) -> Request(Result(Int,String))` |
-| `send_to` | `(socket: Int, address: String, port: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
-| `receive_from` | `(socket: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
-| `local_address` | `(socket: Int) -> Request(Result(String,String))` |
-| `datagram_port` | `(socket: Int) -> Request(Result(Int,String))` |
-| `close_datagram` | `(socket: Int) -> Request(Nil)` |
+| `bind` | `(address : String, port : Int) -> Request(Result(Int,String))` |
+| `send_to` | `(socket : Int, address : String, port : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
+| `receive_from` | `(socket : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
+| `local_address` | `(socket : Int) -> Request(Result(String,String))` |
+| `datagram_port` | `(socket : Int) -> Request(Result(Int,String))` |
+| `close_datagram` | `(socket : Int) -> Request(Nil)` |
 
 Public `bind` returns Datagram. `send_to` takes Datagram, address, port and bytes;
 `receive_from` returns the ordinary i record `(data, address, port)` with labels.
@@ -1302,16 +1302,16 @@ The fields stay in i/process, but each wrapper requires only its capability's se
 | Service / namespace | Raw field | Type |
 |---|---|---|
 | Arguments / `i:arguments/v1` | `args` | `() -> Request(Result(BitArray,String))` |
-| Environment / `i:environment/v1` | `env` | `(name: String) -> Request(Result(String,String))` |
+| Environment / `i:environment/v1` | `env` | `(name : String) -> Request(Result(String,String))` |
 | WorkingDirectory / `i:working-directory/v1` | `cwd` | `() -> Request(Result(String,String))` |
-| Entropy / `i:entropy/v1` | `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
+| Entropy / `i:entropy/v1` | `entropy` | `(bytes : Int) -> Request(Result(BitArray,String))` |
 | Process / `i:process/v1` | `spawn`, `spawn_piped`, `spawn_config` | Start a child with inherited streams, selected streams, or selected streams and process options |
-| Process / `i:process/v1` | `own` | `(child: Int) -> Request(Nil)` |
-| Process / `i:process/v1` | `wait` | `(child: Int) -> Request(Result(Int,String))` |
-| Process / `i:process/v1` | `terminate` | `(child: Int) -> Request(Result(Nil,String))` |
-| Process / `i:process/v1` | `close` | `(child: Int) -> Request(Nil)` |
+| Process / `i:process/v1` | `own` | `(child : Int) -> Request(Nil)` |
+| Process / `i:process/v1` | `wait` | `(child : Int) -> Request(Result(Int,String))` |
+| Process / `i:process/v1` | `terminate` | `(child : Int) -> Request(Result(Nil,String))` |
+| Process / `i:process/v1` | `close` | `(child : Int) -> Request(Nil)` |
 
-Public args gives List(String); spawn takes `(program: String, args: List(String))`
+Public args gives List(String); spawn takes `(program : String, args : List(String))`
 and returns Child; wait/terminate/close take Child. Match Child(number)
 to unwrap arguments and wrap the successful spawn Int with Child. Other wrappers
 keep raw parameters/success values, with `^ ProcessError` except
@@ -1354,7 +1354,7 @@ ProcessError("spawn", "invalid") for bad input before starting work). The
 resource-bearing wrapper parts are:
 
 ```i
-spawn = (program, args) <- (raw: Process) {
+spawn = (program, args) <- (raw : Process) {
 	bytes = encode_args(args)
 	Child(
 		fail.map_error(
@@ -1368,7 +1368,7 @@ spawn = (program, args) <- (raw: Process) {
 	)
 }
 
-wait = (Child(number)) <- (raw: Process) {
+wait = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.wait(number)) |>
 		(Ok(status)) { status }
 		| (Error(code)) {
@@ -1376,7 +1376,7 @@ wait = (Child(number)) <- (raw: Process) {
 		}
 }
 
-close = (Child(number)) <- (raw: Process) {
+close = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.close(number))
 }
 ```
@@ -1385,9 +1385,9 @@ close = (Child(number)) <- (raw: Process) {
 
 | Raw Stdio field | Type |
 |---|---|
-| `read` | `(max_bytes: Int) -> Request(Result(BitArray,String))` |
-| `write` | `(bytes: BitArray) -> Request(Result(Nil,String))` |
-| `write_error` | `(bytes: BitArray) -> Request(Result(Nil,String))` |
+| `read` | `(max_bytes : Int) -> Request(Result(BitArray,String))` |
+| `write` | `(bytes : BitArray) -> Request(Result(Nil,String))` |
+| `write_error` | `(bytes : BitArray) -> Request(Result(Nil,String))` |
 | `flush` | `() -> Request(Result(Nil,String))` |
 | `flush_error` | `() -> Request(Result(Nil,String))` |
 
@@ -1396,8 +1396,8 @@ Public wrappers use request.await_owned to unwrap those results, giving
 read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 and stderr are distinct directions; one write per direction may be pending,
 with busy for a competing write. A cancelled write may have written a prefix.
-Flush functions are explicit. Also export `print(text: String)` and
-`print_error(text: String)`, which UTF-8 encode text plus one LF, write all bytes,
+Flush functions are explicit. Also export `print(text : String)` and
+`print_error(text : String)`, which UTF-8 encode text plus one LF, write all bytes,
 and flush their stream; both can raise StdioError. No implicit text decoding,
 line buffering or newline translation is added. Legacy i/io still prints a
 String plus LF with the old no-error contract under `i:io/v1`.
@@ -1527,8 +1527,8 @@ qualified here; no new syntax or polymorphic service field is needed):
 
 ```i
 await_resource = <A, E, N>(
-	r: Request(Result(A, E)),
-	release: (A) <- N -> Nil
+	r : Request(Result(A, E)),
+	release : (A) <- N -> Nil
 ) -> A {
 	resource.ensure(
 		() { fail.from_result(request.await(r)) },
@@ -1597,7 +1597,7 @@ listeners, destroys sockets and owns child cleanup, including promises settling
 after cancellation. Browser APIs never silently treat URLs as files or a
 WebSocket as Stream. Node and browser async starters read requestSignal()
 synchronously and register cancellation there; the helper and status-2 macrotask
-path already exist (`bindings/javascript/ilang.mjs:34–58`, `:894–902`). New service
+path already exist (`bindings/javascript/ilang.mjs : 34–58`, `:894–902`). New service
 factories and tests are IO work, not claims about today's SDK.
 
 WASI keeps the current §B.7 blocking-import contract. It is not the `i run` host:
@@ -1801,7 +1801,7 @@ It is host policy, not a reserved library namespace or a new type rule.
 > stay on their worker (§11.9).
 >
 > The standard service of i/io remains
-> `@host("i:io/v1") Io { Io(print: (text: String) -> Nil) }`. print writes the
+> `@host("i:io/v1") Io { Io(print : (text : String) -> Nil) }`. print writes the
 > text plus LF and gives up a failed write. i run and i test provide it;
 > the WASI target selects its ordinary checked-adapter provider as §B.7 says. i/stdio is a separate byte-IO
 > service, i:stdio/v1. The clock, files, TCP, process and stdio APIs are given
@@ -2017,12 +2017,12 @@ anchor current regions; implementations re-find them after earlier tracks land.
 
 | Track | Files and regions to change |
 |---|---|
-| R1 | Replace `lib/i/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
-| R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
-| R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
-| R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-| IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs:1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml:15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
-| Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
+| R1 | Replace `lib/i/random.i : 1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
+| R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i : 3–28` keep_env; `lib/i/core.i : 3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs : 1285–1291` and `hir.rs : 210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
+| R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs : 664–679`, `:1470–1555`, mode in `hir.rs : 182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs : 969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs : 23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
+| R2 scheduler and entry | Replace `lib/i/task.i : 1`; `infer.rs : 376–429` resolved allowed-entry-service set and diagnostics; `lower.rs : 828–938` entry wrappers/metadata; `emit/mod.rs : 805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
+| IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs : 1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs : 44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs : 151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
+| Shared registration | `crates/ilang-package/src/library.rs : 7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
 The key/request modules, checker host-form expansion, runtime primitive types,
@@ -2201,9 +2201,9 @@ only to detect a hang; never make timing thresholds the semantic oracle.
 
 ```i
 bad_methods = (scope) {
-  a = scope.go(() { 1 })
-  b = scope.go(() { "x" })
-  (a, b)
+	a = scope.go(() { 1 })
+	b = scope.go(() { "x" })
+	(a, b)
 }
 ```
 
@@ -2217,7 +2217,7 @@ This is an inference/buildability attack, not a rejected syntax spelling alone.
 
 ```i
 // Inside i/net; its raw Net service is private.
-leak = (Listener(number)) <- (n: Net) {
+leak = (Listener(number)) <- (n : Net) {
 	r = n.accept(number)
 	request.await(r)
 }
@@ -2233,10 +2233,10 @@ public net.accept wrapper always does. No extra host ack is smuggled into ABI v3
 
 ```i
 unsafe_handoff = (scope, listener) {
-  stream = net.accept(listener)
-  task.go(scope, () {
-    resource.ensure(() { copy(stream) }, () { net.close_stream(stream) })
-  })
+	stream = net.accept(listener)
+	task.go(scope, () {
+		resource.ensure(() { copy(stream) }, () { net.close_stream(stream) })
+	})
 }
 ```
 
@@ -2405,12 +2405,12 @@ was checked separately before changing the rules:
 1. **Dropped join in a shielded final: confirmed.** At aa20548, R2 dropped the
    child, R4 shielded its joining final, and no completion arm could produce
    its A/E. The control code only reactivates the scheduling boundary
-   (`emit/control.rs:260–295`); it supplies no task completion. R4a now resolves
+   (`emit/control.rs : 260–295`); it supplies no task completion. R4a now resolves
    that protocol hole and §10.1 gives the exact S7 sentence changes.
 2. **Universal async and first-turn polling: confirmed.** The inferred env is
-   already available to entry_point (`types/infer.rs:405–429`) and lower's
-   entry_async (`lower.rs:916–938`). The JS call/callAsync guards explicitly
-   separate synchronous and async signatures (`bindings/javascript/ilang.mjs:965–981`);
+   already available to entry_point (`types/infer.rs : 405–429`) and lower's
+   entry_async (`lower.rs : 916–938`). The JS call/callAsync guards explicitly
+   separate synchronous and async signatures (`bindings/javascript/ilang.mjs : 965–981`);
    status 2 takes a macrotask at `:894–902`. My old D5 and unconditional
    first-turn poll would therefore break synchronous callbacks. D5 and §6.4
    now preserve them and gate host polling on outstanding requests. The review
@@ -2433,33 +2433,37 @@ where specified.
 **Review test J: shielded final joins its dropped child.**
 
 ```i
-(i/task, i/resource, i/fail)
+(
+	i/task
+	i/resource
+	i/fail
+)
 
 probe = () {
-  fail.catch(() {
-    task.scope((s) {
-      gate = task.channel()
-      parked = task.channel()
+	fail.catch(() {
+		task.scope((s) {
+			gate = task.channel()
+			parked = task.channel()
 
-      task.go(s, () {
-        resource.ensure(
-          () {
-            task.send(gate, Nil)
-            task.receive(parked)
-            Nil
-          }
-          () {
-            t = task.go(s, () { Nil })
-            fail.catch(() { task.join(t) })
-            Nil
-          }
-        )
-      })
+			task.go(s, () {
+				resource.ensure(
+					() {
+						task.send(gate, Nil)
+						task.receive(parked)
+						Nil
+					},
+					() {
+						t = task.go(s, () { Nil })
+						fail.catch(() { task.join(t) })
+						Nil
+					},
+				)
+			})
 
-      task.receive(gate)
-      fail.raise("boom")
-    })
-  })
+			task.receive(gate)
+			fail.raise("boom")
+		})
+	})
 }
 ```
 
@@ -2473,9 +2477,11 @@ including scheduler orders that delay cancellation delivery to ordinary tasks.
 **Review test E: a pure synchronous export remains a comparator.**
 
 ```i
-(cmp)
+(
+	cmp
+)
 
-cmp = (a: Float, b: Float) { a -. b }
+cmp = (a : Float, b : Float) { a -. b }
 ```
 
 Compile/export cmp through wasm.exports. Its inferred environment is Never;
@@ -2505,10 +2511,10 @@ Await/Owner/Root alone do not make such an entry async. These are D5/§6.4 tests
 @host("review:work", "request")
 Work = (finish = () -> Request(Nil))
 
-main = () <- (w: Work) {
+main = () <- (w : Work) {
 	request.within(() {
 		r = w.finish()
-		c: task.Channel(Nil) = task.channel()
+		c : task.Channel(Nil) = task.channel()
 		task.receive(c)
 		request.take(r)
 	})
@@ -2566,7 +2572,7 @@ value early. No serious new rule conflict found in this pass.
 
 ### 12.8 New self-attack, pass 2: effects, polling and split addresses
 
-Attack E through a wrapper `cmp2 = (a: Float, b: Float) { cmp(a,b) }` and through
+Attack E through a wrapper `cmp2 = (a : Float, b : Float) { cmp(a,b) }` and through
 an unrelated imported task module: N is still Never and both exports stay sync.
 A higher-order helper called only with pure functions keeps a pure instantiated
 environment; used with a task/async operation, its inferred environment carries

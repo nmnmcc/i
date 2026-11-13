@@ -157,7 +157,7 @@ fn read(path: &Path) -> String {
 /// and an external function, v1.2.0 is the same, and v2.0.0 is another major
 /// version.
 fn lib_repo(w: &World) {
-    const PLAIN: &str = " (twice)\n\ntwice = (n: Int) { n * 2 }\n";
+    const PLAIN: &str = " (twice)\n\ntwice = (n : Int) { n * 2 }\n";
     const WITH_HOST: &str = r#"(
 	twice
 	Net
@@ -167,9 +167,9 @@ fn lib_repo(w: &World) {
 Net = (get = (String) -> String)
 
 @external("env", "now")
-now: () -> Int
+now : () -> Int
 
-twice = (n: Int) { n * 2 }
+twice = (n : Int) { n * 2 }
 "#;
     w.repo(
         "lib",
@@ -254,7 +254,7 @@ fn two_new_packages_work_together() {
         &app,
         &[(
             "src/main.i",
-            "(\n\t(Io) = i/io\n\tgreet = greet/main\n)\n\n(\n\tgreeting\n)\n\ngreeting = (who: String) { greet.greeting(who) }\n\nmain = () <- (io: Io) { io.print(greeting(\"i\")) }\n",
+            "(\n\t(Io) = i/io\n\tgreet = greet/main\n)\n\n(\n\tgreeting\n)\n\ngreeting = (who : String) { greet.greeting(who) }\n\nmain = () <- (io : Io) { io.print(greeting(\"i\")) }\n",
         )],
     );
     let out = w.ok(&["check", "--project", &project]);
@@ -504,7 +504,7 @@ fn update_raises_within_the_major_version_and_shows_new_permissions() {
         "1.3.0",
         &[
             ("i.toml", "name = \"lib\"\n"),
-            ("src/math.i", " (twice)\n\ntwice = (n: Int) { n + n }\n"),
+            ("src/math.i", " (twice)\n\ntwice = (n : Int) { n + n }\n"),
         ],
     );
     let out = w.ok(&["update", "lib", "--project", &project]);
@@ -588,7 +588,7 @@ fn tags(dir: &Path) -> String {
     git(dir, &["tag", "--list"])
 }
 
-const API_1: &str = "(\n\tone\n\tadd\n\tShape(..)\n\tBox\n)\n\none = 1\n\nadd = (a: Int, b: Int) { a + b }\n\nCircle = (r = Float)\nSquare = (side = Float)\nShape = Circle | Square\n\nBox(A) = (A)\n";
+const API_1: &str = "(\n\tone\n\tadd\n\tShape(..)\n\tBox\n)\n\none = 1\n\nadd = (a : Int, b : Int) { a + b }\n\nCircle = (r = Float)\nSquare = (side = Float)\nShape = Circle | Square\n\nBox(A) = (A)\n";
 
 #[test]
 fn publish_tags_a_first_version() {
@@ -677,8 +677,8 @@ fn publish_compares_the_interface() {
     // A changed type and a new constructor are incompatible.
     let changed = added
         .replace(
-            "add = (a: Int, b: Int) { a + b }",
-            "add = (a: Int, b: Int, c: Int) { a + b + c }",
+            "add = (a : Int, b : Int) { a + b }",
+            "add = (a : Int, b : Int, c : Int) { a + b + c }",
         )
         .replace(
             "Shape = Circle | Square\n",
@@ -917,14 +917,14 @@ fn publish_compares_types_by_what_they_are_not_by_their_names() {
     let dir = two_types(
         &w,
         "swap",
-        " (x = pub/a, y = pub/b)\n (f)\n\nf = (v: x.T) { v }\n",
+        " (x = pub/a, y = pub/b)\n (f)\n\nf = (v : x.T) { v }\n",
     );
     let (ok, out) = try_publish(
         &w,
         &dir,
         &[(
             "src/api.i",
-            " (x = pub/b, y = pub/a)\n (f)\n\nf = (v: x.T) { v }\n",
+            " (x = pub/b, y = pub/a)\n (f)\n\nf = (v : x.T) { v }\n",
         )],
         "1.0.1",
     );
@@ -937,14 +937,14 @@ fn publish_compares_types_by_what_they_are_not_by_their_names() {
     let dir = two_types(
         &w,
         "same",
-        "(\n\tpub/a\n)\n\n(\n\tid\n\tf\n\tg\n)\n\nid = <A>(x: A) -> A { x }\n\nf = (v: a.T) { v }\n\ng = (v: a.T) { v }\n",
+        "(\n\tpub/a\n)\n\n(\n\tid\n\tf\n\tg\n)\n\nid = <A>(x : A) -> A { x }\n\nf = (v : a.T) { v }\n\ng = (v : a.T) { v }\n",
     );
     let (ok, out) = try_publish(
         &w,
         &dir,
         &[(
             "src/api.i",
-            "(\n\taa = pub/a\n\t(T) = pub/a\n)\n\n(\n\tid\n\tf\n\tg\n)\n\nid = <B>(x: B) -> B { x }\n\nf = (v: aa.T) { v }\n\ng = (v: T) { v }\n",
+            "(\n\taa = pub/a\n\t(T) = pub/a\n)\n\n(\n\tid\n\tf\n\tg\n)\n\nid = <B>(x : B) -> B { x }\n\nf = (v : aa.T) { v }\n\ng = (v : T) { v }\n",
         )],
         "1.0.1",
     );
@@ -970,7 +970,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
             ("2.0.0", &[("i.toml", "name = \"dep\"\n"), ("src/v.i", &v2)]),
         ],
     );
-    let api = "(\n\tdep/v\n)\n\n(\n\tf\n\tW(..)\n)\n\nf = (x: v.V) { 1 }\n\nW = { (v.V) }\n";
+    let api = "(\n\tdep/v\n)\n\n(\n\tf\n\tW(..)\n)\n\nf = (x : v.V) { 1 }\n\nW = { (v.V) }\n";
     let dir = w.project(
         "pub",
         &[
@@ -1005,7 +1005,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
 #[test]
 fn publish_sees_what_the_host_must_give() {
     let w = World::new();
-    let api = "(\n\tnow\n\tIo\n)\n\n@external(\"env\", \"now\")\nnow: () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n";
+    let api = "(\n\tnow\n\tIo\n)\n\n@external(\"env\", \"now\")\nnow : () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n";
     let dir = w.project(
         "pub",
         &[
@@ -1068,7 +1068,7 @@ fn publish_sees_the_standard_service_of_i_io() {
     let project = dir.display().to_string();
     w.ok(&["publish", "1.0.0", "--project", &project]);
 
-    let printing = "(\n\t(Io) = i/io\n)\n\n(\n\tf\n\tsay\n)\n\nf = () { 1 }\n\nsay = () <- (io: Io) { io.print(\"one\") }\n";
+    let printing = "(\n\t(Io) = i/io\n)\n\n(\n\tf\n\tsay\n)\n\nf = () { 1 }\n\nsay = () <- (io : Io) { io.print(\"one\") }\n";
     let (ok, out) = try_publish(&w, &dir, &[("src/api.i", printing)], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
@@ -1102,7 +1102,7 @@ fn publish_tells_apart_types_that_are_shown_alike() {
             &[("i.toml", "name = \"util\"\n"), ("src/u.i", &u2)],
         )],
     );
-    let get = " (util/u)\n (get)\n\nget = (x: u.T) { x }\n";
+    let get = " (util/u)\n (get)\n\nget = (x : u.T) { x }\n";
     for (name, dep) in [("pa", "u1"), ("pb", "u2")] {
         let toml =
             format!("name = \"{name}\"\n\n[dependencies]\nutil = \"example.com/{dep}@1.0.0\"\n");
@@ -1148,7 +1148,7 @@ fn publish_tells_apart_types_that_are_shown_alike() {
 #[test]
 fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
     let w = World::new();
-    let api = "(\n\tf\n)\n\n@external(\"env\", \"now\")\nnow: () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n\nf = () { now() }\n";
+    let api = "(\n\tf\n)\n\n@external(\"env\", \"now\")\nnow : () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n\nf = () { now() }\n";
     let dir = w.project(
         "pub",
         &[
@@ -1199,7 +1199,7 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
         &dir,
         &[(
             "src/api.i",
-            &api.replace("now: () -> Int", "now: (Int) -> Int")
+            &api.replace("now : () -> Int", "now : (Int) -> Int")
                 .replace("now()", "now(1)"),
         )],
         "1.0.2",

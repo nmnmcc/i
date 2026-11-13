@@ -10,7 +10,7 @@ fn exported_label_scheme_round_trips_with_cross_module_caller() {
     let (graph, program, diags) = common::check_files(&[
         (
             "src/defs.i",
-            "(\n\tget\n)\nget = <A>(r: (a = A)) -> A { r.a }\n",
+            "(\n\tget\n)\nget = <A>(r : (a = A)) -> A { r.a }\n",
         ),
         (
             "src/main.i",

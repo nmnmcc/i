@@ -35,7 +35,7 @@ All rows below are staged in `docs/spec.md` by this lane, except where noted.
 | O8 call brackets make data; `(x)` is not `x`; `x \|> f` is `f(x)` | owner | staged | yes |
 | O9 `( )` creates no scope | RELAYED L 19:19 | staged | yes |
 | O10 labels in data types `label = T`; `:` only name-then-type | RELAYED L 19:22 | staged | yes |
-| O11 `(name: T)` in a parameter is a positional binder; labels only by `key = pattern` | owner (answers D1) | staged | yes |
+| O11 `(name : T)` in a parameter is a positional binder; labels only by `key = pattern` | owner (answers D1) | staged | yes |
 | O12 no punning | owner (answers D2) | staged | yes |
 | O13 destructuring left to right; `=` chains; structure before name | owner (answers B4) | staged | yes |
 | O14 one form of type definition `Name(params) = right side`; labelled types; one constructor each; sums are unions; `T { }` removed | owner | staged | yes |

@@ -31,25 +31,25 @@ These are facts from reading code, not claims that T2 already works.
 
 | Code and lines | Fact | Consequence for T2 |
 |---|---|---|
-| `crates/ilang-check/src/resolve.rs:44–63`, `:421–448`, `:528–592` | Names/exports and imports are collected before type bodies, and type bodies before values. | Collect pattern binders early; resolve a value reference without inferring it. |
-| `resolve.rs:1098–1147`, `:1175–1209`, `:1329–1379` | Alias bodies remain HIR types; alias cycles follow named aliases. | Add `Of`, and alias-pattern edges, rather than eagerly converting bodies. |
-| `resolve.rs:1834–1849`, `:1853–1888`, `:2138–2202` | Value lookup checks locals before module scope; members check exports; parameter and result types are resolved before parameter locals are pushed. | Use the ordinary value lookup, plus an explicit pending-name check to prevent accidental outer capture. |
-| `resolve.rs:1445–1467`, `:1568–1600` | Service heads and host forms are inspected during resolution. | Reject value-dependent aliases there before those checks. |
-| `crates/ilang-check/src/order.rs:17–26`, `:36–85`, `:188–251` | The use walker visits patterns/expressions, not their types; expression uses form SCCs; initialization is computed separately from needs. | Add a second graph over existing groups, keeping runtime needs separate. |
-| `crates/ilang-check/src/types/infer.rs:155–191`, `:233–355` | External types are converted first; groups allocate holders, infer/link their values, generalize, then finish known types and coverage. | Complete value-type reads at explicit group/module events, not in a lazy alias conversion. |
-| `infer.rs:323`, `:1000–1005`, `:1346–1353` | A non-direct binding keeps its monotype; a call returns the instantiated function result, which may be a weak variable. | A closed decode component does not imply that its enclosing value type is closed; R7 must gate later extraction. |
-| `infer.rs:42–56`, `:1000–1005`, `:2052–2100` | A scheme has a level; mono schemes use `u32::MAX`; instantiation copies only quantified variables; local bindings are checked in order. | Keep the same instantiation and sharing rules for annotations. |
-| `infer.rs:852–870`, `:953–970`; `types/known.rs:102–137` | `conv` and `kconv` expand aliases lazily, with depth fallbacks to a fresh variable and `Top`. | Value-dependent definitions need a completed cache; a depth fallback must never invent their meaning. |
-| `infer.rs:2108–2120`; `types/display.rs:515–555` | Generalization preserves weak variables; mono display follows lower bounds **and** reverse `from` links. | Display is not evidence that a weak variable is immutable; a closure walk must include reverse links. |
-| `types/solve.rs:245–285`, `:326–345`, `:385–447`, `:452–507` | Constraints propagate both ways through bound lists; environment arguments compare equally; same-side bounds can create more constraints. | Covariant occurrence alone cannot prove a read stable. Keep existing propagation when fixing a variable. |
-| `types/solve.rs:153–170`, `:577–608`, `:618–633` | Extrusion and freshening also write bound lists directly. | A check only in `add_bound` cannot enforce the earlier draft's replacement invariant. |
-| `infer.rs:569–597`, `:983–989`; `resolve.rs:2394–2486` | Written exported annotations are checked in resolve and skipped by the inferred export check. | Value-dependent annotations must be deferred to the inferred check instead. |
-| `resolve.rs:797–803`; `crates/ilang-check/src/lib.rs:35` | `Alias(..)` is accepted as `Alias`. | Pattern binders retain that behavior; they do not gain constructors. |
-| `crates/ilang-syntax/src/ast.rs:327–338`; `types/pattern.rs:157–185` | A typed pattern binds a name/discard; a whole tuple is not followed by a type annotation. | Use individually annotated tuple parts in examples; no new pattern grammar. |
-| `crates/ilang-check/src/query.rs:26–48`, `:342–346`, `:492–545`, `:991–1053` | Queries infer after errors, use HIR type spans for targets, and collect symbols within item spans. | Failed reads need explicit recovery; give each binder its own span and preserve its whole source item. |
-| `crates/ilang-cli/src/commands/package.rs:1063–1104`, `:1235–1249`, `:1306–1323` | Value interfaces use inferred types; alias interfaces print written bodies; canonical names are separate from display names. | Serialize resolved alias bodies, not a private source's spelling. |
-| `crates/ilang-check/src/hir.rs:167–192`, `:273–296`, `:349–357`; `types/mod.rs:148–199` | Aliases have ordinary TypeIds; value references distinguish local/def/constructor; Typed has no alias-body table. | Reuse TypeDef/ValueRef and add a result table. |
-| `crates/ilang-wasm/src/lower.rs:2209–2237` | Type-test lowering expects real heads; an unexpanded alias can fall back to an impossible tag. | Assert that extraction aliases never survive into runtime type-test heads. |
+| `crates/ilang-check/src/resolve.rs : 44–63`, `:421–448`, `:528–592` | Names/exports and imports are collected before type bodies, and type bodies before values. | Collect pattern binders early; resolve a value reference without inferring it. |
+| `resolve.rs : 1098–1147`, `:1175–1209`, `:1329–1379` | Alias bodies remain HIR types; alias cycles follow named aliases. | Add `Of`, and alias-pattern edges, rather than eagerly converting bodies. |
+| `resolve.rs : 1834–1849`, `:1853–1888`, `:2138–2202` | Value lookup checks locals before module scope; members check exports; parameter and result types are resolved before parameter locals are pushed. | Use the ordinary value lookup, plus an explicit pending-name check to prevent accidental outer capture. |
+| `resolve.rs : 1445–1467`, `:1568–1600` | Service heads and host forms are inspected during resolution. | Reject value-dependent aliases there before those checks. |
+| `crates/ilang-check/src/order.rs : 17–26`, `:36–85`, `:188–251` | The use walker visits patterns/expressions, not their types; expression uses form SCCs; initialization is computed separately from needs. | Add a second graph over existing groups, keeping runtime needs separate. |
+| `crates/ilang-check/src/types/infer.rs : 155–191`, `:233–355` | External types are converted first; groups allocate holders, infer/link their values, generalize, then finish known types and coverage. | Complete value-type reads at explicit group/module events, not in a lazy alias conversion. |
+| `infer.rs : 323`, `:1000–1005`, `:1346–1353` | A non-direct binding keeps its monotype; a call returns the instantiated function result, which may be a weak variable. | A closed decode component does not imply that its enclosing value type is closed; R7 must gate later extraction. |
+| `infer.rs : 42–56`, `:1000–1005`, `:2052–2100` | A scheme has a level; mono schemes use `u32::MAX`; instantiation copies only quantified variables; local bindings are checked in order. | Keep the same instantiation and sharing rules for annotations. |
+| `infer.rs : 852–870`, `:953–970`; `types/known.rs : 102–137` | `conv` and `kconv` expand aliases lazily, with depth fallbacks to a fresh variable and `Top`. | Value-dependent definitions need a completed cache; a depth fallback must never invent their meaning. |
+| `infer.rs : 2108–2120`; `types/display.rs : 515–555` | Generalization preserves weak variables; mono display follows lower bounds **and** reverse `from` links. | Display is not evidence that a weak variable is immutable; a closure walk must include reverse links. |
+| `types/solve.rs : 245–285`, `:326–345`, `:385–447`, `:452–507` | Constraints propagate both ways through bound lists; environment arguments compare equally; same-side bounds can create more constraints. | Covariant occurrence alone cannot prove a read stable. Keep existing propagation when fixing a variable. |
+| `types/solve.rs : 153–170`, `:577–608`, `:618–633` | Extrusion and freshening also write bound lists directly. | A check only in `add_bound` cannot enforce the earlier draft's replacement invariant. |
+| `infer.rs : 569–597`, `:983–989`; `resolve.rs : 2394–2486` | Written exported annotations are checked in resolve and skipped by the inferred export check. | Value-dependent annotations must be deferred to the inferred check instead. |
+| `resolve.rs : 797–803`; `crates/ilang-check/src/lib.rs : 35` | `Alias(..)` is accepted as `Alias`. | Pattern binders retain that behavior; they do not gain constructors. |
+| `crates/ilang-syntax/src/ast.rs : 327–338`; `types/pattern.rs : 157–185` | A typed pattern binds a name/discard; a whole tuple is not followed by a type annotation. | Use individually annotated tuple parts in examples; no new pattern grammar. |
+| `crates/ilang-check/src/query.rs : 26–48`, `:342–346`, `:492–545`, `:991–1053` | Queries infer after errors, use HIR type spans for targets, and collect symbols within item spans. | Failed reads need explicit recovery; give each binder its own span and preserve its whole source item. |
+| `crates/ilang-cli/src/commands/package.rs : 1063–1104`, `:1235–1249`, `:1306–1323` | Value interfaces use inferred types; alias interfaces print written bodies; canonical names are separate from display names. | Serialize resolved alias bodies, not a private source's spelling. |
+| `crates/ilang-check/src/hir.rs : 167–192`, `:273–296`, `:349–357`; `types/mod.rs : 148–199` | Aliases have ordinary TypeIds; value references distinguish local/def/constructor; Typed has no alias-body table. | Reuse TypeDef/ValueRef and add a result table. |
+| `crates/ilang-wasm/src/lower.rs : 2209–2237` | Type-test lowering expects real heads; an unexpanded alias can fall back to an impossible tag. | Assert that extraction aliases never survive into runtime type-test heads. |
 
 ## 3. Alternatives and choice
 
@@ -70,13 +70,13 @@ Fixation is a language rule, equivalent to adding a determined type annotation a
 
 ### 4.1 Names, sites and scope (V)
 
-**V1.** A lowercase `x`, or `m.x` with lowercase final name, in a type and without following `(`, means a **value type**. `{ x }` groups it. `( x: T )` is a record type after T3. With following `(`, `x(…)` and `m.x(…)` are TypeCalls reserved for macros. Imports never change that classification.
+**V1.** A lowercase `x`, or `m.x` with lowercase final name, in a type and without following `(`, means a **value type**. `{ x }` groups it. `( x : T )` is a record type after T3. With following `(`, `x(…)` and `m.x(…)` are TypeCalls reserved for macros. Imports never change that classification.
 
-**V2.** Resolve `x` as an expression name at that place: locals, the module's own/imported value scope, then built-ins. Built-ins are ordinary prelude definitions (HIR `ValueRef`, `hir.rs:349–355`). A module used alone gives E0205; an unknown name gives E0201. `m.x` is only a module member, with the normal export check. A value named `m` gives E0207; no field projection is available in a type. This does not inspect `x`'s runtime value.
+**V2.** Resolve `x` as an expression name at that place: locals, the module's own/imported value scope, then built-ins. Built-ins are ordinary prelude definitions (HIR `ValueRef`, `hir.rs : 349–355`). A module used alone gives E0205; an unknown name gives E0201. `m.x` is only a module member, with the normal export check. A value named `m` gives E0207; no field projection is available in a type. This does not inspect `x`'s runtime value.
 
 **V3.** Before resolving the types of a pattern or function header, collect its pending value binders. In those types, a name of that same pattern or parameter list is E0536, even if it would otherwise find an outer name. The function header includes `->`, `?`, and `!`. Inside a binding's own value, a type may not refer to that binding's own value names, at any nesting depth; ordinary recursive *expression* uses remain legal. Remove the function-header pending names on entry to the body, where parameters become available. For the qualifier of `m.x`, a pending value name gives E0207.
 
-Thus `(x, y: x)`, `(x) -> x { x }`, and `f = (g: f) { g }` are errors. In `f = (x: Int) { y: x = x  y }`, the reference to `x` is allowed. Local bindings and clause patterns follow the same rule. Use two scope mechanisms: a current-pattern/header pending set, checked before outer lookup, and an own-binding reserved frame installed for its RHS. Inner binders that have entered scope cover that reserved frame. Expression lookup ignores reserved frames; type lookup reports E0536 on them. Thus an inner parameter named f may be read in its body even inside the outer binding f; a non-direct local RHS cannot silently capture an outer f as its own type. Track binder identities and lexical depth, not a global set of forbidden text.
+Thus `(x, y: x)`, `(x) -> x { x }`, and `f = (g: f) { g }` are errors. In `f = (x : Int) { y : x = x  y }`, the reference to `x` is allowed. Local bindings and clause patterns follow the same rule. Use two scope mechanisms: a current-pattern/header pending set, checked before outer lookup, and an own-binding reserved frame installed for its RHS. Inner binders that have entered scope cover that reserved frame. Expression lookup ignores reserved frames; type lookup reports E0536 on them. Thus an inner parameter named f may be read in its body even inside the outer binding f; a non-direct local RHS cannot silently capture an outer f as its own type. Track binder identities and lexical depth, not a global set of forbidden text.
 
 **V4.** A value type names `ValueRef::Local` or `ValueRef::Def`, never a constructor. Definitions are top-level only. T3 reuses these resolved references to reject a binding with label parameters (E0542, records L5) or a key parameter (E0543, L2a), including pattern sources. This agrees with records.md question 10.
 
@@ -100,7 +100,7 @@ A group that constrains any earlier, unfixed weak variable is **open**: no weak 
 
 **R4. Closed forms.** For a demanded weak variable of this group:
 
-1. Follow its lower-variable edges **and reverse `from` edges**, and collect every lower bound. Pure variable SCCs are collapsed; they are not recursive types. The checked display walk includes both kinds of edge (`display.rs:531–538`).
+1. Follow its lower-variable edges **and reverse `from` edges**, and collect every lower bound. Pure variable SCCs are collapsed; they are not recursive types. The checked display walk includes both kinds of edge (`display.rs : 531–538`).
 2. Replace each weak variable needed inside a bound by its closed form, regardless of polarity. Earlier fixed variables use their recorded forms. A quantified variable needed here, an earlier unfixed weak variable, `Top`, an unsupported form or a structural recursive dependency makes the part unavailable.
 3. Keep every bound, including unions, intersections, differences and function types. Normalize only with exact type equalities. There is no “ignore an unfamiliar bound” arm. T1 value sets are kept exactly. T3 adds record/Without forms with its exact rewrites.
 4. The candidate is the union of those closed bounds. No concrete lower bound means E0534; do not invent `Never` or take an intersection of upper bounds. An explicit closed `Never` is allowed. A pure-variable SCC with no concrete lower bound is unfilled.
@@ -114,9 +114,9 @@ A solver checkpoint/trial copy is an implementation choice; its rollback include
 
 Fixation never generalizes a weak variable. Variables not demanded remain shared and unfixed. A foreign top-level type read adds no fixation equations to its source. Adding only such reads cannot change the library's completion results. Ordinary expression uses and local monotype sharing can still constrain shared weak variables, as §4.7 already permits; this rule does not introduce separate compilation or make every shown weak scheme consumer-independent.
 
-**R6. Examples and cost.** With `id = (x) { x }`, `twice = (f: id, n: Int) { f(f(n)) }` instantiates `id`; `Same = id` is E0533. `g = id(id)` is weak and unfilled, so `G = g` is E0534. With `port = 8080`, `Port = port` is `8080`, never `Int`; write `port: Int = 8080` to obtain `Int`.
+**R6. Examples and cost.** With `id = (x) { x }`, `twice = (f : id, n : Int) { f(f(n)) }` instantiates `id`; `Same = id` is E0533. `g = id(id)` is weak and unfilled, so `G = g` is E0534. With `port = 8080`, `Port = port` is `8080`, never `Int`; write `port : Int = 8080` to obtain `Int`.
 
-With an invariant `Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }`, `r = cell(1)` and `C = r` in one module fix the demanded parameter to `1` if the batch checks. A later `r.set(2)` fails. Without the read, later constraints may widen that parameter. This is a deliberate, visible cost of D; it is not ordinary display simplification.
+With an invariant `Cell(A) { Cell(get : () -> A, set : (A) -> Nil) }`, `r = cell(1)` and `C = r` in one module fix the demanded parameter to `1` if the batch checks. A later `r.set(2)` fails. Without the read, later constraints may widen that parameter. This is a deliberate, visible cost of D; it is not ordinary display simplification.
 
 **R7. Closed-only reuse after completion (coordinator choice a).** A new definition read or extraction in another module, or performed by a later group, must start from a **wholly closed completed source type**. Replace recorded fixed variables by their closed forms; all remaining structure must contain no generalized variable, unresolved weak variable, label parameter, Top or hole. A successful source-completion batch may publish a wholly closed source form as well as its closed aliases. Do not reconstruct a shape from a weak variable's live bounds, use its displayed type, or add equations to obtain a closed form after the source has completed. The rule is the same for a direct constructor-shaped scheme and for a weak root with that constructor below it.
 
@@ -176,31 +176,31 @@ Runtime needs, full needs and initialization continue to use only expression use
 **O3. Diagnostics.** Keep edge provenance: annotation span, alias chain, source binding and expression-use path. For:
 
 ```i
-a = (n: b) { n }
+a = (n : b) { n }
 b = a(1)
 ```
 
 report E0530 at `b` in the annotation: “the type of b is needed to type a, but b uses a; write the type instead.” For `A = List(A)`, give E0223; for imports in a circle, retain E0214. Do not turn any of these into “type not known”, a fresh variable or a depth-limit result.
 
-**O4. Recovery.** Mark definition sites, pattern binders and annotation sites in a bad dependency component Failed before inference. Dependents propagate failure without another diagnostic. Normal checking stops after resolution/order errors (`lib.rs:160–169`), but query checking continues (`query.rs:36–41`). Pass an explicit prior-error flag to the checker; don't infer it from an empty inference diagnostic vector. In recovery only, a missing dependency gives Failed/Error and preserves unrelated query results. A Pending read in an otherwise valid program is an internal scheduling error.
+**O4. Recovery.** Mark definition sites, pattern binders and annotation sites in a bad dependency component Failed before inference. Dependents propagate failure without another diagnostic. Normal checking stops after resolution/order errors (`lib.rs : 160–169`), but query checking continues (`query.rs : 36–41`). Pass an explicit prior-error flag to the checker; don't infer it from an empty inference diagnostic vector. In recovery only, a missing dependency gives Failed/Error and preserves unrelated query results. A Pending read in an otherwise valid program is an internal scheduling error.
 
 ### 4.5 Known types, places and forbidden contexts (K)
 
 **K1.** `Of` reads inferred schemes/monotypes, never a narrower flow fact. For a completed generalized scheme, its known form erases quantified variables to `_`, keeping relationships only in inference. A completed fixed part has that closed known form.
 
-For a current parameter or monomorphic local, kconv uses a pure **inferred-shape conversion** of its stored monotype: substitute already fixed closed forms, retain its structural nodes, and erase every remaining inference variable to a hole, without following its temporary bounds. A written type on that name is already present in this monotype (`types/pattern.rs:178–185`). For completed generalized locals use the simplified principal scheme while preserving weak variables, then erase remaining variables; do not substitute a value-known fact for a weak variable.
+For a current parameter or monomorphic local, kconv uses a pure **inferred-shape conversion** of its stored monotype: substitute already fixed closed forms, retain its structural nodes, and erase every remaining inference variable to a hole, without following its temporary bounds. A written type on that name is already present in this monotype (`types/pattern.rs : 178–185`). For completed generalized locals use the simplified principal scheme while preserving weak variables, then erase remaining variables; do not substitute a value-known fact for a weak variable.
 
-No separate flow-shape table is needed. Never use fit_known's kvars, expected known types, or the known type of a value matched by a compound pattern as the inferred type read by Of. They can be narrower (`known.rs:457–466`; T1 §4.8). An unannotated source parameter stays unknown here even when its callback has a narrower expected known type. Ordinary expression checking still uses expected types as before.
+No separate flow-shape table is needed. Never use fit_known's kvars, expected known types, or the known type of a value matched by a compound pattern as the inferred type read by Of. They can be narrower (`known.rs : 457–466`; T1 §4.8). An unannotated source parameter stays unknown here even when its callback has a narrower expected known type. Ordinary expression checking still uses expected types as before.
 
 ```i
-copy = (s: String) {
-  x = "a" = s
-  y: x = "b"
-  y
+copy = (s : String) {
+	x = "a" = s
+	y : x = "b"
+	y
 }
 ```
 
-With `"a"` as input this gives `"b"`; the fitted binding needs Assert in its environment. The inferred type of x is String, its value-known type is "a", and y uses String. The inferred-shape conversion must not copy that narrower fitted-literal fact. Likewise, `((a: Int, b: String)) { q: a = a  q == 1 }` uses `Int`, not the whole tuple. Conversion to known information never shares or commits new inference constraints.
+With `"a"` as input this gives `"b"`; the fitted binding needs Assert in its environment. The inferred type of x is String, its value-known type is "a", and y uses String. The inferred-shape conversion must not copy that narrower fitted-literal fact. Likewise, `((a : Int, b : String)) { q : a = a  q == 1 }` uses `Int`, not the whole tuple. Conversion to known information never shares or commits new inference constraints.
 
 **K2. Places.** Check the **whole expanded annotation**, including its surrounding union/intersection, with value types represented by their inferred shape before quantified variables are freshly instantiated. Treat unfilled shared local holders as type variables. Checking each `Of` independently misses `a | b` when both are variable members. Reuse §4.4's polarity and T3's spread restrictions; no new choice in input places. A `pick(A, B)` of type `(A, B, Bool) -> A | B` cannot be smuggled into a parameter annotation through `(f: pick)` (E0518).
 
@@ -216,13 +216,13 @@ Ordinary annotation parameter/result/error types and type tests are allowed. Rea
 
 **X2.** After completion check exported extraction aliases, all exported aliases transitively using them, and exported top annotations transitively using value types against §2.4. Private nominal types of the exporting module may not leak. Written types with no value dependency retain the existing resolve check. With a value dependency, defer the annotation's entire hidden-type check; remove it from the “already checked written annotation” exemption in inference. Expand private aliases and retain source provenance in messages.
 
-**X3.** Add `Typed.alias_types: Map<TypeId, ShownType>` for each extraction binder and value-dependent alias, parameterized by its own written formal parameters. Package interfaces compare the completed structural body, with canonical nominal identities, complete literal sets and canonical formal-parameter identities. Never serialize `= private_value`, solver variable ids, source locations, fixation metadata, or shortened hover text. A change to a private source can change its exported alias. A source rename with the same read type does not. T3's label canonicalization remains in force.
+**X3.** Add `Typed.alias_types : Map<TypeId, ShownType>` for each extraction binder and value-dependent alias, parameterized by its own written formal parameters. Package interfaces compare the completed structural body, with canonical nominal identities, complete literal sets and canonical formal-parameter identities. Never serialize `= private_value`, solver variable ids, source locations, fixation metadata, or shortened hover text. A change to a private source can change its exported alias. A source rename with the same read type does not. T3's label canonicalization remains in force.
 
 **X4.** Query type printing shows the written value name in annotations. Hover on that reference shows the source's scheme; go-to-definition uses its resolved local/DefId. A pattern head targets its existing type; each binder targets its own TypeId. Hover on a completed binder shows `User = <structural type>`; on a failed/pending binder show its written pattern and available diagnostic, never an invented hole alias. The outline lists every binder even when the item has several. Resolve source references even when inference failed. Completion/type navigation uses completed alias bodies when available.
 
 ### 4.7 Records and macros (M)
 
-**M1.** The records.md §5.9 builder gives a weak `Codec(D, E)`. Demand only its decode part and the Codec shape. Normalize `Without(R, {age}) & ( age: Int )` after closing its dependencies; T3's exact rewrites yield `( age: Int, name: String )`. Fix that decode part through checked equations. Leave the distinct encode variable unfixed; `user.encode(u)` still constrains it normally. Reading `Codec(_, Enc) = user` with no encode lower bounds is E0534. No case for “schema” or “codec” exists in the algorithm.
+**M1.** The records.md §5.9 builder gives a weak `Codec(D, E)`. Demand only its decode part and the Codec shape. Normalize `Without(R, {age}) & ( age : Int )` after closing its dependencies; T3's exact rewrites yield `( age : Int, name : String )`. Fix that decode part through checked equations. Leave the distinct encode variable unfixed; `user.encode(u)` still constrains it normally. Reading `Codec(_, Enc) = user` with no encode lower bounds is E0534. No case for “schema” or “codec” exists in the algorithm.
 
 T3 must add closure, provenance and inferred-shape arms for records/Without, rerun its L2a/L5 checks on `Of`, and test this builder. T2 itself tests an ordinary nominal Codec with closed scalar decode output. Until T3 adds those forms, unsupported closure is an explicit failure, never a partial type.
 
@@ -230,8 +230,14 @@ T3 must add closure, provenance and inferred-shape arms for records/Without, rer
 
 ```i
 // app/users: ordinary imports from a schema library
-((Schema, object, field, string, int) = json/schema)
-(User, user)
+(
+	(Schema, object, field, string, int) = json/schema
+)
+
+(
+	User
+	user
+)
 
 user = object |> field("name", string) |> field("age", int)
 Schema(User, _) = user
@@ -239,19 +245,27 @@ Schema(User, _) = user
 
 ```i
 // app/client
-((User) = app/users)
+(
+	(User) = app/users
+)
 
-name = (u: User) { u.name }
+name = (u : User) { u.name }
 ```
 
-User completes to `( age: Int, name: String )` in app/users; app/client reads the exported alias, never users.user's partly open type. This is the plan's `Schema(User, _) = user` with an ordinary library across a module boundary and no repeated record annotation. The module paths are illustrative library paths, not compiler-reserved names.
+User completes to `( age : Int, name : String )` in app/users; app/client reads the exported alias, never users.user's partly open type. This is the plan's `Schema(User, _) = user` with an ordinary library across a module boundary and no repeated record annotation. The module paths are illustrative library paths, not compiler-reserved names.
 
 The accepted records.md §5.9 codec follows exactly the same placement, with Codec imported from the ordinary codec module:
 
 ```i
 // app/codecs
-((Codec, object, field, string, int) = json/codec)
-(User, user)
+(
+	(Codec, object, field, string, int) = json/codec
+)
+
+(
+	User
+	user
+)
 
 user = object |> field("name", string) |> field("age", int)
 Codec(User, _) = user
@@ -319,7 +333,7 @@ ValueType = [ name "." ] name .
 Replace the temporary lowercase-type error bullet:
 
 > - A lowercase `x` in a type, without `(` after it, means the type of the value named `x` at that place. The name follows value scope (§5). `m.x` means an exported value of module `m`, never a field of a value. If `m` names a value, it is a compile error. `{ x }` groups the same type. A lowercase name or member followed by `(` remains a macro call, not a value type or a type application.
-> - A type may not name a value bound by that same pattern; a parameter in the types of that function's own header, including its `->`, `?` and `!` parts; or its own binding's reserved name inside that binding's value. A distinct inner binder that has entered scope may cover that reserved name. This is a compile error even if an outer value has the same name. Those parameters may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x: Int) { y: x = x  y }` is allowed.
+> - A type may not name a value bound by that same pattern; a parameter in the types of that function's own header, including its `->`, `?` and `!` parts; or its own binding's reserved name inside that binding's value. A distinct inner binder that has entered scope may cover that reserved name. This is a compile error even if an outer value has the same name. Those parameters may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x : Int) { y : x = x  y }` is allowed.
 > - A value type is not its known type (§4.8). It follows the scheme, instantiation and completion rules of §4.7. It never makes a monomorphic value polymorphic.
 > - A value type, directly or through aliases, may not occur in a custom constructor field, an external or host declaration, or a service/environment type. Those types must be complete before inference.
 > - A type variable is an UpName declared after a binding, declaration, or type-definition name (§4.7). Lowercase names do not declare type variables.
@@ -352,10 +366,10 @@ TypePattern = UpName | "_"
 
 ```i
 Codec(D, E) = (decode = (String) -> D, encode = (E) -> String)
-make = <D, E>(d: (String) -> D, e: (E) -> String) {
+make = <D, E>(d : (String) -> D, e : (E) -> String) {
 	Codec(decode = d, encode = e)
 }
-size = make((s) { string.length(s) }, (n: Int) { int.to_string(n) })
+size = make((s) { string.length(s) }, (n : Int) { int.to_string(n) })
 Codec(Size, _) = size
 // Size = Int; the distinct encode part is not fixed.
 Pair(A, B) = { (A, B) }
@@ -373,7 +387,7 @@ Pair(Tree, _) = parsed
 > - For a demanded non-general variable, collect all types that come to it, including through variable relationships. Put them together by union, replacing the non-general variables needed inside them by their fixed types. Pure cycles of variable relationships count once. A structural recursive type, an unfilled part, a generalized variable needed inside this replacement, or a part that cannot be made closed is a compile error. An explicit closed `Never` is allowed; the absence of any information does not invent `Never`. Literal types are never widened.
 > - Fixing adds both subtype constraints between the variable and the resulting closed type, keeping every previous constraint. Every needed variable is fixed together, and the usual occurs and place rules apply. If these equations cannot hold, it is a compile error. Pattern shape checks use the original argument variables, so skipping a distinct argument leaves it shared and unfixed. The pattern cannot supply a type to fill an unknown.
 > - A group that constrains an earlier non-general variable that was not fixed cannot fix its own non-general parts. A demanded part carrying such an earlier variable also cannot be fixed. This conservative rule makes the result independent of unrelated groups' inference order.
-> - From then on, later uses must agree with each fixed part. A use that would widen it incompatibly is a type error with a note at the place that fixed it. Write a wider annotation at the source when needed. For example, reading `r = cell(1)` may fix its invariant argument to `1`; write `r: Cell(Int) = cell(1)` to allow other Int values.
+> - From then on, later uses must agree with each fixed part. A use that would widen it incompatibly is a type error with a note at the place that fixed it. Write a wider annotation at the source when needed. For example, reading `r = cell(1)` may fix its invariant argument to `1`; write `r : Cell(Int) = cell(1)` to allow other Int values.
 > - In another module, or when a new definition read is performed by a later group, an alias pattern or other permanent value-derived definition must start from a wholly closed completed source type. A fixed component behind an open enclosing type is not sufficient, even when the open arguments are skipped. This read adds no constraints to the source. If the source remains open, the error says to use the closed alias made by its source module and to export it when needed. Annotation instantiation and current-group local monotype sharing keep their rules above. Adding foreign fixation demands cannot change the source module's completion result. Ordinary expression constraints and local monomorphic sharing remain shared as elsewhere in this section; this rule does not fix the display of every uncompleted weak part.
 > - A permanent alias denotes the completed closed part. It does not change when later bindings are checked. A same-module top-level pattern is handled at its source's completion, regardless of where the item is written. Aliases with several sources assemble already closed per-source results, not saved partial source types. Definitions are completed before their dependents. Importing or using the closed alias later does not read its source value again.
 > - The whole annotation after value types and aliases are read must obey §4.4's rules of places. A value-type spelling does not hide variable members from that check.
@@ -386,13 +400,13 @@ Keep the principal-type and value-restriction bullets. Completion equations abov
 
 ### 7.6 §4.8 Known types and pattern types: edits
 
-Replace the pattern-type bullet for `x: T`:
+Replace the pattern-type bullet for `x : T`:
 
-> - `x: T`: `T`, with new variables for holes and value types read as §4.7 says; `x` gets that type.
+> - `x : T`: `T`, with new variables for holes and value types read as §4.7 says; `x` gets that type.
 
 Add under Names in patterns:
 
-> A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or clause narrowing do not refine this shape. Thus `((a: Int, b: String)) { q: a = a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s: String`, x's inferred type is String even though its known type is "a"; an annotation naming x uses String.
+> A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or clause narrowing do not refine this shape. Thus `((a : Int, b : String)) { q : a = a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s : String`, x's inferred type is String even though its known type is "a"; an annotation naming x uses String.
 
 ### 7.7 §5 and future macro text
 
@@ -405,20 +419,20 @@ When M4 adds typed-macro rules, insert M3 verbatim in its spec section with lang
 Paths below are proposed changes, not changes made by this note.
 
 - `crates/ilang-syntax/src/ast.rs`, parser/type-head region and formatter/printer arms: retain A3's value-type node; add the P1 core-tree distinction and binder/part structure. Validate pattern forms after classification, not by consulting imports. Keep group-insensitive classification and TypeCall. Remove temporary A1/A3 errors. Update `crates/ilang-check/tests/hir.rs` and syntax round-trip fixtures.
-- `crates/ilang-check/src/hir.rs:56–79,167–192,273–296`: add `TypeKind::Of { value: ValueRef, site: OfId, projection: Option<ProjectionId> }`, site/context/provenance tables and the shared type visitor. Add AliasPattern and TypePat (Bind/Skip/Named/Tuple/Exact/Error). Each binder remains TypeBody::Alias(Of(...)), with no new TypeBody variant. Store its full item separately for queries/Definitions. ProjectionId identifies the written pattern for one-shot completion; later conversion reads the binder's closed alias cache and never re-runs its source projection.
-- `resolve.rs:391–592,773–803,1098–1209,1329–1379`: collect pattern binders before exports/imports; resolve definition sources from the value scope; add pattern alias edges, summaries and demands. Do not register the head as a new type. Check E0537 after imports. Collect an AliasPattern slot for items with multiple binders.
-- `resolve.rs:1445–1660,1680–1755,1834–1905,2133–2202,2392–2486`: pending identities, value lookup and forbidden contexts; defer value-dependent hidden-type checks. Reuse one context/readiness check for M4 and one resolved-reference list for T3. All child/substitution/named-type walkers need Of arms.
-- `order.rs:17–135,188–251`: keep the old use graph and initialization; add the group dependency graph and provenance. Store source completion events and alias-site dependency order, including modules with no groups. Add an alternate topological tie-break mode for tests.
-- `types/infer.rs:72–149,155–228,233–355`: add temporary demand snapshots, ownership/availability, closed completed read forms, definition-site states, closed alias results, and a module loop around group processing. Completion must run after generalization and ordinary group checks; failed groups publish Failed, never partial aliases. Process module-start events even without groups.
-- `types/infer.rs:603–687,852–970,1000–1005,1926–1992,2052–2120`: inferred-shape place checking, Of annotation instantiation/local sharing, closed definition cache, R7's non-mutating completed-source gate, and pure inferred-shape conversion for locals. Replace the depth fallback for any alias chain involving value-dependent aliases with checked cache lookup; ordinary alias cycle recovery remains explicit.
+- `crates/ilang-check/src/hir.rs : 56–79,167–192,273–296`: add `TypeKind : : Of { value : ValueRef, site : OfId, projection : Option<ProjectionId> }`, site/context/provenance tables and the shared type visitor. Add AliasPattern and TypePat (Bind/Skip/Named/Tuple/Exact/Error). Each binder remains TypeBody::Alias(Of(...)), with no new TypeBody variant. Store its full item separately for queries/Definitions. ProjectionId identifies the written pattern for one-shot completion; later conversion reads the binder's closed alias cache and never re-runs its source projection.
+- `resolve.rs : 391–592,773–803,1098–1209,1329–1379`: collect pattern binders before exports/imports; resolve definition sources from the value scope; add pattern alias edges, summaries and demands. Do not register the head as a new type. Check E0537 after imports. Collect an AliasPattern slot for items with multiple binders.
+- `resolve.rs : 1445–1660,1680–1755,1834–1905,2133–2202,2392–2486`: pending identities, value lookup and forbidden contexts; defer value-dependent hidden-type checks. Reuse one context/readiness check for M4 and one resolved-reference list for T3. All child/substitution/named-type walkers need Of arms.
+- `order.rs : 17–135,188–251`: keep the old use graph and initialization; add the group dependency graph and provenance. Store source completion events and alias-site dependency order, including modules with no groups. Add an alternate topological tie-break mode for tests.
+- `types/infer.rs : 72–149,155–228,233–355`: add temporary demand snapshots, ownership/availability, closed completed read forms, definition-site states, closed alias results, and a module loop around group processing. Completion must run after generalization and ordinary group checks; failed groups publish Failed, never partial aliases. Process module-start events even without groups.
+- `types/infer.rs : 603–687,852–970,1000–1005,1926–1992,2052–2120`: inferred-shape place checking, Of annotation instantiation/local sharing, closed definition cache, R7's non-mutating completed-source gate, and pure inferred-shape conversion for locals. Replace the depth fallback for any alias chain involving value-dependent aliases with checked cache lookup; ordinary alias cycle recovery remains explicit.
 - New `types/value_types.rs` or `types/alias_pattern.rs`: projection, closed-form collection including pure-variable SCCs/from edges, snapshot batch construction, P4 matching, closed-only R7 reuse, failure provenance. No partial-source projection records survive completion.
-- `types/solve.rs:87–105,245–285,385–507,577–633`: trial/checkpoint support and optional group-origin observation for open-group checks. **No replacement-variable semantics and no bypass of bound propagation.** Existing constraints implement fixation. Include normalization operations in the observed trial state.
-- `types/known.rs:102–162,433–515`: Of known conversion from stored inferred monotypes/schemes, never narrowed `kvars`; no solver-variable allocation in kconv.
-- `types/mod.rs:148–210`, `types/display.rs:515–555`: alias results and exact fixed forms for extraction/display; preserve full typed value sets. Keep fixation metadata out of canonical types.
-- `types/infer.rs:569–597,983–989`: deferred export checks and the written-type exemption. Check aliases even without exported value bindings.
-- `query.rs:331–463,492–545,991–1053,1137–1147,1218–1249`: alias hover/fallback, binder outline, value-reference navigation and completed-body expansion. `query.rs:26–48` and checker entry plumbing pass prior-error recovery state.
-- `crates/ilang-cli/src/commands/package.rs:1063–1198,1235–1385`: pass alias results to TypeShow and canonicalize completed bodies/formals. Human output uses UpName parameters; canonical identities may use internal numbered names. `TypeShow::param` currently prints lowercase (`:1281–1286`), so check A2's migration rather than assuming it was done.
-- `crates/ilang-check/src/lib.rs:18–99`: diagnostic codes and prior-error state. `crates/ilang-wasm/src/lower.rs:2209–2237`: assertion/tests that alias TypeIds do not reach type-test heads; T1's literal test members remain intact.
+- `types/solve.rs : 87–105,245–285,385–507,577–633`: trial/checkpoint support and optional group-origin observation for open-group checks. **No replacement-variable semantics and no bypass of bound propagation.** Existing constraints implement fixation. Include normalization operations in the observed trial state.
+- `types/known.rs : 102–162,433–515`: Of known conversion from stored inferred monotypes/schemes, never narrowed `kvars`; no solver-variable allocation in kconv.
+- `types/mod.rs : 148–210`, `types/display.rs : 515–555`: alias results and exact fixed forms for extraction/display; preserve full typed value sets. Keep fixation metadata out of canonical types.
+- `types/infer.rs : 569–597,983–989`: deferred export checks and the written-type exemption. Check aliases even without exported value bindings.
+- `query.rs : 331–463,492–545,991–1053,1137–1147,1218–1249`: alias hover/fallback, binder outline, value-reference navigation and completed-body expansion. `query.rs : 26–48` and checker entry plumbing pass prior-error recovery state.
+- `crates/ilang-cli/src/commands/package.rs : 1063–1198,1235–1385`: pass alias results to TypeShow and canonicalize completed bodies/formals. Human output uses UpName parameters; canonical identities may use internal numbered names. `TypeShow::param` currently prints lowercase (`:1281–1286`), so check A2's migration rather than assuming it was done.
+- `crates/ilang-check/src/lib.rs : 18–99`: diagnostic codes and prior-error state. `crates/ilang-wasm/src/lower.rs : 2209–2237`: assertion/tests that alias TypeIds do not reach type-test heads; T1's literal test members remain intact.
 - Spec sections in §7; syntax.md's temporary reservations become pointers to the implemented rules. Update records.md §11's code-allocation sentence and §19 question 10; meta.md's core-form/Lisp table, readiness rule and T2 question. These documentation edits belong to T2/M integration after this note is accepted; this lane changes only this note.
 
 No-value-type programs bypass demand collection/closure/trial work. Do not promise literally zero allocations or an unchanged timing without measurement; existing code still receives new exhaustive-match arms and a disabled observation hook.
@@ -443,16 +457,16 @@ These are implementation requirements, not tests reported as passing. Each expec
 
 | Test | Program or change | Expected result and rule |
 |---|---|---|
-| Annotation instance | `id = (x) { x }`; `twice = (f: id, n: Int) { f(f(n)) }`; call with identity and 3. | Result 3; R1. Separate `id` occurrences admit separate instances; one annotated parameter remains monomorphic. |
+| Annotation instance | `id = (x) { x }`; `twice = (f : id, n : Int) { f(f(n)) }`; call with identity and 3. | Result 3; R1. Separate `id` occurrences admit separate instances; one annotated parameter remains monomorphic. |
 | Open alias | `Same = id`; separately `g = id(id)` and `G = g`. | E0533 and E0534 respectively; R2/R4. |
-| Local sharing | `f = (xs: List(Int)) { acc: xs = []  acc }`; call with `[1]`. | Result []; R1. A local alias of a weak captured value still shares its variables, rather than freshening them. |
+| Local sharing | `f = (xs : List(Int)) { acc : xs = []  acc }`; call with `[1]`. | Result []; R1. A local alias of a weak captured value still shares its variables, rather than freshening them. |
 | Inferred, not narrowed | K1's `copy` with `"a"` under Assert; tuple parameter with individually annotated parts. | Result `"b"`, no E0520; projected `q` has known Int; K1. Also test an unannotated outer parameter narrowed by a type test: its shape stays unknown, not the tested type. |
 | Shadowed own name | An outer f contains an inner function with parameter f: Int and body `y: f = f`. | Allowed; the inner parameter identity covers the outer own-binding marker. In the inner header itself `(f, y: f)` remains E0536; V3. |
-| Matched-value known type | `Box(A) { Box(A) }`; `f = (p: Box(Int)) { Box(a) = id(p)  y: a = "s"  y == "s" }`. | Result True; the non-generalized a holder is shared, while Of(a) has unknown shape. Do not copy p's known Int field into the inferred-shape conversion; R1/K1. |
+| Matched-value known type | `Box(A) { Box(A) }`; `f = (p : Box(Int)) { Box(a) = id(p)  y : a = "s"  y == "s" }`. | Result True; the non-generalized a holder is shared, while Of(a) has unknown shape. Do not copy p's known Int field into the inferred-shape conversion; R1/K1. |
 | Expected known type | `list.map(["a"], (x) { y: x = "b"  y == "b" })`. | Result [True], no false E0520 from a source shape of "a"; K1. The inferred holder stays shared, and its unknown shape is erased. |
-| Literal exactness | `port = 8080`; `Port = port`; `bad: Port = 8081`. | E0501; with source annotated Int, both values accepted; R6/T1. |
+| Literal exactness | `port = 8080`; `Port = port`; `bad : Port = 8081`. | E0501; with source annotated Int, both values accepted; R6/T1. |
 | Nominal extraction | §7.4's size fixture. | Size = Int; encoding an Int remains legal. Reading the untouched encode part is E0534; P4/M1. |
-| Skip sharing | `s: PairType(Int, Int)` with two distinct fixed parts; separately a fixture with the same weak variable in both arguments. | Skip never allocates/copies a variable; a distinct skipped part remains live, a shared demanded variable is fixed in both places; P4. |
+| Skip sharing | `s : PairType(Int, Int)` with two distinct fixed parts; separately a fixture with the same weak variable in both arguments. | Skip never allocates/copies a variable; a distinct skipped part remains live, a shared demanded variable is fixed in both places; P4. |
 | Lower-bound graph | Hand-built weak v with a concrete predecessor only in `from`; a pure-variable cycle with one concrete Int bound; same cycle with none. | Int, Int, E0534; R4. No bound disappears. |
 | Old constraints | In solver tests retain `v <: w`, fix v to 1, then constrain 2 <: w (allowed), and separately 2 <: v (fails). Include structural/invariant/env links and extrusion. | The first does not force w equal to v; the second retains the existing error. Fixing cannot detach the graph; R5. |
 | Failed batch | Lower-bound substitutions that conflict with an upper bound; unsupported form; structural recursion. Compare solver state before/after failure. | E0534 with unchanged main solver, no assertion/panic or leaked failures; R4. |
@@ -481,7 +495,7 @@ A complete, ordinary i fixture for the invariant Cell tests (no host or mutable 
 
 ```i
 Cell(A) = (get = () -> A, set = (A) -> Nil)
-cell = <A>(x: A) { Cell(get = () { x }, set = (y: A) { Nil }) }
+cell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }
 r = cell(1)
 C = r
 later = () { r.set(2) }
@@ -502,20 +516,22 @@ Use the review's fixture unchanged first, including its initially private LocalS
 
 Codec(D, E) = (decode = (String) -> D, encode = (E) -> String)
 
-make = <D, E>(d: (String) -> D, e: (E) -> String) {
+make = <D, E>(d : (String) -> D, e : (E) -> String) {
 	Codec(decode = d, encode = e)
 }
 
 id = (x) { x }
 
-size = id(make((s: String) -> Int { 1 }, (n: Int) -> String { "" }))
+size = id(make((s : String) -> Int { 1 }, (n : Int) -> String { "" }))
 
 Codec(LocalSize, _) = size
 ```
 
 ```i
 // app/client
-((Codec) = app/lib)
+(
+	(Codec) = app/lib
+)
 
 Codec(RemoteSize, _) = lib.size
 ```
@@ -526,12 +542,12 @@ Required variants:
 
 - Export LocalSize by changing the first module's exports to `(Codec, size, LocalSize)`. The direct remote extraction still gives E0534, now suggesting the exported lib.LocalSize. In a separate positive client use `((LocalSize) = app/lib)` and `RemoteSize = LocalSize`: RemoteSize is Int. Reading the alias adds no constraint to size.
 - Remove the id wrapper so size's inferred root may be a direct Codec form rather than a weak root. With E still open, remote extraction remains E0534. R7 must not depend on this representation difference.
-- Give size the explicit source annotation `size: Codec(Int, Int) = id(make(…))`, using the same two callbacks. Its whole stored source type is closed, so remote extraction succeeds with RemoteSize = Int and no added source constraint.
-- In app/lib add a normal later binding `use = (value: LocalSize) { value }`: it is accepted using the completed alias. A whole-value annotation using size instead remains E0534 while E is open. A second same-module top-level pattern `Codec(Again, _) = size`, even if written after use, is still an original source-completion demand and yields Again = Int; source order does not create a later-group projection privilege.
-- Use the two-module schema and codec placements of M1a after T3. Both exported User aliases equal `( age: Int, name: String )`; codec encode calls remain legal. The negative client re-extraction of an open codec gives the same E0534/use-User guidance.
+- Give size the explicit source annotation `size : Codec(Int, Int) = id(make(…))`, using the same two callbacks. Its whole stored source type is closed, so remote extraction succeeds with RemoteSize = Int and no added source constraint.
+- In app/lib add a normal later binding `use = (value : LocalSize) { value }`: it is accepted using the completed alias. A whole-value annotation using size instead remains E0534 while E is open. A second same-module top-level pattern `Codec(Again, _) = size`, even if written after use, is still an original source-completion demand and yields Again = Int; source order does not create a later-group projection privilege.
+- Use the two-module schema and codec placements of M1a after T3. Both exported User aliases equal `( age : Int, name : String )`; codec encode calls remain legal. The negative client re-extraction of an open codec gives the same E0534/use-User guidance.
 - Run each variant with reversed independent-group tie breaking and through query recovery. Assert identical alias results/diagnostics and no new source bounds on either a successful closed-source read or a failed open-source read.
 
-The baseline code facts behind the fixture were checked here: calls may return a weak instantiated result (`crates/ilang-check/src/types/infer.rs:1346–1353`), non-direct size keeps its monotype (`:315–325`), and mono display coalesces lower bounds rather than establishing a closed type (`crates/ilang-check/src/types/display.rs:531–555`). The independent reviewer ran an old-syntax checker-only baseline without extraction and reported `size : Codec(Int, Never)`; that run was **not** repeated here and does not test T2. All T2 outcomes above are required implementation results, not reported executions.
+The baseline code facts behind the fixture were checked here: calls may return a weak instantiated result (`crates/ilang-check/src/types/infer.rs : 1346–1353`), non-direct size keeps its monotype (`:315–325`), and mono display coalesces lower bounds rather than establishing a closed type (`crates/ilang-check/src/types/display.rs : 531–555`). The independent reviewer ran an old-syntax checker-only baseline without extraction and reported `size : Codec(Int, Never)`; that run was **not** repeated here and does not test T2. All T2 outcomes above are required implementation results, not reported executions.
 
 ## 11. Self-attack record
 
@@ -539,26 +555,26 @@ All programs here use the proposed syntax. “Checked by reading” means the in
 
 ### Discovery pass: confirmed problems and corrections
 
-1. **Soundness/constraints: replacing a pinned variable detaches existing relations.** With a hand-built constraint `v <: w`, a read fixes v while a later bound reaches it through w/structural relationships. The old proposal replaced variable operands and stopped walking their old lists. It supplied no proof that every propagated constraint survived. Reading `solve.rs:245–285,385–447,577–608` confirmed multiple propagation/direct-write paths. **Fix:** retain the original variables and add checked equalities; no solver replacement invariant (R4/R5). Do not assert that a candidate always checks.
-2. **Cannot build: reverse bounds and pure cycles.** A variable can receive values through `from` without those being in its own lower list (`display.rs:531–538`). Literal-only collection can miss them; recursive DFS can reject a mere variable equality cycle. **Fix:** follow both edges and collapse pure-variable SCCs, failing only unfilled or structural cycles (R4).
-3. **Cannot build: lazy completion misses empty modules and alias order.** A module containing only `Codec(Size, _) = imported.size` has no group; `A = List(B)` may be written before the pattern defining B from the same source. Source-order completion either never runs or reads Pending. `infer.rs:188–191` confirms the current group-only loop. **Fix:** module-start events and dependency-before-source ordering (P5/O4).
-4. **Source conflict: alias exports.** The prior draft called `User(..)` an error. `resolve.rs:797–803` explicitly accepts it. **Fix:** preserve the alias export rule and add a regression (X1/§7.1).
+1. **Soundness/constraints: replacing a pinned variable detaches existing relations.** With a hand-built constraint `v <: w`, a read fixes v while a later bound reaches it through w/structural relationships. The old proposal replaced variable operands and stopped walking their old lists. It supplied no proof that every propagated constraint survived. Reading `solve.rs : 245–285,385–447,577–608` confirmed multiple propagation/direct-write paths. **Fix:** retain the original variables and add checked equalities; no solver replacement invariant (R4/R5). Do not assert that a candidate always checks.
+2. **Cannot build: reverse bounds and pure cycles.** A variable can receive values through `from` without those being in its own lower list (`display.rs : 531–538`). Literal-only collection can miss them; recursive DFS can reject a mere variable equality cycle. **Fix:** follow both edges and collapse pure-variable SCCs, failing only unfilled or structural cycles (R4).
+3. **Cannot build: lazy completion misses empty modules and alias order.** A module containing only `Codec(Size, _) = imported.size` has no group; `A = List(B)` may be written before the pattern defining B from the same source. Source-order completion either never runs or reads Pending. `infer.rs : 188–191` confirms the current group-only loop. **Fix:** module-start events and dependency-before-source ordering (P5/O4).
+4. **Source conflict: alias exports.** The prior draft called `User(..)` an error. `resolve.rs : 797–803` explicitly accepts it. **Fix:** preserve the alias export rule and add a regression (X1/§7.1).
 5. **Soundness/known types: a fitted literal narrows a value fact without changing its type.** K1's copy program would reject its `"b"` annotation, or produce a false E0520, if kconv used narrowed kvars. T1 explicitly distinguishes these facts. **Fix:** pure inferred-shape conversion of stored monotypes/schemes; no fitted-literal or branch fact feeds value-type conversion (K1/§7.6).
 6. **Cannot build: a pattern traverses a weak root while skipping an open argument.** Fixing the whole Codec closes encode unnecessarily; fixing only D leaves the observed root shape unchecked. **Fix:** retain observed-skeleton constraints with original argument identities, while closing only demanded leaves. A skip never creates an independent hole (P4).
 7. **Known-type conflict: expected types can also be narrower than an inferred holder.** In `list.map(["a"], (x) { y: x = "b"  y == "b" })`, the callback's expected known parameter may be "a", while the shared inferred holder must also accept "b" from y's annotation. Using that expected literal for Of's known conversion would give a false E0520. **Fix:** no expected-known fallback for an unannotated source parameter. Only its stored structural monotype provides type shape; written source annotations are part of that monotype (K1). Add the corresponding test. This is distinct from ordinary callback expected-type checking.
-8. **Scope conflict: a global pending-name set over-rejects shadowing.** `f = () { g = (f: Int) { y: f = f  y }  g(1) }` must read the inner parameter's type. Keeping the outer f text globally forbidden would give E0536. **Fix:** own-binding reserved frames participate in lexical type lookup and may be covered by inner binders; current-header pending names remain a separate check (V3).
-9. **Source conflict: a tuple-pattern annotation in the inherited examples is not legal.** The old examples put a type after the entire tuple pattern. Spec §7.1 and `ilang-syntax/src/ast.rs:327–338` only allow a typed name/discard. **Fix:** use `((a: Int, b: String)) { q: a = a  q == 1 }`, annotating individual parts; no pattern-syntax extension is proposed.
+8. **Scope conflict: a global pending-name set over-rejects shadowing.** `f = () { g = (f : Int) { y : f = f  y }  g(1) }` must read the inner parameter's type. Keeping the outer f text globally forbidden would give E0536. **Fix:** own-binding reserved frames participate in lexical type lookup and may be covered by inner binders; current-header pending names remain a separate check (V3).
+9. **Source conflict: a tuple-pattern annotation in the inherited examples is not legal.** The old examples put a type after the entire tuple pattern. Spec §7.1 and `ilang-syntax/src/ast.rs : 327–338` only allow a typed name/discard. **Fix:** use `((a : Int, b : String)) { q : a = a  q == 1 }`, annotating individual parts; no pattern-syntax extension is proposed.
 
 ### Attack pass 1 after those corrections
 
-- **Soundness:** `Box(A) { Box(get: () -> A, put: (A) -> Nil) }`; extract from a weak Box then pass it to incompatible invariant contexts. R4 checks both equality directions with the original graph; later incompatible constraints still fail. A skipped occurrence of that same A cannot escape fixation. The expected-known callback counterexample is also rechecked with an unannotated holder: its shape stays unknown while its monotype is shared. The inner-f shadowing example follows lexical reserved frames. No further serious issue found by tracing `constrain_in`, `compare` and the proposed scope rules.
+- **Soundness:** `Box(A) { Box(get : () -> A, put : (A) -> Nil) }`; extract from a weak Box then pass it to incompatible invariant contexts. R4 checks both equality directions with the original graph; later incompatible constraints still fail. A skipped occurrence of that same A cannot escape fixation. The expected-known callback counterexample is also rechecked with an unannotated holder: its shape stays unknown while its monotype is shared. The inner-f shadowing example follows lexical reserved frames. No further serious issue found by tracing `constrain_in`, `compare` and the proposed scope rules.
 - **Buildability:** `A = List(B)`, then `Pair(B, _) = pair`, with pair's result behind a weak root and an unused encode-like part. Module/group events and dependency order complete B before A without forcing the skipped part. No Pending fallback is needed.
 - **Sources:** `Schema(User, _) = m()` with a syntax macro returning `user`, and a later import of User. The stored generic classification gives a parameter-form error throughout; no import/expansion changes meaning. A newly generated whole pattern item is classified as such. This keeps the macro draft's syntactic definition service and accepted macro reservation. No further serious issue found.
 
 ### Attack pass 2
 
 - **Soundness/order:** lib's `r = cell(1)` and `reset = () { r.set("s") }`; add `C = lib.r` only in app/test, and permute independent groups. The consumer cannot add equations; G from a captured earlier weak c fails even when it merely carries c without constraining it. Library typing remains unchanged. This assertion concerns completion/fixation, not the final display of other weak parts after ordinary consumer expression uses. No further serious issue found under R3.
-- **Buildability/recovery:** `a = (n: b) { n }`, `b = a(1)`, plus a valid independent binding; also an alias-only module in an import cycle. Failed sites and prior-error state are set before query inference, so no new variable or missing-ready panic is required. Checked against `query.rs:26–48`. No further serious issue found.
+- **Buildability/recovery:** `a = (n: b) { n }`, `b = a(1)`, plus a valid independent binding; also an alias-only module in an import cycle. Failed sites and prior-error state are set before query inference, so no new variable or missing-ready panic is required. Checked against `query.rs : 26–48`. No further serious issue found.
 - **Sources/interface:** export an extraction alias with `(..)`; rename its private source without changing the inferred type; then change the source's literal set. X1/X3 preserve constructor privacy, ignore the rename and detect the type change. T3 label binders/key parameters still fail before inference; record closure uses its exact rewrites. No further serious issue found.
 
 Those original passes were design reasoning, not independent reviews or a solver proof, and missed one serious issue. The independent report is `/home/agent/Programming/i/.rd/cache/gpt/report-review-s6.md`. I checked its finding against the actual call result, monomorphic binding and display paths cited in §10.1, and against R3/P4/R5: a fixed D leaves Codec(D,E)'s outer weak variable without the closed entry that later P4 requires. The finding is confirmed.

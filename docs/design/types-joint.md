@@ -26,7 +26,7 @@ Keep the first design’s small independently testable stages and the second’s
 
 ### 2.1 HIR and resolution
 
-The existing HIR has `Named`, `Var`, `Hole`, `Tuple`, `Fn`, `Union`, `Inter`, `Diff`, `Error`, and aliases have ordinary TypeIds (`crates/ilang-check/src/hir.rs:167–192,273–296`). Keep them and add, in order:
+The existing HIR has `Named`, `Var`, `Hole`, `Tuple`, `Fn`, `Union`, `Inter`, `Diff`, `Error`, and aliases have ordinary TypeIds (`crates/ilang-check/src/hir.rs : 167–192,273–296`). Keep them and add, in order:
 
 ```rust
 // Contract sketch; auxiliary identifiers live in the owning track.
@@ -37,7 +37,7 @@ Record { base: Option<Box<Type>>, parts: Vec<RecordTypePart> },     // T3
 
 `LitValue` has Int and String cases only. T1 shares canonical numeric/string conversion with its set and coverage code. HIR may hold BigInt; the solver’s Int set keys remain canonical decimal strings. `RecordTypePart` is a field with a resolved label and Type, or a forgotten label. Keep each label span. A HIR label is a decoded name/string or a reference to a declared label parameter, never an inferred string expression.
 
-`Of` is not a `Ty` variant or a `Head`. It resolves to a scheme instance, a shared monotype, or a completed closed definition result under T2 R1–R7. `ValueRef::Local` and `Def` already distinguish its two sources (`hir.rs:349–357`). A constructor is not an Of source. Each extraction binder stays `TypeBody::Alias(Of(...))`; a separate written-item/pattern record holds the common source, head, skips, binder spans, and dependencies. Projection ids identify one completion operation, not a reusable partly open source cache.
+`Of` is not a `Ty` variant or a `Head`. It resolves to a scheme instance, a shared monotype, or a completed closed definition result under T2 R1–R7. `ValueRef::Local` and `Def` already distinguish its two sources (`hir.rs : 349–357`). A constructor is not an Of source. Each extraction binder stays `TypeBody::Alias(Of(...))`; a separate written-item/pattern record holds the common source, head, skips, binder spans, and dependencies. Projection ids identify one completion operation, not a reusable partly open source cache.
 
 `TypeCall` remains an AST/core form. Before M2, resolution reports E0234 and uses HIR Error for recovery; it must not resolve the head as an Of, instantiate a function, or create an alias. After M2, expansion removes it before ordinary type resolution. T1 changes A1’s type-call arguments to types, since literals are now types. It does not implement macros.
 
@@ -50,17 +50,17 @@ The one `resolve::ty` dispatch is:
 | `m.T(...)` | Named type, normal module/export/arity lookup; T2 does not capture it |
 | Lowercase `x` / `m.x`, without joined `(` | T2: pending/own-binding checks, ordinary value lookup, `Of`; `m` must be a module in the qualified form |
 | Lowercase `m(...)` / `a.m(...)` | Reserved macro form, regardless of imports |
-| `( ..T, ... )` / `( label: T, ... )` | T3: record type, decoded duplicate check, label binding checks; recurse into base and fields |
+| `( ..T, ... )` / `( label : T, ... )` | T3: record type, decoded duplicate check, label binding checks; recurse into base and fields |
 | `{ T }` | Group; no distinct inferred type |
 | Remaining structural forms | Recurse through the same visitor; propagate context and Of provenance |
 
-The old dispatch and lookup are at `resolve.rs:1329–1407`; service and host checks at `:1445–1467,1568–1660`; alias expansion/substitution and visitors at `:1409–1438,2630–2697`. T1 adds literal leaves there, T2 adds reference/context/dependency handling, T3 adds base/field recursion and label uses. The shared visitor must distinguish type children, value references, label references, and pattern binders. A literal or label text has no dependency. A record base or field can contain an Of dependency; a forgotten label cannot.
+The old dispatch and lookup are at `resolve.rs : 1329–1407`; service and host checks at `:1445–1467,1568–1660`; alias expansion/substitution and visitors at `:1409–1438,2630–2697`. T1 adds literal leaves there, T2 adds reference/context/dependency handling, T3 adds base/field recursion and label uses. The shared visitor must distinguish type children, value references, label references, and pattern binders. A literal or label text has no dependency. A record base or field can contain an Of dependency; a forgotten label cannot.
 
 Keep A1’s UpName frames and T2’s identity-based pending-name and own-RHS frames. Run T3’s reusable L1/L2/L2a/L5/L6 checks over the resolved references, including Of and alias-pattern sources. A same-header read first reports T2 E0536; an otherwise legal read of an outer key is E0543; a read of a label-generic callee is E0542. Errors do not authorize inference through a placeholder alias.
 
 ### 2.2 Solver types and public tables
 
-The present solver separates `Head` from `Ty`, stores `Con(Head, Vec<Ty>)`, and identifies heads through `head()` (`types/mod.rs:40–102`). The joint form is:
+The present solver separates `Head` from `Ty`, stores `Con(Head, Vec<Ty>)`, and identifies heads through `head()` (`types/mod.rs : 40–102`). The joint form is:
 
 ```rust
 Head = Named(TypeRef) | Tuple(u32) | Fn | Record;
@@ -81,11 +81,11 @@ Three head questions must remain distinct:
 
 A union has at most one ordinary member per head, including one Rec, but may also retain spread members. Int/String splitting is T1’s finite/cofinite algebra, never a rule for records. Records carry implicit All, not a set of fields in ValueSet. Source: T1 decisions 2–3; T3 D1–D3 and §§4.2–4.5.
 
-The public result tables currently keep span-keyed access, argument order, heads for type tests, and may-fail decisions (`types/mod.rs:148–199`). Their final contracts are:
+The public result tables currently keep span-keyed access, argument order, heads for type tests, and may-fail decisions (`types/mod.rs : 148–199`). Their final contracts are:
 
 | Table/form | T1 | T2 | T3 |
 |---|---|---|---|
-| `type_tests[(ModuleId, Span)]` | `Vec<TestMember { head, values: TestValues }>`; All/Only/Except | Fully expand completed aliases before producing members | Record is `TestMember { Record, All }`; no fields in the runtime test |
+| `type_tests[(ModuleId, Span)]` | `Vec<TestMember { head, values : TestValues }>`; All/Only/Except | Fully expand completed aliases before producing members | Record is `TestMember { Record, All }`; no fields in the runtime test |
 | `scheme_types`, `schemes` | Full literal sets, never shortened | Ordinary scheme instances remain separate from fixed definitions | Full record/spread types and label-parameter metadata |
 | `alias_types[TypeId]` | No new table | Full ShownType of each completed value-dependent alias/extraction binder, with formal identities | Record/Without output through the same exact writer |
 | Internal completion state | Preserve sets | Pending/Ready/Failed sites, closed fixed forms and provenance; trial state is private | Closure over fields/base; no labels escape |
@@ -102,28 +102,28 @@ Every row below is a shared region. “No addition” means preserve the earlier
 
 | File and read region | One final responsibility; contributions in T1 → T2 → T3 order |
 |---|---|
-| `crates/ilang-syntax/src/ast.rs:371–406` | On A1's nodes, T1 adds literal leaves and simplifies TypeArg → T2 preserves ValueOf/pattern classification → T3 adds Record/base/parts. Keep attribute/item macro nodes from A1. |
-| `crates/ilang-syntax/src/parser.rs:452–531,1150–1291` | One type-primary dispatch: literals/negative groups → lowercase value reads and syntactic alias-pattern classification → records versus groups. Preserve TypeCall and the complete §5 lookahead contract. |
-| `crates/ilang-syntax/src/print.rs:528–629`, `format.rs:1472–1552` | Literal/negative type text → Of and alias-pattern text → record parts. All use the same precedence and exact-tree rules. Here `format.rs` is in the same syntax directory. |
-| `hir.rs:167–192,273–296,349–365` | Lit → Of/pattern metadata → Record/labels. Keep aliases as aliases. |
-| `resolve.rs:1329–1467,1568–1660,2630–2697` | Dispatch/visitors above; directional literal ABI checks → Of readiness/context and deferred exports → labels/record rejection at service and host boundaries. No catch-all that hides a new type. |
-| `types/mod.rs:40–102,133–210` | One algebra and the additive tables above. T2’s solver snapshot remains private. |
-| `types/solve.rs:245–345,385–633,698–908` | Literal algebra and bound fusion → transactional checked completion/open-group observation → record arms, width, spreads, escape checks. Preserve T1 sets and T2 rollback on every T3 mutation. |
-| `types/display.rs:215–244,515–615,698–755,860–910,998–1053` | Exact literal normalization → fixed-form reads without live display fixation → Rec/Without normalization and label names. Keep K1 in every occurrence walk. |
-| `types/shown.rs:10–31,43–76` | Lit and full/limited writer → alias bodies with formal identities → structured labels and spreads; shared canonical writer contract in §4. |
-| `types/known.rs:22–69,102–162,239–270,322–418,434–510` | Set-sensitive members, hidden inputs, whole_lits, known_bound → pure inferred-shape Of conversion → record-aware safe known summaries and label substitution before matching. |
-| `types/pattern.rs:157–230,460–482,563–617,723–757` | Literal/fitted distinction, set narrowing/tests and deferred coverage failures → convert Of using its site policy → Record/All tests and `Record` taken head, not Con(Record). |
-| `types/coverage.rs:113–236,615–630` | `(Head, ValueSet, Vec<Ty>, Mode)`, finite/cofinite usefulness → only completed inferred source types, no Of case → `(Record, All, [], mode)`, record witness text. |
-| `types/infer.rs:233–355,603–687,852–1005,1260–1347,1538–1678,2108–2120` | Literal inference, call known bounds, deferred Assert → ordered completion and Of instantiation → records, L4 call preparation, shown-place checks. See §3 for exact group/call order. |
-| `order.rs:17–131,188–251` | Preserve expression graph → second graph over existing SCCs and completion events → walk record expressions for runtime uses and record types for type uses; reject multi-binding label recursion on the expression SCC. |
-| `query.rs:342–346,397–461,1218–1241` | Literal text/leaf navigation → source references, binder targets, completed alias hover → record fields/label references and Access::Label completion. Source spelling and inferred hover are separate views. |
-| `crates/ilang-wasm/src/lower.rs:1500–1513,1675–1685,2123–2135,2209–2237` | TestValues equality/tag conjunction → assert no unresolved alias test head → Record tag test, access/literals/spreads/key labels, empty Field list trap. |
-| `crates/ilang-cli/src/commands/package.rs:1063–1104,1159–1182,1235–1385` | Full literal identity → completed alias bodies instead of source value names → record/label canonicalization. One interface path, detailed below. |
-| `crates/ilang-check/src/lib.rs:18–98`, `crates/ilang-syntax/src/lib.rs:18–71` | Keep existing codes; apply the disjoint allocation in §7. Retired reservations are not recycled. |
+| `crates/ilang-syntax/src/ast.rs : 371–406` | On A1's nodes, T1 adds literal leaves and simplifies TypeArg → T2 preserves ValueOf/pattern classification → T3 adds Record/base/parts. Keep attribute/item macro nodes from A1. |
+| `crates/ilang-syntax/src/parser.rs : 452–531,1150–1291` | One type-primary dispatch: literals/negative groups → lowercase value reads and syntactic alias-pattern classification → records versus groups. Preserve TypeCall and the complete §5 lookahead contract. |
+| `crates/ilang-syntax/src/print.rs : 528–629`, `format.rs : 1472–1552` | Literal/negative type text → Of and alias-pattern text → record parts. All use the same precedence and exact-tree rules. Here `format.rs` is in the same syntax directory. |
+| `hir.rs : 167–192,273–296,349–365` | Lit → Of/pattern metadata → Record/labels. Keep aliases as aliases. |
+| `resolve.rs : 1329–1467,1568–1660,2630–2697` | Dispatch/visitors above; directional literal ABI checks → Of readiness/context and deferred exports → labels/record rejection at service and host boundaries. No catch-all that hides a new type. |
+| `types/mod.rs : 40–102,133–210` | One algebra and the additive tables above. T2’s solver snapshot remains private. |
+| `types/solve.rs : 245–345,385–633,698–908` | Literal algebra and bound fusion → transactional checked completion/open-group observation → record arms, width, spreads, escape checks. Preserve T1 sets and T2 rollback on every T3 mutation. |
+| `types/display.rs : 215–244,515–615,698–755,860–910,998–1053` | Exact literal normalization → fixed-form reads without live display fixation → Rec/Without normalization and label names. Keep K1 in every occurrence walk. |
+| `types/shown.rs : 10–31,43–76` | Lit and full/limited writer → alias bodies with formal identities → structured labels and spreads; shared canonical writer contract in §4. |
+| `types/known.rs : 22–69,102–162,239–270,322–418,434–510` | Set-sensitive members, hidden inputs, whole_lits, known_bound → pure inferred-shape Of conversion → record-aware safe known summaries and label substitution before matching. |
+| `types/pattern.rs : 157–230,460–482,563–617,723–757` | Literal/fitted distinction, set narrowing/tests and deferred coverage failures → convert Of using its site policy → Record/All tests and `Record` taken head, not Con(Record). |
+| `types/coverage.rs : 113–236,615–630` | `(Head, ValueSet, Vec<Ty>, Mode)`, finite/cofinite usefulness → only completed inferred source types, no Of case → `(Record, All, [], mode)`, record witness text. |
+| `types/infer.rs : 233–355,603–687,852–1005,1260–1347,1538–1678,2108–2120` | Literal inference, call known bounds, deferred Assert → ordered completion and Of instantiation → records, L4 call preparation, shown-place checks. See §3 for exact group/call order. |
+| `order.rs : 17–131,188–251` | Preserve expression graph → second graph over existing SCCs and completion events → walk record expressions for runtime uses and record types for type uses; reject multi-binding label recursion on the expression SCC. |
+| `query.rs : 342–346,397–461,1218–1241` | Literal text/leaf navigation → source references, binder targets, completed alias hover → record fields/label references and Access::Label completion. Source spelling and inferred hover are separate views. |
+| `crates/ilang-wasm/src/lower.rs : 1500–1513,1675–1685,2123–2135,2209–2237` | TestValues equality/tag conjunction → assert no unresolved alias test head → Record tag test, access/literals/spreads/key labels, empty Field list trap. |
+| `crates/ilang-cli/src/commands/package.rs : 1063–1104,1159–1182,1235–1385` | Full literal identity → completed alias bodies instead of source value names → record/label canonicalization. One interface path, detailed below. |
+| `crates/ilang-check/src/lib.rs : 18–98`, `crates/ilang-syntax/src/lib.rs : 18–71` | Keep existing codes; apply the disjoint allocation in §7. Retired reservations are not recycled. |
 
-The solver currently propagates bounds in both directions, stores reverse links, and mutates bounds during extrusion/freshening (`solve.rs:265–285,385–447,577–633`). Therefore T2’s trial must include every field of solver state, not just failures or the initial variable. T3’s record comparisons and label-level checks must use that same observed state. T1’s literal bound fusion is limited to argumentless Con; it must never deduplicate Rec upper bounds by their head.
+The solver currently propagates bounds in both directions, stores reverse links, and mutates bounds during extrusion/freshening (`solve.rs : 265–285,385–447,577–633`). Therefore T2’s trial must include every field of solver state, not just failures or the initial variable. T3’s record comparisons and label-level checks must use that same observed state. T1’s literal bound fusion is limited to argumentless Con; it must never deduplicate Rec upper bounds by their head.
 
-The package writer currently prints inferred value trees but written alias bodies (`package.rs:1100–1104,1321–1323`). That is the concrete reason T2 needs a completed alias table; adding a pretty-printer Of arm that prints its source is insufficient.
+The package writer currently prints inferred value trees but written alias bodies (`package.rs : 1100–1104,1321–1323`). That is the concrete reason T2 needs a completed alias table; adding a pretty-printer Of arm that prints its source is insufficient.
 
 ## 3. Rules at the boundaries
 
@@ -132,25 +132,25 @@ The package writer currently prints inferred value trees but written alias bodie
 T2 K1 says: “Of reads inferred schemes/monotypes, never a narrower flow fact.” T1 decision 7 says: “Known types must not have fewer values than may come.” T3 L4 says that a known singleton chooses a label and the solver then checks the argument against that singleton. Keep all three sentences.
 
 ```i
-copy = (s: String) {
+copy = (s : String) {
 	x = "a" = s
 	r = (value = x)
-	y: x = "b"
+	y : x = "b"
 	(r.value, y)
 }
 ```
 
-`copy("a")` gives `("a", "b")` and needs Assert for its fitted pattern. `x` and the inferred field type of `r` are String; their known facts can contain `"a"`. `y` uses String. `record.get(( a: 1 ), x)` chooses label `a` from the known fact but fails E0501 because the inferred String is not a subtype of `"a"`. This is an intentional restriction of L4, not a reason to read known types in Of or strengthen rule 13. Use a literal argument or a genuinely singleton-typed binder.
+`copy("a")` gives `("a", "b")` and needs Assert for its fitted pattern. `x` and the inferred field type of `r` are String; their known facts can contain `"a"`. `y` uses String. `record.get(( a : 1 ), x)` chooses label `a` from the known fact but fails E0501 because the inferred String is not a subtype of `"a"`. This is an intentional restriction of L4, not a reason to read known types in Of or strengthen rule 13. Use a literal argument or a genuinely singleton-typed binder.
 
-Rule 12 narrows the *new catch-all’s* inferred type. Thus a catch-all after `x: String - "a"` can have inferred and known type `"a"`, be read by Of inside the clause, and be a valid record key. The original subject name is not narrowed to a literal by that test. T3’s statement that matching never helps keys must be limited to the original subject name, not new binders. No dependent relationship is introduced between an arbitrary String value and a label.
+Rule 12 narrows the *new catch-all’s* inferred type. Thus a catch-all after `x : String - "a"` can have inferred and known type `"a"`, be read by Of inside the clause, and be a valid record key. The original subject name is not narrowed to a literal by that test. T3’s statement that matching never helps keys must be limited to the original subject name, not new binders. No dependent relationship is introduced between an arbitrary String value and a label.
 
 T3’s L2a/L5 bans remain even though T2 reads inferred types: a direct read of a key parameter is E0543 and of a label-generic function is E0542. A local ordinary copy of the key has String, cannot carry a rigid label, and cannot be forwarded under L4’s own-name rule. Type aliases never bind a new label parameter.
 
 ### J2. Rule 13 keeps T1’s bound in nominal access and tuple access
 
-T3 replaces rule 13’s dispatch, not T1’s bound semantics. In rules 13a and 13c, and in calls constrained from a known function shape, constrain against `known_bound(K)`, not raw K. `known_bound` has T1’s polarity rule: widen Int/String at covariant places, drop partial-literal exclusions there, and use fresh variables at noncovariant places. T3 adds covariant Rec fields and Without bases. Rule 13b has only its principal constraint `t <: { f: A }`; it must not additionally constrain the target or field against a narrowed known fact.
+T3 replaces rule 13’s dispatch, not T1’s bound semantics. In rules 13a and 13c, and in calls constrained from a known function shape, constrain against `known_bound(K)`, not raw K. `known_bound` has T1’s polarity rule: widen Int/String at covariant places, drop partial-literal exclusions there, and use fresh variables at noncovariant places. T3 adds covariant Rec fields and Without bases. Rule 13b has only its principal constraint `t < : { f : A }`; it must not additionally constrain the target or field against a narrowed known fact.
 
-The inferred field/tuple result comes from those same bound forms (or the existing §7.5 constructor-pattern arguments), while its known result comes separately from the original known facts. This follows the existing split at `infer.rs:1636–1678`; widening only the target constraint and still returning a raw known singleton would let Of accidentally read a flow fact. This prevents the false String-to-singleton failure in J1, also for `Box(x).value` and a tuple holding a record. It preserves the rejection of an actual call `sink.put("x")` when sink’s inferred parameter accepts only `"GET" | "POST"`. Source: T1 decision 7 and §5.4 override the stale “subtype of its known type” sentences in T3 §§6/12.
+The inferred field/tuple result comes from those same bound forms (or the existing §7.5 constructor-pattern arguments), while its known result comes separately from the original known facts. This follows the existing split at `infer.rs : 1636–1678`; widening only the target constraint and still returning a raw known singleton would let Of accidentally read a flow fact. This prevents the false String-to-singleton failure in J1, also for `Box(x).value` and a tuple holding a record. It preserves the rejection of an actual call `sink.put("x")` when sink’s inferred parameter accepts only `"GET" | "POST"`. Source: T1 decision 7 and §5.4 override the stale “subtype of its known type” sentences in T3 §§6/12.
 
 Known record summaries are conservative. They are not the solver’s exact types. For Without, discard non-record alternatives, forget labels that are equal or may be equal, and use an all-record summary for an unknown base. Do not return Int from `members(Without(Int, L))`, or an unknown non-record head from an unknown base. Normalize first where possible. If several record alternatives survive (Rec alongside spreads), combine their guarantees by the record join, keeping only common guaranteed fields. `member`/`one_member` must never select an arbitrary alternative with extra fields. Unknown alternatives erase unsupported field facts. Summarize only the record alternatives: preserve non-record and unknown alternatives in the enclosing known union, so `Top | Rec` never becomes records only. The same summary is used for field known types, expected fields, and disjointness. It preserves T1 sets in fields that remain known.
 
@@ -158,7 +158,7 @@ For `match_k(Rec, K)`, a missing known field supplies Top to variables in the ex
 
 ### J3. Calls have one inference order and the existing runtime order
 
-The current call code builds a known callee, places arguments, infers two passes, then records parameter-to-source indices (`infer.rs:1260–1342`). After T3:
+The current call code builds a known callee, places arguments, infers two passes, then records parameter-to-source indices (`infer.rs : 1260–1342`). After T3:
 
 1. Resolve the callee and use its parameter labels to place arguments, including the piped first argument. This needs shape/labels, not an instantiated rigid record label.
 2. For a label-generic callee, infer each key argument once, with expected String, before other arguments. Pick labels by L4 and check repeated keys agree. Keep its `(type, known type)` result; do not infer it again in the later passes.
@@ -170,7 +170,7 @@ A nonliteral expression with singleton type may have effects. Lowering must eval
 
 ### J4. One group lifecycle; no fixation through display
 
-The existing group loop allocates holders, infers values, links holders, generalizes, fills known types, and checks coverage (`infer.rs:233–355`). The joint order is:
+The existing group loop allocates holders, infers values, links holders, generalizes, fills known types, and checks coverage (`infer.rs : 233–355`). The joint order is:
 
 1. Record the solver allocation boundary before holders. Infer and link the ordinary expression SCC; no type dependency enlarges it.
 2. Resolve T1’s deferred binding Assert variables in their saved effect frames after holder linking and before generalization. Flush ordinary failures and occurs checks. A binding’s Assert failure is E0501 at that binding, as the ledger requires.
@@ -189,7 +189,7 @@ Keep T1’s exact split for Int/String: send the portion not covered by the same
 
 Runtime overlap uses the actual domain: Int/String need overlapping sets; Rec/Without/spread values all have Record; nominal values and records are disjoint. `head()` alone is insufficient for this question, while `value_head()` alone is insufficient for merging or routing. In particular T1’s fallback must not mistake a record-only spread for a universal variable alternative for the rest of an Int set.
 
-A record type test takes all records. Its fields are an inference constraint, not field tests. For a subject `( a: Int | String )`, a test `x: ( a: Int )` with a catch-all must fail; it cannot select the Int-valued records. A type test of a closed T2 alias expands first; of a record alias it makes Record/All, of `"a" | "b"` it makes String/Only. A spread test is Record/All even though its solver head is absent. Ordinary unresolved variable members still give E0511.
+A record type test takes all records. Its fields are an inference constraint, not field tests. For a subject `(a : { Int | String })`, a test `x : ( a : Int )` with a catch-all must fail; it cannot select the Int-valued records. A type test of a closed T2 alias expands first; of a record alias it makes Record/All, of `"a" | "b"` it makes String/Only. A spread test is Record/All even though its solver head is absent. Ordinary unresolved variable members still give E0511.
 
 Coverage records `(Record, All, [], mode)` and treats its runtime test as `Pat::Head(Record, 0)`. Never use an empty finite set for records: that would erase a possible runtime value. Rule 12 takes `Record` after a covering record test. It subtracts literal sets for Int/String. A record containing an empty field can conservatively remain a record in coverage; that may reject more, never claim coverage of a possible value. No record patterns or record-shaped alias patterns are added.
 
@@ -203,13 +203,13 @@ T1 then applies direction to allowed Int/String types: host-provided values must
 
 ### J7. K1 is a prerequisite, not a replacement typing rule
 
-At this baseline `generalize` calls `display::simplify` and may rebuild its result (`infer.rs:2108–2120`). Coalescing creates Both for invariant arguments (`display.rs:558–573`), but occurrence analysis walks both directions only for environments (`:1028–1038`). K1 changes that guard to `env || v == Variance::Inv` (`lane/k1`, `display.rs:1030–1038`). This is why a seemingly cosmetic display rebase can lose a principal type variable.
+At this baseline `generalize` calls `display::simplify` and may rebuild its result (`infer.rs : 2108–2120`). Coalescing creates Both for invariant arguments (`display.rs : 558–573`), but occurrence analysis walks both directions only for environments (`:1028–1038`). K1 changes that guard to `env || v == Variance::Inv` (`lane/k1`, `display.rs : 1030–1038`). This is why a seemingly cosmetic display rebase can lose a principal type variable.
 
 T1 must preserve that condition, variable identities, polarity, and weak levels while adding the set field; a set has no variables. T2 must instantiate the preserved scheme, never infer that an erased/shown Never is a closed variable, never generalize a weak variable by reading it, and never use known-type widening as permanent closure. T3 must traverse fields/base with surrounding polarity, still count invariant children in both directions, preserve labels separately from solver variables, and retain the constructor-depth occurs check for both new forms. All three must run K1’s positive and rejection regressions after their shared-file rebase. Required order is K1 → A2 Namer → T1 → T2 → T3 for shared display work.
 
 ### J8. Exact forgetting must survive T2 closure and substitution
 
-There is one remaining mathematical conflict inside T3 that becomes observable at T2’s permanent-read boundary. T3 §4.3 calls E4 an equality even when a removed field contains an unresolved variable, and says “E4 applies to it”. But with `R = ( a: A, b: Int )`, erasing a gives `( b: Int )`; substituting `A = Never` first makes R empty and forgetting must give Never. The two orders disagree. The “no record is ever made” justification is insufficient for a type alias or a type in an input place: types describe sets independently of whether a current expression constructs them. Spec §4.1 and T3’s own set definition decide this.
+There is one remaining mathematical conflict inside T3 that becomes observable at T2’s permanent-read boundary. T3 §4.3 calls E4 an equality even when a removed field contains an unresolved variable, and says “E4 applies to it”. But with `R = ( a : A, b : Int )`, erasing a gives `( b : Int )`; substituting `A = Never` first makes R empty and forgetting must give Never. The two orders disagree. The “no record is ever made” justification is insufficient for a type alias or a type in an input place: types describe sets independently of whether a current expression constructs them. Spec §4.1 and T3’s own set definition decide this.
 
 The conservative joint correction is: apply E1 before E4; E4 may discard a field only when its type is known to have at least one value under every remaining substitution. Otherwise retain Without. No new nonempty constraint or inference choice is introduced. For the first implementation use one fixed conservative predicate, after ordinary exact normalization: true for Top, a nonempty Int/String value set (including All/Except), a tuple whose parts all pass, and a Rec whose labels are distinct fixed Names and whose fields all pass (including `Record`). A union passes if a member passes. All other forms return false. Do not infer inhabitation from a variable’s current bounds, from each side of an intersection separately, or from individually inhabited fields whose parameter labels may later coincide. Retained fields need no such proof because they remain in the result. The existing label-equality conditions still apply. T2 closes dependencies before attempting this rewrite, and never freezes the result of an earlier open-field erasure.
 
@@ -223,7 +223,7 @@ One value can have three presentations, with explicit consumers:
 - Full type tree/text: simplified schemes, completed aliases, `i check --types`, package comparison, and future Types syntax. No truncation, private value spelling, solver id, provenance, or fixation site in type identity.
 - Limited human text: diagnostics and ordinary hover may shorten a literal set over 12 items to its first 10 plus the count. It must not be read back or used by a type operation.
 
-T1 adds Lit; T2 adds completed alias bodies; T3 adds Record/spread and label identity. A `ShownType::Record` cannot use undifferentiated strings for labels: `{ "K": Int }` is a fixed string label, while `( K: Int )` refers to a parameter. Use a structured shown label (`Name(decoded_string)` / `Param(identity, shown_name)`), or an equivalent lossless representation. Carry an ordered list of declared label-parameter identities on the scheme. A key slot also needs its identity: body inference treats it as String but a public scheme must show `key: K`, and instantiation must still find that slot. A separate key-slot map is sufficient; no Ty::Key is needed.
+T1 adds Lit; T2 adds completed alias bodies; T3 adds Record/spread and label identity. A `ShownType::Record` cannot use undifferentiated strings for labels: `{ "K": Int }` is a fixed string label, while `( K: Int )` refers to a parameter. Use a structured shown label (`Name(decoded_string)` / `Param(identity, shown_name)`), or an equivalent lossless representation. Carry an ordered list of declared label-parameter identities on the scheme. A key slot also needs its identity: body inference treats it as String but a public scheme must show `key : K`, and instantiation must still find that slot. A separate key-slot map is sufficient; no Ty::Key is needed.
 
 The Namer reserves all label-parameter spellings before naming ordinary variables. A canonical interface maps ordinary variables to internal `'0`, `'1`, … and label parameters, in their scheme declaration order, to `'k0`, `'k1`, …, as accepted in the ledger. These internal names are not source syntax. First substitute canonical label identities, then sort record fields by those identities, then name ordinary variables on that canonical traversal (retaining alias formal parameter positions). Sorting by source spelling and renaming afterwards would make a rename from K/J to Z/A change the interface. Preserve the same identity in key slots, fields and forgotten-label lists. Fixed string labels are never alpha-renamed.
 
@@ -270,21 +270,21 @@ The grammar is deterministic with these existing or accepted lookaheads; it is n
 | Hard sequence | Unique reading / verdict |
 |---|---|
 | `x`, `{ x }`, `m.x` | Value type, grouped value type, module value type; field access on a value qualifier is E0207 |
-| `x()`, `a.m(Int, -{1}, ( x: "a" ))` | Macro reservation E0234 until M2; arguments are types |
+| `x()`, `a.m(Int, -{1}, ( x : "a" ))` | Macro reservation E0234 until M2; arguments are types |
 | `m.T("a")`, `A(Int)` | Named application; second is E0230 if A is a declared variable |
 | `{ "a" }`, `( "a": x )`, `( K: "a" )` | Grouped literal; fixed-label record with an Of field; parameter-label record subject to L1/L2 |
 | `Record`, `( ..x )`, `( ..x, -a )` | All records; records of Of(x); forgetting label a from Of(x) |
 | `{ x, }`, `{}`, `{ -a }` in a type | Errors: no tuple braces, empty type, or free-standing forgotten label |
 | `Int - -1`, `-{ {1} }`, `-{-1}` | Difference excluding negative one; literal negative one; error (IntPart cannot contain a minus) |
 | `Int - {1}`, `(1)`, `-(1)` | Difference excluding one; one-part tuple type; error |
-| `(x) -> ( name: String )` | Function type with an Of parameter and a record result |
-| `(x) -> (name: String) { (name: x) }` in an expression | Function with record result annotation and record body; x in the body is a value expression |
-| `{ x: 1 -> 2 }` in an expression | One-clause block, fitted annotation 1; T1 replaces A1’s old example |
+| `(x) -> ( name : String )` | Function type with an Of parameter and a record result |
+| `(x) -> (name : String) { (name : x) }` in an expression | Function with record result annotation and record body; x in the body is a value expression |
+| `{ x : 1 -> 2 }` in an expression | One-clause block, fitted annotation 1; T1 replaces A1’s old example |
 | `{ x: y -> 2 }` in an expression | One-clause block with Of(y), not a record |
-| `(f: (x) -> Int { x })` in an expression | Record containing a function; no comma is needed for disambiguation |
-| `v \|> { x: Int \| y -> 0  _ -> 1 }` | The whole `Int \| y` is a type; after T2 its validity depends on y, so it is not an unconditional syntax error |
+| `(f : (x) -> Int { x })` in an expression | Record containing a function; no comma is needed for disambiguation |
+| `v \|> { x : Int \| y -> 0  _ -> 1 }` | The whole `Int \| y` is a type; after T2 its validity depends on y, so it is not an unconditional syntax error |
 
-The last table row escapes pipes only for Markdown; the i tokens are `|>` and `|`. Matching-close lookahead and the first field distinguish function and record forms. `( f: (Int) -> String )` in a type is a record type; commas only separate parts.
+The last table row escapes pipes only for Markdown; the i tokens are `|>` and `|`. Matching-close lookahead and the first field distinguish function and record forms. `( f : (Int) -> String )` in a type is a record type; commas only separate parts.
 
 ### Answer to meta.md open question 2
 
@@ -303,7 +303,7 @@ Reserve the type-call AST, item-call and attribute-call forms, node-kind-aware g
 
 ## 6. Replacement spec text and section ownership
 
-Apply the individual accepted replacement texts only where the table says to, with these joint replacements taking precedence at overlaps. This is a patch to the combined spec, not three sequential whole-section replacements. Keep all existing section numbers. T1 adds subtype rule 8; T3 adds rule **9**, not another rule 8. New §4.9, §6.13 and §14 are unoccupied in the spec tree read here (`docs/spec.md:319–419,494–555,1031–1084`); later owners must recheck those anchors.
+Apply the individual accepted replacement texts only where the table says to, with these joint replacements taking precedence at overlaps. This is a patch to the combined spec, not three sequential whole-section replacements. Keep all existing section numbers. T1 adds subtype rule 8; T3 adds rule **9**, not another rule 8. New §4.9, §6.13 and §14 are unoccupied in the spec tree read here (`docs/spec.md : 319–419,494–555,1031–1084`); later owners must recheck those anchors.
 
 ### Text for the shared paragraphs
 
@@ -347,7 +347,7 @@ Apply the individual accepted replacement texts only where the table says to, wi
 
 > 13. **Fields and tuple parts.** For `v.f`, when v is known to be made by one constructor (§7.5), or v has a known type whose members are all custom types (including no members), every constructor that may have made v must have field f. The inferred result is the union of those field types with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of v must fit the bound. With no possible constructors, the result is Never.
 >
-> Otherwise, when v has no known type, or its known type has at least one member and only record, unknown, or variable members, `v.f` has a fresh type A and requires `type(v) <: { f: A }`. Its known type is the guaranteed field type from the conservative record summary, when available. Do not add a constraint against that known field fact.
+> Otherwise, when v has no known type, or its known type has at least one member and only record, unknown, or variable members, `v.f` has a fresh type A and requires `type(v) < : { f : A }`. Its known type is the guaranteed field type from the conservative record summary, when available. Do not add a constraint against that known field fact.
 >
 > For `v.k`, v must have a known type and every member must be a tuple with more than k parts. Its inferred type must fit the bound of that known type, and the result is the union of parts k from those bound forms. In every other case field/tuple access is a compile error.
 >
@@ -420,7 +420,7 @@ Prior-art algorithm hand-off: records §21 selects Elixir’s lazy BDD and map e
 
 ## 7. Error allocation and reporting order
 
-No track claims a code from A1’s reservations. Retiring a reservation does not free its number for another error. Current checker codes end at E0522 (`crates/ilang-check/src/lib.rs:74–96`); A1’s approved list is `a1-front-end.md:245`, confirmed by the ledger. The combined allocation is:
+No track claims a code from A1’s reservations. Retiring a reservation does not free its number for another error. Current checker codes end at E0522 (`crates/ilang-check/src/lib.rs : 74–96`); A1’s approved list is `a1-front-end.md : 245`, confirmed by the ledger. The combined allocation is:
 
 | Code | Owner and meaning |
 |---|---|
@@ -468,22 +468,22 @@ These are implementation acceptance tests, not claims that this pre-A1 compiler 
 ```i
 r = (method = "GET", port = 8080)
 Config = r
-use = (c: Config) { c.port }
+use = (c : Config) { c.port }
 value = use(r)
 ```
 
-Config is `( method: "GET", port: 8080 )`, value is 8080. `use(( method: "POST", port: 8080 ))` fails E0501. A separate source annotated `( method: String, port: Int )` yields that wider alias. This detects Of-to-known confusion, literal widening, and incorrect package serialization.
+Config is `( method : "GET", port : 8080 )`, value is 8080. `use(( method : "POST", port : 8080 ))` fails E0501. A separate source annotated `( method : String, port : Int )` yields that wider alias. This detects Of-to-known confusion, literal widening, and incorrect package serialization.
 
-**T-B: fitted literal read (J1/J2).** Use `copy` in §3. `copy("a")` gives `("a", "b")`, no false E0501; `copy("b")` fails through Assert. The bad key use in J1 is E0501, not successful lookup and not E0541. Add nominal `Box(A) { Box(value: A) }` and `(Box(r), 0).0.value.value`; reading it inside copy still gives `"a"` without a false inferred String-to-singleton constraint. Bind that result to p and then write `q: p = "b"`: q is accepted and gives `"b"`, proving that the inferred result also came from the bound forms.
+**T-B: fitted literal read (J1/J2).** Use `copy` in §3. `copy("a")` gives `("a", "b")`, no false E0501; `copy("b")` fails through Assert. The bad key use in J1 is E0501, not successful lookup and not E0541. Add nominal `Box(A) { Box(value : A) }` and `(Box(r), 0).0.value.value`; reading it inside copy still gives `"a"` without a false inferred String-to-singleton constraint. Bind that result to p and then write `q: p = "b"`: q is accepted and gives `"b"`, proving that the inferred result also came from the bound forms.
 
 **T-C: legitimate narrowed key (J1/J5).**
 
 ```i
-read = (s: String) {
+read = (s : String) {
 	s |>
-		(other: String - "a") { 0 }
+		(other : String - "a") { 0 }
 		| (key) {
-			same: key = "a"
+			same : key = "a"
 			record.get((a = 7), same)
 		}
 }
@@ -494,7 +494,7 @@ It gives 7 for `read("a")` and 0 for `read("b")`; key/same have singleton type `
 **T-D: keys remain identities (J1/J3).**
 
 ```i
-forward = <K>(r: (k = Int), key: K) -> Int { record.get(r, key) }
+forward = <K>(r : (k = Int), key : K) -> Int { record.get(r, key) }
 answer = forward((a = 7), "a")
 ```
 
@@ -503,45 +503,45 @@ Value 7. Changing the body to `copy = key` then `record.get(r, copy)` is E0541. 
 **T-E: records do not acquire runtime field tests (J5).**
 
 ```i
-bad = (r: (a = Int | String)) { r |> (x: (a = Int)) { x.a + 1 } | (_) { 0 } }
+bad = (r : (a = Int | String)) { r |> (x : (a = Int)) { x.a + 1 } | (_) { 0 } }
 ```
 
-E0501, even with the catch-all: the first test takes all records. The positive version uses `r: Int | ( a: Int )` and `n -> n + 1` as its second clause; it returns the field plus one for a record and the integer plus one otherwise. The second binder is Int. Replacing the record annotation by a completed alias changes neither the test table nor the result. Combine a record clause with `s: String - "a"` and a remaining `"a"` clause; test with an Int rejection where the declared input excludes Int, and with a declared Int branch where it includes it. The string complement must still have its tag guard.
+E0501, even with the catch-all: the first test takes all records. The positive version uses `r : Int | ( a : Int )` and `n -> n + 1` as its second clause; it returns the field plus one for a record and the integer plus one otherwise. The second binder is Int. Replacing the record annotation by a completed alias changes neither the test table nor the result. Combine a record clause with `s : String - "a"` and a remaining `"a"` clause; test with an Int rejection where the declared input excludes Int, and with a declared Int branch where it includes it. The string complement must still have its tag guard.
 
 **T-F: invariant generalization (J7).**
 
 ```i
 Cell(A) = (run = (A) -> A)
 make = () { Cell(run = (x) { x }) }
-int_cell: Cell(Int) = make()
-string_cell: Cell(String) = make()
+int_cell : Cell(Int) = make()
+string_cell : Cell(String) = make()
 nested = () { (cell = Cell(run = (x) { x })) }
 ```
 
-Both calls are accepted with distinct instances. `nested` keeps a general variable in the invariant child of its covariant record field. `Same = make` is E0533, not a closed alias to `Cell(Never)`. `wrong = (c: Cell(Int)) -> Cell(Never) { c }` fails invariant checking. Also run K1’s service-equality, contravariant, bivariant and stream fixtures after migration to the accepted syntax; do not replace them with a check only of printed variable names.
+Both calls are accepted with distinct instances. `nested` keeps a general variable in the invariant child of its covariant record field. `Same = make` is E0533, not a closed alias to `Cell(Never)`. `wrong = (c : Cell(Int)) -> Cell(Never) { c }` fails invariant checking. Also run K1’s service-equality, contravariant, bivariant and stream fixtures after migration to the accepted syntax; do not replace them with a check only of printed variable names.
 
 **T-G: completion fixes constraints, not display (J4).**
 
 ```i
 Cell(A) = (get = () -> A, set = (A) -> Nil)
-make_cell = <A>(x: A) { Cell(get = () { x }, set = (y: A) { Nil }) }
+make_cell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }
 r = make_cell(1)
 Read = r
 later = () { r.set(2) }
 ```
 
-Read fixes the demanded invariant argument to 1 if the completion batch succeeds; later fails with the normal type error and fixation note. Annotating the source `r: Cell(Int)` permits later. Reading through an ordinary local cannot clone the weak variable. A deliberately failing trial must leave solver state unchanged, including T1 fused bounds and T3 record/label propagation. This is checked by an internal before/after state test, followed by an unrelated valid demand in recovery mode.
+Read fixes the demanded invariant argument to 1 if the completion batch succeeds; later fails with the normal type error and fixation note. Annotating the source `r : Cell(Int)` permits later. Reading through an ordinary local cannot clone the weak variable. A deliberately failing trial must leave solver state unchanged, including T1 fused bounds and T3 record/label propagation. This is checked by an internal before/after state test, followed by an unrelated valid demand in recovery mode.
 
-**T-H: codec and consumers (J4).** Compile T3 §5.9’s exact two-parameter builder with T2 M1a’s module placement. User is `( age: Int, name: String )`; decode produces a value usable by a function annotated User; later encode uses still constrain the distinct encode variable. A consumer’s `Codec(Remote, _) = codecs.user` is E0534 if encode remains open. Importing `User` and writing `Remote = User` succeeds without changing source equations or WAT. `Codec(_, Enc) = user` in the source fails E0534 if Enc is unfilled. Repeat with all source parts explicitly closed: foreign extraction then succeeds. No schema-specific solver branch is allowed.
+**T-H: codec and consumers (J4).** Compile T3 §5.9’s exact two-parameter builder with T2 M1a’s module placement. User is `( age : Int, name : String )`; decode produces a value usable by a function annotated User; later encode uses still constrain the distinct encode variable. A consumer’s `Codec(Remote, _) = codecs.user` is E0534 if encode remains open. Importing `User` and writing `Remote = User` succeeds without changing source equations or WAT. `Codec(_, Enc) = user` in the source fails E0534 if Enc is unfilled. Repeat with all source parts explicitly closed: foreign extraction then succeeds. No schema-specific solver branch is allowed.
 
 **T-I: exact forgetting (J8).**
 
 ```i
 Gone(A) = { () }
-empty = (x: Gone(Never)) { core.never(x) }
+empty = (x : Gone(Never)) { core.never(x) }
 ```
 
-`Gone(Never)` is Never. In the internal normalization test, normalize Gone(A), then substitute Never: it must also become Never. Replacing A with 1 yields `( b: Int )`. Add an invariant wrapper around Gone(A), and test both polarities. This catches an erased variable even if no runtime value can inhabit its original record. It also ensures T2 cannot cache the result of an inexact open rewrite.
+`Gone(Never)` is Never. In the internal normalization test, normalize Gone(A), then substitute Never: it must also become Never. Replacing A with 1 yields `( b : Int )`. Add an invariant wrapper around Gone(A), and test both polarities. This catches an erased variable even if no runtime value can inhabit its original record. It also ensures T2 cannot cache the result of an inexact open rewrite.
 
 ### Additional matrix
 
@@ -553,12 +553,12 @@ empty = (x: Gone(Never)) { core.never(x) }
 | `{ "a": 1, "\u{61}": 2 }` and analogous type | E0540; decoded labels |
 | `f(K,J)` renamed consistently to `f(Z,A)` | Identical canonical interface after renaming before sorting; §4 |
 | Fixed label `"K"` beside parameter label K | Remain distinguishable in read-back and canonical text; §4 |
-| `f(A) = (x: A) { x.name }` | Principal structural field constraint, no rigid ordinary variable; J4 |
-| `list.fold` with `( n: 0 )` and a full-literal callback comparing `acc.n == 3` | No false E0520; T1 hidden inputs extended to fields, J2 |
+| `f(A) = (x : A) { x.name }` | Principal structural field constraint, no rigid ordinary variable; J4 |
+| `list.fold` with `( n : 0 )` and a full-literal callback comparing `acc.n == 3` | No false E0520; T1 hidden inputs extended to fields, J2 |
 | Same fold updates with an unannotated spread | E0505; T3 occurs rule, not a hidden-input regression |
 | Record-field union beside a retained spread in an input type read via Of | E0518; T2 whole-expanded annotation and T3 shown-place check |
 | `a = (n: b) { n }` and `b = a(1)` | E0530, with chain; type edges do not merge SCCs |
-| Alias dependency in `( nested: List(source) )` | Orders source completion before reader; shared visitor reaches fields |
+| Alias dependency in `( nested : List(source) )` | Orders source completion before reader; shared visitor reaches fields |
 | Alias-only importing module with no bindings | Module-start completion/export checks still run; J4 |
 | Private nominal type exposed by a completed record alias | E0227; deferred whole-body export check |
 | Host external with return type `"a"` | E0318; host cannot supply restricted set |
@@ -619,14 +619,14 @@ These are instructions for the owning tracks after acceptance, not edits made by
 
 ### Changes to make in `literal-types.md`
 
-1. **§5.7, package text.** Old: “`.head()` (:1165) maps `Lit` to the `Int` or `String` head, and `fn ty` (:1351) prints `hir::TypeKind::Lit`.” New: “`TypeShow::head` prints a whole type definition and delegates its alias body to `TypeShow::ty`; add written Lit printing there and full literal printing to the inferred ShownType path. Never replace an alias's literal by its Int/String head.” Reason: the named method is not `Ty::head`; the actual delegation is `package.rs:1316–1323`, and the export call is `:1162–1167`. T2 then supplies completed alias bodies to that path.
-2. **§6, replacement §7.1.** Old: “So `v |> { p: (Int, Int) -> 0  _ -> 1 }` and `v |> { x: Int | y -> a  _ -> b }` are compile errors, in the first clause and in any other.” New: “The ungrouped tuple-annotation example remains a compile error. In `v |> { x: Int | y -> a  _ -> b }`, `Int | y` is a type; before T2 y is reserved, and after T2 it reads a value type and is checked by the ordinary type-test rules.” Reason: accepted syntax and T2; the bar inside the annotation is not a pattern-choice separator.
+1. **§5.7, package text.** Old: “`.head()` (:1165) maps `Lit` to the `Int` or `String` head, and `fn ty` (:1351) prints `hir::TypeKind::Lit`.” New: “`TypeShow::head` prints a whole type definition and delegates its alias body to `TypeShow::ty`; add written Lit printing there and full literal printing to the inferred ShownType path. Never replace an alias's literal by its Int/String head.” Reason: the named method is not `Ty::head`; the actual delegation is `package.rs : 1316–1323`, and the export call is `:1162–1167`. T2 then supplies completed alias bodies to that path.
+2. **§6, replacement §7.1.** Old: “So `v |> { p : (Int, Int) -> 0  _ -> 1 }` and `v |> { x : Int | y -> a  _ -> b }` are compile errors, in the first clause and in any other.” New: “The ungrouped tuple-annotation example remains a compile error. In `v |> { x : Int | y -> a  _ -> b }`, `Int | y` is a type; before T2 y is reserved, and after T2 it reads a value type and is checked by the ordinary type-test rules.” Reason: accepted syntax and T2; the bar inside the annotation is not a pattern-choice separator.
 3. **§12, step 6a.** Old: “this includes a one-clause match, which A1 lowers to a binding, and a one-clause block with choices if a marked `case` node exists for it.” New: “This includes a one-clause match and one-clause choices; T1 implements the latter as fitted binding behavior, removes E0235, and must pass `tests/spec/6/one_clause_choices.i`.” Reason: the A1 ledger decision is binding, not conditional on a helper node already existing. Preserve the rest of the deferred-Assert algorithm.
 4. **§13, question 9, merge-order sentence.** Old: “T1's arms land in step 8, after T2's `query.rs` and `hir.rs` changes if T2 is merged by then.” New: “T1 lands first; T2 develops alongside it and rebases these shared arms onto T1; T3 follows T2 at integration.” Reason: the assigned joint schedule. The shared-file permission list is §2.3 of this note, not separate whole-file ownership.
 
 ### Changes to make in `value-types.md`
 
-1. **§5, M1.** Old: “Normalize `Without(R, {age}) & ( age: Int )` after closing its dependencies; T3's exact rewrites yield `( age: Int, name: String )`.” New: “Close dependencies before normalizing `Without(R, {age}) & ( age: Int )`; apply the inhabited-discard condition of types-joint J8. The concrete builder still yields `( age: Int, name: String )`; an unresolved or possibly empty discarded field keeps its Without form.” Reason: T2 must not permanently cache T3's inexact open-variable E4 result.
+1. **§5, M1.** Old: “Normalize `Without(R, {age}) & ( age : Int )` after closing its dependencies; T3's exact rewrites yield `( age : Int, name : String )`.” New: “Close dependencies before normalizing `Without(R, {age}) & ( age : Int )`; apply the inhabited-discard condition of types-joint J8. The concrete builder still yields `( age : Int, name : String )`; an unresolved or possibly empty discarded field keeps its Without form.” Reason: T2 must not permanently cache T3's inexact open-variable E4 result.
 2. **§5, record extension boundary.** Old: “Until T3 adds those forms, unsupported closure is an explicit failure, never a partial type.” New: “Until T3 adds those forms, unsupported closure is an explicit failure. T3 must extend closure, provenance, inferred-shape conversion, transactions and full alias display together, and pass the two-module record Codec tests before integration.” Reason: a parser/solver-only record addition does not implement value types of records; make the cross-track gate explicit.
 3. **§9, step 1.** Old: “Rebase on A1/A3 and T1; map the cited regions to the new code.” New: “Develop alongside T1 against the joint contracts; rebase on landed A1/A3 and T1 before integration, preserving K1 in every generalization/display path.” Reason: distinguish the start gate from the merge gate and include the invariant fix.
 4. **§9, step 10.** Old: “T3 adds record/Without closure and shape arms, label checks, shown-place checks and the §5.9 builder test.” New: “T3 adds those arms, the joint conservative known summaries, exact forgetting gate, structured shown labels and scheme key slots, then tests the §5.9 builder under both own-module fixation and R7 closed-only foreign reads.” Reason: the interfaces needed by T1–T3 are wider than a new closure match arm. This does not weaken R7.
@@ -635,10 +635,10 @@ These are instructions for the owning tracks after acceptance, not edits made by
 
 1. **Status paragraph.** Old: “T3 starts after A1 (the new parser) and T1 (literal types) have landed, and after T2 has merged.” New: “T3 starts after A1 and T1 land; shared work rebases onto T2 and merges after T2.” Reason: the assigned schedule permits independent T3 work while T2 finishes.
 2. **§4.3, E4 and its explanation.** Old: “A field type with a type variable is not plainly empty, so E4 applies to it; a variable stands for the types that reach it, and when none reach it, no record of `{ fs }` is ever made, as for `(A, Int)` today.” New: “After E1 and the label checks, E4 may discard only fields whose types are known to be inhabited under every remaining substitution. If that is not established, retain Without; a later closed substitution may enable E1 or E4.” Reason: `Gone(A)` in T-I proves the open rewrite is not an equality. Apply this qualification also to E4's rule line and to §12/§4.9.3's final claim that every known-label record base reduces to a record. No nonemptiness solver is introduced.
-3. **§4.7, shown representation.** Old: `ShownType::Record { base: Option<Box<ShownType>>, fields: Vec<(String, Option<ShownType>)> }`. New: “Use the same base/parts form with a structured shown label distinguishing decoded fixed strings from label parameters. Schemes also retain ordered label-parameter identities and key-slot identities.” Reason: a String cannot tell fixed `"K"` from parameter K; ordinary body String types cannot reconstruct a scheme's `key: K` positions. See §4 of this note.
+3. **§4.7, shown representation.** Old: `ShownType : : Record { base : Option<Box<ShownType>>, fields : Vec<(String, Option<ShownType>)> }`. New: “Use the same base/parts form with a structured shown label distinguishing decoded fixed strings from label parameters. Schemes also retain ordered label-parameter identities and key-slot identities.” Reason: a String cannot tell fixed `"K"` from parameter K; ordinary body String types cannot reconstruct a scheme's `key : K` positions. See §4 of this note.
 4. **§4.8, members.** Old: “A `Without(B, L)` gives the members of `B`, where a record member loses every field whose label is the same as, or may be equal to, a label of `L`.” New: “For Without, keep only record-domain alternatives, forget equal or possibly equal labels, and use all-records for an unknown base. Join the guarantees of multiple record alternatives before selecting a field; preserve other alternatives of the enclosing union.” Reason: Without cannot contain Int, and a Rec beside a spread is not the only possible record. This is conservative known information, not exact E4 normalization.
 5. **§4.8, matching.** Old: “A field with no field of the same label is skipped.” New: “A missing known field is matched with unknown information, including Top for variables in that expected field, under T1's unknown-part rule.” Reason: skipping can leave a variable determined by only another occurrence, producing false E0520; J2 applies T1's fix recursively.
-6. **§5.9, alias stability.** Old: “So `Codec(User, _) = user` binds `User` to `( age: Int, name: String )`, whatever the rest of the module does.” New: “When the own-module completion batch succeeds, User is `( name: String, age: Int )`; later uses must respect its checked fixation equations. Distinct open encode variables stay live. A foreign partial extraction is E0534; import User, or first close the whole source.” Reason: T2 M1/R7 and ledger G2(S6), not unconditional shape freezing.
+6. **§5.9, alias stability.** Old: “So `Codec(User, _) = user` binds `User` to `( age : Int, name : String )`, whatever the rest of the module does.” New: “When the own-module completion batch succeeds, User is `( name : String, age : Int )`; later uses must respect its checked fixation equations. Distinct open encode variables stay live. A foreign partial extraction is E0534; import User, or first close the whole source.” Reason: T2 M1/R7 and ledger G2(S6), not unconditional shape freezing.
 7. **§6 and §12, rule 13a/13c.** Old: “the type of `v` must be a subtype of its known type.” New: “the inferred type of v must be a subtype of the bound of its known type, with T1's covariant whole-literal bound and fresh holes at noncovariant places.” Reason: preserve T1's fitted-literal fix. Use the full joint replacement for rule 13 in §6 above; rule 13b keeps only its structural field constraint.
 8. **§8.2, grammar.** Old: `Prim       = FnType | TupleType | NamedType | "_" | "{" Type "}" | RecordType .` New: “Use types-joint §5's complete grammar, including Literal, ValueType, TypeCall and TypeArg=Type.” Reason: the displayed pre-A1 grammar would remove T1, T2 and macro reservations. Keep T3's record lines and place restrictions.
 9. **§8.3, formatter.** Print a record on one line when it fits and otherwise one field per line. Commas separate fields; a function-valued field does not require one for disambiguation.
@@ -658,20 +658,20 @@ These are my own reviews, not independent RF. New-language program outcomes belo
 
 | Attack | Concrete counterexample | Finding and repair |
 |---|---|---|
-| Soundness: field tests | T-E, followed by a call with `( a: "s" )` | A field test must not select the Int records. Keep Record/All and the inferred field constraint; do not hide its mismatch as a scalar Values failure. |
-| Soundness: flow facts versus types | T-B, and `record.get(( a: 1 ), x)` after `x = "a" = s` | T3's raw rule-13 bound reintroduces false E0501; using known types for Of or for the key subtype check would hide the discrepancy. J1/J2 preserve all three distinct operations. |
+| Soundness: field tests | T-E, followed by a call with `( a : "s" )` | A field test must not select the Int records. Keep Record/All and the inferred field constraint; do not hide its mismatch as a scalar Values failure. |
+| Soundness: flow facts versus types | T-B, and `record.get(( a : 1 ), x)` after `x = "a" = s` | T3's raw rule-13 bound reintroduces false E0501; using known types for Of or for the key subtype check would hide the discrepancy. J1/J2 preserve all three distinct operations. |
 | Soundness: forgotten empty field | T-I, normalize Gone(A) before substituting Never | Accepted E4 is not an equality for an open removed field. J8 retains Without until a fixed inhabitation check allows erasure. This is a correction to T3, not merely a missing visitor. |
 | Soundness: arbitrary string passed as a key | T-D with a copied key; two same-K slots called with `"a"` and `"b"`; self-call exchanging K and J | Retain name identity, repeated-key equality and recursive position checks. Solver String checks alone are insufficient. No rule in T2 overrides these bans. |
-| Cannot be built with the proposed tables | `pick(K) = (r: ( K: Int, "K": String ), key: K) { record.get(r, key) }` | Plain shown-label Strings cannot preserve both labels, and body String slots cannot recover which call slots use K. Add structured shown labels plus scheme key-slot/parameter metadata; no new solver key type. |
-| Cannot be built by printing HIR | T-A exported as an alias, private r renamed, then port changed | `package.rs:1316–1323` prints the written alias body. An Of source spelling gives the wrong identity. Use T2's completed alias table with T1/T3's full writer. |
+| Cannot be built with the proposed tables | `pick(K) = (r : ( K : Int, "K" : String ), key : K) { record.get(r, key) }` | Plain shown-label Strings cannot preserve both labels, and body String slots cannot recover which call slots use K. Add structured shown labels plus scheme key-slot/parameter metadata; no new solver key type. |
+| Cannot be built by printing HIR | T-A exported as an alias, private r renamed, then port changed | `package.rs : 1316–1323` prints the written alias body. An Of source spelling gives the wrong identity. Use T2's completed alias table with T1/T3's full writer. |
 | Source conflict: foreign Codec | T-H's consumer re-extracts only decode from an open source | A skipped encode part does not waive R7. Keep the source-module alias and reject the foreign extraction. Remove the unconditional T3 stability promise. |
-| Source conflict: syntax | `x()`, `{ x }`, `( x: "a" )`, `@m()` | Macro-call, group, record, and reserved macro attribute respectively. The older macro draft cannot change these accepted readings. |
+| Source conflict: syntax | `x()`, `{ x }`, `( x : "a" )`, `@m()` | Macro-call, group, record, and reserved macro attribute respectively. The older macro draft cannot change these accepted readings. |
 
 The quoted source sentences and code paths behind these findings are in §§2–6 and the correction list. Repairs were made in this note only.
 
 ### Pass 2: attack the repairs
 
-The bound repair initially said how to constrain the target but did not state where the inferred field result came from. Add p/q to T-B: after reading the fitted value through a tuple/constructor, `q: p = "b"` must still accept. The code already obtains inferred field parts from bound forms and known parts separately (`infer.rs:1636–1678`). J2 and replacement rule 13 now say both; a later T2 read cannot accidentally inherit the narrow known part.
+The bound repair initially said how to constrain the target but did not state where the inferred field result came from. Add p/q to T-B: after reading the fitted value through a tuple/constructor, `q: p = "b"` must still accept. The code already obtains inferred field parts from bound forms and known parts separately (`infer.rs : 1636–1678`). J2 and replacement rule 13 now say both; a later T2 read cannot accidentally inherit the narrow known part.
 
 The first J8 wording said “structurally inhabited” without fixing its treatment of label collisions. Individually inhabited fields do not suffice: `( K: Int, J: String )` can be empty when K and J become the same label. J8 now uses a fixed conservative predicate and refuses parameter-labelled records and unknown intersections. It never proves inhabitation from current weak bounds. This prevents the repair itself from recreating the substitution bug.
 
@@ -693,7 +693,7 @@ No further serious semantic issue found in this pass. This is a design argument,
 
 Trace T-A from HIR through type dependencies, snapshot/closure, alias_types, type tests, query text and package text; trace T-D from resolved key identities through both scheme instances, expected/known matching, argument permutation and lowering. Every boundary now has an owned representation, including the metadata that cannot be recovered from Ty. T3's closure/known visitors and transaction state are explicit gates, not default match arms.
 
-Recheck group ordering against `infer.rs:233–355`, bound mutation against `solve.rs:265–285,385–447,577–633`, and K1 against its changed invariant walk. No required operation depends on the current package writer parsing hover text, on inventing runtime Of values, or on querying a partly completed imported source. The record runtime work remains exactly T3's assigned implementation, including its empty access-list fix; no new runtime feature is needed for T2.
+Recheck group ordering against `infer.rs : 233–355`, bound mutation against `solve.rs : 265–285,385–447,577–633`, and K1 against its changed invariant walk. No required operation depends on the current package writer parsing hover text, on inventing runtime Of values, or on querying a partly completed imported source. The record runtime work remains exactly T3's assigned implementation, including its empty access-list fix; no new runtime feature is needed for T2.
 
 Recheck the full grammar against syntax §3, T1 §6, T2 P1–P5, T3 §§8.1–8.3 and A1's reserved forms. Check all A1/T1/T2/T3 code ranges, all spec-section ownership rows, and all shared-file merge orders against the final ledger read. Built-in attributes and qualified constructor bindings keep their accepted meanings. The only remaining coordinator choice is the explicit E4 correction in Q1. No further serious implementation or source conflict found in this pass.
 

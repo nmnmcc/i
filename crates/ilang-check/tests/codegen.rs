@@ -26,13 +26,13 @@ Dog = (name = String)
 Clock = (now = () -> Int)
 Watch = Clock
 
-name = (p: { Cat | Dog }) { p.name }
-second = (t: (Int, String)) { t.1 }
-minus = (a: Int, b: Int) { a - b }
+name = (p : { Cat | Dog }) { p.name }
+second = (t : (Int, String)) { t.1 }
+minus = (a : Int, b : Int) { a - b }
 by_label = Cat(name = "a", lives = 9)
 piped = 5 |> minus(1)
-tests = (x) { x |> (_: { Int | String }) { 1 } | (_: (Int, Int)) { 2 } | (_) { 3 } }
-env = () <- (c: Watch) { c.now() <- (c) }
+tests = (x) { x |> (_ : { Int | String }) { 1 } | (_ : (Int, Int)) { 2 } | (_) { 3 } }
+env = () <- (c : Watch) { c.now() <- (c) }
 mono = minus(1, 2)
 age = (Cat(name = name, lives = l)) { l }
 first = (r) {
@@ -41,7 +41,7 @@ first = (r) {
 }
 pair = ((a, b)) { a }
 Handle = Opaque
-div = (a: Int, h: Handle) {
+div = (a : Int, h : Handle) {
 	a |>
 		(0) { fail.raise("zero") }
 		| (1) { fail.raise(a) }
@@ -106,7 +106,7 @@ fn codegen_data() {
     let int = Head::Named(TypeRef::Builtin(BuiltinType::Int));
     let string = Head::Named(TypeRef::Builtin(BuiltinType::String));
     assert_eq!(
-        by_text(&typed.type_tests, m, "_: { Int | String }"),
+        by_text(&typed.type_tests, m, "_ : { Int | String }"),
         &vec![
             TestMember {
                 head: int,
@@ -119,7 +119,7 @@ fn codegen_data() {
         ]
     );
     assert_eq!(
-        by_text(&typed.type_tests, m, "_: (Int, Int)"),
+        by_text(&typed.type_tests, m, "_ : (Int, Int)"),
         &vec![TestMember {
             head: Head::Shape(ilang_check::types::ShapeId::positional(2)),
             values: TestValues::All

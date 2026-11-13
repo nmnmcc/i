@@ -130,7 +130,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
 
 #[test]
 fn syntax_crosses_the_compiler_export_without_losing_identity() {
-    let built = build("(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { x }\n");
+    let built = build("(syntax = i/syntax)\n(identity)\nidentity = (x : syntax.Syntax) { x }\n");
     let original = input();
     for _ in 0..2 {
         let result =
@@ -144,7 +144,7 @@ fn syntax_crosses_the_compiler_export_without_losing_identity() {
 #[test]
 fn untrusted_external_cannot_be_supplied_to_a_macro_instance() {
     let built = build(
-        "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect: () -> Nil\nidentity = (x: syntax.Syntax) { effect() x }\n",
+        "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect : () -> Nil\nidentity = (x : syntax.Syntax) { effect() x }\n",
     );
     let error = ilang_macro::run::invoke(&built, "app/main.identity", &[input()]).unwrap_err();
     assert!(format!("{error:#}").contains("instantiate macro program"));
@@ -157,7 +157,7 @@ fn compiler_export_is_checked_and_executed_with_syntax_services() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(syntax = i/syntax)\nidentity = (x: syntax.Syntax) { syntax.node(x) x }\n",
+        "(syntax = i/syntax)\nidentity = (x : syntax.Syntax) { syntax.node(x) x }\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -283,7 +283,7 @@ fn compiler_program_selects_only_the_macro_import_closure() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/unrelated.i"),
-        "@external(\"outside\", \"effect\")\neffect: () -> Int\ninitial = effect()\n",
+        "@external(\"outside\", \"effect\")\neffect : () -> Int\ninitial = effect()\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -318,7 +318,7 @@ fn compiler_run_preserves_uncatchable_macro_error_position() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.i"), "(syntax = i/syntax)\nreport = (x: syntax.Syntax) -> syntax.Syntax { syntax._report_error(\"bad macro\", x) }\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(syntax = i/syntax)\nreport = (x : syntax.Syntax) -> syntax.Syntax { syntax._report_error(\"bad macro\", x) }\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let (mut parsed, diagnostics) = ilang_check::parse(&graph);
@@ -956,7 +956,7 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, use_int)\n(@ macro (= use_int (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `Int)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nx: m.use_int(Undefined)\nx = 1\n",
+        "(m = app/macros)\nx : m.use_int(Undefined)\nx = 1\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -1832,7 +1832,7 @@ fn checked_collection_validates_targets_and_duplicates() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(anchor)\nanchor = Nil\ngood = () { 42 }\nbad = (x: Int) { x }\nalias = good\n",
+        "(anchor)\nanchor = Nil\ngood = () { 42 }\nbad = (x : Int) { x }\nalias = good\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -2109,7 +2109,7 @@ fn shared_macro_code_reads_each_callers_definition_context() {
     for (module, ty, value) in [("a", "Int", "20"), ("b", "String", "\"b\"")] {
         std::fs::write(
             dir.path().join(format!("src/{module}.i")),
-            format!("(m = app/macros)\n(result)\nT = {ty}\nresult: m.read(T) = {value}\n"),
+            format!("(m = app/macros)\n(result)\nT = {ty}\nresult : m.read(T) = {value}\n"),
         )
         .unwrap();
     }

@@ -83,7 +83,7 @@ fn charges_are_identical_before_and_after_optimization() {
 
 #[test]
 fn the_same_export_counts_longer_paths_and_ignores_the_program_target() {
-    let source = "(\n\tmeasure\n)\nmeasure = (n: Int) -> Int { n |> (0) { 0 } | (_) { measure(n - 1) + 1 } }\n";
+    let source = "(\n\tmeasure\n)\nmeasure = (n : Int) -> Int { n |> (0) { 0 } | (_) { measure(n - 1) + 1 } }\n";
     let manifest = "name = \"app\"\n[wasm]\nexports = [\"app/main.measure\"]\n";
     let native = compile_project(source, manifest, false, ilang_wasm::Target::Native);
     let wasi = compile_project(source, manifest, false, ilang_wasm::Target::Wasi);
@@ -240,7 +240,7 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
 	testlib = (test) = std/test
 	syntax = i/syntax)
       @external("test:syntax", "source")
-      source: () -> syntax.Syntax
+      source : () -> syntax.Syntax
 
       test("exercise", () {
         x = source()
@@ -312,7 +312,7 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
 fn logical_frame_limit_precedes_native_stack_exhaustion_for_large_expressions() {
     // All these argument values have to survive the recursive call.  They
     // are expression temporaries, not written local bindings.
-    let parameters = std::iter::repeat_n("_: Int", 900)
+    let parameters = std::iter::repeat_n("_ : Int", 900)
         .collect::<Vec<_>>()
         .join(", ");
     let arguments = (1..=900)
@@ -320,9 +320,7 @@ fn logical_frame_limit_precedes_native_stack_exhaustion_for_large_expressions() 
         .collect::<Vec<_>>()
         .join(", ");
     let source = format!(
-        "many = ({parameters}, last: Int) -> Int {{ last }}\n\
-         f = (n: Int) -> Int {{ n |> (0) {{ 0 }} | (_) {{ many({arguments}, f(n - 1)) }} }}\n\
-         main = () {{ f(3300) Nil }}\n"
+        "many = ({parameters}, last : Int) -> Int {{ last }}\nf = (n : Int) -> Int {{ n |> (0) {{ 0 }} | (_) {{ many({arguments}, f(n - 1)) }} }}\nmain = () {{ f(3300) Nil }}\n"
     );
     let mut usage = Vec::new();
     for optimized in [false, true] {

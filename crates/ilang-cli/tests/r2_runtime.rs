@@ -336,38 +336,25 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     // a source copy; the IO and continuation queries are unused by this pure unit probe.
     let source = include_str!("../../../lib/i/task.i");
     let source = source.replace(
-        "@external(\"ilang:request\", \"observe_change\")\nobserve_change: (Key(Nil)) -> Request(Nil)",
-        "observe_change = (_root: Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
+        "@external(\"ilang:request\", \"observe_change\")\nobserve_change : (Key(Nil)) -> Request(Nil)",
+        "observe_change = (_root : Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
     ).replace(
-        "@external(\"ilang:request\", \"has_work\")\nhas_work: (Ticket) -> Bool",
-        "has_work = (_ticket: Ticket) -> Bool { False }",
+        "@external(\"ilang:request\", \"has_work\")\nhas_work : (Ticket) -> Bool",
+        "has_work = (_ticket : Ticket) -> Bool { False }",
     );
     let begin = source
         .find("@external(\"ilang:control\", \"finalizing\")")
         .unwrap();
     let end = source[begin..].find("\nFrame = (").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "finalizing = <A, R, E, N, B, F, M>(\n\t_k: Continuation(A, R, E, N),\n\t_b: Boundary(B, F, M)\n) -> Bool { False }\n"
+        + "finalizing = <A, R, E, N, B, F, M>(\n\t_k : Continuation(A, R, E, N),\n\t_b : Boundary(B, F, M)\n) -> Bool { False }\n"
         + &source[end..];
     let begin = source
         .find("@external(\"ilang:worker\", \"enabled\")")
         .unwrap();
     let end = source[begin..].find("\ndrop_shares = ").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "worker_enabled = () -> Bool { False }\n\
-           worker_publish = (_job: Job) -> Int { 0 }\n\
-           worker_claim = (_ticket: Int) -> Bool { True }\n\
-           worker_adopt = (_ticket: Int, _task: Int) -> Nil { Nil }\n\
-           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never, Never) { panic(\"no workers\") }\n\
-           worker_away = (_k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool { False }\n\
-           worker_send = (_task: Int, _resume: Resume) -> Nil { Nil }\n\
-           worker_inbox = () -> Int { 0 }\n\
-           worker_message = () -> Remote { panic(\"no workers\") }\n\
-           worker_pending = () -> Bool { False }\n\
-           worker_wait = () -> Nil { Nil }\n\
-           worker_share_put = (_run: Key(Nil), _address: Address, _value: Keyed) -> Nil { Nil }\n\
-           worker_share_get = (_run: Key(Nil), _address: Address) -> List(Keyed) { [] }\n\
-           worker_share_drop = (_run: Key(Nil), _address: Address) -> Nil { Nil }\n"
+        + "worker_enabled = () -> Bool { False }\nworker_publish = (_job : Job) -> Int { 0 }\nworker_claim = (_ticket : Int) -> Bool { True }\nworker_adopt = (_ticket : Int, _task : Int) -> Nil { Nil }\nworker_placeholder = () -> Continuation(StepAnswer, Turn, Never, Never) { panic(\"no workers\") }\nworker_away = (_k : Continuation(StepAnswer, Turn, Never, Never)) -> Bool { False }\nworker_send = (_task : Int, _resume : Resume) -> Nil { Nil }\nworker_inbox = () -> Int { 0 }\nworker_message = () -> Remote { panic(\"no workers\") }\nworker_pending = () -> Bool { False }\nworker_wait = () -> Nil { Nil }\nworker_share_put = (_run : Key(Nil), _address : Address, _value : Keyed) -> Nil { Nil }\nworker_share_get = (_run : Key(Nil), _address : Address) -> List(Keyed) { [] }\nworker_share_drop = (_run : Key(Nil), _address : Address) -> Nil { Nil }\n"
         + &source[end..];
     assert!(!source.contains("@external(\"ilang:request\""));
     assert!(!source.contains("@external(\"ilang:worker\""));
@@ -375,7 +362,7 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         + r#"
 
 main = () {
-  k: Key(String) = key.new()
+  k : Key(String) = key.new()
   extension = key.wrap(k, "extension")
   prefix = key.wrap(k, "prefix")
   later = key.wrap(k, "later")

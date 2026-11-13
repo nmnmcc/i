@@ -417,8 +417,8 @@ commit. Older code citations in runtime/multicore retain their stated base.
 
 Wasmtime 50 source was also read in the local registry at
 `/home/agent/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-50.0.0/`:
-`src/config.rs:679–737` documents engine-global epochs, required deadlines and lack of
-interruption in blocking host code; `src/runtime/store.rs:1058–1116` defines relative
+`src/config.rs : 679–737` documents engine-global epochs, required deadlines and lack of
+interruption in blocking host code; `src/runtime/store.rs : 1058–1116` defines relative
 deadlines and trapping. These are local source readings, not new runtime probes. One
 Engine per live interrupted entry context avoids shared-epoch cross-talk and
 overflow/rearming questions; caching across domains is MC work.
@@ -523,17 +523,18 @@ hangs; do not use sleep timing as the semantic oracle.
 **Stop beside a spin.** On two workers force the two children to start remotely:
 
 ```i
-(i/task)
+(
+	i/task
+)
 
 spin = () { spin() }
 
-
 main = () {
-  task.scope((s) {
-    task.go(s, spin)
-    task.go(s, () { panic("first") })
-    Nil
-  })
+	task.scope((s) {
+		task.go(s, spin)
+		task.go(s, () { panic("first") })
+		Nil
+	})
 }
 ```
 
@@ -570,7 +571,7 @@ cleanup; an already-removed alias gives Nil.
 @host("i:net/v1", "request")
 Pretend = (read = (Int, Int) -> Request(Result(BitArray, String)))
 
-main = () <- (raw: Pretend) { request.await(raw.read(1, 1)) }
+main = () <- (raw : Pretend) { request.await(raw.read(1, 1)) }
 ```
 
 Private exports alone do not block it. §3.1 denies automatic binding before any service
@@ -683,7 +684,7 @@ timeouts and plugin cleanup, not only tasks.
 @host("review:gate/v1", "request")
 Gate = (wait = () -> Request(Nil))
 
-main = () <- (gate: Gate, root: request.Root) {
+main = () <- (gate : Gate, root : request.Root) {
 	pending = gate.wait()
 	task.scope((s) {
 		child = task.go(s, () { request.count_root(root) })
@@ -719,10 +720,13 @@ request.await remains borrowed. Test with a live Stream and a host fixture
 that keeps the first read pending until the second branch wins:
 
 ```i
-(i/net, i/task)
-twice = (stream: net.Stream) {
-  task.race(() { net.read(stream, 1) }, () { <<>> })
-  net.read(stream, 1)
+(
+	i/net
+	i/task
+)
+twice = (stream : net.Stream) {
+	task.race(() { net.read(stream, 1) }, () { <<>> })
+	net.read(stream, 1)
 }
 ```
 
@@ -755,16 +759,22 @@ for H4/status 1, independently of this program-progress predicate.
 11–12 now distinguish stateful handles from pure event descriptions:
 
 ```i
-(i/task, i/control, i/core)
+(
+	i/task
+	i/control
+	i/core
+)
 event = task.always(1)
 
 main = () {
-  task.run(() { assert(task.sync(event) == 1) })
-  task.run(() { assert(task.sync(event) == 1) })
-  control.boundary((b) {
-    e = task.map(task.always(Nil), (_) { b })
-    assert(core.not(core.portable(e)))
-  })
+	task.run(() { assert(task.sync(event) == 1) })
+	task.run(() { assert(task.sync(event) == 1) })
+	control.boundary((b) {
+		e = task.map(task.always(Nil), (_) { b })
+		assert(
+			core.not(core.portable(e)),
+		)
+	})
 }
 ```
 
@@ -786,7 +796,7 @@ by a nested run on the same worker:
 @host("review:gate/v1", "request")
 Gate = (wait = () -> Request(Nil))
 
-main = () <- (gate: Gate) {
+main = () <- (gate : Gate) {
 	pending = gate.wait()
 	task.run(() { request.await(pending) })
 }
@@ -802,15 +812,17 @@ A captured Request pins a child normally; no cross-worker borrow is introduced.
 **N-R6 combined counter.** The review's go/run/go case is:
 
 ```i
-(i/task)
+(
+	i/task
+)
 
 main = () {
-  task.scope((s) {
-    a = task.go(s, task.path)
-    nested = task.run(task.path)
-    b = task.go(s, task.path)
-    assert((task.join(a), nested, task.join(b)) == ([1], [2], [3]))
-  })
+	task.scope((s) {
+		a = task.go(s, task.path)
+		nested = task.run(task.path)
+		b = task.go(s, task.path)
+		assert((task.join(a), nested, task.join(b)) == ([1], [2], [3]))
+	})
 }
 ```
 
@@ -1019,11 +1031,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Module/service/namespace | Public opaque types and errors |
 > |---|---|
-> | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation: String, code: String) }` |
-> | fs / Fs / `i:fs/v1` | `File {}`; `FsError { FsError(operation: String, path: String, code: String) }` |
-> | net / Net / `i:net/v1` | `Listener {}`; `Stream {}`; `NetError { NetError(operation: String, endpoint: String, code: String) }` |
-> | process / Process / `i:process/v1` | `Child {}`; `ProcessError { ProcessError(operation: String, code: String) }` |
-> | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation: String, code: String) }` |
+> | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation : String, code : String) }` |
+> | fs / Fs / `i:fs/v1` | `File {}`; `FsError { FsError(operation : String, path : String, code : String) }` |
+> | net / Net / `i:net/v1` | `Listener {}`; `Stream {}`; `NetError { NetError(operation : String, endpoint : String, code : String) }` |
+> | process / Process / `i:process/v1` | `Child {}`; `ProcessError { ProcessError(operation : String, code : String) }` |
+> | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation : String, code : String) }` |
 
 - New sentence(s):
 
@@ -1078,11 +1090,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Module/service/namespace | Public resource types and errors |
 > |---|---|
-> | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation: String, code: String) }` |
-> | fs / Fs (type only) / `i:fs/v1` | File, constructor private; `FsError { FsError(operation: String, path: String, code: String) }` |
-> | net / Net (type only) / `i:net/v1` | Listener and Stream, constructors private; `NetError { NetError(operation: String, endpoint: String, code: String) }` |
-> | process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation: String, code: String) }` |
-> | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation: String, code: String) }` |
+> | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation : String, code : String) }` |
+> | fs / Fs (type only) / `i:fs/v1` | File, constructor private; `FsError { FsError(operation : String, path : String, code : String) }` |
+> | net / Net (type only) / `i:net/v1` | Listener and Stream, constructors private; `NetError { NetError(operation : String, endpoint : String, code : String) }` |
+> | process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation : String, code : String) }` |
+> | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation : String, code : String) }` |
 
 - Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
 
@@ -1092,15 +1104,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > | Raw Fs field | Type |
 > |---|---|
-> | `open` | `(path: String, mode: String) -> Request(Result(File,String))` |
-> | `read` | `(file: File, max_bytes: Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(file: File, bytes: BitArray) -> Request(Result(Nil,String))` |
-> | `flush` | `(file: File) -> Request(Result(Nil,String))` |
-> | `close` | `(file: File) -> Request(Nil)` |
-> | `remove` | `(path: String) -> Request(Result(Nil,String))` |
-> | `rename` | `(from: String, to: String) -> Request(Result(Nil,String))` |
-> | `read_file` | `(path: String) -> Request(Result(BitArray,String))` |
-> | `write_file` | `(path: String, bytes: BitArray) -> Request(Result(Nil,String))` |
+> | `open` | `(path : String, mode : String) -> Request(Result(File,String))` |
+> | `read` | `(file : File, max_bytes : Int) -> Request(Result(BitArray,String))` |
+> | `write` | `(file : File, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `flush` | `(file : File) -> Request(Result(Nil,String))` |
+> | `close` | `(file : File) -> Request(Nil)` |
+> | `remove` | `(path : String) -> Request(Result(Nil,String))` |
+> | `rename` | `(from : String, to : String) -> Request(Result(Nil,String))` |
+> | `read_file` | `(path : String) -> Request(Result(BitArray,String))` |
+> | `write_file` | `(path : String, bytes : BitArray) -> Request(Result(Nil,String))` |
 >
 > Public open takes OpenMode and encodes `read`, `truncate`, `append`, or
 > `read_write`; write modes create the file if absent, read_write does not
@@ -1120,15 +1132,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > | Raw Fs field | Type |
 > |---|---|
-> | `open` | `(path: String, mode: String) -> Request(Result(Int,String))` |
-> | `read` | `(file: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(file: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
-> | `flush` | `(file: Int) -> Request(Result(Nil,String))` |
-> | `close` | `(file: Int) -> Request(Nil)` |
-> | `remove` | `(path: String) -> Request(Result(Nil,String))` |
-> | `rename` | `(from: String, to: String) -> Request(Result(Nil,String))` |
-> | `read_file` | `(path: String) -> Request(Result(BitArray,String))` |
-> | `write_file` | `(path: String, bytes: BitArray) -> Request(Result(Nil,String))` |
+> | `open` | `(path : String, mode : String) -> Request(Result(Int,String))` |
+> | `read` | `(file : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
+> | `write` | `(file : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `flush` | `(file : Int) -> Request(Result(Nil,String))` |
+> | `close` | `(file : Int) -> Request(Nil)` |
+> | `remove` | `(path : String) -> Request(Result(Nil,String))` |
+> | `rename` | `(from : String, to : String) -> Request(Result(Nil,String))` |
+> | `read_file` | `(path : String) -> Request(Result(BitArray,String))` |
+> | `write_file` | `(path : String, bytes : BitArray) -> Request(Result(Nil,String))` |
 >
 > Public open returns File by wrapping the successful Int, takes OpenMode and encodes `read`, `truncate`, `append`, or
 > `read_write`; write modes create the file if absent, read_write does not
@@ -1185,15 +1197,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > | Raw Net field | Type |
 > |---|---|
-> | `listen` | `(address: String, port: Int) -> Request(Result(Listener,String))` |
-> | `local_port` | `(listener: Listener) -> Request(Result(Int,String))` |
-> | `accept` | `(listener: Listener) -> Request(Result(Stream,String))` |
-> | `connect` | `(address: String, port: Int) -> Request(Result(Stream,String))` |
-> | `read` | `(stream: Stream, max_bytes: Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(stream: Stream, bytes: BitArray) -> Request(Result(Nil,String))` |
-> | `shutdown_write` | `(stream: Stream) -> Request(Result(Nil,String))` |
-> | `close_stream` | `(stream: Stream) -> Request(Nil)` |
-> | `close_listener` | `(listener: Listener) -> Request(Nil)` |
+> | `listen` | `(address : String, port : Int) -> Request(Result(Listener,String))` |
+> | `local_port` | `(listener : Listener) -> Request(Result(Int,String))` |
+> | `accept` | `(listener : Listener) -> Request(Result(Stream,String))` |
+> | `connect` | `(address : String, port : Int) -> Request(Result(Stream,String))` |
+> | `read` | `(stream : Stream, max_bytes : Int) -> Request(Result(BitArray,String))` |
+> | `write` | `(stream : Stream, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `shutdown_write` | `(stream : Stream) -> Request(Result(Nil,String))` |
+> | `close_stream` | `(stream : Stream) -> Request(Nil)` |
+> | `close_listener` | `(listener : Listener) -> Request(Nil)` |
 >
 > The same names are public wrappers with the same parameters and success types,
 > `^ NetError`, and no errors for the two close functions. Address is a numeric
@@ -1214,15 +1226,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > | Raw Net field | Type |
 > |---|---|
-> | `listen` | `(address: String, port: Int) -> Request(Result(Int,String))` |
-> | `local_port` | `(listener: Int) -> Request(Result(Int,String))` |
-> | `accept` | `(listener: Int) -> Request(Result(Int,String))` |
-> | `connect` | `(address: String, port: Int) -> Request(Result(Int,String))` |
-> | `read` | `(stream: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(stream: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
-> | `shutdown_write` | `(stream: Int) -> Request(Result(Nil,String))` |
-> | `close_stream` | `(stream: Int) -> Request(Nil)` |
-> | `close_listener` | `(listener: Int) -> Request(Nil)` |
+> | `listen` | `(address : String, port : Int) -> Request(Result(Int,String))` |
+> | `local_port` | `(listener : Int) -> Request(Result(Int,String))` |
+> | `accept` | `(listener : Int) -> Request(Result(Int,String))` |
+> | `connect` | `(address : String, port : Int) -> Request(Result(Int,String))` |
+> | `read` | `(stream : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
+> | `write` | `(stream : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `shutdown_write` | `(stream : Int) -> Request(Result(Nil,String))` |
+> | `close_stream` | `(stream : Int) -> Request(Nil)` |
+> | `close_listener` | `(listener : Int) -> Request(Nil)` |
 >
 > Public listen returns Listener; accept/connect return Stream. Public resource
 > parameters use Listener or Stream as appropriate. Other result types stay the
@@ -1278,15 +1290,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Raw Process field | Type |
 > |---|---|
 > | `args` | `() -> Request(Result(BitArray,String))` |
-> | `env` | `(name: String) -> Request(Result(String,String))` |
+> | `env` | `(name : String) -> Request(Result(String,String))` |
 > | `cwd` | `() -> Request(Result(String,String))` |
-> | `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
-> | `spawn` | `(program: String, args: BitArray) -> Request(Result(Child,String))` |
-> | `wait` | `(child: Child) -> Request(Result(Int,String))` |
-> | `terminate` | `(child: Child) -> Request(Result(Nil,String))` |
-> | `close` | `(child: Child) -> Request(Nil)` |
+> | `entropy` | `(bytes : Int) -> Request(Result(BitArray,String))` |
+> | `spawn` | `(program : String, args : BitArray) -> Request(Result(Child,String))` |
+> | `wait` | `(child : Child) -> Request(Result(Int,String))` |
+> | `terminate` | `(child : Child) -> Request(Result(Nil,String))` |
+> | `close` | `(child : Child) -> Request(Nil)` |
 >
-> Public args gives List(String); spawn takes `(program: String, args: List(String))`;
+> Public args gives List(String); spawn takes `(program : String, args : List(String))`;
 > other wrappers keep raw parameters/success values, with `^ ProcessError` except
 > close, which has no errors. Program args exclude the interpreter/program name;
 > spawn's args exclude argv[0]. Each child inherits cwd, environment, and standard
@@ -1301,15 +1313,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Raw Process field | Type |
 > |---|---|
 > | `args` | `() -> Request(Result(BitArray,String))` |
-> | `env` | `(name: String) -> Request(Result(String,String))` |
+> | `env` | `(name : String) -> Request(Result(String,String))` |
 > | `cwd` | `() -> Request(Result(String,String))` |
-> | `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
-> | `spawn` | `(program: String, args: BitArray) -> Request(Result(Int,String))` |
-> | `wait` | `(child: Int) -> Request(Result(Int,String))` |
-> | `terminate` | `(child: Int) -> Request(Result(Nil,String))` |
-> | `close` | `(child: Int) -> Request(Nil)` |
+> | `entropy` | `(bytes : Int) -> Request(Result(BitArray,String))` |
+> | `spawn` | `(program : String, args : BitArray) -> Request(Result(Int,String))` |
+> | `wait` | `(child : Int) -> Request(Result(Int,String))` |
+> | `terminate` | `(child : Int) -> Request(Result(Nil,String))` |
+> | `close` | `(child : Int) -> Request(Nil)` |
 >
-> Public args gives List(String); spawn takes `(program: String, args: List(String))`
+> Public args gives List(String); spawn takes `(program : String, args : List(String))`
 > and returns Child; wait/terminate/close take Child. Match Child(number)
 > to unwrap arguments and wrap the successful spawn Int with Child. Other wrappers
 > keep raw parameters/success values, with `^ ProcessError` except
@@ -1546,7 +1558,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > error-free close contract; flush/terminate expose errors separately.
 >
 > Resource objects are host references, which remain local as S7 requires. On Rust
-> this can use the existing Arc-backed HostReference (`crates/ilang-host/src/lib.rs:372–382`).
+> this can use the existing Arc-backed HostReference (`crates/ilang-host/src/lib.rs : 372–382`).
 > The request table's generation token solves stale i aliases, not a malicious
 > host's late callback after id reuse: ABI H13 already forbids that callback.
 
@@ -1604,7 +1616,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > with ordinary imports. Browser APIs never silently treat URLs as files or a
 > WebSocket as Stream. Node and browser async starters read requestSignal()
 > synchronously and register cancellation there; the helper and status-2 macrotask
-> path already exist (`bindings/javascript/ilang.mjs:34–58`, `:894–902`). New service
+> path already exist (`bindings/javascript/ilang.mjs : 34–58`, `:894–902`). New service
 > factories and tests are IO work, not claims about today's SDK.
 >
 > WASI keeps the current §B.7 blocking-import contract. It is not the `i run` host:
@@ -1618,7 +1630,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > blocking imports, as §B.7 already permits. Implementing a preview-1 adapter set
 > is a separate target project, not an unreviewed second IO host in this track.
 > The current hostref representation requires an externref and reference_id
-> (`crates/ilang-wasm/src/runtime/mod.rs:240`, `:249–268`), so “just return an fd”
+> (`crates/ilang-wasm/src/runtime/mod.rs : 240`, `:249–268`), so “just return an fd”
 > would not implement File under the existing ABI. That unsupported shortcut is
 > specifically rejected.
 
@@ -1644,7 +1656,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > after cancellation. Browser APIs never silently treat URLs as files or a
 > WebSocket as Stream. Node and browser async starters read requestSignal()
 > synchronously and register cancellation there; the helper and status-2 macrotask
-> path already exist (`bindings/javascript/ilang.mjs:34–58`, `:894–902`). New service
+> path already exist (`bindings/javascript/ilang.mjs : 34–58`, `:894–902`). New service
 > factories and tests are IO work, not claims about today's SDK.
 >
 > WASI keeps the current §B.7 blocking-import contract. It is not the `i run` host:
@@ -1988,12 +2000,12 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Track | Files and regions to change |
 > |---|---|
-> | R1 | Replace `lib/i/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
-> | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
-> | R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. No edits to `ilang-host/src/requests.rs` are needed for many outstanding requests |
-> | R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-> | IO service phases | Replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml:15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser service factories and their tests under `bindings/javascript/` and `tests/browser/` |
-> | Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
+> | R1 | Replace `lib/i/random.i : 1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
+> | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i : 3–28` keep_env; `lib/i/core.i : 3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs : 1285–1291` and `hir.rs : 210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
+> | R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs : 664–679`, `:1470–1555`, mode in `hir.rs : 182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs : 969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs : 23–165`, `:172–246`, `:335–358`; add continue export. No edits to `ilang-host/src/requests.rs` are needed for many outstanding requests |
+> | R2 scheduler and entry | Replace `lib/i/task.i : 1`; `infer.rs : 376–429` resolved allowed-entry-service set and diagnostics; `lower.rs : 828–938` entry wrappers/metadata; `emit/mod.rs : 805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
+> | IO service phases | Replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs : 44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs : 151–152`; new JS Node/browser service factories and their tests under `bindings/javascript/` and `tests/browser/` |
+> | Shared registration | `crates/ilang-package/src/library.rs : 7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 > | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
 - New sentence(s):
@@ -2004,12 +2016,12 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Track | Files and regions to change |
 > |---|---|
-> | R1 | Replace `lib/i/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
-> | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
-> | R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
-> | R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-> | IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs:1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml:15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
-> | Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
+> | R1 | Replace `lib/i/random.i : 1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
+> | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i : 3–28` keep_env; `lib/i/core.i : 3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs : 1285–1291` and `hir.rs : 210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
+> | R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs : 664–679`, `:1470–1555`, mode in `hir.rs : 182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs : 969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs : 23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
+> | R2 scheduler and entry | Replace `lib/i/task.i : 1`; `infer.rs : 376–429` resolved allowed-entry-service set and diagnostics; `lower.rs : 828–938` entry wrappers/metadata; `emit/mod.rs : 805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
+> | IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs : 1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs : 44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs : 151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
+> | Shared registration | `crates/ilang-package/src/library.rs : 7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 > | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
 - Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
@@ -2311,7 +2323,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > 3. **No static rule.** A function type does not show its captures, width subtyping hides record fields, and a type variable hides everything. A `Send`-like constraint would be a qualified type and would lose principal inference.
 > 4. **The environment.** §9.2 closures do not capture the environment, so a task started by `go` would get the services of the scheduler loop, not those of the place of `go`. And if the task did hold the scheduler's own boundary, no task could ever move.
 > 5. **Order and timing.** Error choice, results, random numbers and handle ids must not depend on which worker ran first.
-> 6. **Sharing and cycles.** WasmGC has no identity hash, and every `$obj` field is immutable (`runtime/mod.rs:234`). So a naive copy turns a DAG of depth d into a tree of 2^d nodes, and a naive walk never ends on a local recursive function, whose closure captures itself (part 3.6).
+> 6. **Sharing and cycles.** WasmGC has no identity hash, and every `$obj` field is immutable (`runtime/mod.rs : 234`). So a naive copy turns a DAG of depth d into a tree of 2^d nodes, and a naive walk never ends on a local recursive function, whose closure captures itself (part 3.6).
 > 7. **Hosts.** wasmtime needs one `Store` per thread and a shared memory. Browsers need `SharedArrayBuffer`, which needs cross-origin isolation (COOP and COEP), and the main thread must never block.
 
 - New sentence(s):
@@ -2321,7 +2333,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > 3. **No static rule.** A function type does not show its captures, width subtyping hides record fields, and a type variable hides everything. A `Send`-like constraint would be a qualified type and would lose principal inference.
 > 4. **The environment.** §9.2 closures do not capture the environment, so a task started by `go` would get the services of the scheduler loop, not those of the place of `go`. And if the task did hold the scheduler's own boundary, no task could ever move.
 > 5. **Order and timing.** Error choice, results, random numbers and handle ids must not depend on which worker ran first.
-> 6. **Sharing and cycles.** WasmGC has no identity hash, and every `$obj` field is immutable (`runtime/mod.rs:234`). So a naive copy turns a DAG of depth d into a tree of 2^d nodes, and a naive walk never ends on a local recursive function, whose closure captures itself (part 3.6).
+> 6. **Sharing and cycles.** WasmGC has no identity hash, and every `$obj` field is immutable (`runtime/mod.rs : 234`). So a naive copy turns a DAG of depth d into a tree of 2^d nodes, and a naive walk never ends on a local recursive function, whose closure captures itself (part 3.6).
 > 7. **Hosts.** wasmtime needs one `Store` per executing worker; native transport needs no shared Wasm memory. Browsers need `SharedArrayBuffer`, which needs cross-origin isolation (COOP and COEP), and the main thread must never block.
 
 - Reason: Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports.
@@ -2342,11 +2354,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 - Old sentence(s):
 
-> **D5. The scheduler reaches a task only as an argument from the worker loop.** Each worker runs its own scheduler loop. For each task start, the loop makes a **new boundary for that task**, outside the loop's own frames (`control.boundary((b) { start(scheduler_for(b)) })`), and gives the task a `Scheduler` service whose suspends go to `b`, as the argument of the kept function. When the task suspends, `$boundary_run` (`emit/control.rs:195-232`) runs `f(k)` in the boundary's place, so control comes back to the loop with the continuation `k`, and `b` is not active. `control.resume(k, v)`, called from the loop, makes `b` active again for the rest of the task. There is no long-lived boundary of the worker: a suspend to a boundary that encloses the loop would capture the loop itself into `k`. No task closure, kept service, channel handle, scope handle or event that `i/task` makes ever holds a `Scheduler` that the task did not get this way (a kept function that user code makes inside a task does hold its task's `Scheduler`, D4). Every task runs directly from its run's loop, never on another task's stack. The loop never calls `control.cancel` on a task's continuation: a cancel resumes the task, and the task unwinds itself under an inner boundary, so that `b` stays active while its final functions run (part 6). *Reason:* if task closures held the scheduler's boundary, every task would be non-portable, nothing could be stolen, and every send of a closure would stop. Running every task from the loop under its own boundary makes "a boundary of another task is never active" true on any number of workers. A nested run (part 4) runs its loop inside the boundary body of its calling task; that is the one case where a task of one run is on the stack of a task of another run, and part 4 gives its rules.
+> **D5. The scheduler reaches a task only as an argument from the worker loop.** Each worker runs its own scheduler loop. For each task start, the loop makes a **new boundary for that task**, outside the loop's own frames (`control.boundary((b) { start(scheduler_for(b)) })`), and gives the task a `Scheduler` service whose suspends go to `b`, as the argument of the kept function. When the task suspends, `$boundary_run` (`emit/control.rs : 195-232`) runs `f(k)` in the boundary's place, so control comes back to the loop with the continuation `k`, and `b` is not active. `control.resume(k, v)`, called from the loop, makes `b` active again for the rest of the task. There is no long-lived boundary of the worker: a suspend to a boundary that encloses the loop would capture the loop itself into `k`. No task closure, kept service, channel handle, scope handle or event that `i/task` makes ever holds a `Scheduler` that the task did not get this way (a kept function that user code makes inside a task does hold its task's `Scheduler`, D4). Every task runs directly from its run's loop, never on another task's stack. The loop never calls `control.cancel` on a task's continuation: a cancel resumes the task, and the task unwinds itself under an inner boundary, so that `b` stays active while its final functions run (part 6). *Reason:* if task closures held the scheduler's boundary, every task would be non-portable, nothing could be stolen, and every send of a closure would stop. Running every task from the loop under its own boundary makes "a boundary of another task is never active" true on any number of workers. A nested run (part 4) runs its loop inside the boundary body of its calling task; that is the one case where a task of one run is on the stack of a task of another run, and part 4 gives its rules.
 
 - New sentence(s):
 
-> **D5. The scheduler reaches a task only as an argument from the worker loop.** Each worker runs its own scheduler loop. For each task start, the loop makes a **new boundary for that task**, outside the loop's own frames (`control.boundary((b) { start(scheduler_for(b)) })`), and gives the task a `Scheduler` service whose suspends go to `b`, as the argument of the kept function. When the task suspends, `$boundary_run` (`emit/control.rs:195-232`) runs `f(k)` in the boundary's place, so control comes back to the loop with the continuation `k`, and `b` is not active. `control.resume(k, v)`, called from the loop, makes `b` active again for the rest of the task. There is no long-lived boundary of the worker: a suspend to a boundary that encloses the loop would capture the loop itself into `k`. No task closure, kept service, channel handle, scope handle or event that `i/task` makes ever holds a `Scheduler` that the task did not get this way (a kept function that user code makes inside a task does hold its task's `Scheduler`, D4). Every task runs directly from its run's loop, never on another task's stack. The loop never calls `control.cancel` on a task's continuation: a cancel resumes the task, and the task unwinds itself under an inner boundary, so that `b` stays active while its final functions run (part 6). *Reason:* if task closures held the scheduler's boundary, every task would be non-portable, nothing could be remotely claimed, and every send of a closure would stop. Running every task from the loop under its own boundary makes "a boundary of another task is never active" true on any number of workers. A nested run (part 4) runs its loop inside the boundary body of its calling task; that is the one case where a task of one run is on the stack of a task of another run, and part 4 gives its rules.
+> **D5. The scheduler reaches a task only as an argument from the worker loop.** Each worker runs its own scheduler loop. For each task start, the loop makes a **new boundary for that task**, outside the loop's own frames (`control.boundary((b) { start(scheduler_for(b)) })`), and gives the task a `Scheduler` service whose suspends go to `b`, as the argument of the kept function. When the task suspends, `$boundary_run` (`emit/control.rs : 195-232`) runs `f(k)` in the boundary's place, so control comes back to the loop with the continuation `k`, and `b` is not active. `control.resume(k, v)`, called from the loop, makes `b` active again for the rest of the task. There is no long-lived boundary of the worker: a suspend to a boundary that encloses the loop would capture the loop itself into `k`. No task closure, kept service, channel handle, scope handle or event that `i/task` makes ever holds a `Scheduler` that the task did not get this way (a kept function that user code makes inside a task does hold its task's `Scheduler`, D4). Every task runs directly from its run's loop, never on another task's stack. The loop never calls `control.cancel` on a task's continuation: a cancel resumes the task, and the task unwinds itself under an inner boundary, so that `b` stays active while its final functions run (part 6). *Reason:* if task closures held the scheduler's boundary, every task would be non-portable, nothing could be remotely claimed, and every send of a closure would stop. Running every task from the loop under its own boundary makes "a boundary of another task is never active" true on any number of workers. A nested run (part 4) runs its loop inside the boundary body of its calling task; that is the one case where a task of one run is on the stack of a task of another run, and part 4 gives its rules.
 
 - Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics.
 
@@ -2515,20 +2527,20 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - Old sentence(s):
 
 > - §2.5 says top-level values need no environment, so they never call host services. The only ways a top-level value can be non-portable are: an `@external` that gives a host reference (an opaque custom type, §10.3), and a boundary or continuation made by `control.boundary` during start-up.
-> - Such a value is a problem even though it never moves. Top-level names are not captures, so `counter = ext_counter_new()` and `bump = () { ext_counter_inc(counter) }` make `bump` a portable constant closure. Each worker's start-up makes its own counter (`reference_id` is per instance, `lib.rs:602`), and a stolen `bump` would increment the thief's counter: `scope((s) { list.map(range(0, 100), (i) { s.go(bump) }) })` would leave less than 100 in the counter that worker 0 reads. A top-level continuation is the same: each worker would have its own copy to resume.
+> - Such a value is a problem even though it never moves. Top-level names are not captures, so `counter = ext_counter_new()` and `bump = () { ext_counter_inc(counter) }` make `bump` a portable constant closure. Each worker's start-up makes its own counter (`reference_id` is per instance, `lib.rs : 602`), and a stolen `bump` would increment the thief's counter: `scope((s) { list.map(range(0, 100), (i) { s.go(bump) }) })` would leave less than 100 in the counter that worker 0 reads. A top-level continuation is the same: each worker would have its own copy to resume.
 > - So every worker runs `ilang_start` (D7), and the run uses N workers only when both conditions hold:
 >   - (a) **Portable top level.** After start-up on worker 0, the runtime walks every top-level value with the `portable` walk (`ilang_toplevel_portable`, multicore wave). If one is not portable, the run uses one worker. Then `counter` above gives 100, as on one worker.
->   - (b) **Pure start-up externals.** A **host external** is an `@external` that is not of the library package `i`. The `@external` declarations of `i/core` (`not`, `to_float`, `inspect`, `hash`, …; `@external("ilang:core", …)` and `ilang:prelude`'s `panic`) are operations of the runtime, which `lower.rs:1379` and the name tables near `lower.rs:120` map to ops; they do not count. The compiler knows statically which host externals the full needs (§2.5) of the top-level bindings **that are not direct values** reach, and records them in the metadata (§B.6, multicore wave). These are the only bindings whose expressions start-up runs; the body of a top-level function such as `main` is not run at start-up, so an external that only function bodies use does not count. A module with such externals runs N workers only when the host declares those externals pure: each call with equal arguments gives an equal result, and calling them again on each worker has no effect that the program or the user can see. Otherwise it runs one worker. This is the same line that `meta.md` §8 draws for macros (the full needs of top-level values that are not a direct value).
+>   - (b) **Pure start-up externals.** A **host external** is an `@external` that is not of the library package `i`. The `@external` declarations of `i/core` (`not`, `to_float`, `inspect`, `hash`, …; `@external("ilang:core", …)` and `ilang:prelude`'s `panic`) are operations of the runtime, which `lower.rs : 1379` and the name tables near `lower.rs : 120` map to ops; they do not count. The compiler knows statically which host externals the full needs (§2.5) of the top-level bindings **that are not direct values** reach, and records them in the metadata (§B.6, multicore wave). These are the only bindings whose expressions start-up runs; the body of a top-level function such as `main` is not run at start-up, so an external that only function bodies use does not count. A module with such externals runs N workers only when the host declares those externals pure: each call with equal arguments gives an equal result, and calling them again on each worker has no effect that the program or the user can see. Otherwise it runs one worker. This is the same line that `meta.md` §8 draws for macros (the full needs of top-level values that are not a direct value).
 > - Both are choices made when the module is loaded or started, and they cannot be seen. `docs/performance.md` notes the lost parallelism.
 > - Per-instance runtime state is set up on every worker as today: label globals, `$constructors_install`, the shadow stack and the site table.
 
 - New sentence(s):
 
 > - §2.5 says top-level values need no environment, so they never call host services. The only ways a top-level value can be non-portable are: an `@external` that gives a host reference (an opaque custom type, §10.3), and a boundary or continuation made by `control.boundary` during start-up.
-> - Such a value is a problem even though it never moves. Top-level names are not captures, so `counter = ext_counter_new()` and `bump = () { ext_counter_inc(counter) }` make `bump` a portable constant closure. Each worker's start-up makes its own counter (`reference_id` is per instance, `lib.rs:602`), and a remotely claimed `bump` would increment the remote claimant's counter: `scope((s) { list.map(range(0, 100), (i) { s.go(bump) }) })` would leave less than 100 in the counter that worker 0 reads. A top-level continuation is the same: each worker would have its own copy to resume.
+> - Such a value is a problem even though it never moves. Top-level names are not captures, so `counter = ext_counter_new()` and `bump = () { ext_counter_inc(counter) }` make `bump` a portable constant closure. Each worker's start-up makes its own counter (`reference_id` is per instance, `lib.rs : 602`), and a remotely claimed `bump` would increment the remote claimant's counter: `scope((s) { list.map(range(0, 100), (i) { s.go(bump) }) })` would leave less than 100 in the counter that worker 0 reads. A top-level continuation is the same: each worker would have its own copy to resume.
 > - So every worker runs `ilang_start` (D7), and the run uses N workers only when both conditions hold:
 >   - (a) **Portable top level.** After start-up on worker 0, the runtime walks every top-level value with the `portable` walk (`ilang_toplevel_portable`, multicore wave). If one is not portable, the run uses one worker. Then `counter` above gives 100, as on one worker.
->   - (b) **Pure start-up externals.** A **host external** is an `@external` that is not of the library package `i`. The `@external` declarations of `i/core` (`not`, `to_float`, `inspect`, `hash`, …; `@external("ilang:core", …)` and `ilang:prelude`'s `panic`) are operations of the runtime, which `lower.rs:1379` and the name tables near `lower.rs:120` map to ops; they do not count. The compiler knows statically which host externals the full needs (§2.5) of the top-level bindings **that are not direct values** reach, and records them in the metadata (§B.6, multicore wave). These are the only bindings whose expressions start-up runs; the body of a top-level function such as `main` is not run at start-up, so an external that only function bodies use does not count. A module with such externals runs N workers only when the host declares those externals pure: each call with equal arguments gives an equal result, and calling them again on each worker has no effect that the program or the user can see. Otherwise it runs one worker. This is the same line that `meta.md` §8 draws for macros (the full needs of top-level values that are not a direct value).
+>   - (b) **Pure start-up externals.** A **host external** is an `@external` that is not of the library package `i`. The `@external` declarations of `i/core` (`not`, `to_float`, `inspect`, `hash`, …; `@external("ilang:core", …)` and `ilang:prelude`'s `panic`) are operations of the runtime, which `lower.rs : 1379` and the name tables near `lower.rs : 120` map to ops; they do not count. The compiler knows statically which host externals the full needs (§2.5) of the top-level bindings **that are not direct values** reach, and records them in the metadata (§B.6, multicore wave). These are the only bindings whose expressions start-up runs; the body of a top-level function such as `main` is not run at start-up, so an external that only function bodies use does not count. A module with such externals runs N workers only when the host declares those externals pure: each call with equal arguments gives an equal result, and calling them again on each worker has no effect that the program or the user can see. Otherwise it runs one worker. This is the same line that `meta.md` §8 draws for macros (the full needs of top-level values that are not a direct value).
 > - Both are choices made when the module is loaded or started, and they cannot be seen. `docs/performance.md` notes the lost parallelism.
 > - Per-instance runtime state is set up on every worker as today: label globals, `$constructors_install`, the shadow stack and the site table.
 
@@ -2627,7 +2639,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - **Results.** `both`, `race` and `map_concurrently` are ordinary i code built on `scope`, so they are portable paths: each result and error of their children is checked when the child ends (P3), and `both(() { file.open("a") }, () { file.open("b") })`, where both results are host references, stops with `panic: task: value is not portable`. R may add local forms built on `local_scope` (`local_both`, `local_race`, `local_map_concurrently`), which do not check and whose children stay home (P4); without them, the program writes the local scope itself. `both` and `map_concurrently` give results in argument order. `race` gives the first result that commits; timing chooses, as with a CML `choose`. With one worker the FIFO scheduler makes it fixed, but that is not a promise for N workers.
 > - **What a cancel of a scope reaches.** When a scope `s` is cancelled (a child failed, or a task whose chain holds `s` is itself cancelled), the cancel reaches every child of `s` **and the body of `s`**. The body is unwound back to the `scope` call: `scope` runs its body under its own boundary in the body's task, and the cancel suspends to that boundary and cancels the part up to it, so the body's final functions run and the body gives no value; `scope` then waits for its children and gives the error of D10. A cancelled task cancels every scope it is running a body of, so the cancel goes down the whole tree inside `s`. A cancelled body is not a failure; it does not take part in the choice of the error. So `scope((s) { s.go(() { fail.raise(A) })  t = s.go(() { 1 })  t.join() })` gives error `A` on the one-worker FIFO scheduler: child `[1]` fails, `t` is dropped, the body waiting in `t.join()` is unwound, and nothing waits forever.
 > - **Cancellation** is cooperative and goes to the task's home worker. An unstarted task is dropped; it has no final functions. A started task is cancelled when the cancel reaches it: when it is paused (waiting or runnable) at that time, the loop does not give it the answer it waits for and cancels it as the next point says; when it is running, at its next suspend point. When the cancel reaches a task is a step in the order of D1: on one FIFO worker it reaches every paused task at once, and on N workers it reaches a task on another worker at that worker's next poll point. A task that is being unwound is not cancelled again, and its final functions run to their end, with the scopes they open, which that cancel does not reach.
-> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs:270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
+> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs : 270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
 > - **Stops.** A stop on any worker stops the run (D11). The worker writes the stop cell once with compare-and-swap; the others stop at their next poll point or epoch check, and their messages are dropped. No final functions run (§9.5).
 > - **Deadlock.** When no task can run and no host request is outstanding on any worker, nothing can ever go on. The run then stops with `panic: task: deadlock`, on one worker as on N. On one worker the scheduler sees this directly: its queue is empty and its request table is empty. It must not return status 1 then, which host-concurrency.md H4 makes a fault of the module. On N workers it needs quiescence detection: a shared count of runnable and running tasks and of outstanding requests; the worker that sees it reach zero with every deque empty writes the stop cell. In a macro, which has no host services (`meta.md` §8), every wait with nothing to run is a deadlock.
 > - **Idle.** A worker with nothing to run, while others still work or requests are outstanding, waits. By host-concurrency H5, a host answers a request only through `ilang_resume:…` after the instance has returned status 1 or 2, never while it is inside Wasm. So a worker that has **outstanding requests of its own** (its pinned tasks wait on them, P2) must never park inside Wasm: it would never see its answers, and a task that waits on a 10 ms sleep would hang until something else woke the worker. The rule:
@@ -2645,7 +2657,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - **Results.** `both`, `race` and `map_concurrently` are ordinary i code built on `scope`, so they are portable paths: each result and error of their children is checked when the child ends (P3), and a result containing a user host reference stops with `panic: task: value is not portable`. Standard File/Listener/Stream/Child values are portable nominal Int wrappers (native N9); returning them through these combinators succeeds. R may add local forms built on `local_scope` (`local_both`, `local_race`, `local_map_concurrently`), which do not check and whose children stay home (P4); without them, the program writes the local scope itself. `both` and `map_concurrently` give results in argument order. `race` gives the first result that commits; timing chooses, as with a CML `choose`. With one worker the FIFO scheduler makes it fixed, but that is not a promise for N workers.
 > - **What a cancel of a scope reaches.** When a scope `s` is cancelled (a child failed, or a task whose chain holds `s` is itself cancelled), the cancel reaches every child of `s` **and the body of `s`**. The body is unwound back to the `scope` call: `scope` runs its body under its own boundary in the body's task, and the cancel suspends to that boundary and cancels the part up to it, so the body's final functions run and the body gives no value; `scope` then waits for its children and gives the error of D10. A cancelled task cancels every scope it is running a body of, so the cancel goes down the whole tree inside `s`. A cancelled body is not a failure; it does not take part in the choice of the error. So `scope((s) { s.go(() { fail.raise(A) })  t = s.go(() { 1 })  t.join() })` gives error `A` on the one-worker FIFO scheduler: child `[1]` fails, `t` is dropped, the body waiting in `t.join()` is unwound, and nothing waits forever.
 > - **Cancellation** is cooperative and goes to the task's home worker. An unstarted task is dropped; it has no final functions. A started task is cancelled when the cancel reaches it: when it is paused (waiting or runnable) at that time, the loop does not give it the answer it waits for and cancels it as the next point says; when it is running, at its next suspend point. When the cancel reaches a task is a step in the order of D1: on one FIFO worker it reaches every paused task at once, and on N workers it reaches a task on another worker at that worker's next poll point. A task that is being unwound is not cancelled again, and its final functions run to their end, with the scopes they open, which that cancel does not reach.
-> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs:270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
+> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs : 270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
 > - **Stops.** A stop on any worker closes the run's start/claim/delivery gate and records one message under the lock. Stopping invokes no i finals. Every user import checks the stopped-context gate, so spinning native workers cannot start new host effects while reaping delays process exit. Native's independent controller tears down host work/resources before process exit; it does not join a spinning Wasm worker. A continuing host uses stop-only epoch traps in that run's interruption domain, wakes idle reactors and joins workers, then returns the first stop (native N12). Epochs do not interrupt synchronous host code; multicore hosts must supply stop-aware synchronous imports or choose one worker/process isolation. Child cleanup follows runtime §8.1, including reaping before native exit.
 > - **Deadlock.** When no task can run and no host request is outstanding on any worker, nothing can ever go on. The run then stops with `panic: task: deadlock`, on one worker as on N. On one worker the scheduler sees this directly: its queue is empty and its request table is empty. It must not return status 1 then, which host-concurrency.md H4 makes a fault of the module. On N workers it needs quiescence detection: a shared count of runnable and running tasks and of outstanding requests; the worker that sees it reach zero with shared and local queues empty records the stop under the same lock. Queue claims, local running counts, registrations and completion publication must participate in that snapshot; idle workers alone do not prove deadlock. In a macro, which has no host services (`meta.md` §8), every wait with nothing to run is a deadlock.
 > - **Idle.** A worker with nothing to run, while others still work or requests are outstanding, waits. By host-concurrency H5, a host answers a request only through `ilang_resume:…` after the instance has returned status 1 or 2, never while it is inside Wasm. So a worker that has **outstanding requests of its own** (its pinned tasks wait on them, P2) must never park inside Wasm: it would never see its answers, and a task that waits on a 10 ms sleep would hang until something else woke the worker. The rule:
@@ -2766,7 +2778,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > 2. **Wave 5 (MC):** N instances, one shared memory, private deques, cooperative steal of unstarted tasks with a sharing-keeping copy, `scope.share` regions, CAS-committed CML, ids in `$clo` field 2, quiescence detection, the imports module URL in JS.
 > 3. **Later:** with shared-everything threads, immutable data gets shared types (`$obj`, `$values`, `$cons`), copies go away for it, ids allow direct sharing, and boundaries and continuations stay per thread.
 > 4. **Later:** with Go-style per-frame resume, frame records that carry their point index could be encoded, so started tasks could move.
-> 5. **Later: moving host references.** By H, a host reference never leaves its worker, so a task that holds one runs where the reference was made. The plan's own end-to-end target (E2E-echo, `i/net` with `i/task`) then uses one core: worker 0 accepts each socket and hands it to a handler in a local scope, so every handler runs on worker 0 and the other workers sit idle, unless the handlers send their pure work to children of a portable scope. A later, compatible way out is a **host-mediated transfer**: a value `transfer(r)` that the host takes back from the sending instance and gives to the receiving instance as a new host reference (in wasmtime, `HostReference` is already `Arc<dyn Any + Send + Sync>`, `lib.rs:349`; in browsers only for transferable objects). It would be an explicit operation with its own `==` rule (the new reference is a different value), so it does not break H or §11.4. It is not designed here. `docs/performance.md` records the one-core limit of host-reference-heavy servers until then.
+> 5. **Later: moving host references.** By H, a host reference never leaves its worker, so a task that holds one runs where the reference was made. The plan's own end-to-end target (E2E-echo, `i/net` with `i/task`) then uses one core: worker 0 accepts each socket and hands it to a handler in a local scope, so every handler runs on worker 0 and the other workers sit idle, unless the handlers send their pure work to children of a portable scope. A later, compatible way out is a **host-mediated transfer**: a value `transfer(r)` that the host takes back from the sending instance and gives to the receiving instance as a new host reference (in wasmtime, `HostReference` is already `Arc<dyn Any + Send + Sync>`, `lib.rs : 349`; in browsers only for transferable objects). It would be an explicit operation with its own `==` rule (the new reference is a different value), so it does not break H or §11.4. It is not designed here. `docs/performance.md` records the one-core limit of host-reference-heavy servers until then.
 
 - New sentence(s):
 
@@ -2831,7 +2843,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - `crates/ilang-wasm/src/lower.rs`: add `portable` and the key functions to the `CORE` and `CORE_FUNCS` name tables near `:120` and `:130`; the `keep_env` op, which keeps the `$env` array as it is (part 4); bit 0 of field 1 for closures with patched captures (part 3.6). `captures_of` (`:389`) is the definition of captures; it does not change, and a comment points at §11.9.
 > - `crates/ilang-wasm/src/emit/mod.rs`: `closure()` writes the patch flag in field 1 and gives a patched closure's captures array its last element, the walk stamp (part 3.6). The `$clo{n}` types do not change.
 > - `crates/ilang-wasm/src/emit/control.rs`: `$keep_reenter` and the frame record of a kept function (part 4).
-> - The checker's built-in types for `portable`, `keep_env` and keys (`crates/ilang-check`): `BuiltinType::Key` and `BuiltinType::Keyed`, and a `Key: [Inv]` row in `builtin_variance` (`crates/ilang-check/src/types/solve.rs:1285-1292`). Without that row the argument of `Key` is never compared, and `unwrap` is an unchecked cast.
+> - The checker's built-in types for `portable`, `keep_env` and keys (`crates/ilang-check`): `BuiltinType::Key` and `BuiltinType::Keyed`, and a `Key: [Inv]` row in `builtin_variance` (`crates/ilang-check/src/types/solve.rs : 1285-1292`). Without that row the argument of `Key` is never compared, and `unwrap` is an unchecked cast.
 > - `crates/ilang-wasm/src/runtime/values.rs`: `$core_portable`, a walk with an explicit stack like `$value_compare_i32`, with the walk stamp of part 3.6 (one new token for each walk). It gives False at tags 10, 11 and 12 and at a host request, and walks field 5 of `$obj` (tuples, custom values, closure captures, records), `$cons` heads and tails, `Keyed` values, and kept services. The key functions.
 > - `crates/ilang-wasm/src/runtime/mod.rs`: the tag table (`:46`) gains a "portable" note, the patch flag, the key tag, and the planned `$clo` layout of part 3.4.
 > - `crates/ilang-check/tests/library.rs`: the core and control export lists.
@@ -2848,7 +2860,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - `crates/ilang-wasm/src/lower.rs`: add `portable` and the key functions to the `CORE` and `CORE_FUNCS` name tables near `:120` and `:130`; the `keep_env` op, which keeps the `$env` array as it is (part 4); bit 0 of field 1 for closures with patched captures (part 3.6). `captures_of` (`:389`) is the definition of captures; it does not change, and a comment points at §11.9.
 > - `crates/ilang-wasm/src/emit/mod.rs`: `closure()` writes the patch flag in field 1 and gives a patched closure's captures array its last element, the walk stamp (part 3.6). The `$clo{n}` types do not change.
 > - `crates/ilang-wasm/src/emit/control.rs`: `$keep_reenter` and the frame record of a kept function (part 4).
-> - The checker's built-in types for `portable`, `keep_env` and keys (`crates/ilang-check`): `BuiltinType::Key` and `BuiltinType::Keyed`, and a `Key: [Inv]` row in `builtin_variance` (`crates/ilang-check/src/types/solve.rs:1285-1292`). Without that row the argument of `Key` is never compared, and `unwrap` is an unchecked cast.
+> - The checker's built-in types for `portable`, `keep_env` and keys (`crates/ilang-check`): `BuiltinType::Key` and `BuiltinType::Keyed`, and a `Key: [Inv]` row in `builtin_variance` (`crates/ilang-check/src/types/solve.rs : 1285-1292`). Without that row the argument of `Key` is never compared, and `unwrap` is an unchecked cast.
 > - `crates/ilang-wasm/src/runtime/values.rs`: `$core_portable`, a walk with an explicit stack like `$value_compare_i32`, with the walk stamp of part 3.6 (one new token for each walk). It gives False at tags 10, 11 and 12 and at a host request, and walks field 5 of `$obj` (tuples, custom values, closure captures, records), `$cons` heads and tails, `Keyed` values, and kept services. The key functions.
 > - `crates/ilang-wasm/src/runtime/mod.rs`: the tag table (`:46`) gains a "portable" note, the patch flag, the key tag, and the planned `$clo` layout of part 3.4.
 > - `crates/ilang-check/tests/library.rs`: the core and control export lists.
@@ -2862,7 +2874,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - Old sentence(s):
 
 > - `crates/ilang-wasm/src/emit/mod.rs`: `closure()` with flags and arity in field 1 and id in field 2; static ids, also for the root `Assert` closure, which becomes a `$c` constant; the `$funcs` table, with `$entry_assert_fail`; the id counter and worker globals.
-> - `crates/ilang-wasm/src/runtime/values/inspect.rs:262`: arity from field 1.
+> - `crates/ilang-wasm/src/runtime/values/inspect.rs : 262`: arity from field 1.
 > - `crates/ilang-wasm/src/runtime/values.rs`: id compare for tag 7 and keys.
 > - New runtime modules for the copy, request cells, the stop cell, quiescence, share regions and `ilang_toplevel_portable`; the shared-memory allocator in `runtime/mod.rs`; the walk mark of D9 if MC picks it.
 > - `crates/ilang-host`: the `threads` feature, `SharedMemory`, long-lived worker threads, per-worker GC heap, the stop path, the start-up conditions of part 3.5.
@@ -2872,7 +2884,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - New sentence(s):
 
 > - `crates/ilang-wasm/src/emit/mod.rs`: `closure()` with flags and arity in field 1 and id in field 2; static ids, also for the root `Assert` closure, which becomes a `$c` constant; the `$funcs` table, with `$entry_assert_fail`; the id counter and worker globals.
-> - `crates/ilang-wasm/src/runtime/values/inspect.rs:262`: arity from field 1.
+> - `crates/ilang-wasm/src/runtime/values/inspect.rs : 262`: arity from field 1.
 > - `crates/ilang-wasm/src/runtime/values.rs`: id compare for tag 7 and keys.
 > - New runtime modules for copy/identity and the top-level portability probe; worker-local request/continuation tables; shared byte-state transactions, queue ownership, stop/quiescence and share storage. Only browser transport needs the shared-memory allocator in runtime/mod.rs; add the walk mark if MC selects it. Settle worker entry/ABI version at MC-D.
 > - `crates/ilang-host`: runner-owned byte transport and one-lock transactions, long-lived worker threads and private memories/heaps, resource contexts, wake/reactor integration, N12 stop domains/controller and the startup conditions of part 3.5. Native transport needs neither SharedMemory nor the Wasm threads feature.
@@ -2998,7 +3010,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - Old sentence(s):
 
 > 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 > 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 > 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 > 5. How long may a victim wait before it answers a steal request? Poll points only, or a heartbeat in function prologues later?
@@ -3009,7 +3021,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - New sentence(s):
 
 > 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 > 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 > 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 > 5. Which general typed byte-state transaction interface implements part 7 without running i code under a lock? Recommended: ordinary request-mode services; require the MC-D prototype before MC-I.
@@ -3624,8 +3636,8 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > Wasmtime 50 source was also read in the local registry at
 > `/home/agent/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-50.0.0/`:
-> `src/config.rs:679–737` documents engine-global epochs, required deadlines and lack of
-> interruption in blocking host code; `src/runtime/store.rs:1058–1116` defines relative
+> `src/config.rs : 679–737` documents engine-global epochs, required deadlines and lack of
+> interruption in blocking host code; `src/runtime/store.rs : 1058–1116` defines relative
 > deadlines and trapping. These are local source readings, not new runtime probes. One
 > Engine per live interrupted entry context avoids shared-epoch cross-talk and
 > overflow/rearming questions; caching across domains is MC work.
@@ -3908,20 +3920,20 @@ Old sentence(s)/block:
 > | Function | Type | Rule |
 > |---|---|---|
 > | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
-> | `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+> | `close_root` | `(root : Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
 > | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
-> | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
-> | `outstanding` | `(owner: Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
-> | `outstanding_root` | `(root: Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
-> | `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
-> | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
-> | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
-> | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
-> | `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
-> | `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-> | `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
-> | `await(A)` | `(r: Request(A)) -> A ! Await` | Wait, then take the Ready value |
-> | `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+> | `close_owner` | `(owner : Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+> | `outstanding` | `(owner : Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
+> | `outstanding_root` | `(root : Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
+> | `within(A,E,N)` | `(body : () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+> | `ready(A)` | `(value : A) -> Request(A)` | A fresh completed request; available in pure fakes |
+> | `ticket(A)` | `(r : Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+> | `state(A)` | `(r : Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+> | `take(A)` | `(r : Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+> | `settled` | `(r : Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+> | `cancel` | `(r : Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+> | `await(A)` | `(r : Request(A)) -> A ! Await` | Wait, then take the Ready value |
+> | `wait_any` | `(rs : List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
 > | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
 
 New sentence(s)/block:
@@ -3929,27 +3941,27 @@ New sentence(s)/block:
 > | Function | Type | Rule |
 > |---|---|---|
 > | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
-> | `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+> | `close_root` | `(root : Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
 > | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
-> | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
-> | `count` | `(owner: Owner) -> Int` | Number of outstanding requests in this group |
-> | `count_root` | `(root: Root) -> Int` | Number of outstanding requests in all groups of this root |
-> | `settled_owner` | `(owner: Owner) -> Bool` | True exactly when count(owner) is zero |
-> | `settled_root` | `(root: Root) -> Bool` | True exactly when count_root(root) is zero |
-> | `cancel_all` | `(owner: Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
-> | `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
-> | `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
-> | `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
-> | `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
-> | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
-> | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
-> | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
-> | `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
-> | `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-> | `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
-> | `await(A)` | `(r: Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
-> | `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
-> | `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+> | `close_owner` | `(owner : Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+> | `count` | `(owner : Owner) -> Int` | Number of outstanding requests in this group |
+> | `count_root` | `(root : Root) -> Int` | Number of outstanding requests in all groups of this root |
+> | `settled_owner` | `(owner : Owner) -> Bool` | True exactly when count(owner) is zero |
+> | `settled_root` | `(root : Root) -> Bool` | True exactly when count_root(root) is zero |
+> | `cancel_all` | `(owner : Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+> | `cancel_all_root` | `(root : Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+> | `wait_none` | `(owner : Owner) -> Nil ! Await` | Await until this group's count is zero |
+> | `wait_none_root` | `(root : Root) -> Nil ! Await` | Await until this root's count is zero |
+> | `within(A,E,N)` | `(body : () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+> | `ready(A)` | `(value : A) -> Request(A)` | A fresh completed request; available in pure fakes |
+> | `ticket(A)` | `(r : Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+> | `state(A)` | `(r : Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+> | `take(A)` | `(r : Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+> | `settled` | `(r : Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+> | `cancel` | `(r : Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+> | `await(A)` | `(r : Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
+> | `await_owned(A)` | `(r : Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
+> | `wait_any` | `(rs : List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
 > | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
 
 Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
@@ -4107,7 +4119,7 @@ Reason: N-R2: distinguish owned non-creating operations from borrowed waits and 
 Old sentence(s)/block:
 
 > Replace the C region as one change, including every caller identified in
-> `emit/host.rs:23–52`. The module keeps a growable table and a free list. Each
+> `emit/host.rs : 23–52`. The module keeps a growable table and a free list. Each
 > outstanding slot contains import index, ABI id, a fresh GC generation token,
 > Owner group key, immutable Root key, and a reference to its request cell.
 > Root/group indexes must remove a request on answer or cancel; completed cells
@@ -4127,7 +4139,7 @@ Old sentence(s)/block:
 New sentence(s)/block:
 
 > Replace the C region as one change, including every caller identified in
-> `emit/host.rs:23–52`. The module keeps a growable table and a free list. Each
+> `emit/host.rs : 23–52`. The module keeps a growable table and a free list. Each
 > outstanding slot contains import index, ABI id, a fresh GC generation token,
 > Owner group key, immutable Root key, and a reference to its request cell.
 > Root/group indexes must remove a request on answer or cancel; completed cells
@@ -4412,8 +4424,8 @@ Old sentence(s)/block:
 > read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 > and stderr are distinct directions; one write per direction may be pending,
 > with busy for a competing write. A cancelled write may have written a prefix.
-> Flush functions are explicit. Also export `print(text: String)` and
-> `print_error(text: String)`, which UTF-8 encode text plus one LF, write all bytes,
+> Flush functions are explicit. Also export `print(text : String)` and
+> `print_error(text : String)`, which UTF-8 encode text plus one LF, write all bytes,
 > and flush their stream; both can raise StdioError. No implicit text decoding,
 > line buffering or newline translation is added. Legacy i/io still prints a
 > String plus LF with the old no-error contract under `i:io/v1`.
@@ -4425,8 +4437,8 @@ New sentence(s)/block:
 > read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 > and stderr are distinct directions; one write per direction may be pending,
 > with busy for a competing write. A cancelled write may have written a prefix.
-> Flush functions are explicit. Also export `print(text: String)` and
-> `print_error(text: String)`, which UTF-8 encode text plus one LF, write all bytes,
+> Flush functions are explicit. Also export `print(text : String)` and
+> `print_error(text : String)`, which UTF-8 encode text plus one LF, write all bytes,
 > and flush their stream; both can raise StdioError. No implicit text decoding,
 > line buffering or newline translation is added. Legacy i/io still prints a
 > String plus LF with the old no-error contract under `i:io/v1`.
@@ -4829,12 +4841,12 @@ Old sentence(s)/block:
 > 1. **Dropped join in a shielded final: confirmed.** At aa20548, R2 dropped the
 >    child, R4 shielded its joining final, and no completion arm could produce
 >    its A/E. The control code only reactivates the scheduling boundary
->    (`emit/control.rs:260–295`); it supplies no task completion. R4a now resolves
+>    (`emit/control.rs : 260–295`); it supplies no task completion. R4a now resolves
 >    that protocol hole and §10.1 gives the exact S7 sentence changes.
 > 2. **Universal async and first-turn polling: confirmed.** The inferred env is
->    already available to entry_point (`types/infer.rs:405–429`) and lower's
->    entry_async (`lower.rs:916–938`). The JS call/callAsync guards explicitly
->    separate synchronous and async signatures (`bindings/javascript/ilang.mjs:965–981`);
+>    already available to entry_point (`types/infer.rs : 405–429`) and lower's
+>    entry_async (`lower.rs : 916–938`). The JS call/callAsync guards explicitly
+>    separate synchronous and async signatures (`bindings/javascript/ilang.mjs : 965–981`);
 >    status 2 takes a macrotask at `:894–902`. My old D5 and unconditional
 >    first-turn poll would therefore break synchronous callbacks. D5 and §6.4
 >    now preserve them and gate host polling on outstanding requests. The review
@@ -4855,12 +4867,12 @@ New sentence(s)/block:
 > 1. **Dropped join in a shielded final: confirmed.** At aa20548, R2 dropped the
 >    child, R4 shielded its joining final, and no completion arm could produce
 >    its A/E. The control code only reactivates the scheduling boundary
->    (`emit/control.rs:260–295`); it supplies no task completion. R4a now resolves
+>    (`emit/control.rs : 260–295`); it supplies no task completion. R4a now resolves
 >    that protocol hole and §10.1 gives the exact S7 sentence changes.
 > 2. **Universal async and first-turn polling: confirmed.** The inferred env is
->    already available to entry_point (`types/infer.rs:405–429`) and lower's
->    entry_async (`lower.rs:916–938`). The JS call/callAsync guards explicitly
->    separate synchronous and async signatures (`bindings/javascript/ilang.mjs:965–981`);
+>    already available to entry_point (`types/infer.rs : 405–429`) and lower's
+>    entry_async (`lower.rs : 916–938`). The JS call/callAsync guards explicitly
+>    separate synchronous and async signatures (`bindings/javascript/ilang.mjs : 965–981`);
 >    status 2 takes a macrotask at `:894–902`. My old D5 and unconditional
 >    first-turn poll would therefore break synchronous callbacks. D5 and §6.4
 >    now preserve them and gate host polling on outstanding requests. The review
@@ -5008,7 +5020,7 @@ Old sentence(s)/block:
 > - **Results.** `both`, `race` and `map_concurrently` are ordinary i code built on `scope`, so they are portable paths: each result and error of their children is checked when the child ends (P3), and a result containing a user host reference stops with `panic: task: value is not portable`. Standard File/Listener/Stream/Child values are portable nominal Int wrappers (native N9); returning them through these combinators succeeds. R may add local forms built on `local_scope` (`local_both`, `local_race`, `local_map_concurrently`), which do not check and whose children stay home (P4); without them, the program writes the local scope itself. `both` and `map_concurrently` give results in argument order. `race` gives the first result that commits; timing chooses, as with a CML `choose`. With one worker the FIFO scheduler makes it fixed, but that is not a promise for N workers.
 > - **What a cancel of a scope reaches.** When a scope `s` is cancelled (a child failed, or a task whose chain holds `s` is itself cancelled), the cancel reaches every child of `s` **and the body of `s`**. The body is unwound back to the `scope` call: `scope` runs its body under its own boundary in the body's task, and the cancel suspends to that boundary and cancels the part up to it, so the body's final functions run and the body gives no value; `scope` then waits for its children and gives the error of D10. A cancelled task cancels every scope it is running a body of, so the cancel goes down the whole tree inside `s`. A cancelled body is not a failure; it does not take part in the choice of the error. So `scope((s) { s.go(() { fail.raise(A) })  t = s.go(() { 1 })  t.join() })` gives error `A` on the one-worker FIFO scheduler: child `[1]` fails, `t` is dropped, the body waiting in `t.join()` is unwound, and nothing waits forever.
 > - **Cancellation** is cooperative and goes to the task's home worker. An unstarted task is dropped; it has no final functions. A started task is cancelled when the cancel reaches it: when it is paused (waiting or runnable) at that time, the loop does not give it the answer it waits for and cancels it as the next point says; when it is running, at its next suspend point. When the cancel reaches a task is a step in the order of D1: on one FIFO worker it reaches every paused task at once, and on N workers it reaches a task on another worker at that worker's next poll point. A task that is being unwound is not cancelled again, and its final functions run to their end, with the scopes they open, which that cancel does not reach.
-> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs:270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
+> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs : 270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
 > - **Stops.** A stop on any worker closes the run's start/claim/delivery gate and records one message under the lock. Stopping invokes no i finals. Every user import checks the stopped-context gate, so spinning native workers cannot start new host effects while reaping delays process exit. Native's independent controller tears down host work/resources before process exit; it does not join a spinning Wasm worker. A continuing host uses stop-only epoch traps in that run's interruption domain, wakes idle reactors and joins workers, then returns the first stop (native N12). Epochs do not interrupt synchronous host code; multicore hosts must supply stop-aware synchronous imports or choose one worker/process isolation. Child cleanup follows runtime §8.1, including reaping before native exit.
 > - **Deadlock.** When no task can run and no host request is outstanding on any worker, nothing can ever go on. The run then stops with `panic: task: deadlock`, on one worker as on N. On one worker the scheduler sees this directly: its queue is empty and its request table is empty. It must not return status 1 then, which host-concurrency.md H4 makes a fault of the module. On N workers it needs quiescence detection: a shared count of runnable and running tasks and of outstanding requests; the worker that sees it reach zero with shared and local queues empty records the stop under the same lock. Queue claims, local running counts, registrations and completion publication must participate in that snapshot; idle workers alone do not prove deadlock. In a macro, which has no host services (`meta.md` §8), every wait with nothing to run is a deadlock.
 > - **Idle.** A worker with nothing to run, while others still work or requests are outstanding, waits. By host-concurrency H5, a host answers a request only through `ilang_resume:…` after the instance has returned status 1 or 2, never while it is inside Wasm. So a worker that has **outstanding requests of its own** (its pinned tasks wait on them, P2) must never park inside Wasm: it would never see its answers, and a task that waits on a 10 ms sleep would hang until something else woke the worker. The rule:
@@ -5026,7 +5038,7 @@ New sentence(s)/block:
 > - **Results.** `both`, `race` and `map_concurrently` are ordinary i code built on `scope`, so they are portable paths: each result and error of their children is checked when the child ends (P3), and a result containing a user host reference stops with `panic: task: value is not portable`. Standard File/Listener/Stream/Child values are portable nominal Int wrappers (native N9); returning them through these combinators succeeds. R may add local forms built on `local_scope` (`local_both`, `local_race`, `local_map_concurrently`), which do not check and whose children stay home (P4); without them, the program writes the local scope itself. `both` and `map_concurrently` give results in argument order. `race` gives the first result that commits; timing chooses, as with a CML `choose`. With one worker the FIFO scheduler makes it fixed, but that is not a promise for N workers.
 > - **What a cancel of a scope reaches.** When a scope `s` is cancelled (a child failed, or a task whose chain holds `s` is itself cancelled), the cancel reaches every child of `s` **and the body of `s`**. The body is unwound back to the `scope` call: `scope` runs its body under its own boundary in the body's task, and the cancel suspends to that boundary and cancels the part up to it, so the body's final functions run and the body gives no value; `scope` then waits for its children and gives the error of D10. A cancelled task cancels every scope it is running a body of, so the cancel goes down the whole tree inside `s`. A cancelled body is not a failure; it does not take part in the choice of the error. So `scope((s) { s.go(() { fail.raise(A) })  t = s.go(() { 1 })  t.join() })` gives error `A` on the one-worker FIFO scheduler: child `[1]` fails, `t` is dropped, the body waiting in `t.join()` is unwound, and nothing waits forever.
 > - **Cancellation** is cooperative and goes to the task's home worker. An unstarted task is dropped; it has no final functions. A started task is cancelled when the cancel reaches it: when it is paused (waiting or runnable) at that time, the loop does not give it the answer it waits for and cancels it as the next point says; when it is running, at its next suspend point. When the cancel reaches a task is a step in the order of D1: on one FIFO worker it reaches every paused task at once, and on N workers it reaches a task on another worker at that worker's next poll point. A task that is being unwound is not cancelled again, and its final functions run to their end, with the scopes they open, which that cancel does not reach.
-> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs:270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
+> - **How a started task is cancelled.** The loop never calls `control.cancel(k)` on the task's continuation `k`: under §9.4 rule 4 the task's boundary `b` would stay not active while the final functions run (`$control_cancel` and `$cancel_run`, `emit/control.rs : 270-300`, never set field 8 of the boundary), and a final function that uses `i/task` (a send, a receive, a join, a sleep, an async host call through the scheduler) would suspend to `b` and stop with `control: boundary is not active`. Instead the loop **resumes** `k` with a cancel answer. `b` is then active again. The `Scheduler` call inside the task that sees the answer suspends to the task's inner boundary (made by `task.unwind_inside`, part 4) or, for a scope body, to that scope's boundary, and its handler calls `control.cancel` on that inner part only. So the final functions run with `b` active, and they may suspend to `b`; `$cancel_run` already catches a capture through it and gives it the record `$cancel_reenter`, so the rest of the unwind resumes later. They get the environment of §9.4 rule 4 as part 13 amends it: the services kept by the task's kept function and the environment statements inside the task, not the loop's services. This is all ordinary i code on `i/control`.
 > - **Stops.** A stop on any worker closes the run's start/claim/delivery gate and records one message under the lock. Stopping invokes no i finals. Every user import checks the stopped-context gate, so spinning native workers cannot start new host effects while reaping delays process exit. Native's independent controller tears down host work/resources before process exit; it does not join a spinning Wasm worker. A continuing host uses stop-only epoch traps in that run's interruption domain, wakes idle reactors and joins workers, then returns the first stop (native N12). Epochs do not interrupt synchronous host code; multicore hosts must supply stop-aware synchronous imports or choose one worker/process isolation. Child cleanup follows runtime §8.1, including reaping before native exit.
 > - **Deadlock.** Use the program waitable set in part 4/runtime §6.4: all outstanding work owned by the run's program Root plus explicitly awaited borrowed Waiting tickets, deduplicated by identity, expanding group-observer tickets to their underlying members (runtime §5.1). Driver wake requests use a separate ordinary control Root/Owner; they are closed with the driver and never bound into user tasks or exposed as borrowed waits. General Root/Owner accounting distinguishes them by the roots selected by the driver, never by module/import name. With no runnable, claimed-but-unstarted or running task, no pending program completion/group-notification processing, and an empty program waitable set, record `panic: task: deadlock` under the shared lock. Start/claim/cancel/answer transitions and local work counts participate in that snapshot; an answer moves from the request count to pending delivery work atomically. Control requests and wake-only deliveries are excluded from that progress predicate. All actual outstanding requests still count for ABI status 1, so wake requests preserve H4 without masking deadlock. On one worker no wake is needed and the same predicate applies. In a macro without host services, nothing runnable and an empty waitable set is a deadlock.
 > - **Review wake trace.** Worker 0 is idle with one control wake request. The last runnable task on A executes sync(never()); program request count is zero. Once that registration finishes, runnable/running/claimed/pending-program-delivery counts are all zero, so the locked snapshot records deadlock even though the control count is one (or two if A also installed a wake). Stop closes the control roots and wakes the drivers; it does not wait for those wakes to justify progress. If an owned or explicitly borrowed program request is pending instead, its count prevents the stop until it settles.

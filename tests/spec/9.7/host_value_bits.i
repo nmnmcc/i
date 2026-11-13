@@ -1,6 +1,6 @@
 // spec: B.2, 11.7
 // expect: stop "host: value is not correct"
-// at: spec/main:11:27
+// at: spec/main:11:28
 // at: spec/main:14:2
 
 // A bit array from the host whose bits after the end are not 0 stops. The

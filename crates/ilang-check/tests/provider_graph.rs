@@ -45,7 +45,7 @@ fn error(g: &PackageGraph, c: &Checked, target: Target, mentions: &[&str]) {
 fn diamond_builds_shared_node_once() {
     let plan = [row("A", "a"), row("B", "b"), row("C", "c"), row("D", "d")].concat();
     let (g, c) = package(
-        "A = ()\nB = ()\nC = ()\nD = ()\na = () <- (b: B, c: C) { A }\nb = () <- (d: D) { B }\nc = () <- (d: D) { C }\nd = () { D }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\nB = ()\nC = ()\nD = ()\na = () <- (b : B, c : C) { A }\nb = () <- (d : D) { B }\nc = () <- (d : D) { C }\nd = () { D }\n\nmain = () <- (a : A) { Nil }",
         &plan,
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -59,7 +59,7 @@ fn diamond_builds_shared_node_once() {
 #[test]
 fn pure_bundle_entry_is_sync() {
     let (g, c) = package(
-        "Bundle = ()\nmake = () { Bundle }\n\nmain = () <- (b: Bundle) { Nil }",
+        "Bundle = ()\nmake = () { Bundle }\n\nmain = () <- (b : Bundle) { Nil }",
         &row("Bundle", "make"),
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -83,7 +83,7 @@ fn scheduler_and_runner_come_in_spec_order() {
 fn order_is_topological() {
     let plan = [row("A", "a"), row("Z", "z"), row("B", "b")].concat();
     let (g, c) = package(
-        "A = ()\nB = ()\nZ = ()\na = () <- (z: Z) { A }\nz = () { Z }\nb = () { B }\n\nmain = () <- (a: A, b: B) { Nil }",
+        "A = ()\nB = ()\nZ = ()\na = () <- (z : Z) { A }\nz = () { Z }\nb = () { B }\n\nmain = () <- (a : A, b : B) { Nil }",
         &plan,
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -92,7 +92,7 @@ fn order_is_topological() {
 #[test]
 fn cycle_names_entry_and_chain() {
     let (g, c) = package(
-        "A = ()\nB = ()\na = () <- (b: B) { A }\nb = () <- (a: A) { B }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\nB = ()\na = () <- (b : B) { A }\nb = () <- (a : A) { B }\n\nmain = () <- (a : A) { Nil }",
         &[row("A", "a"), row("B", "b")].concat(),
     );
     error(
@@ -110,7 +110,7 @@ fn cycle_names_entry_and_chain() {
 #[test]
 fn missing_service_names_target_entry_service() {
     let (g, c) = package(
-        "A = ()\nB = ()\na = () <- (b: B) { A }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\nB = ()\na = () <- (b : B) { A }\n\nmain = () <- (a : A) { Nil }",
         &row("A", "a"),
     );
     error(
@@ -127,7 +127,7 @@ fn missing_service_names_target_entry_service() {
 }
 #[test]
 fn missing_standard_capability_on_target() {
-    let (g, c) = package("(\n\ti/fs\n)\n\nmain = () <- (f: fs.Fs) { Nil }", "");
+    let (g, c) = package("(\n\ti/fs\n)\n\nmain = () <- (f : fs.Fs) { Nil }", "");
     error(
         &g,
         &c,
@@ -151,7 +151,7 @@ fn caught_unsupported_still_requires_provider() {
 #[test]
 fn root_cell_overrides_shipped_cell() {
     let (g, c) = package(
-        "(\n\ti/clock\n)\nreplacement = () <- (c: clock.Clock) { c }\n\nmain = () <- (c: clock.Clock) { Nil }",
+        "(\n\ti/clock\n)\nreplacement = () <- (c : clock.Clock) { c }\n\nmain = () <- (c : clock.Clock) { Nil }",
         "[providers.\"i/clock.Clock\"]\nnative = \"app/main.replacement\"\n",
     );
     // An override is selected even when it creates a cycle; no shipped host
@@ -163,7 +163,7 @@ fn root_cell_overrides_shipped_cell() {
         &["i/clock.Clock -> i/clock.Clock", "recursive dependency"],
     );
     let (mut g, c) = package(
-        "(\n\ti/clock\n)\nfake = () -> clock.Clock { panic(\"fake\") }\n\nmain = () <- (c: clock.Clock) { Nil }",
+        "(\n\ti/clock\n)\nfake = () -> clock.Clock { panic(\"fake\") }\n\nmain = () <- (c : clock.Clock) { Nil }",
         "[providers.\"i/clock.Clock\"]\nnative = \"app/main.fake\"\n",
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -184,7 +184,7 @@ fn root_cell_overrides_shipped_cell() {
 #[test]
 fn absent_root_cell_inherits_shipped() {
     let (g, c) = package(
-        "(\n\ti/clock\n)\nunused = () -> clock.Clock { panic(\"fake\") }\n\nmain = () <- (c: clock.Clock) { Nil }",
+        "(\n\ti/clock\n)\nunused = () -> clock.Clock { panic(\"fake\") }\n\nmain = () <- (c : clock.Clock) { Nil }",
         "[providers.\"i/clock.Clock\"]\njs = \"app/main.unused\"\n",
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -194,7 +194,7 @@ fn absent_root_cell_inherits_shipped() {
 #[test]
 fn registered_row_without_cell_is_unsupplied() {
     let (g, c) = package(
-        "@host(\"custom\", \"request\")\nRemote = (read = () -> Request(Int))\n\nmain = () <- (r: Remote) { Nil }",
+        "@host(\"custom\", \"request\")\nRemote = (read = () -> Request(Int))\n\nmain = () <- (r : Remote) { Nil }",
         "[providers.\"app/main.Remote\"]\n",
     );
     error(
@@ -212,7 +212,7 @@ fn registered_row_without_cell_is_unsupplied() {
 #[test]
 fn duplicate_supply_is_error() {
     let (mut g, c) = package(
-        "A = ()\na = () { A }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\na = () { A }\n\nmain = () <- (a : A) { Nil }",
         &row("A", "a"),
     );
     // Package aliases resolve to the same nominal identity despite distinct keys.
@@ -238,7 +238,7 @@ fn duplicate_supply_is_error() {
 #[test]
 fn factory_with_uncaught_error_is_rejected() {
     let (g, c) = package(
-        "(\n\ti/fail\n)\nA = ()\na = () {\n\tfail.raise(\"bad\")\n\tA\n}\n\nmain = () <- (a: A) { Nil }",
+        "(\n\ti/fail\n)\nA = ()\na = () {\n\tfail.raise(\"bad\")\n\tA\n}\n\nmain = () <- (a : A) { Nil }",
         &row("A", "a"),
     );
     error(
@@ -251,7 +251,7 @@ fn factory_with_uncaught_error_is_rejected() {
 #[test]
 fn factory_must_return_its_service() {
     let (g, c) = package(
-        "A = ()\na = () { 123 }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\na = () { 123 }\n\nmain = () <- (a : A) { Nil }",
         &row("A", "a"),
     );
     error(
@@ -264,7 +264,7 @@ fn factory_must_return_its_service() {
 #[test]
 fn unchosen_factory_is_type_checked() {
     let (g, c) = package(
-        "A = ()\nB = ()\na = () { A }\nb = () { 123 }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\nB = ()\na = () { A }\nb = () { 123 }\n\nmain = () <- (a : A) { Nil }",
         &[row("A", "a"), row("B", "b")].concat(),
     );
     error(
@@ -277,7 +277,7 @@ fn unchosen_factory_is_type_checked() {
 #[test]
 fn unchosen_factory_needs_are_not_provisioned() {
     let (g, c) = package(
-        "A = ()\nB = ()\nMissing = ()\na = () { A }\nb = () <- (m: Missing) { B }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\nB = ()\nMissing = ()\na = () { A }\nb = () <- (m : Missing) { B }\n\nmain = () <- (a : A) { Nil }",
         &[row("A", "a"), row("B", "b")].concat(),
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -286,7 +286,7 @@ fn unchosen_factory_needs_are_not_provisioned() {
 #[test]
 fn host_cell_must_name_host_service() {
     let (g, c) = package(
-        "A = ()\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\n\nmain = () <- (a : A) { Nil }",
         "[providers.\"app/main.A\"]\nnative = {host=true}\n",
     );
     error(
@@ -321,7 +321,7 @@ fn ill_kinded_type_argument() {
 #[test]
 fn entry_with_request_mode_provider_is_async() {
     let (g, c) = package(
-        "Bundle = ()\n@host(\"custom\", \"request\")\nRemote = (read = () -> Request(Int))\nmake = () <- (r: Remote) { Bundle }\n\nmain = () <- (b: Bundle) { Nil }",
+        "Bundle = ()\n@host(\"custom\", \"request\")\nRemote = (read = () -> Request(Int))\nmake = () <- (r : Remote) { Bundle }\n\nmain = () <- (b : Bundle) { Nil }",
         &row("Bundle", "make"),
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -387,7 +387,7 @@ fn dependency_fixture(source: &str, plan: &str, dependency_plan: &str) -> (Packa
 #[test]
 fn private_dependency_path_in_root_cell_is_access_error() {
     let (g, c) = dependency_fixture(
-        "(\n\tdep/service\n)\n\nmain = () <- (s: service.Service) { Nil }",
+        "(\n\tdep/service\n)\n\nmain = () <- (s : service.Service) { Nil }",
         "[providers.\"dep/service.Service\"]\nnative = \"dep/service.private\"\n",
         "",
     );
@@ -401,7 +401,7 @@ fn private_dependency_path_in_root_cell_is_access_error() {
 #[test]
 fn dependency_cannot_override_root() {
     let (g, c) = dependency_fixture(
-        "(\n\tdep/service\n)\nmake = () { service.Service }\n\nmain = () <- (s: service.Service) { Nil }",
+        "(\n\tdep/service\n)\nmake = () { service.Service }\n\nmain = () <- (s : service.Service) { Nil }",
         "[providers.\"dep/service.Service\"]\nnative = \"app/main.make\"\n",
         "[providers.\"dep/service.Service\"]\nnative = \"dep/service.private\"\n",
     );
@@ -415,7 +415,7 @@ fn dependency_cannot_override_root() {
 
 #[test]
 fn generic_instances_have_separate_nodes_and_instantiated_needs() {
-    let source = "Cell(A) = (A)\nData(A) = (value = A)\nLeft = ()\nRight = ()\ncell = <A>() <- (d: Data(A)) -> Cell(A) { Cell(d.value) }\ndata = <A>() -> Data(A) { panic(\"data\") }\nleft = () <- (c: Cell(Int)) { Left }\nright = () <- (c: Cell(String)) { Right }\n\nmain = () <- (l: Left, r: Right) { Nil }";
+    let source = "Cell(A) = (A)\nData(A) = (value = A)\nLeft = ()\nRight = ()\ncell = <A>() <- (d : Data(A)) -> Cell(A) { Cell(d.value) }\ndata = <A>() -> Data(A) { panic(\"data\") }\nleft = () <- (c : Cell(Int)) { Left }\nright = () <- (c : Cell(String)) { Right }\n\nmain = () <- (l : Left, r : Right) { Nil }";
     let plan = [
         row("Cell", "cell"),
         row("Data", "data"),
@@ -440,7 +440,7 @@ fn generic_instances_have_separate_nodes_and_instantiated_needs() {
 #[test]
 fn recursive_constructor_at_different_arguments_is_rejected() {
     let (g, c) = package(
-        "Cell(A) = (A)\nmake = <A>() <- (next: Cell(List(A))) -> Cell(A) { panic(\"no\") }\n\nmain = () <- (c: Cell(Int)) { Nil }",
+        "Cell(A) = (A)\nmake = <A>() <- (next : Cell(List(A))) -> Cell(A) { panic(\"no\") }\n\nmain = () <- (c : Cell(Int)) { Nil }",
         &row("Cell", "make"),
     );
     error(
@@ -480,7 +480,7 @@ fn adapter_scopes_do_not_share_instances() {
 #[test]
 fn provider_nodes_are_preferred_to_ready_adapter_entry() {
     let (g, c) = package(
-        "(\n\ti/task\n)\nA = ()\na = () { A }\n\nmain = () <- (a: A) { task.yield() }",
+        "(\n\ti/task\n)\nA = ()\na = () { A }\n\nmain = () <- (a : A) { task.yield() }",
         &row("A", "a"),
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -498,7 +498,7 @@ fn provider_nodes_are_preferred_to_ready_adapter_entry() {
 #[test]
 fn wasi_classification_keeps_the_blocking_abi() {
     let (g, c) = package(
-        "@host(\"custom\", \"request\")\nRemote = (read = () -> Request(Int))\n\nmain = () <- (r: Remote) { Nil }",
+        "@host(\"custom\", \"request\")\nRemote = (read = () -> Request(Int))\n\nmain = () <- (r : Remote) { Nil }",
         "",
     );
     let p = resolve(&g, &c, Target::Wasi).unwrap();
@@ -508,7 +508,7 @@ fn wasi_classification_keeps_the_blocking_abi() {
 #[test]
 fn completed_request_values_alone_do_not_classify_async() {
     let (g, c) = package(
-        "(\n\ti/request\n)\nBundle = (value = Request(Int))\nmake = () { Bundle(value = request.ready(7)) }\n\nmain = () <- (b: Bundle) { Nil }",
+        "(\n\ti/request\n)\nBundle = (value = Request(Int))\nmake = () { Bundle(value = request.ready(7)) }\n\nmain = () <- (b : Bundle) { Nil }",
         &row("Bundle", "make"),
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
@@ -518,7 +518,7 @@ fn completed_request_values_alone_do_not_classify_async() {
 #[test]
 fn selected_factories_cannot_require_unavailable_seeds() {
     let (g, c) = package(
-        "A = ()\nmake = (seeds: List(A)) -> A { panic(\"no\") }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\nmake = (seeds : List(A)) -> A { panic(\"no\") }\n\nmain = () <- (a : A) { Nil }",
         "[providers.\"app/main.A\"]\nnative = {factory=\"app/main.make\", arguments=[\"seed\"], seed_required=true}\n",
     );
     error(
@@ -543,7 +543,7 @@ fn adapter_types_are_checked_even_without_reached_roles() {
 }
 #[test]
 fn discriminant_constructor_fields_are_dependency_edges() {
-    let source = "On = (Part)\nOff = ()\nBundle = On | Off\nPart = ()\npart = () { Part }\n\nmain = () <- (b: Bundle) { Nil }";
+    let source = "On = (Part)\nOff = ()\nBundle = On | Off\nPart = ()\npart = () { Part }\n\nmain = () <- (b : Bundle) { Nil }";
     let plan = format!(
         "{}[providers.\"app/main.Bundle\"]\ndiscriminant = {{js=\"app/main.Off\",nodejs=\"app/main.On\",native=\"app/main.On\",wasi=\"app/main.Off\",host=\"app/main.Off\"}}\n",
         row("Part", "part")
@@ -558,7 +558,7 @@ fn discriminant_constructor_fields_are_dependency_edges() {
 #[test]
 fn explicit_role_change_cannot_erase_inherited_async_role() {
     let (g, c) = package(
-        "(\n\ti/task\n)\nfake = () -> task.Runner { panic(\"fake\") }\n\nmain = () <- (r: task.Runner) { Nil }",
+        "(\n\ti/task\n)\nfake = () -> task.Runner { panic(\"fake\") }\n\nmain = () <- (r : task.Runner) { Nil }",
         "[providers.\"i/task.Runner\"]\nrole = \"none\"\nnative = \"app/main.fake\"\n",
     );
     error(
@@ -570,7 +570,7 @@ fn explicit_role_change_cannot_erase_inherited_async_role() {
 }
 #[test]
 fn different_reached_adapters_are_ambiguous() {
-    let source = "(\n\ti/task\n)\nA = ()\nmake = () { A }\nwrap = <T, N>(body: () <- N -> T) -> T { body() }\n\nmain = () <- (a: A) { task.yield() }";
+    let source = "(\n\ti/task\n)\nA = ()\nmake = () { A }\nwrap = <T, N>(body : () <- N -> T) -> T { body() }\n\nmain = () <- (a : A) { task.yield() }";
     let plan = "[providers.\"app/main.A\"]\nrole = \"runner\"\nadapter = \"app/main.wrap\"\nnative = \"app/main.make\"\n[provider_adapters.\"app/main.wrap\"]\nsupplies = []\nrequires = []\n";
     let (g, c) = package(source, plan);
     error(
@@ -589,7 +589,7 @@ fn different_reached_adapters_are_ambiguous() {
 #[test]
 fn unchosen_target_cells_still_check_their_factory_type() {
     let (g, c) = package(
-        "A = ()\nmake = () { A }\nwrong = () { 7 }\n\nmain = () <- (a: A) { Nil }",
+        "A = ()\nmake = () { A }\nwrong = () { 7 }\n\nmain = () <- (a : A) { Nil }",
         "[providers.\"app/main.A\"]\nnative = \"app/main.make\"\njs = \"app/main.wrong\"\n",
     );
     error(
@@ -615,7 +615,7 @@ fn adapter_service_list_order_does_not_change_its_type() {
 
 #[test]
 fn discriminant_constructor_aliases_resolve_before_validation() {
-    let source = "On = (Part)\nOff = ()\nBundle = On | Off\nPart = ()\npart = () { Part }\nselected = On\nalias = selected\n\nmain = () <- (b: Bundle) { Nil }";
+    let source = "On = (Part)\nOff = ()\nBundle = On | Off\nPart = ()\npart = () { Part }\nselected = On\nalias = selected\n\nmain = () <- (b : Bundle) { Nil }";
     let plan = format!(
         "{}[providers.\"app/main.Bundle\"]\ndiscriminant = {{js=\"app/main.Off\",nodejs=\"app/main.alias\",native=\"app/main.alias\",wasi=\"app/main.Off\",host=\"app/main.Off\"}}\n",
         row("Part", "part")
@@ -629,7 +629,7 @@ fn discriminant_constructor_aliases_resolve_before_validation() {
 #[test]
 fn literal_service_arguments_use_i_string_escapes() {
     let (g, c) = package(
-        "Cell(A) = (A)\nmake = <A>() -> Cell(A) { panic(\"no\") }\n\nmain = () <- (c: Cell(\"\\u{0}\" | \"x\")) { Nil }",
+        "Cell(A) = (A)\nmake = <A>() -> Cell(A) { panic(\"no\") }\n\nmain = () <- (c : Cell(\"\\u{0}\" | \"x\")) { Nil }",
         &row("Cell", "make"),
     );
     let p = resolve(&g, &c, Target::Native).unwrap();
