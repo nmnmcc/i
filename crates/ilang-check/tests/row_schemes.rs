@@ -313,3 +313,15 @@ both = () { one() two() }",
     );
     assert_eq!(shown["app/main.both"], "() <- (Cell(Int, 1)) -> Nil");
 }
+
+#[test]
+fn an_undetermined_need_argument_keeps_its_intersection() {
+    // §4.4: “a & T, with a type variable a, stays as it is.” The service
+    // meet must not constrain the ordinary value parameter A to Int.
+    let shown = types(
+        "Read(A) = (value = A)
+need_int = () <- (r: Read(Int)) { Nil }
+both = <A>(x: A) <- (r: Read(A)) { need_int() x }",
+    );
+    assert_eq!(shown["app/main.both"], "(x = A) <- (Read(Int & A)) -> A");
+}
