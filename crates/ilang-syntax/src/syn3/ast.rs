@@ -425,3 +425,238 @@ impl Type {
         }
     }
 }
+
+// Trees produced by macros can be much deeper than the host call stack. Move
+// children onto one explicit work list before dropping their owning node.
+mod iterative_drop {
+    use super::*;
+
+    enum Part {
+        Expr(ExprKind),
+        Pattern(PatternKind),
+        Type(TypeKind),
+    }
+
+    fn expr(e: &mut Expr, work: &mut Vec<Part>) {
+        work.push(Part::Expr(std::mem::replace(
+            &mut e.kind,
+            ExprKind::Data(Vec::new()),
+        )));
+    }
+    fn pattern(p: &mut Pattern, work: &mut Vec<Part>) {
+        work.push(Part::Pattern(std::mem::replace(
+            &mut p.kind,
+            PatternKind::Discard(String::new()),
+        )));
+    }
+    fn ty(t: &mut Type, work: &mut Vec<Part>) {
+        work.push(Part::Type(std::mem::replace(&mut t.kind, TypeKind::Hole)));
+    }
+    fn format(f: &mut Option<Format>, work: &mut Vec<Part>) {
+        if let Some(arg) = f.as_mut().and_then(|f| f.arg.as_mut()) {
+            expr(arg, work);
+        }
+    }
+    fn block(b: &mut Block, work: &mut Vec<Part>) {
+        for stmt in &mut b.stmts {
+            match stmt {
+                Stmt::Bind(b) => {
+                    pattern(&mut b.pattern, work);
+                    expr(&mut b.value, work);
+                }
+                Stmt::Expr(e) => expr(e, work),
+            }
+        }
+    }
+    fn ditems(items: &mut [DItem], work: &mut Vec<Part>) {
+        for i in items {
+            match i {
+                DItem::Pos(e) | DItem::Label(_, e) | DItem::Spread(e) => expr(e, work),
+            }
+        }
+    }
+    fn dpitems(items: &mut [DPItem], work: &mut Vec<Part>) {
+        for i in items {
+            match i {
+                DPItem::Pos(p) | DPItem::Key(_, p) => pattern(p, work),
+                DPItem::Rest(_) => {}
+            }
+        }
+    }
+    fn titems(items: &mut [TItem], work: &mut Vec<Part>) {
+        for i in items {
+            match i {
+                TItem::Pos(t) | TItem::Label(_, t) | TItem::Spread(t) => ty(t, work),
+            }
+        }
+    }
+
+    fn drain(mut work: Vec<Part>) {
+        while let Some(part) = work.pop() {
+            match part {
+                Part::Expr(mut kind) => match &mut kind {
+                    ExprKind::Quote(_)
+                    | ExprKind::Int(_)
+                    | ExprKind::Float(_)
+                    | ExprKind::String(_)
+                    | ExprKind::Name { .. } => {}
+                    ExprKind::Interp(parts) => {
+                        for p in parts {
+                            if let InterpPart::Expr(e) = p {
+                                expr(e, &mut work);
+                            }
+                        }
+                    }
+                    ExprKind::Data(items) => ditems(items, &mut work),
+                    ExprKind::List { items, rest } => {
+                        for x in items {
+                            expr(x, &mut work);
+                        }
+                        if let Some(x) = rest {
+                            expr(x, &mut work);
+                        }
+                    }
+                    ExprKind::BitArray(xs) => {
+                        for x in xs {
+                            expr(&mut x.value, &mut work);
+                            format(&mut x.format, &mut work);
+                        }
+                    }
+                    ExprKind::Block(b) => block(b, &mut work),
+                    ExprKind::Chain(fs) => {
+                        for f in fs {
+                            for p in &mut f.params {
+                                for c in &mut p.choices {
+                                    pattern(c, &mut work);
+                                }
+                            }
+                            if let Some(g) = &mut f.guard {
+                                expr(g, &mut work);
+                            }
+                            for s in f.services.iter_mut().flatten() {
+                                ty(&mut s.ty, &mut work);
+                            }
+                            if let Some(r) = &mut f.ret {
+                                ty(r, &mut work);
+                            }
+                            block(&mut f.body, &mut work);
+                        }
+                    }
+                    ExprKind::Call { callee, args } => {
+                        expr(callee, &mut work);
+                        ditems(args, &mut work);
+                    }
+                    ExprKind::Provide { target, services } => {
+                        expr(target, &mut work);
+                        expr(services, &mut work);
+                    }
+                    ExprKind::Field { target, .. }
+                    | ExprKind::Index { target, .. }
+                    | ExprKind::Unary { expr: target, .. } => expr(target, &mut work),
+                    ExprKind::Binary { lhs, rhs, .. } | ExprKind::Pipe { lhs, rhs } => {
+                        expr(lhs, &mut work);
+                        expr(rhs, &mut work);
+                    }
+                },
+                Part::Pattern(mut kind) => match &mut kind {
+                    PatternKind::Quote(_)
+                    | PatternKind::Var(_)
+                    | PatternKind::Discard(_)
+                    | PatternKind::Int { .. }
+                    | PatternKind::Float { .. }
+                    | PatternKind::String(_)
+                    | PatternKind::Prefix { .. } => {}
+                    PatternKind::Typed { ty: t, .. } => ty(t, &mut work),
+                    PatternKind::Ctor { args, .. } => {
+                        if let Some(args) = args {
+                            dpitems(args, &mut work);
+                        }
+                    }
+                    PatternKind::Data(items) => dpitems(items, &mut work),
+                    PatternKind::List { items, .. } | PatternKind::And(items) => {
+                        for p in items {
+                            pattern(p, &mut work);
+                        }
+                    }
+                    PatternKind::BitArray(xs) => {
+                        for x in xs {
+                            pattern(&mut x.value, &mut work);
+                            format(&mut x.format, &mut work);
+                        }
+                    }
+                },
+                Part::Type(mut kind) => match &mut kind {
+                    TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}
+                    TypeKind::Named { args, .. }
+                    | TypeKind::Call { args, .. }
+                    | TypeKind::Union(args)
+                    | TypeKind::Inter(args)
+                    | TypeKind::Diff(args) => {
+                        for t in args {
+                            ty(t, &mut work);
+                        }
+                    }
+                    TypeKind::Data(items) => titems(items, &mut work),
+                    TypeKind::Fn(f) => {
+                        ty(&mut f.param, &mut work);
+                        if let Some(s) = &mut f.services {
+                            ty(s, &mut work);
+                        }
+                        ty(&mut f.ret, &mut work);
+                    }
+                },
+            }
+        }
+    }
+
+    impl Drop for Expr {
+        fn drop(&mut self) {
+            if matches!(
+                &self.kind,
+                ExprKind::Int(_)
+                    | ExprKind::Float(_)
+                    | ExprKind::String(_)
+                    | ExprKind::Name { .. }
+                    | ExprKind::Quote(_)
+            ) || matches!(&self.kind, ExprKind::Data(xs) if xs.is_empty())
+            {
+                return;
+            }
+            let mut work = Vec::new();
+            expr(self, &mut work);
+            drain(work);
+        }
+    }
+    impl Drop for Pattern {
+        fn drop(&mut self) {
+            if matches!(
+                &self.kind,
+                PatternKind::Quote(_)
+                    | PatternKind::Var(_)
+                    | PatternKind::Discard(_)
+                    | PatternKind::Int { .. }
+                    | PatternKind::Float { .. }
+                    | PatternKind::String(_)
+                    | PatternKind::Prefix { .. }
+            ) {
+                return;
+            }
+            let mut work = Vec::new();
+            pattern(self, &mut work);
+            drain(work);
+        }
+    }
+    impl Drop for Type {
+        fn drop(&mut self) {
+            if matches!(
+                &self.kind,
+                TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole
+            ) {
+                return;
+            }
+            let mut work = Vec::new();
+            ty(self, &mut work);
+            drain(work);
+        }
+    }
+}
