@@ -164,7 +164,7 @@ test("host functions never throw into the module, and the module checks their an
   }, `(${load})`);
   expect(result).toEqual({
     guarded: { nil: "thrown to the caller", float: "thrown to the caller" },
-    stop: "host: value is not correct\napp/app:48:35",
+    stop: "host: value is not correct\napp/app:41:35",
   });
 });
 
