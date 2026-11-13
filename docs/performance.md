@@ -424,3 +424,31 @@ must preserve all tests, their provider plans and fresh instances: spec
 §10.2 requires that the runner compile the collection once and run each
 selected test in a fresh started instance. Filtering out tests is not a
 memory fix.
+
+### Buffer-lifetime experiment
+
+A separately built variant transferred ownership of the original Wasm bytes
+into optimization, released those bytes after removing names and before
+Binaryen, and released Binaryen's input buffer immediately after its reader
+returned. The WAT text was explicitly dropped after parsing; the baseline
+already transferred that string to the parser, so this made its existing
+lifetime explicit. The same full traced command was run, without a filter:
+
+| Variant | Binaryen peak, MiB | Wasmtime compile peak, MiB | Run peak, MiB | Wall time | Result |
+|---|---:|---:|---:|---|---|
+| Baseline | 652 | 19766 | 19844 | 10:11.41 | 2170 passed, 0 failed |
+| Early buffer drops | 664 | 19730 | 19851 | 7:26.56 | 2170 passed, 0 failed |
+
+Every test-result line and the final summary were identical. `i build
+--target host` of `examples/hello` and `examples/echo`, at both `--opt 0`
+and `--opt 2`, produced byte-identical Wasm before and after (`cmp` checked
+all four files). The buffer drops did not lower the peak; the timing
+variation on this shared machine is not evidence of a speed improvement.
+The experiment is not retained as a compiler change.
+
+The baseline and this experiment both exceed the 12 GB target. These
+measurements do not establish whether allocator trimming or other Wasmtime
+settings can meet it. A source inspection of Wasmtime 50 shows that it
+calls `compiler.release_caches()` after assembling the compilation artifact;
+trimming only after that point could reduce memory retained during tests,
+but cannot recover a peak that has already occurred during compilation.
