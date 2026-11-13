@@ -135,14 +135,25 @@ and three E0515s rather than the expected two. Neither experiment was
 applied to the corpus; these investigations stopped after two unsuccessful
 variants. O3/O4 remain bugs with no established language authority.
 
-The final shard rerun is in progress on the restored fixture inputs, using
-the same release compiler and unchanged budgets. Its results will be appended
-below. CLI check passes 10/10 after the fixture merge, and the feature-enabled
-lowering suite passes 19/19.
+The final shard rerun completed on the restored inputs at `d402cf846`, using
+that same release compiler and unchanged budgets. It selected 198 cases:
+138 checks accepted and 60 rejected, with **no semantic requirement failures**.
+All 198 cases preserve their baseline phase exits and runtime stdout (only
+the property-failure source sites are normalized). The runner still exits 1
+for 170 output differences: **11 message only, 154 shown type, five diagnostic
+outcomes**. Two outcomes are the documented removed-grammar cases; the other
+three are unresolved O3/O4 errors. No acceptance or runtime-output change
+remains. No observation, requirement or bound was re-recorded.
+
+The independent 63-case audit was repeated after this final run. It also
+checks diagnostic counts and the original failing bindings, and passes.
+CLI check passes 10/10 after the fixture merge, and the feature-enabled
+lowering suite passes 19/19. This is not a landable result until the three
+unexplained diagnostic differences are resolved.
 
 ## Every differing case
 
-The table records all 170 full-output mismatches. `T` rows can also have
+The table records all 170 final full-output mismatches. `T` rows can also have
 source-coordinate or wording changes; those are included in the same row.
 
 | Case | Classification | Review |
@@ -211,7 +222,7 @@ source-coordinate or wording changes; those are included in the same row.
 | `review-k4c/cases/missing_2_7_0_1` | shown type | T; no observation recorded. |
 | `review-k4c/cases/missing_3_0_1_2` | shown type | T; no observation recorded. |
 | `review-k4c/cases/missing_3_2_1_0` | shown type | T; no observation recorded. |
-| `review-k4c/cases/missing_3_4_0_1` | outcome | O5 BUG: check rejects → accepts; callback A | B contract lost. |
+| `review-k4c/cases/missing_3_4_0_1` | shown type | Fixed O5: original A \| B callback need restored; E0504 retained; type/coordinate display only. |
 | `review-k4c/cases/missing_3_5_1_2` | shown type | T; no observation recorded. |
 | `review-k4c/cases/missing_3_7_1_0` | shown type | T; no observation recorded. |
 | `review-k4c/cases/order_hidden_conflict_11` | shown type | T; no observation recorded. |
@@ -254,19 +265,19 @@ source-coordinate or wording changes; those are included in the same row.
 | `review-k4d/perf/chain200` | shown type | T; no observation recorded. |
 | `review-k4d/perf/mutplain25` | shown type | T; no observation recorded. |
 | `review-k4d/perf/runchain4000` | shown type | T; no observation recorded. |
-| `review-k4d/perm/p0` | outcome | O7 BUG: bad loses its written complete need N; second E0505 disappears. |
-| `review-k4d/perm/p18` | outcome | O7 BUG: bad loses its written complete need N; second E0505 disappears. |
-| `review-k4d/perm/p27` | outcome | O7 BUG: bad loses its written complete need N; second E0505 disappears. |
-| `review-k4d/perm/p36` | outcome | O7 BUG: bad loses its written complete need N; second E0505 disappears. |
-| `review-k4d/perm/p45` | outcome | O7 BUG: bad loses its written complete need N; second E0505 disappears. |
-| `review-k4d/perm/p54` | outcome | O7 BUG: bad loses its written complete need N; second E0505 disappears. |
+| `review-k4d/perm/p0` | shown type | Fixed O7: bad and loop both retain E0505; type/coordinate display only. |
+| `review-k4d/perm/p18` | shown type | Fixed O7: bad and loop both retain E0505; type/coordinate display only. |
+| `review-k4d/perm/p27` | shown type | Fixed O7: bad and loop both retain E0505; type/coordinate display only. |
+| `review-k4d/perm/p36` | shown type | Fixed O7: bad and loop both retain E0505; type/coordinate display only. |
+| `review-k4d/perm/p45` | shown type | Fixed O7: bad and loop both retain E0505; type/coordinate display only. |
+| `review-k4d/perm/p54` | shown type | Fixed O7: bad and loop both retain E0505; type/coordinate display only. |
 | `review-k4d/proj/a1` | shown type | T; no observation recorded. |
 | `review-k4d/proj/b7` | shown type | T; no observation recorded. |
 | `review-k4d/proj/f3` | shown type | T; no observation recorded. |
 | `review-k4d/proj/m4` | shown type | T; no observation recorded. |
 | `review-k4d/proj/q17` | shown type | T; no observation recorded. |
 | `review-k4d/proj/q26` | shown type | T; no observation recorded. |
-| `review-k4d/proj/q35` | shown type | T! BUG: principal-type assertion fails; S(N & A) instead of S(N). |
+| `review-k4d/proj/q35` | shown type | Fixed T!: original principal-type assertion passes; type notation only. |
 | `review-k4d/proj/q8` | shown type | T; no observation recorded. |
 | `review-k4d/proj/w1` | shown type | T; no observation recorded. |
 | `review-k4d/proj/w4` | shown type | T; no observation recorded. |
@@ -279,7 +290,7 @@ source-coordinate or wording changes; those are included in the same row.
 | `review-k4s/min_main_0_0` | shown type | T; no observation recorded. |
 | `review-k4s/min_main_5_0` | shown type | T; no observation recorded. |
 | `review-k4s/mixed_install_3` | shown type | T; no observation recorded. |
-| `review-k4s/mutual_recursive` | outcome | O6 BUG: two occurs errors → acceptance; complete written needs lost. |
+| `review-k4s/mutual_recursive` | shown type | Fixed O6: written needs restored; first and second both retain E0505; type/coordinate display only. |
 | `review-k4s/principal_missing_use` | shown type | T; no observation recorded. |
 | `review-k4s/rec_local_0_17_4` | shown type | T; no observation recorded. |
 | `review-k4s/rec_local_1_17_8` | shown type | T; no observation recorded. |
@@ -323,3 +334,9 @@ coordinator cache as `s3-corpus-first-outcomes.json`,
 `s3-corpus-first-diff.json`, and `s3-corpus-first-diff.txt`, alongside
 `s3-corpus-1of10.log`. These files preserve the first run even when a
 filtered retry replaces an ignored `actual.json`.
+
+The final complete outcomes and unified diffs are preserved in the same cache
+as `s3-corpus-final-outcomes.json`, `s3-corpus-final-diff.json`, and
+`s3-corpus-final-diff.txt`; the final runner log is
+`s3-corpus-final-1of10.log`. Every final difference is classified in the table
+above. The three unexplained diagnostic changes remain blockers.

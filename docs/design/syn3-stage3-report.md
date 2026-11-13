@@ -250,3 +250,35 @@ two unsuccessful variants. The two missing hidden errors and the extra
 `b1` error remain unexplained blockers. The final shard is now queued on
 the restored fixture inputs. The conversion head still reports its `p1`
 blockers and is not marked landable, so its compiler changes remain unmerged.
+
+## Final handoff, 23:24
+
+The final shard completed on the restored inputs at `d402cf846`: 198 cases,
+138 accepted and 60 rejected checks, zero semantic requirement failures.
+Every case preserves its saved phase exits and runtime stdout (normalizing
+only the property-failure source coordinates). The 63-case audit was repeated
+and also confirms every original failing binding and diagnostic-code count.
+
+The raw runner exits 1 for 170 output differences, all individually classified
+in [the audit](syn3-stage3-corpus-audit.md): 11 message only, 154 shown type,
+five diagnostic outcomes. Two are authorized removed-grammar diagnostics.
+Three remain unexplained: the hidden-provider E0515 disappears from
+`provision_closure_False` and `_loose/p/x8`, while `_loose/p/b1` gains another
+E0515 at `main`. None was re-recorded. This branch is **not landable** until
+these are resolved and a landable conversion head is integrated.
+
+All heavy commands ran serially through the wrapper. Fresh results are Wasm
+65, macro 9, CLI providers 18 / commands 14 / macro_run 57 / typed_macros 36 /
+check 10, project goldens 2, type goldens 5, legacy-enabled lowering 19, fresh
+release, and std O2 2,170/2,170. The initial combined CLI command failed on
+the captured-row fixture before its restoration; its final retry passes.
+The complete command/result ledger is in the shared coordinator cache,
+`gpt/r2/report-s3-landing.md`, with the raw logs and both corpus snapshots.
+
+The inherited record-field union solver limitation documented above was not
+investigated or reverified in this pass. The coordinator-owned workspace,
+unfiltered spec and unfiltered corpus gates were not run here. The latest
+conversion status still reports unresolved anomaly groups and is not marked
+landable, so no newer full conversion head was merged. The isolated captured
+row fix and exact, verified fixture corrections were integrated separately;
+`syn3/lower.rs` still does not absorb members.
