@@ -2818,6 +2818,19 @@ impl<'a> Resolver<'a> {
     /// its pattern; in a block, the caller makes them visible from the next
     /// statement (§6.10).
     fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
+        let source = self.p.module(self.cur).source;
+        let file = self.graph.sources.get(source);
+        for span in ilang_syntax::syn3::binding_line_traps(
+            &file.text,
+            Span::new(b.pattern.span.start, b.value.span.start),
+        ) {
+            self.diags.push(Diagnostic::warning(
+                code::ONE_LINE_BINDING,
+                Some(source),
+                span,
+                ilang_syntax::syn3::ONE_BINDING_HINT,
+            ));
+        }
         let ty_vars = self.push_declared_frame(&b.type_params);
         let direct = self.is_direct(&b.value);
         let mut binders = Vec::new();
