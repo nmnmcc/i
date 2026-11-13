@@ -327,3 +327,21 @@ bad = () { run(() { one() }, S(value: \"hi\")) }";
     );
     types(&source.replace("\"hi\"", "1"));
 }
+
+#[test]
+fn inferred_handlers_keep_future_provider_constraints() {
+    // §9.2: a provided value must be a subtype of the needed service.
+    // Generalizing an inferred row must retain that obligation for callers.
+    let source = "S(A) { S(value: A) }
+read = (s ! S(String)) { s.value <> \"!\" }
+with(A) = (x: A, f) { ! S(A) = S(value: x) f() }
+main = () { with(1, read) Nil }";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("with(1, read)", "with(\"ok\", read)"));
+}

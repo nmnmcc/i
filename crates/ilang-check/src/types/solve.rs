@@ -783,15 +783,17 @@ impl Solver {
             self.fail(FailKind::Mismatch, &Ty::Var(v), h);
             return;
         }
-        // Rule B for a service whose parameters all have a direction: a need
-        // of the row with that constructor goes to the handler. Needs written beside the row go to the explicit entry
-        // by routing, so no obligation is kept on the variable: keeping one
-        // would have to be shown in every caller's scheme, and it makes
-        // every later bound of the program check the handlers.
+        // A row occurring inside its own directed handler cannot later take
+        // that same service without a structural cycle. Check its known
+        // members and keep the recursive callback row open. Other directed
+        // handlers retain the obligation below for later instantiations.
         if self.var(v).row == Mode::Env
             && let Ty::Con(hh, _, args) = h
             && !args.is_empty()
             && self.variances(*hh, args.len()).all(|x| x != Variance::Inv)
+            && super::typed_macro::variables(h)
+                .iter()
+                .any(|w| self.same_form(&Ty::Var(v), &Ty::Var(*w)))
         {
             for b in self.reach(vec![v], true).1 {
                 if b.head() == h.head() {
