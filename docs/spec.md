@@ -2365,7 +2365,7 @@ For example, an opaque type defined by a package needs no library rule:
 
 
 ```i
-Element = { Opaque }
+Element = Opaque
 @js("globalThis.document.body")
 body: Element
 ```
