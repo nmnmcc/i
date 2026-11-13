@@ -5,6 +5,9 @@ S(N) = (f = () <- N -> Nil)
 use = <N>() <- (s: S(N)) { s.f() }
 
 main = <N>() {
-	local2 = () { run(() { use() }) <- (S(f = () { get() })) }
+	local2 = () {
+		_syn3_0: S(Dep) = S(f = () { get() })
+		run(() { use() }) <- (_syn3_0)
+	}
 	run(local2)
 }

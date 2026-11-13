@@ -13,8 +13,9 @@ bad = <N>() <- (s: S(N)) -> Int {
 }
 
 main = () {
+	_syn3_0: S(Dep) = S(() { get() })
 	{
 		bad()
 		Nil
-	} <- (S(() { get() }))
+	} <- (_syn3_0)
 }

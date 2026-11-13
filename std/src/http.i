@@ -1303,7 +1303,7 @@ Client = (
 native_client = () <- (n: net.Net, t: tls.Tls) {
 	Client(
 		make = () {
-			provider = network_client()
+			provider: (send = _, close = _) = network_client()
 			Transport(
 				stream = (req) {
 					{
@@ -1782,7 +1782,7 @@ exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
 	lease: Key(Nil) = key.new()
 	resource.ensure(
 		() {
-			transport = entry.connection |>
+			transport: (read = _, write = _) = entry.connection |>
 				(Plain(stream)) { net_transport(stream) }
 				| (Secure(stream)) { tls_transport(stream) }
 			transport.write(wire)

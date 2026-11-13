@@ -7,8 +7,9 @@ use = <N>() <- (s: S(N)) {
 }
 
 main = () {
+	_syn3_0: S(Never) = S(() { get() })
 	{
 		use()
 		Nil
-	} <- (S(() { get() }))
+	} <- (_syn3_0)
 }

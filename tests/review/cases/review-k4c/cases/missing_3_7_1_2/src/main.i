@@ -9,13 +9,14 @@ use = <A, B>() <- (s: S(A, B)) {
 
 main = <A, B>() {
 	local2 = () {
+		_syn3_0: S(Dep, Dep) = S(f = () { get() }, g = () { get() })
 		{
 			local = () {
 				inner = () { use() }
 				inner()
 			}
 			run(local)
-		} <- (S(f = () { get() }, g = () { get() }))
+		} <- (_syn3_0)
 	}
 	run(local2)
 }

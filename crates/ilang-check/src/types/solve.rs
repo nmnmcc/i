@@ -1788,6 +1788,11 @@ impl Solver {
             Ty::Var(v)
                 if env == Mode::Env
                     && h.iter().all(|m| self.directed(m))
+                    && h.iter().any(|m| {
+                        super::typed_macro::variables(m)
+                            .iter()
+                            .any(|w| self.same_form(&Ty::Var(*v), &Ty::Var(*w)))
+                    })
                     && !self
                         .reach(vec![*v], true)
                         .1
@@ -1880,8 +1885,10 @@ impl Solver {
                 Ty::Var(nv)
             }
             Ty::Con(h, values, args) => {
-                // Keep both bounds across levels for a need comparison;
-                // inside each argument, its definition supplies the mode.
+                // Needs compare their service forms in reverse as values
+                // (rule A). Extrusion must follow that direction too;
+                // making every argument invariant can invent a row cycle.
+                // The legacy set-row mode still compares forms equally.
                 Ty::Con(
                     *h,
                     values.clone(),
@@ -1891,10 +1898,10 @@ impl Solver {
                         .map(|((a, variance), row)| {
                             self.extrude(
                                 a,
-                                if env != Mode::Value {
-                                    Pol::Both
-                                } else {
-                                    pol.by(variance)
+                                match env {
+                                    Mode::Env => pol.flip().by(variance),
+                                    Mode::Row => Pol::Both,
+                                    Mode::Value => pol.by(variance),
                                 },
                                 level,
                                 row,
@@ -2336,24 +2343,6 @@ impl Solver {
         self.diff_mode(a, h, Mode::Value)
     }
 
-    /// The member of the environment `env` whose type constructor is
-    /// `head`, read also through the lower bounds of row variables. Used by
-    /// a provide of syntax three, whose service type is not written.
-    pub fn env_need(&self, env: &Ty, head: Head) -> Option<Ty> {
-        let mut seen = HashSet::default();
-        let mut todo = vec![env.clone()];
-        while let Some(t) = todo.pop() {
-            match &t {
-                Ty::Con(h, ..) if *h == head => return Some(t),
-                Ty::Union(ms) => todo.extend(ms.iter().cloned()),
-                Ty::Diff(a, _) => todo.push((**a).clone()),
-                Ty::Var(v) if seen.insert(*v) => todo.extend(self.var(*v).lower.iter().cloned()),
-                _ => {}
-            }
-        }
-        None
-    }
-
     /// Supply an opaque captured row. Named keys excluded from that row
     /// stay at the caller; all other requirements must fit the captured row.
     pub fn env_without_row(&mut self, need: &Ty, row: &Ty, outside: &[TypeRef]) -> Result<Ty, ()> {
@@ -2644,7 +2633,7 @@ impl Solver {
     /// If T <: v <: T (or v <: Never), v is exactly T (§4.5). Its old
     /// bounds have already been propagated through T by constrain_in.
     /// Otherwise v <: u implies v <: u | T, also through variable chains.
-    /// These rewrites preserve every solution; they introduce no variables
+    /// These rewrites preserve principal types; they introduce no variables
     /// and use only finite reachability searches.
     fn normalize_bounds(&mut self, roots: &[V]) -> bool {
         let mut changed = false;
@@ -2659,6 +2648,33 @@ impl Solver {
                 !matches!(b, Ty::Diff(a, _) if matches!(a.as_ref(), Ty::Var(u) if below.contains(u)))
             });
             changed |= before != self.var(v).lower.len();
+            // A closed instantiated row contributes exactly its known
+            // services. Choose that least need before collector feedback
+            // invents R >= Sink(N), N <= Fail(E) + R. Written/input rows,
+            // frozen snapshot rows and deferred meets retain their bounds.
+            if self.var(v).row == Mode::Env
+                && self.var(v).need_meet.is_none()
+                && below.iter().all(|w| {
+                    let state = self.var(*w);
+                    (w.0 as usize) >= self.rigid_boundary
+                        && !state.input
+                        && state.need_meet.is_none()
+                        && state.lower.iter().all(|t| match t {
+                            Ty::Var(_) | Ty::Never => true,
+                            Ty::Con(_, _, args) => args.is_empty(),
+                            _ => false,
+                        })
+                })
+                && lower
+                    .iter()
+                    .all(|t| matches!(t, Ty::Con(_, _, args) if args.is_empty()))
+            {
+                let need = self.union_in(lower.clone(), Mode::Env);
+                if !self.var(v).upper.contains(&need) {
+                    self.constrain_in(&Ty::Var(v), &need, Mode::Env);
+                    changed = true;
+                }
+            }
             let upper = self.var(v).upper.clone();
             let exact = upper.iter().find(|t| match t {
                 Ty::Never => true,
@@ -2996,16 +3012,19 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
         Ty::Con(h, _, args) => {
             let vs = s.variances(*h, args.len());
             for ((a, v), row) in args.iter().zip(vs).zip(s.rows(*h, args.len())) {
-                if row != Mode::Value {
-                    env_vars(s, a, pos, true, out);
-                    continue;
-                }
+                let mut visit = |pol| {
+                    if row != Mode::Value {
+                        env_vars(s, a, pol, true, out);
+                    } else {
+                        bound_vars(s, a, pol, true, out);
+                    }
+                };
                 match v {
-                    Variance::Co | Variance::Bi => bound_vars(s, a, pos, true, out),
-                    Variance::Contra => bound_vars(s, a, !pos, true, out),
+                    Variance::Co | Variance::Bi => visit(pos),
+                    Variance::Contra => visit(!pos),
                     Variance::Inv => {
-                        bound_vars(s, a, pos, true, out);
-                        bound_vars(s, a, !pos, true, out);
+                        visit(pos);
+                        visit(!pos);
                     }
                 }
             }
@@ -3028,20 +3047,41 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
     }
 }
 
-/// `bound_vars` for an environment: the arguments of its members are on
-/// both sides.
+/// `bound_vars` for an environment: service arguments have the reverse
+/// value direction (rule A), exactly as in coalescing.
 fn env_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, bool)>) {
     match t {
-        Ty::Con(_, _, args) => {
-            for a in args {
-                bound_vars(s, a, true, true, out);
-                bound_vars(s, a, false, true, out);
+        Ty::Con(h, _, args) => {
+            for ((a, variance), row) in args
+                .iter()
+                .zip(s.variances(*h, args.len()))
+                .zip(s.rows(*h, args.len()))
+            {
+                let mut visit = |pol| {
+                    if row != Mode::Value {
+                        env_vars(s, a, pol, true, out);
+                    } else {
+                        bound_vars(s, a, pol, true, out);
+                    }
+                };
+                match variance {
+                    Variance::Co => visit(!pos),
+                    Variance::Contra | Variance::Bi => visit(pos),
+                    Variance::Inv => {
+                        visit(true);
+                        visit(false);
+                    }
+                }
             }
         }
         Ty::Union(ms) | Ty::Inter(ms) => ms.iter().for_each(|a| env_vars(s, a, pos, con, out)),
         Ty::Diff(a, h) => {
             env_vars(s, a, pos, con, out);
-            h.iter().for_each(|x| bound_vars(s, x, pos, true, out));
+            h.iter().for_each(|x| env_vars(s, x, pos, true, out));
+        }
+        Ty::Both(a, b) => {
+            env_vars(s, a, true, con, out);
+            env_vars(s, b, false, con, out);
         }
         t => bound_vars(s, t, pos, con, out),
     }
@@ -3598,5 +3638,66 @@ mod reach_marks_tests {
         s.var_mut(a).from.push(e);
         s.var_mut(e).lower = vec![string.clone()];
         assert_eq!(s.reach(vec![a], true), (vec![a, e], vec![int, string]));
+    }
+}
+
+#[cfg(test)]
+mod directed_occurs_tests {
+    use super::*;
+
+    #[test]
+    fn an_opaque_difference_is_not_a_closed_service_source() {
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let source = s.fresh_at(1);
+        s.var_mut(source).row = Mode::Env;
+        s.var_mut(source).input = true;
+        let inferred = s.fresh_at(1);
+        s.var_mut(inferred).row = Mode::Env;
+        s.var_mut(inferred).lower.push(Ty::Diff(
+            Box::new(Ty::Var(source)),
+            vec![Ty::named(TypeRef::Custom(crate::hir::TypeId(0)), vec![])],
+        ));
+        assert!(!s.normalize_bounds(&[inferred]));
+        assert!(s.var(inferred).upper.is_empty());
+    }
+
+    #[test]
+    fn closing_an_inferred_row_never_refines_a_frozen_source() {
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let fixed = s.fresh_at(1);
+        s.var_mut(fixed).row = Mode::Env;
+        s.freeze();
+        let inferred = s.fresh_at(1);
+        s.var_mut(inferred).row = Mode::Env;
+        s.var_mut(inferred).lower.push(Ty::Var(fixed));
+        assert!(!s.normalize_bounds(&[inferred]));
+        assert!(s.failures.is_empty());
+        assert!(s.var(fixed).upper.is_empty());
+        assert!(s.var(inferred).upper.is_empty());
+    }
+
+    #[test]
+    fn need_edges_follow_variance_and_still_reject_constructor_cycles() {
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let id = crate::hir::TypeId(0);
+        s.variance.insert(id, vec![Variance::Co]);
+        s.row_params.insert(id, vec![Mode::Env]);
+        let row = s.fresh_at(1);
+        let argument = s.fresh_at(1);
+        s.var_mut(row).row = Mode::Env;
+        s.var_mut(row).input = true;
+        s.var_mut(argument).row = Mode::Env;
+        s.var_mut(row)
+            .upper
+            .push(Ty::named(TypeRef::Custom(id), vec![Ty::Var(argument)]));
+        s.var_mut(argument).upper.push(Ty::Var(row));
+        // From the input row, a covariant service argument is an output:
+        // its empty lower bounds end the path. An invariant traversal
+        // would invent a constructor cycle through the unused upper bound.
+        assert!(!s.occurs(vec![row]));
+        // Adding the edge on the side coalescing actually visits really
+        // does put the row inside its own constructor, and must reject.
+        s.var_mut(argument).lower.push(Ty::Var(row));
+        assert!(s.occurs(vec![row]));
     }
 }

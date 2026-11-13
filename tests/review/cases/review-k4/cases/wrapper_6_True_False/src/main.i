@@ -7,4 +7,7 @@ run = (f) { f() }
 id = (x) { x }
 f = () -> Nil { run(id(use)) }
 
-main = () { f() <- (S(() { Nil }, (_: Never) { Nil })) }
+main = () {
+	_syn3_0: S(Never) = S(() { Nil }, (_: Never) { Nil })
+	f() <- (_syn3_0)
+}

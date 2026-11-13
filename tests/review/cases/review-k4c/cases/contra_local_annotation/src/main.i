@@ -6,8 +6,9 @@ wrap = <A>(x: A) {
 }
 
 main = () {
+	_syn3_0: S(String) = S(f = (_: String) { 42 })
 	{
 		wrap(1)
 		Nil
-	} <- (S(f = (_: String) { 42 }))
+	} <- (_syn3_0)
 }

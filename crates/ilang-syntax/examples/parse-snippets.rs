@@ -2,6 +2,7 @@
 use std::io::{self, BufRead, Read, Write};
 
 fn main() {
+    let lisp = std::env::args().any(|arg| arg == "--lisp");
     let mut input = io::stdin().lock();
     let mut output = io::BufWriter::new(io::stdout().lock());
     let mut line = String::new();
@@ -9,7 +10,12 @@ fn main() {
         let len: usize = line.trim().parse().unwrap();
         let mut source = vec![0; len];
         input.read_exact(&mut source).unwrap();
-        let (module, diags) = ilang_syntax::parse_module(std::str::from_utf8(&source).unwrap());
+        let source = std::str::from_utf8(&source).unwrap();
+        let (module, diags) = if lisp {
+            ilang_syntax::lisp::parse_source(source)
+        } else {
+            ilang_syntax::parse_module(source)
+        };
         let old_main = module
             .items
             .iter()

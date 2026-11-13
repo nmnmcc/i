@@ -9,4 +9,7 @@ forward = <N>() <- (s: S(N)) {
 	run(local)
 }
 
-example = () { forward() <- (S(() { Nil }, (_: Never) { Nil })) }
+example = () {
+	_syn3_0: S(Never) = S(() { Nil }, (_: Never) { Nil })
+	forward() <- (_syn3_0)
+}

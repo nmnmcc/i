@@ -914,6 +914,46 @@ impl Cx<'_> {
         }
     }
 
+    // E3: Fail is an ordinary prelude service; a bound Fail keeps its name.
+    fn service_type(&mut self, ty: &o::TypeExpr) -> n::Type {
+        self.ty(ty)
+    }
+
+    // Keep the written service form: inference from a constructor alone
+    // can change its arguments (and turn a rejected provider into a valid one).
+    fn provided(&mut self, ty: &o::TypeExpr, value: &o::Expr, out: &mut Vec<n::Stmt>) -> n::DItem {
+        if matches!(&ty.kind, o::TypeKind::Named { args, .. } if !args.is_empty()) {
+            let name = format!("_syn3_{}", self.fresh);
+            self.fresh += 1;
+            let at = value.span;
+            let ty = self.service_type(ty);
+            out.push(n::Stmt::Bind(n::Binding {
+                pattern: n::Pattern::new(
+                    n::PatternKind::Typed {
+                        binder: n::Binder {
+                            name: name.clone(),
+                            discard: false,
+                            span: n::Sp(at),
+                        },
+                        ty,
+                    },
+                    at,
+                ),
+                value: self.expr(value),
+                span: n::Sp(Span::default()),
+            }));
+            n::DItem::Pos(n::Expr::new(
+                n::ExprKind::Name {
+                    module: None,
+                    name: n::Ident::new(name, at),
+                },
+                at,
+            ))
+        } else {
+            n::DItem::Pos(self.expr(value))
+        }
+    }
+
     /// `! T = e` followed by the rest `r` of its block becomes `{ r } <- (e)`.
     fn stmts(&mut self, stmts: &[o::Stmt], span: Span) -> Vec<n::Stmt> {
         let mut out = Vec::new();
@@ -922,23 +962,24 @@ impl Cx<'_> {
                 o::Stmt::Bind(b) => out.push(n::Stmt::Bind(self.binding(b))),
                 o::Stmt::Expr(e) => out.push(n::Stmt::Expr(self.expr(e))),
                 o::Stmt::Env {
+                    ty,
                     value,
                     span: env_span,
                     spread,
                     group,
                     ..
                 } => {
-                    // Keep written provide groups distinct (rule C).
-                    // Legacy statements without groups can still gather
-                    // direct values; effectful values remain nested.
+                    // Keep written provide groups distinct (rule C), and
+                    // retain explicit legacy provider types during conversion.
                     let mut provided = vec![if *spread {
                         n::DItem::Spread(self.expr(value))
                     } else {
-                        n::DItem::Pos(self.expr(value))
+                        self.provided(ty, value, &mut out)
                     }];
                     let mut i = i;
                     while is_direct(value)
                         && let Some(o::Stmt::Env {
+                            ty: next_ty,
                             value: next,
                             spread,
                             group: next_group,
@@ -950,7 +991,7 @@ impl Cx<'_> {
                         provided.push(if *spread {
                             n::DItem::Spread(self.expr(next))
                         } else {
-                            n::DItem::Pos(self.expr(next))
+                            self.provided(next_ty, next, &mut out)
                         });
                         i += 1;
                     }
@@ -1047,7 +1088,7 @@ impl Cx<'_> {
                 o::Param::Env { name, ty, rest } => services.push(n::SItem {
                     rest: *rest,
                     name: id(name),
-                    ty: self.ty(ty),
+                    ty: self.service_type(ty),
                 }),
             }
         }

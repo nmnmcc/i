@@ -19,12 +19,20 @@ h0 = () { get() + us() }
 h1 = () { h0() <- (Dep(v = 2)) }
 
 main = () {
-	w = () { h0() <- (S(f = () { get() }, m = (_: Dep) { Nil })) }
+	w = () {
+		_syn3_0: S(Dep) = S(f = () { get() }, m = (_: Dep) { Nil })
+		h0() <- (_syn3_0)
+	}
+	_syn3_1: T(S(Never)) = T(f = () { us() }, m = (_: S(Never)) { Nil })
 	{
 		a = h1()
+		_syn3_2: T(Dep | S(Dep)) = T(
+			f = () { h0() },
+			m = (_: Dep | S(Dep)) { Nil },
+		)
 		{
 			a + ut() + run(() { ut() }) + w()
 			Nil
-		} <- (Dep(v = 3), T(f = () { h0() }, m = (_: Dep | S(Dep)) { Nil }))
-	} <- (T(f = () { us() }, m = (_: S(Never)) { Nil }))
+		} <- (Dep(v = 3), _syn3_2)
+	} <- (_syn3_1)
 }

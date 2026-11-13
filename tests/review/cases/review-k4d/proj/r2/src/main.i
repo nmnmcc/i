@@ -19,8 +19,9 @@ tell = (x: Int) {
 }
 
 main = () {
+	_syn3_0: S(Dep) = S(f = () { get() })
 	{
 		fw() + fr()
 		Nil
-	} <- (S(f = () { get() }))
+	} <- (_syn3_0)
 }

@@ -3,4 +3,7 @@ use = <N>() <- (s: S(N)) {
 	S(f, _) = s
 	f()
 }
-bad = <N>() { use() <- (S(() { use() }, (_: N) { Nil })) }
+bad = <N>() {
+	_syn3_0: S(N) = S(() { use() }, (_: N) { Nil })
+	use() <- (_syn3_0)
+}
