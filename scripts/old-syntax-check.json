@@ -426,6 +426,9 @@
   "crates/ilang-wasm/tests/codegen.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
   },
+  "crates/ilang-wasm/tests/codegen.rs:fc3b7cf6d9e48c43": {
+    "not_source": "module path of a generated metadata test, not an i source"
+  },
   "crates/ilang-check/tests/library.rs:a55d3ed17385f8dd": {
     "substitutions": [
       [
