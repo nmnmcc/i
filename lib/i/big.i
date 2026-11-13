@@ -65,9 +65,13 @@ put: (Digits, Int, Int) -> Digits
 @external("ilang:big", "finish")
 finish: (Int, Digits) -> Int
 
-// One base-2^30 multiply-add, split into low digit and carry.
-@external("ilang:big", "multiply_add")
-multiply_add: (Int, Int, Int) -> (Int, Int)
+// The two parts of one base-2^30 multiply-add. Separate scalar results
+// keep the inner loop from allocating either a product Int or a tuple.
+@external("ilang:big", "multiply_low")
+multiply_low: (Int, Int, Int) -> Int
+
+@external("ilang:big", "multiply_high")
+multiply_high: (Int, Int, Int) -> Int
 
 // Divide high * base + low by d; high < d. Quotient and remainder.
 @external("ilang:big", "divide_digit")
@@ -106,16 +110,48 @@ order_from = (a: Int, b: Int, i: Int) -> Int {
 	{ i < 0 } |> {
 		True -> 0
 		False -> {
-			x = limb(a, i)
-			y = limb(b, i)
-			{ x == y } |> {
-				True -> order_from(a, b, i - 1)
-				False -> { x < y } |> {
-					True  -> -1
-					False -> 1
+			x0 = limb(a, i)
+			y0 = limb(b, i)
+			{ x0 == y0 } |> {
+				False -> digit_order(x0, y0)
+				True -> {
+					{ i < 3 } |> {
+						True -> order_from(a, b, i - 1)
+						False -> {
+							x1 = limb(a, i - 1)
+							y1 = limb(b, i - 1)
+							{ x1 == y1 } |> {
+								False -> digit_order(x1, y1)
+								True -> {
+									x2 = limb(a, i - 2)
+									y2 = limb(b, i - 2)
+									{ x2 == y2 } |> {
+										False -> digit_order(x2, y2)
+										True -> {
+											x3 = limb(a, i - 3)
+											y3 = limb(b, i - 3)
+											{ x3 == y3 } |> {
+												False -> digit_order(x3, y3)
+												True -> {
+													order_from(a, b, i - 4)
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
+	}
+}
+
+digit_order = (a: Int, b: Int) -> Int {
+	{ a < b } |> {
+		True  -> -1
+		False -> 1
 	}
 }
 
@@ -160,10 +196,12 @@ add_up = (a: Int, b: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits {
 	{ i == n } |> {
 		True -> put(out, i, carry)
 		False -> {
-			sum = limb(a, i) + limb(b, i) + carry
-			{ sum >= 1073741824 } |> {
-				True  -> add_up(a, b, i + 1, n, 1, put(out, i, sum - 1073741824))
-				False -> add_up(a, b, i + 1, n, 0, put(out, i, sum))
+			x = limb(a, i)
+			y = limb(b, i)
+			limit = 1073741824 - y - carry
+			{ x >= limit } |> {
+				True  -> add_up(a, b, i + 1, n, 1, put(out, i, x - limit))
+				False -> add_up(a, b, i + 1, n, 0, put(out, i, x + y + carry))
 			}
 		}
 	}
@@ -213,11 +251,159 @@ multiply = (a: Int, b: Int) -> Int {
 					}
 					finish(s, scale_up(x, d, 0, n, 0, builder(n + 1)))
 				}
-				False -> finish(
-					s
-					columns(a, b, na, nb, 0, 0, builder(na + nb))
+				False -> {
+					p = multiply_range(a, 0, na, b, 0, nb)
+					{ s < 0 } |> {
+						True  -> -p
+						False -> p
+					}
+				}
+			}
+		}
+	}
+}
+
+// Karatsuba on ranges of the original operands. No half is copied into a
+// list or a new number: only the sums and subproducts are materialized.
+// Small or unbalanced ranges use product scanning.
+multiply_range = (a: Int, ao: Int, na: Int, b: Int, bo: Int, nb: Int) -> Int {
+	{ na == 0 || nb == 0 } |> {
+		True -> 0
+		False -> { min(na, nb) <= 16 || max(na, nb) > 2 * min(na, nb) } |> {
+			True -> finish(
+				1
+				columns(a, ao, b, bo, na, nb, 0, 0, builder(na + nb))
+			)
+			False -> {
+				k = max(na, nb) / 2
+				low = multiply_range(a, ao, k, b, bo, k)
+				high = multiply_range(a, ao + k, na - k, b, bo + k, nb - k)
+				sa = finish(
+					1
+					sum_halves(
+						a
+						ao
+						k
+						na
+						0
+						max(k, na - k)
+						0
+						builder(max(k, na - k) + 1)
+					)
+				)
+				sb = finish(
+					1
+					sum_halves(
+						b
+						bo
+						k
+						nb
+						0
+						max(k, nb - k)
+						0
+						builder(max(k, nb - k) + 1)
+					)
+				)
+				middle = multiply(sa, sb) - low - high
+				finish(
+					1
+					combine(
+						low
+						middle
+						high
+						k
+						0
+						na + nb
+						0
+						builder(na + nb)
+					)
 				)
 			}
+		}
+	}
+}
+
+sum_halves = (
+	x: Int
+	offset: Int
+	k: Int
+	n: Int
+	i: Int
+	end: Int
+	carry: Int
+	out: Digits
+) -> Digits {
+	{ i == end } |> {
+		True -> put(out, i, carry)
+		False -> {
+			a = { i < k } |> {
+				True  -> limb(x, offset + i)
+				False -> 0
+			}
+			b = { i < n - k } |> {
+				True  -> limb(x, offset + k + i)
+				False -> 0
+			}
+			limit = 1073741824 - b - carry
+			{ a >= limit } |> {
+				True -> sum_halves(
+					x
+					offset
+					k
+					n
+					i + 1
+					end
+					1
+					put(out, i, a - limit)
+				)
+				False -> sum_halves(
+					x
+					offset
+					k
+					n
+					i + 1
+					end
+					0
+					put(out, i, a + b + carry)
+				)
+			}
+		}
+	}
+}
+
+// low + middle * base^k + high * base^(2*k), into one result array.
+combine = (
+	low: Int
+	middle: Int
+	high: Int
+	k: Int
+	i: Int
+	n: Int
+	carry: Int
+	out: Digits
+) -> Digits {
+	{ i == n } |> {
+		True -> out
+		False -> {
+			m = { i >= k } |> {
+				True  -> limb(middle, i - k)
+				False -> 0
+			}
+			h = { i >= 2 * k } |> {
+				True  -> limb(high, i - 2 * k)
+				False -> 0
+			}
+			total = limb(low, i) + m + h + carry
+			combine(
+				low
+				middle
+				high
+				k
+				i + 1
+				n
+				total / 1073741824
+				put(out, i, total % 1073741824)
+			)
 		}
 	}
 }
@@ -227,17 +413,21 @@ scale_up = (x: Int, d: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits {
 	{ i == n } |> {
 		True -> put(out, i, carry)
 		False -> {
-			(low, high) = multiply_add(limb(x, i), d, carry)
+			digit = limb(x, i)
+			low = multiply_low(digit, d, carry)
+			high = multiply_high(digit, d, carry)
 			scale_up(x, d, i + 1, n, high, put(out, i, low))
 		}
 	}
 }
 
-// Product scanning: accumulate one column at a time. The low accumulator
-// stays one digit; each multiply-add contributes its carry to the high sum.
+// Product scanning with three base-2^30 accumulators. Every inner-loop
+// value stays a small Int; only one carry is materialized per column.
 columns = (
 	a: Int
+	ao: Int
 	b: Int
+	bo: Int
 	na: Int
 	nb: Int
 	k: Int
@@ -248,28 +438,84 @@ columns = (
 		True -> put(out, k, carry)
 		False -> {
 			first = max(0, k - nb + 1)
-			(low, high) = column(a, b, first, min(k, na - 1), k, 0, 0)
-			total = low + carry
-			next = total / 1073741824 + high
-			columns(a, b, na, nb, k + 1, next, put(out, k, total % 1073741824))
+			(low, high, extra) = column(
+				a
+				ao
+				b
+				bo
+				first
+				min(k, na - 1)
+				k
+				carry % 1073741824
+				carry / 1073741824
+				0
+			)
+			columns(
+				a
+				ao
+				b
+				bo
+				na
+				nb
+				k + 1
+				high + extra * 1073741824
+				put(out, k, low)
+			)
 		}
 	}
 }
 
 column = (
 	a: Int
+	ao: Int
 	b: Int
+	bo: Int
 	i: Int
 	last: Int
 	k: Int
 	low: Int
 	high: Int
-) -> (Int, Int) {
+	extra: Int
+) -> (Int, Int, Int) {
 	{ i > last } |> {
-		True -> (low, high)
+		True -> (low, high, extra)
 		False -> {
-			(next, carry) = multiply_add(limb(a, i), limb(b, k - i), low)
-			column(a, b, i + 1, last, k, next, high + carry)
+			x = limb(a, ao + i)
+			y = limb(b, bo + k - i)
+			next = multiply_low(x, y, low)
+			carry = multiply_high(x, y, low)
+			{ carry == 0 } |> {
+				True -> column(a, ao, b, bo, i + 1, last, k, next, high, extra)
+				False -> {
+					limit = 1073741824 - carry
+					{ high >= limit } |> {
+						True -> column(
+							a
+							ao
+							b
+							bo
+							i + 1
+							last
+							k
+							next
+							high - limit
+							extra + 1
+						)
+						False -> column(
+							a
+							ao
+							b
+							bo
+							i + 1
+							last
+							k
+							next
+							high + carry
+							extra
+						)
+					}
+				}
+			}
 		}
 	}
 }
@@ -486,7 +732,9 @@ reduce_digit = (
 	{ i == n } |> {
 		True -> out
 		False -> {
-			(low, high) = multiply_add(limb(y, i), d, carry)
+			digit = limb(y, i)
+			low = multiply_low(digit, d, carry)
+			high = multiply_high(digit, d, carry)
 			x = { i == 0 } |> {
 				True  -> a
 				False -> limb(r, i - 1)

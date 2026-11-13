@@ -119,20 +119,25 @@ i/big.from_top : (sign: Int, digits: List(Int)) -> Int
 i/big.builder : (Int) -> Digits
 i/big.put : (Digits, Int, Int) -> Digits
 i/big.finish : (Int, Digits) -> Int
-i/big.multiply_add : (Int, Int, Int) -> (Int, Int)
+i/big.multiply_low : (Int, Int, Int) -> Int
+i/big.multiply_high : (Int, Int, Int) -> Int
 i/big.divide_digit : (Int, Int, Int) -> (Int, Int)
 i/big.compare : (a: Int, b: Int) -> Int
 i/big.magnitude_order : (a: Int, b: Int) -> Int
 i/big.order_from : (a: Int, b: Int, i: Int) -> Int
+i/big.digit_order : (a: Int, b: Int) -> Int
 i/big.add : (a: Int, b: Int) -> Int
 i/big.subtract : (a: Int, b: Int) -> Int
 i/big.signed_add : (a: Int, sa: Int, b: Int, sb: Int) -> Int
 i/big.add_up : (a: Int, b: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
 i/big.subtract_up : (a: Int, b: Int, i: Int, n: Int, borrow: Int, out: Digits) -> Digits
 i/big.multiply : (a: Int, b: Int) -> Int
+i/big.multiply_range : (a: Int, ao: Int, na: Int, b: Int, bo: Int, nb: Int) -> Int
+i/big.sum_halves : (x: Int, offset: Int, k: Int, n: Int, i: Int, end: Int, carry: Int, out: Digits) -> Digits
+i/big.combine : (low: Int, middle: Int, high: Int, k: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
 i/big.scale_up : (x: Int, d: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits
-i/big.columns : (a: Int, b: Int, na: Int, nb: Int, k: Int, carry: Int, out: Digits) -> Digits
-i/big.column : (a: Int, b: Int, i: Int, last: Int, k: Int, low: Int, high: Int) -> (Int, Int)
+i/big.columns : (a: Int, ao: Int, b: Int, bo: Int, na: Int, nb: Int, k: Int, carry: Int, out: Digits) -> Digits
+i/big.column : (a: Int, ao: Int, b: Int, bo: Int, i: Int, last: Int, k: Int, low: Int, high: Int, extra: Int) -> (Int, Int, Int)
 i/big.max : (a: Int, b: Int) -> Int
 i/big.min : (a: Int, b: Int) -> Int
 i/big.divide : (a: Int, b: Int) -> Int

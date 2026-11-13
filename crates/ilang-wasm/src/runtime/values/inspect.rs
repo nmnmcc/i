@@ -360,7 +360,7 @@ pub fn wat() -> String {
 "#
     .to_owned();
 
-    let source = crate::runtime::with_literals(
+    crate::runtime::with_literals(
         source,
         &[
             ("comma", ", "),
@@ -387,8 +387,7 @@ pub fn wat() -> String {
             ("codepoint_open", "//utfcodepoint("),
             ("unknown", "//wasm(unknown)"),
         ],
-    );
-    source
+    )
 }
 
 #[cfg(test)]

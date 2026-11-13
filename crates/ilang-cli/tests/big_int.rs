@@ -176,18 +176,18 @@ fn large_int_arithmetic_matches_num_bigint() {
         }
         // Exact multiples and near multiples divide with no remainder or
         // with a small one.
-        if let Some(b) = values.get(i + 1) {
-            if *b != BigInt::from(0) {
-                let product = a * b;
-                let step = BigInt::from(if *b > BigInt::from(0) { 1 } else { -1 });
-                pairs.push((product.clone(), b.clone()));
-                pairs.push((&product - step, b.clone()));
-            }
+        if let Some(b) = values.get(i + 1)
+            && *b != BigInt::from(0)
+        {
+            let product = a * b;
+            let step = BigInt::from(if *b > BigInt::from(0) { 1 } else { -1 });
+            pairs.push((product.clone(), b.clone()));
+            pairs.push((&product - step, b.clone()));
         }
     }
     // Indexed reads cross 30-bit digit and 32-bit storage boundaries. Include
     // the measured 8500-bit size and long quotients, with both signs.
-    for width in [100_usize, 200, 300, 8500] {
+    for width in [100_usize, 200, 300, 479, 480, 481, 959, 960, 961, 8500] {
         let a = (BigInt::from(1) << width) - 1_u8;
         for b in [
             BigInt::from(1073741823),
@@ -198,6 +198,15 @@ fn large_int_arithmetic_matches_num_bigint() {
                 pairs.push((x.clone(), y.clone()));
             }
         }
+    }
+    // Karatsuba must also handle an all-zero lower half without copying
+    // or accidentally reading the adjacent range of the original number.
+    for width in [480_usize, 510, 960, 990, 8500] {
+        let power = BigInt::from(1) << width;
+        pairs.push((power.clone(), &power - 1_u8));
+        pairs.push((&power - 1_u8, power.clone()));
+        pairs.push((power.clone(), &power + 1_u8));
+        pairs.push((-&power, &power - 1_u8));
     }
     for (opt, program) in programs() {
         let mut instance = program
