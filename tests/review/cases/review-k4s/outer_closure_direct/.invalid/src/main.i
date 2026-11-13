@@ -6,4 +6,4 @@ use = <N>() <- (s: S(N)) {
 }
 run = <A, N>(body: () <- N -> A) { body() }
 D = ()
-test = <N>() <- (s: S(N)) { provided: D = D }
+test = <N>() <- (s: S(N)) { provided: D = D(() { use() })() }

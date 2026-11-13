@@ -2912,12 +2912,6 @@
       "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
     ]
   },
-  "tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i:27dd511808e077f4": {
-    "reason": "The block ends in a binding and has no result expression, retaining the original BlockEnd counterexample.",
-    "diagnostics": [
-      "E0105: a block ends with an expression"
-    ]
-  },
   "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:dd5c2f037478d5e2": {
     "reason": "A provide operation has no expression on its left, retaining a service statement where an expression is required.",
     "diagnostics": [
@@ -2934,6 +2928,12 @@
     "reason": "Unsupported block-comment delimiters remain malformed; the diagnostic transcript is line-commented data, not executable old syntax.",
     "diagnostics": [
       "E0101: expected an expression, found `*`"
+    ]
+  },
+  "tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i:581dc5481bbfc47f": {
+    "reason": "The block ends in a binding containing the original directly invoked outer closure, with no result expression; retains the original BlockEnd counterexample.",
+    "diagnostics": [
+      "E0105: a block ends with an expression"
     ]
   }
 }
