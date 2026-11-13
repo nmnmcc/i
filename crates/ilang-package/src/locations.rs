@@ -350,13 +350,17 @@ pub(crate) fn resolve(
             };
             let (repository, dir) = split_place(&key.location);
             let what = format!("{}@{version}", key.location);
-            match resolver.git.package(repository, dir, &key.location, commit) {
+            match resolver
+                .git
+                .package_snapshot(repository, dir, &key.location, commit)
+            {
                 Err(e) => {
+                    mismatch |= matches!(e.code, code::LOCK_MISMATCH | code::PACKAGE_FILES);
                     let origin = origin(&sel_with, &sel_without, &key, version);
                     report(loader, &origin, &what, &e);
                     errors = true;
                 }
-                Ok((path, hash)) => {
+                Ok((path, hash, files)) => {
                     if let Some(l) = lock.get(&key.location, version)
                         && (l.commit != *commit || l.hash != hash)
                     {
@@ -390,6 +394,7 @@ pub(crate) fn resolve(
                         Located {
                             location,
                             dir: path,
+                            files: std::sync::Arc::new(files),
                         },
                     );
                 }

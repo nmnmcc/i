@@ -2943,5 +2943,11 @@
   },
   "crates/ilang-package/tests/git.rs:2571ce03d469bbde": {
     "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:2571ce03d469bbde": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-package/tests/git.rs:7d5664697bbe253e": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
   }
 }

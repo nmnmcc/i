@@ -1161,3 +1161,70 @@ fn located_source_links_cannot_escape_the_hashed_tree() {
         assert!(!app.join("i.lock").exists());
     }
 }
+
+#[test]
+fn cached_package_files_are_verified_on_every_load() {
+    for attack in ["edit", "manifest", "add", "remove", "forged-sidecar"] {
+        let w = World::new();
+        let r = w.repo("dep");
+        w.repo("peer").package("peer", &[], "1.0.0");
+        let commit = r.commit(
+            &[
+                ("i.toml", "name = \"dep\"\n"),
+                ("src/lib.i", "(value)\nvalue = 1\n"),
+            ],
+            "v1.0.0",
+        );
+        let app = w.project(
+            "app",
+            &[
+                (
+                    "i.toml",
+                    "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\npeer = \"example.com/peer@1.0.0\"\n",
+                ),
+                ("src/main.i", "main = () { Nil }\n"),
+            ],
+        );
+        let (g, ds) = w.load(&app, false);
+        no_errors(&g, &ds);
+        let locked = fs::read(app.join("i.lock")).unwrap();
+        let cache = w.cache().join("pkg/example.com%2fdep").join(commit);
+        let sidecar = fs::read(cache.with_extension("hash")).unwrap();
+        match attack {
+            "edit" | "forged-sidecar" => {
+                fs::remove_file(cache.join("src/lib.i")).unwrap();
+                fs::write(
+                    cache.join("src/lib.i"),
+                    include_str!("../../../tests/spec/2.8/mp02_cached.i"),
+                )
+                .unwrap();
+            }
+            "manifest" => {
+                fs::remove_file(cache.join("i.toml")).unwrap();
+                fs::write(cache.join("i.toml"), "name = \"impostor\"\n").unwrap();
+            }
+            "add" => fs::write(cache.join("src/extra.i"), "x = 2\n").unwrap(),
+            "remove" => fs::remove_file(cache.join("src/lib.i")).unwrap(),
+            _ => unreachable!(),
+        }
+        if attack == "forged-sidecar" {
+            fs::write(
+                cache.with_extension("hash"),
+                format!("sha256-{}\n", "0".repeat(64)),
+            )
+            .unwrap();
+        } else {
+            assert_eq!(fs::read(cache.with_extension("hash")).unwrap(), sidecar);
+        }
+        let mut options = w.options(false);
+        options.offline = true;
+        let (g, ds) = load_with(&app, &options);
+        assert_eq!(
+            errors(&ds),
+            [code::LOCK_MISMATCH],
+            "attack {attack}: {ds:?}"
+        );
+        assert!(located(&g).is_empty());
+        assert_eq!(fs::read(app.join("i.lock")).unwrap(), locked);
+    }
+}

@@ -659,7 +659,7 @@ The parts are the location, the version, the git commit of the tag, and the **ha
 
 - When the files that are got for a package do not have the commit and the hash in `i.lock`, it is an error, and nothing is compiled. So a tag that is moved, or files that are changed on the way, are found.
 - When `i.lock` has no line for a version that is used, the line is added. Lines for versions that are no longer used, with or without the tests, are taken out. So when a version is raised, the line for the old version is taken out and a line for the new one is added.
-- A tool may get the files from the repository or from any copy of it, because the hash makes certain they are the same files.
+- A tool may get the files from the repository or from any copy of it, because the hash makes certain they are the same files. Each use verifies the actual file set and bytes against the committed package and the lock. A stored hash alone does not verify a copy. Compilation consumes the verified bytes, without reopening mutable paths.
 
 
 ## 3. Type syntax

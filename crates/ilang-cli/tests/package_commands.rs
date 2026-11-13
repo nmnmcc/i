@@ -1436,3 +1436,49 @@ fn add_rejects_dependency_with_source_link() {
     assert_eq!(read(&app.join("i.toml")), manifest);
     assert!(!app.join("i.lock").exists());
 }
+
+#[test]
+fn package_commands_reject_tampered_cache_with_original_sidecar() {
+    let w = World::new();
+    w.repo(
+        "dep",
+        &[(
+            "1.0.0",
+            &[
+                ("i.toml", "name = \"dep\"\n"),
+                ("src/lib.i", "(value)\nvalue = 1\n"),
+            ],
+        )],
+    );
+    let app = w.project(
+        "app",
+        &[
+            (
+                "i.toml",
+                "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
+            ),
+            ("src/main.i", "main = () { Nil }\n"),
+        ],
+    );
+    let project = app.to_str().unwrap();
+    w.ok(&["check", "--project", project]);
+    let locked = read(&app.join("i.lock"));
+    let commit = locked.split_whitespace().nth(2).unwrap();
+    let cache = w.path().join("cache/pkg/example.com%2fdep").join(commit);
+    let sidecar = read(&cache.with_extension("hash"));
+    fs::remove_file(cache.join("src/lib.i")).unwrap();
+    fs::write(
+        cache.join("src/lib.i"),
+        include_str!("../../../tests/spec/2.8/mp02_cached.i"),
+    )
+    .unwrap();
+    for command in ["check", "deps", "update"] {
+        let err = w.fails(&[command, "--project", project]);
+        assert!(
+            err.contains("cached files") && err.contains("do not match"),
+            "{err}"
+        );
+        assert_eq!(read(&app.join("i.lock")), locked);
+        assert_eq!(read(&cache.with_extension("hash")), sidecar);
+    }
+}
