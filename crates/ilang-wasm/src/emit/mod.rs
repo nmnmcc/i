@@ -62,7 +62,8 @@ const ENTRY: &str = r#"
 ;; The raise of the `Fail` of `env` (slot 1, `FAIL_SERVICE`): the glue for
 ;; the errors of host functions.
 (func $fail_env (param $error eqref) (param $env (ref null $env)) (result eqref)
-  (drop (call $call1 (call $field (array.get $env (ref.as_non_null (local.get $env)) (i32.const 1))
+  (drop (call $call1 (call $field (call $service_force
+    (array.get $env (ref.as_non_null (local.get $env)) (i32.const 1)) (local.get $env))
     (i32.const 0)) (local.get $error) (local.get $env)))
   (unreachable))
 
