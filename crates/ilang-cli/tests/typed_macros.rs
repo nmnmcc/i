@@ -625,3 +625,19 @@ fn equal_printed_nominal_members_have_the_same_order_in_both_union_spellings() {
         );
     }
 }
+
+#[test]
+fn typed_macro_diagnostics_are_part_of_the_implementation_contract() {
+    let macros = include_str!("../../../tests/spec/14.8/mp14_typed_diagnostics/src/macros.is");
+    let main = include_str!("../../../tests/spec/14.8/mp14_typed_diagnostics/src/main.i")
+        .replace("probe/macros", "app/macros");
+    let (_, checked) = checked(macros, &main).unwrap();
+    assert_eq!(
+        checked
+            .diags
+            .iter()
+            .filter(|d| d.severity == ilang_package::Severity::Note && d.message == "note")
+            .count(),
+        1
+    );
+}
