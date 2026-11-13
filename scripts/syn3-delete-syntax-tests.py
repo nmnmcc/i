@@ -31,6 +31,9 @@ pub fn parse_module(source: &str) -> (ast::Module, Vec<Diagnostic>) {
 '''
     for path in tests.glob('*.rs'):
         text = path.read_text()
+        if path.name == 'common.rs':
+            path.write_text(text.replace('ilang_syntax::', 'migration_syntax::'))
+            continue
         text = text.replace('#![cfg(feature = "legacy")]\n', '')
         text = text.replace('#[path = "../examples/support/legacy/mod.rs"]\nmod legacy;', 'use migration_syntax::legacy;')
         # Inner docs/attributes precede the adapter declaration.

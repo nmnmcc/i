@@ -636,7 +636,7 @@ mod tests {
     #[test]
     fn the_table_agrees_with_the_reader_of_syntax_three() {
         use crate::syn3::{ast::Module, lisp, surface};
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../..");
         let mut files = Vec::new();
         let mut dirs = vec![
             root.join("std"),

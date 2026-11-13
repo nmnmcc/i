@@ -479,3 +479,25 @@ This compiling checkpoint is not the full green deletion gate.
 
 Logs: target/fa-r3/private-check1.log and private-check2.log. Full deletion
 verification follows; no full-green claim is made by this milestone.
+
+
+## Early full-gate repairs (07:34)
+
+The locked workspace check, root fmt and private all-target check pass.
+The first strict clippy attempt101 detects a duplicate test adapter loaded
+by format.rs and common.rs; common now imports the private shape helper
+directly. Strict retry passes without a lint allow. Private unit tests
+first report22/23: the moved corpus test's ../.. repository path no longer
+exists there. Correcting it to ../../../.. retains the full corpus and
+assertions; all23 pass on retry. The scheduler is paused during retries.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --lib --target-dir target --locked -- --test-threads=2
+direnv exec /home/agent/Programming/i rustfmt --edition 2024 --config skip_children=true crates/ilang-syntax/tests/common.rs crates/ilang-syntax/examples/legacy/src/lisp/source_syntax.rs
+```
+
+Clippy retry0 (step4-clippy-retry.log), private test retry0
+(step4-private-test-retry.log), cleanup formatter0 and diff check0. No
+expectation is re-recorded and no test assertion is removed. The broader
+full-gate results follow.

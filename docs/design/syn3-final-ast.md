@@ -850,3 +850,12 @@ compilation. Its copied corpus reader now uses the same public item reader
 as the retained workspace assertion. The standalone lockfile is retained.
 Workspace compile and private compile are green; the full deletion matrix
 starts next and remains required before a green4 claim.
+
+
+07:34 early gate repairs: workspace check, Rust fmt, locked private check
+and strict clippy now pass. Clippy's duplicate adapter module is removed
+by importing the private shape helper directly in common.rs. Private
+library tests pass23/23 after correcting only the moved package's repository
+path; the complete corpus/renderer assertions are unchanged. The scheduler
+was paused while these retries ran, so no heavy commands overlapped. Main
+Rust/CLI/std/spec/generation tests resume next. This is not a green4 claim.
