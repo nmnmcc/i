@@ -35,7 +35,8 @@ the universal property.
 ## 1. The algebraic base
 
 **Verdict: the order-dependent inference defect is fixed in `685a1b04c`,
-with follow-ups `cde147079` and `c51d1d5a5`, by reporting E0504 when the solver cannot find a principal type (§4.7).
+with follow-ups `cde147079` and `c51d1d5a5`, by reporting E0504 when the
+solver cannot find a principal type (§4.7).
 This is a conservative rejection, not a completeness proof or a general
 representation of relational intersection constraints. The cited calculi
 and the finite/cofinite scalar component retain their separate arguments.**
@@ -178,10 +179,11 @@ successful specializations. It first checks whether an existing bound
 already proves the goal. It retains a successful structural constructor
 proof, then tries competing variable alternatives in isolated states.
 A unique remaining variable constraint keeps its ordinary diagnostic and
-recovery behavior. No failed speculative trial leaves bounds behind. Each read-only alternative gets
-its own proof budget, so an expensive earlier member cannot prevent a later
-proof. An ambiguous subproblem is not discarded as though it had no solutions. The definition-only probe
-also receives E0504. This intentionally removes the old accepted,
+recovery behavior. No failed speculative trial leaves bounds behind. Each
+read-only alternative gets its own proof budget, so an expensive earlier
+member cannot prevent a later proof. An ambiguous subproblem is not discarded
+as though it had no solutions. The definition-only probe also receives
+E0504. This intentionally removes the old accepted,
 nonprincipal schemes under §4.7's requirement to report an error where a
 principal type cannot be found. It does not claim the satisfying assignment
 above is invalid. Adding an explicit `Int` member to either intersection
@@ -1026,10 +1028,35 @@ and the lower-bound-only acceptance control. `cargo fmt --all -- --check`
 and both unstaged/staged `git diff --check` checks passed.
 
 Two test-only clippy suggestions were then applied without changing the
-assertions' meaning or compiler logic. The unit/clippy retry, release CLI
-build, spec filters `4.4/`, `4.5/`, `9/`, std O0/O2, filtered `review-k4`
-corpus and short generation checks are pending. These are later gates,
-not claimed green by the checker result above.
+assertions' meaning or compiler logic. The unit/clippy retry and release CLI
+build passed. The positive spec fixtures received executable roots in
+`3e475c4c4`: the bounded intersection fixture asserts both orders' results,
+and the two type-only need controls have empty entries. The checker still
+tests the lower-only probe without that harness entry.
+
+Every heavy command below ran through `/home/agent/Programming/i/.rd/cache/heavy`.
+Cargo commands also used `direnv exec /home/agent/Programming/i`; the wrapper
+selects this worktree's musl development environment.
+
+| Command | Result |
+| --- | --- |
+| `cargo test -p ilang-check --test row_schemes --locked deferred` | 2 passed: callback and lower-only controls |
+| `cargo test -p ilang-check --locked -- --skip spec_corpus_reverse_order_and_recovery` | 325 passed, 4 existing ignored, 1 requested filter |
+| `cargo test -p ilang-check --lib --locked` | 72 passed, 4 existing ignored after test-only clippy cleanup |
+| `cargo clippy -p ilang-check --all-targets --locked -- -D warnings` | Passed |
+| `cargo build -p ilang-cli --release --locked` | Passed |
+| `cargo test -p ilang-cli --release --test spec --locked -- 4.4/` | 5/5 passed at O0/O2 |
+| `cargo test -p ilang-cli --release --test spec --locked -- 4.5/` | 2/2 passed at O0/O2 |
+| `cargo test -p ilang-cli --release --test spec --locked -- 9/` | 153/153 passed at O0/O2 |
+| `./target/release/i test --project std --opt 0` | 2,171 passed, 0 failed |
+| `./target/release/i test --project std --opt 2` | 2,171 passed, 0 failed |
+| `python3 scripts/qa/corpus.py run --filter review-k4 --jobs 2` | Pending: 1,225 selected observations |
+| `scripts/test-generation --mode short --binary ./target/release/i` | Pending |
+
+The latest focused/clippy retry after the fixture entry changes, final fmt,
+filtered corpus and short generation checks are in progress. The full
+workspace, unfiltered spec suite, unfiltered corpus and `scripts/dev-verify`
+are reserved for the coordinator and were not run here.
 
 ## Unproven parts
 
