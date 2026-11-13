@@ -950,8 +950,13 @@ impl Cx<'_> {
     // A bound ordinary Fail service must not become the transition
     // lowerer's unbound shorthand for the legacy error channel.
     fn service_type(&mut self, ty: &o::TypeExpr) -> n::Type {
-        if let o::TypeKind::Named { module: None, name, args } = &ty.kind
-            && name.name == "Fail" && args.len() == 1
+        if let o::TypeKind::Named {
+            module: None,
+            name,
+            args,
+        } = &ty.kind
+            && name.name == "Fail"
+            && args.len() == 1
         {
             self.service_fail_used = true;
             let args = args.iter().map(|a| self.ty(a)).collect();
@@ -970,16 +975,27 @@ impl Cx<'_> {
             let at = value.span;
             let ty = self.service_type(ty);
             out.push(n::Stmt::Bind(n::Binding {
-                pattern: n::Pattern::new(n::PatternKind::Typed {
-                    binder: n::Binder { name: name.clone(), discard: false, span: n::Sp(at) },
-                    ty,
-                }, at),
+                pattern: n::Pattern::new(
+                    n::PatternKind::Typed {
+                        binder: n::Binder {
+                            name: name.clone(),
+                            discard: false,
+                            span: n::Sp(at),
+                        },
+                        ty,
+                    },
+                    at,
+                ),
                 value: self.expr(value),
                 span: n::Sp(Span::default()),
             }));
-            n::DItem::Pos(n::Expr::new(n::ExprKind::Name {
-                module: None, name: n::Ident::new(name, at),
-            }, at))
+            n::DItem::Pos(n::Expr::new(
+                n::ExprKind::Name {
+                    module: None,
+                    name: n::Ident::new(name, at),
+                },
+                at,
+            ))
         } else {
             n::DItem::Pos(self.expr(value))
         }
@@ -1003,7 +1019,11 @@ impl Cx<'_> {
                     let mut provided = vec![self.provided(ty, value, &mut out)];
                     let mut i = i;
                     while is_direct(value)
-                        && let Some(o::Stmt::Env { ty: next_ty, value: next, .. }) = stmts.get(i + 1)
+                        && let Some(o::Stmt::Env {
+                            ty: next_ty,
+                            value: next,
+                            ..
+                        }) = stmts.get(i + 1)
                         && is_direct(next)
                     {
                         provided.push(self.provided(next_ty, next, &mut out));

@@ -46,7 +46,7 @@ fn a_hidden_handler_obligation_is_rejected_at_the_definition() {
     // §4.4: “When the parameter does not change, Ai and Bi must be equal”.
     // An invariant service still retains a hidden same-form obligation.
     let source = "Svc(A) = (A, (A) -> Nil)
-wrap = <N>(body: () <- N -> Int, svc: Svc(String)) -> Int { body() <- (svc) }";
+wrap: <N>(() <- (Fail(Never), ..N) -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (body, svc) { body() <- (svc) }";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -148,7 +148,9 @@ fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
         } else {
             "wrap: <N>(() <- (Fail(Never), Svc(Int), ..N) -> Int, Svc(Int)) <- (Fail(Never), ..N) -> Int = (body, svc)"
         };
-        let source = format!("Svc(A) = (f = () -> A)\n{head} {{\n provided: Svc(Int) = svc\n body() <- (provided)\n}}\n");
+        let source = format!(
+            "Svc(A) = (f = () -> A)\n{head} {{\n provided: Svc(Int) = svc\n body() <- (provided)\n}}\n"
+        );
         let with_hole = source.replace("provided: Svc(Int)", "provided: Svc(_)");
         assert_ne!(source, with_hole);
         assert_eq!(types(&source), types(&with_hole));
@@ -175,13 +177,16 @@ S(N) = (() <- N -> Nil)
 T(N) = (() <- N -> Nil)
 Alias(N) = T(N)
 ";
-    let invariant_head = head.replace("S(N) = (() <- N -> Nil)", "S(N) = (() <- N -> Nil, (N) -> Nil)");
+    let invariant_head = head.replace(
+        "S(N) = (() <- N -> Nil)",
+        "S(N) = (() <- N -> Nil, (N) -> Nil)",
+    );
     for op in ["|", "&", "-"] {
         let row = ["S(Never)", op, "S(Dep)"].join(" ");
         for (written, error_row) in [
             (format!("T({row})"), false),
             (format!("Alias({row})"), false),
-            (format!("() <- ({row}) -> Nil"), false),
+            (format!("() <- (Fail(Never), ..({row})) -> Nil"), false),
             (format!("() <- (Fail({row})) -> Nil"), true),
         ] {
             let source = format!(
@@ -251,7 +256,7 @@ main = () {
         graph.sources.render_all(&checked.diags)
     );
     let same = types(&source.replace("String", "Int"));
-    assert_eq!(same["app/main.merge"], "(a: T(A), b: T(B)) -> T(A | B)");
+    assert_eq!(same["app/main.merge"], "(T(A), T(B)) -> T(A | B)");
 }
 
 #[test]
@@ -278,9 +283,9 @@ use = <N>() <- (s: S(N)) {
 	S(f = f, ..) = s
 	f()
 }
-wrap = <N>(svc: S(N)) -> Int { use() <- (svc) }",
+wrap: <N>(S(N)) <- (Fail(Never), ..N) -> Int = (svc) { use() <- (svc) }",
     );
-    assert_eq!(shown["app/main.wrap"], "(svc: S(A)) -> Int ! A");
+    assert_eq!(shown["app/main.wrap"], "(S(A)) <- A -> Int");
 }
 
 #[test]
@@ -294,7 +299,7 @@ fns = [one, two]",
     );
     assert_eq!(
         shown["app/main.fns"],
-        "List(() -> Nil ! Yield(Int | String))"
+        "List(() <- (Yield(Int | String)) -> Nil)"
     );
 }
 
@@ -311,7 +316,7 @@ both = () {
 	two()
 }",
     );
-    assert_eq!(shown["app/main.both"], "() -> Nil ! Cell(Int, 1)");
+    assert_eq!(shown["app/main.both"], "() <- (Cell(Int, 1)) -> Nil");
 }
 
 #[test]
@@ -326,7 +331,7 @@ both = <A>(x: A) <- (r: Read(A)) {
 	x
 }",
     );
-    assert_eq!(shown["app/main.both"], "(x: A) -> A ! Read(Int & A)");
+    assert_eq!(shown["app/main.both"], "(A) <- (Read(Int & A)) -> A");
 }
 
 #[test]
@@ -353,7 +358,7 @@ fn inferred_handlers_keep_future_provider_constraints() {
     // Generalizing an inferred row must retain that obligation for callers.
     let source = "S(A) = (value = A)
 read = () <- (s: S(String)) { s.value <> \"!\" }
-with = <A>(x: A, f) { f() <- (S(value = x)) }
+with = <A>(x: A, f) { provided: S(A) = S(value = x) f() <- (provided) }
 main = () {
 	with(1, read)
 	Nil
@@ -471,49 +476,146 @@ fn syntax_three_provision_retains_the_actual_provider_form() {
     let source = "Read(A) = (get = () -> A)\nwith_int = (body) { service: Read(Int) = Read(get = () -> Int { 1 }) body() <- (service) }\nmain = () { with_int(() <- (r: Read(Int)) { r.get() }) }\n";
     let shown = types(source);
     assert!(!shown["app/main.main"].contains("Read"), "{shown:?}");
-    let bad = source.replace("() <- (r: Read(Int)) { r.get() }", "() <- (r: Read(String)) { r.get() }");
+    let bad = source.replace(
+        "() <- (r: Read(Int)) { r.get() }",
+        "() <- (r: Read(String)) { r.get() }",
+    );
     let (graph, _, _) = common::check_files(&[("src/main.i", &bad)]);
     let checked = ilang_check::check(&graph);
-    assert!(checked.diags.iter().any(|d| d.code == "E0515"), "{:?}", graph.sources.render_all(&checked.diags));
-    assert!(!checked.diags.iter().any(|d| d.code == "E0501"), "{:?}", graph.sources.render_all(&checked.diags));
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    assert!(
+        !checked.diags.iter().any(|d| d.code == "E0501"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
 }
 
 #[test]
 fn converted_e1_provider_cases_keep_batch2_check_outcomes() {
     let cases: &[(&str, &[&str], &str)] = &[
-        ("review-k4/cases/closure_inner_annotation", &["E0515"], include_str!("../../../tests/review/cases/review-k4/cases/closure_inner_annotation/src/main.i")),
-        ("review-k4/cases/local_instances_annotated", &["E0515"], include_str!("../../../tests/review/cases/review-k4/cases/local_instances_annotated/src/main.i")),
-        ("review-k4/cases/provision_closure_True", &[], include_str!("../../../tests/review/cases/review-k4/cases/provision_closure_True/src/main.i")),
-        ("review-k4/cases/provision_direct_True", &[], include_str!("../../../tests/review/cases/review-k4/cases/provision_direct_True/src/main.i")),
-        ("review-k4/cases/provision_helper_True", &[], include_str!("../../../tests/review/cases/review-k4/cases/provision_helper_True/src/main.i")),
-        ("review-k4/cases/provision_inferred_True", &[], include_str!("../../../tests/review/cases/review-k4/cases/provision_inferred_True/src/main.i")),
-        ("review-k4/cases/recursive_env_cov", &["E0505"], include_str!("../../../tests/review/cases/review-k4/cases/recursive_env_cov/src/main.i")),
-        ("review-k4/cases/recursive_env_mutual", &["E0505"], include_str!("../../../tests/review/cases/review-k4/cases/recursive_env_mutual/src/main.i")),
+        (
+            "review-k4/cases/closure_inner_annotation",
+            &["E0515"],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/closure_inner_annotation/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/local_instances_annotated",
+            &["E0515"],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/local_instances_annotated/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/provision_closure_True",
+            &[],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/provision_closure_True/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/provision_direct_True",
+            &[],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/provision_direct_True/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/provision_helper_True",
+            &[],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/provision_helper_True/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/provision_inferred_True",
+            &[],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/provision_inferred_True/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/recursive_env_cov",
+            &["E0505"],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/recursive_env_cov/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/recursive_env_mutual",
+            &["E0505"],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/recursive_env_mutual/src/main.i"
+            ),
+        ),
     ];
+    let mut failures = Vec::new();
     for (name, expected, source) in cases {
         let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
         let checked = ilang_check::check(&graph);
-        let actual: std::collections::BTreeSet<_> = checked.diags.iter().filter(|d| d.is_error()).map(|d| d.code.as_str()).collect();
+        let actual: std::collections::BTreeSet<_> = checked
+            .diags
+            .iter()
+            .filter(|d| d.is_error())
+            .map(|d| d.code)
+            .collect();
         let expected: std::collections::BTreeSet<_> = expected.iter().copied().collect();
-        assert_eq!(actual, expected, "{name}: {:?}", graph.sources.render_all(&checked.diags));
+        if actual != expected {
+            failures.push(format!(
+                "{name}: expected {expected:?}, got {actual:?}: {:?}",
+                graph.sources.render_all(&checked.diags)
+            ));
+        }
     }
+    assert!(failures.is_empty(), "{failures:#?}");
 }
 
 #[test]
 fn syntax_three_library_handler_has_no_unhandled_service() {
-    let (graph, _, _) = common::check_files(&[("src/main.i", "(i/failure)\nmain = () { failure.catch(() { failure.raise(1) }) }\n")]);
+    let (graph, _, _) = common::check_files(&[(
+        "src/main.i",
+        "(i/failure)\nmain = () { failure.catch(() { failure.raise(1) }) }\n",
+    )]);
     let checked = ilang_check::check(&graph);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
     let p = checked.program.as_ref().unwrap();
+    let mut found = false;
     let typed = checked.types.as_ref().unwrap();
     for (mi, module) in p.modules.iter().enumerate() {
-        if module.path != "i/failure" { continue; }
+        if module.path != "i/failure" {
+            continue;
+        }
         for (di, def) in module.defs.iter().enumerate() {
-            if def.name != "catch" { continue; }
-            let id = ilang_check::hir::DefId { module: ilang_check::hir::ModuleId(mi as u32), index: di as u32 };
+            if def.name != "catch" {
+                continue;
+            }
+            let id = ilang_check::hir::DefId {
+                module: ilang_check::hir::ModuleId(mi as u32),
+                index: di as u32,
+            };
+            found = true;
             let shown = &typed.scheme_types[&id];
-            let ilang_check::types::ShownType::Fn(function) = shown else { panic!("{shown:#?}"); };
+            let ilang_check::types::ShownType::Fn(function) = shown else {
+                panic!("{shown:#?}");
+            };
             assert!(function.err.is_none(), "{shown:#?}");
-            assert!(matches!(function.env.as_ref(), Some(ilang_check::types::ShownType::Var(_))), "{shown:#?}");
+            assert!(
+                matches!(
+                    function.env.as_ref(),
+                    Some(ilang_check::types::ShownType::Var(_))
+                ),
+                "{shown:#?}"
+            );
         }
     }
+    assert!(found, "the library handler was checked");
 }

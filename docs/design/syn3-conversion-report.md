@@ -614,3 +614,29 @@ The inline typed raise callback retains the light-boundary optimization.
 Row-scheme replacement fragments were also translated: every permutation
 or hole test now changes actual syntax-three text, and the value- and
 error-row branches remain distinct.
+
+The post-fix type suite now passes, including both library and spec snapshots.
+Their observations were reviewed and diagnostic-code sets checked against
+batch2 before translating. The eight refused K4 checker outcomes also pass
+together; recursive-row cases retain their written function need through a
+binding annotation. All refused corpus expectations remain untouched.
+
+The first complete checker run found nine test failures: eight row-scheme
+cases and the captured-row coalescing case. Corrections retain written wider
+needs as binding types (syntax-3 §7.3: "A written `! N` that is wider than
+what the body needs is kept as a type annotation on the binding
+(`f: (P) <- … -> R = …`), so that the type does not change."). The inferred
+provider fixture also keeps its original S(A) annotation. Bare legacy ! N
+callback annotations retain Fail(Never), avoiding an unconstrained error
+variable in this transitional lowerer. Four remaining expected strings only
+change to syntax-three type display (unlabelled positions and `<-`). Row
+algebra is supplied through a spread of the parenthesized algebra rather
+than a union of list items. The unused-local variant now actually removes
+the call and asserts that its substitution changes the source.
+
+Two snippet-inventory entries render actual function-header/template
+fragments with their real surroundings; no diagnostic allowance was added.
+All 37 row-scheme snippets parse, and the 4,761-snippet inventory has no stale
+entries. The complete compiler-package run and focused correction rerun,
+CLI/spec/std/corpus gates, clippy and final snippet gate remain pending;
+this checkpoint is not a landable result.

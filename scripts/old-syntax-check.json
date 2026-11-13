@@ -3097,5 +3097,27 @@
     "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(Nil) = task.channel()\n",
     "suffix": "fail.raise(\"outer\")\n })\n}\n",
     "reason": "A per-pair stress-generator block inside its actual main/scope header and closing tail."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:e47056014dbd60bb": {
+    "prefix": "Svc(A) = (f = () -> A)\n",
+    "suffix": " {\n provided: Svc(Int) = svc\n body() <- (provided)\n}\n",
+    "reason": "Function header selected by the witness test; render it with the exact body appended by its format template."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:7c03fe9bee4b83d4": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{head}",
+        "wrap = <N>(body: () <- (Fail(Never), Svc(Int), ..N) -> Int, svc: Svc(Int))"
+      ]
+    ],
+    "reason": "Render the witness test format template with its actual inferred function header; the other header is parsed separately."
   }
 }

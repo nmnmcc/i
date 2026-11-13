@@ -23,7 +23,10 @@ pub fn env(e: &mut Env, map: &mut impl FnMut(&mut Atom)) {
 }
 pub fn callee(c: &mut Callee, map: &mut impl FnMut(&mut Atom)) {
     match c {
-        Callee::Value(a) | Callee::Shaped(a, _) | Callee::Known { closure: a, .. } | Callee::Lazy { service: a, .. } => map(a),
+        Callee::Value(a)
+        | Callee::Shaped(a, _)
+        | Callee::Known { closure: a, .. }
+        | Callee::Lazy { service: a, .. } => map(a),
         Callee::Direct(_) => {}
     }
 }

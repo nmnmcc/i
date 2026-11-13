@@ -609,7 +609,11 @@ fn env_uses(e: Env, f: &mut dyn FnMut(Local)) {
 }
 
 fn call_uses(callee: &Callee, args: &[Atom], env: Env, f: &mut dyn FnMut(Local)) {
-    if let Callee::Value(a) | Callee::Shaped(a, _) | Callee::Known { closure: a, .. } | Callee::Lazy { service: a, .. } = callee {
+    if let Callee::Value(a)
+    | Callee::Shaped(a, _)
+    | Callee::Known { closure: a, .. }
+    | Callee::Lazy { service: a, .. } = callee
+    {
         atom_uses(a, f);
     }
     args.iter().for_each(|a| atom_uses(a, f));

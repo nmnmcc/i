@@ -1200,14 +1200,21 @@ fn converted_bound_fail_remains_a_service_parameter() {
     let text = converted("use(E) = (error: E, handler ! Fail(E)) { handler.raise(error) }\n");
     let (module, diags) = syn3::parse_lowered(&text);
     assert!(diags.is_empty(), "{text}\n{diags:#?}");
-    let function = module.items.iter().find_map(|item| match &item.kind {
-        ilang_syntax::ast::ItemKind::Binding(binding) => match &binding.value.kind {
-            ilang_syntax::ast::ExprKind::Fn(function) => Some(function),
+    let function = module
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            ilang_syntax::ast::ItemKind::Binding(binding) => match &binding.value.kind {
+                ilang_syntax::ast::ExprKind::Fn(function) => Some(function),
+                _ => None,
+            },
             _ => None,
-        },
-        _ => None,
-    }).unwrap();
-    assert!(function.params.iter().any(|param| matches!(param,
-        ilang_syntax::ast::Param::Env { name, .. } if name.name == "handler"
-    )), "the body still has its bound service: {text}");
+        })
+        .unwrap();
+    assert!(
+        function.params.iter().any(|param| matches!(param,
+            ilang_syntax::ast::Param::Env { name, .. } if name.name == "handler"
+        )),
+        "the body still has its bound service: {text}"
+    );
 }

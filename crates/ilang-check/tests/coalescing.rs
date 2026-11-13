@@ -165,11 +165,12 @@ use = <N>() <- (s: S(N)) {
 }
 
 main = <N>() {
-	local: () <- N -> Nil = () { use() }
+	local: () <- (Fail(Never), ..N) -> Nil = () { use() }
 	local()
 }";
     entry(source);
-    let unused = source.replace("local() }", "Nil }");
+    let unused = source.replace("\tlocal()\n}", "\tNil\n}");
+    assert_ne!(source, unused);
     let (graph, _, _) = common::check_files(&[("src/main.i", &unused)]);
     for checked in [
         ilang_check::check(&graph),
@@ -191,7 +192,7 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 apply = <N>() {
-	local: () <- N -> Nil = () { use() }
+	local: () <- (Fail(Never), ..N) -> Nil = () { use() }
 	local()
 }
 
