@@ -4,7 +4,7 @@
 
 use super::coverage::{self, Col, Ctor, Pat};
 use super::infer::{Checker, Scheme};
-use super::known;
+use super::known::{self, Knowledge};
 use super::{FnTy, Head, Ty};
 use crate::code;
 use crate::hir::*;
@@ -46,7 +46,7 @@ struct Place {
     /// `B`: the type of the values at this place.
     ty: Ty,
     /// The known type of the values at this place (§4.8).
-    known: Ty,
+    known: Knowledge,
     /// The pattern types of the patterns here that are not catch-alls.
     pats: Vec<Ty>,
     /// The arguments shared by the patterns here with one type constructor.
@@ -589,10 +589,10 @@ impl Checker<'_> {
         subject: &Expr,
         clauses: &[Clause],
         span: Span,
-        expected: &Ty,
-    ) -> (Ty, Ty) {
+        expected: &Knowledge,
+    ) -> (Ty, Knowledge) {
         let fitted = clauses.len() == 1 && clauses[0].guard.is_none();
-        let (a, subject_known) = self.infer_k(subject, &Ty::Top);
+        let (a, subject_known) = self.infer_k(subject, &Knowledge::unknown());
         let mut places = vec![Place {
             ty: a.clone(),
             known: subject_known,
@@ -673,10 +673,10 @@ impl Checker<'_> {
             let (t, taken) = self.narrow(&rows, clauses, ci, choice, k as u32, &places[place]);
             self.bind_catch_all(pattern, &t, true);
             let known = match taken {
-                None => Ty::Never,
-                Some(taken) => {
-                    super::display::known_diff(&self.s, places[place].known.clone(), taken)
-                }
+                None => Knowledge::certain(Ty::Never),
+                Some(taken) => places[place]
+                    .known
+                    .map(|k| super::display::known_diff(&self.s, k.clone(), taken.clone())),
             };
             self.fit_known(pattern, &known, true);
         }
@@ -776,7 +776,7 @@ impl Checker<'_> {
                     .collect(),
             });
         }
-        (r, self.kunion(knowns))
+        (r, self.kunion_knowledge(knowns))
     }
 
     /// Rule 12: the type of the catch-all `id` of choice `choice` of clause
@@ -987,7 +987,7 @@ impl Checker<'_> {
         at: usize,
         step: Step,
         ty: Ty,
-        known: Ty,
+        known: Knowledge,
     ) -> usize {
         if let Some((_, i)) = places[at].children.iter().find(|c| c.0 == step) {
             return *i;
@@ -1166,7 +1166,7 @@ impl Checker<'_> {
                 if let Some(b) = binder {
                     self.bind(b, t.clone(), true);
                     let k = self.kconv(ty, &HashMap::new());
-                    self.kbind(b.var, k, true);
+                    self.kbind(b.var, Knowledge::certain(k), true);
                 }
                 (t, pat)
             }
@@ -1175,10 +1175,7 @@ impl Checker<'_> {
                 let n = self.p.ty(ctor.ty).params.len();
                 let targs = self.shared(places, at, h, n);
                 let fields = self.ctor_fields(*ctor, &targs);
-                let kargs = match known::member(&places[at].known, Some(h)) {
-                    Some(Ty::Con(_, _, xs)) => Some(xs),
-                    _ => None,
-                };
+                let kctor = places[at].known.member(h);
                 let mut parts = vec![Pat::Wild(None); fields.len()];
                 let matched = self.match_fields(q.span, &fields, args, *spread);
                 // Rule 11: `..` counts as a catch-all at the places of the
@@ -1188,10 +1185,10 @@ impl Checker<'_> {
                         if matched.iter().any(|m| m.1 == i) {
                             continue;
                         }
-                        let k = match &kargs {
-                            Some(xs) => self.field_known(*ctor, i, Some(xs)),
-                            None => Ty::Top,
-                        };
+                        let k = kctor.map(|t| match t {
+                            Ty::Con(_, _, xs) => self.field_known(*ctor, i, Some(xs)),
+                            _ => Ty::Top,
+                        });
                         let c = self.child(
                             places,
                             at,
@@ -1203,10 +1200,10 @@ impl Checker<'_> {
                     }
                 }
                 for (arg, i) in matched {
-                    let k = match &kargs {
-                        Some(xs) => self.field_known(*ctor, i, Some(xs)),
-                        None => Ty::Top,
-                    };
+                    let k = kctor.map(|t| match t {
+                        Ty::Con(_, _, xs) => self.field_known(*ctor, i, Some(xs)),
+                        _ => Ty::Top,
+                    });
                     let c = self.child(
                         places,
                         at,
@@ -1226,10 +1223,7 @@ impl Checker<'_> {
                 let n = ps.len() as u32;
                 let h = Head::Shape(super::ShapeId::positional(n));
                 let parts = self.shared(places, at, h, ps.len());
-                let kparts = match known::member(&places[at].known, Some(h)) {
-                    Some(Ty::Con(_, _, xs)) => xs,
-                    _ => vec![Ty::Top; ps.len()],
-                };
+                let kdata = places[at].known.member(h);
                 let mut pats = Vec::new();
                 for (i, x) in ps.iter().enumerate() {
                     let c = self.child(
@@ -1237,7 +1231,7 @@ impl Checker<'_> {
                         at,
                         Step::Part(n, i as u32),
                         parts[i].clone(),
-                        kparts[i].clone(),
+                        kdata.part(i),
                     );
                     pats.push(self.visit(x, c, v, places).1);
                 }
@@ -1251,11 +1245,8 @@ impl Checker<'_> {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));
                 let e = self.shared(places, at, h, 1).remove(0);
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e.clone()]);
-                let klist = known::member(&places[at].known, Some(h)).unwrap_or(Ty::Top);
-                let kitem = match &klist {
-                    Ty::Con(_, _, xs) if xs.len() == 1 => xs[0].clone(),
-                    _ => Ty::Top,
-                };
+                let klist = places[at].known.member(h);
+                let kitem = klist.part(0);
                 let mut pats = Vec::new();
                 for (i, x) in items.iter().enumerate() {
                     let c = self.child(places, at, Step::Item(i as u32), e.clone(), kitem.clone());

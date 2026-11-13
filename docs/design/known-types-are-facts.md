@@ -50,16 +50,24 @@ rule 12, and combines branch result knowledge.
 
 ## Assessment of the narrower fix
 
-Keep two channels. The factual channel replaces a hidden-input match by
-`_`, including constructor information, in both call results and expected
-callback parameters. Selection (including selection by an expected
+Keep two channels. Before a callback is checked, the factual channel
+replaces a hidden-input match by `_`, including constructor information,
+in its expected parameters. For a call result, match all checked argument
+facts, including callback results; erase inputs still unshown by those
+arguments (the callee's service need and a later caller of its result).
+This preserves the factual `List(String)` result of mapping a callback
+whose checked result is `String`. Selection (including selection by an expected
 function type), rule-12 factual narrowing and W0503 consume only this
 channel. The structural channel retains the existing whole-literal hints.
 A `.k` or `.f` access can use that channel to find a layout, provided the
 receiver's inferred type is constrained to the corresponding bound and
 the result's inferred type comes from that bound. Projected hints must
 not become projected facts. Carry both channels through aliases, data,
-patterns, nested function results, and weak/generalized bindings.
+patterns, nested function results, and weak/generalized bindings. Imported
+weak names retain their definition's facts; a displayed union of values
+from earlier callers is not evidence about a subsequent caller. This does
+not change weak-export completion or generalization (F11 remains with
+the owner).
 
 Under these conditions the narrower fix is sound for F1: selection cannot
 remove a feasible branch using a hidden-input guess, and a wrong shape
@@ -71,7 +79,7 @@ a written polymorphic result itself lies about the function's behavior.
 This preserves the useful field inference example:
 
 ```i
-(i/list)
+(list = std/list)
 f = () { list.fold([1], (n = 0), (acc, x) { (n = acc.n + x) }).n }
 ```
 
@@ -95,7 +103,9 @@ f = () {
 }
 ```
 
-The program runs safely today. Before its provider is checked, however,
+The baseline release checker accepts this program. The factual checker
+rejects its `n: Int` annotation with E0501: `"string"` is not a subtype of
+`Int`. Before its provider is checked, however,
 `cur(0)` has no factual `Int` bound: the same callee can read `String`.
 Conservative selection retains both results and the `Int` annotation may
 fail. Similarly a callback which always returns its initial constructor

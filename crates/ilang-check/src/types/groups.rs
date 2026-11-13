@@ -53,7 +53,7 @@ pub(crate) fn group_data(shape: ShapeId, parts: &[Ty]) -> Ty {
 
 use super::coverage::{Col, Ctor, Lit, Pat};
 use super::infer::{Checker, Scheme};
-use super::known;
+use super::known::{self, Knowledge};
 use crate::code;
 use crate::hir::*;
 use ilang_syntax::span::Span;
@@ -480,11 +480,15 @@ impl Checker<'_> {
     /// expected. A chain with several shape groups is the group of the
     /// expected shape; in a group, the branches are selected with the
     /// expected parameter types as the known types.
-    pub(super) fn select_by_expected(&mut self, e: &Expr, expected: &Ty) -> Option<(Ty, Ty)> {
+    pub(super) fn select_by_expected(
+        &mut self,
+        e: &Expr,
+        expected: &Knowledge,
+    ) -> Option<(Ty, Knowledge)> {
         let ExprKind::Name(r) = &e.kind else {
             return None;
         };
-        let want: Vec<Ty> = match known::members(expected).as_slice() {
+        let want: Vec<Ty> = match known::members(&expected.fact).as_slice() {
             [Ty::Fn(want)] if !is_multi(want) => want.parts()?.to_vec(),
             _ => return None,
         };
@@ -510,6 +514,6 @@ impl Checker<'_> {
             return None;
         }
         let f = self.selected_fn(&table, &selected, e.span)?;
-        Some((Ty::Fn(Box::new(f)), Ty::Top))
+        Some((Ty::Fn(Box::new(f)), Knowledge::unknown()))
     }
 }
