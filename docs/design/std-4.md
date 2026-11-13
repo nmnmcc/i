@@ -200,7 +200,7 @@ were regex 130, CSV 107, crypto 88; std O0 and O2 each reported 2170 passed,
 new modules. The smallest reproduction is
 `cargo test -p ilang-package --test load standard_library_modules`; actual
 paths include `std/crypto`, `std/csv`, and `std/regex`, while the expected
-list in `crates/ilang-package/tests/load.rs : 201` does not. Updating that
+list in `crates/ilang-package/tests/load.rs:201` does not. Updating that
 assertion conflicts with the task's acceptance rule forbidding any `crates/`
 diff, so the assertion is unchanged. The full acceptance gate cannot pass
 under both requirements until the coordinator updates that upstream test.

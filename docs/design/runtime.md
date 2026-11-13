@@ -33,31 +33,31 @@ Read facts at the base commit (line references below always mean this commit):
 
 | Fact read in code | Evidence |
 |---|---|
-| Seven runtime modules are reserved, included, and empty | `crates/ilang-package/src/library.rs : 14–23`; `lib/i/task.i : 1`, and the single reservation comment at line 1 of each of `lib/i/{random,clock,fs,net,process,stdio}.i` |
-| Libraries are compiled into the package loader | `crates/ilang-package/src/library.rs : 7–26` |
-| Entry environments currently allow host services and Assert only | `crates/ilang-check/src/types/infer.rs : 376–429` |
-| Async metadata currently follows entry host-service needs | `crates/ilang-wasm/src/lower.rs : 916–938` |
-| Async imports currently start, suspend to the root, then read a reply | `crates/ilang-wasm/src/lower.rs : 1140–1202` |
-| The compiler table still has one slot; the hand-off identifies everything R2 must replace | `crates/ilang-wasm/src/emit/host.rs : 23–52`, `:58–64`, `:90–121` |
-| Results still use per-import globals; resumes write them before resuming the root | `crates/ilang-wasm/src/emit/host.rs : 228–246`, `:335–358` |
-| The async-live check is separate from outstanding work | `crates/ilang-wasm/src/emit/host.rs : 123–165` |
-| Root initialization gives Assert and the needed host services | `crates/ilang-wasm/src/emit/mod.rs : 805–836` |
-| Resume activates a task boundary; cancel does not | `crates/ilang-wasm/src/emit/control.rs : 260–295` |
-| The host already stores many requests, with immediate cancellation and stale-wrapper rejection | `crates/ilang-host/src/requests.rs : 72–192` |
-| Status 2 gives the reactor a turn and uses continue if no answer is ready | `crates/ilang-host/src/lib.rs : 1137–1183` |
-| One big-stack thread owns an enabled current-thread reactor | `crates/ilang-host/src/run.rs : 28–68`; tokio production features are currently rt/time, `crates/ilang-host/Cargo.toml : 15` |
-| Only the old text printer is currently standard IO | `crates/ilang-host/src/services.rs : 44–70`; `lib/i/io.i : 8–14` |
-| Integer bit operations and bit-array operations needed by R1 and wire codecs exist | `lib/i/core.i : 67–89`, `:131–141` |
-| A final function cannot raise; acquire is already ordinary i over ensure | `lib/i/resource.i : 8–20` |
+| Seven runtime modules are reserved, included, and empty | `crates/ilang-package/src/library.rs:14–23`; `lib/i/task.i:1`, and the single reservation comment at line 1 of each of `lib/i/{random,clock,fs,net,process,stdio}.i` |
+| Libraries are compiled into the package loader | `crates/ilang-package/src/library.rs:7–26` |
+| Entry environments currently allow host services and Assert only | `crates/ilang-check/src/types/infer.rs:376–429` |
+| Async metadata currently follows entry host-service needs | `crates/ilang-wasm/src/lower.rs:916–938` |
+| Async imports currently start, suspend to the root, then read a reply | `crates/ilang-wasm/src/lower.rs:1140–1202` |
+| The compiler table still has one slot; the hand-off identifies everything R2 must replace | `crates/ilang-wasm/src/emit/host.rs:23–52`, `:58–64`, `:90–121` |
+| Results still use per-import globals; resumes write them before resuming the root | `crates/ilang-wasm/src/emit/host.rs:228–246`, `:335–358` |
+| The async-live check is separate from outstanding work | `crates/ilang-wasm/src/emit/host.rs:123–165` |
+| Root initialization gives Assert and the needed host services | `crates/ilang-wasm/src/emit/mod.rs:805–836` |
+| Resume activates a task boundary; cancel does not | `crates/ilang-wasm/src/emit/control.rs:260–295` |
+| The host already stores many requests, with immediate cancellation and stale-wrapper rejection | `crates/ilang-host/src/requests.rs:72–192` |
+| Status 2 gives the reactor a turn and uses continue if no answer is ready | `crates/ilang-host/src/lib.rs:1137–1183` |
+| One big-stack thread owns an enabled current-thread reactor | `crates/ilang-host/src/run.rs:28–68`; tokio production features are currently rt/time, `crates/ilang-host/Cargo.toml : 15` |
+| Only the old text printer is currently standard IO | `crates/ilang-host/src/services.rs:44–70`; `lib/i/io.i:8–14` |
+| Integer bit operations and bit-array operations needed by R1 and wire codecs exist | `lib/i/core.i:67–89`, `:131–141` |
+| A final function cannot raise; acquire is already ordinary i over ensure | `lib/i/resource.i:8–20` |
 
 These are reading results, not claims that the proposed APIs already compile.
 The scheduler, request-value representation, new service implementations, and
 examples below have not been run. K1 has landed on redesign at `578a17d`.
-I read its first-parent patch: `crates/ilang-check/src/types/display.rs : 993–1040`
+I read its first-parent patch: `crates/ilang-check/src/types/display.rs:993–1040`
 now counts invariant arguments on both sides during normalization. This lane
 still has the older compiler; R2 must consume K1 rather than weaken key
-invariance. The old generalization path is `types/infer.rs : 2104–2120` and
-`types/display.rs : 558–575`. K1's coordinator-run tests are not tests run here.
+invariance. The old generalization path is `types/infer.rs:2104–2120` and
+`types/display.rs:558–575`. K1's coordinator-run tests are not tests run here.
 Section 12 separates model checks from implementation evidence.
 
 ## 2. Alternatives and choice
@@ -120,7 +120,7 @@ returns early causes a defined stop, never an ill-typed answer.
 **D4. One root hand-off, with typed answers stored per request.** Each task owns
 its ordinary control continuation. Root wait/poll pauses the loop once, and a
 resume updates one request cell before resuming that one loop. Reason: C §6.4
-and `emit/host.rs : 23–48`. A slot index alone is not a language handle: cells
+and `emit/host.rs:23–48`. A slot index alone is not a language handle: cells
 have identity and a fresh GC identity token for their generation, so an old alias cannot cancel a reused slot.
 
 **D5. Provision and classify entries by the complete provider plan.**
@@ -208,7 +208,7 @@ portable scopes constrain their children. Reason: S7 §3.3, §6–8, §18 rules 
 unwinds its own inner boundary, leaving its scheduling boundary active. Finals
 may yield, await IO, and open scopes; they cannot raise, and they are shielded
 from a second cancellation. Reason: S7 §6 and the active-boundary behavior read
-at `emit/control.rs : 260–295`. There is no public cancel-one-task operation in v1.
+at `emit/control.rs:260–295`. There is no public cancel-one-task operation in v1.
 join keeps its type: cancellation takes priority for a joiner it can unwind; a
 shielded joiner of a dropped/cancelled child stops with
 `panic("task: join of a cancelled task")` as soon as cancellation is accepted.
@@ -467,7 +467,7 @@ structured tasks/finals end cancels any still-outstanding unowned raw work.
 Root wait/poll require an active async entry context when they must hand off;
 otherwise they stop with `panic("request: no active entry")`. Test async-live,
 not only the non-null host-root pointer: the old pointer can survive a completed
-async call (`emit/host.rs : 78–80`, `:125–165`). A later synchronous export must
+async call (`emit/host.rs:78–80`, `:125–165`). A later synchronous export must
 not hand off through that stale boundary. An immediate wait
 on completed fake requests works without that context. They are public primitives
 for writing dispatchers, batch IO, or request races. Direct use inside a task
@@ -520,7 +520,7 @@ behavior, with Await and Owner now visible in their inferred service requirement
 ### 5.3 Replacing the compiler request table
 
 Replace the C region as one change, including every caller identified in
-`emit/host.rs : 23–52`. The module keeps a growable table and a free list. Each
+`emit/host.rs:23–52`. The module keeps a growable table and a free list. Each
 outstanding slot contains import index, ABI id, a fresh GC generation token,
 Owner group key, immutable Root key, and a reference to its request cell.
 Root/group indexes must remove a request on answer or cancel; completed cells
@@ -570,7 +570,7 @@ unlisted request is decoded and retained; the resumed wait scans its requested
 set and hands off again if necessary. `$req_clear` detaches remaining cells as
 Cancelled at status 0 and clears outstanding roots; the host drops remaining
 work under H7. Structured entry wrapping normally leaves none. Keep the
-async-live guards of `emit/host.rs : 123–165`; zero outstanding does not mean ended.
+async-live guards of `emit/host.rs:123–165`; zero outstanding does not mean ended.
 No ABI version bump, new import, or new host-called export is needed: continue,
 cancel, and typed resume exports are already v3.
 
@@ -1597,7 +1597,7 @@ listeners, destroys sockets and owns child cleanup, including promises settling
 after cancellation. Browser APIs never silently treat URLs as files or a
 WebSocket as Stream. Node and browser async starters read requestSignal()
 synchronously and register cancellation there; the helper and status-2 macrotask
-path already exist (`bindings/javascript/ilang.mjs : 34–58`, `:894–902`). New service
+path already exist (`bindings/javascript/ilang.mjs:34–58`, `:894–902`). New service
 factories and tests are IO work, not claims about today's SDK.
 
 WASI keeps the current §B.7 blocking-import contract. It is not the `i run` host:
@@ -2017,12 +2017,12 @@ anchor current regions; implementations re-find them after earlier tracks land.
 
 | Track | Files and regions to change |
 |---|---|
-| R1 | Replace `lib/i/random.i : 1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
-| R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i : 3–28` keep_env; `lib/i/core.i : 3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs : 1285–1291` and `hir.rs : 210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
-| R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs : 664–679`, `:1470–1555`, mode in `hir.rs : 182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs : 969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs : 23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
-| R2 scheduler and entry | Replace `lib/i/task.i : 1`; `infer.rs : 376–429` resolved allowed-entry-service set and diagnostics; `lower.rs : 828–938` entry wrappers/metadata; `emit/mod.rs : 805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-| IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs : 1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs : 44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs : 151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
-| Shared registration | `crates/ilang-package/src/library.rs : 7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
+| R1 | Replace `lib/i/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
+| R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
+| R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
+| R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
+| IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs:1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
+| Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
 The key/request modules, checker host-form expansion, runtime primitive types,
@@ -2405,12 +2405,12 @@ was checked separately before changing the rules:
 1. **Dropped join in a shielded final: confirmed.** At aa20548, R2 dropped the
    child, R4 shielded its joining final, and no completion arm could produce
    its A/E. The control code only reactivates the scheduling boundary
-   (`emit/control.rs : 260–295`); it supplies no task completion. R4a now resolves
+   (`emit/control.rs:260–295`); it supplies no task completion. R4a now resolves
    that protocol hole and §10.1 gives the exact S7 sentence changes.
 2. **Universal async and first-turn polling: confirmed.** The inferred env is
-   already available to entry_point (`types/infer.rs : 405–429`) and lower's
-   entry_async (`lower.rs : 916–938`). The JS call/callAsync guards explicitly
-   separate synchronous and async signatures (`bindings/javascript/ilang.mjs : 965–981`);
+   already available to entry_point (`types/infer.rs:405–429`) and lower's
+   entry_async (`lower.rs:916–938`). The JS call/callAsync guards explicitly
+   separate synchronous and async signatures (`bindings/javascript/ilang.mjs:965–981`);
    status 2 takes a macrotask at `:894–902`. My old D5 and unconditional
    first-turn poll would therefore break synchronous callbacks. D5 and §6.4
    now preserve them and gate host polling on outstanding requests. The review

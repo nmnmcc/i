@@ -23,33 +23,33 @@ plan, then the ledger. In particular:
 
 | Source | Constraint used here |
 |---|---|
-| `docs/spec.md : 124–142`, `:196–206` | Ordinary packages, acyclic module imports, hidden constructors, no re-export of imported names. |
-| `docs/spec.md : 312–414` | Sets of values, nominal custom types, variance, principal inference, value restriction, monomorphic recursive groups. |
-| `docs/spec.md : 511–518`, `:737–813` | Strict evaluation; a zero-argument function defers work; errors and services belong to calls. |
-| `docs/spec.md : 849–902`, `:968–975` | Resources are scoped computations; expected failures differ from assertions; equality follows representation. |
-| `docs/design/syntax.md : 99–200`, `:223–253`, `:372–386` | Import/export groups, declared UpName variables, ordinary clause functions. |
-| `docs/design/literal-types.md : 50–76`, `:416–438` | Written public types prevent accidental literal-only interfaces; callback state must use the accepted hidden-input known-type fix. |
-| `docs/design/records.md : 57–78`, `:480–486` | Nominal values are not structural records; no record patterns. This API needs neither records nor label parameters. |
-| Plan `/home/agent/.claude/plans/twinkling-swinging-perlis.md : 30–58`, `:74`, `:522–544` | No library exceptions; four plain-i modules; string offsets count codepoints; one writer per module; std test gate. |
-| Ledger `/home/agent/Programming/i/.rd/cache/ledger.md : 61–64`, `:89` | Syntax and literal/record notes accepted; baseline host work landed; new-syntax migration is still separate. |
+| `docs/spec.md:124–142`, `:196–206` | Ordinary packages, acyclic module imports, hidden constructors, no re-export of imported names. |
+| `docs/spec.md:312–414` | Sets of values, nominal custom types, variance, principal inference, value restriction, monomorphic recursive groups. |
+| `docs/spec.md:511–518`, `:737–813` | Strict evaluation; a zero-argument function defers work; errors and services belong to calls. |
+| `docs/spec.md:849–902`, `:968–975` | Resources are scoped computations; expected failures differ from assertions; equality follows representation. |
+| `docs/design/syntax.md:99–200`, `:223–253`, `:372–386` | Import/export groups, declared UpName variables, ordinary clause functions. |
+| `docs/design/literal-types.md:50–76`, `:416–438` | Written public types prevent accidental literal-only interfaces; callback state must use the accepted hidden-input known-type fix. |
+| `docs/design/records.md:57–78`, `:480–486` | Nominal values are not structural records; no record patterns. This API needs neither records nor label parameters. |
+| Plan `/home/agent/.claude/plans/twinkling-swinging-perlis.md:30–58`, `:74`, `:522–544` | No library exceptions; four plain-i modules; string offsets count codepoints; one writer per module; std test gate. |
+| Ledger `/home/agent/Programming/i/.rd/cache/ledger.md:61–64`, `:89` | Syntax and literal/record notes accepted; baseline host work landed; new-syntax migration is still separate. |
 
 Facts checked by reading code:
 
 | Code region | Evidence and consequence |
 |---|---|
-| `std/src/list.i : 9–18`, `:188–199`, `:271–278`, `:366–407`, `:447–455`, `:512–524` | Missing elements use `Option`; negative indexes miss; take/drop clamp negative counts; callbacks carry `^ E ! N`; folds run left to right. Keep these conventions. |
-| `std/src/dict.i : 24–60`, `:136–143`, `:237–244` | A public type hides private recursive nodes; updates return new values. Follow this encapsulation. |
-| `std/src/string.i : 4–6`, `:70–94`, `:110–139`, `:254–308`, `:428–455` | String indexes are codepoints; byte size is separate; concat takes fragments; slice/pop_codepoint convert codepoint lists. Do not repeatedly pop a string in a linear parser. |
-| `std/src/option.i : 1–6`, `:27–31`, `:54–59`; `std/src/result.i : 1–5`, `:244–252` | Absence and failure are distinct; `Result` and error effects have explicit bridges. |
-| `lib/i/fail.i : 10–31` | Raise/catch already exist. Stream error adapters need no new primitive. |
-| `std/test/list_test.i : 1847–1853`, `:1973–1985`, `:2073–2139` | Existing tests cover bounds, error callbacks, labels, known nominal fields, services and control callbacks. Preserve all of these cases for new containers. |
-| `std/test/dict_test.i : 420–428`, `:857–1014` | Tests keep old versions and use a deterministic list model. Use that method for sequences. |
-| `std/test/string_test.i : 2060–2095`, `:2240–2247`; `std/test/option_test.i : 255–280`; `std/test/result_test.i : 319–342`, `:372–382` | Empty pieces, Unicode, known fields, deferred callbacks, long walks, and union errors have concrete precedents. |
-| `crates/ilang-check/src/types/infer.rs : 232–247`, `:292–325` | Recursive group names get monomorphic holders before generalization. A Haskell helper recursively called at `Node(A)` cannot simply be ported. |
-| `crates/ilang-check/src/types/infer.rs : 2237–2266`, `:2321–2329` | Custom variance is found by a fixed point; function result, errors and environment are traversed. A plain thunk wrapper would infer positive N variance. That is insufficient to preserve the stricter environment relation; §3 adds an ordinary negative occurrence to make N invariant. |
-| `crates/ilang-check/src/types/display.rs : 670–679`, `:1028–1052`; `crates/ilang-check/src/types/infer.rs : 2104–2120` | Normalization can collapse equal Both sides; the ordinary constructor occurrence walk does not visit invariant arguments in both directions. Generalization consumes the simplification, so the factory failure in §3.4 affects accepted clients, not only display. This requires a general compiler conformance fix. |
-| `crates/ilang-check/src/order.rs : 135–168`, `:188–207` | Direct recursive functions are possible; eager self-dependent values are rejected. Build infinite streams through functions, not an eager cyclic list. |
-| `std/src/bit_array.i : 33–45`, `:70–77`; `crates/ilang-wasm/src/runtime/core.rs : 110–125` | UTF-8 conversion can fail; whole byte fragments can be joined; conversion validates UTF-8. URI bytes need not be UTF-8. |
+| `std/src/list.i:9–18`, `:188–199`, `:271–278`, `:366–407`, `:447–455`, `:512–524` | Missing elements use `Option`; negative indexes miss; take/drop clamp negative counts; callbacks carry `^ E ! N`; folds run left to right. Keep these conventions. |
+| `std/src/dict.i:24–60`, `:136–143`, `:237–244` | A public type hides private recursive nodes; updates return new values. Follow this encapsulation. |
+| `std/src/string.i:4–6`, `:70–94`, `:110–139`, `:254–308`, `:428–455` | String indexes are codepoints; byte size is separate; concat takes fragments; slice/pop_codepoint convert codepoint lists. Do not repeatedly pop a string in a linear parser. |
+| `std/src/option.i:1–6`, `:27–31`, `:54–59`; `std/src/result.i:1–5`, `:244–252` | Absence and failure are distinct; `Result` and error effects have explicit bridges. |
+| `lib/i/fail.i:10–31` | Raise/catch already exist. Stream error adapters need no new primitive. |
+| `std/test/list_test.i:1847–1853`, `:1973–1985`, `:2073–2139` | Existing tests cover bounds, error callbacks, labels, known nominal fields, services and control callbacks. Preserve all of these cases for new containers. |
+| `std/test/dict_test.i:420–428`, `:857–1014` | Tests keep old versions and use a deterministic list model. Use that method for sequences. |
+| `std/test/string_test.i:2060–2095`, `:2240–2247`; `std/test/option_test.i:255–280`; `std/test/result_test.i:319–342`, `:372–382` | Empty pieces, Unicode, known fields, deferred callbacks, long walks, and union errors have concrete precedents. |
+| `crates/ilang-check/src/types/infer.rs:232–247`, `:292–325` | Recursive group names get monomorphic holders before generalization. A Haskell helper recursively called at `Node(A)` cannot simply be ported. |
+| `crates/ilang-check/src/types/infer.rs:2237–2266`, `:2321–2329` | Custom variance is found by a fixed point; function result, errors and environment are traversed. A plain thunk wrapper would infer positive N variance. That is insufficient to preserve the stricter environment relation; §3 adds an ordinary negative occurrence to make N invariant. |
+| `crates/ilang-check/src/types/display.rs:670–679`, `:1028–1052`; `crates/ilang-check/src/types/infer.rs:2104–2120` | Normalization can collapse equal Both sides; the ordinary constructor occurrence walk does not visit invariant arguments in both directions. Generalization consumes the simplification, so the factory failure in §3.4 affects accepted clients, not only display. This requires a general compiler conformance fix. |
+| `crates/ilang-check/src/order.rs:135–168`, `:188–207` | Direct recursive functions are possible; eager self-dependent values are rejected. Build infinite streams through functions, not an eager cyclic list. |
+| `std/src/bit_array.i:33–45`, `:70–77`; `crates/ilang-wasm/src/runtime/core.rs:110–125` | UTF-8 conversion can fail; whole byte fragments can be joined; conversion validates UTF-8. URI bytes need not be UTF-8. |
 
 These are reading results, not evidence that the new modules compile. Cost
 notes count element/byte/node operations; arbitrary-size integer arithmetic,
@@ -80,13 +80,13 @@ Decisions, reasons, and sources:
    (spec §2.1/§2.4, source table above).
 2. **Factories are functions with written interfaces.** In particular `new()`
    avoids sharing one weakly typed empty value across unrelated uses. This follows
-   the value restriction (spec §4.7) and `list.new` at `std/src/list.i : 394–398`.
+   the value restriction (spec §4.7) and `list.new` at `std/src/list.i:394–398`.
 3. **Streams store calls, not running continuations.** Making/composing a stream
    is pure; pulling supplies services at that call. This is spec §9.1/§9.2, not a
    stream-specific effect rule. The pure case uses `Never` for both effect parts.
 4. **Errors stop a traversal; they are not end-of-stream.** Value errors can be
    ordinary elements, or explicitly promoted/demoted with adapters. Keep the
-   distinction of `std/src/result.i : 1–5`, `:244–252`.
+   distinction of `std/src/result.i:1–5`, `:244–252`.
 5. **Sequence is an eager, uniform-node finger tree.** Keep measured splitting and
    concatenation, avoiding polymorphic recursive helpers. End edits have O(log n)
    worst-case bounds in every persistent history. Do not promise Haskell's
@@ -181,7 +181,7 @@ the constructor would not prevent this coercion.
 
 Consequently combinators use one shared N, and never write `Stream(A, E, N | M)`:
 an invariant argument would make that multi-variable union illegal under spec
-§4.4 (`infer.rs : 600–655`). Choose the full common environment at construction.
+§4.4 (`infer.rs:600–655`). Choose the full common environment at construction.
 The API keeps pure factories polymorphic in N even though they use no services,
 so they can supply empty tails in any such environment once §3.4 is fixed;
 a wholly pure client chooses
@@ -335,7 +335,7 @@ still have depth proportional to the chain. No fusion guarantee.
 
 The API above is unchanged, but stream implementation must wait for a separate
 compiler track to fix generalization of invariant type arguments. This is a
-compiler fault against spec §4.7 (`docs/spec.md : 405–409`), which requires principal
+compiler fault against spec §4.7 (`docs/spec.md:405–409`), which requires principal
 types and meaning-preserving simplification. The private negative N field is
 needed for sound service compatibility; neither removing it nor specializing
 the public factory to Never is an acceptable workaround.
@@ -367,9 +367,9 @@ still fails with E0501. These runs reproduce the blocker; they do not verify a
 fix or the migrated parser. Temporary probe copies were removed.
 
 Source inspection confirms why the prerequisite is material:
-`display.rs : 670–679` collapses equal positive/negative Both forms;
+`display.rs:670–679` collapses equal positive/negative Both forms;
 `:1028–1052` treats invariant constructor arguments like a single polarity
-unless walking an environment. `infer.rs : 2108–2120` uses the simplified type for
+unless walking an environment. `infer.rs:2108–2120` uses the simplified type for
 generalization. The separate compiler track must correct this general behavior
 and pass both gates before the stream writer starts; it must not teach the
 compiler about Stream, Bias or any std path.
@@ -901,10 +901,10 @@ module contracts in ordinary module documentation.
 
 | Spec sections | Disposition and existing authority |
 |---|---|
-| §2.1 and §2.4 | Unchanged. Package/import rules and constructor visibility already make these ordinary package modules (`docs/spec.md : 124–142`, `:203–206`). |
-| §4.1–§4.8 and §6 | Unchanged, apart from the separately accepted syntax/type migrations. The stream prerequisite fixes the compiler against existing §4.7; it adds no inference or direct-value rule (`docs/spec.md : 405–414`, `:590`). |
-| §9.1–§9.6 | Unchanged. Stored computations are ordinary functions, with call-time environments, error propagation and scoped finalizers (`docs/spec.md : 743`, `:779–784`, `:788–813`, `:828–860`). |
-| §11.4 and §13 | Unchanged. Equality/hash already follow language rules independently of constructor visibility or a module's comparison function (`docs/spec.md : 970–975`, `:1078`). |
+| §2.1 and §2.4 | Unchanged. Package/import rules and constructor visibility already make these ordinary package modules (`docs/spec.md:124–142`, `:203–206`). |
+| §4.1–§4.8 and §6 | Unchanged, apart from the separately accepted syntax/type migrations. The stream prerequisite fixes the compiler against existing §4.7; it adds no inference or direct-value rule (`docs/spec.md:405–414`, `:590`). |
+| §9.1–§9.6 | Unchanged. Stored computations are ordinary functions, with call-time environments, error propagation and scoped finalizers (`docs/spec.md:743`, `:779–784`, `:788–813`, `:828–860`). |
+| §11.4 and §13 | Unchanged. Equality/hash already follow language rules independently of constructor visibility or a module's comparison function (`docs/spec.md:970–975`, `:1078`). |
 | §12, Appendix B and all other sections | Unchanged. No built-in name, core operation, host service, package requirement or ABI entry is added. |
 
 ## 8. Files, writer boundaries, and implementation gates
@@ -927,7 +927,7 @@ No spec edit is assigned to Std-1. The coordinator assigns the compiler
 conformance prerequisite to a separate compiler track; std writers do not patch
 it or weaken the stream interface. No `std/i.toml` change is needed: source
 discovery already walks source/test directories and accepts .i files
-(`crates/ilang-package/src/modules.rs : 22–31`, `:84–94`; spec §2.1). Any discovered compiler
+(`crates/ilang-package/src/modules.rs:22–31`, `:84–94`; spec §2.1). Any discovered compiler
 defect is reported with a minimal ordinary-language witness, not patched in std.
 
 ### Path writer: ready independently
@@ -987,7 +987,7 @@ For each writer, use the coordinator's prebuilt migrated compiler:
 `i check --project std --types`, then `i test --project std`, then the changed
 module tests at `--opt 2`. Check all public labels and types against this note,
 including negative clients and common environments with multiple services. CLI
-options are defined at `crates/ilang-cli/src/main.rs : 20–32`, `:68–80`; their help
+options are defined at `crates/ilang-cli/src/main.rs:20–32`, `:68–80`; their help
 was also checked with the cached baseline executable. Later integration repeats the
 full std suite after T1's known-type changes. No new-module result is accepted
 solely because the old std suite passes. Performance measurements belong to the
@@ -1069,11 +1069,11 @@ bad_coerce = (source : stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(
 ```
 
 A plain thunk wrapper makes N covariant under the existing variance walk
-(`infer.rs : 2237–2266`, `:2321–2329`). Ordinary value subtyping then permits a
+(`infer.rs:2237–2266`, `:2321–2329`). Ordinary value subtyping then permits a
 wrapper with N=Sink(Int) to widen to N=Sink(Never), although function-environment
 compatibility must forbid this. Repair: the unused negative N field makes
 Stream/Step invariant in N. Checked the next obstruction too: writing N|M in
-that invariant argument is rejected by `check_places` (`infer.rs : 600–655`). Thus
+that invariant argument is rejected by `check_places` (`infer.rs:600–655`). Thus
 use a shared N and the explicit map_environment runner, not an illegal union or
 a claimed compiler fix. The API keeps new/list factories polymorphic in N so
 empty tails can be built once §3.4's compiler prerequisite is fixed. A compile-fail coercion probe is a required implementation

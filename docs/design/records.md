@@ -50,7 +50,7 @@ Each decision has its reason. The exact rules follow in parts 3 to 10.
 *Reason:* the common-field join is an upper bound, not set equality, and can lose a variable before it becomes empty. Exact alternatives preserve correlations and substitution. Inference declines obligations it cannot prove from existing bounds rather than selecting a solution. Section 20 states the restricted inference contract and its proof limits.
 
 **D3. "Forgetting" is one exact type form, `Ty::Without(T, L)`.** It means "the records of T, with the labels in L forgotten". It holds only records. The written form is a spread: `( ..R, age : V )` is `Without(R, {age}) & ( age : V )`, and `( ..R, -age )` is `Without(R, {age}) & Record`. There is no `\` operator and no new token.
-*Reason:* `put` and `remove` need a type for "R, except that this field may now be anything". `Without` has sound conservative rules on both sides of `<:`. It is rewritten only by equalities (part 4.3). So no rule depends on whether a type is in an input or an output place, and the coalescing and simplifying in `display.rs` (which make the schemes of generalized bindings, `infer.rs : 2337`) cannot make it unsound.
+*Reason:* `put` and `remove` need a type for "R, except that this field may now be anything". `Without` has sound conservative rules on both sides of `<:`. It is rewritten only by equalities (part 4.3). So no rule depends on whether a type is in an input or an output place, and the coalescing and simplifying in `display.rs` (which make the schemes of generalized bindings, `infer.rs:2337`) cannot make it unsound.
 
 **D4. Keys are label parameters.** A type variable declared on a binding and used as a label (`( K: V )`) in the binding's written types is a label parameter. A declared variable that is only the type of a parameter, as `A` in `id(A) = (x : A) { x }`, stays an ordinary type variable. As a type, it may only be the whole type of a top-level parameter of the binding's own function (`key : K`), its **key parameter**. At each call it is fixed from the key argument: an argument whose known type is exactly one String literal, which the solver then checks against that one-value type, or a key parameter of a binding around the call, passed by its own name. Union keys, plain `String` keys and keys with no known type are compile errors. A name bound by a binding with label parameters may only be the callee of a call, also inside its own value and in a type of a value (L5); a key parameter may not be named in a type of a value (L2a); a call of itself gives each label parameter its own key parameter (L6); and the binding may not be in a recursive group with other bindings. Inside the binding, a type that holds the label parameter may not reach a type variable of a name from outside the binding (L8). A binding with label parameters may not be an entry point or a host export, because the host calls it with no check of its keys (L9). The solver never sees a label that is an inference variable.
 *Reason:* this is the fallback rule of the task, made general: any library may declare label parameters, and `i/record` uses nothing else. Inference stays principal, because labels are fixed before solving and never by solving. The limits on where `K` may be a type are what tie the value of the key to its label (part 5.5).
@@ -92,7 +92,7 @@ Types are sets of values.
 pub enum Label { Name(Arc<str>), Param(LabelParamId) }
 ```
 
-- `Arc<str>`, not `Rc<str>`: the LSP sends `Checked` (which holds `Typed`, its `LocalTypes` and the `Solver`, and so every `Ty`) to another thread (`ilang-lsp/src/analysis.rs : 79`, :99). `Ty` must stay `Send`.
+- `Arc<str>`, not `Rc<str>`: the LSP sends `Checked` (which holds `Typed`, its `LocalTypes` and the `Solver`, and so every `Ty`) to another thread (`ilang-lsp/src/analysis.rs:79`, :99). `Ty` must stay `Send`.
 
 - Order: every `Name` before every `Param`; `Name`s by their UTF-8 bytes; `Param`s by id. The order of `Name`s is the order of `$string_compare` at run time (bytes, then length), which is Rust's `str` order.
 - `Param` labels exist only inside the binding that declares the label parameter, and in its type scheme. Every call replaces them (part 5). L8 (part 5.2) rejects a `Param` label that would reach a type variable from outside the binding. Because a binding with label parameters is never in a recursive group with another binding (L6), no other binding sees its type before it has a scheme.
@@ -113,7 +113,7 @@ In `crates/ilang-check/src/types/mod.rs` (logical node forms; U6 requires shared
 
 `map_children`, `extrude`, `freshen`, `bound_vars`, `level_of`, `occurs` and the Coalescer walk every field of a `Rec` and the base of a `Without` with the polarity of the type around them.
 
-**Types that have themselves inside them (§4.7).** A field of a `Rec` and the base of a `Without` count as places inside a type constructor, the same as the arguments of a `Con`: `bound_vars` (`solve.rs : 1483`) passes `con = true` for them, and the Coalescer (`display.rs:~563`) goes in with `depth + 1`. So a cycle through a record field or a spread base is the existing error E0505, "this type has itself inside it, through a type variable". i has no recursive structural types: a recursive alias is already rejected, so a record type can never contain itself, and inference may not make one either. Two programs show what this means:
+**Types that have themselves inside them (§4.7).** A field of a `Rec` and the base of a `Without` count as places inside a type constructor, the same as the arguments of a `Con`: `bound_vars` (`solve.rs:1483`) passes `con = true` for them, and the Coalescer (`display.rs:~563`) goes in with `depth + 1`. So a cycle through a record field or a spread base is the existing error E0505, "this type has itself inside it, through a type variable". i has no recursive structural types: a recursive alias is already rejected, so a record type can never contain itself, and inference may not make one either. Two programs show what this means:
 
 - `last = (r) { r.next |> { Nil -> r.v  n -> last(n) } }` walks a chain of records. Rule 13b gives `R < : ( next : A )`, and the recursive call gives `A <: R | Nil`. The cycle goes through the field `next`, so it is E0505, with or without annotations. A chain, a tree or any other recursive data is a custom type (`Node(A) { Node(v : A, next : Node(A) | Nil) }`), and then `.next` uses rule 13a. The spec says so in §4.9.3.
 - `build = (r, n) { n |> { 0 -> r  _ -> build(record.put(r, "a", n), n - 1) } }` gives `R : > Without(R, {a}) & ( a : N )`: the cycle goes through the base of a `Without`, so it is E0505 too. The way out is a written parameter type that is not a type variable, `build = (r : Record, n : Int) -> Record { … }`. Then `record.put(r, "a", n)` has, in the solver, the type `Without(R2, {a}) & ( a : Int )` with put's own `R2 :> Record`. E4 does not apply to it, because its base is a variable. But it is checked against the written `Record` of `r`, which is not a variable, so no variable gets a bound that holds itself, and there is no cycle. (In a shown type, `R2` is replaced by its lower bound `Record`, and then E4 makes it `( a : Int )`.)
@@ -124,7 +124,7 @@ Why not accept such a cycle? Its least solution is finite: when every field labe
 
 This keeps every shown scheme finite, so the read-back rule of 4.7 holds. Tests: `recursive_record.i`, `accumulate_put.i`, `fold_spread.i` and `fill_generic.i` in the reject list of 15.1, and `accumulate_put_annotated.i` and `fold_spread_annotated.i` in the pass list.
 
-Field types and labels are kept sorted. Under U6, handle identity is only a sufficient equality/cache fast path; semantic equality uses inclusion. The existing quick exit `l == r` (`solve.rs : 346`) remains a sufficient fast path.
+Field types and labels are kept sorted. Under U6, handle identity is only a sufficient equality/cache fast path; semantic equality uses inclusion. The existing quick exit `l == r` (`solve.rs:346`) remains a sufficient fast path.
 
 ### 4.3 Building types: only exact rewrites
 
@@ -158,7 +158,7 @@ No rewrite makes a type larger. In particular, `Without(a & B, L)` is not split,
 
 ### 4.4 Subtyping: the arms of `constrain_in`
 
-The arms go into `constrain_in` (`solve.rs : 335`) in this order. Arms that exist today keep their places.
+The arms go into `constrain_in` (`solve.rs:335`) in this order. Arms that exist today keep their places.
 
 1. (exists) `l == r`, `Never <: _`, `_ <: Top`; the cache.
    **Member (new, general).** `l <: r` when `l` is an `Inter` and `r` is one of its members. This is exact (`l & m` is a subset of `m`). It comes before the variable arms, so that `F & ( K: V ) <: F` holds at once and does not give `F` a lower bound that holds `F` itself (part 5.9).
@@ -181,12 +181,12 @@ The arms go into `constrain_in` (`solve.rs : 335`) in this order. Arms that exis
    - **e. A record.** `U` is a `Rec` `R`. If a label `f` of `R` is the same as a label of `L`, or may be equal to one, fail at once, here, with the reason: `FailKind::NoField(f)`, "the field `f` may be missing here" (E0512), when the labels are the same, and `FailKind::LabelMayBe(K, f)`, "the key `K` may be `f`; it is not known here" (E0544), when they may be equal.
    - **f.** Else `B <: R`.
 
-   This arm ends: each step goes on with a part of `U`, or with `B`, which is a part of the left side. No step gives the same pair to this arm again, so no cache entry is needed (the cache at `solve.rs : 349` only keeps pairs with a `Var`).
+   This arm ends: each step goes on with a part of `U`, or with `B`, which is a part of the left side. No step gives the same pair to this arm again, so no cache entry is needed (the cache at `solve.rs:349` only keeps pairs with a `Var`).
 
    The last case is exact: `R` asks nothing about the labels of `L`, so a record of `Without(B, L)` is in `R` exactly when the record of `B` it came from is. Steps c (a difference that takes records out), d (another head) and e (a forgotten field is needed) fail at once, and they assume that `B` has a record: then a record of `Without(B, L)` is in no type with another head, in no `A - H` whose `H` has records, and, since a forgotten field can be anything or missing, not in `R`. If B has no records, Without(B, L) is empty. A closed goal must use exact emptiness/coverage before reporting these failures; the conservative failures here apply only when an open base prevents that proof. They never accept a wrong one. Every `Without` that `put`, `remove` or a spread expression makes has as its base the type of a value that was checked to be a record (`r : R & Record` in part 5.1, `te <: Record` in part 7), but an unreachable expression can still have an empty base; never use this runtime intuition as an inhabitance proof.
 
    The check fails here and not later. An earlier draft turned the record member into `Never` and went on with `B <: Never`. When `B` is a variable, that is only stored as a bound, so the failure came later as a plain mismatch with `Never`, far from its cause, or not at all when `B` had no lower bound. Failing at once keeps the reason and the place.
-7. (exists) the left-`Inter` arm (`solve.rs : 389`). Its partition counts `Rec` as concrete, next to `Con` and `Fn`: `matches!(m, Ty::Con(..) | Ty::Fn(_) | Ty::Rec(_))`. A `Without` member is tried alone, like a variable. **Which failure is kept:** today, when every try fails, the failures of the last try are kept. Now the failures of the first try that failed with `NoField` or `LabelMayBe` are kept, if there is one, and else those of the last try. So in `Without(R2, {K}) & ( K : "s" ) < : ( a : A )`, both tries fail with E0544, and E0544 is what the user sees.
+7. (exists) the left-`Inter` arm (`solve.rs:389`). Its partition counts `Rec` as concrete, next to `Con` and `Fn`: `matches!(m, Ty::Con(..) | Ty::Fn(_) | Ty::Rec(_))`. A `Without` member is tried alone, like a variable. **Which failure is kept:** today, when every try fails, the failures of the last try are kept. Now the failures of the first try that failed with `NoField` or `LabelMayBe` are kept, if there is one, and else those of the last try. So in `Without(R2, {K}) & ( K : "s" ) < : ( a : A )`, both tries fail with E0544, and E0544 is what the user sees.
 8. (exists) `Diff <: _`, `Top <: _`, `Both`, `_ <: Union` (route), `_ <: Diff`. `route` and `_ <: Diff` compare `value_head()`, not `head()` (part 4.2). A `Without` on the left never reaches them, because arm 6 came first; the change is for a `Without` member on the right of `_ <: Union`, and so that no other path can treat a `Without` as disjoint from records.
 9. **R-width.** `Rec(fs) <: Rec(gs)`: for each `(g, G)` in `gs`, find the field of `fs` whose label is the same as `g`, and constrain `F <: G`. If there is none, fail. The failure is `LabelMayBe`, E0544 ("the key `K` may be `g`"), when a label of `fs` may be equal to `g`, and `NoField`, E0512 ("the record has no field `g`"), when not. With `env` true, fail: records are never services.
 10. (exists) `Con <: Con`, `Fn <: Fn`, and the catch-all mismatch. `Con <: Rec` and `Rec <: Con` fall to the catch-all. When the left is a custom type and the right is a record, the message adds the hint of part 11.
@@ -209,7 +209,7 @@ The arms go into `constrain_in` (`solve.rs : 335`) in this order. Arms that exis
 
 ### 4.6 Bounds: `add_bound`, `reach`, `compare`
 
-The code is at `solve.rs : 512-687`.
+The code is at `solve.rs:512-687`.
 
 - `reach` and the `new` list in `add_bound` collect `Rec` bounds like `Con` bounds: the arms `Ty::Con(..) | Ty::Fn(_)` at :564 and :635 become `is_headed()`. If one is missed, a record bound is dropped with no error, so this is the most important line of the audit.
 - **Every record upper bound is stored**, as every other bound is (`bounds.push` at :582). Nothing is keyed by label.
@@ -222,7 +222,7 @@ The code is at `solve.rs : 512-687`.
 
 - `ShownType : : Record ( base : Option<Box<ShownType>>, fields : Vec<(String, Option<ShownType>)> )` in `shown.rs`. A field with `None` is a forgotten label, shown `-label`.
 - `( name : String, age : Int )` is printed with the fields sorted, and `Record` for no fields. A label that is not a `name` is printed as a string literal: `{ "first-name": String }`. A `Param` label is printed as its `UpName`.
-- **The Namer keeps the names of label parameters.** The Namer (`display.rs : 1168–1242`, with A2’s capital names) puts only the written names of type variables into `taken`, and `fresh()` hands out letters in order. A label parameter is not a type variable, so an inferred variable could get its name: in `f(K) = (r : ( K : Int ), key : K, x) { (record.get(r, key), x.a, x.b, x.c, x.d, x.f, x.g, x.h, x.i, x.j, x.k) }`, the ten variables of `x` would be named `A` to `K` (skipping `E` and `N`), and the last `K` would read back as the label parameter, which is E0543 as a field type. So, before `assign`, the Namer puts the name of every `Param` label of the type it shows into `taken`. This holds for schemes and for the types in error messages. Test: 15.2.
+- **The Namer keeps the names of label parameters.** The Namer (`display.rs:1168–1242`, with A2’s capital names) puts only the written names of type variables into `taken`, and `fresh()` hands out letters in order. A label parameter is not a type variable, so an inferred variable could get its name: in `f(K) = (r : ( K : Int ), key : K, x) { (record.get(r, key), x.a, x.b, x.c, x.d, x.f, x.g, x.h, x.i, x.j, x.k) }`, the ten variables of `x` would be named `A` to `K` (skipping `E` and `N`), and the last `K` would read back as the label parameter, which is E0543 as a field type. So, before `assign`, the Namer puts the name of every `Param` label of the type it shows into `taken`. This holds for schemes and for the types in error messages. Test: 15.2.
 - The text `( ..B, fs, -m … )` means `Without(B, labels(fs) ∪ {m …}) & Rec(fs)` (part 3). So an `Inter` of `Without(B, L)` and `Rec(fs)` is printed `( ..B, fs, -l … )` only when every label of `fs` is in `L`, with `-l` for each label of `L` that is not a label of `fs`. This is the case for every type that `put` and spreads make. When a label of `fs` is not in `L`, it is printed `( ..B, -l … ) & { fs }`, which reads back as the same type. A `Without(B, L)` alone is `( ..B, -l … )`. Small inline types parse back; shared full types use U6’s exact graph bundle. Both round-trip tests belong in 15.2.
 - `display::tree` (:1211 and :1315) gets an explicit `Rec` arm before the arm that shows every other `Con` as a tuple.
 - The Coalescer and `Norm` use only the smart constructors of 4.3 for these forms.
@@ -271,7 +271,7 @@ remove : <R, K>(R & Record, K) -> ()
      - anything else (no known type, `String`, a union `"a" | "b"`, a cofinite set, `_`): E0541. The call then gets fresh types and nothing more.
      When `K` is the type of more than one key parameter, each of their arguments gives a label by these rules, and the labels must all be the same, or it is E0541. This matters for `Param` labels: a parameter type `K` with `K := Param(J)` becomes `String` (step 3), so the solver checks nothing, and only this rule stops `pick(j, l)` from giving `pick(K) = (k1 : K, k2 : K)` two different strings (`key_two_params.i`, 15.1).
   3. the scheme is instantiated with these labels (`freshen` takes a label map and rebuilds with the smart constructors). For `K := Name("s")`, the parameter type `K` becomes the one-value String type `"s"`, so the solver checks that the argument is `"s"`; the known type only chose the label. For `K := Param(J)`, the parameter type `K` becomes `String`, and the check is the name rule of step 2.
-     **The known function type gets the same label map.** In the merged code, the known type `kf` of a callee name is built in `infer.rs : 1220-1245` before any argument is looked at: `display::known(&s.ty, …)` for an external, `other_known` for an imported binding, and `self.kvars` (from `scheme_known`) for a binding of the module. `call()` (`infer.rs : 1422-1512`) then uses it for the expected type of every argument (`ksubst(&ps[i], &sigma)`) and for the known type of the result (`call_known`). For a callee whose scheme has label parameters, T3 builds `kf` after step 2, from the scheme with the label map put in (`display::known`, `other_known` and `scheme_known` take the map, or `kf` is rebuilt with it through the smart constructors), and only then works out the expected types of the other arguments. So the expected types and known types of the caller never hold a `Param` of the callee: with `K := Name("a")` the known parameter type `Box(( K: Int ))` is `Box(( a : Int ))`, and with `K := Param(J)` it is `Box(( J: Int ))`, a label of the caller's own binding. The key arguments of step 1 get the expected type `String` and no known type from `kf`. Without this, a correct caller would be rejected: with `apply(K) = (b : Box(( K : Int )), key : K, f : (Box(( K : Int ))) -> Int) -> Int { f(b) }`, the call `apply(Box(item : ( a : 1 )), "a", (x) { x.item.a })` would give `x` the known type `Box(( K: Int ))` with apply's `K`, rule 13a would put that into the solver, and `( a : Int ) < : ( K : Int )` would fail with E0544. A test checks this program (`key_known_fn.i`, 15.1).
+     **The known function type gets the same label map.** In the merged code, the known type `kf` of a callee name is built in `infer.rs:1220-1245` before any argument is looked at: `display::known(&s.ty, …)` for an external, `other_known` for an imported binding, and `self.kvars` (from `scheme_known`) for a binding of the module. `call()` (`infer.rs:1422-1512`) then uses it for the expected type of every argument (`ksubst(&ps[i], &sigma)`) and for the known type of the result (`call_known`). For a callee whose scheme has label parameters, T3 builds `kf` after step 2, from the scheme with the label map put in (`display::known`, `other_known` and `scheme_known` take the map, or `kf` is rebuilt with it through the smart constructors), and only then works out the expected types of the other arguments. So the expected types and known types of the caller never hold a `Param` of the callee: with `K := Name("a")` the known parameter type `Box(( K: Int ))` is `Box(( a : Int ))`, and with `K := Param(J)` it is `Box(( J: Int ))`, a label of the caller's own binding. The key arguments of step 1 get the expected type `String` and no known type from `kf`. Without this, a correct caller would be rejected: with `apply(K) = (b : Box(( K : Int )), key : K, f : (Box(( K : Int ))) -> Int) -> Int { f(b) }`, the call `apply(Box(item : ( a : 1 )), "a", (x) { x.item.a })` would give `x` the known type `Box(( K: Int ))` with apply's `K`, rule 13a would put that into the solver, and `( a : Int ) < : ( K : Int )` would fail with E0544. A test checks this program (`key_known_fn.i`, 15.1).
   4. the call goes on as every call does (rule 5 of §4.8), with the other arguments.
 
   So the solver never gets a label that is an inference variable, and no type or known type of a caller holds a label parameter of another binding.
@@ -301,7 +301,7 @@ remove : <R, K>(R & Record, K) -> ()
   the call `f(r, j, k, 0)` would check against the self-type `(( K: Int, J: String ), String, String, Int) -> Int`, and in the second run `record.get(r, k)` would give `"s"` as an `Int`. L6 makes it E0541, because `j` refers to a key parameter of type `J` and is given where `K` is wanted (`recursive_key.i`, 15.1). A binding with label parameters may not be in a recursive group with other bindings (spec §4.7: the other names of a group are not general, so a call between them has no scheme for L4). That is E0543 on the label parameter, with a note that names the other binding of the group. The groups are known before inference (`order.rs`), so the check is made there.
 - **L7. Principal types.** The labels come from names and known types, which are found before solving, like the constructors of rule 13a. They never come from solving, so solving does not depend on its own order. Every binding that is accepted has a principal type; programs whose keys are not known are rejected, not guessed. An annotation can always make the key known.
 - **L8. No escape.** A type that holds `Param(K)` may not become a bound of a type variable from outside the binding that declares `K`: a variable of an outer parameter, of an outer binding that is not generalized, or of a name of the binding's group. Such a variable is not generalized with the binding, so `K` would stay in it after every call has replaced `K`, and would leak into the scheme of the outer binding, where nothing declares it. In `outer = (acc) { f(K) = (r : ( K : Int ), key : K) { acc(r) } ⏎ f(( a : 1 ), "a") }`, `acc` would get the type `(( K: Int )) -> B`. That is E0545, "the label parameter `K` of `f` reaches `acc`, which is outside `f`", at the place where the constraint is made.
-  - **How it is found.** Each `LabelParamId` keeps a level: the **raised** level of the binding that declares it, the level at which the binding's own fresh variables are made. For a local binding this is `s.level` after the `self.s.level += 1` at `infer.rs : 2246` (the binding is direct, by L2, so the raise always happens), not the outer level where the name is bound; generalization (`infer.rs : 2337`) takes the variables above the outer level. For a top-level binding it is the level at which its value is inferred. So every variable from outside the binding, such as `acc` in the example, is at a level strictly below the level of `K`. If the outer level were stored, `( K: Int )` would have `level_of` equal to the level of `acc`, `constrain_in` would take the plain `add_bound` arm with no `extrude`, and `K` would leak into the scheme of `outer` with no error. `level_of` (`solve.rs : 285`) counts a `Rec` or `Without` with a `Param(k)` label as being at least at the level of `k`. So a constraint between such a type and a variable of a lower level goes through `extrude` (the variable arms, part 4.4 arm 3). `extrude` (`solve.rs : 814`) to a level below the level of `k`, on a type with the label `Param(k)`, fails with `FailKind::LabelEscapes(k)` instead of copying it, because no fresh variable can stand for a label.
+  - **How it is found.** Each `LabelParamId` keeps a level: the **raised** level of the binding that declares it, the level at which the binding's own fresh variables are made. For a local binding this is `s.level` after the `self.s.level += 1` at `infer.rs:2246` (the binding is direct, by L2, so the raise always happens), not the outer level where the name is bound; generalization (`infer.rs:2337`) takes the variables above the outer level. For a top-level binding it is the level at which its value is inferred. So every variable from outside the binding, such as `acc` in the example, is at a level strictly below the level of `K`. If the outer level were stored, `( K: Int )` would have `level_of` equal to the level of `acc`, `constrain_in` would take the plain `add_bound` arm with no `extrude`, and `K` would leak into the scheme of `outer` with no error. `level_of` (`solve.rs:285`) counts a `Rec` or `Without` with a `Param(k)` label as being at least at the level of `k`. So a constraint between such a type and a variable of a lower level goes through `extrude` (the variable arms, part 4.4 arm 3). `extrude` (`solve.rs:814`) to a level below the level of `k`, on a type with the label `Param(k)`, fails with `FailKind::LabelEscapes(k)` instead of copying it, because no fresh variable can stand for a label.
   - This is the same check as "a rigid type variable escapes its scope" in other languages. It keeps the rule of 4.1 true: `Param` labels exist only inside their binding and its scheme. So every shown scheme reads back (4.7), and the argument of 5.5 ("inside the binding") covers every place a `Param` can be.
 - **L9. Not called by the host.** A binding whose scheme has label parameters may not be an entry point (§10.2: a host export, a test, `main`). The host calls an entry point with no L4 check, and the host signature shows a key parameter only as `String` (L3). So in
   ```i
@@ -310,7 +310,7 @@ remove : <R, K>(R & Record, K) -> ()
     record.get(r, k2)
   }
   ```
-  listed in `[wasm] exports`, the body checks (both keys give `Param(K)`), the host signature is `(String, String) -> Int`, and `pick("a", "b")` would reach `unreachable` in `$record_get`. `entry_point` (`infer.rs : 454`) looks at the scheme first: when it has label parameters, it is E0320, "`pick` has a label parameter, so the host cannot call it: the host gives its keys with no check (§10.3)", and no host type is worked out. This is the only way to call a binding without a call in i code: L5 rules out every other use of its name as a value.
+  listed in `[wasm] exports`, the body checks (both keys give `Param(K)`), the host signature is `(String, String) -> Int`, and `pick("a", "b")` would reach `unreachable` in `$record_get`. `entry_point` (`infer.rs:454`) looks at the scheme first: when it has label parameters, it is E0320, "`pick` has a label parameter, so the host cannot call it: the host gives its keys with no check (§10.3)", and no host type is worked out. This is the only way to call a binding without a call in i code: L5 rules out every other use of its name as a value.
 
 ### 5.3 Two label parameters with the same label
 
@@ -434,7 +434,7 @@ user = object |> field("name", string) |> field("age", int)
 
 This checks as written, with no extra annotation:
 
-- `Schema` is covariant in `A` (its parameter is only in an output place, `infer.rs : 2472`).
+- `Schema` is covariant in `A` (its parameter is only in an output place, `infer.rs:2472`).
 - Declared type variables are flexible (syntax.md §4.7). Inside `field`, `s.decode(j)` has the type `R`. The call of `put` adds `R <: R2 & Record` for put's own fresh `R2`, so `R` gets the upper bound `Record`. The shown scheme is `field : (s : Schema(R & Record), key : K, value : Schema(V)) -> Schema(( ..R, K : V ))`.
 - In the call of `put`, the key argument is the name `key`, the key parameter of `field`, so put's label parameter becomes `Param(K)` (L4).
 - The body's type `Schema(( ..R2, K: V2 ))` is checked against the written `Schema(( ..R, K: V ))`. The right side is split; R-without-right takes the `Without` member and gives `R2 <: R`; the `( K: V2 )` member gives `V2 <: V`.
@@ -487,7 +487,7 @@ user = object |> field("name", string) |> field("age", int)
 Codec(User, _) = user // User is (age: Int, name: String)
 ```
 
-- `Codec` is covariant in `D` and contravariant in `E` (`infer.rs : 2472`).
+- `Codec` is covariant in `D` and contravariant in `E` (`infer.rs:2472`).
 - In `encode`, `x` gets no useful expected type. By §4.8, an argument of a call gets the type of the callee's parameter, here `(E0) -> Json` from the constructor `Codec`, with `E0` filled only from the other arguments, never from the `->` part of `field`. So `x` has a fresh type `X`. `s.encode(x)` gives `X <: E`, and `record.get(x, key)` gives `X <: ( K: V3 )` (the key is the name `key`, so L4 gives `Param(K)`), and `value.encode(…)` gives `V3 <: V`.
 - The body's type is then checked against the written result. `Codec` is contravariant in its second parameter, so this needs `E & ( K: V ) <: X`, which goes on to the upper bounds of `X`: `E & ( K: V ) <: E`, which the Member arm (part 4.4, arm 1) makes true at once, with no bound that holds `E` itself, and `E & ( K: V ) <: ( K: V3 )`, which the left-`Inter` arm gives by R-width (`V <: V3`). With `V3 <: V`, the encode side checks.
 - **What `user` is, and what to read from it.** `user` is not generalized: its value is a call, not a direct value (§6.10), so its type variables stay those of the module. The decode side `D` gets its lower bound `( age : Int, name : String )` from the calls of `field`, and nothing else in the module gives it a lower bound: a use of `user.decode(j)` only adds upper bounds. So `Codec(User, _) = user` binds `User` to `( age : Int, name : String )`, whatever the rest of the module does. The encode side is not stable. `object` gives `E1 <: Record`, the first `field` gives `E2 < : E1 & ( name : String )`, and the encode type of `user` is `E2 & ( age : Int )`: only **upper** bounds, so the encode side accepts exactly the records of `( age : Int, name : String )`. But a variable that is not generalized is shown as the union of the types that come to it (spec §4.7), and each `user.encode(v)` in the module gives `E2` the lower bound `v`. So the shown encode type is `Never` when the module never encodes, and the union of the encoded types when it does; it depends on which bindings call `user.encode`. Code should not read it: an alias pattern reads the decode side, the first argument. When the shown type of `user` matters, write it: `user : Codec(( age : Int, name : String ), ( age : Int, name : String )) = …`.
@@ -507,16 +507,16 @@ M4 lands after T3 and expands typed macros (meta.md §7) after their call is che
 
 ## 6. Field access `v.f`
 
-`field()` (`infer.rs : 1705`) works out the known type `kv` of `v` first, as today. Then:
+`field()` (`infer.rs:1705`) works out the known type `kv` of `v` first, as today. Then:
 
-- **13a. Fields of constructors.** When `v` is known to be made by one constructor (§7.5), or every member of `kv` is a custom type, also when `kv` has no members (`Never`): the existing code of the checker, unchanged. It records `Access::Field`, and the type of `v` must be a subtype of its known type. With no members, the list of `Access::Field` is empty (`infer.rs : 1855-1864`), and the type of `v.f` is `Never`.
+- **13a. Fields of constructors.** When `v` is known to be made by one constructor (§7.5), or every member of `kv` is a custom type, also when `kv` has no members (`Never`): the existing code of the checker, unchanged. It records `Access::Field`, and the type of `v` must be a subtype of its known type. With no members, the list of `Access::Field` is empty (`infer.rs:1855-1864`), and the type of `v.f` is `Never`.
 - **13b. Fields of records.** When `v` has no known type, or `kv` has at least one member and every member is a record type, `_` or a type variable (a declared variable such as `A` in `(x : A) { x.name }`, or a variable from an expected type): make a fresh `A`, constrain `t < : ( f : A )`, give `v.f` the type `A`, and record `Access::Label(f)`. The known type of `v.f` is the field `f` of U5’s conservative summary of all record alternatives of `kv`, when it is guaranteed.
 - **13c. Tuple parts.** `v.k`: unchanged.
-- **Otherwise** (a custom type and a record, or a function, an `Int`, …): E0512 with the message "`.f` reads a field of a record or of a custom type, and this value may be either; write its type". The code generator never sees a mixed target, so the shortcut "the last branch is not tested" in `Lowerer::field` (`lower.rs : 1764`) stays correct.
+- **Otherwise** (a custom type and a record, or a function, an `Int`, …): E0512 with the message "`.f` reads a field of a record or of a custom type, and this value may be either; write its type". The code generator never sees a mixed target, so the shortcut "the last branch is not tested" in `Lowerer::field` (`lower.rs:1764`) stays correct.
 
-E0506 is no longer given for `.f` (it is still given at `infer.rs : 1432`). Every program that is correct today has a known type at each `.f` whose members are all custom types, or that has no members, so it keeps rule 13a. The two rules never overlap: 13a needs every member to be a custom type, and 13b needs no known type or at least one member. So `list.map([], (x) { x.name })`, where `x` has the known type `Never`, keeps `Access::Field([])` and the type `Never`, as today.
+E0506 is no longer given for `.f` (it is still given at `infer.rs:1432`). Every program that is correct today has a known type at each `.f` whose members are all custom types, or that has no members, so it keeps rule 13a. The two rules never overlap: 13a needs every member to be a custom type, and 13b needs no known type or at least one member. So `list.map([], (x) { x.name })`, where `x` has the known type `Never`, keeps `Access::Field([])` and the type `Never`, as today.
 
-**The empty access list in lowering.** At 1865366 the checker accepts that program, and `i build` panics: `Lowerer::field` (`lower.rs : 1764-1771`) starts with `let first = list[0].1`, so an empty list is an index out of bounds (checked with the compiler of the repo: "index out of bounds: the len is 0 but the index is 0" at `lower.rs : 1771`, from `Lowerer::lower` at :1591). T3 fixes it: for an empty list, `Lowerer::field` pushes `Stmt::Unreachable` and gives `Atom::Nil`, as `ExprKind::Error` does (`lower.rs : 1654`). The value has the type `Never`, so it is never made, and the trap is never reached. Tests: `field_never.i` builds and runs (15.1), and a codegen test (15.4).
+**The empty access list in lowering.** At 1865366 the checker accepts that program, and `i build` panics: `Lowerer::field` (`lower.rs:1764-1771`) starts with `let first = list[0].1`, so an empty list is an index out of bounds (checked with the compiler of the repo: "index out of bounds: the len is 0 but the index is 0" at `lower.rs:1771`, from `Lowerer::lower` at :1591). T3 fixes it: for an empty list, `Lowerer::field` pushes `Stmt::Unreachable` and gives `Atom::Nil`, as `ExprKind::Error` does (`lower.rs:1654`). The value has the type `Never`, so it is never made, and the trap is never reached. Tests: `field_never.i` builds and runs (15.1), and a codegen test (15.4).
 
 A written type only adds information (§4.7), so it never turns a correct `.f` into an error: `(x) { x.name }`, `id_name(A) = (x : A) { x.name }` and `names(A) = (xs : List(A)) { list.map(xs, (x) { x.name }) }` all use 13b. The known type of `v.f` under 13b is what lets `r.user.name` use 13a when `r = ( user : User("bo") )`, and lets `r.cb(x : 1)` call by label when `r.cb` is a function.
 
@@ -540,9 +540,9 @@ name_of(
 - **Spread** `( ..e, f1: e1, … )`: `e` first, then the parts in order. `e` gets no expected type. Each `ei` gets the expected type of the guaranteed field `fi` of U5’s conservative expected summary of the whole spread, if there is one, as in a literal. So with `Cfg = ( cb : (User) -> String, n : Int )`, in `next : Cfg = ( ..base, cb : (u) { u.name } )` the parameter `u` has the known type `User`, and `.name` uses rule 13a. `te <: Record`, and the type is `without(te, {f1, …}) & rec(fi: ti)`. `( ..e )` alone has the type `te & Record`. A label twice among the parts is E0540, as in a literal. The known type is in part 4.8.
 - **Same label.** Two labels are the same when their strings are the same, after the escapes of a string literal are worked out. A `name` label is the string of the name. So `( a : 1, "a" : 2 )`, `( a : 1, "\u{61}" : 2 )` and `( ..r, a : 1, a : 2 )` are E0540. HIR keeps each label as its string (`LabelName` holds the string with no escapes), and E0540, the sort, `Ty::Rec` and the label constants of part 9 all use that string. The same holds in a written type: `( a : Int, "a" : String )` and `( ..R, a : Int, -a )` are E0540.
 - **Empty record** `Record`: the type `Record`.
-- **Effects and direct values:** `has_no_effect` (`infer.rs : 2573`) treats a literal as it treats a tuple: a literal whose parts give the warning gives the warning "its value is not used" as a statement that is not the last. A spread is treated as a constructor update `C(..v, …)` (the spec's "record update", renamed in part 12), which gives no warning. Part 12 adds this to the list of §6.10. A literal of direct values is a direct value (§6.10) and is generalized (rule 14).
+- **Effects and direct values:** `has_no_effect` (`infer.rs:2573`) treats a literal as it treats a tuple: a literal whose parts give the warning gives the warning "its value is not used" as a statement that is not the last. A spread is treated as a constructor update `C(..v, …)` (the spec's "record update", renamed in part 12), which gives no warning. Part 12 adds this to the list of §6.10. A literal of direct values is a direct value (§6.10) and is generalized (rule 14).
 - **Type tests.** `x : ( name : String )` in a clause with more than one clause takes every record, by head. Rule 11 already asks for `B <: T | r - T`, so every record that can come to that place must be in `( name : String )`. To tell kinds of records apart, use a custom type. `lower.rs` `head_cond` (:2340) maps `Head::Record` to a test of tag 14.
-- **No record patterns** in T3. `( name: n ) = r` is a parse error with the hint "read the field: `n = r.name`".
+- **No record patterns** in T3. `( name : n ) = r` is a parse error with the hint "read the field: `n = r.name`".
 
 ## 8. Syntax
 
@@ -616,13 +616,13 @@ patterns and constructor exports. Record spreads require a base.
 ### 9.1 The value
 
 - An `$obj` with field 0 (tag) = 14, field 1 = 0, field 2 = 0, and field 5 = a `$values` array `[l0, v0, l1, v1, …]`.
-- Each `li` is a String value. The labels are sorted by `$string_compare` (`values/strings.rs : 137`): bytes, then length.
+- Each `li` is a String value. The labels are sorted by `$string_compare` (`values/strings.rs:137`): bytes, then length.
 - Field 5 is never null. The empty record has an empty array, so that two empty records compare equal.
-- The tag table in `runtime/mod.rs : 37-52` gets the row `| 14 | Record | field 5: labels and values, interleaved, sorted by the bytes of the labels |`.
+- The tag table in `runtime/mod.rs:37-52` gets the row `| 14 | Record | field 5: labels and values, interleaved, sorted by the bytes of the labels |`.
 
 ### 9.2 `==`, compare and hash
 
-They need no new code. The generic `$obj` path of `$value_compare_i32` (`values.rs : 132`) compares the tag first, then fields 2 and 1, then field 5 element by element. Its hash (`values.rs : 276`) mixes fields 1 and 2, the length and every element. So:
+They need no new code. The generic `$obj` path of `$value_compare_i32` (`values.rs:132`) compares the tag first, then fields 2 and 1, then field 5 element by element. Its hash (`values.rs:276`) mixes fields 1 and 2, the length and every element. So:
 
 - `( a : 1, b : 2 ) == ( b : 2, a : 1 )`, because both are sorted;
 - `( a : 1 ) != ( a : 1, b : 2 )`, by length, even when both have the type `( a : Int )`;
@@ -643,15 +643,15 @@ In a new file `runtime/values/record.rs`, included from `values.rs`:
 | `$record_put(r, label, v) -> eqref` | Copies the array, and puts the field in or replaces it. |
 | `$record_with(r, pairs) -> eqref` | A sorted merge of `r` and an already sorted interleaved array, for `( ..r, … )`: one copy. |
 | `$record_remove(r, label) -> eqref` | Copies the array without the field (the same record when it is not there). |
-| `$record_has(r, label) -> eqref` | Whether the field is there, as a Bool value (`$bool_new`, `runtime/values.rs : 47`). |
+| `$record_has(r, label) -> eqref` | Whether the field is there, as a Bool value (`$bool_new`, `runtime/values.rs:47`). |
 | `$record_keys(r) -> eqref` | The labels as a `List(String)`, in order. |
-| `$record_size(r) -> eqref` | The number of fields, as an Int value (`$int_from_i64`, `runtime/bigint.rs : 87`). |
+| `$record_size(r) -> eqref` | The number of fields, as an Int value (`$int_from_i64`, `runtime/bigint.rs:87`). |
 | `$record_texts(r) -> eqref` | A `List((String, String))`: each label, in order, with the text form of its value (the code of `inspect`, 9.5). |
 | `$is_record(v) -> i32` | Tag 14, in `emit/mod.rs` next to `$is_ctor` (:16). Used only by `Cond::IsRec`, never as a value. |
 
-Every function that an `ilang:record` external maps to returns `eqref`, because `Op::Runtime` is emitted as `(call $name args)` and its result is used as an atom (`emit/mod.rs : 543`). So `has` and `size` make a Bool and an Int value inside the runtime function; the `i32` and `i64` forms are local to `record.rs`. A test validates a module that calls each of the seven functions.
+Every function that an `ilang:record` external maps to returns `eqref`, because `Op::Runtime` is emitted as `(call $name args)` and its result is used as an atom (`emit/mod.rs:543`). So `has` and `size` make a Bool and an Int value inside the runtime function; the `i32` and `i64` forms are local to `record.rs`. A test validates a module that calls each of the seven functions.
 
-**Label constants.** Lowering makes one immutable global String for each distinct label used in a literal, a spread, a `.f` or a key argument (below) in the output module. The current String builder, `string()` in `emit/mod.rs : 462-480`, emits `(call $string_from_bytes (array.new_data $bytes $sN …))`. Neither a call nor `array.new_data` is a constant expression, so it cannot initialize an immutable global. A label global is written out instead, with the layout of `$string_from_bytes` (`runtime/values/strings.rs : 8`) and only constant instructions. Every label global is named by a number, `$label_N`, never by the text of its label: a label is any string, and a space, `(`, `)`, `"` or a byte that is not ASCII is not allowed in a WAT name, so `{ "a b": 1 }` would make text that does not assemble. The number is kept in a table keyed by the bytes of the label, as `string()` already keys its `$sN` data segments. Here is the global of the label `name`:
+**Label constants.** Lowering makes one immutable global String for each distinct label used in a literal, a spread, a `.f` or a key argument (below) in the output module. The current String builder, `string()` in `emit/mod.rs:462-480`, emits `(call $string_from_bytes (array.new_data $bytes $sN …))`. Neither a call nor `array.new_data` is a constant expression, so it cannot initialize an immutable global. A label global is written out instead, with the layout of `$string_from_bytes` (`runtime/values/strings.rs:8`) and only constant instructions. Every label global is named by a number, `$label_N`, never by the text of its label: a label is any string, and a space, `(`, `)`, `"` or a byte that is not ASCII is not allowed in a WAT name, so `{ "a b": 1 }` would make text that does not assemble. The number is kept in a table keyed by the bytes of the label, as `string()` already keys its `$sN` data segments. Here is the global of the label `name`:
 
 ```wat
 (global $label_3 (ref $obj)
@@ -664,7 +664,7 @@ Every function that an `ilang:record` external maps to returns `eqref`, because 
 
 **The limit of `array.new_fixed`.** Engines limit its number of operands: V8 takes at most 10000. `string()` uses `array.new_data` and has no such limit. So emit uses a constant `FIXED_MAX = 10000` and two fallbacks:
 
-- A label with more than `FIXED_MAX` bytes gets a mutable global instead, `(global $label_N (mut eqref) (ref.null eq))`, numbered in the same table, set from `string()` at the beginning of `$start` (`emit/mod.rs : 87`), the code that sets the program's `$g` globals today, before any of them. Its uses are `(ref.as_non_null (global.get $label_N))`. It is still one object, so `ref.eq` works.
+- A label with more than `FIXED_MAX` bytes gets a mutable global instead, `(global $label_N (mut eqref) (ref.null eq))`, numbered in the same table, set from `string()` at the beginning of `$start` (`emit/mod.rs:87`), the code that sets the program's `$g` globals today, before any of them. Its uses are `(ref.as_non_null (global.get $label_N))`. It is still one object, so `ref.eq` works.
 - A literal or spread part list with more than `FIXED_MAX / 2` fields is built with `(array.new $values (ref.null eq) (i32.const 2n))` and one `array.set` for each label and value, in a local, and then passed to `$record_new` or `$record_with`. The order is the same, so the record is the same.
 
 Tests: a record with a label of 10001 bytes, and a literal with 5001 fields, validate and run, and give the same `==`, `hash` and `inspect` as the same records built with `put`.
@@ -688,12 +688,12 @@ The wasm crate already uses "Record" for constructors with fields (`CtorRepr::Re
 - `Value::RecNew(Vec<(LabelConst, Atom)>)`: the atoms are worked out in source order first (§6.2), then put in label order, which is fixed when the program is compiled. Emitted as `(call $record_new (array.new_fixed $values 2n …))`, or with `array.new` and `array.set` above `FIXED_MAX / 2` fields (9.3).
 - `Value::RecGet(Atom, LabelConst)`: `ExprKind::Field` with `Access::Label`. `Access::Field` and `Access::Part` are unchanged.
 - `Value::RecWith(Atom, Vec<(LabelConst, Atom)>)`: a spread.
-- `Cond::IsRec(Atom)`: `head_cond` (`lower.rs : 2340`) for `Head::Record`, in T1's type-test region.
-- The `"ilang:record"` externals: a new arm in `external_op` (`lower.rs : 1453`, next to `"ilang:core"` at :1469) that maps each name to its runtime function, as `CORE`/`CORE_FUNCS` do, as `Op::Runtime`. Each of these functions returns `eqref` (9.3).
+- `Cond::IsRec(Atom)`: `head_cond` (`lower.rs:2340`) for `Head::Record`, in T1's type-test region.
+- The `"ilang:record"` externals: a new arm in `external_op` (`lower.rs:1453`, next to `"ilang:core"` at :1469) that maps each name to its runtime function, as `CORE`/`CORE_FUNCS` do, as `Op::Runtime`. Each of these functions returns `eqref` (9.3).
 
 ### 9.5 inspect
 
-`runtime/values/inspect.rs` gets a branch for tag 14. Task kinds 0 to 3 are all in use (value, byte, parts, list rest; `inspect.rs : 291-311`), and the packing `kind | index << 2` (:244) stays as it is:
+`runtime/values/inspect.rs` gets a branch for tag 14. Task kinds 0 to 3 are all in use (value, byte, parts, list rest; `inspect.rs:291-311`), and the packing `kind | index << 2` (:244) stays as it is:
 
 - kind 0 on a record: an empty array writes `Record`. Else write `{ `, push the byte `}` and the byte ` ` (kind 1), then push `(2, record, 0)`.
 - kind 2 whose value has tag 14 (the parent's tag decides): `index` is always even. Write `, ` when `index > 0`, then the label and `: `, then push `(2, record, index + 2)` and `(0, value at index + 1, 0)`.
@@ -787,13 +787,13 @@ T3 takes the block **E0540–E0549**, whatever order T1, T2 and T3 merge in. T1 
 | E0545 | `LABEL_PARAM_ESCAPES` | a type with a label parameter that would become a bound of a type variable from outside its binding (L8, `FailKind::LabelEscapes`) | "the label parameter `K` of `f` reaches `acc`, which is outside `f`". Hint: "pass the field's value out of `f`, not the record with the key `K`" |
 | E0518 | (exists, `TYPE_PLACE`) | existing ordinary-variable place restrictions, including bare `( ..R )` in an output place | No error solely for a record/spread union. U3 proof failures and U6 resource limits have distinct reasons (§20.3). |
 | E0505 | (exists) | a type that has itself inside it through a record field or the base of a spread (part 4.2) | the existing message; when the cycle goes through the base of a spread (a `Without`), the hint: "write the type of this parameter, such as `(acc : ( n : Int, total : Int ), x)`, or build the new record as a full literal" |
-| E0512 | (exists, `NO_FIELD`) | a missing field of a record (`FailKind::NoField`, from R-width); a field that a `put` or a spread may have forgotten (R-without-left, step e) | "the record has no field `b`"; "the field `b` may be missing here". This is the code that `field()` already gives when a constructor has no field `f` (`infer.rs : 1819`), so reading a field that is not there has one code for custom values and for records |
+| E0512 | (exists, `NO_FIELD`) | a missing field of a record (`FailKind::NoField`, from R-width); a field that a `put` or a spread may have forgotten (R-without-left, step e) | "the record has no field `b`"; "the field `b` may be missing here". This is the code that `field()` already gives when a constructor has no field `f` (`infer.rs:1819`), so reading a field that is not there has one code for custom values and for records |
 | E0501 | (exists) | a custom value given to a record type; a field value of the wrong type | "`User` is a custom type, not a record. … Write `(u : User) { u.name }` to read the field of the constructor." |
 | parse | (exists) | an interpolated string as a label | "a label is a string with no `\( )`" |
 | E0512 | (exists) | `.f` on a value whose known type mixes custom types and other types | "`.name` reads a field of a record or of a custom type, and this value may be either; write its type" |
 | E0318, E0320 | (exist) | a record at the host boundary; E0320 also for an entry point whose binding has label parameters (L9) | the existing messages; for L9: "`pick` has a label parameter, so the host cannot call it: the host gives its keys with no check (§10.3)" |
 | parse | (exists) | `Person ( name : String )` | hint "a record type is written `Person = ( name : String )`" |
-| parse | (exists) | `( name: n ) = r` | hint "there are no record patterns; read the field: `n = r.name`" |
+| parse | (exists) | `( name : n ) = r` | hint "there are no record patterns; read the field: `n = r.name`" |
 | E0501 | (exists) | `{}` where a record is needed | hint "`{}` is the empty clause block; the empty record is `Record`" |
 
 An example of a union key, in the new syntax:
@@ -927,7 +927,7 @@ Replace the bullet "A `{` followed by a label `name :` … is kept for records" 
 
 **§7.4.** Add: "All records count as one type constructor."
 
-**§9.2.** "A service is a value of a named type, normally a record of functions" becomes "A service is a value of a named type, normally a custom type whose constructor holds functions. A record (§4.9) is not a named type, so a record type, also through an alias such as `Clock = ( now : () -> Int )`, is never a service type." The E0225 message of `env_type` (`resolve.rs : 1870`) becomes "a service type is one named type `T(…)`: not a type variable, a union, a record type, or `Never` (§9.2)". `env_type` keeps sending `TypeKind::Record` to `_ => None`, and a test (`record_service.i`, 15.1) guards it.
+**§9.2.** "A service is a value of a named type, normally a record of functions" becomes "A service is a value of a named type, normally a custom type whose constructor holds functions. A record (§4.9) is not a named type, so a record type, also through an alias such as `Clock = ( now : () -> Int )`, is never a service type." The E0225 message of `env_type` (`resolve.rs:1870`) becomes "a service type is one named type `T(…)`: not a type variable, a union, a record type, or `Never` (§9.2)". `env_type` keeps sending `TypeKind::Record` to `_ => None`, and a test (`record_service.i`, 15.1) guards it.
 
 **"Record update" for custom values.** The spec calls `C(..v, f: e)` a "record update" (the grammar name `RecordUpdate` in §6.1, the known types of §4.8, §6.2, and any other place the spec after A1 has it). With structural records in §4.9 and `( ..e, … )` in §6.13, that name is confusing. It becomes "constructor update" (`CtorUpdate` in the grammar) everywhere, with no change of meaning. The word "record" in the spec then means only the values of §4.9.
 
@@ -968,7 +968,7 @@ Line numbers are at 1865366.
 
 **`crates/ilang-syntax`**
 - `ast.rs`: `ExprKind::Record`, `TypeKind::Record`, `RecordField`, `LabelName`.
-- `parser.rs`: the record scan, used by `primary` (:1136) and by `function` (:1235) for the body `{`; `type_prim` (:1760), whose brace arm currently groups types; a sequence reader in which a break is a `,`; the hints for `Person { … }` (`type_def`, :768) and for `( name: n ) = r`.
+- `parser.rs`: the record scan, used by `primary` (:1136) and by `function` (:1235) for the body `{`; `type_prim` (:1760), whose brace arm currently groups types; a sequence reader in which a break is a `,`; the hints for `Person { … }` (`type_def`, :768) and for `( name : n ) = r`.
 - `format.rs`, `print.rs`, parser tests, `tests/format.rs`.
 
 **`crates/ilang-check`**
@@ -1037,7 +1037,7 @@ Correct programs (`// expect: pass`):
   Coordinator ruling: “the rule stands and the example is wrong.” The standing correction rule is: “when the spec and a numbered design rule agree and only an example, fixture or expected output in a note disagrees with them, the rule wins: correct the example, add the wrong form as a rejection (or acceptance) test with the reason”. Spec §7.1 and rule 11 agree with part 7: a record head test cannot filter fields. The original broad-input versions below are rejection tests, not alternative runtime behavior.
 - `record_equality.i` (in `tests/spec/11/`, §11.4): `( a : 1, b : 2 ) == ( b : 2, a : 1 )`; `( a : 1 ) != ( a : 1, b : 2 )`, also when both reach `==` through a parameter of type `( a : Int )`; `( a : 1 ) != ( b : 1 )`.
 - `record_text_form.i` (in `tests/spec/11/`, §11.8): `core.inspect` of `Record`, of `( age : 36, name : "ada" )`, of a record with the quoted labels `"Type"` and `"first-name"` (`{ "Type": 1 }`, not `( Type: 1 )`), and of a nested record.
-- `evaluation_order_record.i` (in `tests/spec/6/`, §6.2, as `evaluation_order.i`): effects in a literal `( b: f(1), a: f(2) )` happen in the order written, not in label order; in `( ..g(), a: f(1) )`, `g()` happens first.
+- `evaluation_order_record.i` (in `tests/spec/6/`, §6.2, as `evaluation_order.i`): effects in a literal `( b : f(1), a : f(2) )` happen in the order written, not in label order; in `( ..g(), a: f(1) )`, `g()` happens first.
 - `string_labels.i`: `record.get({ "first-name": "ada" }, "first-name")`.
 - `type_test_all_records.i`: `x : Record` takes the records out of `Int | ( a : Int )`.
 - `field_declared_var.i`: `id_name(A) = (x : A) { x.name }` and `names(A) = (xs : List(A)) { list.map(xs, (x) { x.name }) }` have the same types as without the annotation (rule 13b with a type variable in the known type).
@@ -1168,7 +1168,7 @@ In order, after A1 and T1 have landed, T2 has merged, and S3 is approved.
 1. **Spec text (gate G3).** Part 12 goes to the user, written on top of the spec after T1 and T2. Check that §4.9, §6.13 and §14 are still free, with IO and M2 (part 19). Get the coordinator to add T3 to the merge orders of `resolve.rs`, `order.rs`, `query.rs`, `pattern.rs`, `coverage.rs`, spec §9.2 and §10.3 (the table at the end of part 14).
 2. **Runtime order.** Check that `$string_compare` orders exactly as Rust `str` does, with a test. (At 1865366 it does: bytes, then length.)
 3. **Soundness tests first.** Write the reject list of 15.1 and the unit tests of 15.2 as failing tests.
-4. **Types core.** `Label` (with `Arc<str>`, so that `Ty` stays `Send` for the LSP), `Head::Record`, `Ty::Rec`, `Ty::Without`, `rec()`, `without()`, `is_headed`, `Access::Label`, with unit tests. Then the audit. The exact pattern `Ty::Con(..) | Ty::Fn(_)` finds only 8 lines at 1865366 (solve 6, display 1, known 1), so it is not the gate. The gate is a list: at the start of this step, save the output of `rg -n -e 'Ty::Con\(' -e 'Ty::Fn\(' -e '\.head\(\)' -e 'Head::' crates/ilang-check/src` (200 lines at 1865366: solve 36, display 49, known 34, infer 41, pattern 15, coverage 19, mod 6; more after T1) into the T3 pull request as a checklist, and mark each line "handles `Rec`/`Without`", "cannot see a record" (with the reason), or "changed". The step is done when every line is marked. These come first: `reach` and the `new` list of `add_bound` (`solve.rs : 564`, :635); narrowing and the type test in `pattern.rs` (`:652`, `:886`); `values()` and `show_head` in `coverage.rs` (`:313`, `:1034`). A unit test runs the narrowing of rule 12 on `x : Int | ( a : Int )` with a clause `y : ( a : Int )` and a catch-all `n`, and checks that `n` is `Int` and that the type test is recorded.
+4. **Types core.** `Label` (with `Arc<str>`, so that `Ty` stays `Send` for the LSP), `Head::Record`, `Ty::Rec`, `Ty::Without`, `rec()`, `without()`, `is_headed`, `Access::Label`, with unit tests. Then the audit. The exact pattern `Ty::Con(..) | Ty::Fn(_)` finds only 8 lines at 1865366 (solve 6, display 1, known 1), so it is not the gate. The gate is a list: at the start of this step, save the output of `rg -n -e 'Ty::Con\(' -e 'Ty::Fn\(' -e '\.head\(\)' -e 'Head::' crates/ilang-check/src` (200 lines at 1865366: solve 36, display 49, known 34, infer 41, pattern 15, coverage 19, mod 6; more after T1) into the T3 pull request as a checklist, and mark each line "handles `Rec`/`Without`", "cannot see a record" (with the reason), or "changed". The step is done when every line is marked. These come first: `reach` and the `new` list of `add_bound` (`solve.rs:564`, :635); narrowing and the type test in `pattern.rs` (`:652`, `:886`); `values()` and `show_head` in `coverage.rs` (`:313`, `:1034`). A unit test runs the narrowing of rule 12 on `x : Int | ( a : Int )` with a clause `y : ( a : Int )` and a catch-all `n`, and checks that `n` is `Int` and that the type test is recorded.
 5. **Solver.** The Member arm and the arms of 4.4 (R-without-left with steps a to f, never sending a `Without` past a record member of a union or back to itself; it fails at once, with `FailKind::NoField` and `FailKind::LabelMayBe`; the left-`Inter` arm keeps the record failure; U3, arm 5a, proves multi-alternative inclusions without new bounds or rejects them), `&` and `|` of 4.5, the bounds of 4.6. `value_head` in `route`, `_ <: Diff`, `diff_in`, `diff_left` and `known::disjoint`. Run the unit tests.
 6. **Display and known types.** `display.rs` (with the read-back rule of 4.7, and the Namer keeping the names of `Param` labels), `shown.rs`, `known.rs` (with the record arms of T1's `whole_lits` and `hidden_inputs`, part 4.8). No `.out` file should change at this step, because no program has records yet; if one changes, find out why before going on.
 7. **Syntax.** AST, the scan (with the `,` rule), types (with `( ..R )`), the printer and the formatter (the `,` after a first field with `->`), parser tests. First check with a test that no correct program has a `,` directly inside the braces of a block or a clause block. Remove the "kept for records" error.
@@ -1225,7 +1225,7 @@ In order, after A1 and T1 have landed, T2 has merged, and S3 is approved.
 1. **Numbering.** Are §4.9, §6.13 and §14 still free after T1, T2, IO and M2? If §14 is taken, `i/record` takes the next free number.
 2. **D-types.** Do declared type variables stay flexible (part 5.8)? If not, is `Schema(R & Record)` the form library authors should write?
 3. **Union keys for `get`.** Allow `record.get(r, k)` with `k : { "a" | "b" }` as `r < : ( a : V ) & ( b : V )` in a later track?
-4. **Record patterns.** `( name: n )` as a pattern, after T1's pattern work: a later track, or never?
+4. **Record patterns.** `( name : n )` as a pattern, after T1's pattern work: a later track, or never?
 5. **Lisp surface.** Does M1 take the rows of part 13?
 6. **Shapes.** Should `-O2` add shape ids and inline caches for `.f` later, keeping `==` and `hash` canonical?
 7. **Codecs (for D-types and json-schema).** Is the two-parameter `Codec(D, E)` of part 5.9 good enough for the json-schema track? Its decoded type comes first, so the plan's `Codec(User, _) = user` reads the record type, and the shown encode type, which depends on the module's `encode` calls, is never read. Or should a later track add a "lacks" form (a record type with no field `K`), so that a one-parameter `Schema(A)` with `encode : (A) -> Json` can be built field by field?
@@ -1238,7 +1238,7 @@ In order, after A1 and T1 have landed, T2 has merged, and S3 is approved.
 ## 20. Resolution: normalization commutes with substitution
 
 This amendment is the hand-off for the conflict reported at `6a6edc8` in
-`tests/t3-stages.md : 78–145` and `tests/t3-forgetting-conflict.py : 116–140`.
+`tests/t3-stages.md:78–145` and `tests/t3-forgetting-conflict.py:116–140`.
 It changes the record algebra, not the runtime representation or library API.
 Controlling sources: spec §§4.1/4.4/4.7/4.9; accepted syntax; joint §§3/6; this record note; literal-types decisions 1–4/7 and value-types R/K/M; the plan’s “已定的设计” and T3 track; ledger G3 (approved J8, required substitution and Schema/Codec gates). The user authorizes this reconciliation of their conflict.
 
@@ -1758,20 +1758,20 @@ implemented compiler behavior.
 
 | Current region read | Fact and required change |
 |---|---|
-| `types/mod.rs : 47–79,155` | Head/Ty currently have no records; Ty owns recursive Vec/Box children. Merely adding Rec to Union is insufficient for U6: add shared immutable handles and identity-aware visitors. Keep runtime Record head separate from merge eligibility. |
-| `types/solve.rs : 335–487,713–762` | Variable storage and left-union conjunction exist; route uses the first matching head. Preserve whole-target storage, insert U3 before left-intersection/Without trials, and add pure structural/coverage/bound proofs. Closed record alternatives never route by first head. |
-| `types/solve.rs : 365–388,512–645,649–697` | Lower/upper propagation and bound comparison mutate the solver. U3 reads a saturated snapshot and does not call these mutators. Keep separate lower record bounds, including invariant field contents; retain scalar-specific fusion. |
-| `types/solve.rs : 936–1129` | union_in/inter_in/merge merge headed forms. U1/U2/U6 replace the record path with compact exact smart constructors, shared with display and substitution. Existing non-record leaf variance remains the structural proof relation. |
-| `types/display.rs : 138–184,705–780,912–966,1319` | Simplification and display rebuild recursively. Add graph memoization and full graph output; preserve variables and exact alternatives. Head merging may not turn record unions into summaries. |
-| `types/known.rs : 23–85,414–481,796–831` | Member selection, matching and literal widening need U5’s summary of all records. Summaries stay separate from inferred graphs and aliases. Avoid a Cartesian expansion to find guaranteed fields. |
-| `types/infer.rs : 696–789,979–1090,2337–2388` | **Place checking starts at 696; written conversion starts at 979**, not at union helpers. Generalization/rebuild start at 2337/2355. Remove record-count places, preserve ordinary-variable places, discharge U3 before generalization and rebuild graphs exactly. These replace the review's pre-merge anchors 658/919. |
-| `types/infer.rs : 1705–1866` | Field access builds inferred parts and Access::Field. Add record access via every alternative with union results; no known-summary substitution for inferred field types. |
-| `types/value_types.rs : 715–799,991–1040,1441` | finish_reads takes a snapshot for completion; complete_ready_reads publishes ready reads; check_value_places handles expanded value types. Finish pending U3 checks before snapshot/publication and after any completion constraints affecting them. Preserve T2's one-batch fixation and closed foreign-read rules. Resource failure publishes no alias. |
-| `types/pattern.rs : 470–501,595–655,871–927`; `types/coverage.rs : 277–330`; `types/shown.rs : 10–33` | Pattern/narrowing, coverage and shown forms consume types. Visit shared alternatives on demand; one Record/All runtime test still represents all record alternatives. Extend shown types with exact graph output. |
-| `crates/ilang-cli/src/commands/package.rs : 1263–1280,1366–1429`; `crates/ilang-check/src/query.rs : 1300,1414–1421` | Canonical text, completed aliases and written types feed interfaces; query records constructor field access. Add versioned exact graph encoding/decoding and Label access. Byte inequality is not semantic inequality. |
-| `crates/ilang-syntax/src/parser.rs : 1175–1181,1784–1818` | Record shapes remain reserved. Future record programs below have not been compiler-run. T3 must replace the reservation, then run them as compiler gates. |
+| `types/mod.rs:47–79,155` | Head/Ty currently have no records; Ty owns recursive Vec/Box children. Merely adding Rec to Union is insufficient for U6: add shared immutable handles and identity-aware visitors. Keep runtime Record head separate from merge eligibility. |
+| `types/solve.rs:335–487,713–762` | Variable storage and left-union conjunction exist; route uses the first matching head. Preserve whole-target storage, insert U3 before left-intersection/Without trials, and add pure structural/coverage/bound proofs. Closed record alternatives never route by first head. |
+| `types/solve.rs:365–388,512–645,649–697` | Lower/upper propagation and bound comparison mutate the solver. U3 reads a saturated snapshot and does not call these mutators. Keep separate lower record bounds, including invariant field contents; retain scalar-specific fusion. |
+| `types/solve.rs:936–1129` | union_in/inter_in/merge merge headed forms. U1/U2/U6 replace the record path with compact exact smart constructors, shared with display and substitution. Existing non-record leaf variance remains the structural proof relation. |
+| `types/display.rs:138–184,705–780,912–966,1319` | Simplification and display rebuild recursively. Add graph memoization and full graph output; preserve variables and exact alternatives. Head merging may not turn record unions into summaries. |
+| `types/known.rs:23–85,414–481,796–831` | Member selection, matching and literal widening need U5’s summary of all records. Summaries stay separate from inferred graphs and aliases. Avoid a Cartesian expansion to find guaranteed fields. |
+| `types/infer.rs:696–789,979–1090,2337–2388` | **Place checking starts at 696; written conversion starts at 979**, not at union helpers. Generalization/rebuild start at 2337/2355. Remove record-count places, preserve ordinary-variable places, discharge U3 before generalization and rebuild graphs exactly. These replace the review's pre-merge anchors 658/919. |
+| `types/infer.rs:1705–1866` | Field access builds inferred parts and Access::Field. Add record access via every alternative with union results; no known-summary substitution for inferred field types. |
+| `types/value_types.rs:715–799,991–1040,1441` | finish_reads takes a snapshot for completion; complete_ready_reads publishes ready reads; check_value_places handles expanded value types. Finish pending U3 checks before snapshot/publication and after any completion constraints affecting them. Preserve T2's one-batch fixation and closed foreign-read rules. Resource failure publishes no alias. |
+| `types/pattern.rs:470–501,595–655,871–927`; `types/coverage.rs:277–330`; `types/shown.rs:10–33` | Pattern/narrowing, coverage and shown forms consume types. Visit shared alternatives on demand; one Record/All runtime test still represents all record alternatives. Extend shown types with exact graph output. |
+| `crates/ilang-cli/src/commands/package.rs:1263–1280,1366–1429`; `crates/ilang-check/src/query.rs:1300,1414–1421` | Canonical text, completed aliases and written types feed interfaces; query records constructor field access. Add versioned exact graph encoding/decoding and Label access. Byte inequality is not semantic inequality. |
+| `crates/ilang-syntax/src/parser.rs:1175–1181,1784–1818` | Record shapes remain reserved. Future record programs below have not been compiler-run. T3 must replace the reservation, then run them as compiler gates. |
 
-The left-intersection loop at `types/solve.rs : 389–415` truncates failures but
+The left-intersection loop at `types/solve.rs:389–415` truncates failures but
 does not roll back successful bounds. It cannot implement U3 by speculative
 calls. The pure helper must return Proven/Refuted/Unknown/ResourceLimit;
 resource failure is never cached as a negative semantic answer.
@@ -1825,10 +1825,10 @@ The original `tests/t3-forgetting-conflict.py` is retained unchanged as the
 historical failing witness. The new model includes an old-rule mode with
 J8's guard and the old common-field join, and a new-rule mode. Neither mode
 calls the compiler. The implementation-stage record says record syntax is
-still reserved (`tests/t3-stages.md : 111–118`); no compiler execution of these
+still reserved (`tests/t3-stages.md:111–118`); no compiler execution of these
 examples is claimed.
 
-The original bounded grammar (`tests/t3-record-substitution.py : 169–211`) is
+The original bounded grammar (`tests/t3-record-substitution.py:169–211`) is
 explicit, not an assertion about all type trees:
 three labels a/b/c, each absent or of type Never/1/Int/A; the one variable A
 may also be a base. Each atom and each unordered pair's union receives each
@@ -1850,7 +1850,7 @@ also checks order independence. A further 1,024 label substitutions include
 colliding labels and a fresh label; these are focused checks, not exhaustive
 quantification over arbitrary labels.
 
-A separate set interpreter (`tests/t3-record-substitution.py : 217–272`) uses all 64 finite records over absence, 1,
+A separate set interpreter (`tests/t3-record-substitution.py:217–272`) uses all 64 finite records over absence, 1,
 another Int and a non-Int. It performs **33,344** closed-flat set checks,
 including unions, intersections, every removal set and nested removals.
 The new rules have zero mismatches; the old mode differs from the specified
@@ -1866,11 +1866,11 @@ record composition; the model supplies bounded executable evidence.
 `direnv exec /home/agent/Programming/i python3 tests/t3-record-demand.py`.
 The original model remains an eager, bounded algebra oracle; it is not the
 U6 implementation strategy. The new model uses interned integer handles,
-local exact constructors (`tests/t3-record-demand.py : 38–96`), memoized substitution
+local exact constructors (`tests/t3-record-demand.py:38–96`), memoized substitution
 (:98), a graph codec (:143–164), pure bounded proofs (:166–216) and a finite
 flat-set oracle for closed field coverage (:354–366).
 
-Its bounded compact grammar (`tests/t3-record-demand.py : 228–248`) has 67 atoms: A, Never, the all-record type and
+Its bounded compact grammar (`tests/t3-record-demand.py:228–248`) has 67 atoms: A, Never, the all-record type and
 all three-field records over Never/1/Int/A. It takes each unordered atom pair,
 both union and intersection, and removal sets empty/{a}/{a,b,c}: **13,668**
 trees. Substituting each of the original 64 closed records checks **874,752**
@@ -1885,12 +1885,12 @@ interpreter. Additional probes cover wrap_union, pair, covariant nominal
 fields, function variance, bounds beneath fields, bound direction and cycles,
 Schema's exact field read, a missing field, and ResourceLimit followed by a
 successful retry. The review's extension is retained as a separate bounded
-function (`tests/t3-record-demand.py : 251–319`): **324** two-variable/four-label/nested sources, **15,876**
+function (`tests/t3-record-demand.py:251–319`): **324** two-variable/four-label/nested sources, **15,876**
 substitutions and **4,202** independent flat-set comparisons, with an old-rule
 negative control. Nested cases there remain structural checks.
 
 Measured 20-step construction/check/serialization/decoding
-(`tests/t3-record-demand.py : 375–410`): branch family
+(`tests/t3-record-demand.py:375–410`): branch family
 **137 reachable nodes / 3,487 bytes**, about **0.0013 s**; open Fan **81 nodes /
 2,091 bytes**, about **0.0009 s**, including substitution to its one closed
 record and a record-domain proof. Both meet the model's <0.1s target. The

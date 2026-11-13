@@ -1354,7 +1354,7 @@ and the environment part `"!" Union` of a function type.
 - **Annotation layout (owner).** The normal printer uses the same rule for
   `:` as for `=`: a space on either side and the same continuation layout.
   Examples: `inspect : <A>(A) -> String`, `(name : String, age : Int)` and
-  `<- (db : Db)`. A segment's compact `value : Format` is unchanged: it has
+  `<- (db : Db)`. A segment's compact `<<value:Format>>` is unchanged: it has
   no `=` counterpart and is not a type annotation (spec §8.1).
 - **Annotations.** `Annot = Inter` is the single rule for a type after `:`:
   it ends at any `|` outside brackets (`( )`, `{ }`, `< >`). While reading
@@ -2750,7 +2750,7 @@ wrap each body as `(<- body (, value …))`, the provide of §2.10.5.
 | 5 | `T = (A, B)` | Transparent alias | Labelled type | Silent until a value of `(A, B)` is used as `T` |
 | 6 | `e \|> (x) { … }` | Ordinary call of a function literal | Match in place | Silent: no frame, tail position and stop messages change |
 | 7 | `()` | Empty record, type `Record` | Empty data, type `()` | Silent for values; types change |
-| 8 | Inspect text of records and labelled constructor values | `(label: value)`, `User("ada", 36)` | `(label = value)`, `User(age = 36, name = "ada")` | Silent: printed output changes |
+| 8 | Inspect text of records and labelled constructor values | `(label : value)`, `User("ada", 36)` | `(label = value)`, `User(age = 36, name = "ada")` | Silent: printed output changes |
 | 9 | `x<-1` | `x < -1` | A provide of `1` to `x` | Loud: a compile error (none in the corpus) |
 | 10 | An error raised inside a function kept by `keep` and called after its `catch` ended | Goes to the caller's `fail.catch` | Same with the signature of §2.10.8; a `Fail` captured elsewhere stops with "boundary not active" | Loud at run time, with a warning at compile time |
 | 11 | `fail.raise`, `fail.catch` | Built-in operations | Library code over `Fail` and `control.escape` | Silent; frames in stop messages may change |
@@ -2842,7 +2842,7 @@ printed unchanged.
 | `x<-1` | `x < -1` | None in the corpus; the migrator checks. |
 | Labelled call of a function `f(b: g(), a: h())` | `f(h2, b1)` with locals | Positional in parameter order. When the order changes and two or more moved arguments are not direct values (spec §6.10), bind each such argument, in written order, to a fresh local in a group block: `{ _syn3_0 = g()  f(h(), _syn3_0) }`. Fresh names start with `_syn3_` and are checked against every name in scope. Stage 4. |
 | Constructor call with positional arguments to labelled fields | `C(name = e1, age = e2)` | Stage 4. |
-| Labelled constructor argument `C(name: e)` | `C(name = e)` | |
+| Labelled constructor argument `C(name : e)` | `C(name = e)` | |
 | Constructor pattern punning `User(name, age)`, `User(n = name, ..)` | `User(name = name, age = age)`, `User(name = n, ..)` | No shorthand (O12). |
 | Record `(name : "ada")`, `(..e, f: v)`, `C(..v, f: e)` | `(name = "ada")`, `(..e, f = v)`, `C(..v, f = e)` | |
 | Record type `(name : String)` | `(name = String)` | Inside a function type's parameter, `((a : Int)) -> T` becomes `((a = Int)) -> T`. |
@@ -2850,7 +2850,7 @@ printed unchanged.
 | `a \|> f == b`, `a == b \|> f` | `{ a \|> f } == b`, `a == { b \|> f }` | Stage 5. |
 | `e \|> (x) { … }` (function literal) | unchanged text | Now a match (§7.1 row 6). The migrator lists these for review of stop-message expectations. |
 | Open records, `Record`, `i/record`, label parameters | not migrated | 23 test files (evaluation), rewritten by hand or deleted in stage 6. |
-| Inspect expectations in tests | regenerated | `(label: value)` becomes `(label = value)`; labelled constructor values gain their labels. |
+| Inspect expectations in tests | regenerated | `(label : value)` becomes `(label = value)`; labelled constructor values gain their labels. |
 | `.is` files and Lisp strings in Rust tests | Lisp rows of §6.8 | Parameters `(a b)` become `(, a b)` and `()` becomes `(,)`; the pipe `(\| e f)` becomes `(\|> e f)`; a clause block `{ (-> p e) … }` becomes the chain `(\| (-> (, p) _ e) …)` and a match `(\| s { … })` becomes `(\|> s (\| …))`; `(: x e)` labels become `(= x e)`; `(U { … })` becomes several `(= C (, …))` items; `(! x N)` in the parameters becomes the service pattern `(<- R (, (: x N)))`; `(! N e)` statements become `(<- … (, e))`; `(! (^ R E) V)` result wrappers become `(<- R (, (Fail E) …))`; `i/syntax` node values gain `Node(…)` and lose the `Int` and `Float` wrappers. Quote patterns and templates are rewritten with the same rows. |
 | Rust-embedded snippets and doc fences | converted | The `old-syntax-check` inventory lists them. |
 

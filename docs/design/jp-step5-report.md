@@ -76,7 +76,7 @@ An early smoke using the pre-rebuild CLI reported `E0523 ... UnknownModule` for
 macro compiler plans; rebuilding after sandbox-plan isolation resolved it.
 
 The initial workspace formatter check reported formatting diffs, including
-`Diff in .../crates/ilang-cli/tests/cli_log.rs : 13`; touched Rust files were formatted
+`Diff in .../crates/ilang-cli/tests/cli_log.rs:13`; touched Rust files were formatted
 with rustfmt. Formatting of unrelated imported files was outside this task.
 
 The named-entry smoke initially used an invalid package-qualified `[entries]`

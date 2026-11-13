@@ -72,7 +72,7 @@ All rows below are staged in `docs/spec.md` by this lane, except where noted.
 | Change 1 postfix match `e.{ }` | superseded by USER L 11-11 "e.{} 废除" | no (correct) | — |
 | Change 2 bare pipe `\|` replacing `\|>` | superseded by USER L 11-11 (pipe stays `\|>`) | no (correct) | — |
 | Change 3 error type `^`, `?` only a guard | USER L 11-11; `^` then superseded by O24/O27 (syntax three) | yes §3, §4.6 (today); staged replacement removes it | no today |
-| Change 4 records and record types in parentheses `(name: v)` | USER L 11-11; superseded by O7/O10 (data with `label = v`, no open records) | yes (today); staged replacement | no today |
+| Change 4 records and record types in parentheses `(name : v)` | USER L 11-11; superseded by O7/O10 (data with `label = v`, no open records) | yes (today); staged replacement | no today |
 | Change 5 tuples positional, at least one item, no label mixing | USER L 11-11; superseded by O8 (data mixes positions and labels) | yes (today); staged replacement | no today |
 | Change 6 empty record `()`, type `Record`, `()` forbidden in types | USER L 11-11; superseded by O7/§5.2.2 (`()` is the empty data type, `Record` removed) | yes (today); staged replacement | no today |
 | Change 7 `@main` removed; `main` of `src/main.i`; `[entries]` | USER L 11-11, refined by USER L 11-12 (no file runs, no `--entry`, `i run NAME`) | yes §2.6, §10.2 | no |
@@ -90,7 +90,7 @@ All rows below are staged in `docs/spec.md` by this lane, except where noted.
 | Guard with `?` | owner; position changed by O17 | yes (today); staged replacement | — |
 | One-clause unguarded clause block is a binding (reports to `Assert`) | owner; carried into the staged "group with one branch" rule | yes §6.12 (today); staged | yes |
 | Type variables declared after the binding name `map(A, B) =` | owner; superseded by O23 | yes §2.5, §4.7 (today); staged replacement | — |
-| Records `(name: e)`, `Record` | superseded (see syntax-2, syntax-3) | — | — |
+| Records `(name : e)`, `Record` | superseded (see syntax-2, syntax-3) | — | — |
 | Lowercase types read the type of a value; alias patterns (T2) | coord (T2) | yes §3, §4.3 | no |
 | Forms reserved for macros are compile errors | superseded by meta.md (macros landed, M1–M4) | yes §1.4, §2.2, §3 — **stale** | no |
 | A1/A2/A3 migration notes | historical | n/a | — |

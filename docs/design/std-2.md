@@ -20,28 +20,28 @@ Controlling sources, in order:
 
 | Source | Decision it controls |
 |---|---|
-| `docs/spec.md : 127–145`, `:221–230` | Ordinary package modules, acyclic imports, opaque constructors and fields. No new compiler-recognized std path. |
-| `docs/spec.md : 348–463`, `:854–909` | Types are sets; rank-one principal inference and value restriction; service arguments compare equally; errors and services are distinct. |
-| `docs/spec.md : 591–598`, `:1124–1155` | Strict calls, arbitrary-size exact integers, truncating division, structural value equality, tail calls. |
-| `docs/design/syntax.md : 99–253`, `:372–386` | Import/export groups, declared type variables, ordinary clause functions. |
-| `docs/design/runtime.md : 974–1060`, `:1186–1274` | Clock nanoseconds and origin; arguments exclude program name; explicit stderr output and flush; IO errors and Await/Owner requirements. These are approved future APIs, not available modules. |
-| `docs/design/std-1.md : 1–20`, §2, §3.1–3.4, §8–10 | Exact contracts, pure `Result` validation, invariant stored service rows, compiler probes and honest implementation gates. |
-| Plan `/home/agent/.claude/plans/twinkling-swinging-perlis.md : 30–58`, `:79`, `:510–549` | No keywords or library exceptions; log uses a sink service; pure std first, time.now after IO. |
-| Ledger `/home/agent/Programming/i/.rd/cache/ledger.md : 94–100`, `:128–147` | K1 repaired invariant factory generalization; Std-1 landed; native representation accepted; nominal field privacy landed. Keep inference intact; later IO/provider integration must follow the accepted target rulings. |
+| `docs/spec.md:127–145`, `:221–230` | Ordinary package modules, acyclic imports, opaque constructors and fields. No new compiler-recognized std path. |
+| `docs/spec.md:348–463`, `:854–909` | Types are sets; rank-one principal inference and value restriction; service arguments compare equally; errors and services are distinct. |
+| `docs/spec.md:591–598`, `:1124–1155` | Strict calls, arbitrary-size exact integers, truncating division, structural value equality, tail calls. |
+| `docs/design/syntax.md:99–253`, `:372–386` | Import/export groups, declared type variables, ordinary clause functions. |
+| `docs/design/runtime.md:974–1060`, `:1186–1274` | Clock nanoseconds and origin; arguments exclude program name; explicit stderr output and flush; IO errors and Await/Owner requirements. These are approved future APIs, not available modules. |
+| `docs/design/std-1.md:1–20`, §2, §3.1–3.4, §8–10 | Exact contracts, pure `Result` validation, invariant stored service rows, compiler probes and honest implementation gates. |
+| Plan `/home/agent/.claude/plans/twinkling-swinging-perlis.md:30–58`, `:79`, `:510–549` | No keywords or library exceptions; log uses a sink service; pure std first, time.now after IO. |
+| Ledger `/home/agent/Programming/i/.rd/cache/ledger.md:94–100`, `:128–147` | K1 repaired invariant factory generalization; Std-1 landed; native representation accepted; nominal field privacy landed. Keep inference intact; later IO/provider integration must follow the accepted target rulings. |
 
 Code read, and its consequences:
 
 | Code region | Checked fact |
 |---|---|
-| `lib/i/clock.i : 1`, `lib/i/process.i : 1`, `lib/i/stdio.i : 1`; `crates/ilang-package/src/library.rs : 7–24` | The three IO modules contain reservation comments and export no API. They are embedded by the compiler. Do not add imports of their future names in phase one. |
-| `std/src/option.i : 1–6`, `:28–31`; `std/src/result.i : 1–5`; `lib/i/fail.i : 10–33` | Absence uses Option, fallible pure operations use Result, and fail.from_result/catch bridge to error effects. Follow this style. |
-| `std/src/int.i : 60–110`, `:355–411` | Integer parsing has an explicit grammar. `/` and remainder helpers differ from floor division/modulo. Negative epoch conversion needs floor division. |
-| `std/src/string.i : 70–94`, `:299–308`; `lib/i/core.i : 91–117` | Codepoint traversal and fragment concatenation exist. Repeated pop_codepoint reconstructs the remainder; scan one codepoint list or byte array instead. |
-| `std/src/order.i : 21–27`; `std/src/stream.i : 43–73`, `:93–109` | Order is Less/Equal/Greater; a stored service row uses an ordinary negative marker to keep it invariant. Reuse that technique for sinks. |
-| `std/src/dict.i : 24–60`; `std/src/list.i : 493–512` | Nominal storage and left-to-right Result folds are ordinary source; they suffice for descriptor metadata and validation; no typed heterogeneous runtime dictionary is needed. |
-| `crates/ilang-check/src/types/infer.rs : 231–247`, `:2127–2156`, `:2256–2285`, `:2340–2348` | Recursive groups start monomorphic; generalization and variance traverse ordinary types, including function effects. Do not propose polymorphic recursive parser trees. |
-| `crates/ilang-check/src/types/infer.rs : 1606–1624` | Field selection now checks hidden constructors. Calendar validation cannot be bypassed through constructor update or a public field. |
-| `crates/ilang-check/src/types/solve.rs : 688–714`, `:801–870`, `:950–999` | Environment unions, argument variance, and occurs checking are general solver operations. The logging probe in §7 exposes a failure here; this note does not diagnose its exact cause. |
+| `lib/i/clock.i:1`, `lib/i/process.i:1`, `lib/i/stdio.i:1`; `crates/ilang-package/src/library.rs:7–24` | The three IO modules contain reservation comments and export no API. They are embedded by the compiler. Do not add imports of their future names in phase one. |
+| `std/src/option.i:1–6`, `:28–31`; `std/src/result.i:1–5`; `lib/i/fail.i:10–33` | Absence uses Option, fallible pure operations use Result, and fail.from_result/catch bridge to error effects. Follow this style. |
+| `std/src/int.i:60–110`, `:355–411` | Integer parsing has an explicit grammar. `/` and remainder helpers differ from floor division/modulo. Negative epoch conversion needs floor division. |
+| `std/src/string.i:70–94`, `:299–308`; `lib/i/core.i:91–117` | Codepoint traversal and fragment concatenation exist. Repeated pop_codepoint reconstructs the remainder; scan one codepoint list or byte array instead. |
+| `std/src/order.i:21–27`; `std/src/stream.i:43–73`, `:93–109` | Order is Less/Equal/Greater; a stored service row uses an ordinary negative marker to keep it invariant. Reuse that technique for sinks. |
+| `std/src/dict.i:24–60`; `std/src/list.i:493–512` | Nominal storage and left-to-right Result folds are ordinary source; they suffice for descriptor metadata and validation; no typed heterogeneous runtime dictionary is needed. |
+| `crates/ilang-check/src/types/infer.rs:231–247`, `:2127–2156`, `:2256–2285`, `:2340–2348` | Recursive groups start monomorphic; generalization and variance traverse ordinary types, including function effects. Do not propose polymorphic recursive parser trees. |
+| `crates/ilang-check/src/types/infer.rs:1606–1624` | Field selection now checks hidden constructors. Calendar validation cannot be bypassed through constructor update or a public field. |
+| `crates/ilang-check/src/types/solve.rs:688–714`, `:801–870`, `:950–999` | Environment unions, argument variance, and occurs checking are general solver operations. The logging probe in §7 exposes a failure here; this note does not diagnose its exact cause. |
 
 These are reading results. Algorithms and costs below are design deductions;
 §10 separately records executed checks. The four production modules do not yet
@@ -824,7 +824,7 @@ inference must not turn the public errors/services into Any-like dynamic data.
 ## 8. Replacement spec text, section by section
 
 The normative language spec explicitly leaves other libraries outside the
-language (`docs/spec.md : 14`). These modules need no language change. Follow
+language (`docs/spec.md:14`). These modules need no language change. Follow
 Std-1’s accepted no-spec-change decision (§10), rather than inserting std path
 exceptions into §9. The exact replacement set for this track is empty:
 
@@ -866,8 +866,8 @@ for later authorized implementation, not permission to modify other lanes.
 | New `std/src/cli.i`, entire file | A1–A8, descriptor validation, scanner, buckets, typed decoders, help; later add read. |
 | New `std/src/log.i`, entire file | L1–L6 plus §7 gate; later append stderr and IO imports. No @host declaration. |
 | New `std/test/{time,calendar,cli,log}_test.i`, entire files | All tables above; laws, error ordering and boundary cases. Keep IO-fake cases in the matching second phase. |
-| `crates/ilang-check/src/types/solve.rs : 688–714`, `:801–870`, `:950–999`; `infer.rs : 2127–2156`; type-checker regression tests | Compiler owner investigates §7. These are starting regions, not a claim that all need edits. Exported generic wrappers and closed client calls need paired regression tests. |
-| `lib/i/{clock,process,stdio}.i : 1`, request module and registration `crates/ilang-package/src/library.rs : 7–24` | IO/runtime owners replace reservations and add the accepted request APIs. Std-2 edits none of these. |
+| `crates/ilang-check/src/types/solve.rs:688–714`, `:801–870`, `:950–999`; `infer.rs:2127–2156`; type-checker regression tests | Compiler owner investigates §7. These are starting regions, not a claim that all need edits. Exported generic wrappers and closed client calls need paired regression tests. |
+| `lib/i/{clock,process,stdio}.i:1`, request module and registration `crates/ilang-package/src/library.rs:7–24` | IO/runtime owners replace reservations and add the accepted request APIs. Std-2 edits none of these. |
 | `std/i.toml : 1`; `docs/spec.md` | No manifest or language-spec change required. All new imports are std or accepted i library modules. |
 
 1. Implement pure time first, then calendar. CLI is independent. Log needs

@@ -238,7 +238,7 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 | Unary operator | `-e`, `-.e` | `(- e)`, `(-. e)` |
 | Field, tuple part | `e.x`, `e.0` | `(. e x)`, `(. e 0)` |
 | Tuple | `(e1, e2)`, `(e)` | `(, e1 e2)`, `(, e)` |
-| Structural record | `()`, `(x: e)`, `(..e, x: v)` | `()`, `{ (: x e) }`, `{ .. e (: x v) }` |
+| Structural record | `()`, `(x : e)`, `(..e, x: v)` | `()`, `{ (: x e) }`, `{ .. e (: x v) }` |
 | Match | `e.{ p -> v }` | `(. e { (-> p v) })` |
 | List | `[e1, e2]`, `[e1, ..e2]` | `[e1 e2]`, `[e1 .. e2]` |
 | Bit array | `<<e1, e2: f, e3: f(e4)>>` | `<<e1 (: e2 f) (: e3 (f e4))>>` |

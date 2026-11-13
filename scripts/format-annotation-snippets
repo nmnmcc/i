@@ -18,6 +18,12 @@ M = runpy.run_path(str(ROOT / 'scripts/migrate-annotations'))
 CHECK = M['CHECK']
 
 
+def opaque_inline(source):
+    return bool(re.search(r'\.(?:rs|py|md|js|mjs|i|is|ts)\s*:\s*\d', source)
+                or re.match(r'^(?:ilang\w*|node|app|async|frame|errno|error)\s*:', source)
+                or re.search(r'\b(?:Vec|Option)<', source))
+
+
 def spaced(source, colons):
     data = source.encode()
     for at in reversed(colons):
@@ -75,9 +81,15 @@ def main():
             if any(a <= match.start() < b for a,b in fences):
                 continue
             source = match[1]
-            if re.search(r'\b[a-z_]\w*\s*:\s*[A-Z_{(<0-9"]', source):
+            if opaque_inline(source):
+                continue
+            annotation = re.search(r'\b[a-z_]\w*\s*:\s*[A-Z_{(<0-9"]', source)
+            value_type = (re.search(r'\b[a-z_]\w*\s*:\s*[a-z_]', source)
+                          and any(c in source for c in '()={}'))
+            if annotation or value_type:
                 items.append(dict(path=str(path.relative_to(ROOT)), source=source, start=match.start(1),
-                                  end=match.end(1), kind='inline', lisp=False))
+                                  end=match.end(1), kind='inline', lisp=False,
+                                  valid_inline_only=bool(value_type and not annotation)))
     requests = [dict(source=item['source'], lisp=item['lisp'], format=True) for item in items]
     data = ''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in requests)
     result = subprocess.run([str(args.driver)], input=data, text=True, capture_output=True, check=True)
@@ -89,6 +101,10 @@ def main():
     for item, result in sorted(zip(items, results), key=lambda pair: (pair[0]['path'], -pair[0]['start'])):
         source = item['source']
         entry = item.get('entry', {})
+        # A lowercase type name is also common in ABI pseudocode and older
+        # surface examples. Only extend the selection to valid i fragments.
+        if item.get('valid_inline_only') and result['diagnostics']:
+            continue
         if item['kind'] in ('rust', 'js', 'python') and not CHECK['candidate'](source) and not entry and not source.startswith(': ') and not item.get('source_context'):
             if result['diagnostics'] and not re.match(r'^[A-Z][A-Za-z0-9]*:\s*(?:\(|[A-Z])', source):
                 continue

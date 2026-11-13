@@ -24,7 +24,7 @@ The controlling spec sections are §4.7–4.8 (principal inference), §6.2
   sign, and division/remainder by zero give zero (§11.2).
 - Each Float operation rounds to binary64, nearest with ties to even; a
   non-finite result stops immediately; division by either zero gives positive
-  zero (§11.3; `runtime/core.rs : 19–22`). Here `runtime/` and `emit/` abbreviate
+  zero (§11.3; `runtime/core.rs:19–22`). Here `runtime/` and `emit/` abbreviate
   directories under `crates/ilang-wasm/src/`.
 - Numeric and aggregate equality is by value, but functions, boundaries,
   continuations and host references have identity (§11.4). Float equality
@@ -75,8 +75,8 @@ Artifacts under `target/numeric/`:
 Build with `target/release/i build --project target/numeric/project --opt 0
 --out target/numeric/o0.wasm`, then the same with `2`; print binaries with
 `wasm-tools print`. The CLI's `--wat` is pre-Binaryen, so it cannot stand in for
-optimized WAT (`crates/ilang-cli/src/main.rs : 214–228`,
-`crates/ilang-cli/src/lib.rs : 146–162,190–198`). Run `count.py 0` and `count.py 2`.
+optimized WAT (`crates/ilang-cli/src/main.rs:214–228`,
+`crates/ilang-cli/src/lib.rs:146–162,190–198`). Run `count.py 0` and `count.py 2`.
 Run `cache/quiet direnv exec /home/agent/Programming/i bash
 target/numeric/time.sh` from this lane. The wrapper reserves all three heavy
 slots. Future implementation moves the kernels to bench/, not this commit.
@@ -84,10 +84,10 @@ slots. Future implementation moves the kernels to bench/, not this commit.
 The timer reuses the Std-3 Wasmtime 50.0.1 C API with copying GC, read from
 `.rd/note-std3/target/std3-prof-env`; Python bytecode writes are disabled. That
 upstream build selects Copying for Auto when gc-copying is compiled in
-(`target/std3-c-api-tool/wasmtime-50.0.1/crates/wasmtime/src/config.rs : 3708–3711`,
+(`target/std3-c-api-tool/wasmtime-50.0.1/crates/wasmtime/src/config.rs:3708–3711`,
 in the evidence lane). Its default initial heap differs from i's 256 MiB,
 and its patch version differs from i's pinned 50.0.0. i selects collector/heap
-at `crates/ilang-host/src/lib.rs : 791–793,1534–1547`. These are embedded execution
+at `crates/ilang-host/src/lib.rs:791–793,1534–1547`. These are embedded execution
 measurements, not CLI startup timings.
 
 Machine: Linux 6.18.56, x86-64, AMD EPYC-Genoa virtual CPU, 16 exposed CPUs.
@@ -269,13 +269,13 @@ f64.le
 Full evidence: `target/numeric/horner-o2-hot.wat : 2–28`;
 `integer-o2-hot.wat : 31–80`; tuple helper `tuples-o2-hot.wat : 71`;
 fold handler `closures-o2-hot.wat : 132`. O0 executes runtime paths at
-`runtime/core.rs : 11–24`, `runtime/values.rs : 52–73`,
-`runtime/bigint.rs : 220–228,260–268,304–311`. Each kernel has its own retained
+`runtime/core.rs:11–24`, `runtime/values.rs:52–73`,
+`runtime/bigint.rs:220–228,260–268,304–311`. Each kernel has its own retained
 O0/O2 hot WAT file, including sine and dot.
 
 Binaryen already uses closed-world speed level 2, shrink level 0, observable
 traps and an always-inline limit of 20 expressions
-(`crates/ilang-binaryen/src/lib.rs : 40–47,106–112`). Its pinned
+(`crates/ilang-binaryen/src/lib.rs:40–47,106–112`). Its pinned
 `src/passes/pass.cpp` includes at O2:
 
 - GC type/signature refinement, global type optimization and constant-field
@@ -296,7 +296,7 @@ reference parameters/results. Signature refinement narrows reference types,
 not eqref to f64 (`SignatureRefining.cpp : 18–24,205–260`). O2 inlining stops at the 20-expression always-inline limit
 for multiply-used, nontrivial helpers (`Inlining.cpp : 148–195`); checking,
 allocation and shadow operations increase their size. Closure calls can be
-split for capture before Binaryen runs (`control.rs : 273–304`); later resolving
+split for capture before Binaryen runs (`control.rs:273–304`); later resolving
 a call does not rerun i's control analysis. These measured survivors motivate
 earlier lowering; Binaryen does have useful GC optimizations.
 
@@ -334,7 +334,7 @@ These are performance controls, not compiler implementations or full proofs.
 The supplied Std-3 controls, separately measured and **not rerun here**, are
 131 ns scalar sine, 250 ns with finite checks after emitted arithmetic, and
 130 ns native C for the same algorithm; native libm is about 10 ns. Source:
-`de4d58d : docs/design/std-3.md : 1318–1525` and `.rd/cache/gpt/report-std3b.md`.
+`de4d58d:docs/design/std-3.md:1318–1525` and `.rd/cache/gpt/report-std3b.md`.
 They combine inlining, scalar replacement and LLVM cleanup: 15,212 / 250 =
 61-fold opportunity and 250 / 131 = 1.91-fold check-removal opportunity are not
 independent speedups to multiply or promise.
@@ -380,7 +380,7 @@ it. Bottom/unreachable does not license a cast in reachable code.
 Keep solver terms or stable post-solve facts, not printed type strings. Today
 Typed has exported scheme trees, field access and type-test maps, but no full
 expression-type map; local solver data is optional editor output
-(`crates/ilang-check/src/types/mod.rs : 148–210`, `types/infer.rs : 194–227`). Add a
+(`crates/ilang-check/src/types/mod.rs:148–210`, `types/infer.rs:194–227`). Add a
 small code-generation fact table computed from final solved types and recorded
 expression/parameter handles. Coordinate this export with T1 and T2, separately
 from lowering work: freeze facts only after their completed inference lifecycle,
@@ -395,7 +395,7 @@ available in lower.rs.
 
 Add explicit conversions and a result representation to the IR; distinguish
 F64, source SmallInt, and internal I64/I32. Existing LocalType lacks F64 and
-Func lacks a result-type field (`ir.rs : 113–120,497–508`). Verify every operand,
+Func lacks a result-type field (`ir.rs:113–120,497–508`). Verify every operand,
 call and branch assignment. Locals can have multiple definitions in this
 structured IR: use per-definition versions for analysis and convert on incoming
 edges; do not assume local numbers are SSA. T1 literal Int sets can give bounds,
@@ -426,10 +426,10 @@ scalar form. Box once per dominating value where useful; local consumers stay
 scalar. Preserve all bits when boxing. Numeric object identity is not observable
 (§11.4). Generic helpers remain for untransformed code.
 
-Reason/current seams: parameters are all Value (`lower.rs : 1352–1405`); emitted
-functions have eqref parameters/results (`emit/mod.rs : 284–295`); literals
-allocate (`emit/mod.rs : 490–495`); arithmetic helpers combine checking and boxing
-(`runtime/core.rs : 11–24`, `runtime/values.rs : 52–59`). Split these decisions in
+Reason/current seams: parameters are all Value (`lower.rs:1352–1405`); emitted
+functions have eqref parameters/results (`emit/mod.rs:284–295`); literals
+allocate (`emit/mod.rs:490–495`); arithmetic helpers combine checking and boxing
+(`runtime/core.rs:11–24`, `runtime/values.rs:52–59`). Split these decisions in
 i's lowering rather than asking later passes to recover them.
 
 ### R3. Known calls use bounded scalar workers; function values keep their identity
@@ -447,7 +447,7 @@ closure's function-reference field or reached by casting that reference.
 Known Float functions can call workers with f64 parameters/results. A known
 closure passes the **original closure object** and current environment to its
 selected code. The current Direct path passes null, so merely changing the
-function id is wrong (`ir.rs : 249–255`, `emit/mod.rs : 443–457`). Add explicit
+function id is wrong (`ir.rs:249–255`, `emit/mod.rs:443–457`). Add explicit
 known-code-plus-closure calls. A generic fold may have a Float-accumulator,
 known-callback worker while still receiving the callback's actual captures.
 Different capture values do not create variants. Unknown functions always use
@@ -479,7 +479,7 @@ at most 32 source IR statements and 2x per-caller growth. Before any inlining,
 compute the **transitive may-suspend set** to a fixed point over the candidate
 call graph, including workers. A function in that set is never inlined. Known
 calls propagate suspension, including tail calls; unknown calls and suspending
-operations are conservative seeds, as in `control.rs : 245–304`. A body-local
+operations are conservative seeds, as in `control.rs:245–304`. A body-local
 search for suspend/catch/ensure/unknown calls is not sufficient: a helper can
 call another known function that suspends. Keep the direct catch/ensure/unknown
 call exclusions too. An inline expansion must not bypass the pre-inlining
@@ -488,12 +488,12 @@ exclusion by reconsidering a previously excluded function later in the pass.
 Inline before capture splitting and keep the may-suspend recomputation after
 inlining too. Copy operation origins and logical call-site chains. Preserve
 argument evaluation once, in written order, before the body
-(`lower.rs : 1933–1959`), failing patterns, function identity and environments.
+(`lower.rs:1933–1959`), failing patterns, function identity and environments.
 This applies equally to user helpers. Leave Binaryen's global inline limit at
 20 rather than forcing large runtime functions inline.
 
 The current capture path saves one shadow slot per physical frame and restores
-that one slot (`emit/control.rs : 625–646,686–719,834–888`). Eager logical site
+that one slot (`emit/control.rs:625–646,686–719,834–888`). Eager logical site
 writes and post-inlining liveness cannot preserve additional logical frames
 inside a captured inline expansion. A design for captured logical frame chains
 is deferred. The three-function resumed-stop acceptance case in §8 checks this
@@ -503,7 +503,7 @@ restriction at O0, O2 and O3.
 
 The canonical small set is [-2^30, 2^30-1]. It already uses i31 references
 without allocation; larger numbers have a sign and u32 limbs
-(`runtime/bigint.rs : 1–5,57–108`). Two-small add/sub/mul widen to i64 and return
+(`runtime/bigint.rs:1–5,57–108`). Two-small add/sub/mul widen to i64 and return
 through int_from_i64 (`:220–228,260–268,304–311`). The costs are tests,
 casts/extracts, calls and two result-bound tests, not allocation.
 
@@ -521,7 +521,7 @@ already executed work. A full i64 region is allowed only with proof that every
 intermediate fits, not merely source Int. General i64 multiplication and MIN/-1
 division require proof or fallback *before* a wrapping/trapping instruction.
 Do not use int_to_i64 as a general unboxer: it traps outside range
-(`runtime/bigint.rs : 110–132`).
+(`runtime/bigint.rs:110–132`).
 
 Mixed small/big joins use Value; a later dominating small test can reopen a
 region. A source SmallInt saved/captured is an ordinary i31 Int, unlike the
@@ -547,7 +547,7 @@ record and constant projections by ordered scalar fields. Start with nonrecursiv
 shapes of at most four fields and no escape. All field expressions still run
 left to right, including checks of unused fields. Keep constructor/type identity
 and tuple arity in shape metadata. Fold tests only for a known actual constructor;
-a label can denote different indexes (`lower.rs : 1763–1798`).
+a label can denote different indexes (`lower.rs:1763–1798`).
 
 Expose cross-call pairs first by R3 inlining. Defer out-of-line multivalue
 aggregate workers and typed heap layouts, avoiding a second continuation result
@@ -562,8 +562,8 @@ Scalar fields can survive suspension through R7 if no aggregate reference
 escapes. Otherwise materialize before escape. Nominal records are today's
 client; T3 structural records require checked shape/field mappings before this
 pass supports them. Do not infer T3 layout from today's nominal layout.
-Current aggregates are a values array plus object (`emit/mod.rs : 586–595`,
-`runtime/values.rs : 64–73`); this pass removes both before calls obscure them.
+Current aggregates are a values array plus object (`emit/mod.rs:586–595`,
+`runtime/values.rs:64–73`); this pass removes both before calls obscure them.
 Binaryen heap2local handles remaining allocations where its local proof succeeds.
 
 ### R6. Remove a finite check only with a conservative proof for that exact operation
@@ -598,8 +598,8 @@ numeric stage.
 ### R7. Every live scalar is saved on capture; stored closures have ordinary captures
 
 Rewrite representations/calls **before** control::split. Today split follows
-run immediately (`lower.rs : 499–504`) and computes liveness, segments and
-environment chains (`control.rs : 41–139`). Extend every use/definition walker
+run immediately (`lower.rs:499–504`) and computes liveness, segments and
+environment chains (`control.rs:41–139`). Extend every use/definition walker
 for new operations before permitting scalar locals in suspendable functions.
 
 Retain frame shape, reentry type, saved-values array, environment delta, slot,
@@ -609,7 +609,7 @@ internal I64/I32 using their existing box. Restore by saved representation;
 never recompute a value. Preserve -0 bits, big-Int references and GC roots.
 Normal nonsuspending execution pays no capture box.
 
-Current record emission boxes internal I64/I32 (`emit/control.rs : 686–719`) and
+Current record emission boxes internal I64/I32 (`emit/control.rs:686–719`) and
 restores them (`:834–861`). Extend these matches exhaustively. Segments/joins
 already use saved locals' types (`:752–785`), but result and suspended-call
 result are hardcoded eqref (`:642–646,776–780`). Keep that protocol: receive a
@@ -619,20 +619,20 @@ and propagates tail-result constraints. Every function with a point still has
 a frame (S0).
 
 Closure captures stay canonical heap values, including specialized callbacks.
-Recursive closure construction patches capture arrays (`lower.rs : 1732–1758`,
-`emit/mod.rs : 417–425`); no hoisting of reads before patches. Eliminating a whole
+Recursive closure construction patches capture arrays (`lower.rs:1732–1758`,
+`emit/mod.rs:417–425`); no hoisting of reads before patches. Eliminating a whole
 closure needs proof that identity comparison, a portability walk, environment
 keeping, stores and unknown calls cannot observe it. Known code identity alone
 is not that proof.
 
 go is ordinary i: lexical numeric values use ordinary closure capture, while
-its keep_env wrapper retains the specified services (`runtime.md : 829–831`).
+its keep_env wrapper retains the specified services (`runtime.md:829–831`).
 Ordinary closure calls still receive the environment of their call site; numeric
 optimization must not introduce environment capture there or remove keep_env.
 Task suspension uses these frame rules. There is no scalar task encoding.
-`runtime.md : 820–845` erases results through Keyed and retains local continuations: materialize ordinary values at those edges. Preserve the accepted
+`runtime.md:820–845` erases results through Keyed and retains local continuations: materialize ordinary values at those edges. Preserve the accepted
 capture set even when optimized code does not read every capture, since removing
-a nonportable value could change a portability test. `runtime.md : 683` says go
+a nonportable value could change a portability test. `runtime.md:683` says go
 itself does not check closure portability; later portability/lifetime checks
 must still agree. Typed closure/heap layouts require a separate codec design.
 
@@ -647,7 +647,7 @@ path. Facts after a type/constructor branch do not apply before that branch.
 Exclude environment arrays, unpatched closure arrays, request cells,
 continuation flags, shadow stacks, host state and bigint scratch arrays. The
 values array type is shared with mutable implementation storage, including
-closure patches (`emit/mod.rs : 417–425`); the Wasm type alone cannot prove
+closure patches (`emit/mod.rs:417–425`); the Wasm type alone cannot prove
 immutability. Initially common semantic IR tuple/record/list
 projections with established provenance.
 
@@ -655,7 +655,7 @@ Scalar constants are immediate f64/i64 values. Key Float constants by all 64
 bits, never f64 PartialEq, so the zeros remain distinct. Reuse boxes only when
 they dominate uses; do not eagerly initialize global boxes on untaken paths.
 Module-wide lazy pooling is deferred. Eliminating Horner's eight literal boxes
-needs no pool; current emission allocates each use (`emit/mod.rs : 491–495`).
+needs no pool; current emission allocates each use (`emit/mod.rs:491–495`).
 Constant folding preserves source rounding/check order; failing expressions
 remain runtime stops at their original sites.
 
@@ -663,7 +663,7 @@ Host ABI v3 stays unchanged: Float as f64, Int as sign/address/count, existing
 error tags, async status/results, ownership and metadata (spec B.2–B.6).
 Synchronous adapters may validate then call workers or encode scalar results
 directly. NaN/infinity still stop with `host: value is not correct`, not
-`float: result is not finite` (`runtime/abi.rs : 41–46,50–68`). A raw host f64 is
+`float: result is not finite` (`runtime/abi.rs:41–46,50–68`). A raw host f64 is
 not FiniteF64. Async replies validate and box for the existing root/reentry
 protocol. No new import, libm, target, Wasm feature or root convention is needed.
 
@@ -671,8 +671,8 @@ protocol. No new import, libm, target, Wasm feature or root convention is needed
 
 Initially retain logical enter/site/leave actions for inlined calls, with
 caller site, tail flag and callee operation site. Fewer native calls cannot
-mean fewer language calls. Current shadow protocol: `runtime/mod.rs : 72–100`;
-tail emission: `emit/mod.rs : 390–401`.
+mean fewer language calls. Current shadow protocol: `runtime/mod.rs:72–100`;
+tail emission: `emit/mod.rs:390–401`.
 
 The coordinator defers cold stop-stack reconstruction; it is not part of N0–N5.
 A later design and separate gate may defer these writes across a straight numeric
@@ -688,8 +688,8 @@ stop-metadata optimization, not permission to omit unproved checks.
 
 At O0 retain the existing path byte-for-byte. At O2/O3 pass a numeric optimization
 flag to lowering, off by default for direct library callers. Options currently
-contains only tests/target (`lower.rs : 58–64`); CLI already knows opt level
-(`crates/ilang-cli/src/lib.rs : 12–20,150–162`). Thread the flag through WAT dumps,
+contains only tests/target (`lower.rs:58–64`); CLI already knows opt level
+(`crates/ilang-cli/src/lib.rs:12–20,150–162`). Thread the flag through WAT dumps,
 tests and artifact construction. Do not silently redefine --wat as post-Binaryen.
 
 Ordered pipeline:
@@ -803,8 +803,8 @@ lower.rs:841–1292 (entries/imports/providers) and :2676–2781 (ABI metadata)
 remain with their active tracks; coordinate the adapter call-selection seam.
 emit/host.rs keeps the control handshake and ABI; serialize any scalar sync
 adapter work with R2/JP. No library file is an optimization prerequisite.
-Update calling-convention comments when implemented (`ir.rs : 9–19`,
-`runtime/mod.rs : 31–63`).
+Update calling-convention comments when implemented (`ir.rs:9–19`,
+`runtime/mod.rs:31–63`).
 
 Acceptance gates:
 
@@ -824,7 +824,7 @@ Acceptance gates:
    bookkeeping or unused numeric helper text. Numeric changes can add workers,
    locals and conditional helpers, but host signatures and ABI metadata stay
    equal. Artifact hashes change with bytes; binding plans must be recomputed
-   normally (`crates/ilang-cli/src/lib.rs : 162–168`). No global renumbering waiver.
+   normally (`crates/ilang-cli/src/lib.rs:162–168`). No global renumbering waiver.
 3. **Structure:** no Float box/cast/load between scalar worker arithmetic steps.
    Dot keeps input lists but no per-element product/accumulator boxes. Small
    Int loops allocate no limbs on their small path. Tuple kernel loses three
@@ -922,7 +922,7 @@ locals/arguments. A scalar signature is not proof that a tail adapter is safe.
   expression types was false (Typed locations in R1). Added post-solve fact
   export/verifier; no printed-type parsing or re-inference.
 - **Cannot be built by adding only LocalType::F64:** continuation blocks/results
-  are hardcoded eqref (`emit/control.rs : 642–646,776–780`). R3/R7 retain that
+  are hardcoded eqref (`emit/control.rs:642–646,776–780`). R3/R7 retain that
   result protocol and explicitly save/restore live scalars.
 - **Unsound Int and wrong cost premise:** int_to_i64 is partial; small Int
   already allocates nothing. Boundary arithmetic disproves blanket i64 lowering.
@@ -1035,7 +1035,7 @@ not establish the stronger inlining rule.
 **Acceptance test before N2:** create a project with `name = "trace"` and put
 exactly this source in `src/main.i`. Preserve its lines and single-space body
 indentation so the expected columns below remain exact. This is the review's
-three-function program (`/tmp/review-num/trace/src/main.i : 1–18`):
+three-function program (`/tmp/review-num/trace/src/main.i:1–18`):
 
 ```i
 (

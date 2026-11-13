@@ -156,7 +156,7 @@ and the same continuation indentation and line-breaking rule for a long
 right side. Thus `inspect : <A>(A) -> String`, `x : Int = e`, and
 `(deadline) <- (clock : Clock) { … }`. This applies to declarations, pattern
 annotations and service items. Bit-array segments keep their compact
-`value : Format` spelling (§8.1): that colon introduces a format, and has no
+`<<value:Format>>` spelling (§8.1): that colon introduces a format, and has no
 `=` counterpart. In the normal surface, the
 **call depth** of an expression is the number of nested function calls on the
 deepest path through call arguments: a call whose callee is an `UpName`
@@ -700,7 +700,7 @@ IntPart    = int_lit | "{" IntPart "}" .
 - A `Literal` is a literal type (§4.2): `"a"`, `0`, `-1`. A `-` followed by an integer literal, also inside groups, where a `Prim` begins, is part of the literal: `-{1}` is `-1`. Every other `-` is a difference. So `Int - -1` is `Int` without `-1`, `Int - 1` is `Int` without `1`, and `-1 | 1` is a union of two literal types. A float literal is not a type, because Float has no literal types.
 - A type parameter takes no arguments: `A(Int)`, where `A` is a type parameter, is a compile error.
 - A lowercase `x` in a type, without `(` after it, means the type of the value named `x` at that place. The name follows value scope (§5). `m.x` means an exported value of module `m`, never a key of a value. If `m` names a value, it is a compile error. `{ x }` groups the same type. A lowercase name or member followed by `(` is a macro call, not a value type or a type application.
-- A type may not name a value bound by that same pattern; a name of a parameter group in the types of that function's own head, including its `<-` and `->` parts; or its own binding's name inside that binding's value. A distinct inner binder that has entered scope may cover that name. This is a compile error even if an outer value has the same name. Those names may be named in types in the body. For example, `(x, y: x)` and `(x) -> x { x }` are errors, but `(x : Int) { y : x = x  y }` is allowed.
+- A type may not name a value bound by that same pattern; a name of a parameter group in the types of that function's own head, including its `<-` and `->` parts; or its own binding's name inside that binding's value. A distinct inner binder that has entered scope may cover that name. This is a compile error even if an outer value has the same name. Those names may be named in types in the body. For example, `(x, y : x)` and `(x) -> x { x }` are errors, but `(x : Int) { y : x = x  y }` is allowed.
 - A value type is not its known type (§4.8). It follows the scheme, instantiation and completion rules of §4.7. It never makes a monomorphic value polymorphic.
 - A value type, directly or through names, may not occur in the data of a labelled type, an external or host declaration, or a need. Those types must be complete before inference.
 - A lowercase `name`, or `a.m` with a lowercase `m`, whatever `a` is, followed by `(` is a `TypeCall`. It is a macro call in the position of a type (§14.5), and a compile error when its name is not a macro. It is in the grammar, so a type with it is read in full.
@@ -951,7 +951,7 @@ The **pattern type** of a pattern that is not a catch-all, and its parts, are:
 - A conjunction `p1 = … = pk`: the intersection of the pattern types of its parts that are not catch-alls, and each name part gets that type.
 - `x : T`: `T`, with new variables for holes and value types read as §4.7 says; `x` gets that type.
 
-A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or branch narrowing do not refine this shape. Thus `((a = Int, b = String) = d) { q: a = d.a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s : String`, `x`'s inferred type is `String` even though its known type is `"a"`; an annotation naming `x` uses `String`.
+A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or branch narrowing do not refine this shape. Thus `((a = Int, b = String) = d) { q : a = d.a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s : String`, `x`'s inferred type is `String` even though its known type is `"a"`; an annotation naming `x` uses `String`.
 
 The parts of data are covariant in the hidden-input and whole-literal operations below; invariant arguments inside them still count in both directions. An item written in a data literal gets the matching expected part, when guaranteed. The base of a spread gets no expected type.
 
@@ -3164,7 +3164,7 @@ cannot inherit raw addresses from this synchronous contract.
 the inputs above; allocate private scratch for one iovec and a u32 count; translate
 the checked slice to the real pointer; call the runtime-owned preview-1 import;
 then free scratch on every returning path. On errno != 0, raise String
-`errno : <unsigned decimal>`. On success return the number of bytes written,
+`errno:<unsigned decimal>`. On success return the number of bytes written,
 0..size; a larger count is an invalid host value and stops. No user-controlled
 pointer-bearing bytes are ever passed as an iovec. Other preview-1 functions require separately specified pointer/length/output layouts and raw signatures before an adapter is added.
 

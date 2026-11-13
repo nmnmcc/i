@@ -150,11 +150,11 @@ those would be a separate language proposal, unnecessary for this work.
 **Already alike.** i's accepted R1/R3/R5 separate value types from representation,
 retain generic entries, bound worker variants, specialize known callbacks and
 flatten small products after inlining. Its current ANF fixes evaluation order
-(`W : ir.rs : 1–19`, module contract); this is a useful starting IR.
+(`W:ir.rs:1–19`, module contract); this is a useful starting IR.
 
 **Different.** The current emitter gives every source function eqref arguments
-and result (`W : emit/mod.rs : 284–295`, `header`), and `Func` has no explicit
-result representation (`W : ir.rs : 497–508`). These are implementation choices,
+and result (`W:emit/mod.rs:284–295`, `header`), and `Func` has no explicit
+result representation (`W:ir.rs:497–508`). These are implementation choices,
 not consequences of set types or principal inference. i's strict evaluation,
 observable stops and bounded tail calls *do* require different legality rules
 from a direct import of GHC's demand transformation (spec §§6.2, 11.6–11.7).
@@ -166,11 +166,11 @@ from a direct import of GHC's demand transformation (spec §§6.2, 11.6–11.7).
    argument count, allowing the original source arity. Variant counts and small
    individual products do not bound total signature expansion. This extra budget
    is not a blocker for scalar Float N1. It belongs in R3's future selector,
-   `W : ir.rs : 499–508` and `W : emit/mod.rs : 284–295`.
+   `W:ir.rs:499–508` and `W:emit/mod.rs:284–295`.
 2. In N2, score known callback calls and construction/projection cancellation
    before increasing a global inlining limit. Add reason counters to R3;
-   the call-selection seam is `W : lower.rs : 1294–1405` and
-   `W : emit/mod.rs : 443–457`. Use the original closure and environment.
+   the call-selection seam is `W:lower.rs:1294–1405` and
+   `W:emit/mod.rs:443–457`. Use the original closure and environment.
 3. Keep N3's accepted inlining-first scalar products. If pair-returning calls
    still dominate afterward, propose bounded result-shape summaries across
    known functions, including recursive groups. Accepted R5 explicitly defers
@@ -253,15 +253,15 @@ for serializing a Wasm local.
 
 **Already alike.** R1/R2 and R7 intend local unboxing plus explicit boxing at
 escapes. i already distinguishes `Value`, `I64`, `I32` and `Env` locals
-(`W : ir.rs : 113–120`), and its control IR records saved locals
-(`W : ir.rs : 510` onward, `Point`).
+(`W:ir.rs:113–120`), and its control IR records saved locals
+(`W:ir.rs:510` onward, `Point`).
 
 **Different.** There is no F64 local in that enum. Source parameters are allocated
-as `Value` (`W : lower.rs : 1352–1368`, `function`). Suspension's destination block
-and try expression are hardcoded eqref (`W : emit/control.rs : 622–646`,
+as `Value` (`W:lower.rs:1352–1368`, `function`). Suspension's destination block
+and try expression are hardcoded eqref (`W:emit/control.rs:622–646`,
 `suspendable`); segment headers also return eqref (:760–780). Flat records and
 lists are not present: fields are `$values` references and list heads are
-references (`W : runtime/values.rs : 62–73`, `list_cons`, `record`, `tuple`). The
+references (`W:runtime/values.rs:62–73`, `list_cons`, `record`, `tuple`). The
 existing representation is not forced by i's language rules. Preserving saved
 values, environments, identity and stop positions is forced by §§9.4 and 11.
 
@@ -328,12 +328,12 @@ protocol. Go/Wasm timing would not isolate the cost of i Float boxes.
 ### 4.2 Comparison and ordered recommendations
 
 **Already alike.** i has an ordered ANF, direct versus value calls, and a separate
-control split (`W : ir.rs : 1–19,249–255`; `W : lower.rs : 494–504`,
+control split (`W:ir.rs:1–19,249–255`; `W:lower.rs:494–504`,
 `lower_with_bindings`). R3 already requires recomputing control facts after
 eligible inlining.
 
 **Different.** i emits reference arithmetic helper calls
-(`W : emit/mod.rs : 512` onward, `op`; `W : runtime/core.rs : 11–24`). Go's scalar
+(`W:emit/mod.rs:512` onward, `op`; `W:runtime/core.rs:11–24`). Go's scalar
 arithmetic is not a reason to adopt Go's stack ABI. i's transitive may-suspend
 exclusion and logical trace requirements remain binding (R3/R9, spec §11.7).
 
@@ -342,7 +342,7 @@ exclusion and logical trace requirements remain binding (R3/R9, spec §11.7).
 1. Record a pass contract: solved facts → known-call selection and legal
    inlining → representation/escape repair → control split → verification →
    emission → Binaryen. Refresh invalidated facts explicitly. Reserve
-   `W : lower.rs : 494–504` and `W:control.rs` for the numeric implementation owner.
+   `W:lower.rs:494–504` and `W:control.rs` for the numeric implementation owner.
 2. For N4, use branch-scoped integer interval/known-bit facts with exact generic
    fallback. Reuse the worklist method, not Go's fixed-width overflow semantics.
 3. Postpone profile-guided inlining and broad escape analysis. First count
@@ -404,18 +404,18 @@ and local subtyping at O2, with closed-world type/signature refinement
 Local CSE's later gate is O3 or shrink >=1 (:725–728); GUFA is registered but
 not added in this default sequence. i already selects closed world, observable
 traps, speed level from its option and an always-inline limit of 20
-(`crates/ilang-binaryen/src/lib.rs : 40–47,106–112`, optimization setup).
+(`crates/ilang-binaryen/src/lib.rs:40–47,106–112`, optimization setup).
 
 ### 5.3 Comparison and ordered recommendations
 
 **Already alike.** i already uses i31ref, f64 payloads in GC objects, and
-Binaryen's O2 GC cleanup (`W : runtime/bigint.rs : 87–108`, `int_from_i64`;
-`W : runtime/values.rs : 52–59`, `float_new`/`float_get`). R3 has a more general
+Binaryen's O2 GC cleanup (`W:runtime/bigint.rs:87–108`, `int_from_i64`;
+`W:runtime/values.rs:52–59`, `float_new`/`float_get`). R3 has a more general
 worker/wrapper scheme than the direct-only restriction read in wasm_of_ocaml.
 
 **Different.** i's Float object currently uses the common multi-field `$obj`
 constructor, and source Float literals allocate that object
-(`W : emit/mod.rs : 491–495`, `atom`). More importantly, ordinary functions and
+(`W:emit/mod.rs:491–495`, `atom`). More importantly, ordinary functions and
 arithmetic helpers return references. These are removable implementation costs,
 not requirements of value-set types. Its finite checks and trace fidelity are
 required differences from the reference's permissive optimizer flags.
@@ -427,7 +427,7 @@ required differences from the reference's permissive optimizer flags.
    spend weeks writing a duplicate local Heap2Local pass.
 2. When calls survive, implement N2 scalar signatures in i. Distinguish local
    boxes eliminated by Binaryen from boxes avoided by the calling convention.
-   Change `W : ir.rs : 249–267,499–508`, `W : emit/mod.rs : 284–295,443–457`.
+   Change `W:ir.rs:249–267,499–508`, `W:emit/mod.rs:284–295,443–457`.
 3. Only after measuring survivors, compare `gufa-optimizing` plus cleanup and
    targeted CSE with the default pipeline. Preserve traps. Keep global heap
    layout changes deferred; a smaller Float box is less valuable than no box.
@@ -519,7 +519,7 @@ Std-3 F1.
 
 The current plain-i library already uses TwoSum, a split-product residual,
 fast endpoint agreement, and outward integer intervals
-(`F : std/src/float.i : 1333–1371`, `certify`, `two_sum`, `two_product`;
+(`F:std/src/float.i:1333–1371`, `certify`, `two_sum`, `two_product`;
 :1478–1545, `fast_round`, `fast_reduce`, `fast_sincos`). It is already in the
 same broad certified-fast/accurate-fallback family. The choice is not between
 certification and CORE-MATH: CORE-MATH supplies better studied reductions,
@@ -552,7 +552,7 @@ Three differences *are* required by today's contract:
 
 Table access itself needs a cost plan. There is no indexed numeric array in the
 current value paths read here: list heads and tuple/record fields are references
-(`W : runtime/values.rs : 62–73`). A linear list scan through a table can lose the
+(`W:runtime/values.rs:62–73`). A linear list scan through a table can lose the
 algorithmic gain. Compare ordinary balanced selection code, constant-field
 records, and existing byte/bit storage access. Require indexed-table benchmarks
 before proposing new general storage. A typed-array redesign is not a hidden
@@ -560,7 +560,7 @@ prerequisite for the first reduction experiment.
 
 ### 6.5 Reported i costs and realistic expectations
 
-These are **reported**, not rerun: `F : docs/design/std-3.md : 1390–1433` records
+These are **reported**, not rerun: `F:docs/design/std-3.md:1390–1433` records
 15.212 microseconds and 289 Float allocations for revised fast sin(0.5), among
 313 total allocations. Its scalar controls (:1504–1537) give 131 ns without
 redundant finite checks, 250 ns with checks, 130 ns native C for the same
@@ -699,7 +699,7 @@ constraints. FMA/table-dependent proofs must be adapted to those constraints.
 
 1. Keep compiler N0–N3 first on its own track. In the float track, first replace
    repeated pi construction with generated, certified reciprocal-pi/pi bounds
-   and a windowed reducer. Target `F : std/src/float.i : 1144–1251` and Std-3 F7.
+   and a windowed reducer. Target `F:std/src/float.i:1144–1251` and Std-3 F7.
    Retain an exact outward error bound and refinement fallback. Do not promise
    every hard input is solved by a fixed table without its proof.
 2. Next trial sin/cos table-assisted small-domain polynomials with i-specific
@@ -760,7 +760,7 @@ spec §11.1; reuse behind uniqueness/liveness proofs need not.
 ### 7.2 Comparison and ordered recommendations
 
 **Already alike.** i already has the Zarith-style small/big distinction:
-`W : runtime/bigint.rs : 87–108`, `int_from_i64`, returns signed i31 for
+`W:runtime/bigint.rs:87–108`, `int_from_i64`, returns signed i31 for
 [-2^30,2^30-1], otherwise limbs. `int_add`, `int_sub`, `int_mul`
 (:220–268,304–315) test two i31 operands, calculate in i64 and repack. These
 small operations do not allocate limb arrays when their result stays i31.
@@ -778,7 +778,7 @@ difference requires numeric type annotations or specialized std functions.
 1. Keep R4/N4 after the Float path. Carry proved/guarded small values through
    a whole loop in machine locals, and repack at escapes. Test overflow at
    i31 and i64 boundaries and never replay preceding effects on fallback.
-   Change the future integer analysis and `W : emit/mod.rs : 512` onward; retain
+   Change the future integer analysis and `W:emit/mod.rs:512` onward; retain
    `runtime/bigint.rs` as the exact fallback.
 2. For math reduction, first use existing exact Int operations for fixed-width
    limb algorithms, with explicit masks. Then measure general small-limb
@@ -797,11 +797,11 @@ existing ownership dependencies.
 
 | Order | Proposal | Reference anchor | i change or gate |
 |---|---|---|---|
-| 1 | Expose temporary boxes locally before inventing a pass | Binaryen `Heap2Local.cpp`, `getParentChildInteraction` | N0; `W : emit/mod.rs : 482–554`, `runtime/core.rs : 11–24` |
-| 2 | Scalar locals and known-call workers with generic wrappers | GHC `WorkWrap/Utils.hs`, `mkWwBodies`; wasm_of_ocaml `generate.ml`, signature construction | N1/N2; `ir.rs : 113–120,499–508`, `emit/mod.rs : 284–295` |
+| 1 | Expose temporary boxes locally before inventing a pass | Binaryen `Heap2Local.cpp`, `getParentChildInteraction` | N0; `W:emit/mod.rs:482–554`, `runtime/core.rs:11–24` |
+| 2 | Scalar locals and known-call workers with generic wrappers | GHC `WorkWrap/Utils.hs`, `mkWwBodies`; wasm_of_ocaml `generate.ml`, signature construction | N1/N2; `ir.rs:113–120,499–508`, `emit/mod.rs:284–295` |
 | 3 | Remove pair construction across helper calls | GHC `CprAnal.hs`, `cprTransformDataConWork` | N3/R5 inlining first; out-of-line result summaries remain a later proposal |
 | 4 | Judge inlining by eliminated work and cap scalar arity | GHC `tryUnfolding`, `finaliseArgBoxities`; OCaml `Benefit.evaluate` | R3; worker selector and general diagnostics |
-| 5 | Replace repeated high-precision pi evaluation with bounded table reduction | CORE-MATH `reduce_large_acc`; Go `trigReduce` | Std-3 F7; `F : std/src/float.i : 1144–1251` |
+| 5 | Replace repeated high-precision pi evaluation with bounded table reduction | CORE-MATH `reduce_large_acc`; Go `trigReduce` | Std-3 F7; `F:std/src/float.i:1144–1251` |
 | 6 | Port math proof/data generation with the algorithm | CORE-MATH `cr_sin_moderate`, `computeT`, fpminimax scripts | Std-3 F6–F9; regenerated tables, operation-specific bounds |
 | 7 | Validate every representation edge, including saved locals | OCaml `transl_let`; Flambda2 `make_decisions`; native `scan_stack_frames` | R1/R7; checker facts, control saves and verifier |
 | 8 | Optimize small Int regions, keeping exact promotion | GHC `integerAdd`/`integerMul`; Zarith `add`/`ml_z_reduce` | N4/R4; guards and existing big fallback |
@@ -812,7 +812,7 @@ The narrow first implementation can use local expression/operator facts, but
 cross-call workers need reliable solved facts. Today's `Typed` exposes scheme
 trees, field access, type tests, and optional editor locals, not a complete
 mandatory expression representation table
-(`crates/ilang-check/src/types/mod.rs : 347–402`, `Typed`). Coordinate the export
+(`crates/ilang-check/src/types/mod.rs:347–402`, `Typed`). Coordinate the export
 with checker owners; the accepted note's baseline line numbers have moved after
 T1/T2. Do not parse display strings or silently treat editor data as always
 available. This is a file-map correction, not a new inference algorithm.
@@ -901,7 +901,7 @@ probe = (x : Int) { x + 1 }
 At 1073741823, expect 1073741824; at 9223372036854775807, expect
 9223372036854775808. Repair: keep exact promotion, explicit unsigned-width
 masking for imported algorithms, and no blanket use of partial `int_to_i64`
-(spec §11.2; R4; `W : runtime/bigint.rs : 110–132`).
+(spec §11.2; R4; `W:runtime/bigint.rs:110–132`).
 
 **Accepted R5 defers out-of-line multivalue results.** Repair: keep its
 inlining-first N3; label bounded cross-call product-return summaries as a later
@@ -945,7 +945,7 @@ collection folds. No source type or new feature is required.
 
 Attack endpoint equality near zero: i equates ±0, so numeric endpoint equality
 alone is not enough to certify a signed underflow. Existing `fast_round` rejects
-zero endpoints and `certify` compares bits (`F : std/src/float.i : 1478–1485,1333–1340`).
+zero endpoints and `certify` compares bits (`F:std/src/float.i:1478–1485,1333–1340`).
 The proposed port keeps those conditions and exact tiny-input shortcuts; test
 sin(-0.0) and the least negative subnormal by bits, not only `==` (F1–F5).
 
