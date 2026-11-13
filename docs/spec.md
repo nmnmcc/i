@@ -1316,6 +1316,19 @@ retry = <A, E, N>(times: Int, body: () <- (..N, Fail(E)) -> A) -> A {
 user = () { retry(3, () { load_user("1") }) }
 ```
 
+### 9.1.1 What a need tracks
+
+The need after `<-` tracks the services a computation takes from its caller (§9.2), including errors through `Fail` (§9.3) and assertion failures through `Assert` (§9.6). It does not describe every way a computation can change state or stop.
+
+A need does not track these conditions:
+
+- Whether a continuation has already been resumed or cancelled: a second use stops the program (§9.4).
+- Whether the boundary of a captured `Fail` is still active: using it after its `catch` has ended stops the program (§9.3, §9.4).
+- Whether a task or channel handle still belongs to a live run or scope, or whether a request is ready and has not been cancelled or taken: invalid use is checked at run time and stops the program (§9.9, §9.11).
+- Whether a value is portable (§11.9): an operation that requires portability checks it at run time and stops the program if it is not portable (§9.9).
+
+`request.take` consumes the answer in shared request state: every alias observes the change from `Ready` to `Taken` (§9.11). Its type is `<A>(Request(A)) -> A`, with no need. Thus the absence of a need does not promise that a call leaves shared state unchanged. These run-time failures are stops (§11.7), not errors added to `Fail`.
+
 ### 9.2 Services
 
 A **service** is an ordinary value of a labelled type (§4.3), normally one whose data holds functions. Two services of one form are made by defining two types. A service is a normal value: it may be stored and given to functions, and code that has it may call its functions directly.
