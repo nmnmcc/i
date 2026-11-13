@@ -729,3 +729,21 @@ fn a_covariant_handler_hole_retains_its_upper_bound() {
         "(() <- (Svc(Int), ..N) -> Int, Svc(A & Int)) <- (N - Svc(A & Int)) -> Int"
     );
 }
+
+#[test]
+fn a_filtered_callback_vacates_only_an_unused_fail_need() {
+    let source = "(i/fail)\nNoError(N) = N - Fail(Never)\nrun = <N>(f: () <- (NoError(N)) -> Nil) { f() }\npure = <E>() <- (unused: Fail(E)) { Nil }\nmain = () { run(pure) }\n";
+    let shown = types(source);
+    assert!(!shown["app/main.main"].contains("Fail"), "{shown:?}");
+    let bad = source.replace("{ Nil }", "{ fail.raise(1) }");
+    let (graph, _, _) = common::check_files(&[("src/main.i", &bad)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked
+            .diags
+            .iter()
+            .any(|d| d.is_error() && d.source.is_some_and(|id| graph.sources.get(id).text == bad)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}

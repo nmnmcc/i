@@ -1179,6 +1179,12 @@ impl Solver {
                 if h.iter()
                     .any(|m| m.value_head() == l.value_head() && !m.values().disjoint(l.values()))
                 {
+                    // Dropped entries still disappear in a filtered row.
+                    // A fresh Fail(E) can choose E = Never; an actual error
+                    // bound cannot and reports the failed constraint.
+                    if env == Mode::Env && self.vacate(l) {
+                        return;
+                    }
                     let partial = !l.values().is_all()
                         || h.iter()
                             .any(|m| m.head() == l.head() && !m.values().is_all());
