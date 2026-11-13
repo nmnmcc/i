@@ -1294,7 +1294,7 @@ i has no special effect definitions. Effects are made from normal things: functi
 A function with no parameters, `() <- N -> A`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS, which is `() <- (..R, Fail(E)) -> A` in i. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
 
 ```i
-retry = <A, E, N>(times: Int, body: () <- (..N, Fail(E)) -> A) <- (..N, Fail(E)) -> A {
+retry = <A, E, N>(times: Int, body: () <- (..N, Fail(E)) -> A) -> A {
   fail.catch(body) |> (Ok(value)) { value }
     | (Error(error) ? times > 1) { retry(times - 1, body) }
     | (Error(error)) { fail.raise(error) }
@@ -1447,7 +1447,7 @@ Generators, async code, and schedulers are libraries made from services and thes
 ```i
 Yield(A) = (emit = (A) -> Nil)
 
-collect = <A, N>(body: () <- (..N, Yield(A)) -> Nil) <- N -> List(A) {
+collect = <A, N>(body: () <- (..N, Yield(A)) -> Nil) -> List(A) {
   control.boundary((b) {
     body() <- (Yield(emit = (x) { control.suspend(b, (k) { [x, ..control.resume(k, Nil)] }) }))
     []
@@ -1494,7 +1494,7 @@ A binding whose pattern may fail also reports to `Assert` (§6.10).
 At an entry point (§10.2), the platform gives an `Assert` whose `fail` stops the program; in a test, the test fails. Any code may provide its own `Assert`. The module `i/assertion` has one function that does this:
 
 ```i
-catch = <A, N>(body: () <- (..N, Assert) -> A) <- N -> Result(A, AssertionFailure) {
+catch = <A, N>(body: () <- (..N, Assert) -> A) -> Result(A, AssertionFailure) {
   control.boundary((b) {
     Ok(body() <- (Assert(fail = (failure) { control.escape(b, Error(failure)) })))
   })

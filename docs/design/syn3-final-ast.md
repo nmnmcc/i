@@ -271,12 +271,65 @@ These are not mechanical, and each changes what a macro sees.
 | 1 inventory | done |
 | 2a `i fmt --to` on the new tree | done |
 | 2b datum builder; `needs_row` | done |
-| 2c rows flip | not started |
-| 2d engine on the new tree | not started |
-| 3 resolver | not started |
+| 2c rows flip | additive preparation merged; `NEW_ROWS = false`, `ROWS3 = false`; workspace check and syntax/macro tests passed; CLI gate pending |
+| 2d engine on the new tree | not started; faE readers are beside the old engine, with no production switch-over |
+| 3 resolver | not started; faD is deliberately not merged in this prefix |
 | 4 deletion | not started |
 
 Readers of the old tree after 2b: everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
 `syn3::lisp::{to_lisp, from_lisp}`) is on the new tree; the macro engine's
 `Syntax` values are still in the rows before syntax three.
+
+Integration checkpoint (lane/fa, 2026-11-13):
+
+- faB `1bd592dd`: built-in definition answers and typed-macro function
+  types in the new rows are available beside the old writers. The
+  `NEW_ROWS` switch is off.
+- faC `1c0932f0`: new-reader `show_as_rows3`, public normalization helpers,
+  and the fourteen positions. The library and host position IDs changed
+  together, as syntax-3.md §6.7 requires; `ROWS3` is off.
+- faE `1a433ed3` (including the reboot's pending fixture fixes): new-tree
+  macro engine modules and quote helpers are additive. The production
+  engine still reads the old tree. `cargo check -p ilang-macro
+  --all-targets --locked` passed in faE before committing those fixes.
+- faF `89c0ecf4` (including the reboot's pending test fixes): written Lisp
+  fixtures use §6.8; tests of old readers/encoders keep their old rows.
+  `cargo check -p ilang-syntax -p ilang-check --all-targets --locked`
+  passed in faF before committing. The conversion inventory is in
+  `syn3-final-ast-tests.md`; its post-flip entries are still a checklist.
+
+The integrator's next gate is `cargo check --workspace --all-targets
+--locked`, all tests of `ilang-syntax` and `ilang-macro`, and the CLI
+`macro_run`, `typed_macros`, `fmt`, and `lisp` binaries. Step 2c may only
+land as one commit after that same gate passes with the rows enabled.
+Steps 2d, 3 and 4 are outside this integration's authorized scope.
+
+The first additive test run exposed a stale `format_skip.txt`: six spec
+fences were already skipped by `parse_module`, but absent from its recorded
+list. No parsing or formatter behavior changed. A diagnostic-only rerun
+identified each entry before the snapshot was reconciled:
+
+| Spec fence | Existing diagnostic that prevents this formatter property from running |
+|---|---|
+| 1130 | multi-shape `area` needs stage 9 |
+| 1296 | `retry` writes needs in a function head, where the reader requires `name: Type` services |
+| 1348 | whole-value/whole-environment provide needs E6; mixed data needs stage 6 |
+| 1437 | whole-environment service pattern and provide need E6 |
+| 1447 | `collect` writes a bare row variable in a function head; the reader only permits it in a type |
+| 1496 | `catch` writes a bare row variable in a function head, with the same diagnostic |
+
+The spec-fence test independently rejected fences 1296, 1447 and 1496.
+Their examples now omit those function-head needs: spec §6.8 says, “The
+need of the function is inferred (§4.8 rule 4), also when the `->` part is
+written.” Their parameter types and bodies are unchanged, and the inferred
+needs keep the examples' meaning. No parser rule or diagnostic changes.
+The other three fences remain unchanged: the formatter snapshot records
+existing lowering limitations, without adding any new skip in test code.
+Stages 9/E6 are outside this prefix.
+
+Verification of the additive prefix: workspace/all-targets check passed.
+All syntax and macro test binaries passed across the broad diagnostic run
+and the targeted `format`/`spec` rerun after the documented fixture fixes.
+The four requested CLI binaries are pending; no green landing claim is made
+until they pass. Logs are under `target/fa-integration/` in this worktree.
