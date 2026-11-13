@@ -750,3 +750,15 @@ exit status is zero. Only the paused own scheduler is stopped afterward;
 no queued heavy check starts. No compiler source or commit changes after
 the deadline. Full final-source gate remains incomplete, so step 3 stays
 uncommitted and deletion remains unapplied.
+
+03:31 continuation: requested WIP checkpoint cb02f0cb0 preserves the previous
+staged tree; main68b720e9 merged at 5bc8229db; convdb743 and native alias-aware
+provider resolution compile at c36823ff7. The syntax-time provider classifier
+is removed, and macro expansion retains locals until resolution. Strict
+resolver/deep/quote comparisons and all 29 row tests pass. A full expanded
+gate (39 CLI integration binaries plus lib and filtered spec, release CLI,
+short generation model) is running under target/fa-r3. Its first clippy
+found one needless borrow after borrowing virtual statements; corrected
+without changing behavior, with retry pending after the active Rust run.
+The new coordinator instruction permits WIP/compiling milestone commits;
+earlier no-commit-before-full-green notes are historical.

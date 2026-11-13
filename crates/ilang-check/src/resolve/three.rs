@@ -2741,7 +2741,7 @@ impl<'a, 't> R3<'a, 't> {
                     let span = e.span.0;
                     let value = match name {
                         None => self.expr(e),
-                        Some(name) => self.name_expr(&name, span),
+                        Some(name) => self.name_expr(name, span),
                     };
                     stmts.push(Stmt::Env {
                         ty: Type {
