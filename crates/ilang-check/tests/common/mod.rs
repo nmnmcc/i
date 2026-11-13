@@ -2,6 +2,8 @@
 
 #![allow(dead_code)]
 
+pub mod tree;
+
 use ilang_check::hir::{Def, ModuleId, Program};
 use ilang_package::{Diagnostic, PackageGraph};
 use std::fs;

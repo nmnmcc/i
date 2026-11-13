@@ -16,7 +16,8 @@ fn interpolation_is_concat_before_the_core_tree() {
         let (b, ds) = parse_module(core);
         assert!(ds.is_empty());
         assert!(shape::equivalent(&a, &b), "{source}\n{}", print_module(&a));
-        let printed = lisp::print_module(&a);
+        let printed =
+            ilang_syntax::syn3::lisp::to_lisp(&ilang_syntax::syn3::parse_module(source).0);
         let (back, ds) = lisp::parse_source(&printed);
         assert!(ds.is_empty(), "{printed}: {ds:?}");
         assert!(shape::equivalent(&a, &back));
@@ -100,14 +101,16 @@ x })b" // outside"#,
         let (read, ds) = ilang_syntax::syn3::lisp::from_lisp(&text);
         assert!(ds.is_empty(), "{text}: {ds:?}");
         assert_eq!(ilang_syntax::syn3::lisp::to_lisp(&read), text);
-        let printed = lisp::print_module(&a);
+        // The datum built from the tree (a macro's argument) is the datum of
+        // the Lisp text.
         let scope = lisp::syntax::Scope {
             module: 0,
             marks: Default::default(),
         };
+        let built = ilang_syntax::syn3::lisp::item_datum(&tree.items[0]);
         assert_eq!(
-            lisp::item_syntax(&a.items[0], &scope, source).show(),
-            printed.trim_end()
+            lisp::syntax::Syntax::from_datum(&built, &scope).show(),
+            lisp::show(&lisp::parse(&text).unwrap()[0])
         );
     }
 }
