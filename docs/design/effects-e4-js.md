@@ -77,4 +77,28 @@ preserved environment and completion path.
 - Baseline probes: distance after an error traps; streaming traps with both std snapshots.
 - Corrected compiled fixture: all 8 JavaScript tests pass, including exact stop positions.
 - Corrected streaming probes: pass at O0 and O2.
-- Full requested gates and complete fixture regeneration: pending.
+- Complete ABI regeneration and Wasm validation pass, including the R2 generator.
+  All five generated binding plans retain their contracts after digest normalization.
+- First full JS run: 108/117 Node checks pass. Seven IO fixtures still build
+  for `host`, and two fixtures still use the removed manifest provider table.
+  The IO builds now select `nodejs`; the two fixtures provide their chosen
+  services in their entry bodies. All their assertions are retained. Spec
+  §2.6.1: "Every other service is given in the entry by i code." It also says:
+  "There is no `providers` key in the package file."
+- The generation driver emitted legacy clause blocks, type declarations,
+  function heads and service statements. Its source strings are ported to the
+  current syntax. All model inputs, coverage decisions and expected results
+  match the previous driver for 720 short/long seeded cases; no oracle changes.
+  The emitted chain preserves branch order and guards under spec §6.12.
+- The second Node run passes 114/117. Its three remaining failures are
+  explained: the first provider's exported function now needs its local Host
+  type, so that type is exported (§2.4); the fake-clock fixture adds a task
+  yield to keep exercising async request mode under the new need-based
+  classification (§10.2); the process example's old machine-wide check sees
+  another worker's sleep child. The latter now checks only children whose
+  parent is this run's host process, preserving both cancellation assertions.
+  The Node test deliberately keeps an unrelated sleep child alive while
+  checking this, and terminates only that test-owned child afterward.
+- Short generation gate passes: 32 cases (20 accepted, 12 model rejections),
+  64 declaration permutations, 32 annotation removals, no failures.
+- Full JS rerun and remaining requested gates: in progress.

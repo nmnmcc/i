@@ -16,8 +16,8 @@ VALUES = ['a', 'ab', 'b', 'c', '']
 PATTERNS = ['"a"', '"ab"', '"b"', '_: String - "a"', '_: String - "ab" - "b"', '"a" <> _', '_', '_: "a" | "b"']
 BOOLS = ['True', 'False', '_']
 RULES = {
-    'coverage': 'docs/spec.md §7.4: A clause with a guard is not counted.',
-    'runtime': 'docs/spec.md §6.12: it takes the first clause whose pattern matches the value and whose guard, if there is one, is True',
+    'coverage': 'docs/spec.md §7.4: A branch with a guard is not counted.',
+    'runtime': 'docs/spec.md §6.12: the first branch whose parameter group matches the data and whose guard, if it has one, is True is taken',
     'literal': 'docs/spec.md §4.2: Values are never changed, so a literal type is never made wider',
     'value': 'docs/spec.md §2.5: It only orders type inference',
     'annotation': 'docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance.',
@@ -62,8 +62,8 @@ def literal_case(seed, *, value_types, rng=None):
         declarations += [f'domain: {domain} = ("a", True)', 'Input = domain']
         domain = 'Input'
     declarations.append(f'pass = (x: {domain}) -> {domain} {{ x }}')
-    clauses = '\n'.join(f'({PATTERNS[p]}, {BOOLS[q]})' + (' ? False' if guard else '') + f' -> {i}' for i, (p, q, guard) in enumerate(rows))
-    declarations.append(f'f = (x: {domain}) {{ x |> {{\n{clauses}\n}} }}')
+    clauses = '\n | '.join(f'(({PATTERNS[p]}, {BOOLS[q]})' + (' ? False' if guard else '') + f') {{ {i} }}' for i, (p, q, guard) in enumerate(rows))
+    declarations.append(f'f = (x: {domain}) {{ x |>\n{clauses}\n}}')
     if covered:
         assertions = '\n'.join(f'  assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items())
         declarations.append('main = () {\n' + assertions + '\n  Nil\n}')
@@ -86,13 +86,13 @@ def alias_case(seed):
 def service_case(seed):
     # The positive service family in K4 reviews, with closed equal arguments.
     n = random.Random(seed).randint(1, 8)
-    declarations = ['Svc(A) { Svc(f: () -> A, m: (A) -> Nil) }',
-                    'ask(A) = (s ! Svc(A)) { s.f() }',
-                    'run(A, N) = (body: () -> A ! N) { body() }',
+    declarations = ['Svc(A) = (f = () -> A, m = (A) -> Nil)',
+                    'ask = <A>() <- (s: Svc(A)) { s.f() }',
+                    'run = <A, N>(body: () <- N -> A) { body() }',
                     'pass = (x: Int) -> Int { x }',
                     'h0 = () { ask() }']
     declarations += [f'h{i} = () {{ run(() {{ h{i-1}() }}) }}' for i in range(1, n)]
-    declarations += [f'main = () {{\n ! Svc(Int) = Svc(() {{ 7 }}, (_: Int) {{ Nil }})\n assert(pass(h{n-1}()) == 7)\n Nil\n}}']
+    declarations += [f'main = () {{\n {{ assert(pass(h{n-1}()) == 7)\n Nil }} <- (Svc(f = () {{ 7 }}, m = (_: Int) {{ Nil }}))\n}}']
     return {'name': f'k4-services-{seed}', 'declarations': declarations, 'accept': True,
             'annotation': ('pass = (x: Int) -> Int { x }', 'pass = (x) { x }')}
 
@@ -163,8 +163,8 @@ def rebuild(case, rows):
     candidate['model'] = [{'string': v, 'bool': b, 'result': i} for (v, b), i in expected.items()]
     declarations = [d for d in case['declarations'] if not d.startswith(('f = ', 'main = '))]
     domain = 'Input' if any(d == 'Input = domain' for d in declarations) else '("a" | "ab" | "b" | "c" | "", Bool)'
-    clauses = '\n'.join(f'({PATTERNS[p]}, {BOOLS[q]})' + (' ? False' if guard else '') + f' -> {i}' for i, (p, q, guard) in enumerate(rows))
-    declarations.append(f'f = (x: {domain}) {{ x |> {{\n{clauses}\n}} }}')
+    clauses = '\n | '.join(f'(({PATTERNS[p]}, {BOOLS[q]})' + (' ? False' if guard else '') + f') {{ {i} }}' for i, (p, q, guard) in enumerate(rows))
+    declarations.append(f'f = (x: {domain}) {{ x |>\n{clauses}\n}}')
     if candidate['accept']:
         declarations.append('main = () {\n' + '\n'.join(f' assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items()) + '\n Nil\n}')
     candidate['declarations'] = declarations
