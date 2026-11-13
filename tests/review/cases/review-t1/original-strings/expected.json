@@ -1,6 +1,6 @@
 {
-  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
-  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/main_test.check : (got: String, want: String) -> Nil\nspec/main_test.generated_test : () -> Nil\nspec/main_test.generated_test : () -> Nil\n",
-      "stderr": "test/main_test.i:24:21: warning[W0503]: both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True` (§6.9)\n"
+      "stdout": "spec/main_test.check : (String, String) -> Nil\nspec/main_test.generated_test : () -> Nil\nspec/main_test.generated_test : () -> Nil\n",
+      "stderr": "test/main_test.i:22:21: warning[W0503]: both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True` (§6.9)\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass spec/main_test.append\npass spec/main_test.escapes\npass spec/qa_corpus_runtime_test.qa_startup\n3 passed, 0 failed\n",
-      "stderr": "test/main_test.i:24:21: warning[W0503]: both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True` (§6.9)\n"
+      "stderr": "test/main_test.i:22:21: warning[W0503]: both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True` (§6.9)\n"
     },
     "test2": {
       "command": [
@@ -31,10 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass spec/main_test.append\npass spec/main_test.escapes\npass spec/qa_corpus_runtime_test.qa_startup\n3 passed, 0 failed\n",
-      "stderr": "test/main_test.i:24:21: warning[W0503]: both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True` (§6.9)\n"
+      "stderr": "test/main_test.i:22:21: warning[W0503]: both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True` (§6.9)\n"
     }
-  },
-  "transitions": [
-    "W520 applied: E0520 -> W0503; docs/spec.md §6.9 requires Bool, no widening or new narrowing fact"
-  ]
+  }
 }

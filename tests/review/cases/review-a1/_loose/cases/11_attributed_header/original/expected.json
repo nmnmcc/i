@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:3:1: error[E0115]: a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before them\n1 error\n"
+      "stderr": "src/main.i:3:1: error[E0115]: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file\n1 error\n"
     }
   }
 }

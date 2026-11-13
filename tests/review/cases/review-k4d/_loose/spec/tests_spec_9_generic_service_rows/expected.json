@@ -1,6 +1,6 @@
 {
-  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
-  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/generic_service_rows.use : () -> Nil ! N | S(N)\nspec/generic_service_rows.annotated : () -> Nil ! N | S(N)\nspec/generic_service_rows.run : (body: () -> A ^ E ! N) -> A ^ E ! N\nspec/generic_service_rows.generated_test : () -> Nil ! Assert\nspec/generic_service_rows.get : () -> Int ! Dependency\nspec/generic_service_rows.read : () -> Int ! N | Inner(N)\nspec/generic_service_rows.read_outer : () -> Int ! N | Outer(N)\nspec/generic_service_rows.generated_test : () -> Nil ! Assert\nspec/generic_service_rows.make : (send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)\nspec/generic_service_rows.write : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)\nspec/generic_service_rows.write_annotated : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)\nspec/generic_service_rows.generated_test : () -> Nil ! Assert\n",
+      "stdout": "spec/generic_service_rows.use : () <- (S(N), ..N) -> Nil\nspec/generic_service_rows.annotated : () <- (S(N), ..N) -> Nil\nspec/generic_service_rows.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\nspec/generic_service_rows.generated_test : () <- (Assert) -> Nil\nspec/generic_service_rows.get : () <- (Dependency) -> Int\nspec/generic_service_rows.read : () <- (Inner(N), ..N) -> Int\nspec/generic_service_rows.read_outer : () <- (Outer(N), ..N) -> Int\nspec/generic_service_rows.generated_test : () <- (Assert) -> Nil\nspec/generic_service_rows.make : ((Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N)\nspec/generic_service_rows.write : (Entry) <- (Fail(E), Sink(E, N), ..N) -> Nil\nspec/generic_service_rows.write_annotated : (Entry) <- (Fail(E), Sink(E, N), ..N) -> Nil\nspec/generic_service_rows.generated_test : () <- (Assert) -> Nil\n",
       "stderr": ""
     },
     "test0": {
