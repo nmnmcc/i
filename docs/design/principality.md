@@ -171,12 +171,14 @@ current compiler's principal inference/solution preservation, **not** a
 proof that no principal scheme can exist in a better account of the
 language. Neither annotations nor tests are changed to hide it.
 
-**Correction (`685a1b04c`).** The two operand orders now receive E0504 at
+**Correction (`685a1b04c`, with proof-budget follow-up `cde147079`).**
+The two operand orders now receive E0504 at
 `x + 1`: the solver cannot infer a principal solution from the different
 successful specializations. It first checks whether an existing bound
 already proves the goal, then tries alternatives in isolated states.
-No failed alternative leaves bounds behind. An ambiguous subproblem is
-not discarded as though it had no solutions. The definition-only probe
+No failed alternative leaves bounds behind. Each read-only alternative gets
+its own proof budget, so an expensive earlier member cannot prevent a later
+proof. An ambiguous subproblem is not discarded as though it had no solutions. The definition-only probe
 also receives E0504. This intentionally removes the old accepted,
 nonprincipal schemes under §4.7's requirement to report an error where a
 principal type cannot be found. It does not claim the satisfying assignment
@@ -196,8 +198,9 @@ counterexample.
 
 **Verdict: holds for merging fully determined, compatible entries, because
 the merge is their unique prescribed meet; not shown for the full open-row
-system. The missed deferred E0515 rejection below is fixed in `161d07271`
-and `c9193f54c`; this is a soundness correction.**
+system. The missed deferred E0515 rejection below is fixed in `161d07271`,
+with follow-ups `c9193f54c`, `cde147079` and `31e59eb2d`; this is a soundness
+correction.**
 
 [§9.2, “Merging”](../spec.md#92-services) says that merging needs takes their
 intersection. Its next paragraph makes an empty service intersection an
@@ -353,14 +356,22 @@ deferred meet's metadata. This is a candidate explanation for the observed
 loss, not a traced causal diagnosis. The scalar/ground proof and the
 `freshen` metadata-copying branch do not cover this path.
 
-**Correction (`161d07271`, `c9193f54c`).** The traced loss was at
+**Correction (`161d07271`, `c9193f54c`, `cde147079`, `31e59eb2d`).**
+The traced loss was at
 generalization: `has_obligations` ignored `need_meet`, so `generalize`
 rebuilt the simplified intersection without its marked variable or service
 forms. It now keeps the bounded scheme when a reachable variable carries
 that obligation. Scheme snapshots also retain `has_need_meets`; copying
 only the marked variables while dropping that flag disabled later checks.
-The existing transfer encoding and freshening already copy the obligation
-and both operands. The callback helper alone remains admissible, as do
+The transfer encoding already copies the obligation and both operands.
+Meet discovery also follows reverse inclusion links: a wider receiver can
+otherwise hide a marked predecessor. Instantiation copies that connected
+quantified graph with one map, stopping at nongeneralized variables and
+keeping the receiver's own bounds distinct from the meet's bounds. Handler
+discovery keeps its existing directed traversal. A regression checks a
+conflict in a fresh receiver instance while the original quantified bounds
+remain unchanged. Callback need fitting preserves the late `NeedMeet` and
+its service pair instead of replacing it with a generic form mismatch. The callback helper alone remains admissible, as do
 compatible callback instances; the disjoint callback instance reports
 E0515 under §9.2. Fixtures under `tests/spec/9/` and checker tests cover the
 open definition, compatible instances, local and imported disjoint uses,
