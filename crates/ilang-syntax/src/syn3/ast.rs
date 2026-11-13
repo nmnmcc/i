@@ -36,6 +36,30 @@ impl PartialEq for Quoted {
     }
 }
 
+/// A quote pattern of a compile-time macro: the quoted datum, the slot of
+/// its template in the table of the compiler program, and the patterns of
+/// its unquotes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct QuotePattern {
+    pub datum: Quoted,
+    /// Template table slot, filled when a compiler program is prepared
+    /// (`lisp::quote_lower3`).
+    pub template: Option<u32>,
+    /// Capture patterns in matcher order; the flag marks a splice.
+    pub captures: Vec<(bool, Pattern)>,
+}
+
+impl QuotePattern {
+    /// A quote pattern whose captures were not read.
+    pub fn unread(datum: Datum) -> QuotePattern {
+        QuotePattern {
+            datum: Quoted(Box::new(datum)),
+            template: None,
+            captures: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ident {
     pub name: String,
@@ -294,7 +318,7 @@ pub struct Pattern {
 #[derive(Clone, Debug, PartialEq)]
 pub enum PatternKind {
     /// A Lisp quote pattern (Lisp surface only).
-    Quote(Quoted),
+    Quote(QuotePattern),
     Var(String),
     Discard(String),
     /// `x: T`.

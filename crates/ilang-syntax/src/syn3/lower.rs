@@ -1082,7 +1082,7 @@ impl Cx {
         let span = p.span.0;
         let kind = match &p.kind {
             n::PatternKind::Quote(q) => {
-                match crate::lisp::parse_pattern(&super::lisp::unconvert_quote(&q.0)) {
+                match crate::lisp::parse_pattern(&super::lisp::unconvert_quote(&q.datum.0)) {
                     Ok(p) => p.kind.clone(),
                     Err(d) => {
                         self.errors.push(d);
