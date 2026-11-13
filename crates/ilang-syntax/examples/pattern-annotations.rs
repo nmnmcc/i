@@ -58,14 +58,17 @@ fn main() {
         };
         let mut tree = format!("{module:?}");
         let mut parsed_mode = "module";
+        let mut formatted = None;
         if !lisp && mode != "module" && !diagnostics.is_empty() {
             if let Ok(mut expr) = syn3::parse_expr(source) {
                 tree = format!("{expr:?}");
+                formatted = Some(syn3::print_expr(&expr));
                 diagnostics.clear();
                 parsed_mode = "expr";
                 walk::expr(&mut expr, &mut annotations);
             } else if let Ok(mut pattern) = syn3::parse_pattern(source) {
                 tree = format!("{pattern:?}");
+                formatted = Some(syn3::print_pattern(&pattern));
                 diagnostics.clear();
                 parsed_mode = "pattern";
                 walk::pattern(&mut pattern, &mut annotations);
@@ -79,9 +82,38 @@ fn main() {
             }
             walk::module(&mut module, &mut annotations);
         }
+        let mut colons = Vec::new();
+        if request["format"].as_bool().unwrap_or(false) {
+            if parsed_mode == "module" && diagnostics.is_empty() {
+                formatted = if lisp {
+                    ilang_syntax::lisp::format(source).ok()
+                } else {
+                    syn3::format(source).ok()
+                };
+            }
+            if !lisp {
+                let lex = ilang_syntax::lexer::lex3(source);
+                let mut groups: Vec<(usize, T)> = Vec::new();
+                for (i, token) in lex.tokens.iter().enumerate() {
+                    while groups.last().is_some_and(|(end, _)| *end <= i) {
+                        groups.pop();
+                    }
+                    if token.kind == T::Colon
+                        && !groups.last().is_some_and(|(_, kind)| *kind == T::LtLt)
+                    {
+                        colons.push(token.span.start);
+                    }
+                    if let Some(end) = lex.close[i] {
+                        groups.push((end as usize, token.kind.clone()));
+                    }
+                }
+            }
+        } else {
+            formatted = None;
+        }
         annotations.edits.sort_unstable();
         annotations.edits.dedup();
-        writeln!(output, "{}", json!({"tree": tree, "mode": parsed_mode, "edits": annotations.edits,
+        writeln!(output, "{}", json!({"tree": tree, "mode": parsed_mode, "edits": annotations.edits, "colons": colons, "formatted": formatted,
             "diagnostics": diagnostics.iter().map(|d| format!("{}: {}", d.code.as_str(), d.message)).collect::<Vec<_>>() })).unwrap();
     }
 }

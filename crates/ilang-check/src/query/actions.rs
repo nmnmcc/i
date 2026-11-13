@@ -470,7 +470,7 @@ impl Query<'_> {
             vec![Edit {
                 source: self.source_of(m),
                 span: Span::new(span.end, span.end),
-                text: format!(": {ty}"),
+                text: format!(" : {}", annotation_text(&ty)),
             }]
         };
         Some(CodeFix {
@@ -606,11 +606,11 @@ impl Query<'_> {
                 let Some(row) = lisp_type(&ty) else { continue };
                 row
             } else {
-                ty
+                annotation_text(&ty)
             };
             out.push(InlayHint {
                 offset: b.span.end,
-                label: format!(": {ty}"),
+                label: format!(" : {ty}"),
                 parameter,
             });
         }
@@ -623,7 +623,8 @@ impl Query<'_> {
 /// A type shown in the syntax of §3, in the syntax of the Lisp surface: as
 /// the printer of that surface writes it in an annotation.
 fn lisp_type(ty: &str) -> Option<String> {
-    let (module, diags) = ilang_syntax::syn3::parse_module(&format!("x: {ty} = 0\n"));
+    let (module, diags) =
+        ilang_syntax::syn3::parse_module(&format!("x : {} = 0\n", annotation_text(ty)));
     if !diags.is_empty() {
         return None;
     }

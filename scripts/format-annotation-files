@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""One i fmt invocation over every repository .i/.is file, with tree equality.
+Invalid syntax fixtures are left unchanged by i fmt and included in the proof.
+"""
+import argparse
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import runpy
+import subprocess
+
+ROOT = Path(__file__).resolve().parent.parent
+MIGRATE = runpy.run_path(str(ROOT / 'scripts/migrate-annotations'))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
+    parser.add_argument('--driver', type=Path, default=ROOT / 'target/debug/examples/pattern-annotations')
+    parser.add_argument('--report', type=Path, required=True)
+    parser.add_argument('--baseline', type=Path, required=True)
+    args = parser.parse_args()
+    paths = sorted(set(subprocess.check_output(
+        ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.i', '*.is'],
+        cwd=ROOT, text=True).splitlines()))
+    before = [dict(path=path, source=(ROOT / path).read_text(), lisp=path.endswith('.is'), kind='file') for path in paths]
+    old = MIGRATE['parse'](before, args.driver)
+    with gzip.open(args.baseline, 'wt') as f:
+        for item, tree in zip(before, old):
+            f.write(json.dumps(dict(item, result=tree), ensure_ascii=False) + '\n')
+    result = subprocess.run([str(args.binary), 'fmt', *paths], cwd=ROOT, text=True, capture_output=True)
+    args.report.with_suffix('.fmt.log').write_text(result.stdout + result.stderr)
+    after = [dict(item, source=(ROOT / item['path']).read_text()) for item in before]
+    new = MIGRATE['parse'](after, args.driver)
+    entries = []
+    for a, b, x, y in zip(before, after, old, new):
+        xt = MIGRATE['tree'](x['tree'])
+        yt = MIGRATE['tree'](y['tree'])
+        entries.append(dict(path=a['path'], changed=a['source'] != b['source'],
+                            before_sha256=MIGRATE['digest'](a['source']), after_sha256=MIGRATE['digest'](b['source']),
+                            tree_sha256=MIGRATE['digest'](xt), equal=xt == yt,
+                            diagnostics=x['diagnostics'], diagnostics_equal=x['diagnostics'] == y['diagnostics']))
+    differences = [i for i in entries if not i['equal'] or not i['diagnostics_equal']]
+    report = dict(files=len(entries), changed=sum(i['changed'] for i in entries),
+                  invalid=sum(bool(i['diagnostics']) for i in entries), fmt_exit=result.returncode,
+                  baseline_sha256=hashlib.sha256(args.baseline.read_bytes()).hexdigest(),
+                  differences=differences, entries=entries)
+    args.report.write_text(json.dumps(report, indent=2) + '\n')
+    print(f"one i fmt invocation: {report['files']} files; {report['changed']} changed; "
+          f"{report['invalid']} invalid syntax fixtures; {len(differences)} tree/diagnostic differences")
+    if differences:
+        print(json.dumps(differences, indent=2))
+        raise SystemExit(1)
+    if result.returncode not in (0, 1):
+        raise SystemExit(f'i fmt failed unexpectedly: {result.returncode}; see {args.report.with_suffix(".fmt.log")}')
+
+
+if __name__ == '__main__':
+    main()
