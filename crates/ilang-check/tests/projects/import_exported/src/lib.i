@@ -20,3 +20,4 @@ Private = ()
 // Syntax three §2.8: Hidden is a labelled type; Opaque is its transparent alias.
 // §5.2.1 requires the type used by an exported alias to be exported too, so
 // Hidden is exported above without (..). Its constructor remains private.
+// export_hidden separately keeps the rejection of an alias of a private type.

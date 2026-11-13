@@ -185,3 +185,12 @@ passed. The requested CLI command reproduced the conversion's known
 `a_captured_service_row_keeps_callback_dependencies` failure; its fix is
 being tracked in `status-convfix.txt`. Remaining landing checks are in
 progress; this paragraph does not claim the branch is green.
+
+At the `19882c7d2` compiler tree, the remaining CLI binaries passed:
+providers 18, commands 14, macro_run 57, typed_macros 36. Project goldens
+(2 tests) and type goldens (5 tests) passed, including all three reviewed
+expectations. A fresh release build passed; std O2 passed 2,170 tests with
+zero failures. Shard 1/10 (198 cases, two jobs) is now queued. The conversion
+fix candidate `d67bcf7e` restores the original written provider annotation
+in the failed CLI fixture; it changes no compiler rule and is still awaiting
+its own final validation before integration.
