@@ -864,6 +864,14 @@ size = Codec(decode = (s) { string.length(s) }, encode = (n: Int) { int.to_strin
 Codec(Size, _) = size
 ```
 
+A type application must leave every occurrence in its definition well formed.
+This requirement follows arguments through aliases and other type applications.
+In particular, an argument used as a function need must describe services as
+§9.2 requires; being passed through a named type does not make a scalar value
+type a valid need. Check this requirement on each instance, including unused
+type definitions, before solving value-subtyping constraints. The type-parameter
+uses themselves obey §4.7.
+
 Here `Pair(Int, Int)` is a labelled type, not `(Int, Int)`; `Point` is `(Int, Int)`; and the alias pattern makes `Size` the type `Int`, leaving the `encode` part unread.
 
 ### 4.4 Union, intersection, and difference
