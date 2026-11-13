@@ -6,7 +6,7 @@
 #   scripts/dev-verify rust       Rust formatting, Clippy, snippets and the workspace tests
 #                                 (rust-lint: formatting, Clippy and snippets; rust-test: the tests)
 #   scripts/dev-verify snippets   every i snippet in the repository parses, or gives its registered
-#                                 diagnostics (scripts/old-syntax-check and its own tests)
+#                                 diagnostics (scripts/check-snippets and its own tests)
 #   scripts/dev-verify i          the release `i`, and with it the i sources
 #   scripts/dev-verify editors    VS Code tests, tree-sitter tests and Zed build
 #   scripts/dev-verify js         the JavaScript SDK and browser tests
@@ -24,12 +24,12 @@
 #                                 known failures in requirements.json  i (scripts/review-corpus run)
 #   lib, std, bench, examples     i tests at --opt 0 and 2, formatting i
 #   scripts/qa/generate.py        generated programs                   i (scripts/test-generation)
-#   i snippets in .i/.rs/.js/.md  scripts/old-syntax-check             snippets
+#   i snippets in .i/.rs/.js/.md  scripts/check-snippets               snippets
 #   bindings/javascript, tests/browser                                 js
 #   editors/**                                                         editors
 # Measurements and one-off comparisons, not suites: scripts/bench, scripts/checker-bench,
 # tests/perf/numeric, tests/t1/*, tests/r2-*.py. tests/syn3/services (expected.txt) is run
-# by hand with I_SYNTAX=3 until syntax three is the default.
+# by scripts/syn3-fixtures with the default parser.
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
@@ -50,8 +50,8 @@ rust-lint() {
 }
 
 snippets() {
-  scripts/old-syntax-check # builds the parser driver that its tests use
-  python3 -I scripts/old-syntax-check-test
+  scripts/check-snippets # builds the parser driver that its tests use
+  python3 -I scripts/check-snippets-test
 }
 
 # DEV_VERIFY_TEST_GROUP splits the tests for CI, where one job would take close to an hour:

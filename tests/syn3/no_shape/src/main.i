@@ -1,5 +1,5 @@
 //// Syntax three, stage 9 (docs/design/syntax-3.md §2.6.2 step 2): a direct
-//// call with a shape that the chain does not have. Read with `I_SYNTAX=3`;
+//// call with a shape that the chain does not have.
 //// `i check` gives the errors of `errors.txt`.
 (
 	(Io) = i/io

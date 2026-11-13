@@ -6,8 +6,6 @@ pub mod ast;
 mod ast_clone;
 mod ast_eq;
 pub mod format;
-#[cfg(feature = "legacy")]
-pub mod legacy;
 pub mod lexer;
 pub mod lisp;
 #[doc(hidden)]

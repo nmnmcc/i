@@ -9,7 +9,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-loader = importlib.machinery.SourceFileLoader("old_syntax_check", str(Path(__file__).with_name("old-syntax-check")))
+loader = importlib.machinery.SourceFileLoader("old_syntax_check", str(Path(__file__).with_name("check-snippets")))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 check = importlib.util.module_from_spec(spec)
 loader.exec_module(check)
@@ -48,7 +48,7 @@ class Expectations(unittest.TestCase):
         source = 'x ='
         item = dict(path='fixture.rs', line=1, source=source, start=len(marker), end=len(marker) + len(source), host=marker + source, kind='embedded')
         key = check.identity(item['path'], source)
-        data = type('Data', (), {'read_text': lambda self: json.dumps({"_syn2_old_forms": [], key: entry})})()
+        data = type('Data', (), {'read_text': lambda self: json.dumps({key: entry})})()
         with patch.object(check, 'DATA', data), patch.object(check, 'snippets', return_value=iter([item])), patch.object(check, 'parse', return_value=[actual]), patch.object(check.subprocess, 'run'), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             check.main()
 

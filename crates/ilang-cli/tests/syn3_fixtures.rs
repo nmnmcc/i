@@ -1,6 +1,6 @@
 //! The syntax-three fixtures of `tests/syn3`, read by the default parser.
-//! The library is round-tripped through the syntax-three printer in a
-//! temporary directory first, preserving the source tree and comments.
+//! The library is round-tripped through the syntax-three printer first,
+//! preserving the source tree and comments.
 //!
 //! A fixture is a package directory with any of:
 //!
@@ -32,8 +32,8 @@ fn sources(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Writes `lib` in syntax three under `root`.
-fn convert_library(root: &Path) {
+/// Checks the library against the syntax-three printer.
+fn round_trip_library() {
     let lib = repository().join("lib");
     let mut files = Vec::new();
     sources(&lib, &mut files);
@@ -52,21 +52,16 @@ fn convert_library(root: &Path) {
         let (round_trip, diags) = syn3::parse_module(&text);
         assert!(diags.is_empty(), "{}: {diags:?}", path.display());
         assert_eq!(&round_trip, module, "{}", path.display());
-        let to = root.join(path.strip_prefix(&lib).unwrap());
-        std::fs::create_dir_all(to.parent().unwrap()).unwrap();
-        std::fs::write(to, text).unwrap();
     }
 }
 
 /// Runs `i` on a fixture: whether it succeeded, its output, and both
 /// streams together.
-fn i(library: &Path, args: &[&str], project: &Path) -> (bool, String, String) {
+fn i(args: &[&str], project: &Path) -> (bool, String, String) {
     let output = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(args)
         .arg("--project")
         .arg(project)
-        .env("I_SYNTAX", "3")
-        .env("I_SYNTAX3_LIB", library)
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -76,8 +71,7 @@ fn i(library: &Path, args: &[&str], project: &Path) -> (bool, String, String) {
 
 #[test]
 fn syntax_three_fixtures() {
-    let library = tempfile::tempdir().unwrap();
-    convert_library(library.path());
+    round_trip_library();
     let mut fixtures: Vec<PathBuf> = std::fs::read_dir(repository().join("tests/syn3"))
         .unwrap()
         .map(|e| e.unwrap().path())
@@ -90,7 +84,7 @@ fn syntax_three_fixtures() {
         let name = dir.file_name().unwrap().to_string_lossy().into_owned();
         let read = |file: &str| std::fs::read_to_string(dir.join(file)).ok();
         if let Some(errors) = read("errors.txt") {
-            let (ok, _, all) = i(library.path(), &["check"], dir);
+            let (ok, _, all) = i(&["check"], dir);
             if ok {
                 problems.push(format!("{name}: `i check` passed, but errors are expected"));
             }
@@ -99,7 +93,7 @@ fn syntax_three_fixtures() {
             }
         }
         if let Some(types) = read("types.txt") {
-            let (ok, _, all) = i(library.path(), &["check", "--types"], dir);
+            let (ok, _, all) = i(&["check", "--types"], dir);
             if !ok {
                 problems.push(format!("{name}: `i check --types` failed:\n{all}"));
             }
@@ -108,7 +102,7 @@ fn syntax_three_fixtures() {
             }
         }
         if let Some(expected) = read("expected.txt") {
-            let (ok, stdout, all) = i(library.path(), &["run"], dir);
+            let (ok, stdout, all) = i(&["run"], dir);
             if !ok || stdout.trim_end() != expected.trim_end() {
                 problems.push(format!(
                     "{name}: `i run` gave:\n{all}\nexpected:\n{expected}"

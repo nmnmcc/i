@@ -1,7 +1,7 @@
 //// Syntax three, stage 10 (docs/design/syntax-3.md §6.4, spec §11.6):
 //// 10^6 tail calls through a multi-shape value, in constant stack. The
 //// value is a parameter, so each call goes through the run-time dispatch.
-//// Read with `I_SYNTAX=3`; `i run` prints the lines of `expected.txt`.
+//// `i run` prints the lines of `expected.txt`.
 (
 	(Io) = i/io
 	core = i/core

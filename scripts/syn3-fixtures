@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Runs the syntax-three fixtures under tests/syn3 with the transition switch
-# (docs/design/syntax-3.md §7.2, stages 8 to 11).
+# Runs the syntax-three fixtures under tests/syn3 with the default parser
+# and the repository library (docs/design/syntax-3.md §7.2, stage 12).
 #
 #   scripts/syn3-fixtures [I]
 #
-# I (default: target/debug/i) is the compiler to run. The library is
-# converted to syntax three into a temporary directory first. A fixture is a
+# I (default: target/debug/i) is the compiler to run. A fixture is a
 # package directory with any of:
 #   expected.txt  the lines that `i run` prints
 #   types.txt     lines that `i check --types` prints (others may be there)
@@ -15,9 +14,6 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 i=${1:-$repo/target/debug/i}
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
-cp -r "$repo/lib" "$root/lib"
-env -u I_SYNTAX -u I_SYNTAX3_LIB "$repo/scripts/syn3-convert-all" "$root" > /dev/null
-export I_SYNTAX=3 I_SYNTAX3_LIB=$root/lib
 failed=0
 for dir in "$repo"/tests/syn3/*/; do
 	name=$(basename "$dir")

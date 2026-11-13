@@ -1,6 +1,6 @@
 //// Syntax three, stage 8 (docs/design/syntax-3.md §2.10): services in the
 //// head, needs in types, `Fail` in a need, a row variable, and provides on a
-//// block and on an expression. Read with `I_SYNTAX=3`; `i run` prints the
+//// block and on an expression. `i run` prints the
 //// lines of `expected.txt`.
 (
 	(Io) = i/io

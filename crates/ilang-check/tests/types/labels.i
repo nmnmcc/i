@@ -39,7 +39,7 @@ unknown = make(height = 1, name = "x")
 twice = make("a", name = "b")
 
 missing = make("b")
-
+// Calls through a labelled function value are valid (syntax three stage 10).
 param = (f) { f(x = 1) }
 
 bad_pattern = (u) {

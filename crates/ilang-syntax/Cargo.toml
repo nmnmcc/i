@@ -8,25 +8,10 @@ license.workspace = true
 num-bigint.workspace = true
 thiserror.workspace = true
 
-[features]
-# The syntax before syntax three, for the migrator only.
-legacy = []
-
-[[example]]
-name = "migrate-syntax3"
-required-features = ["legacy"]
-
-[[example]]
-name = "migrate-syntax3-pipe"
-required-features = ["legacy"]
-
-[[test]]
-name = "syn3"
-required-features = ["legacy"]
-
-[[test]]
-name = "syn3_lower"
-required-features = ["legacy"]
+# The transitional old printer is owned by the one-tree lane. Its disabled
+# helper remains known until that file is removed; no Cargo feature enables it.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("legacy"))'] }
 
 [dev-dependencies]
 serde_json.workspace = true

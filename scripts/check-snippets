@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Parse repository i snippets with the syntax-three parser, so that no text of
-the syntax before it remains; see old-syntax-check.md."""
+the syntax before it remains; see check-snippets.md."""
 import hashlib
 import json
 import os
@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "scripts/old-syntax-check.json"
+DATA = ROOT / "scripts/check-snippets.json"
 
 
 def rust_strings(text):
@@ -109,6 +109,7 @@ NEXT_SYNTAX = (
     "crates/ilang-syntax/src/syn3/",
     "crates/ilang-syntax/tests/syn3",
     "crates/ilang-syntax/examples/migrate-syntax3",
+    "crates/ilang-syntax/examples/support/legacy/",
 )
 
 
@@ -198,7 +199,7 @@ def main():
             break
     subprocess.run(command, check=True)
     config = json.loads(DATA.read_text())
-    config.pop("_syn2_old_forms")
+    config.pop("_syn2_old_forms", None)
     all_snippets = list(snippets())
     sources = []
     used = set()

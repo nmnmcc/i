@@ -18,7 +18,7 @@ Valid review modules take part in the existing formatter properties. Only
 parser-negative bytes live in each project's `.invalid` directory, because the
 formatter's fixed skip baseline is outside this track's ownership. The corpus
 runner materializes those bytes in an ignored `.work` directory for the public
-CLI. The existing `old-syntax-check` still scans and asserts their exact parser
+CLI. The existing `check-snippets` still scans and asserts their exact parser
 diagnostics; no parser-negative input is treated as a successful parse.
 
 After the original type check, accepted packages run from a temporary copy with

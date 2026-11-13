@@ -1,6 +1,6 @@
 //// Syntax three, stage 9 (docs/design/syntax-3.md §2.6, §4.5): a chain with
 //// several shape groups, and direct calls that choose the group by the
-//// shape of their argument data. Read with `I_SYNTAX=3`; `i run` prints the
+//// shape of their argument data. `i run` prints the
 //// lines of `expected.txt`.
 (
 	(Io) = i/io

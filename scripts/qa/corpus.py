@@ -439,7 +439,7 @@ def run_corpus(args):
 def register_parses(args):
     if os.environ.get('UPDATE') != '1':
         raise SystemExit('parse-register requires UPDATE=1')
-    scanner = runpy.run_path(str(ROOT / 'scripts/old-syntax-check'))
+    scanner = runpy.run_path(str(ROOT / 'scripts/check-snippets'))
     manifest_path = CORPUS / 'manifest.json'
     manifest = json.loads(manifest_path.read_text())
     files = []
@@ -452,7 +452,7 @@ def register_parses(args):
     files.sort()
     sources = [re.sub(r'(?m)^// old-syntax-check:.*\n?', '', p.read_bytes().decode()) for p in files]
     results = scanner['parse'](sources)
-    config_path = ROOT / 'scripts/old-syntax-check.json'
+    config_path = ROOT / 'scripts/check-snippets.json'
     config = {k: v for k, v in json.loads(config_path.read_text()).items()
               if not k.startswith('tests/review/cases/')}
     invalid = 0

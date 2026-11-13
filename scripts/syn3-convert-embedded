@@ -6,7 +6,7 @@ scripts/syn3-convert-all after the `.i` and `.is` files.
 
     scripts/syn3-convert-embedded MIGRATOR [--ctors DIR]...
 
-The snippets are the ones `scripts/old-syntax-check` extracts. A snippet is
+The snippets are the ones `scripts/check-snippets` extracts. A snippet is
 converted when only the syntax before syntax three reads it (or both read it
 to different trees and it has no `<-`), and left as it is when it is in syntax
 three already, so the script can run again. A string or fence whose text was
@@ -17,7 +17,7 @@ templates (`prefix`, `suffix`, `substitutions`), and Rust strings that use
 `{{` (format strings). A snippet that neither syntax reads, or whose converted
 text cannot be written back into its string, is a failure (exit 1).
 
-The keys of `scripts/old-syntax-check.json` are the paths and hashes of the
+The keys of `scripts/check-snippets.json` are the paths and hashes of the
 snippets; the keys of the snippets and `.i` files that changed are moved to
 their new hashes: those of snippets here, those of whole files by
 `--rekey BEFORE`, where BEFORE is the map written by `--snapshot BEFORE` before
@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def load_check():
-    loader = SourceFileLoader("old_syntax_check", str(ROOT / "scripts/old-syntax-check"))
+    loader = SourceFileLoader("old_syntax_check", str(ROOT / "scripts/check-snippets"))
     spec = importlib.util.spec_from_loader("old_syntax_check", loader)
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
@@ -74,7 +74,7 @@ def rekey(before):
     os.chdir(ROOT)
     places = json.loads(Path(before).read_text())
     moved = move_keys({key: file_identity(path) for key, path in places.items()})
-    print(f"syn3-convert-embedded: {moved} keys of whole files in scripts/old-syntax-check.json moved to the converted text")
+    print(f"syn3-convert-embedded: {moved} keys of whole files in scripts/check-snippets.json moved to the converted text")
 
 
 def rust_encode(literal, value):
