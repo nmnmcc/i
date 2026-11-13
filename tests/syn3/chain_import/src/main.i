@@ -1,6 +1,6 @@
 //// Syntax three, stages 9 and 11 (docs/design/syntax-3.md §2.6.2, §2.6.7): a
 //// chain of another module is called directly as a member, as an imported
-//// name and through a direct alias. Read with `I_SYNTAX=3`; `i run` prints
+//// name and through a direct alias. `i run` prints
 //// the lines of `expected.txt`.
 (
 	(Io) = i/io

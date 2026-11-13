@@ -1,5 +1,5 @@
 //// Syntax three, stage 11 (docs/design/syntax-3.md §2.6.2): what selection
-//// rejects. Read with `I_SYNTAX=3`; `i check` gives the errors of
+//// rejects. `i check` gives the errors of
 //// `errors.txt`.
 (
 	(Io) = i/io

@@ -1,6 +1,6 @@
 //// Syntax three, stage 11 (docs/design/syntax-3.md §2.6.2 to §2.6.7):
 //// selection by known types and by expected types, and direct aliases.
-//// Read with `I_SYNTAX=3`; `i check --types` prints the lines of
+//// `i check --types` prints the lines of
 //// `types.txt`, and `i run` the lines of `expected.txt`.
 (
 	(Io) = i/io
