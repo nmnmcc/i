@@ -493,3 +493,12 @@ that unsuccessful command is recorded in the ledger.
 A source-position audit also mapped own_assert's same panic call 8:32 ->
 7:40, and the async/sync host-error main definitions 15:1 -> 12:1 and 14:1 ->
 11:1. These exact frame assertions pass in the 9/ and 7/ filters respectively.
+
+Repeated conversion had promoted the two remaining E6 future-SYN3 fences
+after their staging markers were already gone. The spec-fold helper now
+only promotes such fences when it is folding a staged document. Checked
+initial old/new staging on a temporary document and byte-for-byte idempotence
+on the current spec. Restored the two future fence tags without changing
+their source or registered diagnostics. Removed one confirmed dead inventory
+identity for the formerly shown hover type with two row variables. Final
+formatter and exact-diagnostic inventory gates will verify this sweep.

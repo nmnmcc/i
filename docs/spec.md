@@ -1346,7 +1346,7 @@ example = () {
 
 **Layers.** There is no layer concept. A function that returns several services returns ordinary data, which may be provided whole or spread:
 
-```i
+```i future-SYN3
 base = () <- (io: Io) -> (Config, Log) {
   (Config(url = "https://example.com"), Log(write = (s) { io.print(s) }))
 }
@@ -1435,7 +1435,7 @@ A structured task cancel resumes its scheduling continuation with a cancel answe
 
 **Keeping services.** In a service pattern, `..env: N` binds the whole set of services that the function receives as one value of the row type `N` (§6.8). A value of a row type may be bound, captured and provided after `<-`, alone or as a spread in provided data; it may not be spread into ordinary data, compared, printed or matched. `keep` makes a function that, wherever it is called, calls `f` with the services of the place where `keep` was called, but with the caller's `Fail`:
 
-```i
+```i future-SYN3
 keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail(E)) -> A {
   (x) { f(x) <- env }
 }
