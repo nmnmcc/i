@@ -1,3 +1,0 @@
-spec/a1_headers_tuple.even : (n: Int) -> Bool
-spec/a1_headers_tuple.odd : (n: Int) -> Bool
-spec/a1_headers_tuple.main : () -> Nil ! Assert

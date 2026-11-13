@@ -34,8 +34,16 @@ struct State {
     generated: HashMap<(ModuleId, Span), ast::Expr>,
 }
 pub struct Driver {
-    graph: PackageGraph,
-    parsed: Vec<Parsed>,
+    graph: Arc<PackageGraph>,
+    parsed: Arc<Vec<Parsed>>,
+    /// The same modules, shared with each call's fresh definition world.
+    shared: Vec<Arc<Parsed>>,
+    /// The expanded program is fixed, so its macro index is built once.
+    registry: std::sync::OnceLock<Result<Registry, Vec<Diagnostic>>>,
+    /// A copy of `parsed` in which one call at a time installs its caller's
+    /// current source map, restoring it afterwards; this avoids copying the
+    /// whole program for every typed call and type parse.
+    scratch: Arc<Mutex<Vec<Parsed>>>,
     state: Mutex<State>,
 }
 impl std::fmt::Debug for Driver {
@@ -46,8 +54,11 @@ impl std::fmt::Debug for Driver {
 impl Driver {
     pub fn new(graph: &PackageGraph, parsed: &[Parsed]) -> Self {
         Self {
-            graph: graph.clone(),
-            parsed: parsed.to_vec(),
+            graph: Arc::new(graph.clone()),
+            parsed: Arc::new(parsed.to_vec()),
+            shared: parsed.iter().cloned().map(Arc::new).collect(),
+            registry: std::sync::OnceLock::new(),
+            scratch: Arc::new(Mutex::new(parsed.to_vec())),
             state: Mutex::new(State {
                 session: Session::default(),
                 scoped: HashMap::new(),
@@ -56,6 +67,32 @@ impl Driver {
         }
     }
 }
+/// Runs `f` on the driver's modules with `scoped` installed as the source map
+/// of module `index`, exactly as on a fresh copy of `parsed` changed in that one
+/// place. The shared scratch copy is restored before returning; if it is in use
+/// (a nested or concurrent call), a fresh copy is made instead.
+fn with_scoped<T>(
+    scratch: &Mutex<Vec<Parsed>>,
+    parsed: &[Parsed],
+    index: usize,
+    scoped: ScopedSource,
+    f: impl FnOnce(&[Parsed]) -> T,
+) -> T {
+    match scratch.try_lock() {
+        Ok(mut modules) => {
+            let previous = modules[index].scoped.replace(scoped);
+            let result = f(&modules);
+            modules[index].scoped = previous;
+            result
+        }
+        Err(_) => {
+            let mut modules = parsed.to_vec();
+            modules[index].scoped = Some(scoped);
+            f(&modules)
+        }
+    }
+}
+
 fn diagnostic(
     program: &Program,
     module: ModuleId,
@@ -146,20 +183,25 @@ impl Expander for Driver {
         let call = syntax_for(p, &self.graph, &original);
         let parser_graph = self.graph.clone();
         let parser_parsed = self.parsed.clone();
+        let parser_scratch = self.scratch.clone();
         let parser_program = program.clone();
         let parser_call = call.clone();
         query.set_parser(Arc::new(move |syntax| {
-            let mut parsed = parser_parsed.clone();
             let index = module.0 as usize;
             let mut scoped = parser_program
                 .module(module)
                 .scoped
                 .clone()
                 .unwrap_or_else(|| {
-                    ScopedSource::new(parser_graph.sources.get(parsed[index].source).text.clone())
+                    ScopedSource::new(
+                        parser_graph
+                            .sources
+                            .get(parser_parsed[index].source)
+                            .text
+                            .clone(),
+                    )
                 });
             let ty = scoped.ty(syntax, &parser_call).map_err(|e| e.message)?;
-            parsed[index].scoped = Some(scoped);
             let expr = ast::Expr {
                 span: ty.span,
                 kind: ast::ExprKind::Fn(Box::new(ast::Function {
@@ -175,17 +217,20 @@ impl Expander for Driver {
                     },
                 })),
             };
-            let (resolved, _) = ilang_check::resolve::typed_output(
-                &parser_graph,
-                &parsed,
-                &parser_program,
-                module,
-                span,
-                &expr,
-                var_count,
-                ty_var_count,
-                &ilang_check::resolve::CheckedInputs::default(),
-            )
+            let resolved = with_scoped(&parser_scratch, &parser_parsed, index, scoped, |parsed| {
+                ilang_check::resolve::typed_output(
+                    &parser_graph,
+                    parsed,
+                    &parser_program,
+                    module,
+                    span,
+                    &expr,
+                    var_count,
+                    ty_var_count,
+                    &ilang_check::resolve::CheckedInputs::default(),
+                )
+            })
+            .map(|(resolved, _)| resolved)
             .map_err(|ds| {
                 ds.into_iter()
                     .map(|d| d.message)
@@ -236,7 +281,11 @@ impl Expander for Driver {
             };
             answer.map_err(|message| (message, args.first().cloned().unwrap_or_else(|| at.clone())))
         }));
-        let registry = Registry::new(&self.graph, &self.parsed)?;
+        let registry = self
+            .registry
+            .get_or_init(|| Registry::new(&self.graph, &self.parsed))
+            .as_ref()
+            .map_err(Clone::clone)?;
         let name = &program.def(definition).name;
         let target_source = program.module(definition.module).source;
         let target = &self.parsed[definition.module.0 as usize];
@@ -254,14 +303,18 @@ impl Expander for Driver {
         let mut engine = BodyEngine::new(
             &self.graph,
             &self.parsed,
-            &registry,
+            registry,
             p.source,
             scoped,
             resolver,
             &mut state.session,
         );
         engine.use_completed_definitions(
-            Arc::new(DefinitionWorld::new(&self.graph, &self.parsed)),
+            Arc::new(DefinitionWorld::new_shared(
+                &self.graph,
+                self.shared.clone(),
+                Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            )),
             &p.ast,
         );
         let args = arguments
@@ -329,8 +382,6 @@ impl Expander for Driver {
         drop(engine);
         state.session.types = None;
         state.scoped.insert(module, scoped.clone());
-        let mut parsed = self.parsed.clone();
-        parsed[module.0 as usize].scoped = Some(scoped.clone());
         let mut input_nodes = Vec::new();
         let mut work = arguments.clone();
         while let Some(s) = work.pop() {
@@ -415,16 +466,24 @@ impl Expander for Driver {
             .values()
             .map(|old| (old.span, old.span))
             .collect();
-        let (expression, mut resolution) = ilang_check::resolve::typed_output(
-            &self.graph,
-            &parsed,
-            program,
-            module,
-            span,
-            &syntax,
-            var_count,
-            ty_var_count,
-            &checked,
+        let (expression, mut resolution) = with_scoped(
+            &self.scratch,
+            &self.parsed,
+            module.0 as usize,
+            scoped.clone(),
+            |parsed| {
+                ilang_check::resolve::typed_output(
+                    &self.graph,
+                    parsed,
+                    program,
+                    module,
+                    span,
+                    &syntax,
+                    var_count,
+                    ty_var_count,
+                    &checked,
+                )
+            },
         )
         .map_err(|mut ds| {
             for d in &mut ds {

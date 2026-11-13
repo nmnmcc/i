@@ -1,6 +1,0 @@
-{
-  "code": 0,
-  "out": "app/main.wrap : (f: () -> A ! N) -> () -> A ! N\n",
-  "err": "",
-  "seconds": 0.01803640089929104
-}

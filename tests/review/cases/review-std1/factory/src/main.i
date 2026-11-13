@@ -7,3 +7,4 @@ new = () -> Stream(a, Never, n) {
 }
 Bias = (value = Int)
 needs_bias = () -> Stream(Int, Never, Bias) { new() }
+// old-syntax-check: E0101

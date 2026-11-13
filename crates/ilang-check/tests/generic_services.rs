@@ -134,7 +134,7 @@ boolean = () {
         accepts(
             &source,
             "use",
-            "(x = A) <- (Fail(E), Outer(A, E, N), ..N) -> A",
+            "(A) <- (Fail(E), Outer(A, E, N), ..N) -> A",
             &["integer", "boolean"],
         );
     }

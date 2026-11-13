@@ -1,3 +1,0 @@
-@deprecated
-("x")
-main = () { Nil }

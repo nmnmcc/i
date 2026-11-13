@@ -1,5 +1,0 @@
-spec/empty_types.kind : (h: Window | Socket) -> String
-spec/empty_types.t : () -> Nil
-test/empty_types.i:12:6: error[E0501]: `Socket` is not a subtype of `_ - Window - Socket`
-test/empty_types.i:13:6: error[E0501]: `Window` is not a subtype of `_ - Socket - Window`
-2 errors

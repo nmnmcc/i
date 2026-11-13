@@ -1,3 +1,0 @@
-test/a1_record_kept.i:5:9: error[E0114]: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`
-test/a1_record_kept.i:5:17: error[E0101]: expected a type, found `1`
-2 errors

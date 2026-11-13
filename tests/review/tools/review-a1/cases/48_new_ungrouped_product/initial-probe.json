@@ -1,1 +1,0 @@
-{"check":["E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"],"parse":["E0111: a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`"],"roundtrip":false,"wat":false}

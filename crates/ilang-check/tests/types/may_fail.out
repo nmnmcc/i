@@ -1,21 +1,21 @@
-pair : (t = (A, B)) -> A
-pair_written : (t = (Int, String)) -> String
-first : (r = Result(A, B)) <- (Assert) -> A
+pair : ((A, B)) -> A
+pair_written : ((Int, String)) -> String
+first : (Result(A, B)) <- (Assert) -> A
 annotated : () -> Int
-literal : (n = A & Int) <- (Assert) -> A
-single : (u = User) -> String
-only_ok : (r = Result(Int, Never)) -> Int
-nested : (p = (Result(Int, Never), Bool)) -> Int
+literal : (A & Int) <- (Assert) -> A
+single : (User) -> String
+only_ok : (Result(Int, Never)) -> Int
+nested : ((Result(Int, Never), Bool)) -> Int
 from_value : () -> 1
-list : (xs = List(A)) <- (Assert) -> A
-list_rest : (xs = List(A)) -> List(A)
-prefix : (s = String) -> String
-prefix_some : (s = String) <- (Assert) -> String
-named : (r = Result(A, B)) <- (Assert) -> Result(A, B)
-typed_part : (p = (Int, A)) -> A
-bits : (b = BitArray) <- (Assert) -> Int
-float : (f = A & Float) <- (Assert) -> A
-type_var : (x = A) -> A
+list : (List(A)) <- (Assert) -> A
+list_rest : (List(A)) -> List(A)
+prefix : (String) -> String
+prefix_some : (String) <- (Assert) -> String
+named : (Result(A, B)) <- (Assert) -> Result(A, B)
+typed_part : ((Int, A)) -> A
+bits : (BitArray) <- (Assert) -> Int
+float : (A & Float) <- (Assert) -> A
+type_var : (A) -> A
 param_tuple : ((A, B)) -> A
 param_user : (User) -> String
 param_ctor : (Result(A, B)) <- (Assert) -> A

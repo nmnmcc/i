@@ -1,2 +1,0 @@
-test/a1_variable_hides_type.i:4:4: error[E0231]: a type variable may not have the name of a type
-1 error

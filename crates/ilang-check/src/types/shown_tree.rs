@@ -180,7 +180,6 @@ impl PartialEq for ShownType {
                 }
                 (ShownType::Fn(a), ShownType::Fn(b))
                     if a.params.len() == b.params.len()
-                        && a.err.is_some() == b.err.is_some()
                         && a.env.is_some() == b.env.is_some() =>
                 {
                     for ((an, at), (bn, bt)) in a.params.iter().zip(&b.params) {

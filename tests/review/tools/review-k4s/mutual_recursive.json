@@ -1,6 +1,0 @@
-{
-  "name": "mutual_recursive",
-  "code": 1,
-  "time": 0.02041166485287249,
-  "out": "app/main.use : () -> Nil ! N | S(N)\nsrc/main.i:3:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\nsrc/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n2 errors\n"
-}

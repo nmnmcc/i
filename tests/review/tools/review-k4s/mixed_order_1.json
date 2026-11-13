@@ -1,6 +1,0 @@
-{
-  "name": "mixed_order_1",
-  "code": 0,
-  "time": 0.01775232795625925,
-  "out": "app/main.one : () -> Int ! S(Int)\napp/main.two : () -> String ! S(String)\napp/main.run : (f: () -> Int ! N, x: N) -> Int ! N\napp/main.bad : () -> Int ! S(Int) | S(A)\n"
-}

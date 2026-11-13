@@ -720,6 +720,21 @@ impl Cx<'_> {
 
     /// §7.3 rows 1 to 5. The last definition keeps the name of the type.
     fn type_def(&mut self, def: &o::TypeDef, span: Span) -> Vec<n::TypeDef> {
+        // The old syntax read a lowercase type parameter and rejected it
+        // (E0232); syntax three rejects the head in the parser (E0101, §3.2).
+        // The converted file no longer parses, so say so.
+        for p in &def.params {
+            if p.name.starts_with(|c: char| c.is_ascii_lowercase()) {
+                self.note(
+                    p.span,
+                    "lowercase-type-param",
+                    format!(
+                        "the type parameter `{}` of `{}` is lowercase: the old compiler rejected it (E0232) and syntax three cannot parse the head (E0101); rename it by hand or keep the file as an error fixture",
+                        p.name, def.name.name
+                    ),
+                );
+            }
+        }
         let params: Vec<n::Type> = def
             .params
             .iter()

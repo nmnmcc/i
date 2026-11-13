@@ -1,3 +1,0 @@
-name="app"
-[dependencies]
-schema={path="../pkg_lib"}

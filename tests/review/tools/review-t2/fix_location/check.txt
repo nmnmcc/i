@@ -1,7 +1,0 @@
-review/main.cell : (x: A) -> Cell(A)
-review/main.put : (c: Cell(A), x: A) -> Nil
-review/main.a : Cell(Int)
-review/main.b : Cell(Int | String)
-review/main.later : () -> Nil
-src/main.i:7:16: error[E0501]: `Int` is not a subtype of `String` (the type at 7:10 needs it) (this type was fixed here: review/main:5:7)
-1 error

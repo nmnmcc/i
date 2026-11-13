@@ -10,7 +10,8 @@ Accepted temporary packages include one ordinary Nil test to exercise startup,
 including source libraries with no original entry. Censored observations keep
 their raw partial outputs; completed phases still compare exactly.
 
-`tools/` preserves original review generators, finite models and evidence.
-Historical tools contain absolute paths and mutation commands: they are source
-artifacts, not commands to run. Host drivers have `.source` suffixes. Use the
-portable `scripts/test-generation` adapters for ongoing generation.
+The review drivers, logs and compiler snapshots that came with the cases are
+not kept here; they are in git history (removed after commit d893698a). The
+finite models that `scripts/test-generation --models` replays are
+`tests/t3-*.py` and `scripts/qa/models/`. Use the portable
+`scripts/test-generation` adapters for ongoing generation.

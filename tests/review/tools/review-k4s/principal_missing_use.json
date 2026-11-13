@@ -1,6 +1,0 @@
-{
-  "name": "principal_missing_use",
-  "code": 0,
-  "time": 0.019333660136908293,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (f: () -> A ! N) -> A ! N\napp/main.example : () -> Nil\n"
-}

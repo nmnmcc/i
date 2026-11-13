@@ -94,3 +94,9 @@ tests/spec/9/control_lazy_env.i constructor-name-clash
 tests/spec/9/control_lazy_env_unwind.i constructor-name-clash
 tests/spec/9/control_lazy_long_pending.i constructor-name-clash
 tests/spec/9/control_lazy_skip.i constructor-name-clash
+crates/ilang-check/tests/types/type_params.i lowercase-type-param (the lowercase head `Mixed(a, B)` is no longer in it: syntax three rejects it in the parser, E0101, tested by front_end kept_form_messages_are_independent_checks)
+tests/review/cases/review-runtime/echo-types/src/task.i lowercase-type-param (error fixture: E0232 before, E0101 now)
+tests/review/cases/review-s6/probe/src/main.i lowercase-type-param (error fixture: E0232 before, E0101 now)
+tests/review/cases/review-std1/factory/src/main.i lowercase-type-param (error fixture: E0232 before, E0101 now)
+tests/review/cases/review-std1/tree/src/main.i lowercase-type-param (error fixture: E0232 before, E0101 now)
+tests/review/cases/review-std1/variance/src/main.i lowercase-type-param (error fixture: E0232 before, E0101 now)

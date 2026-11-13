@@ -136,6 +136,13 @@ pub fn run(
     // leave a partial source document on stdout.
     let mut output = String::new();
     for module in modules {
+        // spec §6.8: "a quote and a macro definition have no normal spelling".
+        if to != "is" && lisp_only(&module.ast) {
+            bail!(
+                "{}: a quotation or a macro definition has no normal spelling; use --to is for quotations or other Lisp-only forms",
+                graph.sources.get(module.source).display
+            );
+        }
         let text = ilang_syntax::syn3::print_current(&module.ast, to == "is");
         output.push_str(&format!("// {}\n{text}\n", module.path));
     }
@@ -152,4 +159,30 @@ pub fn run(
     }
     print!("{output}");
     Ok(ExitCode::SUCCESS)
+}
+
+/// Whether a module has a quotation or a macro definition, which only the
+/// Lisp surface can write (spec §6.8).
+fn lisp_only(module: &ilang_syntax::ast::Module) -> bool {
+    use ilang_syntax::ast::{Expr, ExprKind, Pattern, PatternKind};
+    use ilang_syntax::walk::{Visitor, Walk};
+    struct Find(bool);
+    impl Visitor for Find {
+        fn expr(&mut self, e: &mut Expr, enter: bool) {
+            self.0 |= enter && matches!(e.kind, ExprKind::Quote(_));
+        }
+        fn pattern(&mut self, p: &mut Pattern) {
+            self.0 |= matches!(p.kind, PatternKind::Quote { .. });
+        }
+    }
+    if module.items.iter().any(|item| {
+        item.attributes
+            .iter()
+            .any(|a| a.module.is_none() && a.name.name == "macro")
+    }) {
+        return true;
+    }
+    let mut find = Find(false);
+    module.clone().walk(&mut find);
+    find.0
 }

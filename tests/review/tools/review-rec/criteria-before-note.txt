@@ -1,8 +1,0 @@
-Recorded before opening docs/design/records.md.
-1. Set semantics and substitution-stable normalization, including bottom, nested products, coincident labels, and forgetting intersections.
-2. Principal inference: most-general scheme, annotation and boundary behavior, bound/argument order independence.
-3. Exact-union cost under independent branches, spreads, recursion/folds; no silent resource widening.
-4. Inferred/known/permanent-type separation, literal sets, invariance, weak variables, and J1-J8.
-5. Ordinary user libraries must implement schema extraction, codecs built field by field, and fixed-schema maps.
-6. Complete implementer contract for representation, routing, substitution, completion, coverage, interfaces, and diagnostics.
-Hard cases: overwritten empty fields; hidden contradictory intersections; branch cross products; callbacks consuming branch results; generic union results; label collisions after substitution; open encode/closed decode codec.

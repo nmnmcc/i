@@ -1,15 +1,15 @@
-after_all : (b = Bool) -> 1 | 2 | 3
-duplicate : (n = A) -> 1 | 2 | 3
-after_catch_all : (x = A) -> 1 | 2
-guarded_after : (b = Bool) -> 1 | 2
-guard_not_counted : (b = Bool) -> 1 | 2 | 3
-prefixes : (s = A) -> 1 | 2 | 3 | 4
-no_values : (v = Int) -> 1 | 2
-choices : (r = Result(A, B)) -> 1 | 2
-nested : (r = Result(Bool, Nil)) -> 1 | 2 | 3 | 4
-lists : (xs = List(A)) -> 0 | 1
-bits : (b = A) -> Int
-dead : (x = A) -> 1
+after_all : (Bool) -> 1 | 2 | 3
+duplicate : (A) -> 1 | 2 | 3
+after_catch_all : (A) -> 1 | 2
+guarded_after : (Bool) -> 1 | 2
+guard_not_counted : (Bool) -> 1 | 2 | 3
+prefixes : (A) -> 1 | 2 | 3 | 4
+no_values : (Int) -> 1 | 2
+choices : (Result(A, B)) -> 1 | 2
+nested : (Result(Bool, Nil)) -> 1 | 2 | 3 | 4
+lists : (List(A)) -> 0 | 1
+bits : (A) -> Int
+dead : (A) -> 1
 2:62: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
 4:37: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
 6:43: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)

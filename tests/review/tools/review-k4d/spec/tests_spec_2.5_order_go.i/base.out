@@ -1,5 +1,0 @@
-spec/order_go.a : (Int, Never)
-spec/order_go.y : Never
-spec/order_go.z : Never
-spec/order_go.p : (s: String) -> Never
-spec/order_go.main : () -> String

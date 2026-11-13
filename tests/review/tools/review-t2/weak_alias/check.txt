@@ -1,3 +1,0 @@
-review/main.id : (x: A) -> A
-review/main.v : Int
-review/main.x : Int

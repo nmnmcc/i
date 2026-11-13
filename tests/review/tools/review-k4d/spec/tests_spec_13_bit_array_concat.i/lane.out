@@ -1,5 +1,0 @@
-spec/bit_array_concat.check : (got: BitArray, want: BitArray) -> Nil
-spec/bit_array_concat.same : (got: String, want: String) -> Nil
-spec/bit_array_concat.whole_bytes : () -> Nil
-spec/bit_array_concat.parts_that_are_not_whole_bytes : () -> Nil
-spec/bit_array_concat.slices : () -> Nil

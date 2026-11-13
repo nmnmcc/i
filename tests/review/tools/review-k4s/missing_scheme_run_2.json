@@ -1,5 +1,0 @@
-{
-  "opt": 2,
-  "code": 1,
-  "out": "trap: wasm trap: cast failure\n"
-}

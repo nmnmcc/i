@@ -1,22 +1,22 @@
-with_int : (body = () <- (Fail(E), ..N) -> A) <- (Fail(E), N - Reader(_)) -> A
+with_int : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Reader(_)) -> A
 get_s : () <- (Reader(String)) -> String
 g : () -> String
 k : () -> String
-use_int : (c = Cell(Int)) -> Int
-use_str : (c = Cell(String)) -> String
-pass : (y = Cell(String)) -> String
-through_var : (x = Cell(String)) -> Int
-through_top : (x = Cell(String)) -> Int
-arity : (k = (1) <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> Never
+use_int : (Cell(Int)) -> Int
+use_str : (Cell(String)) -> String
+pass : (Cell(String)) -> String
+through_var : (Cell(String)) -> Int
+through_top : (Cell(String)) -> Int
+arity : ({ (1) | (1, 2) } <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A
 use_state_int : () <- (State(Int)) -> 1
 use_state_str : () <- (State(String)) -> 1
 nested : List(Cell(A))
-unbox : (b = Box(Int)) -> Int
-two_tests : (v = Box(Int | String)) -> Int
-test_then_ctor : (v = Box(Int | String)) -> Int
-lists : (l = List(Int | String)) -> List(Int)
-test_ok : (v = Box(Int) | String) -> Int
-take : (h = () -> A & Int) -> () -> A & Int
+unbox : (Box(Int)) -> Int
+two_tests : (Box(Int | String)) -> Int
+test_then_ctor : (Box(Int | String)) -> Int
+lists : (List(Int | String)) -> List(Int)
+test_ok : (Box(Int) | String) -> Int
+take : (() -> A & Int) -> () -> A & Int
 p : () -> Never
 z : Never
 not_string : String
@@ -25,7 +25,6 @@ not_string : String
 13:29: error[E0515]: `Reader(String)` and `Reader(_)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 13:20 needs it)
 28:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 28:2 needs it)
 33:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 33:2 needs it)
-38:2: error[E0502]: the function types `(1) <- (Fail(_), .._) -> _` and `(1, 2) <- (Fail(_), .._) -> _` have different numbers of parameters
 50:2: error[E0503]: `_` and `_` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)
 59:11: error[E0501]: `String` is not a subtype of `Int`
 59:44: error[E0501]: `Int` is not a subtype of `String`

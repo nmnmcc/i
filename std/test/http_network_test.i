@@ -68,7 +68,7 @@ test("client_timeout", () {
 		provider = (send = (_: http.Request) { task.sync(task.never()) })
 		fail.catch(() {
 			http.send_timeout(
-				provider,
+				provider.send,
 				http.request(http.Method("GET"), "http://localhost"),
 				1000000,
 			)

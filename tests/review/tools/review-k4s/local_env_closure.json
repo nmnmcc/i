@@ -1,6 +1,0 @@
-{
-  "name": "local_env_closure",
-  "code": 0,
-  "time": 0.0200638510286808,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.get : () -> Int ! Dep\napp/main.make : (n: Int) -> () -> Nil\napp/main.example : () -> Nil\n"
-}

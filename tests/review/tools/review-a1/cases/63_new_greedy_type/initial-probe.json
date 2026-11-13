@@ -1,1 +1,0 @@
-{"check":["E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`","E0101: expected a type, found `0`"],"parse":["E0114: `{ name: e }` is kept for records; a tuple type in a clause pattern is put in `{ }`","E0101: expected a type, found `0`"],"roundtrip":false,"wat":false}

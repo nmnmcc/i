@@ -156,11 +156,18 @@ pub fn compile_tests_with_bindings_numeric(
     options: CompilationOptions,
     tests: &[(hir::DefId, String)],
 ) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
+    let stage = ilang_syntax::trace::stage("lower");
     let (mut ir, bindings) =
         lower::lower_tests_numeric(graph, program, typed, options.lower, tests, options.numeric)
             .map_err(Error::Diagnostics)?;
     ir.numeric = options.numeric;
-    let mut wasm = wat::parse_str(emit::wat(&ir)).map_err(|e| Error::Internal(e.to_string()))?;
+    drop(stage);
+    let stage = ilang_syntax::trace::stage("emit WAT");
+    let text = emit::wat(&ir);
+    drop(stage);
+    let stage = ilang_syntax::trace::stage("parse WAT");
+    let mut wasm = wat::parse_str(text).map_err(|e| Error::Internal(e.to_string()))?;
+    drop(stage);
     emit::add_abi_section(&mut wasm, &ir.abi_json);
     add_provider_section(&mut wasm, &bindings);
     validate(&wasm).map_err(Error::Internal)?;

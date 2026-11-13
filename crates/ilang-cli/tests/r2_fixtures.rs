@@ -7,6 +7,18 @@ use ilang_syntax::{
 };
 use std::{fs, path::PathBuf};
 
+/// The byte range of a header group `( … )` from the span the tree gives it:
+/// the whole group, or (syntax three's lowering) only its entries.
+fn group(text: &str, span: ilang_syntax::span::Span) -> (usize, usize) {
+    let (start, end) = (span.start as usize, span.end as usize);
+    if text[start..].starts_with('(') && text[..end].ends_with(')') {
+        return (start, end);
+    }
+    let open = text[..start].rfind('(').unwrap();
+    let close = end + text[end..].find(')').unwrap() + 1;
+    (open, close)
+}
+
 struct Case {
     name: String,
     module: String,
@@ -74,14 +86,16 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
                 }
             }
             assert_eq!(entries, 1, "one main in {}", file.display());
-            if let Some(span) = module.exports_span {
-                edits.push((span.start as usize, span.end as usize, exports));
+            let exports_group = module.exports_span.map(|span| group(&text, span));
+            let imports_group = module.imports_span.map(|span| group(&text, span));
+            if let Some((start, end)) = exports_group {
+                edits.push((start, end, exports));
             } else {
-                let at = module.imports_span.map_or(0, |span| span.end as usize);
+                let at = imports_group.map_or(0, |(_, end)| end);
                 edits.push((at, at, exports));
             }
-            if let Some(span) = module.imports_span {
-                let at = span.end as usize - 1;
+            if let Some((_, end)) = imports_group {
+                let at = end - 1;
                 edits.push((at, at, "\n r2_fail = i/fail\n r2_core = i/core\n".into()));
             } else {
                 edits.push((0, 0, "(r2_fail = i/fail, r2_core = i/core)\n".into()));

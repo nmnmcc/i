@@ -1,3 +1,0 @@
-spec/stop_short_huge.id : (n: Int) -> Int
-spec/stop_short_huge.make : (b: BitArray) -> BitArray
-spec/stop_short_huge.main : () -> Nil

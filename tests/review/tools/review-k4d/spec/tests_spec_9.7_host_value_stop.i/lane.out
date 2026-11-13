@@ -1,2 +1,0 @@
-spec/host_value_stop.half : () -> Float ! Bad
-spec/host_value_stop.main : () -> Nil ! Bad

@@ -1,0 +1,11 @@
+syn3_select/main.s : String
+syn3_select/main.e : Int
+syn3_select/main.x : String | Int
+syn3_select/main.a1 : String
+syn3_select/main.a2 : "a" | 1
+syn3_select/main.t : String
+syn3_select/main.h : (Int | String) -> String | Int
+syn3_select/main.shown : List(String)
+syn3_select/main.applied : String
+syn3_select/main.p1 : String
+syn3_select/main.p2 : Int
