@@ -886,7 +886,7 @@ both = <A, B>(f: () <- (Read(A)) -> A, g: () <- (Read(B)) -> B) { f() g() }";
 need_string = () <- (r: Read(String)) { r.read() }
 use = () { both(need_int, need_string) }";
         let local = format!("{helper}\n{calls}");
-        let library = format!("(Read, both)\n{helper}");
+        let library = format!("(Read(..), both)\n{helper}");
         let main = format!("(app/helper)\nRead(A) = helper.Read(A)\nboth = helper.both\n{calls}");
         let files = if imported {
             vec![
