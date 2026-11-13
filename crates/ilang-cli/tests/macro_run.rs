@@ -2769,3 +2769,23 @@ fn unresolved_current_module_definitions_wait_for_item_expansion_to_settle() {
         }
     }
 }
+
+#[test]
+fn marked_local_parameter_can_shadow_a_macro_module_top_level_name() {
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.6/mp16_local_shadowing");
+    let (mut graph, ds) = ilang_cli::load(&project, false, true);
+    assert!(
+        !ds.iter().any(ilang_package::Diagnostic::is_error),
+        "{ds:?}"
+    );
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
+        "{}",
+        graph.sources.render_all(&checked.diags).join("\n")
+    );
+}
