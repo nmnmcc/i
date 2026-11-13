@@ -16,13 +16,15 @@ print = (text: String) <- (out: Out) { out.print(text) }
 main = () {
 	assert(
 		task.scope((s) {
-			gate: task.Channel(Nil) = task.channel()
+			ready: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				task.receive(gate)
+				task.receive(ready)
+				task.yield()
 				print("child")
 			})
 			print("body")
-			task.send(gate, Nil)
+			// Order the log while retaining the no-join structured exit check.
+			task.send(ready, Nil)
 			42
 		}) ==
 			42,

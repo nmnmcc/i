@@ -484,9 +484,7 @@ pub(super) fn ty_vars(t: &Ty, out: &mut Vec<V>) {
         }
         Ty::Fn(f) => {
             ty_vars(&f.param, out);
-            [&f.ret, &f.env]
-                .into_iter()
-                .for_each(|x| ty_vars(x, out));
+            [&f.ret, &f.env].into_iter().for_each(|x| ty_vars(x, out));
         }
         Ty::Diff(a, h) => {
             ty_vars(a, out);
@@ -741,8 +739,13 @@ impl Coalescer<'_> {
                     if let Some(t) = self.memo.get(&(v, pos, env)) {
                         return t.clone();
                     }
+                    if let Some(t) = self.reuse((v, pos, env), depth) {
+                        return t;
+                    }
                     let generation = self.cycle_generation;
+                    let start = (self.pushed.len(), self.hits.len());
                     self.stack.insert(v, depth);
+                    self.pushed.push(v);
                     let upper: Vec<_> = self
                         .members(v)
                         .into_iter()
@@ -756,7 +759,10 @@ impl Coalescer<'_> {
                     let t = Ty::Inter(parts);
                     if self.cycle_generation == generation {
                         self.memo.insert((v, pos, env), t.clone());
+                    } else {
+                        self.keep_cyclic((v, pos, env), depth, start, &t);
                     }
+                    self.clear_logs();
                     return t;
                 }
                 let empty = |m: V| {
@@ -1690,9 +1696,7 @@ fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
         Ty::Fn(g) => {
             visit(&g.param, f);
-            [&g.ret, &g.env]
-                .into_iter()
-                .for_each(|x| visit(x, f));
+            [&g.ret, &g.env].into_iter().for_each(|x| visit(x, f));
         }
         Ty::Diff(a, h) => {
             visit(a, f);

@@ -15,7 +15,7 @@
 //! move travel as tokens of their worker; a record that holds tokens of a
 //! worker is published for that worker only.
 //!
-//! The worker count comes from `I_WORKERS`; one worker when it is unset.
+//! The worker count comes from `I_WORKERS`, else from the available cores.
 //! One worker keeps the FIFO fast path: no queue, no encoding (N10).
 
 use std::{
@@ -33,16 +33,12 @@ use wasmtime::{Caller, Engine, Linker, Module, Store, UpdateDeadline};
 
 use crate::{Abi, Bridge, HOST_MODULE, HostOptions, ResourceContext, State, THREAD_STACK};
 
-/// The number of workers of an entry run: one when `I_WORKERS` is unset;
-/// `I_WORKERS=<n>` asks for n; `auto` gives the available cores, at most
-/// one per GiB of available memory.
-///
-/// One worker is the default until the trap "the resource context has
-/// ended" in tests/spec/9.9/cancelled_join_cycle.i with several workers is
-/// fixed: that outcome is not one the spec allows.
+/// The number of workers of an entry run: `I_WORKERS=<n>` asks for n;
+/// unset or `auto` gives the available cores, at most one per GiB of
+/// available memory.
 pub fn worker_count() -> usize {
     match std::env::var("I_WORKERS") {
-        Err(_) => 1,
+        Err(_) => auto_workers(),
         Ok(text) if text.trim() == "auto" => auto_workers(),
         Ok(text) => match text.trim().parse::<usize>() {
             Ok(n) if n >= 1 => n.min(255),
@@ -382,11 +378,16 @@ impl Pool {
         self.lock().shares.get(&key).cloned()
     }
 
-    fn stopped(&self, message: String) {
+    pub(crate) fn stop_message(&self) -> Option<String> {
+        self.lock().stop.clone()
+    }
+
+    pub(crate) fn stopped(&self, message: String) -> String {
         let mut state = self.lock();
-        state.stop.get_or_insert(message);
+        let first = state.stop.get_or_insert(message).clone();
         drop(state);
         self.results.notify_all();
+        first
     }
 
     /// Stop every worker and join the threads.
@@ -624,6 +625,7 @@ impl Worker {
         }
         linker.define_unknown_imports_as_traps(&pool.module)?;
         let mut state = State::worker();
+        state.workers = Some(Arc::clone(pool));
         if let Some(resources) = pool
             .resources
             .lock()

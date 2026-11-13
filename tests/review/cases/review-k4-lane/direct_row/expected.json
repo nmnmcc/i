@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "32b10aba775aa3d675d49c37f1cb07220e7452b0",
+  "binary_sha256": "8e1d33b0608793d56a36457c6a6130c250239af3d598944dc0fb4e44c14bc6d9",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -9,9 +9,19 @@
         "check",
         "--types"
       ],
-      "exit": 1,
-      "stdout": "app/main.use : (x: T(S(Never) | S(Dep))) -> T(S(Never) | S(Dep))\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:13:13: error[E0515]: `Never` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+      "exit": 0,
+      "stdout": "app/main.use : (x: T(S(Never))) -> T(S(Never))\napp/main.main : () -> Nil\n",
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `use` is not used\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `use` is not used\n"
     },
     "run0": {
       "command": [
@@ -19,9 +29,19 @@
         "--opt",
         "0"
       ],
-      "exit": 1,
+      "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:13:13: error[E0515]: `Never` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `use` is not used\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `use` is not used\n"
     },
     "run2": {
       "command": [
@@ -29,9 +49,9 @@
         "--opt",
         "2"
       ],
-      "exit": 1,
+      "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:13:13: error[E0515]: `Never` and `Dep` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `use` is not used\n"
     }
   }
 }

@@ -15,12 +15,19 @@ Out = (print = (String) -> Nil)
 main = () <- (out: Out) {
 	result = fail.catch(() {
 		task.scope((s) {
-			task.go(s, () { fail.raise("first") })
-			// §9.9: the sibling may start before the failure; then it waits
-			// until the cancellation reaches it, else it is dropped unstarted.
-			unstarted = task.go(s, () { task.sync(task.never()) })
+			ready: task.Channel(Nil) = task.channel()
 			resource.ensure(
-				() { task.join(unstarted) },
+				() {
+					task.go(s, () {
+						task.receive(ready)
+						fail.raise("first")
+					})
+					// §9.9 permits the sibling to start or be dropped unstarted.
+					unstarted = task.go(s, () { task.sync(task.never()) })
+					// Install the body final and create its join target before failure.
+					task.send(ready, Nil)
+					task.join(unstarted)
+				},
 				() {
 					task.yield()
 					out.print("body-final")

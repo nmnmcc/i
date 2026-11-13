@@ -631,7 +631,9 @@ impl Solver {
     /// member of `M` with the same type constructor that satisfies it as
     /// a value. Needs compare services in reverse (§4.5 rule 4).
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
-        if self.vacuous(l) { return; }
+        if self.vacuous(l) {
+            return;
+        }
         self.constrain_in(l, r, Mode::Env);
     }
 
@@ -646,10 +648,10 @@ impl Solver {
                 |ms| ParamModes::from_slice(ms),
             ),
             Head::Named(TypeRef::Builtin(BuiltinType::Continuation)) => {
-                ParamModes::from_slice(&[Mode::Value, Mode::Value, Mode::Row, Mode::Env])
+                ParamModes::from_slice(&[Mode::Value, Mode::Value, Mode::Env])
             }
             Head::Named(TypeRef::Builtin(BuiltinType::Boundary)) => {
-                ParamModes::from_slice(&[Mode::Value, Mode::Row, Mode::Env])
+                ParamModes::from_slice(&[Mode::Value, Mode::Env])
             }
             _ => ParamModes::repeated(Mode::Value, n),
         }
@@ -734,8 +736,6 @@ impl Solver {
             _ => Mode::Value,
         }
     }
-
-
 
     /// Hidden difference constraints cannot be thrown away by rebuilding
     /// only the visible type. Keep the bounded scheme in this case.
@@ -2107,7 +2107,6 @@ impl Solver {
                 })
     }
 
-
     fn inter_in(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {
         let mut flat = Vec::new();
         for m in ms {
@@ -2937,8 +2936,8 @@ fn builtin_variance_values(b: BuiltinType) -> &'static [Variance] {
     match b {
         BuiltinType::List | BuiltinType::Request => &[Co],
         BuiltinType::Key => &[Inv],
-        BuiltinType::Boundary => &[Inv, Inv, Inv],
-        BuiltinType::Continuation => &[Contra, Co, Co, Co],
+        BuiltinType::Boundary => &[Inv, Inv],
+        BuiltinType::Continuation => &[Contra, Co, Co],
         _ => &[],
     }
 }

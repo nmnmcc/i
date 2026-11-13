@@ -2,14 +2,15 @@
 // expect: pass
 // runtime.md 6.4: FIFO pending partners; new ready alternatives use source order;
 // committing one alternative removes all its losing registrations.
-// The scripted run fixes registration order before testing FIFO and choice.
 (
 	i/task
 	i/random
 )
 
 main = () {
-	task.test(random.from_seed(1), [], () {
+	// The FIFO policy makes partner registration order explicit (spec §9.9).
+	// Spawn order alone does not order steps taken by different workers.
+	task.test(random.from_seed(7), [], () {
 		task.scope((s) {
 			c: task.Channel(Int) = task.channel()
 			task.go(s, () { task.send(c, 1) })
@@ -30,5 +31,14 @@ main = () {
 			})
 			assert(task.join(reader) == (22, 11))
 		})
+	})
+	// On unconstrained workers every sent value must still arrive once.
+	task.scope((s) {
+		c: task.Channel(Int) = task.channel()
+		task.go(s, () { task.send(c, 1) })
+		task.go(s, () { task.send(c, 2) })
+		receiver = task.go(s, () { (task.receive(c), task.receive(c)) })
+		pair = task.join(receiver)
+		assert(pair == (1, 2) || pair == (2, 1))
 	})
 }

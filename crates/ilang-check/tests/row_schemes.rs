@@ -107,25 +107,26 @@ wrap = <N>(
 	svc: Svc(Dep | Extra)
 ) -> Nil { body() <- (svc) }";
     let before = types(base);
-    let after = types(&base.replace("! Svc(Extra | Dep) = svc", "! Svc(Dep | Extra) = svc"));
+    let after = types(&base.replace("Svc(Extra | Dep)", "Svc(Dep | Extra)"));
     assert_eq!(before, after);
     assert!(before["app/main.wrap"].contains("Svc(Dep | Extra)"));
 }
 
 #[test]
 fn row_kind_survives_an_alias_without_algebra() {
-    // F2 requires N to remain a row even when a function alias is copied
-    // without normalization. Its value positions must compare Svc's
-    // arguments equally before generalization can combine the forms.
-    for mode in ["!", "^"] {
-        let source = "Svc(A) = (() -> A)
+    // N stays a need row when a function alias is copied without
+    // normalization, whether alone or beside a named service. Errors
+    // use an ordinary Fail argument now (§9.3), not a second row kind.
+    for need in ["N", "(Dep, ..N)"] {
+        let source = "Dep = ()
+Svc(A) = (() -> A)
 Row(N) = () <- N -> Nil
 bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 	first: N = one
 	second: N = two
 	second
 }"
-        .replace("! N", &format!("{mode} N"));
+        .replace("() <- N -> Nil", &format!("() <- {need} -> Nil"));
         let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
         let checked = ilang_check::check(&graph);
         assert!(
@@ -146,13 +147,13 @@ wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
 }";
     for inferred in [false, true] {
         let source = if inferred {
-            source.replace(") -> Int ! N {", ") {")
+            source.replace(") -> Int {", ") {")
         } else {
             source.to_string()
         };
         assert_eq!(
             types(&source),
-            types(&source.replace("! Svc(Int) = svc", "! Svc(_) = svc"))
+            types(&source.replace("svc: Svc(Int)", "svc: Svc(_)"))
         );
     }
     // Never has an implicit lower bound, so v <: Never also fixes v.
@@ -324,4 +325,89 @@ need_int = () <- (r: Read(Int)) { Nil }
 both = <A>(x: A) <- (r: Read(A)) { need_int() x }",
     );
     assert_eq!(shown["app/main.both"], "(x = A) <- (Read(Int & A)) -> A");
+}
+
+#[test]
+fn closed_constructor_arguments_still_report_an_empty_need_meet() {
+    let source = "S(A) = (value = A)\none = () <- (s: S(Int)) { s.value + 1 }\nrun = <N>(f: () <- N -> Int, x: N) { f() }\nbad = () { run(() { one() }, S(value = \"hi\")) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("S(Int)")
+            && d.message.contains("S(\"hi\")")),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("\"hi\"", "1"));
+}
+
+#[test]
+fn inferred_handlers_keep_future_provider_constraints() {
+    // §9.2: a provided value must be a subtype of the needed service.
+    // Generalizing an inferred row must retain that obligation for callers.
+    let source = "S(A) = (value = A)\nread = () <- (s: S(String)) { s.value <> \"!\" }\nwith = <A>(x: A, f) { f() <- (S(value = x)) }\nmain = () {\n\twith(1, read)\n\tNil\n}\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("with(1, read)", "with(\"ok\", read)"));
+}
+
+#[test]
+fn higher_order_entry_keeps_unprovided_service() {
+    let shown = types(
+        "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s: S(N)) {\n\tS(f) = s\n\tf()\n}\nrun = <A, N>(f: () <- N -> A) { f() }\nmain = <N>() <- (s: S(N)) { run(() { use() }) }\n",
+    );
+    assert!(shown["app/main.main"].contains("S("), "{shown:?}");
+}
+
+#[test]
+fn nested_forwarding_keeps_the_provided_services_own_need() {
+    // §9.2: providing S(Dep) handles S, not the Dep needed by its method.
+    let shown = types(
+        "Dep = (v = Int)\nget = () <- (d: Dep) { d.v }\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nrun = <A, N>(f: () <- N -> A) { f() }\nfw = () { use() }\nfr = () { run(() { use() }) }\nmain = () {\n\t{\n\t\th = () { run(fr) }\n\t\tk = () { run(h) + fw() }\n\t\tk()\n\t\tNil\n\t} <- (S(f = () { get() }))\n}\n",
+    );
+    assert!(shown["app/main.main"].contains("Dep"), "{shown:?}");
+}
+
+#[test]
+fn direct_forwarding_keeps_the_provided_services_own_need() {
+    let shown = types(
+        "Dep = (v = Int)\nget = () <- (d: Dep) { d.v }\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nrun = <A, N>(f: () <- N -> A) { f() }\nfw = () { use() }\nfr = () { run(() { use() }) }\nmain = () {\n\t{\n\t\tfw() + fr()\n\t\tNil\n\t} <- (S(f = () { get() }))\n}\n",
+    );
+    assert!(shown["app/main.main"].contains("Dep"), "{shown:?}");
+}
+
+#[test]
+fn annotated_mutual_forwarding_keeps_finite_service_rows() {
+    types(
+        "S(N) = (() <- N -> Int)\nuse = <N>() <- (s: S(N)) {\n\tS(f) = s\n\tf()\n}\nping = <N>(n: Int) <- (s: S(N)) -> Int {\n\tn |> (0) { use() } | (_) { pong(n - 1) }\n}\npong = (n: Int) { ping(n) }\n",
+    );
+}
+
+#[test]
+fn a_value_argument_cannot_erase_a_shared_row_constraint() {
+    let source = "S(A) = (value = A)\none = () <- (s: S(Int)) { s.value + 1 }\nrun = <N>(f: () <- N -> Int, x: N) { f() }\nbad = () { run(() { one() }, S(value = \"hi\")) <- (S(value = 1)) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("\"hi\"", "2"));
+    types(
+        &source
+            .replace(
+                "one = () <- (s: S(Int)) { s.value + 1 }\n",
+                "one = () <- (s: S(Int | String)) { 1 }\n",
+            )
+            .replace("\"hi\"", "2"),
+    );
 }

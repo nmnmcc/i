@@ -348,9 +348,7 @@ fn contains_var(t: &Ty) -> bool {
     match t {
         Ty::Var(_) | Ty::Top => true,
         Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => ts.iter().any(contains_var),
-        Ty::Fn(f) => {
-            contains_var(&f.param) || [&f.ret, &f.env].into_iter().any(contains_var)
-        }
+        Ty::Fn(f) => contains_var(&f.param) || [&f.ret, &f.env].into_iter().any(contains_var),
         Ty::Diff(t, ts) => contains_var(t) || ts.iter().any(contains_var),
         Ty::Both(a, b) => contains_var(a) || contains_var(b),
         Ty::Never => false,
@@ -1550,9 +1548,7 @@ impl Checker<'_> {
                     .any(|(t, v)| invalid(s, t, pol.by(v))),
                 Ty::Fn(f) => {
                     invalid(s, &f.param, pol.flip())
-                        || [&f.ret, &f.env]
-                            .into_iter()
-                            .any(|t| invalid(s, t, pol))
+                        || [&f.ret, &f.env].into_iter().any(|t| invalid(s, t, pol))
                 }
                 Ty::Diff(t, ts) => {
                     invalid(s, t, pol) || ts.iter().any(|t| invalid(s, t, Pol::Both))

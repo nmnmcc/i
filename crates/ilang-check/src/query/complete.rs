@@ -102,9 +102,11 @@ impl Query<'_> {
                 ExprKind::Case { .. } if case.is_none_or(|c| c.span.start <= e.span.start) => {
                     case = Some(e)
                 }
-                ExprKind::Binary { op: ilang_syntax::ast::BinOp::Pipe, lhs, .. }
-                    if pipe_subject.is_none_or(|old| old.span.start <= lhs.span.start) =>
-                {
+                ExprKind::Binary {
+                    op: ilang_syntax::ast::BinOp::Pipe,
+                    lhs,
+                    ..
+                } if pipe_subject.is_none_or(|old| old.span.start <= lhs.span.start) => {
                     pipe_subject = Some(lhs)
                 }
                 ExprKind::Call { callee, .. }
@@ -999,15 +1001,23 @@ fn in_source_branch_head(text: &str, offset: u32) -> bool {
     let mut stack = Vec::new();
     let mut previous = None;
     for token in &lexed.tokens {
-        if token.span.start >= offset { break; }
+        if token.span.start >= offset {
+            break;
+        }
         match token.kind {
             T::LParen => stack.push((T::LParen, matches!(previous, Some(T::Pipe | T::PipeGt)))),
             T::LBrace => stack.push((T::LBrace, false)),
             T::LBracket => stack.push((T::LBracket, false)),
-            T::RParen | T::RBrace | T::RBracket => { stack.pop(); },
+            T::RParen | T::RBrace | T::RBracket => {
+                stack.pop();
+            }
             _ => {}
         }
         previous = Some(token.kind.clone());
     }
-    stack.iter().rev().take_while(|(kind, _)| !matches!(kind, T::LBrace)).any(|(_, head)| *head)
+    stack
+        .iter()
+        .rev()
+        .take_while(|(kind, _)| !matches!(kind, T::LBrace))
+        .any(|(_, head)| *head)
 }
