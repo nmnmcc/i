@@ -655,9 +655,9 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 Paused = (Continuation(Nil, PausedSum, Int, Never))
 Done = ()
 PausedSum = Paused | Done
-Held = (Continuation(Nil, Held, Never, Never))
+Held = (Continuation(Nil, HeldSum, Never, Never))
 Over = ()
-Held = Held | Over
+HeldSum = Held | Over
 
 // Cancelling this continuation can return to the code after `inner`,
 // because the final function suspends to `inner` during the cancel (D15).

@@ -3551,6 +3551,28 @@ impl<'a> Resolver<'a> {
                 op: *op,
                 expr: Box::new(self.expr(expr)),
             },
+            // `e |> { … }` with a clause block literal is a match (§4.8 rule
+            // 11, "in a match `e |> { … }`"); the Lisp surface writes a
+            // match so (syntax-3.md §6.8).
+            E::Binary {
+                op: ast::BinOp::Pipe,
+                lhs,
+                rhs,
+            } if matches!(&rhs.kind, E::Clauses(_)) => {
+                let E::Clauses(clauses) = &rhs.kind else {
+                    unreachable!()
+                };
+                // The match ends with its last branch, as a match of the
+                // Lisp surface does (inside the `)` of its chain).
+                let end = clauses.last().map_or(e.span.end, |c| c.span.end);
+                return Expr {
+                    kind: ExprKind::Case {
+                        subject: Box::new(self.expr(lhs)),
+                        clauses: clauses.iter().map(|c| self.clause(c)).collect(),
+                    },
+                    span: Span::new(e.span.start, end),
+                };
+            }
             E::Binary { op, lhs, rhs } => ExprKind::Binary {
                 op: *op,
                 lhs: Box::new(self.expr(lhs)),

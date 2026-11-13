@@ -543,22 +543,14 @@ fn adapter_types_are_checked_even_without_reached_roles() {
 }
 #[test]
 fn discriminant_constructor_fields_are_dependency_edges() {
-    let source = "On = (Part)\nOff = ()\nBundle = On | Off\nPart = ()\npart = () { Part }\n\nmain = () <- (b: Bundle) { Nil }";
+    // A service is one labelled type (syntax-3.md §2.8, §9.2), so the
+    // discriminant service wraps the union of its targets' values.
+    let source = "On = (Part)\nOff = ()\nBundleKind = On | Off\nBundle = (value = BundleKind)\nPart = ()\npart = () { Part }\n\nmain = () <- (b: Bundle) { Nil }";
     let plan = format!(
         "{}[providers.\"app/main.Bundle\"]\ndiscriminant = {{js=\"app/main.Off\",nodejs=\"app/main.On\",native=\"app/main.On\",wasi=\"app/main.Off\",host=\"app/main.Off\"}}\n",
         row("Part", "part")
     );
     let (g, c) = package(source, &plan);
-    // Pending (crates/ilang-check/tests/syn3-pending.txt): stage 3 makes
-    // `Bundle = On | Off` a union (syntax-3.md §2.8), and "a service type is
-    // one named type `T(…)`: not a type variable, a union, or `Never`"
-    // (§9.2), so this service is rejected before its plan is read. The
-    // discriminant provider needs the service's members as constructors of
-    // its own; until the provider plan takes a union's members (or is
-    // removed, E5), the rejection is what is checked.
-    if c.diags.iter().any(|d| d.code == "E0225") {
-        return;
-    }
     let p = resolve(&g, &c, Target::Native).unwrap();
     assert_eq!(names(&p), ["app/main.Part", "app/main.Bundle"]);
     assert!(matches!(p.steps[1].supply, Supply::Constructor(_)));
@@ -625,22 +617,14 @@ fn adapter_service_list_order_does_not_change_its_type() {
 
 #[test]
 fn discriminant_constructor_aliases_resolve_before_validation() {
-    let source = "On = (Part)\nOff = ()\nBundle = On | Off\nPart = ()\npart = () { Part }\nselected = On\nalias = selected\n\nmain = () <- (b: Bundle) { Nil }";
+    // A service is one labelled type (syntax-3.md §2.8, §9.2), so the
+    // discriminant service wraps the union of its targets' values.
+    let source = "On = (Part)\nOff = ()\nBundleKind = On | Off\nBundle = (value = BundleKind)\nPart = ()\npart = () { Part }\nselected = On\nalias = selected\n\nmain = () <- (b: Bundle) { Nil }";
     let plan = format!(
         "{}[providers.\"app/main.Bundle\"]\ndiscriminant = {{js=\"app/main.Off\",nodejs=\"app/main.alias\",native=\"app/main.alias\",wasi=\"app/main.Off\",host=\"app/main.Off\"}}\n",
         row("Part", "part")
     );
     let (g, c) = package(source, &plan);
-    // Pending (crates/ilang-check/tests/syn3-pending.txt): stage 3 makes
-    // `Bundle = On | Off` a union (syntax-3.md §2.8), and "a service type is
-    // one named type `T(…)`: not a type variable, a union, or `Never`"
-    // (§9.2), so this service is rejected before its plan is read. The
-    // discriminant provider needs the service's members as constructors of
-    // its own; until the provider plan takes a union's members (or is
-    // removed, E5), the rejection is what is checked.
-    if c.diags.iter().any(|d| d.code == "E0225") {
-        return;
-    }
     let p = resolve(&g, &c, Target::Native).unwrap();
     assert_eq!(names(&p), ["app/main.Part", "app/main.Bundle"]);
     assert!(matches!(p.steps[1].supply, Supply::Constructor(_)));

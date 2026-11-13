@@ -147,6 +147,10 @@ pub struct ConstructionStep {
     pub scope: Scope,
     pub role: Role,
     pub request_mode: bool,
+    /// A discriminant service that wraps a union (syntax-3.md §2.8: a
+    /// service is one labelled type): the constructor of the service whose
+    /// one field holds the value that `supply` makes.
+    pub wrap: Option<hir::CtorRef>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -457,7 +461,7 @@ struct Row {
     authority: PackageId,
     cell: Option<Cell>,
     factory: Option<DefId>,
-    generated: Option<(hir::CtorRef, Vec<ShownType>)>,
+    generated: Option<(hir::CtorRef, Vec<ShownType>, Option<hir::CtorRef>)>,
     adapter: Option<DefId>,
 }
 #[derive(Clone)]
@@ -859,13 +863,28 @@ impl Schema {
             for (&column, path) in &row.declaration.discriminant {
                 let result = (|| {
                     let resolved = resolve_constructor(g, p, row.authority, path)?;
-                    if resolved.ty != id {
-                        return Err(format!(
-                            "constructor {path} does not belong to {}",
-                            row.declaration.service
-                        ));
-                    }
-                    let hir::TypeBody::Custom(ctors) = &p.ty(id).body else {
+                    // A service is one labelled type, so a discriminant
+                    // service is the wrapper of a union with one field, and
+                    // its constructors are the members of that union.
+                    let wrap = if resolved.ty == id {
+                        None
+                    } else {
+                        let member = match &p.ty(id).body {
+                            hir::TypeBody::Custom(cs) if cs.len() == 1 && cs[0].fields.len() == 1 => {
+                                union_has(p, &cs[0].fields[0].ty, resolved.ty, 0)
+                            }
+                            _ => false,
+                        };
+                        if !member {
+                            return Err(format!(
+                                "constructor {path} does not belong to {}",
+                                row.declaration.service
+                            ));
+                        }
+                        Some(hir::CtorRef { ty: id, index: 0 })
+                    };
+                    let ty = resolved.ty;
+                    let hir::TypeBody::Custom(ctors) = &p.ty(ty).body else {
                         unreachable!("resolved nominal row")
                     };
                     let ctor = &ctors[resolved.index as usize];
@@ -874,7 +893,7 @@ impl Schema {
                         fields.push(as_type(&service(p, hir_type(p, t, &f.ty)?)?));
                     }
                     if column == target && row.cell.is_none() {
-                        row.generated = Some((resolved, fields));
+                        row.generated = Some((resolved, fields, wrap));
                     }
                     Ok(())
                 })();
@@ -898,6 +917,25 @@ impl Schema {
             }
         }
         out
+    }
+}
+
+/// Whether the written type `ty` has the labelled type `member` as a member,
+/// through unions and aliases.
+fn union_has(p: &Program, ty: &hir::Type, member: hir::TypeId, depth: usize) -> bool {
+    if depth > 64 {
+        return false;
+    }
+    match &ty.kind {
+        hir::TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } => {
+            *id == member
+                || matches!(&p.ty(*id).body, hir::TypeBody::Alias(body) if union_has(p, body, member, depth + 1))
+        }
+        hir::TypeKind::Union(xs) => xs.iter().any(|x| union_has(p, x, member, depth + 1)),
+        _ => false,
     }
 }
 
@@ -987,6 +1025,7 @@ impl Builder<'_> {
         let role = row.map_or(Role::None, |r| r.declaration.role);
         let mut generated_args = vec![];
         let mut seed = false;
+        let mut wrap = None;
         let (supply, needs) = match row {
             Some(row) => match &row.cell {
                 Some(Cell::Host) => (Supply::Host, vec![]),
@@ -1046,7 +1085,8 @@ impl Builder<'_> {
                     )
                 }
                 None => {
-                    if let Some((ctor, fields)) = &row.generated {
+                    if let Some((ctor, fields, w)) = &row.generated {
+                        wrap = *w;
                         (
                             Supply::Constructor(*ctor),
                             fields
@@ -1084,6 +1124,7 @@ impl Builder<'_> {
                 scope,
                 role,
                 request_mode: host.is_some_and(|h| h.is_request || h.is_async),
+                wrap,
             },
             deps: vec![],
             seed,

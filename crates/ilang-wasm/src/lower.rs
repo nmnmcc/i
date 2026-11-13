@@ -1873,10 +1873,22 @@ impl<'a> Lowerer<'a> {
                         .iter()
                         .map(|&i| values[i].clone().expect("constructor dependency"))
                         .collect();
-                    match self.ctors[&c].repr {
+                    let made = match self.ctors[&c].repr {
                         CtorRepr::Record { ctor, ty } => Value::Record { ctor, ty, fields },
                         CtorRepr::Bool(b) => Value::Atom(Atom::Bool(b)),
                         CtorRepr::Nil => Value::Atom(Atom::Nil),
+                    };
+                    // A discriminant service wraps the member it selects.
+                    match step.wrap.map(|w| &self.ctors[&w].repr) {
+                        Some(&CtorRepr::Record { ctor, ty }) => {
+                            let inner = let_value(fx, out, made, None);
+                            Value::Record {
+                                ctor,
+                                ty,
+                                fields: vec![inner],
+                            }
+                        }
+                        _ => made,
                     }
                 }
             };
