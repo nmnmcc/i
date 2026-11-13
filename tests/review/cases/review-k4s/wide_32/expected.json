@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.u0 : () -> Nil ! N | S0(N)\napp/main.u1 : () -> Nil ! N | S1(N)\napp/main.u2 : () -> Nil ! N | S2(N)\napp/main.u3 : () -> Nil ! N | S3(N)\napp/main.u4 : () -> Nil ! N | S4(N)\napp/main.u5 : () -> Nil ! N | S5(N)\napp/main.u6 : () -> Nil ! N | S6(N)\napp/main.u7 : () -> Nil ! N | S7(N)\napp/main.u8 : () -> Nil ! N | S8(N)\napp/main.u9 : () -> Nil ! N | S9(N)\napp/main.u10 : () -> Nil ! N | S10(N)\napp/main.u11 : () -> Nil ! N | S11(N)\napp/main.u12 : () -> Nil ! N | S12(N)\napp/main.u13 : () -> Nil ! N | S13(N)\napp/main.u14 : () -> Nil ! N | S14(N)\napp/main.u15 : () -> Nil ! N | S15(N)\napp/main.u16 : () -> Nil ! N | S16(N)\napp/main.u17 : () -> Nil ! N | S17(N)\napp/main.u18 : () -> Nil ! N | S18(N)\napp/main.u19 : () -> Nil ! N | S19(N)\napp/main.u20 : () -> Nil ! N | S20(N)\napp/main.u21 : () -> Nil ! N | S21(N)\napp/main.u22 : () -> Nil ! N | S22(N)\napp/main.u23 : () -> Nil ! N | S23(N)\napp/main.u24 : () -> Nil ! N | S24(N)\napp/main.u25 : () -> Nil ! N | S25(N)\napp/main.u26 : () -> Nil ! N | S26(N)\napp/main.u27 : () -> Nil ! N | S27(N)\napp/main.u28 : () -> Nil ! N | S28(N)\napp/main.u29 : () -> Nil ! N | S29(N)\napp/main.u30 : () -> Nil ! N | S30(N)\napp/main.u31 : () -> Nil ! N | S31(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.wide : () -> Nil ! N | N2 | N3 | N4 | N5 | N6 | N7 | N8 | N9 | N10 | N11 | N12 | N13 | N14 | N15 | N16 | N17 | N18 | N19 | N20 | N21 | N22 | N23 | N24 | N25 | N26 | N27 | N28 | N29 | N30 | N31 | N32 | S0(N) | S1(N2) | S10(N3) | S11(N4) | S12(N5) | S13(N6) | S14(N7) | S15(N8) | S16(N9) | S17(N10) | S18(N11) | S19(N12) | S2(N13) | S20(N14) | S21(N15) | S22(N16) | S23(N17) | S24(N18) | S25(N19) | S26(N20) | S27(N21) | S28(N22) | S29(N23) | S3(N24) | S30(N25) | S31(N26) | S4(N27) | S5(N28) | S6(N29) | S7(N30) | S8(N31) | S9(N32)\n",
-      "stderr": "src/main.i:66:1: warning[W0504]: top-level binding `wide` is not used\n"
+      "stdout": "app/main.u0 : () <- (S0(N), ..N) -> Nil\napp/main.u1 : () <- (S1(N), ..N) -> Nil\napp/main.u2 : () <- (S2(N), ..N) -> Nil\napp/main.u3 : () <- (S3(N), ..N) -> Nil\napp/main.u4 : () <- (S4(N), ..N) -> Nil\napp/main.u5 : () <- (S5(N), ..N) -> Nil\napp/main.u6 : () <- (S6(N), ..N) -> Nil\napp/main.u7 : () <- (S7(N), ..N) -> Nil\napp/main.u8 : () <- (S8(N), ..N) -> Nil\napp/main.u9 : () <- (S9(N), ..N) -> Nil\napp/main.u10 : () <- (S10(N), ..N) -> Nil\napp/main.u11 : () <- (S11(N), ..N) -> Nil\napp/main.u12 : () <- (S12(N), ..N) -> Nil\napp/main.u13 : () <- (S13(N), ..N) -> Nil\napp/main.u14 : () <- (S14(N), ..N) -> Nil\napp/main.u15 : () <- (S15(N), ..N) -> Nil\napp/main.u16 : () <- (S16(N), ..N) -> Nil\napp/main.u17 : () <- (S17(N), ..N) -> Nil\napp/main.u18 : () <- (S18(N), ..N) -> Nil\napp/main.u19 : () <- (S19(N), ..N) -> Nil\napp/main.u20 : () <- (S20(N), ..N) -> Nil\napp/main.u21 : () <- (S21(N), ..N) -> Nil\napp/main.u22 : () <- (S22(N), ..N) -> Nil\napp/main.u23 : () <- (S23(N), ..N) -> Nil\napp/main.u24 : () <- (S24(N), ..N) -> Nil\napp/main.u25 : () <- (S25(N), ..N) -> Nil\napp/main.u26 : () <- (S26(N), ..N) -> Nil\napp/main.u27 : () <- (S27(N), ..N) -> Nil\napp/main.u28 : () <- (S28(N), ..N) -> Nil\napp/main.u29 : () <- (S29(N), ..N) -> Nil\napp/main.u30 : () <- (S30(N), ..N) -> Nil\napp/main.u31 : () <- (S31(N), ..N) -> Nil\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.wide : () <- (S0(N), S1(N2), S10(N3), S11(N4), S12(N5), S13(N6), S14(N7), S15(N8), S16(N9), S17(N10), S18(N11), S19(N12), S2(N13), S20(N14), S21(N15), S22(N16), S23(N17), S24(N18), S25(N19), S26(N20), S27(N21), S28(N22), S29(N23), S3(N24), S30(N25), S31(N26), S4(N27), S5(N28), S6(N29), S7(N30), S8(N31), S9(N32), ..N, ..N10, ..N11, ..N12, ..N13, ..N14, ..N15, ..N16, ..N17, ..N18, ..N19, ..N2, ..N20, ..N21, ..N22, ..N23, ..N24, ..N25, ..N26, ..N27, ..N28, ..N29, ..N3, ..N30, ..N31, ..N32, ..N4, ..N5, ..N6, ..N7, ..N8, ..N9) -> Nil\n",
+      "stderr": "src/main.i:162:1: warning[W0504]: top-level binding `wide` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:66:1: warning[W0504]: top-level binding `wide` is not used\n"
+      "stderr": "src/main.i:162:1: warning[W0504]: top-level binding `wide` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:66:1: warning[W0504]: top-level binding `wide` is not used\n"
+      "stderr": "src/main.i:162:1: warning[W0504]: top-level binding `wide` is not used\n"
     }
   }
 }

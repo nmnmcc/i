@@ -1,6 +1,6 @@
 {
-  "compiler": "ae2f13b8a553e9309047d74d2101fa0626859a62",
-  "binary_sha256": "f2447ed6524ac42e527ffba7bc86f6ce4166071bc4a0c4ee9ec692f4c1e3ec59",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.main : () -> String ! Process\n",
+      "stdout": "probe/main.main : () <- (Process) -> String\n",
       "stderr": ""
     },
     "test0": {

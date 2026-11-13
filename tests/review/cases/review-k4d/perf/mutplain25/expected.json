@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () -> Int ! N | S(N)\napp/main.get : () -> Int ! Dep\napp/main.m0 : (k: Int) -> 1\napp/main.m1 : (k: Int) -> 1\napp/main.m2 : (k: Int) -> 1\napp/main.m3 : (k: Int) -> 1\napp/main.m4 : (k: Int) -> 1\napp/main.m5 : (k: Int) -> 1\napp/main.m6 : (k: Int) -> 1\napp/main.m7 : (k: Int) -> 1\napp/main.m8 : (k: Int) -> 1\napp/main.m9 : (k: Int) -> 1\napp/main.m10 : (k: Int) -> 1\napp/main.m11 : (k: Int) -> 1\napp/main.m12 : (k: Int) -> 1\napp/main.m13 : (k: Int) -> 1\napp/main.m14 : (k: Int) -> 1\napp/main.m15 : (k: Int) -> 1\napp/main.m16 : (k: Int) -> 1\napp/main.m17 : (k: Int) -> 1\napp/main.m18 : (k: Int) -> 1\napp/main.m19 : (k: Int) -> 1\napp/main.m20 : (k: Int) -> 1\napp/main.m21 : (k: Int) -> 1\napp/main.m22 : (k: Int) -> 1\napp/main.m23 : (k: Int) -> 1\napp/main.m24 : (k: Int) -> 1\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> Int\napp/main.get : () <- (Dep) -> Int\napp/main.m0 : (Int) -> 1\napp/main.m1 : (Int) -> 1\napp/main.m2 : (Int) -> 1\napp/main.m3 : (Int) -> 1\napp/main.m4 : (Int) -> 1\napp/main.m5 : (Int) -> 1\napp/main.m6 : (Int) -> 1\napp/main.m7 : (Int) -> 1\napp/main.m8 : (Int) -> 1\napp/main.m9 : (Int) -> 1\napp/main.m10 : (Int) -> 1\napp/main.m11 : (Int) -> 1\napp/main.m12 : (Int) -> 1\napp/main.m13 : (Int) -> 1\napp/main.m14 : (Int) -> 1\napp/main.m15 : (Int) -> 1\napp/main.m16 : (Int) -> 1\napp/main.m17 : (Int) -> 1\napp/main.m18 : (Int) -> 1\napp/main.m19 : (Int) -> 1\napp/main.m20 : (Int) -> 1\napp/main.m21 : (Int) -> 1\napp/main.m22 : (Int) -> 1\napp/main.m23 : (Int) -> 1\napp/main.m24 : (Int) -> 1\n",
       "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
     },
     "test0": {
