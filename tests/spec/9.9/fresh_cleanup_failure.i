@@ -29,11 +29,11 @@ main = () {
 					() {
 						inner = fail.catch(() {
 							task.scope((cleanup) {
-								started: task.Channel(Nil) = task.channel()
+								ready: task.Channel(Nil) = task.channel()
 								target = task.go(cleanup, () {
 									resource.ensure(
 										() {
-											task.send(started, Nil)
+											task.send(ready, Nil)
 											task.sync(task.never())
 										},
 										() {
@@ -42,8 +42,9 @@ main = () {
 										},
 									)
 								})
+								// An unstarted child has no installed final (§9.5).
 								task.go(cleanup, () {
-									task.receive(started)
+									task.receive(ready)
 									fail.raise("cleanup")
 								})
 								task.join(target)

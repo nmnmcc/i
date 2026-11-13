@@ -81,6 +81,7 @@ impl SchemeArtifact {
         labelled
             || vars.iter().any(|v| {
                 solver.vars[v.0 as usize].difference
+                    || solver.vars[v.0 as usize].need_meet.is_some()
                     || !solver.vars[v.0 as usize].handled.is_empty()
             })
     }
@@ -935,7 +936,11 @@ fn definite_failure(solver: &Solver) -> bool {
         && solver.failures.iter().all(|f| {
             matches!(
                 f.kind,
-                FailKind::Mismatch | FailKind::Values | FailKind::Invariant | FailKind::EnvForms
+                FailKind::Mismatch
+                    | FailKind::Values
+                    | FailKind::Invariant
+                    | FailKind::EnvForms
+                    | FailKind::NeedMeet
             )
         })
 }
@@ -1258,12 +1263,19 @@ fn project_hidden(
                 || st.input
                 || st.row != Mode::Value
                 || st.difference
+                || st.need_meet.is_some()
                 || !st.handled.is_empty()
             {
                 return false;
             }
             for state in &solver.vars {
-                for ty in state.lower.iter().chain(&state.upper).chain(&state.handled) {
+                for ty in state
+                    .lower
+                    .iter()
+                    .chain(&state.upper)
+                    .chain(&state.handled)
+                    .chain(state.need_meet.iter().flat_map(|(a, b)| [a, b]))
+                {
                     if variables(ty).contains(&v) && !matches!(ty, Ty::Var(w) if *w == v) {
                         return false;
                     }

@@ -329,7 +329,11 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
 
     // `fail.catch` and `resource.ensure` of multi-shape values (`$call0`).
     let mut f = F::new(0);
-    let r = f.let_(Value::OpEnv(Op::Boundary, vec![Atom::Func(catch_body)], Env::Param));
+    let r = f.let_(Value::OpEnv(
+        Op::Boundary,
+        vec![Atom::Func(catch_body)],
+        Env::Param,
+    ));
     f.check(r, int(7));
     let r = f.let_(Value::OpEnv(Op::Ensure, vec![g(4), g(4)], Env::Param));
     f.check(r, int(7));

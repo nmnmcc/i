@@ -588,8 +588,6 @@ impl<'a> Checker<'a> {
         for c in std::mem::take(&mut self.cases) {
             self.check_case(c);
         }
-        self.s.check_need_meets();
-        self.flush(self.p.binding(group[0]).binding.span, None);
         self.finish_reads(group, &candidates);
         if self.pending_typed.is_empty() {
             // No typed call in this group: no barrier work.
@@ -1325,6 +1323,11 @@ impl<'a> Checker<'a> {
                 span,
                 "this type has itself inside it, through a type variable (§4.7)",
             );
+        }
+        let failures = self.s.failures.len();
+        self.s.check_need_meets();
+        if self.s.failures.len() > failures {
+            self.flush(span, None);
         }
         self.report_coalescing(span);
     }
@@ -3627,7 +3630,7 @@ fn host_builtin(b: BuiltinType) -> bool {
     )
 }
 
-/// A parameter used as a need or a Fail argument stays a row through
+/// A parameter used as a need stays a row through
 /// other constructors and aliases (§4.5). The finite mode table grows
 /// to a fixed point, independently of declaration order.
 fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
@@ -3688,13 +3691,7 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
         .types
         .iter()
         .enumerate()
-        .map(|(i, t)| {
-            // The error of `Fail(E)` is a row: unions of errors are sets, as
-            // the error rows of function types were (review Q2).
-            let fail = t.name == "Fail" && Some(t.module) == p.prelude && t.params.len() == 1;
-            let mode = if fail { Mode::Row } else { Mode::Value };
-            (TypeId(i as u32), vec![mode; t.params.len()])
-        })
+        .map(|(i, t)| (TypeId(i as u32), vec![Mode::Value; t.params.len()]))
         .collect();
     loop {
         let mut changed = false;

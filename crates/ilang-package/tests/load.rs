@@ -135,6 +135,7 @@ fn graph_with_path_dependencies() {
         [
             "i/prelude",
             "i/fail",
+            "i/failure",
             "i/control",
             "i/resource",
             "i/assertion",

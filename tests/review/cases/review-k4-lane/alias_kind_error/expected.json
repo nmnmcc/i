@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "32b10aba775aa3d675d49c37f1cb07220e7452b0",
+  "binary_sha256": "8e1d33b0608793d56a36457c6a6130c250239af3d598944dc0fb4e44c14bc6d9",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.bad : (body: () -> Nil ^ E, one: Svc(Int), two: Svc(Nil)) -> E | Svc(Int | Nil)\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:9:2: error[E0515]: `Nil` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+      "stderr": "src/main.i:9:2: error[E0515]: `Nil` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:9:2: error[E0515]: `Nil` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+      "stderr": "src/main.i:9:2: error[E0515]: `Nil` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:9:2: error[E0515]: `Nil` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n1 error\n"
+      "stderr": "src/main.i:9:2: error[E0515]: `Nil` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n1 error\n"
     }
   }
 }

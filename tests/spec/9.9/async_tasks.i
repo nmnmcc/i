@@ -11,21 +11,23 @@
 Later = (double = (Int) <- (Fail(String)) -> Int, echo = (String) -> String)
 
 main = () <- (later: Later) {
-	// §9.9 leaves the order of the two host calls open ("some serial order of
-	// task steps"), so the second starts after the first has answered.
-	c: task.Channel(Nil) = task.channel()
-	assert(
-		task.both(
-			() {
-				value = later.double(21)
-				task.send(c, Nil)
-				value
-			},
-			() {
-				task.receive(c)
-				later.echo("answer")
-			},
-		) ==
-			(42, "answer"),
-	)
+	task.scope((s) {
+		ready: task.Channel(Nil) = task.channel()
+		// Both children use the async Await route. Order the host log calls
+		// explicitly: workers may otherwise start either call first (§9.9).
+		assert(
+			task.both(
+				() {
+					value = later.double(21)
+					task.send(ready, Nil)
+					value
+				},
+				() {
+					task.receive(ready)
+					later.echo("answer")
+				},
+			) ==
+				(42, "answer"),
+		)
+	})
 }
