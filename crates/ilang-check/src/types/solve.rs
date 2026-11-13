@@ -1176,6 +1176,10 @@ impl Solver {
                     self.constrain_in(l, a, env);
                 }
             }
+            (Ty::Con(..), _)
+                if env == Mode::Env
+                    && !matches!(r, Ty::Con(..) if r.head() == l.head())
+                    && self.vacate(l) => {}
             (Ty::Con(h1, s1, a1), Ty::Con(h2, s2, a2)) if h1 == h2 && a1.len() == a2.len() => {
                 if (env == Mode::Env && s1 != s2) || (env != Mode::Env && !s1.subset(s2)) {
                     self.fail(
@@ -1714,6 +1718,7 @@ impl Solver {
                 let m = vars[0].clone();
                 self.constrain_in(rest.as_ref().unwrap_or(l), &m, env);
             }
+            0 if env == Mode::Env && self.vacate(l) => {}
             0 => self.fail(
                 if rest.is_some() {
                     FailKind::Values
@@ -2088,6 +2093,32 @@ impl Solver {
     /// (§4.4). `a & T` with a type variable stays.
     pub fn inter(&mut self, ms: Vec<Ty>) -> Ty {
         self.normalize_mode(Ty::Inter(ms), Mode::Value)
+    }
+
+    /// A need `C(…)` that no member of the receiving row has: it is met
+    /// only when it is vacuous, so its arguments are made so (`Fail(E)` with
+    /// `E` of no values). False, with nothing constrained, when a parameter
+    /// does not change.
+    fn vacate(&mut self, l: &Ty) -> bool {
+        let Ty::Con(h, values, args) = l else {
+            return false;
+        };
+        if args.is_empty() || !values.is_all() {
+            return false;
+        }
+        let vs: Vec<Variance> = self.variances(*h, args.len()).collect();
+        if vs.contains(&Variance::Inv) {
+            return false;
+        }
+        let rows: Vec<Mode> = self.rows(*h, args.len()).collect();
+        for ((a, v), row) in args.iter().zip(vs).zip(rows) {
+            match v {
+                Variance::Contra => self.constrain_in(a, &Ty::Never, row),
+                Variance::Co => self.constrain_in(&Ty::Top, a, row),
+                _ => {}
+            }
+        }
+        true
     }
 
     pub(crate) fn vacuous(&self, t: &Ty) -> bool {

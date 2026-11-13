@@ -103,6 +103,8 @@ pub(crate) struct Checker<'a> {
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
     row_value_allowed: bool,
+    row_lacks: HashMap<super::V, Vec<TypeRef>>,
+    row_supplies: HashMap<(ModuleId, Span), super::V>,
     rest_type_vars: HashSet<TyVarId>,
     value_type_vars: HashSet<TyVarId>,
     mixed_row_type_vars: HashSet<TyVarId>,
@@ -197,6 +199,8 @@ impl<'a> Checker<'a> {
             recovery: false,
             tyvars: HashMap::new(),
             row_value_allowed: false,
+            row_lacks: HashMap::new(),
+            row_supplies: HashMap::new(),
             rest_type_vars: HashSet::new(),
             value_type_vars: HashSet::new(),
             mixed_row_type_vars: HashSet::new(),
@@ -756,6 +760,8 @@ impl<'a> Checker<'a> {
             trial.kvars = call.known;
             trial.defs = self.defs.clone();
             trial.tyvars = self.tyvars.clone();
+            trial.row_lacks = self.row_lacks.clone();
+            trial.row_supplies = self.row_supplies.clone();
             trial.rest_type_vars = self.rest_type_vars.clone();
             trial.value_type_vars = self.value_type_vars.clone();
             trial.mixed_row_type_vars = self.mixed_row_type_vars.clone();
@@ -1576,7 +1582,10 @@ impl<'a> Checker<'a> {
                 Ty::Fn(Box::new(FnTy::new(params, ret, env)))
             }
             TypeKind::Union(ts) => {
-                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                let ms: Vec<Ty> = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                if mode == Mode::Env {
+                    self.note_row_lacks(&ms);
+                }
                 let r = self.s.union_mode(ms, mode);
                 self.flush(t.span, None);
                 r
@@ -3008,7 +3017,15 @@ impl<'a> Checker<'a> {
                     let env = self.pop_effects(*span);
                     let rest = if self.s.mode(&v) == Mode::Env {
                         let rest = self.s.env_without_row(&env, &v);
-                        let keys = self.s.env_keys(&rest);
+                        let mut keys = self.s.env_keys(&rest);
+                        if let Ty::Var(v) = v {
+                            self.row_supplies.insert((self.module, *span), v);
+                            for key in self.row_lacks.get(&v).into_iter().flatten() {
+                                if !keys.contains(key) {
+                                    keys.push(*key);
+                                }
+                            }
+                        }
                         self.out
                             .env_supplies
                             .insert((self.module, *span), super::EnvSupply::Row(keys));
@@ -3117,6 +3134,64 @@ impl<'a> Checker<'a> {
         (nil.clone(), nil)
     }
 
+    /// Rule B: a row excludes every key written beside it. Keep this
+    /// information even when a nested provide has already removed a key
+    /// from the current body's need.
+    fn note_row_lacks(&mut self, members: &[Ty]) {
+        let mut flat = Vec::new();
+        super::solve::flatten_union(members, &mut flat);
+        let keys: Vec<TypeRef> = flat
+            .iter()
+            .filter_map(|t| match t.head() {
+                Some(Head::Named(r)) => Some(r),
+                _ => None,
+            })
+            .collect();
+        for member in flat {
+            let Ty::Var(v) = member else {
+                continue;
+            };
+            let excluded = self.row_lacks.entry(v).or_default();
+            for key in &keys {
+                if !excluded.contains(key) {
+                    excluded.push(*key);
+                }
+            }
+            for (site, row) in &self.row_supplies {
+                if *row == v
+                    && let Some(super::EnvSupply::Row(keep)) = self.out.env_supplies.get_mut(site)
+                {
+                    for key in &keys {
+                        if !keep.contains(key) {
+                            keep.push(*key);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn note_type_row_lacks(&mut self, ty: &Ty) {
+        match ty {
+            Ty::Fn(f) => {
+                self.note_row_lacks(std::slice::from_ref(&f.env));
+                self.note_type_row_lacks(&f.param);
+                self.note_type_row_lacks(&f.ret);
+            }
+            Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => {
+                for part in parts {
+                    self.note_type_row_lacks(part);
+                }
+            }
+            Ty::Diff(base, _) => self.note_type_row_lacks(base),
+            Ty::Both(a, b) => {
+                self.note_type_row_lacks(a);
+                self.note_type_row_lacks(b);
+            }
+            _ => {}
+        }
+    }
+
     /// Rule C applies to the items of one written provide, never to
     /// nested provides, whose later value intentionally replaces a key.
     fn check_provided_duplicates(&mut self, rest: &[Stmt], group: Option<Span>, span: Span) {
@@ -3177,6 +3252,7 @@ impl<'a> Checker<'a> {
     /// type written at its top gets the known type of the matching
     /// parameter.
     fn function(&mut self, f: &Function, expected: &Ty) -> (Ty, Ty) {
+        self.note_type_row_lacks(expected);
         let count = f
             .params
             .iter()
@@ -3188,6 +3264,7 @@ impl<'a> Checker<'a> {
         };
         let mut params = Vec::new();
         let mut env_tys = Vec::new();
+        let has_rest = f.params.iter().any(|p| matches!(p, Param::Env { rest: true, .. }));
         let mut rest_env = false;
         let mut fails = false;
         for p in &f.params {
@@ -3205,6 +3282,13 @@ impl<'a> Checker<'a> {
                         None => expected.get(params.len()).cloned().unwrap_or(Ty::Top),
                     };
                     self.fit_known(pattern, &k, false);
+                    // A rest head closes its body need now. Link the
+                    // parameter's expected type before checking that body,
+                    // as the enclosing function subtype will do later.
+                    if has_rest && let Some(expected) = expected.get(params.len())
+                        && *expected != Ty::Top {
+                        self.sub(expected, &t, pattern.span);
+                    }
                     params.push((label.clone(), t));
                 }
                 Param::Env {
@@ -3216,7 +3300,8 @@ impl<'a> Checker<'a> {
                     rest_env |= rest;
                     if *rest && let TypeKind::Var(tv) = ty.kind {
                         self.rest_type_vars.insert(tv);
-                        if self.value_type_vars.contains(&tv) && self.mixed_row_type_vars.insert(tv) {
+                        if self.value_type_vars.contains(&tv) && self.mixed_row_type_vars.insert(tv)
+                        {
                             self.error(code::ENV_TYPE, ty.span, "a rest service type parameter cannot also be an ordinary value type (§4.7)");
                         }
                     }
@@ -3236,6 +3321,7 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        self.note_row_lacks(&env_tys);
         for p in &f.params {
             if let Param::Pattern { pattern, .. } = p {
                 self.check_pattern_places(pattern, Pol::Neg);

@@ -13,8 +13,34 @@ fn run(source: &str) {
         matches!(
             m.path.as_str(),
             "i/prelude" | "i/control" | "i/fail" | "i/resource" | "i/core"
-        )
+        ) || ilang_package::library::RUNTIME.contains(&m.path.as_str())
     });
+    // Entry completion uses i/fail even when the entry has no Fail need.
+    // Keep its ordinary boundary implementation fully typed in this isolated
+    // harness; the normal spec suite still checks the concurrent library port.
+    let fail = graph.packages[graph.library]
+        .modules
+        .iter()
+        .find(|m| m.path == "i/fail")
+        .unwrap()
+        .source;
+    graph.sources.set_text(
+        fail,
+        r#"
+(i/control)
+(raise, catch, from_result)
+raise = <E>(error: E) <- (handler: Fail(E)) -> Never { handler.raise(error) }
+catch: <A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E) = (body) {
+    control.boundary((b) {
+        Ok(body()) <- (Fail(raise = (error) { control.escape(b, Error(error)) }))
+    })
+}
+from_result = <A, E>(result: Result(A, E)) -> A {
+    result |> (Ok(value)) { value } | (Error(error)) { raise(error) }
+}
+"#
+        .to_string(),
+    );
     let checked = ilang_check::check(&graph);
     assert!(
         !checked.diags.iter().any(|d| d.is_error()),

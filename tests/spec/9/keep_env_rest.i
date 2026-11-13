@@ -9,10 +9,15 @@
 )
 
 // syntax-3 §2.10.8: keep N and use Fail from the later caller.
-keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail(E)) -> A {
-    (x) { f(x) <- env }
+keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (
+	Fail(E),
+) -> A {
+	(x) {
+		// D16: keep a frame until B2 preserves tail-provided environments.
+		value = f(x) <- env
+		value
+	}
 }
-
 
 Name = (text = String)
 Paused = (Continuation(Nil, Hop, Never))
@@ -69,12 +74,13 @@ main = () {
 					})
 					control.cancel(k4)
 					control.boundary((boundary) {
+						extra: Extra(Nil, Assert) = Extra(boundary)
 						{
 							f = keep(pure)
 							assert(
 								core.not(core.portable(f)),
 							)
-						} <- (Name(text = "unused"), Extra(boundary))
+						} <- (Name(text = "unused"), extra)
 					})
 				} <- (Name(text = "canceller"))
 			} <- (Name(text = "final"))

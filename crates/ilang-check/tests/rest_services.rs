@@ -8,7 +8,7 @@ fn checked(source: &str) -> (Vec<String>, Vec<String>) {
     graph.packages[graph.library].modules.retain(|m| {
         matches!(
             m.path.as_str(),
-            "i/prelude" | "i/control" | "i/fail" | "i/resource" | "i/core"
+            "i/prelude" | "i/control" | "i/resource" | "i/core"
         )
     });
     let checked = ilang_check::check(&graph);
@@ -55,7 +55,7 @@ fn rest_requires_a_type_parameter() {
 #[test]
 fn whole_data_provide_uses_service_keys() {
     let (_, errors) = checked(
-        "Db = (value = Int)\nread = () <- (db: Db) { db.value }\nservices = () { (Db(value = 42),) }\nmain = () { assert((read() <- services()) == 42) }",
+        "Db = (value = Int)\nread = () <- (db: Db) { db.value }\nservices = () { (Db(value = 42),) }\nmain = () { assert({ read() <- services() } == 42) }",
     );
     assert!(errors.is_empty(), "{errors:#?}");
 }
@@ -86,7 +86,9 @@ fn rest_needs_fit_the_written_keys() {
         "raise = () <- (handler: Fail(String)) { handler.raise(\"wrong\") }\nf = <N>() <- (handler: Fail(Int), ..env: N) { raise() }",
     );
     assert!(
-        errors.iter().any(|e| e.contains("Fail(String)") && e.contains("Fail(Int)")),
+        errors
+            .iter()
+            .any(|e| e.contains("Fail(String)") && e.contains("Fail(Int)")),
         "{errors:#?}"
     );
 }
@@ -120,11 +122,50 @@ fn e6_runtime_fixtures_type_check() {
 #[test]
 fn a_rest_type_parameter_cannot_also_be_a_value_type() {
     let (_, errors) = checked("f = <N>(x: N) <- (..env: N) { Nil }");
-    assert!(errors.iter().any(|e| e.contains("cannot also be an ordinary value type")), "{errors:#?}");
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("cannot also be an ordinary value type")),
+        "{errors:#?}"
+    );
 }
 
 #[test]
 fn a_rest_head_declares_its_own_row_parameter() {
-    let (_, errors) = checked("outer = <N>(f: () <- N -> Nil) { inner = () <- (..env: N) { f() }; Nil }".replace(";", "\n").as_str());
-    assert!(errors.iter().any(|e| e.contains("a rest service pattern needs a type parameter of the function")), "{errors:#?}");
+    let (_, errors) = checked(
+        "outer = <N>(f: () <- N -> Nil) { inner = () <- (..env: N) { f() }; Nil }"
+            .replace(";", "\n")
+            .as_str(),
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("a rest service pattern needs a type parameter of the function")),
+        "{errors:#?}"
+    );
+}
+
+#[test]
+fn an_unused_fail_parameter_can_be_empty_but_a_real_error_cannot() {
+    let (types, errors) = checked(
+        "constrain = <E>(f: () <- (Fail(E)) -> Int) -> () -> Int { () { f() } }\npure = () { constrain(() { 42 })() }",
+    );
+    assert!(errors.is_empty(), "{errors:#?}");
+    assert!(
+        types.iter().any(|t| t == "app/main.pure : () -> Int"),
+        "{types:#?}"
+    );
+    let (_, errors) = checked(
+        "raises = () <- (handler: Fail(String)) { handler.raise(\"error\") }\nconstrain = (f: () <- (Fail(String)) -> Int) -> () -> Int { () { f() } }",
+    );
+    assert!(
+        errors.iter().any(|e| e.contains("not a subtype")),
+        "{errors:#?}"
+    );
+}
+
+#[test]
+fn a_full_function_type_supplies_the_rest_heads_callback_type() {
+    let (_, errors) = checked("keep: <S, A, E, N>((S) <- (..N, Fail(E)) -> A) <- N -> (S) <- (Fail(E)) -> A = (f) <- (..env: N) { (x) { f(x) <- env } }\nName = (text = String)\nread = (_: Nil) <- (name: Name) { name.text }\nmain = () { f = keep(read) <- (Name(text = \"saved\"))\n assert(f(Nil) == \"saved\") }");
+    assert!(errors.is_empty(), "{errors:#?}");
 }

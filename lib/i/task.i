@@ -1108,14 +1108,19 @@ complete = <A, E, N>(
 		}
 }
 
-make_start: <A, E, N>(() <- (Fail(E), ..N) -> A, Key(Result(A, E)), Key(E), Bool) <- N -> Start = (body, result, errors, check) {
+make_start: <A, E, N>(
+	() <- (Fail(E), ..N) -> A,
+	Key(Result(A, E)),
+	Key(E),
+	Bool,
+) <- N -> Start = (body, result, errors, check) {
 	{
-		kept = control.keep_env((own: Scheduler) {
+		kept = keep_services((own: Scheduler) {
 			own |>
 				(DetachedScheduler) { panic("task: no scheduler") }
 				| (Scheduler(..)) {
 					{
-						local = control.keep_env((_: Nil) {
+						local = keep_services((_: Nil) {
 							complete(body, result, errors, check)
 						})
 						retain(guarded(own, Absent, () { local(Nil) }))
@@ -1262,9 +1267,11 @@ remote_begin = (job: Job) -> (
 	)
 }
 
-remote_resume = (
-	input: (Continuation(StepAnswer, Turn, Never), Resume)
-) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket)) {
+remote_resume = (input: (Continuation(StepAnswer, Turn, Never), Resume)) -> (
+	Remote,
+	Continuation(StepAnswer, Turn, Never),
+	List(Ticket),
+) {
 	(k, next) = input
 	remote_turn(control.resume(k, next.answer), next.finals, next.run)
 }
@@ -3492,7 +3499,7 @@ scope_call_body: <A, E, N>(
 	results: Key(Result(A, E)) = key.new()
 	handle = Group(info = info, errors = errors)
 	checked = portable_witness(info.witness)
-	kept = control.keep_env((_: Nil) {
+	kept = keep_services((_: Nil) {
 		fail.catch(() { body(handle) }) |>
 			(Ok(value)) { Succeeded(key.wrap(results, Ok(value))) }
 			| (Error(error)) {
@@ -3711,11 +3718,22 @@ get = <A>(s: Shared(A)) <- (own: Scheduler) -> A {
 	read(s.values, ask(own, GetShare(s.run, s.owner, s.id)))
 }
 
-keep = <S, A, N>(f: (S) <- N -> A) <- (_own: Scheduler) -> (S) <- (
-	Scheduler,
-) -> A {
+// §9.4: the row is captured as a value; Fail stays with the later call.
+keep_services = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (
+	S,
+) <- (Fail(E)) -> A {
+	(x) {
+		// D16: keep a frame until B2 preserves tail-provided environments.
+		value = f(x) <- env
+		value
+	}
+}
+
+keep = <S, A, E, N>(
+	f: (S) <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A
+) <- (_own: Scheduler, .._env: N) -> (S) <- (Fail(E), Scheduler) -> A {
 	{
-		kept = control.keep_env((input: (S, Scheduler)) {
+		kept = keep_services((input: (S, Scheduler)) {
 			(value, own) = input
 			own |>
 				(DetachedScheduler) { panic("task: no scheduler") }
@@ -3954,7 +3972,7 @@ scope_call: <A, E, N>(
 		(DetachedScheduler) { panic("task: no scheduler") }
 		| (Scheduler(..)) {
 			owner = { retain(request.open_owner()) <- (own.root) }
-			kept = control.keep_env((_: Nil) {
+			kept = keep_services((_: Nil) {
 				resource.ensure(
 					() {
 						retain(scope_call_body(body, witness, mode, own)) <- (
@@ -3974,14 +3992,12 @@ execute: <A, E, N>(
 	rng.Generator,
 	Policy,
 ) <- N -> Result(Result(A, E), ScheduleError) = (body, runner, seed, policy) {
-	kept = control.keep_env((_: Nil) {
-		execute_body(body, runner, seed, policy)
-	})
+	kept = keep_services((_: Nil) { execute_body(body, runner, seed, policy) })
 	retain(kept(Nil))
 }
 
 sync = <A, E, N>(e: Event(A, E, N)) <- (own: Scheduler) -> A {
-	kept = control.keep_env((_: Nil) { sync_body(e, own) })
+	kept = keep_services((_: Nil) { sync_body(e, own) })
 	retain(kept(Nil))
 }
 

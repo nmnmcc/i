@@ -1379,7 +1379,7 @@ impl<'p> Emitter<'p> {
             // `$env` and `$values` have the same Wasm array type. The
             // tuple wraps that immutable pointer, so ordinary capture
             // traversal also sees the row's otherwise unused services.
-            Value::Environment(env) => format!("(call $tuple {})", env_text(*env)),
+            Value::Environment(env) => format!("(call $tuple (ref.as_non_null {}))", env_text(*env)),
             Value::CapturedService(value, id) => {
                 format!("(call $field {} (i32.const {id}))", self.atom(value))
             }

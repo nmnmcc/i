@@ -1,12 +1,28 @@
 // spec: 4.8, 9.2, 9.4
 // expect: pass
 (
-    i/fail
+	i/control
 )
 
+// Ordinary Fail and boundary code, independent of the concurrent i/fail port.
+raise = <E>(error: E) <- (handler: Fail(E)) -> Never { handler.raise(error) }
+catch: <A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E) = (body) {
+	control.boundary((b) {
+		Ok(body()) <- (
+			Fail(raise = (error) { control.escape(b, Error(error)) }),
+		)
+	})
+}
+
 // syntax-3 §2.10.8: keep N and use Fail from the later caller.
-keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail(E)) -> A {
-    (x) { f(x) <- env }
+keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (
+	Fail(E),
+) -> A {
+	(x) {
+		// D16: keep a frame until B2 preserves tail-provided environments.
+		value = f(x) <- env
+		value
+	}
 }
 
 Name = (text = String)
@@ -15,27 +31,31 @@ name = () <- (n: Name) { n.text }
 read = () <- (db: Db) { db.value }
 
 capture = <A, N>(f: () <- N -> A) <- (..env: N) {
-    saved = env
-    () { f() <- saved }
+	saved = env
+	() { f() <- saved }
 }
 
 override = <N>(f: () <- (..N, Db) -> Int, db: Db) <- (..env: N) {
-    () { f() <- (db, ..env) }
+	() { f() <- (db, ..env) }
+}
+
+override_spread = <N>(f: () <- (..N, Db) -> Int, db: Db) <- (..env: N) {
+	() { f() <- (..env, ..(db)) }
 }
 
 services = () { (Name(text = "data"), Db(value = 31)) }
 
 main = () {
-    kept = capture(name) <- (Name(text = "saved"))
-    assert({ kept() <- (Name(text = "caller")) } == "saved")
-    replaced = override(read, Db(value = 42))
-    assert({ replaced() <- (Db(value = 0)) } == 42)
-    assert({ name() == "data" } <- services())
-    assert({ read() <- (..services(), Db(value = 43)) } == 43)
-    raised = fail.catch(() {
-        keep((_: Nil) { fail.raise("later") })
-    })
-    raised |> (Ok(f)) {
-        assert(fail.catch(() { f(Nil) }) == Error("later"))
-    } | (_) { panic("keep raised at creation") }
+	kept = capture(name) <- (Name(text = "saved"))
+	assert({ kept() <- (Name(text = "caller")) } == "saved")
+	disjoint = override_spread(read, Db(value = 44))
+	assert(disjoint() == 44)
+	replaced = override(read, Db(value = 42))
+	assert({ replaced() <- (Db(value = 0)) } == 42)
+	assert({ name() == "data" } <- services())
+	assert({ read() <- (..services(), Db(value = 43)) } == 43)
+	raised = catch(() { keep((_: Nil) { raise("later") }) })
+	raised |>
+		(Ok(f)) { assert(catch(() { f(Nil) }) == Error("later")) }
+		| (_) { panic("keep raised at creation") }
 }
