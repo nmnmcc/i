@@ -71,7 +71,9 @@ fn library_names() {
         ("i/failure", &["raise", "catch"]),
         (
             "i/control",
-            &["boundary", "suspend", "escape", "resume", "cancel", "keep_env"],
+            &[
+                "boundary", "suspend", "escape", "resume", "cancel", "keep_env",
+            ],
         ),
         ("i/key", &["new", "wrap", "unwrap"]),
         (

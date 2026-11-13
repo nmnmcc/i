@@ -1576,6 +1576,10 @@ impl<'a> Checker<'a> {
                     "`{l}` and `{r}` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)"
                 ),
             ),
+            FailKind::NeedMeet => (
+                code::ENV_FORMS,
+                format!("the service requirements `{l}` and `{r}` have an empty intersection and cannot be satisfied (§4.4, §9.2)"),
+            ),
             FailKind::EnvForms => (
                 code::ENV_FORMS,
                 format!(

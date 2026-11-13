@@ -13,6 +13,6 @@ use_int : () -> 1 | "a"
 use_string : () -> 1 | "a"
 state_int : () -> 1 ! State(Int)
 state_str : () -> 1 ! State(String)
-both : () -> 1 ! State(Int) | State(String)
+both : () -> 1 ! State(Never)
 22:3: warning[W0502]: this value is not used, and working it out does nothing
-72:8: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)
+72:8: error[E0515]: the service requirements `State(Int)` and `State(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2)

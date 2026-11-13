@@ -1505,43 +1505,34 @@
       "resolution": "QA metadata correction: all phases already complete in the stored redesign baseline; no K4 behavior change"
     },
     {
-      "outcome": "reject",
-      "diagnostic_codes": [
-        "E0515"
-      ],
+      "outcome": "accept",
       "pattern": "^review\\-k4\\-lane/row_alias$",
       "known_failure": false,
       "finding": "K4 runtime migration: row_alias",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/design/syntax-3.md §2.10 R4: “When a need has one constructor twice, the two are merged by direction”; docs/spec.md §4.4: “when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change.” Never is permitted as either side of a meet; row parameters follow their definition (§4.5 rule 6).",
       "origin": "tests/review/k4-migration.json",
       "phase": "entry",
-      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+      "phase_source": "docs/spec.md §§4.4, 4.5 rule 6, 9.2: directed row parameters permit S(Never) | S(Dep)"
     },
     {
-      "outcome": "reject",
-      "diagnostic_codes": [
-        "E0515"
-      ],
+      "outcome": "accept",
       "pattern": "^review\\-k4\\-lane/direct_row$",
       "known_failure": false,
       "finding": "K4 runtime migration: direct_row",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/design/syntax-3.md §2.10 R4: “When a need has one constructor twice, the two are merged by direction”; docs/spec.md §4.4: “when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change.” Never is permitted as either side of a meet; row parameters follow their definition (§4.5 rule 6).",
       "origin": "tests/review/k4-migration.json",
       "phase": "entry",
-      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+      "phase_source": "docs/spec.md §§4.4, 4.5 rule 6, 9.2: directed row parameters permit S(Never) | S(Dep)"
     },
     {
-      "outcome": "reject",
-      "diagnostic_codes": [
-        "E0515"
-      ],
+      "outcome": "accept",
       "pattern": "^review\\-k4\\-lane/effect_row_alias$",
       "known_failure": false,
       "finding": "K4 runtime migration: effect_row_alias",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/design/syntax-3.md §2.10 R4: “When a need has one constructor twice, the two are merged by direction”; docs/spec.md §4.4: “when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change.” Never is permitted as either side of a meet; row parameters follow their definition (§4.5 rule 6).",
       "origin": "tests/review/k4-migration.json",
       "phase": "entry",
-      "phase_source": "docs/spec.md §§2.6.2 and 9.2: reject the invalid or unprovided service before entry execution at both optimization levels"
+      "phase_source": "docs/spec.md §§4.4, 4.5 rule 6, 9.2: directed row parameters permit S(Never) | S(Dep)"
     },
     {
       "outcome": "reject",
@@ -3545,7 +3536,7 @@
       ],
       "phase": "entry",
       "finding": "K4 additional soundness: incompatible forms of one service constructor",
-      "source": "docs/spec.md §4.5 rule 4 requires equal service arguments; §9.2 says getting an environment parameter never fails at run time; §§4.8/10.2 retain unprovided entry requirements",
+      "source": "docs/spec.md §9.2: “When the intersection for one service of a need is `Never` while neither side is `Never`, the need cannot be satisfied: it is a compile error (E0515).” S(Int) and S(String) have the empty same-direction argument meet (§4.4); §4.5 rule 4 requires the provided value to be a subtype of the need.",
       "origin": "review-k4s/mixed_order_1",
       "fixed_by": "K4 F2"
     },

@@ -775,10 +775,12 @@ impl Engine<'_> {
                 let variance = self.solver.variances(h, aa.len());
                 let rows = self.solver.rows(h, aa.len());
                 for (((a, b), v), row) in aa.into_iter().zip(ba).zip(variance).zip(rows) {
-                    let (v, row) = if env == Mode::Value {
-                        (v, row)
-                    } else {
-                        (Variance::Inv, Mode::Value)
+                    let (a, b, v, row) = match env {
+                        Mode::Value => (a, b, v, row),
+                        // A need fits in the provider when the provider
+                        // is a subtype of it as a value (§4.5 rule 4).
+                        Mode::Env => (b, a, v, row),
+                        Mode::Row => (a, b, Variance::Inv, Mode::Value),
                     };
                     if matches!(v, Variance::Co | Variance::Inv) && !self.rel(a, b, row, f)? {
                         return Ok(false);
