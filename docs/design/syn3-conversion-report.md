@@ -512,3 +512,30 @@ The remaining 29 parked cases each have an individual reason: 28 rely on
 removed dynamic labels, open Record, record operations or width subtyping;
 one pins a former record-graph TypeView error which is now unreachable.
 Std passes all 2,170 tests at both O0 and O2 after main's memory fix.
+
+### Evening final gates
+
+All requested active checks now have passing evidence after main fd99f9e3.
+All remaining CLI binaries ran; all 28 spec filters ran, with passing
+retries for every corrected case (458 unique active cases at O0/O2).
+Std passes 2,170/2,170 at both O0 and O2. Numeric lowering's four tests
+pass, including O0/O2/O3 agreement; the bigint benchmark's default invocation
+compiles and reports one intentionally ignored benchmark, not a measurement.
+
+Workspace rustfmt and its check pass. Workspace clippy with all targets and
+-D warnings passes. The release source-format check of std/lib/examples
+passes. The source formatter regression passes both tests. The exact syntax
+inventory passes 4,723 extracted literals/blocks with five future-track
+entries. Its first evening run exposed an imported template entry still
+substituting the old SPIN constant and a Wasmtime preload argument parsed
+as i. The entry now substitutes the actual converted constant; guest={}
+is correctly classified as the Wasmtime command argument at its call site.
+No expected diagnostic was regenerated. Reviewed rustfmt's four-file diff;
+only Rust formatting changed. Main's marker still names fd99f9e3.
+
+The detailed command/result ledger, including unsuccessful commands and
+their retries, is in the coordinator cache report-conv.txt. The 29 retained
+legacy spec cases each have their own written reason. Checker and CLI
+pending lists are empty. Whole-workspace tests, unfiltered spec/corpus and
+dev-verify remain coordinator-only. R2 opt-in measurements and the bigint
+baseline benchmark were not enabled.
