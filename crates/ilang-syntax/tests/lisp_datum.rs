@@ -99,15 +99,15 @@ fn macro_quotes_are_core_nodes_and_can_be_formatted() {
 #[test]
 fn quote_splices_are_checked_in_their_written_position() {
     for source in [
-        "(= f (-> (,) _ `~..xs))",
-        "(= f (-> (, `(~..xs x)) _ Nil))",
-        "(= f (-> (,) _ `(~(+) x)))",
+        "(= f (-> () _ `~..xs))",
+        "(= f (-> (`(~..xs x)) _ Nil))",
+        "(= f (-> () _ `(~(+) x)))",
     ] {
-        let (_, errors) = ilang_syntax::lisp::parse_source(source);
-        assert!(!errors.is_empty(), "{source}");
+        let doc = parse(source).unwrap();
+        assert!(ilang_syntax::lisp::parse_module(&doc).is_err(), "{source}");
     }
-    let (_, errors) = ilang_syntax::lisp::parse_source("(= f (-> (, `(f ~..xs)) _ Nil))");
-    assert!(errors.is_empty(), "{errors:?}");
+    let doc = parse("(= f (-> (`(f ~..xs)) _ Nil))").unwrap();
+    assert!(ilang_syntax::lisp::parse_module(&doc).is_ok());
 }
 
 #[test]
@@ -231,7 +231,9 @@ fn nested_quote_captures_use_the_parser_work_stack() {
 
 #[test]
 fn invalid_datums_do_not_make_core_items() {
-    for source in ["(= x (1 .. 2))", "(= x [.. 1])"] {
+    // `(1 .. 2)` is the call `1(..2)` in the rows of §6.8, so the spread
+    // with nothing after it stands for the call that is not one.
+    for source in ["(= x (1 ..))", "(= x [.. 1])"] {
         let (_, errors) = ilang_syntax::lisp::parse_source(source);
         assert!(!errors.is_empty(), "{source}");
     }
@@ -255,9 +257,8 @@ fn both_surfaces_preserve_attributes_and_grouped_result_holes() {
 
 #[test]
 fn a_nonfinal_clause_choice_cannot_end_in_a_type_test() {
-    let (_, errors) =
-        ilang_syntax::lisp::parse_source("(= f (-> (, (| (= a (: b Int)) Unit)) _ 1))");
-    assert!(!errors.is_empty());
+    let doc = parse("(= f { (-> (| (= a (: b Int)) Unit) 1) })").unwrap();
+    assert!(ilang_syntax::lisp::parse_module(&doc).is_err());
 }
 
 #[test]

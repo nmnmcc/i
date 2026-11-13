@@ -199,7 +199,7 @@ fn builtin_identity_bypasses_caller_type_shadow() {
         .unwrap()
         .source
         .0;
-    let root = syntax("((-> (, (: z Int)) _ z) 1)", caller, &[]);
+    let root = syntax("((-> ((: z Int)) _ z) 1)", caller, &[]);
     let Node::Round(call) = root.node() else {
         panic!("call")
     };
@@ -209,12 +209,12 @@ fn builtin_identity_bypasses_caller_type_shadow() {
     let Node::Round(params) = fun[1].node() else {
         panic!("parameters")
     };
-    let Node::Round(typed) = params[1].node() else {
+    let Node::Round(typed) = params[0].node() else {
         panic!("typed parameter")
     };
     let builtin = typed[2].with_scope_identity(ScopeIdentity::Builtin { name: "Int".into() });
-    let typed = params[1].replace_children(vec![typed[0].clone(), typed[1].clone(), builtin]);
-    let params = fun[1].replace_children(vec![params[0].clone(), typed]);
+    let typed = params[0].replace_children(vec![typed[0].clone(), typed[1].clone(), builtin]);
+    let params = fun[1].replace_children(vec![typed]);
     let fun =
         call[0].replace_children(vec![fun[0].clone(), params, fun[2].clone(), fun[3].clone()]);
     let root = root.replace_children(vec![fun, call[1].clone()]);
@@ -424,7 +424,7 @@ fn unspellable_compiler_alias_can_call_private_member() {
 #[test]
 fn same_text_in_one_tuple_pattern_binds_distinct_scopes() {
     let (mut graph, mut parsed, caller, template) = setup();
-    let root = syntax("((-> (, (, x x)) _ (, x x)) (, 1 \"s\"))", template, &[7]);
+    let root = syntax("((-> ((, x x)) _ (, x x)) (, 1 \"s\"))", template, &[7]);
     let Node::Round(call) = root.node() else {
         panic!("call")
     };
@@ -434,15 +434,15 @@ fn same_text_in_one_tuple_pattern_binds_distinct_scopes() {
     let Node::Round(params) = fun[1].node() else {
         panic!("parameters")
     };
-    let Node::Round(pattern) = params[1].node() else {
+    let Node::Round(pattern) = params[0].node() else {
         panic!("pattern")
     };
-    let pattern = params[1].replace_children(vec![
+    let pattern = params[0].replace_children(vec![
         pattern[0].clone(),
         pattern[1].clone(),
         syntax("x", caller, &[]),
     ]);
-    let params = fun[1].replace_children(vec![params[0].clone(), pattern]);
+    let params = fun[1].replace_children(vec![pattern]);
     let Node::Round(body) = fun[3].node() else {
         panic!("tuple")
     };
@@ -471,18 +471,14 @@ fn same_text_in_one_tuple_pattern_binds_distinct_scopes() {
 #[test]
 fn parameter_labels_still_compare_written_text() {
     let (mut graph, mut parsed, caller, template) = setup();
-    let root = syntax("(-> (, x x) _ x)", template, &[7]);
+    let root = syntax("(-> (x x) _ x)", template, &[7]);
     let Node::Round(fun) = root.node() else {
         panic!("function")
     };
     let Node::Round(params) = fun[1].node() else {
         panic!("parameters")
     };
-    let params = fun[1].replace_children(vec![
-        params[0].clone(),
-        params[1].clone(),
-        syntax("x", caller, &[]),
-    ]);
+    let params = fun[1].replace_children(vec![params[0].clone(), syntax("x", caller, &[])]);
     let root = root.replace_children(vec![fun[0].clone(), params, fun[2].clone(), fun[3].clone()]);
     insert_expression(&mut graph, &mut parsed, caller, &root);
     let checked = ilang_check::check_parsed(&graph, &parsed);

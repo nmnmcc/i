@@ -636,12 +636,15 @@ fn records_preserve_labels_spreads_and_streamed_cost() {
                 Node::Round(children) | Node::Curly(children) | Node::Square(children) => {
                     nodes.extend(children)
                 }
-                Node::Symbol(symbol) if matches!(symbol.as_str(), "=" | "..") => {
+                Node::Symbol(symbol) if matches!(symbol.as_str(), ":" | ".." | "-") => {
                     let span = node.span();
                     let text = &source[span.start as usize..span.end as usize];
-                    // A labelled item `label = value` is `(= label value)` in
-                    // the rows of syntax-3.md §6.8: the symbol is the token.
-                    assert!(text == symbol, "{symbol} at {text:?}");
+                    // Syntax three writes a record field `label = value`; the
+                    // `:` of its Lisp form has no text of its own.
+                    assert!(
+                        text == symbol || symbol == ":" && (text.is_empty() || text == "="),
+                        "{symbol} at {text:?}"
+                    );
                 }
                 Node::Text(label) if label == "full name" => {
                     let span = node.span();
@@ -654,14 +657,11 @@ fn records_preserve_labels_spreads_and_streamed_cost() {
             }
         }
         let shown = syntax.show();
-        if shown.starts_with("(= f ") {
-            assert!(shown.contains("(= full_name String)"), "{shown}");
-            assert!(
-                shown.contains("(, .. r (= full_name \"Ada\") (= x 1))"),
-                "{shown}"
-            );
+        if shown.starts_with("(= (f ") {
+            assert!(shown.contains("(: full_name String)"), "{shown}");
+            assert!(shown.contains("(: full_name \"Ada\")"), "{shown}");
         } else {
-            assert_eq!(shown, "(= empty (,))");
+            assert_eq!(shown, "(= empty ())");
         }
     }
 }

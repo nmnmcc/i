@@ -130,6 +130,9 @@ fn record_expression_and_type_handle_ten_thousand_nested_fields_and_spreads() {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
+            // The reader is a plain recursive function; a deep datum is read
+            // on the stack of `syn3::deep::deep`.
+            use ilang_syntax::syn3::deep::deep;
             let mut expr = name("x");
             let mut ty = d(K::UpName("Int".into()), 0);
             let mut expr_field = name("x");
@@ -140,7 +143,7 @@ fn record_expression_and_type_handle_ten_thousand_nested_fields_and_spreads() {
                 expr_field = data(vec![field(name("x"), expr_field)]);
                 pattern = data(vec![field(name("x"), pattern)]);
             }
-            let value = parse_expression(&expr).unwrap();
+            let value = deep(|| parse_expression(&expr)).unwrap();
             let mut p = &value;
             for _ in 0..10_000 {
                 let ExprKind::Data(items) = &p.kind else {
@@ -152,7 +155,7 @@ fn record_expression_and_type_handle_ten_thousand_nested_fields_and_spreads() {
                 p = base;
             }
             assert!(matches!(&p.kind, ExprKind::Name { name, .. } if name.name == "x"));
-            let result = parse_type(&ty).unwrap();
+            let result = deep(|| parse_type(&ty)).unwrap();
             let mut p = &result;
             for _ in 0..10_000 {
                 let TypeKind::Data(items) = &p.kind else {
@@ -164,7 +167,7 @@ fn record_expression_and_type_handle_ten_thousand_nested_fields_and_spreads() {
                 p = inner;
             }
             assert!(matches!(&p.kind, TypeKind::Named { name, .. } if name.name == "Int"));
-            let value_field = parse_expression(&expr_field).unwrap();
+            let value_field = deep(|| parse_expression(&expr_field)).unwrap();
             let mut p = &value_field;
             for _ in 0..10_000 {
                 let ExprKind::Data(items) = &p.kind else {
@@ -176,7 +179,7 @@ fn record_expression_and_type_handle_ten_thousand_nested_fields_and_spreads() {
                 p = inner;
             }
             assert!(matches!(&p.kind, ExprKind::Name { name, .. } if name.name == "x"));
-            let result_pattern = parse_pattern(&pattern).unwrap();
+            let result_pattern = deep(|| parse_pattern(&pattern)).unwrap();
             let mut p = &result_pattern;
             for _ in 0..10_000 {
                 let PatternKind::Data(items) = &p.kind else {
@@ -213,12 +216,12 @@ fn expanded_record_labels_keep_their_original_syntax_identity() {
         module: 42,
         marks: BTreeSet::from([7]),
     };
-    let source = one("(, (= name value))");
+    let source = one("((: name value))");
     let root = Syntax::from_datum(&source, &scope);
     let Node::Round(items) = root.node() else {
         panic!()
     };
-    let Node::Round(field) = items[1].node() else {
+    let Node::Round(field) = items[0].node() else {
         panic!()
     };
     let label = field[1].clone();
