@@ -854,7 +854,50 @@ impl Cx {
                     }
                     _ => None,
                 };
-                if let Some(contract) = contract {
+                if let Some(mut contract) = contract {
+                    // Closed function-valued providers keep their original
+                    // generalization point and its deferred obligations.
+                    // Open contracts still have to reach the provide before
+                    // generalization; scalar providers carry no function scheme.
+                    struct Boundary<'a> {
+                        rows: &'a [Row],
+                        contract: bool,
+                        open: bool,
+                        function: bool,
+                    }
+                    impl Visitor for Boundary<'_> {
+                        fn ty(&mut self, t: &mut o::TypeExpr) {
+                            if self.contract {
+                                self.open |= matches!(&t.kind, o::TypeKind::Hole)
+                                    || matches!(&t.kind, o::TypeKind::Named { module: None, name, args }
+                                        if args.is_empty() && self.rows.iter().any(|r| r.name == name.name));
+                            }
+                        }
+                        fn expr(&mut self, e: &mut o::Expr, enter: bool) {
+                            if enter {
+                                self.function |=
+                                    matches!(e.kind, o::ExprKind::Fn(_) | o::ExprKind::Clauses(_));
+                            }
+                        }
+                    }
+                    let mut boundary = Boundary {
+                        rows: &self.rows,
+                        contract: true,
+                        open: false,
+                        function: false,
+                    };
+                    contract.walk(&mut boundary);
+                    if !boundary.open {
+                        boundary.contract = false;
+                        let o::Stmt::Bind(binding) = &mut block.stmts[i] else {
+                            unreachable!()
+                        };
+                        binding.value.walk(&mut boundary);
+                        if boundary.function {
+                            i += 1;
+                            continue;
+                        }
+                    }
                     let o::Stmt::Bind(binding) = block.stmts.remove(i) else {
                         unreachable!()
                     };
