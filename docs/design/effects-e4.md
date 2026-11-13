@@ -142,7 +142,9 @@ test's embedded i source: both catch `http.body_text` before their existing
 Ok/Error matches and retain their original UTF-8 error behavior.
 
 Initial validation at `dc4e5b21` was blocked by the eff3 base's Fail handling.
-The follow-up merges eff3 through `b73532527` and rebuilds the compiler.
+The follow-up merges eff3 through `d5d8e9042` and rebuilds the compiler. Its
+compiler sources are identical to `b73532527`; the final merge changes only
+review fixtures and conversion documentation.
 
 Follow-up changes and their basis:
 
@@ -161,7 +163,7 @@ Follow-up changes and their basis:
 
 Verification checkpoints (2026-11-13):
 
-- Release builds pass through the merged eff3 `b73532527` base.
+- Release builds pass through the final merged eff3 `d5d8e9042` base.
 - `i check --project std --types` passes on that base with two inherited HTTP
   unreachable-clause warnings.
 - On the preceding eff3 `6b0377b2a` base, std O0 and O2 each pass **2,171/2,171**.
@@ -181,5 +183,9 @@ Verification checkpoints (2026-11-13):
   part is stopped per the brief, and the streaming assertions remain intact.
 - There is no ilang-cli `json` test target in this checkout. JSON is covered by
   the std JSON suite and the HTTP integration's schema/JSON cases.
-- Spec chapters 9/11, fixture regeneration, final std runs and Clippy remain
-  in progress. No test or assertion has been removed or weakened.
+- The requested filtered spec gates pass at both i O0 and O2: `9/` is
+  **140/140**, and `11/` is **48/48**. Both runs use a two-CPU affinity limit;
+  chapter 9 completes in the Rust debug test profile and chapter 11 in the
+  Rust release test profile. No spec expectation is changed.
+- Fixture regeneration, final std repetitions and strict Clippy remain in
+  progress. No test or assertion has been removed or weakened.
