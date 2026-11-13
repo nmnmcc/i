@@ -1,6 +1,6 @@
 {
-  "compiler": "4ef2d5b7658082974c2281397f48ee64c4fb2cdc",
-  "binary_sha256": "537c9098d10837ed9159f32219871a2aa6f71a5667a87a58775db45bc422e37b",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 60.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.deep : (n: Int) -> Nil ! request.Owner | request.Root | task.Scheduler\napp/main.main : () -> Nil ! Io | request.Owner | request.Root | task.Scheduler\n",
+      "stdout": "app/main.deep : (Int) <- (task.Scheduler) -> Nil\napp/main.main : () <- (Io, task.Scheduler) -> Nil\n",
       "stderr": ""
     },
     "test0": {

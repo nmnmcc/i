@@ -3,7 +3,10 @@
 )
 Svc(A) = (f = () -> A, m = (A) -> Nil)
 ask = <A>() <- (s: Svc(A)) { s.f() }
-wrap = <N>(body: () <- N -> Int, svc: Svc(String)) -> Int {
+wrap: <N>(() <- N -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (
+	body,
+	svc
+) <- (fail: Fail(Never)) -> Int {
 	_syn3_0: Svc(String) = svc
 	body() <- (_syn3_0)
 }

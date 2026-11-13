@@ -751,13 +751,16 @@ fn a_filtered_callback_vacates_only_an_unused_fail_need() {
 #[test]
 fn syntax_three_written_provider_hole_keeps_its_obligation() {
     let base = "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\n";
-    let positive = format!(
-        "{base}wrap = <N>(body, svc: S(N)) {{ body() <- (svc) }}\nmain = () {{ assert(wrap(() {{ use() }}, S(f = () -> Int {{ 1 }})) == 1) }}\n"
-    );
+    let positive = [
+        base,
+        "wrap = <N>(body, svc: S(N)) { body() <- (svc) }\nmain = () { assert(wrap(() { use() }, S(f = () -> Int { 1 })) == 1) }\n",
+    ].concat();
     types(&positive);
-    let negative = format!(
-        "{base}wrap = (body) {{ provided: S(_) = S(f = () -> Int {{ 1 }}) body() <- (provided) }}\n"
-    );
+    let negative = [
+        base,
+        "wrap = (body) { provided: S(_) = S(f = () -> Int { 1 }) body() <- (provided) }\n",
+    ]
+    .concat();
     let (graph, _, _) = common::check_files(&[("src/main.i", &negative)]);
     let checked = ilang_check::check(&graph);
     let codes: std::collections::BTreeSet<_> = checked
@@ -792,4 +795,23 @@ fn converted_p1_keeps_the_uniform_provider_error() {
         assert_eq!(errors[0].code, "E0515");
         assert!(errors[0].message.contains("S("));
     }
+}
+
+#[test]
+fn a_closed_provider_retains_callback_and_generalization_diagnostics() {
+    // Keep every original Reader obligation, including the two checked
+    // when generalizing g and k, without changing the soundness golden.
+    let source = include_str!("types/soundness.i");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+    let actual = diags
+        .iter()
+        .filter(|d| d.code == "E0515" && d.message.contains("`Reader(String)` and `Reader(Int)`"))
+        .map(|d| ilang_syntax::span::LineIndex::new(source).line_col(d.span.start))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        [(14, 19), (14, 5), (16, 29), (16, 5)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
 }

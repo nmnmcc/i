@@ -1,6 +1,6 @@
 {
-  "compiler": "cfe52a677bb4d23ebdd15695f5a1eb01d621fa08",
-  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () -> Int ! Dep\napp/main.us : () -> Int ! N | S(N)\napp/main.ut : () -> Int ! N | T(N)\napp/main.usa : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.h0 : () -> Int ! N | Dep | S(N)\napp/main.h1 : () -> Int ! N - Dep | S(N)\napp/main.main : () -> Nil ! N - S(Dep) | N - Dep - S(Dep) | T(N)\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.h0 : () <- (Dep, S(N), ..N) -> Int\napp/main.h1 : () <- (N - Dep, S(N)) -> Int\napp/main.main : () <- (N - Dep - S(Dep), N - S(Dep), T(N)) -> Nil\n",
       "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\n"
     },
     "test0": {
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:24:1: error[E0523]: provider target native entry app/main.main: service A - app/main.Dep - app/main.S(app/main.Dep) must be closed\n1 error\n"
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:21:1: error[E0523]: provider target native entry app/main.main: service A - app/main.Dep - app/main.S(app/main.Dep) must be closed\n1 error\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:24:1: error[E0523]: provider target native entry app/main.main: service A - app/main.Dep - app/main.S(app/main.Dep) must be closed\n1 error\n"
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:21:1: error[E0523]: provider target native entry app/main.main: service A - app/main.Dep - app/main.S(app/main.Dep) must be closed\n1 error\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:24:1: error[E0523]: provider target native entry app/main.main: service A - app/main.Dep - app/main.S(app/main.Dep) must be closed\n1 error\n"
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:21:1: error[E0523]: provider target native entry app/main.main: service A - app/main.Dep - app/main.S(app/main.Dep) must be closed\n1 error\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:24:1: error[E0523]: provider target native entry app/main.main: service A - app/main.Dep - app/main.S(app/main.Dep) must be closed\n1 error\n"
+      "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\nsrc/main.i:21:1: error[E0523]: provider target native entry app/main.main: service A - app/main.Dep - app/main.S(app/main.Dep) must be closed\n1 error\n"
     }
   }
 }

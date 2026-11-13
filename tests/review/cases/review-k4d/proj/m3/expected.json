@@ -1,6 +1,6 @@
 {
-  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
-  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.uset : () -> Int ! N | T(N)\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:14:17: error[E0515]: the service requirements `S(Dep)` and `S(_)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 14:5 needs it)\nsrc/main.i:14:39: error[E0515]: `S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 14:17 needs it)\n2 errors\n"
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.uset : () <- (T(N), ..N) -> Int\napp/main.main : () -> Nil\n",
+      "stderr": "src/main.i:10:2: error[E0515]: the service requirements `S(Dep)` and `S(_)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:10:47: error[E0515]: `S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 10:23 needs it)\n2 errors\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:14:17: error[E0515]: the service requirements `S(Dep)` and `S(_)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 14:5 needs it)\nsrc/main.i:14:39: error[E0515]: `S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 14:17 needs it)\n2 errors\n"
+      "stderr": "src/main.i:10:2: error[E0515]: the service requirements `S(Dep)` and `S(_)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:10:47: error[E0515]: `S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 10:23 needs it)\n2 errors\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:14:17: error[E0515]: the service requirements `S(Dep)` and `S(_)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 14:5 needs it)\nsrc/main.i:14:39: error[E0515]: `S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 14:17 needs it)\n2 errors\n"
+      "stderr": "src/main.i:10:2: error[E0515]: the service requirements `S(Dep)` and `S(_)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:10:47: error[E0515]: `S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 10:23 needs it)\n2 errors\n"
     }
   }
 }

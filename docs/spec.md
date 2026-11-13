@@ -187,7 +187,7 @@ A test module may be imported only by test modules of the same package. Its expo
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the **library modules** (§9, §10, §13, §14, §15, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
+- `i`, for the **library modules** (§9, §10, §13, §14, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 

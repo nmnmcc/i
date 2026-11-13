@@ -45,6 +45,7 @@ fn lower_surface(m: &n::Module, lisp: bool) -> (o::Module, Vec<Diagnostic>) {
     let mut cx = Cx {
         lisp,
         errors: Vec::new(),
+        type_params: Vec::new(),
         fresh: 0,
         group: false,
         hidden: Vec::new(),
@@ -91,6 +92,9 @@ pub fn lower_items(items: &[n::Item]) -> Result<Vec<o::Item>, Diagnostic> {
 struct Cx {
     lisp: bool,
     errors: Vec<Diagnostic>,
+    /// Type parameters in scope, used to recognize open provider contracts.
+    /// Errors remain ordinary need entries; this stores no error-channel state.
+    type_params: Vec<String>,
     fresh: usize,
     /// The module imports nothing under the name `core`, so `core.never`
     /// is the empty match (§2.13).
@@ -297,6 +301,7 @@ impl Cx {
         Cx {
             lisp: false,
             errors: Vec::new(),
+            type_params: Vec::new(),
             fresh: 0,
             core_free: false,
             group: false,
@@ -677,6 +682,9 @@ impl Cx {
                 }
             }
         }
+        let mark = self.type_params.len();
+        self.type_params
+            .extend(generics.iter().map(|g| g.name.clone()));
         let pattern = match (&b.pattern.kind, typed_fn) {
             (n::PatternKind::Typed { binder: bd, ty: t }, Some(f)) => pat(
                 o::PatternKind::Typed {
@@ -691,6 +699,7 @@ impl Cx {
             n::ExprKind::Chain(fs) => self.chain(fs, b.value.span.0, true),
             _ => self.expr(&b.value),
         };
+        self.type_params.truncate(mark);
         let type_params: Vec<o::Ident> = generics.iter().map(|g| id(g)).collect();
         o::Binding {
             pattern,
@@ -776,7 +785,50 @@ impl Cx {
                     },
                     _ => None,
                 };
-                if let Some(contract) = contract {
+                if let Some(mut contract) = contract {
+                    // Closed function-valued providers keep their original
+                    // generalization point and its deferred obligations.
+                    // Open contracts still have to reach the provide before
+                    // generalization; scalar providers carry no function scheme.
+                    struct Boundary<'a> {
+                        type_params: &'a [String],
+                        contract: bool,
+                        open: bool,
+                        function: bool,
+                    }
+                    impl Visitor for Boundary<'_> {
+                        fn ty(&mut self, t: &mut o::TypeExpr) {
+                            if self.contract {
+                                self.open |= matches!(&t.kind, o::TypeKind::Hole)
+                                    || matches!(&t.kind, o::TypeKind::Named { module: None, name, args }
+                                        if args.is_empty() && self.type_params.contains(&name.name));
+                            }
+                        }
+                        fn expr(&mut self, e: &mut o::Expr, enter: bool) {
+                            if enter {
+                                self.function |=
+                                    matches!(e.kind, o::ExprKind::Fn(_) | o::ExprKind::Clauses(_));
+                            }
+                        }
+                    }
+                    let mut boundary = Boundary {
+                        type_params: &self.type_params,
+                        contract: true,
+                        open: false,
+                        function: false,
+                    };
+                    contract.walk(&mut boundary);
+                    if !boundary.open {
+                        boundary.contract = false;
+                        let o::Stmt::Bind(binding) = &mut block.stmts[i] else {
+                            unreachable!()
+                        };
+                        binding.value.walk(&mut boundary);
+                        if boundary.function {
+                            i += 1;
+                            continue;
+                        }
+                    }
                     let o::Stmt::Bind(binding) = block.stmts.remove(i) else {
                         unreachable!()
                     };
@@ -938,8 +990,7 @@ impl Cx {
         }
     }
 
-    /// The written `-> R`: the needs are left to inference. A `Fail(E)`
-    /// item of the service pattern gives the error part `E`.
+    /// The written `-> R` leaves needs to inference, including `Fail(E)`.
     fn ret(&mut self, f: &n::Function) -> Option<o::RetType> {
         f.ret.as_ref().map(|t| o::RetType {
             value: self.ty(t),

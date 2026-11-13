@@ -1,6 +1,6 @@
 {
-  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
-  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
+  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
+  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/stop_tail_service.check : (c: Bool) -> Nil ! Assert\nspec/stop_tail_service.apply : (f: (A) -> B ^ E ! N, x: A) -> List(B) ^ E ! N\nspec/stop_tail_service.main : () -> Nil ! Assert\n",
-      "stderr": "test/stop_tail_service.i:20:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
+      "stdout": "spec/stop_tail_service.check : (Bool) <- (Assert) -> Nil\nspec/stop_tail_service.apply : ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> List(B)\nspec/stop_tail_service.main : () <- (Assert) -> Nil\n",
+      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass spec/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "test/stop_tail_service.i:20:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
     },
     "run0": {
       "command": [
@@ -32,7 +32,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "test/stop_tail_service.i:20:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
+      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
     },
     "test2": {
       "command": [
@@ -42,7 +42,7 @@
       ],
       "exit": 0,
       "stdout": "pass spec/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "test/stop_tail_service.i:20:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
     },
     "run2": {
       "command": [
@@ -53,7 +53,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "test/stop_tail_service.i:20:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
+      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
     }
   }
 }
