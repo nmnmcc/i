@@ -2,6 +2,7 @@
 // expect: pass
 (
 	i/control
+	i/core
 )
 
 // Ordinary Fail and boundary code, independent of the concurrent i/fail port.
@@ -54,6 +55,10 @@ main = () {
 	assert({ replaced() <- (Db(value = 0)) } == 42)
 	assert({ name() == "data" } <- services())
 	assert({ read() <- (..services(), Db(value = 43)) } == 43)
+	portable = catch(() { keep((x: Int) { x }) })
+	portable |>
+		(Ok(f)) { assert(core.portable(f)) }
+		| (_) { panic("keep raised at creation") }
 	raised = catch(() { keep((_: Nil) { raise("later") }) })
 	raised |>
 		(Ok(f)) { assert(catch(() { f(Nil) }) == Error("later")) }

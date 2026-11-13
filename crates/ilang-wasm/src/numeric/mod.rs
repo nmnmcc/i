@@ -893,7 +893,7 @@ fn inline(
                         Value::Call { env, .. }
                         | Value::OpEnv(_, _, env)
                         | Value::Service(env, _)
-                        | Value::Environment(env),
+                        | Value::Environment(env, _),
                     ..
                 }
                 | Stmt::TailCall { env, .. }

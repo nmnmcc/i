@@ -428,9 +428,7 @@ pub enum NumericFact {
     SmallInt { min: i32, max: i32 },
 }
 
-/// The result of type checking: the shown types, and what the code
-/// generator needs. Places are keyed by the module and the span of the
-/// node in the HIR, which is unique among the nodes of one kind.
+/// How a whole service value is supplied after `<-`.
 #[derive(Clone, Debug)]
 pub enum EnvSupply {
     /// An opaque row; these explicit keys keep their caller's services.
@@ -439,6 +437,8 @@ pub enum EnvSupply {
     Data(Vec<TypeRef>),
 }
 
+/// The result of type checking: the shown types and code-generation data.
+/// Sites are keyed by module and HIR span.
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
     pub typed_expansions: HashMap<(ModuleId, Span), crate::typed_macro::Output>,
@@ -504,6 +504,9 @@ pub struct Typed {
     /// span of the statement (§9.2). Aliases are expanded.
     pub services: HashMap<(ModuleId, Span), TypeRef>,
     pub env_supplies: HashMap<(ModuleId, Span), EnvSupply>,
+    /// Written keys outside each captured row. They are neither restored
+    /// nor logical captures of that row (notably the caller's Fail).
+    pub env_captures: HashMap<(ModuleId, Span), Vec<TypeRef>>,
     /// Whether each top-level binding was generalized (§4.7): its value is
     /// a direct value, as are the values of its group.
     pub generalized: HashMap<BindingRef, bool>,

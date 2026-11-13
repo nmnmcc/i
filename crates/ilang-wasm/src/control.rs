@@ -635,7 +635,7 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
             args.iter().for_each(|a| atom_uses(a, f));
             env_uses(*env, f);
         }
-        Value::Service(env, _) | Value::Environment(env) => env_uses(*env, f),
+        Value::Service(env, _) | Value::Environment(env, _) => env_uses(*env, f),
         Value::Closure { captures, .. } => captures.iter().for_each(|a| atom_uses(a, f)),
         Value::Multi(groups) => groups.iter().for_each(|(_, a)| atom_uses(a, f)),
         Value::Record { fields, .. } => fields.iter().for_each(|a| atom_uses(a, f)),

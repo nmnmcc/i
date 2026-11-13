@@ -900,6 +900,7 @@ impl<'a> Lowerer<'a> {
                 | ilang_check::types::EnvSupply::Data(keys) => all.extend(keys),
             }
         }
+        all.extend(self.typed.env_captures.values().flatten().copied());
         let key = |t: &TypeRef| match t {
             TypeRef::Custom(id) => (
                 u8::from(self.program.types[id.0 as usize].host.is_some()),
@@ -2265,7 +2266,16 @@ impl<'a> Lowerer<'a> {
                     rest, var, name, ..
                 } => {
                     let value = if *rest {
-                        Value::Environment(Env::Param)
+                        let mut excluded: Vec<u32> = self
+                            .typed
+                            .env_captures
+                            .get(&(module, name.span))
+                            .into_iter()
+                            .flatten()
+                            .map(|t| self.services[t])
+                            .collect();
+                        excluded.sort_unstable();
+                        Value::Environment(Env::Param, excluded)
                     } else {
                         Value::Service(Env::Param, self.service(module, name.span))
                     };

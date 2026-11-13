@@ -166,6 +166,8 @@ fn an_unused_fail_parameter_can_be_empty_but_a_real_error_cannot() {
 
 #[test]
 fn a_full_function_type_supplies_the_rest_heads_callback_type() {
-    let (_, errors) = checked("keep: <S, A, E, N>((S) <- (..N, Fail(E)) -> A) <- N -> (S) <- (Fail(E)) -> A = (f) <- (..env: N) { (x) { f(x) <- env } }\nName = (text = String)\nread = (_: Nil) <- (name: Name) { name.text }\nmain = () { f = keep(read) <- (Name(text = \"saved\"))\n assert(f(Nil) == \"saved\") }");
+    let (_, errors) = checked(
+        "keep: <S, A, E, N>((S) <- (..N, Fail(E)) -> A) <- N -> (S) <- (Fail(E)) -> A = (f) <- (..env: N) { (x) { f(x) <- env } }\nName = (text = String)\nread = (_: Nil) <- (name: Name) { name.text }\nmain = () { f = keep(read) <- (Name(text = \"saved\"))\n assert(f(Nil) == \"saved\") }",
+    );
     assert!(errors.is_empty(), "{errors:#?}");
 }

@@ -105,6 +105,7 @@ pub(crate) struct Checker<'a> {
     row_value_allowed: bool,
     row_lacks: HashMap<super::V, Vec<TypeRef>>,
     row_supplies: HashMap<(ModuleId, Span), super::V>,
+    row_capture_sites: HashMap<(ModuleId, Span), super::V>,
     rest_type_vars: HashSet<TyVarId>,
     value_type_vars: HashSet<TyVarId>,
     mixed_row_type_vars: HashSet<TyVarId>,
@@ -201,6 +202,7 @@ impl<'a> Checker<'a> {
             row_value_allowed: false,
             row_lacks: HashMap::new(),
             row_supplies: HashMap::new(),
+            row_capture_sites: HashMap::new(),
             rest_type_vars: HashSet::new(),
             value_type_vars: HashSet::new(),
             mixed_row_type_vars: HashSet::new(),
@@ -762,6 +764,7 @@ impl<'a> Checker<'a> {
             trial.tyvars = self.tyvars.clone();
             trial.row_lacks = self.row_lacks.clone();
             trial.row_supplies = self.row_supplies.clone();
+            trial.row_capture_sites = self.row_capture_sites.clone();
             trial.rest_type_vars = self.rest_type_vars.clone();
             trial.value_type_vars = self.value_type_vars.clone();
             trial.mixed_row_type_vars = self.mixed_row_type_vars.clone();
@@ -3168,6 +3171,16 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+            for (site, row) in &self.row_capture_sites {
+                if *row == v {
+                    let excluded = self.out.env_captures.entry(*site).or_default();
+                    for key in &keys {
+                        if !excluded.contains(key) {
+                            excluded.push(*key);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -3264,7 +3277,10 @@ impl<'a> Checker<'a> {
         };
         let mut params = Vec::new();
         let mut env_tys = Vec::new();
-        let has_rest = f.params.iter().any(|p| matches!(p, Param::Env { rest: true, .. }));
+        let has_rest = f
+            .params
+            .iter()
+            .any(|p| matches!(p, Param::Env { rest: true, .. }));
         let mut rest_env = false;
         let mut fails = false;
         for p in &f.params {
@@ -3285,8 +3301,10 @@ impl<'a> Checker<'a> {
                     // A rest head closes its body need now. Link the
                     // parameter's expected type before checking that body,
                     // as the enclosing function subtype will do later.
-                    if has_rest && let Some(expected) = expected.get(params.len())
-                        && *expected != Ty::Top {
+                    if has_rest
+                        && let Some(expected) = expected.get(params.len())
+                        && *expected != Ty::Top
+                    {
                         self.sub(expected, &t, pattern.span);
                     }
                     params.push((label.clone(), t));
@@ -3322,6 +3340,22 @@ impl<'a> Checker<'a> {
             }
         }
         self.note_row_lacks(&env_tys);
+        for p in &f.params {
+            if let Param::Env {
+                rest: true,
+                var,
+                name,
+                ..
+            } = p
+                && let Some(Scheme { ty: Ty::Var(v), .. }) = self.locals.get(var)
+            {
+                let site = (self.module, name.span);
+                self.row_capture_sites.insert(site, *v);
+                self.out
+                    .env_captures
+                    .insert(site, self.row_lacks.get(v).cloned().unwrap_or_default());
+            }
+        }
         for p in &f.params {
             if let Param::Pattern { pattern, .. } = p {
                 self.check_pattern_places(pattern, Pol::Neg);

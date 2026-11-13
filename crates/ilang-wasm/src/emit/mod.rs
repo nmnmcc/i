@@ -1376,10 +1376,18 @@ impl<'p> Emitter<'p> {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, &env_text(*env))
             }
-            // `$env` and `$values` have the same Wasm array type. The
-            // tuple wraps that immutable pointer, so ordinary capture
-            // traversal also sees the row's otherwise unused services.
-            Value::Environment(env) => format!("(call $tuple (ref.as_non_null {}))", env_text(*env)),
+            // An ordinary tuple wraps the dense row pointer, so captures
+            // can use the existing portability and worker-transfer paths.
+            // Clear written keys outside N: they stay with the later caller
+            // and must not make this row capture a Fail boundary.
+            Value::Environment(env, excluded) => {
+                let mut captured = env_text(*env);
+                for id in excluded {
+                    captured =
+                        format!("(call $env_with {captured} (i32.const {id}) (ref.null eq))");
+                }
+                format!("(call $tuple (ref.as_non_null {captured}))")
+            }
             Value::CapturedService(value, id) => {
                 format!("(call $field {} (i32.const {id}))", self.atom(value))
             }
