@@ -2834,7 +2834,7 @@ These are normal functions: they are called, given, and compared like any other 
 | `bit_array_to_string` | `(BitArray) -> Result(String, Nil)` | The string, when the bits are whole bytes of correct UTF-8; `Error(Nil)` when not |
 | `bit_array_concat` | `(List(BitArray)) -> BitArray` | The bit arrays one after the other. Their sizes may be any number of bits. |
 | `inspect` | `<A>(A) -> String` | The text form of the value (§11.8) |
-| `hash` | `<A>(A) -> Int` | A number from 0 to 2^32 − 1. Values that are the same (§11.4) give the same number. Which number is not fixed. |
+| `hash` | `<A>(A) -> Int` | A number from 0 to 2^32 − 1. Values that are the same (§11.4) give the same number. Which number is not fixed outside macros; macro execution uses §14.9. |
 | `never` | `<A>(Never) -> A` | The match on `Never` (§6.12); it is never called with a value |
 
 
@@ -3150,7 +3150,39 @@ A type is a set of values that may be written in several ways, so a macro asks `
 
 ### 14.9 Running macros
 
-The macros of a module run in a program made of that module and the modules it imports, compiled for the compiler itself, not for a target. Its entry points get only `Definitions`, `Items` in an item run, `Types` in a typed run, `Diagnostics`, and an `Assert` whose `fail` stops the run. An `@external` function outside the library modules, or an executable `@js` binding, in the needs of a macro is a compile error. `hash` gives fixed numbers there. Each run starts from a fresh state; a result may be kept and used again only when everything the run was given is the same, and it then gets the mark of the new run.
+The macros of a module run in a program made of that module and the modules it imports, compiled for the compiler itself, not for a target. Its entry points get only `Definitions`, `Items` in an item run, `Types` in a typed run, `Diagnostics`, and an `Assert` whose `fail` stops the run. An `@external` function outside the library modules, or an executable `@js` binding, in the needs of a macro is a compile error. `hash` uses the portable macro hash below. Each run starts from a fresh state; a result may be kept and used again only when everything the run was given is the same, and it then gets the mark of the new run.
+
+**Portable macro hash.** In a macro, `core.hash(v)` is the following unsigned
+32-bit number. Start at 2166136261. For each byte `b` of the encoding below,
+replace `h` by `((h xor b) × 16777619) mod 2^32`. Byte order, tags and lengths
+are part of this rule; machine representation and allocation identities are
+not inputs.
+
+`nat(n)` is unsigned base-128 little-endian encoding: emit the low seven bits
+with bit 7 set while more bits remain, then one final byte without bit 7.
+Zero is one zero byte. `text(s)` is `nat(UTF-8 byte length)` then those bytes.
+Concatenation below means bytes in the listed order; recursively encode values
+in that order, also when an implementation shares their storage.
+
+| Value | Encoding |
+|---|---|
+| Int | byte 0; sign byte 1 if negative, otherwise 0; `nat(n)`; the absolute magnitude as `n` minimal little-endian base-256 bytes; zero has `n = 0` |
+| Float | byte 1; its binary64 bits as eight little-endian bytes, with both zero signs encoded as positive zero |
+| String | byte 2; `text(value)` |
+| BitArray | byte 3; `nat(bit length)`; bits packed highest bit first, with zero padding in the low bits of the last byte |
+| List | byte 4; `nat(length)`; the encodings of its parts in order |
+| Data | byte 5; `nat(position count)`; positional encodings; `nat(label count)`; then `text(label)` and the part encoding for each label in UTF-8 byte order |
+| Non-opaque labelled value | byte 6; `text(declared constructor name)`; encoding of its data, including `()` |
+| UtfCodepoint | byte 7; `nat(Unicode scalar value)` |
+| Identity value | byte 255 only |
+
+The identity row takes precedence over structural rows. It includes functions,
+opaque values, boundaries, continuations, keys, keyed values, requests, tickets,
+Syntax and TypeHandle values, and host references. Do not inspect their captures,
+contents, spans, scopes or ids. Unequal values may hash alike: in particular all
+identity values collide, and constructors with the same declared name can
+collide. Equal values (§11.4) always have equal encodings. This rule applies to
+macro execution only; ordinary execution keeps the hash contract of §13.
 
 A **compile-time binding** has `@macro`, or has a quote or a function of `i/syntax` in its full dependencies (§2.5). A program selected by its entries or host exports may not need one. `i test` provides the functions of `i/syntax`, so a test may call the functions a macro is made of, give its own `Definitions`, and compare code with `same_code`.
 
