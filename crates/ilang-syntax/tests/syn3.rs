@@ -1146,4 +1146,20 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     assert!(!shown.contains("^ E"), "{shown}");
     let collision = converted("T { Syn3ServiceFail }\nUse(E) = () -> Nil ! Fail(E)\n");
     assert!(collision.contains("Syn3ServiceFailX(E)"), "{collision}");
+    let row = converted(
+        "wrap(A, E, N) = (body: () -> A ! Fail(E) | N, cap: Fail(E)) -> A ! N { ! Fail(E) = cap body() }\n",
+    );
+    let (lowered, diags) = syn3::parse_lowered(&row);
+    assert!(diags.is_empty(), "{row}\n{diags:#?}");
+    let shown = ilang_syntax::print::print_module(&lowered);
+    let carrier: String = ['N', '%', 'E'].into_iter().collect();
+    assert!(!shown.contains(carrier.as_str()), "{shown}");
+
+    let row = converted(
+        "wrap(E, N) = (body: () -> Nil ^ E ! Fail(Int) | N, cap: Fail(Int)) -> Nil ^ E ! N { ! Fail(Int) = cap body() }\n",
+    );
+    let (lowered, diags) = syn3::parse_lowered(&row);
+    assert!(diags.is_empty(), "{row}\n{diags:#?}");
+    let shown = ilang_syntax::print::print_module(&lowered);
+    assert!(shown.contains(carrier.as_str()), "{shown}");
 }

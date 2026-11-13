@@ -26,6 +26,8 @@ The direct-forwarding copies `review-k4d/_loose/p/r2` and `review-k4d/proj/r2` a
 
 All syntax-three fixtures previously failed through converted `i/failure.catch`: migration confused its ordinary `! Fail(E)` service with the transition lowerer’s bare `Fail(E)` shorthand for the legacy error channel. Migration now emits a transparent alias for the service, preserving its constructor and obligations. Spec §4.3: “`T = Type` is a transparent alias.” No syn3 expectation changed.
 
+When that alias is beside a row variable, migration also marks an originally empty legacy error channel with `Fail(Never)`. This prevents the transition lowerer from inventing a separate error carrier for the row. Spec §9.2 removes this universal need entry, so it adds no service. A regression checks both the empty channel and preservation of an explicitly written legacy channel.
+
 ## (i) Diagnostic wording only
 
 The old equal-service explanation becomes directed provider subtyping (§9.2), or an empty-intersection explanation where the error code remains E0515. Invariant arguments still require equality (§4.4).

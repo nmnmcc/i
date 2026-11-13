@@ -1609,6 +1609,7 @@ impl Cx<'_> {
     fn row(&mut self, err: Option<&o::TypeExpr>, env: Option<&o::TypeExpr>) -> Vec<n::TItem> {
         let mut items = Vec::new();
         let mut spreads = Vec::new();
+        let mut ordinary_fail = false;
         if let Some(env) = env {
             let members: Vec<&o::TypeExpr> = match &env.kind {
                 o::TypeKind::Union(ms) => ms.iter().collect(),
@@ -1637,6 +1638,7 @@ impl Cx<'_> {
                     // channel. A transparent alias keeps an ordinary ! Fail(E)
                     // in the service row, without changing its type (§4.3).
                     self.service_fail_used = true;
+                    ordinary_fail = true;
                     let o::TypeKind::Named { args, .. } = &m.kind else {
                         unreachable!()
                     };
@@ -1674,6 +1676,23 @@ impl Cx<'_> {
                 let inner = self.ty(err);
                 out.push(n::TItem::Pos(named("Fail", vec![inner], err.span)));
             }
+        }
+        if ordinary_fail
+            && !spreads.is_empty()
+            && err.is_none_or(|e| {
+                matches!(&e.kind, o::TypeKind::Named { module: None, name, args }
+                if name.name == "Never" && args.is_empty())
+            })
+        {
+            // The alias still occupies Fail's key. Suppress the transition
+            // lowerer's synthetic legacy error carrier for the other row.
+            // Fail(Never) is a dropped need entry (§9.2), so this marker
+            // preserves the old empty error channel without another service.
+            out.push(n::TItem::Pos(named(
+                "Fail",
+                vec![named("Never", Vec::new(), Span::default())],
+                Span::default(),
+            )));
         }
         out.extend(items);
         out.extend(spreads);
