@@ -23,6 +23,9 @@ use crate::print::string_literal;
 use crate::span::Span;
 use crate::token::TokenKind as T;
 
+/// Printers of one part of a tree by the positions of `i/syntax` (§6.7).
+pub(crate) mod position;
+
 pub const WIDTH: usize = 80;
 pub const TAB_WIDTH: usize = 4;
 

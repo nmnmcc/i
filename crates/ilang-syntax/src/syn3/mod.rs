@@ -4,7 +4,7 @@
 
 pub mod ast;
 mod parse;
-mod print;
+pub(crate) mod print;
 
 pub use parse::{parse_expr, parse_module, parse_pattern, parse_type, pipe_target};
 pub use print::{

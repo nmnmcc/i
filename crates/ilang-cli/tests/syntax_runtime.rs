@@ -60,7 +60,10 @@ fn syntax_library_round_trips_through_the_host() {
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
-        r#"(
+        // The empty data `(,)` is not an expression of the rows before syntax
+        // three; in the rows of syntax three it is one, and the empty Round
+        // is not.
+        &r#"(
 	testlib = (test) = std/test
 	i/fail
 	syntax = i/syntax
@@ -89,6 +92,17 @@ test("exercise", () -> Nil {
 		assert(syntax.show_as(made, syntax.Expression) == "made")
 		pair = syntax.make(syntax.Round([made, value]), value)
 		assert(syntax.show(pair) == "(made (f x))")
+		assert(syntax.show_as(pair, syntax.Expression) == "made(f(x))")
+		assert(syntax.show_as(pair, syntax.ValueItem) == "made(f(x))")
+		assert(syntax.show_as(pair, syntax.Statement) == "made(f(x))")
+		assert(syntax.show_as(pair, syntax.Type) == "made(f(x))")
+		assert(syntax.show_as(pair, syntax.TypeItem) == "made(f(x))")
+		assert(syntax.show_as(made, syntax.Pattern) == "made")
+		assert(syntax.show_as(made, syntax.PatternItem) == "made")
+		assert(syntax.show_as(made, syntax.ExportItem) == "made")
+		assert(syntax.show_as(made, syntax.Format) == "made")
+		assert(syntax.show_as(made, syntax.Segment) == "made")
+		assert(syntax.show_as(made, syntax.Attribute) == "@made")
 		fail.catch(() { syntax.make(syntax.Name("Bad Name"), value) }) |>
 			(Error(syntax.SyntaxError(message = message, at = at))) {
 				assert(message != "")
@@ -96,7 +110,8 @@ test("exercise", () -> Nil {
 			}
 			| (Ok(_)) { panic("invalid syntax atom was accepted") }
 		comma = syntax.make(syntax.Symbol(","), value)
-		bad = syntax.make(syntax.Round([comma]), value)
+		assert(syntax.show(comma) == ",")
+		bad = syntax.make(syntax.Round(BAD), value)
 		fail.catch(() { syntax.show_as(bad, syntax.Expression) }) |>
 			(Error(syntax.SyntaxError(message = message, at = at))) {
 				assert(message != "")
@@ -106,7 +121,15 @@ test("exercise", () -> Nil {
 		Nil
 	} <- (syntax.Definitions(definition = (of) { of }))
 })
-"#,
+"#
+        .replace(
+            "BAD",
+            if ilang_syntax::lisp::syntax::ROWS3 {
+                "[]"
+            } else {
+                "[comma]"
+            },
+        ),
     )
     .unwrap();
     let source = Syntax::from_datum(

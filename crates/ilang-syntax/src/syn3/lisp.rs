@@ -12,6 +12,9 @@ use crate::lisp::{Datum, DatumKind as K, show};
 use crate::span::Span;
 use crate::{Code, Diagnostic};
 
+/// Readers of one datum by the positions of `i/syntax` (§6.7).
+pub mod position;
+
 // ---- The tree as Lisp datums ----
 //
 // One builder serves the Lisp printer (`to_lisp` is `show` of each datum),

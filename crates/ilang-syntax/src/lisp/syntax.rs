@@ -137,25 +137,76 @@ pub enum Substitution {
     Many(Vec<Syntax>),
 }
 
+/// Whether `Syntax` values are in the rows of syntax three
+/// (docs/design/syntax-3.md §6.8). This is the one switch of step 2c of
+/// docs/design/syn3-final-ast.md for the parts of this directory that read
+/// rows: [`Syntax::show_as`] and `source_syntax`. While it is off they read
+/// the rows before syntax three; there the positions that syntax three
+/// merged ([`Position::TypeItem`], [`Position::ValueItem`],
+/// [`Position::PatternItem`]) are a field, a call argument and a parameter.
+pub const ROWS3: bool = false;
+
+/// A position of the grammar that [`Syntax::show_as`] can write: the
+/// fourteen of docs/design/syntax-3.md §6.7, in that order. The number of a
+/// position ([`Position::id`]) is the one that `lib/i/syntax.i`
+/// (`position_id`) and the host share.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Position {
     ImportItem,
     ExportItem,
     Item,
     Attribute,
-    Constructor,
-    Field,
     Type,
+    /// An item of a data type: `T`, `(= label T)`.
+    TypeItem,
+    /// `R`, `_`, or `(<- R needs)`.
     FunctionResult,
-    Parameter,
+    /// An expression; a branch of a chain is one.
     Expression,
+    /// An item of a data value or of a call's data: `e`, `(= label e)`.
+    ValueItem,
     Statement,
-    CallArgument,
-    Clause,
-    ClauseHead,
+    /// A pattern; the parameter part of a function, `(, …)` or
+    /// `(? (, …) g)`, is one.
     Pattern,
+    /// An item of a data pattern, of a constructor pattern or of the
+    /// parameter data of a function: `p`, `(= key p…)`, `..`, `(| p1 p2 …)`.
+    PatternItem,
     Segment,
     Format,
+}
+
+impl Position {
+    /// Every position, in the order of the numbers.
+    pub const ALL: [Position; 14] = [
+        Position::ImportItem,
+        Position::ExportItem,
+        Position::Item,
+        Position::Attribute,
+        Position::Type,
+        Position::TypeItem,
+        Position::FunctionResult,
+        Position::Expression,
+        Position::ValueItem,
+        Position::Statement,
+        Position::Pattern,
+        Position::PatternItem,
+        Position::Segment,
+        Position::Format,
+    ];
+
+    /// The number that `position_id` of `lib/i/syntax.i` gives the position.
+    pub fn id(self) -> usize {
+        Self::ALL
+            .iter()
+            .position(|p| *p == self)
+            .expect("every position is listed")
+    }
+
+    /// The position of a number of `position_id`.
+    pub fn from_id(id: usize) -> Option<Self> {
+        Self::ALL.get(id).copied()
+    }
 }
 
 /// One quote-pattern capture, paired with its written pattern syntax.
@@ -528,7 +579,17 @@ impl Syntax {
         }
         super::show_tree(self)
     }
+    /// The code in the normal surface, read for `position`: in the rows of
+    /// syntax three when [`ROWS3`] is on, else in the rows before it.
     pub fn show_as(&self, position: Position) -> Result<String, SyntaxError> {
+        if ROWS3 {
+            self.show_as_rows3(position)
+        } else {
+            self.show_as_old_rows(position)
+        }
+    }
+
+    fn no_type_view(&self) -> Result<(), SyntaxError> {
         let mut work = vec![self];
         while let Some(s) = work.pop() {
             match s.node() {
@@ -542,7 +603,24 @@ impl Syntax {
                 _ => {}
             }
         }
+        Ok(())
+    }
+
+    /// [`Syntax::show_as`] in the rows before syntax three.
+    fn show_as_old_rows(&self, position: Position) -> Result<String, SyntaxError> {
+        self.no_type_view()?;
         super::to_source::show_as(&self.to_datum(), position).map_err(|e| SyntaxError {
+            message: e.message,
+            span: e.span,
+        })
+    }
+
+    /// [`Syntax::show_as`] in the rows of syntax three (§6.8): the datum is
+    /// read for `position` by the reader of syntax three and written by its
+    /// printer. The tree may be of any depth.
+    pub fn show_as_rows3(&self, position: Position) -> Result<String, SyntaxError> {
+        self.no_type_view()?;
+        super::to_source::show_as3(&self.to_datum(), position).map_err(|e| SyntaxError {
             message: e.message,
             span: e.span,
         })
