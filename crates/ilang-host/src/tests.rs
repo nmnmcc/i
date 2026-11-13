@@ -116,8 +116,14 @@ fn stop(outcome: Outcome) -> Stop {
 
 #[test]
 fn metadata_is_read_from_the_custom_section() {
-    let abi = program().abi().clone();
-    // The checked-in fixture is a version 3 module, which this host still reads.
+    // Keep legacy metadata coverage when the shared browser fixture is updated.
+    let text = include_str!("../../../tests/browser/fixtures/host-abi.wat").replacen(
+        r#"{\"version\":4,"#,
+        r#"{\"version\":3,"#,
+        1,
+    );
+    let legacy = wat::parse_str(text).unwrap();
+    let abi = Program::from_bytes(&legacy).unwrap().abi().clone();
     assert_eq!(abi.version, ABI_OLDEST);
     assert_eq!(abi.entry, Some(EntryPoint::new("app/main.main")));
     assert_eq!(abi.tests.len(), 6);
