@@ -534,6 +534,10 @@ pub enum Stmt {
         env: Env,
         service: u32,
         value: Atom,
+        /// Sets the slot of `env` itself, without a copy: only at the start
+        /// of a light boundary's body, whose environment is its own and new
+        /// (`Value::Light`), so nothing can have kept it yet.
+        in_place: bool,
     },
     Unreachable,
     /// Fills a capture of a closure made by a direct value, once the names of

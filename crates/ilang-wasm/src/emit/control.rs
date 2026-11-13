@@ -456,7 +456,7 @@ pub(super) const EFFECTS: &str = r#"
   (return_call $boundary_core
     (struct.new $boundary (i32.const 11) (i32.const 0) (i64.const 0) (f64.const 0)
       (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)
-      (ref.null eq) (i32.const 0) (ref.null eq) (ref.null eq))
+      (ref.null eq) (i32.const 0))
     (local.get $env) (local.get $body) (ref.null $sub) (ref.null eq) (i32.const 0)))
 
 ;; Kept with these parameters for `emit/host.rs`. `rest`, `cancel` and
@@ -530,63 +530,138 @@ pub(super) const EFFECTS: &str = r#"
     (local.get $v) (local.get $mode)))
 
 ;; A light boundary (`Value::Light`): a boundary whose handle is only given
-;; to `control.escape`. Field 2 keeps the depth of the shadow stack where it
-;; starts, which an escape to it puts back.
-(func $light_new (result eqref)
-  (struct.new $boundary (i32.const 11) (i32.const 0) (i64.extend_i32_u (call $shadow_depth)) (f64.const 0)
-    (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call) (i32.const 1)
-    (ref.null eq) (i32.const 0) (ref.null eq) (ref.null eq)))
+;; to `control.escape`. Its handle is the environment its body runs in: a
+;; copy of the caller's `n` services with four slots after them: `n` 1
+;; while it is active, `n + 1` the depth of the shadow stack where it
+;; starts, `n + 2` the function that makes a provided value that the handle
+;; stands for (`$service_force`), `n + 3` that value once made. So the
+;; boundary and the environment of its body are one object.
+(func $light_new (param $env (ref null $env)) (param $n i32) (result eqref)
+  (local $b (ref $env))
+  (local.set $b (array.new_default $env (i32.add (local.get $n) (i32.const 4))))
+  (array.copy $env $env (local.get $b) (i32.const 0) (local.get $env) (i32.const 0) (local.get $n))
+  (array.set $env (local.get $b) (local.get $n) (ref.i31 (i32.const 1)))
+  (array.set $env (local.get $b) (i32.add (local.get $n) (i32.const 1)) (ref.i31 (call $shadow_depth)))
+  (local.get $b))
 
-;; A provided value made later (`Stmt::LetEnv` of a light boundary's
-;; handle): the light boundary `b` stands for the value `builder(b)` in the
-;; environment until a service read needs it (`$service_force`).
-(func $light_lazy (param $b eqref) (param $builder eqref) (result eqref)
-  (struct.set $boundary 11 (ref.cast (ref $boundary) (local.get $b)) (local.get $builder))
-  (ref.null eq))
+;; Slot `n` of the light boundary `b`: where its state starts.
+(func $light_base (param $b (ref $env)) (result i32)
+  (i32.sub (array.len (local.get $b)) (i32.const 4)))
 
-;; The value of a service read from the environment: a light boundary that
-;; stands for a provided value gives that value, made once (the same value
-;; at every read); anything else is the value.
-(func $service_force (param $v eqref) (param $env (ref null $env)) (result eqref)
-  (local $b (ref $boundary)) (local $m eqref)
-  (if (i32.eqz (ref.test (ref $boundary) (local.get $v))) (then (return (local.get $v))))
-  (local.set $b (ref.cast (ref $boundary) (local.get $v)))
-  (if (ref.is_null (struct.get $boundary 11 (local.get $b))) (then (return (local.get $v))))
-  (local.set $m (struct.get $boundary 12 (local.get $b)))
-  (if (ref.is_null (local.get $m))
-    (then
-      (local.set $m (call $call1 (struct.get $boundary 11 (local.get $b)) (local.get $b) (local.get $env)))
-      (struct.set $boundary 12 (local.get $b) (local.get $m))))
-  (local.get $m))
+(func $light_set_active (param $b (ref $env)) (param $on i32)
+  (array.set $env (local.get $b) (call $light_base (local.get $b)) (ref.i31 (local.get $on))))
+
+;; Whether the boundary `b` (a `$boundary` or a light one) is active.
+(func $boundary_active (param $b eqref) (result i32)
+  (local $l (ref $env))
+  (if (ref.test (ref $boundary) (local.get $b))
+    (then (return (struct.get $boundary 8 (ref.cast (ref $boundary) (local.get $b))))))
+  (local.set $l (ref.cast (ref $env) (local.get $b)))
+  (i31.get_u (ref.cast (ref i31) (array.get $env (local.get $l) (call $light_base (local.get $l))))))
 
 ;; The body of the light boundary `b` gave `r`.
 (func $light_done (param $b eqref) (param $r eqref) (result eqref)
-  (struct.set $boundary 8 (ref.cast (ref $boundary) (local.get $b)) (i32.const 0))
+  (call $light_set_active (ref.cast (ref $env) (local.get $b)) (i32.const 0))
   (local.get $r))
 
 ;; The error or the cancel `e` (exception `x`) left the body of the light
 ;; boundary `b`: an escape to `b` ends it with its value; anything else goes
 ;; on, as in `$boundary_core`.
 (func $light_unwind (param $e eqref) (param $x exnref) (param $b eqref) (result eqref)
-  (local $boundary (ref $boundary)) (local $esc (ref $escaped))
-  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
-  (struct.set $boundary 8 (local.get $boundary) (i32.const 0))
+  (local $l (ref $env)) (local $esc (ref $escaped))
+  (local.set $l (ref.cast (ref $env) (local.get $b)))
+  (call $light_set_active (local.get $l) (i32.const 0))
   (if (ref.test (ref $escaped) (local.get $e))
     (then
       (local.set $esc (ref.cast (ref $escaped) (local.get $e)))
-      (if (ref.eq (struct.get $escaped 0 (local.get $esc)) (local.get $boundary))
+      (if (ref.eq (struct.get $escaped 0 (local.get $esc)) (local.get $l))
         (then
-          (call $shadow_restore (i32.wrap_i64 (struct.get $boundary 2 (local.get $boundary))))
+          (call $shadow_restore (i31.get_u (ref.cast (ref i31) (array.get $env (local.get $l)
+            (i32.add (call $light_base (local.get $l)) (i32.const 1))))))
           (return (struct.get $escaped 1 (local.get $esc)))))))
   (throw_ref (local.get $x)))
 
 ;; A capture for another boundary went through the light boundary `b`: it
-;; is paused with it, and is re-entered as a `$boundary` (`$boundary_reenter`).
+;; is paused with it, and is re-entered by `$light_reenter`.
 (func $light_captured (param $c (ref $cap)) (param $x exnref) (param $b eqref)
-  (local $boundary (ref $boundary))
-  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
-  (struct.set $boundary 8 (local.get $boundary) (i32.const 0))
-  (call $capture_pack (local.get $c) (local.get $x) (ref.func $boundary_reenter) (local.get $boundary)))
+  (call $light_set_active (ref.cast (ref $env) (local.get $b)) (i32.const 0))
+  (call $capture_pack (local.get $c) (local.get $x) (ref.func $light_reenter) (local.get $b)))
+
+;; A light boundary that a capture for another boundary went through: active
+;; again, around the records inside it.
+(func $light_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
+    (param $mode i32) (result eqref)
+  (local $saved (ref $values)) (local $b (ref $env))
+  (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
+  (local.set $b (ref.cast (ref $env) (array.get $values (local.get $saved) (i32.const 0))))
+  (call $light_set_active (local.get $b) (i32.const 1))
+  (return_call $light_core (local.get $b) (local.get $env)
+    (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
+    (local.get $v) (local.get $mode)))
+
+;; The re-entered light boundary `b`, around the records `sub`, as
+;; `$boundary_core` is for a `$boundary`.
+(func $light_core (param $b (ref $env)) (param $env (ref null $env)) (param $sub (ref null $sub))
+    (param $v eqref) (param $mode i32) (result eqref)
+  (local $depth i32) (local $r eqref) (local $c (ref null $cap)) (local $x exnref) (local $f eqref)
+  (local $esc (ref $escaped))
+  (local.set $depth (call $shadow_depth))
+  (block $unwind (result eqref exnref)
+    (block $captured (result (ref $cap) exnref)
+      (local.set $r
+        (try_table (result eqref) (catch_ref $capture $captured) (catch_ref $error $unwind)
+            (catch_ref $cancel $unwind)
+          (call $tramp_run (local.get $sub) (local.get $env) (local.get $v) (local.get $mode))))
+      (call $light_set_active (local.get $b) (i32.const 0))
+      (return (local.get $r)))
+    (local.set $x)
+    (local.set $c)
+    (call $light_set_active (local.get $b) (i32.const 0))
+    (call $capture_pack (ref.as_non_null (local.get $c)) (local.get $x) (ref.func $light_reenter)
+      (local.get $b))
+    (unreachable))
+  (local.set $x)
+  (local.set $f)
+  (call $light_set_active (local.get $b) (i32.const 0))
+  (if (ref.test (ref $escaped) (local.get $f))
+    (then
+      (local.set $esc (ref.cast (ref $escaped) (local.get $f)))
+      (if (ref.eq (struct.get $escaped 0 (local.get $esc)) (local.get $b))
+        (then
+          (call $shadow_restore (local.get $depth))
+          (return (struct.get $escaped 1 (local.get $esc)))))))
+  (throw_ref (local.get $x)))
+
+;; The environment `env` (a light boundary's, at the start of its body)
+;; with the service `id` set to `v` in place (`Stmt::LetEnv` with
+;; `in_place`): nothing can have kept it yet.
+(func $env_set (param $env (ref null $env)) (param $id i32) (param $v eqref) (result (ref null $env))
+  (array.set $env (local.get $env) (local.get $id) (local.get $v))
+  (local.get $env))
+
+;; The light boundary `b` stands for the value `builder(b)` in the
+;; environment (`$service_force`).
+(func $light_lazy (param $b eqref) (param $builder eqref) (result eqref)
+  (local $l (ref $env))
+  (local.set $l (ref.cast (ref $env) (local.get $b)))
+  (array.set $env (local.get $l) (i32.add (call $light_base (local.get $l)) (i32.const 2)) (local.get $builder))
+  (ref.null eq))
+
+;; The value of a service read from the environment: a light boundary that
+;; stands for a provided value gives that value, made once (the same value
+;; at every read); anything else is the value.
+(func $service_force (param $v eqref) (param $env (ref null $env)) (result eqref)
+  (local $l (ref $env)) (local $m eqref) (local $at i32)
+  (if (i32.eqz (ref.test (ref $env) (local.get $v))) (then (return (local.get $v))))
+  (local.set $l (ref.cast (ref $env) (local.get $v)))
+  (local.set $at (i32.add (call $light_base (local.get $l)) (i32.const 2)))
+  (if (ref.is_null (array.get $env (local.get $l) (local.get $at))) (then (return (local.get $v))))
+  (local.set $m (array.get $env (local.get $l) (i32.add (local.get $at) (i32.const 1))))
+  (if (ref.is_null (local.get $m))
+    (then
+      (local.set $m (call $call1 (array.get $env (local.get $l) (local.get $at)) (local.get $l) (local.get $env)))
+      (array.set $env (local.get $l) (i32.add (local.get $at) (i32.const 1)) (local.get $m))))
+  (local.get $m))
 
 ;; `control.suspend(b, f)`: stops when `b` is not active.
 (func $control_suspend (param $b eqref) (param $f eqref) (result eqref)
@@ -601,20 +676,14 @@ pub(super) const EFFECTS: &str = r#"
 ;; so `resource.ensure` and the trampoline treat it as an error, and the
 ;; boundary `b` ends with `v` (`$boundary_core`). No capture, no records.
 (func $control_escape (param $b eqref) (param $v eqref) (result eqref)
-  (local $boundary (ref $boundary))
-  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
-  (if (i32.eqz (struct.get $boundary 8 (local.get $boundary)))
-    (then (call $stop_boundary_inactive) (unreachable)))
-  (throw $error (struct.new $escaped (local.get $boundary) (local.get $v))))
+  (throw $error (call $escape_payload (local.get $b) (local.get $v))))
 
 ;; The value of `$error` for `control.escape(b, v)`, thrown by the caller
 ;; (`Op::Escape`): stops when `b` is not active.
 (func $escape_payload (param $b eqref) (param $v eqref) (result (ref $escaped))
-  (local $boundary (ref $boundary))
-  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
-  (if (i32.eqz (struct.get $boundary 8 (local.get $boundary)))
+  (if (i32.eqz (call $boundary_active (local.get $b)))
     (then (call $stop_boundary_inactive) (unreachable)))
-  (struct.new $escaped (local.get $boundary) (local.get $v)))
+  (struct.new $escaped (ref.as_non_null (local.get $b)) (local.get $v)))
 
 ;; The continuation `k`, used now: stops when it was already used (rule 5).
 (func $continuation_take (param $k eqref) (result (ref $cont))
@@ -854,12 +923,10 @@ pub(super) const EFFECTS: &str = r#"
 pub(super) const TYPES: &str = r#"
 (type $boundary (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
-  (field (ref null $call)) (field (mut i32)) (field (mut eqref)) (field (mut i32))
-  ;; 11 for a light boundary that stands for a provided value: the function
-  ;; that makes the value from the boundary; 12 the value once made.
-  (field (mut eqref)) (field (mut eqref)))))
-;; The value of `$error` for `control.escape(b, v)`: the boundary and the value.
-(type $escaped (struct (field (ref $boundary)) (field eqref)))
+  (field (ref null $call)) (field (mut i32)) (field (mut eqref)) (field (mut i32)))))
+;; The value of `$error` for `control.escape(b, v)`: the boundary (a
+;; `$boundary`, or the `$env` of a light boundary) and the value.
+(type $escaped (struct (field (ref eq)) (field eqref)))
 (rec
   ;; 0 re-entry function, 1 saved values, 2 shadow slot, 3 kind, 4 delta (kind 1 only)
   (type $frame (struct (field (ref $refn)) (field (ref null $values)) (field i32) (field i32)

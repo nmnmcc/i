@@ -184,6 +184,9 @@ struct Fx {
     /// In the body of a light boundary: the names of its handle, which is
     /// local 0; `None` once one environment statement is made lazy.
     light: Option<HashSet<VarId>>,
+    /// Whether the statements being lowered are the start of a light
+    /// boundary's body, where its environment is still its own.
+    light_start: bool,
 }
 
 impl Fx {
@@ -199,6 +202,7 @@ impl Fx {
             patches: Vec::new(),
             env: Env::Param,
             light: None,
+            light_start: false,
         }
     }
 
@@ -1753,6 +1757,7 @@ impl<'a> Lowerer<'a> {
                 value: values[position]
                     .clone()
                     .expect("dependency precedes provider"),
+                in_place: false,
             });
             env = Env::Local(dst);
         }
@@ -2413,6 +2418,7 @@ impl<'a> Lowerer<'a> {
         if lifted {
             fx.light = light_names(f);
         }
+        let mut start = lifted;
         for (i, &v) in captures.iter().enumerate() {
             let l = fx.var(v);
             let value = if lifted {
@@ -2453,6 +2459,9 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
+        // Binding a plain name keeps nothing of the environment.
+        start &= fx.light.is_some();
+        fx.light_start = start;
         self.block(&mut fx, &mut out, &f.body, true);
         let pending = f
             .params
@@ -2886,6 +2895,7 @@ impl<'a> Lowerer<'a> {
         tail: bool,
     ) -> Option<Atom> {
         let last = b.stmts.len().saturating_sub(1);
+        let start = std::mem::replace(&mut fx.light_start, false);
         for (i, s) in b.stmts.iter().enumerate() {
             match s {
                 hir::Stmt::Expr(e) if i == last => return self.lower(fx, out, e, tail),
@@ -2894,7 +2904,7 @@ impl<'a> Lowerer<'a> {
                 }
                 hir::Stmt::Bind(binding) => self.binding(fx, out, binding),
                 hir::Stmt::Env { value, span, .. } => {
-                    if self.lazy_provide(fx, out, value, *span) {
+                    if self.lazy_provide(fx, out, value, *span, start && i == 0) {
                         continue;
                     }
                     // The value uses the environment from outside the
@@ -2907,6 +2917,7 @@ impl<'a> Lowerer<'a> {
                         env: fx.env,
                         service,
                         value: v,
+                        in_place: false,
                     });
                     fx.env = Env::Local(dst);
                 }
@@ -3016,15 +3027,17 @@ impl<'a> Lowerer<'a> {
         let name = format!("{}:light{}", self.program.module(fx.module).path, id.0);
         let func = self.function_code(fx.module, f, &captures, name, id, true);
         self.out.funcs[id.0 as usize] = FuncKind::Code(func);
+        // The boundary is the environment of its body (`$light_new`).
         let b = let_value(
             fx,
             out,
-            Value::Op(
+            Value::OpEnv(
                 Op::Runtime {
                     name: "light_new",
                     arity: 0,
                 },
                 vec![],
+                fx.env,
             ),
             None,
         );
@@ -3051,7 +3064,14 @@ impl<'a> Lowerer<'a> {
     /// environment, and the value is made at the first read of the service
     /// (`$service_force`), once. Only the first such statement of a body.
     /// False when the statement is not one.
-    fn lazy_provide(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, value: &Expr, span: Span) -> bool {
+    fn lazy_provide(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        value: &Expr,
+        span: Span,
+        in_place: bool,
+    ) -> bool {
         let Some(names) = fx.light.as_ref() else {
             return false;
         };
@@ -3116,6 +3136,7 @@ impl<'a> Lowerer<'a> {
             env: fx.env,
             service,
             value: Atom::Local(0),
+            in_place,
         });
         fx.env = Env::Local(dst);
         true

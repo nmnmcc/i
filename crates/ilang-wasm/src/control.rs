@@ -796,6 +796,7 @@ mod tests {
                 env: Env::Param,
                 service: 1,
                 value: Atom::Nil,
+                in_place: false,
             },
             Stmt::Let {
                 dst: 3,

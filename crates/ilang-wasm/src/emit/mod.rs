@@ -65,6 +65,7 @@ const DECLARED: &[&str] = &[
     "$ensure_reenter",
     "$final_reenter",
     "$boundary_reenter",
+    "$light_reenter",
     "$cancel_reenter",
     "$control_unpend",
     "$keep_call",
@@ -616,11 +617,13 @@ impl<'p> Emitter<'p> {
                 env,
                 service,
                 value,
+                in_place,
             } => {
                 let v = self.atom(value);
+                let f = if *in_place { "$env_set" } else { "$env_with" };
                 let _ = writeln!(
                     out,
-                    "(local.set $l{dst} (call $env_with {} (i32.const {service}) {v}))",
+                    "(local.set $l{dst} (call {f} {} (i32.const {service}) {v}))",
                     env_text(*env)
                 );
             }
@@ -912,6 +915,17 @@ impl<'p> Emitter<'p> {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, "(local.get $env)")
             }
+            Value::OpEnv(
+                Op::Runtime {
+                    name: "light_new", ..
+                },
+                _,
+                env,
+            ) => format!(
+                "(call $light_new {} (i32.const {}))",
+                env_text(*env),
+                self.p.services.max(1)
+            ),
             Value::OpEnv(op, args, env) => {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, &env_text(*env))
@@ -923,9 +937,12 @@ impl<'p> Emitter<'p> {
                 // An error or a cancel that is not for it goes on.
                 let n = self.lights;
                 self.lights += 1;
+                // The boundary is the environment of the body.
+                let _ = env;
                 let b = self.atom(&args[0]);
                 let callee = Callee::Direct(*func);
-                let mut call = self.call(&callee, args, false, &env_text(*env));
+                let mut call =
+                    self.call(&callee, args, false, &format!("(ref.cast (ref $env) {b})"));
                 if self.float_call(&callee) {
                     call = numeric::box_float(&call);
                 }
