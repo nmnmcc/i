@@ -132,13 +132,16 @@ fn render_comments(
                 _ => None,
             };
             if let Some(body) = body {
-                for stmt in &body.stmts {
+                for (index, stmt) in body.stmts.iter().enumerate() {
                     let span = match stmt {
                         Stmt::Bind(b) => b.span,
                         Stmt::Env { span, .. } => *span,
                         Stmt::Expr(e) => e.span,
                     };
-                    self.0.push((span, statement(stmt)));
+                    self.0.push((
+                        span,
+                        statement(stmt, super::starts_provide_group(&body.stmts, index)),
+                    ));
                 }
             }
         }
@@ -423,19 +426,34 @@ fn expr(e: &Expr) -> String {
     }
 }
 fn block(b: &Block) -> String {
-    braced("{", "}", b.stmts.iter().map(statement))
+    braced(
+        "{",
+        "}",
+        b.stmts
+            .iter()
+            .enumerate()
+            .map(|(index, s)| statement(s, super::starts_provide_group(&b.stmts, index))),
+    )
 }
-fn statement(s: &Stmt) -> String {
+fn statement(s: &Stmt, first: bool) -> String {
     match s {
         Stmt::Bind(b) => binding(b),
         Stmt::Env {
-            ty, value, spread, ..
+            ty,
+            value,
+            spread,
+            group,
+            ..
         } => {
-            if *spread {
-                form("!", ["..".into(), typ(ty), expr(value)])
-            } else {
-                form("!", [typ(ty), expr(value)])
+            let mut parts = Vec::new();
+            if group.is_some() {
+                parts.push(form("..", [if first { "+".into() } else { "=".into() }]));
             }
+            if *spread {
+                parts.push("..".into());
+            }
+            parts.extend([typ(ty), expr(value)]);
+            form("!", parts)
         }
         Stmt::Expr(e) => expr(e),
     }

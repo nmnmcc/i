@@ -36,7 +36,8 @@ enum Task<'a> {
     Result(&'a TypeExpr, Option<&'a TypeExpr>, Option<&'a TypeExpr>),
     ResultError(&'a TypeExpr, Option<&'a TypeExpr>),
     Block(&'a Block),
-    Statement(&'a Stmt),
+    Statement(&'a Stmt, bool),
+    ProvideGroup(bool),
     ClauseList(&'a [Clause]),
     Clause(&'a Clause),
     ClauseHead(&'a Clause),
@@ -427,18 +428,36 @@ pub(super) fn item<E>(
             },
             Block(block) => {
                 bracket(&mut f, &mut work, block.stmts.len())?;
-                work.extend(block.stmts.iter().rev().map(Statement));
+                work.extend(block.stmts.iter().enumerate().rev().map(|(index, stmt)| {
+                    Statement(stmt, super::starts_provide_group(&block.stmts, index))
+                }));
             }
-            Statement(stmt) => match stmt {
+            ProvideGroup(first) => {
+                bracket(&mut f, &mut work, 2)?;
+                work.push(Atom(if first { "+" } else { "=" }));
+                work.push(Atom(".."));
+            }
+            Statement(stmt, first) => match stmt {
                 Stmt::Bind(b) => work.push(Binding(b)),
                 Stmt::Env {
-                    ty, value, spread, ..
+                    ty,
+                    value,
+                    spread,
+                    group,
+                    ..
                 } => {
-                    bracket(&mut f, &mut work, if *spread { 4 } else { 3 })?;
+                    bracket(
+                        &mut f,
+                        &mut work,
+                        3 + usize::from(*spread) + usize::from(group.is_some()),
+                    )?;
                     work.push(Expr(value));
                     work.push(Type(ty));
                     if *spread {
                         work.push(Atom(".."));
+                    }
+                    if group.is_some() {
+                        work.push(ProvideGroup(first));
                     }
                     work.push(Atom("!"));
                 }

@@ -764,13 +764,48 @@ async fn clause_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Clause> {
         span: d.span,
     })
 }
+fn provided_statement(d: &Datum) -> Option<(&Datum, &Datum, bool, Option<bool>)> {
+    let parts = round(d)?;
+    let (head, mut parts) = parts.split_first()?;
+    if !symbol(head, "!") {
+        return None;
+    }
+    let group = match parts.first().and_then(round) {
+        Some([dots, mark]) if symbol(dots, "..") && (symbol(mark, "+") || symbol(mark, "=")) => {
+            parts = &parts[1..];
+            Some(symbol(mark, "+"))
+        }
+        _ => None,
+    };
+    let spread = parts.first().is_some_and(|d| symbol(d, ".."));
+    if spread {
+        parts = &parts[1..];
+    }
+    let [ty, value] = parts else {
+        return None;
+    };
+    Some((ty, value, spread, group))
+}
+
 async fn block_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Block> {
     let K::Curly(xs) = &d.kind else {
         return Err(bad(d, "a function body"));
     };
     let mut stmts = Vec::with_capacity(xs.len());
+    let mut current_group = None;
     for x in xs {
-        stmts.push(statement_inner(s, x).await?);
+        let mut stmt = statement_inner(s, x).await?;
+        if let Some(first) = provided_statement(x).and_then(|(_, _, _, group)| group) {
+            if first || current_group.is_none() {
+                current_group = Some(x.span);
+            }
+            if let Stmt::Env { group, .. } = &mut stmt {
+                *group = current_group;
+            }
+        } else {
+            current_group = None;
+        }
+        stmts.push(stmt);
     }
     if !matches!(stmts.last(), Some(Stmt::Expr(_))) {
         return Err(Diagnostic::new(
@@ -785,31 +820,19 @@ async fn block_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Block> {
     })
 }
 async fn statement_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Stmt> {
-    if let Some([h, dots, left, right]) = round(d)
-        && symbol(h, "!")
-        && symbol(dots, "..")
-    {
+    if let Some((left, right, spread, _)) = provided_statement(d) {
         return Ok(Stmt::Env {
-            spread: true,
+            spread,
             group: None,
             ty: type_child(s, left).await?,
             value: expression_child(s, right).await?,
             span: d.span,
         });
     }
-    if let Some([h, left, right]) = round(d) {
-        if symbol(h, "!") {
-            return Ok(Stmt::Env {
-                spread: false,
-                group: None,
-                ty: type_child(s, left).await?,
-                value: expression_child(s, right).await?,
-                span: d.span,
-            });
-        }
-        if symbol(h, "=") {
-            return Ok(Stmt::Bind(binding_inner(s, d, left, right).await?));
-        }
+    if let Some([h, left, right]) = round(d)
+        && symbol(h, "=")
+    {
+        return Ok(Stmt::Bind(binding_inner(s, d, left, right).await?));
     }
     Ok(Stmt::Expr(expression_child(s, d).await?))
 }

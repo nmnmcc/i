@@ -2834,7 +2834,10 @@ impl<'a> Resolver<'a> {
             names.insert(key, var);
             vars.push(var);
         }
-        self.ty_frames.push(TyFrame { names, fn_depth: self.fn_depth });
+        self.ty_frames.push(TyFrame {
+            names,
+            fn_depth: self.fn_depth,
+        });
         vars
     }
 

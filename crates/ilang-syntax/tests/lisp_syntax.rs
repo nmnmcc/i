@@ -1412,3 +1412,51 @@ fn a_captured_rest_row_can_still_be_provided_after_macro_decoding() {
     };
     check(&binding.value);
 }
+
+#[test]
+fn macro_round_trips_preserve_written_provide_groups() {
+    use ilang_syntax::{
+        ast::ItemKind,
+        lisp::{self, scoped::ScopedSource},
+        walk::{Visitor, Walk},
+    };
+    // The text bridge needs lexical names for lowering's internal
+    // `%service` temporaries. Their spelling does not affect group identity.
+    struct LexicalTemporaries;
+    impl Visitor for LexicalTemporaries {
+        fn string(&mut self, name: &mut String) {
+            if let Some(rest) = name.strip_prefix('%') {
+                *name = format!("bridge_{rest}");
+            }
+        }
+    }
+    for source in [
+        "f = () { read() <- (Db(1), Db(2)) }",
+        "f = () { read() <- (Db(2)) <- (Db(1)) }",
+        "f = <N>(body: () <- (..N, Db) -> Int, db: Db) <- (..env: N) { body() <- (..env, db) }",
+    ] {
+        let (module, errors) = ilang_syntax::parse_module(source);
+        assert!(errors.is_empty(), "{source}: {errors:?}");
+        let ItemKind::Binding(binding) = &module.items[0].kind else {
+            panic!()
+        };
+        let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
+        let mut expanded = ScopedSource::new(source.into());
+        let decoded = expanded.expression(&syntax, &syntax).unwrap();
+        assert!(
+            ilang_syntax::shape::equivalent_expression(&binding.value, &decoded),
+            "{source}: {}",
+            syntax.show()
+        );
+        let mut module = module.clone();
+        module.walk(&mut LexicalTemporaries);
+        let printed = lisp::print_module(&module);
+        let doc = lisp::parse(&printed).unwrap();
+        let restored = lisp::parse_module(&doc)
+            .unwrap_or_else(|error| panic!("{source}: {printed}: {error:?}"));
+        assert!(
+            ilang_syntax::shape::equivalent(&module, &restored),
+            "{source}: {printed}"
+        );
+    }
+}

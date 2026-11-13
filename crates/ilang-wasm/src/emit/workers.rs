@@ -679,7 +679,10 @@ pub(super) fn closures(
 ) -> String {
     use std::fmt::Write;
     let mut out = String::new();
-    let mut names = vec!["$adapter_pin_call".to_string(), "$entry_assert_fail".to_string()];
+    let mut names = vec![
+        "$adapter_pin_call".to_string(),
+        "$entry_assert_fail".to_string(),
+    ];
     names.extend((0..funcs).map(|i| format!("$f{i}")));
     let _ = writeln!(
         out,

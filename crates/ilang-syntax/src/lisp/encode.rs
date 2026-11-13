@@ -810,16 +810,25 @@ impl Encoder<'_> {
         let parts = b
             .stmts
             .iter()
-            .map(|s| match s {
+            .enumerate()
+            .map(|(index, s)| match s {
                 Stmt::Bind(b) => self.binding(b),
                 Stmt::Env {
                     ty,
                     value,
                     span,
                     spread,
-                    ..
+                    group,
                 } => {
                     let mut parts = Vec::new();
+                    if let Some(group) = group {
+                        let mark = if super::starts_provide_group(&b.stmts, index) {
+                            "+"
+                        } else {
+                            "="
+                        };
+                        parts.push(self.form("..", [self.symbol(mark, *group)], *group));
+                    }
                     if *spread {
                         parts.push(self.symbol("..", *span));
                     }

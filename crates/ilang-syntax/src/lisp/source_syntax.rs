@@ -167,6 +167,13 @@ fn normalize(root: &Syntax, mode: Mode) -> Syntax {
                 {
                     modes[2] = Mode::Type;
                     modes[3] = Mode::Expr;
+                } else if matches!(node.node(), Node::Round(_))
+                    && (xs.len() == 4 || xs.len() == 5)
+                    && symbol(&xs[0], "!")
+                    && matches!(xs[1].node(), Node::Round(mark) if mark.len() == 2 && symbol(&mark[0], "..") && (symbol(&mark[1], "+") || symbol(&mark[1], "=")))
+                {
+                    modes[xs.len() - 2] = Mode::Type;
+                    modes[xs.len() - 1] = Mode::Expr;
                 } else {
                     work.push(Task::Enter(node, Mode::Expr));
                     continue;
