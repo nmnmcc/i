@@ -1897,8 +1897,8 @@ send_with = <N>(send: (Request) <- N -> Response, req: Request) -> Response {
 }
 
 /// `send_with`, failing with `Timeout` when no response comes in time.
-send_timeout = (
-	send: (Request) <- (Fail(HttpError)) -> Response,
+send_timeout = <N>(
+	send: (Request) <- (Fail(HttpError), ..N) -> Response,
 	req: Request,
 	duration_ns: Int
 ) {

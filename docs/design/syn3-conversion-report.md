@@ -374,3 +374,13 @@ comparison failures. Their assertions remain active and unchanged. This part
 is unfinished; no weaker comparison or new blanket skip was introduced.
 The final labelled-function-type fix has focused lowering/interface evidence;
 the complete checker suite has not been repeated after it.
+
+
+The fresh post-merge release build and std/lib/examples formatting pass.
+The std opt-0 run stopped at `http_network_test`'s existing timeout callback:
+`send_timeout`'s migrated `(Request) <- (Fail(HttpError)) -> Response` had lost
+the old `! _` service need (`need-not-named` in the conversion notes), forcing
+its callback to need nothing. Preserve that open need with `<N>` and
+`(Request) <- (Fail(HttpError), ..N) -> Response`. The body and timeout test
+are unchanged. Formatting passes; the complete std retry is queued through
+the wrapper. No passing result is claimed until that run completes.
