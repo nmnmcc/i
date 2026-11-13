@@ -598,7 +598,7 @@ row. The focused regression passes: a concrete Read(Int) handler is not
 falsely hidden, and Read(String) reports E0515 without an extra E0501.
 
 The first guarded K4 pass was stopped at a checkpoint (about 100 cases):
-90 matching observations were recorded and eight outcome changes refused.
+92 matching observations were recorded and eight outcome changes refused.
 No refused expectation was changed. Retained an anonymous closure's written
 need through a typed binding and kept literal callback result annotations.
 The new checker regressions pin all eight batch2 checker code sets. Seven
@@ -659,3 +659,11 @@ original constructor and scope, as syntax-3 §2.8 kind 4 requires: "A name is
 a transparent alias, as today." A lowering unit test pins both definitions
 and S's N parameter; that focused lowering regression passes. The final
 checker row-algebra rerun and remaining gates are pending.
+
+All nine initial checker fixture failures now pass focused verification,
+including the row-algebra test after the alias correction. The complete
+compiler packages are being repeated for that lowering change. Formatted
+the edited library handler and verified its focused format check. The
+stopped first corpus recording finalized 92 observations (90 was the live
+checkpoint count); all 92 have source changes and batch2-equivalent phase
+exits/error-code sets. The eight refused observations remain unrecorded.

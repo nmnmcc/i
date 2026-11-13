@@ -17,8 +17,12 @@ raise = <E>(error: E) <- (fail: Syn3ServiceFail(E)) -> Never {
 
 /// Gives `Ok(value)` when `body` ends with `value`, or `Error(error)` for the
 /// first `error` it raises through `Fail(E)`.
-catch = <A, E, N>(body: () <- (Fail(Never), Syn3ServiceFail(E), ..N) -> A) -> Result(A, E) {
+catch = <A, E, N>(
+	body: () <- (Fail(Never), Syn3ServiceFail(E), ..N) -> A
+) -> Result(A, E) {
 	control.boundary((b) {
-		Ok(body()) <- (Fail(raise = (error: E) { control.escape(b, Error(error)) }))
+		Ok(body()) <- (
+			Fail(raise = (error: E) { control.escape(b, Error(error)) }),
+		)
 	})
 }
