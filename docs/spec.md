@@ -753,6 +753,25 @@ Every type denotes a set of values. The union of two members of one type constru
 
 A **member** of a type (§4.4) is a type constructor, its type arguments, and a **value set**: the values of that type constructor that are in the member. Only `Int` and `String` may have a value set that is not all of their values (§4.2). For every other type constructor, the value set is all of its values.
 
+**Inhabitance.** A type is empty when it has no values, and every empty type
+is equal to `Never`. Data is inhabited exactly when every required part is
+inhabited. A non-opaque labelled type is inhabited exactly when its data is
+inhabited. Apply these rules after substituting its type arguments.
+Thus `(Never, Int)` and `Box(Never)` with `Box(A) = (A)` are `Never`.
+`List(Never)` is inhabited: it contains `[]`.
+
+Recursive labelled data denotes finite values. Its inhabitance is the least
+fixed point of these rules: start recursive members as empty, then admit a
+member when its data can be made from already inhabited parts, until no new
+member is admitted. Thus `Loop = (Loop)` is empty, whereas a recursive union
+with a nonrecursive base can be inhabited. A function field requires a function
+value, not a value of its result type; a function that stops or diverges can
+inhabit `() -> Never`. Do not infer emptiness of an opaque or built-in handle
+type merely from an empty type argument.
+
+Coverage, usefulness, subtyping and the empty match (§6.12) use this same
+inhabitance rule; destructuring an impossible value first is not required.
+
 ### 4.2 Built-in types
 
 These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. So a module that defines a type with the name of a built-in type can still name the built-in type. The prelude types may be named through `i/prelude`.
@@ -1277,6 +1296,8 @@ A pattern **can not fail** for a type `T` when it matches every value of `T`. Ot
 A literal pattern can not fail for its literal type, so `"a" = x` with `x: "a"` needs no `Assert`. Where a pattern is fitted (§4.8), a literal has the whole `Int` or `String`, so `"a" = s` with `s: String` is correct and may fail: it reports to `Assert`. A constructor pattern fitted to a union, as `Ok(v) = r` with `r: Ok(Int) | Error(String)`, is correct and may fail. Whether a pattern may fail is decided with every value that may come, also when the value is a direct value of the same group (§6.10), whose values are known only when the whole group is checked: in `pair = ("b", () { ("a", _) = pair  1 })`, the binding may fail, and the function reports to `Assert`. The same holds for a match whose chain has one branch and no guard.
 
 ### 7.4 Covering every value
+
+Empty domains are determined by §4.1. They are covered vacuously, and no branch is useful for an empty domain.
 
 The branches of a shape group whose parameter has the type `A` **cover** `A` when, for every value of `A`, some branch without a guard has a parameter group that matches it. A branch with a guard is not counted. A branch is **never used** when no value in the applicable parameter domain can reach it: every value in that domain that its pattern matches is matched by an earlier branch without a guard. Values outside the domain do not make a branch useful. In an inline match, use only the one-position shape group and the possible incoming subject values; branches of other shapes are never used (§6.12).
 
