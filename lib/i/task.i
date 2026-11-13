@@ -121,10 +121,7 @@ Turn {
 }
 
 Start {
-	Start(
-		body:   (Scheduler) -> Completion
-		ticket: Int
-	)
+	Start(body: (Scheduler) -> Completion, ticket: Int)
 }
 
 /// What a task on another worker tells the scheduler (native N7/N8): its
@@ -151,10 +148,18 @@ Resume {
 /// function with its kept services, the task's path, run, root and runner.
 Job {
 	Job(
-		begin:  (job: Job) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+		begin: (job: Job) -> (
+			Remote
+			Continuation(StepAnswer, Turn, Never, Never)
+			List(Ticket)
+		)
 		resume: (
 			input: (Continuation(StepAnswer, Turn, Never, Never), Resume)
-		) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket))
+		) -> (
+			Remote
+			Continuation(StepAnswer, Turn, Never, Never)
+			List(Ticket)
+		)
 		body:   (Scheduler) -> Completion
 		path:   List(Int)
 		run:    Key(Nil)
@@ -1179,10 +1184,7 @@ complete(A, E, N) = (
 				True  -> portable(error)
 				False -> Nil
 			}
-			Failed(
-				key.wrap(result, Error(error))
-				key.wrap(errors, error)
-			)
+			Failed(key.wrap(result, Error(error)), key.wrap(errors, error))
 		}
 	}
 }
@@ -1280,25 +1282,42 @@ remote_turn = (
 				run
 				read(address_key, id)
 			) |> {
-				[value] -> remote_turn(control.resume(k, Proceed(value)), finals, run)
+				[value] -> remote_turn(
+					control.resume(k, Proceed(value))
+					finals
+					run
+				)
 				_ -> (Stepped(command, list_map(finals, (f) { f(k) })), k, [])
 			}
 			// Requests of this worker are waited for here; the scheduler
 			// only sees a wait that a `Woken` message or a cancel ends.
-			Wait(tickets) -> (Stepped(Wait([]), list_map(finals, (f) { f(k) })), k, tickets)
+			Wait(tickets) -> (
+				Stepped(Wait([]), list_map(finals, (f) { f(k) }))
+				k
+				tickets
+			)
 			Register(_, _, _, _, final) -> (
-				Stepped(command, append(list_map(finals, (f) { f(k) }), [final(k)]))
+				Stepped(
+					command
+					append(list_map(finals, (f) { f(k) }), [final(k)])
+				)
 				k
 				[]
 			)
 			_ -> (Stepped(command, list_map(finals, (f) { f(k) })), k, [])
 		}
-		Finished(_, completion) -> (Exited(completion), worker_placeholder(), [])
+		Finished(_, completion) -> (
+			Exited(completion)
+			worker_placeholder()
+			[]
+		)
 		Sent(_) -> panic("task: a worker task was sent")
 	}
 }
 
-remote_begin = (job: Job) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket)) {
+remote_begin = (
+	job: Job
+) -> (Remote, Continuation(StepAnswer, Turn, Never, Never), List(Ticket)) {
 	task_path = job.path
 	run = job.run
 	root = job.root
@@ -1321,29 +1340,36 @@ remote_resume = (
 /// worker runs (D8). A nested run keeps its tasks (runtime §6.5).
 publish = (s: State, task_path: List(Int), start: Start) -> Start {
 	{ s.scripted || core.not(s.top) || core.not(worker_enabled()) } |> {
-		True  -> start
+		True -> start
 		False -> Start(
 			..start
-			ticket: worker_publish(Job(
-				remote_begin
-				remote_resume
-				start.body
-				task_path
-				s.run
-				s.root
-				s.runner
-				Woken
-			))
+			ticket: worker_publish(
+				Job(
+					remote_begin
+					remote_resume
+					start.body
+					task_path
+					s.run
+					s.root
+					s.runner
+					Woken
+				)
+			)
 		)
 	}
 }
 
-frame_finals = (frames: List(Frame)) -> List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool) {
+frame_finals = (
+	frames: List(Frame)
+) -> List((Continuation(StepAnswer, Turn, Never, Never)) -> Bool) {
 	list_map(frames, (f) { f.final })
 }
 
 /// The answers for the task's frames, then the one for a frame it registers.
-split_flags = (frames: List(Frame), flags: List(Bool)) -> (List(Bool), List(Bool)) {
+split_flags = (
+	frames: List(Frame)
+	flags: List(Bool)
+) -> (List(Bool), List(Bool)) {
 	(frames, flags) |> {
 		([_, ..rest], [flag, ..more]) -> {
 			(own, extra) = split_flags(rest, more)
@@ -1390,7 +1416,10 @@ pull = (s: State) -> State {
 						WaitingTicket(k, _) -> queue(
 							set_task(
 								State(..s, waiting: without(s.waiting, serial))
-								TaskState(..t, status: Runnable(k, Proceed(unit())))
+								TaskState(
+									..t
+									status: Runnable(k, Proceed(unit()))
+								)
 							)
 							serial
 						)
@@ -2697,7 +2726,11 @@ do_command = (
 			child_path = append(t.path, [index])
 			immune = exemptions(s, t)
 			(status, outcome, clean) = scope.cancellation |> {
-				Absent         -> (Dormant(publish(s, child_path, start)), Pending, False)
+				Absent -> (
+					Dormant(publish(s, child_path, start))
+					Pending
+					False
+				)
 				Present(cause) -> (Ended, Cancelled(cause), True)
 			}
 			child = TaskState(
@@ -3051,7 +3084,10 @@ on_command = (
 			(own, extra) = split_flags(original.frames, answers)
 			set_task(
 				State(..s, register_flag: extra == [True])
-				TaskState(..original, frames: apply_finals(original.frames, own))
+				TaskState(
+					..original
+					frames: apply_finals(original.frames, own)
+				)
 			)
 		}
 		Absent -> { finals_changed(original.frames, k) } |> {
@@ -3155,7 +3191,8 @@ turn = (s: State, t: TaskState) -> Turn {
 	// Project before the callback: suspended tasks must not retain State or a
 	// TaskState snapshot through the boundary body's closure environment.
 	t.status |> {
-		Dormant(start) ? start.ticket != 0 && core.not(worker_claim(start.ticket)) -> {
+		Dormant(start) ? start.ticket != 0 &&
+			core.not(worker_claim(start.ticket)) -> {
 			worker_adopt(start.ticket, t.serial)
 			Sent(t.serial)
 		}
@@ -3388,7 +3425,10 @@ loop = (state: State) -> RunReply {
 											set_task(
 												running
 												TaskState(
-													..find_task(running.tasks, path)
+													..find_task(
+														running.tasks
+														path
+													)
 													status: Away
 												)
 											)
@@ -3416,7 +3456,8 @@ loop = (state: State) -> RunReply {
 									) >
 										0 ||
 										any(tickets, has_work) ||
-										core.not(prepared.top) && worker_pending()
+										core.not(prepared.top) &&
+											worker_pending()
 									away = prepared.top && worker_pending()
 									{ away } |> {
 										True -> {
@@ -3424,31 +3465,35 @@ loop = (state: State) -> RunReply {
 											loop(
 												apply_run_control(
 													prepared
-													runner.poll(prepared.run, tickets, True)
-												)
-											)
-										}
-										False -> { possible } |> {
-										False -> panic("task: deadlock")
-										True -> {
-											{ prepared.scripted } |> {
-												True -> panic(
-													"task: test needs fake IO"
-												)
-												False -> Nil
-											}
-											loop(
-												apply_run_control(
-													prepared
-													runner.wait(
+													runner.poll(
 														prepared.run
-														prepared.root
 														tickets
+														True
 													)
 												)
 											)
 										}
-									}
+										False -> { possible } |> {
+											False -> panic("task: deadlock")
+											True -> {
+												{ prepared.scripted } |> {
+													True -> panic(
+														"task: test needs fake IO"
+													)
+													False -> Nil
+												}
+												loop(
+													apply_run_control(
+														prepared
+														runner.wait(
+															prepared.run
+															prepared.root
+															tickets
+														)
+													)
+												)
+											}
+										}
 									}
 								}
 							}
