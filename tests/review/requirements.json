@@ -3617,6 +3617,75 @@
         "E0515"
       ],
       "diagnostic_reason": "Reject the hidden provider-form obligation at checking; E0505 or acceptance does not preserve main behavior."
+    },
+    {
+      "pattern": "^review\\-a1/_loose/cases/17_old_unbound_fn_group/original$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "A1 intentional old text now reads as an expression block containing an immediately called explicit function literal; f returns 42.",
+      "source": "docs/design/syntax-3.md §2.2: “In an expression, every `{` begins a block: `{ s1 … sn e }`. The statements run in order and the value is `e`. A block with only an expression is a group: `{ a - 48 } * 100`.” §2.4: “A function is a parameter group, an optional `->` part, and a block:”",
+      "origin": "Coordinator b15 item 5; no requirement previously matched this case",
+      "types_contain": [
+        "app/main.f : () -> Int"
+      ]
+    },
+    {
+      "pattern": "^review\\-a1/_loose/cases/18_old_expected_fn_group/original$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "A1 intentional old text now reads as an expression block grouping an explicit function literal; f returns an Int-to-Int function.",
+      "source": "docs/design/syntax-3.md §2.2: “In an expression, every `{` begins a block: `{ s1 … sn e }`. The statements run in order and the value is `e`. A block with only an expression is a group: `{ a - 48 } * 100`.” §2.4: “A function is a parameter group, an optional `->` part, and a block:”",
+      "origin": "Coordinator b15 item 5; no requirement previously matched this case",
+      "types_contain": [
+        "app/main.f : () -> (Int) -> Int"
+      ]
+    },
+    {
+      "pattern": "^review\\-a1/_loose/runtime/17/original$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "A1 intentional old text now reads as an expression block containing an immediately called explicit function literal; f returns 42.",
+      "source": "docs/design/syntax-3.md §2.2: “In an expression, every `{` begins a block: `{ s1 … sn e }`. The statements run in order and the value is `e`. A block with only an expression is a group: `{ a - 48 } * 100`.” §2.4: “A function is a parameter group, an optional `->` part, and a block:”",
+      "origin": "Coordinator b15 item 5; no requirement previously matched this case",
+      "types_contain": [
+        "app/main.f : () -> Int"
+      ],
+      "run_stdout": ""
+    },
+    {
+      "pattern": "^review\\-a1/_loose/runtime/18/original$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "A1 intentional old text now reads as an expression block grouping an explicit function literal; f returns an Int-to-Int function.",
+      "source": "docs/design/syntax-3.md §2.2: “In an expression, every `{` begins a block: `{ s1 … sn e }`. The statements run in order and the value is `e`. A block with only an expression is a group: `{ a - 48 } * 100`.” §2.4: “A function is a parameter group, an optional `->` part, and a block:”",
+      "origin": "Coordinator b15 item 5; no requirement previously matched this case",
+      "types_contain": [
+        "app/main.f : () -> (Int) -> Int"
+      ],
+      "run_stdout": ""
+    },
+    {
+      "pattern": "^review\\-a1/cases/18_old_expected_fn_group$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "A1 intentional old text now reads as an expression block grouping an explicit function literal; f returns an Int-to-Int function.",
+      "source": "docs/design/syntax-3.md §2.2: “In an expression, every `{` begins a block: `{ s1 … sn e }`. The statements run in order and the value is `e`. A block with only an expression is a group: `{ a - 48 } * 100`.” §2.4: “A function is a parameter group, an optional `->` part, and a block:”",
+      "origin": "Coordinator b15 item 5; no requirement previously matched this case",
+      "types_contain": [
+        "app/main.f : () -> (Int) -> Int"
+      ]
+    },
+    {
+      "pattern": "^review\\-a1/runtime/18$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "A1 intentional old text now reads as an expression block grouping an explicit function literal; f returns an Int-to-Int function.",
+      "source": "docs/design/syntax-3.md §2.2: “In an expression, every `{` begins a block: `{ s1 … sn e }`. The statements run in order and the value is `e`. A block with only an expression is a group: `{ a - 48 } * 100`.” §2.4: “A function is a parameter group, an optional `->` part, and a block:”",
+      "origin": "Coordinator b15 item 5; no requirement previously matched this case",
+      "types_contain": [
+        "app/main.f : () -> (Int) -> Int"
+      ],
+      "run_stdout": ""
     }
   ],
   "transitions": [

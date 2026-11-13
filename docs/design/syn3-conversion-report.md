@@ -858,3 +858,27 @@ with these samples. No large repeatable conversion-specific slowdown was
 found. No case bound or expected observation was changed. Raw per-stage,
 CPU and wall samples are in target/conv-b15/perf-results.json and
 perf-controlled-results.json; the probes run through the heavy wrapper.
+
+Coordinator b15 item 5: all six intentionally old A1 programs are now valid.
+No existing requirement matched any of them. Their source is unchanged.
+Syntax-three §2.2 says: “In an expression, every `{` begins a block:
+`{ s1 … sn e }`. The statements run in order and the value is `e`. A block
+with only an expression is a group: `{ a - 48 } * 100`.” Section 2.4 says:
+“A function is a parameter group, an optional `->` part, and a block:”.
+The old brace-decision rejection is explicitly removed by §2.2. Each case
+now has an accept requirement quoting these paragraphs, with its inferred
+f type pinned; runtime copies retain their assertions and empty stdout.
+
+| Case | Prior requirement | Syntax-three reading |
+|---|---|---|
+| `review-a1/_loose/cases/17_old_unbound_fn_group/original` | None | Block calls `(x) -> Int { x + 1 }` at 41; f returns 42. |
+| `review-a1/_loose/cases/18_old_expected_fn_group/original` | None | Block groups `(x) -> Int { x + 1 }`; f returns that function. |
+| `review-a1/_loose/runtime/17/original` | None | Block calls `(x) -> Int { x + 1 }` at 41; f returns 42. |
+| `review-a1/_loose/runtime/18/original` | None | Block groups `(x) -> Int { x + 1 }`; f returns that function. |
+| `review-a1/cases/18_old_expected_fn_group` | None | Block groups `(x) -> Int { x + 1 }`; f returns that function. |
+| `review-a1/runtime/18` | None | Block groups `(x) -> Int { x + 1 }`; f returns that function. |
+
+All six pass checking and O0/O2 native test compilation/execution. The three
+runtime copies also pass their O0/O2 assertions. These observations were
+read-only; expected.json files remain unchanged. Probe results are saved in
+target/conv-b15/a1-observations.json.
