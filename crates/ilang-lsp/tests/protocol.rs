@@ -614,6 +614,19 @@ fn labels(r: &Value) -> Vec<&str> {
         .collect()
 }
 
+/// The requests of a test that must be answered without a check took less than the check that
+/// opened the package. The debounce is 600 seconds, so a request that waited for a check would
+/// not be answered at all before the test's own timeout; this bound catches one that does the
+/// work of a check on every request. It is relative to the first check, with a floor, not a
+/// wall-clock limit.
+fn assert_answered_without_a_check(took: Duration, first_check: Duration) {
+    let limit = first_check.max(Duration::from_millis(500)) * 10;
+    assert!(
+        took < limit,
+        "the requests took {took:?}, the first check took {first_check:?}"
+    );
+}
+
 /// While a package waits to be checked again after a change, hover and go
 /// to definition are answered from the last check where the text around
 /// the position has not changed; elsewhere they wait for a new check,
@@ -625,8 +638,10 @@ fn answers_from_the_last_check() {
     let main = file_uri(&dir.path().join("src/main.i"));
     // Long enough that no check starts by itself during the test.
     let mut c = Client::with_debounce(Duration::from_secs(600));
+    let checking = Instant::now();
     c.open(&main, MAIN);
     assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
+    let check_time = checking.elapsed();
     let started = Instant::now();
     // A line before everything.
     let edited = format!("\n{MAIN}");
@@ -641,7 +656,9 @@ fn answers_from_the_last_check() {
     assert_eq!(d["range"]["start"], json!({ "line": dl, "character": dch }));
     // Answered without a check: none has published problems.
     assert!(!c.has_diagnostics(&main));
-    assert!(started.elapsed() < Duration::from_secs(300));
+    // About: these answers need no check. Relative to the first check of the same package (so
+    // a busy machine does not fail it): the three requests together cost less than the check.
+    assert_answered_without_a_check(started.elapsed(), check_time);
     // New bindings at the end. In the new text, hover waits for a check,
     // which publishes the new problem.
     let edited = format!("{edited}extra = add(1, 2)\nbad = nope\n");
@@ -669,11 +686,13 @@ fn completion_after_a_dot_just_written() {
     package(dir.path(), &[("src/main.i", &text), ("src/util.i", UTIL)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::with_debounce(Duration::from_secs(600));
+    let checking = Instant::now();
     c.open(&main, &text);
     assert_eq!(
         c.diagnostics(&main),
         unused_diagnostics(&text, &["greet", "m"])
     );
+    let check_time = checking.elapsed();
     let started = Instant::now();
     for (version, (from, to)) in [("u.name", "u."), ("make().name", "make().")]
         .into_iter()
@@ -687,7 +706,7 @@ fn completion_after_a_dot_just_written() {
         assert_eq!(labels(&r), vec!["name", "age"], "after {to}");
     }
     assert!(!c.has_diagnostics(&main));
-    assert!(started.elapsed() < Duration::from_secs(300));
+    assert_answered_without_a_check(started.elapsed(), check_time);
     c.shutdown();
 }
 
@@ -2983,7 +3002,8 @@ fn lsp_latency_on_std() {
     c.open(&uri, &text);
     let started = Instant::now();
     c.diagnostics_within(&uri, Duration::from_secs(900));
-    eprintln!("first check of std: {:?}", started.elapsed());
+    let first_check = started.elapsed();
+    eprintln!("first check of std: {first_check:?}");
     // The first requests after the check, and then the next ones.
     let at = |needle: &str| {
         let (l, ch) = find(&text, needle, 0);

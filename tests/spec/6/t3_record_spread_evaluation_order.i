@@ -1,11 +1,14 @@
 // spec: 6.2, 6.7
 // expect: stop "panic: base"
-// at: spec/main:7:6
+// at: spec/main:7:33
+// at: spec/main:10:6
 (
 	main
 )
 
+base = () -> (a = Int, b = Int) { panic("base") }
+
 main = () {
-	(..panic("base"), a = panic("field"))
+	(..base(), a = panic("field"))
 	Nil
 }

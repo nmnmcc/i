@@ -651,7 +651,6 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
     match v {
         Value::Atom(a)
         | Value::Field(a, _)
-        | Value::RecGet(a, _)
         | Value::ListHead(a)
         | Value::ListTail(a)
         | Value::StringSuffix(a, _, _)
@@ -673,11 +672,7 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
         Value::Service(env, _) => env_uses(*env, f),
         Value::Closure { captures, .. } => captures.iter().for_each(|a| atom_uses(a, f)),
         Value::Record { fields, .. } => fields.iter().for_each(|a| atom_uses(a, f)),
-        Value::RecNew(fields) => fields.iter().for_each(|(_, a)| atom_uses(a, f)),
-        Value::RecWith(base, fields) => {
-            atom_uses(base, f);
-            fields.iter().for_each(|(_, a)| atom_uses(a, f));
-        }
+        Value::Data(_, args) => args.iter().for_each(|a| atom_uses(a, f)),
         Value::Cons(a, b) | Value::BitsConcat(a, b) => {
             atom_uses(a, f);
             atom_uses(b, f);
@@ -731,7 +726,7 @@ fn cond_uses(c: &Cond, f: &mut dyn FnMut(Local)) {
     match c {
         Cond::True(a)
         | Cond::Tag(a, _)
-        | Cond::IsRec(a)
+        | Cond::Data(a, _, _)
         | Cond::Bool(a, _)
         | Cond::Ctor(a, _)
         | Cond::Type(a, _)

@@ -40,8 +40,9 @@ lane runs; the lists it names are the authority.
     does not show; the stage 4 migrator (`labels`) makes it positional.
   - `empty-match`: `x |> {}` becomes `core.never(x)` (§2.13); the module must
     import `i/core`.
-- `tests/spec/syn3-pending.txt`: spec cases skipped until stage 6 (open
-  records) lands.
+- `tests/spec/syn3-pending.txt`: retained legacy dynamic-label cases whose
+  intent still needs a closed-data rewrite after stage 6; each has a written
+  reason. Newly valid inspect and spread-order cases are unparked.
 - `crates/ilang-check/tests/syn3-pending.txt`: checker tests that use a form a
   later stage removes, named with that stage; each returns early and says so.
 - Spec fences that need forms of later stages (shape groups, stage 9;
@@ -271,3 +272,51 @@ The new unit regression and all three compile-time tests pass, including
 both optimization levels and both source modules' unmarked quote templates.
 The 57 macro-run and 35 typed-macro tests pass after the fix, retaining
 source-position and hygiene checks.
+
+
+### Main integration after 13:00
+
+Merged the coordinator marker `eb2d7b03` (closed data, a single data
+parameter, shape groups, selection and multicore). Kept the Fail-head lowering,
+the outer-environment order of provided services, and the LSP CPU latency
+bound from this lane. The two remaining feature-switch checks are unconditional
+because syntax three is the default.
+
+Re-ran the converter on the imported source: 26 files converted initially,
+34 embedded programs converted, and eight multicore and eight HTTP Rust
+format templates converted with their substitutions retained. Two constructor
+documentation comments in the new task scheduler had been placed after the
+converted union by the comment printer; they were moved onto their own new
+types (`Woken`, `Away`). No comment was dropped. A mixed callback annotation
+was changed from `send: _` to the data type field `send = _`.
+
+Positional binder hints are no longer field keys in shown function types:
+`(x) { x }` displays `(A) -> A` (§4.6), while actual labels of the data shape
+remain labels. Closed data displays fields with `=` (syntax-3 §2.1).
+The stage-7 CLI `check_types` test is now unparked and all ten check tests pass.
+The three stage-7 package-command tests are also unparked for validation.
+The retained cross-module scheme test now round-trips a generic value under a
+fixed closed-data label; both scheme tests pass. Legacy dynamic-label tests
+remain present with current rewrite reasons, rather than silently disappearing
+in modify/delete resolutions. The old opaque record-graph query case remains
+parked with its reason; main also brings its closed-data union replacement.
+
+The checker golden review separated 37 files changed only by removing
+positional binder names from types from 11 further changes. Those 11 follow:
+closed-data access requires a known field-bearing type (§4.8 rule 13), unknown
+fields now fail there and suppress the existing unused-binding warnings;
+function arguments constrain one data shape (§4.6), so arity disagreement is
+a data-subtyping error and an inferred function may accept a union of shapes;
+selection proves `field(S1(...))` is `0` (syntax-3 §2.6); and main's worker
+exports and corrected closed TLS annotations change library types. All five
+checker type tests and both cross-module scheme tests pass after review.
+No runtime assertion or bound was changed to obtain those results.
+
+The full syntax run passed every target except the skip-list check: the
+converter's fold had promoted two E6 examples. Their future fences were
+restored, preserving their exact errors. Six stale expected-error records
+now parse and were graduated; nine dead identities from removed/moved code
+or replaced template strings were removed without changing retained entries.
+The inventory retry passes all **4,728** texts with **five** exact tracked-error
+entries (two E6 examples and three historical invalid inputs). Both provided
+service and environment examples still have their explicit E6 reasons.

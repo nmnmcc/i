@@ -78,12 +78,12 @@ pub(super) const EFFECTS: &str = r#"
 ;; Calls a computation (§9.1) with the environment.
 (func $call0 (param $f eqref) (param $env (ref null $env)) (result eqref)
   (call_ref $fn0 (ref.cast (ref $clo0) (local.get $f)) (local.get $env)
-    (struct.get $clo0 8 (ref.cast (ref $clo0) (local.get $f)))))
+    (struct.get $clo0 9 (ref.cast (ref $clo0) (local.get $f)))))
 
 ;; Calls a function of one parameter with the environment.
 (func $call1 (param $f eqref) (param $a eqref) (param $env (ref null $env)) (result eqref)
   (call_ref $fn1 (ref.cast (ref $clo1) (local.get $f)) (local.get $env) (local.get $a)
-    (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f)))))
+    (struct.get $clo1 9 (ref.cast (ref $clo1) (local.get $f)))))
 
 ;; Adds the frame record `f` at the end of the capture `c` (the list is
 ;; innermost first), and throws `x` again.
@@ -495,7 +495,7 @@ pub(super) const EFFECTS: &str = r#"
           (struct.new $cont (i32.const 12) (i32.const 0) (i64.const 0) (f64.const 0)
             (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
             (i32.const 0) (local.get $b) (call $capture_sub (ref.as_non_null (local.get $c))) (ref.null eq))
-          (struct.get $clo1 8 (ref.cast (ref $clo1) (local.get $f))))))
+          (struct.get $clo1 9 (ref.cast (ref $clo1) (local.get $f))))))
     ;; A capture for an outer boundary: this one is paused with it.
     (call $capture_pack (ref.as_non_null (local.get $c)) (local.get $x) (ref.func $boundary_reenter)
       (local.get $b))
@@ -676,10 +676,10 @@ pub(super) const EFFECTS: &str = r#"
       (array.get $env (local.get $env) (local.get $i)))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $copy)))
-  (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
+  (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 1)
     (ref.null $bytes)
     (array.new_fixed $values 2 (local.get $f) (call $tuple (local.get $slots)))
-    (ref.null $limbs) (ref.null $call) (ref.func $keep_call)))
+    (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $keep_call)))
 
 (func $keep_call (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env))
     (param $arg eqref) (result eqref)
@@ -736,7 +736,7 @@ pub(super) const EFFECTS: &str = r#"
   (return_call $control_suspend (call $host_root_boundary)
     (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)
       (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)
-      (ref.func $request_handoff))))
+      (i64.const 0) (ref.func $request_handoff))))
 (func $request_wait_loop (param $tickets eqref) (param $env (ref null $env)) (result eqref)
   (if (call $request_any_settled (local.get $tickets)) (then (return (ref.null eq))))
   (block $captured (result (ref $cap) exnref)
@@ -965,10 +965,6 @@ impl<'p> Emitter<'p> {
         }
         self.out
             .push_str(" (result eqref)\n (local $clo (ref null $obj))");
-        if self.p.labels.len() > super::FIXED_MAX / 2 {
-            self.out
-                .push_str(" (local $record_pairs (ref null $values))");
-        }
         if f.frame {
             self.out.push_str(" (local $slot i32)");
         }

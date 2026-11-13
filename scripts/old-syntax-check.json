@@ -1755,57 +1755,6 @@
     "not_source": true,
     "reason": "Rust format string generates a TOML manifest."
   },
-  "crates/ilang-cli/tests/http.rs:97e31cf541bb26e9": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
-  },
-  "crates/ilang-cli/tests/http.rs:146cf9901a2b99ba": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
-  },
-  "crates/ilang-cli/tests/http.rs:5475c0aa0e2f0c43": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render Rust format string with a representative port."
-  },
   "tests/spec/3/syn2_old_empty_record_type.i:8e197a393e555c9d": {
     "reason": "Intentional legacy migration or rejection fixture.",
     "diagnostics": [
@@ -2651,9 +2600,6 @@
     ],
     "reason": "Render the source template of the Lisp-branch helper"
   },
-  "crates/ilang-check/src/types/records/codec.rs:217fe1a139ac8e12": {
-    "not_source": "a format string that builds a type name or an attribute head, not i source"
-  },
   "crates/ilang-check/src/types/shown.rs:ccfaa87f19759eaf": {
     "not_source": "a format string that builds a type name or an attribute head, not i source"
   },
@@ -2682,13 +2628,6 @@
       ]
     ],
     "reason": "Render the source template; the test still exercises the generator"
-  },
-  "docs/spec.md:e7d9c651ae0ffea8": {
-    "track": "SYN3",
-    "reason": "Shape groups (syntax three stage 9): branches of different shapes. The syntax-three parser now reaches this lowering requirement.",
-    "diagnostics": [
-      "E0101: a chain whose branches have different shapes needs shape groups (stage 9 of syntax three), which this compiler does not have yet"
-    ]
   },
   "docs/spec.md:8cd36264ae24baa3": {
     "track": "SYN3",
@@ -2742,12 +2681,6 @@
   },
   "crates/ilang-lsp/tests/protocol.rs:0f1c00c95cc031e0": {
     "not_source": "Position/search substring inside a complete source fixture"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:71ef2e710ff5278a": {
-    "reason": "Completion test: the last branch `() { 2 }` is the pattern being typed, so the chain has branches of different shapes on purpose",
-    "diagnostics": [
-      "E0101: a chain whose branches have different shapes needs shape groups (stage 9 of syntax three), which this compiler does not have yet"
-    ]
   },
   "crates/ilang-lsp/tests/protocol.rs:d27e00e4dc5cccc7": {
     "not_source": "Position/search substring inside a complete source fixture"
@@ -2822,5 +2755,290 @@
       "E0101: the head of a data type or an opaque type has only type parameters",
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
+  },
+  "crates/ilang-cli/tests/multicore.rs:32586dd5d3cd919b": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:8a7d445a9741b557": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:b3d7af2754f74d3d": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:8e2a1c1281f9894b": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:220a24ce91164a08": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:87b5d1cf07b6351c": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:070b6af6019524ce": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/http.rs:af5cd8e64db33bfe": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:0cef4a65c4bff658": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:72601bfd90ecbc03": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:9800d04a16e9b3b0": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:4b11ef07a2bf54d9": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:f7eff0a37bf28534": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:0284547aae203ebc": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:5108534ec7f720fb": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{first_port}",
+        "1234"
+      ],
+      [
+        "{second_port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/multicore.rs:68026936c073b50a": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:b5e1cb94b1632476": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:dce9f9ef401d7b83": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:a61d3c1293ef6e72": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   }
 }

@@ -153,15 +153,6 @@ impl<'a> Closure<'a> {
 
     fn close(&mut self, t: &Ty) -> Result<Ty, &'static str> {
         match t {
-            Ty::Graph(g) => {
-                if g.nodes()
-                    .iter()
-                    .any(|(_, node)| matches!(node, super::records::Node::Top))
-                {
-                    return Err(code::VALUE_TYPE_OPEN);
-                }
-                g.try_map_vars(&mut |v| self.close(&Ty::Var(v)))
-            }
             Ty::Var(v) => {
                 if let Some(f) = self.fixed.get(v) {
                     return Ok(f.ty.clone());
@@ -207,11 +198,8 @@ impl<'a> Closure<'a> {
                     .collect::<Result<_, _>>()?,
             )),
             Ty::Fn(f) => Ok(Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(n, t)| Ok((n.clone(), self.close(t)?)))
-                    .collect::<Result<_, &'static str>>()?,
+                param: self.close(&f.param)?,
+                labels: f.labels.clone(),
                 ret: self.close(&f.ret)?,
                 err: self.close(&f.err)?,
                 env: self.close(&f.env)?,
@@ -245,7 +233,6 @@ impl<'a> Closure<'a> {
     /// completion demands; their candidates use the same immutable snapshot.
     fn annotation(&mut self, t: &Ty) -> Result<Ty, &'static str> {
         Ok(match t {
-            Ty::Graph(g) => g.try_map_vars(&mut |v| self.annotation(&Ty::Var(v)))?,
             Ty::Var(v) if self.s.vars[v.0 as usize].level > self.level => t.clone(),
             Ty::Var(_) => self.close(t)?,
             Ty::Con(h, values, ts) => Ty::Con(
@@ -256,11 +243,8 @@ impl<'a> Closure<'a> {
                     .collect::<Result<_, _>>()?,
             ),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f
-                    .params
-                    .iter()
-                    .map(|(n, t)| Ok((n.clone(), self.annotation(t)?)))
-                    .collect::<Result<_, &'static str>>()?,
+                param: self.annotation(&f.param)?,
+                labels: f.labels.clone(),
                 ret: self.annotation(&f.ret)?,
                 err: self.annotation(&f.err)?,
                 env: self.annotation(&f.env)?,
@@ -364,17 +348,10 @@ impl<'a> Closure<'a> {
 
 fn contains_var(t: &Ty) -> bool {
     match t {
-        Ty::Graph(g) => {
-            !g.variables().is_empty()
-                || g.nodes()
-                    .iter()
-                    .any(|(_, node)| matches!(node, super::records::Node::Top))
-        }
         Ty::Var(_) | Ty::Top => true,
         Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => ts.iter().any(contains_var),
         Ty::Fn(f) => {
-            f.params.iter().any(|(_, t)| contains_var(t))
-                || [&f.ret, &f.err, &f.env].into_iter().any(contains_var)
+            contains_var(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(contains_var)
         }
         Ty::Diff(t, ts) => contains_var(t) || ts.iter().any(contains_var),
         Ty::Both(a, b) => contains_var(a) || contains_var(b),
@@ -396,7 +373,6 @@ fn closed_equal(s: &Solver, a: &Ty, b: &Ty) -> bool {
 /// have no known shape, including variables narrowed by expected/flow facts.
 fn shape(t: &Ty, fixed: &HashMap<V, Fixed>) -> Ty {
     match t {
-        Ty::Graph(g) => g.map_vars(&mut |v| shape(&Ty::Var(v), fixed)),
         Ty::Var(v) => fixed.get(v).map_or(Ty::Top, |f| f.ty.clone()),
         Ty::Con(h, values, ts) => Ty::Con(
             *h,
@@ -404,11 +380,8 @@ fn shape(t: &Ty, fixed: &HashMap<V, Fixed>) -> Ty {
             ts.iter().map(|t| shape(t, fixed)).collect(),
         ),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| (n.clone(), shape(t, fixed)))
-                .collect(),
+            param: shape(&f.param, fixed),
+            labels: f.labels.clone(),
             ret: shape(&f.ret, fixed),
             err: shape(&f.err, fixed),
             env: shape(&f.env, fixed),
@@ -459,15 +432,6 @@ fn completed_in(
     level: u32,
 ) -> Result<Ty, &'static str> {
     match t {
-        Ty::Graph(g) => {
-            if g.nodes()
-                .iter()
-                .any(|(_, node)| matches!(node, super::records::Node::Top))
-            {
-                return Err(code::VALUE_TYPE_OPEN);
-            }
-            g.try_map_vars(&mut |v| completed_in(&Ty::Var(v), s, fixed, level))
-        }
         Ty::Var(v) if !fixed.contains_key(v) => Err(if s.vars[v.0 as usize].level > level {
             code::VALUE_TYPE_OPEN
         } else {
@@ -482,11 +446,8 @@ fn completed_in(
                 .collect::<Result<_, _>>()?,
         )),
         Ty::Fn(f) => Ok(Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| Ok((n.clone(), completed_in(t, s, fixed, level)?)))
-                .collect::<Result<_, &'static str>>()?,
+            param: completed_in(&f.param, s, fixed, level)?,
+            labels: f.labels.clone(),
             ret: completed_in(&f.ret, s, fixed, level)?,
             err: completed_in(&f.err, s, fixed, level)?,
             env: completed_in(&f.env, s, fixed, level)?,
@@ -611,24 +572,6 @@ impl Checker<'_> {
     }
 
     pub(super) fn read_annotation(&mut self, value: ValueRef, site: OfId) -> Ty {
-        if !self.label_slots_ref(value).is_empty() {
-            let span = self.p.of_sites[site.0 as usize].span;
-            self.error(
-                code::LABEL_PARAMETER_VALUE,
-                span,
-                "a binding with label parameters may only be called",
-            );
-        }
-        if let ValueRef::Local(var) = value
-            && self.label_key_values.contains_key(&var)
-        {
-            let span = self.p.of_sites[site.0 as usize].span;
-            self.error(
-                code::INVALID_LABEL_PARAMETER,
-                span,
-                "a key parameter may not be named in a value-derived type",
-            );
-        }
         if let Some(read) = self.reads.sites.get(&site) {
             let result = match read {
                 Read::Ready(t) => t.clone(),
@@ -822,10 +765,6 @@ impl Checker<'_> {
             .iter()
             .any(|site| self.p.of_sites[site.0 as usize].module == group[0].module);
         if !has_demands {
-            if !self.discharge_union_proofs() {
-                self.fail_group_reads(&defs, &sites, &pattern_ids);
-                return;
-            }
             for d in defs {
                 if !self.reads.sources.contains(&d) {
                     continue;
@@ -970,12 +909,7 @@ impl Checker<'_> {
             checked_batch(&snapshot, &equations, &shapes, self.reads.boundary, &fixed)
         };
         if let Some(trial) = trial {
-            let original = std::mem::replace(&mut self.s, trial);
-            if !self.discharge_union_proofs() {
-                self.s = original;
-                self.fail_group_reads(&defs, &sites, &pattern_ids);
-                return;
-            }
+            self.s = trial;
             for (site, t) in results {
                 if self.p.of_sites[site.0 as usize].permanent {
                     self.reads.set(site, Read::Ready(t));
@@ -1028,28 +962,6 @@ impl Checker<'_> {
             if let Some(scheme) = candidates.get(&d) {
                 let t = completed(&scheme.ty, &self.s, &self.reads.fixed, scheme.level);
                 self.reads.completed.insert(d, t);
-            }
-        }
-        self.complete_ready_reads();
-    }
-
-    fn fail_group_reads(
-        &mut self,
-        defs: &HashSet<DefId>,
-        sites: &[OfId],
-        patterns: &[ProjectionId],
-    ) {
-        for &site in sites {
-            self.reads.set(site, Read::Failed);
-        }
-        for &pattern in patterns {
-            self.fail_pattern(pattern);
-        }
-        for &def in defs {
-            if self.reads.sources.contains(&def) {
-                self.reads
-                    .completed
-                    .insert(def, Err(code::VALUE_TYPE_NOT_FIXED));
             }
         }
         self.complete_ready_reads();
@@ -1247,10 +1159,10 @@ impl Checker<'_> {
             }
             TypePattern::Tuple(args) => {
                 let t = c.expose(source)?;
-                let Ty::Con(Head::Tuple(n), _, parts) = t else {
+                let Ty::Con(Head::Shape(n), _, parts) = t else {
                     return Err(code::TYPE_PATTERN_MISMATCH);
                 };
-                if n as usize != args.len() {
+                if n != super::ShapeId::positional(args.len() as u32) {
                     return Err(code::TYPE_PATTERN_MISMATCH);
                 }
                 for (p, t) in args.iter().zip(parts) {
@@ -1313,41 +1225,19 @@ impl Checker<'_> {
                     .map(|t| self.closed_written(t, map, seen))
                     .collect::<Result<_, _>>()?,
             )),
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let pool = super::records::Pool::default();
-                let mut labels = Vec::new();
-                let mut resolved = Vec::new();
-                for (name, ty) in fields {
-                    let label = super::records::written_label(name, self.s.level);
-                    labels.push(label.clone());
-                    resolved.push((label, self.closed_written(ty, map, seen)?));
-                }
-                labels.extend(
-                    removed
-                        .iter()
-                        .map(|name| super::records::written_label(name, self.s.level)),
-                );
-                let record = pool.record(resolved);
-                Ok(match base {
-                    Some(base) => {
-                        let base = self.closed_written(base, map, seen)?;
-                        let rest = pool.without(&base, labels);
-                        pool.inter(&[rest, record])
-                    }
-                    None => record,
-                })
-            }
+            TypeKind::Record { fields } => Ok(Ty::record(
+                fields
+                    .iter()
+                    .map(|(name, ty)| Ok((name.name.clone(), self.closed_written(ty, map, seen)?)))
+                    .collect::<Result<_, _>>()?,
+            )),
             TypeKind::Fn {
                 params,
                 ret,
                 err,
                 env,
-            } => Ok(Ty::Fn(Box::new(FnTy {
-                params: params
+            } => Ok(Ty::Fn(Box::new(FnTy::new(
+                params
                     .iter()
                     .map(|p| {
                         Ok((
@@ -1356,14 +1246,12 @@ impl Checker<'_> {
                         ))
                     })
                     .collect::<Result<_, &'static str>>()?,
-                ret: self.closed_written(ret, map, seen)?,
-                err: err
-                    .as_ref()
+                self.closed_written(ret, map, seen)?,
+                err.as_ref()
                     .map_or(Ok(Ty::Never), |t| self.closed_written(t, map, seen))?,
-                env: env
-                    .as_ref()
+                env.as_ref()
                     .map_or(Ok(Ty::Never), |t| self.closed_written(t, map, seen))?,
-            }))),
+            )))),
             TypeKind::Union(ts) | TypeKind::Inter(ts) => {
                 let parts = ts
                     .iter()
@@ -1450,7 +1338,6 @@ fn fixed_scheme(
     level: u32,
 ) -> Result<Ty, &'static str> {
     match t {
-        Ty::Graph(g) => g.try_map_vars(&mut |v| fixed_scheme(&Ty::Var(v), s, fixed, level)),
         Ty::Var(v) if s.vars[v.0 as usize].level > level => Ok(t.clone()),
         Ty::Var(v) => fixed
             .get(v)
@@ -1464,11 +1351,8 @@ fn fixed_scheme(
                 .collect::<Result<_, _>>()?,
         )),
         Ty::Fn(f) => Ok(Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| Ok((n.clone(), fixed_scheme(t, s, fixed, level)?)))
-                .collect::<Result<_, &'static str>>()?,
+            param: fixed_scheme(&f.param, s, fixed, level)?,
+            labels: f.labels.clone(),
             ret: fixed_scheme(&f.ret, s, fixed, level)?,
             err: fixed_scheme(&f.err, s, fixed, level)?,
             env: fixed_scheme(&f.env, s, fixed, level)?,
@@ -1514,7 +1398,6 @@ impl Checker<'_> {
 
 pub(super) fn replace_vars(t: &Ty, map: &HashMap<V, Ty>) -> Ty {
     match t {
-        Ty::Graph(g) => g.map_vars(&mut |v| map.get(&v).cloned().unwrap_or(Ty::Var(v))),
         Ty::Var(v) => map.get(v).cloned().unwrap_or_else(|| t.clone()),
         Ty::Con(h, values, ts) => Ty::Con(
             *h,
@@ -1522,11 +1405,8 @@ pub(super) fn replace_vars(t: &Ty, map: &HashMap<V, Ty>) -> Ty {
             ts.iter().map(|t| replace_vars(t, map)).collect(),
         ),
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(n, t)| (n.clone(), replace_vars(t, map)))
-                .collect(),
+            param: replace_vars(&f.param, map),
+            labels: f.labels.clone(),
             ret: replace_vars(&f.ret, map),
             err: replace_vars(&f.err, map),
             env: replace_vars(&f.env, map),
@@ -1619,40 +1499,12 @@ impl Checker<'_> {
                 TypeKind::Tuple(ts) => {
                     Ty::tuple(ts.iter().map(|t| written(c, t, map, seen)).collect())
                 }
-                TypeKind::Record {
-                    base,
-                    fields,
-                    removed,
-                } => {
-                    let pool = super::records::Pool::default();
-                    let labels: Vec<_> = fields
+                TypeKind::Record { fields } => Ty::record(
+                    fields
                         .iter()
-                        .map(|(name, _)| super::records::written_label(name, c.s.level))
-                        .chain(
-                            removed
-                                .iter()
-                                .map(|name| super::records::written_label(name, c.s.level)),
-                        )
-                        .collect();
-                    let record = pool.record(
-                        fields
-                            .iter()
-                            .map(|(name, ty)| {
-                                (
-                                    super::records::written_label(name, c.s.level),
-                                    written(c, ty, map, seen),
-                                )
-                            })
-                            .collect(),
-                    );
-                    match base {
-                        Some(base) => {
-                            let rest = pool.without(&written(c, base, map, seen), labels);
-                            pool.inter(&[rest, record])
-                        }
-                        None => record,
-                    }
-                }
+                        .map(|(name, ty)| (name.name.clone(), written(c, ty, map, seen)))
+                        .collect(),
+                ),
                 TypeKind::Union(ts) => {
                     Ty::Union(ts.iter().map(|t| written(c, t, map, seen)).collect())
                 }
@@ -1669,8 +1521,8 @@ impl Checker<'_> {
                     ret,
                     err,
                     env,
-                } => Ty::Fn(Box::new(FnTy {
-                    params: params
+                } => Ty::Fn(Box::new(FnTy::new(
+                    params
                         .iter()
                         .map(|p| {
                             (
@@ -1679,17 +1531,16 @@ impl Checker<'_> {
                             )
                         })
                         .collect(),
-                    ret: written(c, ret, map, seen),
-                    err: err.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
-                    env: env.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
-                })),
+                    written(c, ret, map, seen),
+                    err.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
+                    env.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
+                ))),
                 TypeKind::Hole | TypeKind::Error => Ty::Top,
             }
         }
         fn invalid(s: &Solver, t: &Ty, pol: super::solve::Pol) -> bool {
             use super::solve::Pol;
             match t {
-                Ty::Graph(g) => g.invalid_places(s, pol),
                 Ty::Union(ts) => {
                     let variables = ts
                         .iter()
@@ -1707,7 +1558,7 @@ impl Checker<'_> {
                     .zip(s.variances(*h, ts.len()))
                     .any(|(t, v)| invalid(s, t, pol.by(v))),
                 Ty::Fn(f) => {
-                    f.params.iter().any(|(_, t)| invalid(s, t, pol.flip()))
+                    invalid(s, &f.param, pol.flip())
                         || [&f.ret, &f.err, &f.env]
                             .into_iter()
                             .any(|t| invalid(s, t, pol))
@@ -1772,7 +1623,6 @@ impl Checker<'_> {
     pub(super) fn fixed_reached(&self, l: &Ty, r: &Ty) -> Vec<V> {
         fn collect(t: &Ty, out: &mut Vec<V>) {
             match t {
-                Ty::Graph(g) => out.extend(g.variables()),
                 Ty::Var(v) => out.push(*v),
                 Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => {
                     for t in ts {
@@ -1780,9 +1630,7 @@ impl Checker<'_> {
                     }
                 }
                 Ty::Fn(f) => {
-                    for (_, t) in &f.params {
-                        collect(t, out);
-                    }
+                    collect(&f.param, out);
                     for t in [&f.ret, &f.err, &f.env] {
                         collect(t, out);
                     }
@@ -1966,7 +1814,7 @@ mod tests {
         let before = s.clone();
         let mut c = Closure::new(&s, &fixed, 0, u32::MAX, false);
         let exposed = c.expose(&Ty::Var(root)).unwrap();
-        let Ty::Con(Head::Tuple(2), _, parts) = &exposed else {
+        let Ty::Con(Head::Shape(_), _, parts) = &exposed else {
             panic!("tuple required")
         };
         for part in parts {
@@ -2013,12 +1861,7 @@ mod tests {
         let old = s.fresh_at(0);
         let boundary = s.vars.len();
         let current = s.fresh_at(1);
-        let fun = Ty::Fn(Box::new(FnTy {
-            params: vec![],
-            ret: int(),
-            err: Ty::Never,
-            env: Ty::Var(old),
-        }));
+        let fun = Ty::Fn(Box::new(FnTy::new(vec![], int(), Ty::Never, Ty::Var(old))));
         s.constrain(&Ty::Var(current), &fun);
         let before = s.clone();
         assert!(

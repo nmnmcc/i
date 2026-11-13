@@ -3,7 +3,7 @@
 (
 	main
 )
-identity = (r: Record) { r }
+identity = (r: ()) { r }
 main = () {
 	assert(identity(()) == ())
 	Nil

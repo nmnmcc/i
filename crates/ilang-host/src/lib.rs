@@ -78,6 +78,8 @@ pub mod native;
 mod requests;
 pub mod resources;
 mod run;
+mod workers;
+pub use workers::worker_count;
 pub mod services;
 pub mod syntax;
 #[cfg(test)]
@@ -774,6 +776,24 @@ struct State {
     failure: Option<anyhow::Error>,
     /// The requests of async host functions that are outstanding.
     requests: Requests,
+    /// The other workers of a multicore entry (multicore D8, native N7).
+    workers: Option<Arc<workers::Pool>>,
+}
+
+impl State {
+    /// The state of a remote worker instance: no host services at all.
+    fn worker() -> Self {
+        Self {
+            resources: HostImports::default().resource_host.context(),
+            macro_budget: None,
+            references: BTreeMap::new(),
+            next_reference: 1,
+            stop_message: None,
+            failure: None,
+            requests: Requests::default(),
+            workers: None,
+        }
+    }
 }
 
 /// Service identities attached to required host fields by the compiler. They
@@ -797,6 +817,11 @@ pub struct Program {
     binding_plan: Option<bindings::BindingPlan>,
     provider_registrations: Vec<ProviderRegistration>,
     macro_static_cost: Option<(u64, u64)>,
+    /// Workers of an entry run ([`worker_count`]); more than one needs
+    /// epoch-instrumented code (native N12).
+    workers: usize,
+    /// The engine is epoch-instrumented, so every store needs a deadline.
+    epochs: bool,
 }
 
 #[cfg(feature = "compiler")]
@@ -1115,6 +1140,12 @@ impl Program {
         // optimized machine code used for long-running guest programs.
         config.parallel_compilation(true);
         config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+        let workers = if metadata.macro_static_cost.is_some() {
+            1
+        } else {
+            worker_count()
+        };
+        config.epoch_interruption(workers > 1);
         if let Some(dir) = compile_cache_dir() {
             config.enable_incremental_compilation(std::sync::Arc::new(FunctionCache(
                 dir.join("functions"),
@@ -1123,7 +1154,10 @@ impl Program {
         let engine = Engine::new(&config)?;
         let module =
             compiled_module(&engine, bytes).context("compiling the i WebAssembly module")?;
-        Self::from_parts(engine, module, metadata)
+        let mut program = Self::from_parts(engine, module, metadata)?;
+        program.workers = workers;
+        program.epochs = workers > 1;
+        Ok(program)
     }
 
     fn from_parts(engine: Engine, module: Module, metadata: Metadata) -> Result<Self> {
@@ -1143,7 +1177,28 @@ impl Program {
             binding_plan: None,
             provider_registrations: metadata.provider_registrations,
             macro_static_cost: metadata.macro_static_cost,
+            workers: 1,
+            epochs: false,
         })
+    }
+
+    /// The engine of this program is epoch-instrumented: entries may use
+    /// `workers` workers.
+    pub(crate) fn with_epochs(mut self, workers: usize) -> Self {
+        self.epochs = true;
+        self.workers = if self.macro_static_cost.is_some() {
+            1
+        } else {
+            workers.max(1)
+        };
+        self
+    }
+
+    /// Runs entries on at most `workers` workers (multicore D12: the host's
+    /// choice). One worker keeps the FIFO fast path (native N10).
+    pub fn with_workers(mut self, workers: usize) -> Self {
+        self.workers = if self.epochs { workers.max(1) } else { 1 };
+        self
     }
 
     /// Gives the metadata of a module that has no `ilang.abi` section.
@@ -1176,6 +1231,7 @@ impl Program {
     /// Makes an instance and calls `ilang_start`. When the program stops
     /// during `ilang_start`, the error is a [`Stop`].
     pub fn instantiate(&self, options: HostOptions) -> Result<Instance> {
+        let pool_options = options.clone();
         if let Some((work, allocation)) = self.macro_static_cost {
             let budget = options
                 .imports
@@ -1193,6 +1249,7 @@ impl Program {
         )?;
         let mut linker = Linker::new(&self.engine);
         define_builtins(&mut linker)?;
+        workers::define_home(&mut linker)?;
         for (kind, modules) in [(true, &self.abi.services), (false, &self.abi.externals)] {
             for (module, functions) in modules {
                 for (name, signature) in functions {
@@ -1231,8 +1288,13 @@ impl Program {
                 stop_message: None,
                 failure: None,
                 requests: Requests::default(),
+                workers: None,
             },
         );
+        if self.epochs {
+            // Only remote workers are ever interrupted (native N12).
+            store.set_epoch_deadline(1 << 62);
+        }
         let instance = {
             let mut scope = RootScope::new(&mut store);
             linker
@@ -1253,11 +1315,32 @@ impl Program {
             .get_func(&mut instance.store, "ilang_start")
             .context("the module does not export ilang_start")?;
         match instance.invoke(start, &[], &mut [])? {
-            None => Ok(instance),
+            None => {}
             Some(stop) => {
-                Err(anyhow::Error::new(stop).context("the program stopped in ilang_start"))
+                return Err(anyhow::Error::new(stop).context("the program stopped in ilang_start"));
             }
         }
+        // A module whose `i/task` can publish records gets the other
+        // workers; they start when the first record is published.
+        if self.workers > 1
+            && options.imports.macro_budget.is_none()
+            && let Ok(setup) = instance
+                .instance
+                .get_typed_func::<i64, ()>(&mut instance.store, "ilang_mc_setup")
+        {
+            setup
+                .call(&mut instance.store, workers::id_prefix(0, 0))
+                .map_err(anyhow::Error::from)
+                .context("ilang_mc_setup")?;
+            instance.store.data_mut().workers = Some(workers::Pool::new(
+                self.engine.clone(),
+                self.module.clone(),
+                self.workers,
+                self.abi.clone(),
+                pool_options,
+            ));
+        }
+        Ok(instance)
     }
 
     /// Runs the program entry in a new instance, on one `ilang` thread
@@ -1367,6 +1450,9 @@ impl Instance {
 
     /// Stops admission and releases host work/resources without invoking i code.
     pub fn dispose(&mut self) {
+        if let Some(pool) = self.store.data_mut().workers.take() {
+            pool.shutdown();
+        }
         self.store.data().resources.teardown();
         self.store.data_mut().requests.drop_all();
         self.unusable
@@ -1932,6 +2018,9 @@ fn invoke_in(
 /// than replaced with the trap that carried it out of Wasm.
 fn trapped_in(context: &mut impl AsContextMut<Data = State>, error: anyhow::Error) -> Invoked {
     let mut context = context.as_context_mut();
+    if std::env::var_os("I_WORKERS_TRACE").is_some() {
+        eprintln!("i: trap: {:?} {error:?}", context.data().stop_message);
+    }
     let state = context.data_mut();
     state.resources.teardown();
     state.requests.drop_all();

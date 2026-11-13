@@ -13,14 +13,14 @@ both : Bool
 cmp : Bool
 text : String
 same : Bool
-id : (x = A) -> A
-const : (x = A, y = B) -> A
-add : (x = Int, y = Int) -> Int
-inc : (x = A & Int) -> A
-apply : (f = (A) <- (Fail(E), ..N) -> B, x = A) <- (Fail(E), ..N) -> B
-compose : (f = (A) <- (Fail(E), ..N) -> B, g = (C) <- (Fail(E2), ..N2) -> A) -> (x = C) <- (Fail(E2 | E), ..N, ..N2) -> B
-twice : (f = (A | B) <- (Fail(E), ..N) -> B & C, x = A) <- (Fail(E), ..N) -> C
-ignore : (x = A) -> 1
+id : (A) -> A
+const : (A, B) -> A
+add : (Int, Int) -> Int
+inc : (A & Int) -> A
+apply : ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B
+compose : ((A) <- (Fail(E), ..N) -> B, (C) <- (Fail(E2), ..N2) -> A) -> (C) <- (Fail(E2 | E), ..N, ..N2) -> B
+twice : ((A | B) <- (Fail(E), ..N) -> B & C, A) <- (Fail(E), ..N) -> C
+ignore : (A) -> 1
 30:8: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
 40:2: warning[W0502]: this value is not used, and working it out does nothing
 2:1: warning[W0504]: top-level binding `one` is not used

@@ -264,8 +264,9 @@ one  = (pair)                    // shape: 1 position; one is not pair
   and `h`.
 - **One-tuple.** `(x)` is data with one position. Grouping in an expression
   is only `{ x }`.
-- **Unit.** `()` is the empty data, a value, a type and a pattern. It is not
-  `Nil`, which is the prelude's labelled type `Nil = ()`.
+- **Unit.** `()` is the empty data: the map with no keys. Data is the one
+  kind of thing written with `( )`, and `()` is that thing wherever it is
+  written. It is not `Nil`, which is the prelude's labelled type `Nil = ()`.
 - **Access.** `d.k` (a decimal) reads position `k`; `d.f` reads label `f`.
   Both need a known type (spec §4.8) whose members are all data types, or
   labelled types whose data is visible (§2.8), each with that key. The result
@@ -2591,8 +2592,8 @@ type.
   a three-part `(-> …)`. Today `(| a f)` is the pipe (`lisp/to_ast.rs`:489,
   `encode.rs`:969); the pipe's head becomes `|>`, the spelling of its token in
   the normal surface, as for every other operator.
-- `(,)` is the empty data in value, type and pattern positions, and so the
-  empty parameter data. The empty Round `()` has no legal position; `(f)` is
+- `(,)` is the empty data wherever data is written, and so the empty
+  parameter data. The empty Round `()` has no legal position; `(f)` is
   a call with one part, not an empty Round.
 
 **Patterns**

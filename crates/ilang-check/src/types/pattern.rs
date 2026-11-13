@@ -596,6 +596,7 @@ impl Checker<'_> {
         };
         let r = self.s.fresh();
         let mut knowns = Vec::new();
+        let mut rets = Vec::new();
         for c in clauses {
             // Every choice of the clause has `C` at its top.
             let known = subject_var.filter(|_| !fitted).and_then(|x| {
@@ -622,6 +623,7 @@ impl Checker<'_> {
             let (t, k) = self.infer_k(&c.body, expected);
             knowns.push(k);
             self.sub(&t, &r, c.body.span);
+            rets.push(t);
             if let Some((x, old, old_args)) = before {
                 match old {
                     Some(o) => self.known.insert(x, o),
@@ -644,6 +646,19 @@ impl Checker<'_> {
                 .to(clause.patterns.last().unwrap().span);
             self.defer_failure(Pat::Or(rows[0].clone()), a, at);
         } else {
+            {
+                // Syntax three §2.6.1: the rows and the branch results, for
+                // the selection table of a function with this body.
+                let table = super::groups::CaseTable {
+                    rows: rows
+                        .iter()
+                        .zip(clauses)
+                        .map(|(choices, c)| (Pat::Or(choices.clone()), c.guard.is_some()))
+                        .collect(),
+                    rets,
+                };
+                self.case_tables.insert((module, span), table);
+            }
             self.cases.push(PendingCase {
                 module,
                 held,
@@ -726,12 +741,12 @@ impl Checker<'_> {
             if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
                 let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
                 taken.push(match h {
-                    Head::Fn => Ty::Fn(Box::new(FnTy {
-                        params: args.into_iter().map(|a| (None, a)).collect(),
-                        ret: self.s.fresh(),
-                        err: self.s.fresh(),
-                        env: self.s.fresh(),
-                    })),
+                    Head::Fn => Ty::Fn(Box::new(FnTy::new(
+                        args.into_iter().map(|a| (None, a)).collect(),
+                        self.s.fresh(),
+                        self.s.fresh(),
+                        self.s.fresh(),
+                    ))),
                     h => Ty::Con(h, super::lits::ValueSet::ALL, args),
                 });
             }
@@ -972,8 +987,7 @@ impl Checker<'_> {
                                     Some(coverage::scalar_pat(m))
                                 }
                                 Ty::Con(h, _, args) => Some(Pat::Head(*h, args.len())),
-                                Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
-                                Ty::Graph(g) if g.record_only() => Some(Pat::Head(Head::Record, 0)),
+                                Ty::Fn(_) => Some(Pat::Head(Head::Fn, 1)),
                                 _ => None,
                             })
                             .collect(),
@@ -1022,7 +1036,7 @@ impl Checker<'_> {
                         } else if let Some(h) = m.value_head() {
                             let n = match m {
                                 Ty::Con(_, _, xs) => xs.len(),
-                                Ty::Fn(f) => f.params.len(),
+                                Ty::Fn(_) => 1,
                                 _ => 0,
                             };
                             places[at].seen.push((v.clause, v.unguarded, h, n));
@@ -1114,7 +1128,7 @@ impl Checker<'_> {
             }
             PatternKind::Tuple(ps) => {
                 let n = ps.len() as u32;
-                let h = Head::Tuple(n);
+                let h = Head::Shape(super::ShapeId::positional(n));
                 let parts = self.shared(places, at, h, ps.len());
                 let kparts = match known::member(&places[at].known, Some(h)) {
                     Some(Ty::Con(_, _, xs)) => xs,
@@ -1132,7 +1146,10 @@ impl Checker<'_> {
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 places[at].seen.push((v.clause, v.unguarded, h, ps.len()));
-                (Ty::tuple(parts), Pat::Ctor(Ctor::Tuple(n), pats))
+                (
+                    Ty::tuple(parts),
+                    Pat::Ctor(Ctor::Shape(super::ShapeId::positional(n)), pats),
+                )
             }
             PatternKind::List { items, rest } => {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));
@@ -1316,13 +1333,13 @@ mod shared_place_tests {
         std::fs::create_dir(root.path().join("src")).unwrap();
         std::fs::write(
             root.path().join("src/main.i"),
-            r#"Pair(A) = (A, A)
-Start(A) = (A)
-Stop(A) = (A)
+            r#"Pair(A) = { (A, A) }
+Start(A) = { (A) }
+Stop(A) = { (A) }
 Event(A) = Start(A) | Stop(A)
 Two(A) = { (A, A) }
-Wrapped(A) = (Two(A))
-Solo(A) = (A, Int)
+Wrapped(A) = { (Two(A)) }
+Solo(A) = { (A, Int) }
 "#,
         )
         .unwrap();

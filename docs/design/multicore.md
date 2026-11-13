@@ -636,3 +636,41 @@ MC-I. These are fixed semantics, not choices left to that prototype.
 23. `Key(A)` is invariant in `A`, and keys are only used through `i/key`; no API casts.
 24. `s.go` and joins check the chain, channels and `Shared` values are freed with their scope, and handles check their run, all in M:1 already, so that the multicore wave changes no program.
 25. Only `==` reads function and key ids. The text form of a function, a key, a `Keyed` value or any task/scope/channel/event/share handle never shows an id, a worker index or anything else that depends on placement, and no `i/task` API gives one out.
+
+## 19. First native implementation (lane mc, 2026-11-13)
+
+- **Workers.** One module, N instances: the entry's instance is worker 0; workers
+  1..N-1 each have their own `Store`, host services and OS thread
+  (`crates/ilang-host/src/workers.rs`), started as records are published. N is 1
+  by default; `I_WORKERS=<n>` or `I_WORKERS=auto` (cores, at most one per GiB of
+  available memory) or `Program::with_workers` opt in. Macro programs, WASI and
+  JS run one worker. More than one worker turns on epoch instrumentation (N12).
+- **Publication (D8/P1, N7).** At `go` in the entry run, `i/task` encodes the
+  complete record (start function with kept services, path, run, root, runner)
+  with the runtime codec (`crates/ilang-wasm/src/emit/workers.rs`, keeps sharing
+  and cycles). A record holding values of worker 0 that cannot move stays local;
+  one holding tokens of worker w is published for w only. Nested runs never
+  publish (runtime §6.5).
+- **Claim once, run where claimed.** The maker claims a record only when no
+  worker is free for it (Go: work goes to idle Ps first); otherwise a worker
+  that holds no task claims it. A claimed task runs on that worker to each next
+  step; started tasks never move (N6).
+- **One locked authority (N8).** All shared scheduler state stays in worker 0's
+  i scheduler. A worker sends each step of its task as a message (the command,
+  with the `finalizing` answers of the task's frames); worker 0 answers, and
+  the answer goes back to the worker holding the stack. Values that cannot move
+  travel as tokens of their worker. Shared values are read from the host
+  transport directly while their scope lives.
+- **IO on every worker.** A worker's requests are started in mirrors of the
+  task's request groups, waited for there and settled through `ilang_settle:*`
+  exports; worker 0 sees a cancellable wait that a `Woken` message ends.
+- **Stops (N12).** A stop on a worker stops the run with its message.
+- **Open: scheduling order with several workers.** With N > 1, outcomes that
+  depend on the order of steps can differ from the one-worker FIFO schedule
+  (e.g. spec 9.9/tasks.i's race winner, 9.9/final_cancel_phases.i's first child
+  cancelled before it starts). Whether D1 permits these is an owner question;
+  hence the default of one worker.
+- **Not done.** Function ids for `==` across copies (a copied closure is not
+  `==` its original); D7's top-level portability walk; worker-local Root/Owner
+  counts are not shared with worker 0; worker token tables are never freed;
+  browser workers (N11); the packaged runner runs one worker.

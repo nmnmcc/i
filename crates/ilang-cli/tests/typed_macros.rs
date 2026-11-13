@@ -11,8 +11,8 @@ fn project(macros: &str, main: &str) -> tempfile::TempDir {
 }
 const ID: &str = r#"(, (= syntax (/ i syntax)))
 (, identity)
-(@ macro (: identity (-> [A] (, A) A)))
-(@ macro (= identity (-> (, value) _ value)))
+(@ macro (: (identity A) (-> ((: value A)) A)))
+(@ macro (= identity (-> (value) _ value)))
 "#;
 #[test]
 fn typed_macro_identity_differential() {
@@ -65,7 +65,7 @@ fn reject(macros: &str, source: &str, message: &str) {
 }
 #[test]
 fn typed_macro_signature_checks_dropped_arguments() {
-    let m = declared("m (-> (, Int) Int)", "(-> (, value) _ `7)");
+    let m = declared("m (-> (Int) Int)", "(-> (value) _ `7)");
     reject(
         &m,
         "(m = app/macros)\nmain = () { m.m(\"bad\") }",
@@ -74,7 +74,7 @@ fn typed_macro_signature_checks_dropped_arguments() {
 }
 #[test]
 fn typed_macro_narrow_output_keeps_declared_type() {
-    let m = declared("m (-> (, Int) Int)", "(-> (, value) _ `7)");
+    let m = declared("m (-> (Int) Int)", "(-> (value) _ `7)");
     let (_, c) = checked(
         &m,
         "(m = app/macros)\nf = () { m.m(1) }\nmain = () { assert(f() == 7) }",
@@ -98,7 +98,7 @@ fn typed_macro_narrow_output_keeps_declared_type() {
 }
 #[test]
 fn typed_macro_output_cannot_change_result_type() {
-    let m = declared("m (-> (, Int) String)", "(-> (, value) _ value)");
+    let m = declared("m (-> (Int) String)", "(-> (value) _ value)");
     reject(
         &m,
         "(m = app/macros)\nmain = () { m.m(1) }",
@@ -107,7 +107,7 @@ fn typed_macro_output_cannot_change_result_type() {
 }
 #[test]
 fn typed_macro_result_only_variable_cannot_guess() {
-    let m = declared("m (-> [A] (,) A)", "(-> (,) _ `\"\")");
+    let m = declared("(m A) (-> () A)", "(-> () _ `\"\")");
     reject(
         &m,
         "(m = app/macros)\nf = () -> String { m.m() }\nmain = () { f() }",
@@ -117,8 +117,8 @@ fn typed_macro_result_only_variable_cannot_guess() {
 #[test]
 fn typed_macro_labels_and_pipe() {
     let m = declared(
-        "m (-> (, Int Int) Int)",
-        "(-> (, x y) _ `(+ ~x ~y))",
+        "m (-> ((: left Int) (: right Int)) Int)",
+        "(-> (x y) _ `(+ ~x ~y))",
     );
     checked(
         &m,
@@ -129,16 +129,16 @@ fn typed_macro_labels_and_pipe() {
 #[test]
 fn typed_macro_type_of_observes_literal() {
     let m = declared(
-        "m (-> [A] (, A) Int)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax subtype) t `Int) (| (-> (, (. syntax Yes)) _ `7) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) \"expected integer type\" value)))))})",
+        "(m A) (-> (A) Int)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax subtype) t `Int) { (-> (. syntax Yes) `7) (-> _ ((. fail raise) ((. syntax SyntaxError) \"expected integer type\" value))) }) })",
     );
     checked(&m, "(m = app/macros)\nmain = () { assert(m.m(42) == 7) }").unwrap();
 }
 #[test]
 fn typed_macro_type_of_rejects_fabricated_syntax() {
     let m = declared(
-        "m (-> (, Int) Int)",
-        "(-> (, value) _ {((. syntax type_of) `1) value})",
+        "m (-> (Int) Int)",
+        "(-> (value) _ { ((. syntax type_of) `1) value })",
     );
     reject(
         &m,
@@ -149,16 +149,16 @@ fn typed_macro_type_of_rejects_fabricated_syntax() {
 #[test]
 fn typed_macro_signature_query_is_reflexive() {
     let m = declared(
-        "m (-> [A] (, A) A)",
-        "(-> (, value) _ {(= s ((. syntax signature))) (|> ((. syntax subtype) s s) (| (-> (, (. syntax Yes)) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) \"signature is not reflexive\" value)))))})",
+        "(m A) (-> (A) A)",
+        "(-> (value) _ { (= s ((. syntax signature))) (| ((. syntax subtype) s s) { (-> (. syntax Yes) value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"signature is not reflexive\" value))) }) })",
     );
     checked(&m, "(m = app/macros)\nmain = () { assert(m.m(42) == 42) }").unwrap();
 }
 #[test]
 fn typed_macro_members_preserve_finite_scalar_order() {
     let m = declared(
-        "m (-> (, Int) Int)",
-        "(-> (, value) _ (|> ((. syntax members) `(| 2 10 Nil)) (-> (, [a b c]) _ (|> (== ((. syntax show) a) \"10\") (| (-> (, True) _ value) (-> (, False) _ ((. fail raise) ((. syntax SyntaxError) \"wrong member order\" value))))))))",
+        "m (-> (Int) Int)",
+        "(-> (value) _ { (| ((. syntax members) `(| 2 10 Nil)) { (-> [a b c] (| (== ((. syntax show) a) \"10\") { (-> True value) (-> False ((. fail raise) ((. syntax SyntaxError) \"wrong member order\" value))) })) }) })",
     );
     checked(&m, "(m = app/macros)\nmain = () { m.m(1) }").unwrap();
 }
@@ -188,7 +188,7 @@ fn typed_macro_rejects_value_position() {
 }
 #[test]
 fn typed_macro_rejects_signature_holes() {
-    let m = declared("m (-> (, Int) _)", "(-> (, x) _ x)");
+    let m = declared("m (-> (Int) _)", "(-> (x) _ x)");
     reject(
         &m,
         "(m = app/macros)\nmain = () { Nil }",
@@ -197,7 +197,7 @@ fn typed_macro_rejects_signature_holes() {
 }
 #[test]
 fn typed_macro_rejects_implementation_arity() {
-    let m = declared("m (-> (, Int Int) Int)", "(-> (, x) _ x)");
+    let m = declared("m (-> (Int Int) Int)", "(-> (x) _ x)");
     reject(
         &m,
         "(m = app/macros)\nmain = () { Nil }",
@@ -247,8 +247,8 @@ fn typed_macro_builds_and_runs_forwarded_argument() {
 #[test]
 fn typed_macro_cannot_delay_effectful_argument() {
     let m = declared(
-        "m (-> [A] (, A) (-> (,) A))",
-        "(-> (, value) _ `(-> (,) _ ~value))",
+        "(m A) (-> (A) (-> () A))",
+        "(-> (value) _ `(-> () _ ~value))",
     );
     reject(
         &m,
@@ -259,8 +259,8 @@ fn typed_macro_cannot_delay_effectful_argument() {
 #[test]
 fn typed_macro_can_delay_pure_argument() {
     let m = declared(
-        "m (-> [A] (, A) (-> (,) A))",
-        "(-> (, value) _ `(-> (,) _ ~value))",
+        "(m A) (-> (A) (-> () A))",
+        "(-> (value) _ `(-> () _ ~value))",
     );
     checked(
         &m,
@@ -364,10 +364,10 @@ fn typed_macro_nested_forwarding_runs_retained_inner_call() {
 fn typed_macro_outer_drop_does_not_execute_inner_macro() {
     let macros = r#"(, (= syntax (/ i syntax)) (= fail (/ i fail)))
 (, drop bad)
-(@ macro (: drop (-> (, Int) Int)))
-(@ macro (= drop (-> (, x) _ `7)))
-(@ macro (: bad (-> (, Int) Int)))
-(@ macro (= bad (-> (, x) _ ((. fail raise) ((. syntax SyntaxError) "must not run" x)))))
+(@ macro (: drop (-> (Int) Int)))
+(@ macro (= drop (-> (x) _ `7)))
+(@ macro (: bad (-> (Int) Int)))
+(@ macro (= bad (-> (x) _ ((. fail raise) ((. syntax SyntaxError) "must not run" x)))))
 "#;
     let (_, c) = checked(
         macros,
@@ -380,10 +380,10 @@ fn typed_macro_outer_drop_does_not_execute_inner_macro() {
 fn typed_macro_result_can_introduce_another_typed_call() {
     let macros = r#"(, (= syntax (/ i syntax)))
 (, outer)
-(@ macro (: outer (-> (, Int) Int)))
-(@ macro (= outer (-> (, x) _ `(inner ~x))))
-(@ macro (: inner (-> (, Int) Int)))
-(@ macro (= inner (-> (, x) _ `(+ ~x 1))))
+(@ macro (: outer (-> (Int) Int)))
+(@ macro (= outer (-> (x) _ `(inner ~x))))
+(@ macro (: inner (-> (Int) Int)))
+(@ macro (= inner (-> (x) _ `(+ ~x 1))))
 "#;
     let (_, c) = checked(
         macros,
@@ -431,10 +431,12 @@ fn typed_macro_forwarding_effect_rows_graph_differential() {
     same_principal(&typed, &plain, "f");
 }
 #[test]
-fn typed_macro_graph_members_keep_one_exact_record_graph() {
+fn typed_macro_members_give_each_closed_data_member_once() {
+    // syntax-3 stage 6: a union of closed data has one member per shape
+    // (§2.3, §6.2); it is no longer one record graph.
     let m = declared(
-        "m (-> [A] (, A) A)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax members) t) (| (-> (, [one]) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) \"record graph was split\" value)))))})",
+        "(m A) (-> (A) A)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax members) t) { (-> [one two] value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"closed data members not one per shape\" value))) }) })",
     );
     checked(
         &m,
@@ -445,8 +447,8 @@ fn typed_macro_graph_members_keep_one_exact_record_graph() {
 #[test]
 fn typed_macro_frozen_variable_is_legal_in_output_annotation() {
     let m = declared(
-        "m (-> [A] (, A) A)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) `{(= (: saved ~t) ~value) saved}})",
+        "(m A) (-> (A) A)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) `{ (= (: saved ~t) ~value) saved } })",
     );
     checked(
         &m,
@@ -458,8 +460,8 @@ fn typed_macro_frozen_variable_is_legal_in_output_annotation() {
 #[test]
 fn typed_macro_members_accept_symbolic_difference_without_new_bounds() {
     let m = declared(
-        "m (-> [A] (, A) A)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) (= difference `(- ~t Int)) (|> ((. syntax members) difference) (| (-> (, [one]) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) \"symbolic difference split\" value)))))})",
+        "(m A) (-> (A) A)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (= difference `(- ~t Int)) (| ((. syntax members) difference) { (-> [one] value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"symbolic difference split\" value))) }) })",
     );
     checked(
         &m,
@@ -475,8 +477,8 @@ fn typed_macro_forwarding_keeps_original_value_type_reads() {
 #[test]
 fn typed_macro_argument_binder_cannot_escape() {
     let m = declared(
-        "m (-> (, (-> (, Int) Int)) Int)",
-        "(-> (, value) _ (|> value (| (-> (, `(-> (, ~parameter) ~ret {~body})) _ body) (-> (, _) _ value))))",
+        "m (-> ((-> (Int) Int)) Int)",
+        "(-> (value) _ (| value { (-> `(-> (~parameter) ~ret {~body}) body) (-> _ value) }))",
     );
     reject(
         &m,
@@ -487,8 +489,8 @@ fn typed_macro_argument_binder_cannot_escape() {
 #[test]
 fn typed_macro_partial_argument_rebuild_retains_original_binders() {
     let m = declared(
-        "m (-> (, (-> (, Int) Int)) (-> (, Int) Int))",
-        "(-> (, value) _ (|> value (| (-> (, `(-> (, ~parameter) ~ret {~body})) _ `(-> (, ~parameter) ~ret {~body})) (-> (, _) _ value))))",
+        "m (-> ((-> (Int) Int)) (-> (Int) Int))",
+        "(-> (value) _ (| value { (-> `(-> (~parameter) ~ret {~body}) `(-> (~parameter) ~ret {~body})) (-> _ value) }))",
     );
     checked(
         &m,
@@ -501,10 +503,20 @@ fn typed_macro_partial_argument_rebuild_retains_original_binders() {
 fn typed_macro_nested_queries_keep_parent_type_handles() {
     let macros = r#"(, (= syntax (/ i syntax)))
 (, outer)
-(@ macro (: outer (-> [A] (, A) A)))
-(@ macro (= outer (-> (, value) _ {(= t ((. syntax type_of) value)) `(inner {(= (: saved ~t) ~value) saved})})))
-(@ macro (: inner (-> [A] (, A) A)))
-(@ macro (= inner (-> (, value) _ (|> value (| (-> (, `{(= (: ~name ~annotation) ~arg) ~last}) _ {(= t ((. syntax type_of) arg)) (|> ((. syntax subtype) annotation t) (| (-> (, (. syntax Yes)) _ value) (-> (, _) _ value)))}) (-> (, _) _ value))))))
+(@ macro (: (outer A) (-> (A) A)))
+(@ macro (= outer (-> (value) _ {
+  (= t ((. syntax type_of) value))
+  `(inner { (= (: saved ~t) ~value) saved })
+})))
+(@ macro (: (inner A) (-> (A) A)))
+(@ macro (= inner (-> (value) _ (| value {
+  (-> `{ (= (: ~name ~annotation) ~arg) ~last }
+    { (= t ((. syntax type_of) arg))
+      (| ((. syntax subtype) annotation t) {
+        (-> (. syntax Yes) value)
+        (-> _ value) }) })
+  (-> _ value)
+}))))
 "#;
     checked(
         macros,
@@ -516,8 +528,8 @@ fn typed_macro_nested_queries_keep_parent_type_handles() {
 #[test]
 fn typed_macro_generic_choice_reports_restriction() {
     let m = declared(
-        "m (-> [A] (, A) Int)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax subtype) t `Int) (| (-> (, (. syntax Yes)) _ `7) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) \"no choice\" value)))))})",
+        "(m A) (-> (A) Int)",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax subtype) t `Int) { (-> (. syntax Yes) `7) (-> _ ((. fail raise) ((. syntax SyntaxError) \"no choice\" value))) }) })",
     );
     reject(
         &m,

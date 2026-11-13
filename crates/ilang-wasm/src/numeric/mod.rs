@@ -554,7 +554,7 @@ pub fn run(p: &mut Program) {
             if matches!(
                 s,
                 Stmt::Let {
-                    value: Value::Field(_, _) | Value::RecGet(_, _),
+                    value: Value::Field(_, _),
                     ..
                 }
             ) {

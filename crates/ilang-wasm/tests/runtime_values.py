@@ -15,7 +15,6 @@ import tempfile
 import sys
 
 sys.dont_write_bytecode = True
-import runtime_records
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1] / "src" / "runtime"
@@ -336,7 +335,6 @@ def main():
         "COLLISION_B": "ilang-hamt-429330",
     }.items():
         tests = tests.replace("{{" + key + "}}", string(value))
-    tests += runtime_records.tests(string)
     wat = "(module\n" + "\n".join([
         pathlib.Path(args.types).read_text(), PRELUDE,
         pathlib.Path(args.runtime).read_text(), tests,
@@ -347,9 +345,8 @@ def main():
                  "deep_records_first_field", "deep_records_middle_field",
                  "deep_records_unequal_base", "deep_records_delayed_siblings",
                  "deep_list_heads", "deep_records_boxed_siblings",
-                 "lexicographic_continuations", "structural_records",
-                 "record_identity_labels", "deep_structural_records"],
-                ["reject_nan", "reject_infinity", "record_missing_traps"])
+                 "lexicographic_continuations"],
+                ["reject_nan", "reject_infinity"])
         allocator = "(module\n" + raw(ROOT / "mod.rs", "MEMORY") + ALLOCATOR_TESTS + ")"
         execute(args, directory, "allocator", allocator,
                 ["allocator_reuse_and_growth", "allocator_full_memory32"],

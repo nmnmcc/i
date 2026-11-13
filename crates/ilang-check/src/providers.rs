@@ -336,10 +336,6 @@ fn canonical(p: &Program, t: &ShownType) -> String {
 fn normalize(p: &Program, t: ShownType) -> ShownType {
     let union = matches!(t, ShownType::Union(_));
     match t {
-        ShownType::Graph(graph) => match graph.ordinary_view() {
-            Some(view) => normalize(p, view),
-            None => ShownType::Graph(graph),
-        },
         ShownType::Union(xs) | ShownType::Inter(xs) => {
             let mut out = vec![];
             for x in xs {
@@ -398,7 +394,6 @@ fn closed(t: &ShownType) -> bool {
                 && f.err.as_ref().is_none_or(closed)
                 && f.env.as_ref().is_none_or(closed)
         }
-        ShownType::Graph(g) => g.graph_is_closed(),
         _ => true,
     }
 }
@@ -605,6 +600,7 @@ fn substitute(t: &ShownType, vars: &HashMap<String, ShownType>) -> ShownType {
                 .iter()
                 .map(|(label, ty)| (label.clone(), substitute(ty, vars)))
                 .collect(),
+            group: f.group,
             ret: substitute(&f.ret, vars),
             err: f.err.as_ref().map(|ty| substitute(ty, vars)),
             env: f.env.as_ref().map(|ty| substitute(ty, vars)),

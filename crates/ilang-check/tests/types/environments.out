@@ -1,9 +1,9 @@
 collect : (() <- (Fail(E), Yield(A), ..N) -> Nil) <- (Fail(E), ..N) -> List(A)
 numbers : () -> List(Int)
 inferred : () -> List("s")
-run_never : (body = () <- (Yield(Never)) -> Nil) -> 1
+run_never : (() <- (Yield(Never)) -> Nil) -> 1
 bad_never : () -> 1
-run_int : (body = () <- (Yield(Int)) -> Nil) -> 1
+run_int : (() <- (Yield(Int)) -> Nil) -> 1
 good_int : () -> 1
 emit_int : () <- (Yield(Int)) -> Nil
 emit_string : () <- (Yield(String)) -> Nil

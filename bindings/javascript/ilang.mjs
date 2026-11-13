@@ -924,6 +924,19 @@ export async function instantiate(source, options = {}) {
       }
       return id;
     }), broken, [0x6f], [0x7e], `${namespace} reference_id`),
+    // One worker in JavaScript: browser workers are not implemented, so
+    // `i/task` never publishes a record (multicore D12).
+    mc_publish: () => 0n,
+    mc_claim: () => 1,
+    mc_adopt: () => { throw new ModuleFault("mc_adopt without workers"); },
+    mc_send: () => { throw new ModuleFault("mc_send without workers"); },
+    mc_inbox: () => 0n,
+    mc_message: () => { throw new ModuleFault("mc_message without workers"); },
+    mc_pending: () => 0,
+    mc_wait: () => undefined,
+    mc_share_put: () => undefined,
+    mc_share_get: () => 0n,
+    mc_share_drop: () => undefined,
     // The module traps right after this call.
     panic: typedFunction(bridge.admitting((_, pointer, length) => {
       let message;

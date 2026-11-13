@@ -16,7 +16,9 @@ main = () <- (out: Out) {
 	result = fail.catch(() {
 		task.scope((s) {
 			task.go(s, () { fail.raise("first") })
-			unstarted = task.go(s, () { panic("dropped sibling ran") })
+			// §9.9: the sibling may start before the failure; then it waits
+			// until the cancellation reaches it, else it is dropped unstarted.
+			unstarted = task.go(s, () { task.sync(task.never()) })
 			resource.ensure(
 				() { task.join(unstarted) },
 				() {

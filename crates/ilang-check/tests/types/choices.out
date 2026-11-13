@@ -1,10 +1,10 @@
-either : (r = Result(Int, String)) -> Int | String
-small : (n = A) -> "big" | "small"
-mixed : (v = Int | String | Nil) -> "one or text" | "other"
-tuple_choice : (p = (Int, Int)) -> Int
-nested_choice : (r = Result(Result(A, A), A)) -> A
-shared : (r = Result(1 | "a", A)) -> A | 0 | 1
-shared_list : (xs = List(Int | String)) -> 0 | 1 | 2
-shared_tuple : (p = (1 | "a", Bool)) -> 0 | 1
+either : (Result(Int, String)) -> Int | String
+small : (A) -> "big" | "small"
+mixed : (Int | String | Nil) -> "one or text" | "other"
+tuple_choice : ((Int, Int)) -> Int
+nested_choice : (Result(Result(A, A), A)) -> A
+shared : (Result(1 | "a", A)) -> A | 0 | 1
+shared_list : (List(Int | String)) -> 0 | 1 | 2
+shared_tuple : ((1 | "a", Bool)) -> 0 | 1
 23:22: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[1, _, ..]`
 25:22: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(1, False)`

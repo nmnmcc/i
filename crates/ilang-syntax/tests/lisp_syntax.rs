@@ -666,7 +666,7 @@ fn definition_table_distinguishes_waits_catchable_and_compile_errors() {
     use ilang_syntax::lisp::definition_schedule::Mode;
     use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
     let mut table = DefinitionTable::default();
-    let source = "Box(A) = (A)";
+    let source = "Box(A) = { (A) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty());
     let of = root("Box");
@@ -1120,7 +1120,7 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
         Definition, DefinitionCost, DefinitionTable, Lookup,
     };
     let of = root("Box");
-    let source = "Box(A) = (A)";
+    let source = "Box(A) = { (A) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty());
     let mut table = DefinitionTable::default();

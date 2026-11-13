@@ -1603,39 +1603,15 @@ impl<'a> TypeShow<'a> {
             },
             TypeKind::Hole | TypeKind::Error => "_".to_string(),
             TypeKind::Tuple(ts) => format!("({})", join(ts, ", ", 0)),
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let mut parts = Vec::new();
-                if let Some(base) = base {
-                    parts.push(format!("..{}", self.ty(base, 0)));
-                }
-                let label_text = |label: &hir::RecordLabel| match label.parameter {
-                    Some(id) if self.canonical => self
-                        .def
-                        .params
-                        .iter()
-                        .position(|(_, p)| *p == id)
-                        .map(|i| self.param(i))
-                        .unwrap_or_else(|| self.var(id)),
-                    _ => ilang_syntax::print::record_label(&label.name, label.parameter.is_some()),
-                };
+            TypeKind::Record { fields } => {
                 let mut members: Vec<_> = fields
                     .iter()
-                    .map(|(label, ty)| format!("{}: {}", label_text(label), self.ty(ty, 0)))
+                    .map(|(label, ty)| format!("{}: {}", label.name, self.ty(ty, 0)))
                     .collect();
-                members.extend(
-                    removed
-                        .iter()
-                        .map(|label| format!("-{}", label_text(label))),
-                );
                 if self.canonical {
                     members.sort();
                 }
-                parts.extend(members);
-                format!("({})", parts.join(", "))
+                format!("({})", members.join(", "))
             }
             TypeKind::Fn {
                 params,
@@ -2096,6 +2072,7 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
                 .iter()
                 .map(|(n, t)| (n.clone(), canonical_alias_order(t, key)))
                 .collect(),
+            group: f.group,
             ret: canonical_alias_order(&f.ret, key),
             err: f.err.as_ref().map(|t| canonical_alias_order(t, key)),
             env: f.env.as_ref().map(|t| canonical_alias_order(t, key)),
@@ -2104,11 +2081,11 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
             Box::new(canonical_alias_order(t, key)),
             ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
         ),
-        ShownType::Lit(_)
-        | ShownType::Var(_)
-        | ShownType::Hole
-        | ShownType::Never
-        | ShownType::Graph(_) => t.clone(),
+        ShownType::Lit(_) | ShownType::Var(_) | ShownType::Hole | ShownType::Never => t.clone(),
+        ShownType::Record(keys, ts) => ShownType::Record(
+            keys.clone(),
+            ts.iter().map(|t| canonical_alias_order(t, key)).collect(),
+        ),
     }
 }
 

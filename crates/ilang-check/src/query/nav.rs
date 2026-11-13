@@ -91,10 +91,7 @@ pub(crate) fn visit_type<'h>(t: &'h Type, f: &mut dyn FnMut(Node<'h>)) {
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
             ts.iter().for_each(|a| visit_type(a, f))
         }
-        TypeKind::Record { base, fields, .. } => {
-            if let Some(b) = base {
-                visit_type(b, f);
-            }
+        TypeKind::Record { fields } => {
             fields.iter().for_each(|(_, t)| visit_type(t, f));
         }
         TypeKind::Fn {
@@ -134,6 +131,7 @@ pub(crate) fn visit_expr<'h>(e: &'h Expr, f: &mut dyn FnMut(Node<'h>)) {
     f(Node::Expr(e));
     match &e.kind {
         ExprKind::Tuple(xs) => xs.iter().for_each(|x| visit_expr(x, f)),
+        ExprKind::Multi(groups) => groups.iter().for_each(|g| visit_expr(&g.value, f)),
         ExprKind::Record { base, fields } => {
             if let Some(b) = base {
                 visit_expr(b, f);

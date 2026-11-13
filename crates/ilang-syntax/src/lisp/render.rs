@@ -337,6 +337,8 @@ pub(super) fn render_anchored(
                         record!(xs, Type, true);
                     } else {
                         match xs {
+                            // syntax-3 stage 6: `()` is the empty data type.
+                            [] => text!("()"),
                             [h, a, b] if symbol(h, ".") => {
                                 text!(label(a)?);
                                 text!(".");

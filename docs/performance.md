@@ -63,6 +63,43 @@ has every change below.
 | `i test --project std --opt 0` | | 39 s |
 | type check of the suspend-point chain below, n=800 | 1.6 s | 0.8 s |
 
+## Instruction counts and peak memory
+
+Wall-clock time moves with the load of the machine. `scripts/bench-instructions` measures by
+user-space instruction count (`perf stat -e instructions:u`; where perf is not usable it falls
+back to user CPU time, and each result line says which metric it has) and by peak resident
+memory (`time -v`, the largest process of the tree). It writes one JSON line per benchmark to
+`target/bench-instructions/results.jsonl` and a markdown table beside it. It is run by hand and
+is not a CI gate.
+
+| Benchmark | What it runs |
+|---|---|
+| `check_std` | `i check --project std` (checks the tests too) |
+| `build_std_tests_o0`, `build_std_tests_o2` | `i test --project std --opt N` with a filter that matches no test: the build of the whole test program, and no test runs (`i test` has no build-only mode) |
+| `corpus_wide_256`, `corpus_wide_1024`, `corpus_wide_generic_1024` | `i check --types` of the wide-union cases `tests/review/cases/review-k4/perf/*` |
+| `kernel_*` | the kernels of `tests/perf/numeric` (`identity`, `fast`, `horner`, `integer`, `dot`, `tuples`, `closures`), a million calls each, in `tests/perf/numeric-loop`; `kernel_base` is the loop alone, to subtract |
+| `bench_closures`, `bench_resume_depth_1000` | tests of `bench/` at `--opt 2`, build included |
+
+### Recorded measurements
+
+Numbers from the optimization work of 2026-11-13 that were not written down anywhere else.
+They are ratios or sizes taken on the shared 16-core machine, not instruction counts; the
+script gives instruction counts for the same things from now on.
+
+| Measurement | Result |
+|---|---|
+| Library `catch` against the built-in `fail.catch`, with an error caught | 1.9 to 2.1 times as slow |
+| The same, with no error | 2.9 to 3.1 times as slow |
+| Float to text after the runtime moved into i (`lib/i/float_text.i`), typical values | about 3 times as slow as before |
+| The same, largest float (max `Float`) | 2.0 times |
+| The same, `5e-324` (smallest subnormal) | 5.9 times |
+| `NUM` integer kernel (`integer` in `tests/perf/numeric`) at step N4 | about 15% slower |
+| `i test --project std` peak memory | 8.5 GB at `--opt 0`, 17 GB at `--opt 2` |
+| `i check --project std` peak memory | 0.3 GB |
+
+The memory of `i test --project std` is the backend (the Wasm module, Binaryen and Wasmtime's
+code generation), not inference, which is why `i check --project std` stays small.
+
 ## Garbage collection
 
 Wasmtime 50 has three collectors:

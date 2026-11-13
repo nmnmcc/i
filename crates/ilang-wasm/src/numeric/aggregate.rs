@@ -8,13 +8,14 @@ use std::collections::BTreeMap;
 enum Kind {
     Tuple(usize),
     Nominal(u32, u32, usize),
-    Record(Vec<LabelConst>),
+    /// Data with labels: its label set and number of parts.
+    Data(u32, usize),
 }
 impl Kind {
     fn width(&self) -> usize {
         match self {
             Self::Tuple(n) | Self::Nominal(_, _, n) => *n,
-            Self::Record(labels) => labels.len(),
+            Self::Data(_, n) => *n,
         }
     }
     fn value(&self, fields: &[Local]) -> Value {
@@ -26,7 +27,7 @@ impl Kind {
                 ty: *ty,
                 fields,
             },
-            Self::Record(labels) => Value::RecNew(labels.iter().copied().zip(fields).collect()),
+            Self::Data(set, _) => Value::Data(*set, fields),
         }
     }
 }
@@ -34,11 +35,7 @@ fn kind(v: &Value, known: &BTreeMap<Local, Kind>) -> Option<Kind> {
     let shape = match v {
         Value::Tuple(fields) => Kind::Tuple(fields.len()),
         Value::Record { ctor, ty, fields } => Kind::Nominal(*ctor, *ty, fields.len()),
-        Value::RecNew(fields) => {
-            let mut labels = fields.iter().map(|(label, _)| *label).collect::<Vec<_>>();
-            labels.sort();
-            Kind::Record(labels)
-        }
+        Value::Data(set, fields) => Kind::Data(*set, fields.len()),
         Value::Atom(Atom::Local(l)) => return known.get(l).cloned(),
         _ => return None,
     };
@@ -126,22 +123,8 @@ pub fn run(f: &mut Func) {
             && let Some(product) = products.get(dst)
         {
             let mut fields = match value {
-                Value::Tuple(fields) | Value::Record { fields, .. } => fields.clone(),
-                Value::RecNew(fields) => {
-                    let Kind::Record(labels) = &product.kind else {
-                        unreachable!()
-                    };
-                    labels
-                        .iter()
-                        .map(|label| {
-                            fields
-                                .iter()
-                                .find(|(l, _)| l == label)
-                                .expect("record shape label")
-                                .1
-                                .clone()
-                        })
-                        .collect()
+                Value::Tuple(fields) | Value::Record { fields, .. } | Value::Data(_, fields) => {
+                    fields.clone()
                 }
                 Value::Atom(Atom::Local(source)) => products[source]
                     .fields
@@ -175,17 +158,9 @@ pub fn run(f: &mut Func) {
         }
         if let Stmt::Let { value, .. } = s {
             let field = match value {
-                Value::Field(Atom::Local(l), index) => products
-                    .get(l)
-                    .filter(|p| !matches!(p.kind, Kind::Record(_)))
-                    .map(|p| p.fields[*index as usize]),
-                Value::RecGet(Atom::Local(l), label) => products.get(l).and_then(|p| {
-                    if let Kind::Record(labels) = &p.kind {
-                        labels.iter().position(|l| l == label).map(|i| p.fields[i])
-                    } else {
-                        None
-                    }
-                }),
+                Value::Field(Atom::Local(l), index) => {
+                    products.get(l).map(|p| p.fields[*index as usize])
+                }
                 _ => None,
             };
             if let Some(field) = field {
@@ -227,14 +202,14 @@ fn fold_cond(c: &mut Cond, products: &BTreeMap<Local, Product>) {
                 Cond::Type(Atom::Local(l), ty) => products
                     .get(l)
                     .map(|p| matches!(p.kind, Kind::Nominal(_, t, _) if t == *ty)),
-                Cond::IsRec(Atom::Local(l)) => {
-                    products.get(l).map(|p| matches!(p.kind, Kind::Record(_)))
-                }
+                Cond::Data(Atom::Local(l), set, n) => products
+                    .get(l)
+                    .map(|p| p.kind == Kind::Data(*set, *n as usize)),
                 Cond::Tag(Atom::Local(l), tag) => products.get(l).map(|p| {
                     *tag == match p.kind {
                         Kind::Tuple(_) => 4,
                         Kind::Nominal(..) => 5,
-                        Kind::Record(_) => 14,
+                        Kind::Data(..) => 4,
                     }
                 }),
                 _ => None,
@@ -262,10 +237,7 @@ fn common(body: &mut [Stmt], cache: &mut Vec<(Value, Local)>) {
                     });
                     !uses && result != dst
                 });
-                if matches!(
-                    value,
-                    Value::ListHead(_) | Value::ListTail(_) | Value::RecGet(_, _)
-                ) {
+                if matches!(value, Value::ListHead(_) | Value::ListTail(_)) {
                     if let Some((_, source)) = cache.iter().find(|(v, _)| v == value) {
                         *value = Value::Atom(Atom::Local(*source));
                     } else {

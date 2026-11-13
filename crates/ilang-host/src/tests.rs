@@ -503,6 +503,8 @@ fn engine_features_include_gc_tail_calls_and_exceptions() {
     .unwrap();
     let engine = &probe.engine;
     let mut store = Store::new(engine, ());
+    // Multicore engines are epoch-instrumented (native N12).
+    store.set_epoch_deadline(1 << 62);
     let instance = Linker::new(engine)
         .instantiate(&mut store, &probe.module)
         .unwrap();

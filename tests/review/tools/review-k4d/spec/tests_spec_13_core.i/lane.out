@@ -1,9 +1,0 @@
-spec/core.check : (got: String, want: String) -> Nil
-spec/core.show : (x: A) -> String
-spec/core.booleans_and_numbers : () -> Nil
-spec/core.bits : () -> Nil
-spec/core.strings : () -> Nil
-spec/core.bit_arrays : () -> Nil
-spec/core.in_range : (h: Int) -> Bool
-spec/core.inspect_and_hash : () -> Nil
-spec/core.as_values : () -> Nil

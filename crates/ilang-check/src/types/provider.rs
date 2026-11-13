@@ -30,23 +30,23 @@ fn concrete(t: &ShownType) -> Result<Ty, String> {
                 lits::ValueSet::only([value.into()]).expect("one literal"),
             )
         }
-        ShownType::Tuple(xs) => Ty::Con(
-            Head::Tuple(xs.len() as u32),
-            lits::ValueSet::ALL,
-            xs.iter().map(concrete).collect::<Result<_, _>>()?,
-        ),
+        ShownType::Tuple(xs) => Ty::tuple(xs.iter().map(concrete).collect::<Result<_, _>>()?),
+        ShownType::Record(keys, xs) => {
+            let positions = keys.iter().filter(|k| k.is_none()).count() as u32;
+            Ty::data(
+                ShapeId::new(positions, keys.iter().flatten().cloned()),
+                xs.iter().map(concrete).collect::<Result<_, _>>()?,
+            )
+        }
         ShownType::Union(xs) => Ty::Union(xs.iter().map(concrete).collect::<Result<_, _>>()?),
         ShownType::Inter(xs) => Ty::Inter(xs.iter().map(concrete).collect::<Result<_, _>>()?),
         ShownType::Diff(a, xs) => Ty::Diff(
             Box::new(concrete(a)?),
             xs.iter().map(concrete).collect::<Result<_, _>>()?,
         ),
-        ShownType::Fn(f) => Ty::Fn(Box::new(FnTy {
-            params: f
-                .params
-                .iter()
-                .map(|(l, t)| Ok((l.clone(), concrete(t)?)))
-                .collect::<Result<_, String>>()?,
+        ShownType::Fn(f) if f.group => Ty::Fn(Box::new(FnTy {
+            param: concrete(&f.params[0].1)?,
+            labels: Vec::new(),
             ret: concrete(&f.ret)?,
             err: f
                 .err
@@ -61,7 +61,28 @@ fn concrete(t: &ShownType) -> Result<Ty, String> {
                 .transpose()?
                 .unwrap_or(Ty::Never),
         })),
-        ShownType::Graph(g) if g.graph.variables().is_empty() => Ty::Graph(g.graph.clone()),
+        ShownType::Fn(f) => Ty::Fn(Box::new(FnTy {
+            param: Ty::tuple(
+                f.params
+                    .iter()
+                    .map(|(_, t)| concrete(t))
+                    .collect::<Result<_, _>>()?,
+            ),
+            labels: f.params.iter().map(|(l, _)| l.clone()).collect(),
+            ret: concrete(&f.ret)?,
+            err: f
+                .err
+                .as_ref()
+                .map(concrete)
+                .transpose()?
+                .unwrap_or(Ty::Never),
+            env: f
+                .env
+                .as_ref()
+                .map(concrete)
+                .transpose()?
+                .unwrap_or(Ty::Never),
+        })),
         _ => return Err("provider type must be closed (no holes or free variables)".into()),
     })
 }
@@ -95,7 +116,7 @@ impl Typed {
         let Ty::Fn(f) = ty else {
             return Err("factory must be an ordinary function".into());
         };
-        if f.params.len() != args.len() {
+        if f.arity() != Some(args.len()) {
             return Err("factory argument count does not match generated arguments".into());
         }
         let service = concrete(service)?;
@@ -107,7 +128,9 @@ impl Typed {
             && head == wanted
         {
             for (actual, wanted) in actual.iter().zip(args) {
-                if !s.records.graph(actual).variables().is_empty() {
+                let mut vars = Vec::new();
+                display::ty_vars(actual, &mut vars);
+                if !vars.is_empty() {
                     s.constrain(wanted, actual);
                 }
             }
@@ -119,7 +142,7 @@ impl Typed {
         if !s.failures.is_empty() {
             return Err("factory has uncaught typed errors".into());
         }
-        for ((_, param), arg) in f.params.iter().zip(args) {
+        for (param, arg) in f.parts().expect("checked arity").iter().zip(args) {
             s.constrain(&concrete(arg)?, param);
         }
         if !s.failures.is_empty() {
@@ -169,26 +192,22 @@ impl Typed {
             .iter()
             .map(concrete)
             .collect::<Result<Vec<_>, _>>()?;
+        let required = s.env_union(requires.clone());
+        let supplied_only = s.env_union(supplies.clone());
         let rest = s.env_diff(n.clone(), supplies.clone());
         let env = s.env_union(requires.into_iter().chain([rest]).collect());
         let supplied = s.env_union(supplies);
         let available = s.env_union(vec![env.clone(), supplied]);
         let body_env = s.inter(vec![n, available]);
-        let body = Ty::Fn(Box::new(FnTy {
-            params: vec![],
-            ret: a.clone(),
-            err: e.clone(),
-            env: body_env,
-        }));
+        let body = Ty::Fn(Box::new(FnTy::new(vec![], a.clone(), e.clone(), body_env)));
         let scheme = Scheme {
             level: 0,
-            key_slots: vec![],
-            ty: Ty::Fn(Box::new(FnTy {
-                params: vec![(Some("body".into()), body)],
-                ret: a,
-                err: e,
+            ty: Ty::Fn(Box::new(FnTy::new(
+                vec![(Some("body".into()), body)],
+                a,
+                e,
                 env,
-            })),
+            ))),
         };
         let expected = SchemeArtifact {
             scheme: scheme.clone(),
@@ -206,10 +225,31 @@ impl Typed {
         // Normalize the identity on both sides before comparing the complete
         // generalized schemes; parameterized services keep their constraints.
         fn view(t: &Ty) -> Ty {
-            match t {
-                Ty::Graph(g) => g.view().expect("ordinary environment node"),
-                _ => t.clone(),
-            }
+            t.clone()
+        }
+        fn map_nodes(ty: &Ty, env: bool, f: &mut dyn FnMut(Ty, bool) -> Ty) -> Ty {
+            let all = |xs: &[Ty], env: bool, f: &mut dyn FnMut(Ty, bool) -> Ty| -> Vec<Ty> {
+                xs.iter().map(|x| map_nodes(x, env, f)).collect()
+            };
+            let shallow = match ty {
+                Ty::Con(h, vs, args) => Ty::Con(*h, vs.clone(), all(args, false, f)),
+                Ty::Fn(fun) => Ty::Fn(Box::new(FnTy {
+                    param: map_nodes(&fun.param, false, f),
+                    labels: fun.labels.clone(),
+                    ret: map_nodes(&fun.ret, false, f),
+                    err: map_nodes(&fun.err, false, f),
+                    env: map_nodes(&fun.env, true, f),
+                })),
+                Ty::Union(xs) => Ty::Union(all(xs, env, f)),
+                Ty::Inter(xs) => Ty::Inter(all(xs, env, f)),
+                Ty::Diff(b, hs) => Ty::Diff(Box::new(map_nodes(b, env, f)), all(hs, false, f)),
+                Ty::Both(a, b) => Ty::Both(
+                    Box::new(map_nodes(a, env, f)),
+                    Box::new(map_nodes(b, env, f)),
+                ),
+                t => t.clone(),
+            };
+            f(shallow, env)
         }
         fn parts(t: &Ty, intersection: bool) -> Vec<Ty> {
             let mut pending = vec![t.clone()];
@@ -244,21 +284,19 @@ impl Typed {
             }
         }
         fn ordered_differences(p: &Program, ty: &Ty) -> Ty {
-            records::Pool::default()
-                .graph(ty)
-                .map_nodes(false, &mut |ty, env| match ty {
-                    Ty::Diff(base, mut removed) => {
-                        removed.sort_by_cached_key(|ty| match ty.head() {
-                            Some(Head::Named(TypeRef::Custom(id))) => {
-                                format!("{}.{}", p.module(p.ty(id).module).path, p.ty(id).name)
-                            }
-                            head => format!("{head:?}"),
-                        });
-                        Ty::Diff(base, removed)
-                    }
-                    ty if env => admission(ty),
-                    ty => ty,
-                })
+            map_nodes(ty, false, &mut |ty, env| match ty {
+                Ty::Diff(base, mut removed) => {
+                    removed.sort_by_cached_key(|ty| match ty.head() {
+                        Some(Head::Named(TypeRef::Custom(id))) => {
+                            format!("{}.{}", p.module(p.ty(id).module).path, p.ty(id).name)
+                        }
+                        head => format!("{head:?}"),
+                    });
+                    Ty::Diff(base, removed)
+                }
+                ty if env => admission(ty),
+                ty => ty,
+            })
         }
         let mut actual = actual.clone();
         actual.scheme.ty = ordered_differences(p, &actual.scheme.ty);
@@ -267,9 +305,49 @@ impl Typed {
         let name = |r: TypeRef| format!("{r:?}");
         match actual.compare(&expected, &mut |r| name(r), &mut |r| name(r))? {
             SchemeComparison::Equivalent(_) => Ok(()),
-            other => Err(format!(
-                "adapter must have the generalized structured body/result/error/environment type ({other:?})"
-            )),
+            other => {
+                // The solver's own subtype check both ways, each side
+                // instantiated fresh, and a supplied service given to the
+                // body must not reach the adapter's own environment beyond
+                // what it requires.
+                let mut t = expected
+                    .catalog
+                    .solver
+                    .lock()
+                    .expect("adapter scheme snapshot")
+                    .clone();
+                t.level = 1;
+                let a = t.freshen(
+                    &actual.scheme.ty,
+                    actual.scheme.level,
+                    &mut Default::default(),
+                );
+                t.constrain(&a, &expected.scheme.ty);
+                let e = t.freshen(&expected.scheme.ty, 0, &mut Default::default());
+                t.constrain(&e, &actual.scheme.ty);
+                let leak = t.freshen(
+                    &actual.scheme.ty,
+                    actual.scheme.level,
+                    &mut Default::default(),
+                );
+                match &leak {
+                    Ty::Fn(f) => match f.parts() {
+                        Some([Ty::Fn(body)]) => {
+                            t.constrain_env(&supplied_only, &body.env);
+                            t.constrain_env(&f.env, &required);
+                        }
+                        _ => t.constrain(&leak, &Ty::Never),
+                    },
+                    _ => t.constrain(&leak, &Ty::Never),
+                }
+                if t.failures.is_empty() {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "adapter must have the generalized structured body/result/error/environment type ({other:?})"
+                    ))
+                }
+            }
         }
     }
 }
@@ -303,7 +381,7 @@ impl Typed {
         let Ty::Fn(f) = display::both(&ty) else {
             return Err("factory must be an ordinary function".into());
         };
-        if f.params.len() != args.len() {
+        if f.arity() != Some(args.len()) {
             return Err("factory argument count does not match generated arguments".into());
         }
         let params = (0..arity).map(|_| s.fresh_input()).collect();
@@ -316,7 +394,7 @@ impl Typed {
         if !s.failures.is_empty() {
             return Err("factory has uncaught typed errors".into());
         }
-        for ((_, param), arg) in f.params.iter().zip(args) {
+        for (param, arg) in f.parts().expect("checked arity").iter().zip(args) {
             let actual = match arg {
                 Argument::Seed => Ty::named(
                     TypeRef::Builtin(hir::BuiltinType::List),

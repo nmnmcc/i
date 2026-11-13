@@ -300,9 +300,21 @@ fn segments_grow_linearly() {
     let base = size(0);
     let ratio = (large - base) as f64 / (small - base) as f64;
     assert!(ratio < 5.0, "{base} {small} {large}: {ratio}");
-    let start = std::time::Instant::now();
-    wasm(&many_points(200)).unwrap();
-    assert!(start.elapsed().as_secs() < 30);
+    // The time to generate the module must not blow up either. It is a growth ratio, not a
+    // wall-clock bound, so a busy machine does not fail the test: from 50 to 200 points a
+    // polynomial grows by far less than 500 times, an exponential by far more.
+    let time = |n| {
+        let source = many_points(n);
+        let start = std::time::Instant::now();
+        wasm(&source).unwrap();
+        start.elapsed()
+    };
+    let small = time(50).max(std::time::Duration::from_millis(50));
+    let large = time(200);
+    assert!(
+        large < small * 500,
+        "200 points took {large:?}, 50 points took {small:?}"
+    );
 }
 
 /// Spec 4.1/11.4: opaque constructors remain distinct through a shared
@@ -318,8 +330,8 @@ fn opaque_decoders_keep_the_declared_type_on_both_targets() {
 	same_a
 	echo
 )
-A = Opaque
-B = Opaque
+A = { Opaque }
+B = { Opaque }
 Alias = A
 @external("opaque", "get")
 get_a: () -> A

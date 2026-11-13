@@ -1127,7 +1127,7 @@ A function's parameter group is a data pattern (§7). When the function is calle
 
 A **chain** `F1 | … | Fn` of function expressions, with `n ≥ 1`, is one function value. Each branch may write its own type parameters, which are in scope in that branch only. The branches are grouped by shape: a **shape group** has the branches whose parameter groups have one shape, in the order written. When the chain is called with data, the group with the shape of the data is used, and in it the first branch whose parameter group matches the data and whose guard, if it has one, is `True` is taken; the value of its body is the value of the call. A guard is any expression of type `Bool`. It is worked out only after its parameter group matched, and it may use the names of the group and of the service pattern. Alternatives in an item are tried in order.
 
-```i future-SYN3
+```i
 gcd = (a: Int, 0) -> Int { a } | (a: Int, b: Int) -> Int { gcd(b, a % b) }
 
 area = (r: Float) -> Float { 3.14159 *. r *. r } | (w: Float, h: Float) -> Float { w *. h }
@@ -2709,7 +2709,7 @@ The `{ }` around the right side of a name whose right side is a data type is par
 
 - In the position of an expression, `(-> …)` is a function: an optional `Square` of type parameters, the parameter data pattern, the result (`_` when no `->` part is written, or `(<- R needs)` with a service pattern), and the body, which is any one expression. In the position of a type, `(-> …)` is a function type. In an expression, `(<- e s)` is a provide.
 - `(| …)` in the position of an expression is a chain of two or more functions.
-- `(,)` is the empty data in the positions of values, types and patterns. The empty `()` has no position.
+- `(,)` is the empty data wherever data is written. The empty `()` has no position.
 - In the position of a data pattern item, `(= n …)` whose first part is a name is a labelled item: `n` is the label and the other parts are its pattern. So `(size = whole = (w, h))` is `(, (= size whole (, w h)))`, and `((a, b) = args)` is `(, (= (, a b) args))`.
 - `|`, `&` and `-` take two or more parts in a type. A string interpolation of the normal surface is written as the `<>` of its parts (§1.6).
 

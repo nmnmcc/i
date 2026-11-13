@@ -9,7 +9,7 @@ operation = () <- (second: Second) { second.run() }
 
 handle = <A, N>(body: () <- N -> A) -> A { body() }
 
-wrapper = (p) { handle(() { p.send() }) }
+wrapper = (p: (send = _)) { handle(() { p.send() }) }
 
 main = () {
 	wrapper((send = () { operation() })) <- (

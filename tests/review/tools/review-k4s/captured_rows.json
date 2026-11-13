@@ -1,6 +1,0 @@
-{
-  "name": "captured_rows",
-  "code": 0,
-  "time": 0.019269229844212532,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.capture : (body: () -> A ? E ! N) -> () -> A ? E ! N\napp/main.example : () -> Nil\n"
-}

@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Benchmarks by instruction count and peak memory, which do not move with the load of the
+# machine the way wall-clock time does. Not a CI gate: run it by hand and compare the numbers.
+#
+#   scripts/bench-instructions            all benchmarks
+#   scripts/bench-instructions kernel     the benchmarks whose name has `kernel`
+#
+# Each benchmark runs once. Its line goes to standard output and to $OUT/results.jsonl as JSON:
+#   {"name":..,"metric":"instructions:u"|"user_cpu_s","value":..,"peak_rss_kb":..,"wall_s":..,"exit":..}
+# and a markdown table goes to $OUT/results.md (the shape of docs/performance.md).
+#
+# metric: `perf stat -e instructions:u` (user-space instructions) when perf works on this
+# machine (it needs perf installed and perf_event_paranoid <= 2, or CAP_PERFMON); otherwise the
+# user CPU time of the process tree from GNU time. The metric of each line says which; numbers
+# of the two metrics are not comparable. Peak RSS is `Maximum resident set size` of
+# `time -v` (GNU time), the largest process of the tree.
+#
+# Environment:
+#   I=path     the `i` to measure (default target/release/i, built when missing)
+#   OUT=dir    where results go (default target/bench-instructions)
+# The std benchmarks need about 10 GB (17 GB at --opt 2); on a shared machine run this script
+# through the machine's memory-aware runner.
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+filter="${1:-}"
+OUT="${OUT:-target/bench-instructions}"
+I="${I:-target/release/i}"
+if [[ ! -x "$I" ]]; then
+  git submodule update --init crates/ilang-binaryen/binaryen
+  cargo build --release --locked -p ilang-cli
+fi
+I="$(realpath "$I")"
+mkdir -p "$OUT"
+: > "$OUT/results.jsonl"
+
+gnu_time=""
+for candidate in /usr/bin/time "$(command -v time || true)" /run/current-system/sw/bin/time; do
+  if [[ -x "$candidate" ]] && "$candidate" -v true 2>&1 | grep -q 'Maximum resident'; then
+    gnu_time="$candidate"
+    break
+  fi
+done
+[[ -n "$gnu_time" ]] || { echo "bench-instructions: GNU time (time -v) is needed" >&2; exit 2; }
+
+if perf stat -e instructions:u -x, -o /dev/null true 2>/dev/null &&
+  [[ "$(perf stat -e instructions:u -x, -o /dev/stdout true 2>/dev/null | cut -d, -f1)" =~ ^[0-9]+$ ]]; then
+  metric=instructions:u
+else
+  metric=user_cpu_s
+  echo "bench-instructions: perf is not usable here; measuring user CPU time (user_cpu_s)" >&2
+fi
+
+# bench NAME COMMAND...  runs COMMAND once and records one line.
+bench() {
+  local name="$1"
+  shift
+  [[ -z "$filter" || "$name" == *"$filter"* ]] || return 0
+  local timing perfout value rss wall user status=0
+  timing="$(mktemp)"
+  perfout="$(mktemp)"
+  if [[ "$metric" == instructions:u ]]; then
+    "$gnu_time" -v -o "$timing" perf stat -e instructions:u -x, -o "$perfout" "$@" > /dev/null 2> "$OUT/$name.stderr" || status=$?
+    value="$(grep -m1 'instructions' "$perfout" | cut -d, -f1)"
+  else
+    "$gnu_time" -v -o "$timing" "$@" > /dev/null 2> "$OUT/$name.stderr" || status=$?
+    value="$(sed -n 's/^\s*User time (seconds): //p' "$timing")"
+  fi
+  rss="$(sed -n 's/^\s*Maximum resident set size (kbytes): //p' "$timing")"
+  wall="$(sed -n 's/^\s*Elapsed (wall clock) time.*: //p' "$timing" |
+    awk -F: '{ s = 0; for (i = 1; i <= NF; i++) s = s * 60 + $i; print s }')"
+  rm -f "$timing" "$perfout"
+  local line
+  line="$(printf '{"name":"%s","metric":"%s","value":%s,"peak_rss_kb":%s,"wall_s":%s,"exit":%s}' \
+    "$name" "$metric" "${value:-null}" "${rss:-null}" "${wall:-null}" "$status")"
+  echo "$line" | tee -a "$OUT/results.jsonl"
+}
+
+# --- the compiler ---------------------------------------------------------------------------
+bench check_std "$I" check --project std
+# `i test` has no build-only mode: a filter that matches no test builds the whole test program of
+# std (to Wasm, then to machine code) and runs nothing, so this is the build up to the first test.
+bench build_std_tests_o0 "$I" test --project std --opt 0 no_such_test_zz
+bench build_std_tests_o2 "$I" test --project std --opt 2 no_such_test_zz
+# Three wide-union cases of the review corpus (checking only).
+for case in review-k4/perf/wide_256 review-k4/perf/wide_1024 review-k4/perf/wide_generic_1024; do
+  bench "corpus_$(basename "$case")" "$I" check --types --project "tests/review/cases/$case"
+done
+
+# --- the programs it makes ------------------------------------------------------------------
+# Runtime kernels of tests/perf/numeric, a million calls each (tests/perf/numeric-loop). The
+# executables are built outside the measurement; `kernel_base` is the same loop with no kernel,
+# to subtract (process start-up included).
+for entry in base identity fast horner integer dot tuples closures; do
+  [[ -z "$filter" || "kernel_$entry" == *"$filter"* ]] || continue
+  exe="$OUT/kernel_$entry"
+  "$I" build --project tests/perf/numeric-loop --opt 2 --out "$exe" "$entry" > /dev/null 2>&1
+  bench "kernel_$entry" "$exe"
+done
+# bench/test: closure calls and resumes, at --opt 2 (the build is part of the count).
+bench bench_closures "$I" test --project bench --opt 2 closures
+bench bench_resume_depth_1000 "$I" test --project bench --opt 2 resume_depth_1000
+
+# --- the table ------------------------------------------------------------------------------
+python3 - "$OUT/results.jsonl" > "$OUT/results.md" <<'PY'
+import json, sys
+print("| Benchmark | Metric | Value | Peak RSS (GB) | Wall (s) |")
+print("|---|---|---|---|---|")
+for line in open(sys.argv[1]):
+    r = json.loads(line)
+    value = r["value"]
+    shown = f"{value / 1e9:.3f} G" if r["metric"] == "instructions:u" and value is not None else f"{value} s"
+    rss = r["peak_rss_kb"]
+    print(f"| `{r['name']}` | {r['metric']} | {shown} | {rss / 1048576:.2f} | {r['wall_s']:.1f} |")
+PY
+echo "results: $OUT/results.jsonl, $OUT/results.md" >&2

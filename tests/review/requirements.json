@@ -739,39 +739,34 @@
     {
       "pattern": "^review-rec/_loose/growth$",
       "known_failure": false,
-      "outcome": "accept",
-      "finding": "T3 preserves a compact exact 20-step record graph and normalizes the Never substitution",
-      "source": "docs/spec.md §4.9.3: keep unions and forgetting shared and exact; normalization commutes with closed substitution",
+      "outcome": "reject",
+      "finding": "Syntax three stage 6: open records and spreads of a record-graph type are removed; the spread base has no known type with exactly one data member",
+      "source": "docs/design/syntax-3.md §2.3 Spread: \"`..e` in a data value contributes all keys of `e`. `e` must have a known type with exactly one member that is a data type or a labelled type whose constructor is visible.\"",
       "origin": "review-rec/growth.i; original source fingerprint retained as a historical snapshot",
-      "types_contain": [
-        "type-graph-v1"
+      "diagnostic_codes": [
+        "E0506"
       ]
     },
     {
       "pattern": "^review-rec/_loose/probes$",
       "known_failure": false,
       "outcome": "reject",
-      "finding": "T3 proves scalar and tuple record alternatives but rejects an unestablished open union obligation",
-      "source": "docs/spec.md §4.9.3 and docs/design/records.md §20.3: union inclusion does not choose alternative-specific bounds",
+      "finding": "Syntax three stage 6: `i/record`, `Record`, spreads in types and forgetting are removed; the program is rejected at its import of i/record",
+      "source": "docs/design/syntax-3.md §2.3 Closed: \"Data of one shape is never a value of a type of another shape. ... There is no width subtyping, no `Record`, no field addition or removal at run time.\" and §7.2 row 6 (`lib/i/record.i` deleted)",
       "origin": "review-rec/probes.i; original source fingerprint retained as a historical snapshot",
       "diagnostic_codes": [
-        "E0501"
-      ],
-      "types_contain": [
-        "app/main.wrap_union :",
-        "app/main.pair_annotated :",
-        "app/main.choose :"
+        "E0210"
       ]
     },
     {
       "pattern": "^review-rec/_loose/schema-union$",
       "known_failure": false,
-      "outcome": "accept",
-      "finding": "T2 completion preserves the exact record union through a user-defined schema",
-      "source": "docs/spec.md §4.9.3 and docs/design/records.md §20.3: common fields work across every record alternative",
+      "outcome": "reject",
+      "finding": "Syntax three stage 6: `r.a` on a parameter with no known type is no longer a structural record read",
+      "source": "docs/design/syntax-3.md §2.3 Access: \"`d.k` (a decimal) reads position `k`; `d.f` reads label `f`. Both need a known type (spec §4.8) whose members are all data types, or labelled types whose data is visible (§2.8), each with that key.\"",
       "origin": "review-rec/schema-union.i; original source fingerprint retained as a historical snapshot",
-      "types_contain": [
-        "app/main.read : (r: (a: 1) | (a: \"x\")) -> 1 | \"x\""
+      "diagnostic_codes": [
+        "E0506"
       ]
     },
     {
@@ -3553,8 +3548,8 @@
       "pattern": "^review-r2/(?:cancel_(?:choose|error_final|normal_final|send)|choice_commit|dag_[0-9]+(?:_local)?|deep_(?:50|200|1000)|determinism|join_failure|lifetime|local_capture|pure_fake|race_tie|senders_[0-9]+|shield_nested|tasks_[0-9]+)$",
       "known_failure": false,
       "outcome": "accept",
-      "finding": "R2 structured lifetime, protected cleanup, FIFO rendezvous and single commitment; functional assertions are preserved in each independent program. Exact final output is additionally checked by r2_runtime and spec/9.9.",
-      "source": "docs/spec.md §§9.5,9.9; runtime.md §§6.2,6.4–6.5: final functions finish, FIFO partners, one commit and deterministic pure schedules."
+      "finding": "R2 structured lifetime, protected cleanup, rendezvous that delivers every sent value exactly once and single commitment; functional assertions are preserved in each independent program and do not depend on the order of task steps (spec §9.9). Exact final output is additionally checked by r2_runtime and spec/9.9.",
+      "source": "docs/spec.md §§9.5,9.9; runtime.md §§6.2,6.4–6.5: final functions finish, every value is received once, one commit and deterministic pure schedules; spec §9.9 leaves the order of steps to each run and worker count."
     },
     {
       "pattern": "^review-r2/missing_service$",

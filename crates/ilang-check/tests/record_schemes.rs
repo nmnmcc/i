@@ -7,19 +7,14 @@ use ilang_check::{
 
 #[test]
 fn exported_label_scheme_round_trips_with_cross_module_caller() {
-    if common::syn3_pending(
-        "record_schemes::exported_label_scheme_round_trips_with_cross_module_caller",
-    ) {
-        return;
-    }
     let (graph, program, diags) = common::check_files(&[
         (
             "src/defs.i",
-            "(\n\ti/record\n)\n\n(\n\tget\n)\nget = <K>(r: (k = Int), key: K) -> Int { record.get(r, key) }\n",
+            "(\n\tget\n)\nget = <A>(r: (a = A)) -> A { r.a }\n",
         ),
         (
             "src/main.i",
-            "(\n\tapp/defs\n)\n\n(\n\tmain\n)\nmain = () { assert(defs.get((a = 1), \"a\") == 1) }\n",
+            "(\n\tapp/defs\n)\n\n(\n\tmain\n)\nmain = () { assert(defs.get((a = 1)) == 1) }\n",
         ),
     ]);
     assert!(diags.is_empty(), "{:?}", graph.sources.render_all(&diags));

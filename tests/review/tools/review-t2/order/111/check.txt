@@ -1,3 +1,0 @@
-review/main.result : (Int, Int, String)
-review/main.parts : (Int, String)
-review/main.v : Int

@@ -338,6 +338,7 @@ fn expression_values(e: &Expr) -> usize {
         | ExprKind::Error
         | ExprKind::Fn(_) => 1,
         ExprKind::Tuple(items) => pending_values(items),
+        ExprKind::Multi(groups) => pending_values(groups.iter().map(|g| &g.value)),
         ExprKind::Record { base, fields } => pending_values(
             base.iter()
                 .map(Box::as_ref)
@@ -396,6 +397,7 @@ impl Walk {
             | ExprKind::Name(_)
             | ExprKind::Error => {}
             ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x)),
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::Record { base, fields } => {
                 if let Some(base) = base {
                     self.expr(base);
@@ -779,6 +781,8 @@ struct Lowerer<'a> {
     packages: HashSet<PackageId>,
     ctors: HashMap<CtorRef, CtorInfo>,
     types: HashMap<TypeId, TypeRepr>,
+    /// The label sets of data, as `ir::Program::shapes`.
+    shapes: std::cell::RefCell<Vec<Vec<String>>>,
     /// The top-level bindings whose value is a function, by their name.
     known: HashMap<DefId, BindingRef>,
     def_funcs: HashMap<DefId, FuncId>,
@@ -828,6 +832,7 @@ impl<'a> Lowerer<'a> {
             packages: HashSet::new(),
             ctors: HashMap::new(),
             types: HashMap::new(),
+            shapes: Default::default(),
             known: HashMap::new(),
             def_funcs: HashMap::new(),
             def_globals: HashMap::new(),
@@ -1029,6 +1034,25 @@ impl<'a> Lowerer<'a> {
     }
 
     fn run(&mut self) {
+        self.run_all();
+        self.out.shapes = self.shapes.take();
+    }
+
+    /// The index of the label set of a data shape (`ir::Program::shapes`).
+    fn shape_set(&self, shape: ilang_check::types::ShapeId) -> u32 {
+        let labels = shape.labels().to_vec();
+        let mut shapes = self.shapes.borrow_mut();
+        let i = match shapes.iter().position(|l| *l == labels) {
+            Some(i) => i,
+            None => {
+                shapes.push(labels);
+                shapes.len() - 1
+            }
+        };
+        i as u32 + 1
+    }
+
+    fn run_all(&mut self) {
         // Top-level functions are known functions with one value.
         for (mi, m) in self.program.modules.iter().enumerate() {
             for (bi, b) in m.bindings.iter().enumerate() {
@@ -2542,16 +2566,23 @@ impl<'a> Lowerer<'a> {
                 )),
                 _ => Err(format!("`key.{function}` is not known")),
             },
-            "ilang:record" => {
+            "ilang:worker" => {
                 let name = match function.as_str() {
-                    "get" => "record_get",
-                    "put" => "record_put",
-                    "remove" => "record_remove",
-                    "has" => "record_has",
-                    "keys" => "record_keys",
-                    "size" => "record_size",
-                    "texts" => "record_texts",
-                    _ => return Err(format!("`record.{function}` is not known")),
+                    "enabled" => "worker_enabled",
+                    "publish" => "worker_publish",
+                    "claim" => "worker_claim",
+                    "adopt" => "worker_adopt",
+                    "placeholder" => "worker_placeholder",
+                    "away" => "worker_away",
+                    "send" => "worker_send",
+                    "inbox" => "worker_inbox",
+                    "message" => "worker_message",
+                    "pending" => "worker_pending",
+                    "wait" => "worker_wait",
+                    "share_put" => "worker_share_put",
+                    "share_get" => "worker_share_get",
+                    "share_drop" => "worker_share_drop",
+                    _ => return Err(format!("`worker.{function}` is not known")),
                 };
                 Ok((Op::Runtime { name, arity }, arity))
             }
@@ -2656,29 +2687,69 @@ impl<'a> Lowerer<'a> {
             ExprKind::Int(n) => Atom::Int(BigInt::from(n.clone())),
             ExprKind::Float(x) => Atom::Float(*x),
             ExprKind::String(s) => Atom::String(s.clone()),
-            ExprKind::Name(r) => self.name(fx, e, *r),
+            ExprKind::Name(r) => {
+                // A chain name that an expected type narrowed to one shape
+                // group stands for that group's function.
+                let r = self
+                    .typed
+                    .selected_names
+                    .get(&(fx.module, e.span))
+                    .copied()
+                    .unwrap_or(*r);
+                self.name(fx, e, r)
+            }
             ExprKind::Tuple(items) => {
                 let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let_value(fx, out, Value::Tuple(parts), None)
             }
+            ExprKind::Multi(groups) => match self.typed.selected_groups.get(&(fx.module, e.span)) {
+                // An expected type chose one shape group: the value is that
+                // group's function.
+                Some(i) => self.expr(fx, out, &groups[*i as usize].value),
+                // syn3-stage10: a multi-shape value. Until the run time has
+                // `$multi`, it is the tuple of its group closures; the
+                // checker lets nothing call it.
+                None => {
+                    let parts = groups
+                        .iter()
+                        .map(|g| self.expr(fx, out, &g.value))
+                        .collect();
+                    let_value(fx, out, Value::Tuple(parts), None)
+                }
+            },
             ExprKind::Record { base, fields } => {
+                // syntax-3 §6.4: the items are worked out in written order,
+                // the spread base first; the data has its parts in canonical
+                // order.
+                let (shape, base_shape) = self.typed.data_shapes[&(fx.module, e.span)];
                 let base = base.as_ref().map(|b| self.expr(fx, out, b));
-                let fields = fields
+                let given: Vec<(String, Atom)> = fields
                     .iter()
-                    .map(|(label, value)| {
-                        let index = match self.out.labels.iter().position(|x| x == &label.name) {
-                            Some(index) => index,
-                            None => {
-                                self.out.labels.push(label.name.clone());
-                                self.out.labels.len() - 1
-                            }
-                        };
-                        (LabelConst(index as u32), self.expr(fx, out, value))
-                    })
+                    .map(|(label, value)| (label.name.clone(), self.expr(fx, out, value)))
                     .collect();
-                let value = match base {
-                    Some(base) => Value::RecWith(base, fields),
-                    None => Value::RecNew(fields),
+                let mut parts = Vec::with_capacity(shape.len());
+                for key in shape.keys() {
+                    let found = key
+                        .as_ref()
+                        .and_then(|l| given.iter().find(|(g, _)| g == l))
+                        .map(|(_, a)| a.clone());
+                    parts.push(match found {
+                        Some(a) => a,
+                        None => {
+                            let base_shape = base_shape.expect("a key from the spread");
+                            let at = match &key {
+                                Some(l) => base_shape.label_index(l).expect("a spread label"),
+                                None => parts.len().min(base_shape.positions() as usize),
+                            };
+                            let b = base.clone().expect("a spread base");
+                            let_value(fx, out, Value::Field(b, at as u32), None)
+                        }
+                    });
+                }
+                let value = if shape.has_labels() {
+                    Value::Data(self.shape_set(shape), parts)
+                } else {
+                    Value::Tuple(parts)
                 };
                 let_value(fx, out, value, None)
             }
@@ -2709,16 +2780,6 @@ impl<'a> Lowerer<'a> {
                 match self.typed.access.get(&(fx.module, e.span)) {
                     Some(Access::Field(list)) => self.field(fx, out, t, list),
                     Some(Access::Part(k)) => let_value(fx, out, Value::Field(t, *k), None),
-                    Some(Access::Label(label)) => {
-                        let index = match self.out.labels.iter().position(|x| x == label) {
-                            Some(index) => index,
-                            None => {
-                                self.out.labels.push(label.clone());
-                                self.out.labels.len() - 1
-                            }
-                        };
-                        let_value(fx, out, Value::RecGet(t, LabelConst(index as u32)), None)
-                    }
                     None => unreachable!("a checked field has an access"),
                 }
             }
@@ -3542,8 +3603,10 @@ impl<'a> Lowerer<'a> {
 
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
         match h {
-            Head::Record => Cond::IsRec(v),
-            Head::Tuple(n) => Cond::Tuple(v, n),
+            Head::Shape(shape) if shape.has_labels() => {
+                Cond::Data(v, self.shape_set(shape), shape.len() as u32)
+            }
+            Head::Shape(shape) => Cond::Tuple(v, shape.positions()),
             Head::Fn => Cond::Tag(v, 7),
             Head::Named(TypeRef::Builtin(b)) => Cond::Tag(
                 v,
@@ -3561,7 +3624,6 @@ impl<'a> Lowerer<'a> {
                     BuiltinType::Request => 17,
                     BuiltinType::Ticket => 18,
                     BuiltinType::Never => u32::MAX,
-                    BuiltinType::Record => unreachable!("Record is normalized to the record head"),
                 },
             ),
             Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {

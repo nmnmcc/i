@@ -1,8 +1,8 @@
-lit : (v = A) -> Bool
-prefix : (v = A) -> Bool
-float : (v = A) -> Bool
-lit_known : (v = Int | String) -> Bool
-prefix_known : (v = String) -> Bool
+lit : (A) -> Bool
+prefix : (A) -> Bool
+float : (A) -> Bool
+lit_known : (Int | String) -> Bool
+prefix_known : (String) -> Bool
 4:28: warning[W0503]: both sides are constants, `1` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
 6:48: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 11:48: warning[W0503]: both sides are constants, `1` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
