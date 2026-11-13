@@ -1518,16 +1518,63 @@ impl<'a> Checker<'a> {
         self.flush(span, None);
     }
 
-    /// Hold only value-set failures belonging to rule 11 until its own coverage check.
+    /// Hold the failures of rule 11 that its own coverage check reports
+    /// instead: value-set failures, and a labelled type of the subject that no
+    /// pattern at the place takes while a pattern takes another member of a
+    /// union it is declared in (see `uncovered_member`).
     pub fn sub_case(&mut self, l: &Ty, r: &Ty, span: Span) -> Vec<(super::solve::Failure, Span)> {
         self.s.constrain(l, r);
         let failures = std::mem::take(&mut self.s.failures);
         let (held, ordinary): (Vec<_>, Vec<_>) = failures
             .into_iter()
-            .partition(|f| f.kind == FailKind::Values);
+            .partition(|f| f.kind == FailKind::Values || self.uncovered_member(f));
         self.s.failures = ordinary;
         self.flush(span, None);
         held.into_iter().map(|f| (f, span)).collect()
+    }
+
+    /// `l <: r` for the one clause of a match: what its pattern does not take
+    /// is reported as the error of §7.4 when the clause may fail
+    /// (`defer_failure`), as it was when the members of a sum were
+    /// constructors of one type (see `uncovered_member`).
+    pub fn sub_fitted_match(&mut self, l: &Ty, r: &Ty, span: Span) {
+        self.fix_notes = self.fixed_reached(l, r);
+        self.s.constrain(l, r);
+        let failures = std::mem::take(&mut self.s.failures);
+        self.s.failures = failures
+            .into_iter()
+            .filter(|f| !self.uncovered_member(f))
+            .collect();
+        self.flush(span, None);
+    }
+
+    /// A failure `C <: P` of a match subject where `C` is a labelled type
+    /// that no pattern at the place takes, and some pattern there takes
+    /// another member of a declared union with `C` (`True` against `False`,
+    /// both in `Bool = True | False`). Before stage 3 these were constructors
+    /// of one type, so `B <: P` held and the only error was the one of §7.4;
+    /// a sum is now a union of such types (syntax-3.md §2.8), and the coverage
+    /// error in a match is unchanged (§5.2.8 rule 11), so that error is
+    /// given alone. A labelled type with no union in common with the
+    /// patterns (`Some` against `Ok`) is still a type error.
+    pub(crate) fn uncovered_member(&self, f: &super::solve::Failure) -> bool {
+        if f.kind != FailKind::Mismatch {
+            return false;
+        }
+        let Some(h @ Head::Named(TypeRef::Custom(_))) = f.lhs.head() else {
+            return false;
+        };
+        let mut ms = Vec::new();
+        super::solve::flatten_union(std::slice::from_ref(&f.rhs), &mut ms);
+        if ms.iter().any(|m| m.head() == Some(h)) {
+            return false;
+        }
+        ms.iter().filter_map(Ty::head).any(|g| {
+            self.s
+                .alias_folds
+                .iter()
+                .any(|a| a.has_head(h) && a.has_head(g))
+        })
     }
 
     /// `l <: r`, where `r` comes from the written type at `other`.

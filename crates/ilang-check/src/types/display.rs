@@ -1869,6 +1869,11 @@ impl AliasFold {
             })
     }
 
+    /// Whether a member of the expansion has the type constructor `h`.
+    pub(crate) fn has_head(&self, h: super::Head) -> bool {
+        self.members.iter().any(|m| m.head() == Some(h))
+    }
+
     /// The arguments of the alias, and the positions in `ms` of its
     /// members, when `ms` contains exactly its expansion (and maybe more).
     fn fit(&self, ms: &[Ty]) -> Option<(Vec<Ty>, Vec<usize>)> {

@@ -191,3 +191,13 @@ no_error = () {
 		Ok(x) -> x
 	}
 }
+
+// A member of the subject that no pattern takes is reported by §7.4 alone
+// when a pattern takes another member of its sum (above: `Point`, `False`);
+// a pattern of another sum is still a type error.
+other_sum = (r: Result(Int, Int)) {
+	r |> {
+		True  -> 1
+		False -> 2
+	}
+}

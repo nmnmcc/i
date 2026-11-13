@@ -593,7 +593,10 @@ impl Checker<'_> {
             let b = places[i].ty.clone();
             let at = if i == 0 { subject.span } else { span };
             if fitted {
-                self.sub(&b, &want, at);
+                // A one-clause match reports what its pattern does not take
+                // as the error of §7.4 (`defer_failure` below), as it did
+                // when the members of a sum were constructors of one type.
+                self.sub_fitted_match(&b, &want, at);
             } else {
                 held.extend(self.sub_case(&b, &want, at));
             }

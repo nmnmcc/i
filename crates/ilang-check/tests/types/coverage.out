@@ -22,9 +22,8 @@ empty : 0
 any : (x: Int) -> 1
 unknown : (f: () -> Bool ^ E ! N) -> 1 | 2 ^ E ! N
 no_error : () -> 1
-30:2: error[E0501]: `Point` is not a subtype of `Circle | Square`
+other_sum : (r: Result(Int, Int)) -> 1 | 2
 30:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Point`
-37:2: error[E0501]: `False` is not a subtype of `True`
 37:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(False)`
 44:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `0`
 51:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Flags(admin = False, active = False)`
@@ -35,6 +34,9 @@ no_error : () -> 1
 118:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`
 126:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[]`
 133:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[_, _, ..]`
-148:2: error[E0501]: `False` is not a subtype of `True`
 148:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[False, ..]`
 156:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(False, False)`
+199:2: error[E0501]: `Ok(Int)` is not a subtype of `Bool`
+200:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+201:3: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+199:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Ok(..)`

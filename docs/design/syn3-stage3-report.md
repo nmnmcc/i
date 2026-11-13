@@ -89,8 +89,13 @@ With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
 - Types are more precise: `named : (r: Result(A, B)) -> Ok(A | 0)`,
   `not_known : (s: Shape) -> Circle`; a constructor's type is its own
   (`Some: (A) -> Some(A)`).
-- A one-clause match that does not cover gives E0501 (`Point` is not a
-  subtype of `Circle | Square`) besides E0516.
+- A match that does not cover a member of the subject's sum gives E0516
+  alone, as before (a former constructor that no pattern takes is held for
+  the coverage error when a pattern takes another member of a declared union
+  with it; `Checker::uncovered_member`). An earlier state of this lane also
+  gave E0501 (`Point` is not a subtype of `Circle | Square`, corpus fuzz-5:
+  `True` is not a subtype of `False`); that was a bug against §5.2.8 rule 11
+  ("the coverage error in a match is unchanged").
 - `Circle(..v, …)` with `v: Shape` gives E0501, not E0517's message.
 - `field_shared` no longer joins the constructors of a former family.
 - Coverage witnesses show a one-constructor type as its constructor
