@@ -99,9 +99,29 @@ string_lit = cooked_string | multiline_string | raw_string .
 cooked_string = '"' { char | escape | interpolation } '"' .
 interpolation = "\(" Expr ")" .
 multiline_string = '"""' line_end { char | escape | interpolation } line_end indent '"""' .
-raw_string = hashes ( cooked_string | multiline_string ) hashes .
-hashes = "#" { "#" } .
+raw_string = raw_single(h) | raw_multi(h) .
+raw_single(h) = hashes(h) '"' { raw_char(h) | raw_escape(h) | raw_interpolation(h) } '"' hashes(h) .
+raw_multi(h) = hashes(h) '"""' line_end { raw_char(h) | raw_escape(h) | raw_interpolation(h) }
+               line_end indent '"""' hashes(h) .
+raw_escape(h) = "\" hashes(h) ( "n" | "r" | "t" | "f" | '"' | "\" | "u{" hex { hex } "}" | line_end ) .
+raw_interpolation(h) = "\" hashes(h) "(" Expr ")" .
 escape     = "\" ( "n" | "r" | "t" | "f" | '"' | "\" ) | "\u{" hex { hex } "}" .
+```
+
+In the parameterized raw productions, `h` is the positive number of opening
+hashes and `hashes(h)` is exactly that many `#` characters. `raw_char(h)` is
+any character that starts neither a closing delimiter for that raw form nor
+a backslash followed by exactly `h` hashes, not more. Such a backslash must
+begin a valid raw escape or interpolation; an unknown active escape is a compile
+error. Other backslashes and quotes are ordinary content. After the opening
+hashes, triple quotes immediately followed by a line break select the multi-line
+form. Raw multi-line strings also obey the closing-line and indentation rules
+below.
+
+```i
+backslash = #"\q"#
+quote = #"a"b"#
+main = () { (backslash, quote) }
 ```
 
 - A literal is never negative. A negative number is made with the operator `-` (Int) or `-.` (Float) (§6.9). In a pattern, a negative literal is written in the same way (§7.1).
