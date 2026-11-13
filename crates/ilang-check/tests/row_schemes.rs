@@ -309,3 +309,21 @@ both(A) = (x: A, r ! Read(A)) { need_int() x }",
     );
     assert_eq!(shown["app/main.both"], "(x: A) -> A ! Read(Int & A)");
 }
+
+#[test]
+fn closed_constructor_arguments_still_report_an_empty_need_meet() {
+    let source = "S(A) { S(value: A) }
+one = (s ! S(Int)) { s.value + 1 }
+run(N) = (f: () -> Int ! N, x: N) { f() }
+bad = () { run(() { one() }, S(value: \"hi\")) }";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("S(Int)")
+            && d.message.contains("S(\"hi\")")),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("\"hi\"", "1"));
+}

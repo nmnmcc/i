@@ -1521,6 +1521,7 @@ impl Solver {
                             || (a.scalar().is_some() && a.values().disjoint(b.values()))
                     })
                 }) {
+                    self.var_mut(meet).need_meet = None;
                     self.fail(FailKind::NeedMeet, &left, &right);
                 }
             }
@@ -1753,6 +1754,104 @@ impl Solver {
         self.constrain_in(&Ty::Var(v), x, row);
         self.constrain_in(&Ty::Var(v), y, row);
         Ty::Var(v)
+    }
+
+    /// A value-produced argument is known at completion from its lower
+    /// bounds. Inputs and still-open sources remain undetermined (§4.7).
+    fn known_need_members(&self, t: &Ty) -> Option<Vec<Ty>> {
+        match t {
+            Ty::Never => None,
+            Ty::Graph(g) if g.is_ordinary_head() => {
+                self.known_need_members(&g.view().expect("ordinary head"))
+            }
+            Ty::Var(v) => {
+                let (vars, members) = self.reach(vec![*v], true);
+                if members.is_empty()
+                    || vars.iter().any(|v| {
+                        let state = self.var(*v);
+                        state.need_meet.is_none()
+                            && (state.input || (state.lower.is_empty() && state.from.is_empty()))
+                    })
+                {
+                    None
+                } else {
+                    Some(
+                        members
+                            .into_iter()
+                            .map(|m| match m {
+                                Ty::Graph(g) if g.is_ordinary_head() => {
+                                    g.view().expect("ordinary head")
+                                }
+                                m => m,
+                            })
+                            .collect(),
+                    )
+                }
+            }
+            Ty::Union(ms) => {
+                let mut out = Vec::new();
+                for m in ms {
+                    out.extend(self.known_need_members(m)?);
+                }
+                Some(out)
+            }
+            t if t.is_headed() => Some(vec![t.clone()]),
+            _ => None,
+        }
+    }
+
+    fn known_need_form(&self, t: &Ty) -> Ty {
+        let Ty::Con(h, values, args) = t else {
+            return t.clone();
+        };
+        let args = args
+            .iter()
+            .map(|arg| match self.known_need_members(arg) {
+                Some(mut ms) if ms.len() == 1 => ms.pop().unwrap(),
+                _ => arg.clone(),
+            })
+            .collect();
+        Ty::Con(*h, values.clone(), args)
+    }
+
+    /// Check deferred meets whose arguments became closed values during
+    /// this binding, as well as the concrete upper bounds checked on insertion.
+    pub fn check_need_meets(&mut self) {
+        if !self.has_need_meets {
+            return;
+        }
+        let meets: Vec<_> = self
+            .vars
+            .iter()
+            .enumerate()
+            .filter_map(|(i, state)| state.need_meet.clone().map(|forms| (V(i as u32), forms)))
+            .collect();
+        for (v, (a, b)) in meets {
+            let parts: Vec<_> = self
+                .var(v)
+                .upper
+                .iter()
+                .filter_map(|t| self.known_need_members(t))
+                .collect();
+            let empty = parts.iter().enumerate().any(|(i, xs)| {
+                parts[..i].iter().any(|ys| {
+                    !xs.iter().any(|x| {
+                        ys.iter().any(|y| {
+                            x.head() == y.head()
+                                && (x.scalar().is_none() || !x.values().disjoint(y.values()))
+                        })
+                    })
+                })
+            });
+            if empty {
+                let a = self.known_need_form(&a);
+                let b = self.known_need_form(&b);
+                // An invalid binding is reported once; no successful scheme
+                // can carry this failed obligation into another binding.
+                self.var_mut(v).need_meet = None;
+                self.fail(FailKind::NeedMeet, &a, &b);
+            }
+        }
     }
 
     /// Puts two types together by union in a new variable, only for the

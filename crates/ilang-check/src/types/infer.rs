@@ -1474,6 +1474,11 @@ impl<'a> Checker<'a> {
                 "this type has itself inside it, through a type variable (§4.7)",
             );
         }
+        let failures = self.s.failures.len();
+        self.s.check_need_meets();
+        if self.s.failures.len() > failures {
+            self.flush(span, None);
+        }
         self.report_coalescing(span);
     }
 
