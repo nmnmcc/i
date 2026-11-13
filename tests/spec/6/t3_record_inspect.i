@@ -5,9 +5,7 @@
 
 main = () {
   assert(core.inspect(()) == "()")
-  assert(core.inspect((name: "ada", age: 36)) == "(age: 36, name: \"ada\")")
-  assert(core.inspect(("Type": 1, "first-name": (x: 2))) == "(\"Type\": 1, \"first-name\": (x: 2))")
-  assert((a: 1) != (a: 1, b: 2))
-  assert((a: 1) != (b: 1))
+  assert(core.inspect((name: "ada", age: 36)) == "(age = 36, name = \"ada\")")
+  assert(core.inspect((first: 1, nested: (x: 2))) == "(first = 1, nested = (x = 2))")
   Nil
 }

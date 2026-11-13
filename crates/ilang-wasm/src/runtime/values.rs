@@ -1,7 +1,6 @@
 //! Shared, boxed WasmGC values. The generated functions never expose GC addresses.
 
 mod inspect;
-mod record;
 mod strings;
 
 pub fn wat(references: bool) -> String {
@@ -15,7 +14,6 @@ pub fn wat(references: bool) -> String {
     }
     source.push_str(&strings::wat());
     source.push_str(&inspect::wat());
-    source.push_str(record::WAT);
     source
 }
 
@@ -73,6 +71,21 @@ const CORE: &str = r#"
 (func $tuple (param $fields (ref $values)) (result eqref)
   (struct.new $obj (i32.const 4) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
+;; Data with labels (syntax-3 §6.4): field 1 is the index of its label set.
+(func $data (param $set i32) (param $fields (ref $values)) (result eqref)
+  (struct.new $obj (i32.const 4) (local.get $set) (i64.const 0) (f64.const 0)
+    (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
+;; The label sets of data, installed by `ilang_start`: set `i` is entry `i - 1`.
+(global $shape_labels (mut (ref null $values)) (ref.null $values))
+(func $shapes_install (param $shapes (ref $values))
+  (global.set $shape_labels (local.get $shapes)))
+;; The labels of a data value, or null for a tuple.
+(func $data_labels (param $v eqref) (result (ref null $values))
+  (local $set i32)
+  (local.set $set (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))
+  (if (i32.eqz (local.get $set)) (then (return (ref.null $values))))
+  (ref.cast (ref $values) (array.get $values (ref.as_non_null (global.get $shape_labels))
+    (i32.sub (local.get $set) (i32.const 1)))))
 (func $list_is_empty (param $v eqref) (result i32)
   (i32.eqz (ref.test (ref $cons) (local.get $v))))
 (func $list_head (param $v eqref) (result eqref)

@@ -965,10 +965,6 @@ impl<'p> Emitter<'p> {
         }
         self.out
             .push_str(" (result eqref)\n (local $clo (ref null $obj))");
-        if self.p.labels.len() > super::FIXED_MAX / 2 {
-            self.out
-                .push_str(" (local $record_pairs (ref null $values))");
-        }
         if f.frame {
             self.out.push_str(" (local $slot i32)");
         }

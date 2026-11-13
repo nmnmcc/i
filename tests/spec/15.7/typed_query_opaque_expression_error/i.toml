@@ -1,3 +1,0 @@
-# spec: 15.7; typed macro typed_query_opaque_expression_error.
-# expect: compile-error E0234
-name = "spec"

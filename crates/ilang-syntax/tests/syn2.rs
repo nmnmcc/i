@@ -25,6 +25,8 @@ fn pipe_and_match_keep_their_spelling() {
 fn records_tuples_and_guard_are_distinct() {
     for source in [
         "answer = ()",
+        // syntax-3 stage 6: `()` is the empty data type.
+        "T = ()",
         "answer = (name: 1)",
         "answer = (1, 2)",
         "answer = (x) -> Int ^ String { x }",
@@ -34,7 +36,6 @@ fn records_tuples_and_guard_are_distinct() {
         assert!(diagnostics.is_empty(), "{source}: {diagnostics:?}");
     }
     for source in [
-        /* old-syntax-check: E0101 */ "T = ()",
         /* old-syntax-check: E0101 */ "answer = (1, name: 2)",
         /* old-syntax-check: E0101 */ "answer = (name: 1, 2)",
     ] {

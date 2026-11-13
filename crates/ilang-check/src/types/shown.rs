@@ -8,8 +8,9 @@ use crate::hir::TypeRef;
 /// [`ShownType::text`] writes it in the syntax of §3.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ShownType {
-    /// An exact shared graph; its full output is a versioned interface artifact.
-    Graph(super::ShownGraph),
+    /// Data with labels (syntax-3 §2.3), its keys in canonical order:
+    /// `None` for a position. `(a: A, b: B)`.
+    Record(Vec<Option<String>>, Vec<ShownType>),
     /// The canonical source text of an Int or String literal.
     Lit(String),
     /// A built-in or custom type, with its arguments.
@@ -39,6 +40,9 @@ pub enum ShownType {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ShownFn {
     pub params: Vec<(Option<String>, ShownType)>,
+    /// The parameter is not data of one shape: `params` has the whole
+    /// parameter type, shown as a group `{ T } -> R` (syntax-3 §6.1).
+    pub group: bool,
     pub ret: ShownType,
     pub err: Option<ShownType>,
     pub env: Option<ShownType>,
@@ -157,7 +161,20 @@ impl ShownType {
             }
         };
         match self {
-            ShownType::Graph(g) => out.push_str(&g.text_with(n.ty, n.var)),
+            ShownType::Record(keys, parts) => {
+                out.push('(');
+                for (i, (l, p)) in keys.iter().zip(parts).enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    if let Some(l) = l {
+                        out.push_str(l);
+                        out.push_str(": ");
+                    }
+                    p.write(0, out, n);
+                }
+                out.push(')');
+            }
             ShownType::Lit(s) => out.push_str(s),
             ShownType::Var(v) => out.push_str(&(n.var)(v)),
             ShownType::Never => out.push_str("Never"),
@@ -177,7 +194,7 @@ impl ShownType {
             }
             ShownType::Fn(f) => {
                 open(out, 0);
-                out.push('(');
+                out.push_str(if f.group { "{ " } else { "(" });
                 for (i, (l, p)) in f.params.iter().enumerate() {
                     if i > 0 {
                         out.push_str(", ");
@@ -188,7 +205,7 @@ impl ShownType {
                     }
                     p.write(0, out, n);
                 }
-                out.push_str(") -> ");
+                out.push_str(if f.group { " } -> " } else { ") -> " });
                 // A function type followed by `^` or `!` is put in `{ }`.
                 let part = |x: &ShownType, followed: bool, out: &mut String, n: &mut Names| {
                     let braces = followed && matches!(x, ShownType::Fn(_));
@@ -246,9 +263,8 @@ impl ShownType {
     /// Nominal identities in the complete tree, including function inputs.
     pub fn type_refs(&self, out: &mut Vec<TypeRef>) {
         match self {
-            ShownType::Graph(g) => {
-                out.extend(g.named_types());
-                for (_, t) in &g.names {
+            ShownType::Record(_, parts) => {
+                for t in parts {
                     t.type_refs(out);
                 }
             }

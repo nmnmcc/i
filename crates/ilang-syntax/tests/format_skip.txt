@@ -49,7 +49,6 @@ parse tests/spec/6/multiline_open.i
 parse tests/spec/6/multiline_underindent.i
 parse tests/spec/6/raw_string_bad_escape.i
 parse tests/spec/6/raw_string_unterminated.i
-parse tests/spec/6/syn2_empty_tuple_type.i
 parse tests/spec/6/syn2_mixed_tuple.i
 parse tests/spec/6/syn2_old_brace_record.i
 parse tests/spec/6/syn2_old_mixed_tuple.i

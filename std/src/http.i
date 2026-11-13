@@ -926,8 +926,8 @@ lowercase = (s: String) -> String {
 
 /// Buffered request handler, built on the incremental body reader.
 serve = (listener, handler) {
-	serve_stream(listener, (req: Request, reader) {
-		body = collect_body(reader, [])
+	serve_stream(listener, (req: Request, reader: (read: _, trailers: _)) {
+		body = collect_body(reader.read, [])
 		handler(Request(..req, body: body, trailers: reader.trailers()))
 	})
 }
@@ -1003,7 +1003,7 @@ connection_loop = (stream, handler, buffer) {
 						Error(BadMessage(why)) -> fail.raise(BadMessage(why))
 						Error(_)               -> response(Status(500))
 					}
-					drain_body(reader)
+					drain_body(reader.read)
 					tail = task.update(cursor, (state) {
 						(state, state.buffer)
 					})
@@ -1196,18 +1196,18 @@ split_bytes = (buffer: BitArray, count: Int) -> (BitArray, BitArray) {
 	}
 }
 
-collect_body = (reader, acc: List(BitArray)) {
-	piece = reader.read(65536)
+collect_body = (read, acc: List(BitArray)) {
+	piece = read(65536)
 	{ bit_array.bit_size(piece) == 0 } |> {
 		True  -> bit_array.concat(list.reverse(acc))
-		False -> collect_body(reader, [piece, ..acc])
+		False -> collect_body(read, [piece, ..acc])
 	}
 }
 
-drain_body = (reader) {
-	{ bit_array.bit_size(reader.read(65536)) == 0 } |> {
+drain_body = (read) {
+	{ bit_array.bit_size(read(65536)) == 0 } |> {
 		True  -> Nil
-		False -> drain_body(reader)
+		False -> drain_body(read)
 	}
 }
 
@@ -1385,7 +1385,7 @@ fetch_client = (f ! fetch.Fetch) {
 					status:   h.status
 					reason:   h.reason
 					headers:  h.headers
-					body:     collect_body(reader, [])
+					body:     collect_body(reader.read, [])
 					trailers: h.trailers
 				)
 			}, reader.close)
@@ -1764,11 +1764,11 @@ exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
 	})
 }
 
-read_reply = (transport, method, buffer) {
+read_reply = (transport: (read: _, write: _), method, buffer) {
 	read_progress(transport, method, buffer, False)
 }
 
-read_progress = (transport, method, buffer, eof) {
+read_progress = (transport: (read: _, write: _), method, buffer, eof) {
 	feed_response_for(<<>>, buffer, method, eof, 32768) |> {
 		Complete(res, rest) -> {
 			Status(code) = res.status
@@ -1825,9 +1825,9 @@ body_decode(A) = (
 	}
 }
 
-send_with = (provider, req) { provider.send(req) }
+send_with = (provider: (send: _), req) { provider.send(req) }
 
-send_timeout = (provider, req, duration_ns) {
+send_timeout = (provider: (send: _), req, duration_ns) {
 	task.race(() { provider.send(req) }, () {
 		clock.sleep_ns(duration_ns)
 		fail.raise(Timeout)

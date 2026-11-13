@@ -31,7 +31,6 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
     match v {
         Value::Atom(a)
         | Value::Field(a, _)
-        | Value::RecGet(a, _)
         | Value::ListHead(a)
         | Value::ListTail(a)
         | Value::StringSuffix(a, _, _)
@@ -60,11 +59,7 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
         Value::Service(e, _) => env(e, map),
         Value::Closure { captures, .. } => captures.iter_mut().for_each(map),
         Value::Record { fields, .. } => fields.iter_mut().for_each(map),
-        Value::RecNew(fields) => fields.iter_mut().for_each(|(_, a)| map(a)),
-        Value::RecWith(a, fields) => {
-            map(a);
-            fields.iter_mut().for_each(|(_, a)| map(a));
-        }
+        Value::Data(_, fields) => fields.iter_mut().for_each(map),
         Value::Cons(a, b) | Value::BitsConcat(a, b) => {
             map(a);
             map(b);
@@ -103,7 +98,7 @@ pub fn cond(c: &mut Cond, map: &mut impl FnMut(&mut Atom)) {
     match c {
         Cond::True(a)
         | Cond::Tag(a, _)
-        | Cond::IsRec(a)
+        | Cond::Data(a, _, _)
         | Cond::Bool(a, _)
         | Cond::Ctor(a, _)
         | Cond::Type(a, _)

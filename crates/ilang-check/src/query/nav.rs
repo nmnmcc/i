@@ -91,10 +91,7 @@ pub(crate) fn visit_type<'h>(t: &'h Type, f: &mut dyn FnMut(Node<'h>)) {
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
             ts.iter().for_each(|a| visit_type(a, f))
         }
-        TypeKind::Record { base, fields, .. } => {
-            if let Some(b) = base {
-                visit_type(b, f);
-            }
+        TypeKind::Record { fields } => {
             fields.iter().for_each(|(_, t)| visit_type(t, f));
         }
         TypeKind::Fn {
