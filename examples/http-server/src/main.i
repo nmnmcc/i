@@ -55,13 +55,14 @@ handle = (req: http.Request) {
 		| ((http.Method("POST"), "/users")) {
 			fail.catch(() { bit_array.to_string(req.body) }) |>
 				(Ok(text)) {
-					{
+					parsed: Result(User, schema.ParseError) = {
 						e4_call_arg_0 = user_schema()
 						e4_call_arg_1 = text
 						fail.catch(() {
 							schema.parse(e4_call_arg_0, e4_call_arg_1)
 						})
-					} |>
+					}
+					parsed |>
 						(Ok(user)) {
 							reply(
 								200,

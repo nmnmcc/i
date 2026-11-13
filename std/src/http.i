@@ -1559,7 +1559,7 @@ post = (url: String, body: BitArray) -> Response {
 	)
 }
 
-_body_text_result = (res: Response) {
+_body_text_result = (res: Response) -> Result(String, Nil) {
 	fail.catch(() { bit_array.to_string(res.body) })
 }
 

@@ -55,10 +55,10 @@ test('fetch provider: GET POST headers status timeout cancel refused streamed bo
 	cancel
 	stream
 )
-checked = <A, N>(body: () <- N -> A) -> A {
-	fail.catch(body) |>
+checked = <A, E, N>(body: () <- (Fail(E), http.Client, ..N) -> A) <- (handler: Fail(String)) -> A {
+	fail.catch(() { body() <- (http.fetch_client()) }) |>
 		(Ok(value)) { value }
-		| (Error(e)) { fail.raise(core.inspect(e)) }
+		| (Error(e)) { handler.raise(core.inspect(e)) }
 }
 text = (res: http.Response) {
 	fail.catch(() { http.body_text(res) }) |> (Ok(s)) { s } | (Error(_)) { panic("bad UTF-8") }

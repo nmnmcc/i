@@ -99,7 +99,8 @@ def definitions():
             old = f'{tp}({params}) -> Result({a}, {e})'
             new = f'{tp}({params}) <- (Fail({e})) -> {a}'
             found.append(dict(path=p, mod=mod, name=name, params=params,
-                              names=names, tp=tp, old=old, new=new, a=a, e=e))
+                              names=names, tp=tp, old=old, new=new, a=a, e=e,
+                              inferred=result is None))
     return found
 
 
@@ -227,6 +228,12 @@ def main():
         own = [f for f in funcs if f['path'] == p]
         if own:
             s = rename_local(s, {f['name'] for f in own})
+            for f in own:
+                if f['inferred'] and (f['mod'], f['name']) == ('http', 'body_text'):
+                    # Its new catch still represents the original Nil error.
+                    head = f'_{f["name"]}_result = ({f["params"]})'
+                    assert head in s
+                    s = s.replace(head, head + f' -> Result({f["a"]}, {f["e"]})', 1)
         seen = set()
         s = rewrite_calls(s, bindings(s, funcs), seen)
         for key in seen:

@@ -18,7 +18,9 @@ so their errors still reach the caller (notably URI escape validation).
 The power-pipe and chained-slice tests keep named function calls in their
 pipelines, catching around the pipeline while retaining the original values.
 Parameter names in this table document arguments, rather than type labels.
-The table shows the inferred Fail need. Wrapper literal heads omit it, following
+The table shows the Fail need instantiated at the original Result error type.
+Printed schemes may additionally contain open error-row variables; the host
+error translators bind `Fail(String)` to keep their export contract closed. Wrapper literal heads omit it, following
 §2.10.1: "A function that needs a service only to pass it on writes nothing:
 the need passes down by R2." Their call to `fail.from_result` infers Fail;
 the other needs of original bodies also continue to be inferred.
@@ -37,7 +39,9 @@ Per-function choices for Result data:
 - `http.body_text` and `cli.read` have inferred Result returns; both are
   included below because they forward a failing operation.
 
-Only `std/**`, examples, this table, and the migration script are owned here.
+The initial port owns std, examples, this table, and the migration script.
+The follow-up additionally covers the JavaScript/browser fetch callers and
+the native HTTP integration-test fixture.
 The `resource.acquire`/`Scope` library change in §2.10.9 requires `lib/i`, which
 this lane is explicitly instructed not to edit. The only std caller, `log.file`,
 now opens its handle and uses `resource.ensure` directly: §2.10.9 says
@@ -137,42 +141,45 @@ The follow-up also adapts the browser HTTP fixture and the JavaScript fetch
 test's embedded i source: both catch `http.body_text` before their existing
 Ok/Error matches and retain their original UTF-8 error behavior.
 
-Initial validation at `dc4e5b21` on 2026-11-13:
+Initial validation at `dc4e5b21` was blocked by the eff3 base's Fail handling.
+The follow-up merges eff3 through `b73532527` and rebuilds the compiler.
 
-- Release builds from the merged eff3 bases `ce39db845` and `81c2abf9` pass.
-  The first cold build required initializing the missing Binaryen submodule.
-- `i fmt --check std` and formatting checks on the changed HTTP examples pass.
-  Initial generated heads incorrectly wrote a need type as a service pattern;
-  wrappers now infer the need through their calls, per §2.10.1 above.
-- Migration audit: all 75 original helper signatures and public exports remain;
-  wrappers directly unwrap the same Result. All 2,170 original named tests and
-  3,103 assertions remain; the added JSON test brings the totals to 2,171 and
-  3,105. No expectation was re-recorded.
-- The required wrapped `i check --project std` with the latest release from
-  `81c2abf9` stops at `<i>/fail.i:19:1`, E0515: the type hides the environment
-  statement's obligation for `Fail(_)`. This is the library implementation of
-  `fail.catch`; std's migrated modules have not been typechecked successfully.
-- With the earlier `ce39db845` binary, the required std check stopped at 12
-  E0322/E0521 errors in `std/src/test.is`. Temporary source-only packages under
-  `target/` (no std test macros) exposed 33 errors after E4 versus 19 for the
-  unmodified eff3 std sources. The 14 additional diagnostics concern unhandled
-  `Fail(Nil)` in added catches (JSON/URI/schema/HTTP and regex constants). They
-  remain unresolved; the comparison predates the latest catch/E1 merge and
-  is not evidence of a successful typecheck.
-- `i test --project std --opt 0` has not run because the required typecheck is
-  blocked. Runtime behavior, including the new exact JSON error fixture, is
-  unverified. This lane did not modify `lib/i` or the compiler; those changes
-  arrived only through the requested eff3 merges.
+Follow-up changes and their basis:
 
+- Browser and JavaScript fetch fixtures choose `http.fetch_client()`; native
+  integration programs choose `http.native_client()`. Design §2.10.11 says:
+  "All other services are provided in `main` by i code."
+- Host error translators name `handler: Fail(String)` and call `handler.raise`
+  on the same inspected error text. This closes the host-passable error type
+  without changing the translated value (spec §9.3 and §10.3).
+- The HTTP server assigns its caught parse result the type
+  `Result(User, schema.ParseError)` before matching. Spec §4.8 says: "The value
+  of a binding whose pattern has `x: T` at its top has `T`." The existing
+  `.path` projection therefore retains its known schema error type.
+- `_body_text_result` explicitly retains `Result(String, Nil)`, its original
+  inferred data contract; the migration script now produces that annotation.
 
-Revalidation after merging eff3 `6b0377b2a` on 2026-11-13:
+Verification checkpoints (2026-11-13):
 
-- The release rebuild passes; `i check --project std` passes with the same
-  two inherited HTTP unreachable-clause warnings.
-- `i test --project std --opt 0`: **2,171 passed, 0 failed**, including the
-  exact E4 JSON error, entropy service error, and direct-call pipeline tests.
-- `i fmt --check bench std lib examples` and the browser HTTP fixture pass.
-- O2, chapters 9/11, HTTP/CLI integration, host fixture regeneration and Clippy
-  are still in progress. There is no ilang-cli `json` test target in this tree;
-  JSON is covered by the std JSON suite at both requested optimization levels
-  and by the HTTP server integration's schema/JSON success and failure cases.
+- Release builds pass through the merged eff3 `b73532527` base.
+- `i check --project std --types` passes on that base with two inherited HTTP
+  unreachable-clause warnings.
+- On the preceding eff3 `6b0377b2a` base, std O0 and O2 each pass **2,171/2,171**.
+  Final repetitions on the latest base are pending.
+- `i fmt --check bench std lib examples` and the browser fixture pass; the
+  Rust HTTP test fixture and JavaScript source pass their format/syntax checks.
+- Native integration tests pass: **HTTP 11/11**, **CLI/log 2/2**. The first HTTP
+  run exposed the example's missing known schema type; the complete rerun is
+  green with every original response/error assertion unchanged.
+- The browser HTTP fixture builds for JS at O0. Its first build exposed an
+  open error variable at the host export; its String Fail handler closes it.
+- JavaScript fetch: **9/10 subtests pass**, including GET/POST/headers/status,
+  timeout, both cancellation paths, refused connection and DNS errors.
+  Streaming fails with an illegal cast in `field`, `f157`, `f156`, `s28`,
+  `keep_reenter`. Two attempts reproduce the same failure; adding a helper
+  return annotation produced identical failing Wasm and was discarded. This
+  part is stopped per the brief, and the streaming assertions remain intact.
+- There is no ilang-cli `json` test target in this checkout. JSON is covered by
+  the std JSON suite and the HTTP integration's schema/JSON cases.
+- Spec chapters 9/11, fixture regeneration, final std runs and Clippy remain
+  in progress. No test or assertion has been removed or weakened.
