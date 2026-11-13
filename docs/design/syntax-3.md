@@ -1261,6 +1261,8 @@ function `core.never : (Never) -> A` (D9; the name [R4]) is the match on
 | Labelled value | The constructor name; when its data is not `()`, then the text form of its data: `Some(1)`, `User(age = 36, name = "ada")`, `None`. The printed text is a legal expression (O20); labels in UTF-8 byte order [R4]. |
 | Function | `//fn(`, one name per key of its shape: positions `a`, `b`, … as today, then each label as `label = ` followed by the next name of the same sequence, `) { ... }`. A multi-shape value writes each group's part joined by ` \| `: `//fn(a) { ... } \| (a, b) { ... }`, in the written order of the groups' first branches. |
 
+Float text uses the source form specified by spec §11.8.
+
 ### 2.16 Type parameters on function values (owner, O23)
 
 Type parameters are written on function values and function types, not on
