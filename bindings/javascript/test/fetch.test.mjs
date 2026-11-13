@@ -92,7 +92,7 @@ timeout = (url: String) {
 	checked(() {
 		text(
 			http.send_timeout(
-				http.client(),
+				http.client().send,
 				http.request(http.Method("GET"), url),
 				20000000,
 			),
