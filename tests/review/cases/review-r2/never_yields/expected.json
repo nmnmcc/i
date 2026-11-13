@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.spin : (n: Int) -> Never\napp/main.main : () -> Never ! Io | task.Scheduler\n",
+      "stdout": "app/main.spin : (n: Int) -> Never\napp/main.main : () -> Never ^ task.ScheduleError ! Io | task.Runner\n",
       "stderr": ""
     },
     "test0": {

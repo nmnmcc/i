@@ -1,2 +1,0 @@
-test/a1_alias_pattern.i:5:8: error[E0233]: the left side of an alias that is not a list of type parameters is kept for alias patterns
-1 error

@@ -1,6 +1,0 @@
-{
-  "name": "ann_twice1",
-  "code": 0,
-  "time": 0.01966561796143651,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : () -> Nil ! N | S(N)\n"
-}

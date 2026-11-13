@@ -46,6 +46,20 @@ pub enum Error {
 /// costs twice that (docs/performance.md).
 pub const ALWAYS_INLINE: u32 = 20;
 
+/// Run once more after the default pipeline. Heap2Local only removes an
+/// allocation whose reference does not escape; an allocation stored into
+/// another one escapes until that one is removed. The default pipeline runs
+/// it once after inlining, which removes a closure whose loop was inlined but
+/// leaves its capture array and the boxes in it. Two more rounds remove them
+/// when they too do not escape (numeric-step3-report.md, R7).
+const AFTER_OPTIMIZE: [&std::ffi::CStr; 5] = [
+    c"heap2local",
+    c"simplify-locals",
+    c"heap2local",
+    c"simplify-locals",
+    c"vacuum",
+];
+
 /// Binaryen keeps its optimization settings in global state, so every use of
 /// it is done while holding this lock.
 static BINARYEN: Mutex<()> = Mutex::new(());
@@ -110,6 +124,9 @@ pub fn optimize(wasm: &[u8], level: Level) -> Result<Vec<u8>, Error> {
         ffi::BinaryenSetDebugInfo(false);
         ffi::BinaryenSetAlwaysInlineMaxSize(ALWAYS_INLINE);
         ffi::BinaryenModuleOptimize(module.0);
+        let passes: Vec<*const std::ffi::c_char> =
+            AFTER_OPTIMIZE.iter().map(|p| p.as_ptr()).collect();
+        ffi::BinaryenModuleRunPasses(module.0, passes.as_ptr(), passes.len() as u32);
         if !ffi::BinaryenModuleValidate(module.0) {
             return Err(Error::Invalid);
         }

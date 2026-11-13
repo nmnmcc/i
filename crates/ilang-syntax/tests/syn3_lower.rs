@@ -66,6 +66,19 @@ fn calls_data_and_patterns() {
 }
 
 #[test]
+fn empty_data_has_the_same_tree_on_both_surfaces() {
+    // Spec §14.3: "(,) is the empty data in the positions of values,
+    // types and patterns. The empty () has no position."
+    let (normal, diags) = syn3::parse_lowered("empty = ()\n");
+    assert!(diags.is_empty(), "{diags:#?}");
+    let (lisp, diags) = syn3::parse_lisp_lowered("(= empty (,))\n");
+    assert!(diags.is_empty(), "{diags:#?}");
+    assert!(ilang_syntax::shape::equivalent(&normal, &lisp));
+    let (_, diags) = syn3::parse_lisp_lowered("(= empty ())\n");
+    assert!(!diags.is_empty());
+}
+
+#[test]
 fn services_and_needs() {
     same(
         "find_user = (id: String) <- (db: Db, log: Log) {\n\tlog.write(id)\n\tdb.find(id)\n}\n\nDb = (find = (String) <- (Fail(NotFound), Log) -> User)\n",
@@ -104,12 +117,47 @@ fn several_positions() {
     assert!(text.contains("(%arg1, %arg2)"), "{text}");
 }
 
+/// Stage 9: a chain with several shape groups, or with a label in its
+/// shape, is one hidden binding for each group and then the name, bound to
+/// the transition form of the multi-shape value. The parts of a shape are
+/// in canonical order: the positions, then the labels by name.
+#[test]
+fn shape_groups() {
+    let text = shown(
+        "area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n\nopen = (host: String, port = p: Int, addr = a: String) { p }\n",
+    );
+    let bindings: Vec<&str> = text
+        .lines()
+        .filter(|l| !l.starts_with(['\t', '}']) && l.contains(" = "))
+        .collect();
+    assert_eq!(bindings.len(), 5, "{text}");
+    assert!(bindings[0].starts_with("area%g0 = (r: Float)"), "{text}");
+    assert!(
+        bindings[1].starts_with("area%g1 = (w: Float, h: Float)"),
+        "{text}"
+    );
+    assert!(
+        bindings[2].starts_with("area = %multi(1: area%g0, 2: area%g1)"),
+        "{text}"
+    );
+    assert!(
+        bindings[3].starts_with("open%g0 = (host: String, a: String, p: Int)"),
+        "{text}"
+    );
+    assert!(
+        bindings[4].starts_with("open = %multi(1,addr,port: open%g0)"),
+        "{text}"
+    );
+    // A chain that is not bound to a name has its group functions in place.
+    let text = shown("fs = [(a) { a } | (a, b) { b }]\n");
+    assert!(
+        text.contains("%multi(1: (a) {") && text.contains("2: (a, b) {"),
+        "{text}"
+    );
+}
+
 #[test]
 fn forms_of_later_stages_are_errors() {
-    bad(
-        "area = (r: Float) { r } | (w: Float, h: Float) { w *. h }\n",
-        "stage 9",
-    );
     bad("keep = (f: Int) <- (..env: N) { f }\n", "stage E6");
     bad("f = (x) { g(x) <- env }\n", "stage E6");
 }
@@ -160,4 +208,97 @@ fn written_full_type_is_closed() {
 fn repeated_type_parameter_kept() {
     let out = shown("pair = <A, A>(x: A) { (x, x) }\n");
     assert!(out.contains("pair(A, A)"), "{out}");
+}
+
+#[test]
+fn one_member_alias_keeps_a_type_written_as_a_type() {
+    // `Alias(N) = T(N)` is an alias (§2.8, kind 4) when `T` is written as
+    // a type; it does not take `T` in as its one constructor.
+    same(
+        "Dep = ()\nT(N) = (N)\nAlias(N) = T(N)\nf = (x: T(Dep)) { x }\n",
+        "Dep { Dep }\nT(N) { T(N) }\nAlias(N) = T(N)\nf = (x: T(Dep)) { x }\n",
+    );
+    same(
+        "T(N) = (N)\nAlias(N) = T(N)\ng = (x: Alias(Int)) { x }\ny: T(Int) = T(1)\n",
+        "T(N) { T(N) }\nAlias(N) = T(N)\ng = (x: Alias(Int)) { x }\ny: T(Int) = T(1)\n",
+    );
+    // Not written as a type, the member is still the one constructor.
+    same(
+        "DivisionByZero = ()\nTimeError = DivisionByZero\n",
+        "TimeError { DivisionByZero }\n",
+    );
+    same("A = (Int)\nB = ()\nAB = A | B\n", "AB { A(Int) B }\n");
+}
+
+#[test]
+fn fail_in_a_function_head_is_its_error_part() {
+    use ilang_syntax::ast::{ExprKind, ItemKind, Param, TypeKind};
+
+    // `name: Fail(E)` in a head is the error part `^ E`, as in a need of a
+    // function type (§2.10.6): no service parameter `Fail`.
+    let text = shown(
+        "load = (id: String) <- (clock: Clock, fail: Fail(String)) -> Int { 1 }\n\nkeep = () <- (fail: Fail(Int)) { 1 }\n\nboth = (0) <- (fail: Fail(Int)) { 1 } | (n: Int) -> Int { n }\n",
+    );
+    assert!(text.contains("clock ! Clock"), "{text}");
+    assert!(!text.contains("Fail"), "{text}");
+    assert!(text.contains("-> Int ^ String"), "{text}");
+    assert!(text.contains("^ Int"), "{text}");
+    // With no written result, keep the value and other needs inferred.
+    // A later branch's Fail entry must also supply the chain's error part.
+    for source in [
+        "keep = () <- (fail: Fail(String)) { 1 }\n",
+        "late = (0) { 1 } | (n: Int) <- (fail: Fail(String)) { n }\n",
+    ] {
+        let (module, diags) = syn3::parse_lowered(source);
+        assert!(diags.is_empty(), "{source}\n{diags:#?}");
+        let ItemKind::Binding(binding) = &module.items[0].kind else {
+            panic!("expected a binding: {source}");
+        };
+        let ExprKind::Fn(function) = &binding.value.kind else {
+            panic!("expected a function: {source}");
+        };
+        assert!(
+            function
+                .params
+                .iter()
+                .all(|p| !matches!(p, Param::Env { .. }))
+        );
+        let ret = function.ret.as_ref().expect("Fail supplies an error part");
+        assert!(matches!(ret.value.kind, TypeKind::Hole));
+        assert!(matches!(ret.env.as_ref().unwrap().kind, TypeKind::Hole));
+        assert!(matches!(
+            &ret.err.as_ref().unwrap().kind,
+            TypeKind::Named { module: None, name, args }
+                if name.name == "String" && args.is_empty()
+        ));
+    }
+    bad(
+        "f = () <- (a: Fail(Int), b: Fail(String)) { 1 }\n",
+        "a need has one `Fail` entry",
+    );
+}
+
+#[test]
+fn labelled_function_type_parameters_keep_their_data_keys() {
+    use ilang_syntax::ast::{ItemKind, TypeKind};
+    let (module, errors) = syn3::parse_lowered("f: (x = Int, y = String) -> Int\n");
+    assert!(errors.is_empty(), "{errors:?}");
+    let ItemKind::Declaration { ty, .. } = &module.items[0].kind else {
+        panic!()
+    };
+    let TypeKind::Fn { params, .. } = &ty.kind else {
+        panic!()
+    };
+    assert_eq!(params.len(), 1);
+    assert_eq!(params[0].label.as_ref().unwrap().name, syn3::lower::DATA);
+    let TypeKind::Record { fields, .. } = &params[0].ty.kind else {
+        panic!()
+    };
+    assert_eq!(
+        fields
+            .iter()
+            .map(|(l, _)| l.name.as_str())
+            .collect::<Vec<_>>(),
+        ["x", "y"]
+    );
 }

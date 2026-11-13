@@ -1,3 +1,0 @@
-compiler_feature=false answer=42
-moved idle Store to another thread: answer=42
-actual i WasmGC module start+main passed, compiler_feature=false

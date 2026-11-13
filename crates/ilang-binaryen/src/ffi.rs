@@ -40,6 +40,11 @@ unsafe extern "C" {
     pub fn BinaryenModuleSetFeatures(module: BinaryenModuleRef, features: BinaryenFeatures);
     pub fn BinaryenModuleValidate(module: BinaryenModuleRef) -> bool;
     pub fn BinaryenModuleOptimize(module: BinaryenModuleRef);
+    pub fn BinaryenModuleRunPasses(
+        module: BinaryenModuleRef,
+        passes: *const *const c_char,
+        num_passes: u32,
+    );
     pub fn BinaryenModuleAllocateAndWrite(
         module: BinaryenModuleRef,
         source_map_url: *const c_char,

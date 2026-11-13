@@ -1,7 +1,0 @@
-spec/control_lazy_skip.check : (got: String, want: String) -> Nil
-spec/control_lazy_skip.show : (x: A) -> String
-spec/control_lazy_skip.note : (log: Boundary(String, A, B), text: String) -> Nil
-spec/control_lazy_skip.named : (log: Boundary(String, A, B), name: String, body: () -> Int ? E ! N) -> Int ? E ! N
-spec/control_lazy_skip.cancel_through_catch : () -> Nil
-spec/control_lazy_skip.paused_final : (log: Boundary(String, A, B), h: Boundary(Held, Never, Never)) -> Held
-spec/control_lazy_skip.cancel_through_final : () -> Nil

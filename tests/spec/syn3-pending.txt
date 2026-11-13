@@ -1,11 +1,12 @@
-# Spec cases skipped until open records are removed (syntax three, stage 6, another lane).
+# Legacy dynamic-label cases retained while their intent is rewritten for closed data.
+# Stage 6 is merged: these converted fixtures still call removed i/record or
+# require a dynamic field key, which closed data cannot express (syntax-3 §2.3).
 # They use i/record and Record-bounded parameters: open records. One case name per line.
 6/t3_record_builder.i
 6/t3_record_codec.i
 6/t3_record_cross_module
 6/t3_record_evaluation_order.i
 6/t3_record_host_boundary.i
-6/t3_record_inspect.i
 6/t3_record_key_known_fn.i
 6/t3_record_library.i
 6/t3_record_param_alias.i
@@ -24,4 +25,28 @@
 6/t3_record_param_value.i
 6/t3_record_param_value_type.i
 6/t3_record_schema.i
-6/t3_record_spread_evaluation_order.i
+
+# Stage 6 makes closed-data types printable: the old record-graph TypeView
+# expression error is no longer reachable; retained for replacement intent review.
+15.7/typed_query_opaque_expression_error
+
+# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+6/t3_record_param_inner_label.i
+
+# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+6/t3_record_param_mismatch.i
+
+# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+6/t3_record_param_two_keys.i
+
+# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+6/t3_record_structural_instantiation.i
+
+# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+6/t3_record_type_test.i
+
+# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+6/t3_record_type_test_partial.i
+
+# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+6/t3_record_types.i

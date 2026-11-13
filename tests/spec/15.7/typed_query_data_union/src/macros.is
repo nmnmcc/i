@@ -1,0 +1,7 @@
+(, (= syntax (/ i syntax)) (= fail (/ i fail)))
+(, m)
+(@ macro (: m (-> [A] (, A) A)))
+(@ macro
+  (= m
+    (-> (, value) _
+      {(= t ((. syntax type_of) value)) `{(= (: result ~t) ~value) result}})))

@@ -1,18 +1,18 @@
-exact : (x = Int) -> Int
-general : (x = A) -> A
-holes : (x = List(A)) -> List(A)
-inner : (x = A) -> A
+exact : (Int) -> Int
+general : (A) -> A
+holes : (List(A)) -> List(A)
+inner : (A) -> A
 apart : () -> (1, "s")
 typed_value : Int
 fn_type : (Int) -> Int
-union_arg : (x = Int | String) -> Int | String
-inter_arg : (x = A & Int) -> A
+union_arg : (Int | String) -> Int | String
+inter_arg : (A & Int) -> A
 list_union : List(Int | String)
-result_written : (r = Result(A, B)) <- (Fail(B)) -> A
-diff_written : (x = Int | String | Nil) -> Int | Nil
-alias_use : (p = (Int, Int)) -> (Int, Int)
-pair_use : (p = (String, String)) -> (String, String)
+result_written : (Result(A, B)) <- (Fail(B)) -> A
+diff_written : (Int | String | Nil) -> Int | Nil
+alias_use : ((Int, Int)) -> (Int, Int)
+pair_use : ((String, String)) -> (String, String)
 wrong : String
-wrong_ret : (x = Int) -> String
+wrong_ret : (Int) -> String
 50:1: error[E0501]: `1` is not a subtype of `String`
 52:29: error[E0501]: `Int` is not a subtype of `String` (the type at 52:20 needs it)

@@ -27,10 +27,13 @@ fn field(label: Datum, value: Datum) -> Datum {
 #[test]
 fn record_values_types_and_source_locations_are_preserved() {
     let empty = one("()");
+    // The transitional AST adapter keeps empty data as an empty tuple.
+    // The source reader requires `(,)` (spec §14.3).
     assert!(
-        matches!(&parse_expression(&empty).unwrap().kind, ExprKind::Record { base: None, fields } if fields.is_empty())
+        matches!(&parse_expression(&empty).unwrap().kind, ExprKind::Tuple(items) if items.is_empty())
     );
-    assert!(parse_type(&empty).is_err());
+    // syntax-3 stage 6: `()` is the empty data type.
+    assert!(parse_type(&empty).is_ok());
     assert!(parse_pattern(&empty).is_err());
     let source = one("(.. base (: name 1) (: \"x-y\" value))");
     let K::Round(parts) = &source.kind else {

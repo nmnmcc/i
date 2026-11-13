@@ -1,3 +1,0 @@
-spec/a1_fitting_expected_subject.get : (opt: Option(User)) -> String ! Assert
-spec/a1_fitting_expected_subject.single : (Int) -> Int ! Assert
-spec/a1_fitting_expected_subject.main : () -> Nil ! Assert

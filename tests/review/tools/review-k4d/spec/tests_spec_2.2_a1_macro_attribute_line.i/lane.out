@@ -1,2 +1,0 @@
-test/a1_macro_attribute_line.i:4:1: error[E0301]: the attribute `@m` is kept for macros; the built-in attributes are `@external`, `@host`, `@main`, `@test`, and `@deprecated`
-1 error

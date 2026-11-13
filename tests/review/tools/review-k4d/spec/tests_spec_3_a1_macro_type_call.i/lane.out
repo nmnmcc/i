@@ -1,2 +1,0 @@
-test/a1_macro_type_call.i:4:10: error[E0234]: a call in a type is kept for macros
-1 error

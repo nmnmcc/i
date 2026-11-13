@@ -84,17 +84,28 @@ impl Query<'_> {
         let p = self.program;
         let mut in_type = false;
         let mut case: Option<&Expr> = None;
+        let mut pipe_subject: Option<&Expr> = None;
         let mut call: Option<&Expr> = None;
         let mut record = false;
         visit_module(p, m, &mut |n| match n {
+            // Not a hole: the lowering of a provide `e <- (v)` gives each
+            // value `v` the type `_` with the span of the value.
             Node::Type(t)
-                if t.span.start <= start && offset <= t.span.end && t.span.start < t.span.end =>
+                if t.span.start <= start
+                    && offset <= t.span.end
+                    && t.span.start < t.span.end
+                    && !matches!(t.kind, TypeKind::Hole) =>
             {
                 in_type = true
             }
             Node::Expr(e) if e.span.start < offset && offset <= e.span.end => match &e.kind {
                 ExprKind::Case { .. } if case.is_none_or(|c| c.span.start <= e.span.start) => {
                     case = Some(e)
+                }
+                ExprKind::Binary { op: ilang_syntax::ast::BinOp::Pipe, lhs, .. }
+                    if pipe_subject.is_none_or(|old| old.span.start <= lhs.span.start) =>
+                {
+                    pipe_subject = Some(lhs)
                 }
                 ExprKind::Call { callee, .. }
                     if callee.span.end <= start
@@ -108,6 +119,14 @@ impl Query<'_> {
             },
             _ => {}
         });
+        // A service pattern `<- (name: S, …)` of a function head, or the
+        // need `<- (S, …)` of a function type (syntax three §2.10.2): a
+        // type there, or the place after `name:`, is a service. After
+        // `e <- (` of a provide the items are values, which are not types
+        // of the tree.
+        if (in_type || before == Some(b':')) && after_need_arrow(text, start) {
+            return CompletionContext::Environment;
+        }
         if in_type {
             return CompletionContext::Type;
         }
@@ -135,6 +154,17 @@ impl Query<'_> {
                     types: self.subject_types(m, subject, clauses),
                 };
             }
+        }
+        // An unfinished branch such as `| () { ... }` can lower as a
+        // different-shape function instead of a Case. The source still puts
+        // this cursor in the pattern head of the match, not its body.
+        if let Some(subject) = pipe_subject
+            && !self.is_lisp(m)
+            && in_source_branch_head(text, offset)
+        {
+            return CompletionContext::Pattern {
+                types: self.subject_types(m, subject, &[]),
+            };
         }
         if before == Some(b':') && call.is_none() && !record {
             return CompletionContext::Type;
@@ -935,8 +965,49 @@ fn prev_byte(text: &str, offset: u32) -> Option<u8> {
 }
 
 /// The text of the line before `offset`.
+/// The position is an item of the group `( … )` that follows a `<-`:
+/// a service pattern or a need.
+fn after_need_arrow(text: &str, offset: u32) -> bool {
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut i = (offset as usize).min(bytes.len());
+    while i > 0 {
+        i -= 1;
+        match bytes[i] {
+            b')' | b']' | b'}' => depth += 1,
+            b'[' | b'{' if depth == 0 => return false,
+            b'(' | b'[' | b'{' if depth > 0 => depth -= 1,
+            b'(' => return text[..i].trim_end().ends_with("<-"),
+            _ => {}
+        }
+    }
+    false
+}
+
 fn line_before(text: &str, offset: u32) -> &str {
     let o = (offset as usize).min(text.len());
     let start = text[..o].rfind(['\n', '\r']).map_or(0, |i| i + 1);
     &text[start..o]
+}
+
+/// Whether the cursor is inside the parentheses directly following a
+/// syntax-three branch join or match pipe. Tokens keep comments and strings
+/// from inventing a head, and the delimiter stack excludes branch bodies.
+fn in_source_branch_head(text: &str, offset: u32) -> bool {
+    use ilang_syntax::token::TokenKind as T;
+    let lexed = ilang_syntax::lexer::lex3(text);
+    let mut stack = Vec::new();
+    let mut previous = None;
+    for token in &lexed.tokens {
+        if token.span.start >= offset { break; }
+        match token.kind {
+            T::LParen => stack.push((T::LParen, matches!(previous, Some(T::Pipe | T::PipeGt)))),
+            T::LBrace => stack.push((T::LBrace, false)),
+            T::LBracket => stack.push((T::LBracket, false)),
+            T::RParen | T::RBrace | T::RBracket => { stack.pop(); },
+            _ => {}
+        }
+        previous = Some(token.kind.clone());
+    }
+    stack.iter().rev().take_while(|(kind, _)| !matches!(kind, T::LBrace)).any(|(_, head)| *head)
 }

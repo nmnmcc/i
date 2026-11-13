@@ -1,7 +1,7 @@
 needs_int : () <- (Sink(Int)) -> Nil
 unsound : () -> Nil
-wrong_cell : (c = Cell(Int)) -> Cell(Never)
-run_never : (body = () <- (Sink(Never)) -> Nil) -> Nil
+wrong_cell : (Cell(Int)) -> Cell(Never)
+run_never : (() <- (Sink(Never)) -> Nil) -> Nil
 bad_computation : () -> Nil
 8:32: error[E0501]: `Int` is not a subtype of `Never` (the type at 8:32 needs it)
 13:46: error[E0501]: `Int` is not a subtype of `Never` (the type at 13:32 needs it)

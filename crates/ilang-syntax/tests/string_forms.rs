@@ -116,7 +116,7 @@ x })b" // outside"#,
 fn interpolation_and_multiline_boundaries_are_diagnosed() {
     for source in [
         /* old-syntax-check: E0101 */ r#"value = (s) { s |> ("\(x)") { 1 } }"#,
-        /* old-syntax-check: E0108 */ r#"value = (s) { s |> (a <> "x" <> b) { 1 } }"#,
+        /* old-syntax-check: E0101 */ r#"value = (s) { s |> (a <> "x" <> b) { 1 } }"#,
         /* old-syntax-check: E0003 */ "value = \"\"\"bad\n\"\"\"",
         /* old-syntax-check: E0003 */ "value = \"\"\"\na\n  \"\"\"",
         /* old-syntax-check: E0003 */ "value = \"\"\"\n  a\"\"\"",

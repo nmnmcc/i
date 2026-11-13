@@ -1,6 +1,0 @@
-{
-  "name": "rec_local_1_10_4",
-  "code": 1,
-  "time": 0.01894760807044804,
-  "out": "app/main.use : () -> Nil ! N | S(N)\nsrc/main.i:3:34: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
-}

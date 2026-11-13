@@ -2,7 +2,6 @@
 // expect: pass
 (
 	list = std/list
-	i/record
 )
 
 (
@@ -19,6 +18,5 @@ main = () {
 	})
 	assert(r == (n = 3, total = 6))
 	assert(s.n == 3)
-	assert(record.size(r) == 2)
 	Nil
 }

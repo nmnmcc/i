@@ -67,3 +67,4 @@ main = () {
 			),
 	)
 }
+// old-syntax-check: E0101

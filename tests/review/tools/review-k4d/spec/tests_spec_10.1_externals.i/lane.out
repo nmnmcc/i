@@ -1,7 +1,0 @@
-spec/externals.add : (a: Int, b: Int) -> Int
-spec/externals.hypot : (a: Float, b: Float) -> Float
-spec/externals.seven : Int
-spec/externals.check : (got: String, want: String) -> Nil
-spec/externals.apply : (f: (Int, Int) -> Int, a: Int, b: Int) -> Int
-spec/externals.calls_are_made_as_written : () -> Nil
-spec/externals.an_external_function_is_a_value : () -> Nil

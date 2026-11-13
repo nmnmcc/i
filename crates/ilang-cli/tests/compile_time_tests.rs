@@ -42,7 +42,7 @@ fn fixture() -> tempfile::TempDir {
     write(
         dir.path(),
         "src/helpers.is",
-        "(, quote)\n(= quote (-> () _ `(f x)))\n",
+        "(, quote)\n(= quote (-> (,) _ `(f x)))\n",
     );
     write(
         dir.path(),
@@ -145,7 +145,7 @@ fn tests_use_each_builds_unmarked_quote_templates() {
         write(
             root,
             "test/quote.is",
-            "(, (= syntax (/ i syntax)) (= testlib (, test) (/ std test)))\n(= quoted `(a b))\n(test \"quote_test\" (-> () _ { (assert (== ((. syntax show) quoted) \"(a b)\")) Nil }))\n",
+            "(, (= syntax (/ i syntax)) (= testlib (, test) (/ std test)))\n(= quoted `(a b))\n(test \"quote_test\" (-> (,) _ {(assert (== ((. syntax show) quoted) \"(a b)\")) Nil}))\n",
         );
         let built = build(root, true, opt).unwrap();
         let templates = built
@@ -192,7 +192,7 @@ fn selected_test_collection_installs_its_quote_templates() {
     write(
         root,
         "src/macros.is",
-        "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (c x body (! it (. syntax Items))) _ { ((. it add) c x [] x) `(= ~x (-> () _ { ~body })) })))\n",
+        "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x body) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {~body}))})))\n",
     );
     write(
         root,
@@ -202,7 +202,7 @@ fn selected_test_collection_installs_its_quote_templates() {
     write(
         root,
         "src/quote.is",
-        "(, quoted)\n(= quoted (-> () _ `(a b)))\n",
+        "(, quoted)\n(= quoted (-> (,) _ `(a b)))\n",
     );
     write(
         root,

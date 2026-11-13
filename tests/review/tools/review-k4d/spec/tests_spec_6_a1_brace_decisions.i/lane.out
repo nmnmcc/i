@@ -1,5 +1,0 @@
-spec/a1_brace_decisions.identity : (n: A) -> A
-spec/a1_brace_decisions.take_tuple : ((A, B) | C - (A, B)) -> (A | Int, B | Int)
-spec/a1_brace_decisions.take_result : (Result(A, B) | C - Result(A, _)) -> A | Int
-spec/a1_brace_decisions.take_prefix : (A) -> String
-spec/a1_brace_decisions.main : () -> Nil ! Assert

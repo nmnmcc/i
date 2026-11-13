@@ -1,6 +1,0 @@
-{
-  "name": "extra_genuine_mutual_fn",
-  "code": 1,
-  "time": 0.02789691206999123,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (f: () -> A ! N) -> A ! N\napp/main.f : (x: A) -> Never\napp/main.g : (x: A) -> Never\nsrc/main.i:4:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
-}

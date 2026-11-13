@@ -108,11 +108,11 @@ fn files_with_errors_are_left_as_they_are() {
 
 #[test]
 fn lisp_files_are_formatted_in_default_roots_and_given_paths() {
-    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n";
+    let source = "// keep\n(= main (-> (,) _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n";
     let pretty = ilang_syntax::lisp::format(source).unwrap();
     assert_eq!(
         pretty,
-        "// keep\n(= main\n  (-> () _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n"
+        "// keep\n(= main\n  (-> (,) _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n"
     );
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),

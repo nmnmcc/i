@@ -1,3 +1,0 @@
-review/main.make : () -> Cell(A)
-src/main.i:3:6: error[E0533]: a permanent alias cannot contain a generalized variable or an unknown type
-1 error

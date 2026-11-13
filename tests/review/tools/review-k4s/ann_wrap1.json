@@ -1,6 +1,0 @@
-{
-  "name": "ann_wrap1",
-  "code": 0,
-  "time": 0.01835819287225604,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : () -> Nil ! N | S(N)\n"
-}

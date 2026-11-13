@@ -213,7 +213,7 @@ option_name = (opt: Option(User)) {
 	opt |> (Some(u)) { u.name } | (None) { "" }
 }
 
-// An annotation label wins over the label of the value.
+// A written positional signature determines the call interface (§6.6).
 annotated: (Int) -> Int = (y) { y }
 
 annotated_call = annotated(1)

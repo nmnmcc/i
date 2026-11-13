@@ -1,2 +1,0 @@
-test/host_errors_type.i:10:10: error[E0320]: the parameters and the value of a function of a host service are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors; its errors are a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; and it has no environment (§9.7, §10.3)
-1 error

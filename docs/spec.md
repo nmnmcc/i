@@ -10,6 +10,7 @@ This document is complete in itself. It defines:
 - the library module `i/core`, which has the operations that are not written in i (§13);
 
 - macros, the Lisp surface, and the library module `i/syntax` (§14);
+- the library module `i/float_text`, the text form of a Float written in i (§11.8);
 - packages, versions, and the files `i.toml` and `i.lock` (§2.1, §2.6 to §2.8);
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
@@ -1108,7 +1109,7 @@ i has no special effect definitions. Effects are made from normal things: functi
 A function with no parameters, `() <- N -> A`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS, which is `() <- (..R, Fail(E)) -> A` in i. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
 
 ```i
-retry = <A, E, N>(times: Int, body: () <- (..N, Fail(E)) -> A) <- (..N, Fail(E)) -> A {
+retry = <A, E, N>(times: Int, body: () <- (..N, Fail(E)) -> A) -> A {
   fail.catch(body) |> (Ok(value)) { value }
     | (Error(error) ? times > 1) { retry(times - 1, body) }
     | (Error(error)) { fail.raise(error) }
@@ -1263,7 +1264,7 @@ Generators, async code, and schedulers are libraries made from services and thes
 ```i
 Yield(A) = (emit = (A) -> Nil)
 
-collect = <A, N>(body: () <- (..N, Yield(A)) -> Nil) <- N -> List(A) {
+collect = <A, N>(body: () <- (..N, Yield(A)) -> Nil) -> List(A) {
   control.boundary((b) {
     body() <- (Yield(emit = (x) { control.suspend(b, (k) { [x, ..control.resume(k, Nil)] }) }))
     []
@@ -1310,7 +1311,7 @@ A binding whose pattern may fail also reports to `Assert` (§6.10).
 At an entry point (§10.2), the platform gives an `Assert` whose `fail` stops the program; in a test, the test fails. Any code may provide its own `Assert`. The module `i/assertion` has one function that does this:
 
 ```i
-catch = <A, N>(body: () <- (..N, Assert) -> A) <- N -> Result(A, AssertionFailure) {
+catch = <A, N>(body: () <- (..N, Assert) -> A) -> Result(A, AssertionFailure) {
   control.boundary((b) {
     Ok(body() <- (Assert(fail = (failure) { control.escape(b, Error(failure)) })))
   })
@@ -2339,6 +2340,8 @@ A **Float** is written in this way. Let d1 … dn be the shortest list of decima
 - In the long form, the digits are written as a decimal number, with `.` and at least one digit after it: `123.0`, `12.67`, `0.0123`.
 - In the short form, d1 is written, then `.`, then d2 … dn, or `0` when n = 1, then `e`, then k − 1 as a decimal number with `-` when it is negative: `3.0e26`, `1.0e-7`, `1.0e3`.
 
+The library module `i/float_text` writes this text in i: `float_text.to_string(x)` is the text form of the Float `x`, the same as `core.inspect(x)`.
+
 The text form of a function, a key or a keyed value never depends on which worker made it or holds it. Task handles keep bookkeeping ids under keyed fields, whose text is `//keyed`; only task.path exposes the semantic task path. Requests and tickets show no ids, state or answers.
 
 ### 11.9 Workers
@@ -2524,7 +2527,7 @@ The `{ }` around the right side of a name whose right side is a data type is par
 
 - In the position of an expression, `(-> …)` is a function: an optional `Square` of type parameters, the parameter data pattern, the result (`_` when no `->` part is written, or `(<- R needs)` with a service pattern), and the body, which is any one expression. In the position of a type, `(-> …)` is a function type. In an expression, `(<- e s)` is a provide.
 - `(| …)` in the position of an expression is a chain of two or more functions.
-- `(,)` is the empty data in the positions of values, types and patterns. The empty `()` has no position.
+- `(,)` is the empty data wherever data is written. The empty `()` has no position.
 - In the position of a data pattern item, `(= n …)` whose first part is a name is a labelled item: `n` is the label and the other parts are its pattern. So `(size = whole = (w, h))` is `(, (= size whole (, w h)))`, and `((a, b) = args)` is `(, (= (, a b) args))`.
 - `|`, `&` and `-` take two or more parts in a type. A string interpolation of the normal surface is written as the `<>` of its parts (§1.6).
 

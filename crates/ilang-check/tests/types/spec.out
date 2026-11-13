@@ -1,15 +1,15 @@
-retry : (times = Int, body = () <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A
-load_user : (id = String) <- (Fail(404)) -> String
+retry : (Int, () <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A
+load_user : (String) <- (Fail(404)) -> String
 user : () <- (Fail(404)) -> String
-elapsed : (start = Int) <- (Clock) -> Int
+elapsed : (Int) <- (Clock) -> Int
 fixed : () -> Int
 collect : (() <- (Fail(E), Yield(A), ..N) -> Nil) <- (Fail(E), ..N) -> List(A)
 numbers : () -> List(Int)
-my_assert : (c = Bool) <- (Assert) -> Nil
-catch : (body = () <- (Fail(E), ..N) -> A) <- (Fail(E), N - Assert) -> Result(A, AssertionFailure)
+my_assert : (Bool) <- (Assert) -> Nil
+catch : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Assert) -> Result(A, AssertionFailure)
 checked : () -> Result(1, AssertionFailure)
 checked_library : () -> Result("x", AssertionFailure)
-inc : (x = A & Int) -> A
+inc : (A & Int) -> A
 mixed : List(1 | "a")
 91:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)
 98:2: warning[W0502]: this value is not used, and working it out does nothing

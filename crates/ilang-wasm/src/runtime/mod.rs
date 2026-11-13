@@ -40,7 +40,7 @@
 //! | 1 | Bool | field 1 is 0 or 1; use `$bool_new` (or the globals `$value_true` and `$value_false`) |
 //! | 2 | Float | field 3; always finite |
 //! | 3 | String | field 4: UTF-8 bytes |
-//! | 4 | Tuple | field 5: the parts |
+//! | 4 | Tuple, data | field 1: the index of the label set (0 for none, `$shape_labels`); field 5: the parts, positions then labels in UTF-8 order |
 //! | 5 | Custom type value | field 1: constructor id, field 2: type id, field 5: the fields, or null when there are none |
 //! | 6 | List | `[]` is an `$obj` (the global `$value_empty_list`); any other list is a `$cons`: field 1 the head, field 2 the tail |
 //! | 7 | Function | field 1 bit 0: patched captures with a final walk stamp; field 2: arity |
@@ -50,7 +50,6 @@
 //! | 11 | Boundary | an `$obj` with tag 11; the other fields belong to the code generator |
 //! | 12 | Continuation | an `$obj` with tag 12; the other fields belong to the code generator |
 //! | 13 | UtfCodepoint | field 1: the scalar value |
-//! | 14 | Record | field 5: labels and values, interleaved, sorted by the UTF-8 bytes of the labels |
 //! | 15 | Key | identity value; no parts |
 //! | 16 | Keyed | field 5: key, value |
 //! | 17 | Request | identity cell with private mutable completion state |
@@ -249,7 +248,20 @@ pub const TYPES: &str = r#"
  (field (mut i32)) (field i32) (field i64) (field f64)
  (field (ref null $bytes)) (field (ref null $values))
  (field (ref null $limbs)) (field (ref null $call)))))
+(type $shapes (array (mut i64)))
 (type $cons (sub final $val (struct (field (mut i32)) (field eqref) (field eqref))))
+;; A function value: `$obj`, then its id (multicore D6, given when it is first
+;; copied to another worker; 0 before). Each arity's `$clo{n}` adds its code.
+(type $clo (sub $obj (struct
+ (field (mut i32)) (field i32) (field i64) (field f64)
+ (field (ref null $bytes)) (field (ref null $values))
+ (field (ref null $limbs)) (field (ref null $call)) (field (mut i64)))))
+;; A multi-shape function has the same identity header as other functions.
+;; Field 2 is -1, field 5 holds the groups, and field 9 their shape ids.
+(type $multi (sub final $clo (struct
+ (field (mut i32)) (field i32) (field i64) (field f64)
+ (field (ref null $bytes)) (field (ref null $values))
+ (field (ref null $limbs)) (field (ref null $call)) (field (mut i64)) (field (ref $shapes)))))
 (type $hostref (struct (field externref) (field i32) (field i64)))
 (type $sites (array i32))
 (type $frames (array (mut i32)))
@@ -318,13 +330,30 @@ pub const WASI_RUNTIME: &str = r#"
  (unreachable))
 "#;
 
+/// Stands in for the library functions written in i that the runtime calls
+/// (`ir::RUNTIME_CALLS`), in a module made without a program, such as the
+/// runtime alone: they stop.
+pub const LIBRARY_ABSENT: &str = "\
+(func $float_to_string (param eqref) (result eqref) unreachable)
+(func $big_compare (param eqref eqref) (result eqref) unreachable)
+(func $big_add (param eqref eqref) (result eqref) unreachable)
+(func $big_subtract (param eqref eqref) (result eqref) unreachable)
+(func $big_multiply (param eqref eqref) (result eqref) unreachable)
+(func $big_divide (param eqref eqref) (result eqref) unreachable)
+(func $big_remainder (param eqref eqref) (result eqref) unreachable)
+(func $big_to_text (param eqref eqref) (result eqref) unreachable)
+(func $bits_from_int_wide (param eqref eqref eqref) (result eqref) unreachable)
+(func $bits_read_int_wide (param eqref eqref eqref eqref eqref) (result eqref) unreachable)
+";
+
 /// The first constructor id that the code generator may use.
 pub const FIRST_CONSTRUCTOR: u32 = 16;
 
-/// The runtime definitions. They need [`TYPES`] in the module, and the
+/// The runtime definitions. They need [`TYPES`] in the module, the
 /// functions `$host_panic` and `$host_reference_id`: the imports of
 /// [`HOST`], or on the WASI target [`WASI_HOST`] with [`WASI_RUNTIME`] and
-/// [`WASI_REFERENCE_ID_IMPORT`] or [`WASI_REFERENCE_ID`].
+/// [`WASI_REFERENCE_ID_IMPORT`] or [`WASI_REFERENCE_ID`], and the library
+/// functions of `ir::RUNTIME_CALLS` (or [`LIBRARY_ABSENT`]).
 pub fn wat() -> &'static str {
     wat_for_host_references(true)
 }

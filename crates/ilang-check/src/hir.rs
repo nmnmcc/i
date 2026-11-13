@@ -54,6 +54,12 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// The top-level names that are the callee of a direct call of a chain
+    /// with several shape groups: the call itself names the group.
+    pub chain_uses: Vec<DefId>,
+    /// The hidden group bindings of each top-level name bound to a chain
+    /// with several shape groups (syntax three §2.5), in group order.
+    pub chain_groups: std::collections::HashMap<DefId, Vec<(crate::types::ShapeId, DefId)>>,
     pub typed_macros: std::collections::HashSet<DefId>,
     pub typed_expander: Option<std::sync::Arc<dyn crate::typed_macro::Expander>>,
     pub(crate) expansion_names: Option<std::sync::Arc<crate::resolve::ExpansionNames>>,
@@ -272,7 +278,6 @@ pub enum BuiltinType {
     BitArray,
     UtfCodepoint,
     Never,
-    Record,
     Boundary,
     Continuation,
     Key,
@@ -282,7 +287,7 @@ pub enum BuiltinType {
 }
 
 impl BuiltinType {
-    pub const ALL: [BuiltinType; 14] = [
+    pub const ALL: [BuiltinType; 13] = [
         BuiltinType::Int,
         BuiltinType::Float,
         BuiltinType::String,
@@ -290,7 +295,6 @@ impl BuiltinType {
         BuiltinType::BitArray,
         BuiltinType::UtfCodepoint,
         BuiltinType::Never,
-        BuiltinType::Record,
         BuiltinType::Boundary,
         BuiltinType::Continuation,
         BuiltinType::Key,
@@ -308,7 +312,6 @@ impl BuiltinType {
             BuiltinType::BitArray => "BitArray",
             BuiltinType::UtfCodepoint => "UtfCodepoint",
             BuiltinType::Never => "Never",
-            BuiltinType::Record => "Record",
             BuiltinType::Boundary => "Boundary",
             BuiltinType::Continuation => "Continuation",
             BuiltinType::Key => "Key",
@@ -342,19 +345,6 @@ pub struct Type {
 }
 
 #[derive(Clone, Debug)]
-pub struct RecordLabel {
-    pub ident: Ident,
-    pub parameter: Option<TyVarId>,
-}
-
-impl std::ops::Deref for RecordLabel {
-    type Target = Ident;
-    fn deref(&self) -> &Ident {
-        &self.ident
-    }
-}
-
-#[derive(Clone, Debug)]
 pub enum TypeKind {
     Lit(crate::types::LitValue),
     Of {
@@ -372,10 +362,9 @@ pub enum TypeKind {
     /// `_`.
     Hole,
     Tuple(Vec<Type>),
+    /// Closed labelled data (syntax-3 §2.3): `(name: String, age: Int)`.
     Record {
-        base: Option<Box<Type>>,
-        fields: Vec<(RecordLabel, Type)>,
-        removed: Vec<RecordLabel>,
+        fields: Vec<(Ident, Type)>,
     },
     Fn {
         params: Vec<FnParamType>,
@@ -471,6 +460,9 @@ pub enum ExprKind {
     BitArray(Vec<Segment<Expr>>),
     Block(Block),
     Fn(Box<Function>),
+    /// A multi-shape function value: one function per shape group of a
+    /// chain, in the order of the first branch of each group.
+    Multi(Vec<MultiGroup>),
     Case {
         subject: Box<Expr>,
         clauses: Vec<Clause>,
@@ -513,6 +505,15 @@ pub enum ExprKind {
 #[derive(Clone, Debug)]
 pub struct Arg {
     pub label: Option<Ident>,
+    pub value: Expr,
+}
+
+/// One shape group of a multi-shape function value. The value is the name
+/// of the group's function or a function expression; it takes the parts of
+/// the shape in canonical order.
+#[derive(Clone, Debug)]
+pub struct MultiGroup {
+    pub shape: crate::types::ShapeId,
     pub value: Expr,
 }
 
@@ -690,10 +691,7 @@ pub fn walk_type(t: &Type, f: &mut impl FnMut(&Type)) {
                 walk_type(t, f);
             }
         }
-        TypeKind::Record { base, fields, .. } => {
-            if let Some(base) = base {
-                walk_type(base, f);
-            }
+        TypeKind::Record { fields } => {
             for (_, field) in fields {
                 walk_type(field, f);
             }
@@ -829,6 +827,139 @@ pub fn summarize_aliases(p: &mut Program) {
     p.value_aliases = Some(affected);
 }
 
+/// A node of a value tree: what one step of [`children`] reaches.
+#[derive(Clone, Copy)]
+pub enum Node<'a> {
+    Expr(&'a Expr),
+    Pattern(&'a Pattern),
+    Block(&'a Block),
+}
+
+/// The expressions, patterns and blocks directly inside `node`, in source
+/// order. Types are not nodes; neither are environment parameters nor the
+/// rest binder of a list pattern, which bind names but hold no value tree.
+pub fn children<'a>(node: Node<'a>, mut f: impl FnMut(Node<'a>)) {
+    match node {
+        Node::Expr(e) => match &e.kind {
+            ExprKind::Int(_)
+            | ExprKind::Float(_)
+            | ExprKind::String(_)
+            | ExprKind::Name(_)
+            | ExprKind::Error => {}
+            ExprKind::Tuple(xs) => xs.iter().for_each(|x| f(Node::Expr(x))),
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| f(Node::Expr(&g.value))),
+            ExprKind::Record { base, fields } => {
+                base.iter().for_each(|x| f(Node::Expr(x)));
+                fields.iter().for_each(|(_, x)| f(Node::Expr(x)));
+            }
+            ExprKind::List { items, rest } => items
+                .iter()
+                .chain(rest.as_deref())
+                .for_each(|x| f(Node::Expr(x))),
+            ExprKind::BitArray(segs) => {
+                for s in segs {
+                    f(Node::Expr(&s.value));
+                    if let Some(arg) = s.format.as_ref().and_then(|x| x.arg.as_deref()) {
+                        f(Node::Expr(arg));
+                    }
+                }
+            }
+            ExprKind::Block(b) => f(Node::Block(b)),
+            ExprKind::Fn(fun) => {
+                for p in &fun.params {
+                    if let Param::Pattern { pattern, .. } = p {
+                        f(Node::Pattern(pattern));
+                    }
+                }
+                f(Node::Block(&fun.body));
+            }
+            ExprKind::Case { subject, clauses } => {
+                f(Node::Expr(subject));
+                for c in clauses {
+                    c.patterns.iter().for_each(|p| f(Node::Pattern(p)));
+                    c.guard.iter().for_each(|g| f(Node::Expr(g)));
+                    f(Node::Expr(&c.body));
+                }
+            }
+            ExprKind::Call { callee, args } => {
+                f(Node::Expr(callee));
+                args.iter().for_each(|a| f(Node::Expr(&a.value)));
+            }
+            ExprKind::Field { target, .. }
+            | ExprKind::TupleIndex { target, .. }
+            | ExprKind::Unary { expr: target, .. } => f(Node::Expr(target)),
+            ExprKind::RecordUpdate { base, fields, .. } => {
+                f(Node::Expr(base));
+                fields.iter().for_each(|(_, x)| f(Node::Expr(x)));
+            }
+            ExprKind::Binary { lhs, rhs, .. } => {
+                f(Node::Expr(lhs));
+                f(Node::Expr(rhs));
+            }
+        },
+        Node::Pattern(p) => match &p.kind {
+            PatternKind::Quote { captures, .. } => {
+                captures.iter().for_each(|(_, p)| f(Node::Pattern(p)))
+            }
+            PatternKind::Named { pattern, .. } => f(Node::Pattern(pattern)),
+            PatternKind::Constructor { args, .. }
+            | PatternKind::Tuple(args)
+            | PatternKind::Error(args)
+            | PatternKind::List { items: args, .. } => {
+                args.iter().for_each(|p| f(Node::Pattern(p)))
+            }
+            PatternKind::BitArray(segs) => {
+                for s in segs {
+                    f(Node::Pattern(&s.value));
+                    if let Some(arg) = s.format.as_ref().and_then(|x| x.arg.as_deref()) {
+                        f(Node::Expr(arg));
+                    }
+                }
+            }
+            PatternKind::Var(_)
+            | PatternKind::Discard
+            | PatternKind::Typed { .. }
+            | PatternKind::Prefix { .. }
+            | PatternKind::Int { .. }
+            | PatternKind::Float { .. }
+            | PatternKind::String(_) => {}
+        },
+        Node::Block(b) => {
+            for s in &b.stmts {
+                match s {
+                    Stmt::Bind(b) => {
+                        f(Node::Pattern(&b.pattern));
+                        f(Node::Expr(&b.value));
+                    }
+                    Stmt::Env { value, .. } | Stmt::Expr(value) => f(Node::Expr(value)),
+                }
+            }
+        }
+    }
+}
+
+/// The names that a pattern binds, in source order.
+pub fn pattern_binders<'a>(p: &'a Pattern, f: &mut impl FnMut(&'a Binder)) {
+    match &p.kind {
+        PatternKind::Var(b) | PatternKind::Named { binder: b, .. } => f(b),
+        PatternKind::Typed { binder, .. } => binder.iter().for_each(&mut *f),
+        PatternKind::Prefix { rest, .. } => rest.iter().for_each(&mut *f),
+        _ => {}
+    }
+    children(Node::Pattern(p), |c| {
+        if let Node::Pattern(c) = c {
+            pattern_binders(c, f);
+        }
+    });
+    if let PatternKind::List {
+        rest: Some(Some(b)),
+        ..
+    } = &p.kind
+    {
+        f(b);
+    }
+}
+
 /// All written types in a binding, including nested bodies and patterns.
 /// Runtime-use analysis deliberately does not call this visitor.
 pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
@@ -928,6 +1059,11 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
                 }
             }
             ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => expr(target, f),
+            ExprKind::Multi(groups) => {
+                for g in groups {
+                    expr(&g.value, f);
+                }
+            }
             ExprKind::RecordUpdate { base, fields, .. } => {
                 expr(base, f);
                 for (_, e) in fields {
@@ -1002,6 +1138,11 @@ pub fn visit_expr_mut(e: &mut Expr, visit: &mut impl FnMut(&mut Expr) -> bool) {
         ExprKind::Tuple(xs) => {
             for x in xs {
                 visit_expr_mut(x, visit);
+            }
+        }
+        ExprKind::Multi(groups) => {
+            for g in groups {
+                visit_expr_mut(&mut g.value, visit);
             }
         }
         ExprKind::Record { base, fields } => {
@@ -1079,41 +1220,7 @@ pub fn visit_expr_mut(e: &mut Expr, visit: &mut impl FnMut(&mut Expr) -> bool) {
 /// Binding identities introduced inside an expression, for checked-hole scope validation.
 pub fn expression_binders(expression: &Expr) -> Vec<Binder> {
     fn pattern(p: &Pattern, out: &mut Vec<Binder>) {
-        match &p.kind {
-            PatternKind::Var(b) => out.push(b.clone()),
-            PatternKind::Typed { binder, .. } => out.extend(binder.iter().cloned()),
-            PatternKind::Named { binder, pattern: p } => {
-                out.push(binder.clone());
-                pattern(p, out);
-            }
-            PatternKind::Prefix { rest, .. } => out.extend(rest.iter().cloned()),
-            PatternKind::Quote { captures, .. } => {
-                for (_, p) in captures {
-                    pattern(p, out);
-                }
-            }
-            PatternKind::Constructor { args, .. }
-            | PatternKind::Tuple(args)
-            | PatternKind::Error(args) => {
-                for p in args {
-                    pattern(p, out);
-                }
-            }
-            PatternKind::List { items, rest } => {
-                for p in items {
-                    pattern(p, out);
-                }
-                if let Some(Some(b)) = rest {
-                    out.push(b.clone());
-                }
-            }
-            PatternKind::BitArray(segments) => {
-                for s in segments {
-                    pattern(&s.value, out);
-                }
-            }
-            _ => {}
-        }
+        pattern_binders(p, &mut |b| out.push(b.clone()));
     }
     let mut out = Vec::new();
     let mut e = expression.clone();

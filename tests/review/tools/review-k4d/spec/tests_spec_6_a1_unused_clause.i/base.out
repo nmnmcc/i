@@ -1,2 +1,0 @@
-spec/a1_unused_clause.main : () -> Nil
-test/a1_unused_clause.i:7:3: warning[W0502]: this value is not used, and working it out does nothing

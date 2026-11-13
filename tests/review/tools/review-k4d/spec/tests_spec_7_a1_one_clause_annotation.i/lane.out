@@ -1,4 +1,0 @@
-spec/a1_one_clause_annotation.read : (v: Int | String) -> Int
-spec/a1_one_clause_annotation.main : () -> Nil
-test/a1_one_clause_annotation.i:4:35: error[E0501]: `String` is not a subtype of `Int`
-1 error

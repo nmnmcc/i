@@ -1,2 +1,0 @@
-src/main.i:1:9: error[E0530]: the type of b is needed to type a, but the dependencies form a circle (a -> b -> a); write the type instead
-1 error

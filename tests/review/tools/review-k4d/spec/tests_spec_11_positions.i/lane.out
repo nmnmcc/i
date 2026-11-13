@@ -1,5 +1,0 @@
-spec/positions.inner : (s: String) -> String
-spec/positions.middle : (s: String) -> String
-spec/positions.outer : (s: String) -> String
-spec/positions.each : (xs: List(A), f: (A) -> B ? E ! N) -> Nil ? E ! N
-spec/positions.main : () -> Nil

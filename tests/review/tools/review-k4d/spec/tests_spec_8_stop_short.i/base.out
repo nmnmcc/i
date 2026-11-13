@@ -1,2 +1,0 @@
-spec/stop_short.make : (n: Int) -> BitArray
-spec/stop_short.main : () -> Nil

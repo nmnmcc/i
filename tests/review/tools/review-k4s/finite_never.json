@@ -1,6 +1,0 @@
-{
-  "name": "finite_never",
-  "code": 1,
-  "time": 0.018665617099031806,
-  "out": "app/main.bad : (x: Never) -> Never\nsrc/main.i:1:1: error[E0501]: `List(_)` is not a subtype of `Never`\n1 error\n"
-}

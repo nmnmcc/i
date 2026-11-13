@@ -1,5 +1,0 @@
-spec/host_services.say : (text: String) -> Nil ! Io
-spec/host_services.checks : () -> String ! Kv
-spec/host_services.each : (xs: List(Int), f: (Int) -> String) -> String
-spec/host_services.main : () -> Nil ? String ! Io | Kv
-spec/host_services.services_are_values : () -> Nil ? String ! Kv

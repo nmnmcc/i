@@ -1,2 +1,0 @@
-spec/stop_float_from_bits.value : () -> Float
-spec/stop_float_from_bits.main : () -> Nil

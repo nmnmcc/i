@@ -1,18 +1,18 @@
-app/main.add : (a = Int, b = Int) -> Int
-app/main.opaque : (h = Handle, flag = Bool) -> Handle
-app/main.errors : (x = Int) <- (Fail(1 | "one")) -> Nil
-app/main.never : (s = String) -> Never
-app/main.never_param : (x = Never) -> Int
-app/main.bad_param : (xs = List(Int)) -> 1
+app/main.add : (Int, Int) -> Int
+app/main.opaque : (Handle, Bool) -> Handle
+app/main.errors : (Int) <- (Fail(1 | "one")) -> Nil
+app/main.never : (String) -> Never
+app/main.never_param : (Never) -> Int
+app/main.bad_param : (List(Int)) -> 1
 app/main.bad_value : () -> (1, 2)
-app/main.generic : (x = A) -> A
+app/main.generic : (A) -> A
 app/main.bad_errors : () <- (Fail((1, 2))) -> Int
 app/main.twice_error : () -> Int
 app/main.number : 1
 app/main.with_host : () <- (Assert, Storage) -> 1
 app/main.with_clock : () <- (Clock) -> Int
 app/main.main : () <- (Clock, Storage) -> Nil
-app/main.core_text : (n = Int) -> "x"
+app/main.core_text : (Int) -> "x"
 app/main_test.passes : () <- (Assert) -> Nil
 app/main_test.host : () <- (Assert, Storage) -> Nil
 app/main_test.gives_int : () -> 1

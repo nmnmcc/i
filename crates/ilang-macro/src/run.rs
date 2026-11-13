@@ -63,7 +63,15 @@ pub fn compile(
     parsed: &[ilang_check::Parsed],
     entries: &[(&str, &str)],
 ) -> Result<MacroProgram, CompileError> {
-    let mut graph = graph.clone();
+    compile_owned(graph.clone(), parsed, entries)
+}
+
+/// [`compile`] for a caller that already owns a private copy of the graph.
+pub fn compile_owned(
+    mut graph: ilang_package::PackageGraph,
+    parsed: &[ilang_check::Parsed],
+    entries: &[(&str, &str)],
+) -> Result<MacroProgram, CompileError> {
     let first = entries
         .first()
         .expect("a compiler program must have an entry");

@@ -1,3 +1,0 @@
-name="probe"
-[dependencies]
-lib={path="../cross-lib"}

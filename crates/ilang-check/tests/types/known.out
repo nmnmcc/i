@@ -1,15 +1,15 @@
-radius : (s = Shape) -> Float
-side : (s = A) -> Float
-grow : (s = Shape) -> Shape
-grow_named : (s = Shape) -> Shape
-from_binding : (s = Shape) <- (Assert) -> Float
-later : (s = Shape) -> () -> Float
-label : (s = Shape) -> String
-choice : (s = Shape) -> String
-not_known : (s = Shape) -> Shape
-wrong_ctor : (s = Shape) -> Shape
-no_field : (s = Shape) -> Float
-choice_field : (s = Shape) -> Never
+radius : (Shape) -> Float
+side : (A) -> Float
+grow : (Shape) -> Shape
+grow_named : (Shape) -> Shape
+from_binding : (Shape) <- (Assert) -> Float
+later : (Shape) -> () -> Float
+label : (Shape) -> String
+choice : (Shape) -> String
+not_known : (Shape) -> Shape
+wrong_ctor : (Shape) -> Shape
+no_field : (Shape) -> Float
+choice_field : (Shape) -> Never
 40:26: error[E0517]: `Circle(..v, …)` needs `v` to be known to be made by `Circle` (§6.7): its type has other constructors, so `v` must be a name matched with `Circle(…)` (§7.5)
 43:22: error[E0517]: `Circle(..v, …)` needs `v` to be known to be made by `Circle` (§6.7): its type has other constructors, so `v` must be a name matched with `Circle(…)` (§7.5)
 46:47: error[E0512]: the constructor `Square`, which made this value (§7.5), has no field with the label `radius` (§4.8 rule 13)
