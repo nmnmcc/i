@@ -12,7 +12,9 @@ parts = re.split(r'(?m)^(## (?:\d+\.|Appendix [A-Z]\.).*)$', text)
 OUT.mkdir(parents=True, exist_ok=True)
 for old in OUT.glob('*.mdx'):
     old.unlink()
-pages = []
+pages = ['introduction']
+intro = re.sub(r'^# .*?\n', '', parts[0], count=1).strip()
+(OUT / 'introduction.mdx').write_text('---\ntitle: Introduction\n---\n\n' + intro + '\n')
 for heading, body in zip(parts[1::2], parts[2::2]):
     title = heading[3:]
     number = re.match(r'(\d+|Appendix [A-Z])\.', title)[1]
