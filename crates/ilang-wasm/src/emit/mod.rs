@@ -93,6 +93,14 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         numeric_enabled: false,
         numeric_plan: numeric::Plan::default(),
         worker: None,
+        self_loop: None,
+        pending: Vec::new(),
+        deferring: false,
+        carry: false,
+        joins: HashMap::new(),
+        split: Default::default(),
+        mismatch: Default::default(),
+        dead: false,
         arities: BTreeSet::new(),
         ctors: BTreeSet::new(),
         strings: HashMap::new(),
@@ -365,6 +373,25 @@ struct Emitter<'p> {
     numeric_enabled: bool,
     numeric_plan: numeric::Plan,
     worker: Option<crate::numeric::Worker>,
+    /// The function whose self tail calls branch back to its loop, and the
+    /// non-parameter locals that the back edge resets to their entry values.
+    self_loop: Option<(FuncId, Vec<(String, String)>)>,
+    /// Site stores not written yet, by frame: index 0 is the slot `sp - 1`.
+    /// A store waits until something could read the shadow stack; a failed
+    /// Float check writes them in its own cold branch (§11.7 traces stay the
+    /// same because every reader sees every store).
+    pending: Vec<Option<Site>>,
+    /// Set while a `Let` is emitted whose site store is decided afterwards.
+    deferring: bool,
+    /// Whether waiting stores may cross block labels (see `stmts`), the
+    /// waiting stores on the branches to each open label, the labels that
+    /// are written joins, the labels found to need it in this pass, and
+    /// whether the code here cannot be reached.
+    carry: bool,
+    joins: HashMap<u32, Option<Vec<Option<Site>>>>,
+    split: std::collections::HashSet<u32>,
+    mismatch: std::collections::HashSet<u32>,
+    dead: bool,
     arities: BTreeSet<u32>,
     /// The constructors without fields that are used, as (constructor id,
     /// type id).
@@ -398,9 +425,11 @@ impl<'p> Emitter<'p> {
                 let fields: String = (0..*arity).map(|i| format!(" (local.get $l{i})")).collect();
                 let _ = writeln!(
                     self.out,
-                    "(call $shadow_enter_call)\n\
+                    "{}\
                      (local.set $l{arity} (call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {arity}{fields})))\n\
-                     (call $shadow_leave) (local.get $l{arity}))"
+                     {} (local.get $l{arity}))",
+                    self.enter_call(),
+                    self.leave()
                 );
             }
             FuncKind::Runtime { op, arity } => {
@@ -413,8 +442,10 @@ impl<'p> Emitter<'p> {
                 let body = self.op(*op, &args, "(local.get $env)");
                 let _ = writeln!(
                     self.out,
-                    "(call $shadow_enter_call)\n(local.set $l{arity} {body})\n\
-                     (call $shadow_leave) (local.get $l{arity}))"
+                    "{}(local.set $l{arity} {body})\n\
+                     {} (local.get $l{arity}))",
+                    self.enter_call(),
+                    self.leave()
                 );
             }
         }
@@ -471,6 +502,7 @@ impl<'p> Emitter<'p> {
         let begin = self.out.len();
         self.call_locals.clear();
         let _ = writeln!(self.out, ";; {}", f.name.replace('\n', " "));
+        let start = self.out.len();
         self.worker = id.and_then(|id| self.p.workers.get(&id)).cloned();
         self.header(name, f.arity, &f.locals);
         self.numeric_plan = if self.p.numeric == crate::Numeric::Scalars && !self.metered {
@@ -521,7 +553,16 @@ impl<'p> Emitter<'p> {
                     f.budget_frame
                 );
             }
-            self.out.push_str("(call $shadow_enter_call)\n");
+            self.out.push_str(self.enter_call());
+        }
+        // A self tail call of a function with a frame becomes a branch back
+        // to the start of its body: the frame stays, and the back edge does
+        // what leaving with a tail site and entering again would do to it.
+        let looped = id.filter(|&id| f.frame && self.fast_frames() && self_tail_loop(id, &f.body));
+        if let Some(id) = looped {
+            let resets = local_resets(&self.out[start..]);
+            self.self_loop = Some((id, resets));
+            self.out.push_str("(loop $self_loop\n");
         }
         let mut parameters = self.numeric_plan.parameters(f.arity);
         if let Some(worker) = &self.worker {
@@ -541,6 +582,9 @@ impl<'p> Emitter<'p> {
         let mut body = String::new();
         self.stmts(&mut body, &f.body, f.frame);
         self.out.push_str(&body);
+        if self.self_loop.take().is_some() {
+            self.out.push_str(")\n");
+        }
         self.out.push_str("(unreachable))\n");
         self.declare_call_locals(begin, mark);
         self.numeric_enabled = false;
@@ -565,20 +609,82 @@ impl<'p> Emitter<'p> {
         self.call_locals.clear();
     }
 
+    /// Statements with deferred site stores. A block label is a join: the
+    /// stores still waiting on every path into it must be the same, or they
+    /// are written before each branch to it and at its end. Which labels need
+    /// that is found by emitting again until no new one turns up (the set only
+    /// grows). Bodies with points keep every label a written join.
     fn stmts(&mut self, out: &mut String, stmts: &[Stmt], frame: bool) {
+        let saved = (
+            std::mem::take(&mut self.pending),
+            std::mem::take(&mut self.joins),
+            std::mem::take(&mut self.split),
+            std::mem::take(&mut self.mismatch),
+            std::mem::replace(&mut self.carry, false),
+        );
+        self.carry = self.defers(frame) && !has_points(stmts);
+        loop {
+            self.pending.clear();
+            self.joins.clear();
+            self.mismatch.clear();
+            self.dead = false;
+            let mut text = String::new();
+            self.stmts_once(&mut text, stmts, frame);
+            if self.mismatch.is_empty() {
+                out.push_str(&text);
+                break;
+            }
+            let mismatch = std::mem::take(&mut self.mismatch);
+            self.split.extend(mismatch);
+        }
+        (
+            self.pending,
+            self.joins,
+            self.split,
+            self.mismatch,
+            self.carry,
+        ) = saved;
+    }
+
+    fn stmts_once(&mut self, out: &mut String, stmts: &[Stmt], frame: bool) {
         enum Action<'a> {
             Stmt(&'a Stmt),
             Text(&'static str),
+            End(u32),
         }
         let mut work: Vec<_> = stmts.iter().rev().map(Action::Stmt).collect();
         while let Some(action) = work.pop() {
             match action {
-                Action::Text(text) => out.push_str(text),
+                Action::Text(text) => {
+                    out.push_str(&self.flush());
+                    out.push_str(text);
+                    self.dead = false;
+                }
+                Action::End(label) => {
+                    let fallthrough = (!self.dead).then(|| normal(&self.pending));
+                    let joined = self.joins.remove(&label).flatten();
+                    let state = match (fallthrough, joined) {
+                        _ if !self.carry || self.split.contains(&label) => None,
+                        (Some(a), Some(b)) if a != b => {
+                            self.mismatch.insert(label);
+                            None
+                        }
+                        (Some(a), _) | (None, Some(a)) => Some(a),
+                        (None, None) => None,
+                    };
+                    match state {
+                        Some(state) => self.pending = state,
+                        None => out.push_str(&self.flush()),
+                    }
+                    self.dead = false;
+                    out.push_str(")\n");
+                }
                 Action::Stmt(Stmt::If {
                     cond,
                     then,
                     otherwise,
                 }) => {
+                    out.push_str(&self.flush());
                     if self.metered {
                         out.push_str("(call $macro_charge (i64.const 1) (i64.const 0))\n");
                     }
@@ -590,16 +696,30 @@ impl<'p> Emitter<'p> {
                     work.extend(then.iter().rev().map(Action::Stmt));
                 }
                 Action::Stmt(Stmt::Block { label, body }) => {
+                    if !self.carry || self.split.contains(label) {
+                        out.push_str(&self.flush());
+                    }
                     if self.metered {
                         out.push_str("(call $macro_charge (i64.const 1) (i64.const 0))\n");
                     }
                     let _ = writeln!(out, "(block $b{label}");
-                    work.push(Action::Text(")\n"));
+                    self.joins.insert(*label, None);
+                    work.push(Action::End(*label));
                     work.extend(body.iter().rev().map(Action::Stmt));
                 }
-                Action::Stmt(stmt) => self.stmt(out, stmt, frame),
+                Action::Stmt(stmt) => {
+                    self.deferred_stmt(out, stmt, frame);
+                    self.dead = matches!(
+                        stmt,
+                        Stmt::Break(_)
+                            | Stmt::Return(_)
+                            | Stmt::TailCall { .. }
+                            | Stmt::Unreachable
+                    );
+                }
             }
         }
+        out.push_str(&self.flush());
     }
 
     fn stmt(&mut self, out: &mut String, s: &Stmt, frame: bool) {
@@ -610,23 +730,18 @@ impl<'p> Emitter<'p> {
             Stmt::Logical(action) => match action {
                 Logical::Enter(site) => {
                     if let Some(site) = site {
-                        let _ =
-                            writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                        out.push_str(&self.shadow_site(*site, frame));
                     }
-                    out.push_str("(call $shadow_enter_call)\n");
+                    out.push_str(self.enter_call());
                 }
-                Logical::Leave => out.push_str("(call $shadow_leave)\n"),
-                Logical::Tail(site) => {
-                    let _ = writeln!(
-                        out,
-                        "(call $shadow_leave_tail (i32.const {}))",
-                        site.map_or(-1, site_code)
-                    );
-                }
+                Logical::Leave => out.push_str(self.leave()),
+                Logical::Tail(site) => out.push_str(&self.leave_tail(*site)),
             },
             Stmt::Let { dst, value, site } => {
-                if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                if let Some(site) = site
+                    && !self.deferring
+                {
+                    out.push_str(&self.shadow_site(*site, frame));
                 }
                 if let Some(assignment) = self.scalar_assignment(*dst, value) {
                     out.push_str(&assignment);
@@ -642,8 +757,10 @@ impl<'p> Emitter<'p> {
                 }
             }
             Stmt::LetNum { dst, value, site } => {
-                if let Some(site) = site {
-                    let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(*site));
+                if let Some(site) = site
+                    && !self.deferring
+                {
+                    out.push_str(&self.shadow_site(*site, frame));
                 }
                 let v = self.num_value(value);
                 let _ = writeln!(out, "(local.set $l{dst} {v})");
@@ -679,7 +796,7 @@ impl<'p> Emitter<'p> {
                     self.atom(a)
                 };
                 if frame {
-                    out.push_str("(call $shadow_leave)\n");
+                    out.push_str(self.leave());
                 }
                 let _ = writeln!(out, "(return {a})");
             }
@@ -689,9 +806,16 @@ impl<'p> Emitter<'p> {
                 env,
                 site,
             } => {
+                if frame
+                    && let Some((id, _)) = &self.self_loop
+                    && matches!(callee, Callee::Direct(f) | Callee::Known { func: f, .. } if f == id)
+                {
+                    let back = self.self_tail(callee, args, &env_text(*env), *site);
+                    let _ = writeln!(out, "{back}");
+                    return;
+                }
                 if frame {
-                    let s = site.map_or(-1, site_code);
-                    let _ = writeln!(out, "(call $shadow_leave_tail (i32.const {s}))");
+                    out.push_str(&self.leave_tail(*site));
                 }
                 let call = self.call(callee, args, true, &env_text(*env));
                 let _ = writeln!(out, "{call}");
@@ -835,6 +959,238 @@ impl<'p> Emitter<'p> {
             "(call $dispatch{n} {a} (i64.const {}) {env} {})",
             callee.shape(n),
             args.join(" ")
+        )
+    }
+
+    /// Numeric (O2/O3) code writes the shadow-stack actions out and turns self
+    /// tail calls into loops; reference code, the O0 oracle, and metered code
+    /// keep the runtime calls.
+    fn fast_frames(&self) -> bool {
+        self.p.numeric != crate::Numeric::Reference
+            && !self.metered
+            && (self.numeric_enabled
+                || self.worker.is_some()
+                || !self.numeric_plan.locals.is_empty())
+    }
+
+    fn enter_call(&self) -> &'static str {
+        if self.fast_frames() {
+            SHADOW_ENTER_CALL
+        } else {
+            "(call $shadow_enter_call)\n"
+        }
+    }
+
+    fn leave(&self) -> &'static str {
+        if self.fast_frames() {
+            SHADOW_LEAVE
+        } else {
+            "(call $shadow_leave)\n"
+        }
+    }
+
+    fn shadow_site(&self, site: Site, frame: bool) -> String {
+        shadow_site(site, frame && self.fast_frames())
+    }
+
+    fn leave_tail(&self, site: Option<Site>) -> String {
+        if self.fast_frames() {
+            leave_tail(site)
+        } else {
+            format!(
+                "(call $shadow_leave_tail (i32.const {}))\n",
+                site.map_or(-1, site_code)
+            )
+        }
+    }
+
+    fn defers(&self, frame: bool) -> bool {
+        frame && self.fast_frames()
+    }
+
+    /// The pending site stores, written out (they stay pending).
+    fn pending_text(&self) -> String {
+        let mut text = String::new();
+        for (k, site) in self.pending.iter().enumerate() {
+            if let Some(site) = site {
+                let _ = writeln!(
+                    text,
+                    "(array.set $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const {})) (i32.const {}))",
+                    k + 1,
+                    site_code(*site)
+                );
+            }
+        }
+        text
+    }
+
+    fn flush(&mut self) -> String {
+        let text = self.pending_text();
+        self.pending.clear();
+        text
+    }
+
+    fn defer_site(&mut self, site: Site) {
+        if self.pending.is_empty() {
+            self.pending.push(None);
+        }
+        self.pending[0] = Some(site);
+    }
+
+    /// One statement with the site stores that wait. Code that can only stop
+    /// through a Float check leaves its own site store waiting, and the check's
+    /// failure branch writes every waiting store before `$stop_float`. Logical
+    /// frames move the waiting stores with them; anything else that could read
+    /// the shadow stack (a call, a throw, a point, control flow) writes them
+    /// first, in the order the eager code would have.
+    fn deferred_stmt(&mut self, out: &mut String, s: &Stmt, frame: bool) {
+        if !self.defers(frame) {
+            return self.stmt(out, s, frame);
+        }
+        match s {
+            Stmt::Logical(Logical::Enter(site)) => {
+                if let Some(site) = site {
+                    self.defer_site(*site);
+                }
+                out.push_str(self.enter_call());
+                if !self.pending.is_empty() {
+                    self.pending.insert(0, None);
+                }
+            }
+            Stmt::Logical(Logical::Leave) => {
+                if !self.pending.is_empty() {
+                    self.pending.remove(0);
+                }
+                out.push_str(self.leave());
+            }
+            Stmt::Return(_) | Stmt::TailCall { site: Some(_), .. } => {
+                // The frame's own slot is left, or overwritten by the back
+                // edge; a tail call without a site reads it.
+                if let Some(own) = self.pending.first_mut() {
+                    *own = None;
+                }
+                out.push_str(&self.flush());
+                self.stmt(out, s, frame);
+            }
+            Stmt::Let { site, .. } | Stmt::LetNum { site, .. } => {
+                self.deferring = true;
+                let mut text = String::new();
+                self.stmt(&mut text, s, frame);
+                self.deferring = false;
+                let quiet = text.matches("call").count()
+                    == text.matches("(call $stop_float)").count()
+                    && !text.contains("throw")
+                    && !text.contains("return");
+                if quiet {
+                    if let Some(site) = site {
+                        self.defer_site(*site);
+                    }
+                    let cold = format!("{}(call $stop_float)", self.pending_text());
+                    out.push_str(&text.replace("(call $stop_float)", &cold));
+                } else {
+                    out.push_str(&self.flush());
+                    if let Some(site) = site {
+                        out.push_str(&self.shadow_site(*site, frame));
+                    }
+                    out.push_str(&text);
+                }
+            }
+            Stmt::Break(label) if self.carry && !self.split.contains(label) => {
+                let state = normal(&self.pending);
+                match self.joins.get_mut(label) {
+                    Some(slot @ None) => *slot = Some(state),
+                    Some(Some(joined)) if *joined == state => {}
+                    _ => {
+                        self.mismatch.insert(*label);
+                    }
+                }
+                self.stmt(out, s, frame);
+            }
+            _ => {
+                out.push_str(&self.flush());
+                self.stmt(out, s, frame);
+            }
+        }
+    }
+
+    /// A self tail call as a back edge of `$self_loop`. Leaving with the tail
+    /// site and entering again leaves `sp` as it was, the tail site in the
+    /// frame's slot and `$tail` at -1; the back edge does exactly that. The
+    /// arguments are all worked out before any parameter is set, and the other
+    /// locals get their entry values again.
+    fn self_tail(
+        &mut self,
+        callee: &Callee,
+        args: &[Atom],
+        env: &str,
+        site: Option<Site>,
+    ) -> String {
+        let worker = self.worker.clone();
+        let closure = match callee {
+            Callee::Known { closure, .. } => {
+                format!("(ref.cast (ref null $obj) {})", self.atom(closure))
+            }
+            _ => "(ref.null $obj)".into(),
+        };
+        let mut guards = Vec::new();
+        let mut values = format!("{closure} {env}");
+        let mut sets = Vec::new();
+        for (i, a) in args.iter().enumerate() {
+            let (raw, param) = if worker.as_ref().is_some_and(|w| w.floats[i]) {
+                (self.float_atom(a), format!("$numeric_f{i}"))
+            } else if worker.as_ref().is_some_and(|w| w.ints[i]) {
+                let (guard, raw) = self.small_int(a);
+                guards.push(guard);
+                (raw, format!("$numeric_i{i}"))
+            } else {
+                (self.atom(a), format!("$l{i}"))
+            };
+            let _ = write!(values, " {raw}");
+            sets.push(param);
+        }
+        let mut back = values;
+        for param in sets.iter().rev() {
+            let _ = write!(back, " (local.set {param})");
+        }
+        back.push_str(" (local.set $env) (local.set $clo)\n");
+        let (_, resets) = self.self_loop.as_ref().expect("in a self loop");
+        for (local, default) in resets {
+            let _ = writeln!(back, "(local.set {local} {default})");
+        }
+        match site {
+            Some(site) => {
+                let _ = writeln!(back, "{SHADOW_SLOT_SET}(i32.const {}))", site_code(site));
+            }
+            None => back.push_str(
+                "(if (i32.gt_s (array.get $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const 1))) (i32.const -2))\n\
+                 (then {SHADOW_SLOT_SET}(i32.const -1))))\n"
+                    .replace("{SHADOW_SLOT_SET}", SHADOW_SLOT_SET)
+                    .as_str(),
+            ),
+        }
+        back.push_str("(global.set $tail (i32.const -1))\n(br $self_loop)");
+        if guards.is_empty() {
+            return back;
+        }
+        let worker = worker.expect("integer guards have a worker");
+        let guard = guards
+            .into_iter()
+            .reduce(|a, b| format!("(i32.and {a} {b})"))
+            .unwrap();
+        let canonical = args
+            .iter()
+            .map(|a| format!(" {}", self.atom(a)))
+            .collect::<String>();
+        let closure = match callee {
+            Callee::Known { closure, .. } => {
+                format!("(ref.cast (ref null $obj) {})", self.atom(closure))
+            }
+            _ => "(ref.null $obj)".into(),
+        };
+        format!(
+            "(if {guard} (then {back}) (else {}(return_call $f{} {closure} {env}{canonical})))",
+            self.leave_tail(site),
+            worker.origin.0
         )
     }
 
@@ -984,6 +1340,24 @@ impl<'p> Emitter<'p> {
                     let args: Vec<_> = args.iter().map(|a| self.float_atom(a)).collect();
                     return numeric::box_float(
                         &numeric::float_op(*op, &args).expect("float operation"),
+                    );
+                }
+                if let (
+                    Op::Runtime {
+                        name: "core_truncate",
+                        ..
+                    },
+                    [Atom::Local(l)],
+                ) = (op, args.as_slice())
+                    && self.numeric_plan.locals.get(l) == Some(&numeric::Repr::Float)
+                {
+                    // A scalar Float below 2^30 in magnitude truncates to an
+                    // i31, the canonical small Int; only others need the box.
+                    let boxed = self.atom(&args[0]);
+                    return format!(
+                        "(if (result eqref) (f64.lt (f64.abs (local.get $numeric_f{l})) (f64.const 1073741824)) \
+                         (then (ref.i31 (i32.trunc_f64_s (local.get $numeric_f{l})))) \
+                         (else (call $core_truncate {boxed})))"
                     );
                 }
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
@@ -1624,6 +1998,128 @@ fn local_type(t: LocalType) -> &'static str {
     }
 }
 
+/// `$shadow_enter_call` written out (runtime/stops.rs): push `$tail` and
+/// clear it. The array grows in the cold call.
+const SHADOW_ENTER_CALL: &str = "(if (i32.ge_u (global.get $sp) (array.len (global.get $shadow))) (then (call $shadow_grow)))\n\
+(array.set $frames (global.get $shadow) (global.get $sp) (global.get $tail))\n\
+(global.set $sp (i32.add (global.get $sp) (i32.const 1)))\n\
+(global.set $tail (i32.const -1))\n";
+
+/// `$shadow_leave` written out.
+const SHADOW_LEAVE: &str = "(global.set $sp (i32.sub (global.get $sp) (i32.const 1)))\n";
+
+/// `$shadow_site`: in a function with a frame the slot `sp - 1` is its own,
+/// so the store is written out; elsewhere `sp` may be 0.
+fn shadow_site(site: Site, frame: bool) -> String {
+    if frame {
+        format!("{SHADOW_SLOT_SET}(i32.const {}))\n", site_code(site))
+    } else {
+        format!("(call $shadow_site (i32.const {}))\n", site_code(site))
+    }
+}
+
+/// The start of a store into the slot of the running frame, `sp - 1`; the
+/// caller gives the value and the closing parenthesis.
+const SHADOW_SLOT_SET: &str =
+    "(array.set $frames (global.get $shadow) (i32.sub (global.get $sp) (i32.const 1)) ";
+
+/// `$shadow_leave_tail` written out when the site is known: the frame is
+/// gone and its tail site waits in `$tail` for the callee.
+fn leave_tail(site: Option<Site>) -> String {
+    match site {
+        Some(site) => format!(
+            "(global.set $sp (i32.sub (global.get $sp) (i32.const 1)))\n(global.set $tail (i32.const {}))\n",
+            site_code(site)
+        ),
+        None => "(call $shadow_leave_tail (i32.const -1))\n".into(),
+    }
+}
+
+/// Waiting stores without the frames past the last one that waits.
+fn normal(pending: &[Option<Site>]) -> Vec<Option<Site>> {
+    let n = pending
+        .iter()
+        .rposition(Option::is_some)
+        .map_or(0, |i| i + 1);
+    pending[..n].to_vec()
+}
+
+/// Whether statements have a point or join anywhere.
+fn has_points(body: &[Stmt]) -> bool {
+    let mut work = vec![body];
+    while let Some(stmts) = work.pop() {
+        for stmt in stmts {
+            match stmt {
+                Stmt::Suspendable { .. } | Stmt::Continue(_) | Stmt::Join(_) => return true,
+                Stmt::If {
+                    then, otherwise, ..
+                } => {
+                    work.push(then);
+                    work.push(otherwise);
+                }
+                Stmt::Block { body, .. } => work.push(body),
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
+/// Whether a function's body calls itself in tail position and has no point
+/// or join, so that its self tail calls can branch back to its start.
+fn self_tail_loop(id: FuncId, body: &[Stmt]) -> bool {
+    let mut found = false;
+    let mut work = vec![body];
+    while let Some(stmts) = work.pop() {
+        for stmt in stmts {
+            match stmt {
+                Stmt::TailCall {
+                    callee: Callee::Direct(f) | Callee::Known { func: f, .. },
+                    ..
+                } if *f == id => found = true,
+                Stmt::Suspendable { .. } | Stmt::Continue(_) | Stmt::Join(_) => return false,
+                Stmt::If {
+                    then, otherwise, ..
+                } => {
+                    work.push(then);
+                    work.push(otherwise);
+                }
+                Stmt::Block { body, .. } => work.push(body),
+                _ => {}
+            }
+        }
+    }
+    found
+}
+
+/// The locals declared in a function's text so far (its header), with the
+/// value each has when the function is entered.
+fn local_resets(header: &str) -> Vec<(String, String)> {
+    header
+        .split("(local $")
+        .skip(1)
+        .map(|rest| {
+            let (name, ty) = rest.split_once(' ').expect("a local has a type");
+            let default = if ty.starts_with("f64") {
+                "(f64.const 0)".to_owned()
+            } else if ty.starts_with("i64") {
+                "(i64.const 0)".to_owned()
+            } else if ty.starts_with("i32") {
+                "(i32.const 0)".to_owned()
+            } else if ty.starts_with("eqref") {
+                "(ref.null eq)".to_owned()
+            } else {
+                let heap = ty
+                    .strip_prefix("(ref null ")
+                    .and_then(|t| t.split(')').next())
+                    .expect("locals have defaultable types");
+                format!("(ref.null {heap})")
+            };
+            (format!("${name}"), default)
+        })
+        .collect()
+}
+
 fn env_text(e: Env) -> String {
     match e {
         Env::Param => "(local.get $env)".into(),
@@ -1713,7 +2209,7 @@ mod deep_emit_tests {
     fn nested_conditions_and_blocks_emit_on_a_small_stack() {
         std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
             let program = Program::default();
-            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new(), worker:None, dispatch:BTreeSet::new(), call_locals:BTreeSet::new(), blocks:0 };
+            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, dispatch:BTreeSet::new(), call_locals:BTreeSet::new(), blocks:0, self_loop:None, pending:Vec::new(), deferring:false, carry:false, joins:HashMap::new(), split:Default::default(), mismatch:Default::default(), dead:false, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
             let leaf = Cond::I32(1);
             let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
             assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");

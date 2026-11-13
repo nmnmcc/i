@@ -461,6 +461,82 @@ fn corpus() -> Vec<Case> {
             cases.push(stop(body, Value::Float(y)));
         }
     }
+    // Scalar truncate takes the i31 path only below 2^30 in magnitude, and
+    // scalar to_float only for i31 values; both edges and the runtime paths.
+    for (x, expected) in [
+        (1073741823.9_f64, "1073741823"),
+        (1073741824.0, "1073741824"),
+        (-1073741823.5, "-1073741823"),
+        (-1073741824.0, "-1073741824"),
+        (-0.0, "0"),
+        (-2.5, "-2"),
+        (1.0e20, "100000000000000000000"),
+    ] {
+        cases.push(Case {
+            body: "core.inspect(core.truncate(x *. 1.0))".into(),
+            input: Value::Float(x),
+            expected: expected.into(),
+            stop: false,
+            events: vec![],
+        });
+    }
+    for text in [
+        "1073741822",
+        "1073741823",
+        "-1073741825",
+        "9007199254740993",
+    ] {
+        let a: BigInt = text.parse().unwrap();
+        let sum = &a + BigInt::from(1);
+        let value: f64 = sum.to_string().parse().unwrap();
+        cases.push(Case {
+            body: "core.inspect(core.float_to_bits(core.to_float(x + 1)))".into(),
+            input: Value::Int(a),
+            expected: value.to_bits().to_string(),
+            stop: false,
+            events: vec![],
+        });
+    }
+    // Self tail loops whose stop is in an inlined helper, a list loop, and
+    // a fold whose callback captures the input: a stop in a later iteration
+    // must print the same trace as the reference.
+    for x in [1.0e10_f64, 1.5, -2.0e9] {
+        let mut acc = Some(x);
+        for _ in 0..10 {
+            acc = acc
+                .map(|a| a * a)
+                .filter(|a| a.is_finite())
+                .map(|a| a + 1.0)
+                .filter(|a| a.is_finite());
+        }
+        match acc {
+            Some(y) => cases.push(float_case("sq_loop(10, x)", x, y)),
+            None => cases.push(stop("sq_loop(10, x)".into(), Value::Float(x))),
+        }
+    }
+    for x in [1.0_f64, 1.0e-300] {
+        let body = "list_product([1.0e200, 3.0, 1.0e200], x)";
+        let y = x * 1.0e200 * 3.0 * 1.0e200;
+        if y.is_finite() {
+            cases.push(float_case(body, x, y));
+        } else {
+            cases.push(stop(body.into(), Value::Float(x)));
+        }
+    }
+    for x in [1.0e10_f64, 0.5] {
+        let body = "fold_float([1.0, 2.0, 1.0e300], 1.0, (acc: Float, v: Float) -> Float { acc +. v *. x })";
+        let y = [1.0, 2.0, 1.0e300].iter().try_fold(1.0_f64, |acc, v| {
+            let p = v * x;
+            let s = acc + p;
+            (p.is_finite() && s.is_finite()).then_some(s)
+        });
+        match y {
+            Some(y) => cases.push(float_case(body, x, y)),
+            None => cases.push(stop(body.into(), Value::Float(x))),
+        }
+    }
+    let huge: BigInt = format!("1{}", "0".repeat(400)).parse().unwrap();
+    cases.push(stop("core.to_float(x + 1)".into(), Value::Int(huge)));
     cases
 }
 
@@ -518,6 +594,9 @@ resumed_h = (x: Float) -> Float {
  control.boundary((b) { y = resumed_f(b, x) y +. 0.5 })
 }
 helper_sq = (x: Float) -> Float { x *. x }
+sq_loop = (n: Int, acc: Float) -> Float { n |> { 0 -> acc _ -> sq_loop(n - 1, helper_sq(acc) +. 1.0) } }
+list_product = (xs: List(Float), acc: Float) -> Float { xs |> { [] -> acc [a, ..rest] -> list_product(rest, acc *. a) } }
+fold_float(A) = (items: List(A), acc: Float, f: (Float, A) -> Float) -> Float { items |> { [] -> acc [a, ..rest] -> fold_float(rest, f(acc, a), f) } }
 helper_g = (x: Float) -> Float {
  y = helper_sq(x)
  y +. 1.0

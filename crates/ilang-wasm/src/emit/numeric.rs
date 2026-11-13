@@ -177,6 +177,13 @@ impl Plan {
                         _,
                     )
                     | Value::Finite(_, _)
+                    | Value::Op(
+                        Op::Runtime {
+                            name: "core_to_float",
+                            ..
+                        },
+                        _,
+                    )
                     | Value::Atom(Atom::Float(_)) => Some(Repr::Float),
                     Value::Op(
                         Op::IntAdd | Op::IntSub | Op::IntMul | Op::IntDiv | Op::IntRem | Op::IntNeg,
@@ -439,6 +446,23 @@ impl Emitter<'_> {
                     {
                         let args = args.iter().map(|a| self.float_atom(a)).collect::<Vec<_>>();
                         float_op(*op, &args).expect("Float definition has a scalar operation")
+                    }
+                    // An i31 converts exactly and is always finite; any other
+                    // Int goes through the runtime, which stops when the result
+                    // is not finite, and gives a box.
+                    Value::Op(
+                        Op::Runtime {
+                            name: "core_to_float",
+                            ..
+                        },
+                        args,
+                    ) => {
+                        let (small, raw) = self.small_int(&args[0]);
+                        let boxed = self.atom(&args[0]);
+                        format!(
+                            "(if (result f64) {small} (then (f64.convert_i64_s {raw})) (else {}))",
+                            unbox_float(&format!("(call $core_to_float {boxed})"))
+                        )
                     }
                     _ => {
                         // A call/projection already produced a canonical Float.

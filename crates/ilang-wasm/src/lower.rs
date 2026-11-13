@@ -3706,7 +3706,16 @@ impl<'a> Lowerer<'a> {
                 }
             }
             PatternKind::List { items, rest } => {
-                guard(out, Cond::Tag(v.clone(), 6), fail);
+                // Only lists are `$cons` cells, so a first cell proves the
+                // tag. `[]` tests for a cell first, which fails at once on
+                // the cells of a recursion, and the tag after that.
+                let first = items.is_empty();
+                if first {
+                    if rest.is_none() {
+                        guard(out, Cond::Empty(v.clone()), fail);
+                    }
+                    guard(out, Cond::Tag(v.clone(), 6), fail);
+                }
                 let mut cur = v;
                 for item in items {
                     guard(out, Cond::Not(Box::new(Cond::Empty(cur.clone()))), fail);
@@ -3715,6 +3724,7 @@ impl<'a> Lowerer<'a> {
                     cur = let_value(fx, out, Value::ListTail(cur), None);
                 }
                 match rest {
+                    None if first => {}
                     None => guard(out, Cond::Empty(cur), fail),
                     Some(Some(b)) => Self::bind_var(fx, out, b, cur),
                     Some(None) => {}
