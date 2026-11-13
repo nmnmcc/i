@@ -1327,6 +1327,7 @@ shown are unchanged. EBNF as in spec §0.
 
 ```text
 Type      = Union .
+Annot     = Inter .
 Union     = Inter { "|" Inter } .
 Inter     = Diff { "&" Diff } .
 Diff      = Prim { "-" Prim } .
@@ -1350,6 +1351,15 @@ Removed: `TupleType`, both copies of `RecordType`, `FPart`, `RPart`, `Label`
 (string and `UpName` labels), `ParamType`, `Record`, the error part `"^" Union`
 and the environment part `"!" Union` of a function type.
 
+- **Annotations.** `Annot = Inter` is the single rule for a type after `:`:
+  it ends at any `|` outside brackets (`( )`, `{ }`, `< >`). While reading
+  `Annot`, an unbracketed `FnType` reads `Inter` for its result, recursively;
+  bracket contents read full `Type`. Thus a union needs braces, including
+  the result of a function type: `x: { A | B }` and
+  `f: (Int) -> { Int | String }`. `&` and `-` are unchanged. Declarations,
+  pattern atoms and service items all read `":" Annot`; service items
+  restrict it further to `NamedType` (or `UpName` for the rest). A bit-array
+  segment's `":" Format` is not a type and is unchanged.
 - **Needs.** `<- N` with a bare `UpName` is the same type as `<- (..N)`: the
   `UpName` must be a type parameter in scope (a row variable). In the bracket
   form every `NItem` is a named service type (its constructor is its key,
@@ -1379,7 +1389,7 @@ TypePattern = UpName | "_"
             | "(" [ TPItem { "," TPItem } [ "," ] ] ")" .
 TPItem      = [ name "=" ] TypePattern .
 Binding     = Pattern "=" Expr .
-Declaration = name ":" Type .
+Declaration = name ":" Annot .
 ```
 
 `TypeHead` is read as type patterns and then checked by the kind (§2.8): for
@@ -1414,7 +1424,7 @@ Branches  = Function { "|" Function } .
 Function  = [ TypeParams ] Params [ "<-" SvcPat ] [ "->" Union ] Block .
 Params    = "(" [ PItem { "," PItem } [ "," ] ] [ "?" Expr ] ")" .
 SvcPat    = "(" [ SvcItem { "," SvcItem } [ "," ] ] ")" .
-SvcItem   = name ":" NamedType | ".." name ":" UpName .
+SvcItem   = name ":" Annot | ".." name ":" Annot .
 ```
 
 `TypeParams` is the production of §3.1.
@@ -1426,7 +1436,8 @@ environment statement `"!" NamedType "=" Expr`, the environment read
 
 - **Function head.** `<-` after `Params` is the **service pattern** (§2.10.3):
   each `SvcItem` binds a name to the service whose key is the written named
-  type; the annotation is required. `..name: N` binds the whole environment
+  type; the annotation is required and uses `Annot` (§3.1), restricted to
+  `NamedType`. `..name: N` binds the whole environment
   the function receives, as one value of the row type `N` (§2.10.8); it is
   the last item, at most once, and `N` must be a type parameter of the
   function. No other pattern is allowed in a service item, and a service
@@ -1456,7 +1467,7 @@ Pattern   = Part { "=" Part } .
 Part      = Atom | StringPat .
 StringPat = string_lit "<>" Binder [ "<>" string_lit ] | Binder "<>" string_lit .
 Binder    = name | discard .
-Atom      = name | discard | ( name | discard ) ":" Type
+Atom      = name | discard | ( name | discard ) ":" Annot
           | [ "-" ] int_lit | [ "-." ] float_lit | string_lit
           | Name [ DataPat ]
           | DataPat
@@ -1474,9 +1485,7 @@ Rest      = ".." [ name | discard ] .
   lowercase name followed by `(` is not a pattern.
 - `Rest` is the last item of a `DataPat`, at most once. `PItem` has no rest.
 - `PatArgs` is removed: constructor patterns use `DataPat`.
-- Immediately after `:` in a pattern, `Type` reads an `Inter`, so an
-  outermost `|` belongs to the pattern (P8). Nested types, including the
-  return of a function type, still read a full `Union`.
+- The type after `:` is `Annot` (§3.1, P8), in every pattern position.
 
 ### 3.5 Disambiguation rules
 
@@ -1534,17 +1543,16 @@ needs a comma.
 - **P7 Key exception.** Rule 2 of §2.7: inside `DataPat` and `Params`, a
   leading `name =` is a key, never a conjunction; at statement level it is a
   conjunction.
-- **P8 Alternatives and types.** The type after `:` in every pattern ends
-  at the outermost `|`: that token always separates pattern alternatives
-  (spec §7.1). A union annotation requires braces, as in
-  `(x: { Int | String })`, `v: { A | B } = e`, and a data-pattern item
-  `C(value = x: { Int | String })`. `(x: Int | y)` is two alternatives,
-  not a union annotation, and fails the rule that alternatives bind the
-  same names; `(x: Int | x)` is valid. `(True | _: Int)` is unchanged.
-  This boundary applies even where alternatives are forbidden. Type
-  definitions `T = A | B`, nested type arguments `List(Int | String)`,
-  `<A>` lists, and the `->` return of a function type are unchanged:
-  `f: (Int) -> Int | String = e` still has a union return type.
+- **P8 Annotations and alternatives.** Every type after `:` reads `Annot`
+  (§3.1 and spec §3), in declarations, patterns, and service items alike.
+  `(x: Int | y)` has the alternatives `x: Int` and `y`, rejected because
+  they bind different names; `(x: Int | x)` and `(True | _: Int)` are valid.
+  A union annotation is `(x: { Int | String })`, `v: { A | B } = e`, or
+  `C(value = x: { Int | String })`. Alternatives remain forbidden outside
+  parameter items. `f: (Int) -> Int | String = e` is a compile error; write
+  `f: (Int) -> { Int | String } = e`. `List((Int) -> Int | String)` and
+  type definitions `T = A | B` are unchanged. A segment's `: Format` is
+  unchanged because it is not a type annotation.
 - **P9 Guard.** `?` in `Params` begins the guard, after the last item; the
   guard ends at the matching `)`. `?` in any other pattern is an error.
 - **P10 Types.** In a `DataType`, `name =` is a label; a `name` not followed by
