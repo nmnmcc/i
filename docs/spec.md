@@ -456,9 +456,19 @@ its lexical scope. It does not union incompatible instantiations into one
 environment; §9.2's same-constructor restrictions still apply to each
 actual function environment. This changes no source inference.
 
-A factory for service S has type `(generated arguments) -> S ^ Never ! R`,
-with R its ordinary inferred environment. The selected arguments have these
-exact types and meanings. `Key(Nil)` and the request/task services below refer to the accepted R2 contracts in [runtime.md §§5–6](design/runtime.md); their definitions are installed by that track. This plan does not give them host-reference representations:
+A factory for service `S` has type `(generated arguments) <- R -> S`,
+with `R` its ordinary inferred need and no uncaught `Fail` requirement (§9.3).
+`Key(Nil)` is an invariant identity key (§9.8). A request `Root` holds such a
+key and identifies a request run in an entry context; an `Owner` holds its own
+key and its `Root` and identifies a cancellation group. Both are ordinary
+portable service values; `Await` supplies the function that waits for a request
+to settle (§9.11). `Scheduler` and `Runner` are ordinary service values for a
+structured task run and its scheduling and random-generator context (§9.9).
+The primitive entry registry and any required initial root key exist before
+factories run; ordinary factories construct the chosen services from their arguments
+and dependencies. The request and task contracts are defined in §9.9 and
+§9.11. This plan gives none of these services a host-reference representation.
+The selected arguments have these exact types and meanings:
 
 | Argument | Type | Value and dependency |
 |---|---|---|
@@ -1806,8 +1816,8 @@ before cancellation reaches them.
 R6. The runtime entry wrapper and every explicit run own a local root task,
 which they run to completion with structured children. An entry error is
 reported only after the run has unwound; a host export receives its ordinary
-error. A stop immediately traps and runs no finals, as §9.5 requires. Host
-trap/failure/drop also invalidates the instance under ABI H8–H11; it cannot
+error. A stop immediately traps and runs no finals, as §9.5 requires. A host
+trap, failure or drop also invalidates the instance (§B.5); it cannot
 promise to resume i cleanup. “Cancellation runs finals” refers to i structured
 cancellation, not destruction of a trapped instance by its host.
 
