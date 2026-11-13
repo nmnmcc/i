@@ -23,7 +23,9 @@ pub fn env(e: &mut Env, map: &mut impl FnMut(&mut Atom)) {
 }
 pub fn callee(c: &mut Callee, map: &mut impl FnMut(&mut Atom)) {
     match c {
-        Callee::Value(a) | Callee::Known { closure: a, .. } => map(a),
+        Callee::Value(a) | Callee::Known { closure: a, .. } | Callee::Lazy { service: a, .. } => {
+            map(a)
+        }
         Callee::Direct(_) => {}
     }
 }
@@ -57,7 +59,7 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
             args.iter_mut().for_each(&mut *map);
             env(e, map);
         }
-        Value::Service(e, _) => env(e, map),
+        Value::Service(e, _) | Value::ServiceRaw(e, _) => env(e, map),
         Value::Closure { captures, .. } => captures.iter_mut().for_each(map),
         Value::Record { fields, .. } => fields.iter_mut().for_each(map),
         Value::RecNew(fields) => fields.iter_mut().for_each(|(_, a)| map(a)),

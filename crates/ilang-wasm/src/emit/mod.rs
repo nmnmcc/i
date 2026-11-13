@@ -99,6 +99,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         data: String::new(),
         out: String::new(),
         lights: 0,
+        lazy_calls: BTreeSet::new(),
     };
     e.arities.insert(0);
     e.arities.insert(1);
@@ -229,6 +230,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     ));
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
+    for &n in &e.lazy_calls {
+        m.push_str(&control::lazy_call(n));
+    }
     m.push_str(&host::effects());
     m.push_str(ENTRY);
     m.push_str(&e.data);
@@ -274,11 +278,35 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     }
     for &f in &p.constants {
         let n = p.funcs[f.0 as usize].arity();
+        // The function that makes a lazily provided value keeps the code
+        // of its fields in its captures, which it does not read
+        // (`$lazy_call{n}`).
+        let captures = match p.lazy_fields.get(&f) {
+            Some(fields) => {
+                let parts: String = fields
+                    .iter()
+                    .map(|field| match field {
+                        Some(g) => format!(
+                            " {}",
+                            closure(
+                                p.funcs[g.0 as usize].arity(),
+                                *g,
+                                "(ref.null $values)",
+                                false
+                            )
+                        ),
+                        None => " (ref.null eq)".to_string(),
+                    })
+                    .collect();
+                format!("(array.new_fixed $values {}{parts})", fields.len())
+            }
+            None => "(ref.null $values)".to_string(),
+        };
         let _ = writeln!(
             m,
             "(global $c{} (ref $clo{n}) {})",
             f.0,
-            closure(n, f, "(ref.null $values)", false)
+            closure(n, f, &captures, false)
         );
     }
     m.push_str(&e.out);
@@ -314,6 +342,9 @@ struct Emitter<'p> {
     out: String,
     /// The number of light boundaries emitted, for their labels.
     lights: u32,
+    /// The arities of the `Callee::Lazy` calls, each with its
+    /// `$lazy_call{n}`.
+    lazy_calls: BTreeSet<u32>,
 }
 
 impl<'p> Emitter<'p> {
@@ -690,6 +721,12 @@ impl<'p> Emitter<'p> {
             Callee::Direct(f) | Callee::Known { func: f, .. } => {
                 format!("({prefix}call $f{} {closure} {env}{raw_args})", f.0)
             }
+            Callee::Lazy { service, field } => {
+                self.arities.insert(n + 1);
+                self.lazy_calls.insert(n);
+                let s = self.atom(service);
+                format!("({prefix}call $lazy_call{n} {s} (i32.const {field}) {env}{raw_args})")
+            }
             Callee::Value(a) => {
                 let a = self.atom(a);
                 format!(
@@ -960,6 +997,9 @@ impl<'p> Emitter<'p> {
                      (br $lt{n} (call $light_unwind {b})))\n\
                      (call $light_captured {b}) (unreachable))"
                 )
+            }
+            Value::ServiceRaw(env, id) => {
+                format!("(array.get $env {} (i32.const {id}))", env_text(*env))
             }
             Value::Service(env, id) => {
                 let read = format!("(array.get $env {} (i32.const {id}))", env_text(*env));
@@ -1387,6 +1427,7 @@ impl<'p> Emitter<'p> {
                     converted.join(" ")
                 )
             }
+            Callee::Lazy { .. } => unreachable!("an export calls a function"),
         };
         if abi.errors.is_empty() {
             let (types, out) = abi_out(abi.result, &call);
@@ -1661,7 +1702,7 @@ mod deep_emit_tests {
     fn nested_conditions_and_blocks_emit_on_a_small_stack() {
         std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
             let program = Program::default();
-            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new(), lights:0 };
+            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new(), lights:0, lazy_calls:BTreeSet::new() };
             let leaf = Cond::I32(1);
             let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
             assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");

@@ -187,6 +187,10 @@ struct Fx {
     /// Whether the statements being lowered are the start of a light
     /// boundary's body, where its environment is still its own.
     light_start: bool,
+    /// The names of environment parameters that hold the slot of their
+    /// service as it is (`Value::ServiceRaw`): every use is the callee of
+    /// `x.f(…)`, which is lowered as `Callee::Lazy`.
+    lazy_params: HashSet<VarId>,
 }
 
 impl Fx {
@@ -203,6 +207,7 @@ impl Fx {
             env: Env::Param,
             light: None,
             light_start: false,
+            lazy_params: HashSet::new(),
         }
     }
 
@@ -396,6 +401,14 @@ struct Walk {
     /// left side of `|>`) is a local name: the callee, the name, and the
     /// span of the call, which keys its argument order.
     first_args: Vec<(DefId, VarId, Span)>,
+    /// How deep in function literals the walk is.
+    depth: u32,
+    /// The calls `x.f(…)` of a local name `x` outside function literals:
+    /// the name and the span of the callee `x.f`.
+    field_calls: Vec<(VarId, Span)>,
+    /// The environment statements whose value is a constructor applied to
+    /// function literals and local names (as `lazy_provide` takes them).
+    lazy_envs: Vec<Span>,
 }
 
 impl Walk {
@@ -432,7 +445,11 @@ impl Walk {
                 }
             }
             ExprKind::Block(b) => self.block(b),
-            ExprKind::Fn(f) => self.function(f),
+            ExprKind::Fn(f) => {
+                self.depth += 1;
+                self.function(f);
+                self.depth -= 1;
+            }
             ExprKind::Case { subject, clauses } => {
                 self.expr(subject);
                 for c in clauses {
@@ -447,6 +464,12 @@ impl Walk {
                     && let ExprKind::Name(ValueRef::Local(v)) = first.value.kind
                 {
                     self.first_args.push((*d, v, e.span));
+                }
+                if self.depth == 0
+                    && let ExprKind::Field { target, .. } = &callee.kind
+                    && let ExprKind::Name(ValueRef::Local(v)) = target.kind
+                {
+                    self.field_calls.push((v, callee.span));
                 }
                 self.expr(callee);
                 args.iter().for_each(|a| self.expr(&a.value));
@@ -493,7 +516,20 @@ impl Walk {
                     self.pattern(&b.pattern);
                     self.expr(&b.value);
                 }
-                hir::Stmt::Env { value, .. } => self.expr(value),
+                hir::Stmt::Env { value, span, .. } => {
+                    if let ExprKind::Call { callee, args } = &ungroup(value).kind
+                        && let ExprKind::Name(ValueRef::Ctor(_)) = &ungroup(callee).kind
+                        && args.iter().all(|a| {
+                            matches!(
+                                ungroup(&a.value).kind,
+                                ExprKind::Fn(_) | ExprKind::Name(ValueRef::Local(_))
+                            )
+                        })
+                    {
+                        self.lazy_envs.push(*span);
+                    }
+                    self.expr(value)
+                }
                 hir::Stmt::Expr(e) => self.expr(e),
             }
         }
@@ -862,6 +898,10 @@ struct Lowerer<'a> {
     /// once: hashing every source of the package per import was measured at
     /// a twentieth of a test build.
     package_hashes: HashMap<PackageId, String>,
+    /// The services that an environment statement may provide lazily
+    /// (`lazy_provide`), found before lowering: a call `x.f(…)` of an
+    /// environment parameter of one of them is a `Callee::Lazy`.
+    lazy_candidates: HashSet<u32>,
     out: ir::Program,
     diags: Vec<Diagnostic>,
 }
@@ -902,6 +942,7 @@ impl<'a> Lowerer<'a> {
             bindings: Vec::new(),
             external_funcs: HashMap::new(),
             package_hashes: HashMap::new(),
+            lazy_candidates: HashSet::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
         };
@@ -1087,6 +1128,23 @@ impl<'a> Lowerer<'a> {
     }
 
     fn run(&mut self) {
+        // The services that an environment statement may provide lazily.
+        for (mi, m) in self.program.modules.iter().enumerate() {
+            let mut w = Walk::default();
+            for b in &m.bindings {
+                w.expr(&b.binding.value);
+            }
+            for span in w.lazy_envs {
+                if let Some(id) = self
+                    .typed
+                    .services
+                    .get(&(ModuleId(mi as u32), span))
+                    .and_then(|t| self.services.get(t))
+                {
+                    self.lazy_candidates.insert(*id);
+                }
+            }
+        }
         // Top-level functions are known functions with one value.
         for (mi, m) in self.program.modules.iter().enumerate() {
             for (bi, b) in m.bindings.iter().enumerate() {
@@ -2386,11 +2444,13 @@ impl<'a> Lowerer<'a> {
         name: String,
         id: FuncId,
     ) -> Func {
-        self.function_code(module, f, captures, name, id, false)
+        self.function_code(module, f, captures, name, id, false, false)
     }
 
     /// As `function`; when `lifted`, the captures are parameters after the
-    /// function's own, and it has no closure (a light boundary's body).
+    /// function's own, and it has no closure; when `light` too, it is a
+    /// light boundary's body.
+    #[allow(clippy::too_many_arguments)]
     fn function_code(
         &mut self,
         module: ModuleId,
@@ -2399,6 +2459,7 @@ impl<'a> Lowerer<'a> {
         name: String,
         id: FuncId,
         lifted: bool,
+        light: bool,
     ) -> Func {
         let mut fx = Fx::new(module, self.is_library(module));
         let mut out = Vec::new();
@@ -2415,10 +2476,10 @@ impl<'a> Lowerer<'a> {
         for _ in 0..arity {
             fx.local(LocalType::Value);
         }
-        if lifted {
+        if light {
             fx.light = light_names(f);
         }
-        let mut start = lifted;
+        let mut start = light;
         for (i, &v) in captures.iter().enumerate() {
             let l = fx.var(v);
             let value = if lifted {
@@ -2451,9 +2512,18 @@ impl<'a> Lowerer<'a> {
                 Param::Env { var, name, .. } => {
                     let service = self.service(module, name.span);
                     let l = fx.var(*var);
+                    let raw = self.lazy_candidates.contains(&service)
+                        && self.only_field_calls(module, &f.body, *var);
+                    if raw {
+                        fx.lazy_params.insert(*var);
+                    }
                     out.push(Stmt::Let {
                         dst: l,
-                        value: Value::Service(Env::Param, service),
+                        value: if raw {
+                            Value::ServiceRaw(Env::Param, service)
+                        } else {
+                            Value::Service(Env::Param, service)
+                        },
                         site: None,
                     });
                 }
@@ -3025,7 +3095,7 @@ impl<'a> Lowerer<'a> {
         }
         let id = self.new_func();
         let name = format!("{}:light{}", self.program.module(fx.module).path, id.0);
-        let func = self.function_code(fx.module, f, &captures, name, id, true);
+        let func = self.function_code(fx.module, f, &captures, name, id, true, true);
         self.out.funcs[id.0 as usize] = FuncKind::Code(func);
         // The boundary is the environment of its body (`$light_new`).
         let b = let_value(
@@ -3116,6 +3186,34 @@ impl<'a> Lowerer<'a> {
             frame: true,
         });
         self.constants.insert(builder);
+        // The code of each field that is a function literal, lifted so
+        // that the handle is its last parameter: a call of that field of
+        // the service (`Callee::Lazy`) runs it without making the value.
+        if let [handle] = names.iter().copied().collect::<Vec<_>>()[..] {
+            let written: Vec<Option<FuncId>> = args
+                .iter()
+                .map(|a| match &ungroup(&a.value).kind {
+                    ExprKind::Fn(f) => {
+                        let id = self.new_func();
+                        let name = format!("{}:field{}", self.program.module(fx.module).path, id.0);
+                        let func =
+                            self.function_code(fx.module, f, &[handle], name, id, true, false);
+                        self.out.funcs[id.0 as usize] = FuncKind::Code(func);
+                        Some(id)
+                    }
+                    _ => None,
+                })
+                .collect();
+            let fields: Vec<Option<FuncId>> = match self.typed.args.get(&(fx.module, e.span)) {
+                Some(order) if order.len() == written.len() => {
+                    order.iter().map(|&i| written[i as usize]).collect()
+                }
+                _ => written,
+            };
+            if fields.iter().any(Option::is_some) {
+                self.out.lazy_fields.insert(builder, fields);
+            }
+        }
         let_value(
             fx,
             out,
@@ -3140,6 +3238,36 @@ impl<'a> Lowerer<'a> {
         });
         fx.env = Env::Local(dst);
         true
+    }
+
+    /// Whether every use of the name `v` in `body` is the callee `v.f` of
+    /// a call outside function literals, with one field index for `f`.
+    fn only_field_calls(&self, module: ModuleId, body: &Block, v: VarId) -> bool {
+        let mut w = Walk::default();
+        w.block(body);
+        let calls: Vec<Span> = w
+            .field_calls
+            .iter()
+            .filter(|(x, _)| *x == v)
+            .map(|(_, span)| *span)
+            .collect();
+        !calls.is_empty()
+            && w.uses.get(&v).copied() == Some(calls.len() as u32)
+            && calls
+                .iter()
+                .all(|span| self.lazy_field(module, *span).is_some())
+    }
+
+    /// The field index of the callee `x.f` at `span`, when it is the same
+    /// for every constructor.
+    fn lazy_field(&self, module: ModuleId, span: Span) -> Option<u32> {
+        match self.typed.access.get(&(module, span)) {
+            Some(Access::Field(list)) if !list.is_empty() => {
+                let first = list[0].1;
+                list.iter().all(|(_, i)| *i == first).then_some(first)
+            }
+            _ => None,
+        }
     }
 
     /// The operation of a callee that names an external function of the
@@ -3391,7 +3519,25 @@ impl<'a> Lowerer<'a> {
         if let Some(a) = first {
             written.push(self.expr(fx, out, a));
         }
-        let target = self.target(fx, out, callee);
+        let lazy = match &callee.kind {
+            ExprKind::Field { target, .. } => match target.kind {
+                ExprKind::Name(ValueRef::Local(v)) if fx.lazy_params.contains(&v) => {
+                    let field = self
+                        .lazy_field(fx.module, callee.span)
+                        .expect("checked by only_field_calls");
+                    Some(Callee::Lazy {
+                        service: Atom::Local(fx.var(v)),
+                        field,
+                    })
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+        let target = match lazy {
+            Some(callee) => Target::Callee(callee),
+            None => self.target(fx, out, callee),
+        };
         for a in args {
             written.push(self.expr(fx, out, a));
         }

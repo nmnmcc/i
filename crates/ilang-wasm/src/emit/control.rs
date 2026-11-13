@@ -1265,3 +1265,41 @@ impl<'p> Emitter<'p> {
         );
     }
 }
+
+/// `$lazy_call{n}`: calls field `$k` of the value of a service whose slot
+/// is `$s` (`Callee::Lazy`) with `n` arguments. When `$s` is a light
+/// boundary that stands for a value made from it, and the field is the
+/// code of a function literal (the captures of the function that makes
+/// the value, `Program::lazy_fields`), that code is called with the
+/// arguments and the boundary, and the value is not made: it would hold a
+/// closure of the same code over the same boundary. Otherwise the value is
+/// made (`$service_force`) and its field is called.
+pub(super) fn lazy_call(n: u32) -> String {
+    let m = n + 1;
+    let params: String = (0..n).map(|i| format!(" (param $a{i} eqref)")).collect();
+    let args: String = (0..n).map(|i| format!(" (local.get $a{i})")).collect();
+    format!(
+        "(func $lazy_call{n} (param $s eqref) (param $k i32) (param $env (ref null $env)){params} (result eqref)
+  (local $l (ref $env)) (local $t (ref null $values)) (local $f eqref)
+  (if (ref.test (ref $env) (local.get $s))
+    (then
+      (local.set $l (ref.cast (ref $env) (local.get $s)))
+      (local.set $f (array.get $env (local.get $l) (i32.sub (array.len (local.get $l)) (i32.const 2))))
+      (if (ref.test (ref $obj) (local.get $f))
+        (then
+          (local.set $t (struct.get $obj 5 (ref.cast (ref $obj) (local.get $f))))
+          (if (i32.eqz (ref.is_null (local.get $t)))
+            (then
+              (if (i32.lt_u (local.get $k) (array.len (local.get $t)))
+                (then
+                  (local.set $f (array.get $values (local.get $t) (local.get $k)))
+                  (if (ref.test (ref $clo{m}) (local.get $f))
+                    (then
+                      (return_call_ref $fn{m} (ref.cast (ref $clo{m}) (local.get $f)) (local.get $env){args}
+                        (local.get $s) (struct.get $clo{m} 8 (ref.cast (ref $clo{m}) (local.get $f))))))))))))))
+  (local.set $f (call $field (call $service_force (local.get $s) (local.get $env)) (local.get $k)))
+  (return_call_ref $fn{n} (ref.cast (ref $clo{n}) (local.get $f)) (local.get $env){args}
+    (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) (local.get $f)))))
+"
+    )
+}

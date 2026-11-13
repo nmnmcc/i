@@ -76,6 +76,30 @@ test("a lazy service keeps its value and function identities", () {
 	check(show(left == right), "False")
 })
 
+test("a raise through the service agrees with its value", () {
+	r: Result(Nil, Int) = failure.catch(() {
+		f: Fail(Int) = the_fail()
+		check(show(f == the_fail()), "True")
+		failure.raise(5)
+	})
+	check(show(r), "Error(5)")
+	s: Result(Nil, Int) = failure.catch(() {
+		failure.raise(6)
+		f: Fail(Int) = the_fail()
+		f.raise(7)
+	})
+	check(show(s), "Error(6)")
+	t: Result(Int, Int) = failure.catch(() {
+		f: Fail(Int) = the_fail()
+		inner: Result(Nil, Int) = failure.catch(() { failure.raise(8) })
+		inner |> {
+			Ok(_)    -> 0
+			Error(e) -> f.raise(e + 1)
+		}
+	})
+	check(show(t), "Error(9)")
+})
+
 test("light boundary captures stay non-portable", () {
 	r: Result(Fail(Int), Int) = failure.catch(() { the_fail() })
 	check(show(core.portable(r)), "False")

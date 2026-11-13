@@ -647,7 +647,7 @@ pub fn run(p: &mut Program) {
             {
                 match callee {
                     Callee::Direct(id) | Callee::Known { func: id, .. } => *id = worker,
-                    Callee::Value(_) => {
+                    Callee::Value(_) | Callee::Lazy { .. } => {
                         unreachable!("known calls resolved before worker selection")
                     }
                 }
@@ -897,7 +897,8 @@ fn inline(
                         Value::Call { env, .. }
                         | Value::OpEnv(_, _, env)
                         | Value::Light { env, .. }
-                        | Value::Service(env, _),
+                        | Value::Service(env, _)
+                        | Value::ServiceRaw(env, _),
                     ..
                 }
                 | Stmt::TailCall { env, .. }

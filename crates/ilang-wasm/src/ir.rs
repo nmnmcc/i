@@ -290,6 +290,13 @@ pub enum Callee {
     Known { func: FuncId, closure: Atom },
     /// A closure value, called with `call_ref` after a cast to `$clo_n`.
     Value(Atom),
+    /// Field `field` of the value of a service, called: `service` is the
+    /// slot as read from the environment (`Value::ServiceRaw`). When the
+    /// slot is a light boundary that stands for a value made from its
+    /// handle (`Program::lazy_fields`), the code of that field is called
+    /// with the handle, and the value is not made; otherwise the value is
+    /// made (`$service_force`) and its field is called as a closure.
+    Lazy { service: Atom, field: u32 },
 }
 
 /// The right side of a `Let`.
@@ -322,6 +329,10 @@ pub enum Value {
     },
     /// The service with this id in the environment (§9.2).
     Service(Env, u32),
+    /// The slot of the service with this id in the environment, as it is:
+    /// a light boundary that stands for a value is not made into it. Only
+    /// a name whose every use is the callee of `Callee::Lazy` has it.
+    ServiceRaw(Env, u32),
     Closure {
         func: FuncId,
         captures: Vec<Atom>,
@@ -847,6 +858,11 @@ pub struct Program {
     /// The service ids that a light boundary may provide lazily (its handle
     /// stands for the value, `Value::Light`): reads of them force it.
     pub lazy_services: std::collections::BTreeSet<u32>,
+    /// For the function that makes a lazily provided value from a light
+    /// boundary's handle: for each field of the value, the code of the
+    /// function literal written there, lifted so that the handle is its
+    /// last parameter (`Callee::Lazy`), or `None`.
+    pub lazy_fields: std::collections::BTreeMap<FuncId, Vec<Option<FuncId>>>,
     pub request_owner: Option<u32>,
     /// The code of `ilang_start` after the tables are installed.
     pub start: Option<Func>,
