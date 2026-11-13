@@ -256,12 +256,12 @@ fn scheme_types_know_each_type_by_what_it_is() {
         fs::write(p, text).unwrap();
     };
     write("dep/i.toml", "name = \"dep\"\n");
-    write("dep/src/u.i", "(\n\tT(..)\n)\nT = { (String) }\n");
+    write("dep/src/u.i", "(\n\tT(..)\n)\nT = (String)\n");
     write(
         "app/i.toml",
         "name = \"app\"\n[dependencies]\ndep = { path = \"../dep\" }\n",
     );
-    write("app/src/geo/u.i", "(\n\tT(..)\n)\nT = { (Int) }\n");
+    write("app/src/geo/u.i", "(\n\tT(..)\n)\nT = (Int)\n");
     write(
         "app/src/main.i",
         "(\n\tapp/geo/u\n\td = dep/u\n)\n\n(\n\tf\n\tg\n\text\n)\n@external(\"env\", \"now\")\nnow: () -> Int\n@external(\"env\", \"ext\")\next: (Int) -> Int\nf = <A>(x: u.T, y: d.T, z: A) -> A { z }\ng = (o: Result(u.T, Int)) { o }\nhidden = (x: u.T) { x }\n",

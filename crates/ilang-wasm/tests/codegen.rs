@@ -318,8 +318,8 @@ fn opaque_decoders_keep_the_declared_type_on_both_targets() {
 	same_a
 	echo
 )
-A = { Opaque }
-B = { Opaque }
+A = Opaque
+B = Opaque
 Alias = A
 @external("opaque", "get")
 get_a: () -> A
