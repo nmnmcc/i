@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
+  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ^ E ! N) -> A ^ E ! N\napp/main.with : (x: A, f: () -> B ! N) -> () -> B ! N - S(A)\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:7:25: error[E0515]: `S(String)` and `S(_)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 7:17 needs it)\n1 error\n"
+      "stdout": "app/main.read : () <- (S(String)) -> String\napp/main.read_int : () <- (S(Int)) -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.with : (A, () <- (Fail(E), ..N) -> B) -> () <- (Fail(E), N - S(A)) -> B\napp/main.main : () -> Nil\n",
+      "stderr": "src/main.i:13:14: error[E0515]: `S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 13:6 needs it)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:25: error[E0515]: `S(String)` and `S(_)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 7:17 needs it)\n1 error\n"
+      "stderr": "src/main.i:13:14: error[E0515]: `S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 13:6 needs it)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:25: error[E0515]: `S(String)` and `S(_)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 7:17 needs it)\n1 error\n"
+      "stderr": "src/main.i:13:14: error[E0515]: `S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 13:6 needs it)\n1 error\n"
     }
   }
 }

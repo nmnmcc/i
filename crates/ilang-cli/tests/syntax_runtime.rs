@@ -63,7 +63,7 @@ fn syntax_library_round_trips_through_the_host() {
         // The empty data `(,)` is not an expression of the rows before syntax
         // three; in the rows of syntax three it is one, and the empty Round
         // is not.
-        &r#"(
+        r#"(
 	testlib = (test) = std/test
 	i/fail
 	syntax = i/syntax

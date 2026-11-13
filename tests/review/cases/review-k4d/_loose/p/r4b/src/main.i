@@ -22,14 +22,16 @@ tell = (x: Int) {
 }
 
 main = () <- (io: Io) {
+	_syn3_0: S(Dep) = S(f = () { get() })
 	{
 		h = () { run(fr) }
 		k = () { run(h) + fw() }
 		io.print(
 			tell(k()),
 		)
+		_syn3_1: S(Never) = S(f = () { 1 })
 		io.print(
 			tell(k() + fr()),
-		) <- (S(f = () { 1 }))
-	} <- (S(f = () { get() }), Dep(v = 2))
+		) <- (_syn3_1)
+	} <- (_syn3_0, Dep(v = 2))
 }

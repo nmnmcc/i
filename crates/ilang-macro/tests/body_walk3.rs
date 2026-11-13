@@ -375,10 +375,7 @@ fn a_service_name_is_a_binder_of_its_function() {
 
 #[test]
 fn a_match_binds_per_branch_at_the_same_function_depth() {
-    assert_eq!(
-        calls("f = (x) { x |> (m) { m(1) } | (_) { m(2) } }"),
-        ["m"]
-    );
+    assert_eq!(calls("f = (x) { x |> (m) { m(1) } | (_) { m(2) } }"), ["m"]);
     // The value of `m` is not direct (it is a match), so `m` is not in
     // scope inside its own value.
     assert_eq!(calls("f = (x) { m = x |> (_) { m(1) }  m(2) }"), ["m"]);
@@ -409,20 +406,26 @@ fn conjunction_and_key_patterns_bind_as_the_old_named_patterns() {
     assert_eq!(calls("f = (C(m = _)) { m(1) }"), Vec::<String>::new());
     assert_eq!(calls("f = (C(k = x)) { m(1) }"), ["m"]);
     let binders = |source: &str| {
-        let pattern = ilang_syntax::syn3::parse_pattern(source)
-            .unwrap_or_else(|e| panic!("{source}: {e:?}"));
+        let pattern =
+            ilang_syntax::syn3::parse_pattern(source).unwrap_or_else(|e| panic!("{source}: {e:?}"));
         let mut out = Vec::new();
         body_walk3::for_each_binder(&pattern, |name, _| out.push(name.to_owned()));
         out
     };
-    assert_eq!(binders("C(a, k = b, c = d: Int, e = e)"), ["a", "b", "k", "d", "c", "e"]);
+    assert_eq!(
+        binders("C(a, k = b, c = d: Int, e = e)"),
+        ["a", "b", "k", "d", "c", "e"]
+    );
     assert_eq!(binders("(x, y) = whole"), ["whole", "x", "y"]);
     assert_eq!(binders("[a, b, ..rest]"), ["a", "b", "rest"]);
 }
 
 #[test]
 fn interpolation_parts_are_visited() {
-    assert_eq!(calls("f = () { \"a\\(m(1))b\\(inner(2))\" }"), ["m", "inner"]);
+    assert_eq!(
+        calls("f = () { \"a\\(m(1))b\\(inner(2))\" }"),
+        ["m", "inner"]
+    );
 }
 
 #[test]
@@ -517,8 +520,12 @@ impl Hook for New {
         // Multi-shape values have a synthetic one-byte root in the
         // transition AST. Compare their classification at that root.
         let span = if matches!(e.kind, ExprKind::Chain(_)) {
-            ilang_syntax::syn3::lower::lower_expr(e).map(|e| e.span).unwrap_or(e.span.0)
-        } else { e.span.0 };
+            ilang_syntax::syn3::lower::lower_expr(e)
+                .map(|e| e.span)
+                .unwrap_or(e.span.0)
+        } else {
+            e.span.0
+        };
         self.direct.push((at(span), direct));
         direct
     }
@@ -568,8 +575,8 @@ fn old_is_direct(expression: &ilang_syntax::ast::Expr, aliases: &[String]) -> bo
                 pending.extend(items);
                 pending.extend(rest.as_deref());
             }
-            ExprKind::Call { callee, args }
-                if matches!(&callee.kind, ExprKind::Name { module: None, name } if name.name == ilang_syntax::syn3::lower::MULTI) => {
+            ExprKind::Call { callee, args } if matches!(&callee.kind, ExprKind::Name { module: None, name } if name.name == ilang_syntax::syn3::lower::MULTI) =>
+            {
                 pending.extend(args.iter().map(|arg| &arg.value));
             }
             ExprKind::Call { callee, args } if constructor(callee) => {
@@ -605,7 +612,9 @@ impl body_walk::Hook for Old {
         if let Some(call) = call::expression(e) {
             // A shape-group closure is introduced by transition lowering;
             // it has no call in the source tree (syntax-3 §6.12).
-            if call.name.name.starts_with('%') { return Ok(false); }
+            if call.name.name.starts_with('%') {
+                return Ok(false);
+            }
             self.events.push((
                 "call".into(),
                 at(e.span),
@@ -685,7 +694,11 @@ fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
     if !errors.is_empty() {
         return false;
     }
-    let is_macro_item = |m: &Module| m.items.iter().any(|i| matches!(i.kind, ItemKind::Macro { .. }));
+    let is_macro_item = |m: &Module| {
+        m.items
+            .iter()
+            .any(|i| matches!(i.kind, ItemKind::Macro { .. }))
+    };
     if is_macro_item(&new) {
         return false;
     }
@@ -739,6 +752,9 @@ fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
 fn snippets_walk_as_their_lowered_trees() {
     let cases = [
         "f = (m) { m(1) }",
+        "f = () <- (failure: Fail(Int), service: S) -> Int { g() }",
+        "f = (x) <- (failure: Fail(Int)) -> Int { g(x) } | (x) <- (failure: Fail(Int)) { h(x) }",
+        "Alias(E) = Fail(E)\nf = () <- (failure: Alias(Int)) { g() }",
         "f = (a, b) -> Int { g(a) |> h(b) }",
         "f = (0, x) <- (s: S) -> Int { g(s, x) } | (n, _) <- (t: T) { h(n, t, s) }",
         "f = (x) { x |> (Some(y)) { g(y) } | (None) { h(x) } }",
@@ -761,7 +777,10 @@ fn snippets_walk_as_their_lowered_trees() {
         "f = () { (a = g(1), b = h(2)) }",
     ];
     for case in cases {
-        assert!(same_as_old_walker(case, case, false), "{case}: not a program");
+        assert!(
+            same_as_old_walker(case, case, false),
+            "{case}: not a program"
+        );
         let text = ilang_syntax::syn3::lisp::to_lisp(&module(case));
         same_as_old_walker(&text, &text, true);
     }
@@ -776,7 +795,10 @@ fn sources(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
         let name = entry.file_name();
         let name = name.to_string_lossy();
         if path.is_dir() {
-            if !matches!(&*name, "target" | "node_modules" | "binaryen" | ".git" | ".rd") {
+            if !matches!(
+                &*name,
+                "target" | "node_modules" | "binaryen" | ".git" | ".rd"
+            ) {
                 sources(&path, out);
             }
         } else if name.ends_with(".i") || name.ends_with(".is") {

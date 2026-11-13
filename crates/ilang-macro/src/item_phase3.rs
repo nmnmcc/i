@@ -196,7 +196,12 @@ pub(crate) fn type_ready(engine: &mut BodyEngine<'_>, item: &Item) -> Result<boo
         fn expand(&mut self, _: &Expr, _: &[Local], _: u32) -> Result<Expr, Found> {
             unreachable!("type probe does not expand expressions")
         }
-        fn is_type_macro(&mut self, ty: &Type, locals: &[Local], depth: u32) -> Result<bool, Found> {
+        fn is_type_macro(
+            &mut self,
+            ty: &Type,
+            locals: &[Local],
+            depth: u32,
+        ) -> Result<bool, Found> {
             match Hook::is_type_macro(self.0, ty, locals, depth) {
                 Ok(true) => Err(Found::Macro),
                 Ok(false) => Ok(false),
@@ -315,10 +320,7 @@ mod tests {
     fn item_names_are_the_binders_and_the_defined_names() {
         let m = module("T = (Int)\nx: Int\n(a, C(k = b)) = f()\nm(1)");
         let names: Vec<_> = m.items.iter().map(item_names).collect();
-        assert_eq!(
-            names,
-            [vec!["T"], vec!["x"], vec!["a", "b", "k"], vec![]]
-        );
+        assert_eq!(names, [vec!["T"], vec!["x"], vec!["a", "b", "k"], vec![]]);
     }
 
     #[test]

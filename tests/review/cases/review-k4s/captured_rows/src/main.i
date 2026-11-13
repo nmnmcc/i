@@ -7,4 +7,7 @@ capture = (body) {
 	local = () { body() }
 	local
 }
-example = () { capture(() { use() })() <- (S(() { Nil }, (_: Never) { Nil })) }
+example = () {
+	_syn3_0: S(Never) = S(() { Nil }, (_: Never) { Nil })
+	capture(() { use() })() <- (_syn3_0)
+}

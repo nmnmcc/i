@@ -678,12 +678,11 @@ impl Cx {
                     for member in members {
                         if let Some(at) = items.iter().position(|item| item.span.0 == *member) {
                             member_of.insert(at, i);
-                            if let n::ItemKind::TypeDef(def) = &items[at].kind {
-                                if let n::ItemKind::TypeDef(parent) = &item.kind
-                                    && def.name.name != parent.name.name
-                                {
-                                    absorbed.insert(def.name.name.clone());
-                                }
+                            if let n::ItemKind::TypeDef(def) = &items[at].kind
+                                && let n::ItemKind::TypeDef(parent) = &item.kind
+                                && def.name.name != parent.name.name
+                            {
+                                absorbed.insert(def.name.name.clone());
                             }
                         }
                     }
@@ -714,9 +713,15 @@ impl Cx {
                         && match &items[at].kind {
                             n::ItemKind::TypeDef(n::TypeDef {
                                 name,
+                                head,
                                 rhs: n::TypeRhs::Data(_),
                                 ..
-                            }) => member_name(m) == Some(name.name.as_str()),
+                            }) => {
+                                member_name(m) == Some(name.name.as_str())
+                                    && matches!(&m.kind, n::TypeKind::Named { args, .. }
+                                        if args.len() == head.len()
+                                            && args.iter().zip(head).all(|(a, b)| member_name(a) == member_name(b)))
+                            },
                             _ => false,
                         }
                 });

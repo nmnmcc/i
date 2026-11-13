@@ -1,6 +1,6 @@
 {
-  "compiler": "ae2f13b8a553e9309047d74d2101fa0626859a62",
-  "binary_sha256": "f2447ed6524ac42e527ffba7bc86f6ce4166071bc4a0c4ee9ec692f4c1e3ec59",
+  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
+  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ^ E ! N) -> A ^ E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(String) | S(Int)\n",
-      "stderr": "src/main.i:6:7: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:6:23: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 6:12 needs it)\n2 errors\n"
+      "stdout": "app/main.read : () <- (S(String)) -> String\napp/main.read_int : () <- (S(Int)) -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.join : (() <- (Fail(E), ..N) -> String, () <- (Fail(E2), ..N2) -> Int) <- (Fail(E | E2), ..N, ..N2) -> Int\napp/main.bad : () <- (S(Never)) -> Int\n",
+      "stderr": "src/main.i:9:23: error[E0515]: the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 9:12 needs it)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:6:7: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:6:23: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 6:12 needs it)\n2 errors\n"
+      "stderr": "src/main.i:9:23: error[E0515]: the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 9:12 needs it)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:6:7: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:6:23: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 6:12 needs it)\n2 errors\n"
+      "stderr": "src/main.i:9:23: error[E0515]: the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 9:12 needs it)\n1 error\n"
     }
   }
 }

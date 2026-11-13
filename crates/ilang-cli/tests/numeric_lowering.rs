@@ -535,6 +535,40 @@ fn corpus() -> Vec<Case> {
             None => cases.push(stop(body.into(), Value::Float(x))),
         }
     }
+    // List matching must agree through failed literal patterns, short lists,
+    // non-list union members, and self-tail iterations with new cells.
+    for (items, expected) in [
+        ("[]", 0.5),
+        ("[2.0]", 1.0),
+        ("[2.0, 3.0]", 5.5),
+        ("[0.0, 2.0]", 2.5),
+        ("[0.0, 2.0, 3.0]", 7.5),
+        ("[2.0, 3.0, 4.0]", 8.0),
+    ] {
+        cases.push(float_case(
+            &format!("list_match({items}, x)"),
+            0.5,
+            expected,
+        ));
+    }
+    for (value, expected) in [("[]", 0.5), ("[2.0]", 2.5), ("x", 1.0)] {
+        cases.push(float_case(
+            &format!("list_or_float({value}, x)"),
+            0.5,
+            expected,
+        ));
+    }
+    cases.push(float_case(
+        "list_dot([2.0, 3.0, 4.0], [5.0, 6.0], x)",
+        0.5,
+        28.5,
+    ));
+    cases.push(float_case("list_dot([2.0], [5.0, 6.0], x)", 0.5, 10.5));
+    cases.push(stop(
+        "list_match([0.0, 2.0, 3.0], x)".into(),
+        Value::Float(f64::MAX),
+    ));
+    cases.push(stop("list_or_float(x, x)".into(), Value::Float(f64::MAX)));
     let huge: BigInt = format!("1{}", "0".repeat(400)).parse().unwrap();
     cases.push(stop("core.to_float(x + 1)".into(), Value::Int(huge)));
     cases
@@ -636,6 +670,26 @@ helper_sq = (x: Float) -> Float { x *. x }
 sq_loop = (n: Int, acc: Float) -> Float { n |> (0) { acc } | (_) { sq_loop(n - 1, helper_sq(acc) +. 1.0) } }
 list_product = (xs: List(Float), acc: Float) -> Float { xs |> ([]) { acc } | ([a, ..rest]) { list_product(rest, acc *. a) } }
 fold_float = <A>(items: List(A), acc: Float, f: (Float, A) -> Float) -> Float { items |> ([]) { acc } | ([a, ..rest]) { fold_float(rest, f(acc, a), f) } }
+list_match = (xs: List(Float), x: Float) -> Float {
+	xs |>
+		([0.0, a, ..rest]) { list_match(rest, a +. x) }
+		| ([a, b]) { a +. b +. x }
+		| ([]) { x }
+		| ([a, ..rest]) { list_match(rest, a *. x) }
+}
+list_or_float = (v: List(Float) | Float, x: Float) -> Float {
+	v |>
+		([]) { x }
+		| ([a, ..rest]) { list_or_float(rest, a +. x) }
+		| (_: Float) { x *. 2.0 }
+}
+list_dot = (as: List(Float), bs: List(Float), acc: Float) -> Float {
+	as |>
+		([]) { acc }
+		| ([a, ..ar]) {
+			bs |> ([]) { acc } | ([b, ..br]) { list_dot(ar, br, acc +. a *. b) }
+		}
+}
 helper_g = (x: Float) -> Float {
 	y = helper_sq(x)
 	y +. 1.0

@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
+  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.u_0 : () -> Nil ! S0(A)\napp/main.u_1 : () -> Nil ! S1(A)\napp/main.u_2 : () -> Nil ! S2(A)\napp/main.u_3 : () -> Nil ! S3(A)\napp/main.u_4 : () -> Nil ! S4(A)\napp/main.u_5 : () -> Nil ! S5(A)\napp/main.u_6 : () -> Nil ! S6(A)\napp/main.u_7 : () -> Nil ! S7(A)\napp/main.u_8 : () -> Nil ! S8(A)\napp/main.u_9 : () -> Nil ! S9(A)\napp/main.u_10 : () -> Nil ! S10(A)\napp/main.u_11 : () -> Nil ! S11(A)\napp/main.u_12 : () -> Nil ! S12(A)\napp/main.u_13 : () -> Nil ! S13(A)\napp/main.u_14 : () -> Nil ! S14(A)\napp/main.u_15 : () -> Nil ! S15(A)\napp/main.u_16 : () -> Nil ! S16(A)\napp/main.u_17 : () -> Nil ! S17(A)\napp/main.u_18 : () -> Nil ! S18(A)\napp/main.u_19 : () -> Nil ! S19(A)\napp/main.u_20 : () -> Nil ! S20(A)\napp/main.u_21 : () -> Nil ! S21(A)\napp/main.u_22 : () -> Nil ! S22(A)\napp/main.u_23 : () -> Nil ! S23(A)\napp/main.u_24 : () -> Nil ! S24(A)\napp/main.u_25 : () -> Nil ! S25(A)\napp/main.u_26 : () -> Nil ! S26(A)\napp/main.u_27 : () -> Nil ! S27(A)\napp/main.u_28 : () -> Nil ! S28(A)\napp/main.u_29 : () -> Nil ! S29(A)\napp/main.u_30 : () -> Nil ! S30(A)\napp/main.u_31 : () -> Nil ! S31(A)\napp/main.wide : () -> Nil ! S0(A) | S1(B) | S10(C) | S11(D) | S12(F) | S13(G) | S14(H) | S15(I) | S16(J) | S17(K) | S18(L) | S19(M) | S2(O) | S20(P) | S21(Q) | S22(R) | S23(S) | S24(T) | S25(U) | S26(V) | S27(W) | S28(X) | S29(Y) | S3(Z) | S30(A2) | S31(B2) | S4(C2) | S5(D2) | S6(F2) | S7(G2) | S8(H2) | S9(I2)\n",
+      "stdout": "app/main.u_0 : () <- (S0(A)) -> Nil\napp/main.u_1 : () <- (S1(A)) -> Nil\napp/main.u_2 : () <- (S2(A)) -> Nil\napp/main.u_3 : () <- (S3(A)) -> Nil\napp/main.u_4 : () <- (S4(A)) -> Nil\napp/main.u_5 : () <- (S5(A)) -> Nil\napp/main.u_6 : () <- (S6(A)) -> Nil\napp/main.u_7 : () <- (S7(A)) -> Nil\napp/main.u_8 : () <- (S8(A)) -> Nil\napp/main.u_9 : () <- (S9(A)) -> Nil\napp/main.u_10 : () <- (S10(A)) -> Nil\napp/main.u_11 : () <- (S11(A)) -> Nil\napp/main.u_12 : () <- (S12(A)) -> Nil\napp/main.u_13 : () <- (S13(A)) -> Nil\napp/main.u_14 : () <- (S14(A)) -> Nil\napp/main.u_15 : () <- (S15(A)) -> Nil\napp/main.u_16 : () <- (S16(A)) -> Nil\napp/main.u_17 : () <- (S17(A)) -> Nil\napp/main.u_18 : () <- (S18(A)) -> Nil\napp/main.u_19 : () <- (S19(A)) -> Nil\napp/main.u_20 : () <- (S20(A)) -> Nil\napp/main.u_21 : () <- (S21(A)) -> Nil\napp/main.u_22 : () <- (S22(A)) -> Nil\napp/main.u_23 : () <- (S23(A)) -> Nil\napp/main.u_24 : () <- (S24(A)) -> Nil\napp/main.u_25 : () <- (S25(A)) -> Nil\napp/main.u_26 : () <- (S26(A)) -> Nil\napp/main.u_27 : () <- (S27(A)) -> Nil\napp/main.u_28 : () <- (S28(A)) -> Nil\napp/main.u_29 : () <- (S29(A)) -> Nil\napp/main.u_30 : () <- (S30(A)) -> Nil\napp/main.u_31 : () <- (S31(A)) -> Nil\napp/main.wide : () <- (S0(A), S1(B), S10(C), S11(D), S12(F), S13(G), S14(H), S15(I), S16(J), S17(K), S18(L), S19(M), S2(O), S20(P), S21(Q), S22(R), S23(S), S24(T), S25(U), S26(V), S27(W), S28(X), S29(Y), S3(Z), S30(A2), S31(B2), S4(C2), S5(D2), S6(F2), S7(G2), S8(H2), S9(I2)) -> Nil\n",
       "stderr": "src/main.i:65:1: warning[W0504]: top-level binding `wide` is not used\n"
     },
     "test0": {

@@ -66,6 +66,7 @@ const DECLARED: &[&str] = &[
     "$ensure_reenter",
     "$final_reenter",
     "$boundary_reenter",
+    "$light_reenter",
     "$cancel_reenter",
     "$control_unpend",
     "$keep_call",
@@ -109,6 +110,8 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         dispatch: BTreeSet::new(),
         call_locals: BTreeSet::new(),
         blocks: 0,
+        lights: 0,
+        lazy_calls: BTreeSet::new(),
     };
     e.arities.insert(0);
     e.arities.insert(1);
@@ -253,6 +256,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     ));
     m.push_str(SUPPORT);
     m.push_str(control::EFFECTS);
+    for &n in &e.lazy_calls {
+        m.push_str(&control::lazy_call(n, &ShapeId::from(n).to_string()));
+    }
     m.push_str(&host::effects());
     m.push_str(ENTRY);
     if uses_workers {
@@ -290,11 +296,36 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     }
     for &f in &p.constants {
         let n = p.funcs[f.0 as usize].arity();
+        // The function that makes a lazily provided value keeps the code
+        // of its fields in its captures, which it does not read
+        // (`$lazy_call{n}`).
+        let captures = match p.lazy_fields.get(&f) {
+            Some(fields) => {
+                let parts: String = fields
+                    .iter()
+                    .map(|field| match field {
+                        Some(g) => format!(
+                            " {}",
+                            closure(
+                                p.funcs[g.0 as usize].arity(),
+                                p.func_shape(*g),
+                                *g,
+                                "(ref.null $values)",
+                                false
+                            )
+                        ),
+                        None => " (ref.null eq)".to_string(),
+                    })
+                    .collect();
+                format!("(array.new_fixed $values {}{parts})", fields.len())
+            }
+            None => "(ref.null $values)".to_string(),
+        };
         let _ = writeln!(
             m,
             "(global $c{} (ref $clo{n}) {})",
             f.0,
-            closure(n, p.func_shape(f), f, "(ref.null $values)", false)
+            closure(n, p.func_shape(f), f, &captures, false)
         );
     }
     m.push_str(&e.out);
@@ -406,6 +437,11 @@ struct Emitter<'p> {
     call_locals: BTreeSet<u32>,
     /// A counter for the labels of the blocks of closure calls.
     blocks: u32,
+    /// The number of light boundaries emitted, for their labels.
+    lights: u32,
+    /// The arities of the `Callee::Lazy` calls, each with its
+    /// `$lazy_call{n}`.
+    lazy_calls: BTreeSet<u32>,
 }
 
 impl<'p> Emitter<'p> {
@@ -825,11 +861,13 @@ impl<'p> Emitter<'p> {
                 env,
                 service,
                 value,
+                in_place,
             } => {
                 let v = self.atom(value);
+                let f = if *in_place { "$env_set" } else { "$env_with" };
                 let _ = writeln!(
                     out,
-                    "(local.set $l{dst} (call $env_with {} (i32.const {service}) {v}))",
+                    "(local.set $l{dst} (call {f} {} (i32.const {service}) {v}))",
                     env_text(*env)
                 );
             }
@@ -900,6 +938,13 @@ impl<'p> Emitter<'p> {
         let call = match callee {
             Callee::Direct(f) | Callee::Known { func: f, .. } => {
                 format!("({prefix}call $f{} {closure} {env}{raw_args})", f.0)
+            }
+            Callee::Lazy { service, field } => {
+                self.arities.insert(n + 1);
+                self.lazy_calls.insert(n);
+                self.dispatch.insert(n);
+                let s = self.atom(service);
+                format!("({prefix}call $lazy_call{n} {s} (i32.const {field}) {env}{raw_args})")
             }
             Callee::Value(a) | Callee::Shaped(a, _) => {
                 let shape = callee.shape(n);
@@ -1296,9 +1341,15 @@ impl<'p> Emitter<'p> {
             Op::Ensure => format!("(call $resource_ensure {a} {b} {env})"),
             Op::Boundary => format!("(call $control_boundary {a} {env})"),
             Op::Suspend => format!("(call $control_suspend {a} {b})"),
+            // The throw is in the frame of the caller, so that it unwinds
+            // one frame less.
+            Op::Escape => format!("(throw $error (call $escape_payload {a} {b}))"),
             Op::Resume => format!("(call $control_resume {a} {b} {env})"),
             Op::Cancel => format!("(call $control_cancel {a} {env})"),
-            Op::KeepEnv => format!("(call $control_keep_env {a} {env})"),
+            Op::KeepEnv => format!(
+                "(call $control_keep_env {a} {env} (i32.const {}))",
+                self.p.services.max(1)
+            ),
             Op::WaitRequests => format!("(call $request_wait_any {a} {env})"),
             Op::PollRequests => {
                 if self.p.target == Target::Wasi {
@@ -1363,11 +1414,50 @@ impl<'p> Emitter<'p> {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, "(local.get $env)")
             }
+            Value::OpEnv(
+                Op::Runtime {
+                    name: "light_new", ..
+                },
+                _,
+                env,
+            ) => format!(
+                "(call $light_new {} (i32.const {}))",
+                env_text(*env),
+                self.p.services.max(1)
+            ),
             Value::OpEnv(op, args, env) => {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, &env_text(*env))
             }
-            Value::Service(env, id) => {
+            Value::Light { func, args, env } => {
+                // The body runs in a handler that takes an escape to this
+                // boundary (`$light_unwind`), and makes a capture that goes
+                // through it a record of the boundary (`$light_captured`).
+                // An error or a cancel that is not for it goes on.
+                let n = self.lights;
+                self.lights += 1;
+                // The boundary is the environment of the body.
+                let _ = env;
+                let b = self.atom(&args[0]);
+                let callee = Callee::Direct(*func);
+                let mut call =
+                    self.call(&callee, args, false, &format!("(ref.cast (ref $env) {b})"));
+                if self.float_call(&callee) {
+                    call = numeric::box_float(&call);
+                }
+                format!(
+                    "(block $lt{n} (result eqref)\n\
+                     (block $lc{n} (result (ref $cap) exnref)\n\
+                     (block $lu{n} (result eqref exnref)\n\
+                     (br $lt{n} (call $light_done {b}\n\
+                     (try_table (result eqref) (catch_ref $error $lu{n}) (catch_ref $cancel $lu{n})\n\
+                     (catch_ref $capture $lc{n})\n\
+                     {call}))))\n\
+                     (br $lt{n} (call $light_unwind {b})))\n\
+                     (call $light_captured {b}) (unreachable))"
+                )
+            }
+            Value::ServiceRaw(env, id) => {
                 format!("(array.get $env {} (i32.const {id}))", env_text(*env))
             }
             Value::Multi(groups) => {
@@ -1385,6 +1475,14 @@ impl<'p> Emitter<'p> {
                      (i64.const 0) (array.new_fixed $shapes {k}{shapes}))",
                     k = groups.len()
                 )
+            }
+            Value::Service(env, id) => {
+                let read = format!("(array.get $env {} (i32.const {id}))", env_text(*env));
+                if self.p.lazy_services.contains(id) {
+                    format!("(call $service_force {read} {})", env_text(*env))
+                } else {
+                    read
+                }
             }
             Value::Closure {
                 func,
@@ -1853,6 +1951,7 @@ impl<'p> Emitter<'p> {
                 )
             }
             Callee::Value(_) | Callee::Shaped(..) => self.call_dispatched(callee, &converted, env),
+            Callee::Lazy { .. } => unreachable!("an export calls a function"),
         };
         if abi.errors.is_empty() {
             let (types, out) = abi_out(abi.result, &call);
@@ -2249,7 +2348,7 @@ mod deep_emit_tests {
     fn nested_conditions_and_blocks_emit_on_a_small_stack() {
         std::thread::Builder::new().stack_size(256 * 1024).spawn(|| {
             let program = Program::default();
-            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, dispatch:BTreeSet::new(), call_locals:BTreeSet::new(), blocks:0, self_loop:None, pending:Vec::new(), deferring:false, carry:false, joins:HashMap::new(), split:Default::default(), mismatch:Default::default(), dead:false, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new() };
+            let mut emitter = Emitter { p:&program, metered:false, numeric_enabled:false, numeric_plan:numeric::Plan::default(), worker:None, dispatch:BTreeSet::new(), call_locals:BTreeSet::new(), blocks:0, self_loop:None, pending:Vec::new(), deferring:false, carry:false, joins:HashMap::new(), split:Default::default(), mismatch:Default::default(), dead:false, arities:BTreeSet::new(), ctors:BTreeSet::new(), strings:HashMap::new(), data:String::new(), out:String::new(), lights:0, lazy_calls:BTreeSet::new() };
             let leaf = Cond::I32(1);
             let combined = Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::Or(Box::new(Cond::I32(2)),Box::new(Cond::I32(3)))));
             assert_eq!(emitter.cond(&combined), "(if (result i32) (local.get $l1) (then (if (result i32) (local.get $l2) (then (i32.const 1)) (else (local.get $l3)))) (else (i32.const 0)))");

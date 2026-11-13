@@ -7,14 +7,15 @@ use = <N>() <- (s: S(N)) {
 }
 run = <A, N>(body: () <- N -> A) { body() }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), S(N)) -> Int = () <- (s: S(N)) -> Int {
 	S(f) = s
 	f()
 }
 
 main = () {
+	_syn3_0: S(Dep) = S(() { get() })
 	{
 		bad()
 		Nil
-	} <- (S(() { get() }))
+	} <- (_syn3_0)
 }

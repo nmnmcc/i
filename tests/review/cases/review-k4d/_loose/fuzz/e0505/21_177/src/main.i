@@ -20,14 +20,16 @@ h1 = () { usa() }
 
 main = () {
 	w = () { ut() + run(() { us() }) <- (Dep(v = 1)) }
+	_syn3_0: T(Dep) = T(f = () { get() }, m = (_: Dep) { Nil })
+	_syn3_1: S(Dep | T(Dep)) = S(
+		f = () { ut() + get() },
+		m = (_: Dep | T(Dep)) { Nil },
+	)
 	{
 		l = () { run(() { us() + usa() }) }
 		h0() + l() + ut() + h1() + w()
 		Nil
-	} <- (
-		T(f = () { get() }, m = (_: Dep) { Nil }),
-		S(f = () { ut() + get() }, m = (_: Dep | T(Dep)) { Nil }),
-	)
+	} <- (_syn3_0, _syn3_1)
 }
 // src/main.i:21:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `Dep`, which must be given before it gets to the entry point
 // src/main.i:22:3: error[E0505]: this type has itself inside it, through a type variable (§4.7)

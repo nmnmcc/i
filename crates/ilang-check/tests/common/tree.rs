@@ -10,9 +10,7 @@
 
 /// The tree before syntax three.
 pub mod old {
-    use ilang_syntax::ast::{
-        Expr, ExprKind, Ident, ItemKind, Module, PatternKind, Stmt, TypeExpr,
-    };
+    use ilang_syntax::ast::{Expr, ExprKind, Ident, ItemKind, Module, PatternKind, Stmt, TypeExpr};
     use ilang_syntax::span::Span;
 
     /// The statements of the function that the binding `item` gives.

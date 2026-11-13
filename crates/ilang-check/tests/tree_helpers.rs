@@ -71,7 +71,10 @@ fn the_last_expression_is_the_same_statement() {
         *new::last_expression(&mut a, item) = expr.clone();
         *old::last_expression(&mut b, item) = lowered.clone();
         same(&a, &b);
-        assert_eq!(new::statements(&mut a, item).len(), old::statements(&mut b, item).len());
+        assert_eq!(
+            new::statements(&mut a, item).len(),
+            old::statements(&mut b, item).len()
+        );
     }
 }
 

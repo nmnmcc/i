@@ -3,7 +3,7 @@ use = <N>() <- (s: S(N)) {
 	S(f, _) = s
 	f()
 }
-bad = <N>() -> Nil {
+bad: <N>() <- (Fail(Never), ..N) -> Nil = () -> Nil {
 	f: () <- (S(N), ..N) -> Nil = () { use() }
 	f()
 }

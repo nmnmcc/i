@@ -7,16 +7,14 @@ Dep = (value = Int)
 get = () <- (d: Dep) { d.value }
 make = (n: Int) {
 	() {
-		use() <- (
-			Dep(value = n),
-			S(
-				() {
-					get()
-					Nil
-				},
-				(_: Dep) { Nil },
-			),
+		_syn3_0: S(Dep) = S(
+			() {
+				get()
+				Nil
+			},
+			(_: Dep) { Nil },
 		)
+		use() <- (Dep(value = n), _syn3_0)
 	}
 }
 example = () {

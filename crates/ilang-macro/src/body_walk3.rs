@@ -337,6 +337,11 @@ impl<H: Hook> Walker<'_, H> {
         let mut seen = HashSet::new();
         for f in fs.iter() {
             for service in f.services.iter().flatten() {
+                // A direct Fail(E) service pattern supplies the error channel;
+                // the transition does not create a local for its written name.
+                if !service.rest && is_fail_need(&service.ty) {
+                    continue;
+                }
                 if seen.insert(service.name.name.as_str()) {
                     self.locals.push(local(&service.name));
                 }
@@ -357,7 +362,13 @@ impl<H: Hook> Walker<'_, H> {
                 binders(pattern, &mut bindings);
             }
         }
-        bindings.extend(f.services.iter().flatten().map(|s| local(&s.name)));
+        bindings.extend(
+            f.services
+                .iter()
+                .flatten()
+                .filter(|s| s.rest || !is_fail_need(&s.ty))
+                .map(|s| local(&s.name)),
+        );
         for param in &mut f.params {
             for pattern in &mut param.choices {
                 self.pattern(pattern, depth)?;
@@ -606,10 +617,7 @@ pub fn for_each_binder<'a>(pattern: &'a Pattern, mut visit: impl FnMut(&'a str, 
                                 .iter()
                                 .rev()
                                 .filter(|p| {
-                                    !matches!(
-                                        p.kind,
-                                        PatternKind::Var(_) | PatternKind::Discard(_)
-                                    )
+                                    !matches!(p.kind, PatternKind::Var(_) | PatternKind::Discard(_))
                                 })
                                 .map(Task::Pattern),
                         );

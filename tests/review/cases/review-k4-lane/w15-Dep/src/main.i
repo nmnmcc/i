@@ -9,7 +9,10 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-wrap = <N>(svc: S(N)) { use() <- (svc) }
+wrap = <N>(svc: S(N)) {
+	_syn3_0: S(N) = svc
+	use() <- (_syn3_0)
+}
 
 main = () {
 	assert(wrap(S(f = () { get() }, m = (_: Dep) { Nil })) == 7) <- (

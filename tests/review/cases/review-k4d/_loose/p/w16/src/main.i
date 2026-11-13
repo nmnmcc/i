@@ -3,4 +3,7 @@ use = <N>() <- (s: S(N)) {
 	S(f = f, ..) = s
 	f()
 }
-wrap = (svc) { use() <- (svc) }
+wrap = (svc) {
+	_syn3_0: S(_) = svc
+	use() <- (_syn3_0)
+}

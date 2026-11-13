@@ -1172,3 +1172,79 @@ fn nested_calls_break() {
     assert_eq!(fmt(lit), lit);
     assert_eq!(syn3::call_depth(&value("x = f(g(h(1)))")), 3);
 }
+
+#[test]
+fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
+    // §4.3 aliases keep nominal identity. The transition syntax reserves
+    // bare Fail(E) for ^ E; an ordinary ! Fail(E) remains a service.
+    let text = converted("Use(E) = () -> Nil ! Fail(E)\n");
+    let (lowered, diags) = syn3::parse_lowered(&text);
+    assert!(diags.is_empty(), "{text}\n{diags:#?}");
+    let shown = ilang_syntax::print::print_module(&lowered);
+    assert!(shown.contains("! Syn3ServiceFail(E)"), "{shown}");
+    assert!(!shown.contains("^ E"), "{shown}");
+    let collision = converted("T { Syn3ServiceFail }\nUse(E) = () -> Nil ! Fail(E)\n");
+    assert!(collision.contains("Syn3ServiceFailX(E)"), "{collision}");
+    let row = converted(
+        "wrap(A, E, N) = (body: () -> A ! Fail(E) | N, cap: Fail(E)) -> A ! N { ! Fail(E) = cap body() }\n",
+    );
+    let (lowered, diags) = syn3::parse_lowered(&row);
+    assert!(diags.is_empty(), "{row}\n{diags:#?}");
+    let shown = ilang_syntax::print::print_module(&lowered);
+    let carrier: String = ['N', '%', 'E'].into_iter().collect();
+    assert!(!shown.contains(carrier.as_str()), "{shown}");
+
+    let row = converted(
+        "wrap(E, N) = (body: () -> Nil ^ E ! Fail(Int) | N, cap: Fail(Int)) -> Nil ^ E ! N { ! Fail(Int) = cap body() }\n",
+    );
+    let (lowered, diags) = syn3::parse_lowered(&row);
+    assert!(diags.is_empty(), "{row}\n{diags:#?}");
+    let shown = ilang_syntax::print::print_module(&lowered);
+    assert!(shown.contains(carrier.as_str()), "{shown}");
+}
+
+#[test]
+fn converted_bound_fail_remains_a_service_parameter() {
+    let text = converted("use(E) = (error: E, handler ! Fail(E)) { handler.raise(error) }\n");
+    let (module, diags) = syn3::parse_lowered(&text);
+    assert!(diags.is_empty(), "{text}\n{diags:#?}");
+    let function = module
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            ilang_syntax::ast::ItemKind::Binding(binding) => match &binding.value.kind {
+                ilang_syntax::ast::ExprKind::Fn(function) => Some(function),
+                _ => None,
+            },
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        function.params.iter().any(|param| matches!(param,
+            ilang_syntax::ast::Param::Env { name, .. } if name.name == "handler"
+        )),
+        "the body still has its bound service: {text}"
+    );
+}
+
+#[test]
+fn specialized_alias_keeps_the_constructors_type_parameter_scope() {
+    let (module, diags) = syn3::parse_lowered("S(N) = (() <- N -> Nil)\nBad = S(Never)\n");
+    assert!(diags.is_empty(), "{diags:#?}");
+    let definitions: Vec<_> = module
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            ilang_syntax::ast::ItemKind::TypeDef(def) => Some(def),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(definitions.len(), 2);
+    assert_eq!(definitions[0].name.name, "S");
+    assert_eq!(definitions[0].params[0].name, "N");
+    assert_eq!(definitions[1].name.name, "Bad");
+    assert!(matches!(
+        definitions[1].body,
+        ilang_syntax::ast::TypeBody::Alias(_)
+    ));
+}

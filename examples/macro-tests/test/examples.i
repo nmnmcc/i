@@ -44,9 +44,9 @@ suite("block services", () {
 
 suite("nested override", () {
 	{
-		suite("inner", () {
-			test("service", () { assert(read() == 84) })
-		}) <- (SuiteService(value = 84))
+		suite("inner", () { test("service", () { assert(read() == 84) }) }) <- (
+			SuiteService(value = 84),
+		)
 		test("outer", () { assert(read() == 42) })
 	} <- (SuiteService(value = 42))
 })

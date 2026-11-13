@@ -255,7 +255,10 @@ mod tests {
             (Ok(a), Ok(b)) => {
                 assert_eq!(a.len(), b.len(), "{source}");
                 for (a, b) in a.iter().zip(b) {
-                    assert_eq!((a.item, &a.name, a.signature), (b.item, &b.name, b.signature));
+                    assert_eq!(
+                        (a.item, &a.name, a.signature),
+                        (b.item, &b.name, b.signature)
+                    );
                     assert_eq!(a.parameters.len(), b.parameters.len(), "{source}");
                     if !b.parameters.iter().any(|p| p.starts_with('%')) {
                         assert_eq!(a.parameters, b.parameters, "{source}");

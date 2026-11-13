@@ -502,3 +502,137 @@ commands, earlier explained failures and retries are in
 The initial queued std wrapper was cancelled by its own PID before starting,
 so the spec and boundary checks could run first; std then ran last through
 the wrapper. Step 3 is next; no deletion is authorized before its green gate.
+
+### Night continuation, 21:43–02:00
+
+The coordinator extends the deadline to 02:00 and authorizes steps 3 and 4
+with the expanded gate: workspace check; syntax/macro/check/LSP tests
+(skip only `spec_corpus_reverse_order_and_recovery`); CLI macro_run,
+typed_macros, fmt, lisp, check, commands, macro_budget; macro examples;
+std O0/O2; spec filters 6/, 7/, 9/, 15.7/; source/Rust fmt and clippy.
+Targets are step 3 by 23:30 and deletion by 00:30. The committed green base
+is still `6bc71b71e`. The former red faD merge was saved completely under
+`target/fa-night/` before deliberately aborting it to integrate conv first.
+
+Conv integration is through `424361875` (including tonight main's lazy-call
+shape dispatcher). The specialized-alias member check is combined with
+2d's recorded fragment metadata. Generated `Syn3ServiceFail` has ordinary
+formal parameters, not an alias-pattern head. Correct labelled SyntaxError
+fixtures are retained; two function-body quote patterns again capture the
+single expression directly, as the §6.8 builder emits it. All escape and
+rebuild assertions remain. The prior curly wrapper made the escape fixture
+miss its target and take the fallback branch.
+
+The broader CLI check gate reported E0505 in the captured-service-row
+regression, which was outside the earlier 2d gate. Initial probes compared
+unsupplied/supplied rows, alpha-renaming and a finite annotation. A tentative
+local solver normalization made it pass, but that change was deliberately
+removed after conv's `d67bcf7e1` identified the actual migration defect:
+the original program wrote `! S(Dependency) = ...`; its conversion had
+lost that provider annotation. The repair restores it through a typed local
+before providing the value, and retains every type, missing-service and
+O0/O2 runtime assertion. A legacy-to-native lowering comparison pins the
+original written contract. Spec §4.7: “Annotations are used in inference,
+and the inferred type must agree with them. A type variable in an annotation
+may become a more exact type.” Spec §9.2: “A provided value of type `P`
+satisfies the need entry `S` when `P <: S` (§4.5 rule 4).” No solver change
+remains. The entire expanded gate is restarted on this restored snapshot.
+
+The native resolver and fa2 query/shared-value integration are drafted
+outside production under `target/fa-night/draft`. Missing stages 9/10 forms
+are handled by grouping native chains into canonical hidden or inline
+functions, native selection tables, ordered calls and general parameter
+data. Native quote captures replace the obsolete old-row compatibility
+reader. Written/standalone facts and validation are being moved into a
+pure syntax-three prepass, so compiler parse and macro-result readers will
+no longer build an old tree. The differential retains all comparisons and
+adds group, alias, recursion, parameter-data and directed-row cases.
+
+Conv's status reports a separate unresolved guarded-corpus observation:
+`review-k4d/{_loose/p,proj}/p1` accepts instead of its batch2 E0515.
+That audit is the coordinator's; its expectation has not been changed here.
+No result for it is claimed by this lane's requested-gate checks.
+
+22:47 checkpoint: the full Rust gate passes 683 tests (four existing
+ignored, the one requested recovery-corpus skip), CLI passes all 144,
+and macro examples pass 13 with the existing skip. Std O0 passes 2170,
+including `std/schema_test.null_round`; this is the baseline before the
+fa2 final-reader switch. Std O2 is queued since 22:36. The wrapper takes
+both memory slots for O2, so no second heavy command is started.
+
+The pending conversion parent advances to `7e1b73741` after incorporating
+the full descendant delta: review fixtures/docs and the native-test
+executable-busy retry helper. No production compiler, runtime, lib, std,
+examples or spec input changed in that delta. Final all-target check and
+clippy will compile the added helper. No global wrapper policy changed.
+
+23:05 checkpoint: pending conv now includes `dfcf0ed83`, review observations
+and documentation only since `7e1b73741`. Independently checked unchanged
+phase exits, diagnostic-code sets and runtime stdout; recorded type displays
+follow current main. No production inputs changed. Std O2 remains queued
+since 22:36, holding m1 and waiting for m2 held by the conversion corpus.
+No second heavy command was started and no shared lock policy was changed.
+
+The old extra differential's first substantive difference is the missing
+keyed function-group binding in `l0.is`; subsequent module local-ID offsets
+cascade from it. The native draft includes that later stage-9/10 form,
+canonical key order, selection tables and general parameter data, rather
+than normalizing IDs or weakening comparisons. The incomplete query branch
+is replaced by the final native metadata index with an old/native oracle.
+All 35 draft Rust files parse under rustfmt; compilation and behavioral
+verification remain pending until the conversion gate releases the slot.
+
+23:25 checkpoint: temporary native preview passed workspace all-target
+check, all 677 files and 519 program comparisons of the resolver
+(628/628 repository `.i` coverage), prepared quotes and the 20,000-level
+deep tree. It extends missing stage-9/10 grouping and table dispatch,
+function parameter data, written branch result unions and Fail error
+channels. A separate genuine discrepancy gave synthetic `%arg` parameters
+labels; native resolution now follows the old resolver's unlabelled rule.
+No HIR/diagnostic comparisons or expectations were relaxed. Query initially
+passed 23/24; combining fa2's early pun relocation with main's late splitting
+retained a spurious label-binder flag. Retaining main's binder/reference
+handling gives 24/24 query tests and 68 checker unit tests (four existing
+ignored). The corrected 35-file draft is saved outside production.
+
+The exact conversion source snapshot was restored by recorded SHA256,
+index tree and merge parent, then latest conv `31ecae801` was incorporated,
+including the provider-contract fixture repair. The earlier O2 wrapper was
+cancelled at 23:16 after 39 minutes queued; it had no `i` child and had not
+started a test. Only this lane's wrapper, flock waiter and scheduler were
+stopped by PID. No other process or shared policy was changed. The full
+conversion gate is now rerunning, with O2 last so its memory-slot wait does
+not hide other gate results. Step 3 remains uncommitted until its own full
+gate, and deletion remains gated on it.
+
+23:54 checkpoint: the restored full Rust gate found one target red:
+`ilang-macro --test body_walk3`, whose repository differential first failed
+at `review-k4-lane/q25`: the native walker exposed the written name of a
+direct `Fail(E)` service pattern, while the current lowerer creates its
+error channel and no local binder. The native walker now preserves that
+scope in both plain and wrapped functions; ordinary service aliases keep
+their binders. Three differential snippets pin both paths. All 19 walker
+tests, including the unchanged whole-repository comparison, pass. The full
+macro and LSP packages pass again; syntax/check package code and dependencies
+are unchanged from their successful targets in the full run. The second
+CLI pass is 144/144 and macro examples pass 13 with the existing skip.
+Std O0 is running without failures. Workspace check passes on the repair;
+remaining std/spec/fmt/clippy gates still precede the conversion commit.
+
+00:24 GREEN conversion checkpoint through `31ecae801`: workspace all-target
+check; the syntax/check targets of the full Rust run and repaired full
+macro/LSP packages (683 tests collectively, four existing ignores and the
+requested reverse/recovery-corpus skip); specified CLI 144; examples 13 with
+one existing skip; std O0/O2 each 2170; spec 6/80, 7/104, 9/139, 15.7/28
+at both levels; Rust/source fmt and workspace all-target clippy -D warnings.
+Formatting changed eight Rust files and one macro-example layout; a needless
+Rust borrow and equivalent nested-if lint were fixed without changing any
+assertion. The macro example was rerun after formatting. `schema.null_round`
+passes at both levels. Exact commands/results are under `target/fa-night`.
+
+This checkpoint intentionally freezes the tested conversion parent. Newer
+conversion work (provider-contract rejoining before generalization, p1
+E0515 regressions and converted corpus repairs) arrived during this gate.
+It is next, together with the native resolver switch; it is not claimed by
+this checkpoint. The old solver experiment remains discarded. No deletion
+has started, and the updated native provider-plan draft is not yet compiled.

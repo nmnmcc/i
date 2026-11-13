@@ -470,11 +470,25 @@ impl TypedMacroQuery {
                 .into_iter()
                 .zip(parts)
                 .map(|(label, t)| match label {
-                    Some(name) => form(if new_rows { "=" } else { ":" }, vec![atom(if new_rows { DatumKind::Name(name) } else { DatumKind::String(name) }), self.syntax_rows(s, t, scope, new_rows)]),
+                    Some(name) => form(
+                        if new_rows { "=" } else { ":" },
+                        vec![
+                            atom(if new_rows {
+                                DatumKind::Name(name)
+                            } else {
+                                DatumKind::String(name)
+                            }),
+                            self.syntax_rows(s, t, scope, new_rows),
+                        ],
+                    ),
                     None => self.syntax_rows(s, t, scope, new_rows),
                 })
                 .collect();
-            return if new_rows { form(",", fields) } else { round(fields) };
+            return if new_rows {
+                form(",", fields)
+            } else {
+                round(fields)
+            };
         }
         match t {
             Ty::Top | Ty::Both(..) => {
@@ -610,7 +624,10 @@ impl TypedMacroQuery {
                     .map(|(i, t)| {
                         let t = self.syntax_rows(s, t, scope, new_rows);
                         if let Some(l) = f.label(i) {
-                            form(if new_rows { "=" } else { ":" }, vec![atom(DatumKind::Name(l)), t])
+                            form(
+                                if new_rows { "=" } else { ":" },
+                                vec![atom(DatumKind::Name(l)), t],
+                            )
                         } else {
                             t
                         }
@@ -1048,7 +1065,15 @@ mod tests {
         (old, new)
     }
     fn function(params: Vec<(Option<&str>, Ty)>, ret: Ty, err: Ty, env: Ty) -> Ty {
-        Ty::Fn(Box::new(FnTy::new(params.into_iter().map(|(label,t)| (label.map(Into::into),t)).collect(), ret, err, env)))
+        Ty::Fn(Box::new(FnTy::new(
+            params
+                .into_iter()
+                .map(|(label, t)| (label.map(Into::into), t))
+                .collect(),
+            ret,
+            err,
+            env,
+        )))
     }
     fn builtin(b: BuiltinType) -> Ty {
         Ty::named(TypeRef::Builtin(b), Vec::new())

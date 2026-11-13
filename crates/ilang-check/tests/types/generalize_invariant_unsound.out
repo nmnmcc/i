@@ -3,6 +3,6 @@ unsound : () -> Nil
 wrong_cell : (Cell(Int)) -> Cell(Never)
 run_never : (() <- (Sink(Never)) -> Nil) -> Nil
 bad_computation : () -> Nil
-8:32: error[E0501]: `Int` is not a subtype of `Never` (the type at 8:32 needs it)
-13:46: error[E0501]: `Int` is not a subtype of `Never` (the type at 13:32 needs it)
-18:34: error[E0515]: `Int` and `Never` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 18:24 needs it)
+10:18: error[E0515]: `Sink(Int)` and `Sink(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)
+16:46: error[E0501]: `Int` is not a subtype of `Never` (the type at 16:32 needs it)
+21:34: error[E0515]: `Sink(Int)` and `Sink(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 21:24 needs it)

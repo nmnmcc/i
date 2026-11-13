@@ -2,8 +2,14 @@ State(A) = (get = () -> A)
 read = <A>() <- (s: State(A)) { s.get() }
 outer = () {
 	inner = () { read() }
-	fa = () { inner() + 1 <- (State(get = () { 1 })) }
-	fb = () { inner() <> "y" <- (State(get = () { "x" })) }
+	fa = () {
+		_syn3_0: State(Int) = State(get = () { 1 })
+		inner() + 1 <- (_syn3_0)
+	}
+	fb = () {
+		_syn3_1: State(String) = State(get = () { "x" })
+		inner() <> "y" <- (_syn3_1)
+	}
 	(fa(), fb())
 }
 

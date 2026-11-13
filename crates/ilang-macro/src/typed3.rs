@@ -7,8 +7,8 @@
 //! a deep stack when the tree can hold the result of a macro.
 use ilang_syntax::span::Span;
 use ilang_syntax::syn3::ast::{
-    Binding, Block, DItem, DPItem, Expr, ExprKind, Format, Function, Ident, Item, ItemKind,
-    Module, Pattern, PatternKind, Stmt, TItem, Type, TypeKind,
+    Binding, Block, DItem, DPItem, Expr, ExprKind, Format, Function, Ident, Item, ItemKind, Module,
+    Pattern, PatternKind, Stmt, TItem, Type, TypeKind,
 };
 use ilang_syntax::syn3::walk::{self, Visitor};
 use std::collections::HashMap;
@@ -323,7 +323,9 @@ mod tests {
         let e = expression(source);
         let mut spans = Vec::new();
         for_each_span(&e, |span| spans.push(span));
-        for part in ["a", "b", "Int", "s", "S", "C(k = a)", "k", "m", "f", "lab", "b.x", "x"] {
+        for part in [
+            "a", "b", "Int", "s", "S", "C(k = a)", "k", "m", "f", "lab", "b.x", "x",
+        ] {
             assert!(spans.contains(&span_of(source, part)), "{part}");
         }
         let by_span = expressions(&e);
