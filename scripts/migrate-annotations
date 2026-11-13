@@ -68,6 +68,11 @@ def inventory():
                         and isinstance(n.value, str) and hasattr(n, 'end_lineno')]
             kind = 'python'
         for start, end, source in literals:
+            try:
+                source.encode('utf-8')
+            except UnicodeEncodeError:
+                # JS tests with lone UTF-16 surrogates are not UTF-8 i source.
+                continue
             # JoinedStr constants share their whole f-string's source span;
             # they are templates, not independently replaceable literals.
             if kind == 'python' and host[start:end].lstrip().lower().startswith(('f\"', "f'", 'rf\"', "rf'", 'fr\"', "fr'")):
@@ -84,13 +89,13 @@ def prepared(item):
     source = entry.get('prefix', '') + item['source'] + entry.get('suffix', '')
     for old, new in entry.get('substitutions', []):
         source = source.replace(old, new)
-    return dict(source=source, lisp=item['lisp'], mode=item.get('result', {}).get('mode', 'auto'))
+    return dict(source=source, lisp=item['lisp'], mode=item.get('result', {}).get('mode', 'module' if item['kind'] == 'file' else 'auto'))
 
 
 def parse(items, binary):
     data = ''.join(json.dumps(prepared(item), ensure_ascii=False) + '\n' for item in items)
     result = subprocess.run([str(binary)], input=data, text=True, stdout=subprocess.PIPE, check=True)
-    return [json.loads(line) for line in result.stdout.splitlines()]
+    return [json.loads(line) for line in result.stdout.split('\n') if line]
 
 
 def read(path):

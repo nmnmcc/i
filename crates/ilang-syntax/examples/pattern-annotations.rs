@@ -46,7 +46,10 @@ fn main() {
         let request: serde_json::Value = serde_json::from_str(&line.unwrap()).unwrap();
         let source = request["source"].as_str().unwrap();
         let lisp = request["lisp"].as_bool().unwrap_or(false);
-        let mut annotations = Annotations { source, edits: Vec::new() };
+        let mut annotations = Annotations {
+            source,
+            edits: Vec::new(),
+        };
         let mode = request["mode"].as_str().unwrap_or("auto");
         let (mut module, mut diagnostics) = if lisp {
             syn3::lisp::from_lisp(source)

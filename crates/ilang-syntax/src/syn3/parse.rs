@@ -519,7 +519,7 @@ impl Parser<'_> {
                 None if matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon => {
                     let name = self.name()?;
                     self.bump();
-                    let ty = self.ty()?;
+                    let ty = self.annot()?;
                     ItemKind::Decl { name, ty }
                 }
                 None => {
@@ -1223,7 +1223,7 @@ impl Parser<'_> {
                 } else if !segment && self.eat(&T::Colon) {
                     PatternKind::Typed {
                         binder,
-                        ty: self.ty()?,
+                        ty: self.annot()?,
                     }
                 } else if binder.discard {
                     PatternKind::Discard(binder.name)
@@ -1385,15 +1385,21 @@ impl Parser<'_> {
     // ---- Types ----
 
     fn ty(&mut self) -> PResult<Type> {
-        self.type_list(T::Pipe, Self::type_inter, TypeKind::Union)
+        self.type_list(T::Pipe, Self::type_inter::<false>, TypeKind::Union)
     }
 
-    fn type_inter(&mut self) -> PResult<Type> {
-        self.type_list(T::Amp, Self::type_diff, TypeKind::Inter)
+    /// The one precedence rule after every type colon. Bracket contents
+    /// use `ty`; unbracketed function results keep this boundary.
+    fn annot(&mut self) -> PResult<Type> {
+        self.type_inter::<true>()
     }
 
-    fn type_diff(&mut self) -> PResult<Type> {
-        self.type_list(T::Minus, Self::type_prim, TypeKind::Diff)
+    fn type_inter<const ANNOT: bool>(&mut self) -> PResult<Type> {
+        self.type_list(T::Amp, Self::type_diff::<ANNOT>, TypeKind::Inter)
+    }
+
+    fn type_diff<const ANNOT: bool>(&mut self) -> PResult<Type> {
+        self.type_list(T::Minus, Self::type_prim::<ANNOT>, TypeKind::Diff)
     }
 
     fn type_list(
@@ -1488,14 +1494,19 @@ impl Parser<'_> {
     }
 
     /// `[ "<-" Services ] "->" Union`, after the parameter part.
-    fn fn_type(&mut self, generics: Vec<Ident>, param: Type, start: u32) -> PResult<Type> {
+    fn fn_type<const ANNOT: bool>(
+        &mut self,
+        generics: Vec<Ident>,
+        param: Type,
+        start: u32,
+    ) -> PResult<Type> {
         let services = if self.eat(&T::LArrow) {
             Some(self.needs()?)
         } else {
             None
         };
         self.expect(&T::Arrow)?;
-        let ret = self.ty()?;
+        let ret = if ANNOT { self.annot()? } else { self.ty()? };
         Ok(Type::new(
             TypeKind::Fn(Box::new(FnType {
                 generics,
@@ -1568,7 +1579,7 @@ impl Parser<'_> {
         matches!(self.kind(), T::Arrow | T::LArrow)
     }
 
-    fn type_prim(&mut self) -> PResult<Type> {
+    fn type_prim<const ANNOT: bool>(&mut self) -> PResult<Type> {
         let start = self.start();
         let kind = match self.kind().clone() {
             T::Int(n) => {
@@ -1608,13 +1619,13 @@ impl Parser<'_> {
                 if !self.at_fn_tail() {
                     return self.error("`->` or `<-`: type parameters `<A>` begin a function type");
                 }
-                return self.fn_type(generics, param, start);
+                return self.fn_type::<ANNOT>(generics, param, start);
             }
             T::LParen => {
                 let items = self.data_type()?;
                 let data = Type::new(TypeKind::Data(items), self.span_from(start));
                 if self.at_fn_tail() {
-                    return self.fn_type(Vec::new(), data, start);
+                    return self.fn_type::<ANNOT>(Vec::new(), data, start);
                 }
                 return Ok(data);
             }
@@ -1623,7 +1634,7 @@ impl Parser<'_> {
                 let inner = self.ty()?;
                 self.close_type_group()?;
                 if self.at_fn_tail() {
-                    return self.fn_type(Vec::new(), inner, start);
+                    return self.fn_type::<ANNOT>(Vec::new(), inner, start);
                 }
                 return Ok(inner);
             }
