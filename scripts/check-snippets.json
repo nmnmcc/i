@@ -2078,20 +2078,9 @@
   },
   "docs/spec.md:8cd36264ae24baa3": {
     "track": "SYN3",
-    "reason": "Mixed data awaits stage 6; providing a value not written as data and spreading a whole environment await stage E6. These examples now reach the corresponding lowering requirements.",
+    "reason": "Mixed ordinary data still awaits stage 6. E6 has landed: whole provided values and rest-environment provisions parse under syntax-3 section 2.10.8 and spec 9.4.",
     "diagnostics": [
-      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
-      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-      "E0101: providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet"
-    ]
-  },
-  "docs/spec.md:9dd6b392676320e8": {
-    "track": "SYN3",
-    "reason": "Capturing a whole environment and providing it as one value await stage E6. The syntax-three parser now reaches those lowering requirements.",
-    "diagnostics": [
-      "E0101: `..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet",
-      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet"
+      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)"
     ]
   },
   "crates/ilang-cli/examples/migrate-syntax3-labels.rs:7372e79824e15040": {
@@ -2511,10 +2500,10 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |> {\n\t\tTrue  -> x\n\t\tFalse -> spin(n - 1, { x * 75 + 74 } % 65537)\n\t}\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
-    "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
+    "reason": "Render the Rust format template using its current syntax-three SPIN constant and escaped braces; runtime identity assertions remain unchanged."
   },
   "crates/ilang-wasm/tests/multi_shape.rs:6c0e82244f1f33bc": {
     "not_source": "Wasmtime --preload command argument guest={} rendered with a Wasm file path; not i source."
@@ -2621,5 +2610,59 @@
   "crates/ilang-package/tests/load.rs:484dbf1ace20d2a2": {
     "not_source": true,
     "reason": "TOML root/dependency manifests for the entry-default fixture, not i code."
+  },
+  "crates/ilang-check/tests/rest_services.rs:cba1acee53aef38c": {
+    "substitutions": [
+      [
+        ";",
+        "\n"
+      ]
+    ],
+    "reason": "Apply the exact semicolon-to-newline replacement used by the rest-row fixture before parsing; its semantic rejection assertion remains."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:1349e21bc6e31820": {
+    "suffix": " (message = String)\n",
+    "reason": "Complete this Entry binding-name replacement fragment with the actual remaining record definition from the fixture."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:a3c551731c3dfc91": {
+    "suffix": " (message = String)\n",
+    "reason": "Complete this Entry binding-name replacement fragment with the actual remaining record definition from the fixture."
+  },
+  "crates/ilang-cli/tests/http.rs:5d670fc264ba0466": {
+    "suffix": "() { Nil }\n",
+    "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
+  },
+  "crates/ilang-cli/tests/http.rs:df75d3c57754e19a": {
+    "suffix": "() { Nil }\n",
+    "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
+  },
+  "crates/ilang-cli/tests/http.rs:ef4fa58b5b0b6bad": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{source}",
+        "(http = std/http)\n_http_test_body = () { Nil }\n"
+      ]
+    ],
+    "reason": "Render the HTTP wrapper format string with a minimal imported body; runtime HTTP tests exercise the actual assembled programs."
+  },
+  "crates/ilang-cli/tests/rest_services.rs:42887e26a0a16e0d": {
+    "not_source": true,
+    "reason": "Rust assertion diagnostic format string for an Outcome, not i code."
+  },
+  "crates/ilang-package/tests/manifest.rs:4398f7ac72f10c87": {
+    "not_source": true,
+    "reason": "TOML provider-table fragment concatenated to the package manifest in the E5 regression, not i code."
+  },
+  "crates/ilang-package/tests/manifest.rs:9132145e5e389a5e": {
+    "not_source": true,
+    "reason": "TOML provider-table fragment concatenated to the package manifest in the E5 regression, not i code."
   }
 }
