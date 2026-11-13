@@ -461,6 +461,44 @@ fn corpus() -> Vec<Case> {
             cases.push(stop(body, Value::Float(y)));
         }
     }
+    // Scalar truncate takes the i31 path only below 2^30 in magnitude, and
+    // scalar to_float only for i31 values; both edges and the runtime paths.
+    for (x, expected) in [
+        (1073741823.9_f64, "1073741823"),
+        (1073741824.0, "1073741824"),
+        (-1073741823.5, "-1073741823"),
+        (-1073741824.0, "-1073741824"),
+        (-0.0, "0"),
+        (-2.5, "-2"),
+        (1.0e20, "100000000000000000000"),
+    ] {
+        cases.push(Case {
+            body: "core.inspect(core.truncate(x *. 1.0))".into(),
+            input: Value::Float(x),
+            expected: expected.into(),
+            stop: false,
+            events: vec![],
+        });
+    }
+    for text in [
+        "1073741822",
+        "1073741823",
+        "-1073741825",
+        "9007199254740993",
+    ] {
+        let a: BigInt = text.parse().unwrap();
+        let sum = &a + BigInt::from(1);
+        let value: f64 = sum.to_string().parse().unwrap();
+        cases.push(Case {
+            body: "core.inspect(core.float_to_bits(core.to_float(x + 1)))".into(),
+            input: Value::Int(a),
+            expected: value.to_bits().to_string(),
+            stop: false,
+            events: vec![],
+        });
+    }
+    let huge: BigInt = format!("1{}", "0".repeat(400)).parse().unwrap();
+    cases.push(stop("core.to_float(x + 1)".into(), Value::Int(huge)));
     cases
 }
 

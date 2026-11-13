@@ -1249,6 +1249,19 @@ impl<'p> Emitter<'p> {
                         &numeric::float_op(*op, &args).expect("float operation"),
                     );
                 }
+                if let (Op::Runtime { name: "core_truncate", .. }, [Atom::Local(l)]) =
+                    (op, args.as_slice())
+                    && self.numeric_plan.locals.get(l) == Some(&numeric::Repr::Float)
+                {
+                    // A scalar Float below 2^30 in magnitude truncates to an
+                    // i31, the canonical small Int; only others need the box.
+                    let boxed = self.atom(&args[0]);
+                    return format!(
+                        "(if (result eqref) (f64.lt (f64.abs (local.get $numeric_f{l})) (f64.const 1073741824)) \
+                         (then (ref.i31 (i32.trunc_f64_s (local.get $numeric_f{l})))) \
+                         (else (call $core_truncate {boxed})))"
+                    );
+                }
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, "(local.get $env)")
             }
