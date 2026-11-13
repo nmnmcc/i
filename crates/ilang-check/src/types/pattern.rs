@@ -729,7 +729,6 @@ impl Checker<'_> {
                     Head::Fn => Ty::Fn(Box::new(FnTy {
                         params: args.into_iter().map(|a| (None, a)).collect(),
                         ret: self.s.fresh(),
-                        err: self.s.fresh(),
                         env: self.s.fresh(),
                     })),
                     h => Ty::Con(h, super::lits::ValueSet::ALL, args),
@@ -1289,14 +1288,14 @@ fn field_vars(p: &Program, t: &Type, out: &mut Vec<TyVarId>, depth: usize) {
         TypeKind::Fn {
             params,
             ret,
-            err,
+            err: _,
             env,
         } => {
             for pty in params {
                 field_vars(p, &pty.ty, out, depth);
             }
             field_vars(p, ret, out, depth);
-            for t in [err, env].into_iter().flatten() {
+            if let Some(t) = env {
                 field_vars(p, t, out, depth);
             }
         }

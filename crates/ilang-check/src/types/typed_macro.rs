@@ -66,7 +66,7 @@ pub(super) struct QueryState {
     pub tyvars: HashMap<TyVarId, Ty>,
     pub module: ModuleId,
     fixed: HashSet<V>,
-    effects: HashMap<Span, (Ty, Ty)>,
+    effects: HashMap<Span, Ty>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MacroTruth {
@@ -108,9 +108,7 @@ fn occurrences(s: &Solver, t: &Ty, pol: Pol, out: &mut HashMap<V, Pol>) {
             for (_, p) in &f.params {
                 occurrences(s, p, pol.flip(), out);
             }
-            for t in [&f.ret, &f.err] {
-                occurrences(s, t, pol, out);
-            }
+            occurrences(s, &f.ret, pol, out);
             occurrences_env(s, &f.env, pol, out);
         }
         Ty::Union(xs) | Ty::Inter(xs) => {
@@ -173,7 +171,7 @@ pub(super) fn reachable(s: &Solver, roots: impl IntoIterator<Item = V>) -> HashS
 fn observe(s: &Solver, t: &Ty, fixed: &HashSet<V>, parts: Option<&FnTy>) -> HashMap<V, Ty> {
     let mut ps = HashMap::new();
     if let Some(f) = parts {
-        for t in f.params.iter().map(|(_, t)| t).chain([&f.ret, &f.err]) {
+        for t in f.params.iter().map(|(_, t)| t).chain([&f.ret]) {
             occurrences(s, t, Pol::Pos, &mut ps);
         }
         occurrences_env(s, &f.env, Pol::Pos, &mut ps);
@@ -272,12 +270,11 @@ impl TypedMacroQuery {
     }
     pub fn argument_is_effectful(&self, span: Span) -> bool {
         let s = self.state.lock().expect("query snapshot");
-        let Some((err, env)) = s.effects.get(&span) else {
+        let Some(env) = s.effects.get(&span) else {
             return false;
         };
         let mut trial = s.solver.clone();
         trial.freeze();
-        trial.constrain(err, &Ty::Never);
         trial.constrain_env(env, &Ty::Never);
         !trial.failures.is_empty()
     }
@@ -654,10 +651,7 @@ impl TypedMacroQuery {
                     })
                     .collect();
                 let mut ret = self.syntax(s, &f.ret);
-                if f.err != Ty::Never {
-                    let err = self.syntax(s, &f.err);
-                    ret = form("^", vec![ret, err]);
-                }
+
                 if f.env != Ty::Never {
                     let env = self.syntax(s, &f.env);
                     ret = form("!", vec![ret, env]);
@@ -781,7 +775,7 @@ fn convert_query(s: &QueryState, t: &Type, local: &HashMap<TyVarId, Ty>) -> Resu
         TypeKind::Fn {
             params,
             ret,
-            err,
+            err: _,
             env,
         } => Ty::Fn(Box::new(FnTy {
             params: params
@@ -789,11 +783,6 @@ fn convert_query(s: &QueryState, t: &Type, local: &HashMap<TyVarId, Ty>) -> Resu
                 .map(|p| Ok((p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)?)))
                 .collect::<Result<_, String>>()?,
             ret: go(ret)?,
-            err: err
-                .as_ref()
-                .map(|t| go(t))
-                .transpose()?
-                .unwrap_or(Ty::Never),
             env: env
                 .as_ref()
                 .map(|t| go(t))
@@ -969,7 +958,6 @@ mod tests {
         let signature = FnTy {
             params: vec![(None, Ty::Var(v))],
             ret: Ty::Var(v),
-            err: Ty::Never,
             env: Ty::Never,
         };
         let t = Ty::Fn(Box::new(signature.clone()));

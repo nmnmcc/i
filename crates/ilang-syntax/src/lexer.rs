@@ -341,7 +341,7 @@ impl Lexer<'_> {
             // Syntax three P0: `^` and `!` alone are no symbols of i.
             let span = Span::new(self.pos as u32, self.pos as u32 + 1);
             self.error(
-                Code::UnexpectedChar,
+                if c == b'^' { Code::ErrorChannel } else { Code::UnexpectedChar },
                 span,
                 format!(
                     "`{}` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",

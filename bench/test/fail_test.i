@@ -58,7 +58,10 @@ builtin_passed = (i: Int, acc: Int) -> Int {
 		}
 }
 
+test("fail_builtin_caught", () {
+	check(builtin_caught(rounds, 0) == total, "fail_builtin_caught")
+})
 
-test("fail_builtin_caught", () { check(builtin_caught(rounds, 0) == total, "fail_builtin_caught") })
-
-test("fail_builtin_passed", () { check(builtin_passed(rounds, 0) == total, "fail_builtin_passed") })
+test("fail_builtin_passed", () {
+	check(builtin_passed(rounds, 0) == total, "fail_builtin_passed")
+})

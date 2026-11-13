@@ -54,7 +54,7 @@ pub(crate) fn label_params(ty: &super::Ty) -> rustc_hash::FxHashSet<LabelParam> 
             Ty::Con(_, _, args) | Ty::Union(args) | Ty::Inter(args) => todo.extend(args),
             Ty::Fn(f) => {
                 todo.extend(f.params.iter().map(|(_, t)| t));
-                todo.extend([&f.ret, &f.err, &f.env]);
+                todo.extend([&f.ret, &f.env]);
             }
             Ty::Diff(base, heads) => {
                 todo.push(base);
@@ -90,7 +90,6 @@ pub(crate) fn map_labels(
                 .map(|(n, t)| (n.clone(), map_labels(t, labels)))
                 .collect(),
             ret: map_labels(&f.ret, labels),
-            err: map_labels(&f.err, labels),
             env: map_labels(&f.env, labels),
         })),
         Ty::Union(ts) => Ty::Union(ts.iter().map(|t| map_labels(t, labels)).collect()),

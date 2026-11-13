@@ -221,7 +221,6 @@ mod tests {
         let function = Ty::Fn(Box::new(crate::types::FnTy {
             params: vec![],
             ret: Ty::Never,
-            err: Ty::Never,
             env: Ty::Never,
         }));
         let row = record(&mut s, "cb", function);
@@ -797,9 +796,7 @@ impl Engine<'_> {
                         return Ok(false);
                     }
                 }
-                self.rel(a.ret, b.ret, Mode::Value, f)?
-                    && self.rel(a.err, b.err, Mode::Row, f)?
-                    && self.rel(a.env, b.env, Mode::Env, f)?
+                self.rel(a.ret, b.ret, Mode::Value, f)? && self.rel(a.env, b.env, Mode::Env, f)?
             }
             (Node::Rec(a), Node::Rec(b)) if env == Mode::Value => {
                 for (l, t) in b {

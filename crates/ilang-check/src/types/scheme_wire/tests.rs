@@ -208,7 +208,6 @@ fn scheme_comparison_proves_alpha_renamed_record_labels_without_mutation() {
         let ty = Ty::Fn(Box::new(FnTy {
             params: vec![(None, record), (None, Ty::Var(var))],
             ret: Ty::Var(var),
-            err: Ty::Never,
             env: Ty::Never,
         }));
         let scheme = Scheme {
@@ -473,7 +472,6 @@ fn scheme_coverage_preserves_keys_while_instantiating_union_variables() {
         let root = Ty::Fn(Box::new(FnTy {
             params: vec![(None, root), (None, Ty::Var(k))],
             ret: Ty::Never,
-            err: Ty::Never,
             env: Ty::Never,
         }));
         let scheme = Scheme {
@@ -530,7 +528,6 @@ fn scheme_coverage_preserves_handlers_through_union_row_instantiation() {
         let root = Ty::Fn(Box::new(FnTy {
             params: vec![],
             ret: Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
-            err: Ty::Never,
             env: row,
         }));
         let scheme = Scheme {
@@ -583,13 +580,11 @@ fn scheme_coverage_finds_a_counterexample_in_a_union_row_handler() {
         let body = Ty::Fn(Box::new(FnTy {
             params: vec![],
             ret: result.clone(),
-            err: Ty::Never,
             env: row.clone(),
         }));
         let root = Ty::Fn(Box::new(FnTy {
             params: vec![(Some("body".into()), body)],
             ret: result,
-            err: Ty::Never,
             env: row,
         }));
         let scheme = Scheme {
@@ -636,7 +631,6 @@ fn output_only_environment_can_choose_an_empty_row() {
         let root = Ty::Fn(Box::new(FnTy {
             params: vec![],
             ret: Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
-            err: Ty::Never,
             env: Ty::Var(row),
         }));
         let scheme = Scheme {
@@ -719,7 +713,6 @@ fn scheme_coverage_synthesizes_a_union_of_subject_binders() {
                 (Some("c".into()), Ty::Var(c)),
             ],
             ret: Ty::Top,
-            err: Ty::Never,
             env: Ty::Never,
         }));
         let root = solver.records.record(vec![(Label::name("f"), fun)]);
@@ -761,7 +754,6 @@ fn a_reverse_subtype_failure_is_not_a_coverage_counterexample() {
     let ground = Ty::Fn(Box::new(FnTy {
         params: vec![(Some("x".into()), int), (Some("y".into()), string)],
         ret: source.records.record(vec![(Label::name("value"), result)]),
-        err: Ty::Never,
         env: Ty::Never,
     }));
     let generic = Ty::Fn(Box::new(FnTy {
@@ -772,7 +764,6 @@ fn a_reverse_subtype_failure_is_not_a_coverage_counterexample() {
         ret: target
             .records
             .record(vec![(Label::name("value"), Ty::Var(x))]),
-        err: Ty::Never,
         env: Ty::Never,
     }));
     let mut forward = target.scheme_snapshot();
@@ -810,7 +801,6 @@ fn scheme_coverage_combines_structured_subject_bounds() {
         Ty::Fn(Box::new(FnTy {
             params: vec![(Some("x".into()), a), (Some("y".into()), b)],
             ret: result,
-            err: Ty::Never,
             env: Ty::Never,
         }))
     };
@@ -956,7 +946,6 @@ fn scheme_comparison_distinguishes_universal_from_monomorphic_function() {
         let fun = Ty::Fn(Box::new(FnTy {
             params: vec![(None, arg.clone())],
             ret: arg,
-            err: Ty::Never,
             env: Ty::Never,
         }));
         let root = solver.records.record(vec![(Label::name("f"), fun)]);
@@ -1042,13 +1031,11 @@ fn scheme_comparison_detects_hidden_service_form_counterexample() {
         let body = Ty::Fn(Box::new(FnTy {
             params: vec![],
             ret: result.clone(),
-            err: Ty::Never,
             env: Ty::Var(row),
         }));
         let root = Ty::Fn(Box::new(FnTy {
             params: vec![(Some("body".into()), body)],
             ret: result,
-            err: Ty::Never,
             env: Ty::Var(row),
         }));
         let scheme = Scheme {
@@ -1169,7 +1156,6 @@ fn decoded_label_scheme_can_be_instantiated_and_called() {
     let ty = Ty::Fn(Box::new(FnTy {
         params: vec![(None, record), (None, Ty::Var(key_type))],
         ret: int.clone(),
-        err: Ty::Never,
         env: Ty::Never,
     }));
     let scheme = Scheme {

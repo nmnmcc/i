@@ -14,7 +14,7 @@
 	DetachedScheduler
 	Runner
 	DetachedRunner
-	Scope
+	Group
 	Task
 	Channel
 	Event
@@ -65,9 +65,9 @@ TaskInfo = (scope = ScopeInfo, id = Keyed)
 
 ChannelInfo = (run = Key(Nil), id = Keyed, witness = Witness)
 
-Scope(E) = (info = ScopeInfo, errors = Key(E))
+Group(E) = (info = ScopeInfo, errors = Key(E))
 
-Task(A, E) = (info = TaskInfo, result = Key(Result(A, E)), owner = Scope(E))
+Task(A, E) = (info = TaskInfo, result = Key(Result(A, E)), owner = Group(E))
 
 Channel(A) = (info = ChannelInfo, values = Key(A))
 
@@ -3117,7 +3117,7 @@ loop = (state: State) -> RunReply {
 }
 
 scope_call_body: <A, E, N>(
-	(Scope(E)) <- (Fail(E), ..N) -> A,
+	(Group(E)) <- (Fail(E), ..N) -> A,
 	Witness,
 	Mode,
 	Scheduler,
@@ -3125,7 +3125,7 @@ scope_call_body: <A, E, N>(
 	info = read(scope_key, ask(own, NewScope(witness, mode)))
 	errors: Key(E) = key.new()
 	results: Key(Result(A, E)) = key.new()
-	handle = Scope(info = info, errors = errors)
+	handle = Group(info = info, errors = errors)
 	checked = portable_witness(info.witness)
 	kept = control.keep_env((_: Nil) {
 		fail.catch(() { body(handle) }) |>
@@ -3161,7 +3161,7 @@ scope_call_body: <A, E, N>(
 	)
 }
 
-scope = <A, E, N>(body: (Scope(E)) <- (Fail(E), ..N) -> A) <- (
+scope = <A, E, N>(body: (Group(E)) <- (Fail(E), ..N) -> A) <- (
 	own: Scheduler,
 ) -> A {
 	scope_call(body, Portable, Ordinary, own) |>
@@ -3169,7 +3169,7 @@ scope = <A, E, N>(body: (Scope(E)) <- (Fail(E), ..N) -> A) <- (
 		| (WinnerValue(_)) { panic("task: invalid scope winner") }
 }
 
-local_scope = <A, E, N>(body: (Scope(E)) <- (Fail(E), ..N) -> A) <- (
+local_scope = <A, E, N>(body: (Group(E)) <- (Fail(E), ..N) -> A) <- (
 	own: Scheduler,
 ) -> A {
 	own |>
@@ -3182,7 +3182,7 @@ local_scope = <A, E, N>(body: (Scope(E)) <- (Fail(E), ..N) -> A) <- (
 }
 
 go_key = <A, E, N>(
-	s: Scope(E),
+	s: Group(E),
 	body: () <- (Fail(E), ..N) -> A,
 	result: Key(Result(A, E))
 ) <- (own: Scheduler) -> Task(A, E) {
@@ -3191,7 +3191,7 @@ go_key = <A, E, N>(
 	Task(info = TaskInfo(scope = s.info, id = id), result = result, owner = s)
 }
 
-go: <A, E, N>(Scope(E), () <- (Fail(E), ..N) -> A) <- (Scheduler, ..N) -> Task(
+go: <A, E, N>(Group(E), () <- (Fail(E), ..N) -> A) <- (Scheduler, ..N) -> Task(
 	A,
 	E,
 ) = (s, body) {
@@ -3336,7 +3336,7 @@ send = <A>(c: Channel(A), value: A) <- (own: Scheduler) -> Nil {
 
 receive = <A>(c: Channel(A)) -> A { sync(receive_event(c)) }
 
-share = <A, E>(s: Scope(E), value: A) <- (own: Scheduler) -> Shared(A) {
+share = <A, E>(s: Group(E), value: A) <- (own: Scheduler) -> Shared(A) {
 	values: Key(A) = key.new()
 	id = ask(own, NewShare(s.info, key.wrap(values, value)))
 	Shared(run = s.info.run, owner = s.info.id, id = id, values = values)
@@ -3418,7 +3418,7 @@ race = <A, E, N>(
 		| (BodyValue(_)) { panic("task: missing race winner") }
 }
 
-spawn_values: <A, B, E, N>(Scope(E), List(A), (A) <- (Fail(E), ..N) -> B) <- (
+spawn_values: <A, B, E, N>(Group(E), List(A), (A) <- (Fail(E), ..N) -> B) <- (
 	Scheduler,
 	..N,
 ) -> List(Task(B, E)) = (s, xs, f) {
@@ -3578,7 +3578,7 @@ _entry = <A, N>(body: () <- N -> A) <- (root: request.Root) -> A {
 }
 
 scope_call: <A, E, N>(
-	(Scope(E)) <- (Fail(E), ..N) -> A,
+	(Group(E)) <- (Fail(E), ..N) -> A,
 	Witness,
 	Mode,
 	Scheduler,

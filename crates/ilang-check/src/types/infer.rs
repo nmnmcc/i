@@ -1,8 +1,8 @@
 //! The typing rules of §4.8 for expressions, blocks, functions, and
-//! bindings, with the errors `E` and the environment `N` of each expression
+//! bindings, with the need `N` of each expression
 //! (§9.2, §9.3).
 //!
-//! The `E` and `N` of the expression being typed are gathered in a stack of
+//! The needs of the expression being typed are gathered in a stack of
 //! `Effects`: a call adds the `E` and `N` of its callee, and a function or
 //! the rest of a block after an environment statement starts a new entry.
 
@@ -60,7 +60,6 @@ impl Scheme {
 
 #[derive(Default)]
 struct Effects {
-    err: Vec<Ty>,
     env: Vec<Ty>,
 }
 
@@ -255,7 +254,7 @@ pub(crate) struct Checker<'a> {
     pending_typed: Vec<PendingTyped>,
     checked_holes: HashMap<Span, (Ty, Ty)>,
     expression_known: HashMap<(ModuleId, Span), Ty>,
-    pub(super) expression_effects: HashMap<(ModuleId, Span), (Ty, Ty)>,
+    pub(super) expression_effects: HashMap<(ModuleId, Span), Ty>,
     pub(super) typed_handles: super::typed_macro::HandleArena,
     typed_generalized_roots: HashSet<super::V>,
     typed_depth: u16,
@@ -638,23 +637,21 @@ impl<'a> Checker<'a> {
             if self.binding_may_fail(&binding.pattern, &a) {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
-            let (err, env) = self.pop_effects(binding.span);
-            // §2.5: a top-level binding may not give errors or need an
-            // environment.
-            for (t, what) in [(err, "give errors"), (env, "need an environment")] {
-                self.s.constrain(&t, &Ty::Never);
-                if !self.s.failures.is_empty() {
-                    let f = self.s.failures.remove(0);
-                    self.s.failures.clear();
-                    self.error(
-                        code::TOP_LEVEL_EFFECT,
-                        binding.span,
-                        format!(
-                            "a top-level binding may not {what} (§2.5), but this one has `{}`",
-                            display::show(&self.s, &f.lhs)
-                        ),
-                    );
-                }
+            let env = self.pop_effects(binding.span);
+            // §2.5: a top-level binding may not need services (errors
+            // included as Fail).
+            self.s.constrain(&env, &Ty::Never);
+            if !self.s.failures.is_empty() {
+                let f = self.s.failures.remove(0);
+                self.s.failures.clear();
+                self.error(
+                    code::TOP_LEVEL_EFFECT,
+                    binding.span,
+                    format!(
+                        "a top-level binding may not need an environment (§2.5), but this one has `{}`",
+                        display::show(&self.s, &f.lhs)
+                    ),
+                );
             }
             self.check_occurs(mark, binding.span);
         }
@@ -942,7 +939,7 @@ impl<'a> Checker<'a> {
                 .collect();
             trial.effects.push(Effects::default());
             let ty = trial.infer(&output.expression);
-            let (err, env) = trial.pop_effects(call.span);
+            let env = trial.pop_effects(call.span);
             if let Ty::Fn(f) = &call.signature {
                 let before = trial.diags.len();
                 trial.sub(&ty, &f.ret, call.span);
@@ -971,7 +968,6 @@ impl<'a> Checker<'a> {
                         )
                     };
                 }
-                trial.sub(&err, &f.err, call.span);
                 trial.s.constrain_env(&env, &f.env);
                 if !trial.s.failures.is_empty() {
                     trial.s.failures.clear();
@@ -1374,16 +1370,13 @@ impl<'a> Checker<'a> {
             TypeKind::Fn {
                 params,
                 ret,
-                err,
+                err: _,
                 env,
             } => {
                 for p in params {
                     self.check_places(&p.ty, pol.flip(), depth);
                 }
-                for x in [Some(&**ret), err.as_deref(), env.as_deref()]
-                    .into_iter()
-                    .flatten()
-                {
+                for x in [Some(&**ret), env.as_deref()].into_iter().flatten() {
                     self.check_places(x, pol, depth);
                 }
             }
@@ -1671,15 +1664,6 @@ impl<'a> Checker<'a> {
 
     // ---- Effects ----
 
-    fn add_err(&mut self, t: Ty) {
-        self.s.mark_mode(&t, Mode::Row);
-        if t != Ty::Never
-            && let Some(e) = self.effects.last_mut()
-        {
-            e.err.push(t);
-        }
-    }
-
     pub fn add_env(&mut self, t: Ty) {
         self.s.mark_row(&t);
         if t != Ty::Never
@@ -1689,13 +1673,10 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// The errors and the environment of an entry of the effect stack.
-    fn pop_effects(&mut self, span: Span) -> (Ty, Ty) {
+    /// The need of an entry of the effect stack.
+    fn pop_effects(&mut self, span: Span) -> Ty {
         let e = self.effects.pop().unwrap_or_default();
-        let err = self.s.union_mode(e.err, Mode::Row);
-        self.flush(span, None);
-        let env = self.env_union(e.env, span);
-        (err, env)
+        self.env_union(e.env, span)
     }
 
     // ---- Written types ----
@@ -1802,7 +1783,7 @@ impl<'a> Checker<'a> {
             TypeKind::Fn {
                 params,
                 ret,
-                err,
+                err: _,
                 env,
             } => {
                 let params = params
@@ -1815,18 +1796,10 @@ impl<'a> Checker<'a> {
                     })
                     .collect();
                 let ret = self.conv(ret, local);
-                let err = err
-                    .as_ref()
-                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Row));
                 let env = env
                     .as_ref()
                     .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
-                Ty::Fn(Box::new(FnTy {
-                    params,
-                    ret,
-                    err,
-                    env,
-                }))
+                Ty::Fn(Box::new(FnTy { params, ret, env }))
             }
             TypeKind::Union(ts) => {
                 let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
@@ -1976,7 +1949,6 @@ impl<'a> Checker<'a> {
         Ty::Fn(Box::new(FnTy {
             params: fields,
             ret: t,
-            err: Ty::Never,
             env: Ty::Never,
         }))
     }
@@ -2010,8 +1982,7 @@ impl<'a> Checker<'a> {
         let result = self.infer_k_inner(e, expected);
         if observe {
             let effects = self.pop_effects(e.span);
-            self.add_err(effects.0.clone());
-            self.add_env(effects.1.clone());
+            self.add_env(effects.clone());
             self.expression_effects
                 .insert((self.module, e.span), effects);
             self.expression_known
@@ -2595,7 +2566,6 @@ impl<'a> Checker<'a> {
                 for ((t, s), (_, p)) in placed.iter().zip(&ft.params) {
                     self.sub2(t, p, *s, callee.span);
                 }
-                self.add_err(ft.err.clone());
                 self.add_env(ft.env.clone());
                 ft.ret.clone()
             }
@@ -2616,19 +2586,13 @@ impl<'a> Checker<'a> {
             _ => {
                 // The function may be a parameter: what it gives back may
                 // come from outside.
-                let (r, e, n) = (
-                    self.s.fresh_input(),
-                    self.s.fresh_input(),
-                    self.s.fresh_input(),
-                );
+                let (r, n) = (self.s.fresh_input(), self.s.fresh_input());
                 let want = Ty::Fn(Box::new(FnTy {
                     params: placed.into_iter().map(|(t, _)| (None, t)).collect(),
                     ret: r.clone(),
-                    err: e.clone(),
                     env: n.clone(),
                 }));
                 self.sub(&f, &want, span);
-                self.add_err(e);
                 self.add_env(n);
                 r
             }
@@ -3294,8 +3258,7 @@ impl<'a> Checker<'a> {
                     self.out.services.insert((self.module, *span), r);
                     self.effects.push(Effects::default());
                     let a = self.block(&stmts[i + 1..], *span, expected);
-                    let (err, env) = self.pop_effects(*span);
-                    self.add_err(err);
+                    let env = self.pop_effects(*span);
                     // The service type is the need of the rest for this
                     // key, when the rest writes one; else its arguments are
                     // left open, and the value and the rest fix them.
@@ -3322,8 +3285,7 @@ impl<'a> Checker<'a> {
                     self.sub2(&v, &t, value.span, ty.span);
                     self.effects.push(Effects::default());
                     let a = self.block(&stmts[i + 1..], *span, expected);
-                    let (err, env) = self.pop_effects(*span);
-                    self.add_err(err);
+                    let env = self.pop_effects(*span);
                     let rest = self.s.env_diff(env, vec![t]);
                     self.flush(*span, None);
                     self.add_env(rest);
@@ -3367,10 +3329,7 @@ impl<'a> Checker<'a> {
             }
         }
         if let Some(ret) = &f.ret {
-            for ty in [Some(&ret.value), ret.err.as_ref(), ret.env.as_ref()]
-                .into_iter()
-                .flatten()
-            {
+            for ty in [Some(&ret.value), ret.env.as_ref()].into_iter().flatten() {
                 visit(ty);
             }
         }
@@ -3454,10 +3413,7 @@ impl<'a> Checker<'a> {
             }
         }
         if let Some(r) = &f.ret {
-            for t in [Some(&r.value), r.err.as_ref(), r.env.as_ref()]
-                .into_iter()
-                .flatten()
-            {
+            for t in [Some(&r.value), r.env.as_ref()].into_iter().flatten() {
                 self.check_places(t, Pol::Pos, 0);
             }
         }
@@ -3468,17 +3424,13 @@ impl<'a> Checker<'a> {
         let ret = f.ret.as_ref().map(|r| {
             let value = self.conv(&r.value, &HashMap::new());
             if inferred_needs {
-                return (value, Ty::Never, Ty::Never);
+                return (value, Ty::Never);
             }
-            let err = r
-                .err
-                .as_ref()
-                .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Row));
             let env = r
                 .env
                 .as_ref()
                 .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Env));
-            (value, err, env)
+            (value, env)
         });
         // §4.8: the body of a function with a written `->` part has that
         // type as its expected type.
@@ -3507,10 +3459,10 @@ impl<'a> Checker<'a> {
         self.function_depth -= 1;
         self.active_key_parameters.pop();
         let known = self.fn_known(f, &expected, body_known);
-        let (err, env) = self.pop_effects(f.span);
+        let env = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
         let t = match (ret, &f.ret) {
-            (Some((value, _, _)), Some(written)) if inferred_needs => {
+            (Some((value, _)), Some(written)) if inferred_needs => {
                 let body_span = match f.body.stmts.last() {
                     Some(Stmt::Expr(e)) => e.span,
                     _ => f.body.span,
@@ -3525,11 +3477,10 @@ impl<'a> Checker<'a> {
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret: value,
-                    err,
                     env,
                 }))
             }
-            (Some((value, rerr, renv)), Some(written)) => {
+            (Some((value, renv)), Some(written)) => {
                 // §6.8: the written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
                 // `Assert` when a parameter may fail.
@@ -3538,11 +3489,8 @@ impl<'a> Checker<'a> {
                     _ => f.body.span,
                 };
                 let wspan = written.value.span;
-                let espan = written.err.as_ref().map_or(wspan, |t| t.span);
                 let nspan = written.env.as_ref().map_or(wspan, |t| t.span);
                 self.sub2(&a, &value, body_span, wspan);
-                self.s.constrain_row(&err, &rerr);
-                self.flush(f.body.span, Some(espan));
                 self.sub_env(&env, &renv, f.body.span, Some(nspan));
                 for t in &env_tys {
                     self.sub_env(t, &renv, nspan, None);
@@ -3553,7 +3501,6 @@ impl<'a> Checker<'a> {
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret: value,
-                    err: rerr,
                     env: renv,
                 }))
             }
@@ -3567,7 +3514,6 @@ impl<'a> Checker<'a> {
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret: a,
-                    err,
                     env,
                 }))
             }
@@ -3789,7 +3735,6 @@ impl<'a> Checker<'a> {
                     .map(|(l, p)| (l.clone(), go(self, p)))
                     .collect(),
                 ret: go(self, &f.ret),
-                err: go(self, &f.err),
                 env: go(self, &f.env),
             })),
             Ty::Never | Ty::Both(..) => t.clone(),
@@ -3811,7 +3756,7 @@ fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
         Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| uses_types(x, out)),
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| uses_types(&p.1, out));
-            [&f.ret, &f.err, &f.env]
+            [&f.ret, &f.env]
                 .into_iter()
                 .for_each(|x| uses_types(x, out));
         }
@@ -3836,8 +3781,7 @@ fn has_both(t: &Ty) -> bool {
         Ty::Both(..) => true,
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
         Ty::Fn(f) => {
-            f.params.iter().any(|p| has_both(&p.1))
-                || [&f.ret, &f.err, &f.env].into_iter().any(has_both)
+            f.params.iter().any(|p| has_both(&p.1)) || [&f.ret, &f.env].into_iter().any(has_both)
         }
         Ty::Diff(a, _) => has_both(a),
         _ => false,
@@ -3852,7 +3796,7 @@ fn host_builtin(b: BuiltinType) -> bool {
     )
 }
 
-/// A parameter used as an environment or error row stays a row through
+/// A parameter used as a need or a Fail argument stays a row through
 /// other constructors and aliases (§4.5). The finite mode table grows
 /// to a fixed point, independently of declaration order.
 fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
@@ -3885,16 +3829,13 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
             TypeKind::Fn {
                 params: ps,
                 ret,
-                err,
+                err: _,
                 env,
             } => {
                 for x in ps {
                     walk(&x.ty, Mode::Value, params, acc, table);
                 }
                 walk(ret, Mode::Value, params, acc, table);
-                if let Some(x) = err {
-                    walk(x, Mode::Row, params, acc, table);
-                }
                 if let Some(x) = env {
                     walk(x, Mode::Env, params, acc, table);
                 }
@@ -4048,13 +3989,13 @@ fn walk_variance(
         TypeKind::Fn {
             params: ps,
             ret,
-            err,
+            err: _,
             env,
         } => {
             ps.iter().for_each(|x| go(&x.ty, v.flip(), acc));
             go(ret, v, acc);
-            err.iter().for_each(|x| go(x, v, acc));
-            env.iter().for_each(|x| walk_env_variance(p, x, v, params, acc, table, depth));
+            env.iter()
+                .for_each(|x| walk_env_variance(p, x, v, params, acc, table, depth));
         }
         TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
     }

@@ -179,6 +179,93 @@ fn generated_contributions_are_selected_independently() {
     ));
 }
 
+// E5 replaces target provider plans with explicit provision in i code. Keep
+// the collection-selection, async-factory, wrong-value, and missing-service
+// coverage of the former provider-plan case.
+#[test]
+fn selected_collection_uses_explicit_services_and_transitive_requests() {
+    let dir = tempfile::tempdir().unwrap();
+    project(dir.path());
+    let source_path = dir.path().join("src/main.i");
+    let mut source =
+        std::fs::read_to_string(&source_path)
+            .unwrap()
+            .replacen("(m =", "(i/clock, i/fail, m =", 1);
+    source.push_str(
+        r#"
+Service = (value = Int)
+make = () {
+    fail.catch(() { clock.sleep_ns(1000) }) |>
+        (Ok(_)) { Service(value = 42) }
+        | (Error(_)) { panic("clock failed") }
+}
+wrong = () { Service(value = 0) }
+read = () <- (s: Service) { assert(s.value == 42) }
+m.emit(anchor, configured, read() <- (make()))
+m.emit(anchor, wrong_configured, read() <- (wrong()))
+m.emit(anchor, unconfigured, read())
+"#,
+    );
+    std::fs::write(source_path, source).unwrap();
+    let manifest = ilang_cli::collections(dir.path(), false, true).unwrap();
+    let added = &manifest.entries[manifest.entries.len() - 3..];
+    for level in [Level::O0, Level::O2] {
+        let selected = ilang_cli::build_collection(
+            dir.path(),
+            options(level),
+            &added[0].handle,
+            CollectionResult::Nil,
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+        assert!(
+            selected.is_async,
+            "the factory's request dependency needs the async protocol"
+        );
+        assert!(
+            ilang_cli::CollectionArtifact::from_wasm(&selected.built.wasm)
+                .unwrap()
+                .unwrap()
+                .is_async
+        );
+        assert!(matches!(
+            selected.run_with(selected.built.host_options()).unwrap(),
+            Outcome::Ok(_)
+        ));
+        run_javascript(dir.path(), &selected);
+    }
+    let node = ilang_cli::build_collection(
+        dir.path(),
+        BuildOptions {
+            target: Target::Nodejs,
+            ..options(Level::O0)
+        },
+        &added[1].handle,
+        CollectionResult::Nil,
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert!(!node.is_async);
+    assert!(matches!(
+        node.run_with(node.built.host_options()).unwrap(),
+        Outcome::Stop(_)
+    ));
+    let error = ilang_cli::build_collection(
+        dir.path(),
+        BuildOptions {
+            target: Target::Js,
+            ..options(Level::O0)
+        },
+        &added[2].handle,
+        CollectionResult::Nil,
+    )
+    .err()
+    .expect("an unprovided service must fail the build")
+    .to_string();
+    assert!(
+        error.contains("app/main.Service") && error.contains("js"),
+        "{error}"
+    );
+}
+
 #[test]
 fn expand_command_prints_both_surfaces_and_macro_trace() {
     let dir = tempfile::tempdir().unwrap();

@@ -1,8 +1,8 @@
 //! Type inference (§4.7, §4.8) with effects (§9.2–§9.6): algebraic
 //! subtyping in the style of Simple-sub (Parreaux, ICFP 2020; the theory is
 //! MLsub, Dolan and Mycroft, POPL 2017), with the unions, intersections,
-//! and differences of §4.4, the variance of §4.5, and the `^ E ! N` parts of
-//! function types.
+//! and differences of §4.4, the variance of §4.5, and the needs of function
+//! types. Errors are the ordinary need entry `Fail(E)` (§9.3).
 //!
 //! - `solve.rs`: type variables with levels and bounds, `constrain`, and the
 //!   smart constructors that merge unions by type constructor (§4.4).
@@ -96,7 +96,6 @@ pub(crate) struct FnTy {
     /// Labels have no effect on subtyping (§4.6).
     pub params: Vec<(Option<String>, Ty)>,
     pub ret: Ty,
-    pub err: Ty,
     pub env: Ty,
 }
 
@@ -258,7 +257,7 @@ pub(crate) fn boundary_type(
             TypeKind::Fn {
                 params,
                 ret,
-                err,
+                err: _,
                 env,
             } => Ty::Fn(Box::new(FnTy {
                 params: params
@@ -271,10 +270,6 @@ pub(crate) fn boundary_type(
                     })
                     .collect::<Option<_>>()?,
                 ret: convert(s, ret, p, expand)?,
-                err: match err {
-                    Some(t) => convert(s, t, p, expand)?,
-                    None => Ty::Never,
-                },
                 env: match env {
                     Some(t) => convert(s, t, p, expand)?,
                     None => Ty::Never,

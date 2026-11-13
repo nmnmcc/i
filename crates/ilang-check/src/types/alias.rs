@@ -22,7 +22,7 @@ fn has_algebra(t: &Ty) -> bool {
         Ty::Con(_, _, ts) => ts.iter().any(has_algebra),
         Ty::Fn(f) => {
             f.params.iter().any(|(_, t)| has_algebra(t))
-                || [&f.ret, &f.err, &f.env].into_iter().any(has_algebra)
+                || [&f.ret, &f.env].into_iter().any(has_algebra)
         }
         Ty::Both(a, b) => has_algebra(a) || has_algebra(b),
         Ty::Var(_) | Ty::Never | Ty::Top => false,
@@ -40,7 +40,7 @@ fn has_record(t: &Ty) -> bool {
         Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.iter().any(has_record),
         Ty::Fn(f) => {
             f.params.iter().any(|(_, t)| has_record(t))
-                || [&f.ret, &f.err, &f.env].into_iter().any(has_record)
+                || [&f.ret, &f.env].into_iter().any(has_record)
         }
         Ty::Diff(base, heads) => has_record(base) || heads.iter().any(has_record),
         Ty::Both(a, b) => has_record(a) || has_record(b),
@@ -72,7 +72,6 @@ pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
                 .map(|(n, t)| (n.clone(), map_vars(t, f)))
                 .collect(),
             ret: map_vars(&g.ret, f),
-            err: map_vars(&g.err, f),
             env: map_vars(&g.env, f),
         })),
         Ty::Union(ts) => Ty::Union(ts.iter().map(|t| map_vars(t, f)).collect()),
@@ -264,7 +263,7 @@ impl Checker<'_> {
             TypeKind::Fn {
                 params: ps,
                 ret,
-                err,
+                err: _,
                 env,
             } => Ty::Fn(Box::new(FnTy {
                 params: ps
@@ -272,7 +271,6 @@ impl Checker<'_> {
                     .map(|p| Some((p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)?)))
                     .collect::<Option<_>>()?,
                 ret: go(ret)?,
-                err: err.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
                 env: env.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
             })),
         })
@@ -326,7 +324,6 @@ impl Checker<'_> {
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
                 params: f.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
                 ret: go(f.ret),
-                err: go(f.err),
                 env: go(f.env),
             })),
             Ty::Union(ts) => self.kunion(ts.into_iter().map(go).collect()),

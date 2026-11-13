@@ -213,7 +213,6 @@ impl<'a> Closure<'a> {
                     .map(|(n, t)| Ok((n.clone(), self.close(t)?)))
                     .collect::<Result<_, &'static str>>()?,
                 ret: self.close(&f.ret)?,
-                err: self.close(&f.err)?,
                 env: self.close(&f.env)?,
             }))),
             Ty::Union(ts) => {
@@ -262,7 +261,6 @@ impl<'a> Closure<'a> {
                     .map(|(n, t)| Ok((n.clone(), self.annotation(t)?)))
                     .collect::<Result<_, &'static str>>()?,
                 ret: self.annotation(&f.ret)?,
-                err: self.annotation(&f.err)?,
                 env: self.annotation(&f.env)?,
             })),
             Ty::Union(ts) => Ty::Union(
@@ -374,7 +372,7 @@ fn contains_var(t: &Ty) -> bool {
         Ty::Con(_, _, ts) | Ty::Union(ts) | Ty::Inter(ts) => ts.iter().any(contains_var),
         Ty::Fn(f) => {
             f.params.iter().any(|(_, t)| contains_var(t))
-                || [&f.ret, &f.err, &f.env].into_iter().any(contains_var)
+                || [&f.ret, &f.env].into_iter().any(contains_var)
         }
         Ty::Diff(t, ts) => contains_var(t) || ts.iter().any(contains_var),
         Ty::Both(a, b) => contains_var(a) || contains_var(b),
@@ -410,7 +408,6 @@ fn shape(t: &Ty, fixed: &HashMap<V, Fixed>) -> Ty {
                 .map(|(n, t)| (n.clone(), shape(t, fixed)))
                 .collect(),
             ret: shape(&f.ret, fixed),
-            err: shape(&f.err, fixed),
             env: shape(&f.env, fixed),
         })),
         Ty::Union(ts) => Ty::Union(ts.iter().map(|t| shape(t, fixed)).collect()),
@@ -488,7 +485,6 @@ fn completed_in(
                 .map(|(n, t)| Ok((n.clone(), completed_in(t, s, fixed, level)?)))
                 .collect::<Result<_, &'static str>>()?,
             ret: completed_in(&f.ret, s, fixed, level)?,
-            err: completed_in(&f.err, s, fixed, level)?,
             env: completed_in(&f.env, s, fixed, level)?,
         }))),
         Ty::Union(ts) => Ok(Ty::Union(
@@ -1344,7 +1340,7 @@ impl Checker<'_> {
             TypeKind::Fn {
                 params,
                 ret,
-                err,
+                err: _,
                 env,
             } => Ok(Ty::Fn(Box::new(FnTy {
                 params: params
@@ -1357,9 +1353,6 @@ impl Checker<'_> {
                     })
                     .collect::<Result<_, &'static str>>()?,
                 ret: self.closed_written(ret, map, seen)?,
-                err: err
-                    .as_ref()
-                    .map_or(Ok(Ty::Never), |t| self.closed_written(t, map, seen))?,
                 env: env
                     .as_ref()
                     .map_or(Ok(Ty::Never), |t| self.closed_written(t, map, seen))?,
@@ -1470,7 +1463,6 @@ fn fixed_scheme(
                 .map(|(n, t)| Ok((n.clone(), fixed_scheme(t, s, fixed, level)?)))
                 .collect::<Result<_, &'static str>>()?,
             ret: fixed_scheme(&f.ret, s, fixed, level)?,
-            err: fixed_scheme(&f.err, s, fixed, level)?,
             env: fixed_scheme(&f.env, s, fixed, level)?,
         }))),
         Ty::Union(ts) => Ok(Ty::Union(
@@ -1528,7 +1520,6 @@ pub(super) fn replace_vars(t: &Ty, map: &HashMap<V, Ty>) -> Ty {
                 .map(|(n, t)| (n.clone(), replace_vars(t, map)))
                 .collect(),
             ret: replace_vars(&f.ret, map),
-            err: replace_vars(&f.err, map),
             env: replace_vars(&f.env, map),
         })),
         Ty::Union(ts) => Ty::Union(ts.iter().map(|t| replace_vars(t, map)).collect()),
@@ -1667,7 +1658,7 @@ impl Checker<'_> {
                 TypeKind::Fn {
                     params,
                     ret,
-                    err,
+                    err: _,
                     env,
                 } => Ty::Fn(Box::new(FnTy {
                     params: params
@@ -1680,7 +1671,6 @@ impl Checker<'_> {
                         })
                         .collect(),
                     ret: written(c, ret, map, seen),
-                    err: err.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
                     env: env.as_ref().map_or(Ty::Never, |t| written(c, t, map, seen)),
                 })),
                 TypeKind::Hole | TypeKind::Error => Ty::Top,
@@ -1708,9 +1698,7 @@ impl Checker<'_> {
                     .any(|(t, v)| invalid(s, t, pol.by(v))),
                 Ty::Fn(f) => {
                     f.params.iter().any(|(_, t)| invalid(s, t, pol.flip()))
-                        || [&f.ret, &f.err, &f.env]
-                            .into_iter()
-                            .any(|t| invalid(s, t, pol))
+                        || [&f.ret, &f.env].into_iter().any(|t| invalid(s, t, pol))
                 }
                 Ty::Diff(t, ts) => {
                     invalid(s, t, pol) || ts.iter().any(|t| invalid(s, t, Pol::Both))
@@ -1783,7 +1771,7 @@ impl Checker<'_> {
                     for (_, t) in &f.params {
                         collect(t, out);
                     }
-                    for t in [&f.ret, &f.err, &f.env] {
+                    for t in [&f.ret, &f.env] {
                         collect(t, out);
                     }
                 }
@@ -2016,7 +2004,6 @@ mod tests {
         let fun = Ty::Fn(Box::new(FnTy {
             params: vec![],
             ret: int(),
-            err: Ty::Never,
             env: Ty::Var(old),
         }));
         s.constrain(&Ty::Var(current), &fun);

@@ -131,6 +131,16 @@ fn service_types() {
 }
 
 #[test]
+fn removed_error_channel_has_its_diagnostic() {
+    let (_, diags) = syn3::parse_module("f: (Int) -> Int ^ String\n");
+    assert!(
+        diags.iter().any(|d| d.code.as_str() == "E0116"),
+        "{diags:?}"
+    );
+    ok("f: (Int) <- (Fail(String)) -> Int\n");
+}
+
+#[test]
 fn type_errors() {
     // P10: `:` inside a type.
     bad("f: (a: Int) -> Int", "`:` is not written in a type");

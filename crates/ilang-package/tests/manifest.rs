@@ -285,3 +285,19 @@ fn dotted_entry_paths_are_relative_modules() {
     assert_eq!(entries[0].1.function, "work");
     assert!(!codes("name = \"app\"\n[entries]\nworker = \"app/tools.work\"\n").is_empty());
 }
+
+// Provider tables have no meaning after E5, including in dependencies.
+#[test]
+fn former_provider_tables_do_not_choose_entries_or_dependencies() {
+    for parse in [parse_manifest, parse_dependency_manifest] {
+        let baseline = parse("name = \"app\"\n").0.unwrap();
+        for tables in [
+            "[providers]\n[provider_adapters]\n",
+            "[providers.\"dep/main.S\"]\nhost = \"app/main.fake\"\n",
+        ] {
+            let (manifest, diagnostics) = parse(&format!("name = \"app\"\n{tables}"));
+            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+            assert_eq!(manifest.unwrap(), baseline);
+        }
+    }
+}

@@ -451,7 +451,7 @@ impl Solver {
                 for (_, t) in &f.params {
                     self.observe_type(t);
                 }
-                for t in [&f.ret, &f.err, &f.env] {
+                for t in [&f.ret, &f.env] {
                     self.observe_type(t);
                 }
             }
@@ -606,7 +606,7 @@ impl Solver {
                 .params
                 .iter()
                 .map(|p| &p.1)
-                .chain([&f.ret, &f.err, &f.env])
+                .chain([&f.ret, &f.env])
                 .map(|a| self.level_of(a))
                 .max()
                 .unwrap_or(0),
@@ -921,7 +921,6 @@ impl Solver {
                         .zip(&g.params)
                         .all(|(p, q)| self.same_form_in(&p.1, &q.1, expanding))
                     && self.same_form_in(&f.ret, &g.ret, expanding)
-                    && self.same_form_in(&f.err, &g.err, expanding)
                     && self.same_form_in(&f.env, &g.env, expanding)
             }
             _ => false,
@@ -948,7 +947,7 @@ impl Solver {
                     for p in &f.params {
                         parts(&p.1, out);
                     }
-                    for x in [&f.ret, &f.err, &f.env] {
+                    for x in [&f.ret, &f.env] {
                         parts(x, out);
                     }
                 }
@@ -1329,7 +1328,9 @@ impl Solver {
                     // constraints go the other way round from values.
                     let before = self.failures.len();
                     let vs = self.variances(*h1, a1.len());
-                    for (((x, y), v), row) in a1.iter().zip(a2).zip(vs).zip(self.rows(*h1, a1.len())) {
+                    for (((x, y), v), row) in
+                        a1.iter().zip(a2).zip(vs).zip(self.rows(*h1, a1.len()))
+                    {
                         if row == Mode::Env {
                             // A row inside a service is one row: equal.
                             self.constrain_in(x, y, row);
@@ -1365,7 +1366,6 @@ impl Solver {
                     self.constrain(&q.1, &p.1);
                 }
                 self.constrain(&f.ret, &g.ret);
-                self.constrain_row(&f.err, &g.err);
                 self.constrain_env(&f.env, &g.env);
             }
             _ => self.fail(FailKind::Mismatch, l, r),
@@ -1708,7 +1708,6 @@ impl Solver {
                     self.fail(FailKind::Arity, b, a);
                 } else if lower {
                     self.join(&f.ret, &g.ret, level, Mode::Value);
-                    self.join(&f.err, &g.err, level, Mode::Row);
                     self.join(&f.env, &g.env, level, Mode::Env);
                 }
             }
@@ -2019,7 +2018,6 @@ impl Solver {
                     })
                     .collect(),
                 ret: self.extrude(&f.ret, pol, level, Mode::Value, cache),
-                err: self.extrude(&f.err, pol, level, Mode::Row, cache),
                 env: self.extrude(&f.env, pol, level, Mode::Env, cache),
             })),
             Ty::Union(ms) if env != Mode::Value || self.is_row(t) => {
@@ -2108,7 +2106,6 @@ impl Solver {
                     .map(|(l, p)| (l.clone(), f(self, p, pol.flip())))
                     .collect(),
                 ret: f(self, &fun.ret, pol),
-                err: f(self, &fun.err, pol),
                 env: f(self, &fun.env, pol),
             })),
             Ty::Union(ms) => Ty::Union(ms.iter().map(|m| f(self, m, pol)).collect()),
@@ -2166,7 +2163,11 @@ impl Solver {
             // At the level of the members: a collector below them would
             // copy their variables to its level and link every later
             // instance of a scheme to that shared copy.
-            let level = ms.iter().map(|m| self.level_of(m)).max().unwrap_or(self.level);
+            let level = ms
+                .iter()
+                .map(|m| self.level_of(m))
+                .max()
+                .unwrap_or(self.level);
             let row = Ty::Var(self.fresh_at(level));
             for m in ms {
                 self.constrain_in(m, &row, mode);
@@ -2203,7 +2204,8 @@ impl Solver {
         }
         let mut out: Vec<Ty> = Vec::new();
         for m in flat {
-            if matches!(m, Ty::Never) || out.contains(&m) || (mode == Mode::Env && self.vacuous(&m)) {
+            if matches!(m, Ty::Never) || out.contains(&m) || (mode == Mode::Env && self.vacuous(&m))
+            {
                 continue;
             }
             if matches!(m, Ty::Top) {
@@ -2283,12 +2285,15 @@ impl Solver {
         };
         !args.is_empty()
             && values.is_all()
-            && self.variances(*h, args.len()).zip(args).all(|(v, a)| match v {
-                Variance::Contra => matches!(a, Ty::Never),
-                Variance::Co => matches!(a, Ty::Top),
-                Variance::Bi => true,
-                Variance::Inv => false,
-            })
+            && self
+                .variances(*h, args.len())
+                .zip(args)
+                .all(|(v, a)| match v {
+                    Variance::Contra => matches!(a, Ty::Never),
+                    Variance::Co => matches!(a, Ty::Top),
+                    Variance::Bi => true,
+                    Variance::Inv => false,
+                })
     }
 
     fn inter_in(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {
@@ -2473,7 +2478,6 @@ impl Solver {
                 Ty::Fn(Box::new(FnTy {
                     params,
                     ret: self.merge_arg(f.ret, g.ret, Variance::Co, union, Mode::Value),
-                    err: self.merge_arg(f.err, g.err, Variance::Co, union, Mode::Row),
                     env,
                 }))
             }
@@ -2613,7 +2617,6 @@ impl Solver {
                     .map(|(n, t)| (n, self.normalize_mode(t, Mode::Value)))
                     .collect(),
                 ret: self.normalize_mode(f.ret, Mode::Value),
-                err: self.normalize_mode(f.err, Mode::Row),
                 env: self.normalize_mode(f.env, Mode::Env),
             })),
             Ty::Union(ms) => {
@@ -2629,7 +2632,14 @@ impl Solver {
                     .map(|t| self.normalize_mode(t, mode))
                     .collect();
                 let scalar = ms.iter().any(|t| t.scalar().is_some());
-                self.inter_in(ms, if mode == Mode::Row && scalar { Mode::Value } else { mode })
+                self.inter_in(
+                    ms,
+                    if mode == Mode::Row && scalar {
+                        Mode::Value
+                    } else {
+                        mode
+                    },
+                )
             }
             Ty::Diff(t, hs) => {
                 let t = self.normalize_mode(*t, mode);
@@ -2651,7 +2661,11 @@ impl Solver {
         let scalar = members.iter().any(|t| t.scalar().is_some());
         self.inter_in(
             members,
-            if mode == Mode::Row && scalar { Mode::Value } else { mode },
+            if mode == Mode::Row && scalar {
+                Mode::Value
+            } else {
+                mode
+            },
         )
     }
 
@@ -3107,7 +3121,6 @@ fn bound_vars(s: &Solver, t: &Ty, pos: bool, con: bool, out: &mut Vec<(V, bool, 
                 bound_vars(s, &p.1, !pos, true, out);
             }
             bound_vars(s, &f.ret, pos, true, out);
-            env_vars(s, &f.err, pos, true, out);
             env_vars(s, &f.env, pos, true, out);
         }
         Ty::Union(ms) | Ty::Inter(ms) => ms.iter().for_each(|a| bound_vars(s, a, pos, con, out)),

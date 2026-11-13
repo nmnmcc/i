@@ -83,7 +83,6 @@ impl Label {
 pub(crate) struct Function {
     pub params: Vec<(Option<Arc<str>>, Id)>,
     pub ret: Id,
-    pub err: Id,
     pub env: Id,
 }
 
@@ -120,7 +119,7 @@ impl Node {
                 .params
                 .iter()
                 .map(|(_, t)| *t)
-                .chain([f.ret, f.err, f.env])
+                .chain([f.ret, f.env])
                 .collect(),
             Self::Rec(fields) => fields.iter().map(|(_, t)| *t).collect(),
             Self::Union(a, b) | Self::Inter(a, b) | Self::Both(a, b) => vec![*a, *b],
@@ -586,7 +585,6 @@ impl Arena {
                         .map(|(name, t)| (name, done[&t]))
                         .collect(),
                     ret: done[&f.ret],
-                    err: done[&f.err],
                     env: done[&f.env],
                 }),
                 Node::Rec(fields) => self.record(
@@ -697,7 +695,6 @@ mod tests {
         let f = g.function(Function {
             params: vec![(None, a)],
             ret: a,
-            err: Id::NEVER,
             env: Id::NEVER,
         });
         let left = g.record(vec![(Label::name("cell"), cell)]);

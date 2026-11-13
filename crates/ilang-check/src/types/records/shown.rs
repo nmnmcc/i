@@ -22,7 +22,7 @@ enum Shape {
     Top,
     Var(ShownType),
     Con(Head, crate::types::lits::ValueSet, Vec<usize>),
-    Fn(Vec<(Option<String>, usize)>, usize, usize, usize),
+    Fn(Vec<(Option<String>, usize)>, usize, usize),
     Record(Vec<(ShapeLabel, usize)>),
     Union(usize, usize),
     Inter(usize, usize),
@@ -74,7 +74,6 @@ fn graph_shape(shown: &ShownGraph, interned: &mut FxHashMap<Shape, usize>) -> us
                     .map(|(n, t)| (n.map(|n| n.to_string()), at(t)))
                     .collect(),
                 at(f.ret),
-                at(f.err),
                 at(f.env),
             ),
             Node::Rec(fields) => Shape::Record(
@@ -277,9 +276,7 @@ impl ShownGraph {
                     // The need (syntax three §2.10): an error is the service
                     // `Fail(E)`; a row variable is `..N`.
                     let mut items = Vec::new();
-                    if fun.err != super::Id::NEVER {
-                        items.push(format!("Fail({})", child(fun.err)));
-                    }
+
                     if fun.env != super::Id::NEVER {
                         let mut stack = vec![fun.env];
                         while let Some(id) = stack.pop() {

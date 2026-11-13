@@ -33,7 +33,6 @@ enum WireNode {
     Function {
         params: Vec<(Option<String>, usize)>,
         ret: usize,
-        err: usize,
         env: usize,
     },
     Record {
@@ -148,7 +147,6 @@ pub(crate) fn encode(
                         .map(|(n, t)| (n.map(|n| n.to_string()), at(t)))
                         .collect(),
                     ret: at(f.ret),
-                    err: at(f.err),
                     env: at(f.env),
                 },
                 Node::Rec(fields) => WireNode::Record {
@@ -169,7 +167,7 @@ pub(crate) fn encode(
         })
         .collect();
     serde_json::to_string(&Bundle {
-        version: 1,
+        version: 2,
         root: indices[&graph.id],
         nodes,
     })
@@ -186,7 +184,7 @@ pub(crate) fn decode(
     scope_owner: &mut impl FnMut(usize, u32, &str) -> Option<LabelOwner>,
 ) -> Result<Ty, String> {
     let bundle: Bundle = serde_json::from_str(text).map_err(|e| e.to_string())?;
-    if bundle.version != 1 || bundle.root >= bundle.nodes.len() {
+    if bundle.version != 2 || bundle.root >= bundle.nodes.len() {
         return Err("invalid type graph version or root".into());
     }
     let mut owners: FxHashMap<usize, LabelOwner> = FxHashMap::default();
@@ -253,18 +251,12 @@ pub(crate) fn decode(
                 let args = args.into_iter().map(get).collect::<Result<Vec<_>, _>>()?;
                 Node::Con(Head::Tuple(args.len() as u32), ValueSet::ALL, args)
             }
-            WireNode::Function {
-                params,
-                ret,
-                err,
-                env,
-            } => Node::Fn(Function {
+            WireNode::Function { params, ret, env } => Node::Fn(Function {
                 params: params
                     .into_iter()
                     .map(|(n, t)| Ok((n.map(Arc::from), get(t)?)))
                     .collect::<Result<_, String>>()?,
                 ret: get(ret)?,
-                err: get(err)?,
                 env: get(env)?,
             }),
             WireNode::Record { fields } => {
@@ -379,7 +371,7 @@ mod tests {
         let mut var = |_: &str| Some(V(0));
         assert!(
             decode(
-                r#"{"version":2,"root":0,"nodes":[{"kind":"Top"}]}"#,
+                r#"{"version":1,"root":0,"nodes":[{"kind":"Top"}]}"#,
                 &pool,
                 &mut ty,
                 &mut var,
@@ -389,7 +381,7 @@ mod tests {
         );
         assert!(
             decode(
-                r#"{"version":1,"root":0,"nodes":[{"kind":"Union","a":0,"b":0}]}"#,
+                r#"{"version":2,"root":0,"nodes":[{"kind":"Union","a":0,"b":0}]}"#,
                 &pool,
                 &mut ty,
                 &mut var,

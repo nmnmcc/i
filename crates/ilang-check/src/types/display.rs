@@ -256,7 +256,6 @@ fn same_unmarked(a: &Ty, b: &Ty) -> bool {
                     .zip(&g.params)
                     .all(|(p, q)| p.0 == q.0 && same_unmarked(&p.1, &q.1))
                 && same_unmarked(&f.ret, &g.ret)
-                && same_unmarked(&f.err, &g.err)
                 && same_unmarked(&f.env, &g.env)
         }
         (Ty::Diff(x, h), Ty::Diff(y, g)) => same_unmarked(x, y) && all(h, g),
@@ -451,9 +450,7 @@ fn ty_vars(t: &Ty, out: &mut Vec<V>) {
         }
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| ty_vars(&p.1, out));
-            [&f.ret, &f.err, &f.env]
-                .into_iter()
-                .for_each(|x| ty_vars(x, out));
+            [&f.ret, &f.env].into_iter().for_each(|x| ty_vars(x, out));
         }
         Ty::Diff(a, h) => {
             ty_vars(a, out);
@@ -616,7 +613,6 @@ impl Coalescer<'_> {
                     .map(|(l, p)| (l.clone(), self.bound_key(p)))
                     .collect(),
                 ret: self.bound_key(&f.ret),
-                err: self.bound_key(&f.err),
                 env: self.bound_key(&f.env),
             })),
             Ty::Union(xs) => Ty::Union(xs.iter().map(|x| self.bound_key(x)).collect()),
@@ -797,9 +793,7 @@ impl Coalescer<'_> {
                         // Rule A: in a need, arguments go the other way
                         // round from values.
                         Variance::Co if env => self.go(a, !pos, depth + 1, row != Mode::Value),
-                        Variance::Contra if env => {
-                            self.go(a, pos, depth + 1, row != Mode::Value)
-                        }
+                        Variance::Contra if env => self.go(a, pos, depth + 1, row != Mode::Value),
                         Variance::Bi if env => self.go(a, pos, depth + 1, row != Mode::Value),
                         Variance::Co | Variance::Bi => {
                             self.go(a, pos, depth + 1, row != Mode::Value)
@@ -820,7 +814,6 @@ impl Coalescer<'_> {
                     .map(|(l, p)| (l.clone(), self.go(p, !pos, depth + 1, false)))
                     .collect(),
                 ret: self.go(&f.ret, pos, depth + 1, false),
-                err: self.go(&f.err, pos, depth + 1, true),
                 env: self.go(&f.env, pos, depth + 1, true),
             })),
             Ty::Union(ms) => Ty::Union(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
@@ -867,7 +860,6 @@ pub(crate) fn both(t: &Ty) -> Ty {
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f.params.iter().map(|(l, p)| (l.clone(), both(p))).collect(),
             ret: both(&f.ret),
-            err: both(&f.err),
             env: both(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(both(a)), h.iter().map(both).collect()),
@@ -991,7 +983,6 @@ impl Norm<'_> {
                         .map(|(l, p)| (l, self.norm(p)))
                         .collect(),
                     ret: self.norm(f.ret),
-                    err: self.env(f.err),
                     env: self.services(f.env),
                 }))
             }
@@ -1052,10 +1043,9 @@ impl Norm<'_> {
                 continue;
             }
             let directed = |t: &Ty| match t {
-                Ty::Con(h, _, xs) if !xs.is_empty() => self
-                    .s
-                    .variances(*h, xs.len())
-                    .all(|v| v != Variance::Inv),
+                Ty::Con(h, _, xs) if !xs.is_empty() => {
+                    self.s.variances(*h, xs.len()).all(|v| v != Variance::Inv)
+                }
                 _ => false,
             };
             if directed(&m)
@@ -1199,7 +1189,7 @@ impl Norm<'_> {
             }
             Ty::Fn(f) => {
                 f.params.iter().all(|p| p.1 == Ty::Never)
-                    && [&f.ret, &f.err, &f.env].iter().all(|x| is_top(x))
+                    && [&f.ret, &f.env].iter().all(|x| is_top(x))
             }
             _ => false,
         }
@@ -1423,7 +1413,6 @@ impl Norm<'_> {
                         })
                         .collect(),
                     ret: pick(f.ret, g.ret, Variance::Co),
-                    err: pick(f.err, g.err, Variance::Co),
                     env: pick(f.env, g.env, Variance::Co),
                 }))
             }
@@ -1633,7 +1622,6 @@ impl Norm<'_> {
                         self.walk(p, !pos, occ, order, false);
                     }
                     self.walk(&f.ret, pos, occ, order, false);
-                    self.walk(&f.err, pos, occ, order, true);
                     self.walk(&f.env, pos, occ, order, true);
                 }
                 Ty::Both(a, b) => {
@@ -1687,9 +1675,7 @@ fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
         Ty::Fn(g) => {
             g.params.iter().for_each(|p| visit(&p.1, f));
-            [&g.ret, &g.err, &g.env]
-                .into_iter()
-                .for_each(|x| visit(x, f));
+            [&g.ret, &g.env].into_iter().for_each(|x| visit(x, f));
         }
         Ty::Diff(a, h) => {
             visit(a, f);
@@ -1725,7 +1711,6 @@ fn replace_map(t: &Ty, map: &HashMap<V, &Ty>) -> Ty {
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f.params.iter().map(|(l, p)| (l.clone(), r(p))).collect(),
             ret: r(&f.ret),
-            err: r(&f.err),
             env: r(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(r(a)), h.iter().map(r).collect()),
@@ -1746,7 +1731,6 @@ fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f.params.iter().map(|(l, p)| (l.clone(), r(p))).collect(),
             ret: r(&f.ret),
-            err: r(&f.err),
             env: r(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(r(a)), h.iter().map(r).collect()),
@@ -1760,7 +1744,6 @@ fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Role {
     Value,
-    Err,
     Env,
 }
 
@@ -1833,9 +1816,6 @@ impl Namer {
 
     fn fresh(&mut self, role: Role) -> String {
         let candidates: Box<dyn Iterator<Item = String>> = match role {
-            Role::Err => {
-                Box::new(std::iter::once("E".to_string()).chain((2..).map(|i| format!("E{i}"))))
-            }
             Role::Env => {
                 Box::new(std::iter::once("N".to_string()).chain((2..).map(|i| format!("N{i}"))))
             }
@@ -1957,7 +1937,6 @@ fn fit_pattern(p: &Ty, t: &Ty, args: &mut [Option<Ty>]) -> bool {
                     .zip(&g.params)
                     .all(|(x, y)| x.0 == y.0 && fit_pattern(&x.1, &y.1, args))
                 && fit_pattern(&f.ret, &g.ret, args)
-                && fit_pattern(&f.err, &g.err, args)
                 && fit_pattern(&f.env, &g.env, args)
         }
         _ => {
@@ -1985,7 +1964,6 @@ fn fold_in(s: &Solver, t: &Ty) -> Ty {
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
             ret: go(&f.ret),
-            err: go(&f.err),
             env: go(&f.env),
         })),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
@@ -2029,7 +2007,6 @@ fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
             ret: go(&f.ret),
-            err: go(&f.err),
             env: go(&f.env),
         })),
         // A part of `H` with no effect is written `_`.
@@ -2067,7 +2044,6 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| roles(&p.1, Role::Value, out));
             roles(&f.ret, Role::Value, out);
-            roles(&f.err, Role::Err, out);
             roles(&f.env, Role::Env, out);
         }
         Ty::Both(a, b) => {
@@ -2131,7 +2107,7 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
                 .map(|(l, p)| (l.clone(), tree_with(p, name)))
                 .collect();
             let ret = tree_with(&f.ret, name);
-            let err = (f.err != Ty::Never).then(|| tree_with(&f.err, name));
+            let err = None;
             let env = (f.env != Ty::Never).then(|| tree_with(&f.env, name));
             ShownType::Fn(Box::new(ShownFn {
                 params,
@@ -2193,7 +2169,7 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
         }
         Ty::Fn(f) => {
             f.params.iter().for_each(|p| outer_vars(&p.1, out));
-            [&f.ret, &f.err, &f.env]
+            [&f.ret, &f.env]
                 .into_iter()
                 .for_each(|x| outer_vars(x, out));
         }
@@ -2230,7 +2206,6 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
             ret: go(&f.ret),
-            err: go(&f.err),
             env: go(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(
@@ -2287,7 +2262,6 @@ fn not_general(s: &Solver, t: &Ty, level: u32) -> Ty {
         Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
             params: f.params.iter().map(|(l, p)| (l.clone(), go(p))).collect(),
             ret: go(&f.ret),
-            err: go(&f.err),
             env: go(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.iter().map(go).collect()),

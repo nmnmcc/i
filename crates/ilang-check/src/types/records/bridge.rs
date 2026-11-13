@@ -149,7 +149,7 @@ impl Pool {
                                 .params
                                 .iter()
                                 .map(|(_, t)| t)
-                                .chain([&f.ret, &f.err, &f.env])
+                                .chain([&f.ret, &f.env])
                                 .collect(),
                             Ty::Diff(base, heads) => {
                                 std::iter::once(base.as_ref()).chain(heads).collect()
@@ -163,7 +163,7 @@ impl Pool {
                 Task::Finish(t) => {
                     let arity = match t {
                         Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.len(),
-                        Ty::Fn(f) => f.params.len() + 3,
+                        Ty::Fn(f) => f.params.len() + 2,
                         Ty::Diff(_, heads) => heads.len() + 1,
                         Ty::Both(..) => 2,
                         _ => unreachable!(),
@@ -182,8 +182,7 @@ impl Pool {
                                     .map(|((l, _), id)| (l.as_deref().map(Arc::from), *id))
                                     .collect(),
                                 ret: parts[n],
-                                err: parts[n + 1],
-                                env: parts[n + 2],
+                                env: parts[n + 1],
                             })
                         }
                         Ty::Union(_) => parts.into_iter().fold(Id::NEVER, |a, b| arena.union(a, b)),
@@ -232,7 +231,6 @@ fn remap(node: Node, done: &FxHashMap<Id, Id>) -> Node {
         Node::Fn(f) => Node::Fn(Function {
             params: f.params.into_iter().map(|(l, t)| (l, done[&t])).collect(),
             ret: done[&f.ret],
-            err: done[&f.err],
             env: done[&f.env],
         }),
         Node::Rec(fs) => Node::Rec(fs.into_iter().map(|(l, t)| (l, done[&t])).collect()),
@@ -261,7 +259,7 @@ impl Graph {
                 .enumerate()
                 .map(|(i, child)| {
                     let env = match &node {
-                        Node::Fn(fun) => i == fun.params.len() + 2,
+                        Node::Fn(fun) => i == fun.params.len() + 1,
                         Node::Con(..) | Node::Rec(_) | Node::Without(..) => false,
                         Node::Diff(..) => i == 0 && env,
                         _ => env,
@@ -288,7 +286,6 @@ impl Graph {
                         .map(|(label, _)| (label.map(|l| l.to_string()), next()))
                         .collect(),
                     ret: next(),
-                    err: next(),
                     env: next(),
                 })),
                 Node::Rec(fields) => self
@@ -406,7 +403,6 @@ impl Graph {
                     .map(|(l, t)| (l.map(|l| l.to_string()), self.child(t)))
                     .collect(),
                 ret: self.child(f.ret),
-                err: self.child(f.err),
                 env: self.child(f.env),
             })),
             Node::Union(a, b) => Ty::Union(vec![self.child(a), self.child(b)]),
@@ -530,7 +526,7 @@ impl Graph {
                 .params
                 .iter()
                 .map(|(_, t)| (*t, pol.flip()))
-                .chain([(f.ret, pol), (f.err, pol), (f.env, pol)])
+                .chain([(f.ret, pol), (f.env, pol)])
                 .collect(),
             Node::Diff(base, heads) => std::iter::once((*base, pol))
                 .chain(heads.iter().map(|t| (*t, Pol::Both)))
@@ -584,7 +580,7 @@ impl Graph {
                         (Node::Con(..), Some(env)) => {
                             (if env { Pol::Both } else { p }, Some(false))
                         }
-                        (Node::Fn(fun), Some(_)) => (p, Some(index == fun.params.len() + 2)),
+                        (Node::Fn(fun), Some(_)) => (p, Some(index == fun.params.len() + 1)),
                         (Node::Rec(_) | Node::Without(..), Some(_)) => (p, Some(false)),
                         (Node::Diff(..), Some(env)) => (pol, Some(index == 0 && env)),
                         _ => (p, env),
@@ -622,7 +618,6 @@ impl Graph {
                     Node::Fn(f) => Node::Fn(Function {
                         params: f.params.into_iter().map(|(l, _)| (l, next())).collect(),
                         ret: next(),
-                        err: next(),
                         env: next(),
                     }),
                     Node::Rec(fs) => Node::Rec(fs.into_iter().map(|(l, _)| (l, next())).collect()),
@@ -684,7 +679,6 @@ impl Graph {
                             .map(|(_, t)| (t, pol.flip(), true, false)),
                     );
                     pending.push((f.ret, pol, true, false));
-                    pending.push((f.err, pol, true, false));
                     pending.push((f.env, pol, true, true));
                 }
                 Node::Rec(fields) => {
@@ -780,7 +774,7 @@ impl Graph {
                             .zip(solver.variances(*h, parts.len()))
                             .filter_map(|(t, v)| (v == crate::types::Variance::Co).then_some(*t))
                             .collect(),
-                        Node::Fn(f) => vec![f.ret, f.err],
+                        Node::Fn(f) => vec![f.ret],
                         Node::Diff(base, _) => vec![*base],
                         _ => node.children(),
                     };
@@ -833,7 +827,6 @@ impl Graph {
                                 .map(|(l, _)| (l.map(|l| l.to_string()), solver.fresh()))
                                 .collect(),
                             ret: next(),
-                            err: next(),
                             env: solver.fresh(),
                         })),
                         Node::Rec(fields) => self
@@ -963,7 +956,7 @@ impl Graph {
                 ),
                 Node::Fn(f) => {
                     pending.extend(f.params.into_iter().map(|(_, id)| (id, Mode::Value)));
-                    pending.extend([(f.ret, Mode::Value), (f.err, Mode::Row), (f.env, Mode::Env)]);
+                    pending.extend([(f.ret, Mode::Value), (f.env, Mode::Env)]);
                 }
                 Node::Rec(fields) => {
                     pending.extend(fields.into_iter().map(|(_, id)| (id, Mode::Value)))
@@ -1004,7 +997,6 @@ impl Graph {
                         })
                         .collect(),
                     ret: done[&(f.ret, Mode::Value)].clone(),
-                    err: done[&(f.err, Mode::Row)].clone(),
                     env: done[&(f.env, Mode::Env)].clone(),
                 })),
                 Node::Rec(fields) => solver.record(
