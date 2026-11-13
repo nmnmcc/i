@@ -1300,11 +1300,10 @@ first = <A>(xs: List(A)) -> Option(A) { … }
 - **Polymorphic types are rigid.** A written function type with
   `TypeParams` in a parameter, a field, a type definition or an annotation is
   a polymorphic type: `Layer = <N>() <- N -> (Config, Log)`,
-  `Show = (write = <A>(A) -> Nil)`. A value checked against it is checked with
-  fresh rigid constants for its parameters and a level-escape check
-  (skolemisation, Peyton Jones et al. 2007); each use instantiates it afresh
-  through the existing `instantiate` (`infer.rs`:1618). Inference never
-  guesses a polymorphic type: a parameter gets one only from a written type,
+  `Show = (write = <A>(A) -> Nil)`. Rigid checking, subtyping, variance and
+  quantified joins and meets follow spec §4.6; each use instantiates afresh.
+  Inference never guesses a polymorphic type: a parameter gets one only from
+  a written type,
   as for polymorphic fields in OCaml and polymorphic function types in
   Scala 3. A rigid row variable is one opaque member of a need.
 - **Chains.** Each branch of a chain writes its own `<…>`, which scopes over

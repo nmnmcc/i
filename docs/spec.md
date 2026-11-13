@@ -955,6 +955,28 @@ main = () { f(1, 2) }
 
 `<A, N>` before the parameter part makes the type polymorphic (§4.7).
 
+A written polymorphic type binds its parameters universally. Bound names are
+local to that type and may be renamed without changing it. They are not free
+variables for the variance of an enclosing labelled type; free variables in
+the quantified body still follow the ordinary input and output places.
+
+To check subtyping against a polymorphic type, first replace its bound
+parameters with fresh rigid types. Instantiate a polymorphic source with fresh
+inference variables, then check the bodies by §4.5. An instance may use the
+rigid types in scope, but none may escape its comparison. An instantiation is
+a monotype: it does not introduce a new universal binder. Invariant places
+require subtyping both ways. This is the same rigid check used when a value is
+checked against a written polymorphic type (§4.7).
+
+A union or intersection of polymorphic types keeps each complete quantified
+type as an operand. Do not instantiate their binders to merge them as ordinary
+function members, or move a binder across `|` or `&`. The unquantified function
+merge of §4.4 applies within their bodies, not across the quantifiers. Equal
+operands, including renamed bound parameters, coalesce; subtyping can remove
+a redundant operand by the join and meet laws of §4.4. These operations never
+infer a new polymorphic parameter type that was not written.
+
+
 ### 4.7 Type inference
 
 Types are worked out by inference with subtypes (algebraic subtyping).
@@ -971,7 +993,7 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 - On a function expression, the type parameters may be used in its parameter group, its service pattern, its `->` part and its body, also in nested functions and annotations there. On a function type, they may be used in the rest of that type.
 - A type parameter used where a need is written (`<- N`, `<- (..N, …)`) is a **row variable**: it stands for a whole set of services. Any other use makes it an ordinary type variable. Using one name both ways is a compile error.
 - On a function expression, a type parameter is a type variable of that function, and it is generalized with it. Inference may make it more exact: `id = <A>(x: A) -> A { 1 }` is correct.
-- A written function type with type parameters in a parameter, in the data of a type, in a type definition, or in an annotation is a **polymorphic type**, as `Show = (write = <A>(A) -> Nil)`. A value checked against it is checked with a new rigid type for each of its parameters, which may not escape; each use of a value of that type instantiates it again. Inference never guesses a polymorphic type: a parameter gets one only from a written type.
+- A written function type with type parameters in a parameter, in the data of a type, in a type definition, or in an annotation is a **polymorphic type**, as `Show = (write = <A>(A) -> Nil)`. Its comparisons and quantified lattice operations use §4.6; each use instantiates it again. Inference never guesses a polymorphic type: a parameter gets one only from a written type.
 - An `UpName` in a type that is neither a type nor a type parameter in scope is a compile error. The message says how to declare it.
 - A bound on a type variable is written as an intersection where it is used, as `x: A & Show`. Capabilities are passed as parameters or as services; none is passed implicitly.
 
