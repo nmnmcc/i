@@ -902,6 +902,13 @@ impl<'a> Checker<'a> {
         let Some(root) = p.root else {
             return;
         };
+        let invalid: HashSet<_> = p
+            .declared_entries
+            .iter()
+            .copied()
+            .filter(|&d| matches!(p.def(d).kind, DefKind::Binding { .. }))
+            .filter(|&d| !self.entry_value(d))
+            .collect();
         let mut entries = Vec::new();
         for m in p.modules.iter().filter(|m| m.package == root) {
             for b in m.bindings.iter().filter(|b| b.main) {
@@ -911,8 +918,47 @@ impl<'a> Checker<'a> {
         entries.extend(p.host_exports.iter().map(|d| (*d, false, true)));
         entries.extend(selected.iter().map(|(d, nil)| (*d, *nil, false)));
         for (d, require_nil, export) in entries {
-            self.entry_point(d, require_nil, export);
+            if !invalid.contains(&d)
+                && (export || p.declared_entries.contains(&d) || self.entry_value(d))
+            {
+                self.entry_point(d, require_nil, export);
+            }
         }
+    }
+
+    /// Entries call initialized values, so shape validation belongs to typing.
+    fn entry_value(&mut self, d: DefId) -> bool {
+        self.set_module(d.module);
+        let def = self.p.def(d);
+        let (name, span) = (def.name.clone(), def.span);
+        let Some(scheme) = self.defs.get(&d) else {
+            return false;
+        };
+        let opts = display::Opts {
+            mono: true,
+            written: false,
+        };
+        let Ok(t) = display::shown(&self.s, &scheme.ty, opts) else {
+            self.report_coalescing(span);
+            return false;
+        };
+        let Ty::Fn(f) = display::both(&t) else {
+            self.error(
+                code::ENTRY_TYPE,
+                span,
+                format!("entry `{name}` must be a function value (§10.2)"),
+            );
+            return false;
+        };
+        if !matches!(&f.param, Ty::Con(Head::Shape(shape), _, _) if shape.is_empty()) {
+            self.error(
+                code::ENTRY_PARAMS,
+                span,
+                format!("entry `{name}` has no parameters but environment parameters (§10.2)"),
+            );
+            return false;
+        }
+        true
     }
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test

@@ -205,3 +205,47 @@ fn cli_selects_entries_and_passes_arguments() {
     // A native executable named after the entry.
     assert!(dir.path().join("build/tool").exists());
 }
+
+#[test]
+fn entries_call_initialized_aliases_and_computed_function_values() {
+    for value in ["worker", "make(42)"] {
+        let source = format!(
+            "worker = () {{ panic(\"target invoked\") }}\nmake = (n) {{ () {{ assert(n == 42) }} }}\nmain = {value}\n"
+        );
+        let dir = project(
+            "name = \"app\"\n[entries]\nother = \"main.main\"\n",
+            &[("src/main.i", &source)],
+        );
+        for opt in [Level::O0, Level::O2] {
+            for selected in [None, Some("other")] {
+                let built =
+                    build_entry(dir.path(), BuildOptions { opt, ..options() }, selected).unwrap();
+                let program = built.host_program().unwrap();
+                let mut instance = program.instantiate(built.host_options()).unwrap();
+                let outcome = instance.run_entry().unwrap();
+                if value == "worker" {
+                    assert!(
+                        matches!(outcome, ilang_host::Outcome::Stop(_)),
+                        "{outcome:?}"
+                    );
+                    assert!(format!("{outcome:?}").contains("target invoked"));
+                } else {
+                    assert!(matches!(outcome, ilang_host::Outcome::Ok(_)), "{outcome:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn unselected_computed_entry_types_are_still_validated() {
+    let dir = project(
+        "name = \"app\"\n[entries]\nbad = \"tools.target\"\n",
+        &[
+            ("src/main.i", "main = () { Nil }\n"),
+            ("src/tools.i", "make = () { (x) { x } }\ntarget = make()\n"),
+        ],
+    );
+    let err = build(dir.path(), options()).err().unwrap().to_string();
+    assert!(err.contains("no parameters"), "{err}");
+}

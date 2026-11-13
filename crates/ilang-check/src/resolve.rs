@@ -961,14 +961,20 @@ impl<'a> Resolver<'a> {
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
         let written = "a program entry";
-        let ast::ExprKind::Fn(f) = &ungroup(&b.value).kind else {
+        // Aliases and computed function values are validated after inference.
+        // Keep definite literal errors available even during resolver recovery.
+        let value = &ungroup(&b.value).kind;
+        if matches!(
+            value,
+            ast::ExprKind::Int(_) | ast::ExprKind::Float(_) | ast::ExprKind::String(_)
+        ) {
             self.error(
                 code::ENTRY_FORM,
                 span,
-                format!("{written} is on a binding whose value is a function expression"),
+                format!("{written} must be a function value"),
             );
             return false;
-        };
+        }
         if names.len() != 1 {
             self.error(
                 code::ENTRY_FORM,
@@ -977,7 +983,9 @@ impl<'a> Resolver<'a> {
             );
             return false;
         }
-        if f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_))) {
+        if let ast::ExprKind::Fn(f) = value
+            && f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_)))
+        {
             self.error(
                 code::ENTRY_PARAMS,
                 span,

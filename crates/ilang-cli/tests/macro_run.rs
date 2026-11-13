@@ -1887,9 +1887,21 @@ fn checked_collection_validates_targets_and_duplicates() {
     assert_eq!(good.len(), 1);
     assert_eq!(program.def(good[0].target).name, "good");
     assert_eq!(good[0].data[0].1, "example");
+    // §6.6 and §14.5 call the initialized value, so an alias is a valid
+    // target. Keep scalar, nonempty-parameter and duplicate targets invalid.
+    let alias = collections::resolve(
+        &parsed,
+        program,
+        typed,
+        &[transaction(vec![request("alias")])],
+    )
+    .unwrap();
+    assert_eq!(alias.len(), 1);
+    assert_eq!(program.def(alias[0].target).name, "alias");
+    assert_eq!(alias[0].data[0].1, "example");
     for requests in [
         vec![request("bad")],
-        vec![request("alias")],
+        vec![request("anchor")],
         vec![request("good"), request("good")],
     ] {
         assert!(collections::resolve(&parsed, program, typed, &[transaction(requests)]).is_err());

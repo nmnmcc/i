@@ -1,4 +1,4 @@
-src/main.i:2:1: error[E0304]: a program entry is on a binding whose value is a function expression
+src/main.i:2:1: error[E0304]: a program entry must be a function value
 src/main.i:12:1: error[E0301]: the attribute `@test` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`
 test/ok_test.i:2:1: error[E0301]: the attribute `@test` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`
 test/ok_test.i:5:1: error[E0301]: the attribute `@test` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`
