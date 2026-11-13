@@ -947,7 +947,13 @@ impl Parser<'_> {
             self.expect(&T::Eq)?;
             let value = self.expr()?;
             let span = self.span_from(start);
-            return Ok(Stmt::Env { ty, value, span, spread: false, group: None });
+            return Ok(Stmt::Env {
+                ty,
+                value,
+                span,
+                spread: false,
+                group: None,
+            });
         }
         if self.at_type_params() {
             let (name, type_params, ty) = self.declared_head()?;

@@ -555,7 +555,12 @@ pub enum Param {
         label: Option<String>,
     },
     /// `name ! T` (§6.11). `ty` is one named type.
-    Env { rest: bool, var: VarId, name: Ident, ty: Type },
+    Env {
+        rest: bool,
+        var: VarId,
+        name: Ident,
+        ty: Type,
+    },
 }
 
 #[derive(Clone, Debug)]

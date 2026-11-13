@@ -812,9 +812,9 @@ impl Encoder<'_> {
             .iter()
             .map(|s| match s {
                 Stmt::Bind(b) => self.binding(b),
-                Stmt::Env { ty, value, span, .. } => {
-                    self.form("!", [self.ty(ty), self.expr(value)], *span)
-                }
+                Stmt::Env {
+                    ty, value, span, ..
+                } => self.form("!", [self.ty(ty), self.expr(value)], *span),
                 Stmt::Expr(e) => self.expr(e),
             })
             .collect();

@@ -631,7 +631,9 @@ impl Solver {
     /// member of `M` with the same type constructor that satisfies it as
     /// a value. Needs compare services in reverse (§4.5 rule 4).
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
-        if self.vacuous(l) { return; }
+        if self.vacuous(l) {
+            return;
+        }
         self.constrain_in(l, r, Mode::Env);
     }
 
@@ -734,8 +736,6 @@ impl Solver {
             _ => Mode::Value,
         }
     }
-
-
 
     /// Hidden difference constraints cannot be thrown away by rebuilding
     /// only the visible type. Keep the bounded scheme in this case.
@@ -2107,7 +2107,6 @@ impl Solver {
                 })
     }
 
-
     fn inter_in(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {
         let mut flat = Vec::new();
         for m in ms {
@@ -2310,7 +2309,9 @@ impl Solver {
     /// not install a handler obligation: the same row is supplied whole.
     pub fn env_without_row(&mut self, need: &Ty, row: &Ty) -> Ty {
         fn go(s: &mut Solver, need: &Ty, row: &Ty, seen: &mut HashSet<V>) -> Ty {
-            if need == row { return Ty::Never; }
+            if need == row {
+                return Ty::Never;
+            }
             match need {
                 Ty::Union(ms) => {
                     let parts = ms.iter().map(|m| go(s, m, row, seen)).collect();
@@ -2318,12 +2319,17 @@ impl Solver {
                 }
                 Ty::Var(v) => {
                     if let Ty::Var(r) = row
-                        && s.reach(vec![*v], false).0.contains(r) {
+                        && s.reach(vec![*v], false).0.contains(r)
+                    {
                         return Ty::Never;
                     }
-                    if !seen.insert(*v) { return Ty::Never; }
+                    if !seen.insert(*v) {
+                        return Ty::Never;
+                    }
                     let lower = s.var(*v).lower.clone();
-                    if lower.is_empty() { return need.clone(); }
+                    if lower.is_empty() {
+                        return need.clone();
+                    }
                     let parts = lower.iter().map(|m| go(s, m, row, seen)).collect();
                     s.env_union(parts)
                 }
@@ -2344,7 +2350,11 @@ impl Solver {
         let mut todo = vec![need.clone()];
         while let Some(t) = todo.pop() {
             match t {
-                Ty::Con(Head::Named(r), ..) => { if !out.contains(&r) { out.push(r); } }
+                Ty::Con(Head::Named(r), ..) => {
+                    if !out.contains(&r) {
+                        out.push(r);
+                    }
+                }
                 Ty::Union(ms) => todo.extend(ms),
                 Ty::Var(v) if seen.insert(v) => todo.extend(self.var(v).lower.clone()),
                 Ty::Diff(base, _) => todo.push(*base),

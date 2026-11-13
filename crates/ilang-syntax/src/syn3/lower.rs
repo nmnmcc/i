@@ -773,17 +773,26 @@ impl Cx {
         let mut stmts = Vec::new();
         let mut envs = Vec::new();
         let items: Vec<(&n::Expr, bool)> = match &services.kind {
-            n::ExprKind::Data(items) => items.iter().filter_map(|item| match item {
-                n::DItem::Pos(e) => Some((e, false)),
-                n::DItem::Spread(e) => Some((e, true)),
-                n::DItem::Label(l, _) => {
-                    self.error(l.span.0, "a provided service has no label: it is keyed by its type (§2.10.2)");
-                    None
-                }
-            }).collect(),
+            n::ExprKind::Data(items) => items
+                .iter()
+                .filter_map(|item| match item {
+                    n::DItem::Pos(e) => Some((e, false)),
+                    n::DItem::Spread(e) => Some((e, true)),
+                    n::DItem::Label(l, _) => {
+                        self.error(
+                            l.span.0,
+                            "a provided service has no label: it is keyed by its type (§2.10.2)",
+                        );
+                        None
+                    }
+                })
+                .collect(),
             _ => vec![(services, true)],
         };
-        let apart = items.len() > 1 && items.iter().any(|(e, _)| !matches!(e.kind, n::ExprKind::Name { .. }));
+        let apart = items.len() > 1
+            && items
+                .iter()
+                .any(|(e, _)| !matches!(e.kind, n::ExprKind::Name { .. }));
         for (e, spread) in items {
             let mut value = self.expr(e);
             if apart {

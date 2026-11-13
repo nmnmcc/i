@@ -240,8 +240,12 @@ fn fail_in_a_function_head_is_an_ordinary_service() {
     ] {
         let (module, diags) = syn3::parse_lowered(source);
         assert!(diags.is_empty(), "{source}\n{diags:#?}");
-        let ItemKind::Binding(binding) = &module.items[0].kind else { panic!() };
-        let ExprKind::Fn(function) = &binding.value.kind else { panic!() };
+        let ItemKind::Binding(binding) = &module.items[0].kind else {
+            panic!()
+        };
+        let ExprKind::Fn(function) = &binding.value.kind else {
+            panic!()
+        };
         assert!(function.params.iter().any(|p| matches!(p,
             Param::Env { ty, rest: false, .. }
                 if matches!(&ty.kind, TypeKind::Named { name, .. } if name.name == "Fail")
@@ -282,14 +286,31 @@ fn labelled_function_type_parameters_keep_their_data_keys() {
 #[test]
 fn rest_service_heads_and_whole_provides_lower() {
     use ilang_syntax::ast::{ExprKind, ItemKind, Param, Stmt};
-    let source = "keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) { (x) { f(x) <- env } }";
+    let source =
+        "keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) { (x) { f(x) <- env } }";
     let (module, diags) = syn3::parse_lowered(source);
     assert!(diags.is_empty(), "{diags:#?}");
-    let ItemKind::Binding(binding) = &module.items[0].kind else { panic!() };
-    let ExprKind::Fn(f) = &binding.value.kind else { panic!() };
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let ExprKind::Fn(f) = &binding.value.kind else {
+        panic!()
+    };
     assert!(matches!(&f.params[1], Param::Env { rest: true, name, .. } if name.name == "env"));
-    let Stmt::Expr(inner) = &f.body.stmts[0] else { panic!() };
-    let ExprKind::Fn(inner) = &inner.kind else { panic!() };
-    assert!(matches!(&inner.body.stmts[0], Stmt::Env { spread: true, .. }));
-    assert!(syn3::parse_lowered("f = <N>() <- (..env: N, db: Db) { Nil }").1.iter().any(|d| d.message.contains("last item")));
+    let Stmt::Expr(inner) = &f.body.stmts[0] else {
+        panic!()
+    };
+    let ExprKind::Fn(inner) = &inner.kind else {
+        panic!()
+    };
+    assert!(matches!(
+        &inner.body.stmts[0],
+        Stmt::Env { spread: true, .. }
+    ));
+    assert!(
+        syn3::parse_lowered("f = <N>() <- (..env: N, db: Db) { Nil }")
+            .1
+            .iter()
+            .any(|d| d.message.contains("last item"))
+    );
 }

@@ -930,13 +930,25 @@ impl Cx<'_> {
                     // §7.3: consecutive statements whose values are direct
                     // values are one provide; others nest, because a later
                     // value may need an earlier service.
-                    let mut provided = vec![if *spread { n::DItem::Spread(self.expr(value)) } else { n::DItem::Pos(self.expr(value)) }];
+                    let mut provided = vec![if *spread {
+                        n::DItem::Spread(self.expr(value))
+                    } else {
+                        n::DItem::Pos(self.expr(value))
+                    }];
                     let mut i = i;
                     while is_direct(value)
-                        && let Some(o::Stmt::Env { value: next, spread, .. }) = stmts.get(i + 1)
+                        && let Some(o::Stmt::Env {
+                            value: next,
+                            spread,
+                            ..
+                        }) = stmts.get(i + 1)
                         && is_direct(next)
                     {
-                        provided.push(if *spread { n::DItem::Spread(self.expr(next)) } else { n::DItem::Pos(self.expr(next)) });
+                        provided.push(if *spread {
+                            n::DItem::Spread(self.expr(next))
+                        } else {
+                            n::DItem::Pos(self.expr(next))
+                        });
                         i += 1;
                     }
                     let rest_span = Span::new(env_span.end, span.end.max(env_span.end));

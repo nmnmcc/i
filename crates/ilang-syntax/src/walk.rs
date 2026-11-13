@@ -137,7 +137,9 @@ impl Walk for Stmt {
         match self {
             Self::Bind(b) => b.walk(v),
             Self::Expr(e) => e.walk(v),
-            Self::Env { ty, value, span, .. } => {
+            Self::Env {
+                ty, value, span, ..
+            } => {
                 ty.walk(v);
                 value.walk(v);
                 span.walk(v);

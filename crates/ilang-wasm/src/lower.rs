@@ -896,7 +896,8 @@ impl<'a> Lowerer<'a> {
         let mut all: Vec<TypeRef> = self.typed.services.values().copied().collect();
         for supply in self.typed.env_supplies.values() {
             match supply {
-                ilang_check::types::EnvSupply::Row(keys) | ilang_check::types::EnvSupply::Data(keys) => all.extend(keys),
+                ilang_check::types::EnvSupply::Row(keys)
+                | ilang_check::types::EnvSupply::Data(keys) => all.extend(keys),
             }
         }
         let key = |t: &TypeRef| match t {
@@ -2260,8 +2261,12 @@ impl<'a> Lowerer<'a> {
                     next += 1;
                     self.bind_checked(&mut fx, &mut out, pattern, v, pattern.span.start);
                 }
-                Param::Env { rest, var, name, .. } => {
-                    let value = if *rest { Value::Environment(Env::Param) } else {
+                Param::Env {
+                    rest, var, name, ..
+                } => {
+                    let value = if *rest {
+                        Value::Environment(Env::Param)
+                    } else {
                         Value::Service(Env::Param, self.service(module, name.span))
                     };
                     let l = fx.var(*var);
@@ -2802,19 +2807,30 @@ impl<'a> Lowerer<'a> {
                     let v = self.expr(fx, out, value);
                     if let Some(supply) = self.typed.env_supplies.get(&(fx.module, *span)) {
                         let mut entries: Vec<(u32, Value)> = match supply {
-                            ilang_check::types::EnvSupply::Row(keep) => self.services.iter()
+                            ilang_check::types::EnvSupply::Row(keep) => self
+                                .services
+                                .iter()
                                 .filter(|(ty, _)| !keep.contains(ty))
                                 .map(|(_, id)| (*id, Value::CapturedService(v.clone(), *id)))
                                 .collect(),
-                            ilang_check::types::EnvSupply::Data(keys) => keys.iter().enumerate()
-                                .map(|(i, ty)| (self.services[ty], Value::Field(v.clone(), i as u32)))
+                            ilang_check::types::EnvSupply::Data(keys) => keys
+                                .iter()
+                                .enumerate()
+                                .map(|(i, ty)| {
+                                    (self.services[ty], Value::Field(v.clone(), i as u32))
+                                })
                                 .collect(),
                         };
                         entries.sort_by_key(|(id, _)| *id);
                         for (service, value) in entries {
                             let value = let_value(fx, out, value, None);
                             let dst = fx.local(LocalType::Env);
-                            out.push(Stmt::LetEnv { dst, env: fx.env, service, value });
+                            out.push(Stmt::LetEnv {
+                                dst,
+                                env: fx.env,
+                                service,
+                                value,
+                            });
                             fx.env = Env::Local(dst);
                         }
                         continue;

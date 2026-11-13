@@ -111,7 +111,18 @@ fn function<'a>(a: &'a Function, b: &'a Function, q: &mut Vec<Pair<'a>>) -> bool
             q.push(Pair::Pattern(a, b));
             true
         }
-        (Param::Env { name: a, ty: at, rest: ar }, Param::Env { name: b, ty: bt, rest: br }) => {
+        (
+            Param::Env {
+                name: a,
+                ty: at,
+                rest: ar,
+            },
+            Param::Env {
+                name: b,
+                ty: bt,
+                rest: br,
+            },
+        ) => {
             q.push(Pair::Type(at, bt));
             a == b && ar == br
         }

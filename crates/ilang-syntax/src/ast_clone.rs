@@ -145,7 +145,13 @@ async fn block<'a>(s: &Scheduler<'a>, b: &'a Block) -> Block {
     for x in &b.stmts {
         out.push(match x {
             Stmt::Expr(e) => Stmt::Expr(s.call(|s| ce(s, e)).await),
-            Stmt::Env { ty, value, span, spread, group } => Stmt::Env {
+            Stmt::Env {
+                ty,
+                value,
+                span,
+                spread,
+                group,
+            } => Stmt::Env {
                 spread: *spread,
                 group: *group,
                 ty: s.call(|s| ct(s, ty)).await,

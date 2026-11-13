@@ -1380,9 +1380,9 @@ impl<'p> Emitter<'p> {
             // tuple wraps that immutable pointer, so ordinary capture
             // traversal also sees the row's otherwise unused services.
             Value::Environment(env) => format!("(call $tuple {})", env_text(*env)),
-            Value::CapturedService(value, id) => format!(
-                "(call $field {} (i32.const {id}))", self.atom(value)
-            ),
+            Value::CapturedService(value, id) => {
+                format!("(call $field {} (i32.const {id}))", self.atom(value))
+            }
             Value::Service(env, id) => {
                 format!("(array.get $env {} (i32.const {id}))", env_text(*env))
             }
