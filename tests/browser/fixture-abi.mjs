@@ -5,7 +5,7 @@ const allErrors = ["nil", "bool", "int", "float", "string", "bit_array"];
 const fallible = { params: ["float"], result: "string", errors: allErrors };
 
 export const customAbi = {
-  version: 3,
+  version: 4,
   entry: null,
   tests: [],
   exports: {
