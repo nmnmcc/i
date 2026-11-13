@@ -299,7 +299,7 @@ fn host_cell_must_name_host_service() {
 #[test]
 fn adapter_types_must_be_closed() {
     let (mut g, c) = package(
-        "A(X) = { (X) }\nwrap = (body) { body() }\n\nmain = () { Nil }",
+        "A(X) = (X)\nwrap = (body) { body() }\n\nmain = () { Nil }",
         "[provider_adapters.\"app/main.wrap\"]\nsupplies = [\"app/main.A(Int)\"]\nrequires = []\n",
     );
     g.packages[g.root.unwrap()].provider_plan.adapters[0].supplies[0] = "app/main.A(X)".into();
@@ -308,7 +308,7 @@ fn adapter_types_must_be_closed() {
 #[test]
 fn ill_kinded_type_argument() {
     let (g, c) = package(
-        "A(X) = { (X) }\nwrap = (body) { body() }\n\nmain = () { Nil }",
+        "A(X) = (X)\nwrap = (body) { body() }\n\nmain = () { Nil }",
         "[provider_adapters.\"app/main.wrap\"]\nsupplies = [\"app/main.A(Int(String))\"]\nrequires = []\n",
     );
     error(
