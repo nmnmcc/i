@@ -685,7 +685,7 @@ and every type variable must be a parameter (spec §4.3, unchanged). In a
 labelled type (kinds 2 and 3), a parameter need not be used (a phantom), and a
 parameter that is not used in the data is invariant; an `Opaque` parameter is
 invariant (§1.3). Other parameters of labelled types get their variance from
-the data by spec §4.5 rule 6.
+the data by the simultaneous variance rule of spec §4.5.
 
 - **Constructors.** A labelled type with data `D` has the constructor
   function `{ D } -> T(…)` (spec §4.6): `Some : (A) -> Some(A)`,

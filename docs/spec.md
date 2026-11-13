@@ -906,6 +906,24 @@ The two members of `Correlated` have different type constructors and do not merg
 7. `List(a)` goes in the same direction as `a`. In `Continuation(A, R, N)`, `A` goes in the other direction and `R` and `N` in the same direction. `Boundary(R, N)` does not change.
 8. A member of `Int` or `String` is a subtype of a member with the same type constructor when every value of its value set is in the value set of the other. So `"a" <: "a" | "b" <: String`, and `String - "a" <: String`, but `String` is not a subtype of `"a" | "b"`, and `String - "a"` is not a subtype of `"b"`.
 
+For recursive definitions, determine variance for all definitions together,
+independently of declaration order. A parameter is **bivariant** when changing
+its argument does not change the type at all: `T(A)` and `T(B)` are equal for
+any `A` and `B` at that parameter. Such an argument adds no constraint to
+subtyping, union or intersection. It differs from an invariant parameter,
+whose arguments must be equal.
+
+Use the greatest fixed point of the variance constraints. Start recursively
+determined parameters as bivariant. Propagate the output and input places of
+rule 6 through data, functions, and the current variances of named arguments;
+an invariant argument propagates both places and a bivariant argument
+propagates neither. Repeat for all definitions until no variance changes,
+retaining only directions allowed by their data. Opaque parameters and
+parameters not used in the written data remain invariant throughout. An unused
+parameter of a labelled type is legal (§4.3); it is not a reason to reject the
+definition. For example, `Chain(A) = (next = Chain(A) | Nil)` is bivariant in
+`A`, while `Phantom(A) = ()` has the explicitly unused, invariant parameter.
+
 Two types are **equal** when each is a subtype of the other. A value of a subtype may be used in every place where a value of the type is needed.
 
 `Key(A)` (§9.8) does not change. `Request(A)` (§9.11) goes in the same direction as `A`. The variance of task types follows their definitions (§9.9).
