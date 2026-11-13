@@ -7,7 +7,7 @@ fn lisp_modules_are_checked_with_source_locations() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/math.is"),
-        "(, twice)\n(= twice (-> (x) _ (* x 2)))\n",
+        "(, twice)\n(= twice (-> (, x) _ (* x 2)))\n",
     )
     .unwrap();
     std::fs::write(
@@ -126,7 +126,7 @@ fn conversion_reports_unplaced_comments_and_keeps_existing_destination() {
 fn conversion_does_not_write_an_unrepresentable_module() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("sample.is");
-    let source = "(= f (-> () _ { (consume { (-> (x) Int { x }) 1 }) }))\n";
+    let source = "(= f (-> (,) _ { (consume { (-> (, x) Int { x }) 1 }) }))\n";
     std::fs::write(&file, source).unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["fmt", "--to=i"])
@@ -142,7 +142,7 @@ fn conversion_does_not_write_an_unrepresentable_module() {
 fn macro_quote_formats_in_lisp_and_cannot_convert_to_normal() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("macros.is");
-    std::fs::write(&file, "(@ macro (= wrap (-> (x) _ `(f ~x))))\n").unwrap();
+    std::fs::write(&file, "(@ macro (= wrap (-> (, x) _ `(f ~x))))\n").unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .arg("fmt")
         .arg(&file)
