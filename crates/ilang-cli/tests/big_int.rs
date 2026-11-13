@@ -185,6 +185,20 @@ fn large_int_arithmetic_matches_num_bigint() {
             }
         }
     }
+    // Indexed reads cross 30-bit digit and 32-bit storage boundaries. Include
+    // the measured 8500-bit size and long quotients, with both signs.
+    for width in [100_usize, 200, 300, 8500] {
+        let a = (BigInt::from(1) << width) - 1_u8;
+        for b in [
+            BigInt::from(1073741823),
+            (BigInt::from(1) << (width / 2)) + 123_u8,
+            &a - 37_u8,
+        ] {
+            for (x, y) in [(&a, &b), (&(-&a), &b), (&a, &(-&b))] {
+                pairs.push((x.clone(), y.clone()));
+            }
+        }
+    }
     for (opt, program) in programs() {
         let mut instance = program
             .instantiate(HostOptions::new(HostImports::default()))

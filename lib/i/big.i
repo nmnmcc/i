@@ -5,8 +5,8 @@
 //// The runtime keeps a large Int as its sign and an array of 32-bit limbs.
 //// This code reads its digits in base 2^30 in place, by index (`size`,
 //// `limb`), and builds each result once from its digits (`from_top`,
-//// `from_digits`). Division and the text form work on lists of digits
-//// (`digits`). Every number this code computes with is below 2^62, where
+//// `from_digits`). Only the text form works on lists of operand digits
+//// (`digits`). Every single-digit calculation is below 2^62, where
 //// the runtime does the arithmetic in 64 bits itself, so this code never
 //// calls itself through the runtime: a digit product is below 2^60.
 ////
@@ -114,7 +114,10 @@ signed_add = (a: Int, sa: Int, b: Int, sb: Int) -> Int {
 				False -> -b
 			}
 			False -> { sa == sb } |> {
-				True -> from_top(sa, add_up(a, b, 0, max(size(a), size(b)), 0, []))
+				True -> from_top(
+					sa
+					add_up(a, b, 0, max(size(a), size(b)), 0, [])
+				)
 				False -> magnitude_order(a, b) |> {
 					0 -> 0
 					1 -> from_top(sa, subtract_up(a, b, 0, size(a), 0, []))
@@ -127,7 +130,14 @@ signed_add = (a: Int, sa: Int, b: Int, sb: Int) -> Int {
 
 // The digits of |a| + |b| from digit `i` up, most significant first in
 // front of `acc`.
-add_up = (a: Int, b: Int, i: Int, n: Int, carry: Int, acc: List(Int)) -> List(Int) {
+add_up = (
+	a: Int
+	b: Int
+	i: Int
+	n: Int
+	carry: Int
+	acc: List(Int)
+) -> List(Int) {
 	{ i == n } |> {
 		True -> [carry, ..acc]
 		False -> {
@@ -141,13 +151,27 @@ add_up = (a: Int, b: Int, i: Int, n: Int, carry: Int, acc: List(Int)) -> List(In
 }
 
 // The digits of |a| - |b|, where |a| is at least |b|.
-subtract_up = (a: Int, b: Int, i: Int, n: Int, borrow: Int, acc: List(Int)) -> List(Int) {
+subtract_up = (
+	a: Int
+	b: Int
+	i: Int
+	n: Int
+	borrow: Int
+	acc: List(Int)
+) -> List(Int) {
 	{ i == n } |> {
 		True -> acc
 		False -> {
 			difference = limb(a, i) - limb(b, i) - borrow
 			{ difference < 0 } |> {
-				True  -> subtract_up(a, b, i + 1, n, 1, [difference + 1073741824, ..acc])
+				True -> subtract_up(
+					a
+					b
+					i + 1
+					n
+					1
+					[difference + 1073741824, ..acc]
+				)
 				False -> subtract_up(a, b, i + 1, n, 0, [difference, ..acc])
 			}
 		}
@@ -177,7 +201,14 @@ multiply = (a: Int, b: Int) -> Int {
 }
 
 // |x| × d for one digit d.
-scale_up = (x: Int, d: Int, i: Int, n: Int, carry: Int, acc: List(Int)) -> List(Int) {
+scale_up = (
+	x: Int
+	d: Int
+	i: Int
+	n: Int
+	carry: Int
+	acc: List(Int)
+) -> List(Int) {
 	{ i == n } |> {
 		True -> [carry, ..acc]
 		False -> {
@@ -190,7 +221,15 @@ scale_up = (x: Int, d: Int, i: Int, n: Int, carry: Int, acc: List(Int)) -> List(
 // Product scanning: digit k of |a| × |b| is the sum of the products of the
 // digits i and k - i, with the carry of the digits below. Each product is
 // split at 2^30, so the two sums stay below 2^62 for any size.
-columns = (a: Int, b: Int, na: Int, nb: Int, k: Int, carry: Int, acc: List(Int)) -> List(Int) {
+columns = (
+	a: Int
+	b: Int
+	na: Int
+	nb: Int
+	k: Int
+	carry: Int
+	acc: List(Int)
+) -> List(Int) {
 	{ k == na + nb - 1 } |> {
 		True -> spill(carry, acc)
 		False -> {
@@ -203,12 +242,28 @@ columns = (a: Int, b: Int, na: Int, nb: Int, k: Int, carry: Int, acc: List(Int))
 	}
 }
 
-column = (a: Int, b: Int, i: Int, last: Int, k: Int, low: Int, high: Int) -> (Int, Int) {
+column = (
+	a: Int
+	b: Int
+	i: Int
+	last: Int
+	k: Int
+	low: Int
+	high: Int
+) -> (Int, Int) {
 	{ i > last } |> {
 		True -> (low, high)
 		False -> {
 			p = limb(a, i) * limb(b, k - i)
-			column(a, b, i + 1, last, k, low + p % 1073741824, high + p / 1073741824)
+			column(
+				a
+				b
+				i + 1
+				last
+				k
+				low + p % 1073741824
+				high + p / 1073741824
+			)
 		}
 	}
 }
@@ -241,7 +296,7 @@ divide = (a: Int, b: Int) -> Int {
 	{ s == 0 } |> {
 		True -> 0
 		False -> {
-			(q, _) = magnitude_divide(digits(a), digits(b))
+			(q, _) = magnitude_divide(a, b)
 			from_digits(s, q)
 		}
 	}
@@ -253,8 +308,11 @@ remainder = (a: Int, b: Int) -> Int {
 	{ sa * sign(b) == 0 } |> {
 		True -> 0
 		False -> {
-			(_, r) = magnitude_divide(digits(a), digits(b))
-			from_digits(sa, r)
+			(_, r) = magnitude_divide(a, b)
+			{ sa < 0 } |> {
+				True  -> -r
+				False -> r
+			}
 		}
 	}
 }
@@ -276,104 +334,172 @@ to_text = (value: Int, radix: Int) -> String {
 	}
 }
 
-// ---- Magnitudes ----
+// ---- Division ----
 
-length = (x: List(Int), n: Int) -> Int {
-	x |> {
-		[]        -> n
-		[_, ..xs] -> length(xs, n + 1)
-	}
-}
-
-reverse = (x: List(Int), acc: List(Int)) -> List(Int) {
-	x |> {
-		[]        -> acc
-		[d, ..ds] -> reverse(ds, [d, ..acc])
-	}
-}
-
-// Without zero digits at the most significant end.
-trim = (x: List(Int)) -> List(Int) { reverse(drop_zeros(reverse(x, [])), []) }
-
-drop_zeros = (x: List(Int)) -> List(Int) {
-	x |> {
-		[0, ..rest] -> drop_zeros(rest)
-		_           -> x
-	}
-}
-
-// The digit at `index`, or 0 past the end.
-at = (x: List(Int), index: Int) -> Int {
-	x |> {
-		[]        -> 0
-		[d, ..ds] -> { index == 0 } |> {
-			True  -> d
-			False -> at(ds, index - 1)
-		}
-	}
-}
-
-magnitude_compare = (x: List(Int), y: List(Int)) -> Int {
-	nx = length(x, 0)
-	ny = length(y, 0)
-	{ nx == ny } |> {
-		True -> compare_from_top(reverse(x, []), reverse(y, []))
-		False -> { nx < ny } |> {
-			True  -> -1
-			False -> 1
-		}
-	}
-}
-// `x - y - borrow`, where `x` is at least `y`.
-magnitude_subtract = (x: List(Int), y: List(Int), borrow: Int, acc: List(Int)) -> List(Int) {
-	(x, y) |> {
-		([], _) -> trim(reverse(acc, []))
-		([a, ..xs], []) -> subtract_digit(a - borrow, xs, [], acc)
-		([a, ..xs], [b, ..ys]) -> subtract_digit(a - b - borrow, xs, ys, acc)
-	}
-}
-
-subtract_digit = (difference: Int, x: List(Int), y: List(Int), acc: List(Int)) -> List(Int) {
-	{ difference < 0 } |> {
-		True  -> magnitude_subtract(x, y, 1, [difference + 1073741824, ..acc])
-		False -> magnitude_subtract(x, y, 0, [difference, ..acc])
-	}
-}
-// Quotient and remainder of magnitudes; `y` is not zero.
-magnitude_divide = (x: List(Int), y: List(Int)) -> (List(Int), List(Int)) {
-	{ magnitude_compare(x, y) < 0 } |> {
-		True -> ([], x)
-		False -> y |> {
-			[d] -> {
-				(q, r) = short_divide(reverse(x, []), d, 0, [])
-				(q, [r])
-			}
-			_ -> {
-				// Normalize so that the top digit of the divisor is at
-				// least base / 2; then each estimate is at most a few short.
-				s = normal_shift(at(y, length(y, 0) - 1), 0)
-				ny = shift_left(y, s, 0, [])
-				nx = shift_left(x, s, 0, [])
-				m = length(ny, 0)
-				top = at(ny, m - 1) + 1
-				// The first m - 1 digits are below the divisor, so they
-				// start the remainder and give no quotient digits.
-				(start, rest) = split_top(reverse(nx, []), m - 1, [])
-				(q, r) = long_divide(rest, ny, m, top, trim(start), [])
-				(q, shift_right(reverse(r, []), s, 0, []))
+// Quotient digits, least significant first, and the positive remainder.
+// Normalize each operand once, then read both numbers directly by offset.
+magnitude_divide = (a: Int, b: Int) -> (List(Int), Int) {
+	{ magnitude_order(a, b) < 0 } |> {
+		True -> ([], { sign(a) < 0 } |> {
+			True  -> -a
+			False -> a
+		})
+		False -> {
+			m = size(b)
+			{ m == 1 } |> {
+				True -> short_divide_number(a, limb(b, 0), size(a) - 1, 0, [])
+				False -> {
+					factor = power_of_two(normal_shift(limb(b, m - 1), 0), 1)
+					x = normalized(a, factor)
+					y = normalized(b, factor)
+					n = size(x)
+					start = from_digits(
+						1
+						initial_remainder(x, n - 1, n - m, [])
+					)
+					(q, r) = long_divide(
+						x
+						y
+						n - m
+						m
+						limb(y, m - 1) + 1
+						start
+						[]
+					)
+					{ factor == 1 } |> {
+						True -> (q, r)
+						False -> {
+							(rest, _) = short_divide_number(
+								r
+								factor
+								size(r) - 1
+								0
+								[]
+							)
+							(q, from_digits(1, rest))
+						}
+					}
+				}
 			}
 		}
 	}
 }
 
-// The first `n` digits of `top`, least significant first, and the rest.
-split_top = (top: List(Int), n: Int, acc: List(Int)) -> (List(Int), List(Int)) {
-	{ n == 0 } |> {
-		True -> (acc, top)
-		False -> top |> {
-			[]          -> (acc, [])
-			[d, ..rest] -> split_top(rest, n - 1, [d, ..acc])
+normalized = (x: Int, factor: Int) -> Int {
+	{ factor == 1 } |> {
+		True  -> x
+		False -> from_top(1, scale_up(x, factor, 0, size(x), 0, []))
+	}
+}
+
+// The top m - 1 dividend digits are below the normalized divisor.
+initial_remainder = (x: Int, i: Int, stop: Int, acc: List(Int)) -> List(Int) {
+	{ i == stop } |> {
+		True  -> acc
+		False -> initial_remainder(x, i - 1, stop, [limb(x, i), ..acc])
+	}
+}
+
+short_divide_number = (
+	x: Int
+	d: Int
+	i: Int
+	r: Int
+	acc: List(Int)
+) -> (List(Int), Int) {
+	{ i < 0 } |> {
+		True -> (acc, r)
+		False -> {
+			v = r * 1073741824 + limb(x, i)
+			short_divide_number(x, d, i - 1, v % d, [v / d, ..acc])
 		}
+	}
+}
+
+// Bring down one dividend digit. Estimate from the top two digits of the
+// shifted remainder, dividing by divisor_top + 1 so it cannot be too big.
+long_divide = (
+	x: Int
+	y: Int
+	i: Int
+	m: Int
+	top: Int
+	r: Int
+	q: List(Int)
+) -> (List(Int), Int) {
+	{ i < 0 } |> {
+		True -> (q, r)
+		False -> {
+			a = limb(x, i)
+			estimate = { limb(r, m - 1) * 1073741824 + limb(r, m - 2) } / top
+			reduced = from_top(
+				1
+				reduce_digit(r, a, y, estimate, 0, m + 1, 0, 0, [])
+			)
+			(digit, left) = correct(reduced, y, estimate)
+			long_divide(x, y, i - 1, m, top, left, [digit, ..q])
+		}
+	}
+}
+
+// r * base + a - y * d. Fuse the one-digit product and subtraction so
+// there is no temporary product or list copy of either operand.
+reduce_digit = (
+	r: Int
+	a: Int
+	y: Int
+	d: Int
+	i: Int
+	n: Int
+	carry: Int
+	borrow: Int
+	acc: List(Int)
+) -> List(Int) {
+	{ i == n } |> {
+		True -> acc
+		False -> {
+			p = limb(y, i) * d + carry
+			x = { i == 0 } |> {
+				True  -> a
+				False -> limb(r, i - 1)
+			}
+			difference = x - p % 1073741824 - borrow
+			{ difference < 0 } |> {
+				True -> reduce_digit(
+					r
+					a
+					y
+					d
+					i + 1
+					n
+					p / 1073741824
+					1
+					[difference + 1073741824, ..acc]
+				)
+				False -> reduce_digit(
+					r
+					a
+					y
+					d
+					i + 1
+					n
+					p / 1073741824
+					0
+					[difference, ..acc]
+				)
+			}
+		}
+	}
+}
+
+correct = (r: Int, y: Int, digit: Int) -> (Int, Int) {
+	{ magnitude_order(r, y) >= 0 } |> {
+		True -> correct(
+			from_top(1, subtract_up(r, y, 0, size(r), 0, []))
+			y
+			digit + 1
+		)
+		False -> (digit, r)
 	}
 }
 
@@ -381,29 +507,6 @@ normal_shift = (top: Int, s: Int) -> Int {
 	{ top >= 536870912 } |> {
 		True  -> s
 		False -> normal_shift(top * 2, s + 1)
-	}
-}
-
-// `x × 2^s`, for `s` below 30.
-shift_left = (x: List(Int), s: Int, carry: Int, acc: List(Int)) -> List(Int) {
-	x |> {
-		[] -> trim(reverse([carry, ..acc], []))
-		[d, ..ds] -> {
-			v = d * power_of_two(s, 1) + carry
-			shift_left(ds, s, v / 1073741824, [v % 1073741824, ..acc])
-		}
-	}
-}
-
-// `x / 2^s`, for `s` below 30, from the most significant digit `top`.
-shift_right = (top: List(Int), s: Int, carry: Int, acc: List(Int)) -> List(Int) {
-	top |> {
-		[] -> trim(acc)
-		[d, ..ds] -> {
-			p = power_of_two(s, 1)
-			v = carry * 1073741824 + d
-			shift_right(ds, s, v % p, [v / p, ..acc])
-		}
 	}
 }
 
@@ -416,7 +519,12 @@ power_of_two = (s: Int, acc: Int) -> Int {
 
 // Division by one digit, from the most significant digit `top`; the
 // quotient least significant first, and the remainder.
-short_divide = (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (List(Int), Int) {
+short_divide = (
+	top: List(Int)
+	d: Int
+	r: Int
+	acc: List(Int)
+) -> (List(Int), Int) {
 	top |> {
 		[] -> (trim(acc), r)
 		[a, ..rest] -> {
@@ -426,64 +534,20 @@ short_divide = (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (List(Int), I
 	}
 }
 
-// Long division, one digit of the dividend at a time from the most
-// significant one (`top`). The remainder `r` stays below `y × base`, so
-// each quotient digit is below `base`. The estimate divides the top two
-// digits of `r` by the top digit of `y` plus one, so it is never too big.
-long_divide = (
-	top: List(Int)
-	y: List(Int)
-	m: Int
-	divisor_top: Int
-	r: List(Int)
-	q: List(Int)
-) -> (List(Int), List(Int)) {
-	top |> {
-		[] -> (trim(q), r)
-		[a, ..rest] -> {
-			shifted = { r == [] && a == 0 } |> {
-				True  -> []
-				False -> [a, ..r]
-			}
-			estimate = { at(shifted, m) * 1073741824 + at(shifted, m - 1) } / divisor_top
-			reduced = { estimate == 0 } |> {
-				True  -> shifted
-				False -> magnitude_subtract(shifted, trim(multiply_digit(y, estimate, 0, [])), 0, [])
-			}
-			(digit, left) = correct(reduced, y, estimate)
-			long_divide(rest, y, m, divisor_top, left, [digit, ..q])
-		}
-	}
-}
-
-correct = (r: List(Int), y: List(Int), digit: Int) -> (Int, List(Int)) {
-	{ magnitude_compare(r, y) >= 0 } |> {
-		True  -> correct(magnitude_subtract(r, y, 0, []), y, digit + 1)
-		False -> (digit, r)
-	}
-}
-
-compare_from_top = (x: List(Int), y: List(Int)) -> Int {
-	(x, y) |> {
-		([a, ..xs], [b, ..ys]) -> { a == b } |> {
-			True -> compare_from_top(xs, ys)
-			False -> { a < b } |> {
-				True  -> -1
-				False -> 1
-			}
-		}
-		_ -> 0
-	}
-}
-
-// `x × d` for one digit `d`, with the carry `carry`.
-multiply_digit = (x: List(Int), d: Int, carry: Int, acc: List(Int)) -> List(Int) {
+// Text conversion alone uses lists of digits.
+reverse = (x: List(Int), acc: List(Int)) -> List(Int) {
 	x |> {
-		[] -> reverse([carry, ..acc], [])
-		[a, ..xs] -> {
-			p = a * d + carry
-			multiply_digit(xs, d, p / 1073741824, [p % 1073741824, ..acc])
-		}
+		[]        -> acc
+		[d, ..ds] -> reverse(ds, [d, ..acc])
+	}
+}
+
+trim = (x: List(Int)) -> List(Int) { reverse(drop_zeros(reverse(x, [])), []) }
+
+drop_zeros = (x: List(Int)) -> List(Int) {
+	x |> {
+		[0, ..rest] -> drop_zeros(rest)
+		_           -> x
 	}
 }
 
@@ -509,14 +573,26 @@ text_chunks = (
 ) -> List(String) {
 	(q, r) = short_divide(reverse(x, []), chunk, 0, [])
 	{ q == [] } |> {
-		True  -> chunk_text(r, radix, 0, False, acc)
-		False -> text_chunks(q, chunk, radix, width, chunk_text(r, radix, width, True, acc))
+		True -> chunk_text(r, radix, 0, False, acc)
+		False -> text_chunks(
+			q
+			chunk
+			radix
+			width
+			chunk_text(r, radix, width, True, acc)
+		)
 	}
 }
 
 // The digits of `v` in `radix` before `acc`, at least `width` of them
 // when `padded`.
-chunk_text = (v: Int, radix: Int, width: Int, padded: Bool, acc: List(String)) -> List(String) {
+chunk_text = (
+	v: Int
+	radix: Int
+	width: Int
+	padded: Bool
+	acc: List(String)
+) -> List(String) {
 	next = [digit_text(v % radix), ..acc]
 	rest = v / radix
 	{ rest == 0 && { core.not(padded) || width <= 1 } } |> {
