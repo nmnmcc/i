@@ -883,7 +883,9 @@ pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
             Ty::Fn(f) => {
                 walk(s, &f.param, !given, false, out);
                 walk(s, &f.ret, given, false, out);
-                walk(s, &f.env, true, false, out);
+                // A callback gets its services from the called function;
+                // a returned function gets them from a later caller.
+                walk(s, &f.env, !given, false, out);
             }
             Ty::Union(ms) | Ty::Inter(ms) => {
                 for t in ms {
@@ -940,6 +942,33 @@ pub(super) fn neg_literal(mut e: &Expr) -> Option<String> {
 #[cfg(test)]
 mod literal_known_tests {
     use super::*;
+
+    #[test]
+    fn callback_need_entries_follow_their_service_variance() {
+        let read = TypeId(0);
+        let write = TypeId(1);
+        let mut s = super::super::solve::Solver::new(
+            std::collections::HashMap::from([
+                (read, vec![super::super::Variance::Co]),
+                (write, vec![super::super::Variance::Contra]),
+            ]),
+            Vec::new(),
+        );
+        let read_value = s.fresh();
+        let written_value = s.fresh();
+        let need = s.env_union(vec![
+            Ty::named(TypeRef::Custom(read), vec![read_value]),
+            Ty::named(TypeRef::Custom(write), vec![written_value]),
+        ]);
+        let callback = Ty::Fn(Box::new(FnTy::new(Vec::new(), Ty::Never, need)));
+        let take = FnTy::new(vec![(None, callback.clone())], Ty::Never, Ty::Never);
+        // A callback sends values through Write; Read gets values from the
+        // callee's provider, so it is not a hidden input to that callee.
+        assert_eq!(hidden_inputs(&s, &take), [V(1)]);
+        let give = FnTy::new(Vec::new(), callback, Ty::Never);
+        assert_eq!(hidden_inputs(&s, &give), [V(0)]);
+    }
+
     #[test]
     fn hidden_inputs_and_recursive_widening() {
         // decision 7: callback outputs and environments, not callback inputs.
