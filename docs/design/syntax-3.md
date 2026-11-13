@@ -1352,11 +1352,11 @@ Removed: `TupleType`, both copies of `RecordType`, `FPart`, `RPart`, `Label`
 and the environment part `"!" Union` of a function type.
 
 - **Annotation layout (owner).** The normal printer uses the same rule for
-  `:` as for `=`: a space on either side and the same continuation layout.
+  `:` and `<:` as for `=`: a space on either side and the same continuation layout.
   Examples: `inspect : <A>(A) -> String`, `(name : String, age : Int)` and
   `<- (db : Db)`. A segment's compact `value:Format` is unchanged: it has
   no `=` counterpart and is not a type annotation (spec §8.1).
-- **Annotations.** `Annot = Inter` is the single rule for a type after `:`:
+- **Annotations.** `Annot = Inter` is the single rule for a type after `:` or `<:`:
   it ends at any `|` outside brackets (`( )`, `{ }`, `< >`). While reading
   `Annot`, an unbracketed `FnType` reads `Inter` for its result, recursively;
   bracket contents read full `Type`. Thus a union needs braces, including
@@ -1472,7 +1472,7 @@ Pattern   = Part { "=" Part } .
 Part      = Atom | StringPat .
 StringPat = string_lit "<>" Binder [ "<>" string_lit ] | Binder "<>" string_lit .
 Binder    = name | discard .
-Atom      = name | discard | ( name | discard ) ":" Annot
+Atom      = name | discard | ( name | discard ) ( ":" | "<:" ) Annot
           | [ "-" ] int_lit | [ "-." ] float_lit | string_lit
           | Name [ DataPat ]
           | DataPat
@@ -1491,6 +1491,15 @@ Rest      = ".." [ name | discard ] .
 - `Rest` is the last item of a `DataPat`, at most once. `PItem` has no rest.
 - `PatArgs` is removed: constructor patterns use `DataPat`.
 - The type after `:` is `Annot` (§3.1, P8), in every pattern position.
+
+- **Annotation or test (owner amendment).** `x : T` always fits the value
+  to `T`, including in a guarded or multi-branch group. It matches every
+  value at that place. `x <: T` always tests and narrows to `T`; it uses
+  `Annot` too. A single-branch test may fail and needs `Assert`. With several
+  branches or a guard it participates in coverage. An unguarded annotation
+  makes a following catch-all unreachable; give the warning with the hint
+  "to test the type, write `<:`". `<:` is one longest-match token and is
+  not an expression operator. Both colons use the layout rule for `=`.
 
 ### 3.5 Disambiguation rules
 
@@ -1548,7 +1557,7 @@ needs a comma.
 - **P7 Key exception.** Rule 2 of §2.7: inside `DataPat` and `Params`, a
   leading `name =` is a key, never a conjunction; at statement level it is a
   conjunction.
-- **P8 Annotations and alternatives.** Every type after `:` reads `Annot`
+- **P8 Annotations and alternatives.** Every type after `:` or `<:` reads `Annot`
   (§3.1 and spec §3), in declarations, patterns, and service items alike.
   `(x: Int | y)` has the alternatives `x: Int` and `y`, rejected because
   they bind different names; `(x: Int | x)` and `(True | _: Int)` are valid.
@@ -2567,6 +2576,18 @@ The `{ }` around the right side of a name whose right side is a data type is
 part of the item form, not a type group: it is kept in `Syntax` and is not
 removed for macros (meta.md §3.1), so a macro can tell a name from a labelled
 type.
+
+**Annotation and test patterns**
+
+| Core form | Normal surface | Lisp surface |
+|---|---|---|
+| Type annotation | `x : T`, `_ : T` | `(: x T)`, `(: _ T)` |
+| Type test | `x <: T`, `_ <: T` | `(<: x T)`, `(<: _ T)` |
+
+These rows have an explicit type child, so a union remains `(| A B)`;
+there is no outermost-pipe ambiguity in a row. `:` never becomes a test by
+its context. The migration classifies old `:` rows by their shape group,
+guard and alternatives, and changes exactly the old tests to `<:` rows.
 
 **Types**
 
