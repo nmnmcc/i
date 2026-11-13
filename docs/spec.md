@@ -637,7 +637,7 @@ A plain `i build` writes no `.wasm` module.
 
 A **version** of a package with a location is a git tag `vmajor.minor.patch` in its repository, for example `v1.4.0`. The package is the files of the repository at that tag, or the files of the directory after `//`, with its `i.toml` at the top.
 
-A **package** in a program is a location and a major version, or a directory for a path dependency. So `github.com/alice/json@1.4.0` and `github.com/alice/json@2.0.1` are two different packages, and their types are different. A program may use both, with two dependency names. Inside one major version, a newer version must be able to take the place of an older one.
+A **package** in a program is a location and a major version, or a directory for a path dependency. So `github.com/alice/json@1.4.0` and `github.com/alice/json@2.0.1` are two different packages, and their types are different. A program may use both, with two dependency names. Inside one major version, a newer version must be able to take the place of an older one. A published macro interface includes whether it is a syntax or typed macro, its argument-data shapes and explicit labels, and its compile-time contract. Without a stronger declared contract, a tool conservatively treats any change to the source bytes of its defining module or its transitive imported modules (including initializers) as a changed macro interface, even when its ordinary function type is unchanged. Removing or changing that contract requires a new major version; adding a macro requires a new minor version.
 
 A program uses one version of each package. It is chosen by **minimal version selection**:
 

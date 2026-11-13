@@ -1549,3 +1549,82 @@ fn package_commands_reject_moved_superseded_resolution_input() {
         assert_eq!(read(&app.join("i.lock")), locked);
     }
 }
+
+#[test]
+fn publish_pins_macro_kind_call_contract_and_compile_time_source() {
+    let w = World::new();
+    let macros = include_str!("../../../tests/spec/14.5/mp07_macro_contract/src/macros.is");
+    let dir = w.project(
+        "pub",
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/macros.is", macros),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "original macro");
+    let project = dir.to_str().unwrap();
+    w.ok(&["publish", "1.0.0", "--project", project]);
+    // Identical source is a valid patch.
+    let (ok, out) = try_publish(&w, &dir, &[], "1.0.1");
+    assert!(ok, "{out}");
+    // Renaming a parameter and changing the transformer both escape a plain
+    // (Syntax) -> Syntax comparison, but change the conservative contract.
+    for changed in [
+        macros.replace("value", "renamed"),
+        macros.replace("((. syntax make) ((. syntax node) value) value)", "`False"),
+    ] {
+        let (ok, out) = try_publish(&w, &dir, &[("src/macros.is", &changed)], "1.0.1");
+        assert!(!ok, "{out}");
+        assert!(
+            out.contains("changed macro macros.id") && out.contains("a new major version"),
+            "{out}"
+        );
+    }
+}
+
+#[test]
+fn publish_macro_contract_includes_imported_compile_time_initializers() {
+    let w = World::new();
+    let dir = w.project("pub", &[
+        ("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n"),
+        ("src/helper.i", "(answer)\nanswer = 42\n"),
+        ("src/macros.is", "(, (= helper (/ pub helper)))\n(, m)\n(@ macro (= m (-> (, value) _ {(. helper answer) value})))\n"),
+    ]);
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "original helper");
+    w.ok(&["publish", "1.0.0", "--project", dir.to_str().unwrap()]);
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[("src/helper.i", "(answer)\nanswer = 43\n")],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed macro macros.m"), "{out}");
+}
+
+#[test]
+fn publish_compares_interfaces_after_macro_generated_exports() {
+    let w = World::new();
+    let dir = w.project("pub", &[
+        ("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n"),
+        ("src/macros.is", "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, name value) (<- _ (, (: items (. syntax Items)))) {((. items expose) name) `(= ~name ~value)})))\n"),
+        ("src/api.i", "(m = pub/macros)\nm.emit(answer, 42)\n"),
+    ]);
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "generated API");
+    w.ok(&["publish", "1.0.0", "--project", dir.to_str().unwrap()]);
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "src/api.i",
+            "(m = pub/macros)\nm.emit(answer, \"changed\")\n",
+        )],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed value api.answer"), "{out}");
+}

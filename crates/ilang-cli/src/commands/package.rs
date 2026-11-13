@@ -1238,8 +1238,63 @@ type Interface = BTreeMap<String, Entry>;
 /// The interface of the package in `dir`, checked without its tests. The
 /// outer error is a problem of the tool; the inner one says that the
 /// package does not check.
+/// An unrestricted transformer can inspect syntax and call compile-time code.
+/// Its ordinary function type cannot prove client compatibility. Fingerprint
+/// the defining module and import closure, including module initializers.
+fn macro_contracts(graph: &PackageGraph, out: &mut Interface) -> Result<()> {
+    let (parsed_modules, _) = ilang_check::parse(graph);
+    for parsed in &parsed_modules {
+        if Some(parsed.package) != graph.root || parsed.kind != ModuleKind::Src {
+            continue;
+        }
+        let lisp = graph.sources.get(parsed.source).display.ends_with(".is");
+        let definitions = ilang_syntax::lisp::expansion::definitions(&parsed.ast, lisp)
+            .map_err(|_| anyhow!("invalid macro interface"))?;
+        let closure = ilang_macro::prepare::import_closure(graph, &parsed_modules, parsed.source)
+            .map_err(|ds| problems(graph, &ds))?;
+        let files = closure
+            .iter()
+            .map(|module| {
+                let identity = ilang_check::identity::package_identity(graph, module.package);
+                ilang_package::lock::PackageFile {
+                    path: format!("{identity:?}/{}", inner_path(&module.path)),
+                    kind: ilang_package::lock::FileKind::Regular,
+                    bytes: graph.sources.get(module.source).text.as_bytes().to_vec(),
+                }
+            })
+            .collect::<Vec<_>>();
+        let hash = ilang_package::lock::hash(&files);
+        for definition in definitions {
+            if !parsed
+                .ast
+                .exports
+                .iter()
+                .any(|e| e.name.name == definition.name)
+            {
+                continue;
+            }
+            let kind = if definition.signature.is_some() {
+                "typed"
+            } else {
+                "syntax"
+            };
+            let contract = format!("{kind} {:?} {hash}", definition.parameters);
+            out.insert(
+                format!("macro {}.{}", inner_path(&parsed.path), definition.name),
+                Entry {
+                    shown: contract.clone(),
+                    canonical: contract,
+                    alias: None,
+                    scheme: None,
+                },
+            );
+        }
+    }
+    Ok(())
+}
+
 fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
-    let (graph, mut diags) = ilang_package::load_with(
+    let (mut graph, mut diags) = ilang_package::load_with(
         dir,
         &LoadOptions {
             tests: false,
@@ -1250,7 +1305,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
     let Some(root) = graph.root else {
         return Ok(Err(problems(&graph, &diags)));
     };
-    let checked = ilang_check::check(&graph);
+    let checked = ilang_macro::project::check(&mut graph);
     diags.extend(checked.diags);
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
         return Ok(Err(problems(&graph, &diags)));
@@ -1402,6 +1457,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             },
         );
     }
+    macro_contracts(&graph, &mut out)?;
     Ok(Ok(out))
 }
 
