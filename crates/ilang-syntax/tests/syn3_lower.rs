@@ -302,3 +302,37 @@ fn labelled_function_type_parameters_keep_their_data_keys() {
         ["x", "y"]
     );
 }
+
+#[test]
+fn migrated_captured_row_provider_keeps_its_written_contract() {
+    // §4.7: annotations participate in inference. §9.2: the provided
+    // value must satisfy the needed service by subtyping. Dropping the
+    // old provider's S(Dependency) contract changes those constraints.
+    let old = "S(N) { S(() -> Nil ! N) }
+Dependency { Dependency }
+read = (d ! Dependency) { Nil }
+use(N) = (s ! S(N)) { S(f) = s f() }
+apply(N) = () { local: () -> Nil ! N = () { use() } local() }
+main = () { ! S(Dependency) = S(() { read() }) apply() }";
+    let (old, diags) = ilang_syntax::legacy::parser::parse_module_legacy(old);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let (converted, notes) =
+        syn3::convert::convert(&old, None, &syn3::convert::Signatures::default());
+    assert!(notes.is_empty(), "{notes:#?}");
+    let (lowered, diags) = syn3::lower::lower(&converted);
+    assert!(diags.is_empty(), "{diags:#?}");
+    assert_eq!(
+        print_module(&lowered),
+        shown(
+            "S(N) = (() <- N -> Nil)
+Dependency = ()
+read = () <- (d: Dependency) { Nil }
+use = <N>() <- (s: S(N)) { S(f) = s f() }
+apply = <N>() { local: () <- N -> Nil = () { use() } local() }
+main = () {
+    _syn3_0: S(Dependency) = S(() { read() })
+    apply() <- (_syn3_0)
+}",
+        ),
+    );
+}
