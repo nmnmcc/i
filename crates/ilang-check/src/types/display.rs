@@ -179,6 +179,9 @@ fn simplify_steps(
         mono: opts.mono,
         stack: HashMap::default(),
         memo: HashMap::default(),
+        cyclic: HashMap::default(),
+        pushed: Vec::new(),
+        hits: Vec::new(),
         cycle_generation: 0,
         occurs: false,
         rep,
@@ -575,6 +578,14 @@ struct Coalescer<'s> {
     /// Completed acyclic expansions only. A cycle-dependent result belongs
     /// to its active path and cannot be reused by another branch.
     memo: HashMap<(V, bool, bool), Ty>,
+    /// Completed expansions that met a variable being expanded, each with
+    /// what it depends on (see [`Cyclic`]).
+    cyclic: HashMap<(V, bool, bool), Cyclic>,
+    /// Each variable put on `stack`, in order, also by a reused expansion.
+    pushed: Vec<V>,
+    /// Each time a variable on `stack` was met: the variable and the
+    /// number of type constructors above the place where it was met.
+    hits: Vec<(V, u32)>,
     cycle_generation: u64,
 
     occurs: bool,
@@ -584,7 +595,90 @@ struct Coalescer<'s> {
     members: HashMap<V, Vec<V>>,
 }
 
+/// An expansion of a variable that met variables being expanded around it.
+/// Expanding the variable again gives the same type when the same variables
+/// are being expanded: each of `outer`, and none of `inner`. Then it meets
+/// the variables of `outer` again, at the same depths below it.
+struct Cyclic {
+    ty: Ty,
+    /// The variables met that were being expanded around it, each with the
+    /// greatest number of type constructors from it to a place where it
+    /// was met.
+    outer: Vec<(V, u32)>,
+    /// The variables expanded inside it, and the variable itself.
+    inner: Vec<V>,
+}
+
 impl Coalescer<'_> {
+    /// The expansion of `v` done again from `cyclic`, when it is the same:
+    /// it meets the same variables, with the same effects.
+    fn reuse(&mut self, key: (V, bool, bool), depth: u32) -> Option<Ty> {
+        let c = self.cyclic.get(&key)?;
+        if !c.outer.iter().all(|(w, _)| self.stack.contains_key(w))
+            || c.inner.iter().any(|w| self.stack.contains_key(w))
+        {
+            return None;
+        }
+        self.cycle_generation += 1;
+        for &(w, rel) in &c.outer {
+            if depth + rel > self.stack[&w] {
+                self.occurs = true;
+            }
+            self.hits.push((w, depth + rel));
+        }
+        self.pushed.extend(c.inner.iter().copied());
+        Some(c.ty.clone())
+    }
+
+    /// Keeps the expansion of `key.0` at `depth`, which met variables
+    /// being expanded: `pushed` and `hits` from `start` are its own.
+    fn keep_cyclic(&mut self, key: (V, bool, bool), depth: u32, start: (usize, usize), ty: &Ty) {
+        if self.occurs {
+            return;
+        }
+        let mut inner = self.pushed[start.0..].to_vec();
+        inner.sort_unstable();
+        inner.dedup();
+        let mut outer: HashMap<V, u32> = HashMap::default();
+        for &(w, at) in &self.hits[start.1..] {
+            // Still being expanded: around `key.0` (or `key.0` itself,
+            // which is met inside its own expansion).
+            if w != key.0 && self.stack.contains_key(&w) {
+                let rel = at - depth;
+                let e = outer.entry(w).or_insert(rel);
+                *e = (*e).max(rel);
+            }
+        }
+        let mut outer: Vec<(V, u32)> = outer.into_iter().collect();
+        outer.sort_unstable();
+        self.cyclic.insert(
+            key,
+            Cyclic {
+                ty: ty.clone(),
+                outer,
+                inner,
+            },
+        );
+    }
+
+    /// Outside every expansion, nothing reads what was met before.
+    fn clear_logs(&mut self) {
+        if self.stack.is_empty() {
+            self.pushed.clear();
+            self.hits.clear();
+        }
+    }
+
+    /// [`Self::bound_key`], borrowed when there is no cycle of variables:
+    /// then the key of a bound is the bound itself.
+    fn bound_key_of<'b>(&self, t: &'b Ty) -> std::borrow::Cow<'b, Ty> {
+        if self.rep.is_empty() {
+            std::borrow::Cow::Borrowed(t)
+        } else {
+            std::borrow::Cow::Owned(self.bound_key(t))
+        }
+    }
+
     /// Alias-class variables expand identically when their row roles agree.
     /// Graph aliases also keep their row and constructor-path roles.
     fn bound_key(&self, t: &Ty) -> Ty {
@@ -724,6 +818,7 @@ impl Coalescer<'_> {
                     if depth > d {
                         self.occurs = true;
                     }
+                    self.hits.push((v, depth));
                     return if mono { Ty::Never } else { Ty::Var(v) };
                 }
                 let empty = |m: V| {
@@ -746,9 +841,14 @@ impl Coalescer<'_> {
                 if let Some(t) = self.memo.get(&(v, pos, env)) {
                     return t.clone();
                 }
+                if let Some(t) = self.reuse((v, pos, env), depth) {
+                    return t;
+                }
                 let generation = self.cycle_generation;
+                let start = (self.pushed.len(), self.hits.len());
 
                 self.stack.insert(v, depth);
+                self.pushed.push(v);
                 let mut parts = Vec::new();
                 let solver = self.s;
                 // Alias-class members can share stored bounds. Expand each
@@ -762,7 +862,7 @@ impl Coalescer<'_> {
                     for m in self.members(v) {
                         let st = &solver.vars[m.0 as usize];
                         for b in &st.lower {
-                            if expanded_bounds.insert(self.bound_key(b)) {
+                            if expanded_bounds.insert(self.bound_key_of(b)) {
                                 parts.push(self.go(b, true, depth, env));
                             }
                         }
@@ -776,7 +876,7 @@ impl Coalescer<'_> {
                         let st = &solver.vars[m.0 as usize];
                         let bounds = if pos { &st.lower } else { &st.upper };
                         for b in bounds {
-                            if expanded_bounds.insert(self.bound_key(b)) {
+                            if expanded_bounds.insert(self.bound_key_of(b)) {
                                 parts.push(self.go(b, pos, depth, env));
                             }
                         }
@@ -802,7 +902,10 @@ impl Coalescer<'_> {
                     };
                     if self.cycle_generation == generation {
                         self.memo.insert((v, pos, env), t.clone());
+                    } else {
+                        self.keep_cyclic((v, pos, env), depth, start, &t);
                     }
+                    self.clear_logs();
                     return t;
                 }
                 let mut flat = Vec::new();
@@ -825,7 +928,10 @@ impl Coalescer<'_> {
                 };
                 if self.cycle_generation == generation {
                     self.memo.insert((v, pos, env), t.clone());
+                } else {
+                    self.keep_cyclic((v, pos, env), depth, start, &t);
                 }
+                self.clear_logs();
                 t
             }
             Ty::Con(h, values, args) => {
