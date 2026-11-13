@@ -431,10 +431,12 @@ fn typed_macro_forwarding_effect_rows_graph_differential() {
     same_principal(&typed, &plain, "f");
 }
 #[test]
-fn typed_macro_graph_members_keep_one_exact_record_graph() {
+fn typed_macro_members_give_each_closed_data_member_once() {
+    // syntax-3 stage 6: a union of closed data has one member per shape
+    // (§2.3, §6.2); it is no longer one record graph.
     let m = declared(
         "(m A) (-> (A) A)",
-        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax members) t) { (-> [one] value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"record graph was split\" value))) }) })",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax members) t) { (-> [one two] value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"closed data members not one per shape\" value))) }) })",
     );
     checked(
         &m,
