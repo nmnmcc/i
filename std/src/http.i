@@ -1825,10 +1825,20 @@ body_decode(A) = (
 	}
 }
 
-send_with = (provider: (send: _), req) { provider.send(req) }
+/// Send with a provider's send function, as `client().send`; a caller may
+/// give any function of this type in its place.
+send_with(E, N) = (
+	send: (Request) -> Response ^ E ! N
+	req: Request
+) -> Response ^ E ! N { send(req) }
 
-send_timeout = (provider: (send: _), req, duration_ns) {
-	task.race(() { provider.send(req) }, () {
+/// `send_with`, failing with `Timeout` when no response comes in time.
+send_timeout = (
+	send: (Request) -> Response ^ HttpError ! _
+	req: Request
+	duration_ns: Int
+) {
+	task.race(() { send(req) }, () {
 		clock.sleep_ns(duration_ns)
 		fail.raise(Timeout)
 	})

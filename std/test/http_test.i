@@ -804,7 +804,7 @@ test("http_reject_chunk_extension_trailing_space", () {
 test("provider_and_route", () {
 	provider = (send: (req: http.Request) { http.response(http.Status(201)) })
 	res = http.send_with(
-		provider
+		provider.send
 		http.request(http.Method("GET"), "http://example.com")
 	)
 	assert(res.status == http.Status(201))

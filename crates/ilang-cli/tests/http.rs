@@ -129,7 +129,7 @@ fn http_timeout() {
 )
 main = () {{
  task.run(() {{
-  result = fail.catch(() {{ http.send_timeout(http.client(), http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
+  result = fail.catch(() {{ http.send_timeout(http.client().send, http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
   result |> {{ Error(http.Timeout) -> Nil _ -> panic("expected timeout") }}
  }})
 }}
@@ -358,8 +358,8 @@ fn http_reuse() {
 main = () {{
  client = http.client()
  req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
- assert(http.send_with(client, req).status == http.Status(200))
- assert(http.send_with(client, req).status == http.Status(200))
+ assert(http.send_with(client.send, req).status == http.Status(200))
+ assert(http.send_with(client.send, req).status == http.Status(200))
 }}
 "#
     ));
@@ -400,8 +400,8 @@ fn http_reuse_replaces_closed_connection() {
 main = () {{
  client = http.client()
  req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
- assert(http.send_with(client, req).body == <<"first":utf8>>)
- assert(http.send_with(client, req).body == <<"second":utf8>>)
+ assert(http.send_with(client.send, req).body == <<"first":utf8>>)
+ assert(http.send_with(client.send, req).body == <<"second":utf8>>)
  client.close()
 }}
 "#
@@ -426,7 +426,7 @@ fn http_stream_request_body() {
         project.path().join("src/main.i"),
         r#"
 (i/net, i/task, i/stdio, i/core, std/http, std/bit_array, std/list, std/option)
-read_pieces = (body, acc: List(BitArray), count: Int) {
+read_pieces = (body: (read: _, trailers: _), acc: List(BitArray), count: Int) {
  piece = body.read(4096)
  { bit_array.byte_size(piece) == 0 } |> {
   True -> (bit_array.concat(list.reverse(acc)), count)
@@ -436,13 +436,13 @@ read_pieces = (body, acc: List(BitArray), count: Int) {
   }
  }
 }
-handle = (req: http.Request, body) {
+handle = (req: http.Request, body: (read: _, trailers: _)) {
  { req.target == "/ignore" || req.target == "/next" } |> {
   True -> http.response(http.Status(204))
   False -> echo_upload(req, body)
  }
 }
-echo_upload = (req: http.Request, body) {
+echo_upload = (req: http.Request, body: (read: _, trailers: _)) {
  (bytes, count) = read_pieces(body, [], 0)
  assert(bit_array.byte_size(bytes) == 1048576)
  assert(count >= 256)
@@ -575,11 +575,11 @@ main = () {{
  client = http.client()
  first = http.request(http.Method("GET"), "http://127.0.0.1:{first_port}/")
  second = http.request(http.Method("GET"), "http://127.0.0.1:{second_port}/")
- a = http.send_with(client, first)
+ a = http.send_with(client.send, first)
  assert(a.body == <<"first":utf8>>)
  assert(http.header(a.trailers, "X-End") == option.Some("yes"))
- assert(http.send_with(client, second).body == <<"second":utf8>>)
- assert(http.send_with(client, first).body == <<"first":utf8>>)
+ assert(http.send_with(client.send, second).body == <<"second":utf8>>)
+ assert(http.send_with(client.send, first).body == <<"first":utf8>>)
  client.close()
 }}
 "#
