@@ -772,3 +772,9 @@ The complete first 400 K4 observations have now passed the same independent
 source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
 Only these stable completed observations are committed; recording continues.
 The full corpus and the two known p1 regressions still block landing.
+
+A total of 600 completed K4 observations have passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only eligible completed observations are committed; refused cases remain
+untouched and recording continues.
+The full corpus, two known p1 regressions and pending phase refusals still block landing.
