@@ -44,7 +44,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= choose (-> ((: x (. syntax Syntax))) (. syntax Syntax) (. x { (-> (? `(f ~item) False) item) (-> `(f ~`(g ~item)) item) (-> `(f ~item) item) (-> `(s ~..[first ..rest]) first) (-> (| `(h ~item) `(i ~item)) item) (-> _ x) }))))\n").unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= choose (-> (, (: x (. syntax Syntax))) (. syntax Syntax) (|> x (| (-> (? (, `(f ~item)) False) _ item) (-> (, `(f ~`(g ~item))) _ item) (-> (, `(f ~item)) _ item) (-> (, `(s ~..[first .. rest])) _ first) (-> (, (| `(h ~item) `(i ~item))) _ item) (-> (, _) _ x))))))\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -178,7 +178,7 @@ fn expression_quote_is_compiled_and_keeps_unquote_identity() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(= quoted (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(f ~x)))\n").unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(= quoted (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(f ~x)))\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let (mut parsed, diagnostics) = ilang_check::parse(&graph);
@@ -213,7 +213,7 @@ fn quote_splice_preserves_order_and_reuses_original_syntax() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(= quoted (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(f ~x ~..[x x] z)))\n").unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(= quoted (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(f ~x ~..[x x] z)))\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let (mut parsed, diagnostics) = ilang_check::parse(&graph);
@@ -247,7 +247,7 @@ fn prepares_and_executes_a_real_macro_binding() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(wrapped ~x))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(wrapped ~x))))\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -280,7 +280,7 @@ fn compiler_program_selects_only_the_macro_import_closure() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/unrelated.i"),
         "@external(\"outside\", \"effect\")\neffect: () -> Int\ninitial = effect()\n",
@@ -357,7 +357,7 @@ fn compiler_wrapper_reports_a_macro_syntax_error_with_original_position() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, bad)\n(@ macro (= bad (-> ((: x (. syntax Syntax))) (^ (. syntax Syntax) (. syntax SyntaxError)) ((. fail raise) ((. syntax SyntaxError) \"bad\" x)))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, bad)\n(@ macro (= bad (-> (, (: x (. syntax Syntax))) (. syntax Syntax) ((. fail raise) ((. syntax SyntaxError) \"bad\" x)))))\n").unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -404,7 +404,7 @@ fn compiler_wrapper_returns_a_successful_macro_value() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(wrapped ~x))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(wrapped ~x))))\n").unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -477,7 +477,7 @@ fn compiler_wrapper_rejects_a_macro_with_the_wrong_result_type() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/macros.is"),
-        "(, wrong)\n(@ macro (= wrong (-> (x) _ 1)))\n",
+        "(, wrong)\n(@ macro (= wrong (-> (, x) _ 1)))\n",
     )
     .unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -515,7 +515,7 @@ fn compiler_wrapper_buffers_items_and_notes_for_success() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (x (! it (. syntax Items)) (! d (. syntax Diagnostics))) _ { ((. d note) \"note\") ((. it expose) x) x })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (, x) (<- _ (, (: it (. syntax Items)) (: d (. syntax Diagnostics)))) {((. d note) \"note\") ((. it expose) x) x})))\n").unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -574,7 +574,7 @@ fn expression_macro_requiring_items_is_rejected_before_execution() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (x (! it (. syntax Items))) _ { ((. it expose) x) x })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (, x) (<- _ (, (: it (. syntax Items)))) {((. it expose) x) x})))\n").unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -611,7 +611,7 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (x (! it (. syntax Items))) _ { ((. it expose) x) x })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (, x) (<- _ (, (: it (. syntax Items)))) {((. it expose) x) x})))\n").unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -692,7 +692,7 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/macros.is"),
-        "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> (x) _ `(wrapped ~x))))\n",
+        "(, (= syntax (/ i syntax)))\n(, wrap)\n(@ macro (= wrap (-> (, x) _ `(wrapped ~x))))\n",
     )
     .unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -771,7 +771,7 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, exported)\n(@ macro (= exported (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n(@ macro (= private (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, exported)\n(@ macro (= exported (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n(@ macro (= private (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros, (exported) = app/macros)\nmain = () { Nil }\n",
@@ -865,7 +865,7 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ignore outer)\n(@ macro (= ignore (-> ((: x (. syntax Syntax))) (. syntax Syntax) `123)))\n(@ macro (= outer (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ignore outer)\n(@ macro (= ignore (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `123)))\n(@ macro (= outer (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\n(calc)\ncalc = () { m.outer(m.ignore(unknown(1))) }\n",
@@ -953,7 +953,7 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, use_int)\n(@ macro (= use_int (-> ((: x (. syntax Syntax))) (. syntax Syntax) `Int)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, use_int)\n(@ macro (= use_int (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `Int)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nx: m.use_int(Undefined)\nx = 1\n",
@@ -1003,7 +1003,7 @@ fn body_engine_expands_pipe_left_operand_as_first_argument() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, first)\n(@ macro (= first (-> ((: x (. syntax Syntax)) (: ignored (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, first)\n(@ macro (= first (-> (, (: x (. syntax Syntax)) (: ignored (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nmain = () { 42 |> m.first(unknown) }\n",
@@ -1063,7 +1063,7 @@ fn body_engine_discards_notes_if_macro_result_is_not_an_expression() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, bad)\n(@ macro (= bad (-> (x (! d (. syntax Diagnostics))) _ { ((. d note) \"discard me\") `(= x 1) })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, bad)\n(@ macro (= bad (-> (, x) (<- _ (, (: d (. syntax Diagnostics)))) {((. d note) \"discard me\") `(= x 1)})))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nmain = () { m.bad(1) }\n",
@@ -1116,7 +1116,7 @@ fn body_engine_reports_invalid_macro_signature_at_its_definition() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/macros.is"),
-        "(, bad)\n(@ macro (= bad (-> (x) _ 1)))\n",
+        "(, bad)\n(@ macro (= bad (-> (, x) _ 1)))\n",
     )
     .unwrap();
     std::fs::write(
@@ -1189,8 +1189,8 @@ fn unused_macro_definitions_are_checked_for_signature_and_capabilities() {
             .source;
         ilang_macro::validate::module(&graph, &parsed, source)
     };
-    assert!(check("(, (= syntax (/ i syntax)))\n(@ macro (= ok (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").is_ok());
-    let wrong = check("(@ macro (= wrong (-> (x) _ 1)))\n").unwrap_err();
+    assert!(check("(, (= syntax (/ i syntax)))\n(@ macro (= ok (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").is_ok());
+    let wrong = check("(@ macro (= wrong (-> (, x) _ 1)))\n").unwrap_err();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let checked = ilang_macro::project::check(&mut graph);
@@ -1206,7 +1206,7 @@ fn unused_macro_definitions_are_checked_for_signature_and_capabilities() {
         wrong.iter().any(|d| d.message.contains("macro `wrong`")),
         "{wrong:?}"
     );
-    let outside = check("(, (= syntax (/ i syntax)))\n(@ (external \"other\" \"effect\") (: effect (-> () Nil)))\n(@ macro (= unsafe (-> ((: x (. syntax Syntax))) (. syntax Syntax) { (effect) x })))\n").unwrap_err();
+    let outside = check("(, (= syntax (/ i syntax)))\n(@ (external \"other\" \"effect\") (: effect (-> (,) Nil)))\n(@ macro (= unsafe (-> (, (: x (. syntax Syntax))) (. syntax Syntax) {(effect) x})))\n").unwrap_err();
     assert!(outside.iter().any(|d| d.is_error()), "{outside:?}");
 }
 
@@ -1252,9 +1252,9 @@ fn item_phase_runs_imported_calls_and_preserves_written_types() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, emit keep empty)
-(@ macro (= emit (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(= generated ~x))))
-(@ macro (= keep (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))
-(@ macro (= empty (-> ((: x (. syntax Syntax))) (. syntax Syntax) `{})))
+(@ macro (= emit (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(= generated ~x))))
+(@ macro (= keep (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))
+(@ macro (= empty (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `{})))
 "#,
     )
     .unwrap();
@@ -1324,8 +1324,8 @@ fn item_phase_retries_definition_after_a_later_item() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, ask make)
-(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))
-(@ macro (= make (-> (x) _ `(= ~x Int))))
+(@ macro (= ask (-> (, x) _ {(= d ((. syntax definition) x)) `{}})))
+(@ macro (= make (-> (, x) _ `(= ~x Int))))
 "#,
     )
     .unwrap();
@@ -1390,7 +1390,7 @@ fn item_phase_reports_each_unresolved_waiter_and_restores_the_module() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, ask)
-(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))
+(@ macro (= ask (-> (, x) _ {(= d ((. syntax definition) x)) `{}})))
 "#,
     )
     .unwrap();
@@ -1461,7 +1461,7 @@ fn item_phase_rechecks_an_early_builtin_answer() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, replace)
-(@ macro (= replace (-> () _ { (= d ((. syntax definition) `Result)) `(= Result Int)})))
+(@ macro (= replace (-> (,) _ {(= d ((. syntax definition) `Result)) `(= Result Int)})))
 "#,
     )
     .unwrap();
@@ -1555,9 +1555,9 @@ fn item_phase_queries_the_expanded_generated_type() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, ask make)
-(@ macro (= typ (-> () _ `Int)))
-(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))
-(@ macro (= make (-> (x) _ `(= ~x (typ)))))
+(@ macro (= typ (-> (,) _ `Int)))
+(@ macro (= ask (-> (, x) _ {(= d ((. syntax definition) x)) `{}})))
+(@ macro (= make (-> (, x) _ `(= ~x (typ)))))
 "#,
     )
     .unwrap();
@@ -1615,7 +1615,7 @@ fn project_expands_imported_macro_and_runs_generated_program() {
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\n(value)\nvalue = () { m.twice(21) }\n",
@@ -1673,7 +1673,7 @@ fn successful_macro_note_is_a_compiler_note_not_a_warning() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, mark)\n(@ macro (= mark (-> (x (! d (. syntax Diagnostics))) _ { ((. d note) \"hello\") x })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, mark)\n(@ macro (= mark (-> (, x) (<- _ (, (: d (. syntax Diagnostics)))) {((. d note) \"hello\") x})))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nmain = () { m.mark(1) }\n",
@@ -1701,7 +1701,7 @@ fn cli_check_and_run_expand_imported_macros() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nmain = () { m.twice(21) }\n",
@@ -1726,7 +1726,7 @@ fn cli_expands_imported_macro_with_standard_service() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, twice)\n(@ macro (= twice (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(+ ~x ~x))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros, i/stdio)\nmain = () { assert(m.twice(21) == 42) stdio.print(\"macro ok\") }\n",
@@ -1750,7 +1750,7 @@ fn cli_expands_attribute_macros_before_checking() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, keep)\n(@ macro (= keep (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\n@m.keep\nvalue = () { 42 }\nmain = () { value() }\n",
@@ -1773,7 +1773,7 @@ fn cli_runs_item_macro_with_exposed_caller_name() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (x (! it (. syntax Items))) _ { ((. it expose) x) `(= ~x 42) })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, x) (<- _ (, (: it (. syntax Items)))) {((. it expose) x) `(= ~x 42)})))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nm.emit(value)\nmain = () { value }\n",
@@ -1796,7 +1796,7 @@ fn a_later_macro_failure_keeps_an_earlier_committed_note() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, mark bad)\n(@ macro (= mark (-> (x (! d (. syntax Diagnostics))) _ { ((. d note) \"earlier\") x })))\n(@ macro (= bad (-> (x) _ `(= x 1))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, mark bad)\n(@ macro (= mark (-> (, x) (<- _ (, (: d (. syntax Diagnostics)))) {((. d note) \"earlier\") x})))\n(@ macro (= bad (-> (, x) _ `(= x 1))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nmain = () { m.mark(1) m.bad(2) }\n",
@@ -1899,7 +1899,7 @@ fn cli_retries_definition_queries_after_later_item_macros() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ask make)\n(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))\n(@ macro (= make (-> (x) _ `(= ~x Int))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ask make)\n(@ macro (= ask (-> (, x) _ {(= d ((. syntax definition) x)) `{}})))\n(@ macro (= make (-> (, x) _ `(= ~x Int))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nm.ask(T)\nm.make(T)\nmain = () { 1 }\n",
@@ -1922,7 +1922,7 @@ fn cli_macro_stop_reports_call_site_and_template() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, bomb)\n(@ macro (= bomb (-> ((: x (. syntax Syntax))) (. syntax Syntax) `(panic \"boom\"))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, bomb)\n(@ macro (= bomb (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `(panic \"boom\"))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nmain = () { m.bomb(1) }\n",
@@ -1948,7 +1948,7 @@ fn cli_nested_macro_stop_preserves_outer_call_and_templates() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, outer)\n(@ macro (= inner (-> (x) _ `(panic \"boom\"))))\n(@ macro (= outer (-> (x) _ `(inner ~x))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, outer)\n(@ macro (= inner (-> (, x) _ `(panic \"boom\"))))\n(@ macro (= outer (-> (, x) _ `(inner ~x))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nmain = () { m.outer(1) }\n",
@@ -1974,7 +1974,7 @@ fn collection_manifest_from_a_real_item_macro() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (c x (! it (. syntax Items))) _ { ((. it add) c x [] x) `(= ~x (-> () _ { 42 })) })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {42}))})))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\n(anchor)\nanchor = Nil\nm.emit(anchor, generated)\n",
@@ -2013,7 +2013,7 @@ fn project_check_rejects_a_private_collection_binding() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (c x (! it (. syntax Items))) _ { ((. it add) c x [] x) `(= ~x (-> () _ { 42 })) })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {42}))})))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nanchor = Nil\nm.emit(anchor, generated)\n",
@@ -2043,7 +2043,7 @@ fn definition_query_reads_expanded_type_from_dependency() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, make)\n(@ macro (= typ (-> () _ `Int)))\n(@ macro (= make (-> (x) _ `(= ~x (typ)))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, make)\n(@ macro (= typ (-> (,) _ `Int)))\n(@ macro (= make (-> (, x) _ `(= ~x (typ)))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/types.i"),
         "(m = app/macros)\n(T)\nm.make(T)\n",
@@ -2103,7 +2103,7 @@ fn shared_macro_code_reads_each_callers_definition_context() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/macros.is"),
-        "(, (= syntax (/ i syntax)))\n(, read)\n(@ macro (= read (-> (x) _ (| ((. syntax definition) x) { (-> `(= ~name ~value) value) (-> _ (panic \"expected binding\")) }))))\n",
+        "(, (= syntax (/ i syntax)))\n(, read)\n(@ macro (= read (-> (, x) _ (|> ((. syntax definition) x) (| (-> (, `(= ~name ~value)) _ value) (-> (, _) _ (panic \"expected binding\")))))))\n",
     )
     .unwrap();
     for (module, ty, value) in [("a", "Int", "20"), ("b", "String", "\"b\"")] {
@@ -2135,7 +2135,7 @@ fn cli_queries_a_dependency_type_after_its_type_macro_expands() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, make check)\n(@ macro (= typ (-> () _ `Int)))\n(@ macro (= make (-> (x) _ `(= ~x (typ)))))\n(@ macro (= check (-> (x) _ (| ((. syntax definition) x) { (-> `(= T Int) `{}) (-> _ (panic \"wrong definition\")) }))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, make check)\n(@ macro (= typ (-> (,) _ `Int)))\n(@ macro (= make (-> (, x) _ `(= ~x (typ)))))\n(@ macro (= check (-> (, x) _ (|> ((. syntax definition) x) (| (-> (, `(= T Int)) _ `{}) (-> (, _) _ (panic \"wrong definition\")))))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/types.i"),
         "(m = app/macros)\n(T)\nm.make(T)\n",
@@ -2163,7 +2163,7 @@ fn collection_error_from_template_points_at_call() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (x (! it (. syntax Items))) _ { ((. it add) `missing x [] x) `(= ~x (-> () _ { 42 })) })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, x) (<- _ (, (: it (. syntax Items)))) {((. it add) `missing x [] x) `(= ~x (-> (,) _ {42}))})))\n").unwrap();
     let source_text = "(m = app/macros)\nm.emit(generated)\n";
     std::fs::write(dir.path().join("src/main.i"), source_text).unwrap();
     let (mut graph, _) = ilang_cli::load(dir.path(), false, true);
@@ -2193,7 +2193,7 @@ fn item_collection_resolves_qualified_import() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (c x (! it (. syntax Items))) _ { ((. it add) c x [] x) `(= ~x (-> () _ { 42 })) })))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {42}))})))\n").unwrap();
     std::fs::write(dir.path().join("src/anchors.i"), "(anchor)\nanchor = Nil\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
@@ -2233,7 +2233,7 @@ fn a_macro_cannot_be_used_in_its_defining_module() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= id (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n(= f (-> () _ (id 1)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= id (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n(= f (-> (,) _ (id 1)))\n").unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let checked = ilang_macro::project::check(&mut graph);
@@ -2305,7 +2305,7 @@ fn unused_compile_time_helper_does_not_break_a_normal_program() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/helpers.is"),
-        "(= quoted (-> () _ `hello))\n",
+        "(= quoted (-> (,) _ `hello))\n",
     )
     .unwrap();
     std::fs::write(dir.path().join("src/main.i"), "main = () { 1 }\n").unwrap();
@@ -2326,7 +2326,7 @@ fn cli_runs_task_scope_inside_expanded_macro_argument() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(dir.path().join("src/main.i"), "(i/task, m = app/macros)\nmain = () {\n  result = m.id(task.scope((s) {\n    t = task.go(s, () { 7 })\n    task.join(t)\n  }))\n  assert(result == 7)\n}\n").unwrap();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["run", "--offline", "--project"])
@@ -2353,7 +2353,7 @@ fn body_engine_expands_real_macro_under_deep_mixed_body() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, outer)\n(@ macro (= outer (-> ((: x (. syntax Syntax))) (. syntax Syntax) `123)))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, outer)\n(@ macro (= outer (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `123)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros)\nf = () { m.outer(unknown()) }\n",
@@ -2504,7 +2504,7 @@ fn real_macro_definition_query_stops_before_oversize_source_construction() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ask)\n(@ macro (= ask (-> (x) _ { (= d ((. syntax definition) x)) `{}})))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, ask)\n(@ macro (= ask (-> (, x) _ {(= d ((. syntax definition) x)) `{}})))\n").unwrap();
     let source = format!(
         "(m = app/macros)\nT = {}\nm.ask(T)\n",
         "X".repeat(9_000_000)
@@ -2650,9 +2650,8 @@ fn macro_output_over_frame_budget_reports_the_limit() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, deep)
-(= nest (-> ((: n Int) (: x (. syntax Syntax))) (^ (. syntax Syntax) (. syntax SyntaxError))
-  (| n { (-> 0 x) (-> _ (nest (- n 1) ((. syntax make) ((. syntax Square) [x]) x))) })))
-(@ macro (= deep (-> (x) _ (nest 10000 x))))
+(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (| (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Square) [x]) x)))))))
+(@ macro (= deep (-> (, x) _ (nest 10000 x))))
 "#,
     )
     .unwrap();
