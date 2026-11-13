@@ -1040,7 +1040,18 @@ The **pattern type** of a pattern that is not a catch-all, and its parts, are:
 - A conjunction `p1 = … = pk`: the intersection of the pattern types of its parts that are not catch-alls, and each name part gets that type.
 - `x: T`: `T`, with new variables for holes and value types read as §4.7 says; `x` gets that type.
 
-A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or branch narrowing do not refine this shape. Thus `((a = Int, b = String) = d) { q: a = d.a  q == 1 }` gives `q` the known type `Int`. For `x = "a" = s` with `s: String`, `x`'s inferred type is `String` even though its known type is `"a"`; an annotation naming `x` uses `String`.
+A value type in an annotation uses the inferred type of its source, not a narrower known type at the use. A completed scheme gives its known structural form, with `_` for general variables. For a local source still being inferred, use its stored structural monotype with unresolved variables erased to `_`. A written type on the source name is part of that monotype. The known type of a matched value does not supply a type for a name inside its pattern. Do not infer a smaller shape from temporary lower bounds. Later literal tests or branch narrowing do not refine this shape. A local value type can read the type of a key result:
+
+```i
+f = (d : (a = Int, b = String)) {
+  a = d.a
+  q : a = d.a
+  q == 1
+}
+main = () { f((a = 1, b = "s")) }
+```
+
+Here `a` is a bound value, and `q` has the known type `Int`. For `x = "a" = s` with `s: String`, `x`'s inferred type is `String` even though its known type is `"a"`; an annotation naming `x` uses `String`.
 
 The parts of data are covariant in the hidden-input and whole-literal operations below; invariant arguments inside them still count in both directions. An item written in a data literal gets the matching expected part, when guaranteed. The base of a spread gets no expected type.
 
