@@ -712,3 +712,33 @@ fn a_closed_provider_retains_callback_and_generalization_diagnostics() {
         graph.sources.render_all(&diags)
     );
 }
+
+#[test]
+fn named_function_provider_keeps_call_and_binding_diagnostics() {
+    // §9.2: changing an inline provider function to a named helper must
+    // retain the same call and binding obligations. The lowering boundary
+    // fix sees inline function expressions; this case also needs cached-row
+    // validation when the closed provider contains only a function name.
+    let source = include_str!("types/soundness.i")
+        .replace("Reader(get = () -> Int { 1 })", "Reader(get = get_i)")
+        + "\nget_i = () -> Int { 1 }\n";
+    assert!(source.contains("Reader(get = get_i)"));
+    let source = source.as_str();
+    let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+    let mut sites: Vec<_> = diags
+        .iter()
+        .filter(|d| {
+            d.code == "E0515"
+                && d.message.contains("Reader(String)")
+                && d.message.contains("Reader(Int)")
+        })
+        .map(|d| ilang_syntax::span::LineIndex::new(source).line_col(d.span.start))
+        .collect();
+    sites.sort();
+    assert_eq!(
+        sites,
+        [(14, 5), (14, 19), (16, 5), (16, 29)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
