@@ -171,3 +171,17 @@ fn a_full_function_type_supplies_the_rest_heads_callback_type() {
     );
     assert!(errors.is_empty(), "{errors:#?}");
 }
+
+#[test]
+fn a_named_client_beside_a_rest_row_keeps_its_known_data_type() {
+    let (_, errors) = checked(
+        "Client = (make = () -> (send = () -> Int, close = () -> Nil))\n\
+         read = <N>() <- (client: Client, ..env: N) { functions = client.make()\n functions.close()\n functions.send() }\n\
+         saved = <N>() <- (client: Client, ..env: N) { value = client\n () { value.make().send() } }\n\
+         forward = <A, N>(body: () <- (..N, Client) -> A) <- (client: Client, ..env: N) { body() <- (..env, client) }\n\
+         main = () { client = Client(make = () { (send = () { 42 }, close = () { Nil }) })\n\
+           assert({ forward(() { read() }) <- (client) } == 42)\n\
+           callback = saved() <- (client)\n assert(callback() == 42) }",
+    );
+    assert!(errors.is_empty(), "{errors:#?}");
+}
