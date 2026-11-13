@@ -1929,7 +1929,7 @@ fn lsp_completion_import_names() {
 #[test]
 fn lsp_completion_services_in_an_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock = (now = () -> Int)\nPoint = { (x = Int) }\nTimer = (wait = () <- (Clock) -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nrun = (c: Clock) { elapsed(1) <- (c) }\n";
+    let text = "Clock = (now = () -> Int)\nPoint = (x = Int)\nTimer = (wait = () <- (Clock) -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nrun = (c: Clock) { elapsed(1) <- (c) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1942,12 +1942,16 @@ fn lsp_completion_services_in_an_environment() {
         "{:?}",
         items.iter().map(|i| &i.label).collect::<Vec<_>>()
     );
-    assert!(!items.iter().any(|i| i.label == "Point"));
-    assert!(!items.iter().any(|i| i.label == "elapsed"));
+    // A service type is an ordinary labelled type (syntax three §2.10.3,
+    // R1), so `Point` may be one; the types used as services come first.
+    let place = |label: &str| items.iter().position(|i| i.label == label);
+    assert!(place("Point").is_some_and(|p| p > 0), "{items:?}");
+    // Values are not services.
+    assert!(!items.iter().any(|i| i.label == "elapsed" || i.label == "run"));
     // The need of a function type in a type.
     let items = completion(&mut c, &main, text, "Clock) -> Int)", 0, 0);
     assert_eq!(items[0].label, "Clock");
-    assert!(!items.iter().any(|i| i.label == "Point"));
+    assert!(!items.iter().any(|i| i.label == "elapsed" || i.label == "run"));
     // After `e <- (` the items are the provided values.
     let items = completion(&mut c, &main, text, "c) }", 0, 0);
     item(&items, "c");
