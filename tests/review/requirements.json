@@ -3687,6 +3687,66 @@
         "app/main.f : () -> (Int) -> Int"
       ],
       "run_stdout": ""
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/b1$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0225"
+      ],
+      "finding": "E6 main integration: Two explicit S providers in one provide must be rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/r6$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0225"
+      ],
+      "finding": "E6 main integration: Two explicit S providers in one provide must be rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/b10$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0505"
+      ],
+      "finding": "E6 main integration: The recursive type in bad must still be rejected at its definition.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/b10$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "E6 main integration: The incompatible S provider must still be rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/z3$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "E6 main integration: The incompatible Svc(String)/Svc(Int) provider obligation must remain rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/z5$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "E6 main integration: The incompatible Svc(String)/Svc(Int) provider obligation must remain rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
     }
   ],
   "transitions": [
