@@ -10,7 +10,7 @@ def apply():
     oracle_path=ROOT/'target/fa-r3/engine-boundary-oracle.json'
     oracle=json.loads(oracle_path.read_text())
     assert oracle['source_hash']==head and len(oracle['cases'])==5
-    spec=importlib.util.spec_from_file_location('resolver_delete', ROOT/'target/fa-night/delete-resolver.py')
+    spec=importlib.util.spec_from_file_location('resolver_delete', ROOT/'scripts/syn3-delete-resolver.py')
     helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
     path=ROOT/'crates/ilang-cli/tests/macro_run.rs';text=path.read_text()
     start=text.index('fn type_macro_keeps_its_standalone_need_channel()')
