@@ -870,3 +870,40 @@ fn named_function_provider_keeps_call_and_binding_diagnostics() {
         graph.sources.render_all(&diags)
     );
 }
+
+#[test]
+fn deferred_callback_need_meet_survives_generalization_and_transfer() {
+    let helper = "Read(A) = (read = () -> A)
+both = <A, B>(f: () <- (Read(A)) -> A, g: () <- (Read(B)) -> B) { f() g() }";
+    // An open meet is admissible. Only the instance with disjoint closed
+    // callback requirements is forbidden by §9.2's empty-meet paragraph.
+    types(helper);
+    types(&format!(
+        "{helper}\nneed_int = () <- (r: Read(Int)) {{ r.read() }}\nuse = () {{ both(need_int, need_int) }}"
+    ));
+    for imported in [false, true] {
+        let calls = "need_int = () <- (r: Read(Int)) { r.read() }
+need_string = () <- (r: Read(String)) { r.read() }
+use = () { both(need_int, need_string) }";
+        let local = format!("{helper}\n{calls}");
+        let library = format!("(Read, both)\n{helper}");
+        let main = format!("(app/helper)\nRead(A) = helper.Read(A)\nboth = helper.both\n{calls}");
+        let files = if imported {
+            vec![
+                ("src/helper.i", library.as_str()),
+                ("src/main.i", main.as_str()),
+            ]
+        } else {
+            vec![("src/main.i", local.as_str())]
+        };
+        let (graph, _, diags) = common::check_files(&files);
+        let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
+        assert_eq!(errors.len(), 1, "{}", graph.sources.render_all(&diags));
+        assert_eq!(
+            errors[0].code,
+            "E0515",
+            "{}",
+            graph.sources.render_all(&diags)
+        );
+    }
+}

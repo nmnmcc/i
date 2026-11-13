@@ -737,10 +737,10 @@ impl Solver {
         }
     }
 
-    /// Hidden difference constraints cannot be thrown away by rebuilding
-    /// only the visible type. Keep the bounded scheme in this case.
+    /// Hidden difference and need-meet constraints cannot be thrown away by
+    /// rebuilding only the visible type. Keep the bounded scheme in this case.
     pub fn has_obligations(&self, t: &Ty) -> bool {
-        if !self.has_handlers {
+        if !self.has_handlers && !self.has_need_meets {
             return false;
         }
         let mut edges = Vec::new();
@@ -752,7 +752,7 @@ impl Solver {
                 continue;
             }
             let st = self.var(v);
-            if st.difference {
+            if st.difference || st.need_meet.is_some() {
                 return true;
             }
             for b in st.lower.iter().chain(&st.upper) {
@@ -3447,6 +3447,11 @@ mod literal_tests {
         let b = Ty::named(service, vec![y.clone()]);
         let meet = s.need_meet(&x, &y, &a, &b, Mode::Value, 0);
         assert!(s.failures.is_empty());
+        assert!(s.has_obligations(&meet));
+        assert!(!s.has_obligations(&Ty::Never));
+        let receiver = s.fresh();
+        s.constrain(&meet, &receiver);
+        assert!(s.has_obligations(&receiver));
         let Ty::Var(v) = meet else {
             panic!("a deferred meet is a variable")
         };
