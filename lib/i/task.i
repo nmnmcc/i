@@ -1108,7 +1108,12 @@ complete = <A, E, N>(
 		}
 }
 
-make_start: <A, E, N>(() <- (Fail(E), ..N) -> A, Key(Result(A, E)), Key(E), Bool) <- N -> Start = (body, result, errors, check) {
+make_start: <A, E, N>(
+	() <- (Fail(E), ..N) -> A,
+	Key(Result(A, E)),
+	Key(E),
+	Bool,
+) <- N -> Start = (body, result, errors, check) {
 	{
 		kept = control.keep_env((own: Scheduler) {
 			own |>
@@ -1262,9 +1267,11 @@ remote_begin = (job: Job) -> (
 	)
 }
 
-remote_resume = (
-	input: (Continuation(StepAnswer, Turn, Never), Resume)
-) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket)) {
+remote_resume = (input: (Continuation(StepAnswer, Turn, Never), Resume)) -> (
+	Remote,
+	Continuation(StepAnswer, Turn, Never),
+	List(Ticket),
+) {
 	(k, next) = input
 	remote_turn(control.resume(k, next.answer), next.finals, next.run)
 }
