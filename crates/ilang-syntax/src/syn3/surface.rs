@@ -109,9 +109,11 @@ fn transfer(
         let standalone = source[line_start..comment.span.start as usize]
             .trim()
             .is_empty();
-        while lexed.tokens.get(token).is_some_and(|t| {
-            t.span.start < comment.span.end || t.span.start == t.span.end
-        }) {
+        while lexed
+            .tokens
+            .get(token)
+            .is_some_and(|t| t.span.start < comment.span.end || t.span.start == t.span.end)
+        {
             token += 1;
         }
         while from.get(place).is_some_and(|s| s.start < comment.span.end) {

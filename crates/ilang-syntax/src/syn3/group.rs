@@ -83,8 +83,8 @@ fn group_pattern(p: &mut Pattern) {
 /// Makes `e` an operand of at least the level `min`.
 fn at_least(e: &mut Expr, min: i8) {
     group_expr(e);
-    let literal = min == super::print::POSTFIX + 1
-        && matches!(e.kind, ExprKind::Int(_) | ExprKind::Float(_));
+    let literal =
+        min == super::print::POSTFIX + 1 && matches!(e.kind, ExprKind::Int(_) | ExprKind::Float(_));
     if super::print::level(e) < min.min(super::print::POSTFIX) || literal {
         let span = e.span;
         let inner = std::mem::replace(e, Expr::new(ExprKind::Data(Vec::new()), span.0));

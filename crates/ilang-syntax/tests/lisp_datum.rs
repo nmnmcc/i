@@ -344,7 +344,11 @@ fn comments_before_header_groups_and_many_statements_are_kept_in_order() {
     source.push_str("}\n");
     let (lisp, lost) = normal_to_lisp(&source).unwrap();
     assert!(lost.is_empty(), "{lost:?}");
-    assert!(lisp.contains("// imports\n(, (/ i list))"), "{}", &lisp[..200]);
+    assert!(
+        lisp.contains("// imports\n(, (/ i list))"),
+        "{}",
+        &lisp[..200]
+    );
     assert!(lisp.contains("// exports\n(, f)"), "{}", &lisp[..200]);
     let (normal, lost) = lisp_to_normal(&lisp).unwrap();
     assert!(lost.is_empty(), "{lost:?}");

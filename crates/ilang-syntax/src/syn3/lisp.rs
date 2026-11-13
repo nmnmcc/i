@@ -57,10 +57,7 @@ fn list(span: Span, parts: Vec<Datum>) -> Datum {
 }
 
 fn form(head: &str, span: Span, parts: impl IntoIterator<Item = Datum>) -> Datum {
-    list(
-        span,
-        std::iter::once(op(head, span)).chain(parts).collect(),
-    )
+    list(span, std::iter::once(op(head, span)).chain(parts).collect())
 }
 
 /// `(head parts…)` with a head that is a datum itself (a call).
@@ -170,11 +167,9 @@ pub fn item_datum(item: &Item) -> Datum {
             };
             form("=", span, [head, rhs])
         }
-        ItemKind::Macro { module, name, args } => apply(
-            qualified(module, name, name.span.0),
-            span,
-            ditems(args),
-        ),
+        ItemKind::Macro { module, name, args } => {
+            apply(qualified(module, name, name.span.0), span, ditems(args))
+        }
     };
     for a in item.attributes.iter().rev() {
         let n = qualified(&a.module, &a.name, a.name.span.0);
@@ -284,11 +279,7 @@ fn segment<X>(s: &Segment<X>, f: impl Fn(&X) -> Datum) -> Datum {
         Some(fmt) => {
             let fmt = match &fmt.arg {
                 None => name(&fmt.name),
-                Some(arg) => apply(
-                    name(&fmt.name),
-                    fmt.name.span.0.to(arg.span.0),
-                    [expr(arg)],
-                ),
+                Some(arg) => apply(name(&fmt.name), fmt.name.span.0.to(arg.span.0), [expr(arg)]),
             };
             let span = v.span.to(fmt.span);
             form(":", span, [v, fmt])
@@ -342,7 +333,11 @@ fn function(f: &Function) -> Datum {
                 ",",
                 head,
                 items.iter().flat_map(|s| {
-                    let item = form(":", s.name.span.0.to(s.ty.span.0), [name(&s.name), typ(&s.ty)]);
+                    let item = form(
+                        ":",
+                        s.name.span.0.to(s.ty.span.0),
+                        [name(&s.name), typ(&s.ty)],
+                    );
                     if s.rest {
                         vec![op("..", s.name.span.0), item]
                     } else {
@@ -507,7 +502,10 @@ fn pattern(p: &Pattern) -> Datum {
                 form(
                     "<>",
                     span,
-                    [string(prefix, Span::new(span.start, span.start)), binder(rest)],
+                    [
+                        string(prefix, Span::new(span.start, span.start)),
+                        binder(rest),
+                    ],
                 )
             } else {
                 binder(rest)
