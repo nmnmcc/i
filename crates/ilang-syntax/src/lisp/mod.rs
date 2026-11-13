@@ -21,6 +21,7 @@ pub mod quote_lower;
 mod render;
 pub mod scoped;
 pub mod source_syntax;
+pub mod source_tree;
 pub mod syntax;
 mod to_ast;
 mod to_source;

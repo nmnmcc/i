@@ -591,8 +591,8 @@ impl Parser<'_> {
         }
         self.expect(&T::Eq)?;
         let first = self.kind().clone();
-        let ty = self.ty()?;
-        let rhs = match (first, ty.kind) {
+        let mut ty = self.ty()?;
+        let rhs = match (first, std::mem::replace(&mut ty.kind, TypeKind::Hole)) {
             (
                 T::UpName(n),
                 TypeKind::Named {

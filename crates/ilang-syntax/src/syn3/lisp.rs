@@ -16,9 +16,71 @@ use crate::{Code, Diagnostic};
 //
 // One builder serves the Lisp printer (`to_lisp` is `show` of each datum),
 // and the syntax given to macros. An atom that stands for a written name has
-// the span of that name; a compound has the span of its node; a symbol that
-// the tree does not keep (`,`, `->`, `=`, an operator) has the empty span at
-// the start of its node.
+// the span of that name; a compound has the span of its node. A symbol that
+// the tree does not keep has the span of its token when it is an operator
+// written between or before its operands (`+`, `.`, `:`, `=`, `..`, `@`,
+// `<-`) and the builder runs inside [`with_tokens`]; every other symbol
+// (`,`, `->`, `|`, `?`) has the span of its node, and an operator whose
+// token is not found has the empty span at the start of the gap searched.
+
+/// The tokens of a normal-surface file, for the spans of operators.
+pub struct TokenIndex {
+    /// Start, end and spelling of each symbol token, in source order.
+    tokens: Vec<(Span, &'static str)>,
+}
+
+impl TokenIndex {
+    pub fn new(source: &str) -> TokenIndex {
+        let lexed = crate::lexer::lex3(source);
+        TokenIndex {
+            tokens: lexed
+                .tokens
+                .iter()
+                .filter(|t| t.span.start != t.span.end)
+                .map(|t| (t.span, t.kind.text()))
+                .collect(),
+        }
+    }
+
+    /// The first token spelled `text` that lies in `gap`.
+    fn between(&self, text: &str, gap: Span) -> Option<Span> {
+        let first = self.tokens.partition_point(|(s, _)| s.start < gap.start);
+        self.tokens[first..]
+            .iter()
+            .take_while(|(s, _)| s.end <= gap.end)
+            .find(|(_, t)| *t == text)
+            .map(|(s, _)| *s)
+    }
+
+    /// The token spelled `text` that ends right before `at`.
+    fn before(&self, text: &str, at: u32) -> Option<Span> {
+        let next = self.tokens.partition_point(|(s, _)| s.end <= at);
+        let (span, found) = self.tokens.get(next.checked_sub(1)?)?;
+        (*found == text).then_some(*span)
+    }
+}
+
+thread_local! {
+    static TOKENS: std::cell::Cell<Option<std::sync::Arc<TokenIndex>>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Builds datums with the spans of the operator tokens of `index`.
+pub fn with_tokens<T>(index: &std::sync::Arc<TokenIndex>, f: impl FnOnce() -> T) -> T {
+    let before = TOKENS.with(|t| t.replace(Some(index.clone())));
+    let out = f();
+    TOKENS.with(|t| t.set(before));
+    out
+}
+
+fn token(find: impl FnOnce(&TokenIndex) -> Option<Span>) -> Option<Span> {
+    TOKENS.with(|t| {
+        let index = t.take();
+        let found = index.as_deref().and_then(find);
+        t.set(index);
+        found
+    })
+}
 
 fn at(kind: K, span: Span) -> Datum {
     Datum {
@@ -28,8 +90,21 @@ fn at(kind: K, span: Span) -> Datum {
     }
 }
 
+/// A symbol that stands for its whole node.
 fn op(text: &str, span: Span) -> Datum {
-    at(K::Symbol(text.into()), Span::new(span.start, span.start))
+    at(K::Symbol(text.into()), span)
+}
+
+/// An operator written in `gap`.
+fn op_in(text: &str, gap: Span) -> Datum {
+    let span = token(|i| i.between(text, gap)).unwrap_or(Span::new(gap.start, gap.start));
+    at(K::Symbol(text.into()), span)
+}
+
+/// `..` written right before the node at `next`.
+fn spread(next: Span) -> Datum {
+    let span = token(|i| i.before("..", next.start)).unwrap_or(Span::new(next.start, next.start));
+    at(K::Symbol("..".into()), span)
 }
 
 /// A name as the reader gives it: `Up`, `_discard`, or `name`.
@@ -60,6 +135,19 @@ fn form(head: &str, span: Span, parts: impl IntoIterator<Item = Datum>) -> Datum
     list(span, std::iter::once(op(head, span)).chain(parts).collect())
 }
 
+/// `(head parts…)` whose head is an operator written in `gap`.
+fn form_in(head: &str, gap: Span, span: Span, parts: impl IntoIterator<Item = Datum>) -> Datum {
+    list(
+        span,
+        std::iter::once(op_in(head, gap)).chain(parts).collect(),
+    )
+}
+
+/// The gap between two nodes.
+fn gap(a: Span, b: Span) -> Span {
+    Span::new(a.end, b.start.max(a.end))
+}
+
 /// `(head parts…)` with a head that is a datum itself (a call).
 fn apply(head: Datum, span: Span, parts: impl IntoIterator<Item = Datum>) -> Datum {
     list(span, std::iter::once(head).chain(parts).collect())
@@ -67,7 +155,12 @@ fn apply(head: Datum, span: Span, parts: impl IntoIterator<Item = Datum>) -> Dat
 
 fn qualified(module: &Option<Ident>, n: &Ident, span: Span) -> Datum {
     match module {
-        Some(m) => form(".", m.span.0.to(n.span.0).to(span), [name(m), name(n)]),
+        Some(m) => form_in(
+            ".",
+            gap(m.span.0, n.span.0),
+            m.span.0.to(n.span.0).to(span),
+            [name(m), name(n)],
+        ),
         None => name(n),
     }
 }
@@ -133,7 +226,9 @@ pub fn item_datum(item: &Item) -> Datum {
     let span = item.span.0;
     let mut out = match &item.kind {
         ItemKind::Bind(b) => binding(b),
-        ItemKind::Decl { name: n, ty } => form(":", span, [name(n), typ(ty)]),
+        ItemKind::Decl { name: n, ty } => {
+            form_in(":", gap(n.span.0, ty.span.0), span, [name(n), typ(ty)])
+        }
         ItemKind::TypeDef(def) => {
             let head = if def.head.is_empty() {
                 name(&def.name)
@@ -178,13 +273,18 @@ pub fn item_datum(item: &Item) -> Datum {
             None => n,
         };
         let span = a.span.to(out.span);
-        out = form("@", span, [a, out]);
+        out = form_in("@", Span::new(span.start, a.span.end), span, [a, out]);
     }
     out
 }
 
 fn binding(b: &Binding) -> Datum {
-    form("=", b.span.0, [pattern(&b.pattern), expr(&b.value)])
+    form_in(
+        "=",
+        gap(b.pattern.span.0, b.value.span.0),
+        b.span.0,
+        [pattern(&b.pattern), expr(&b.value)],
+    )
 }
 
 fn data_type(items: &[TItem], span: Span) -> Datum {
@@ -193,8 +293,13 @@ fn data_type(items: &[TItem], span: Span) -> Datum {
         span,
         items.iter().flat_map(|i| match i {
             TItem::Pos(t) => vec![typ(t)],
-            TItem::Label(n, t) => vec![form("=", n.span.0.to(t.span.0), [name(n), typ(t)])],
-            TItem::Spread(t) => vec![op("..", t.span.0), typ(t)],
+            TItem::Label(n, t) => vec![form_in(
+                "=",
+                gap(n.span.0, t.span.0),
+                n.span.0.to(t.span.0),
+                [name(n), typ(t)],
+            )],
+            TItem::Spread(t) => vec![spread(t.span.0), typ(t)],
         }),
     )
 }
@@ -266,8 +371,13 @@ fn ditems(items: &[DItem]) -> Vec<Datum> {
         .iter()
         .flat_map(|i| match i {
             DItem::Pos(e) => vec![expr(e)],
-            DItem::Label(n, e) => vec![form("=", n.span.0.to(e.span.0), [name(n), expr(e)])],
-            DItem::Spread(e) => vec![op("..", e.span.0), expr(e)],
+            DItem::Label(n, e) => vec![form_in(
+                "=",
+                gap(n.span.0, e.span.0),
+                n.span.0.to(e.span.0),
+                [name(n), expr(e)],
+            )],
+            DItem::Spread(e) => vec![spread(e.span.0), expr(e)],
         })
         .collect()
 }
@@ -339,7 +449,7 @@ fn function(f: &Function) -> Datum {
                         [name(&s.name), typ(&s.ty)],
                     );
                     if s.rest {
-                        vec![op("..", s.name.span.0), item]
+                        vec![spread(s.name.span.0), item]
                     } else {
                         vec![item]
                     }
@@ -411,7 +521,7 @@ fn expr(e: &Expr) -> Datum {
                 items
                     .iter()
                     .map(expr)
-                    .chain(rest.iter().flat_map(|r| [op("..", r.span.0), expr(r)]))
+                    .chain(rest.iter().flat_map(|r| [spread(r.span.0), expr(r)]))
                     .collect(),
             ),
             span,
@@ -421,8 +531,18 @@ fn expr(e: &Expr) -> Datum {
         ExprKind::Chain(fs) if fs.len() == 1 => function(&fs[0]),
         ExprKind::Chain(fs) => form("|", span, fs.iter().map(function)),
         ExprKind::Call { callee, args } => apply(expr(callee), span, ditems(args)),
-        ExprKind::Provide { target, services } => form("<-", span, [expr(target), expr(services)]),
-        ExprKind::Field { target, name: n } => form(".", span, [expr(target), name(n)]),
+        ExprKind::Provide { target, services } => form_in(
+            "<-",
+            gap(target.span.0, services.span.0),
+            span,
+            [expr(target), expr(services)],
+        ),
+        ExprKind::Field { target, name: n } => form_in(
+            ".",
+            gap(target.span.0, n.span.0),
+            span,
+            [expr(target), name(n)],
+        ),
         ExprKind::Index { target, index } => form(
             ".",
             span,
@@ -431,16 +551,27 @@ fn expr(e: &Expr) -> Datum {
                 at(K::Int(index.clone()), Span::new(span.end, span.end)),
             ],
         ),
-        ExprKind::Unary { op, expr: e } => form(
+        ExprKind::Unary { op, expr: e } => form_in(
             match op {
                 UnOp::Neg => "-",
                 UnOp::NegFloat => "-.",
             },
+            Span::new(span.start, e.span.0.start.max(span.start)),
             span,
             [expr(e)],
         ),
-        ExprKind::Binary { op, lhs, rhs } => form(op.text(), span, [expr(lhs), expr(rhs)]),
-        ExprKind::Pipe { lhs, rhs } => form("|>", span, [expr(lhs), expr(rhs)]),
+        ExprKind::Binary { op, lhs, rhs } => form_in(
+            op.text(),
+            gap(lhs.span.0, rhs.span.0),
+            span,
+            [expr(lhs), expr(rhs)],
+        ),
+        ExprKind::Pipe { lhs, rhs } => form_in(
+            "|>",
+            gap(lhs.span.0, rhs.span.0),
+            span,
+            [expr(lhs), expr(rhs)],
+        ),
     }
 }
 
@@ -462,8 +593,8 @@ fn dpitems(items: &[DPItem], span: Span) -> Vec<Datum> {
                 k.span.0.to(p.span.0),
                 std::iter::once(name(k)).chain(pattern_parts(p)),
             )],
-            DPItem::Rest(None) => vec![op("..", Span::new(span.end, span.end))],
-            DPItem::Rest(Some(b)) => vec![op("..", b.span.0), binder(b)],
+            DPItem::Rest(None) => vec![op("..", span)],
+            DPItem::Rest(Some(b)) => vec![spread(b.span.0), binder(b)],
         })
         .collect()
 }
@@ -485,7 +616,9 @@ fn pattern(p: &Pattern) -> Datum {
     match &p.kind {
         PatternKind::Quote(d) => (*d.0).clone(),
         PatternKind::Var(s) | PatternKind::Discard(s) => atom(s, span),
-        PatternKind::Typed { binder: b, ty } => form(":", span, [binder(b), typ(ty)]),
+        PatternKind::Typed { binder: b, ty } => {
+            form_in(":", gap(b.span.0, ty.span.0), span, [binder(b), typ(ty)])
+        }
         PatternKind::Int { negative, value } => {
             number(*negative, "-", at(K::Int(value.clone()), span))
         }
@@ -532,19 +665,20 @@ fn pattern(p: &Pattern) -> Datum {
             }
         }
         PatternKind::Data(items) => form(",", span, dpitems(items, span)),
-        PatternKind::List { items, rest } => at(
-            K::Square(
-                items
-                    .iter()
-                    .map(pattern)
-                    .chain(rest.iter().flat_map(|r| {
-                        std::iter::once(op("..", Span::new(span.end, span.end)))
-                            .chain(r.iter().map(binder))
-                    }))
-                    .collect(),
-            ),
-            span,
-        ),
+        PatternKind::List { items, rest } => {
+            at(
+                K::Square(
+                    items
+                        .iter()
+                        .map(pattern)
+                        .chain(rest.iter().flat_map(|r| {
+                            std::iter::once(op("..", span)).chain(r.iter().map(binder))
+                        }))
+                        .collect(),
+                ),
+                span,
+            )
+        }
         PatternKind::BitArray(xs) => at(
             K::Bits(xs.iter().map(|s| segment(s, pattern)).collect()),
             span,
@@ -615,6 +749,71 @@ pub fn from_lisp(source: &str) -> (Module, Vec<Diagnostic>) {
         }
     }
     (module, diags)
+}
+
+/// The unquoted parts of a quote, checked: `~e` and `~..e` hold expressions
+/// in a template and patterns in a quote pattern; a splice stands in a
+/// sequence (last, in a pattern); a quote does not hold a quote. The
+/// captures of a quote pattern are returned in matcher order, a splice
+/// marked `true`.
+pub fn quote_captures(d: &Datum, pattern: bool) -> Result<Vec<(bool, Pattern)>, Diagnostic> {
+    let bad = |d: &Datum, what: &str| {
+        Diagnostic::new(
+            Code::Unexpected,
+            d.span,
+            format!("datum is not valid as {what}"),
+        )
+    };
+    let K::Quote(body) = &d.kind else {
+        return Err(bad(d, "a quote"));
+    };
+    let mut work = vec![(&**body, false, true)];
+    let mut captures = Vec::new();
+    while let Some((d, in_sequence, last)) = work.pop() {
+        match &d.kind {
+            K::Unquote(inner) => {
+                if pattern {
+                    captures.push((false, pattern_of(inner)?));
+                } else {
+                    expr_of(inner)?;
+                }
+            }
+            K::Splice(inner) => {
+                if !in_sequence || (pattern && !last) {
+                    return Err(bad(d, "a splice in this position"));
+                }
+                if pattern {
+                    captures.push((true, pattern_of(inner)?));
+                } else {
+                    expr_of(inner)?;
+                }
+            }
+            K::Round(xs) | K::Square(xs) | K::Curly(xs) | K::Bits(xs) => {
+                work.extend(
+                    xs.iter()
+                        .enumerate()
+                        .rev()
+                        .map(|(i, child)| (child, true, i + 1 == xs.len())),
+                );
+            }
+            K::Quote(_) => return Err(bad(d, "a nested quote")),
+            _ => {}
+        }
+    }
+    Ok(captures)
+}
+
+/// Reads one item datum.
+pub fn item_from_datum(d: &Datum) -> Result<Item, Diagnostic> {
+    item(d)
+}
+
+/// Reads the item result of a macro: one item, or a Curly of items.
+pub fn items_from_datum(d: &Datum) -> Result<Vec<Item>, Diagnostic> {
+    match &d.kind {
+        K::Curly(items) => items.iter().map(item).collect(),
+        _ => Ok(vec![item(d)?]),
+    }
 }
 
 /// Reads one expression datum.

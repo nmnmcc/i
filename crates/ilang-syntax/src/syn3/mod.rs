@@ -12,6 +12,7 @@ pub use print::{
     print_with_comments,
 };
 pub mod convert;
+pub mod deep;
 pub mod group;
 pub mod lisp;
 pub mod lower;
