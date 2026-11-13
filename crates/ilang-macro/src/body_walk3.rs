@@ -84,7 +84,7 @@ pub fn expressions<H: Hook + Send>(module: &mut Module, hook: &mut H) -> Result<
 where
     H::Error: Send,
 {
-    crate::deep3::deep(|| expressions_on_this_stack(module, hook))
+    ilang_syntax::syn3::deep::deep(|| expressions_on_this_stack(module, hook))
 }
 
 /// [`expressions`] for a caller that is already on a deep stack.
@@ -122,7 +122,7 @@ pub fn type_definition<H: Hook + Send>(
 where
     H::Error: Send,
 {
-    crate::deep3::deep(|| type_definition_on_this_stack(definition, hook))
+    ilang_syntax::syn3::deep::deep(|| type_definition_on_this_stack(definition, hook))
 }
 
 /// [`type_definition`] for a caller that is already on a deep stack.

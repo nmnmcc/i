@@ -3,7 +3,7 @@
 //! and a comparison with the old walker on the lowered tree over every
 //! source file of the repository.
 use ilang_macro::body_walk3::{self, Hook, Local};
-use ilang_macro::{body_engine3, body_walk, call, call3, deep3};
+use ilang_macro::{body_engine3, body_walk, call, call3};
 use ilang_syntax::{
     span::Span,
     syn3::ast::{
@@ -214,15 +214,14 @@ fn deep_expression(depth: usize, inner: Expr) -> Expr {
     value
 }
 
-/// A small host stack, as the tests of the old walker have. The tree of
-/// syntax three is dropped by recursion until `syn3::ast` drops with a work
-/// list (lane/fa), so the test drops it on a deep stack.
+/// A small host stack, as the tests of the old walker have.
 fn on_small_stack(test: impl FnOnce() -> Module + Send + 'static) {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
             let module = test();
-            deep3::deep(move || drop(module));
+            // No recursive cleanup is permitted either.
+            drop(module);
         })
         .unwrap()
         .join()
@@ -712,7 +711,6 @@ fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
             "{name}: is_direct of the value at {span:?}"
         );
     }
-    deep3::deep(move || drop(new));
     true
 }
 

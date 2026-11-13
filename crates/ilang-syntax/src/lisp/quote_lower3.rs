@@ -17,63 +17,13 @@ use super::{Datum, DatumKind};
 // shadowed by a written name. Its scope is local to the compiler program.
 const ALIAS: &str = "\0quote-syntax";
 
-fn bad<T>(d: &Datum, what: &str) -> Result<T, Diagnostic> {
-    Err(Diagnostic::new(
-        Code::Unexpected,
-        d.span,
-        format!("expected {what}"),
-    ))
-}
-
-/// Checks the shape of a quote and visits its unquotes in matcher order;
-/// the flag marks a splice. A splice stands in a sequence, and in a pattern
-/// it is the last part of its sequence; a quote holds no quote.
-fn unquotes<'a>(
-    d: &'a Datum,
-    pattern: bool,
-    mut visit: impl FnMut(bool, &'a Datum) -> Result<(), Diagnostic>,
-) -> Result<(), Diagnostic> {
-    let DatumKind::Quote(body) = &d.kind else {
-        return bad(d, "a quote");
-    };
-    let mut work = vec![(&**body, false, true)];
-    while let Some((d, in_sequence, last)) = work.pop() {
-        match &d.kind {
-            DatumKind::Unquote(inner) => visit(false, inner)?,
-            DatumKind::Splice(inner) => {
-                if !in_sequence || (pattern && !last) {
-                    return bad(d, "a splice in this position");
-                }
-                visit(true, inner)?;
-            }
-            DatumKind::Round(xs)
-            | DatumKind::Square(xs)
-            | DatumKind::Curly(xs)
-            | DatumKind::Bits(xs) => work.extend(
-                xs.iter()
-                    .enumerate()
-                    .rev()
-                    .map(|(i, child)| (child, true, i + 1 == xs.len())),
-            ),
-            DatumKind::Quote(_) => return bad(d, "a nested quote"),
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
 /// Reads a quote pattern: its unquotes are patterns in the rows of syntax
 /// three (§6.8).
 pub fn read_pattern(d: &Datum) -> Result<QuotePattern, Diagnostic> {
-    let mut captures = Vec::new();
-    unquotes(d, true, |splice, inner| {
-        captures.push((splice, crate::syn3::lisp::pattern_from_datum(inner)?));
-        Ok(())
-    })?;
     Ok(QuotePattern {
         datum: Quoted(Box::new(d.clone())),
         template: None,
-        captures,
+        captures: crate::syn3::lisp::quote_captures(d, true)?,
     })
 }
 
@@ -87,9 +37,7 @@ pub fn read_pattern_lenient(d: &Datum) -> QuotePattern {
 /// Checks an expression quote: its shape, and that every unquote reads as
 /// an expression.
 pub fn check_expression(d: &Datum) -> Result<(), Diagnostic> {
-    unquotes(d, false, |_, inner| {
-        crate::syn3::lisp::expr_from_datum(inner).map(|_| ())
-    })
+    crate::syn3::lisp::quote_captures(d, false).map(|_| ())
 }
 
 fn ident(name: &str, span: Span) -> Ident {

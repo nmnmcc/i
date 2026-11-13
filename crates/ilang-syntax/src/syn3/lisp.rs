@@ -821,14 +821,6 @@ pub fn expr_from_datum(d: &Datum) -> Result<Expr, Diagnostic> {
     expr_of(d)
 }
 
-/// Reads a macro's item result: one item, or a curly list of items.
-pub fn items_from_datum(d: &Datum) -> Result<Vec<Item>, Diagnostic> {
-    match &d.kind {
-        K::Curly(items) => items.iter().map(item).collect(),
-        _ => Ok(vec![item(d)?]),
-    }
-}
-
 /// Reads one type datum.
 pub fn type_from_datum(d: &Datum) -> Result<Type, Diagnostic> {
     type_of(d)
