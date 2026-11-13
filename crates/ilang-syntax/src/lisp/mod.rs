@@ -9,6 +9,7 @@ use crate::token::{Token, TokenKind as T};
 use crate::{Code, Diagnostic};
 use num_bigint::BigUint;
 
+mod comments;
 pub mod definition_schedule;
 pub mod definition_table;
 pub mod definitions;
@@ -30,11 +31,11 @@ mod to_source;
 pub(crate) mod trampoline;
 pub use encode::{SourceEncoder, expression_syntax, item_syntax, pattern_syntax, type_syntax};
 pub use encode_charge::SyntaxCharge;
-pub use from_ast::print_module;
+pub use from_ast::{print_module, print_with_comments};
 pub use to_ast::{
     parse_expression, parse_item, parse_items, parse_module, parse_pattern, parse_type,
 };
-pub use to_source::normal_source;
+pub use to_source::{normal_source, normal_with_comments};
 
 #[derive(Debug)]
 pub struct Datum {

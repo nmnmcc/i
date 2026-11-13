@@ -254,6 +254,15 @@ fn both_surfaces_preserve_attributes_and_grouped_result_holes() {
     }
 }
 
+// Retain the historical decoder's rejection beside the native row test.
+// Syntax-three §6.8 replaces the clause-block rows; neither decoder may
+// silently turn this nonfinal type test into another normal pattern.
+#[test]
+fn a_nonfinal_clause_choice_cannot_end_in_a_type_test() {
+    let doc = parse("(= f { (-> (| (= a (: b Int)) Unit) 1) })").unwrap();
+    assert!(ilang_syntax::lisp::parse_module(&doc).is_err());
+}
+
 #[test]
 fn a_nonfinal_clause_choice_with_a_type_test_has_no_normal_spelling() {
     // Spec §14.1 permits a Lisp tree without a normal spelling, but
