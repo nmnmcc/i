@@ -1,8 +1,0 @@
-[0mdirenv: loading ~/Programming/i/.envrc
-[0mdirenv: using devenv --quiet
-• Running devenv:files:cleanup
-✓ Running devenv:files:cleanup in 18.8ms
-• Running devenv:enterShell
-✓ Running devenv:enterShell in 14.2ms
-pass review/fixed_test.cosine_reduced_one (0.002 s, cpu 0.00 s)
-1 passed, 0 failed

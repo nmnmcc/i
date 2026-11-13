@@ -4,6 +4,48 @@
 
 use ilang_wasm::{Error, Options, compile, compile_wat};
 
+#[test]
+fn large_runtime_metadata_has_bounded_initializers() {
+    use ilang_wasm::ir::{Program, SitePos};
+
+    // Expanded test collections carry a note for every source site. Keep a
+    // large collection here without depending on the size of std's tests.
+    let count = 4097;
+    let program = Program {
+        site_modules: (0..130).map(|i| format!("app/module{i}")).collect(),
+        constructors: (0..130).map(|i| format!("Constructor{i}")).collect(),
+        shapes: (0..130).map(|i| vec![format!("field{i}")]).collect(),
+        sites: (0..count)
+            .map(|i| SitePos {
+                module: i % 130,
+                line: i + 1,
+                column: 1,
+            })
+            .collect(),
+        site_notes: (0..count).map(|i| Some(format!("\nnote {i}"))).collect(),
+        ..Default::default()
+    };
+    let text = ilang_wasm::emit::wat(&program);
+    let bytes = wat::parse_str(&text).unwrap();
+    ilang_wasm::validate(&bytes).unwrap();
+    let largest = wasmparser::Parser::new(0)
+        .parse_all(&bytes)
+        .filter_map(|payload| match payload.unwrap() {
+            wasmparser::Payload::CodeSectionEntry(body) => {
+                Some(body.range().end - body.range().start)
+            }
+            _ => None,
+        })
+        .max()
+        .unwrap();
+    // A single array.new_fixed would make a large initializer whose
+    // allocating operands keep thousands of GC values live at once.
+    assert!(
+        largest < 8192,
+        "metadata initializer grew to {largest} bytes"
+    );
+}
+
 fn checked(
     source: &str,
 ) -> (
@@ -125,7 +167,7 @@ fn metadata() {
     assert_eq!(
         json,
         serde_json::json!({
-            "version": 3,
+            "version": 4,
             "entry": { "name": "app/main.main", "async": false },
             "tests": [],
             "exports": {},
@@ -300,9 +342,21 @@ fn segments_grow_linearly() {
     let base = size(0);
     let ratio = (large - base) as f64 / (small - base) as f64;
     assert!(ratio < 5.0, "{base} {small} {large}: {ratio}");
-    let start = std::time::Instant::now();
-    wasm(&many_points(200)).unwrap();
-    assert!(start.elapsed().as_secs() < 30);
+    // The time to generate the module must not blow up either. It is a growth ratio, not a
+    // wall-clock bound, so a busy machine does not fail the test: from 50 to 200 points a
+    // polynomial grows by far less than 500 times, an exponential by far more.
+    let time = |n| {
+        let source = many_points(n);
+        let start = std::time::Instant::now();
+        wasm(&source).unwrap();
+        start.elapsed()
+    };
+    let small = time(50).max(std::time::Duration::from_millis(50));
+    let large = time(200);
+    assert!(
+        large < small * 500,
+        "200 points took {large:?}, 50 points took {small:?}"
+    );
 }
 
 /// Spec 4.1/11.4: opaque constructors remain distinct through a shared
@@ -318,8 +372,8 @@ fn opaque_decoders_keep_the_declared_type_on_both_targets() {
 	same_a
 	echo
 )
-A = { Opaque }
-B = { Opaque }
+A = Opaque
+B = Opaque
 Alias = A
 @external("opaque", "get")
 get_a: () -> A

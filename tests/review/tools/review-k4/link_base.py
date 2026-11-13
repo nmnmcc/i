@@ -1,2 +1,0 @@
-import subprocess
-subprocess.run(['rustc', '--edition=2024', '-C', 'link-arg=-fuse-ld=bfd', '/tmp/review-k4/check.rs', '-C', 'debuginfo=1', '-L', 'dependency=/home/agent/Programming/i/.rd/std1/target/debug/deps', '--extern', 'ilang_check=/tmp/review-k4/libilang_check_before.rlib', '--extern', 'ilang_package=/home/agent/Programming/i/.rd/std1/target/debug/deps/libilang_package-0eb7ff9f828bdc01.rlib', '-o', '/tmp/review-k4/check-before'],check=True)

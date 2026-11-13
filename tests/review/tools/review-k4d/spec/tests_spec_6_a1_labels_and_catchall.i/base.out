@@ -1,4 +1,0 @@
-spec/a1_labels_and_catchall.identity : (n: A) -> A
-spec/a1_labels_and_catchall.classify : (A) -> String
-spec/a1_labels_and_catchall.guarded : (value: (Int) -> Int) -> Int
-spec/a1_labels_and_catchall.main : () -> Nil ! Assert

@@ -4,7 +4,7 @@
 	main
 )
 
-name_of = (r) { r.name }
+name_of = (r: (age = Int, name = String)) { r.name }
 
 main = () {
 	ada = (age = 36, name = "Ada")

@@ -1,2 +1,0 @@
-spec/async_many_waits.sum : (n: Int, total: Int) -> Int ? String ! Later
-spec/async_many_waits.main : () -> Nil ? String ! Later | Assert

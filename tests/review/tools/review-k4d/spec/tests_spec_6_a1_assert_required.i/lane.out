@@ -1,4 +1,0 @@
-spec/a1_assert_required.pure : (Int) -> Int
-spec/a1_assert_required.main : () -> Nil ! Assert
-test/a1_assert_required.i:4:1: error[E0501]: `Assert` is not a subtype of `Never`
-1 error

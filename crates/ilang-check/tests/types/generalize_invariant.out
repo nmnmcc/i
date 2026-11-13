@@ -4,7 +4,7 @@ int_cell : () -> Cell(Int)
 string_cell : () -> Cell(String)
 written_int : () -> Cell(Int)
 written_string : () -> Cell(String)
-ignore : (x = Cell(A)) -> Nil
+ignore : (Cell(A)) -> Nil
 ignore_inferred : (Cell(A)) -> Nil
 ignored : () -> (Nil, Nil)
 nested : () -> List(Cell(A))

@@ -10,3 +10,4 @@ go = (s: Scope(e), body: () <- (Fail(e)) -> a) -> Task(a, e) {
 local_scope = (body: (Scope(e)) <- (Fail(e)) -> a) -> a {
 	panic("type-only stub")
 }
+// old-syntax-check: E0101,E0101

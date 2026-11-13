@@ -12,15 +12,42 @@ use crate::{Code, Diagnostic};
 /// A converted file, and the spans of the comments that have no place in it.
 pub type Converted = Result<(String, Vec<Span>), Vec<Diagnostic>>;
 
-/// The tree without groups: a block of one expression statement, in the
-/// place of an expression, is that expression. The two surfaces differ only
-/// in where they need groups.
+/// The tree without expression groups and with interpolation lowered to
+/// concatenation (§1.6). These are the surface differences before the core
+/// tree is compared (§14.1).
 pub fn ungrouped(module: &Module) -> Module {
     struct Ungroup;
     impl Visitor for Ungroup {
         fn expr(&mut self, e: &mut Expr, enter: bool) {
             if enter {
                 return;
+            }
+            let span = e.span;
+            if let ExprKind::Interp(parts) = &mut e.kind {
+                let mut operands: Vec<Expr> = std::mem::take(parts)
+                    .into_iter()
+                    .map(|part| match part {
+                        InterpPart::Text(text) => Expr::new(ExprKind::String(text), span.0),
+                        InterpPart::Expr(e) => e,
+                    })
+                    .collect();
+                if operands.len() == 1 {
+                    operands.insert(0, Expr::new(ExprKind::String(String::new()), span.0));
+                }
+                let mut operands = operands.into_iter();
+                let first = operands
+                    .next()
+                    .unwrap_or_else(|| Expr::new(ExprKind::String(String::new()), span.0));
+                *e = operands.fold(first, |lhs, rhs| {
+                    Expr::new(
+                        ExprKind::Binary {
+                            op: crate::ast::BinOp::Concat,
+                            lhs: Box::new(lhs),
+                            rhs: Box::new(rhs),
+                        },
+                        span.0,
+                    )
+                });
             }
             if let ExprKind::Block(b) = &mut e.kind
                 && let [Stmt::Expr(_)] = b.stmts.as_slice()
@@ -168,6 +195,15 @@ pub fn lisp_to_normal(source: &str) -> Converted {
     let (module, errors) = super::lisp::from_lisp(source);
     if !errors.is_empty() {
         return Err(errors);
+    }
+    // Spec §14.1: a macro definition has no normal spelling, even when
+    // its body contains no quote and could otherwise round-trip as text.
+    if module.items.iter().any(|item| {
+        item.attributes
+            .iter()
+            .any(|a| a.module.is_none() && a.name.name == "macro")
+    }) {
+        return Err(unrepresentable());
     }
     let mut grouped = module.clone();
     super::group::regroup(&mut grouped);

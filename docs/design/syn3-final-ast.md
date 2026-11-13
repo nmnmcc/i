@@ -339,3 +339,18 @@ Step 2c will be attempted separately on `lane/fa-2c`, based on this green
 prefix. It is not part of `lane/fa` unless the same gate passes with the
 new rows enabled. No production engine migration, resolver migration, or
 old-tree deletion is included.
+
+Evening resumption (18:01, extended deadline 20:30): the complete surviving
+2c patch was preserved in `target/fa-integration/surviving-2c.patch` before
+integrating `lane/conv`. Its shape-based checker and function types are
+combined with the additive row writers, deep helper, quote captures,
+normalization and position printers. The new walker comparison removes
+only compiler-synthesized `%multi` calls and hidden `%g` binders and compares
+all written calls with their lexical environments in source order. Multi
+values use the transition's one-byte root for the direct-value comparison.
+The old engine now recognizes the transition `%multi` construction as a
+direct value: spec §6.12 says “A chain is a direct value (§6.10), as every
+function is.” The formatter skip entries now name spec fences 1349 and
+1438: whole-data/environment provide still needs E6, while `area` now parses
+through the shape-group lowering. No parser or diagnostic expectation was
+changed to hide that limitation.

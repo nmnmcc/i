@@ -9,7 +9,9 @@ scripts/syn3-convert-all after the `.i` and `.is` files.
 The snippets are the ones `scripts/old-syntax-check` extracts. A snippet is
 converted when only the syntax before syntax three reads it (or both read it
 to different trees and it has no `<-`), and left as it is when it is in syntax
-three already, so the script can run again. Left out, and listed: snippets the
+three already, so the script can run again. A string or fence whose text was
+already in the tree of the last conversion commit is not read again
+(`SYN3_EMBEDDED_ALL=1` reads every one). Left out, and listed: snippets the
 inventory marks as not i, as invalid on purpose (`diagnostics`), and source
 templates (`prefix`, `suffix`, `substitutions`), and Rust strings that use
 `{{` (format strings). A snippet that neither syntax reads, or whose converted
@@ -142,14 +144,49 @@ def listed():
     return keys
 
 
+def last_conversion():
+    """The newest conversion commit (as in scripts/syn3-convert-all), or None."""
+    out = subprocess.run(
+        ["git", "log", "-1", "--format=%H", "-E",
+         "--grep=^(Convert the repository to syntax three|Re-run the conversion)"],
+        cwd=ROOT, stdout=subprocess.PIPE, text=True).stdout.strip()
+    return out or None
+
+
+def converted_before(since, cache, path, literal):
+    """Whether the string or fence `literal` of `path` was already in the tree
+    of the last conversion: such a snippet has been converted (or written in
+    syntax three by hand) and is not read again. This settles the snippets
+    that both syntaxes read to different trees (`T = (A)` is an alias before
+    and a labelled type after), as syn3-convert-all does for whole files."""
+    if since is None:
+        return False
+    if path not in cache:
+        r = subprocess.run(["git", "show", f"{since}:{path}"], cwd=ROOT,
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        cache[path] = r.stdout.decode(errors="replace") if r.returncode == 0 else ""
+    return literal in cache[path]
+
+
+def conversion_base():
+    """Honor syn3-convert-all's --since for embedded text as well as files."""
+    if os.environ.get("SYN3_EMBEDDED_ALL"):
+        return None
+    return os.environ.get("SYN3_EMBEDDED_SINCE") or last_conversion()
+
+
 def convert(binary, ctors):
     os.chdir(ROOT)
     config = json.loads(check.DATA.read_text())
     unconvertible = listed()
+    since = conversion_base()
+    cache = {}
     items = []
     left = []
     for item in check.snippets():
         if item["kind"] == "file":
+            continue
+        if converted_before(since, cache, item["path"], item["host"][item["start"]:item["end"]]):
             continue
         key = check.identity(item["path"], item["source"])
         entry = config.get(key, {})

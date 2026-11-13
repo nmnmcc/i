@@ -15,8 +15,10 @@ probe = (wait: () <- (request.Await) -> Nil) {
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.send(armed, Nil)
+				// §9.9: the failure may come before or after the await; the
+				// child then waits until the cancellation reaches it.
 				wait()
-				panic("await continued")
+				task.sync(task.never())
 			})
 			task.go(s, () {
 				task.receive(armed)
@@ -31,8 +33,12 @@ probe = (wait: () <- (request.Await) -> Nil) {
 main = () {
 	borrowed = request.ready(Nil)
 	probe(() { request.await(borrowed) })
-	assert(request.state(borrowed) == request.Ready(Nil))
+	// §9.9: "Timing may choose ... which failures precede cancellation"; when
+	// the await completed before the failure, it took the answer.
+	after = request.state(borrowed)
+	assert(after == request.Ready(Nil) || after == request.Taken)
 	owned = request.ready(Nil)
 	probe(() { request.await_owned(owned) })
-	assert(request.state(owned) == request.Cancelled)
+	settled = request.state(owned)
+	assert(settled == request.Cancelled || settled == request.Taken)
 }

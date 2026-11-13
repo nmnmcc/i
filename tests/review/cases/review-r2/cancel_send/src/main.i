@@ -13,11 +13,15 @@ main = () <- (io: Io) {
 	r = fail.catch(() {
 		task.scope((s) {
 			c: task.Channel(Int) = task.channel()
+			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
 						resource.ensure(
-							() { task.send(c, 1) },
+							() {
+								task.send(armed, Nil)
+								task.send(c, 1)
+							},
 							() {
 								io.print("inner")
 								task.yield()
@@ -32,7 +36,7 @@ main = () <- (io: Io) {
 				)
 			})
 			task.go(s, () {
-				task.yield()
+				task.receive(armed)
 				fail.raise("boom")
 			})
 			task.sync(task.never())

@@ -146,7 +146,7 @@ fn shared_fields_do_not_infer_an_empty_parameter() {
     assert_eq!(ds.iter().filter(|d| d.0 == "E0516").count(), 1, "{ds:?}");
     assert!(!ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     assert!(
-        lines.iter().any(|l| l.contains("(p = Pair(String))")),
+        lines.iter().any(|l| l.contains("(Pair(String))")),
         "{lines:?}"
     );
 }
@@ -471,13 +471,8 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
     }
     // The old environments `! Int - Int` and `! String - String` cannot be
     // written: a need list holds named service types only (syntax-3 §3.1).
-    for env in ["Never"] {
-        let (ds, _) = check(
-            &"@host(\"app\")\nSvc = (get = () <- (BoundaryType) -> String)\n"
-                .replace("BoundaryType", env),
-        );
-        assert!(ds.is_empty(), "{env}: {ds:?}");
-    }
+    let (ds, _) = check("@host(\"app\")\nSvc = (get = () <- (Never) -> String)\n");
+    assert!(ds.is_empty(), "Never: {ds:?}");
     for empty in ["1 - 1", "Int & String"] {
         let (ds, _) = check(
             &"Empty = BoundaryType\n@external(\"app\", \"write\")\nwrite: (Empty) -> Nil\n"
@@ -604,10 +599,27 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
 
 #[test]
 fn fitted_choices_keep_the_deferred_binding_error() {
-    // Joint J4/J5: deferred Assert failure is E0501 at this binding, not E0516.
-    let (ds, _) = check("s = \"b\"\nf = () -> Int { s |> (\"a\" | \"c\") { 1 } }\n");
-    assert_eq!(ds.len(), 1, "{ds:?}");
-    assert_eq!(ds[0].0, "E0501");
+    // Joint J4/J5: a fitted group (one branch, no guard) is not checked for
+    // coverage, so this is never E0516. Syntax three: `-> Int` on a function
+    // literal leaves its needs to inference (syntax-3 §2.10.1, "the whole
+    // need, inferred"), and
+    // "a group with one branch and no guard ... when it may fail it reports
+    // to `Assert`" (spec §6.12), so `f` needs `Assert` instead of the old
+    // E0501. No value of the known type `"b"` matches `"a" | "c"`: "a branch
+    // that can never be used gives a compile warning" (spec §6.12; syntax-3
+    // §2.12, D4), W0505.
+    let (ds, lines) = check("s = \"b\"\nf = () -> Int { s |> (\"a\" | \"c\") { 1 } }\n");
+    assert_eq!(
+        ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
+        ["W0505"],
+        "{ds:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains("f :") && l.contains("Assert")),
+        "{lines:?}"
+    );
 }
 
 #[test]
@@ -662,7 +674,7 @@ fn disjoint_guards_do_not_narrow_or_cover() {
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "W0503");
     assert!(
-        lines.iter().any(|l| l.ends_with("f : (x = 1) -> 0 | 1")),
+        lines.iter().any(|l| l.ends_with("f : (1) -> 0 | 1")),
         "{lines:?}"
     );
     // The impossible guard does not let an invalid body escape checking.

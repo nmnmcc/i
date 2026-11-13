@@ -1,2 +1,0 @@
-spec/control_stop_after_resume.step : (b: Boundary(A, B, C)) -> Never
-spec/control_stop_after_resume.main : () -> Nil

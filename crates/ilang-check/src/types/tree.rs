@@ -494,7 +494,7 @@ mod tests {
                     };
                     end = &args[0];
                 }
-                let Ty::Con(Head::Tuple(3), _, parts) = end else {
+                let Ty::Con(Head::Shape(_), _, parts) = end else {
                     panic!("expected tuple")
                 };
                 assert!(parts == &[Ty::Var(new), Ty::Var(weak), Ty::Var(new)]);

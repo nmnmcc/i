@@ -1,3 +1,0 @@
-spec/fake_service.greeting : () -> String ? String ! Kv | Later
-spec/fake_service.with_fakes : () -> Nil ? String
-spec/fake_service.with_the_host : () -> Nil ? String ! Later

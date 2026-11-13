@@ -41,9 +41,17 @@ Tls = (
 	close = (Int) -> Request(Nil),
 )
 
-options = () { (alpn = [], roots = <<>>, cert = <<>>, key = <<>>) }
+options = () -> (
+	alpn = List(String),
+	roots = BitArray,
+	cert = BitArray,
+	key = BitArray,
+) { (alpn = [], roots = <<>>, cert = <<>>, key = <<>>) }
 
-identity = (cert: BitArray, key: BitArray) { (cert = cert, key = key) }
+identity = (cert: BitArray, key: BitArray) -> (
+	cert = BitArray,
+	key = BitArray,
+) { (cert = cert, key = key) }
 
 join = (items: List(String)) -> String {
 	items |>
@@ -94,7 +102,16 @@ finish = (r: Request(Result(Int, String))) <- (raw: Tls) {
 	Stream(number)
 }
 
-connect = (stream, name, opts) <- (raw: Tls) {
+connect = (
+	stream,
+	name,
+	opts: (
+		alpn = List(String),
+		roots = BitArray,
+		cert = BitArray,
+		key = BitArray,
+	)
+) <- (raw: Tls) {
 	finish(
 		raw.connect(
 			net.stream_number(stream),
@@ -107,7 +124,16 @@ connect = (stream, name, opts) <- (raw: Tls) {
 	)
 }
 
-accept = (stream, ident, opts) <- (raw: Tls) {
+accept = (
+	stream,
+	ident: (cert = BitArray, key = BitArray),
+	opts: (
+		alpn = List(String),
+		roots = BitArray,
+		cert = BitArray,
+		key = BitArray,
+	)
+) <- (raw: Tls) {
 	finish(
 		raw.accept(
 			net.stream_number(stream),

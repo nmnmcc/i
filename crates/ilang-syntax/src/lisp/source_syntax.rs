@@ -27,7 +27,10 @@ fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
         .iter()
         .find_map(|x| find(x, span))
         .expect("AST node belongs to a Lisp datum");
-    Syntax::from_datum(datum, scope)
+    // The compiler's macro engine still consumes the transitional rows. Use
+    // the same span-preserving adapter as Lisp lowering before normalizing
+    // source datums; otherwise `(-> (,) _ body)` reaches the legacy reader.
+    Syntax::from_datum(&crate::syn3::lisp::unconvert_quote(datum), scope)
 }
 fn symbol(s: &Syntax, expected: &str) -> bool {
     matches!(s.node(), Node::Symbol(value) if value == expected)
@@ -524,7 +527,7 @@ fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
     }
     built.pop().expect("normalization produced a root")
 }
-fn item(s: &Syntax) -> Syntax {
+fn item(s: &Syntax, kind: &crate::ast::ItemKind) -> Syntax {
     if ROWS3 {
         return normalize3(s, Mode3::Item);
     }
@@ -541,11 +544,10 @@ fn item(s: &Syntax) -> Syntax {
         }
     }
     let s = &current;
-    let parsed = super::parse_item(&s.to_datum()).expect("parsed item remains valid");
     let Node::Round(xs) = s.node() else {
         unreachable!("item is round")
     };
-    let mut result = match parsed.kind {
+    let mut result = match kind {
         crate::ast::ItemKind::TypeDef(_) => match xs.as_slice() {
             [head, body] if matches!(body.node(), Node::Curly(_)) => {
                 let constructors = children(body, |constructor| match constructor.node() {
@@ -609,7 +611,7 @@ pub fn source_type_syntax(type_ast: &TypeExpr, scope: &Scope, source: &str, lisp
 /// Encode a source item for a macro, preserving each written atom's span.
 pub fn source_item_syntax(item_ast: &Item, scope: &Scope, source: &str, lisp: bool) -> Syntax {
     if lisp {
-        item(&lisp_source(item_ast.span, scope, source))
+        item(&lisp_source(item_ast.span, scope, source), &item_ast.kind)
     } else {
         super::item_syntax(item_ast, scope, source)
     }
@@ -632,6 +634,21 @@ pub fn source_pattern_syntax(
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn accepted_lisp_item_uses_its_parsed_kind() {
+        // Syntax-three empty data is `(,)`; the legacy item reader rejects
+        // this function head, so the accepted item must not be reparsed there.
+        let source = "(test \"quote\" (-> (,) _ { Nil }))";
+        let (module, errors) = super::super::parse_source(source);
+        assert!(errors.is_empty(), "{errors:?}");
+        let scope = Scope {
+            module: 0,
+            marks: BTreeSet::new(),
+        };
+        let syntax = source_item_syntax(&module.items[0], &scope, source, true);
+        assert_eq!(syntax.show(), "(test \"quote\" (-> () _ {Nil}))");
+    }
 
     #[test]
     fn single_field_records_are_not_transparent_groups() {

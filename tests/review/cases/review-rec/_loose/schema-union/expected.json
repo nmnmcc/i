@@ -1,6 +1,6 @@
 {
-  "compiler": "efb6266cde3be7cf34c9771fc42fc2214c8570d0",
-  "binary_sha256": "d46121b363ffda062935e29391dcb8122612b597ad6ed942712ea78a8cc31f46",
+  "compiler": "d03cc87d1608e3a9646fcaf9a2d70078bfc75c5b",
+  "binary_sha256": "338fee00cda5bfa27c168cbd43f82c731a2db9601a6e250531b96b44e3497ca5",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -9,29 +9,9 @@
         "check",
         "--types"
       ],
-      "exit": 0,
-      "stdout": "app/main.make : (c: Bool) -> Schema((a: 1) | (a: \"x\"))\napp/main.schema : Schema((a: 1) | (a: \"x\"))\napp/main.read : (r: (a: 1) | (a: \"x\")) -> 1 | \"x\"\napp/main.read_inferred : (r: (a: A)) -> A\napp/main.read_written : (r: (a: { 1 } | { \"x\" })) -> { 1 } | { \"x\" }\n",
-      "stderr": "src/main.i:12:1: warning[W0504]: top-level binding `read` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `read_inferred` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `read_written` is not used\n"
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:12:1: warning[W0504]: top-level binding `read` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `read_inferred` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `read_written` is not used\n"
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:12:1: warning[W0504]: top-level binding `read` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `read_inferred` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `read_written` is not used\n"
+      "exit": 1,
+      "stdout": "app/main.make : (c: Bool) -> Schema((a: 1 | \"x\"))\napp/main.schema : Schema((a: 1 | \"x\"))\napp/main.read : (r: (a: 1 | \"x\")) -> Int | String\napp/main.read_inferred : (r: A) -> Never\napp/main.read_written : (r: (a: 1 | \"x\")) -> Int | String\n",
+      "stderr": "src/main.i:13:25: error[E0506]: `.a` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`\n1 error\n"
     }
   }
 }

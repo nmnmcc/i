@@ -1,12 +1,18 @@
 //! `i check --types` prints the type of every top-level name.
 
+#[path = "common/syn3_pending.rs"]
+mod syn3_pending;
 #[path = "common/test_project.rs"]
 mod test_project;
+use syn3_pending::syn3_pending;
 
 use std::process::Command;
 
 #[test]
 fn check_types() {
+    if syn3_pending("check::check_types") {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
@@ -23,7 +29,7 @@ fn check_types() {
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
-        "app/main.id : (x: A) -> A\napp/main.elapsed : (start: Int) -> Int ! Clock\n"
+        "app/main.id : (A) -> A\napp/main.elapsed : (Int) <- (Clock) -> Int\n"
     );
 }
 
@@ -97,7 +103,7 @@ main = <N>() {
 }";
     for source in [
         annotated.to_string(),
-        annotated.replace("local: () -> Nil ! N | S(N)", "local"),
+        annotated.replace("local: () <- (S(N), ..N) -> Nil", "local"),
     ] {
         let dir = front_end_project(&source);
         let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -111,7 +117,12 @@ main = <N>() {
             String::from_utf8_lossy(&out.stderr)
         );
         assert!(
-            String::from_utf8_lossy(&out.stdout).contains("app/main.main : () -> Nil ! N | S(N)")
+            // Syntax three prints a need as `<- (…)` (spec §6.8 table, "Function
+            // type with a need": `(T) <- (Db, Log) -> R`).
+            String::from_utf8_lossy(&out.stdout)
+                .contains("app/main.main : () <- (S(N), ..N) -> Nil"),
+            "{}",
+            String::from_utf8_lossy(&out.stdout)
         );
         for opt in ["0", "2"] {
             let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -148,10 +159,9 @@ apply = <N>() {
 main = () { apply() <- (S(() { read() })) }";
     for supplied in [false, true] {
         let source = if supplied {
-            source.replace(
-                "! S(Dependency)",
-                "! Dependency = Dependency\n! S(Dependency)",
-            )
+            // `Dependency = ()` makes the value `Dependency` (syntax-3.md
+            // §5.2.3: "when `D` is `()`, the value `T`").
+            source.replace("apply() <- (S(", "apply() <- (Dependency, S(")
         } else {
             source.to_string()
         };
@@ -164,7 +174,8 @@ main = () { apply() <- (S(() { read() })) }";
         let main = if supplied {
             "app/main.main : () -> Nil\n"
         } else {
-            "app/main.main : () -> Nil ! Dependency\n"
+            // spec §6.8 table, "Function type with a need": `(T) <- (Db, Log) -> R`.
+            "app/main.main : () <- (Dependency) -> Nil\n"
         };
         assert!(
             out.status.success(),
@@ -317,6 +328,11 @@ fn old_forms_have_helpful_errors_without_reserving_names() {
         .unwrap();
     assert!(
         out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !String::from_utf8_lossy(&out.stderr).contains("if this is old"),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );

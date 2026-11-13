@@ -1,9 +1,0 @@
-[package]
-name = "review-bg"
-version = "0.0.0"
-edition = "2024"
-[dependencies]
-ilang-host = { path = "/home/agent/Programming/i/.rd/c/crates/ilang-host" }
-serde_json = "1"
-[profile.dev]
-debug = 0

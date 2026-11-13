@@ -1,13 +1,10 @@
-apply : (f = (User) -> A, x = User) -> A
-map : (xs = List(A), f = (A) -> B) -> List(B)
-flip : (f = (A) -> B, xs = List(A)) -> List(B)
+apply : ((User) -> A, User) -> A
+map : (List(A), (A) -> B) -> List(B)
+flip : ((A) -> B, List(A)) -> List(B)
 u : User
 left_fn : String
 left_fn_later : List(Int)
-pair : (p = ((User) -> Int, Int)) -> ((User) -> Int, Int)
+pair : (((User) -> Int, Int)) -> ((User) -> Int, Int)
 left_tuple : ((User) -> Int, Int)
-unknown : (g = ((u = (name = A)) -> A) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B
-17:1: warning[W0504]: top-level binding `left_fn` is not used
-19:1: warning[W0504]: top-level binding `left_fn_later` is not used
-24:1: warning[W0504]: top-level binding `left_tuple` is not used
-27:1: warning[W0504]: top-level binding `unknown` is not used
+unknown : (((A) -> Never) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B
+27:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

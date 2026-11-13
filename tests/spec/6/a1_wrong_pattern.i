@@ -7,3 +7,4 @@ main = () {
   assert(bad(1) == 1)
   Nil
 }
+// old-syntax-check: E0108

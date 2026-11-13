@@ -126,11 +126,9 @@ fn conversion_reports_unplaced_comments_and_keeps_existing_destination() {
 fn conversion_does_not_write_an_unrepresentable_module() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("sample.is");
-    // The right side of a pipe is a name, a call or a function in the normal
-    // surface; the Lisp rows also read a pipe there. (The module of this test
-    // before syntax three, a block with a function statement in a call, can
-    // be written now: its statements are on lines of their own.)
-    let source = "(= f (-> (,) _ (|> a (|> b c))))\n";
+    // A macro definition has no normal spelling, including one with no
+    // quote in its body (spec §14.1).
+    let source = "(@ macro (= f (-> (, x) _ x)))\n";
     std::fs::write(&file, source).unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["fmt", "--to=i"])
@@ -140,6 +138,77 @@ fn conversion_does_not_write_an_unrepresentable_module() {
     assert!(!out.status.success());
     assert_eq!(std::fs::read_to_string(&file).unwrap(), source);
     assert!(!file.with_extension("i").exists());
+}
+
+#[test]
+fn conversion_accepts_a_block_containing_a_function_and_value() {
+    // The former unrepresentable fixture is now a normal block: every
+    // expression `{ … }` is a computation (syntax three §2.2).
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("sample.is");
+    let source = "(= f (-> (,) _ { (consume { (-> (, x) Int { x }) 1 }) }))\n";
+    std::fs::write(&file, source).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=i"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!file.exists());
+    let normal = file.with_extension("i");
+    assert!(normal.exists());
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--check"])
+        .arg(&normal)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn interpolation_keeps_its_result_through_both_surface_conversions() {
+    // Interpolation becomes concatenation before the core tree (§1.6).
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    let mut file = dir.path().join("src/main.i");
+    std::fs::write(
+        &file,
+        "f = (x: String) { \"a\\(x)b\" }\nmain = () { assert(f(\"c\") == \"acb\") }\n",
+    )
+    .unwrap();
+    for target in ["is", "i"] {
+        let out = Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["fmt", "--to", target])
+            .arg(&file)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        file = file.with_extension(target);
+        assert!(file.exists());
+        let out = Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["run", "--opt", "0", "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
 }
 
 #[test]

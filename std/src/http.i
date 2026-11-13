@@ -921,8 +921,8 @@ lowercase = (s: String) -> String {
 
 /// Buffered request handler, built on the incremental body reader.
 serve = (listener, handler) {
-	serve_stream(listener, (req: Request, reader) {
-		body = collect_body(reader, [])
+	serve_stream(listener, (req: Request, reader: (read = _, trailers = _)) {
+		body = collect_body(reader.read, [])
 		handler(Request(..req, body = body, trailers = reader.trailers()))
 	})
 }
@@ -1003,7 +1003,7 @@ connection_loop = (stream, handler, buffer) {
 							fail.raise(BadMessage(why))
 						}
 						| (Error(_)) { response(Status(500)) }
-					drain_body(reader)
+					drain_body(reader.read)
 					tail = task.update(cursor, (state) {
 						(state, state.buffer)
 					})
@@ -1214,17 +1214,17 @@ split_bytes = (buffer: BitArray, count: Int) -> (BitArray, BitArray) {
 		| (_) { panic("http: invalid body slice") }
 }
 
-collect_body = (reader, acc: List(BitArray)) {
-	piece = reader.read(65536)
+collect_body = (read, acc: List(BitArray)) {
+	piece = read(65536)
 	{ bit_array.bit_size(piece) == 0 } |>
 		(True) { bit_array.concat(list.reverse(acc)) }
-		| (False) { collect_body(reader, [piece, ..acc]) }
+		| (False) { collect_body(read, [piece, ..acc]) }
 }
 
-drain_body = (reader) {
-	{ bit_array.bit_size(reader.read(65536)) == 0 } |>
+drain_body = (read) {
+	{ bit_array.bit_size(read(65536)) == 0 } |>
 		(True) { Nil }
-		| (False) { drain_body(reader) }
+		| (False) { drain_body(read) }
 }
 
 // Target providers capture transport services; callers retain one principal type.
@@ -1451,7 +1451,7 @@ fetch_client = () <- (f: fetch.Fetch) {
 									status = h.status,
 									reason = h.reason,
 									headers = h.headers,
-									body = collect_body(reader, []),
+									body = collect_body(reader.read, []),
 									trailers = h.trailers,
 								)
 							},
@@ -1828,11 +1828,11 @@ exchange = (pool: task.Ref(Pool), entry: Idle, req: Request, wire: BitArray) {
 	)
 }
 
-read_reply = (transport, method, buffer) {
+read_reply = (transport: (read = _, write = _), method, buffer) {
 	read_progress(transport, method, buffer, False)
 }
 
-read_progress = (transport, method, buffer, eof) {
+read_progress = (transport: (read = _, write = _), method, buffer, eof) {
 	feed_response_for(<<>>, buffer, method, eof, 32768) |>
 		(Complete(res, rest)) {
 			Status(code) = res.status
@@ -1890,11 +1890,20 @@ body_decode = <A>(
 		}
 }
 
-send_with = (provider, req) { provider.send(req) }
+/// Send with a provider's send function, as `client().send`; a caller may
+/// give any function of this type in its place.
+send_with = <N>(send: (Request) <- N -> Response, req: Request) -> Response {
+	send(req)
+}
 
-send_timeout = (provider, req, duration_ns) {
+/// `send_with`, failing with `Timeout` when no response comes in time.
+send_timeout = <N>(
+	send: (Request) <- (Fail(HttpError), ..N) -> Response,
+	req: Request,
+	duration_ns: Int
+) {
 	task.race(
-		() { provider.send(req) },
+		() { send(req) },
 		() {
 			clock.sleep_ns(duration_ns)
 			fail.raise(Timeout)

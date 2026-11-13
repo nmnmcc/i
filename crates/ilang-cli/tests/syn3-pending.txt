@@ -1,0 +1,6 @@
+# ilang-cli tests (integration tests and the unit tests of src/) that use forms
+# a later stage of syntax three removes or replaces (docs/design/syntax-3.md
+# §7.2). Each test named here returns early until that stage lands; the stage
+# then deletes its line and either rewrites the test or removes it. One
+# `file::test` per line (`src/<path>::<module>::test` for unit tests), then the
+# stage and reason.

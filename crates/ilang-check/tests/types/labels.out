@@ -1,38 +1,37 @@
-make : (name = String, age = Int) -> User
+make : (String, Int) -> User
 by_label : User
 mixed : User
 ctor : User
 annotated : (Int) -> Int
-call_annotated : Never
+call_annotated : Int
 relabel : (Int) -> Int
 local : () -> String
-age : (u = User) -> Int
-names : (u = User) -> (String, String, Int)
+age : (User) -> Int
+names : (User) -> (String, String, Int)
 unknown : Never
 twice : Never
-missing : Never
-param : (f = A) -> Never
-bad_pattern : (u = User) -> Never
-id : (x = A) -> A
+missing : User
+param : ((x = 1) <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A
+bad_pattern : (User) -> Never
+id : (A) -> A
 through : () -> User
-holes : (f = (Never) -> Int) -> Never
-minus : (a = Int, b = Int) -> Int
+holes : ((1) -> Int) -> Int
+minus : (Int, Int) -> Int
 piped : Int
-walk : (n = Int) -> Node
-walk_unwritten : (n = Int) -> Node
-ping : (n = Int) -> 0
-pong : (m = Int) -> 0
+walk : (Int) -> Node
+walk_unwritten : (Int) -> Node
+ping : (Int) -> 0
+pong : (Int) -> 0
 wins : (Int) -> Int
-wins_ok : Never
+wins_ok : Int
 wins_value : Int
 direct : String
-15:28: error[E0507]: the function has no parameter with the label `x`
+37:16: error[E0507]: an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)
 37:16: error[E0507]: the function has no parameter with the label `height`
+39:19: error[E0507]: an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)
 39:19: error[E0507]: the parameter `name` gets more than one argument
-41:11: error[E0507]: every parameter must get one argument (§6.6), but `age` gets none
-43:15: error[E0506]: a call with an argument by label needs a known function type for the function (§6.6, §4.8); write the type of the function, or give the arguments by position
+41:11: error[E0501]: `("b")` is not a subtype of `(String, Int)` (the type at 41:11 needs it)
+43:15: error[E0551]: a call with labels through a function value is not possible until the run time has multi-shape values; call the function directly by its name
 46:7: error[E0510]: the constructor has no field with the label `n` (§7.1)
 46:10: error[E0510]: the constructor has no field with the label `a` (§7.1)
-60:29: error[E0507]: the function has no parameter with the label `x`
-76:1: error[E0501]: `Node` is not a subtype of `(value = _)`
-90:16: error[E0507]: the function has no parameter with the label `x`
+79:46: error[E0506]: `.value` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

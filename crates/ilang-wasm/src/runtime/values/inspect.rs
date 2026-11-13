@@ -3,14 +3,13 @@
 //! Objects are never exposed to a host formatter. In particular, arbitrary precision
 //! integers and bit-array slices retain their exact value on every supported host.
 
-mod float_format;
-
 /// Runtime definitions, to be inserted after the common value types.
 pub fn wat() -> String {
     let source = r#"
   ;; The text form is written into one growable byte buffer, `$ib` with the
   ;; length `$il`, so that inspecting is linear in the size of the text. Only
-  ;; `$inspect` uses it, and it runs no i code.
+  ;; `$inspect` uses it. The only i code it runs is the text of a Float
+  ;; (`$float_to_string`, `lib/i/float_text.i`), which does not inspect.
   (global $ib (mut (ref null $bytes)) (ref.null $bytes))
   (global $il (mut i32) (i32.const 0))
 
@@ -178,15 +177,33 @@ pub fn wat() -> String {
         (br $next)))
     (call $string_concat (call $list_reverse (call $list_cons {{bits_close}} (local.get $out)))))
 
-  ;; Parameter i is the letter a + (i mod 26), then i div 26 when i >= 26.
-  (func $inspect_function (param $arity i32) (result eqref)
-    (local $n i32) (local $i i32) (local $out eqref)
-    (local.set $n (local.get $arity))
-    (local.set $out (call $list_cons {{fn_open}} (call $list_nil)))
+  ;; The parameter data of a function of the shape `shape`, `(a, b, port = c)`,
+  ;; put in front of the reversed list `out`. Key i is named by the letter
+  ;; a + (i mod 26), then i div 26 when i >= 26; a label key is written
+  ;; `label = name`.
+  (func $inspect_params (param $shape i64) (param $out eqref) (result eqref)
+    (local $n i32) (local $total i32) (local $i i32) (local $entry (ref null $values))
+    (local.set $n (i32.wrap_i64 (local.get $shape)))
+    (local.set $total (local.get $n))
+    ;; A shape with labels is `set << 32 | n`, its labels set `set` of
+    ;; `$shape_labels` (syntax-3.md §6.4).
+    (if (i64.ge_u (local.get $shape) (i64.const 4294967296))
+      (then
+        (local.set $entry (ref.cast (ref $values) (array.get $values
+          (ref.as_non_null (global.get $shape_labels))
+          (i32.sub (i32.wrap_i64 (i64.shr_u (local.get $shape) (i64.const 32))) (i32.const 1)))))
+        (local.set $total (i32.add (local.get $n)
+          (array.len (ref.as_non_null (local.get $entry)))))))
+    (local.set $out (call $list_cons {{fn_paren}} (local.get $out)))
     (block $done
       (loop $next
-        (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
+        (br_if $done (i32.ge_u (local.get $i) (local.get $total)))
         (if (local.get $i) (then (local.set $out (call $list_cons {{comma}} (local.get $out)))))
+        (if (i32.ge_u (local.get $i) (local.get $n))
+          (then
+            (local.set $out (call $list_cons (array.get $values (ref.as_non_null (local.get $entry))
+              (i32.sub (local.get $i) (local.get $n))) (local.get $out)))
+            (local.set $out (call $list_cons {{label_eq}} (local.get $out)))))
         (local.set $out (call $list_cons
           (call $string_from_bytes (array.new_fixed $bytes 1
             (i32.add (i32.const 97) (i32.rem_u (local.get $i) (i32.const 26))))) (local.get $out)))
@@ -196,7 +213,27 @@ pub fn wat() -> String {
               (i64.extend_i32_u (i32.div_u (local.get $i) (i32.const 26))))) (local.get $out)))))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $next)))
-    (call $string_concat (call $list_reverse (call $list_cons {{fn_close}} (local.get $out)))))
+    (call $list_cons {{fn_close}} (local.get $out)))
+
+  ;; A function: `//fn(a, b) { ... }`; a multi-shape value (field 2 is -1)
+  ;; shows each group in order, `//fn(a) { ... } | (a, b) { ... }`.
+  (func $inspect_function (param $obj (ref $obj)) (result eqref)
+    (local $out eqref) (local $groups (ref null $values)) (local $i i32)
+    (local.set $out (call $list_cons {{fn_open}} (call $list_nil)))
+    (if (i64.ne (struct.get $obj 2 (local.get $obj)) (i64.const -1))
+      (then (return (call $string_concat (call $list_reverse
+        (call $inspect_params (struct.get $obj 2 (local.get $obj)) (local.get $out)))))))
+    (local.set $groups (struct.get $obj 5 (local.get $obj)))
+    (block $done
+      (loop $next
+        (br_if $done (i32.ge_u (local.get $i) (array.len (ref.as_non_null (local.get $groups)))))
+        (if (local.get $i) (then (local.set $out (call $list_cons {{fn_bar}} (local.get $out)))))
+        (local.set $out (call $inspect_params
+          (array.get $shapes (struct.get $multi 9 (ref.cast (ref $multi) (local.get $obj))) (local.get $i))
+          (local.get $out)))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $next)))
+    (call $string_concat (call $list_reverse (local.get $out))))
 
   ;; Constructor names: the runtime's own below FIRST_CONSTRUCTOR (16), then the
   ;; names that the code generator installs, in order.
@@ -263,7 +300,7 @@ pub fn wat() -> String {
     (if (i32.eq (local.get $tag) (i32.const 18)) (then (return {{ticket}})))
     (local.set $obj (ref.cast (ref $obj) (local.get $value)))
     (if (i32.eq (local.get $tag) (i32.const 7))
-      (then (return_call $inspect_function (i32.wrap_i64 (struct.get $obj 2 (local.get $obj))))))
+      (then (return_call $inspect_function (local.get $obj))))
     (if (i32.eq (local.get $tag) (i32.const 13))
       (then (return (call $string_append (call $string_append {{codepoint_open}}
         (call $string_from_codepoints (call $list_cons (local.get $value) (call $list_nil)))) {{paren_close}}))))
@@ -302,12 +339,13 @@ pub fn wat() -> String {
       ;; 2: the parts of a tuple or a custom value, from `index` on.
       (if (i32.eq (local.get $kind) (i32.const 2))
         (then
-          (if (i32.eq (call $value_tag (local.get $value)) (i32.const 14))
-            (then (call $inspect_record_field (local.get $value) (local.get $index)) (br $next)))
           (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $value))))
           (if (ref.is_null (local.get $fields)) (then (br $next)))
           (br_if $next (i32.ge_u (local.get $index) (array.len (ref.as_non_null (local.get $fields)))))
           (if (local.get $index) (then (call $ib_comma)))
+          (if (i32.eq (call $value_tag (local.get $value)) (i32.const 4))
+            (then (call $inspect_label (local.get $value) (local.get $index)
+              (array.len (ref.as_non_null (local.get $fields))))))
           (call $inspect_push (i32.const 2) (local.get $value) (i32.add (local.get $index) (i32.const 1)))
           (call $inspect_push (i32.const 0)
             (array.get $values (ref.as_non_null (local.get $fields)) (local.get $index)) (i32.const 0))
@@ -325,8 +363,6 @@ pub fn wat() -> String {
 
       ;; 0: a value.
       (local.set $tag (call $value_tag (local.get $value)))
-      (if (i32.eq (local.get $tag) (i32.const 14))
-        (then (call $inspect_record (local.get $value)) (br $next)))
       (if (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
         (then
           (local.set $obj (ref.cast (ref $obj) (local.get $value)))
@@ -356,12 +392,23 @@ pub fn wat() -> String {
     (global.set $it_meta (ref.null $frames))
     (call $string_from_bytes (local.get $out)))
 
+  ;; `label = ` before the labelled part `index` of data (syntax-3 §2.15).
+  (func $inspect_label (param $value eqref) (param $index i32) (param $len i32)
+    (local $labels (ref null $values)) (local $at i32)
+    (local.set $labels (call $data_labels (local.get $value)))
+    (if (ref.is_null (local.get $labels)) (then (return)))
+    (local.set $at (i32.sub (local.get $index)
+      (i32.sub (local.get $len) (array.len (ref.as_non_null (local.get $labels))))))
+    (if (i32.lt_s (local.get $at) (i32.const 0)) (then (return)))
+    (call $ib_string (array.get $values (ref.as_non_null (local.get $labels)) (local.get $at)))
+    (call $ib_byte (i32.const 32)) (call $ib_byte (i32.const 61)) (call $ib_byte (i32.const 32)))
+
   (func $value_inspect (param $value eqref) (result eqref)
     (return_call $inspect (local.get $value)))
 "#
     .to_owned();
 
-    let mut source = crate::runtime::with_literals(
+    crate::runtime::with_literals(
         source,
         &[
             ("comma", ", "),
@@ -369,7 +416,10 @@ pub fn wat() -> String {
             ("bits_open", "<<"),
             ("bits_close", ">>"),
             ("bits_size", ":u"),
-            ("fn_open", "//fn("),
+            ("fn_open", "//fn"),
+            ("fn_paren", "("),
+            ("fn_bar", " | "),
+            ("label_eq", " = "),
             ("fn_close", ") { ... }"),
             ("nil", "Nil"),
             ("true", "True"),
@@ -388,9 +438,7 @@ pub fn wat() -> String {
             ("codepoint_open", "//utfcodepoint("),
             ("unknown", "//wasm(unknown)"),
         ],
-    );
-    source.push_str(&float_format::wat());
-    source
+    )
 }
 
 #[cfg(test)]

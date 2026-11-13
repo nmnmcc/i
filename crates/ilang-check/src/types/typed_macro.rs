@@ -94,20 +94,13 @@ fn occurrences(s: &Solver, t: &Ty, pol: Pol, out: &mut HashMap<V, Pol>) {
                 })
                 .or_insert(pol);
         }
-        Ty::Graph(g) => {
-            for v in g.variables() {
-                out.insert(v, Pol::Both);
-            }
-        }
         Ty::Con(h, _, xs) => {
             for (x, variance) in xs.iter().zip(s.variances(*h, xs.len())) {
                 occurrences(s, x, pol.by(variance), out);
             }
         }
         Ty::Fn(f) => {
-            for (_, p) in &f.params {
-                occurrences(s, p, pol.flip(), out);
-            }
+            occurrences(s, &f.param, pol.flip(), out);
             for t in [&f.ret, &f.err] {
                 occurrences(s, t, pol, out);
             }
@@ -173,7 +166,7 @@ pub(super) fn reachable(s: &Solver, roots: impl IntoIterator<Item = V>) -> HashS
 fn observe(s: &Solver, t: &Ty, fixed: &HashSet<V>, parts: Option<&FnTy>) -> HashMap<V, Ty> {
     let mut ps = HashMap::new();
     if let Some(f) = parts {
-        for t in f.params.iter().map(|(_, t)| t).chain([&f.ret, &f.err]) {
+        for t in [&f.param, &f.ret, &f.err] {
             occurrences(s, t, Pol::Pos, &mut ps);
         }
         occurrences_env(s, &f.env, Pol::Pos, &mut ps);
@@ -220,9 +213,9 @@ impl TypedMacroQuery {
         } else {
             unreachable!("typed signature is a function")
         };
-        observation
-            .params
-            .extend(argument_types.iter().cloned().map(|t| (None, t)));
+        let mut parts = vec![observation.param.clone()];
+        parts.extend(argument_types.iter().cloned());
+        observation.param = Ty::tuple(parts);
         let substitution = observe(&c.s, &signature, &fixed, Some(&observation));
         Self {
             id: c.typed_handles.id,
@@ -361,13 +354,6 @@ impl TypedMacroQuery {
         let mut trial = s.solver.clone();
         trial.freeze();
         trial.constrain(&a, &b);
-        if trial
-            .failures
-            .iter()
-            .any(|f| f.kind == super::solve::FailKind::ResourceLimit)
-        {
-            return Err("E0546: type proof resource limit exceeded".into());
-        }
         Ok(if trial.failures.is_empty() {
             MacroTruth::Yes
         } else if variables(&a).is_empty() && variables(&b).is_empty() {
@@ -379,7 +365,7 @@ impl TypedMacroQuery {
     pub fn members(&self, syntax: &Syntax) -> Result<Vec<Syntax>, String> {
         let mut s = self.state.lock().expect("type query snapshot");
         let mut t = self.read(&mut s, syntax)?;
-        if variables(&t).is_empty() && !matches!(t, Ty::Graph(_)) {
+        if variables(&t).is_empty() {
             let mut scratch = s.solver.clone();
             scratch.freeze();
             t = scratch.normalize_mode(t, super::solve::Mode::Value);
@@ -390,13 +376,6 @@ impl TypedMacroQuery {
         fn split(t: Ty, out: &mut Vec<Ty>) {
             match t {
                 Ty::Never => {}
-                Ty::Graph(g) if !g.record_only() => {
-                    if let Some(view) = g.view() {
-                        split(view, out);
-                    } else {
-                        out.push(Ty::Graph(g));
-                    }
-                }
                 Ty::Union(ts) => {
                     for t in ts {
                         split(t, out);
@@ -483,57 +462,22 @@ impl TypedMacroQuery {
             xs.insert(0, atom(DatumKind::Symbol(name.into())));
             round(xs)
         };
-        if let Ty::Graph(g) = t {
-            if matches!(
-                g.node(),
-                super::records::Node::Never
-                    | super::records::Node::Var(_)
-                    | super::records::Node::Con(..)
-                    | super::records::Node::Fn(_)
-            ) {
-                return self.syntax_rows(
-                    s,
-                    &g.view().expect("ordinary graph head has a surface view"),
-                    scope,
-                    new_rows,
-                );
-            }
-            if let Some(fields) = g.fields()
-                && fields
-                    .iter()
-                    .all(|(label, _)| matches!(label, super::records::Label::Name(_)))
-            {
-                if fields.is_empty() {
-                    return atom(DatumKind::UpName("Record".into())).with_scope_identity(
-                        ScopeIdentity::Builtin {
-                            name: "Record".into(),
-                        },
-                    );
-                }
-                let fields = fields
-                    .iter()
-                    .map(|(label, t)| {
-                        let super::records::Label::Name(name) = label else {
-                            unreachable!("surface record label")
-                        };
-                        let t = self.syntax_rows(s, t, scope, new_rows);
-                        if new_rows {
-                            // A labelled item of a data type (§6.8).
-                            form("=", vec![atom(DatumKind::Name(name.to_string())), t])
-                        } else {
-                            form(":", vec![atom(DatumKind::String(name.to_string())), t])
-                        }
-                    })
-                    .collect();
-                return if new_rows {
-                    form(",", fields)
-                } else {
-                    round(fields)
-                };
-            }
+        if let Ty::Con(Head::Shape(shape), _, parts) = t
+            && shape.has_labels()
+        {
+            let fields = shape
+                .keys()
+                .into_iter()
+                .zip(parts)
+                .map(|(label, t)| match label {
+                    Some(name) => form(if new_rows { "=" } else { ":" }, vec![atom(if new_rows { DatumKind::Name(name) } else { DatumKind::String(name) }), self.syntax_rows(s, t, scope, new_rows)]),
+                    None => self.syntax_rows(s, t, scope, new_rows),
+                })
+                .collect();
+            return if new_rows { form(",", fields) } else { round(fields) };
         }
         match t {
-            Ty::Graph(_) | Ty::Top | Ty::Both(..) => {
+            Ty::Top | Ty::Both(..) => {
                 let index = self.handle(s, t);
                 if let Some(answer) = s.answers.get(&index) {
                     return answer.clone();
@@ -629,10 +573,10 @@ impl TypedMacroQuery {
                             .as_answer()
                         }
                     }
-                    Head::Tuple(_) => atom(DatumKind::Symbol(",".into())),
+                    Head::Shape(_) => atom(DatumKind::Symbol(",".into())),
                     _ => unreachable!("type constructor"),
                 };
-                let base = if args.is_empty() && !(new_rows && matches!(h, Head::Tuple(_))) {
+                let base = if args.is_empty() && !(new_rows && matches!(h, Head::Shape(_))) {
                     name
                 } else {
                     // In the rows of §6.8 the empty data type is `(,)`.
@@ -657,14 +601,16 @@ impl TypedMacroQuery {
                 }
             }
             Ty::Fn(f) => {
-                let params: Vec<_> = f
-                    .params
+                let parts = f
+                    .parts()
+                    .map_or_else(|| vec![f.param.clone()], <[Ty]>::to_vec);
+                let params: Vec<_> = parts
                     .iter()
-                    .map(|(label, t)| {
+                    .enumerate()
+                    .map(|(i, t)| {
                         let t = self.syntax_rows(s, t, scope, new_rows);
-                        if let Some(l) = label {
-                            let head = if new_rows { "=" } else { ":" };
-                            form(head, vec![atom(DatumKind::Name(l.clone())), t])
+                        if let Some(l) = f.label(i) {
+                            form(if new_rows { "=" } else { ":" }, vec![atom(DatumKind::Name(l)), t])
                         } else {
                             t
                         }
@@ -808,53 +754,32 @@ fn convert_query(s: &QueryState, t: &Type, local: &HashMap<TyVarId, Ty>) -> Resu
             }
         }
         TypeKind::Tuple(parts) => Ty::tuple(parts.iter().map(go).collect::<Result<_, _>>()?),
-        TypeKind::Record {
-            base,
-            fields,
-            removed,
-        } => {
-            let labels = fields
+        TypeKind::Record { fields } => Ty::record(
+            fields
                 .iter()
-                .map(|(label, _)| label)
-                .chain(removed)
-                .map(|label| super::records::written_label(label, s.solver.level))
-                .collect();
-            let fields = fields
-                .iter()
-                .map(|(label, t)| {
-                    Ok((super::records::written_label(label, s.solver.level), go(t)?))
-                })
-                .collect::<Result<_, String>>()?;
-            let record = s.solver.records.record(fields);
-            if let Some(base) = base {
-                let rest = s.solver.records.without(&go(base)?, labels);
-                s.solver.records.inter(&[rest, record])
-            } else {
-                record
-            }
-        }
+                .map(|(label, t)| Ok((label.name.clone(), go(t)?)))
+                .collect::<Result<_, String>>()?,
+        ),
         TypeKind::Fn {
             params,
             ret,
             err,
             env,
-        } => Ty::Fn(Box::new(FnTy {
-            params: params
+        } => Ty::Fn(Box::new(FnTy::new(
+            params
                 .iter()
                 .map(|p| Ok((p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)?)))
                 .collect::<Result<_, String>>()?,
-            ret: go(ret)?,
-            err: err
-                .as_ref()
+            go(ret)?,
+            err.as_ref()
                 .map(|t| go(t))
                 .transpose()?
                 .unwrap_or(Ty::Never),
-            env: env
-                .as_ref()
+            env.as_ref()
                 .map(|t| go(t))
                 .transpose()?
                 .unwrap_or(Ty::Never),
-        })),
+        ))),
         TypeKind::Union(parts) => {
             let mut flat = Vec::new();
             for part in parts {
@@ -863,9 +788,7 @@ fn convert_query(s: &QueryState, t: &Type, local: &HashMap<TyVarId, Ty>) -> Resu
             }
             let mut joined = super::solve::join_literals(flat);
             joined.retain(|t| *t != Ty::Never);
-            if joined.iter().any(|t| matches!(t, Ty::Graph(_))) {
-                s.solver.records.union(&joined)
-            } else if joined.len() == 1 {
+            if joined.len() == 1 {
                 joined.pop().expect("one union member")
             } else if joined.is_empty() {
                 Ty::Never
@@ -1021,21 +944,17 @@ mod tests {
         let a = s.fresh();
         s.constrain(&int(), &a);
         let Ty::Var(v) = a else { unreachable!() };
-        let signature = FnTy {
-            params: vec![(None, Ty::Var(v))],
-            ret: Ty::Var(v),
-            err: Ty::Never,
-            env: Ty::Never,
-        };
+        let signature = FnTy::new(vec![(None, Ty::Var(v))], Ty::Var(v), Ty::Never, Ty::Never);
         let t = Ty::Fn(Box::new(signature.clone()));
         let sub = observe(&s, &t, &HashSet::new(), Some(&signature));
         assert_eq!(sub[&v], int());
         let fixed = HashSet::from([v]);
         assert!(observe(&s, &t, &fixed, Some(&signature)).is_empty());
         let mut ps = HashMap::new();
-        let record = s.record(vec![(super::super::records::Label::name("x"), Ty::Var(v))]);
+        let record = Ty::record(vec![("x".to_string(), Ty::Var(v))]);
         occurrences(&s, &record, Pol::Pos, &mut ps);
-        assert_eq!(ps[&v], Pol::Both);
+        // Closed data is covariant in its parts (syntax-3 §6.2).
+        assert_eq!(ps[&v], Pol::Pos);
     }
     #[test]
     fn typed_macro_graph_bundle_gate_preserves_sharing_and_obligations() {
@@ -1046,15 +965,12 @@ mod tests {
         s.constrain(&int(), &Ty::Var(v));
         s.vars[v.0 as usize].difference = true;
         s.vars[v.0 as usize].handled.push(string());
-        let left = s.record(vec![
-            (super::super::records::Label::name("x"), Ty::Var(v)),
-            (super::super::records::Label::name("y"), Ty::Var(v)),
+        let left = Ty::record(vec![
+            ("x".to_string(), Ty::Var(v)),
+            ("y".to_string(), Ty::Var(v)),
         ]);
-        let right = s.record(vec![
-            (super::super::records::Label::name("x"), string()),
-            (super::super::records::Label::name("y"), int()),
-        ]);
-        let graph = s.records.union(&[left.clone(), right]);
+        let right = Ty::record(vec![("x".to_string(), string()), ("y".to_string(), int())]);
+        let graph = Ty::Union(vec![left.clone(), right]);
         let scheme = Scheme::mono(Ty::tuple(vec![graph, Ty::Var(v)]));
         let artifact = SchemeArtifact {
             catalog: Arc::new(SchemeCatalog {
@@ -1083,10 +999,7 @@ mod tests {
                 .iter()
                 .any(|v| v.difference && !v.handled.is_empty())
         );
-        let decoded = match &restored.scheme.ty {
-            Ty::Graph(g) => g.view().expect("bundle tuple view"),
-            t => t.clone(),
-        };
+        let decoded = restored.scheme.ty.clone();
         let Ty::Con(_, _, roots) = &decoded else {
             panic!("bundle tuple")
         };
@@ -1135,15 +1048,7 @@ mod tests {
         (old, new)
     }
     fn function(params: Vec<(Option<&str>, Ty)>, ret: Ty, err: Ty, env: Ty) -> Ty {
-        Ty::Fn(Box::new(FnTy {
-            params: params
-                .into_iter()
-                .map(|(label, t)| (label.map(Into::into), t))
-                .collect(),
-            ret,
-            err,
-            env,
-        }))
+        Ty::Fn(Box::new(FnTy::new(params.into_iter().map(|(label,t)| (label.map(Into::into),t)).collect(), ret, err, env)))
     }
     fn builtin(b: BuiltinType) -> Ty {
         Ty::named(TypeRef::Builtin(b), Vec::new())
@@ -1309,11 +1214,7 @@ mod tests {
             rows(&pair),
             ("(, Int String)".into(), "(, Int String)".into())
         );
-        let mut solver = solver();
-        let record = solver.record(vec![
-            (super::super::records::Label::name("x"), int()),
-            (super::super::records::Label::name("y"), string()),
-        ]);
+        let record = Ty::record(vec![("x".into(), int()), ("y".into(), string())]);
         assert_eq!(
             rows(&record),
             (
@@ -1327,9 +1228,9 @@ mod tests {
         let mut solver = solver();
         let variable = solver.fresh();
         let Ty::Var(v) = variable else { unreachable!() };
-        let graph = solver.record(vec![
-            (super::super::records::Label::name("x"), variable.clone()),
-            (super::super::records::Label::name("y"), variable.clone()),
+        let graph = Ty::record(vec![
+            ("x".to_string(), variable.clone()),
+            ("y".to_string(), variable.clone()),
         ]);
         let query = TypedMacroQuery {
             id: 1,
@@ -1364,6 +1265,7 @@ mod tests {
             &mut |_| None,
         )
         .unwrap();
+        // Labelled data is compared semantically, as records were.
         assert!(graph.needs_semantic_comparison());
         let before = query.graph_bundle();
         query.state.lock().unwrap().fixed.clear();

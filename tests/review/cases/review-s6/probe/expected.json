@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "045dd7dc8590cba93ec27bd6f7f03d49a995deaa",
+  "binary_sha256": "c1ef55233cb94ac719e5a0eec5514ed86d3fa9a27e7a9243802c618099483270",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:1:7: error[E0232]: a type parameter is an `UpName` with no module name and no arguments; old lowercase type parameters are now declared as UpNames, as in `Box(A) { Box(A) }` or `Id(A) = A`\nsrc/main.i:2:24: error[E0201]: `a` is not defined\nsrc/main.i:2:31: error[E0201]: `b` is not defined\n3 errors\n"
+      "stderr": "src/main.i:1:1: error[E0101]: the head of a data type or an opaque type has only type parameters\n1 error\n"
     }
   }
 }

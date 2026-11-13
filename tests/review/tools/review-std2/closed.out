@@ -1,3 +1,0 @@
-probe/main.use : () -> Nil ! N | S(N)
-probe/main.closed : () -> Nil ! S(Never)
-probe/main.example : () -> Nil

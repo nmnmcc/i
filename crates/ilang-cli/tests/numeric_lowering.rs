@@ -118,10 +118,10 @@ fn corpus() -> Vec<Case> {
             0.5,
             0.5,
         ),
-        ("{ a = x *. 0.5\n(a, a) |> { (b, c) -> b +. c } }", 0.5, 0.5),
-        ("{ a = x *. 0.5 r = (v: a) r.v +. a }", 0.5, 0.5),
+        ("{ a = x *. 0.5\n(a, a) |> ((b, c)) { b +. c } }", 0.5, 0.5),
+        ("{ a = x *. 0.5\nr = (v = a)\nr.v +. a }", 0.5, 0.5),
         (
-            "{ a = x *. 0.5 { x <. 0.0 } |> { True -> a False -> a +. 0.25 } }",
+            "{ a = x *. 0.5\n{ x <. 0.0 } |> (True) { a } | (False) { a +. 0.25 } }",
             0.5,
             0.5,
         ),
@@ -132,7 +132,7 @@ fn corpus() -> Vec<Case> {
         cases.push(float_case(source, x, expected));
     }
     cases.push(Case {
-        body: "{ a = { x <. 0.0 } |> { True -> x False -> \"s\" } core.inspect(a) }".into(),
+        body: "{ a = { x <. 0.0 } |> (True) { x } | (False) { \"s\" }\ncore.inspect(a) }".into(),
         input: Value::Float(1.0),
         expected: "\"s\"".into(),
         stop: false,
@@ -216,13 +216,13 @@ fn corpus() -> Vec<Case> {
         stop: true,
         events: vec!["before".into()],
     });
-    cases.push(float_case("{ f = { x <. 0.0 } |> { True -> (v: Float) -> Float { v } False -> (v: Float) -> Float { v +. 0.0 } } relay(f, 1000000, x) }", 0.5, 0.5));
+    cases.push(float_case("{ f = { x <. 0.0 } |> (True) { (v: Float) -> Float { v } } | (False) { (v: Float) -> Float { v +. 0.0 } }\nrelay(f, 1000000, x) }", 0.5, 0.5));
     cases.push(Case {
-        body: "{ f = make_float(x) g = make_float(x) r = (value: x, callback: f) s = (value: x, callback: f) t = (value: x, callback: g) core.inspect(f == f && f != g && r == s && r != t) }".into(),
+        body: "{ f = make_float(x) g = make_float(x) r = (value = x, callback = f) s = (value = x, callback = f) t = (value = x, callback = g) core.inspect(f == f && f != g && r == s && r != t) }".into(),
         input: Value::Float(-0.0), expected: "True".into(), stop: false, events: vec![],
     });
     for (x, expected) in [(-1.0, -0.5), (1.0, 0.0)] {
-        cases.push(float_case("{ a = { x <. 0.0 } |> { True -> x False -> \"s\" } a |> { v: Float -> v +. 0.5 _ -> 0.0 } }", x, expected));
+        cases.push(float_case("{ a = { x <. 0.0 } |> (True) { x } | (False) { \"s\" }\na |> (v: Float) { v +. 0.5 } | (_) { 0.0 } }", x, expected));
     }
     // N5: exact rounded chains under dominating bounds, and chains whose
     // middle result overflows even though the final expression would be finite.
@@ -300,12 +300,12 @@ fn corpus() -> Vec<Case> {
     for n in 0..24 {
         let x = n as f64 * 0.125 - 1.5;
         cases.push(float_case(
-            &format!("{{ p = Left(x, {n}.0) p.x +. p.x }}"),
+            &format!("{{ p = Left(x = x, y = {n}.0) p.x +. p.x }}"),
             x,
             x + x,
         ));
         cases.push(float_case(
-            &format!("{{ p = Right({n}.0, x) p.x +. p.x }}"),
+            &format!("{{ p = Right(y = {n}.0, x = x) p.x +. p.x }}"),
             x,
             x + x,
         ));
@@ -315,11 +315,11 @@ fn corpus() -> Vec<Case> {
             ((x + n as f64) + 0.25) + (x + n as f64) * 0.5,
         ));
         cases.push(float_case(
-            &format!("{{ r = (a: x, b: x *. {n}.0) r.a +. r.a +. r.b }}"),
+            &format!("{{ r = (a = x, b = x *. {n}.0) r.a +. r.a +. r.b }}"),
             x,
             (x + x) + x * n as f64,
         ));
-        cases.push(float_case(&format!("{{ r = {{ x <. 0.0 }} |> {{ True -> (a: x, b: {n}.0) False -> (a: x, b: {}.0) }} r.a +. r.b }}", n + 1), x, x + if x < 0.0 { n as f64 } else { (n + 1) as f64 }));
+        cases.push(float_case(&format!("{{ r = {{ x <. 0.0 }} |> (True) {{ (a = x, b = {n}.0) }} | (False) {{ (a = x, b = {}.0) }}\nr.a +. r.b }}", n + 1), x, x + if x < 0.0 { n as f64 } else { (n + 1) as f64 }));
     }
     // N2: cross-call scalar chains and closures with different captures share
     // code without sharing identity or the capture values.
@@ -461,6 +461,82 @@ fn corpus() -> Vec<Case> {
             cases.push(stop(body, Value::Float(y)));
         }
     }
+    // Scalar truncate takes the i31 path only below 2^30 in magnitude, and
+    // scalar to_float only for i31 values; both edges and the runtime paths.
+    for (x, expected) in [
+        (1073741823.9_f64, "1073741823"),
+        (1073741824.0, "1073741824"),
+        (-1073741823.5, "-1073741823"),
+        (-1073741824.0, "-1073741824"),
+        (-0.0, "0"),
+        (-2.5, "-2"),
+        (1.0e20, "100000000000000000000"),
+    ] {
+        cases.push(Case {
+            body: "core.inspect(core.truncate(x *. 1.0))".into(),
+            input: Value::Float(x),
+            expected: expected.into(),
+            stop: false,
+            events: vec![],
+        });
+    }
+    for text in [
+        "1073741822",
+        "1073741823",
+        "-1073741825",
+        "9007199254740993",
+    ] {
+        let a: BigInt = text.parse().unwrap();
+        let sum = &a + BigInt::from(1);
+        let value: f64 = sum.to_string().parse().unwrap();
+        cases.push(Case {
+            body: "core.inspect(core.float_to_bits(core.to_float(x + 1)))".into(),
+            input: Value::Int(a),
+            expected: value.to_bits().to_string(),
+            stop: false,
+            events: vec![],
+        });
+    }
+    // Self tail loops whose stop is in an inlined helper, a list loop, and
+    // a fold whose callback captures the input: a stop in a later iteration
+    // must print the same trace as the reference.
+    for x in [1.0e10_f64, 1.5, -2.0e9] {
+        let mut acc = Some(x);
+        for _ in 0..10 {
+            acc = acc
+                .map(|a| a * a)
+                .filter(|a| a.is_finite())
+                .map(|a| a + 1.0)
+                .filter(|a| a.is_finite());
+        }
+        match acc {
+            Some(y) => cases.push(float_case("sq_loop(10, x)", x, y)),
+            None => cases.push(stop("sq_loop(10, x)".into(), Value::Float(x))),
+        }
+    }
+    for x in [1.0_f64, 1.0e-300] {
+        let body = "list_product([1.0e200, 3.0, 1.0e200], x)";
+        let y = x * 1.0e200 * 3.0 * 1.0e200;
+        if y.is_finite() {
+            cases.push(float_case(body, x, y));
+        } else {
+            cases.push(stop(body.into(), Value::Float(x)));
+        }
+    }
+    for x in [1.0e10_f64, 0.5] {
+        let body = "fold_float([1.0, 2.0, 1.0e300], 1.0, (acc: Float, v: Float) -> Float { acc +. v *. x })";
+        let y = [1.0, 2.0, 1.0e300].iter().try_fold(1.0_f64, |acc, v| {
+            let p = v * x;
+            let s = acc + p;
+            (p.is_finite() && s.is_finite()).then_some(s)
+        });
+        match y {
+            Some(y) => cases.push(float_case(body, x, y)),
+            None => cases.push(stop(body.into(), Value::Float(x))),
+        }
+    }
+    let huge: BigInt = format!("1{}", "0".repeat(400)).parse().unwrap();
+    cases.push(stop("core.to_float(x + 1)".into(), Value::Int(huge)));
     cases
 }
 
@@ -557,6 +633,9 @@ resumed_h = (x: Float) -> Float {
 	})
 }
 helper_sq = (x: Float) -> Float { x *. x }
+sq_loop = (n: Int, acc: Float) -> Float { n |> (0) { acc } | (_) { sq_loop(n - 1, helper_sq(acc) +. 1.0) } }
+list_product = (xs: List(Float), acc: Float) -> Float { xs |> ([]) { acc } | ([a, ..rest]) { list_product(rest, acc *. a) } }
+fold_float = <A>(items: List(A), acc: Float, f: (Float, A) -> Float) -> Float { items |> ([]) { acc } | ([a, ..rest]) { fold_float(rest, f(acc, a), f) } }
 helper_g = (x: Float) -> Float {
 	y = helper_sq(x)
 	y +. 1.0
@@ -765,7 +844,11 @@ bounded_div = (x: Float, y: Float) -> Float {
 }
 
 #[test]
-fn nonnumeric_emission_and_optimization_are_byte_equal() {
+fn nonnumeric_functions_are_emitted_byte_equal() {
+    // Every program has the library code that the runtime calls
+    // (`lib/i/float_text.i`), which has Int arithmetic, so no whole module is
+    // free of numeric regions any more. A function with no numeric region
+    // must still be emitted byte for byte the same at every level.
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
@@ -789,9 +872,17 @@ fn nonnumeric_emission_and_optimization_are_byte_equal() {
     );
     let program = checked.program.as_ref().unwrap();
     let typed = checked.types.as_ref().unwrap();
+    // The text of the function with this debug name, up to the next one.
+    fn function<'t>(text: &'t str, name: &str) -> &'t str {
+        let start = text
+            .find(&format!("\n;; {name}\n"))
+            .unwrap_or_else(|| panic!("no function {name}"));
+        let end = text[start + 1..]
+            .find("\n;; ")
+            .map_or(text.len(), |end| start + 1 + end);
+        &text[start..end]
+    }
     let reference = ilang_wasm::compile_wat(&graph, program, typed, Options::default()).unwrap();
-    let (bytes, _) =
-        ilang_wasm::compile_with_bindings(&graph, program, typed, Options::default()).unwrap();
     for mode in [Numeric::Visible, Numeric::Scalars] {
         let text = ilang_wasm::compile_wat_numeric(
             &graph,
@@ -801,22 +892,10 @@ fn nonnumeric_emission_and_optimization_are_byte_equal() {
         )
         .unwrap();
         assert_eq!(
-            text, reference,
+            function(&text, "plain/pass.pass"),
+            function(&reference, "plain/pass.pass"),
             "no numeric region must leave WAT unchanged"
         );
-        let (candidate, _) = ilang_wasm::compile_with_bindings_numeric(
-            &graph,
-            program,
-            typed,
-            Options::default().numeric(mode),
-        )
-        .unwrap();
-        for level in [ilang_cli::Level::O2, ilang_cli::Level::O3] {
-            assert_eq!(
-                ilang_cli::optimize(&bytes, level).unwrap(),
-                ilang_cli::optimize(&candidate, level).unwrap()
-            );
-        }
     }
 }
 

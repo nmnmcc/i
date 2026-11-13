@@ -449,7 +449,7 @@ fn visible(locals: &[Local], depth: u32) -> Vec<(String, (u32, u32))> {
         .iter()
         .filter(|l| l.fn_only.is_none_or(|level| depth > level))
         // The lowering's own names (`%arg1`, `%service1`, `%field1`).
-        .filter(|l| !l.name.starts_with('%'))
+        .filter(|l| !l.name.contains('%'))
         .map(|l| (l.name.clone(), (l.span.start, l.span.end)))
         .collect()
 }
@@ -514,7 +514,12 @@ impl Hook for New {
     fn depth_error(&mut self, _: Span) {}
     fn is_direct(&mut self, e: &Expr, _: &[Local], _: u32) -> bool {
         let direct = body_engine3::is_direct(e, |name| self.aliases.contains(&name.name));
-        self.direct.push((at(e.span.0), direct));
+        // Multi-shape values have a synthetic one-byte root in the
+        // transition AST. Compare their classification at that root.
+        let span = if matches!(e.kind, ExprKind::Chain(_)) {
+            ilang_syntax::syn3::lower::lower_expr(e).map(|e| e.span).unwrap_or(e.span.0)
+        } else { e.span.0 };
+        self.direct.push((at(span), direct));
         direct
     }
 }
@@ -563,6 +568,10 @@ fn old_is_direct(expression: &ilang_syntax::ast::Expr, aliases: &[String]) -> bo
                 pending.extend(items);
                 pending.extend(rest.as_deref());
             }
+            ExprKind::Call { callee, args }
+                if matches!(&callee.kind, ExprKind::Name { module: None, name } if name.name == ilang_syntax::syn3::lower::MULTI) => {
+                pending.extend(args.iter().map(|arg| &arg.value));
+            }
             ExprKind::Call { callee, args } if constructor(callee) => {
                 pending.extend(args.iter().map(|arg| &arg.value))
             }
@@ -594,6 +603,9 @@ impl body_walk::Hook for Old {
         depth: u32,
     ) -> Result<bool, ()> {
         if let Some(call) = call::expression(e) {
+            // A shape-group closure is introduced by transition lowering;
+            // it has no call in the source tree (syntax-3 §6.12).
+            if call.name.name.starts_with('%') { return Ok(false); }
             self.events.push((
                 "call".into(),
                 at(e.span),
@@ -693,6 +705,11 @@ fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
         ..Default::default()
     };
     body_walk::expressions(&mut old, &mut old_hook).unwrap();
+    // Lowering groups multi-shape branches and may hoist their hidden
+    // bindings. Compare source events in source order, retaining every
+    // written call and its lexical environment on both sides.
+    new_hook.events.sort();
+    old_hook.events.sort();
     if new_hook.events != old_hook.events {
         let first = new_hook
             .events

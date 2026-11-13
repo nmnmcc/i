@@ -1,8 +1,0 @@
-Criteria recorded after reading spec 4.5, 4.7, 4.8, 9.2, before reading diff:
-1. Soundness: accepted programs never go wrong; execute suspect accepted candidates at --opt 0 and --opt 2.
-2. Principal schemes: preserve every finite solution and the most general inferred scheme; a valid annotation must not change acceptance (subject to spec known-type requirements).
-3. Solver termination and practical scaling on deep chains and wide unions.
-4. Genuine structural recursive types through variables must be rejected with E0505.
-5. Environment inclusion compares service arguments equally, irrespective of declared variance; one environment cannot contain different arguments of one service constructor.
-6. Declaration order cannot affect acceptance or inferred meaning.
-Check invariants across generalization/instantiation, multiple arguments, mixed variable/constructor rows, mutually recursive functions, and environment statements inside closures.

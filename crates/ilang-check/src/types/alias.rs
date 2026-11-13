@@ -17,31 +17,21 @@ pub(super) struct Template {
 
 fn has_algebra(t: &Ty) -> bool {
     match t {
-        Ty::Graph(_) => true,
         Ty::Union(_) | Ty::Inter(_) | Ty::Diff(_, _) => true,
         Ty::Con(_, _, ts) => ts.iter().any(has_algebra),
-        Ty::Fn(f) => {
-            f.params.iter().any(|(_, t)| has_algebra(t))
-                || [&f.ret, &f.err, &f.env].into_iter().any(has_algebra)
-        }
+        Ty::Fn(f) => has_algebra(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(has_algebra),
         Ty::Both(a, b) => has_algebra(a) || has_algebra(b),
         Ty::Var(_) | Ty::Never | Ty::Top => false,
     }
 }
 
+/// Labelled data (closed records, syntax-3 §2.3) is compared semantically in
+/// interfaces, as open records were.
 fn has_record(t: &Ty) -> bool {
     match t {
-        Ty::Graph(g) => g.nodes().into_iter().any(|(_, node)| {
-            matches!(
-                node,
-                super::records::Node::Rec(_) | super::records::Node::Without(..)
-            )
-        }),
+        Ty::Con(super::Head::Shape(shape), _, _) if shape.has_labels() => true,
         Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.iter().any(has_record),
-        Ty::Fn(f) => {
-            f.params.iter().any(|(_, t)| has_record(t))
-                || [&f.ret, &f.err, &f.env].into_iter().any(has_record)
-        }
+        Ty::Fn(f) => has_record(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(has_record),
         Ty::Diff(base, heads) => has_record(base) || heads.iter().any(has_record),
         Ty::Both(a, b) => has_record(a) || has_record(b),
         Ty::Var(_) | Ty::Never | Ty::Top => false,
@@ -58,7 +48,6 @@ impl Template {
 
 pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
     match t {
-        Ty::Graph(g) => g.map_vars(f),
         Ty::Var(v) => f(*v),
         Ty::Con(h, values, ts) => Ty::Con(
             *h,
@@ -66,11 +55,8 @@ pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
             ts.iter().map(|t| map_vars(t, f)).collect(),
         ),
         Ty::Fn(g) => Ty::Fn(Box::new(FnTy {
-            params: g
-                .params
-                .iter()
-                .map(|(n, t)| (n.clone(), map_vars(t, f)))
-                .collect(),
+            param: map_vars(&g.param, f),
+            labels: g.labels.clone(),
             ret: map_vars(&g.ret, f),
             err: map_vars(&g.err, f),
             env: map_vars(&g.env, f),
@@ -226,34 +212,12 @@ impl Checker<'_> {
                 }
             }
             TypeKind::Tuple(ts) => Ty::tuple(ts.iter().map(&mut go).collect::<Option<_>>()?),
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let pool = super::records::Pool::default();
-                let mut labels = Vec::new();
-                let mut resolved = Vec::new();
-                for (name, ty) in fields {
-                    let label = super::records::written_label(name, self.s.level);
-                    labels.push(label.clone());
-                    resolved.push((label, go(ty)?));
-                }
-                labels.extend(
-                    removed
-                        .iter()
-                        .map(|name| super::records::written_label(name, self.s.level)),
-                );
-                let record = pool.record(resolved);
-                match base {
-                    Some(base) => {
-                        let base = go(base)?;
-                        let rest = pool.without(&base, labels);
-                        pool.inter(&[rest, record])
-                    }
-                    None => record,
-                }
-            }
+            TypeKind::Record { fields } => Ty::record(
+                fields
+                    .iter()
+                    .map(|(name, ty)| Some((name.name.clone(), go(ty)?)))
+                    .collect::<Option<_>>()?,
+            ),
             TypeKind::Union(ts) => Ty::Union(ts.iter().map(&mut go).collect::<Option<_>>()?),
             TypeKind::Inter(ts) => Ty::Inter(ts.iter().map(&mut go).collect::<Option<_>>()?),
             TypeKind::Diff(ts) => {
@@ -266,15 +230,14 @@ impl Checker<'_> {
                 ret,
                 err,
                 env,
-            } => Ty::Fn(Box::new(FnTy {
-                params: ps
-                    .iter()
+            } => Ty::Fn(Box::new(FnTy::new(
+                ps.iter()
                     .map(|p| Some((p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)?)))
                     .collect::<Option<_>>()?,
-                ret: go(ret)?,
-                err: err.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
-                env: env.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
-            })),
+                go(ret)?,
+                err.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
+                env.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
+            ))),
         })
     }
 
@@ -321,10 +284,10 @@ impl Checker<'_> {
     fn normalize_known_alias(&self, t: Ty) -> Ty {
         let go = |t| self.normalize_known_alias(t);
         match t {
-            Ty::Graph(_) => t,
             Ty::Con(h, values, ts) => Ty::Con(h, values, ts.into_iter().map(go).collect()),
             Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
-                params: f.params.into_iter().map(|(n, t)| (n, go(t))).collect(),
+                param: go(f.param),
+                labels: f.labels,
                 ret: go(f.ret),
                 err: go(f.err),
                 env: go(f.env),

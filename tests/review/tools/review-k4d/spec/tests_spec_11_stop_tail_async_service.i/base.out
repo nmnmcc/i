@@ -1,3 +1,0 @@
-spec/stop_tail_async_service.take : () -> Float ! Later | Io
-spec/stop_tail_async_service.twice : () -> String ! Later
-spec/stop_tail_async_service.main : () -> Nil ! Later | Io
