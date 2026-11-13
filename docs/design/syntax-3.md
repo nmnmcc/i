@@ -2206,10 +2206,9 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
     with the type arguments of the bound forms, as today for `.f`.
 15. Removed.
 
-Fitting: "Only a clause block with one clause may have choices…" becomes
-"Only a fitted group may have alternatives where a pattern is fitted". The
-pattern type of a conjunction `p1 = … = pk` is the intersection of the
-pattern types of its parts that are not catch-alls; a name part gets that
+Alternatives use spec §4.8 in every shape group; they are not restricted to
+fitted groups. The pattern type of a conjunction `p1 = … = pk` is the
+intersection of the pattern types of its parts that are not catch-alls; a name part gets that
 type. A catch-all is a name, a discard, or a conjunction of catch-alls. A data
 pattern has the data type of its items' pattern types at their keys (with new
 type variables, as today for tuples); a rest gets the data type of the
