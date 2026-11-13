@@ -3,7 +3,7 @@
 
 This document is the definition of the i programming language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
 
-This document is complete in itself. It defines:
+This document is complete in itself, except that the principality argument (§4.7), the contract of `resource.ensure`'s final callback (§9.5), and the contracts of the library operations in §9.12 are still being completed; this qualification is to be removed when all three are complete. It defines:
 
 - the source language (§1 to §8);
 - effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, `i/key`, `i/task`, `i/random`, `i/request`, `i/clock`, `i/fs`, `i/process`, `i/net`, `i/tls`, and `i/stdio` (§9);
@@ -80,7 +80,7 @@ Some forms are macro calls (§14): an attribute that is not built in, such as `@
 ### 1.5 Symbols
 
 ```
-=   :   ,   .   ..   ->   <-   ?   |   @
+=   :   ,   .   ..   ->   <-   ?   |   |>   @
 (   )   [   ]   {   }   <<   >>
 +   -   *   /   %   <   <=   >   >=   ==   !=   &&   ||   <>   &
 +.  -.  *.  /.      <.  <=.  >.  >=.
@@ -456,9 +456,19 @@ its lexical scope. It does not union incompatible instantiations into one
 environment; §9.2's same-constructor restrictions still apply to each
 actual function environment. This changes no source inference.
 
-A factory for service S has type `(generated arguments) -> S ^ Never ! R`,
-with R its ordinary inferred environment. The selected arguments have these
-exact types and meanings. `Key(Nil)` and the request/task services below refer to the accepted R2 contracts in [runtime.md §§5–6](design/runtime.md); their definitions are installed by that track. This plan does not give them host-reference representations:
+A factory for service `S` has type `(generated arguments) <- R -> S`,
+with `R` its ordinary inferred need and no uncaught `Fail` requirement (§9.3).
+`Key(Nil)` is an invariant identity key (§9.8). A request `Root` holds such a
+key and identifies a request run in an entry context; an `Owner` holds its own
+key and its `Root` and identifies a cancellation group. Both are ordinary
+portable service values; `Await` supplies the function that waits for a request
+to settle (§9.11). `Scheduler` and `Runner` are ordinary service values for a
+structured task run and its scheduling and random-generator context (§9.9).
+The primitive entry registry and any required initial root key exist before
+factories run; ordinary factories construct the chosen services from their arguments
+and dependencies. The request and task contracts are defined in §9.9 and
+§9.11. This plan gives none of these services a host-reference representation.
+The selected arguments have these exact types and meanings:
 
 | Argument | Type | Value and dependency |
 |---|---|---|
@@ -704,9 +714,9 @@ IntPart    = int_lit | "{" IntPart "}" .
 
 ## 4. Types
 
-### 4.1 Types are sets of values
+### 4.1 Types denote sets of values
 
-Every type is a set of values.
+Every type denotes a set of values. The union of two members of one type constructor is their least upper bound (a join) in the lattice of types ordered by subtyping (§4.5), subject to the merging rules of §4.4. Its set of values can be larger than the exact union of the two sets.
 
 - Values of different type constructors are never the same.
 - Values of different forms of one type constructor, such as `List(Int)` and `List(String)`, may not be told apart at run time (§7.1).
@@ -812,7 +822,7 @@ Here `Pair(Int, Int)` is a labelled type, not `(Int, Int)`; `Point` is `(Int, In
 
 ### 4.4 Union, intersection, and difference
 
-- The values of `A | B` are the values of `A` and the values of `B`. Order has no effect, `A | A` is `A`, and `A | Never` is `A`.
+- `A | B` is the least upper bound (join) of `A` and `B` under subtyping (§4.5). It contains every value of either type, and merging members of one type constructor can add values beyond the exact union of their sets. Order has no effect, `A | A` is `A`, and `A | Never` is `A`.
 - Members of a union with the same type constructor are put together into one. For `Int` and `String`, the value set of the member is the union of their value sets: `"a" | "b"` is one member, and `"a" | String` is `String`. `T(A1, …) | T(B1, …)` is `T(C1, …)`, where for each parameter of `T` (§4.5 rules 6 and 7), `Ci` is `Ai | Bi` when the parameter goes in the same direction as the type, and `Ai & Bi` when it goes in the other direction. When the parameter does not change, `Ai` and `Bi` must be equal, and `Ci` is that type; if they cannot be equal, it is a compile error. Data of one shape is one type constructor, whose part under each key goes in the same direction as the data. All function types are one type constructor: `(P) <- N -> R | (Q) <- M -> S` is `(P & Q) <- N ∧ M -> R | S`, where `N ∧ M` is the merge of the two needs (§9.2). When `P` and `Q` have no shape in common, `P & Q` is `Never`, and the function cannot be called. So `List(Int) | List(String)` is `List(Int | String)`.
 - The **members** of a type are the types that make it up as a union, after these rules are used. So no two members of a type have the same type constructor. A type variable may be a member.
 - The values of `A & B` are the values that are in both `A` and `B`. `{ A | B } & C` is `A & C | B & C`. When `T` and `U` are not type variables, `T & U` is `Never` when they have different type constructors; when they have the same one, it is that type constructor with each pair of arguments put together the other way round: `&` where the parameter goes in the same direction, `|` where it goes in the other direction, and equal where it does not change. For `Int` and `String`, the value set is the values in both; when there are none, `T & U` is `Never`. So `"a" & String` is `"a"`, and `"a" & "b"` is `Never`. `a & T`, with a type variable `a`, stays as it is.
@@ -825,6 +835,18 @@ Here `Pair(Int, Int)` is a labelled type, not `(Int, Int)`; `Point` is `(Int, In
 - So `{ Int | String | Nil } - String` is `Int | Nil`, `A - A` is `Never`, and `{ Yield(a) | n } - Yield(a)` is `n - Yield(a)`.
 - `{ Int | String | Nil } - "a" - 1` is `Int - 1 | String - "a" | Nil`.
 - Unions, intersections, and differences may be used in every place where a type may be used. In a written type, a union with two or more type variables as members may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places. The parameter of a function is an input place; its `->` part, the type at the top of a binding pattern, and the data of a type are output places. The parts of data keep the direction of the place of the data. The restrictions on variable members apply to expanded annotations and shown types, including after substitution and completion.
+
+Merging loses correlations between parts of data of one shape and between arguments of one type constructor. Thus `(Int, String) | (String, Int)` is `(Int | String, Int | String)`, which also contains `(1, 2)`. If `Pair(A, B) = (A, B)`, then `Pair(Int, String) | Pair(String, Int)` likewise admits `Pair(1, 2)`. `List(Int) | List(String)` admits `[1, "a"]`, even though neither original list type does.
+
+Keep a correlation by giving each alternative a distinct labelled constructor (§4.3):
+
+```i
+IntString = (Int, String)
+StringInt = (String, Int)
+Correlated = IntString | StringInt
+```
+
+The two members of `Correlated` have different type constructors and do not merge: `IntString(1, "a")` belongs to it, while `IntString(1, 2)` does not.
 
 ### 4.5 Subtypes
 
@@ -1304,6 +1326,19 @@ retry = <A, E, N>(times: Int, body: () <- (..N, Fail(E)) -> A) -> A {
 user = () { retry(3, () { load_user("1") }) }
 ```
 
+### 9.1.1 What a need tracks
+
+The need after `<-` tracks the services a computation takes from its caller (§9.2), including errors through `Fail` (§9.3) and assertion failures through `Assert` (§9.6). It does not describe every way a computation can change state or stop.
+
+A need does not track these conditions:
+
+- Whether a continuation has already been resumed or cancelled: a second use stops the program (§9.4).
+- Whether the boundary of a captured `Fail` is still active: using it after its `catch` has ended stops the program (§9.3, §9.4).
+- Whether a task or channel handle still belongs to a live run or scope, or whether a request is ready and has not been cancelled or taken: invalid use is checked at run time and stops the program (§9.9, §9.11).
+- Whether a value is portable (§11.9): an operation that requires portability checks it at run time and stops the program if it is not portable (§9.9).
+
+`request.take` consumes the answer in shared request state: every alias observes the change from `Ready` to `Taken` (§9.11). Its type is `<A>(Request(A)) -> A`, with no need. Thus the absence of a need does not promise that a call leaves shared state unchanged. These run-time failures are stops (§11.7), not errors added to `Fail`.
+
 ### 9.2 Services
 
 A **service** is an ordinary value of a labelled type (§4.3), normally one whose data holds functions. Two services of one form are made by defining two types. A service is a normal value: it may be stored and given to functions, and code that has it may call its functions directly.
@@ -1781,8 +1816,8 @@ before cancellation reaches them.
 R6. The runtime entry wrapper and every explicit run own a local root task,
 which they run to completion with structured children. An entry error is
 reported only after the run has unwound; a host export receives its ordinary
-error. A stop immediately traps and runs no finals, as §9.5 requires. Host
-trap/failure/drop also invalidates the instance under ABI H8–H11; it cannot
+error. A stop immediately traps and runs no finals, as §9.5 requires. A host
+trap, failure or drop also invalidates the instance (§B.5); it cannot
 promise to resume i cleanup. “Cancellation runs finals” refers to i structured
 cancellation, not destruction of a trapped instance by its host.
 
@@ -2340,7 +2375,7 @@ For example, an opaque type defined by a package needs no library rule:
 
 
 ```i
-Element = { Opaque }
+Element = Opaque
 @js("globalThis.document.body")
 body: Element
 ```
@@ -2426,7 +2461,7 @@ No value may be changed. The values are integers, floats, strings, codepoints, b
 
 An Int may be of any size. It never overflows.
 
-- `a / b` rounds toward zero. `a % b` has the sign of `a`, and `a == (a / b) * b + a % b`.
+- `a / b` rounds toward zero. `a % b` has the sign of `a`, and `a == (a / b) * b + a % b` when `b` is not 0.
 - When `b` is 0, `a / b` and `a % b` are 0.
 
 ### 11.3 Float
