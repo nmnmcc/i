@@ -18,8 +18,12 @@ run = <A, N>(body: () <- N -> A) { body() }
 
 main = () {
 	l0_0 = () { ut() }
+	_syn3_0: T(T(S(Never))) = T(
+		f = () { get() + ut() + us() },
+		m = (_: T(S(Never))) { Nil },
+	)
 	{
 		ut()
 		Nil
-	} <- (T(f = () { get() + ut() + us() }, m = (_: T(S(Never))) { Nil }))
+	} <- (_syn3_0)
 }

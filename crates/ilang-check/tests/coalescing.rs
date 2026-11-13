@@ -165,11 +165,12 @@ use = <N>() <- (s: S(N)) {
 }
 
 main = <N>() {
-	local: () <- N -> Nil = () { use() }
+	local: () <- (Fail(Never), ..N) -> Nil = () { use() }
 	local()
 }";
     entry(source);
-    let unused = source.replace("local() }", "Nil }");
+    let unused = source.replace("\tlocal()\n}", "\tNil\n}");
+    assert_ne!(source, unused);
     let (graph, _, _) = common::check_files(&[("src/main.i", &unused)]);
     for checked in [
         ilang_check::check(&graph),
@@ -181,7 +182,7 @@ main = <N>() {
             graph.sources.render_all(&checked.diags)
         );
     }
-    // §9.2 compares service arguments equally even when S is covariant.
+    // §9.2 fits the provided service by ordinary value subtyping.
     // Supplying S(Dependency) does not supply its callback's Dependency.
     let dependency = "S(N) = (() <- N -> Nil)
 Dependency = ()
@@ -191,17 +192,20 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 apply = <N>() {
-	local: () <- N -> Nil = () { use() }
+	local: () <- (Fail(Never), ..N) -> Nil = () { use() }
 	local()
 }
 
-main = () { apply() <- (S(() { read() })) }";
+main = () { provided: S(Dependency) = S(() { read() }) apply() <- (provided) }";
     entry(dependency);
     // An empty `Dependency = ()` is not a keyed service type in syntax three
     // (E0225), so the supplied variant gives it a field.
     let supplied = dependency
         .replace("Dependency = ()", "Dependency = (value = Int)")
-        .replace("apply() <- (S(", "apply() <- (Dependency(value = 1), S(");
+        .replace(
+            "apply() <- (provided)",
+            "apply() <- (Dependency(value = 1), provided)",
+        );
     let (graph, _, _) = common::check_files(&[("src/main.i", &supplied)]);
     let checked = ilang_check::check(&graph);
     assert!(

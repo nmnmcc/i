@@ -1,4 +1,4 @@
-with_int : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Reader(_)) -> A
+with_int : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Reader(Int)) -> A
 get_s : () <- (Reader(String)) -> String
 g : () -> String
 k : () -> String
@@ -20,17 +20,18 @@ take : (() -> A & Int) -> () -> A & Int
 p : () -> Never
 z : Never
 not_string : String
-7:1: error[E0515]: the type hides the environment statement's obligation for `Reader(_)`: every instance must use the same service form (§4.8 rule 9, §9.2)
-11:19: error[E0515]: `Reader(String)` and `Reader(_)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 11:10 needs it)
-13:29: error[E0515]: `Reader(String)` and `Reader(_)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 13:20 needs it)
-28:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 28:2 needs it)
-33:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 33:2 needs it)
-50:2: error[E0503]: `_` and `_` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)
-59:11: error[E0501]: `String` is not a subtype of `Int`
-59:44: error[E0501]: `Int` is not a subtype of `String`
-59:41: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-63:11: error[E0501]: `String` is not a subtype of `Int`
-63:41: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-66:44: error[E0501]: `String` is not a subtype of `Int`
-66:64: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-79:1: error[E0501]: `1` is not a subtype of `String`
+14:19: error[E0515]: `Reader(String)` and `Reader(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 14:10 needs it)
+14:5: error[E0515]: `Reader(String)` and `Reader(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)
+16:29: error[E0515]: `Reader(String)` and `Reader(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 16:20 needs it)
+16:5: error[E0515]: `Reader(String)` and `Reader(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)
+31:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 31:2 needs it)
+36:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 36:2 needs it)
+53:2: error[E0503]: `_` and `_` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)
+62:11: error[E0501]: `String` is not a subtype of `Int`
+62:44: error[E0501]: `Int` is not a subtype of `String`
+62:41: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+66:11: error[E0501]: `String` is not a subtype of `Int`
+66:41: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+69:44: error[E0501]: `String` is not a subtype of `Int`
+69:64: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+82:1: error[E0501]: `1` is not a subtype of `String`

@@ -6,4 +6,7 @@ use = <N>() <- (s: S(N)) {
 f = (n: Int) { n |> (0) { use() } | (_) { g(n - 1) } }
 g = (n: Int) { n |> (0) { use() } | (_) { f(n - 1) } }
 
-main = () { f(3) <- (S(() { Nil }, (_: Never) { Nil })) }
+main = () {
+	_syn3_0: S(Never) = S(() { Nil }, (_: Never) { Nil })
+	f(3) <- (_syn3_0)
+}

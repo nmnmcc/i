@@ -9,7 +9,6 @@ both = (a, b) {
 	}
 }
 bad = () {
-	both(() { int() }, () { text() })() <- (
-		Cell(read = () { 1 }, write = (_: Int) { Nil }),
-	)
+	_syn3_0: Cell(Int) = Cell(read = () { 1 }, write = (_: Int) { Nil })
+	both(() { int() }, () { text() })() <- (_syn3_0)
 }

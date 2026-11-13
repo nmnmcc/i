@@ -1,6 +1,6 @@
 {
-  "compiler": "cfe52a677bb4d23ebdd15695f5a1eb01d621fa08",
-  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () -> Int ! Dep\napp/main.us : () -> Int ! N | S(N)\napp/main.ut : () -> Int ! N | T(N)\napp/main.usa : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.h0 : () -> Int ! N | S(N)\napp/main.h1 : () -> Int ! N | S(N)\napp/main.main : () -> Nil ! N - S(Dep | T(Dep)) - Dep | T(Dep) | T(N & Dep)\n",
+      "stdout": "app/main.get : () -> Int ! Dep\napp/main.us : () -> Int ! N | S(N)\napp/main.ut : () -> Int ! N | T(N)\napp/main.usa : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.h0 : () -> Int ! N | S(N)\napp/main.h1 : () -> Int ! N | S(N)\napp/main.main : () -> Nil ! T(Dep)\n",
       "stderr": ""
     },
     "test0": {

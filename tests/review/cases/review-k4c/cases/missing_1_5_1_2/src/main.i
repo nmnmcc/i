@@ -6,9 +6,8 @@ use = <N>() <- (s: S(N)) { s.f() }
 
 main = <N>() {
 	local2 = () {
-		run(() -> Nil { use() }) <- (
-			S(f = () { get() }, mark = (_: Dep) { Nil }),
-		)
+		_syn3_0: S(Dep) = S(f = () { get() }, mark = (_: Dep) { Nil })
+		run(() -> Nil { use() }) <- (_syn3_0)
 	}
 	run(local2)
 }

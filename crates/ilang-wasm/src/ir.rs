@@ -226,6 +226,9 @@ pub enum Op {
     Boundary,
     /// `control.suspend(b, f)`: it throws `$capture`.
     Suspend,
+    /// `control.escape(b, v)`: throws `$error` with `(b, v)`; the boundary
+    /// `b` ends with `v`.
+    Escape,
     /// `control.resume(k, value)`.
     Resume,
     /// `control.cancel(k)`.
@@ -252,6 +255,7 @@ impl Op {
                 | Op::Ensure
                 | Op::Boundary
                 | Op::Suspend
+                | Op::Escape
                 | Op::Resume
                 | Op::Cancel
                 | Op::WaitRequests
@@ -314,6 +318,13 @@ pub enum Callee {
     /// number of arguments: `call_ref` when it is a `$clo{n}`, else the
     /// dispatch of a multi-shape value on the shape (syntax-3.md §6.4).
     Value(Atom),
+    /// Field `field` of the value of a service, called: `service` is the
+    /// slot as read from the environment (`Value::ServiceRaw`). When the
+    /// slot is a light boundary that stands for a value made from its
+    /// handle (`Program::lazy_fields`), the code of that field is called
+    /// with the handle, and the value is not made; otherwise the value is
+    /// made (`$service_force`) and its field is called as a closure.
+    Lazy { service: Atom, field: u32 },
     /// A function value called with argument data of a shape with labels;
     /// the arguments are in canonical order.
     Shaped(Atom, ShapeId),
@@ -323,7 +334,7 @@ impl Callee {
     /// The function value of an indirect call.
     pub fn value(&self) -> Option<&Atom> {
         match self {
-            Callee::Direct(_) | Callee::Known { .. } => None,
+            Callee::Direct(_) | Callee::Known { .. } | Callee::Lazy { .. } => None,
             Callee::Value(a) | Callee::Shaped(a, _) => Some(a),
         }
     }
@@ -354,8 +365,24 @@ pub enum Value {
     Finite(Op, Vec<Atom>),
     /// An operation that calls i code with this environment.
     OpEnv(Op, Vec<Atom>, Env),
+    /// A light boundary (syntax-3 §2.10.7, O30): `control.boundary(f)` where
+    /// `f` is a function literal whose parameter is used only as the first
+    /// argument of `control.escape`. `func` is the literal's code, lifted:
+    /// its parameters are the boundary, then the literal's captures, so no
+    /// closure is made. `args[0]` is the boundary, made by `light_new`. The
+    /// call runs in a handler that takes only an escape to that boundary;
+    /// a capture that goes through it pauses it as a `$boundary` does.
+    Light {
+        func: FuncId,
+        args: Vec<Atom>,
+        env: Env,
+    },
     /// The service with this id in the environment (§9.2).
     Service(Env, u32),
+    /// The slot of the service with this id in the environment, as it is:
+    /// a light boundary that stands for a value is not made into it. Only
+    /// a name whose every use is the callee of `Callee::Lazy` has it.
+    ServiceRaw(Env, u32),
     Closure {
         func: FuncId,
         captures: Vec<Atom>,
@@ -574,6 +601,10 @@ pub enum Stmt {
         env: Env,
         service: u32,
         value: Atom,
+        /// Sets the slot of `env` itself, without a copy: only at the start
+        /// of a light boundary's body, whose environment is its own and new
+        /// (`Value::Light`), so nothing can have kept it yet.
+        in_place: bool,
     },
     Unreachable,
     /// Fills a capture of a closure made by a direct value, once the names of
@@ -887,6 +918,14 @@ pub struct Program {
     pub globals: u32,
     /// The number of service ids, at least 1 for `Assert` (§9.2).
     pub services: u32,
+    /// The service ids that a light boundary may provide lazily (its handle
+    /// stands for the value, `Value::Light`): reads of them force it.
+    pub lazy_services: std::collections::BTreeSet<u32>,
+    /// For the function that makes a lazily provided value from a light
+    /// boundary's handle: for each field of the value, the code of the
+    /// function literal written there, lifted so that the handle is its
+    /// last parameter (`Callee::Lazy`), or `None`.
+    pub lazy_fields: std::collections::BTreeMap<FuncId, Vec<Option<FuncId>>>,
     pub request_owner: Option<u32>,
     /// The code of `ilang_start` after the tables are installed.
     pub start: Option<Func>,

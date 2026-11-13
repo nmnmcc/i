@@ -6,7 +6,8 @@ use = <N>() <- (s: S(N)) {
 }
 
 wrap: <N>(() <- (S(N), ..N) -> Int, S(N)) <- N -> Int = (body, svc) {
-	body() <- (svc)
+	_syn3_0: S(N) = svc
+	body() <- (_syn3_0)
 }
 
 main = () { assert(wrap(() { use() }, S(f = () { 1 })) == 1) }

@@ -5,11 +5,12 @@ S(N) = (f = () <- N -> Nil)
 use = <N>() <- (s: S(N)) { s.f() }
 
 main = <N>() {
+	_syn3_0: S(Dep) = S(f = () { get() })
 	{
 		local = () {
 			inner = () { use() }
 			inner()
 		}
 		run(local)
-	} <- (S(f = () { get() }))
+	} <- (_syn3_0)
 }

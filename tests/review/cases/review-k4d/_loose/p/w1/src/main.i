@@ -4,5 +4,6 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 wrap: <N>(() <- (S(N), ..N) -> Int) <- N -> Int = (body) {
-	body() <- (S(f = () { 1 }))
+	_syn3_0: S(N) = S(f = () { 1 })
+	body() <- (_syn3_0)
 }

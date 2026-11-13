@@ -18,13 +18,12 @@ run = <A, N>(body: () <- N -> A) { body() }
 h0 = () { 1 }
 
 main = () {
+	_syn3_0: S(Dep | S(Dep)) = S(
+		f = () { run(() { h0() + 1 + get() }) },
+		m = (_: Dep | S(Dep)) { Nil },
+	)
 	{
 		run(() { run(() { usa() + h0() }) + 1 })
 		Nil
-	} <- (
-		S(
-			f = () { run(() { h0() + 1 + get() }) },
-			m = (_: Dep | S(Dep)) { Nil },
-		),
-	)
+	} <- (_syn3_0)
 }

@@ -11,29 +11,34 @@ call = <N>(c: Cb(N)) {
 }
 run = <A, N>(body: () <- N -> A) { body() }
 twice = <N>(body: () <- N -> Int) { body() + body() }
-with_int = (body) { body() <- (Svc(f = () { 1 }, m = (_: Int) { Nil })) }
+with_int = (body) {
+	_syn3_0: Svc(Int) = Svc(f = () { 1 }, m = (_: Int) { Nil })
+	body() <- (_syn3_0)
+}
 with_dep = (body) { body() <- (Dep(v = 5)) }
-with_cov = (body, v) { body() <- (Cov(f = () { v })) }
+with_cov = (body, v) {
+	_syn3_1: Cov(_) = Cov(f = () { v })
+	body() <- (_syn3_1)
+}
 pick = (a, b) { [a, b] }
 h0 = () { run(h0) }
 h1 = () {
-	with_int(() { ask() }) <- (
-		Cov(
-			f = () { with_dep(() { with_int(() { get() + ask() }) }) + askc() },
-		),
-		Svc(f = () { "s" }, m = (_: String) { Nil }),
+	_syn3_2: Cov(Int) = Cov(
+		f = () { with_dep(() { with_int(() { get() + ask() }) }) + askc() },
 	)
+	_syn3_3: Svc(String) = Svc(f = () { "s" }, m = (_: String) { Nil })
+	with_int(() { ask() }) <- (_syn3_2, _syn3_3)
 }
 
 main = () {
+	_syn3_4: Cov(Int) = Cov(
+		f = () { with_int(() { run(() { ask() + 1 }) }) + 1 + askc() },
+	)
+	_syn3_5: Svc(Int) = Svc(f = () { get() }, m = (_: Int) { Nil })
 	{
 		call(Cb(f = () { ask() }, m = (_) { Nil })) +
 			twice(h1) +
 			with_dep(() { get() })
 		Nil
-	} <- (
-		Cov(f = () { with_int(() { run(() { ask() + 1 }) }) + 1 + askc() }),
-		Dep(v = 1),
-		Svc(f = () { get() }, m = (_: Int) { Nil }),
-	)
+	} <- (_syn3_4, Dep(v = 1), _syn3_5)
 }
