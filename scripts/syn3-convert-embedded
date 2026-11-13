@@ -168,11 +168,18 @@ def converted_before(since, cache, path, literal):
     return literal in cache[path]
 
 
+def conversion_base():
+    """Honor syn3-convert-all's --since for embedded text as well as files."""
+    if os.environ.get("SYN3_EMBEDDED_ALL"):
+        return None
+    return os.environ.get("SYN3_EMBEDDED_SINCE") or last_conversion()
+
+
 def convert(binary, ctors):
     os.chdir(ROOT)
     config = json.loads(check.DATA.read_text())
     unconvertible = listed()
-    since = None if os.environ.get("SYN3_EMBEDDED_ALL") else last_conversion()
+    since = conversion_base()
     cache = {}
     items = []
     left = []

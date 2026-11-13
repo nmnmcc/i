@@ -1569,7 +1569,9 @@ impl Cx {
         }
         let mut params = Vec::new();
         match &f.param.kind {
-            n::TypeKind::Data(items) => {
+            n::TypeKind::Data(items)
+                if items.is_empty() || items.iter().any(|i| !matches!(i, n::TItem::Label(..))) =>
+            {
                 for item in items {
                     match item {
                         n::TItem::Pos(t) => params.push(o::FnParamType {

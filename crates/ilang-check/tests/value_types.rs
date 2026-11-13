@@ -105,15 +105,15 @@ fn closed_aliases_and_patterns_complete_eagerly() {
     assert_eq!(alias(&c, "Composite"), "(A, Int)");
     // P5 checks even a pattern binding nothing.
     bad(
-        "Box(A) = { (A) }\nv: Int = 1\nBox(_) = v",
+        "Box(A) = (A)\nv: Int = 1\nBox(_) = v",
         code::TYPE_PATTERN_MISMATCH,
     );
     bad(
-        "Box(A) = { (A) }\nv: Box(Int) = Box(1)\nBox(Int) = v",
+        "Box(A) = (A)\nv: Box(Int) = Box(1)\nBox(Int) = v",
         code::TYPE_PATTERN_BINDER_IS_TYPE,
     );
     bad(
-        "Box(A) = { (A) }\nv = Box(1)\nBox(Foo, Foo) = v",
+        "Box(A) = (A)\nv = Box(1)\nBox(Foo, Foo) = v",
         code::DEFINED_TWICE,
     );
 }
@@ -148,7 +148,7 @@ fn type_edges_do_not_change_runtime_needs_or_generalization() {
 fn early_contexts_preserve_dependency_provenance() {
     // K3/J6: even a completed Int alias remains forbidden at early uses.
     for src in [
-        "n: Int = 1\nA = n\nBox = { (A) }",
+        "n: Int = 1\nA = n\nBox = (A)",
         "n: Int = 1\nA = n\n@external(\"env\",\"f\")\nf: (A) -> Int",
         "n: Int = 1\nA = n\nf = () <- (x: A) { x }",
         "n: Int = 1\nA = n\n@host(\"env\")\nService = A",
@@ -278,10 +278,10 @@ fn expanded_places_and_constant_head_alias_parts() {
 fn imported_pattern_binders_are_never_reclassified() {
     // P1/P3: an imported User changes the collision, never the item kind.
     let files = [
-        ("src/types.i", "(\n\tUser\n)\nUser = { Opaque }"),
+        ("src/types.i", "(\n\tUser\n)\nUser = Opaque"),
         (
             "src/main.i",
-            "(\n\t(User) = app/types\n)\nBox(A) = { (A) }\nv: Box(Int) = Box(1)\nBox(User) = v",
+            "(\n\t(User) = app/types\n)\nBox(A) = (A)\nv: Box(Int) = Box(1)\nBox(User) = v",
         ),
     ];
     let (g, c) = checked(&files);
@@ -301,7 +301,7 @@ fn imported_pattern_binders_are_never_reclassified() {
 
 #[test]
 fn eager_alias_dependencies_and_reverse_ties() {
-    let src = "Wrap(A) = { (A) }\nComposite = List(Item)\nv: Wrap(Int) = Wrap(1)\nWrap(Item) = v\nleft: Int = 1\nright: String = \"x\"\nL = left\nR = right\nuse = (x: Composite) { x }";
+    let src = "Wrap(A) = (A)\nComposite = List(Item)\nv: Wrap(Int) = Wrap(1)\nWrap(Item) = v\nleft: Int = 1\nright: String = \"x\"\nL = left\nR = right\nuse = (x: Composite) { x }";
     let (g, c) = good(src);
     let mut p = c.program.unwrap();
     let first = c.types.unwrap().alias_types;
@@ -761,7 +761,7 @@ fn alias_exports_preserve_constructor_privacy() {
     for exports in ["(Secret, Public)", "(Secret, Public(..))"] {
         let lib = [
             exports,
-            "Hidden = { (Int) }\nSecret = Hidden\nvalue: Secret = Hidden(1)\nPublic = value",
+            "\nHidden = (Int)\nSecret = Hidden\nvalue: Secret = Hidden(1)\nPublic = value",
         ]
         .concat();
         let (_, c) = checked(&[
@@ -838,7 +838,7 @@ fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
     assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));
     // P4 cannot discard the Nil alternative to find a convenient named head.
     bad(
-        "Box(A) = { (A) }\nv: Box(Int) | Nil = Box(1)\nBox(_) = v",
+        "Box(A) = (A)\nv: Box(Int) | Nil = Box(1)\nBox(_) = v",
         code::TYPE_PATTERN_MISMATCH,
     );
     // A constant part introduced by a head alias compares after closing.
@@ -948,7 +948,7 @@ fn cached_templates_preserve_hole_sharing_and_deferred_constraints() {
 
 #[test]
 fn nested_pattern_heads_have_hover_and_definition_targets() {
-    let src = "Pair(A, B) = { (A, B) }\nBox(A) = { (A) }\nv = (Box(1), \"s\")\nPair(Box(Item), _) = v\nx: Item = 1";
+    let src = "Pair(A, B) = { (A, B) }\nBox(A) = (A)\nv = (Box(1), \"s\")\nPair(Box(Item), _) = v\nx: Item = 1";
     let (g, c) = good(src);
     let p = c.program.as_ref().unwrap();
     let m = common::module(p, "app/main");
@@ -1054,7 +1054,7 @@ fn review_declaration_permutations_are_identical() {
 
 #[test]
 fn qualified_exact_heads_expand_through_named_and_tuple_aliases() {
-    let main = "(\n\tapp/lib\n)\nBox(A) = { (A) }\nv: Box(Int) = Box(1)\nBox(lib.Scalar) = v\nw: (Int, String) = (1, \"s\")\nPair(A, B) = { (A, B) }\nPair(lib.Scalar, lib.Text) = w\np: Box((Int, String)) = Box((1, \"s\"))\nBox(lib.Parts) = p";
+    let main = "(\n\tapp/lib\n)\nBox(A) = (A)\nv: Box(Int) = Box(1)\nBox(lib.Scalar) = v\nw: (Int, String) = (1, \"s\")\nPair(A, B) = { (A, B) }\nPair(lib.Scalar, lib.Text) = w\np: Box((Int, String)) = Box((1, \"s\"))\nBox(lib.Parts) = p";
     let (g, c) = checked(&[
         (
             "src/lib.i",
@@ -1074,7 +1074,7 @@ fn qualified_exact_heads_expand_through_named_and_tuple_aliases() {
             ("src/lib.i", &lib),
             (
                 "src/main.i",
-                "(\n\tapp/lib\n)\nBox(A) = { (A) }\nv: Box(Int) = Box(1)\nBox(lib.Bad) = v",
+                "(\n\tapp/lib\n)\nBox(A) = (A)\nv: Box(Int) = Box(1)\nBox(lib.Bad) = v",
             ),
         ]);
         assert!(

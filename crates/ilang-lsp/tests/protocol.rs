@@ -254,7 +254,7 @@ fn an_editor_session() {
     let (l, ch) = find(MAIN, "add(1", 0);
     let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch + 1));
     let value = h["contents"]["value"].as_str().unwrap();
-    assert!(value.contains("add: (x = Int, y = Int) -> Int"), "{value}");
+    assert!(value.contains("add: (Int, Int) -> Int"), "{value}");
     assert!(value.contains("Adds two numbers."), "{value}");
     assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
 
@@ -357,7 +357,7 @@ fn an_editor_session() {
     let (l, ch) = find(&typing, "util.", 0);
     let r = c.request::<lsp::request::Completion>(position_params(&main, l, ch + 5));
     assert_eq!(r[0]["label"], "double");
-    assert_eq!(r[0]["detail"], "(n = Int) -> Int");
+    assert_eq!(r[0]["detail"], "(Int) -> Int");
 
     // Formatting gives the text of `i fmt` as one edit of the whole document.
     c.change(&main, 7, MAIN);
@@ -649,7 +649,7 @@ fn answers_from_the_last_check() {
     let (l, ch) = find(&edited, "add(1", 0);
     let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch + 1));
     let value = h["contents"]["value"].as_str().unwrap();
-    assert!(value.contains("add: (x = Int, y = Int) -> Int"), "{value}");
+    assert!(value.contains("add: (Int, Int) -> Int"), "{value}");
     assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
     let d = c.request::<lsp::request::GotoDefinition>(position_params(&main, l, ch));
     let (dl, dch) = find(&edited, "add =", 0);
@@ -760,7 +760,7 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
     };
     assert_eq!(
         hover("k ="),
-        "k: (f = (A) <- (Fail(E), ..N) -> B, x = A) <- (Fail(E), ..N) -> B"
+        "k: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(hover("y ="), "y: B");
     assert_eq!(hover("f, x"), "f: (A) <- (Fail(E), ..N) -> B");
@@ -800,19 +800,19 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("one"), "one: (x = A) -> 1");
+    assert_eq!(hover("one"), "one: (A) -> 1");
     assert_eq!(hover("x) {\n  y = x"), "x: A");
     assert_eq!(hover("y = x"), "y: A");
     assert_eq!(
         hover("drop2"),
-        "drop2: (x = A, g = (1) <- (Fail(E), ..N) -> B, h = C) <- (Fail(E), ..N) -> B"
+        "drop2: (A, (1) <- (Fail(E), ..N) -> B, C) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(hover("x, g, h"), "x: A");
     assert_eq!(hover("h) {"), "h: C");
     assert_eq!(hover("y = (x, h)"), "y: (A, C)");
     assert_eq!(
         hover("effonly"),
-        "effonly: (f = (A) <- (Fail(E), ..N) -> B, x = A) <- (Fail(E), ..N) -> Nil"
+        "effonly: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> Nil"
     );
     assert_eq!(hover("f, x) {\n  r"), "f: (A) <- (Fail(E), ..N) -> B");
     assert_eq!(hover("r = "), "r: B");
@@ -1840,7 +1840,7 @@ fn lsp_completion_module_members() {
     c.change(&ws.main, 2, &typing);
     let items = completion(&mut c, &ws.main, &typing, "shapes.\n", 0, 7);
     let area = item(&items, "area");
-    assert_eq!(area.detail.as_deref(), Some("(s = Shape) -> Int"));
+    assert_eq!(area.detail.as_deref(), Some("(Shape) -> Int"));
     item(&items, "origin");
     item(&items, "Circle");
     c.shutdown();
@@ -2004,7 +2004,7 @@ fn lsp_completion_resolve_gives_documentation() {
     let mut c = ws.open();
     let items = completion(&mut c, &ws.main, &ws.main_text, "a + shapes", 0, 0);
     let size = item(&items, "size").clone();
-    assert_eq!(size.detail.as_deref(), Some("(s = Shape) -> Int"));
+    assert_eq!(size.detail.as_deref(), Some("(Shape) -> Int"));
     let resolved =
         c.request::<lsp::request::ResolveCompletionItem>(serde_json::to_value(&size).unwrap());
     assert_eq!(resolved["documentation"]["value"], "How big a shape is.");
@@ -2048,7 +2048,7 @@ fn lsp_completion_lisp_surface() {
     item(&items, "s");
     item(&items, "size");
     let size = item(&items, "size");
-    assert_eq!(size.detail.as_deref(), Some("(s = Shape) -> Int"));
+    assert_eq!(size.detail.as_deref(), Some("(Shape) -> Int"));
     c.shutdown();
 }
 
@@ -2125,7 +2125,7 @@ fn lsp_hover_type_and_documentation() {
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "area(s)", 0, 1));
     assert!(
-        h.contains("area: (s = Shape) -> Int") && h.contains("The area of a shape."),
+        h.contains("area: (Shape) -> Int") && h.contains("The area of a shape."),
         "{h}"
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "Circle(radius", 0, 1));
@@ -2207,7 +2207,7 @@ fn lsp_hover_lisp_surface() {
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "area s", 0, 1));
     assert!(
-        h.contains("area: (s = Shape) -> Int") && h.contains("The area of a shape."),
+        h.contains("area: (Shape) -> Int") && h.contains("The area of a shape."),
         "{h}"
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "(= a ", 0, 3));

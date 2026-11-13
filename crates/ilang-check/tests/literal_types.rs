@@ -146,7 +146,7 @@ fn shared_fields_do_not_infer_an_empty_parameter() {
     assert_eq!(ds.iter().filter(|d| d.0 == "E0516").count(), 1, "{ds:?}");
     assert!(!ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     assert!(
-        lines.iter().any(|l| l.contains("(p = Pair(String))")),
+        lines.iter().any(|l| l.contains("(Pair(String))")),
         "{lines:?}"
     );
 }
@@ -674,7 +674,7 @@ fn disjoint_guards_do_not_narrow_or_cover() {
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "W0503");
     assert!(
-        lines.iter().any(|l| l.ends_with("f : (x = 1) -> 0 | 1")),
+        lines.iter().any(|l| l.ends_with("f : (1) -> 0 | 1")),
         "{lines:?}"
     );
     // The impossible guard does not let an invalid body escape checking.

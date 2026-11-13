@@ -328,3 +328,49 @@ moved from 21:24 to 22:16; the three `no_shape` calls and three
 unchanged. The `scale` type keeps its actual `by` key and writes `by = Int`.
 The fixture library helper now checks a syntax-three AST/printer round trip
 instead of converting a library that is already converted.
+
+
+### Final recovery sweep and remaining package-interface failures
+
+The post-main full checker run found nine failing targets. The library,
+`types_joint`, `value_types` and `provider_graph` failures traced to a converter
+rerun: previously converted nominal heads such as `Box(A) = (A)` had been
+reread as old aliases. Restored those original snippets; main had no changes
+to the three whole test files, and only the literal in the pattern unit test
+was restored. `--since` now selects the same baseline for embedded programs
+as whole files. Three isolated conversion-baseline tests and the eight
+inventory unit tests pass. No expectation was regenerated to hide this error.
+
+All checker targets then passed through the full run plus target retries,
+with exactly `spec_corpus_reverse_order_and_recovery` skipped. The display-only
+failures were reviewed positional binder hints; types, needs, unions, source
+spans, alias identities and bounds remain checked. Twelve LSP hover/completion
+expectations were ported by the same rule; signature-help binder labels and
+offsets remain unchanged and still use the source parameter metadata.
+
+The nine formerly parked CLI interface cases were rewritten for concrete
+closed keys and ordinary generic value types, retaining all assertions and
+adding the required equality under labelled-key reordering. This exposed a
+lowering bug: wholly labelled function parameter data had been sent to the
+old positional-hint representation. It now uses the existing `%data` adapter,
+so actual keys survive and their order is immaterial (§2.3, §2.4). The existing
+positional/mixed adapter and invalid-spread diagnostic are retained. A direct
+lowering regression checks that both keys survive in one data parameter.
+
+The `i` binary unit test retry is **17 passed, 6 failed**. The remaining names
+in `commands::package::value_type_interfaces` are:
+
+- `distinct_key_parameters_may_receive_the_same_string`
+- `exported_record_schemes_compare_labels_and_value_types`
+- `inferred_record_polymorphism_is_not_a_concrete_field_scheme`
+- `key_parameter_and_field_type_parameter_are_compared_together`
+- `key_parameter_can_collide_with_a_written_record_field`
+- `record_union_interface_compares_denoted_sets`
+
+Three diagnosed differences are classified `representation=1, changed=0`
+(the proof is unknown); the unannotated open-record inference case is now
+E0506 under the closed-data known-key rule. The other two remain semantic
+comparison failures. Their assertions remain active and unchanged. This part
+is unfinished; no weaker comparison or new blanket skip was introduced.
+The final labelled-function-type fix has focused lowering/interface evidence;
+the complete checker suite has not been repeated after it.

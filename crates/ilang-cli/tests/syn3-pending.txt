@@ -4,12 +4,3 @@
 # then deletes its line and either rewrites the test or removes it. One
 # `file::test` per line (`src/<path>::<module>::test` for unit tests), then the
 # stage and reason.
-src/commands/package.rs::value_type_interfaces::distinct_key_parameters_may_receive_the_same_string closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged
-src/commands/package.rs::value_type_interfaces::exported_record_schemes_compare_labels_and_value_types closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged
-src/commands/package.rs::value_type_interfaces::function_call_protocol_distinguishes_labels_positions_and_nested_fields closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged
-src/commands/package.rs::value_type_interfaces::function_labels_inside_record_aliases_are_part_of_the_call_interface closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged
-src/commands/package.rs::value_type_interfaces::generic_record_update_schemes_compare_after_binder_renaming closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged
-src/commands/package.rs::value_type_interfaces::key_parameter_and_field_type_parameter_are_compared_together closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged
-src/commands/package.rs::value_type_interfaces::key_parameter_can_collide_with_a_written_record_field closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged
-src/commands/package.rs::value_type_interfaces::open_alias_proofs_report_representation_without_claiming_a_counterexample closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged
-src/commands/package.rs::value_type_interfaces::record_interfaces_preserve_label_parameters_and_field_sets closed-data intent rewrite: this converted legacy case still needs dynamic labels or row spreads removed by syntax-3 §2.3; stage 6 is now merged

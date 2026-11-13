@@ -2093,24 +2093,6 @@ fn canonical_alias_order(t: &ShownType, key: &dyn Fn(&ShownType) -> String) -> S
 mod value_type_interfaces {
     use super::*;
     use std::fs;
-    /// Tests parked until a later stage of syntax three: the names listed in
-    /// `tests/syn3-pending.txt` (as `src/commands/package.rs::<test>`)
-    /// return early.
-    fn syn3_pending(test: &str) -> bool {
-        let list = fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/syn3-pending.txt"),
-        )
-        .unwrap();
-        let name = format!("src/commands/package.rs::value_type_interfaces::{test}");
-        let listed = list
-            .lines()
-            .filter(|l| !l.starts_with('#'))
-            .any(|l| l.split_whitespace().next() == Some(name.as_str()));
-        if listed {
-            eprintln!("{name}: skipped, listed in tests/syn3-pending.txt");
-        }
-        listed
-    }
     fn interface(source: &str) -> Interface {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
@@ -2216,18 +2198,16 @@ mod value_type_interfaces {
     }
     #[test]
     fn record_interfaces_preserve_label_parameters_and_field_sets() {
-        if syn3_pending("record_interfaces_preserve_label_parameters_and_field_sets") {
-            return;
-        }
+        // A label is concrete; rename the generic value type, keeping its key.
         let a = canonical(
-            "(\n\tf\n\tPerson\n)\nf = <K>(r: (k = Int), key: K) -> Int { 1 }\nPerson = { (name = String, age = Int) }",
+            "(f, Person)\nf = <A>(r: (item = A), key: String) -> Int { 1 }\nPerson = { (name = String, age = Int) }",
         );
         let b = canonical(
-            "(\n\tf\n\tPerson\n)\nf = <LabelName>(r: (labelname = Int), key: LabelName) -> Int { 1 }\nPerson = { (age = Int, name = String) }",
+            "(f, Person)\nf = <Value>(r: (item = Value), key: String) -> Int { 1 }\nPerson = { (age = Int, name = String) }",
         );
         assert_eq!(a, b);
         let changed = canonical(
-            "(\n\tf\n\tPerson\n)\nf = <LabelName>(r: (labelname = String), key: LabelName) -> Int { 1 }\nPerson = { (age = Int, name = String) }",
+            "(f, Person)\nf = <Value>(r: (item = Value), key: String) -> Int { 1 }\nPerson = { (age = String, name = String) }",
         );
         assert_ne!(a, changed);
     }
@@ -2264,12 +2244,9 @@ mod value_type_interfaces {
 
     #[test]
     fn open_alias_proofs_report_representation_without_claiming_a_counterexample() {
-        if syn3_pending("open_alias_proofs_report_representation_without_claiming_a_counterexample")
-        {
-            return;
-        }
-        let old = interface("(\n\tT\n)\nT(A) = { () }");
-        let new = interface("(\n\tT\n)\nT(A) = { () }");
+        // Stage 6 replaces open-row removal by a difference of closed data.
+        let old = interface("(T)\nT(A) = A - (x = Int)");
+        let new = interface("(T)\nT(A) = A - (y = Int)");
         let same = Diff::new(&old, &old).unwrap();
         assert!(same.changed.is_empty());
         assert!(same.representation.is_empty());
@@ -2284,13 +2261,11 @@ mod value_type_interfaces {
 
     #[test]
     fn function_labels_inside_record_aliases_are_part_of_the_call_interface() {
-        if syn3_pending("function_labels_inside_record_aliases_are_part_of_the_call_interface") {
-            return;
-        }
-        let a = interface("(\n\tT\n)\nT = { (run = (Int | String) -> Int) }");
-        let same = interface("(\n\tT\n)\nT = { (run = (String | Int) -> Int) }");
-        let changed = interface("(\n\tT\n)\nT = { (run = (Int | String) -> Int) }");
-        let tuple = interface("(\n\tT\n)\nT = { (run = ((Int | String) -> Int, String)) }");
+        // These are actual keys in the function's parameter data, not hints.
+        let a = interface("(T)\nT = { (run = (a = Int | String) -> Int) }");
+        let same = interface("(T)\nT = { (run = (a = String | Int) -> Int) }");
+        let changed = interface("(T)\nT = { (run = (b = Int | String) -> Int) }");
+        let tuple = interface("(T)\nT = { (run = ((a = Int | String) -> Int, String)) }");
         assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
         assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
         assert!(!Diff::new(&a, &tuple).unwrap().changed.is_empty());
@@ -2298,9 +2273,6 @@ mod value_type_interfaces {
 
     #[test]
     fn function_call_protocol_distinguishes_labels_positions_and_nested_fields() {
-        if syn3_pending("function_call_protocol_distinguishes_labels_positions_and_nested_fields") {
-            return;
-        }
         let compare = |a: &str, b: &str| {
             Diff::new(&interface(a), &interface(b))
                 .unwrap()
@@ -2308,38 +2280,39 @@ mod value_type_interfaces {
                 .is_empty()
         };
         assert!(!compare(
-            "(\n\tT\n)\nT = { (run = (Int) -> Int) }",
-            "(\n\tT\n)\nT = { (run = (Int) -> Int) }"
+            "(T)\nT = { (run = (a = Int) -> Int) }",
+            "(T)\nT = { (run = (Int) -> Int) }"
         ));
+        // Positions keep their order; labels have no order (syntax-3 §2.3).
         assert!(!compare(
-            "(\n\tT\n)\nT = { (run = (Int, Int) -> Int) }",
-            "(\n\tT\n)\nT = { (run = (Int, Int) -> Int) }"
-        ));
-        assert!(!compare(
-            "(\n\tT\n)\nT = { (a = (run = (Int) -> Int)) }",
-            "(\n\tT\n)\nT = { (a = (run = (Int) -> Int)) }"
+            "(T)\nT = { (run = (Int, String) -> Int) }",
+            "(T)\nT = { (run = (String, Int) -> Int) }"
         ));
         assert!(compare(
-            "(\n\tT\n)\nT = { (a = (Int) -> Int) }",
-            "(\n\tT\n)\nT = { (a = (Int) -> Int) }"
+            "(T)\nT = { (run = (a = Int, b = String) -> Int) }",
+            "(T)\nT = { (run = (b = String, a = Int) -> Int) }"
         ));
         assert!(!compare(
-            "(\n\tT\n)\nT = { (a = (Int) -> Int) }",
-            "(\n\tT\n)\nT = { (a = (Int) -> Int) }"
+            "(T)\nT = { (a = (run = (x = Int) -> Int)) }",
+            "(T)\nT = { (a = (run = (y = Int) -> Int)) }"
+        ));
+        assert!(compare(
+            "(T)\nT = { (a = (a = Int) -> Int) }",
+            "(T)\nT = { (a = (a = Int) -> Int) }"
+        ));
+        assert!(!compare(
+            "(T)\nT = { (a = (a = Int) -> Int) }",
+            "(T)\nT = { (a = (b = Int) -> Int) }"
         ));
     }
 
     #[test]
     fn exported_record_schemes_compare_labels_and_value_types() {
-        if syn3_pending("exported_record_schemes_compare_labels_and_value_types") {
-            return;
-        }
-        let a = interface("(\n\tf\n)\nf = <K>(r: (k = Int), key: K) -> Int { 1 }");
-        let same = interface(
-            "(\n\tf\n)\nf = <LabelName>(r: (labelname = Int), key: LabelName) -> Int { 1 }",
-        );
+        let a = interface("(f)\nf = <K>(r: (item = Int), key: K) -> Int { r.item }");
+        let same =
+            interface("(f)\nf = <LabelName>(r: (item = Int), key: LabelName) -> Int { r.item }");
         let changed = interface(
-            "(\n\tf\n)\nf = <LabelName>(r: (labelname = String), key: LabelName) -> Int { 1 }",
+            "(f)\nf = <LabelName>(r: (item = String), key: LabelName) -> String { r.item }",
         );
         assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
         assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
@@ -2349,39 +2322,43 @@ mod value_type_interfaces {
     fn inferred_record_polymorphism_is_not_a_concrete_field_scheme() {
         let generic = interface("(f)\nf = (r) { r.a }");
         let concrete = interface("(\n\tf\n)\nf = (r: (a = Int)) { r.a }");
-        assert!(!Diff::new(&generic, &concrete).unwrap().changed.is_empty());
+        let diff = Diff::new(&generic, &concrete).unwrap();
+        assert!(
+            !diff.changed.is_empty(),
+            "classification: changed={}, representation={}",
+            diff.changed.len(),
+            diff.representation.len()
+        );
         let annotated = interface("(\n\tf\n)\nf = <A>(r: (a = A)) -> A { r.a }");
         assert!(Diff::new(&generic, &annotated).unwrap().changed.is_empty());
     }
 
     #[test]
     fn key_parameter_and_field_type_parameter_are_compared_together() {
-        if syn3_pending("key_parameter_and_field_type_parameter_are_compared_together") {
-            return;
-        }
-        let generic = interface(
-            "(\n\ti/record\n)\n\n(\n\tf\n)\nf = <K, V>(r: (k = V), key: K) -> V { record.get(r, key) }",
+        // K is an ordinary argument type; the closed field key is `item`.
+        let generic = interface("(f)\nf = <K, V>(r: (item = V), key: K) -> V { r.item }");
+        let concrete = interface("(f)\nf = <K>(r: (item = Int), key: K) -> Int { r.item }");
+        let diff = Diff::new(&generic, &concrete).unwrap();
+        assert!(
+            !diff.changed.is_empty(),
+            "classification: changed={}, representation={}",
+            diff.changed.len(),
+            diff.representation.len()
         );
-        let concrete = interface(
-            "(\n\ti/record\n)\n\n(\n\tf\n)\nf = <K>(r: (k = Int), key: K) -> Int { record.get(r, key) }",
-        );
-        assert!(!Diff::new(&generic, &concrete).unwrap().changed.is_empty());
         let renamed = interface(
-            "(\n\ti/record\n)\n\n(\n\tf\n)\nf = <LabelName, Item>(r: (labelname = Item), key: LabelName) -> Item {\n\trecord.get(r, key)\n}",
+            "(f)\nf = <LabelName, Item>(r: (item = Item), key: LabelName) -> Item { r.item }",
         );
         assert!(Diff::new(&generic, &renamed).unwrap().changed.is_empty());
     }
 
     #[test]
     fn generic_record_update_schemes_compare_after_binder_renaming() {
-        if syn3_pending("generic_record_update_schemes_compare_after_binder_renaming") {
-            return;
-        }
+        // Closed updates still compare the replaced and preserved parts.
         let a = interface(
-            "(\n\ti/record\n)\n\n(\n\tf\n)\nf = <R, K, V>(r: R & Record, key: K, value: V) -> (k = V) {\n\trecord.put(r, key, value)\n}",
+            "(f)\nf = <Old, Keep, K, V>(r: (item = Old, keep = Keep), key: K, value: V) -> (item = V, keep = Keep) { (..r, item = value) }",
         );
         let b = interface(
-            "(\n\ti/record\n)\n\n(\n\tf\n)\nf = <Row, LabelName, Item>(r: Row & Record, key: LabelName, value: Item) -> (\n\tlabelname = Item,\n) { record.put(r, key, value) }",
+            "(f)\nf = <Before, Stay, LabelName, Item>(r: (keep = Stay, item = Before), key: LabelName, value: Item) -> (keep = Stay, item = Item) { (..r, item = value) }",
         );
         assert!(Diff::new(&a, &b).unwrap().changed.is_empty());
     }
@@ -2395,35 +2372,33 @@ mod value_type_interfaces {
 
     #[test]
     fn key_parameter_can_collide_with_a_written_record_field() {
-        if syn3_pending("key_parameter_can_collide_with_a_written_record_field") {
-            return;
-        }
+        // Field keys are concrete and independent of argument type parameters.
         let both =
             interface("(\n\tf\n)\nf = <K>(r: (k = Int, fixed = String), key: K) -> Int { 1 }");
         let override_field =
             interface("(\n\tf\n)\nf = <K>(r: (fixed = String), key: K) -> Int { 1 }");
+        let diff = Diff::new(&both, &override_field).unwrap();
         assert!(
-            !Diff::new(&both, &override_field)
-                .unwrap()
-                .changed
-                .is_empty()
+            !diff.changed.is_empty(),
+            "classification: changed={}, representation={}",
+            diff.changed.len(),
+            diff.representation.len()
         );
     }
 
     #[test]
     fn distinct_key_parameters_may_receive_the_same_string() {
-        if syn3_pending("distinct_key_parameters_may_receive_the_same_string") {
-            return;
-        }
+        // Field keys are concrete and independent of argument type parameters.
         let both =
             interface("(\n\tf\n)\nf = <K, J>(r: (k = Int, j = String), k: K, j: J) -> Int { 1 }");
         let override_field =
             interface("(\n\tf\n)\nf = <K, J>(r: (j = String), k: K, j: J) -> Int { 1 }");
+        let diff = Diff::new(&both, &override_field).unwrap();
         assert!(
-            !Diff::new(&both, &override_field)
-                .unwrap()
-                .changed
-                .is_empty()
+            !diff.changed.is_empty(),
+            "classification: changed={}, representation={}",
+            diff.changed.len(),
+            diff.representation.len()
         );
     }
 

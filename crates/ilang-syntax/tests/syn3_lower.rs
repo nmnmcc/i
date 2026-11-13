@@ -277,3 +277,28 @@ fn fail_in_a_function_head_is_its_error_part() {
         "a need has one `Fail` entry",
     );
 }
+
+#[test]
+fn labelled_function_type_parameters_keep_their_data_keys() {
+    use ilang_syntax::ast::{ItemKind, TypeKind};
+    let (module, errors) = syn3::parse_lowered("f: (x = Int, y = String) -> Int\n");
+    assert!(errors.is_empty(), "{errors:?}");
+    let ItemKind::Declaration { ty, .. } = &module.items[0].kind else {
+        panic!()
+    };
+    let TypeKind::Fn { params, .. } = &ty.kind else {
+        panic!()
+    };
+    assert_eq!(params.len(), 1);
+    assert_eq!(params[0].label.as_ref().unwrap().name, syn3::lower::DATA);
+    let TypeKind::Record { fields, .. } = &params[0].ty.kind else {
+        panic!()
+    };
+    assert_eq!(
+        fields
+            .iter()
+            .map(|(l, _)| l.name.as_str())
+            .collect::<Vec<_>>(),
+        ["x", "y"]
+    );
+}

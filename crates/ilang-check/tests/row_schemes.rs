@@ -250,7 +250,7 @@ main = () {
         graph.sources.render_all(&checked.diags)
     );
     let same = types(&source.replace("String", "Int"));
-    assert_eq!(same["app/main.merge"], "(a = T(A), b = T(B)) -> T(A | B)");
+    assert_eq!(same["app/main.merge"], "(T(A), T(B)) -> T(A | B)");
 }
 
 #[test]

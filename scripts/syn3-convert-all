@@ -32,6 +32,8 @@ elif [ "${1:-}" = --all ]; then
 	since=
 	shift
 fi
+# Embedded snippets use the same pre-merge baseline as whole files.
+export SYN3_EMBEDDED_SINCE="$since"
 bin=${SYN3_MIGRATE:-}
 if [ -z "$bin" ]; then
 	cargo build --release --locked -p ilang-syntax --features legacy --example migrate-syntax3
