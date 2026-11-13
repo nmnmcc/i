@@ -158,3 +158,32 @@ against the printed actual output before updating its expectation:
   focused `control_lazy` retry passed all 17 tests.
 - LSP: all 8 unit tests and 98 protocol tests passed, including
   `lsp_hover_errors_and_environment` and the latency bound.
+
+### Syntax inventory review
+
+The first current-source inventory run found 37 mismatches, all reviewed:
+
+- Eighteen spec examples now parse as syntax three, so their graduated
+  future-track records were removed. Their source is still checked normally.
+- Three spec example heads (`retry`, `collect`, assertion `catch`) incorrectly
+  wrote a need where the grammar permits a service pattern. The heads now
+  omit that part and infer their needs, as §6.8 and syntax-3 §2.10.1 require;
+  the types of their callback parameters retain the same stated needs. Their
+  future tags and old parser expectations were removed.
+- The remaining affected future examples keep exact errors for shape groups
+  (stage 9), mixed data (stage 6), and whole environments (stage E6), with a
+  specific dependency reason for each.
+- Four Rust host strings are Cargo/logging directives or a source-search
+  fragment, not programs. One numeric test body is checked with the function
+  head its generator supplies, instead of being parsed as a whole module.
+- The independent lowercase-head test and the two negative string-pattern
+  snippets keep exact syntax-three errors. Five existing negative review
+  files record the specified lowercase-head E0101 instead of the old E0232
+  checker path. All have adjacent diagnostic declarations. Three existing
+  negative spec fixtures were missing only those declarations; their exact
+  expectations did not change.
+
+The retry passed: **4,713** extracted snippets/files/fences, exact expected
+messages matched, **6** future-track entries. No blanket parser exemption or
+expectation regeneration was used. Checker clippy also passed with
+`--all-targets --locked -- -D warnings`.

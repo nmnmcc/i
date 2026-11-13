@@ -195,7 +195,11 @@ fn kept_form_messages_are_independent_checks() {
         ("T = { (Missing) }", "E0202", "declare it in the head"),
         ("Box(Int) = { (Int) }", "E0231", "name of a type"),
         // Syntax three checks the head by its kind (§3.2): E0101, not E0232.
-        ("Box(a, B) = ()", "E0101", "only type parameters"),
+        (
+            /* old-syntax-check: E0101 */ "Box(a, B) = ()",
+            "E0101",
+            "only type parameters",
+        ),
         ("Schema(Int) = Int", "E0231", "name of a type"),
         ("f = (x: p.name) { x }", "E0201", "not defined"),
         ("f = (x: m(Int)) { x }", "E0234", "kept for macros"),

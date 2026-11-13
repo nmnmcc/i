@@ -2683,202 +2683,29 @@
     ],
     "reason": "Render the source template; the test still exercises the generator"
   },
-  "docs/spec.md:a12d9a52fd631114": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "docs/spec.md:f644ea0d31f307b2": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:2f5b05034fc1229f": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
-    ]
-  },
   "docs/spec.md:e7d9c651ae0ffea8": {
     "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "reason": "Shape groups (syntax three stage 9): branches of different shapes. The syntax-three parser now reaches this lowering requirement.",
     "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`",
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`",
-      "E0101: expected `,` or `)`, found `?`"
-    ]
-  },
-  "docs/spec.md:912892ff09b080d5": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:6e7bc6c384edd950": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:f30f07d66d50ef70": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
+      "E0101: a chain whose branches have different shapes needs shape groups (stage 9 of syntax three), which this compiler does not have yet"
     ]
   },
   "docs/spec.md:8cd36264ae24baa3": {
     "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "reason": "Mixed data awaits stage 6; providing a value not written as data and spreading a whole environment await stage E6. These examples now reach the corresponding lowering requirements.",
     "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected a name, found `..`",
-      "E0101: expected `:`, found `)`"
-    ]
-  },
-  "docs/spec.md:5aae9c9a5ac4e3f9": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:fa26cd87534cb894": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `<`",
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:d457fbb1e446a369": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `|`"
+      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
+      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
+      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
+      "E0101: providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet"
     ]
   },
   "docs/spec.md:9dd6b392676320e8": {
     "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
+    "reason": "Capturing a whole environment and providing it as one value await stage E6. The syntax-three parser now reaches those lowering requirements.",
     "diagnostics": [
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:5a03b853ff51115c": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:d6fdfeb8cc43c346": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:3f075e37e918dad7": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `|`"
-    ]
-  },
-  "docs/spec.md:31ad23aa280e3999": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:8826291ef2e8a1ab": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:bedb60a148643970": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "docs/spec.md:f1593542964fc4e8": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`"
-    ]
-  },
-  "docs/spec.md:e90707beeb178a90": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected an expression, found `<`"
-    ]
-  },
-  "docs/spec.md:a3d2992aab5bde34": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:8793f6c04245c85f": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`",
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:5db078f812d3d664": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `,` or `)`, found `=`"
-    ]
-  },
-  "docs/spec.md:9305a9d9ed7d77fe": {
-    "track": "SYN3",
-    "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
-    "diagnostics": [
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `Record` for all records, or `Nil` for a unit type; `()` is not a type, found `)`",
-      "E0101: expected `,` or `)`, found `=`"
+      "E0101: `..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet",
+      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet"
     ]
   },
   "crates/ilang-cli/examples/migrate-syntax3-labels.rs:7372e79824e15040": {
@@ -2927,5 +2754,73 @@
   },
   "crates/ilang-check/tests/query.rs:924116554a35a736": {
     "not_source": "Expected hover text: a shown function type with two row variables, not i source"
+  },
+  "crates/ilang-check/tests/front_end.rs:b6f419e1a1d303f6": {
+    "reason": "Independent negative type-head case: a lowercase head is rejected by syntax-three grammar (§2.8, §3.2), before checker errors.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "crates/ilang-cli/build.rs:4e548071870d2506": {
+    "not_source": "Cargo build-script directive with a Rust format placeholder, not an i module."
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:79cf32e4a6929fa2": {
+    "prefix": "f = (x: Float) ",
+    "reason": "The actual body block of a numeric differential fixture; its generator supplies the function head. Parse the body in that same syntactic context."
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:984911d0c3ae6707": {
+    "not_source": "Position/search substring locating Frame in a complete library source fixture."
+  },
+  "crates/ilang-syntax/tests/lisp_format.rs:b893e17cd23fac3e": {
+    "not_source": "Rust progress-log format string, not an i type definition."
+  },
+  "crates/ilang-syntax/tests/lisp_format.rs:b9a563448a1f88bb": {
+    "not_source": "Rust progress-log format string, not an i type definition."
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:68d70a8fa472acc8": {
+    "reason": "Interpolation is forbidden in patterns (spec §1.6); the migrated one-branch syntax still rejects the same negative case.",
+    "diagnostics": [
+      "E0101: string interpolation is not allowed in patterns"
+    ]
+  },
+  "crates/ilang-syntax/tests/string_forms.rs:f791f2429f546a31": {
+    "reason": "String patterns have exactly one binder (spec §7.1). The syntax-three parameter-item parser rejects the second <> part; the two-binder negative intent is retained.",
+    "diagnostics": [
+      "E0101: expected `,`, `?` or `)`, found `<>`"
+    ]
+  },
+  "tests/review/cases/review-runtime/echo-types/src/task.i:2905e07d4029594b": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-s6/probe/src/main.i:70c3b6101c991c5f": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/factory/src/main.i:6af88000cc971bba": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/tree/src/main.i:317793d710d99a2d": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/variance/src/main.i:2d326cd3da5ff46c": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
   }
 }
