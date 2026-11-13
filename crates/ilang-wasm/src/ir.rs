@@ -941,3 +941,4 @@ impl Program {
 
 #[path = "ir_tree.rs"]
 mod tree;
+pub use tree::each_stmt;

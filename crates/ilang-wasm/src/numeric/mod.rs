@@ -785,21 +785,10 @@ fn inline(
     all_facts: &HashMap<FuncId, HashMap<Local, NumericFact>>,
 ) {
     for stmt in body.iter_mut() {
-        match stmt {
-            Stmt::If {
-                then, otherwise, ..
-            } => {
-                inline(
-                    then, caller, facts, funcs, may, recursive, labels, used, limit, all_facts,
-                );
-                inline(
-                    otherwise, caller, facts, funcs, may, recursive, labels, used, limit, all_facts,
-                );
-            }
-            Stmt::Block { body, .. } => inline(
+        for body in stmt.bodies_mut() {
+            inline(
                 body, caller, facts, funcs, may, recursive, labels, used, limit, all_facts,
-            ),
-            _ => {}
+            );
         }
         let Stmt::Let {
             dst,

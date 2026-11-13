@@ -201,32 +201,12 @@ pub fn operands(s: &mut Stmt, map: &mut impl FnMut(&mut Atom)) {
 }
 pub fn walk(stmts: &mut [Stmt], visit: &mut impl FnMut(&mut Stmt)) {
     for s in stmts {
-        match s {
-            Stmt::If {
-                then, otherwise, ..
-            } => {
-                walk(then, visit);
-                walk(otherwise, visit);
-            }
-            Stmt::Block { body, .. } => walk(body, visit),
-            _ => {}
-        }
+        s.bodies_mut().for_each(|b| walk(b, visit));
         visit(s);
     }
 }
 pub fn size(stmts: &[Stmt]) -> usize {
-    stmts
-        .iter()
-        .map(|s| {
-            1 + match s {
-                Stmt::If {
-                    then, otherwise, ..
-                } => size(then) + size(otherwise),
-                Stmt::Block { body, .. } => size(body),
-                _ => 0,
-            }
-        })
-        .sum()
+    each_stmt(stmts).count()
 }
 
 /// ANF arguments are already evaluated. Forward fresh, single-definition copies
@@ -283,16 +263,7 @@ pub fn copies(body: &mut Vec<Stmt>, first: Local) {
     });
     fn prune(body: &mut Vec<Stmt>, aliases: &std::collections::BTreeMap<Local, Atom>) {
         for s in body.iter_mut() {
-            match s {
-                Stmt::Block { body, .. } => prune(body, aliases),
-                Stmt::If {
-                    then, otherwise, ..
-                } => {
-                    prune(then, aliases);
-                    prune(otherwise, aliases);
-                }
-                _ => {}
-            }
+            s.bodies_mut().for_each(|b| prune(b, aliases));
         }
         body.retain(|s| !matches!(s, Stmt::Let { dst, .. } if aliases.contains_key(dst)));
     }
