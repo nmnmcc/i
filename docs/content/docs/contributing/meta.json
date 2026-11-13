@@ -1,0 +1,12 @@
+{
+  "title": "Contributing",
+  "pages": [
+    "index",
+    "repository-layout",
+    "compiler-architecture",
+    "building-and-testing",
+    "how-to-send-changes",
+    "design-notes",
+    "roadmap"
+  ]
+}
