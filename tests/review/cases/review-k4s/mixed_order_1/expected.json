@@ -1,6 +1,6 @@
 {
-  "compiler": "32b10aba775aa3d675d49c37f1cb07220e7452b0",
-  "binary_sha256": "8e1d33b0608793d56a36457c6a6130c250239af3d598944dc0fb4e44c14bc6d9",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.one : () -> Int ! S(Int)\napp/main.two : () -> String ! S(String)\napp/main.run : (f: () -> Int ! N, x: N) -> Int ! N\napp/main.bad : () -> Int ! S(Int & A)\n",
-      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\n1 error\n"
+      "stdout": "app/main.one : () -> Int ! S(Int)\napp/main.two : () -> String ! S(String)\napp/main.run : (f: () -> Int ! N, x: N) -> Int ! N\napp/main.bad : () -> Int ! S(Int & { A & Int })\n",
+      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:5:30: error[E0515]: `S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 5:12 needs it)\n2 errors\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\n1 error\n"
+      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:5:30: error[E0515]: `S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 5:12 needs it)\n2 errors\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\n1 error\n"
+      "stderr": "src/main.i:5:1: error[E0515]: the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:5:30: error[E0515]: `S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 5:12 needs it)\n2 errors\n"
     }
   }
 }

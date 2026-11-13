@@ -1,6 +1,6 @@
 {
-  "compiler": "b63e231587ca9145475decbba75d1bed498f6d17",
-  "binary_sha256": "e969a142fdef02fbdb4fd5c3692ce662d9809aa3c8e37711fcabca3f66638baa",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.one : () -> Int ! S(Int)\napp/main.run : (f: () -> Int ! N, x: N) -> Int ! N\napp/main.bad : () -> Int\napp/main.generated_test : () -> Nil\n",
-      "stderr": "src/main.i:14:2: error[E0515]: `S(Int)` and `S(String)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:15:20: error[E0515]: `_` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 15:2 needs it)\nsrc/main.i:21:18: error[E0501]: `Int - 2` is not a subtype of `String` (the type at 25:72 needs it)\n3 errors\n"
+      "stderr": "src/main.i:13:1: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:14:2: error[E0515]: `S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:15:20: error[E0515]: `S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 15:2 needs it)\nsrc/main.i:21:18: error[E0501]: `Int - 2` is not a subtype of `String` (the type at 25:72 needs it)\n4 errors\n"
     }
   }
 }

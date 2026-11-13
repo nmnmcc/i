@@ -1,6 +1,6 @@
 {
-  "compiler": "5dda78bad9683aa09eb2c66eb0ba1b9237ea2b04",
-  "binary_sha256": "949ad211006493843ce0f2384caa9ff3fe9f0e5d2c37fb624bf1d1db875b57cc",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () -> Int ! Dep\napp/main.us : () -> Int ! N | S(N)\napp/main.ut : () -> Int ! N | T(N)\napp/main.usa : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.h0 : () -> Int ! N | S(N)\napp/main.h1 : () -> Int ! N | N2 | S(N) | T(N2)\napp/main.main : () -> Nil ! Dep\n",
-      "stderr": "src/main.i:22:3: error[E0515]: `S(Dep | T(Dep))` and `S(Never)` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:23:3: error[E0515]: `T(Dep)` and `T(S(Never))` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:25:3: error[E0515]: `S(Dep | T(Dep))` and `S(T(Dep))` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:25:43: error[E0501]: `Dep` is not a subtype of `T(Dep)` (the type at 25:17 needs it)\nsrc/main.i:26:3: error[E0515]: `S(_)` and `S(Dep | T(Dep) | S(Dep | T(Dep)))` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\n5 errors\n"
+      "stderr": "src/main.i:22:3: error[E0515]: `S(Dep | T(Dep))` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:23:3: error[E0515]: `T(Dep)` and `T(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:25:3: error[E0515]: `S(Dep | T(Dep))` and `S(T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:25:43: error[E0501]: `Dep` is not a subtype of `T(Dep)` (the type at 25:17 needs it)\nsrc/main.i:26:3: error[E0515]: `S(_)` and `S(Dep | T(Dep) | S(Dep | T(Dep)))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n5 errors\n"
     }
   }
 }

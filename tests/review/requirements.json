@@ -3560,6 +3560,41 @@
       "outcome": "diverge",
       "finding": "In a scripted single-worker run, the intentionally divergent body never yields, so the child must not run during the bounded observation.",
       "source": "runtime.md §6.4: cooperative M:1 does not preempt non-yielding work; docs/testing.md: observation budgets are resource caps, not performance promises."
+    },
+    {
+      "pattern": "^review\\-k4/cases/local_instances$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "E1: local providers satisfy independent callback needs by value subtyping",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "origin": "docs/design/effects-e1-corpus.md"
+    },
+    {
+      "pattern": "^review\\-k4/cases/local_instances_nocheck$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "E1: local providers satisfy independent callback needs by value subtyping",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "origin": "docs/design/effects-e1-corpus.md"
+    },
+    {
+      "pattern": "^review\\-k4/cases/local_instances_toprun$",
+      "known_failure": false,
+      "outcome": "accept",
+      "finding": "E1: local providers satisfy independent callback needs by value subtyping",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "origin": "docs/design/effects-e1-corpus.md"
+    },
+    {
+      "pattern": "^review\\-k4/cases/generic_conflict$",
+      "known_failure": false,
+      "outcome": "reject",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "E1: incompatible service requirements remain rejected with the empty-intersection diagnostic",
+      "source": "docs/spec.md §9.2: \"When the intersection for one service of a need is `Never` while neither side is `Never`, the need cannot be satisfied: it is a compile error (E0515).\"",
+      "origin": "docs/design/effects-e1-corpus.md"
     }
   ],
   "transitions": [
