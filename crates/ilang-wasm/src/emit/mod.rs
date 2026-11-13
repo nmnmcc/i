@@ -12,6 +12,7 @@ mod control;
 mod host;
 pub(crate) mod numeric;
 mod wasi;
+mod workers;
 
 pub(super) const FIXED_MAX: usize = 10_000;
 
@@ -100,8 +101,13 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     };
     e.arities.insert(0);
     e.arities.insert(1);
+    let mut async_funcs = Vec::new();
     for (i, f) in p.funcs.iter().enumerate() {
+        let at = e.out.len();
         e.func(FuncId(i as u32), f);
+        if e.out[at..].contains("(call $req_start") {
+            async_funcs.push(i);
+        }
     }
     for i in 0..p.points.len() {
         e.point(i as PointId);
@@ -115,6 +121,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     e.start();
     e.exports();
     e.resume_exports();
+    // The `ilang:worker` operations of `i/task` bring the multicore codec and
+    // its transport imports (emit/workers.rs).
+    let uses_workers = e.out.contains("(call $worker_");
     let mut m = String::from("(module\n");
     for decision in &p.numeric_log {
         let _ = writeln!(m, ";; numeric: {}", decision.replace('\n', " "));
@@ -142,9 +151,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         let _ = writeln!(
             m,
             "(type $fn{n} (func (param (ref null $obj) (ref null $env){params}) (result eqref)))\n\
-             (type $clo{n} (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64) \
+             (type $clo{n} (sub final $clo (struct (field (mut i32)) (field i32) (field i64) (field f64) \
              (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs)) \
-             (field (ref null $call)) (field (ref $fn{n})))))"
+             (field (ref null $call)) (field (mut i64)) (field (ref $fn{n})))))"
         );
     }
     let wasi = p.target == Target::Wasi;
@@ -155,6 +164,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         }
     } else {
         m.push_str(runtime::HOST);
+        if uses_workers {
+            m.push_str(workers::IMPORTS);
+        }
     }
     if p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
         m.push_str("(import \"ilang:host/v1\" \"cancel\" (func $host_cancel (param i32)))\n");
@@ -229,6 +241,13 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     m.push_str(control::EFFECTS);
     m.push_str(&host::effects());
     m.push_str(ENTRY);
+    if uses_workers {
+        if wasi {
+            m.push_str(workers::WASI_STUBS);
+        }
+        m.push_str(workers::WAT);
+        m.push_str(&workers::closures(&e.arities, p.funcs.len(), &async_funcs));
+    }
     m.push_str(&e.data);
     for (id, label) in p.labels.iter().enumerate() {
         if label.len() > FIXED_MAX {
@@ -291,8 +310,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
 fn closure(arity: u32, f: FuncId, captures: &str, patched: bool) -> String {
     let flags = u32::from(patched);
     format!(
-        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const 0) \
-         (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (ref.func $f{}))",
+        "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {arity}) (f64.const {}) \
+         (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $f{}))",
+        f.0 + 3,
         f.0
     )
 }
@@ -687,7 +707,7 @@ impl<'p> Emitter<'p> {
             Callee::Value(a) => {
                 let a = self.atom(a);
                 format!(
-                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{raw_args} (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))"
+                    "({prefix}call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env}{raw_args} (struct.get $clo{n} 9 (ref.cast (ref $clo{n}) {a})))"
                 )
             }
         };
@@ -1259,8 +1279,8 @@ impl<'p> Emitter<'p> {
             "(global.set $root_env (array.new $env (ref.null eq) (i32.const {})))\n\
              (array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {ASSERT_SERVICE})\n\
              (call $record (i32.const 3) (i64.const 2) (array.new_fixed $values 1\n\
-             (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0) (ref.null $bytes)\n\
-             (ref.null $values) (ref.null $limbs) (ref.null $call) (ref.func $entry_assert_fail)))))",
+             (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 2) (ref.null $bytes)\n\
+             (ref.null $values) (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $entry_assert_fail)))))",
             self.p.services.max(1)
         );
         if self.p.start.is_some() {
@@ -1327,7 +1347,7 @@ impl<'p> Emitter<'p> {
                 let a = self.atom(a);
                 format!(
                     "(call_ref $fn{n} (ref.cast (ref $clo{n}) {a}) {env} {} \
-                     (struct.get $clo{n} 8 (ref.cast (ref $clo{n}) {a})))",
+                     (struct.get $clo{n} 9 (ref.cast (ref $clo{n}) {a})))",
                     converted.join(" ")
                 )
             }

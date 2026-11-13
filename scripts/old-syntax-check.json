@@ -3244,5 +3244,41 @@
   "crates/ilang-cli/build.rs:18f1e7e7ee554c11": {
     "not_source": true,
     "reason": "Cargo build-script directive, not an i module."
+  },
+  "crates/ilang-cli/tests/multicore.rs:32586dd5d3cd919b": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:8a7d445a9741b557": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:ebc9abc4dc7ef48f": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:b3d7af2754f74d3d": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:21ab8b3715d17f39": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:8e2a1c1281f9894b": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:220a24ce91164a08": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:2d9f0f45e2d52433": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:5ded92a1dbafe8c0": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/multicore.rs:4d49c08373ddf91d": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:87b5d1cf07b6351c": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:070b6af6019524ce": {
+    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
   }
 }

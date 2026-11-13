@@ -138,6 +138,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
 (global $req_free (mut i32) (i32.const -1))
 (global $req_total (mut i32) (i32.const 0))
 (global $req_entry_live (mut i32) (i32.const 0))
+(global $req_mirror (mut i32) (i32.const 0))
 
 (func $request_fail (param $reason i32)
   (if (i32.eq (local.get $reason) (i32.const 0)) (then (call $panic {{cancelled}}) unreachable))
@@ -190,9 +191,14 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
   (block $done (loop $each
     (br_if $done (ref.is_null (local.get $xs)))
     (local.set $r (ref.cast (ref $request_root) (call $list_head (local.get $xs))))
-    (if (ref.eq (local.get $key) (struct.get $request_root 0 (local.get $r)))
+    (if (call $key_same (local.get $key) (struct.get $request_root 0 (local.get $r)))
       (then (return (local.get $r))))
     (local.set $xs (call $list_tail (local.get $xs))) (br $each)))
+  ;; A multicore worker other than 0 mirrors the groups of the run's tasks.
+  (if (global.get $req_mirror) (then
+    (local.set $r (struct.new $request_root (local.get $key) (i32.const 0)))
+    (global.set $req_roots (call $list_cons (local.get $r) (global.get $req_roots)))
+    (return (local.get $r))))
   (ref.null $request_root))
 (func $request_find_owner (param $key eqref) (result (ref null $request_owner))
   (local $xs eqref) (local $o (ref $request_owner))
@@ -200,9 +206,14 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
   (block $done (loop $each
     (br_if $done (ref.is_null (local.get $xs)))
     (local.set $o (ref.cast (ref $request_owner) (call $list_head (local.get $xs))))
-    (if (ref.eq (local.get $key) (struct.get $request_owner 0 (local.get $o)))
+    (if (call $key_same (local.get $key) (struct.get $request_owner 0 (local.get $o)))
       (then (return (local.get $o))))
     (local.set $xs (call $list_tail (local.get $xs))) (br $each)))
+  (if (global.get $req_mirror) (then
+    (local.set $o (struct.new $request_owner (local.get $key)
+      (struct.new $request_root (call $key_new) (i32.const 0)) (i32.const 0)))
+    (global.set $req_owners (call $list_cons (local.get $o) (global.get $req_owners)))
+    (return (local.get $o))))
   (ref.null $request_owner))
 (func $request_check_owner (param $owner eqref) (result eqref)
   (if (ref.is_null (call $request_find_owner (call $field (local.get $owner) (i32.const 0))))
@@ -886,6 +897,20 @@ impl<'p> Emitter<'p> {
                  (call $request_deliver (local.get $cell) (local.get $answer))\n\
                  (global.set $host_last_status (i32.const 0))\n\
                  (call $async_run (ref.null eq)))",
+                wat_string(&x.module),
+                wat_string(&x.name)
+            );
+            // A multicore worker settles a cell without resuming an entry.
+            let _ = writeln!(
+                self.out,
+                "(func (export \"ilang_settle:{}:{}\") (param $id i32){params} (local $cell (ref $request)) (local $old_shadow (ref $frames)) (local $old_sp i32) (local $answer eqref)\n\
+                 (local.set $cell (call $req_answer (i32.const {i}) (local.get $id))){sets}\n\
+                 (local.set $old_shadow (global.get $shadow)) (local.set $old_sp (global.get $sp))\n\
+                 (global.set $shadow (ref.as_non_null (struct.get $request 15 (local.get $cell))))\n\
+                 (global.set $sp (array.len (global.get $shadow)))\n\
+                 (local.set $answer {answer})\n\
+                 (global.set $shadow (local.get $old_shadow)) (global.set $sp (local.get $old_sp))\n\
+                 (call $request_deliver (local.get $cell) (local.get $answer)))",
                 wat_string(&x.module),
                 wat_string(&x.name)
             );
