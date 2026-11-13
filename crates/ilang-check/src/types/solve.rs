@@ -2555,7 +2555,7 @@ impl Solver {
     /// If T <: v <: T (or v <: Never), v is exactly T (§4.5). Its old
     /// bounds have already been propagated through T by constrain_in.
     /// Otherwise v <: u implies v <: u | T, also through variable chains.
-    /// These rewrites preserve every solution; they introduce no variables
+    /// These rewrites preserve principal types; they introduce no variables
     /// and use only finite reachability searches.
     fn normalize_bounds(&mut self, roots: &[V]) -> bool {
         let mut changed = false;
@@ -2570,20 +2570,32 @@ impl Solver {
                 !matches!(b, Ty::Diff(a, _) if matches!(a.as_ref(), Ty::Var(u) if below.contains(u)))
             });
             changed |= before != self.var(v).lower.len();
-            // An instantiated row with no source of services is empty.
-            // Choosing its least need removes collector feedback such as
-            // R >= Sink(N), N <= Fail(E) + R, without changing an input row
-            // or forgetting any handled obligation. Ordinary type variables
-            // and deferred value meets must retain their existing bounds.
+            // A closed instantiated row contributes exactly its known
+            // services. Choose that least need before collector feedback
+            // invents R >= Sink(N), N <= Fail(E) + R. Written/input rows,
+            // frozen snapshot rows and deferred meets retain their bounds.
             if self.var(v).row == Mode::Env
-                && !self.var(v).input
                 && self.var(v).need_meet.is_none()
-                && lower.is_empty()
-                && below.iter().all(|w| !self.var(*w).input)
-                && !self.var(v).upper.contains(&Ty::Never)
+                && below.iter().all(|w| {
+                    let state = self.var(*w);
+                    (w.0 as usize) >= self.rigid_boundary
+                        && !state.input
+                        && state.need_meet.is_none()
+                        && state.lower.iter().all(|t| match t {
+                            Ty::Var(_) | Ty::Never => true,
+                            Ty::Con(_, _, args) => args.is_empty(),
+                            _ => false,
+                        })
+                })
+                && lower
+                    .iter()
+                    .all(|t| matches!(t, Ty::Con(_, _, args) if args.is_empty()))
             {
-                self.constrain_in(&Ty::Var(v), &Ty::Never, Mode::Env);
-                changed = true;
+                let need = self.union_in(lower.clone(), Mode::Env);
+                if !self.var(v).upper.contains(&need) {
+                    self.constrain_in(&Ty::Var(v), &need, Mode::Env);
+                    changed = true;
+                }
             }
             let upper = self.var(v).upper.clone();
             let exact = upper.iter().find(|t| match t {
@@ -3554,6 +3566,37 @@ mod reach_marks_tests {
 #[cfg(test)]
 mod directed_occurs_tests {
     use super::*;
+
+    #[test]
+    fn an_opaque_difference_is_not_a_closed_service_source() {
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let source = s.fresh_at(1);
+        s.var_mut(source).row = Mode::Env;
+        s.var_mut(source).input = true;
+        let inferred = s.fresh_at(1);
+        s.var_mut(inferred).row = Mode::Env;
+        s.var_mut(inferred).lower.push(Ty::Diff(
+            Box::new(Ty::Var(source)),
+            vec![Ty::named(TypeRef::Custom(crate::hir::TypeId(0)), vec![])],
+        ));
+        assert!(!s.normalize_bounds(&[inferred]));
+        assert!(s.var(inferred).upper.is_empty());
+    }
+
+    #[test]
+    fn closing_an_inferred_row_never_refines_a_frozen_source() {
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let fixed = s.fresh_at(1);
+        s.var_mut(fixed).row = Mode::Env;
+        s.freeze();
+        let inferred = s.fresh_at(1);
+        s.var_mut(inferred).row = Mode::Env;
+        s.var_mut(inferred).lower.push(Ty::Var(fixed));
+        assert!(!s.normalize_bounds(&[inferred]));
+        assert!(s.failures.is_empty());
+        assert!(s.var(fixed).upper.is_empty());
+        assert!(s.var(inferred).upper.is_empty());
+    }
 
     #[test]
     fn need_edges_follow_variance_and_still_reject_constructor_cycles() {

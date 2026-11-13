@@ -496,8 +496,7 @@ fn a_closed_callback_can_instantiate_an_unused_fail_entry_as_never() {
 fn a_sink_with_a_stored_callback_row_has_a_finite_instantiation() {
     // E3 stores Fail in the callback row. The factory is pure and its
     // callback raises String; neither row contains the sink itself.
-    types(
-        r#"(i/fail)
+    let source = r#"(i/fail)
 Entry = (message = String)
 Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, () <- N -> Nil)
 make = <E, N>(send: (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
@@ -512,8 +511,18 @@ example = () {
         make((entry) { fail.raise(entry.message) }),
     )
 }
-"#,
-    );
+"#;
+    types(source);
+    let with_dependency = source
+        .replace(
+            "Entry =",
+            "Dep = (read = () -> Nil)\nread = () <- (d: Dep) { d.read() }\nEntry =",
+        )
+        .replace(
+            "fail.raise(entry.message)",
+            "read()\n        fail.raise(entry.message)",
+        );
+    types(&with_dependency);
 }
 
 #[test]
