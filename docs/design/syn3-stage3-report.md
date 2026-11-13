@@ -282,3 +282,29 @@ conversion status still reports unresolved anomaly groups and is not marked
 landable, so no newer full conversion head was merged. The isolated captured
 row fix and exact, verified fixture corrections were integrated separately;
 `syn3/lower.rs` still does not absorb members.
+
+## Follow-up after conversion landed, 2026-11-14
+
+Merged main `68b720e9` at `a3cb1ba96`, resolving all 60 permutation source
+conflicts to main. Stage 3's checker/LSP/Wasm changes and independent data
+definitions remain. Main's provider contracts survive lowering. The later
+READY fix `db743d5e`, merged at `2af820b34`, moves the open/closed provider
+decision to resolution so transparent/imported aliases cannot hide holes;
+it preserves the original annotation and value through lowering and keeps
+closed function-valued providers' generalization boundary. No member
+absorption is restored.
+
+The three previously unexplained cases now match landed main exactly:
+`provision_closure_False` has one E0515, `_loose/p/x8` two, and `_loose/p/b1`
+three. A new checker regression separately pins these counts and compares
+the complete diagnostic multisets, including source locations/messages,
+against main's unchanged records. It passes after the merge. In particular,
+main's `x8` source restores the full written need on `wrap`; the source
+contract and provider-generalization repairs supersede the old discrepancies.
+No expectation is rewritten in this follow-up.
+
+The five-package gate passes: checker 357 (four existing ignores, requested
+recovery test skipped), syntax 190, LSP 106 including all 98 protocol tests,
+Wasm 65, macro 9. The new three-case regression passes separately after
+compilation. Final workspace/release/runtime/static gates are in progress;
+this checkpoint does not yet claim landability.

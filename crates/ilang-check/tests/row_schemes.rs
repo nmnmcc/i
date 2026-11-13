@@ -1,6 +1,44 @@
 //! Row schemes preserve obligations, identity, and declaration independence.
 mod common;
 
+#[test]
+fn stage_three_provider_diagnostics_match_landed_conversion() {
+    // §9.2: a supplied value must satisfy the needed form by subtyping;
+    // incompatible same-key requirements have an empty intersection.
+    // Keep each landed diagnostic, including its source binding, rather than
+    // accepting a matching rejection with a lost or additional E0515.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
+    for (case, count) in [
+        ("review-k4/cases/provision_closure_False", 1),
+        ("review-k4d/_loose/p/x8", 2),
+        ("review-k4d/_loose/p/b1", 3),
+    ] {
+        let dir = root.join(case);
+        let source = std::fs::read_to_string(dir.join("src/main.i")).unwrap();
+        let observation: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.join("expected.json")).unwrap())
+                .unwrap();
+        let mut expected: Vec<_> = observation["outcome"]["check"]["stderr"]
+            .as_str()
+            .unwrap()
+            .lines()
+            .filter(|line| line.contains("error["))
+            .collect();
+        assert_eq!(expected.len(), count, "landed diagnostic count: {case}");
+        let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
+        let checked = ilang_check::check(&graph);
+        let mut actual: Vec<_> = checked
+            .diags
+            .iter()
+            .filter(|d| d.is_error())
+            .map(|d| graph.sources.render(d))
+            .collect();
+        expected.sort_unstable();
+        actual.sort_unstable();
+        assert_eq!(actual, expected, "{case}");
+    }
+}
+
 fn types(source: &str) -> std::collections::BTreeMap<String, String> {
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
