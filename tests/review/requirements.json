@@ -3595,6 +3595,28 @@
       "finding": "E1: incompatible service requirements remain rejected with the empty-intersection diagnostic",
       "source": "docs/spec.md §9.2: \"When the intersection for one service of a need is `Never` while neither side is `Never`, the need cannot be satisfied: it is a compile error (E0515).\"",
       "origin": "docs/design/effects-e1-corpus.md"
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/p/p1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "A written S(_) provider contract cannot disappear through local generalization.",
+      "source": "docs/spec.md §9.2 rule B: retain a uniform provider-form obligation; syntax-3.md §7.3 preserves the old provider contract.",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "Reject the hidden provider-form obligation at checking; E0505 or acceptance does not preserve main behavior."
+    },
+    {
+      "pattern": "^review\\-k4d/proj/p1$",
+      "known_failure": false,
+      "outcome": "reject",
+      "finding": "A written S(_) provider contract cannot disappear through local generalization.",
+      "source": "docs/spec.md §9.2 rule B: retain a uniform provider-form obligation; syntax-3.md §7.3 preserves the old provider contract.",
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "diagnostic_reason": "Reject the hidden provider-form obligation at checking; E0505 or acceptance does not preserve main behavior."
     }
   ],
   "transitions": [

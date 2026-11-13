@@ -1,6 +1,6 @@
 {
-  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
-  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.use : (A) <- (S(A)) -> Int\napp/main.wrap : (A) <- (S(B)) -> Int\napp/main.different : ((Int) <- (S(String)) -> Int) -> (Int) <- (S(String)) -> Int\napp/main.test : (Int) <- (S(String)) -> Int\n",
-      "stderr": "src/main.i:8:18: error[E0515]: `S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 8:8 needs it)\n1 error\n"
+      "stdout": "app/main.use : (x: A) -> Int ! S(A)\napp/main.wrap : (x: A) -> Int ! S(B)\napp/main.different : (f: (Int) -> Int ! S(String)) -> (Int) -> Int ! S(String)\napp/main.test : (Int) -> Int ! S(String)\n",
+      "stderr": "src/main.i:5:18: error[E0515]: `S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 5:8 needs it)\n1 error\n"
     }
   }
 }

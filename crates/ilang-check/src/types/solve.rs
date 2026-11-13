@@ -912,8 +912,9 @@ impl Solver {
     }
 
     /// A shown scheme must express every handler restriction. A visible
-    /// difference or a row containing both the variable and the supplied
-    /// constructor expresses it (§2.10.4 rule B). Its arguments may have
+    /// difference with arguments bound outside its erased side, or a row
+    /// containing both the variable and the supplied constructor, expresses
+    /// it (§2.10.4 rule B). Its arguments may have
     /// been coalesced; the original directed constraints stay in the scheme
     /// and are checked at instantiation. A form tied to that variable, as
     /// S(N) in a parameter S(N), also keeps the obligation on that same row.
@@ -921,28 +922,31 @@ impl Solver {
         if !self.has_handlers {
             return Vec::new();
         }
-        fn parts(t: &Ty, out: &mut Vec<Ty>) {
+        fn parts(t: &Ty, out: &mut Vec<Ty>, visible: &mut HashSet<V>, in_handler: bool) {
             out.push(t.clone());
             match t {
+                Ty::Var(v) if !in_handler => {
+                    visible.insert(*v);
+                }
                 Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => {
                     for x in xs {
-                        parts(x, out);
+                        parts(x, out, visible, in_handler);
                     }
                 }
                 Ty::Fn(f) => {
                     for x in [&f.param, &f.ret, &f.env] {
-                        parts(x, out);
+                        parts(x, out, visible, in_handler);
                     }
                 }
                 Ty::Diff(a, hs) => {
-                    parts(a, out);
+                    parts(a, out, visible, in_handler);
                     for h in hs {
-                        parts(h, out);
+                        parts(h, out, visible, true);
                     }
                 }
                 Ty::Both(a, b) => {
-                    parts(a, out);
-                    parts(b, out);
+                    parts(a, out, visible, in_handler);
+                    parts(b, out, visible, in_handler);
                 }
                 _ => {}
             }
@@ -959,7 +963,8 @@ impl Solver {
                 }
         }
         let mut all = Vec::new();
-        parts(t, &mut all);
+        let mut visible = HashSet::default();
+        parts(t, &mut all, &mut visible, false);
         let mut hidden = Vec::new();
         for v in all
             .iter()
@@ -992,7 +997,27 @@ impl Solver {
                                 && m.head() == h.head())
                     };
                     let witnessed = all.iter().any(|part| match part {
-                        Ty::Diff(a, hs) => row_has(a, &is_var) && hs.iter().any(stated),
+                        Ty::Diff(a, hs) => {
+                            // Difference arguments do not introduce quantified
+                            // variables. A provider hole must also occur in
+                            // the visible scheme to retain its obligation.
+                            row_has(a, &is_var)
+                                && hs.iter().any(|provided| {
+                                    stated(provided)
+                                        && super::typed_macro::variables(provided).iter().all(
+                                            |arg| {
+                                                self.var(*arg).level <= level
+                                                    || visible.contains(arg)
+                                                    || visible.iter().any(|other| {
+                                                        self.same_form(
+                                                            &Ty::Var(*arg),
+                                                            &Ty::Var(*other),
+                                                        )
+                                                    })
+                                            },
+                                        )
+                                })
+                        }
                         Ty::Union(_) | Ty::Inter(_) => {
                             row_has(part, &is_var) && row_has(part, &stated)
                         }

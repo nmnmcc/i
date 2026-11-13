@@ -1,6 +1,6 @@
 {
-  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
-  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
+  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
+  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:10:2: error[E0501]: `Dep` is not a subtype of `Never`\n1 error\n"
+      "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.main : () -> Nil\n",
+      "stderr": "src/main.i:10:16: error[E0501]: `Dep` is not a subtype of `Never` (the type at 10:5 needs it)\n1 error\n"
     }
   }
 }

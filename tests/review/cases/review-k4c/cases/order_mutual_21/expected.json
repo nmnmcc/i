@@ -1,6 +1,6 @@
 {
-  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
-  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.a : (Bool) <- (S(N & N2), ..N, ..N2) -> Nil\napp/main.use : () <- (S(N), ..N) -> Nil\napp/main.wrap : () <- (S(N & N2), ..N, ..N2) -> Nil\napp/main.b : (Bool) <- (S(N & N2), ..N, ..N2) -> Nil\napp/main.run : (() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil\n",
-      "stderr": "src/main.i:7:1: warning[W0504]: top-level binding `wrap` is not used\n"
+      "stdout": "app/main.a : (x: Bool) -> Nil ! N | N2 | S(N & N2)\napp/main.use : () -> Nil ! N | S(N)\napp/main.wrap : () -> Nil ! N | N2 | S(N & N2)\napp/main.b : (x: Bool) -> Nil ! N | N2 | S(N & N2)\napp/main.run : (body: () -> Nil ! N) -> Nil ! N\n",
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `wrap` is not used\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:7:1: warning[W0504]: top-level binding `wrap` is not used\n"
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `wrap` is not used\n"
     },
     "test2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:7:1: warning[W0504]: top-level binding `wrap` is not used\n"
+      "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `wrap` is not used\n"
     }
   }
 }

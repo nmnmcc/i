@@ -797,3 +797,35 @@ source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
 Only eligible completed observations are committed; refused cases remain
 untouched and recording continues.
 The full corpus, two known p1 regressions and pending phase refusals still block landing.
+
+Coordinator b15 item 1: the lost p1 obligation was caused by generalizing the
+migration's typed provider temporary before its provide. The inferred pure
+service form replaced the old explicit `S(_)` provider contract. Merely
+choosing the checker's known type, or copying the annotation onto a provide
+of the already-generalized variable, did not restore the obligation.
+
+The lowerer now rejoins an immediately preceding typed provider temporary
+with its environment statement when the temporary has exactly one use.
+Both the written contract and original value reach inference together, as
+in the legacy statement. Other locals retain their binding. Both complete
+p1 copies now report exactly E0515; all 26 row-scheme tests and all 20
+lowering tests pass, including single-use/reused-provider regressions.
+The requirement remains reject E0515, and no expectation was re-recorded.
+
+Coordinator b15 item 2: E0523 is the entry-provider plan error, here
+`service std/list_test.Yield(A) must be closed`. The copied std fixture lost
+its generator callback's direct parameter annotation during conversion,
+leaving A open at the native test entry. Restored the original callback type
+on the function literal and the emitter's x:A annotation, using the already
+verified repository std helper. At O0 and O2 the complete test bundle builds
+before CLI runtime filtering, then generator_callbacks_test passes. This is
+not a full runtime run of the copied std suite. No bound or expectation was
+changed, and there is no longer an E0523 compilation failure.
+
+Coordinator b15 item 3: measured stdout differs only at failure source
+positions: 12:21 became 13:4, and 24:2/29:2/34:2 became 25:2/30:2/35:2.
+The converted fixture now retains the original call-token coordinates.
+Both O0 and O2 stdout are byte-for-byte equal to main again: the same four
+intentional failures and two passing tests, including the corpus startup
+probe. No failure was suppressed and no expectation was changed. The
+before/after execution diff is in target/conv-b15/failure-output-results.json.

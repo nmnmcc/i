@@ -1,6 +1,6 @@
 {
-  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
-  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.run : (() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil\napp/main.one : () <- (S(Int)) -> Nil\napp/main.bad : () <- (S(Never)) -> Nil\napp/main.two : () <- (S(String)) -> Nil\n",
+      "stdout": "app/main.run : (body: () -> Nil ! N) -> Nil ! N\napp/main.one : () -> Nil ! S(Int)\napp/main.bad : () -> Nil ! S(Never)\napp/main.two : () -> Nil ! S(String)\n",
       "stderr": "src/main.i:4:7: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)\n1 error\n"
     },
     "run0": {

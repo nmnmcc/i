@@ -1,6 +1,6 @@
 {
-  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
-  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
+  "compiler": "cc02dc36481b29de48de9db520056cc950174d3e",
+  "binary_sha256": "6f627a56cc8019f3107c538828edbe827a3d6f2d308c37edc384b20d03b60920",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.tell : (Int) -> \"four\" | \"many\" | \"one\" | \"three\" | \"two\" | \"zero\"\napp/main.main : () <- (S(N), ..N) -> Nil\n",
+      "stdout": "app/main.get : () -> Int ! Dep\napp/main.use : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.fw : () -> Int ! N | S(N)\napp/main.fr : () -> Int ! N | S(N)\napp/main.tell : (x: Int) -> \"four\" | \"many\" | \"one\" | \"three\" | \"two\" | \"zero\"\napp/main.main : () -> Nil ! N | S(N)\n",
       "stderr": "src/main.i:5:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:10:1: warning[W0504]: top-level binding `fr` is not used\nsrc/main.i:11:1: warning[W0504]: top-level binding `tell` is not used\n"
     },
     "test0": {

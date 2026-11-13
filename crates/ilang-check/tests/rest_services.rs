@@ -185,3 +185,17 @@ fn a_named_client_beside_a_rest_row_keeps_its_known_data_type() {
     );
     assert!(errors.is_empty(), "{errors:#?}");
 }
+
+#[test]
+fn a_whole_provided_data_value_keeps_its_written_type() {
+    let source = "Db(A) = (value = A)\nread = () <- (db: Db(Int)) { db.value }\nmain = () { given: (Db(Int),) = (Db(value = 1),)\n read() <- given }";
+    let (_, errors) = checked(source);
+    assert!(errors.is_empty(), "{errors:#?}");
+    let (_, errors) = checked(&source.replace("(Db(Int),)", "(Db(String),)"));
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("E0501") && e.contains("String")),
+        "the written data annotation must still be checked: {errors:#?}"
+    );
+}
