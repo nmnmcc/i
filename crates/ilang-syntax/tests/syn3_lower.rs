@@ -1,6 +1,9 @@
 //! The transition front of syntax three (docs/design/syntax-3.md §7.2,
 //! stage 8): a syntax-three text lowers to the tree that today's text gives.
 
+#[path = "../examples/support/legacy/mod.rs"]
+mod legacy;
+
 use ilang_syntax::print::print_module;
 use ilang_syntax::syn3;
 
@@ -9,7 +12,7 @@ use ilang_syntax::syn3;
 fn same(new: &str, old: &str) {
     let (module, diags) = syn3::parse_lowered(new);
     assert!(diags.is_empty(), "{new}\n{diags:#?}");
-    let (expected, diags) = ilang_syntax::legacy::parser::parse_module_legacy(old);
+    let (expected, diags) = legacy::parser::parse_module_legacy(old);
     assert!(diags.is_empty(), "{old}\n{diags:#?}");
     assert_eq!(print_module(&module), print_module(&expected), "{new}");
 }

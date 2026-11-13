@@ -5,11 +5,12 @@
 //! inside `{ }` and at the top level it begins the next statement, clause,
 //! constructor, or item.
 
-use crate::ast::*;
-use crate::lexer::{DocComment, lex};
-use crate::span::Span;
-use crate::token::{StringPart, Token, TokenKind as T};
-use crate::{Code, Diagnostic};
+use super::lexer::lex;
+use ilang_syntax::ast::*;
+use ilang_syntax::lexer::DocComment;
+use ilang_syntax::span::Span;
+use ilang_syntax::token::{StringPart, Token, TokenKind as T};
+use ilang_syntax::{Code, Diagnostic};
 use std::collections::HashMap;
 
 type PResult<X> = Result<X, Diagnostic>;
@@ -90,7 +91,7 @@ fn run_with(source: &str, cache: bool, old_pipe: bool) -> (Module, Vec<Diagnosti
     // Recovery may go on at the token that failed, and fail there again.
     diags.dedup();
     if !diags.is_empty()
-        && let Some(hint) = crate::old_syntax_hint(source)
+        && let Some(hint) = ilang_syntax::old_syntax_hint(source)
     {
         for d in &mut diags {
             d.message.push_str("; ");
@@ -1208,7 +1209,7 @@ impl Parser<'_> {
                 }),
                 StringPart::Text(_, _) => {}
                 StringPart::Expr { tokens, .. } => {
-                    let close = crate::lexer::pair_brackets(&tokens, &mut self.diags);
+                    let close = super::lexer::pair_brackets(&tokens, &mut self.diags);
                     let mut child = Parser {
                         toks: &tokens,
                         close: &close,
