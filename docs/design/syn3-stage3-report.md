@@ -317,3 +317,17 @@ differences. Every difference is explained in the November 14 section of
 behind `ScheduleError` → `NotRunnable`. No expectation, requirement, source,
 or timeout bound was changed. Main's exact three provider observations
 match. CLI, chapter, generation, and static gates remain in progress.
+
+The five requested CLI binaries now pass: check 10, commands 14,
+macro_run 57, providers 18, typed_macros 36. The five spec filters pass at
+both optimization levels: `4.3/` 17, `6/` 80, `7/` 104, `9/` 139, and
+`15.7/` 28. Existing pending entries remain unchanged: 28 under `6/`, one
+under `7/`, and one under `15.7/`. Short generation with the fresh release
+passes 32 cases (20 accepted, 12 rejected by the model), 64 declaration
+permutations, and 32 annotation removals. Its one expected report-only
+annotation-removal difference cites spec §4.7; there are no failures.
+
+The exact verification commands, exits, and log paths are recorded in the
+coordinator cache's `gpt/r2/report-s3-r3.md` and JSON command ledgers.
+All heavy commands are serial and wrapped. Formatting, clippy, and snippet
+checks are queued for a shared slot; this checkpoint awaits those gates.
