@@ -839,3 +839,22 @@ fn query_unused_imports_and_fixes() {
     assert_eq!(fixes.len(), 1);
     assert_eq!(fixes[0].edits[0].text, "(area) = ");
 }
+
+#[test]
+fn incomplete_syntax_three_branch_keeps_constructor_completion() {
+    use ilang_check::query::CompletionContext;
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
+    let f = Fixture::new(&[("src/main.i", text)]);
+    let q = f.query();
+    let m = f.module("app/main");
+    let at = f.at("app/main", "() { 2", 0, 1);
+    let context = q.completion_context(m, at);
+    assert!(matches!(context, CompletionContext::Pattern { .. }), "{context:?}");
+    let completions = q.completions_at(m, at);
+    for (label, insertion) in [("Circle", "Circle(${1:_})"), ("Rect", "Rect(..)"), ("Dot", "Dot")] {
+        let item = completions.iter().find(|item| item.label == label).unwrap();
+        assert_eq!(item.insert.as_deref(), Some(insertion));
+    }
+    let body = f.at("app/main", "() { 2", 0, 5);
+    assert!(!matches!(q.completion_context(m, body), CompletionContext::Pattern { .. }));
+}

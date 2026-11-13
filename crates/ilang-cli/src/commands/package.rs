@@ -2227,6 +2227,11 @@ mod value_type_interfaces {
         let joined = interface("(\n\tT\n)\nT = { (a = Int | String) }");
         let split = interface("(\n\tT\n)\nT = (a = Int) | (a = String)");
         assert!(Diff::new(&joined, &split).unwrap().changed.is_empty());
+        // Distributing fields must retain cross-field correlation: the
+        // independent product also contains (Int, String) and (String, Int).
+        let independent = interface("(T)\nT = { (a = Int | String, b = Int | String) }");
+        let correlated = interface("(T)\nT = (a = Int, b = Int) | (a = String, b = String)");
+        assert!(!Diff::new(&independent, &correlated).unwrap().changed.is_empty());
     }
 
     #[test]
@@ -2308,6 +2313,10 @@ mod value_type_interfaces {
 
     #[test]
     fn exported_record_schemes_compare_labels_and_value_types() {
+        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // changed retained scheme still requires a major version. As in
+        // main's open_alias test, Unknown is a representation change, not
+        // a claim that a semantic counterexample was proved.
         let a = interface("(f)\nf = <K>(r: (item = Int), key: K) -> Int { r.item }");
         let same =
             interface("(f)\nf = <LabelName>(r: (item = Int), key: LabelName) -> Int { r.item }");
@@ -2315,36 +2324,41 @@ mod value_type_interfaces {
             "(f)\nf = <LabelName>(r: (item = String), key: LabelName) -> String { r.item }",
         );
         assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
-        assert!(!Diff::new(&a, &changed).unwrap().changed.is_empty());
+        let diff = Diff::new(&a, &changed).unwrap();
+        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
+        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(diff.representation.len(), 1);
     }
 
     #[test]
     fn inferred_record_polymorphism_is_not_a_concrete_field_scheme() {
-        let generic = interface("(f)\nf = (r) { r.a }");
+        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // changed retained scheme still requires a major version. As in
+        // main's open_alias test, Unknown is a representation change, not
+        // a claim that a semantic counterexample was proved.
+        let generic = interface("(f)\nf = (r: (a = _)) { r.a }");
         let concrete = interface("(\n\tf\n)\nf = (r: (a = Int)) { r.a }");
         let diff = Diff::new(&generic, &concrete).unwrap();
-        assert!(
-            !diff.changed.is_empty(),
-            "classification: changed={}, representation={}",
-            diff.changed.len(),
-            diff.representation.len()
-        );
+        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
+        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(diff.representation.len(), 1);
         let annotated = interface("(\n\tf\n)\nf = <A>(r: (a = A)) -> A { r.a }");
         assert!(Diff::new(&generic, &annotated).unwrap().changed.is_empty());
     }
 
     #[test]
     fn key_parameter_and_field_type_parameter_are_compared_together() {
+        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // changed retained scheme still requires a major version. As in
+        // main's open_alias test, Unknown is a representation change, not
+        // a claim that a semantic counterexample was proved.
         // K is an ordinary argument type; the closed field key is `item`.
         let generic = interface("(f)\nf = <K, V>(r: (item = V), key: K) -> V { r.item }");
         let concrete = interface("(f)\nf = <K>(r: (item = Int), key: K) -> Int { r.item }");
         let diff = Diff::new(&generic, &concrete).unwrap();
-        assert!(
-            !diff.changed.is_empty(),
-            "classification: changed={}, representation={}",
-            diff.changed.len(),
-            diff.representation.len()
-        );
+        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
+        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(diff.representation.len(), 1);
         let renamed = interface(
             "(f)\nf = <LabelName, Item>(r: (item = Item), key: LabelName) -> Item { r.item }",
         );
@@ -2372,34 +2386,36 @@ mod value_type_interfaces {
 
     #[test]
     fn key_parameter_can_collide_with_a_written_record_field() {
+        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // changed retained scheme still requires a major version. As in
+        // main's open_alias test, Unknown is a representation change, not
+        // a claim that a semantic counterexample was proved.
         // Field keys are concrete and independent of argument type parameters.
         let both =
             interface("(\n\tf\n)\nf = <K>(r: (k = Int, fixed = String), key: K) -> Int { 1 }");
         let override_field =
             interface("(\n\tf\n)\nf = <K>(r: (fixed = String), key: K) -> Int { 1 }");
         let diff = Diff::new(&both, &override_field).unwrap();
-        assert!(
-            !diff.changed.is_empty(),
-            "classification: changed={}, representation={}",
-            diff.changed.len(),
-            diff.representation.len()
-        );
+        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
+        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(diff.representation.len(), 1);
     }
 
     #[test]
     fn distinct_key_parameters_may_receive_the_same_string() {
+        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // changed retained scheme still requires a major version. As in
+        // main's open_alias test, Unknown is a representation change, not
+        // a claim that a semantic counterexample was proved.
         // Field keys are concrete and independent of argument type parameters.
         let both =
             interface("(\n\tf\n)\nf = <K, J>(r: (k = Int, j = String), k: K, j: J) -> Int { 1 }");
         let override_field =
             interface("(\n\tf\n)\nf = <K, J>(r: (j = String), k: K, j: J) -> Int { 1 }");
         let diff = Diff::new(&both, &override_field).unwrap();
-        assert!(
-            !diff.changed.is_empty(),
-            "classification: changed={}, representation={}",
-            diff.changed.len(),
-            diff.representation.len()
-        );
+        assert_eq!(diff.version_step(), (Step::Major, "an interface representation changed"));
+        assert!(diff.changed.is_empty(), "no semantic counterexample was proved");
+        assert_eq!(diff.representation.len(), 1);
     }
 
     #[test]

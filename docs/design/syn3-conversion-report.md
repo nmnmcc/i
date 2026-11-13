@@ -415,3 +415,33 @@ keeping every body. The embedded retry reads all imported snippets without
 errors. Stage 10 replaces multi_value_call's former rejected call with main's
 runtime expected-output fixture, preserving its intent. The workspace
 all-target check passes.
+
+
+### Evening step 2: interface and completion recovery
+
+The comparison implementation is identical to main's ba23adb0 family:
+labelled data forces semantic comparison, closed shared groups have a
+counterexample check, and open_alias uses closed-data difference. The
+converted legacy cases now retain closed keys, with polymorphic field values
+inferred from `(a = _)` instead of the removed open-record inference. All
+five uncertain scheme differences remain breaking major-version changes;
+tests pin their exact representation-only classification, as main's
+open_alias test does, rather than asserting a semantic counterexample that
+the read-only prover did not establish. Positive alpha-renaming and
+generic-value comparisons remain unchanged. This preserves the migration's
+versioning intent under syntax-3 §2.3's removal of dynamic keys and Record.
+
+The denoted-set alias comparison lacked distribution through a closed data
+field: `(a = Int | String)` equals `(a = Int) | (a = String)` (spec §4.1,
+§4.4). The read-only prover now checks each field-union alternative under
+its existing demand budget; no mutable solver or input acceptance changes.
+The regression also keeps two-field correlation: the independent product
+is different from the union of only the two correlated shapes.
+
+An unfinished match branch `| () { ... }` lowers as a different-shape
+function instead of a Case. Completion now recognizes a source branch head
+inside the enclosing pipe, and uses the subject's known types for constructor
+snippets. Token delimiters exclude strings/comments and branch bodies. The
+new query regression checks Circle/Rect/Dot snippets and excludes the body;
+the formerly failing LSP protocol test passes. The 23 CLI binary unit tests
+pass, with the added correlation check verified separately.
