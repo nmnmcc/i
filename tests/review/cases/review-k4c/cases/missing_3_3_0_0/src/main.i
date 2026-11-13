@@ -1,3 +1,4 @@
+RowPair(A, B) = A | B
 Dep = ()
 get = () <- (d: Dep) { Nil }
 run = <N>(body: () <- N -> Nil) { body() }
@@ -8,6 +9,6 @@ use = <A, B>() <- (s: S(A, B)) {
 }
 
 main = <A, B>() {
-	local: () <- (S(A, B), ..A) -> Nil = () { use() }
+	local: () <- (Fail(Never), S(A, B), RowPair(A, B)) -> Nil = () { use() }
 	local()
 }
