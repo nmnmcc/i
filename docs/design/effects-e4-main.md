@@ -2,6 +2,8 @@
 
 Base: main `180e00cf70398034e50f253c0b209298758bb4d5`.
 Merge: `72892af423bcac0bcb242ce2d23dd25b8a6f6325`.
+All requested integration gates are green on this base.
+
 The earlier JavaScript investigation and its green pre-merge gates remain in
 [effects-e4-js.md](effects-e4-js.md); the operation table remains in
 [effects-e4.md](effects-e4.md).
@@ -64,7 +66,7 @@ syntax-3 §6.1: “**One need row.** `err` is removed (stage E3): errors are the
 `Fail(E)` entry of `env`.” Spec §9.2 gives the whole-row example
 `map : <A, B, N>(List(A), (A) <- N -> B) <- N -> List(B)`.
 The first protocol run passes 96/98; both failures show exactly the explained
-one-row difference. A complete corrected protocol run follows.
+one-row difference. The complete corrected protocol run passes all 98 tests.
 
 ## Lazy control fixtures
 
@@ -129,8 +131,26 @@ An identity audit finds 77 stale records, all found in main's pre-E3/E5 source:
 75 obsolete non-i classifications and two changed source-template fragments.
 Drop the classifications for absent literals, rekey both current fragments
 with the same render settings, and classify two reviewed root/dependency
-TOML manifests written to `i.toml`. No diagnostic expectation is added,
-removed, changed, or regenerated. The full parser gate runs afterwards.
+TOML manifests written to `i.toml`. This initial identity cleanup changes no diagnostic expectation. The full
+parser gate then exposes additional assembly fragments and stale E6 metadata:
+
+- Render the rest-row semicolon replacement, the two Entry-name fragments,
+  three HTTP assembly fragments, and the multicore template with its actual
+  syntax-three SPIN constant. Three other literals are Rust diagnostic/TOML
+  data. No runtime source, assertion, or semantic expectation changes.
+- E6 has implemented whole provided values and `..env` capture/provision.
+  Remove only five obsolete “stage E6 not implemented” diagnostics from two
+  spec examples. The keep example becomes an ordinary positive parse check;
+  the layers example retains its exact mixed-data stage-6 diagnostic.
+
+syntax-3 §2.10.8: “In a service pattern, `..env: N` binds the whole environment
+the function receives as one value of the row type `N`”; “`g() <- env`
+provides it again; `<- (..env, fake)` overrides one key of it (rule C).”
+Spec §9.4: “A value of a row type may be bound, captured and provided after
+`<-`, alone or as a spread in provided data.” The E6 rest/keep regression
+fixtures already pass in the checker, CLI and requested spec runs.
+No other parser diagnostic expectation is changed, and no expectations are
+blindly regenerated.
 
 ## Verification on the merged tree
 
@@ -149,6 +169,10 @@ both i optimization levels. The checker skip is exactly
   r2_runtime 8, WASI 17). `typed_macros` has its separate complete 36-test run.
 - Std typecheck: pass.
 - Std O0 and O2: each 2,171 passed, zero failures.
+- ABI regeneration, R2 conformance fixture generation and Wasm validation: pass;
+  every generated artifact is unchanged.
+- `DEV_VERIFY_SKIP_CORPUS=1 scripts/dev-verify js`: 117 Node tests and 60
+  browser tests pass (Chromium, Firefox, WebKit). No JS tests skipped.
 - Release CLI build: pass.
 - Macro expansion and macro example tests O0/O2: pass.
 - Complete CLI `typed_macros` target: 36 passed.
@@ -159,7 +183,17 @@ both i optimization levels. The checker skip is exactly
 - Spec `9.7/`: 17 passed at O0/O2.
 - Spec `9.9/`: 78 passed at O0/O2.
 - Spec `11/`: 48 passed at O0/O2.
-- Remaining requested gates: running; this record is updated before handover.
+- Short generation: 32 attempted, 20 accepted, 12 rejected by the model;
+  64 permutations and 32 annotation removals pass with zero failures. The
+  existing report-only permanent-read annotation difference remains permitted
+  by spec §4.7; it is not rerecorded as an expectation.
+- Strict workspace/all-targets clippy: pass (`-D warnings`).
+- Full snippet gate: 4,682 extracted literals/blocks match their exact
+  diagnostics; four unrelated future-track entries remain. The Lisp companion
+  parses all 34 repository `.is` files and 89 CLI macro fragments.
+- Snippet gate regression tests: eight passed.
+- All requested checks are complete. Only the coordinator's unfiltered
+  corpus/final b1/r6 recording and merge into main remain outside this lane.
 
 Commands (the following are the commands inside the wrapper):
 
@@ -192,3 +226,49 @@ cargo test --release --no-fail-fast -p ilang-cli --locked --lib --bins \
   --test udp --test unused --test value_type_performance --test value_types \
   --test wasi --test wat_dump -- --test-threads 2
 ```
+
+The corrected targets are rerun completely, without test-name filters:
+
+```sh
+cargo test --release -p ilang-lsp --test protocol --locked -- --test-threads 2
+cargo test --release -p ilang-wasm --test control_lazy --locked -- --test-threads 2
+cargo test --release -p ilang-cli --test wasi --locked -- --test-threads 2
+cargo test --release -p ilang-cli --test determinism --locked -- --test-threads 2
+cargo test --release -p ilang-cli --test macro_budget --locked -- --test-threads 2 --nocapture
+cargo test --release -p ilang-cli --test native --locked -- --test-threads 2
+cargo test --release -p ilang-cli --test r2_runtime --locked -- --test-threads 2
+cargo test --release -p ilang-cli --doc --locked -- --test-threads 2
+for chapter in 6 9 9.7 9.9 11; do
+  taskset -c 0,1 cargo test --release -p ilang-cli --test spec --locked -- "$chapter/"
+done
+./target/release/i check --project std
+./target/release/i test --project std --opt 0
+./target/release/i test --project std --opt 2
+I="$PWD/target/release/i" bash scripts/build-abi-fixture.sh
+DEV_VERIFY_SKIP_CORPUS=1 ILANG_BROWSER_PORT=4184 scripts/dev-verify js
+scripts/test-generation --mode short --binary ./target/release/i --output target/e4-main-generation.json
+cargo clippy --workspace --all-targets --locked -- -D warnings
+```
+
+Formatting and snippet commands:
+
+```sh
+./target/release/i fmt --check bench std lib examples
+cargo fmt --all -- --check
+rustfmt --check --edition 2024 crates/ilang-cli/tests/typed_macros.rs
+scripts/check-snippets
+python3 -I scripts/check-snippets-test
+```
+
+The snippet script wraps its own parser-driver cargo build, so it runs after
+the other heavy batch ends, with no second outer wrapper held. One queued
+batch was cancelled before any checks started to correct its wrapper slot
+classification, then requeued as a regular heavy job with a std memory
+reservation. The later wait was 23 minutes; no slot limit was bypassed.
+
+Read-only audits also verify that every edited Rust test name remains,
+assertion counts stay the same or increase, the soundness diagnostic lines
+match main, b1/r6 match main exactly, and all active parser diagnostic registrations are retained, except the
+five explicitly retired E6 implementation guards described above. `git diff --check` passes throughout. No unfiltered corpus,
+unfiltered spec or full-workspace Rust test run is substituted for the
+coordinator's gates. The coordinator retains the final b1/r6 corpus recording.
