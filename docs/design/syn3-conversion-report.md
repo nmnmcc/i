@@ -465,3 +465,10 @@ WASI passed 16/17 before finding the stop fixture's same-name constructor
 converted as a transparent alias. Main's `Bad { Bad(Int) }` needs `Bad = (Int)`
 by syntax-3 §2.8 rule 3. Restored that nominal declaration; the focused test
 passes at every optimization level with unchanged messages and exit codes.
+
+Chapter 11 initially passed 49/51 at both levels except stale frame coordinates
+in two stop fixtures. Derived call anchors from main to converted source:
+stop_tail_service: a.fail 12:12 -> 10:34, f(x) 16:19 -> 13:19, apply 20:2 ->
+16:2; stop_tail_async_service: later.nan 26:2 -> 22:2, take 37:2 -> 32:2.
+All five frames and exact stop messages/outputs remain asserted. The 11/
+retry passes all 51 cases at O0/O2, including the matching 9.11/ paths.
