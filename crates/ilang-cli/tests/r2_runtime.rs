@@ -344,7 +344,7 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     let begin = source
         .find("@external(\"ilang:control\", \"finalizing\")")
         .unwrap();
-    let end = source[begin..].find("\nFrame {").unwrap() + begin;
+    let end = source[begin..].find("\nFrame = (").unwrap() + begin;
     let source = source[..begin].to_string()
         + "finalizing = <A, R, E, N, B, F, M>(\n\t_k: Continuation(A, R, E, N),\n\t_b: Boundary(B, F, M)\n) -> Bool { False }\n"
         + &source[end..];
