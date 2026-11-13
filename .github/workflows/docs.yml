@@ -40,12 +40,13 @@ jobs:
           devenv shell -- npm run build
           devenv shell -- npm run check:links
           devenv shell -- npm run check:examples
-      - name: Upload checked site
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # The Pages artifact is uploaded by the job that built and checked the site. The deploy job
+      # only deploys it: an artifact uploaded in the deploy job itself is not yet visible to
+      # deploy-pages.
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
-          name: checked-docs
           path: docs/dist
-          if-no-files-found: error
 
   deploy:
     name: Deploy to GitHub Pages
@@ -65,15 +66,6 @@ jobs:
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
         with:
           enablement: false
-      - name: Download checked site
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: checked-docs
-          path: docs-dist
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
-        with:
-          path: docs-dist
       - name: Deploy Pages artifact
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
