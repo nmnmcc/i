@@ -1,52 +1,89 @@
-# Legacy dynamic-label cases retained while their intent is rewritten for closed data.
-# Stage 6 is merged: these converted fixtures still call removed i/record or
-# require a dynamic field key, which closed data cannot express (syntax-3 §2.3).
-# They use i/record and Record-bounded parameters: open records. One case name per line.
+# Retained legacy intent awaiting closed-data rewrites (syntax-3 §2.3).
+# Each reason applies to the immediately following case.
+
+# Builds a new field through removed i/record.put and a dynamic key (§2.3).
 6/t3_record_builder.i
+
+# Extends generic Record codecs through dynamic-key i/record get/put (§2.3).
 6/t3_record_codec.i
+
+# Exports and forwards dynamic-key record get/put across modules (§2.3).
 6/t3_record_cross_module
-6/t3_record_evaluation_order.i
-6/t3_record_host_boundary.i
+
+# Threads a dynamic field key through Box and a known function type (§2.3).
 6/t3_record_key_known_fn.i
+
+# Exercises removed i/record get/put/remove/has/size operations (§2.3).
 6/t3_record_library.i
+
+# Aliases a dynamic key parameter used by i/record.get (§2.3).
 6/t3_record_param_alias.i
+
+# Instantiates a field label from a string key parameter at a call (§2.3).
 6/t3_record_param_call.i
+
+# Captures a dynamic field key and returns data indexed by it (§2.3).
 6/t3_record_param_capture.i
+
+# Exports a function with a nested dynamic-key record parameter (§2.3).
 6/t3_record_param_export
+
+# Forwards the same dynamic-key record type between functions (§2.3).
 6/t3_record_param_forward.i
+
+# Infers a dynamic field label under an open Record parameter (§2.3).
 6/t3_record_param_inner_label_unknown.i
+
+# Checks the removed distinction between a label parameter and a value type (§2.3).
 6/t3_record_param_key_type.i
+
+# Narrows a runtime string key before removed i/record.get (§2.3).
 6/t3_record_param_matched_key.i
+
+# Reads a written field whose label may equal a dynamic key parameter (§2.3).
 6/t3_record_param_may_alias.i
+
+# Checks the removed label-parameter restriction in a nested function (§2.3).
 6/t3_record_param_nested.i
+
+# Propagates a dynamic-key record parameter through recursion (§2.3).
 6/t3_record_param_recursive.i
+
+# Checks incompatible values when two dynamic put keys may coincide (§2.3).
 6/t3_record_param_two_keys_bad.i
+
+# Checks an unknown runtime key against a dynamic-key record parameter (§2.3).
 6/t3_record_param_unknown.i
+
+# Uses removed polymorphic i/record.get as a first-class value (§2.3).
 6/t3_record_param_value.i
+
+# Uses the value type of removed i/record.get (§2.3).
 6/t3_record_param_value_type.i
+
+# Builds a generic schema with dynamic-key i/record.put (§2.3).
 6/t3_record_schema.i
 
-# Stage 6 makes closed-data types printable: the old record-graph TypeView
-# expression error is no longer reachable; retained for replacement intent review.
+# Pins the former record-graph TypeView error; closed data is now printable, so that error is unreachable (§2.3).
 15.7/typed_query_opaque_expression_error
 
-# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+# Binds a dynamic field label in a nested function under open Record (§2.3).
 6/t3_record_param_inner_label.i
 
-# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+# Pins a mismatch between a string key and a dynamic field label (§2.3).
 6/t3_record_param_mismatch.i
 
-# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+# Allows coincident runtime keys through dynamic i/record.put/get (§2.3).
 6/t3_record_param_two_keys.i
 
-# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+# Requires width subtyping from two-field records to one-field records (§2.3).
 6/t3_record_structural_instantiation.i
 
-# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+# Tests membership in removed open Record against Int (§2.3).
 6/t3_record_type_test.i
 
-# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+# Tests a partial match against removed open Record (§2.3).
 6/t3_record_type_test_partial.i
 
-# Legacy dynamic-label/record-graph intent needs a closed-data rewrite (§2.3).
+# Quantifies over removed open Record rather than one closed shape (§2.3).
 6/t3_record_types.i
