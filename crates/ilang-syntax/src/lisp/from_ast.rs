@@ -428,7 +428,15 @@ fn block(b: &Block) -> String {
 fn statement(s: &Stmt) -> String {
     match s {
         Stmt::Bind(b) => binding(b),
-        Stmt::Env { ty, value, .. } => form("!", [typ(ty), expr(value)]),
+        Stmt::Env {
+            ty, value, spread, ..
+        } => {
+            if *spread {
+                form("!", ["..".into(), typ(ty), expr(value)])
+            } else {
+                form("!", [typ(ty), expr(value)])
+            }
+        }
         Stmt::Expr(e) => expr(e),
     }
 }

@@ -785,6 +785,18 @@ async fn block_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Block> {
     })
 }
 async fn statement_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Stmt> {
+    if let Some([h, dots, left, right]) = round(d)
+        && symbol(h, "!")
+        && symbol(dots, "..")
+    {
+        return Ok(Stmt::Env {
+            spread: true,
+            group: None,
+            ty: type_child(s, left).await?,
+            value: expression_child(s, right).await?,
+            span: d.span,
+        });
+    }
     if let Some([h, left, right]) = round(d) {
         if symbol(h, "!") {
             return Ok(Stmt::Env {

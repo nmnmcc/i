@@ -813,8 +813,19 @@ impl Encoder<'_> {
             .map(|s| match s {
                 Stmt::Bind(b) => self.binding(b),
                 Stmt::Env {
-                    ty, value, span, ..
-                } => self.form("!", [self.ty(ty), self.expr(value)], *span),
+                    ty,
+                    value,
+                    span,
+                    spread,
+                    ..
+                } => {
+                    let mut parts = Vec::new();
+                    if *spread {
+                        parts.push(self.symbol("..", *span));
+                    }
+                    parts.extend([self.ty(ty), self.expr(value)]);
+                    self.form("!", parts, *span)
+                }
                 Stmt::Expr(e) => self.expr(e),
             })
             .collect();

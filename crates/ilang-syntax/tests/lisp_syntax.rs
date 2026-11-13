@@ -1381,3 +1381,34 @@ fn captured_rest_service_survives_both_macro_encoders_and_scoped_decoding() {
     let restored = lisp::parse_module(&doc).unwrap();
     assert!(ilang_syntax::shape::equivalent(&module, &restored));
 }
+
+#[test]
+fn a_captured_rest_row_can_still_be_provided_after_macro_decoding() {
+    use ilang_syntax::{
+        ast::{ExprKind, ItemKind, Param, Stmt},
+        lisp::{self, scoped::ScopedSource},
+    };
+    let source = "f = <N>(body: () <- N -> Nil) <- (..env: N) { body() <- env }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let check = |value: &ilang_syntax::ast::Expr| {
+        let ExprKind::Fn(f) = &value.kind else {
+            panic!()
+        };
+        assert!(matches!(&f.params[1], Param::Env { rest: true, .. }));
+        assert!(matches!(&f.body.stmts[0], Stmt::Env { spread: true, .. }));
+    };
+    let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
+    let mut expanded = ScopedSource::new(source.into());
+    check(&expanded.expression(&syntax, &syntax).unwrap());
+    let printed = lisp::print_module(&module);
+    let doc = lisp::parse(&printed).unwrap();
+    let restored = lisp::parse_module(&doc).unwrap();
+    let ItemKind::Binding(binding) = &restored.items[0].kind else {
+        panic!()
+    };
+    check(&binding.value);
+}

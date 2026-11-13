@@ -685,7 +685,7 @@ fn charge_events_for_interpolation_and_two_sided_string_patterns() {
 
 #[test]
 fn captured_rest_service_charge_matches_the_encoded_datum() {
-    let source = "keep = <N>() <- (db: Db, ..env: N) { Nil }";
+    let source = "keep = <N>(body: () <- N -> Nil) <- (db: Db, ..env: N) { body() <- env }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let scope = scope();

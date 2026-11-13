@@ -431,10 +431,15 @@ pub(super) fn item<E>(
             }
             Statement(stmt) => match stmt {
                 Stmt::Bind(b) => work.push(Binding(b)),
-                Stmt::Env { ty, value, .. } => {
-                    bracket(&mut f, &mut work, 3)?;
+                Stmt::Env {
+                    ty, value, spread, ..
+                } => {
+                    bracket(&mut f, &mut work, if *spread { 4 } else { 3 })?;
                     work.push(Expr(value));
                     work.push(Type(ty));
+                    if *spread {
+                        work.push(Atom(".."));
+                    }
                     work.push(Atom("!"));
                 }
                 Stmt::Expr(e) => work.push(Expr(e)),
