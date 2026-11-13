@@ -7,7 +7,7 @@ use = <N>() <- (s: S(N)) {
 }
 run = <A, N>(body: () <- N -> A) { body() }
 
-bad = <N>() <- (s: S(N)) -> Int {
+bad: <N>() <- (Fail(Never), S(N)) -> Int = () <- (s: S(N)) -> Int {
 	S(f) = s
 	f()
 }
