@@ -101,4 +101,9 @@ preserved environment and completion path.
   checking this, and terminates only that test-owned child afterward.
 - Short generation gate passes: 32 cases (20 accepted, 12 model rejections),
   64 declaration permutations, 32 annotation removals, no failures.
-- Full JS rerun and remaining requested gates: in progress.
+- `DEV_VERIFY_SKIP_CORPUS=1 ILANG_BROWSER_PORT=4184 scripts/dev-verify js`
+  passes: **117/117 Node checks**, **60/60 browser checks** across Chromium,
+  Firefox and WebKit. This includes all fetch cases at O0/O2, compiled host
+  calls after ordinary errors, R2 seeded replays and every runnable R2 law
+  body at both optimization levels in each engine.
+- Remaining std/spec/HTTP/Clippy gates: in progress.
