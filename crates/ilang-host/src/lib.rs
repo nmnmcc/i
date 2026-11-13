@@ -1186,7 +1186,11 @@ impl Program {
     /// `workers` workers.
     pub(crate) fn with_epochs(mut self, workers: usize) -> Self {
         self.epochs = true;
-        self.workers = if self.macro_static_cost.is_some() { 1 } else { workers.max(1) };
+        self.workers = if self.macro_static_cost.is_some() {
+            1
+        } else {
+            workers.max(1)
+        };
         self
     }
 

@@ -1695,7 +1695,11 @@ impl Solver {
             // At the level of the members: a collector below them would
             // copy their variables to its level and link every later
             // instance of a scheme to that shared copy.
-            let level = ms.iter().map(|m| self.level_of(m)).max().unwrap_or(self.level);
+            let level = ms
+                .iter()
+                .map(|m| self.level_of(m))
+                .max()
+                .unwrap_or(self.level);
             let row = Ty::Var(self.fresh_at(level));
             for m in ms {
                 self.constrain_in(m, &row, mode);
