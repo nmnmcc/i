@@ -1,5 +1,7 @@
 # The i Language
 
+Version: 1.0; Date: 2026-11-14
+
 
 This document is the definition of the i programming language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
 
