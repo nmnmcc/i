@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""Snapshot old syntax trees, add annotation braces, and prove new trees equal.
+
+Build the pattern-annotations example against the OLD parser, then snapshot.
+Rewrite uses only the saved offsets, so it never needs an old-parser binary.
+Rebuild the example against the NEW parser, then verify. See the lane report.
+"""
+import argparse
+from collections import Counter
+import gzip
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import runpy
+import subprocess
+
+ROOT = Path(__file__).resolve().parent.parent
+CHECK = runpy.run_path(str(ROOT / 'scripts/check-snippets'))
+
+
+def digest(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def tree(text):
+    # Rust Debug strings can themselves contain @1..2, so skip strings.
+    return re.sub(r'"(?:\\.|[^"\\])*"|@\d+\.\.\d+',
+                  lambda m: '@span' if m[0].startswith('@') else m[0], text)
+
+
+def inventory():
+    paths = sorted(set(subprocess.check_output(
+        ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--',
+         '*.i', '*.is', '*.rs', '*.md', '*.js', '*.mjs', '*.py'], cwd=ROOT, text=True).splitlines()))
+    config = json.loads(CHECK['DATA'].read_text())
+    for path in paths:
+        host = (ROOT / path).read_text()
+        if path.endswith(('.i', '.is')):
+            yield dict(path=path, start=0, end=len(host), source=host,
+                       kind='file', lisp=path.endswith('.is'))
+            continue
+        if path.endswith('.md'):
+            literals = [(m.start(1), m.end(1), m[1]) for m in
+                        re.finditer(r'(?m)^```i(?:[ \t][^\n]*)?\n(.*?)^```[ \t]*$', host, re.S)]
+            kind = 'markdown'
+        elif path.endswith('.rs'):
+            literals = CHECK['rust_strings'](host)
+            kind = 'rust'
+        elif path.endswith(('.js', '.mjs')):
+            literals = CHECK['js_strings'](host)
+            kind = 'js'
+        else:
+            # Python program builders are inventoried as decoded literals too.
+            import ast
+            try:
+                parsed = ast.parse(host)
+            except SyntaxError:
+                continue
+            lines = host.splitlines(keepends=True)
+            starts = [0]
+            for line in lines:
+                starts.append(starts[-1] + len(line))
+            literals = [(starts[n.lineno-1] + n.col_offset,
+                         starts[n.end_lineno-1] + n.end_col_offset, n.value)
+                        for n in ast.walk(parsed) if isinstance(n, ast.Constant)
+                        and isinstance(n.value, str) and hasattr(n, 'end_lineno')]
+            kind = 'python'
+        for start, end, source in literals:
+            # JoinedStr constants share their whole f-string's source span;
+            # they are templates, not independently replaceable literals.
+            if kind == 'python' and host[start:end].lstrip().lower().startswith(('f\"', "f'", 'rf\"', "rf'", 'fr\"', "fr'")):
+                continue
+            # Inventory all decoded literals, including fragments and invalid
+            # examples. Registry wrappers/substitutions preserve their context.
+            entry = config.get(CHECK['identity'](path, source), {})
+            yield dict(path=path, start=start, end=end, source=source,
+                       kind=kind, lisp=False, entry=entry)
+
+
+def prepared(item):
+    entry = item.get('entry', {})
+    source = entry.get('prefix', '') + item['source'] + entry.get('suffix', '')
+    for old, new in entry.get('substitutions', []):
+        source = source.replace(old, new)
+    return dict(source=source, lisp=item['lisp'], mode=item.get('result', {}).get('mode', 'auto'))
+
+
+def parse(items, binary):
+    data = ''.join(json.dumps(prepared(item), ensure_ascii=False) + '\n' for item in items)
+    result = subprocess.run([str(binary)], input=data, text=True, stdout=subprocess.PIPE, check=True)
+    return [json.loads(line) for line in result.stdout.splitlines()]
+
+
+def read(path):
+    with gzip.open(path, 'rt') as f:
+        return [json.loads(line) for line in f]
+
+
+def edits(source, offsets):
+    data = source.encode()
+    for start, end in reversed(offsets):
+        data = data[:start] + b'{ ' + data[start:end] + b' }' + data[end:]
+    return data.decode()
+
+
+def rewritten(item):
+    entry = item.get('entry', {})
+    if entry.get('substitutions') and item['result']['edits']:
+        raise SystemExit(f"review substituted snippet before rewriting: {item['path']}:{item['start']}")
+    prefix = len(entry.get('prefix', '').encode())
+    offsets = [(a-prefix, b-prefix) for a,b in item['result']['edits']]
+    if any(a < 0 or b > len(item['source'].encode()) for a,b in offsets):
+        raise SystemExit(f"annotation crosses snippet context: {item['path']}:{item['start']}")
+    return edits(item['source'], offsets)
+
+
+def encode(source, old, kind):
+    if kind == 'rust':
+        raw = re.match(r'r(#+)?"', old)
+        if raw:
+            hashes = raw[1] or ''
+            if '"' + hashes in source:
+                raise SystemExit('raw string delimiter collision')
+            return 'r' + hashes + '"' + source + '"' + hashes
+        return json.dumps(source, ensure_ascii=False).replace('\\u0000', '\\0')
+    if kind in ('python', 'js'):
+        # JSON quoting is valid in both hosts for these source strings.
+        return json.dumps(source, ensure_ascii=False)
+    return source
+
+
+def rewrite(items):
+    hosts = {}
+    registry = json.loads(CHECK['DATA'].read_text())
+    counts = Counter()
+    for item in sorted(items, key=lambda i: (i['path'], -i['start'])):
+        if not item['result']['edits']:
+            continue
+        path = item['path']
+        host = hosts.setdefault(path, (ROOT / path).read_text())
+        old = host[item['start']:item['end']]
+        if item['kind'] in ('file', 'markdown') and old != item['source']:
+            raise SystemExit(f'stale baseline for {path}; snapshot the old parser again')
+        source = rewritten(item)
+        host = host[:item['start']] + encode(source, old, item['kind']) + host[item['end']:]
+        hosts[path] = host
+        counts[path] += len(item['result']['edits'])
+        key = CHECK['identity'](path, item['source'])
+        if key in registry:
+            registry[CHECK['identity'](path, source)] = registry.pop(key)
+    for path, source in hosts.items():
+        (ROOT / path).write_text(source)
+    CHECK['DATA'].write_text(json.dumps(registry, indent=2, ensure_ascii=False) + '\n')
+    return counts
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mode', choices=['snapshot', 'rewrite', 'verify'])
+    parser.add_argument('--baseline', type=Path, required=True)
+    parser.add_argument('--binary', type=Path, default=ROOT / 'target/debug/examples/pattern-annotations')
+    parser.add_argument('--report', type=Path)
+    args = parser.parse_args()
+    os.chdir(ROOT)
+    if args.mode == 'snapshot':
+        items = list(inventory())
+        results = parse(items, args.binary)
+        assert len(items) == len(results)
+        with gzip.open(args.baseline, 'wt') as f:
+            for item, result in zip(items, results):
+                result['tree'] = tree(result['tree'])
+                item['result'] = result
+                f.write(json.dumps(item, ensure_ascii=False) + '\n')
+        print(f'saved {len(items)} file/literal trees in {args.baseline}')
+        return
+    items = read(args.baseline)
+    if args.mode == 'rewrite':
+        counts = rewrite(items)
+        print(json.dumps(dict(counts), indent=2))
+        print(f'rewrote {sum(counts.values())} annotations in {len(counts)} files')
+        return
+    # Pair by decoded source, so moving implementation literals is harmless.
+    current = list(inventory())
+    lookup = {}
+    for item in current:
+        lookup.setdefault((item['path'], item['source']), []).append(item)
+    paired = []
+    missing = []
+    for item in items:
+        expected = rewritten(item)
+        matches = lookup.get((item['path'], expected), [])
+        if not matches:
+            missing.append((item['path'], item['start'], expected[:100]))
+            continue
+        new = matches.pop()
+        new['result'] = item['result']
+        paired.append(new)
+    if missing:
+        raise SystemExit(f'missing rewritten sources: {missing[:30]}')
+    actual = parse(paired, args.binary)
+    differences = []
+    records = []
+    for old, new, result in zip(items, paired, actual):
+        same = old['result']['tree'] == tree(result['tree'])
+        diagnostics_same = old['result']['diagnostics'] == result['diagnostics']
+        record = dict(path=old['path'], start=old['start'],
+                      source_sha256=digest(old['source']), rewritten_sha256=digest(new['source']),
+                      tree_sha256=digest(old['result']['tree']),
+                      sites=len(old['result']['edits']), equal=same, diagnostics_equal=diagnostics_same)
+        records.append(record)
+        if not same or not diagnostics_same:
+            differences.append(dict(record, before=old['source'], after=new['source'],
+                                    old=old['result'], new=result))
+    if args.report:
+        args.report.write_text(json.dumps(dict(entries=records, differences=differences), indent=2) + '\n')
+    print(f'{len(records)} trees compared; {len(differences)} differences; '
+          f'{sum(r["sites"] for r in records)} rewritten sites')
+    if differences:
+        for d in differences[:30]:
+            print(d['path'], d['start'], d['before'][:150], d['old']['diagnostics'], d['new']['diagnostics'])
+        raise SystemExit(1)
+
+
+if __name__ == '__main__':
+    main()
