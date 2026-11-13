@@ -3630,9 +3630,6 @@
       "E0108: a string pattern has exactly one binder; two binders around a literal are not allowed"
     ]
   },
-  "crates/ilang-check/src/query/actions.rs:6d1f5e1b060e086f": {
-    "not_source": "Rust format template with a clause placeholder, not a complete i source"
-  },
   "docs/spec.md:a12d9a52fd631114": {
     "track": "SYN3",
     "reason": "Syntax-three spec text staged beside the section it replaces; it parses with the syntax-three parser.",
@@ -3890,5 +3887,8 @@
   },
   "crates/ilang-lsp/tests/protocol.rs:d27e00e4dc5cccc7": {
     "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-check/tests/query.rs:924116554a35a736": {
+    "not_source": "Expected hover text: a shown function type with two row variables, not i source"
   }
 }
