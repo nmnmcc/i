@@ -369,6 +369,8 @@ pub(super) const EFFECTS: &str = r#"
           (try_table (result eqref) (catch $error $caught) (catch_ref $capture $captured)
             (call $call0 (local.get $body) (local.get $env))))
         (return (call $result_ok (local.get $r)))))
+    ;; An escape goes on to its boundary.
+    (if (ref.test (ref $escaped) (local.get $e)) (then (throw $error (local.get $e))))
     (call $shadow_restore (local.get $depth))
     (return (call $result_error (local.get $e))))
   (call $capture_rethrow
@@ -379,7 +381,10 @@ pub(super) const EFFECTS: &str = r#"
 ;; The body ended with the value or the error `v`.
 (func $catch_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
     (param $mode i32) (result eqref)
-  (if (i32.eq (local.get $mode) (i32.const 1)) (then (return_call $result_error (local.get $v))))
+  (if (i32.eq (local.get $mode) (i32.const 1))
+    (then
+      (if (ref.test (ref $escaped) (local.get $v)) (then (throw $error (local.get $v))))
+      (return_call $result_error (local.get $v))))
   (return_call $result_ok (local.get $v)))
 
 ;; `resource.ensure(body, with)` (§9.5): `with` runs after `body`, also when
@@ -500,8 +505,15 @@ pub(super) const EFFECTS: &str = r#"
       (local.get $b))
     (unreachable))
   (local.set $x)
-  (drop)
+  (local.set $f)
   (struct.set $boundary 8 (local.get $b) (i32.const 0))
+  ;; `control.escape(b, v)` for this boundary: it ends with `v`.
+  (if (ref.test (ref $escaped) (local.get $f))
+    (then
+      (if (ref.eq (struct.get $escaped 0 (ref.cast (ref $escaped) (local.get $f))) (local.get $b))
+        (then
+          (call $shadow_restore (local.get $depth))
+          (return (struct.get $escaped 1 (ref.cast (ref $escaped) (local.get $f))))))))
   (throw_ref (local.get $x)))
 
 ;; A boundary that a capture for another boundary went through: active
@@ -524,6 +536,16 @@ pub(super) const EFFECTS: &str = r#"
     (then (call $stop_boundary_inactive) (unreachable)))
   (throw $capture (struct.new $cap (local.get $boundary) (local.get $f) (ref.null $flist) (ref.null $flist)
     (ref.null $flist) (ref.null $flist))))
+
+;; `control.escape(b, v)`: stops when `b` is not active. It throws `$error`,
+;; so `resource.ensure` and the trampoline treat it as an error, and the
+;; boundary `b` ends with `v` (`$boundary_core`). No capture, no records.
+(func $control_escape (param $b eqref) (param $v eqref) (result eqref)
+  (local $boundary (ref $boundary))
+  (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
+  (if (i32.eqz (struct.get $boundary 8 (local.get $boundary)))
+    (then (call $stop_boundary_inactive) (unreachable)))
+  (throw $error (struct.new $escaped (local.get $boundary) (local.get $v))))
 
 ;; The continuation `k`, used now: stops when it was already used (rule 5).
 (func $continuation_take (param $k eqref) (result (ref $cont))
@@ -764,6 +786,8 @@ pub(super) const TYPES: &str = r#"
 (type $boundary (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
   (field (ref null $call)) (field (mut i32)) (field (mut eqref)) (field (mut i32)))))
+;; The value of `$error` for `control.escape(b, v)`: the boundary and the value.
+(type $escaped (struct (field (ref $boundary)) (field eqref)))
 (rec
   ;; 0 re-entry function, 1 saved values, 2 shadow slot, 3 kind, 4 delta (kind 1 only)
   (type $frame (struct (field (ref $refn)) (field (ref null $values)) (field i32) (field i32)

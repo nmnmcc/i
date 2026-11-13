@@ -400,3 +400,55 @@ fn scheme_comparison_detects_hidden_service_form_counterexample() {
         SchemeComparison::Different
     );
 }
+
+#[test]
+fn deferred_need_meets_survive_transfer_and_instantiation() {
+    let mut source = Solver::new(HashMap::new(), Vec::new());
+    source.level = 1;
+    let (x, y, meet) = (source.fresh(), source.fresh(), source.fresh());
+    let Ty::Var(v) = meet else { unreachable!() };
+    let service = TypeRef::Custom(TypeId(17));
+    source.vars[v.0 as usize].need_meet = Some((
+        Ty::named(service, vec![x.clone()]),
+        Ty::named(service, vec![y.clone()]),
+    ));
+    source.has_need_meets = true;
+    source.constrain(&meet, &x);
+    source.constrain(&meet, &y);
+    let scheme = Scheme { level: 0, ty: meet };
+    let text = encode_test(&source, &scheme, &mut |_| "pkg:Svc".into());
+    let mut restored = Solver::new(HashMap::new(), Vec::new());
+    let decoded = decode(
+        &text,
+        &mut restored,
+        0,
+        &mut |_| Some(TypeRef::Custom(TypeId(99))),
+        &mut |_, _| None,
+    )
+    .unwrap();
+    let old = V(restored
+        .vars
+        .iter()
+        .position(|s| s.need_meet.is_some())
+        .unwrap() as u32);
+    let mut map = HashMap::new();
+    restored.freshen(&decoded.ty, 0, &mut map);
+    let fresh = map[&old];
+    let upper = restored.vars[fresh.0 as usize].upper.clone();
+    assert_eq!(upper.len(), 2);
+    restored.constrain(
+        &upper[0],
+        &Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
+    );
+    assert!(restored.failures.is_empty());
+    restored.constrain(
+        &upper[1],
+        &Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]),
+    );
+    assert!(
+        restored
+            .failures
+            .iter()
+            .any(|f| f.kind == super::super::solve::FailKind::NeedMeet)
+    );
+}

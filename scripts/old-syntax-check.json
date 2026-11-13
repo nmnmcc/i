@@ -3071,5 +3071,31 @@
   },
   "crates/ilang-wasm/tests/multi_shape.rs:6c0e82244f1f33bc": {
     "not_source": "Wasmtime --preload command argument guest={} rendered with a Wasm file path; not i source."
+  },
+  "crates/ilang-cli/tests/multicore.rs:7111383378a50a4c": {
+    "not_source": "Delimiter used to split a fixture before its main declaration."
+  },
+  "crates/ilang-cli/tests/multicore.rs:8de0b702d7782f25": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{waiter}",
+        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
+      ]
+    ],
+    "suffix": "fail.raise(\"outer\")\n })\n}\n",
+    "reason": "Render the stress generator header with its actual waiter fixture prefix and closing tail."
+  },
+  "crates/ilang-cli/tests/multicore.rs:995dc31b7483facf": {
+    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(Nil) = task.channel()\n",
+    "suffix": "fail.raise(\"outer\")\n })\n}\n",
+    "reason": "A per-pair stress-generator block inside its actual main/scope header and closing tail."
   }
 }

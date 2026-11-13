@@ -539,3 +539,23 @@ legacy spec cases each have their own written reason. Checker and CLI
 pending lists are empty. Whole-workspace tests, unfiltered spec/corpus and
 dev-verify remain coordinator-only. R2 opt-in measurements and the bigint
 baseline benchmark were not enabled.
+
+### Tonight integration: batch2 E1 and multicore
+
+Merged batch2 1cb245b4. Kept its substantive fixture and row-scheme changes,
+converted the incoming programs, retained both independent syntax tests,
+and preserved the folded syntax-three spec with its E1 paragraphs. Two
+old declarations inserted into already converted library modules needed
+direct translation: control.escape's signature and the new prelude Fail.
+The converter retry converts the remaining 31 embedded row-scheme snippets.
+Batch2 golden observations are retained pending reviewed syntax/display and
+coordinate translation. Corpus baseline snapshots are taken from batch2;
+only the 1,216 review-k4 cases whose program text differs from that revision
+may be re-recorded, with each phase exit and error-code set checked first.
+The other nine cases must keep their observations unchanged.
+
+Authority: spec §9.2, "The merge of two needs is their intersection (§4.4)."
+"When the intersection for one service of a need is Never while neither
+side is Never, the need cannot be satisfied: it is a compile error (E0515)."
+"A provided value of type P satisfies the need entry S when P <: S (§4.5
+rule 4)." Batch2's runtime/default-worker and fixture changes are preserved.
