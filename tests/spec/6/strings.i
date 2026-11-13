@@ -6,18 +6,16 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 test("append", () {
 	check("a" <> "b", "ab")
 	check("" <> "", "")
 	check("héllo" <> " " <> "wörld", "héllo wörld")
-	check("multi
-line", "multi\nline")
+	check("multi\nline", "multi\nline")
 	check("\u{1F600}" <> "!", "😀!")
 	check("tab\there", "tab	here")
 	check(core.inspect("a" <> "b" == "ab"), "True")
@@ -25,6 +23,12 @@ line", "multi\nline")
 })
 
 test("escapes", () {
-	check(core.inspect(core.byte_size("\n\r\t\f\"\\")), "6")
-	check(core.inspect(core.byte_size("\u{0}\u{7FF}\u{FFFF}\u{10FFFF}")), "10")
+	check(
+		core.inspect(core.byte_size("\n\r\t\f\"\\")),
+		"6",
+	)
+	check(
+		core.inspect(core.byte_size("\u{0}\u{7FF}\u{FFFF}\u{10FFFF}")),
+		"10",
+	)
 })

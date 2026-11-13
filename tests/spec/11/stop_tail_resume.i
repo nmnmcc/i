@@ -1,8 +1,8 @@
 // spec: 11.7, 9.4
 // expect: stop "panic: after"
 // at: spec/main:14:2
-// at: spec/main:20:3
-// at: spec/main:19:2
+// at: spec/main:19:3
+// at: spec/main:18:2
 (
 	i/control
 )
@@ -13,7 +13,6 @@ step = (b) {
 	control.suspend(b, (k) { control.resume(k, Nil) })
 	panic("after")
 }
-
 
 main = () {
 	control.boundary((b) {

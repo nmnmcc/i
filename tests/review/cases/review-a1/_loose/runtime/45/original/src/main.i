@@ -1,4 +1,10 @@
-f = (n: Int) { case n { 0 -> (x) { x + 1 } _ -> (x) { x + 2 } }(40) }
+f = (n: Int) {
+	case
+	n
+	(0) { (x) { x + 1 } } | (_) { (x) { x + 2 } }(40)
+}
 
-
-main = () { assert(f(0) == 41 && f(1) == 42) Nil }
+main = () {
+	assert(f(0) == 41 && f(1) == 42)
+	Nil
+}

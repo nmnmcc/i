@@ -1,4 +1,4 @@
 (, (= syntax (/ i syntax)) (= fail (/ i fail)))
 (, m)
-(@ macro (: (m A) (-> (A) (-> () A))))
-(@ macro (= m (-> (value) _ `(-> () _ ~value))))
+(@ macro (: m (-> [A] (, A) (-> (,) A))))
+(@ macro (= m (-> (, value) _ `(-> (,) _ ~value))))

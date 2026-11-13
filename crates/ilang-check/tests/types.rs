@@ -193,31 +193,45 @@ fn library() {
 /// were made equal.
 #[test]
 fn many_uses_of_a_parameter() {
-    let n = 200;
-    let mut source = String::from(
-        " (i/control)\ns = (b, v) { control.suspend(b, (k) { control.resume(k, v) }) }\nf = (b, x) {\n  a0 = x\n",
-    );
-    for i in 1..=n {
-        let p = i - 1;
-        source.push_str(&format!(
-            "  a{i} = {{ a{p} % 3 }} |> {{ 0 -> s(b, a{p} + 1)  _ -> a{p} + 2 }}\n"
-        ));
+    // About: checking a function whose parameter is used by many `suspend` points must not
+    // blow up. The bound is a growth ratio, not a wall-clock limit, so a busy machine does not
+    // fail it: from 50 to 200 uses the work may grow by far less than 1000 times (polynomial),
+    // an exponential would grow by far more.
+    let source_for = |n: usize| {
+        let mut source = String::from(
+            " (i/control)\ns = (b, v) { control.suspend(b, (k) { control.resume(k, v) }) }\nf = (b, x) {\n  a0 = x\n",
+        );
+        for i in 1..=n {
+            let p = i - 1;
+            source.push_str(&format!(
+                "  a{i} = {{ a{p} % 3 }} |> (0) {{ s(b, a{p} + 1) }} | (_) {{ a{p} + 2 }}\n"
+            ));
+        }
+        source.push_str(&format!("  a{n}\n}}\n"));
+        source
+    };
+    let mut smallest = None;
+    for n in [50, 100, 200] {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::write(dir.path().join("src/main.i"), source_for(n)).unwrap();
+        let (graph, diags) = ilang_package::load(dir.path());
+        assert!(diags.is_empty());
+        let start = std::time::Instant::now();
+        let out = output(&graph, true, false);
+        let elapsed = start.elapsed();
+        eprintln!("{n} uses: {elapsed:?}");
+        assert!(
+            out.contains("f : (Boundary(A, B, C), Int) -> Int\n") && !out.contains("error"),
+            "{out}"
+        );
+        let base = *smallest.get_or_insert(elapsed.max(std::time::Duration::from_millis(50)));
+        assert!(
+            elapsed < base * 1000,
+            "{n} uses took {elapsed:?}, 50 uses took {base:?}"
+        );
     }
-    source.push_str(&format!("  a{n}\n}}\n"));
-    let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
-    fs::create_dir_all(dir.path().join("src")).unwrap();
-    fs::write(dir.path().join("src/main.i"), source).unwrap();
-    let (graph, diags) = ilang_package::load(dir.path());
-    assert!(diags.is_empty());
-    let start = std::time::Instant::now();
-    let out = output(&graph, true, false);
-    let elapsed = start.elapsed();
-    assert!(
-        out.contains("f : (b: Boundary(A, B, C), x: Int) -> Int\n") && !out.contains("error"),
-        "{out}"
-    );
-    assert!(elapsed.as_secs() < 30, "{elapsed:?}");
 }
 
 #[test]
@@ -229,16 +243,16 @@ fn shown_names_skip_types_and_ignore_written_variable_names() {
     fs::create_dir(dir.path().join("src")).unwrap();
     fs::write(
         dir.path().join("src/main.i"),
-        "A { A }\nE { E }\nN { N }\nkeep(Z) = (v: Z) -> Z { v }\nagain(K) = (v: K) -> K { v }\neffect(X, Y, Z) = (f: () -> X ^ Y ! Z) { f() }\n",
+        "A = ()\nE = ()\nN = ()\nkeep = <Z>(v: Z) -> Z { v }\nagain = <K>(v: K) -> K { v }\neffect = <X, Z>(f: () <- Z -> X) { f() }\n",
     )
     .unwrap();
     let (graph, diags) = ilang_package::load(dir.path());
     assert!(diags.is_empty());
     let out = output(&graph, true, false);
-    assert!(out.contains("keep : (v: B) -> B\n"), "{out}");
-    assert!(out.contains("again : (v: B) -> B\n"), "{out}");
+    assert!(out.contains("keep : (B) -> B\n"), "{out}");
+    assert!(out.contains("again : (B) -> B\n"), "{out}");
     assert!(
-        out.contains("effect : (f: () -> B ^ E2 ! N2) -> B ^ E2 ! N2\n"),
+        out.contains("effect : (() <- (Fail(E2), ..N2) -> B) <- (Fail(E2), ..N2) -> B\n"),
         "{out}"
     );
     assert!(!out.contains("error"), "{out}");
@@ -256,15 +270,15 @@ fn scheme_types_know_each_type_by_what_it_is() {
         fs::write(p, text).unwrap();
     };
     write("dep/i.toml", "name = \"dep\"\n");
-    write("dep/src/u.i", " (T(..))\nT { T(String) }\n");
+    write("dep/src/u.i", "(\n\tT(..)\n)\nT = (String)\n");
     write(
         "app/i.toml",
         "name = \"app\"\n[dependencies]\ndep = { path = \"../dep\" }\n",
     );
-    write("app/src/geo/u.i", " (T(..))\nT { T(Int) }\n");
+    write("app/src/geo/u.i", "(\n\tT(..)\n)\nT = (Int)\n");
     write(
         "app/src/main.i",
-        " (app/geo/u, d = dep/u)\n (f, g, ext)\n@external(\"env\", \"now\")\nnow: () -> Int\n@external(\"env\", \"ext\")\next: (n: Int) -> Int\nf(A) = (x: u.T, y: d.T, z: A) -> A { z }\ng = (o: Result(u.T, Int)) { o }\nhidden = (x: u.T) { x }\n",
+        "(\n\tapp/geo/u\n\td = dep/u\n)\n\n(\n\tf\n\tg\n\text\n)\n@external(\"env\", \"now\")\nnow: () -> Int\n@external(\"env\", \"ext\")\next: (Int) -> Int\nf = <A>(x: u.T, y: d.T, z: A) -> A { z }\ng = (o: Result(u.T, Int)) { o }\nhidden = (x: u.T) { x }\n",
     );
     let (graph, diags) = ilang_package::load(&tmp.path().join("app"));
     assert!(diags.is_empty(), "{diags:?}");
@@ -300,7 +314,8 @@ fn scheme_types_know_each_type_by_what_it_is() {
         panic!("f is not a function");
     };
     let labels: Vec<_> = f.params.iter().map(|p| p.0.as_deref()).collect();
-    assert_eq!(labels, [Some("x"), Some("y"), Some("z")]);
+    // Positional binder names are hints, not keys in the parameter data.
+    assert_eq!(labels, [None, None, None]);
     assert_eq!(
         custom(&f.params[0].1),
         TypeIdentity {

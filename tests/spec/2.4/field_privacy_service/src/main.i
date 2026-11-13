@@ -2,10 +2,6 @@
 	app/secret
 )
 
-read = (raw ! secret.Raw) { raw.read() }
+read = () <- (raw: secret.Raw) { raw.read() }
 
-
-main = () {
-	! secret.Raw = secret.raw
-	assert(read() == 42)
-}
+main = () { assert(read() == 42) <- (secret.raw) }

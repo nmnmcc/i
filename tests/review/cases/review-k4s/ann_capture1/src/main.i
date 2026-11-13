@@ -1,5 +1,14 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-run(A, N) = (body: () -> A ! N) { body() }
-D { D }
-test(N) = (f: () -> Nil ! N, s ! S(N)) -> Nil ! N | S(N) { helper = () { f() use() } run(helper) }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+run = <A, N>(body: () <- N -> A) { body() }
+D = ()
+test = <N>(f: () <- N -> Nil) <- (s: S(N)) -> Nil {
+	helper = () {
+		f()
+		use()
+	}
+	run(helper)
+}

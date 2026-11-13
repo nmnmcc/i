@@ -1,4 +1,10 @@
-S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
-run(N) = (f: () -> Nil ! N) { f() }
-bad(N) = (s ! S(N)) -> Nil ! N { S(f) = s f() }
+S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+run = <N>(f: () <- N -> Nil) { f() }
+bad = <N>() <- (s: S(N)) -> Nil {
+	S(f) = s
+	f()
+}

@@ -5,5 +5,4 @@
 )
 
 // When the program stops, final functions are not run.
-
 main = () { resource.ensure(() { panic("body") }, () { panic("final") }) }

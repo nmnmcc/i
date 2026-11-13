@@ -1,0 +1,211 @@
+==================
+Branches, guards and matches
+==================
+kind = (n: Int) { n |> (0) { "zero" } | (k ? k < 0) { "negative" } | (_) { "positive" } }
+
+---
+
+(source_file
+  (binding
+    (identifier)
+    (function
+      (parameters
+        (parameter
+          (typed_pattern
+            (identifier)
+            (named_type
+              (type_identifier)))))
+      (block
+        (pipe
+          (identifier)
+          (branches
+            (function
+              (parameters
+                (parameter
+                  (integer)))
+              (block
+                (string
+                  (string_start)
+                  (string_content)
+                  (string_end))))
+            (function
+              (parameters
+                (parameter
+                  (identifier))
+                (guard
+                  (binary_expression
+                    (identifier)
+                    (integer))))
+              (block
+                (string
+                  (string_start)
+                  (string_content)
+                  (string_end))))
+            (function
+              (parameters
+                (parameter
+                  (discard)))
+              (block
+                (string
+                  (string_start)
+                  (string_content)
+                  (string_end))))))))))
+
+==================
+Services and provide
+==================
+run = () <- (io: Io, ..env: N) { io.print("x") }
+main = () { run() <- (io) }
+
+---
+
+(source_file
+  (binding
+    (identifier)
+    (function
+      (parameters)
+      (service_pattern
+        (service_item
+          (identifier)
+          (named_type
+            (type_identifier)))
+        (service_item
+          (identifier)
+          (type_identifier)))
+      (block
+        (call
+          (field_access
+            (identifier)
+            (identifier))
+          (data
+            (data_item
+              (string
+                (string_start)
+                (string_content)
+                (string_end))))))))
+  (binding
+    (identifier)
+    (function
+      (parameters)
+      (block
+        (provide
+          (call
+            (identifier)
+            (data))
+          (data
+            (data_item
+              (identifier))))))))
+
+==================
+Type parameters and function types
+==================
+id = <A>(x: A) -> A { x }
+F(A) = <B>(A, B) <- (Fail(String), ..N) -> A
+Pair = (left = Int, right = Int)
+p = Pair(left = 1, right = 2)
+
+---
+
+(source_file
+  (binding
+    (identifier)
+    (function
+      (type_parameters
+        (type_identifier))
+      (parameters
+        (parameter
+          (typed_pattern
+            (identifier)
+            (named_type
+              (type_identifier)))))
+      (return_type
+        (named_type
+          (type_identifier)))
+      (block
+        (identifier))))
+  (type_definition
+    (type_identifier)
+    (type_head
+      (named_type
+        (type_identifier)))
+    (function_type
+      (type_parameters
+        (type_identifier))
+      (data_type
+        (type_item
+          (named_type
+            (type_identifier)))
+        (type_item
+          (named_type
+            (type_identifier))))
+      (needs
+        (named_type
+          (type_identifier)
+          (type_arguments
+            (named_type
+              (type_identifier))))
+        (type_identifier))
+      (named_type
+        (type_identifier))))
+  (type_definition
+    (type_identifier)
+    (data_type
+      (type_item
+        (identifier)
+        (named_type
+          (type_identifier)))
+      (type_item
+        (identifier)
+        (named_type
+          (type_identifier)))))
+  (binding
+    (identifier)
+    (call
+      (type_identifier)
+      (data
+        (data_item
+          (identifier)
+          (integer))
+        (data_item
+          (identifier)
+          (integer))))))
+
+==================
+Data patterns
+==================
+f = ((a, b) = t, Point(x = px, ..)) { (a, b, px, t) }
+
+---
+
+(source_file
+  (binding
+    (identifier)
+    (function
+      (parameters
+        (parameter
+          (alias_pattern
+            (data_pattern
+              (data_pattern_item
+                (identifier))
+              (data_pattern_item
+                (identifier)))
+            (identifier)))
+        (parameter
+          (constructor_pattern
+            (type_identifier)
+            (data_pattern
+              (data_pattern_item
+                (alias_pattern
+                  (identifier)
+                  (identifier)))
+              (rest_pattern)))))
+      (block
+        (data
+          (data_item
+            (identifier))
+          (data_item
+            (identifier))
+          (data_item
+            (identifier))
+          (data_item
+            (identifier)))))))

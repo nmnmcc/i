@@ -33,55 +33,58 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (String) -> Nil)
-}
+Out = (print = (String) -> Nil)
 
-print = (text: String, out ! Out) { out.print(text) }
+print = (text: String) <- (out: Out) { out.print(text) }
 
 probe = (phase: Int, typed: Bool) {
 	result = fail.catch(() {
 		task.scope((s) {
 			gate: task.Channel(Nil) = task.channel()
 			never: task.Channel(Nil) = task.channel()
+			started: task.Channel(Nil) = task.channel()
 			child = task.go(s, () {
 				fail.catch(() {
-					resource.ensure(() {
-						phase |> {
-							0 -> task.receive(never)
-							_ -> Nil
-						}
-						typed |> {
-							True  -> fail.raise("child")
-							False -> Nil
-						}
-					}, () {
-						print("start")
-						phase |> {
-							1 -> task.send(gate, Nil)
-							_ -> Nil
-						}
-						resource.ensure(() { task.yield() }, () {
+					resource.ensure(
+						() {
+							phase |>
+								(0) {
+									task.send(started, Nil)
+									task.receive(never)
+								}
+								| (_) { Nil }
+							typed |>
+								(True) { fail.raise("child") }
+								| (False) { Nil }
+						},
+						() {
+							print("start")
+							phase |> (1) { task.send(gate, Nil) } | (_) { Nil }
+							resource.ensure(
+								() { task.yield() },
+								() {
+									task.yield()
+									print("inner")
+								},
+							)
 							task.yield()
-							print("inner")
-						})
-						task.yield()
-						print("end")
-					})
+							print("end")
+						},
+					)
 				})
 				Nil
 			})
-			phase |> {
-				0 -> task.yield()
-				1 -> task.receive(gate)
-				_ -> task.join(child)
-			}
+			// §9.9: "Timing may choose ... which failures precede
+			// cancellation"; the child says it started before the parent fails.
+			phase |>
+				(0) { task.receive(started) }
+				| (1) { task.receive(gate) }
+				| (_) { task.join(child) }
 			fail.raise("parent")
 		})
 	})
 	print(core.inspect(result))
 }
-
 
 main = () {
 	probe(0, False)

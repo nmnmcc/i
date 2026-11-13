@@ -1,3 +1,0 @@
-spec/stop_in_start.ready : Int
-spec/stop_in_start.check : (n: Int) -> Int
-spec/stop_in_start.main : () -> String

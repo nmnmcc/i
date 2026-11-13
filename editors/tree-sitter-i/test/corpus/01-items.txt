@@ -1,0 +1,177 @@
+==================
+Headers, types and bindings
+==================
+//// A first program in i. It imports the standard service `Io` from `i/io`
+//// (§9.7), and `i run` gives it, so the program can print: `i run` prints
+//// `Hello from i!`.
+(
+	(Io) = i/io
+)
+
+(
+	Greeting(..)
+	greet
+	repeat
+)
+
+Greeting = (name = String, times = Int)
+
+/// `text` `times` times, with `sep` between.
+repeat = (text: String, times: Int, sep: String) -> String {
+	times |>
+		(0) { "" }
+		| (1) { text }
+		| (_) { text <> sep <> repeat(text, times - 1, sep) }
+}
+
+greet = (g: Greeting) { repeat("hello \(g.name)!", g.times, " ") }
+
+// Program entry.
+main = () <- (io: Io) { io.print("Hello from i!") }
+
+---
+
+(source_file
+  (module_comment)
+  (module_comment)
+  (module_comment)
+  (imports
+    (import
+      (type_identifier)
+      (module_path
+        (identifier)
+        (identifier))))
+  (exports
+    (export
+      (type_identifier))
+    (export
+      (identifier))
+    (export
+      (identifier)))
+  (type_definition
+    (type_identifier)
+    (data_type
+      (type_item
+        (identifier)
+        (named_type
+          (type_identifier)))
+      (type_item
+        (identifier)
+        (named_type
+          (type_identifier)))))
+  (doc_comment)
+  (binding
+    (identifier)
+    (function
+      (parameters
+        (parameter
+          (typed_pattern
+            (identifier)
+            (named_type
+              (type_identifier))))
+        (parameter
+          (typed_pattern
+            (identifier)
+            (named_type
+              (type_identifier))))
+        (parameter
+          (typed_pattern
+            (identifier)
+            (named_type
+              (type_identifier)))))
+      (return_type
+        (named_type
+          (type_identifier)))
+      (block
+        (pipe
+          (identifier)
+          (branches
+            (function
+              (parameters
+                (parameter
+                  (integer)))
+              (block
+                (string
+                  (string_start)
+                  (string_end))))
+            (function
+              (parameters
+                (parameter
+                  (integer)))
+              (block
+                (identifier)))
+            (function
+              (parameters
+                (parameter
+                  (discard)))
+              (block
+                (binary_expression
+                  (binary_expression
+                    (identifier)
+                    (identifier))
+                  (call
+                    (identifier)
+                    (data
+                      (data_item
+                        (identifier))
+                      (data_item
+                        (binary_expression
+                          (identifier)
+                          (integer)))
+                      (data_item
+                        (identifier))))))))))))
+  (binding
+    (identifier)
+    (function
+      (parameters
+        (parameter
+          (typed_pattern
+            (identifier)
+            (named_type
+              (type_identifier)))))
+      (block
+        (call
+          (identifier)
+          (data
+            (data_item
+              (string
+                (string_start)
+                (string_content)
+                (interpolation
+                  (interpolation_start)
+                  (field_access
+                    (identifier)
+                    (identifier))
+                  (interpolation_end))
+                (string_content)
+                (string_end)))
+            (data_item
+              (field_access
+                (identifier)
+                (identifier)))
+            (data_item
+              (string
+                (string_start)
+                (string_content)
+                (string_end))))))))
+  (comment)
+  (binding
+    (identifier)
+    (function
+      (parameters)
+      (service_pattern
+        (service_item
+          (identifier)
+          (named_type
+            (type_identifier))))
+      (block
+        (call
+          (field_access
+            (identifier)
+            (identifier))
+          (data
+            (data_item
+              (string
+                (string_start)
+                (string_content)
+                (string_end)))))))))

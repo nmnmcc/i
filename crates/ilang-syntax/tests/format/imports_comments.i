@@ -1,11 +1,14 @@
- ( // what we use
-  i/core // printing
-  // decoding
-  decode = json/decode
-  opt = (Option, Some, // the constructors
-    None) = std/option
+// what we use
+(
+	i/core // printing
+	// decoding
+	decode = json/decode
+	opt = (Option, Some, None) = std/option
 )
 
- (main)
+// the constructors
+(
+	main
+)
 
 main = () { 1 }

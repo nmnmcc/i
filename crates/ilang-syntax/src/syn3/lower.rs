@@ -19,16 +19,15 @@
 //!   binding with the type parameter `N` carries the errors in `N`: it
 //!   becomes `^ N%E ! N`, with `N%E` one more type parameter of the binding.
 //!
-//! One-constructor types: the checker of this stage has no unions of data
-//! types that stand for a sum, so `C1 = (…)`, `C2 = (…)`, `T = C1 | C2`
-//! written one after the other are read as today's `T { C1(…) C2(…) }`; an
-//! export of `C1` alone is then part of the export of `T`.
+//! Type definitions (§2.8, stage 3): `C(A) = (…)` is today's one-constructor
+//! type `C(A) { C(…) }`, and a sum `T(A) = C1(A) | C2` is the alias of the
+//! union of such types, which the checker reads as a sum.
 
 use super::ast as n;
 use crate::ast as o;
 use crate::span::Span;
 use crate::{Code, Diagnostic};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// Lowers a module of syntax three to the current tree.
 pub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
@@ -47,6 +46,8 @@ fn lower_surface(m: &n::Module, lisp: bool) -> (o::Module, Vec<Diagnostic>) {
         errors: Vec::new(),
         rows: Vec::new(),
         fresh: 0,
+        group: false,
+        hidden: Vec::new(),
         // `core` is not the name of another module than `i/core`.
         core_free: !m.imports.iter().any(|i| {
             let named = match &i.alias {
@@ -83,7 +84,7 @@ pub fn lower_pattern(p: &n::Pattern) -> Result<o::Pattern, Diagnostic> {
 /// Lowers items that stand alone (macro results).
 pub fn lower_items(items: &[n::Item]) -> Result<Vec<o::Item>, Diagnostic> {
     let mut cx = Cx::plain();
-    let (out, _) = cx.items(items);
+    let out = cx.items(items);
     cx.finish(out)
 }
 
@@ -168,6 +169,82 @@ struct Cx {
     /// The module imports nothing under the name `core`, so `core.never`
     /// is the empty match (§2.13).
     core_free: bool,
+    /// The chain being lowered is one shape group of a multi chain: its
+    /// branches have one shape and may have keys.
+    group: bool,
+    /// The hidden group bindings of the multi chains bound at the top
+    /// level, by the name of the chain.
+    hidden: Vec<(String, String)>,
+}
+
+/// The shape of a branch: its number of positions and its sorted labels.
+fn shape_of(f: &n::Function) -> (usize, Vec<&str>) {
+    let mut labels: Vec<&str> = f
+        .params
+        .iter()
+        .filter_map(|p| p.key.as_ref())
+        .map(|k| k.name.as_str())
+        .collect();
+    labels.sort();
+    (f.params.len() - labels.len(), labels)
+}
+
+/// The branches of a chain by shape, in the order of the first branch of
+/// each group (§2.5).
+fn shape_groups(fs: &[n::Function]) -> Vec<Vec<n::Function>> {
+    let mut groups: Vec<Vec<n::Function>> = Vec::new();
+    for f in fs {
+        match groups.iter_mut().find(|g| shape_of(&g[0]) == shape_of(f)) {
+            Some(g) => g.push(f.clone()),
+            None => groups.push(vec![f.clone()]),
+        }
+    }
+    groups
+}
+
+/// A chain with several shape groups, or with a label in its one shape.
+fn is_multi(fs: &[n::Function]) -> bool {
+    fs.iter()
+        .any(|f| f.params.iter().any(|p| p.key.is_some()) || shape_of(f) != shape_of(&fs[0]))
+}
+
+/// The parameter items of a branch in canonical order: the positions, then
+/// the labels in UTF-8 byte order.
+fn canonical(f: &n::Function) -> Vec<&n::PItem> {
+    let mut items: Vec<&n::PItem> = f.params.iter().filter(|p| p.key.is_none()).collect();
+    let mut keyed: Vec<&n::PItem> = f.params.iter().filter(|p| p.key.is_some()).collect();
+    keyed.sort_by(|a, b| {
+        a.key
+            .as_ref()
+            .unwrap()
+            .name
+            .cmp(&b.key.as_ref().unwrap().name)
+    });
+    items.extend(keyed);
+    items
+}
+
+/// The label under which a shape is written in the transition tree: the
+/// number of positions and then each label after a comma.
+pub fn shape_text(positions: usize, labels: &[&str]) -> String {
+    let mut text = positions.to_string();
+    for l in labels {
+        text.push(',');
+        text.push_str(l);
+    }
+    text
+}
+
+/// The label of the one parameter of a multi-shape function type in the
+/// transition tree.
+pub const DATA: &str = "%data";
+
+/// The callee of the transition form of a multi chain (see `multi_expr`).
+pub const MULTI: &str = "%multi";
+
+/// The hidden binding of group `index` of the chain bound to `name`.
+pub fn group_name(name: &str, index: usize) -> String {
+    format!("{name}%g{index}")
 }
 
 fn id(i: &n::Ident) -> o::Ident {
@@ -218,6 +295,28 @@ fn name_expr(name: &str, span: Span) -> o::Expr {
     )
 }
 
+/// The transition form of a multi-shape value (deleted in stage 12, when
+/// the resolver reads the syntax-three tree): a call of the reserved name
+/// [`MULTI`] with one argument per shape group, whose label is the group's
+/// shape ([`shape_text`]) and whose value is the group's function.
+fn multi_expr(groups: Vec<(String, o::Expr)>, span: Span) -> o::Expr {
+    let at = Span::new(span.end.saturating_sub(1), span.end);
+    let args = groups
+        .into_iter()
+        .map(|(shape, value)| o::Arg {
+            label: Some(ident(shape, value.span)),
+            value,
+        })
+        .collect();
+    expr(
+        o::ExprKind::Call {
+            callee: Box::new(name_expr(MULTI, at)),
+            args,
+        },
+        at,
+    )
+}
+
 /// The bare names of a head `(A, B)`, when every part is one.
 fn head_params(head: &[n::Type]) -> Option<Vec<o::Ident>> {
     head.iter()
@@ -232,19 +331,6 @@ fn head_params(head: &[n::Type]) -> Option<Vec<o::Ident>> {
         .collect()
 }
 
-/// The name of a member `C` or `C(A, …)` of a sum, when its arguments are
-/// bare names.
-fn member_name(t: &n::Type) -> Option<&str> {
-    match &t.kind {
-        n::TypeKind::Named {
-            module: None,
-            name,
-            args,
-        } if head_params(args).is_some() => Some(&name.name),
-        _ => None,
-    }
-}
-
 impl Cx {
     fn plain() -> Cx {
         Cx {
@@ -253,6 +339,8 @@ impl Cx {
             rows: Vec::new(),
             fresh: 0,
             core_free: false,
+            group: false,
+            hidden: Vec::new(),
         }
     }
 
@@ -277,7 +365,7 @@ impl Cx {
     // ---- Module and items ----
 
     fn module(&mut self, m: &n::Module) -> o::Module {
-        let (items, absorbed) = self.items(&m.items);
+        let items = self.items(&m.items);
         let cover = |spans: Vec<Span>| spans.into_iter().reduce(Span::to);
         o::Module {
             doc: m.doc.clone(),
@@ -294,11 +382,25 @@ impl Cx {
             exports: m
                 .exports
                 .iter()
-                .filter(|e| e.constructors || !absorbed.contains(&e.name.name))
-                .map(|e| o::ExportItem {
-                    name: id(&e.name),
-                    constructors: e.constructors,
-                    span: e.span.0,
+                .flat_map(|e| {
+                    // The group bindings of an exported chain go with it.
+                    let hidden = self
+                        .hidden
+                        .iter()
+                        .filter(|(name, _)| !e.constructors && *name == e.name.name);
+                    let mut items: Vec<o::ExportItem> = hidden
+                        .map(|(_, h)| o::ExportItem {
+                            name: ident(h.clone(), e.span.0),
+                            constructors: false,
+                            span: e.span.0,
+                        })
+                        .collect();
+                    items.push(o::ExportItem {
+                        name: id(&e.name),
+                        constructors: e.constructors,
+                        span: e.span.0,
+                    });
+                    items
                 })
                 .collect(),
             items,
@@ -307,69 +409,30 @@ impl Cx {
         }
     }
 
-    /// The items, and the names of the one-constructor types that became
-    /// constructors of a sum.
-    fn items(&mut self, items: &[n::Item]) -> (Vec<o::Item>, HashSet<String>) {
-        // The sums: a definition `T = C1 | … | Ck` whose `k` members are
-        // the data definitions just before it, in order.
-        let mut member_of: HashMap<usize, usize> = HashMap::new();
-        let mut absorbed = HashSet::new();
-        for (i, item) in items.iter().enumerate() {
-            let n::ItemKind::TypeDef(def) = &item.kind else {
-                continue;
-            };
-            let n::TypeRhs::Type(rhs) = &def.rhs else {
-                continue;
-            };
-            let members: Vec<&n::Type> = match &rhs.kind {
-                n::TypeKind::Union(ms) => ms.iter().collect(),
-                _ => vec![rhs],
-            };
-            let k = members.len();
-            if k > i || head_params(&def.head).is_none() {
-                continue;
-            }
-            let fits = members.iter().enumerate().all(|(j, m)| {
-                let at = i - k + j;
-                !member_of.contains_key(&at)
-                    && match &items[at].kind {
-                        n::ItemKind::TypeDef(n::TypeDef {
-                            name,
-                            rhs: n::TypeRhs::Data(_),
-                            ..
-                        }) => member_name(m) == Some(name.name.as_str()),
-                        _ => false,
-                    }
-            });
-            if fits {
-                for j in 0..k {
-                    member_of.insert(i - k + j, i);
-                    let n::ItemKind::TypeDef(member) = &items[i - k + j].kind else {
-                        unreachable!()
-                    };
-                    if member.name.name != def.name.name {
-                        absorbed.insert(member.name.name.clone());
-                    }
-                }
-            }
-        }
-        let mut sums: HashMap<usize, Vec<o::Constructor>> = HashMap::new();
+    /// The items. Each definition is lowered alone (§2.8, stage 3): a data
+    /// definition `C(A) = (…)` is a type with one constructor of its name,
+    /// and `T = C1 | … | Ck` is the alias for the union of those types.
+    fn items(&mut self, items: &[n::Item]) -> Vec<o::Item> {
         let mut out = Vec::new();
-        for (i, item) in items.iter().enumerate() {
+        for item in items {
             let attributes = item.attributes.iter().map(|a| self.attribute(a)).collect();
             let kind = match &item.kind {
                 n::ItemKind::TypeDef(def) => {
-                    if let Some(sum) = member_of.get(&i) {
-                        let n::TypeRhs::Data(fields) = &def.rhs else {
-                            unreachable!()
-                        };
-                        let c = self.constructor(&def.name, fields, item.span.0);
-                        sums.entry(*sum).or_default().push(c);
-                        continue;
-                    }
-                    o::ItemKind::TypeDef(self.type_def(def, sums.remove(&i), item.span.0))
+                    o::ItemKind::TypeDef(self.type_def(def, item.span.0))
                 }
-                n::ItemKind::Bind(b) => o::ItemKind::Binding(self.binding(b)),
+                n::ItemKind::Bind(b) => {
+                    let mut bindings = self.bindings(b, true);
+                    let last = bindings.pop().unwrap();
+                    for hidden in bindings {
+                        out.push(o::Item {
+                            doc: Vec::new(),
+                            attributes: Vec::new(),
+                            span: hidden.span,
+                            kind: o::ItemKind::Binding(hidden),
+                        });
+                    }
+                    o::ItemKind::Binding(last)
+                }
                 n::ItemKind::Decl { name, ty: t } => {
                     let mut type_params = Vec::new();
                     let ty = match &t.kind {
@@ -398,7 +461,7 @@ impl Cx {
                 span: item.span.0,
             });
         }
-        (out, absorbed)
+        out
     }
 
     fn attribute(&mut self, a: &n::Attribute) -> o::Attribute {
@@ -460,12 +523,7 @@ impl Cx {
         }
     }
 
-    fn type_def(
-        &mut self,
-        def: &n::TypeDef,
-        sum: Option<Vec<o::Constructor>>,
-        span: Span,
-    ) -> o::TypeDef {
+    fn type_def(&mut self, def: &n::TypeDef, span: Span) -> o::TypeDef {
         let params = head_params(&def.head);
         let custom = |cx: &mut Cx, ctors: Vec<o::Constructor>| {
             if params.is_none() {
@@ -482,9 +540,6 @@ impl Cx {
                 body: o::TypeBody::Custom(ctors),
             }
         };
-        if let Some(ctors) = sum {
-            return custom(self, ctors);
-        }
         match &def.rhs {
             n::TypeRhs::Opaque => custom(self, Vec::new()),
             n::TypeRhs::Data(fields) => {
@@ -515,9 +570,12 @@ impl Cx {
     fn binding(&mut self, b: &n::Binding) -> o::Binding {
         let mut generics: Vec<&n::Ident> = Vec::new();
         if let n::ExprKind::Chain(fs) = &b.value.kind {
+            // Branches may share a name; a name written twice in one list
+            // is kept twice, so that the resolver reports it (E0226).
             for f in fs {
+                let before = generics.len();
                 for g in &f.generics {
-                    if !generics.iter().any(|x| x.name == g.name) {
+                    if !generics[..before].iter().any(|x| x.name == g.name) {
                         generics.push(g);
                     }
                 }
@@ -598,6 +656,9 @@ impl Cx {
                     kind: n::ExprKind::Provide { target, services },
                     ..
                 }) if i + 1 == b.stmts.len() => stmts.extend(self.provide(target, services)),
+                n::Stmt::Bind(b) => {
+                    stmts.extend(self.bindings(b, false).into_iter().map(o::Stmt::Bind))
+                }
                 _ => stmts.push(self.stmt(s)),
             }
         }
@@ -614,18 +675,108 @@ impl Cx {
         }
     }
 
-    /// `e <- (s1, s2)`: the environment statements and then `e`.
+    /// A binding as one or more bindings of the current tree. A multi chain
+    /// bound to one name with no written type (§2.6.1) becomes one hidden
+    /// binding per shape group and then the name itself, bound to the
+    /// multi-shape value of those groups.
+    fn bindings(&mut self, b: &n::Binding, top: bool) -> Vec<o::Binding> {
+        let (n::PatternKind::Var(name), n::ExprKind::Chain(fs)) = (&b.pattern.kind, &b.value.kind)
+        else {
+            return vec![self.binding(b)];
+        };
+        if !is_multi(fs) {
+            return vec![self.binding(b)];
+        }
+        let span = b.value.span.0;
+        let mut out = Vec::new();
+        let mut groups = Vec::new();
+        for (i, group) in shape_groups(fs).into_iter().enumerate() {
+            let first = group[0].span.0;
+            let at = Span::new(first.start, first.start + 1);
+            let (positions, labels) = shape_of(&group[0]);
+            let shape = shape_text(positions, &labels);
+            let hidden = group_name(name, i);
+            let cover = first.to(group.last().unwrap().span.0);
+            let binding = n::Binding {
+                pattern: n::Pattern {
+                    kind: n::PatternKind::Var(hidden.clone()),
+                    span: n::Sp(at),
+                },
+                value: n::Expr {
+                    kind: n::ExprKind::Chain(group),
+                    span: n::Sp(cover),
+                },
+                span: b.span,
+            };
+            self.group = true;
+            out.push(self.binding(&binding));
+            groups.push((shape, name_expr(&hidden, at)));
+            if top {
+                self.hidden.push((name.clone(), hidden));
+            }
+        }
+        out.push(o::Binding {
+            pattern: self.pattern(&b.pattern),
+            value: multi_expr(groups, span),
+            span: b.span.0,
+            type_params: Vec::new(),
+        });
+        out
+    }
+
+    /// A multi chain that is not bound to one name: the multi-shape value
+    /// of its group functions, written in place.
+    fn multi_value(&mut self, fs: &[n::Function], span: Span) -> o::Expr {
+        let mut groups = Vec::new();
+        for group in shape_groups(fs) {
+            let (positions, labels) = shape_of(&group[0]);
+            let shape = shape_text(positions, &labels);
+            let cover = group[0].span.0.to(group.last().unwrap().span.0);
+            self.group = true;
+            groups.push((shape, self.chain(&group, cover, false)));
+        }
+        multi_expr(groups, span)
+    }
+
+    /// `e <- (s1, s2)`: the environment statements and then `e`. Every
+    /// service is worked out in the outer environment (§2.10.5): when there
+    /// are several and one is not a name, each is bound to a fresh local
+    /// first, so that no service sees another.
     fn provide(&mut self, target: &n::Expr, services: &n::Expr) -> Vec<o::Stmt> {
         let mut stmts = Vec::new();
+        let mut envs = Vec::new();
         match &services.kind {
             n::ExprKind::Data(items) => {
+                let apart = items.len() > 1
+                    && items.iter().any(|i| {
+                        !matches!(i, n::DItem::Pos(n::Expr { kind: n::ExprKind::Name { .. }, .. }))
+                    });
                 for item in items {
                     match item {
-                        n::DItem::Pos(e) => stmts.push(o::Stmt::Env {
-                            ty: ty(o::TypeKind::Hole, e.span.0),
-                            value: self.expr(e),
-                            span: e.span.0,
-                        }),
+                        n::DItem::Pos(e) => {
+                            let mut value = self.expr(e);
+                            if apart {
+                                let name = self.fresh("service");
+                                stmts.push(o::Stmt::Bind(o::Binding {
+                                    pattern: pat(o::PatternKind::Var(name.clone()), e.span.0),
+                                    value,
+                                    span: e.span.0,
+                                    type_params: Vec::new(),
+                                }));
+                                value = expr(
+                                    o::ExprKind::Name {
+                                        module: None,
+                                        name: ident(name, e.span.0),
+                                    },
+                                    e.span.0,
+                                );
+                            }
+                            envs.push(o::Stmt::Env {
+                                ty: ty(o::TypeKind::Hole, e.span.0),
+                                value,
+                                span: e.span.0,
+                            });
+                        }
                         n::DItem::Label(l, _) => self.error(
                             l.span.0,
                             "a provided service has no label: it is keyed by its type (§2.10.2)",
@@ -642,6 +793,7 @@ impl Cx {
                 "providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
             ),
         }
+        stmts.extend(envs);
         match &target.kind {
             n::ExprKind::Block(b) => stmts.extend(self.block(b).stmts),
             n::ExprKind::Provide {
@@ -656,7 +808,19 @@ impl Cx {
     // ---- Functions ----
 
     fn params_of(&mut self, f: &n::Function, params: &mut Vec<o::Param>) {
+        let mut fails = 0;
         for s in f.services.iter().flatten() {
+            // `name: Fail(E)` is today's error part (`ret`).
+            if fail_of(s).is_some() {
+                fails += 1;
+                if fails == 2 {
+                    self.error(
+                        s.ty.span.0,
+                        "a need has one `Fail` entry: write `Fail(A | B)`",
+                    );
+                }
+                continue;
+            }
             if s.rest {
                 self.error(
                     s.name.span.0,
@@ -671,12 +835,20 @@ impl Cx {
         }
     }
 
-    /// The written `-> R`: the needs are left to inference.
+    /// The written `-> R`: the needs are left to inference. A `Fail(E)`
+    /// item of the service pattern gives the error part `E`.
     fn ret(&mut self, f: &n::Function) -> Option<o::RetType> {
-        f.ret.as_ref().map(|t| o::RetType {
-            value: self.ty(t),
-            err: Some(ty(o::TypeKind::Hole, t.span.0)),
-            env: Some(ty(o::TypeKind::Hole, t.span.0)),
+        let fail = f.services.iter().flatten().find_map(fail_of);
+        let at = match (&f.ret, fail) {
+            (Some(t), _) => t.span.0,
+            (None, Some(e)) => e.span.0,
+            (None, None) => return None,
+        };
+        let hole = || ty(o::TypeKind::Hole, at);
+        Some(o::RetType {
+            value: f.ret.as_ref().map_or_else(hole, |t| self.ty(t)),
+            err: Some(fail.map_or_else(hole, |e| self.ty(e))),
+            env: Some(hole()),
         })
     }
 
@@ -687,22 +859,31 @@ impl Cx {
         }
     }
 
-    fn keys(&mut self, f: &n::Function) {
-        for p in &f.params {
-            if let Some(k) = &p.key {
-                self.error(
-                    k.span.0,
-                    "a key on a parameter needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
-                );
-            }
-        }
-    }
-
     /// A chain as a value. `bound` is set when the chain is the value of a
     /// binding, which takes its type parameters.
     fn chain(&mut self, fs: &[n::Function], span: Span, bound: bool) -> o::Expr {
+        let group = std::mem::replace(&mut self.group, false);
+        if !group && is_multi(fs) {
+            return self.multi_value(fs, span);
+        }
+        // The branches of one shape group take their parts in canonical
+        // order; the keys are in the shape.
+        let fs: Vec<n::Function> = fs
+            .iter()
+            .map(|f| {
+                let mut g = f.clone();
+                g.params = canonical(f)
+                    .into_iter()
+                    .map(|p| n::PItem {
+                        key: None,
+                        choices: p.choices.clone(),
+                    })
+                    .collect();
+                g
+            })
+            .collect();
+        let fs = fs.as_slice();
         for f in fs {
-            self.keys(f);
             if !bound && !f.generics.is_empty() {
                 self.error(
                     f.generics[0].span.0,
@@ -711,12 +892,6 @@ impl Cx {
             }
         }
         let count = fs[0].params.len();
-        if let Some(other) = fs.iter().find(|f| f.params.len() != count) {
-            self.error(
-                other.span.0,
-                "a chain whose branches have different shapes needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
-            );
-        }
         let plain =
             |f: &n::Function| f.guard.is_none() && f.params.iter().all(|p| p.choices.len() == 1);
         if let [f] = fs
@@ -775,10 +950,37 @@ impl Cx {
                 }
             }
         }
-        let ret = fs
-            .iter()
-            .find(|f| f.ret.is_some())
-            .and_then(|f| self.ret(f));
+        // The written results: one type when the branches write the same
+        // one; their union when every branch writes one (each branch body
+        // keeps its tail position); none when a branch leaves it out.
+        let mut written: Vec<&n::Type> = Vec::new();
+        for t in fs.iter().filter_map(|f| f.ret.as_ref()) {
+            if !written.contains(&t) {
+                written.push(t);
+            }
+        }
+        let ret = match written.as_slice() {
+            [] => fs
+                .iter()
+                .find(|f| f.services.iter().flatten().any(|s| fail_of(s).is_some()))
+                .and_then(|f| self.ret(f)),
+            [_] => fs
+                .iter()
+                .find(|f| {
+                    f.ret.is_some() || f.services.iter().flatten().any(|s| fail_of(s).is_some())
+                })
+                .and_then(|f| self.ret(f)),
+            _ if fs.iter().any(|f| f.ret.is_none()) => None,
+            many => {
+                let at = many[0].span.0;
+                let members = many.iter().map(|t| self.ty(t)).collect();
+                Some(o::RetType {
+                    value: ty(o::TypeKind::Union(members), at),
+                    err: Some(ty(o::TypeKind::Hole, at)),
+                    env: Some(ty(o::TypeKind::Hole, at)),
+                })
+            }
+        };
         let subject = if count == 1 {
             name_expr(&names[0].0, names[0].1)
         } else {
@@ -929,7 +1131,9 @@ impl Cx {
                 name: id(name),
             },
             n::ExprKind::Data(items) => {
-                if items.iter().all(|i| matches!(i, n::DItem::Pos(_))) && !items.is_empty() {
+                // `()` is the empty data, a value and a pattern of the type
+                // `()` (§7.1 row 7): an empty tuple, as its pattern is.
+                if items.iter().all(|i| matches!(i, n::DItem::Pos(_))) {
                     o::ExprKind::Tuple(
                         items
                             .iter()
@@ -1234,7 +1438,9 @@ impl Cx {
         }
         let mut params = Vec::new();
         match &f.param.kind {
-            n::TypeKind::Data(items) => {
+            n::TypeKind::Data(items)
+                if items.is_empty() || items.iter().any(|i| !matches!(i, n::TItem::Label(..))) =>
+            {
                 for item in items {
                     match item {
                         n::TItem::Pos(t) => params.push(o::FnParamType {
@@ -1251,10 +1457,13 @@ impl Cx {
                     }
                 }
             }
-            _ => self.error(
-                f.param.span.0,
-                "a function type whose parameter is not written as data needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
-            ),
+            // A multi-shape function type `{ (A) | (B, C) } -> R`: in the
+            // transition tree, one parameter with the reserved label
+            // `%data` whose type is the parameter data type.
+            _ => params.push(o::FnParamType {
+                label: Some(ident(DATA, f.param.span.0)),
+                ty: self.ty(&f.param),
+            }),
         }
         let mut err: Option<o::TypeExpr> = None;
         let mut env: Vec<o::TypeExpr> = Vec::new();
@@ -1394,5 +1603,17 @@ impl Cx {
             }
         };
         ty(kind, span)
+    }
+}
+
+/// The `E` of a service item `name: Fail(E)`.
+fn fail_of(s: &n::SItem) -> Option<&n::Type> {
+    match &s.ty.kind {
+        n::TypeKind::Named {
+            module: None,
+            name,
+            args,
+        } if !s.rest && name.name == "Fail" && args.len() == 1 => Some(&args[0]),
+        _ => None,
     }
 }

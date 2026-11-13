@@ -5,8 +5,7 @@
 	(Io) = i/io
 )
 
-
-main = (io ! Io) {
+main = () <- (io: Io) {
 	answer = task.scope((s) {
 		a = task.go(s, () { 20 })
 		b = task.go(s, () { 22 })

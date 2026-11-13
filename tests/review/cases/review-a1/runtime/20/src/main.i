@@ -1,11 +1,6 @@
-g = (p: (Int, Int)) {
-	p |> {
-		t = (a, b) -> { (x) { a + b + x } }
-	}
-}
+g = (p: (Int, Int)) { p |> ((a, b) = t) { (x) { a + b + x } } }
 
 f = () { g((20, 21))(1) }
-
 
 main = () {
 	assert(f() == 42)

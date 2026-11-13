@@ -91,10 +91,7 @@ pub(crate) fn visit_type<'h>(t: &'h Type, f: &mut dyn FnMut(Node<'h>)) {
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) | TypeKind::Diff(ts) => {
             ts.iter().for_each(|a| visit_type(a, f))
         }
-        TypeKind::Record { base, fields, .. } => {
-            if let Some(b) = base {
-                visit_type(b, f);
-            }
+        TypeKind::Record { fields } => {
             fields.iter().for_each(|(_, t)| visit_type(t, f));
         }
         TypeKind::Fn {
@@ -134,6 +131,7 @@ pub(crate) fn visit_expr<'h>(e: &'h Expr, f: &mut dyn FnMut(Node<'h>)) {
     f(Node::Expr(e));
     match &e.kind {
         ExprKind::Tuple(xs) => xs.iter().for_each(|x| visit_expr(x, f)),
+        ExprKind::Multi(groups) => groups.iter().for_each(|g| visit_expr(&g.value, f)),
         ExprKind::Record { base, fields } => {
             if let Some(b) = base {
                 visit_expr(b, f);
@@ -313,8 +311,23 @@ impl Query<'_> {
             visit_module(p, m, &mut |n| {
                 if let Node::Block(b) = n {
                     for s in &b.stmts {
-                        if let Stmt::Env { ty, span, .. } = s
-                            && matches!(&ty.kind, TypeKind::Named { ty: TypeRef::Custom(x), .. } if *x == t)
+                        let Stmt::Env { ty, value, span } = s else {
+                            continue;
+                        };
+                        // A provide `e <- (C(…))` of syntax three lowers to
+                        // an environment statement with no written type: its
+                        // type is the one of the constructor it calls.
+                        let provided = matches!(&ty.kind, TypeKind::Hole)
+                            && match &value.kind {
+                                ExprKind::Name(ValueRef::Ctor(c)) => c.ty == t,
+                                ExprKind::Call { callee, .. } => matches!(
+                                    &callee.kind,
+                                    ExprKind::Name(ValueRef::Ctor(c)) if c.ty == t
+                                ),
+                                _ => false,
+                            };
+                        if provided
+                            || matches!(&ty.kind, TypeKind::Named { ty: TypeRef::Custom(x), .. } if *x == t)
                         {
                             found.push(*span);
                         }
@@ -496,6 +509,9 @@ impl Query<'_> {
         };
         let mut out = Vec::new();
         for s in [ast.imports_span, ast.exports_span].into_iter().flatten() {
+            // The header group `( … )` of syntax three folds whole: the
+            // span of the tree covers only the names inside it.
+            let s = group_around(text, s);
             if lines(s) {
                 out.push(Folding {
                     span: s,
@@ -616,6 +632,21 @@ impl Query<'_> {
 }
 
 /// The letters of `query` are in `name` in the same order.
+/// The span of the group `( … )` around `s` when only blanks separate
+/// them, or else `s`.
+fn group_around(text: &str, s: Span) -> Span {
+    let before = text[..(s.start as usize).min(text.len())].trim_end();
+    let after_at = (s.end as usize).min(text.len());
+    let after = text[after_at..].trim_start();
+    if before.ends_with('(') && after.starts_with(')') {
+        let start = before.len() - 1;
+        let end = text.len() - after.len() + 1;
+        Span::new(start as u32, end as u32)
+    } else {
+        s
+    }
+}
+
 fn fuzzy(name: &str, query: &str) -> bool {
     let mut chars = name.chars();
     query.chars().all(|q| chars.any(|c| c == q))

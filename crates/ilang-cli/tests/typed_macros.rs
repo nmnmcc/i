@@ -206,7 +206,7 @@ fn typed_macro_rejects_implementation_arity() {
 }
 #[test]
 fn typed_macro_forwarding_record_differential() {
-    let (_,c)=checked(ID,"(m = app/macros)\nf = (x: (a: Int, b: String)) { m.identity(x).a }\nmain = () { assert(f((a: 42, b: \"b\")) == 42) }").unwrap();
+    let (_,c)=checked(ID,"(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { m.identity(x).a }\nmain = () { assert(f((a = 42, b = \"b\")) == 42) }").unwrap();
     assert_eq!(c.types.unwrap().typed_expansions.len(), 1);
 }
 #[test]
@@ -326,10 +326,10 @@ fn typed_macro_identity_principal_graph_differential() {
 }
 #[test]
 fn typed_macro_forwarding_principal_record_graph_differential() {
-    let (_,typed)=checked(ID,"(m = app/macros)\nf = (x: (a: Int, b: String)) { m.identity(x) }\nmain = () { f((a: 42, b: \"x\")) }").unwrap();
+    let (_,typed)=checked(ID,"(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { m.identity(x) }\nmain = () { f((a = 42, b = \"x\")) }").unwrap();
     let (_, plain) = checked(
         ID,
-        "(m = app/macros)\nf = (x: (a: Int, b: String)) { x }\nmain = () { f((a: 42, b: \"x\")) }",
+        "(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { x }\nmain = () { f((a = 42, b = \"x\")) }",
     )
     .unwrap();
     same_principal(&typed, &plain, "f");
@@ -431,14 +431,16 @@ fn typed_macro_forwarding_effect_rows_graph_differential() {
     same_principal(&typed, &plain, "f");
 }
 #[test]
-fn typed_macro_graph_members_keep_one_exact_record_graph() {
+fn typed_macro_members_give_each_closed_data_member_once() {
+    // syntax-3 stage 6: a union of closed data has one member per shape
+    // (§2.3, §6.2); it is no longer one record graph.
     let m = declared(
         "(m A) (-> (A) A)",
-        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax members) t) { (-> [one] value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"record graph was split\" value))) }) })",
+        "(-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax members) t) { (-> [one two] value) (-> _ ((. fail raise) ((. syntax SyntaxError) \"closed data members not one per shape\" value))) }) })",
     );
     checked(
         &m,
-        "(m = app/macros)\nf = (x: (a: Int) | (b: String)) { m.m(x) }\nmain = () { f((a: 42)) }",
+        "(\n\tm = app/macros\n)\nf = (x: (a = Int) | (b = String)) { m.m(x) }\nmain = () { f((a = 42)) }",
     )
     .unwrap();
 }
@@ -534,4 +536,63 @@ fn typed_macro_generic_choice_reports_restriction() {
         "(m = app/macros)\nf = (x) { m.m(x) }\nmain = () { f(1) }",
         "cannot choose by the type inside a binding with type variables",
     );
+}
+
+/// Expansion and the built program are pure functions of the project: the same
+/// input expanded and built twice gives identical expanded modules and identical
+/// Wasm. Several modules expand in order, so the macro index is brought up to
+/// date between them, and a typed macro runs during checking.
+#[test]
+fn expansion_and_wasm_are_deterministic() {
+    let macros = format!(
+        "{}(@ macro (= twice (-> (e) _ `(+ ~e ~e))))\n",
+        ID.replacen("(, identity)", "(, identity twice)", 1)
+    );
+    let dir = project(
+        &macros,
+        "(m = app/macros, mid = app/mid)\nmain = () { assert(mid.f(m.identity(21)) == 84) }\n",
+    );
+    std::fs::write(
+        dir.path().join("src/mid.i"),
+        "(m = app/macros)\n(f)\nf = (x) { m.twice(m.twice(x)) }\n",
+    )
+    .unwrap();
+    let expand = || {
+        let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);
+        assert!(!ds.iter().any(Diagnostic::is_error), "{ds:?}");
+        let expanded = match ilang_macro::project::expand(&mut graph) {
+            Ok(expanded) => expanded,
+            Err(ds) => panic!("{}", graph.sources.render_all(&ds).join("\n")),
+        };
+        expanded
+            .parsed
+            .iter()
+            .map(|p| {
+                format!(
+                    "{}\n{}\n{:?}",
+                    p.path,
+                    graph.sources.get(p.source).text,
+                    p.ast
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let first = expand();
+    assert!(first.iter().any(|m| m.contains("app/mid")));
+    assert_eq!(first, expand(), "expansion differs between two runs");
+    let build = || {
+        ilang_cli::build(
+            dir.path(),
+            ilang_cli::BuildOptions {
+                tests: false,
+                opt: ilang_cli::Level::O0,
+                offline: true,
+                target: ilang_cli::Target::Host,
+            },
+        )
+        .unwrap_or_else(|_| panic!("project builds"))
+        .wasm
+    };
+    let wasm = build();
+    assert!(wasm == build(), "wasm differs between two builds");
 }

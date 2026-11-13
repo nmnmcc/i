@@ -1,13 +1,11 @@
-S(N) {
-	S(() -> Nil ! N, (N) -> Nil)
-}
+S(N) = (() <- N -> Nil, (N) -> Nil)
 
-use(N) = (s ! S(N)) {
+use = <N>() <- (s: S(N)) {
 	S(f, _) = s
 	f()
 }
 
-run(N) = (body: () -> Nil ! N) { body() }
+run = <N>(body: () <- N -> Nil) { body() }
 
 forward_0 = () { run(() { use() }) }
 
@@ -136,6 +134,5 @@ forward_61 = () { run(() { forward_60() }) }
 forward_62 = () { run(() { forward_61() }) }
 
 forward_63 = () { run(() { forward_62() }) }
-
 
 main = () { forward_63() }

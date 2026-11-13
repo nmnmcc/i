@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Parse repository i snippets using the new-only parser; see old-syntax-check.md."""
+"""Parse repository i snippets with the syntax-three parser, so that no text of
+the syntax before it remains; see old-syntax-check.md."""
 import hashlib
 import json
 import os
@@ -143,6 +144,49 @@ def parse(sources):
              for _ in range(int(next(it)))] for _ in sources]
 
 
+MARKER = re.compile(r"old-syntax-check: ([A-Z0-9,]+)")
+
+
+def regenerate(all_snippets, results):
+    """After the conversion to syntax three: the expected diagnostics of the
+    registered invalid snippets become the new parser's, and their adjacent
+    markers follow; an entry whose snippet now parses loses its diagnostics
+    and its marker (a future-track entry whose syntax landed is deleted)."""
+    config = json.loads(DATA.read_text())
+    hosts = {}
+    changed = 0
+    # From the end, so that an edit leaves the places before it as they are.
+    for item, actual in reversed(list(zip(all_snippets, results))):
+        entry = config.get(item["id"])
+        if not entry or "diagnostics" not in entry or entry["diagnostics"] == actual:
+            continue
+        changed += 1
+        old = ",".join(d.split(":", 1)[0] for d in entry["diagnostics"])
+        host = hosts.setdefault(item["path"], item["host"])
+        if actual:
+            entry["diagnostics"] = actual
+            new = ",".join(d.split(":", 1)[0] for d in actual)
+        else:
+            if entry.pop("track", None):
+                del config[item["id"]]
+            else:
+                entry.pop("diagnostics")
+                entry["reason"] = entry.get("reason", "") + " (valid in syntax three)"
+            new = None
+        start = max(0, item["start"] - len(old) - 40)
+        window = host[start:item["end"] + len(old) + 40]
+        m = re.search(r"(?:// |/\* |<!-- )?old-syntax-check: " + re.escape(old) + r"(?: \*/ ?| -->\n?|\n)?", window)
+        if not m:
+            continue
+        replacement = m[0].replace("old-syntax-check: " + old, "old-syntax-check: " + new) if new else ""
+        hosts[item["path"]] = host[:start + m.start()] + replacement + host[start + m.end():]
+    for path, text in hosts.items():
+        if text != (ROOT / path).read_text():
+            (ROOT / path).write_text(text)
+    DATA.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+    print(f"old-syntax-check: {changed} registered expectations regenerated")
+
+
 def main():
     os.chdir(ROOT)
     command = ["cargo", "build", "-p", "ilang-syntax", "--example", "parse-snippets", "--locked", "--quiet"]
@@ -170,6 +214,9 @@ def main():
             source = source.replace(old, new)
         sources.append(source)
     results = parse(sources)
+    if "--regenerate" in sys.argv:
+        regenerate(all_snippets, results)
+        return
     if "--inventory" in sys.argv:
         print(json.dumps([{k: v for k, v in item.items() if k not in ("host", "entry")} | {"diagnostics": ds} for item, ds in zip(all_snippets, results)], indent=2))
         return

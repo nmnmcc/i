@@ -6,10 +6,13 @@
 	testlib = (test) = std/test
 )
 
-pair = ((1, 2), () {
-	(a, b) = pair.0
-	a
-})
+pair = (
+	(1, 2),
+	() {
+		(a, b) = pair.0
+		a
+	},
+)
 
 use = (f: () -> Int) -> Int { f() }
 

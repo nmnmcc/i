@@ -1,6 +1,9 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N))  { S(f, _) = s f() }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
 run = (body) { body() }
-f(N) = (s ! S(N))  { run(() { use() }) }
+f = <N>() <- (s: S(N)) { run(() { use() }) }
 
-main = () { ! S(Never) = S(() { Nil }, (_: Never) { Nil }) f() }
+main = () { f() <- (S(() { Nil }, (_: Never) { Nil })) }

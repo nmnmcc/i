@@ -100,7 +100,7 @@ fn pending_scopes_and_identity_shadowing() {
 fn closed_aliases_and_patterns_complete_eagerly() {
     // R2/P4: a closed scalar is read exactly; permanent binders are aliases.
     let (_, c) = good(
-        "value: Int = 1\nRead = value\nPair(A,B) = (A,B)\np: (Int,String) = (1,\"a\")\nPair(Left,Right) = p\nComposite(A) = (A, value)\nuse = (x: Read, y: Left) { x + y }",
+        "value: Int = 1\nRead = value\nPair(A, B) = { (A, B) }\np: (Int, String) = (1, \"a\")\nPair(Left, Right) = p\nComposite(A) = { (A, value) }\nuse = (x: Read, y: Left) { x + y }",
     );
     assert_eq!(alias(&c, "Read"), "Int");
     assert_eq!(alias(&c, "Left"), "Int");
@@ -108,15 +108,15 @@ fn closed_aliases_and_patterns_complete_eagerly() {
     assert_eq!(alias(&c, "Composite"), "(A, Int)");
     // P5 checks even a pattern binding nothing.
     bad(
-        "Box(A) { Box(A) }\nv: Int = 1\nBox(_) = v",
+        "Box(A) = (A)\nv: Int = 1\nBox(_) = v",
         code::TYPE_PATTERN_MISMATCH,
     );
     bad(
-        "Box(A) { Box(A) }\nv: Box(Int) = Box(1)\nBox(Int) = v",
+        "Box(A) = (A)\nv: Box(Int) = Box(1)\nBox(Int) = v",
         code::TYPE_PATTERN_BINDER_IS_TYPE,
     );
     bad(
-        "Box(A) { Box(A) }\nv = Box(1)\nBox(Foo,Foo) = v",
+        "Box(A) = (A)\nv = Box(1)\nBox(Foo, Foo) = v",
         code::DEFINED_TWICE,
     );
 }
@@ -151,11 +151,11 @@ fn type_edges_do_not_change_runtime_needs_or_generalization() {
 fn early_contexts_preserve_dependency_provenance() {
     // K3/J6: even a completed Int alias remains forbidden at early uses.
     for src in [
-        "n: Int = 1\nA = n\nBox { Box(A) }",
+        "n: Int = 1\nA = n\nBox = (A)",
         "n: Int = 1\nA = n\n@external(\"env\",\"f\")\nf: (A) -> Int",
-        "n: Int = 1\nA = n\nf = (x ! A) { x }",
+        "n: Int = 1\nA = n\nf = () <- (x: A) { x }",
         "n: Int = 1\nA = n\n@host(\"env\")\nService = A",
-        "n: Int = 1\nA = n\nf = () -> Int ! A { 1 }",
+        "n: Int = 1\nA = n\nf: () <- (A) -> Int = () { 1 }",
     ] {
         bad(src, code::VALUE_TYPE_PLACE);
     }
@@ -164,7 +164,7 @@ fn early_contexts_preserve_dependency_provenance() {
 #[test]
 fn source_module_alias_is_the_foreign_closed_read_boundary() {
     // R7: library completion may fix decode while leaving encode live.
-    let lib = "(Codec, size)\nCodec(D,E) { Codec(decode: (String) -> D, encode: (E) -> String) }\nmake(D,E) = (d: (String) -> D, e: (E) -> String) { Codec(decode:d,encode:e) }\nid = (x) { x }\nsize = id(make((s: String) -> Int { 1 }, (n: Int) -> String { \"\" }))\nCodec(LocalSize,_) = size";
+    let lib = "(\n\tCodec\n\tsize\n)\nCodec(D, E) = (decode = (String) -> D, encode = (E) -> String)\nmake = <D, E>(d: (String) -> D, e: (E) -> String) {\n\tCodec(decode = d, encode = e)\n}\nid = (x) { x }\nsize = id(make((s: String) -> Int { 1 }, (n: Int) -> String { \"\" }))\nCodec(LocalSize, _) = size";
     let client = "((Codec) = app/lib)\nCodec(RemoteSize,_) = lib.size";
     recovery_order_invariant(&[("src/lib.i", lib), ("src/client.i", client)]);
     let (g, c) = checked(&[("src/lib.i", lib), ("src/client.i", client)]);
@@ -188,7 +188,11 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
     let whole = [own, "\nwhole = (value: size) {value}".into()].concat();
     recovery_order_invariant(&[("src/main.i", &whole)]);
     bad(&whole, code::VALUE_TYPE_NOT_FIXED);
-    let lib = lib.replacen("(Codec, size)", "(Codec, size, LocalSize)", 1);
+    let lib = lib.replacen(
+        "(\n\tCodec\n\tsize\n)",
+        "(\n\tCodec\n\tsize\n\tLocalSize\n)",
+        1,
+    );
     recovery_order_invariant(&[("src/lib.i", &lib), ("src/client.i", client)]);
     let closed_wrapped = lib.replace("size = id", "size: Codec(Int,Int) = id");
     let (_, c) = checked(&[("src/lib.i", &closed_wrapped), ("src/client.i", client)]);
@@ -220,7 +224,10 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
     assert!(!ds.iter().any(Diagnostic::is_error));
     // R7's guidance should prefer an exported transitive alias over a private one.
     let lib = [
-        lib.replace("(Codec, size, LocalSize)", "(Codec, size, PublicSize)"),
+        lib.replace(
+            "(\n\tCodec\n\tsize\n\tLocalSize\n)",
+            "(\n\tCodec\n\tsize\n\tPublicSize\n)",
+        ),
         "\nPublicSize = LocalSize".into(),
     ]
     .concat();
@@ -247,7 +254,7 @@ fn query_recovery_keeps_unrelated_results() {
 fn expanded_places_and_constant_head_alias_parts() {
     // K2: checking only each Of misses the union surrounding two local holders.
     bad(
-        "pick(A,B) = (a: A, b: B, c: Bool) { result = c |> { True -> a  False -> b }\n (result,a,b) }\nuse = (f: pick) { f }",
+        "pick = <A, B>(a: A, b: B, c: Bool) {\n\tresult = c |> (True) { a } | (False) { b }\n\t(result, a, b)\n}\nuse = (f: pick) { f }",
         code::TYPE_PLACE,
     );
     bad(
@@ -255,13 +262,13 @@ fn expanded_places_and_constant_head_alias_parts() {
         code::TYPE_PLACE,
     );
     // P2: exact constants are observations; they cannot fill a source hole.
-    good("Tail(A) = (A,Int)\np: (String,Int) = (\"a\",1)\nTail(Text) = p");
+    good("Tail(A) = { (A, Int) }\np: (String, Int) = (\"a\", 1)\nTail(Text) = p");
     bad(
-        "Tail(A) = (A,Int)\np: (String,String) = (\"a\",\"b\")\nTail(Text) = p",
+        "Tail(A) = { (A, Int) }\np: (String, String) = (\"a\", \"b\")\nTail(Text) = p",
         code::TYPE_PATTERN_MISMATCH,
     );
     bad(
-        "Dup(A) = (A,A)\np: (Int,Int) = (1,2)\nDup(Text) = p",
+        "Dup(A) = { (A, A) }\np: (Int, Int) = (1, 2)\nDup(Text) = p",
         code::TYPE_PATTERN_FORM,
     );
     bad(
@@ -274,10 +281,10 @@ fn expanded_places_and_constant_head_alias_parts() {
 fn imported_pattern_binders_are_never_reclassified() {
     // P1/P3: an imported User changes the collision, never the item kind.
     let files = [
-        ("src/types.i", "(User)\nUser {}"),
+        ("src/types.i", "(\n\tUser\n)\nUser = Opaque"),
         (
             "src/main.i",
-            "((User) = app/types)\nBox(A) {Box(A)}\nv: Box(Int) = Box(1)\nBox(User) = v",
+            "(\n\t(User) = app/types\n)\nBox(A) = (A)\nv: Box(Int) = Box(1)\nBox(User) = v",
         ),
     ];
     let (g, c) = checked(&files);
@@ -290,14 +297,14 @@ fn imported_pattern_binders_are_never_reclassified() {
     );
     bad("Pair(A,_) = macro_type()", code::TYPE_PARAM_FORM);
     bad(
-        "(m = i/core)\nf = () {m = {x: m.inspect = 1  x}  m}",
+        "(\n\tm = i/core\n)\nf = () {\n\tm = {\n\t\tx: m.inspect = 1\n\t\tx\n\t}\n\tm\n}",
         code::NOT_A_MODULE,
     );
 }
 
 #[test]
 fn eager_alias_dependencies_and_reverse_ties() {
-    let src = "Wrap(A) {Wrap(A)}\nComposite = List(Item)\nv: Wrap(Int) = Wrap(1)\nWrap(Item) = v\nleft: Int = 1\nright: String = \"x\"\nL = left\nR = right\nuse = (x: Composite) { x }";
+    let src = "Wrap(A) = (A)\nComposite = List(Item)\nv: Wrap(Int) = Wrap(1)\nWrap(Item) = v\nleft: Int = 1\nright: String = \"x\"\nL = left\nR = right\nuse = (x: Composite) { x }";
     let (g, c) = good(src);
     let mut p = c.program.unwrap();
     let first = c.types.unwrap().alias_types;
@@ -320,7 +327,7 @@ fn eager_alias_dependencies_and_reverse_ties() {
 
 #[test]
 fn r7_closed_source_annotations_and_direct_roots() {
-    let base = "(Codec,size,LocalSize)\nCodec(D,E) {Codec(decode:(String)->D,encode:(E)->String)}\nmake(D,E) = (d:(String)->D,e:(E)->String) {Codec(d,e)}\nsize = make((s:String)->Int {1},(n:Int)->String {\"\"})\nCodec(LocalSize,_) = size\nlater = () {size.encode(2)}";
+    let base = "(\n\tCodec\n\tsize\n\tLocalSize\n)\nCodec(D, E) = (decode = (String) -> D, encode = (E) -> String)\nmake = <D, E>(d: (String) -> D, e: (E) -> String) {\n\tCodec(decode = d, encode = e)\n}\nsize = make((s: String) -> Int { 1 }, (n: Int) -> String { \"\" })\nCodec(LocalSize, _) = size\nlater = () { size.encode(2) }";
     let client = "((Codec) = app/lib)\nCodec(RemoteSize,_) = lib.size";
     recovery_order_invariant(&[("src/lib.i", base), ("src/client.i", client)]);
     // R7 gates both a direct constructor-shaped root and a weak wrapped root.
@@ -345,11 +352,11 @@ fn r7_closed_source_annotations_and_direct_roots() {
 fn exported_aliases_cannot_leak_private_nominal_types() {
     // X2: the source value being public does not export a private nominal type.
     bad(
-        "(Alias)\nSecret {Secret}\nvalue = Secret\nAlias = value",
+        "(\n\tAlias\n)\nSecret = ()\nvalue = Secret\nAlias = value",
         code::EXPORT_HIDDEN_TYPE,
     );
     bad(
-        "(use)\nSecret {Secret}\nvalue = Secret\nA = value\nuse: (A) -> A = (x) {x}",
+        "(\n\tuse\n)\nSecret = ()\nvalue = Secret\nA = value\nuse: (A) -> A = (x) { x }",
         code::EXPORT_HIDDEN_TYPE,
     );
     good("(A)\nvalue: Int = 1\nA = value");
@@ -358,7 +365,7 @@ fn exported_aliases_cannot_leak_private_nominal_types() {
 #[test]
 fn query_sources_heads_binders_and_outline() {
     // X4: each written role has a different navigation target.
-    let src = "Pair(A,B) = (A,B)\nvalue: (Int,String) = (1,\"a\")\nPair(Left,Right) = value\nuse = (x: Left) {x}";
+    let src = "Pair(A, B) = { (A, B) }\nvalue: (Int, String) = (1, \"a\")\nPair(Left, Right) = value\nuse = (x: Left) { x }";
     let (g, c) = good(src);
     let p = c.program.as_ref().unwrap();
     let m = common::module(p, "app/main");
@@ -370,7 +377,7 @@ fn query_sources_heads_binders_and_outline() {
         q.definition_at(m, source).unwrap().span.start,
         src.find("value:").unwrap() as u32
     );
-    let left = src.find("Left,Right").unwrap() as u32;
+    let left = src.find("Left, Right").unwrap() as u32;
     assert!(q.type_at(m, left).unwrap().code.contains("Left = Int"));
     let symbols = q.symbols(m);
     assert!(symbols.iter().any(|s| s.name == "Left"));
@@ -380,7 +387,7 @@ fn query_sources_heads_binders_and_outline() {
 #[test]
 fn a_consumer_cannot_fix_the_library() {
     // R3/X3: adding only a consumer Of demand leaves the library interface intact.
-    let lib = "(Cell,r,reset)\nCell(A) {Cell(get:()->A,set:(A)->Nil)}\ncell(A) = (x:A) {Cell(get:(){x},set:(y:A){Nil})}\nr = cell(1)\nput(A) = (c:Cell(A),value:A) {c.set(value)}\nreset = () {put(r,\"s\")}";
+    let lib = "(\n\tCell\n\tr\n\treset\n)\nCell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x: A) { Cell(get = () { x }, set = (y: A) { Nil }) }\nr = cell(1)\nput = <A>(c: Cell(A), value: A) { c.set(value) }\nreset = () { put(r, \"s\") }";
     let (g, base) = checked(&[("src/lib.i", lib)]);
     assert!(
         !base.diags.iter().any(Diagnostic::is_error),
@@ -424,7 +431,7 @@ fn a_consumer_cannot_fix_the_library() {
 #[test]
 fn fixation_keeps_constraints_and_rejects_earlier_weak_parts() {
     // R5: an ordinary generic helper avoids a narrowed known-field fact.
-    let prefix = "Cell(A) {Cell(get:()->A,set:(A)->Nil)}\ncell(A) = (x:A) {Cell(get:(){x},set:(y:A){Nil})}\nput(A) = (c:Cell(A),value:A) {c.set(value)}\nr = cell(1)\n";
+    let prefix = "Cell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x: A) { Cell(get = () { x }, set = (y: A) { Nil }) }\nput = <A>(c: Cell(A), value: A) { c.set(value) }\nr = cell(1)\n";
     good(&[prefix, "later = () {put(r,\"s\")}"].concat());
     let src = [prefix, "Read = r\nlater = () {put(r,\"s\")}"].concat();
     let (g, c) = checked(&[("src/main.i", &src)]);
@@ -492,9 +499,11 @@ fn every_bad_dependency_component_recovers_without_publishing_aliases() {
 #[test]
 fn alias_formals_and_written_holes_are_instantiated_per_use() {
     // R2 closes the Of part; ordinary written formals/holes keep their rules.
-    good("port: Int = 1\nT = (port,_)\nf = () {a: T = (1,\"s\")  b: T = (2,3)\n (a,b)}");
+    good(
+        "port: Int = 1\nT = { (port, _) }\nf = () {\n\ta: T = (1, \"s\")\n\tb: T = (2, 3)\n\t(a, b)\n}",
+    );
     let prefix =
-        "Cell(A) {Cell(get:()->A,set:(A)->Nil)}\nport: Int = 1\nT(A) = Cell(A) | Cell(port)\n";
+        "Cell(A) = (get = () -> A, set = (A) -> Nil)\nport: Int = 1\nT(A) = Cell(A) | Cell(port)\n";
     // Invariant same-head union still requires equal arguments after substitution.
     bad(
         &[prefix, "f = (x: T(String)) {x}"].concat(),
@@ -506,7 +515,7 @@ fn alias_formals_and_written_holes_are_instantiated_per_use() {
 #[test]
 fn places_keep_local_declaration_identity_before_allocation() {
     bad(
-        "port: Int = 1\nuse = () {g(A,B): (A | B,port) -> Int = (x,y) {1}  g}",
+        "port: Int = 1\nuse = () {\n\tg: <A, B>(A | B, port) -> Int = (x, y) { 1 }\n\tg\n}",
         code::TYPE_PLACE,
     );
 }
@@ -755,7 +764,10 @@ fn alias_exports_preserve_constructor_privacy() {
     for exports in ["(Secret, Public)", "(Secret, Public(..))"] {
         let lib = [
             exports,
-            "\nSecret { Hidden(Int) }\nvalue: Secret = Hidden(1)\nPublic = value",
+            // Stage 3 (§2.8): a type and its constructor have one name, so
+            // the exported type `Secret` is the labelled type itself, with
+            // its constructor not exported.
+            "\nSecret = (Int)\nvalue: Secret = Secret(1)\nPublic = value",
         ]
         .concat();
         let (_, c) = checked(&[
@@ -766,7 +778,7 @@ fn alias_exports_preserve_constructor_privacy() {
         assert_eq!(alias(&c, "Public"), "Secret");
         let (_, c) = checked(&[
             ("src/lib.i", &lib),
-            ("src/main.i", "((Public) = app/lib)\nx = lib.Hidden(1)"),
+            ("src/main.i", "((Public) = app/lib)\nx = lib.Secret(1)"),
         ]);
         assert!(
             c.diags.iter().any(|d| d.code == code::NOT_EXPORTED),
@@ -809,15 +821,16 @@ fn invalid_components_fail_dependents_without_cascading_diagnostics() {
 #[test]
 fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
     // R2/P4: a skip can leave a quantified part alone only at own completion.
-    let (_, c) =
-        good("id = (x) {x}\nPair(A,B) = (A,B)\none: Int = 1\nv = (id,one)\nPair(_,Number) = v");
+    let (_, c) = good(
+        "id = (x) { x }\nPair(A, B) = { (A, B) }\none: Int = 1\nv = (id, one)\nPair(_, Number) = v",
+    );
     assert_eq!(alias(&c, "Number"), "Int");
     let lib = "(v)\nid = (x) {x}\nv = (id,1)";
     let (_, c) = checked(&[
         ("src/lib.i", lib),
         (
             "src/main.i",
-            "(app/lib)\nPair(A,B) = (A,B)\nPair(_,Number) = lib.v",
+            "(\n\tapp/lib\n)\nPair(A, B) = { (A, B) }\nPair(_, Number) = lib.v",
         ),
     ]);
     assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));
@@ -825,27 +838,28 @@ fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
         ("src/lib.i", lib),
         (
             "src/main.i",
-            "(app/lib)\nPair(A,B) = (A,B)\nPair(_,_) = lib.v",
+            "(\n\tapp/lib\n)\nPair(A, B) = { (A, B) }\nPair(_, _) = lib.v",
         ),
     ]);
     assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));
     // P4 cannot discard the Nil alternative to find a convenient named head.
     bad(
-        "Box(A) {Box(A)}\nv: Box(Int) | Nil = Box(1)\nBox(_) = v",
+        "Box(A) = (A)\nv: Box(Int) | Nil = Box(1)\nBox(_) = v",
         code::TYPE_PATTERN_MISMATCH,
     );
     // A constant part introduced by a head alias compares after closing.
     bad(
-        "Tagged(A) = (Int,A)\nv: (String,Int) = (\"s\",1)\nTagged(_) = v",
+        "Tagged(A) = { (Int, A) }\nv: (String, Int) = (\"s\", 1)\nTagged(_) = v",
         code::TYPE_PATTERN_MISMATCH,
     );
     bad(
-        "id = (x) {x}\nTagged(A) = (Int,A)\nv = id((id(id),1))\nTagged(_) = v",
+        "id = (x) { x }\nTagged(A) = { (Int, A) }\nv = id((id(id), 1))\nTagged(_) = v",
         code::VALUE_TYPE_NOT_FIXED,
     );
     // A closed function constant is permitted inside an otherwise linear head.
-    let (_, c) =
-        good("Fixed(A) = (() -> Int,A)\nv: (() -> Int,String) = (() {1},\"s\")\nFixed(Text) = v");
+    let (_, c) = good(
+        "Fixed(A) = { (() -> Int, A) }\nv: (() -> Int, String) = (() { 1 }, \"s\")\nFixed(Text) = v",
+    );
     assert_eq!(alias(&c, "Text"), "String");
 }
 
@@ -915,32 +929,32 @@ fn independent_review_reproducers() {
 #[test]
 fn normalized_shapes_preserve_skips_and_nested_heads() {
     let (_, c) = good(
-        "Box(A) {Box(A)}\nleft: Int = 1\nright: Int = 2\nv = True |> {True -> Box(left) False -> Box(right)}\nBox(Item) = v",
+        "Box(A) = (A)\nleft: Int = 1\nright: Int = 2\nv = True |> (True) { Box(left) } | (False) { Box(right) }\nBox(Item) = v",
     );
     assert_eq!(alias(&c, "Item"), "Int");
     let (_, c) = good(
-        "Outer(A) {Outer(A)}\nBox(A) {Box(A)}\nleft: Int = 1\nright: Int = 2\nv = True |> {True -> Outer(Box(left)) False -> Outer(Box(right))}\nOuter(Box(Item)) = v",
+        "Outer(A) = (A)\nBox(A) = (A)\nleft: Int = 1\nright: Int = 2\nv = True |> (True) { Outer(Box(left)) } | (False) { Outer(Box(right)) }\nOuter(Box(Item)) = v",
     );
     assert_eq!(alias(&c, "Item"), "Int");
     good(
-        "Cell(A) {Cell(get:()->A,set:(A)->Nil)}\ncell(A)=(x:A){Cell(get:(){x},set:(y:A){Nil})}\nput(A)=(c:Cell(A),x:A){c.set(x)}\nPair(A,B)=(A,B)\npack(A)=(a:Cell(A),b:Bool){(a,b |> {True -> (1,a) False -> (2,a)})}\n(a,v)=pack(cell(1),True)\nPair(Item,_) = v\nlater=(){put(a,\"s\")}",
+        "Cell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x: A) { Cell(get = () { x }, set = (y: A) { Nil }) }\nput = <A>(c: Cell(A), x: A) { c.set(x) }\nPair(A, B) = { (A, B) }\npack = <A>(a: Cell(A), b: Bool) {\n\t(a, b |> (True) { (1, a) } | (False) { (2, a) })\n}\n(a, v) = pack(cell(1), True)\nPair(Item, _) = v\nlater = () { put(a, \"s\") }",
     );
 }
 
 #[test]
 fn cached_templates_preserve_hole_sharing_and_deferred_constraints() {
-    let prefix = "Cell(A){Cell(get:()->A,set:(A)->Nil)}\nci:Cell(Int)=Cell(get:(){1},set:(x:Int){Nil})\ncs:Cell(String)=Cell(get:(){\"s\"},set:(x:String){Nil})\nport:Int=1\nDuo(A)=(Cell(A),Cell(A))\nT=(Duo(_),port)\n";
+    let prefix = "Cell(A) = (get = () -> A, set = (A) -> Nil)\nci: Cell(Int) = Cell(get = () { 1 }, set = (x: Int) { Nil })\ncs: Cell(String) = Cell(get = () { \"s\" }, set = (x: String) { Nil })\nport: Int = 1\nDuo(A) = { (Cell(A), Cell(A)) }\nT = { (Duo(_), port) }\n";
     bad(&[prefix, "a:T=((ci,cs),2)"].concat(), code::TYPE_MISMATCH);
     good(&[prefix, "a:T=((ci,ci),3)\nb:T=((cs,cs),4)"].concat());
     bad(
-        "Cell(A){Cell(get:()->A,set:(A)->Nil)}\nport: Int=1\nT(A)=Cell(A)|Cell(port)\nf=(x:T(String)){x}",
+        "Cell(A) = (get = () -> A, set = (A) -> Nil)\nport: Int = 1\nT(A) = Cell(A) | Cell(port)\nf = (x: T(String)) { x }",
         code::TYPE_INVARIANT,
     );
 }
 
 #[test]
 fn nested_pattern_heads_have_hover_and_definition_targets() {
-    let src = "Pair(A,B)=(A,B)\nBox(A){Box(A)}\nv=(Box(1),\"s\")\nPair(Box(Item),_)=v\nx:Item=1";
+    let src = "Pair(A, B) = { (A, B) }\nBox(A) = (A)\nv = (Box(1), \"s\")\nPair(Box(Item), _) = v\nx: Item = 1";
     let (g, c) = good(src);
     let p = c.program.as_ref().unwrap();
     let m = common::module(p, "app/main");
@@ -951,8 +965,8 @@ fn nested_pattern_heads_have_hover_and_definition_targets() {
     let target = q.definition_at(m, pos).unwrap();
     assert_eq!(target.span.start as usize, src.find("Box(A)").unwrap());
     for bad_src in [
-        src.replace("v=(Box(1),\"s\")", "v=1"),
-        src.replace("=v\nx:Item", "=missing\nx:Item"),
+        src.replace("v = (Box(1), \"s\")", "v = 1"),
+        src.replace("= v\nx: Item", "= missing\nx: Item"),
     ] {
         let (g, _) = checked(&[("src/main.i", &bad_src)]);
         let c = query::check_for_queries(&g);
@@ -981,7 +995,7 @@ fn annotation_demands_fix_weak_sources_and_keep_generalized_instances() {
 fn review_declaration_permutations_are_identical() {
     let mut items = [
         "v: Int = 1",
-        "Pair(A,B)=(A,B)",
+        "Pair(A, B) = { (A, B) }",
         "parts:(Int,String)=(1,\"s\")",
         "Pair(Left,Right)=parts",
         "result:(v,Left,Right)=(2,3,\"ok\")",
@@ -1046,11 +1060,11 @@ fn review_declaration_permutations_are_identical() {
 
 #[test]
 fn qualified_exact_heads_expand_through_named_and_tuple_aliases() {
-    let main = "(app/lib)\nBox(A){Box(A)}\nv:Box(Int)=Box(1)\nBox(lib.Scalar)=v\nw:(Int,String)=(1,\"s\")\nPair(A,B)=(A,B)\nPair(lib.Scalar,lib.Text)=w\np:Box((Int,String))=Box((1,\"s\"))\nBox(lib.Parts)=p";
+    let main = "(\n\tapp/lib\n)\nBox(A) = (A)\nv: Box(Int) = Box(1)\nBox(lib.Scalar) = v\nw: (Int, String) = (1, \"s\")\nPair(A, B) = { (A, B) }\nPair(lib.Scalar, lib.Text) = w\np: Box((Int, String)) = Box((1, \"s\"))\nBox(lib.Parts) = p";
     let (g, c) = checked(&[
         (
             "src/lib.i",
-            "(Scalar,Text,Parts)\nBase=Int\nScalar=Base\nText=String\nParts=(Int,String)",
+            "(\n\tScalar\n\tText\n\tParts\n)\nBase = Int\nScalar = Base\nText = String\nParts = { (Int, String) }",
         ),
         ("src/main.i", main),
     ]);
@@ -1059,14 +1073,14 @@ fn qualified_exact_heads_expand_through_named_and_tuple_aliases() {
         "{:?}",
         g.sources.render_all(&c.diags)
     );
-    good("Head(A)=(A,()->Int)\nv:(Int,()->Int)=(1,(){2})\nHead(Item)=v");
+    good("Head(A) = { (A, () -> Int) }\nv: (Int, () -> Int) = (1, () { 2 })\nHead(Item) = v");
     for body in ["()->Int", "Int|String"] {
         let lib = "(Bad)\nBad=()->Int".replace("()->Int", body);
         let (_, c) = checked(&[
             ("src/lib.i", &lib),
             (
                 "src/main.i",
-                "(app/lib)\nBox(A){Box(A)}\nv:Box(Int)=Box(1)\nBox(lib.Bad)=v",
+                "(\n\tapp/lib\n)\nBox(A) = (A)\nv: Box(Int) = Box(1)\nBox(lib.Bad) = v",
             ),
         ]);
         assert!(

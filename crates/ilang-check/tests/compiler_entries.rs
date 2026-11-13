@@ -43,7 +43,7 @@ fn compiler_export_rejects_foreign_external_through_a_helper() {
 fn compiler_export_cannot_request_a_host_service() {
     let (graph, _, _) = common::check_files(&[(
         "src/main.i",
-        "(syntax = i/syntax)\n@host(\"outside\")\nOutside { Outside(read: () -> Nil) }\nidentity = (x: syntax.Syntax, s ! Outside) { s.read() x }\n",
+        "(\n\tsyntax = i/syntax\n)\n@host(\"outside\")\nOutside = (read = () -> Nil)\nidentity = (x: syntax.Syntax) <- (s: Outside) {\n\ts.read()\n\tx\n}\n",
     )]);
     let (parsed, diags) = ilang_check::parse(&graph);
     assert!(diags.is_empty());

@@ -1,19 +1,13 @@
-elapsed : (start: Int) -> Int ! Clock
+elapsed : (Int) <- (Clock) -> Int
 fixed : () -> Int
-logged : () -> Int ! Clock | Log
-half : () -> Int ! Log
-given : (c: Clock) -> Int
-fetch : (url: String) -> String ^ Int ! Http
-two : () -> (String, String) ^ Int | Nil ! Http
-first : (r: Ok(A)) -> A
-pair : (t: (A, B)) -> A
-head : (List(A)) -> A ! Assert
-unwrap : (Ok(Int)) -> Int
-17:1: warning[W0504]: top-level binding `fixed` is not used
-28:1: warning[W0504]: top-level binding `half` is not used
-34:1: warning[W0504]: top-level binding `given` is not used
-46:1: warning[W0504]: top-level binding `two` is not used
-53:1: warning[W0504]: top-level binding `first` is not used
-58:1: warning[W0504]: top-level binding `pair` is not used
-64:1: warning[W0504]: top-level binding `head` is not used
-66:1: warning[W0504]: top-level binding `unwrap` is not used
+logged : () <- (Clock, Log) -> Int
+half : () <- (Log) -> Int
+given : (Clock) -> Int
+fetch : (String) <- (Fail(Int), Http) -> String
+two : () <- (Fail(Int | Nil), Http) -> (String, String)
+first : (Result(A, B)) <- (Assert) -> A
+pair : ((A, B)) -> A
+head : (List(A)) <- (Assert) -> A
+unwrap : (Result(Int, A)) <- (Assert) -> Int
+closed : (Result(Int, String)) -> Int
+56:1: error[E0501]: `Assert` is not a subtype of `Never`

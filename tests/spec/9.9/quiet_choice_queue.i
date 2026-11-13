@@ -6,37 +6,36 @@
 )
 
 loop = (
-	a: task.Channel(Int)
-	b: task.Channel(Int)
-	c: task.Channel(Int)
+	a: task.Channel(Int),
+	b: task.Channel(Int),
+	c: task.Channel(Int),
 	n: Int
-) -> Nil ! task.Scheduler | Assert {
-	n |> {
-		0 -> Nil
-		_ -> {
+) -> Nil {
+	n |>
+		(0) { Nil }
+		| (_) {
 			value = task.sync(
-				task.choose([
-					task.receive_event(a)
-					task.receive_event(b)
-					task.receive_event(c)
-				])
+				task.choose(
+					[
+						task.receive_event(a),
+						task.receive_event(b),
+						task.receive_event(c),
+					],
+				),
 			)
 			assert(value == n)
 			loop(a, b, c, n - 1)
 		}
-	}
 }
 
-send = (c: task.Channel(Int), n: Int) -> Nil ! task.Scheduler {
-	n |> {
-		0 -> Nil
-		_ -> {
+send = (c: task.Channel(Int), n: Int) -> Nil {
+	n |>
+		(0) { Nil }
+		| (_) {
 			task.send(c, n)
 			send(c, n - 1)
 		}
-	}
 }
-
 
 main = () {
 	task.scope((s) {

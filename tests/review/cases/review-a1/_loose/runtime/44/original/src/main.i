@@ -1,4 +1,10 @@
-f = () { case "a" <> "b" { "ab" -> 42 _ -> 7 } }
+f = () {
+	case
+	"a" <> "b"
+	("ab") { 42 } | (_) { 7 }
+}
 
-
-main = () { assert(f() == 42) Nil }
+main = () {
+	assert(f() == 42)
+	Nil
+}

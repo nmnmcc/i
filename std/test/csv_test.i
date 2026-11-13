@@ -13,17 +13,14 @@
 )
 
 config = (delimiter: String, fields: Int, crlf: Bool) -> csv.Options {
-	csv.options(delimiter, fields, crlf) |> {
-		Ok(c)    -> c
-		Error(_) -> panic("test options")
-	}
+	csv.options(delimiter, fields, crlf) |>
+		(Ok(c)) { c }
+		| (Error(_)) { panic("test options") }
 }
 
-PullProbe {
-	PullProbe(note: () -> Nil)
-}
+PullProbe = (note = () -> Nil)
 
-note_pull = (probe ! PullProbe) -> Nil ! PullProbe { probe.note() }
+note_pull = () <- (probe: PullProbe) -> Nil { probe.note() }
 
 test("parse_empty", () {
 	assert(csv.parse("") == Ok([]))
@@ -178,7 +175,7 @@ test("parse_bom", () {
 test("error_bare_quote", () {
 	assert(
 		csv.parse("a\"b") ==
-			Error(csv.CsvError(line: 1, column: 2, reason: "bare quote"))
+			Error(csv.CsvError(line = 1, column = 2, reason = "bare quote")),
 	)
 	Nil
 })
@@ -188,11 +185,11 @@ test("error_after_quote", () {
 		csv.parse("\"a\"b") ==
 			Error(
 				csv.CsvError(
-					line:   1
-					column: 4
-					reason: "data after closing quote"
-				)
-			)
+					line = 1,
+					column = 4,
+					reason = "data after closing quote",
+				),
+			),
 	)
 	Nil
 })
@@ -202,11 +199,11 @@ test("error_space_after_quote", () {
 		csv.parse("\"a\" ") ==
 			Error(
 				csv.CsvError(
-					line:   1
-					column: 4
-					reason: "data after closing quote"
-				)
-			)
+					line = 1,
+					column = 4,
+					reason = "data after closing quote",
+				),
+			),
 	)
 	Nil
 })
@@ -216,11 +213,11 @@ test("error_missing_quote", () {
 		csv.parse("\"a") ==
 			Error(
 				csv.CsvError(
-					line:   1
-					column: 3
-					reason: "unterminated quoted field"
-				)
-			)
+					line = 1,
+					column = 3,
+					reason = "unterminated quoted field",
+				),
+			),
 	)
 	Nil
 })
@@ -230,11 +227,11 @@ test("error_multiline_quote", () {
 		csv.parse("\"a\nb") ==
 			Error(
 				csv.CsvError(
-					line:   2
-					column: 2
-					reason: "unterminated quoted field"
-				)
-			)
+					line = 2,
+					column = 2,
+					reason = "unterminated quoted field",
+				),
+			),
 	)
 	Nil
 })
@@ -242,71 +239,64 @@ test("error_multiline_quote", () {
 test("error_unicode_position", () {
 	assert(
 		csv.parse("é\"") ==
-			Error(csv.CsvError(line: 1, column: 2, reason: "bare quote"))
+			Error(csv.CsvError(line = 1, column = 2, reason = "bare quote")),
 	)
 	Nil
 })
 
 test("invalid_delimiter_0", () {
-	csv.options("", 0, False) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("invalid delimiter")
-	}
+	csv.options("", 0, False) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_1", () {
-	csv.options("ab", 0, False) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("invalid delimiter")
-	}
+	csv.options("ab", 0, False) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_2", () {
-	csv.options("\n", 0, False) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("invalid delimiter")
-	}
+	csv.options("\n", 0, False) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_3", () {
-	csv.options("\r", 0, False) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("invalid delimiter")
-	}
+	csv.options("\r", 0, False) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_4", () {
-	csv.options("\"", 0, False) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("invalid delimiter")
-	}
+	csv.options("\"", 0, False) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_5", () {
-	csv.options("\u{0000}", 0, False) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("invalid delimiter")
-	}
+	csv.options("\u{0000}", 0, False) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_6", () {
-	csv.options("�", 0, False) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("invalid delimiter")
-	}
+	csv.options("�", 0, False) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("delimiter_semicolon", () {
 	assert(
 		csv.parse_with("a;b\nc;d", config(";", 0, False)) ==
-			Ok([["a", "b"], ["c", "d"]])
+			Ok([["a", "b"], ["c", "d"]]),
 	)
 	Nil
 })
@@ -314,43 +304,45 @@ test("delimiter_semicolon", () {
 test("delimiter_unicode", () {
 	assert(
 		csv.parse_with("a🦀b\nc🦀d", config("🦀", 0, False)) ==
-			Ok([["a", "b"], ["c", "d"]])
+			Ok([["a", "b"], ["c", "d"]]),
 	)
 	Nil
 })
 
 test("delimiter_tab", () {
-	assert(csv.parse_with("a\tb", config("\t", 0, False)) == Ok([["a", "b"]]))
+	assert(
+		csv.parse_with("a\tb", config("\t", 0, False)) == Ok([["a", "b"]]),
+	)
 	Nil
 })
 
 test("width_infer_error", () {
-	csv.parse("a,b\nc") |> {
-		Error(csv.CsvError(reason = reason, ..)) -> assert(
-			reason == "wrong number of fields"
-		)
-		Ok(_) -> panic("width")
-	}
+	csv.parse("a,b\nc") |>
+		(Error(csv.CsvError(reason = reason, ..))) {
+			assert(reason == "wrong number of fields")
+		}
+		| (Ok(_)) { panic("width") }
 	Nil
 })
 
 test("width_explicit", () {
-	assert(csv.parse_with("a,b", config(",", 2, False)) == Ok([["a", "b"]]))
+	assert(
+		csv.parse_with("a,b", config(",", 2, False)) == Ok([["a", "b"]]),
+	)
 	Nil
 })
 
 test("width_explicit_error", () {
-	csv.parse_with("a,b", config(",", 3, False)) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("width")
-	}
+	csv.parse_with("a,b", config(",", 3, False)) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("width") }
 	Nil
 })
 
 test("width_variable", () {
 	assert(
 		csv.parse_with("a\nb,c", config(",", -1, False)) ==
-			Ok([["a"], ["b", "c"]])
+			Ok([["a"], ["b", "c"]]),
 	)
 	Nil
 })
@@ -413,14 +405,14 @@ test("print_unicode", () {
 test("print_crlf", () {
 	assert(
 		csv.print_with([["a", "b"], ["c", "d"]], config(",", 0, True)) ==
-			"a,b\r\nc,d\r\n"
+			"a,b\r\nc,d\r\n",
 	)
 	Nil
 })
 
 test("print_custom_delimiter", () {
 	assert(
-		csv.print_with([["a;b", "c"]], config(";", 0, False)) == "\"a;b\";c\n"
+		csv.print_with([["a;b", "c"]], config(";", 0, False)) == "\"a;b\";c\n",
 	)
 	Nil
 })
@@ -430,9 +422,9 @@ test("stream_boundaries_0", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[]
+				[],
 		)
 		Nil
 	})
@@ -444,9 +436,9 @@ test("stream_boundaries_1", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a"])]
+				[Ok(["a"])],
 		)
 		Nil
 	})
@@ -458,9 +450,9 @@ test("stream_boundaries_2", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a"])]
+				[Ok(["a"])],
 		)
 		Nil
 	})
@@ -472,9 +464,9 @@ test("stream_boundaries_3", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a"])]
+				[Ok(["a"])],
 		)
 		Nil
 	})
@@ -483,19 +475,19 @@ test("stream_boundaries_3", () {
 
 test("stream_boundaries_4", () {
 	cases = [
-		["", "a,b,c"]
-		["a", ",b,c"]
-		["a,", "b,c"]
-		["a,b", ",c"]
-		["a,b,", "c"]
-		["a,b,c", ""]
+		["", "a,b,c"],
+		["a", ",b,c"],
+		["a,", "b,c"],
+		["a,b", ",c"],
+		["a,b,", "c"],
+		["a,b,c", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a", "b", "c"])]
+				[Ok(["a", "b", "c"])],
 		)
 		Nil
 	})
@@ -504,22 +496,22 @@ test("stream_boundaries_4", () {
 
 test("stream_boundaries_5", () {
 	cases = [
-		["", "a,b\nc,d\n"]
-		["a", ",b\nc,d\n"]
-		["a,", "b\nc,d\n"]
-		["a,b", "\nc,d\n"]
-		["a,b\n", "c,d\n"]
-		["a,b\nc", ",d\n"]
-		["a,b\nc,", "d\n"]
-		["a,b\nc,d", "\n"]
-		["a,b\nc,d\n", ""]
+		["", "a,b\nc,d\n"],
+		["a", ",b\nc,d\n"],
+		["a,", "b\nc,d\n"],
+		["a,b", "\nc,d\n"],
+		["a,b\n", "c,d\n"],
+		["a,b\nc", ",d\n"],
+		["a,b\nc,", "d\n"],
+		["a,b\nc,d", "\n"],
+		["a,b\nc,d\n", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a", "b"]), Ok(["c", "d"])]
+				[Ok(["a", "b"]), Ok(["c", "d"])],
 		)
 		Nil
 	})
@@ -531,9 +523,9 @@ test("stream_boundaries_6", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["", "", ""])]
+				[Ok(["", "", ""])],
 		)
 		Nil
 	})
@@ -545,9 +537,9 @@ test("stream_boundaries_7", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a", ""])]
+				[Ok(["a", ""])],
 		)
 		Nil
 	})
@@ -559,9 +551,9 @@ test("stream_boundaries_8", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["", "b"])]
+				[Ok(["", "b"])],
 		)
 		Nil
 	})
@@ -573,9 +565,9 @@ test("stream_boundaries_9", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok([""])]
+				[Ok([""])],
 		)
 		Nil
 	})
@@ -584,19 +576,19 @@ test("stream_boundaries_9", () {
 
 test("stream_boundaries_10", () {
 	cases = [
-		["", "\"a\",b"]
-		["\"", "a\",b"]
-		["\"a", "\",b"]
-		["\"a\"", ",b"]
-		["\"a\",", "b"]
-		["\"a\",b", ""]
+		["", "\"a\",b"],
+		["\"", "a\",b"],
+		["\"a", "\",b"],
+		["\"a\"", ",b"],
+		["\"a\",", "b"],
+		["\"a\",b", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a", "b"])]
+				[Ok(["a", "b"])],
 		)
 		Nil
 	})
@@ -605,21 +597,21 @@ test("stream_boundaries_10", () {
 
 test("stream_boundaries_11", () {
 	cases = [
-		["", "\"a,b\",c"]
-		["\"", "a,b\",c"]
-		["\"a", ",b\",c"]
-		["\"a,", "b\",c"]
-		["\"a,b", "\",c"]
-		["\"a,b\"", ",c"]
-		["\"a,b\",", "c"]
-		["\"a,b\",c", ""]
+		["", "\"a,b\",c"],
+		["\"", "a,b\",c"],
+		["\"a", ",b\",c"],
+		["\"a,", "b\",c"],
+		["\"a,b", "\",c"],
+		["\"a,b\"", ",c"],
+		["\"a,b\",", "c"],
+		["\"a,b\",c", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a,b", "c"])]
+				[Ok(["a,b", "c"])],
 		)
 		Nil
 	})
@@ -628,20 +620,20 @@ test("stream_boundaries_11", () {
 
 test("stream_boundaries_12", () {
 	cases = [
-		["", "\"a\"\"b\""]
-		["\"", "a\"\"b\""]
-		["\"a", "\"\"b\""]
-		["\"a\"", "\"b\""]
-		["\"a\"\"", "b\""]
-		["\"a\"\"b", "\""]
-		["\"a\"\"b\"", ""]
+		["", "\"a\"\"b\""],
+		["\"", "a\"\"b\""],
+		["\"a", "\"\"b\""],
+		["\"a\"", "\"b\""],
+		["\"a\"\"", "b\""],
+		["\"a\"\"b", "\""],
+		["\"a\"\"b\"", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a\"b"])]
+				[Ok(["a\"b"])],
 		)
 		Nil
 	})
@@ -650,18 +642,18 @@ test("stream_boundaries_12", () {
 
 test("stream_boundaries_13", () {
 	cases = [
-		["", "\"\"\"\""]
-		["\"", "\"\"\""]
-		["\"\"", "\"\""]
-		["\"\"\"", "\""]
-		["\"\"\"\"", ""]
+		["", "\"\"\"\""],
+		["\"", "\"\"\""],
+		["\"\"", "\"\""],
+		["\"\"\"", "\""],
+		["\"\"\"\"", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["\""])]
+				[Ok(["\""])],
 		)
 		Nil
 	})
@@ -670,21 +662,21 @@ test("stream_boundaries_13", () {
 
 test("stream_boundaries_14", () {
 	cases = [
-		["", "\"a\nb\",c"]
-		["\"", "a\nb\",c"]
-		["\"a", "\nb\",c"]
-		["\"a\n", "b\",c"]
-		["\"a\nb", "\",c"]
-		["\"a\nb\"", ",c"]
-		["\"a\nb\",", "c"]
-		["\"a\nb\",c", ""]
+		["", "\"a\nb\",c"],
+		["\"", "a\nb\",c"],
+		["\"a", "\nb\",c"],
+		["\"a\n", "b\",c"],
+		["\"a\nb", "\",c"],
+		["\"a\nb\"", ",c"],
+		["\"a\nb\",", "c"],
+		["\"a\nb\",c", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a\nb", "c"])]
+				[Ok(["a\nb", "c"])],
 		)
 		Nil
 	})
@@ -693,22 +685,22 @@ test("stream_boundaries_14", () {
 
 test("stream_boundaries_15", () {
 	cases = [
-		["", "\"a\r\nb\",c"]
-		["\"", "a\r\nb\",c"]
-		["\"a", "\r\nb\",c"]
-		["\"a\r", "\nb\",c"]
-		["\"a\r\n", "b\",c"]
-		["\"a\r\nb", "\",c"]
-		["\"a\r\nb\"", ",c"]
-		["\"a\r\nb\",", "c"]
-		["\"a\r\nb\",c", ""]
+		["", "\"a\r\nb\",c"],
+		["\"", "a\r\nb\",c"],
+		["\"a", "\r\nb\",c"],
+		["\"a\r", "\nb\",c"],
+		["\"a\r\n", "b\",c"],
+		["\"a\r\nb", "\",c"],
+		["\"a\r\nb\"", ",c"],
+		["\"a\r\nb\",", "c"],
+		["\"a\r\nb\",c", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a\nb", "c"])]
+				[Ok(["a\nb", "c"])],
 		)
 		Nil
 	})
@@ -720,9 +712,9 @@ test("stream_boundaries_16", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a\rb"])]
+				[Ok(["a\rb"])],
 		)
 		Nil
 	})
@@ -731,19 +723,19 @@ test("stream_boundaries_16", () {
 
 test("stream_boundaries_17", () {
 	cases = [
-		["", "\"a\rb\""]
-		["\"", "a\rb\""]
-		["\"a", "\rb\""]
-		["\"a\r", "b\""]
-		["\"a\rb", "\""]
-		["\"a\rb\"", ""]
+		["", "\"a\rb\""],
+		["\"", "a\rb\""],
+		["\"a", "\rb\""],
+		["\"a\r", "b\""],
+		["\"a\rb", "\""],
+		["\"a\rb\"", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a\rb"])]
+				[Ok(["a\rb"])],
 		)
 		Nil
 	})
@@ -752,21 +744,21 @@ test("stream_boundaries_17", () {
 
 test("stream_boundaries_18", () {
 	cases = [
-		["", " a , b "]
-		[" ", "a , b "]
-		[" a", " , b "]
-		[" a ", ", b "]
-		[" a ,", " b "]
-		[" a , ", "b "]
-		[" a , b", " "]
-		[" a , b ", ""]
+		["", " a , b "],
+		[" ", "a , b "],
+		[" a", " , b "],
+		[" a ", ", b "],
+		[" a ,", " b "],
+		[" a , ", "b "],
+		[" a , b", " "],
+		[" a , b ", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok([" a ", " b "])]
+				[Ok([" a ", " b "])],
 		)
 		Nil
 	})
@@ -775,20 +767,20 @@ test("stream_boundaries_18", () {
 
 test("stream_boundaries_19", () {
 	cases = [
-		["", "\n\r\na\n\n"]
-		["\n", "\r\na\n\n"]
-		["\n\r", "\na\n\n"]
-		["\n\r\n", "a\n\n"]
-		["\n\r\na", "\n\n"]
-		["\n\r\na\n", "\n"]
-		["\n\r\na\n\n", ""]
+		["", "\n\r\na\n\n"],
+		["\n", "\r\na\n\n"],
+		["\n\r", "\na\n\n"],
+		["\n\r\n", "a\n\n"],
+		["\n\r\na", "\n\n"],
+		["\n\r\na\n", "\n"],
+		["\n\r\na\n\n", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a"])]
+				[Ok(["a"])],
 		)
 		Nil
 	})
@@ -800,9 +792,9 @@ test("stream_boundaries_20", () {
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok([" "])]
+				[Ok([" "])],
 		)
 		Nil
 	})
@@ -811,22 +803,22 @@ test("stream_boundaries_20", () {
 
 test("stream_boundaries_21", () {
 	cases = [
-		["", "名字,值\n🦀,é"]
-		["名", "字,值\n🦀,é"]
-		["名字", ",值\n🦀,é"]
-		["名字,", "值\n🦀,é"]
-		["名字,值", "\n🦀,é"]
-		["名字,值\n", "🦀,é"]
-		["名字,值\n🦀", ",é"]
-		["名字,值\n🦀,", "é"]
-		["名字,值\n🦀,é", ""]
+		["", "名字,值\n🦀,é"],
+		["名", "字,值\n🦀,é"],
+		["名字", ",值\n🦀,é"],
+		["名字,", "值\n🦀,é"],
+		["名字,值", "\n🦀,é"],
+		["名字,值\n", "🦀,é"],
+		["名字,值\n🦀", ",é"],
+		["名字,值\n🦀,", "é"],
+		["名字,值\n🦀,é", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["名字", "值"]), Ok(["🦀", "é"])]
+				[Ok(["名字", "值"]), Ok(["🦀", "é"])],
 		)
 		Nil
 	})
@@ -835,17 +827,17 @@ test("stream_boundaries_21", () {
 
 test("stream_boundaries_22", () {
 	cases = [
-		["", "a\u{0000}b"]
-		["a", "\u{0000}b"]
-		["a\u{0000}", "b"]
-		["a\u{0000}b", ""]
+		["", "a\u{0000}b"],
+		["a", "\u{0000}b"],
+		["a\u{0000}", "b"],
+		["a\u{0000}b", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a\u{0000}b"])]
+				[Ok(["a\u{0000}b"])],
 		)
 		Nil
 	})
@@ -854,21 +846,21 @@ test("stream_boundaries_22", () {
 
 test("stream_boundaries_23", () {
 	cases = [
-		["", "a,b\nc,d"]
-		["a", ",b\nc,d"]
-		["a,", "b\nc,d"]
-		["a,b", "\nc,d"]
-		["a,b\n", "c,d"]
-		["a,b\nc", ",d"]
-		["a,b\nc,", "d"]
-		["a,b\nc,d", ""]
+		["", "a,b\nc,d"],
+		["a", ",b\nc,d"],
+		["a,", "b\nc,d"],
+		["a,b", "\nc,d"],
+		["a,b\n", "c,d"],
+		["a,b\nc", ",d"],
+		["a,b\nc,", "d"],
+		["a,b\nc,d", ""],
 	]
 	list.each(cases, (chunks) {
 		assert(
 			stream.to_list(
-				csv.rows(stream.from_list(chunks), csv.defaults())
+				csv.rows(stream.from_list(chunks), csv.defaults()),
 			) ==
-				[Ok(["a", "b"]), Ok(["c", "d"])]
+				[Ok(["a", "b"]), Ok(["c", "d"])],
 		)
 		Nil
 	})
@@ -878,8 +870,10 @@ test("stream_boundaries_23", () {
 test("stream_scalar_chunks", () {
 	chunks = string.to_codepoint_strings("名字,\"🦀\r\né\"\r\n")
 	assert(
-		stream.to_list(csv.rows(stream.from_list(chunks), csv.defaults())) ==
-			[Ok(["名字", "🦀\né"])]
+		stream.to_list(
+			csv.rows(stream.from_list(chunks), csv.defaults()),
+		) ==
+			[Ok(["名字", "🦀\né"])],
 	)
 	Nil
 })
@@ -887,9 +881,9 @@ test("stream_scalar_chunks", () {
 test("stream_stops_on_error", () {
 	assert(
 		stream.to_list(
-			csv.rows(stream.from_list(["a\"\nb\n"]), csv.defaults())
+			csv.rows(stream.from_list(["a\"\nb\n"]), csv.defaults()),
 		) ==
-			[Error(csv.CsvError(line: 1, column: 2, reason: "bare quote"))]
+			[Error(csv.CsvError(line = 1, column = 2, reason = "bare quote"))],
 	)
 	Nil
 })
@@ -900,19 +894,28 @@ test("stream_early_termination", () {
 	})
 	source = stream.make(() { stream.Next("a,b\n", tail) })
 	assert(
-		stream.to_list(stream.take(csv.rows(source, csv.defaults()), 1)) ==
-			[Ok(["a", "b"])]
+		stream.to_list(
+			stream.take(
+				csv.rows(source, csv.defaults()),
+				1,
+			),
+		) ==
+			[Ok(["a", "b"])],
 	)
 	Nil
 })
 
 test("stream_source_error", () {
-	source = stream.make(() -> stream.Step(String, String, Never) ^ String {
+	source = stream.make(() -> stream.Step(String, String, Never) {
 		fail.raise("source error")
 	})
 	assert(
-		fail.catch(() { stream.to_list(csv.rows(source, csv.defaults())) }) ==
-			Error("source error")
+		fail.catch(() {
+			stream.to_list(
+				csv.rows(source, csv.defaults()),
+			)
+		}) ==
+			Error("source error"),
 	)
 	Nil
 })
@@ -930,35 +933,40 @@ test("header", () {
 })
 
 test("header_empty", () {
-	assert(csv.parse_header("", csv.defaults()) == Ok([]))
+	assert(
+		csv.parse_header("", csv.defaults()) == Ok([]),
+	)
 	Nil
 })
 
 test("header_only", () {
-	assert(csv.parse_header("a,b", csv.defaults()) == Ok([]))
+	assert(
+		csv.parse_header("a,b", csv.defaults()) == Ok([]),
+	)
 	Nil
 })
 
 test("header_duplicate", () {
 	assert(
 		csv.parse_header("a,a\n1,2", csv.defaults()) ==
-			Error(csv.CsvError(line: 1, column: 1, reason: "duplicate header"))
+			Error(
+				csv.CsvError(line = 1, column = 1, reason = "duplicate header"),
+			),
 	)
 	Nil
 })
 
 test("header_width", () {
-	csv.parse_header("a,b\n1", config(",", -1, False)) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("header width")
-	}
+	csv.parse_header("a,b\n1", config(",", -1, False)) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("header width") }
 	Nil
 })
 
 test("header_empty_name", () {
 	assert(
 		csv.parse_header(",b\n1,2", csv.defaults()) ==
-			Ok([dict.from_list([("", "1"), ("b", "2")])])
+			Ok([dict.from_list([("", "1"), ("b", "2")])]),
 	)
 	Nil
 })
@@ -966,9 +974,9 @@ test("header_empty_name", () {
 test("stream_records", () {
 	assert(
 		stream.to_list(
-			csv.records(stream.from_list(["a,b\n", "1,2\n"]), csv.defaults())
+			csv.records(stream.from_list(["a,b\n", "1,2\n"]), csv.defaults()),
 		) ==
-			[Ok(dict.from_list([("a", "1"), ("b", "2")]))]
+			[Ok(dict.from_list([("a", "1"), ("b", "2")]))],
 	)
 	Nil
 })
@@ -982,16 +990,17 @@ test("schema", () {
 
 test("schema_error", () {
 	codec = schema.dict(schema.int)
-	csv.decode(codec, dict.from_list([("a", "one")])) |> {
-		Error(_) -> Nil
-		Ok(_)    -> panic("string must not coerce")
-	}
+	csv.decode(codec, dict.from_list([("a", "one")])) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("string must not coerce") }
 	Nil
 })
 
 test("large_roundtrip", () {
 	rows = list.repeat(["hello", "quoted,field", "é🦀"], 2000)
-	assert(csv.parse(csv.print(rows)) == Ok(rows))
+	assert(
+		csv.parse(csv.print(rows)) == Ok(rows),
+	)
 	Nil
 })
 
@@ -1000,11 +1009,11 @@ test("width_error_record_line", () {
 		csv.parse("a,b\n\nc\n") ==
 			Error(
 				csv.CsvError(
-					line:   3
-					column: 1
-					reason: "wrong number of fields"
-				)
-			)
+					line = 3,
+					column = 1,
+					reason = "wrong number of fields",
+				),
+			),
 	)
 	Nil
 })
@@ -1014,11 +1023,11 @@ test("header_width_error_line", () {
 		csv.parse_header("a,b\n\n1\n", config(",", -1, False)) ==
 			Error(
 				csv.CsvError(
-					line:   3
-					column: 1
-					reason: "header width differs from row"
-				)
-			)
+					line = 3,
+					column = 1,
+					reason = "header width differs from row",
+				),
+			),
 	)
 	Nil
 })
@@ -1026,52 +1035,66 @@ test("header_width_error_line", () {
 test("duplicate_header_error_line", () {
 	assert(
 		csv.parse_header("\n\na,a\n", csv.defaults()) ==
-			Error(csv.CsvError(line: 3, column: 1, reason: "duplicate header"))
+			Error(
+				csv.CsvError(line = 3, column = 1, reason = "duplicate header"),
+			),
 	)
 	Nil
 })
 
-test("bare_cr_lookahead_pulls_once", () -> Nil ! Assert {
+test("bare_cr_lookahead_pulls_once", () -> Nil {
 	events = control.boundary((boundary) {
-		! PullProbe = PullProbe(note: () {
-			control.suspend(boundary, (continuation) {
-				[1, ..control.resume(continuation, Nil)]
-			})
-		})
-		last = stream.make(
-			() -> stream.Step(String, Never, PullProbe) ! PullProbe {
+		{
+			last = stream.make(() -> stream.Step(String, Never, PullProbe) {
 				note_pull()
 				stream.Next("b\n", stream.new())
-			}
+			})
+			source = stream.append(stream.from_list(["a\r"]), last)
+			assert(
+				stream.to_list(
+					csv.rows(source, csv.defaults()),
+				) ==
+					[Ok(["a\rb"])],
+			)
+			[]
+		} <- (
+			PullProbe(
+				note = () {
+					control.suspend(boundary, (continuation) {
+						[1, ..control.resume(continuation, Nil)]
+					})
+				},
+			),
 		)
-		source = stream.append(stream.from_list(["a\r"]), last)
-		assert(
-			stream.to_list(csv.rows(source, csv.defaults())) == [Ok(["a\rb"])]
-		)
-		[]
 	})
 	assert(events == [1])
 	Nil
 })
 
-test("bare_cr_eof_pulls_once", () -> Nil ! Assert {
+test("bare_cr_eof_pulls_once", () -> Nil {
 	events = control.boundary((boundary) {
-		! PullProbe = PullProbe(note: () {
-			control.suspend(boundary, (continuation) {
-				[1, ..control.resume(continuation, Nil)]
-			})
-		})
-		last = stream.make(
-			() -> stream.Step(String, Never, PullProbe) ! PullProbe {
+		{
+			last = stream.make(() -> stream.Step(String, Never, PullProbe) {
 				note_pull()
 				stream.Done
-			}
+			})
+			source = stream.append(stream.from_list(["a\r"]), last)
+			assert(
+				stream.to_list(
+					csv.rows(source, csv.defaults()),
+				) ==
+					[Ok(["a\r"])],
+			)
+			[]
+		} <- (
+			PullProbe(
+				note = () {
+					control.suspend(boundary, (continuation) {
+						[1, ..control.resume(continuation, Nil)]
+					})
+				},
+			),
 		)
-		source = stream.append(stream.from_list(["a\r"]), last)
-		assert(
-			stream.to_list(csv.rows(source, csv.defaults())) == [Ok(["a\r"])]
-		)
-		[]
 	})
 	assert(events == [1])
 	Nil

@@ -3,7 +3,7 @@
 //! A datum carries its source span even when nested. The following layer maps
 //! the datum to the core AST in a specific syntactic position.
 
-use crate::lexer::{DocComment, lex_lisp};
+use crate::lexer::DocComment;
 use crate::span::Span;
 use crate::token::{Token, TokenKind as T};
 use crate::{Code, Diagnostic};
@@ -226,10 +226,13 @@ impl IntoIterator for Document {
 
 /// Read all datums, ignoring the normal surface's line break rule.
 pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
-    if crate::syn3::enabled() {
-        return parse3(source);
-    }
-    parse_lexed(lex_lisp(source))
+    parse3(source)
+}
+
+/// Read all datums with the rows before syntax three (the migrator).
+#[cfg(feature = "legacy")]
+pub fn parse_legacy(source: &str) -> Result<Document, Vec<Diagnostic>> {
+    parse_lexed(crate::lexer::lex_lisp(source))
 }
 
 /// Read all datums of a syntax-three Lisp file, where `<-` is one symbol.
@@ -266,10 +269,14 @@ fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> 
 
 /// Parse a Lisp-surface source file into the common core tree.
 pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
-    if crate::syn3::enabled() {
-        return crate::syn3::parse_lisp_lowered(source);
-    }
-    match parse(source).and_then(|d| parse_module(&d).map_err(|e| vec![e])) {
+    crate::syn3::parse_lisp_lowered(source)
+}
+
+/// Parses a Lisp-surface file with the rows before syntax three (the
+/// migrator).
+#[cfg(feature = "legacy")]
+pub fn parse_source_legacy(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
+    match parse_legacy(source).and_then(|d| parse_module(&d).map_err(|e| vec![e])) {
         Ok(module) => (module, Vec::new()),
         Err(diags) => (crate::ast::Module::default(), diags),
     }
@@ -277,14 +284,9 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
 
 /// Format a Lisp module without discarding its ordinary comments.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
-    if crate::syn3::enabled() {
-        let (module, diagnostics) = crate::syn3::lisp::from_lisp(source);
-        if !diagnostics.is_empty() {
-            return Err(diagnostics);
-        }
-        return Ok(crate::syn3::lisp::to_lisp(&module));
-    }
-    let (_, diagnostics) = parse_source(source);
+    // The rows are checked by syntax three's reader; the layout is the
+    // source-preserving one of the Lisp convention, which keeps comments.
+    let (_, diagnostics) = crate::syn3::lisp::from_lisp(source);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }

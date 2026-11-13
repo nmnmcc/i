@@ -10,9 +10,8 @@ sum = (a, b) {
 	mixed = alpha_value_name * beta_value_name +
 		gamma_value_name * delta_value_name -
 		epsilon_value
-	grouped = { first_long_operand_name - second_long_operand_name } * {
-		third_operand - fourth_value
-	}
+	grouped = { first_long_operand_name - second_long_operand_name } *
+		{ third_operand - fourth_value }
 	negative = -first_long_operand_name -
 		-second_long_operand_name -
 		-third_long_operand_name -

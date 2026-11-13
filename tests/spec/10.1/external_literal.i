@@ -6,5 +6,4 @@ Level = 1 | 2
 @external("test:math/v1", "add")
 add: (Level, Int) -> Int
 
-
 main = () { assert(add(1, 4) == 5) }

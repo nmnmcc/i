@@ -1,6 +1,0 @@
-{
-  "name": "rec_local_1_0_8",
-  "code": 0,
-  "time": 0.018502924125641584,
-  "out": "app/main.use : () -> Nil ! N | S(N)\n"
-}

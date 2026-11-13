@@ -1,3 +1,3 @@
-import (i/core)
-export (f)
+import(i / core)
+export(f)
 f = () { core.inspect(42) }

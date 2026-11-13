@@ -3,8 +3,9 @@ use ilang_package::Diagnostic;
 
 #[test]
 fn completed_aliases_and_projections_do_not_change_wat() {
-    let base = "(run)\nsource: Int = 1\nparts: (Int, String) = (1, \"a\")\nrun = (n: Int) { n + source }\n\nmain = () { _ = run(1) Nil }\n";
-    let typed = "(run)\nsource: Int = 1\nparts: (Int, String) = (1, \"a\")\nrun = (n: Num) { n + source }\n\nmain = () { _ = run(1) Nil }\nNum = source\nPair(A,B) = (A,B)\nPair(First,Second) = parts\n";
+    // Keep executable source positions equal: call-site metadata is part of WAT.
+    let base = "(\n\trun\n)\nsource: Int = 1\nparts: (Int, String) = (1, \"a\")\nrun = (n: Int) { n + source }\n\nmain = () {\n\t_ = run(1)\n\tNil\n}\n";
+    let typed = "(\n\trun\n)\nsource: Int = 1\nparts: (Int, String) = (1, \"a\")\nrun = (n: Num) { n + source }\n\nmain = () {\n\t_ = run(1)\n\tNil\n}\nNum = source\nPair(A, B) = { (A, B) }\nPair(First, Second) = parts\n";
     let compile = |source: &str, tests, target| {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();

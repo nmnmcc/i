@@ -3,8 +3,6 @@
 // at: spec/main:8:32
 
 // Any code may give its own `Assert` with an environment statement.
-
 main = () {
-	! Assert = Assert(fail: (f) { panic("custom: " <> f.message) })
-	assert(False)
+	assert(False) <- (Assert(fail = (f) { panic("custom: " <> f.message) }))
 }

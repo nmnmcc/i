@@ -121,7 +121,7 @@ fn test_runs_each_test() {
         ("src/lib.i", " (twice)\n\ntwice = (n: Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            " (\n\ttestlib = (test) = std/test\n\tapp/lib)\n\n\ntest(\"good\", () {  lib.twice(2) |> { 4 -> Nil  _ -> panic(\"no\") } })\n\n\ntest(\"bad\", () { panic(\"bad\") })\n",
+            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { Nil } | (_) { panic(\"no\") } })\n\ntest(\"bad\", () { panic(\"bad\") })\n",
         ),
     ]);
     let out = i(&["test"], dir.path());
@@ -248,41 +248,40 @@ fn host_exports_give_errors() {
         ),
         (
             "src/math.i",
-            r#" (i/fail)
+            r#"(
+	i/fail
+)
 
- (divide, check, positive, bits)
+(
+	divide
+	check
+	positive
+	bits
+)
 
 // The errors are `String | Int`, given to the host in the canonical
 // order: `Int` is member 1 and `String` member 2 (B.2).
 divide = (a: Int, b: Int) {
-   b |> {
-    0 -> fail.raise("division by zero")
-    1 -> fail.raise(a)
-    _ -> a / b
-  }
+	b |>
+		(0) { fail.raise("division by zero") }
+		| (1) { fail.raise(a) }
+		| (_) { a / b }
 }
 
 // `Nil` and `Bool` errors have their own tags.
-check = (n: Int) -> Float ^ Bool | Nil {
-   n |> {
-    0 -> fail.raise(Nil)
-    1 -> fail.raise(True)
-    _ -> 1.5
-  }
+check = (n: Int) -> Float {
+	n |> (0) { fail.raise(Nil) } | (1) { fail.raise(True) } | (_) { 1.5 }
 }
 
 // The `Assert` of a host export stops the program (§9.6).
 positive = (n: Int) {
-  assert(n > 0)
-  n
+	assert(n > 0)
+	n
 }
 
 // A `BitArray` error.
-bits = (b: Bool) -> Nil ^ BitArray {
-   b |> {
-    True -> fail.raise(<<1, 2>>)
-    False -> Nil
-  }
+bits = (b: Bool) -> Nil {
+	b |> (True) { fail.raise(<<1, 2>>) } | (False) { Nil }
 }
 "#,
         ),
@@ -365,7 +364,7 @@ bits = (b: Bool) -> Nil ^ BitArray {
         match instance.call("app/math.positive", &[int(0)]).unwrap() {
             Outcome::Stop(stop) => assert_eq!(
                 stop.message.as_deref(),
-                Some("assertion failed: assert\napp/math:26:3")
+                Some("assertion failed: assert\napp/math:28:2")
             ),
             other => panic!("{other:?}"),
         }
@@ -384,22 +383,31 @@ fn host_exports_with_services_and_async() {
         ),
         (
             "src/api.i",
-            r#" (i/core)
+            r#"(
+	i/core
+)
 
- (Kv, Later, lookup, quadruple, both, pure)
+(
+	Kv
+	Later
+	lookup
+	quadruple
+	both
+	pure
+)
 
 @host("test:kv/v1")
-Kv { Kv(get: (key: String) -> String ^ String) }
+Kv = (get = (String) <- (Fail(String)) -> String)
 
 @host("test:async/v1", "async")
-Later { Later(double: (n: Int) -> Int ^ String, echo: (text: String) -> String) }
+Later = (double = (Int) <- (Fail(String)) -> Int, echo = (String) -> String)
 
-lookup = (key: String, kv ! Kv) { kv.get(key) }
+lookup = (key: String) <- (kv: Kv) { kv.get(key) }
 
-quadruple = (n: Int, later ! Later) { later.double(later.double(n)) }
+quadruple = (n: Int) <- (later: Later) { later.double(later.double(n)) }
 
-both = (key: String, kv ! Kv, later ! Later) {
-  later.echo(kv.get(key) <> "!")
+both = (key: String) <- (kv: Kv, later: Later) {
+	later.echo(kv.get(key) <> "!")
 }
 
 pure = (n: Int) { n + 1 }
@@ -505,7 +513,7 @@ fn async_entry_points_and_needed_services() {
         ("test/fake_service.i", &text),
         (
             "src/main.i",
-            "@host(\"test:unused/v1\")\nUnused { Unused(f: () -> Nil) }\n\n\nmain = () { Nil }\n",
+            "@host(\"test:unused/v1\")\nUnused = (f = () -> Nil)\n\nmain = () { Nil }\n",
         ),
     ]);
     let (built, _) = ilang_cli::build_tests(
@@ -566,11 +574,11 @@ fn run_gives_the_standard_services() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            " ((Io) = i/io)\n\n\nmain = (io ! Io) {\n  io.print(\"one\")\n  io.print(\"two\")\n}\n",
+            "(\n\t(Io) = i/io\n)\n\nmain = () <- (io: Io) {\n\tio.print(\"one\")\n\tio.print(\"two\")\n}\n",
         ),
         (
             "test/main_test.i",
-            " (\n\ttestlib = (test) = std/test\n\ti/io)\n\n\ntest(\"prints\", (out ! io.Io) { out.print(\"in a test\") })\n",
+            "(\n\ttestlib = (test) = std/test\n\ti/io\n)\n\ntest(\"prints\", () <- (out: io.Io) { out.print(\"in a test\") })\n",
         ),
     ]);
     let out = i(&["run"], dir.path());
@@ -737,11 +745,18 @@ fn incorrect_host_answers_stop_in_the_module() {
         (
             "src/main.i",
             "@host(\"test:bad/v1\")\n\
-             Bad { Bad(nan: () -> Float) }\n\
+             Bad = (nan = () -> Float)\n\
              \n\
-             half = (bad ! Bad) {\n  x = bad.nan()\n  x /. 2.0\n}\n\
+             half = () <- (bad: Bad) {\n\
+             \tx = bad.nan()\n\
+             \tx /. 2.0\n\
+             }\n\
              \n\
-             \nmain = () {\n  half()\n  Nil\n}\n",
+             main = () {\n\
+             \thalf()\n\
+             \tNil\n\
+             }\n\
+             ",
         ),
     ]);
     let built = build(
@@ -762,7 +777,7 @@ fn incorrect_host_answers_stop_in_the_module() {
     let imports = || ilang_host::services::testing(Default::default());
     assert_eq!(
         run(HostOptions::new(imports())).as_deref(),
-        Some("host: value is not correct\napp/main:5:7\napp/main:11:3")
+        Some("host: value is not correct\napp/main:5:6\napp/main:10:2")
     );
     assert_eq!(
         run(HostOptions {

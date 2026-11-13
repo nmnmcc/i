@@ -5,13 +5,7 @@
 	testlib = (test) = std/test
 )
 
-f = (s: "a" | "b") {
-	s |> {
-		"a" ? False -> 0
-		"a"         -> 1
-		"b"         -> 2
-	}
-}
+f = (s: "a" | "b") { s |> ("a" ? False) { 0 } | ("a") { 1 } | ("b") { 2 } }
 
 test("later_rows", () {
 	assert(f("a") == 1)

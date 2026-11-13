@@ -1,10 +1,11 @@
-import (probe/stream)
-Bias { Bias(value: Int) }
+import(probe / stream)
+Bias = (value = Int)
 source = () -> stream.Stream(Int, Never, Bias) {
- stream.make((b ! Bias) { stream.Next(b.value, stream.new()) })
+	stream.make(() <- (b: Bias) { stream.Next(b.value, stream.new()) })
 }
 
 main = () {
- ! Bias = Bias(10)
- assert(stream.to_list(source()) == [10])
+	assert(
+		stream.to_list(source()) == [10],
+	) <- (Bias(value = 10))
 }

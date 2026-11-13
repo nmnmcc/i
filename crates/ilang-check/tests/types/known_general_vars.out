@@ -1,7 +1,7 @@
-map : (xs: List(A), f: (A) -> B) -> List(B)
-id : (x: A) -> A
+map : (List(A), (A) -> B) -> List(B)
+id : (A) -> A
 users : List(User)
 through_id : List(Never)
 boxed : List(User)
 written : List(Int)
-19:38: error[E0501]: `User` is not a subtype of `(age: _)` (the type at 19:34 needs it)
+14:46: error[E0506]: `.age` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`

@@ -1,2 +1,4 @@
-((Codec) = review/lib)
-Codec(Remote,_) = lib.size
+(
+	(Codec) = review/lib
+)
+Codec(Remote, _) = lib.size

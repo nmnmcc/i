@@ -3,26 +3,22 @@
 	i/fail
 )
 
-Clock {
-	Clock(now: () -> Int)
-}
+Clock = (now = () -> Int)
 
-Late {
-	Late(by: Int)
-}
+Late = (by = Int)
 
 // Inferred: (deadline: Int) -> Int ^ Late ! Clock
-remaining = (deadline, clock ! Clock) {
-	deadline - clock.now() |> {
-		left ? left < 0 -> fail.raise(Late(by: 0 - left))
-		left            -> left
-	}
+remaining = (deadline) <- (clock: Clock) {
+	deadline - clock.now() |>
+		(left ? left < 0) { fail.raise(Late(by = 0 - left)) }
+		| (left) { left }
 }
 
 test("a test gives its own clock", () {
-	! Clock = Clock(now: () { 40 })
-	assert(remaining(42) == 2)
-	late = fail.catch(() { remaining(30) })
-	expected = Error(Late(by: 10))
-	assert(late == expected)
+	{
+		assert(remaining(42) == 2)
+		late = fail.catch(() { remaining(30) })
+		expected = Error(Late(by = 10))
+		assert(late == expected)
+	} <- (Clock(now = () { 40 }))
 })

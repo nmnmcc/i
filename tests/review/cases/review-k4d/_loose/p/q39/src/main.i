@@ -1,3 +1,3 @@
-S(N) { S(f: () -> Int ! N) }
-use(N) = (s ! S(N)) -> Int ! S(N) | N { s.f() }
+S(N) = (f = () <- N -> Int)
+use = <N>() <- (s: S(N)) -> Int { s.f() }
 fw = () { use() }

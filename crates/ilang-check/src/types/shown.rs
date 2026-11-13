@@ -8,15 +8,16 @@ use crate::hir::TypeRef;
 /// [`ShownType::text`] writes it in the syntax of §3.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ShownType {
-    /// An exact shared graph; its full output is a versioned interface artifact.
-    Graph(super::ShownGraph),
+    /// Data with labels (syntax-3 §2.3), its keys in canonical order:
+    /// `None` for a position. `(a: A, b: B)`.
+    Record(Vec<Option<String>>, Vec<ShownType>),
     /// The canonical source text of an Int or String literal.
     Lit(String),
     /// A built-in or custom type, with its arguments.
     Named(TypeRef, Vec<ShownType>),
     /// `(A, B)`.
     Tuple(Vec<ShownType>),
-    /// `(label: A, B) -> R ^ E ! N`.
+    /// `(label = A, B) <- (S, Fail(E), ..N) -> R`.
     Fn(Box<ShownFn>),
     /// A type variable, by its shown name. The variables of one shown type
     /// have different names.
@@ -39,6 +40,9 @@ pub enum ShownType {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ShownFn {
     pub params: Vec<(Option<String>, ShownType)>,
+    /// The parameter is not data of one shape: `params` has the whole
+    /// parameter type, shown as a group `{ T } -> R` (syntax-3 §6.1).
+    pub group: bool,
     pub ret: ShownType,
     pub err: Option<ShownType>,
     pub env: Option<ShownType>,
@@ -157,7 +161,20 @@ impl ShownType {
             }
         };
         match self {
-            ShownType::Graph(g) => out.push_str(&g.text_with(n.ty, n.var)),
+            ShownType::Record(keys, parts) => {
+                out.push('(');
+                for (i, (l, p)) in keys.iter().zip(parts).enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    if let Some(l) = l {
+                        out.push_str(l);
+                        out.push_str(" = ");
+                    }
+                    p.write(0, out, n);
+                }
+                out.push(')');
+            }
             ShownType::Lit(s) => out.push_str(s),
             ShownType::Var(v) => out.push_str(&(n.var)(v)),
             ShownType::Never => out.push_str("Never"),
@@ -177,38 +194,44 @@ impl ShownType {
             }
             ShownType::Fn(f) => {
                 open(out, 0);
-                out.push('(');
+                out.push_str(if f.group { "{ " } else { "(" });
                 for (i, (l, p)) in f.params.iter().enumerate() {
                     if i > 0 {
                         out.push_str(", ");
                     }
                     if let Some(l) = l {
                         out.push_str(l);
-                        out.push_str(": ");
+                        out.push_str(" = ");
                     }
                     p.write(0, out, n);
                 }
-                out.push_str(") -> ");
-                // A function type followed by `^` or `!` is put in `{ }`.
-                let part = |x: &ShownType, followed: bool, out: &mut String, n: &mut Names| {
-                    let braces = followed && matches!(x, ShownType::Fn(_));
-                    if braces {
-                        out.push_str("{ ");
-                    }
-                    x.write(0, out, n);
-                    if braces {
-                        out.push_str(" }");
-                    }
-                };
-                part(&f.ret, f.err.is_some() || f.env.is_some(), out, n);
+                out.push_str(if f.group { " }" } else { ")" });
+                // The need (syntax three §2.10): the services, an error as
+                // the service `Fail(E)`, and row variables as `..N`.
+                let mut items = Vec::new();
                 if let Some(e) = &f.err {
-                    out.push_str(" ^ ");
-                    part(e, f.env.is_some(), out, n);
+                    let mut t = String::new();
+                    e.write(0, &mut t, n);
+                    items.push(format!("Fail({t})"));
                 }
                 if let Some(e) = &f.env {
-                    out.push_str(" ! ");
-                    part(e, false, out, n);
+                    let members: Vec<&ShownType> = match e {
+                        ShownType::Union(ms) => ms.iter().collect(),
+                        ShownType::Never => vec![],
+                        e => vec![e],
+                    };
+                    for m in members {
+                        let mut t = String::new();
+                        m.write(1, &mut t, n);
+                        if matches!(m, ShownType::Var(_)) {
+                            t.insert_str(0, "..");
+                        }
+                        items.push(t);
+                    }
                 }
+                out.push_str(&need_text(items));
+                out.push_str(" -> ");
+                f.ret.write(0, out, n);
                 close(out, 0);
             }
             ShownType::Union(ms) => {
@@ -235,6 +258,28 @@ impl ShownType {
     }
 }
 
+/// The `<- …` part of a function type from its items (syntax three
+/// §3.1): empty when nothing is needed, `<- N` for a lone row variable, and
+/// otherwise the bracket form with the services in byte order of their
+/// names and the row variables last.
+pub(crate) fn need_text(mut items: Vec<String>) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    items.sort_by(|a, b| {
+        (a.starts_with(".."))
+            .cmp(&b.starts_with(".."))
+            .then(a.cmp(b))
+    });
+    items.dedup();
+    if let [one] = items.as_slice()
+        && let Some(row) = one.strip_prefix("..")
+    {
+        return format!(" <- {row}");
+    }
+    format!(" <- ({})", items.join(", "))
+}
+
 /// How the names in a text are found.
 struct Names<'a> {
     ty: &'a mut dyn FnMut(TypeRef) -> String,
@@ -246,9 +291,8 @@ impl ShownType {
     /// Nominal identities in the complete tree, including function inputs.
     pub fn type_refs(&self, out: &mut Vec<TypeRef>) {
         match self {
-            ShownType::Graph(g) => {
-                out.extend(g.named_types());
-                for (_, t) in &g.names {
+            ShownType::Record(_, parts) => {
+                for t in parts {
                     t.type_refs(out);
                 }
             }

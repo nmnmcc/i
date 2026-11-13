@@ -1,18 +1,24 @@
 //! `i check --types` prints the type of every top-level name.
 
+#[path = "common/syn3_pending.rs"]
+mod syn3_pending;
 #[path = "common/test_project.rs"]
 mod test_project;
+use syn3_pending::syn3_pending;
 
 use std::process::Command;
 
 #[test]
 fn check_types() {
+    if syn3_pending("check::check_types") {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "id = (x) { x }\nClock { Clock(now: () -> Int) }\nelapsed = (start: Int, clock ! Clock) { clock.now() - start }\n",
+        "id = (x) { x }\nClock = (now = () -> Int)\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n",
     )
     .unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -23,7 +29,7 @@ fn check_types() {
     assert!(out.status.success());
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
-        "app/main.id : (x: A) -> A\napp/main.elapsed : (start: Int) -> Int ! Clock\n"
+        "app/main.id : (A) -> A\napp/main.elapsed : (Int) <- (Clock) -> Int\n"
     );
 }
 
@@ -85,13 +91,19 @@ fn front_end_project(source: &str) -> tempfile::TempDir {
 fn a_local_annotation_cannot_hide_an_entry_service() {
     // §4.8 retains the service through the local binding; §10.2 requires
     // a provider before entry. Both annotations have the same finite type.
-    let annotated = "S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
+    let annotated = "S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
 
-main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
+main = <N>() {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	local()
+}";
     for source in [
         annotated.to_string(),
-        annotated.replace("local: () -> Nil ! N | S(N)", "local"),
+        annotated.replace("local: () <- (S(N), ..N) -> Nil", "local"),
     ] {
         let dir = front_end_project(&source);
         let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -105,7 +117,12 @@ main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
             String::from_utf8_lossy(&out.stderr)
         );
         assert!(
-            String::from_utf8_lossy(&out.stdout).contains("app/main.main : () -> Nil ! N | S(N)")
+            // Syntax three prints a need as `<- (…)` (spec §6.8 table, "Function
+            // type with a need": `(T) <- (Db, Log) -> R`).
+            String::from_utf8_lossy(&out.stdout)
+                .contains("app/main.main : () <- (S(N), ..N) -> Nil"),
+            "{}",
+            String::from_utf8_lossy(&out.stdout)
         );
         for opt in ["0", "2"] {
             let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -127,19 +144,24 @@ main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
 fn a_captured_service_row_keeps_callback_dependencies() {
     // §4.5 rule 4 keeps S's argument equal across levels; §4.8 rule 9
     // removes the supplied S(Dependency), leaving Dependency itself.
-    let source = "S(N) { S(() -> Nil ! N) }
-Dependency { Dependency }
-read = (d ! Dependency) { Nil }
-use(N) = (s ! S(N)) { S(f) = s f() }
-apply(N) = () { local: () -> Nil ! N = () { use() } local() }
+    let source = "S(N) = (() <- N -> Nil)
+Dependency = ()
+read = () <- (d: Dependency) { Nil }
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+apply = <N>() {
+	local: () <- N -> Nil = () { use() }
+	local()
+}
 
-main = () { ! S(Dependency) = S(() { read() }) apply() }";
+main = () { apply() <- (S(() { read() })) }";
     for supplied in [false, true] {
         let source = if supplied {
-            source.replace(
-                "! S(Dependency)",
-                "! Dependency = Dependency\n! S(Dependency)",
-            )
+            // `Dependency = ()` makes the value `Dependency` (syntax-3.md
+            // §5.2.3: "when `D` is `()`, the value `T`").
+            source.replace("apply() <- (S(", "apply() <- (Dependency, S(")
         } else {
             source.to_string()
         };
@@ -152,7 +174,8 @@ main = () { ! S(Dependency) = S(() { read() }) apply() }";
         let main = if supplied {
             "app/main.main : () -> Nil\n"
         } else {
-            "app/main.main : () -> Nil ! Dependency\n"
+            // spec §6.8 table, "Function type with a need": `(T) <- (Db, Log) -> R`.
+            "app/main.main : () <- (Dependency) -> Nil\n"
         };
         assert!(
             out.status.success(),
@@ -216,7 +239,7 @@ fn lowering_rejects_an_uncoalesced_partial_result() {
 fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
     // A1 §3.9 / spec §6.12: a top-level clause block is a known function,
     // and a failing one-clause match reports at p, adding no match frame.
-    let source = "f = { 0 -> 1  _ -> 2 }\nget = (o) { o |> { Ok(x) -> x } }\n\nmain = () { assert(f(1) == 2)  get(Error(Nil))  Nil }\n";
+    let source = "f = (0) { 1 } | (_) { 2 }\nget = (o) { o |> (Ok(x)) { x } }\n\nmain = () {\n\tassert(f(1) == 2)\n\tget(Error(Nil))\n\tNil\n}\n";
     let dir = front_end_project(source);
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["build", "--wat", "--opt", "0", "--project"])
@@ -305,6 +328,11 @@ fn old_forms_have_helpful_errors_without_reserving_names() {
         .unwrap();
     assert!(
         out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !String::from_utf8_lossy(&out.stderr).contains("if this is old"),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );

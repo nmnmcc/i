@@ -1,6 +1,0 @@
-{
-  "name": "outer_no_sparam",
-  "code": 1,
-  "time": 0.01886794390156865,
-  "out": "app/main.use : () -> Nil ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.test : () -> Nil ! N - D | S(N)\nsrc/main.i:5:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n1 error\n"
-}

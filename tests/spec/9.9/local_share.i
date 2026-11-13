@@ -7,7 +7,6 @@
 	i/core
 )
 
-
 main = () {
 	task.local_scope((s) {
 		value = task.share(s, "shared")

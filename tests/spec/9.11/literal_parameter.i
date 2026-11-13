@@ -8,9 +8,10 @@
 )
 
 @host("test:async/v1", "request")
-Later {
-	Later(echo: ("a" | "b") -> Request(String))
+Later = (echo = ("a" | "b") -> Request(String))
+
+main = () <- (later: Later) {
+	assert(
+		request.await_owned(later.echo("a")) == "a",
+	)
 }
-
-
-main = (later ! Later) { assert(request.await_owned(later.echo("a")) == "a") }

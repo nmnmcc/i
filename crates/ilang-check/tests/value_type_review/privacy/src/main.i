@@ -1,4 +1,6 @@
-(Read)
-Hidden { Hidden }
+(
+	Read
+)
+Hidden = ()
 v = Hidden
 Read = v

@@ -448,10 +448,7 @@ Each path:
 §11.6 says an environment statement does not change tail positions. So this function makes a tail call, and its frame is gone before `g` runs:
 
 ```i
-h_tail = (b) {
-  ! Name = Name("in")
-  g(b)
-}
+h_tail = (b) { g(b) <- (Name("in")) }
 ```
 
 If `g` suspends and the computation is resumed from a place where `Name` is "resumer", §9.4 rule 3 asks `g` to see "in": the statement is inside the paused part. Eager at `dcb19df` gives "resumer". It records only `point.env` back to `Env::Param` of each captured frame, `g`'s point has `point.env = Env::Param`, and the frame of `h_tail`, which ran the statement, has no record. The outermost record is given the environment of `resume`. The same happens on `cancel` to a final function reached through such a frame (rule 4). A frame that is kept (a call that is not a tail call) is right, in eager and in lazy.
@@ -633,78 +630,62 @@ This uses the new syntax, so it is committed after A1+A2 land.
 //// Resuming a paused computation at depth 10, 100 and 1000. `scripts/bench`
 //// runs these with `i test --time` at `--opt 2`. A resume and the next
 //// suspend should take the same time at every depth (docs/performance.md).
-
 (
 	testlib = (test) = std/test
-
-  i/control
-  i/core
+	i/control
+	i/core
 )
 
 rounds = 100_000
 
+Done = (Int)
+More = (Int, Continuation(Nil, Step, Never, Never))
 // What the paused computation gives: each number, and at the end the
 // number of frames it went back through.
 Step = Done | More
-Done { Done(Int) }
-More { More(Int, Continuation(Nil, Step, Never, Never)) }
 
 check = (ok: Bool, what: String) -> Nil {
-  ok |> {
-    True -> Nil
-    False -> panic(what)
-  }
+	ok |> (True) { Nil } | (False) { panic(what) }
 }
 
 // Suspends once for each number from `n` down to 1. The call after the
 // suspend is a tail call, so this is one frame.
 yields = (b, n) {
-  n |> {
-    0 -> Done(0)
-    _ -> {
-      control.suspend(b, (k) { More(n, k) })
-      yields(b, n - 1)
-    }
-  }
+	n |>
+		(0) { Done(0) }
+		| (_) {
+			control.suspend(b, (k) { More(n, k) })
+			yields(b, n - 1)
+		}
 }
 
 // Counts one more frame on the way back.
-deeper = {
-  Done(d) -> Done(d + 1)
-  more -> more
-}
+deeper = (Done(d)) { Done(d + 1) } | (more) { more }
 
 // `depth` frames that wait under the suspends.
 down = (b, depth) {
-  depth |> {
-    0 -> yields(b, rounds)
-    _ -> deeper(down(b, depth - 1))
-  }
+	depth |> (0) { yields(b, rounds) } | (_) { deeper(down(b, depth - 1)) }
 }
 
 // Resumes until the end. It runs outside the boundary and calls itself as
 // a tail call, so the place of resume is always at the same depth.
 sum = (step, acc, depth) {
-  step |> {
-    Done(d) -> {
-      check(d == depth, "a frame was lost or ran twice")
-      acc
-    }
-    More(v, k) -> sum(control.resume(k, Nil), acc + v, depth)
-  }
+	step |>
+		(Done(d)) {
+			check(d == depth, "a frame was lost or ran twice")
+			acc
+		}
+		| (More(v, k)) { sum(control.resume(k, Nil), acc + v, depth) }
 }
 
 run = (depth) {
-  got = sum(control.boundary((b) { down(b, depth) }), 0, depth)
-  check(got == 5_000_050_000, "the sum of 1 to rounds is wrong")
+	got = sum(control.boundary((b) { down(b, depth) }), 0, depth)
+	check(got == 5_000_050_000, "the sum of 1 to rounds is wrong")
 }
-
 
 test("resume_depth_10", () { run(10) })
 
-
 test("resume_depth_100", () { run(100) })
-
 
 test("resume_depth_1000", () { run(1000) })
 ```

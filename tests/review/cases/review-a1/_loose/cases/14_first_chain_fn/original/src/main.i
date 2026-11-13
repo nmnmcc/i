@@ -1,1 +1,6 @@
-f = () { { go = alias = (n) -> Int { n + 1 } go(41) } }
+f = () {
+	{
+		go = alias = (n) -> Int { n + 1 }
+		go(41)
+	}
+}

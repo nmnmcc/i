@@ -6,7 +6,6 @@
 	i/task
 )
 
-
 main = () {
 	task.scope((s) {
 		t = task.go(s, () { 7 })

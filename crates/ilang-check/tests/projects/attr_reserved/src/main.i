@@ -2,9 +2,7 @@
 not: (Bool) -> Bool
 
 @host("ilang:storage")
-S {
-	S(get: () -> Int)
-}
+S = (get = () -> Int)
 
 @external("app:math/v1", "add")
 add: (Int, Int) -> Int

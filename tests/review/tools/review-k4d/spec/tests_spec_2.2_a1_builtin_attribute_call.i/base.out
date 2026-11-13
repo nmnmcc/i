@@ -1,2 +1,0 @@
-test/a1_builtin_attribute_call.i:4:1: error[E0302]: `@main` takes no arguments and is written with no `( )`
-1 error

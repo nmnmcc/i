@@ -19,8 +19,7 @@ Two children and a result:
 	(Io) = i/io
 )
 
-
-main = (io ! Io) {
+main = () <- (io: Io) {
 	answer = task.scope((s) {
 		a = task.go(s, () { 20 })
 		b = task.go(s, () { 22 })
@@ -46,17 +45,19 @@ Cancellation of a race loser:
 	(Io) = i/io
 )
 
-forever = () -> Never ! task.Scheduler {
+forever = () -> Never {
 	task.yield()
 	forever()
 }
 
-
-main = (io ! Io) {
-	answer = task.race(() {
-		task.yield()
-		7
-	}, () { resource.ensure(forever, () { io.print("loser cancelled") }) })
+main = () <- (io: Io) {
+	answer = task.race(
+		() {
+			task.yield()
+			7
+		},
+		() { resource.ensure(forever, () { io.print("loser cancelled") }) },
+	)
 	io.print(core.inspect(answer))
 }
 ```
@@ -76,8 +77,7 @@ A channel between two children:
 	(Io) = i/io
 )
 
-
-main = (io ! Io) {
+main = () <- (io: Io) {
 	task.scope((s) {
 		c: task.Channel(String) = task.channel()
 		task.go(s, () { task.send(c, "hello") })

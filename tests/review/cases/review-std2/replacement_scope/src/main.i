@@ -1,10 +1,25 @@
-(i/fail)
-S(E) { S(() -> Nil ^ E) }
-use(E) = (s ! S(E)) { S(f) = s f() }
-first: () -> Nil ^ String ! S(String) = use
-second: () -> Nil ^ Int ! S(Int) = use
+(
+	i/fail
+)
+S(E) = (() <- (Fail(E)) -> Nil)
+use = <E>() <- (s: S(E)) {
+	S(f) = s
+	f()
+}
+first: () <- (Fail(String), S(String)) -> Nil = use
+second: () <- (Fail(Int), S(Int)) -> Nil = use
 
 example = () {
- { ! S(String) = S(() { fail.raise("s") }) Error("s") = fail.catch(first) Nil }
- { ! S(Int) = S(() { fail.raise(2) }) Error(2) = fail.catch(second) Nil }
+	{
+		{
+			Error("s") = fail.catch(first)
+			Nil
+		} <- (S(() { fail.raise("s") }))
+	}
+	{
+		{
+			Error(2) = fail.catch(second)
+			Nil
+		} <- (S(() { fail.raise(2) }))
+	}
 }

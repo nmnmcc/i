@@ -84,17 +84,28 @@ impl Query<'_> {
         let p = self.program;
         let mut in_type = false;
         let mut case: Option<&Expr> = None;
+        let mut pipe_subject: Option<&Expr> = None;
         let mut call: Option<&Expr> = None;
         let mut record = false;
         visit_module(p, m, &mut |n| match n {
+            // Not a hole: the lowering of a provide `e <- (v)` gives each
+            // value `v` the type `_` with the span of the value.
             Node::Type(t)
-                if t.span.start <= start && offset <= t.span.end && t.span.start < t.span.end =>
+                if t.span.start <= start
+                    && offset <= t.span.end
+                    && t.span.start < t.span.end
+                    && !matches!(t.kind, TypeKind::Hole) =>
             {
                 in_type = true
             }
             Node::Expr(e) if e.span.start < offset && offset <= e.span.end => match &e.kind {
                 ExprKind::Case { .. } if case.is_none_or(|c| c.span.start <= e.span.start) => {
                     case = Some(e)
+                }
+                ExprKind::Binary { op: ilang_syntax::ast::BinOp::Pipe, lhs, .. }
+                    if pipe_subject.is_none_or(|old| old.span.start <= lhs.span.start) =>
+                {
+                    pipe_subject = Some(lhs)
                 }
                 ExprKind::Call { callee, .. }
                     if callee.span.end <= start
@@ -108,6 +119,14 @@ impl Query<'_> {
             },
             _ => {}
         });
+        // A service pattern `<- (name: S, …)` of a function head, or the
+        // need `<- (S, …)` of a function type (syntax three §2.10.2): a
+        // type there, or the place after `name:`, is a service. After
+        // `e <- (` of a provide the items are values, which are not types
+        // of the tree.
+        if (in_type || before == Some(b':')) && after_need_arrow(text, start) {
+            return CompletionContext::Environment;
+        }
         if in_type {
             return CompletionContext::Type;
         }
@@ -135,6 +154,17 @@ impl Query<'_> {
                     types: self.subject_types(m, subject, clauses),
                 };
             }
+        }
+        // An unfinished branch such as `| () { ... }` can lower as a
+        // different-shape function instead of a Case. The source still puts
+        // this cursor in the pattern head of the match, not its body.
+        if let Some(subject) = pipe_subject
+            && !self.is_lisp(m)
+            && in_source_branch_head(text, offset)
+        {
+            return CompletionContext::Pattern {
+                types: self.subject_types(m, subject, &[]),
+            };
         }
         if before == Some(b':') && call.is_none() && !record {
             return CompletionContext::Type;
@@ -530,13 +560,13 @@ impl Query<'_> {
                     return None;
                 }
                 Some(Completion {
-                    label: format!("{label}:"),
+                    label: format!("{label} ="),
                     kind: CompletionKind::Field,
                     detail: ty,
                     insert: Some(if lisp {
-                        format!("(: {label} ")
+                        format!("(= {label} ")
                     } else {
-                        format!("{label}: ")
+                        format!("{label} = ")
                     }),
                     preferred: true,
                     ..Default::default()
@@ -621,7 +651,7 @@ impl Query<'_> {
                         .into_iter()
                         .enumerate()
                         .map(|(i, text)| {
-                            let (label, ty) = match text.split_once(": ") {
+                            let (label, ty) = match text.split_once(" = ") {
                                 Some((l, t)) if ilang_package::is_name(l) => {
                                     (Some(l.to_string()), t.to_string())
                                 }
@@ -737,7 +767,7 @@ impl Query<'_> {
             }
             let start = label.len() as u32;
             match (l, ty) {
-                (Some(l), Some(t)) => label.push_str(&format!("{l}: {t}")),
+                (Some(l), Some(t)) => label.push_str(&format!("{l} = {t}")),
                 (Some(l), None) => label.push_str(l),
                 (None, Some(t)) => label.push_str(t),
                 (None, None) => label.push('_'),
@@ -750,23 +780,24 @@ impl Query<'_> {
         }
         label.push(')');
         let ret = match &callee.kind {
-            ExprKind::Name(ValueRef::Ctor(c)) => Some(self.type_head(c.ty)),
+            ExprKind::Name(ValueRef::Ctor(c)) => Some(format!(" -> {}", self.type_head(c.ty))),
             ExprKind::Name(ValueRef::Def(d)) => self
                 .def_type(*d)
                 .as_deref()
-                .and_then(split_fn_type)
-                .map(|x| x.1),
+                .and_then(split_fn_type_need)
+                .map(need_and_result),
             ExprKind::Name(ValueRef::Local(v)) => {
                 let t = match self.def_of_var(m, *v) {
                     Some(d) => self.def_type(d),
                     None => self.local_type(m, *v, callee.span.start),
                 };
-                t.as_deref().and_then(split_fn_type).map(|x| x.1)
+                t.as_deref()
+                    .and_then(split_fn_type_need)
+                    .map(need_and_result)
             }
             _ => None,
         };
         if let Some(r) = ret {
-            label.push_str(" -> ");
             label.push_str(&r);
         }
         // The argument at the position: by its label, else by place.
@@ -826,6 +857,12 @@ impl Query<'_> {
 
 /// The parameters and the rest of a shown function type `(a, b) -> c`.
 pub(crate) fn split_fn_type(t: &str) -> Option<(Vec<String>, String)> {
+    split_fn_type_need(t).map(|(p, _, r)| (p, r))
+}
+
+/// The parameter items, the need (the text after `<-`, if any) and the
+/// result of a shown function type `(P) <- S -> R` (syntax three §3.1).
+pub(crate) fn split_fn_type_need(t: &str) -> Option<(Vec<String>, Option<String>, String)> {
     let t = t.trim();
     let t = t
         .strip_prefix("{ ")
@@ -866,12 +903,37 @@ pub(crate) fn split_fn_type(t: &str) -> Option<(Vec<String>, String)> {
     if !cur.trim().is_empty() {
         parts.push(cur.trim().to_string());
     }
-    let rest = t[close + 1..]
-        .trim_start()
-        .strip_prefix("->")?
-        .trim()
-        .to_string();
-    Some((parts, rest))
+    let mut rest = t[close + 1..].trim_start();
+    let mut need = None;
+    if let Some(n) = rest.strip_prefix("<-") {
+        let n = n.trim_start();
+        let mut depth = 0i32;
+        let mut end = None;
+        for (i, c) in n.char_indices() {
+            match c {
+                '(' | '[' | '{' => depth += 1,
+                ')' | ']' | '}' => depth -= 1,
+                _ if depth == 0 && n[i..].starts_with(" ->") => {
+                    end = Some(i);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        let end = end?;
+        need = Some(n[..end].trim().to_string());
+        rest = n[end..].trim_start();
+    }
+    let rest = rest.strip_prefix("->")?.trim().to_string();
+    Some((parts, need, rest))
+}
+
+/// ` <- S -> R`, or ` -> R` when nothing is needed.
+fn need_and_result((_, need, ret): (Vec<String>, Option<String>, String)) -> String {
+    match need {
+        Some(n) => format!(" <- {n} -> {ret}"),
+        None => format!(" -> {ret}"),
+    }
 }
 
 fn word_start(text: &str, offset: u32) -> u32 {
@@ -903,8 +965,49 @@ fn prev_byte(text: &str, offset: u32) -> Option<u8> {
 }
 
 /// The text of the line before `offset`.
+/// The position is an item of the group `( … )` that follows a `<-`:
+/// a service pattern or a need.
+fn after_need_arrow(text: &str, offset: u32) -> bool {
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut i = (offset as usize).min(bytes.len());
+    while i > 0 {
+        i -= 1;
+        match bytes[i] {
+            b')' | b']' | b'}' => depth += 1,
+            b'[' | b'{' if depth == 0 => return false,
+            b'(' | b'[' | b'{' if depth > 0 => depth -= 1,
+            b'(' => return text[..i].trim_end().ends_with("<-"),
+            _ => {}
+        }
+    }
+    false
+}
+
 fn line_before(text: &str, offset: u32) -> &str {
     let o = (offset as usize).min(text.len());
     let start = text[..o].rfind(['\n', '\r']).map_or(0, |i| i + 1);
     &text[start..o]
+}
+
+/// Whether the cursor is inside the parentheses directly following a
+/// syntax-three branch join or match pipe. Tokens keep comments and strings
+/// from inventing a head, and the delimiter stack excludes branch bodies.
+fn in_source_branch_head(text: &str, offset: u32) -> bool {
+    use ilang_syntax::token::TokenKind as T;
+    let lexed = ilang_syntax::lexer::lex3(text);
+    let mut stack = Vec::new();
+    let mut previous = None;
+    for token in &lexed.tokens {
+        if token.span.start >= offset { break; }
+        match token.kind {
+            T::LParen => stack.push((T::LParen, matches!(previous, Some(T::Pipe | T::PipeGt)))),
+            T::LBrace => stack.push((T::LBrace, false)),
+            T::LBracket => stack.push((T::LBracket, false)),
+            T::RParen | T::RBrace | T::RBracket => { stack.pop(); },
+            _ => {}
+        }
+        previous = Some(token.kind.clone());
+    }
+    stack.iter().rev().take_while(|(kind, _)| !matches!(kind, T::LBrace)).any(|(_, head)| *head)
 }

@@ -6,29 +6,26 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 // The choices are tried in order: the clause is taken with the first choice
 // that matches and whose guard is `True`. With `(1, 20)`, the first choice
 // matches with `x = 1`, but its guard is `False`; the second gives `x = 20`.
 pick = (p) {
-	p |> {
-		(x, _) | (_, x) ? x > 10 -> "big " <> core.inspect(x)
-		_                        -> "small"
-	}
+	p |>
+		((x, _) | (_, x) ? x > 10) { "big " <> core.inspect(x) }
+		| (_) { "small" }
 }
 
 // Each choice binds `n`; the guard is tried with each choice that matches.
 tag = (v) {
-	v |> {
-		Ok(n) | Error(n) ? n == 1 -> "one"
-		Ok(_)                     -> "ok"
-		Error(_)                  -> "error"
-	}
+	v |>
+		(Ok(n) | Error(n) ? n == 1) { "one" }
+		| (Ok(_)) { "ok" }
+		| (Error(_)) { "error" }
 }
 
 test("choices", () {

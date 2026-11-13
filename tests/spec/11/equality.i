@@ -6,29 +6,20 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 yes = (b: Bool) { check(core.inspect(b), "True") }
 
 no = (b: Bool) { check(core.inspect(b), "False") }
 
-User {
-	User(name: String, age: Int)
-}
+User = (name = String, age = Int)
 
+Some(A) = (A)
+None = ()
 Option(A) = Some(A) | None
-
-Some(A) {
-	Some(A)
-}
-
-None {
-	None
-}
 
 top = (x) { x }
 
@@ -60,8 +51,8 @@ test("structures", () {
 	no([1, 2] == [1, 2, 3])
 	no([1] == [])
 	yes([] == [])
-	yes(User(name: "a", age: 1) == User(name: "a", age: 1))
-	no(User(name: "a", age: 1) == User(name: "a", age: 2))
+	yes(User(name = "a", age = 1) == User(name = "a", age = 1))
+	no(User(name = "a", age = 1) == User(name = "a", age = 2))
 	yes(Some([1]) == Some([1]))
 	no(Some(1) == None)
 	yes(None == None)

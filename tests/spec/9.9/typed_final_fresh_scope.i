@@ -14,46 +14,53 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (String) -> Nil)
-}
+Out = (print = (String) -> Nil)
 
-print = (text: String, out ! Out) { out.print(text) }
+print = (text: String) <- (out: Out) { out.print(text) }
 
-forever = () -> Never ! task.Scheduler {
+forever = () -> Never {
 	task.yield()
 	forever()
 }
-
 
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
 			gate: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(() { fail.raise("child") }, () {
-					print("start")
-					task.send(gate, Nil)
-					local = fail.catch(() {
-						task.run(() {
-							task.scope((fresh) {
-								task.go(fresh, () {
-									task.yield()
-									fail.raise("fresh")
-								})
-								sibling = task.go(fresh, () {
-									resource.ensure(forever, () {
-										task.yield()
-										print("nested-final")
+				resource.ensure(
+					() { fail.raise("child") },
+					() {
+						print("start")
+						task.send(gate, Nil)
+						local = fail.catch(() {
+							task.run(() {
+								task.scope((fresh) {
+									started: task.Channel(Nil) = task.channel()
+									task.go(fresh, () {
+										task.receive(started)
+										fail.raise("fresh")
 									})
+									sibling = task.go(fresh, () {
+										resource.ensure(
+											() {
+												task.send(started, Nil)
+												forever()
+											},
+											() {
+												task.yield()
+												print("nested-final")
+											},
+										)
+									})
+									task.join(sibling)
 								})
-								task.join(sibling)
 							})
 						})
-					})
-					assert(local == Error("fresh"))
-					print("end")
-				})
+						assert(local == Error("fresh"))
+						print("end")
+					},
+				)
 			})
 			task.receive(gate)
 			fail.raise("parent")

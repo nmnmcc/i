@@ -25,27 +25,7 @@ pub(crate) fn catch_all(p: &Pattern) -> bool {
 
 /// The names a pattern binds.
 pub(crate) fn binders(p: &Pattern, out: &mut Vec<VarId>) {
-    match &p.kind {
-        PatternKind::Quote { captures, .. } => captures.iter().for_each(|(_, p)| binders(p, out)),
-        PatternKind::Var(b) => out.push(b.var),
-        PatternKind::Typed { binder, .. } => out.extend(binder.as_ref().map(|b| b.var)),
-        PatternKind::Named { binder, pattern } => {
-            out.push(binder.var);
-            binders(pattern, out);
-        }
-        PatternKind::Prefix { rest, .. } => out.extend(rest.as_ref().map(|b| b.var)),
-        PatternKind::Constructor { args: ps, .. }
-        | PatternKind::Tuple(ps)
-        | PatternKind::Error(ps) => ps.iter().for_each(|q| binders(q, out)),
-        PatternKind::List { items, rest } => {
-            items.iter().for_each(|q| binders(q, out));
-            if let Some(Some(b)) = rest {
-                out.push(b.var);
-            }
-        }
-        PatternKind::BitArray(segs) => segs.iter().for_each(|s| binders(&s.value, out)),
-        _ => {}
-    }
+    crate::hir::pattern_binders(p, &mut |b| out.push(b.var));
 }
 
 /// The label of a part of a constructor pattern (§7.1): the last name in
@@ -272,7 +252,12 @@ impl Checker<'_> {
                     let ft = fields[i].1.clone();
                     self.fit_in(arg, &ft, in_case);
                 }
-                Ty::named(TypeRef::Custom(ctor.ty), targs)
+                let t = Ty::named(TypeRef::Custom(ctor.ty), targs);
+                if in_case {
+                    t
+                } else {
+                    self.family(t, ctor.ty, q.span)
+                }
             }
             PatternKind::Tuple(ps) => {
                 Ty::tuple(ps.iter().map(|x| self.param_in(x, in_case)).collect())
@@ -290,6 +275,45 @@ impl Checker<'_> {
             }
             _ => self.leaf(q, in_case, false),
         }
+    }
+
+    /// The pattern type of a fitted constructor pattern `C(…)` (a binding, a
+    /// parameter, or a part of one): the declared union that `C` is a member
+    /// of, when there is one smallest such union of labelled types
+    /// (`Ok(v)` gives `Ok(A) | Error(B)`, that is `Result(A, B)`), and else
+    /// `C`'s own type. Before stage 3 the pattern type of `Ok(v)` was
+    /// `Result(A, B)`; syntax-3.md §2.12 keeps that: "So with `r : Ok(Int) |
+    /// Error(String)`, `Ok(v) = r` is correct and needs `Assert`, as today
+    /// with the multi-constructor `Result`". So an unknown value fitted to
+    /// `Ok(v)` is a `Result` and the pattern may fail (§7.3), as before.
+    fn family(&mut self, t: Ty, id: TypeId, span: Span) -> Ty {
+        let h = Head::Named(TypeRef::Custom(id));
+        let mut best: Option<&super::display::AliasFold> = None;
+        let mut tie = false;
+        for f in self.s.alias_folds.iter() {
+            if !f.has_head(h) || !f.all_defined() {
+                continue;
+            }
+            match best {
+                Some(b) if b.len() < f.len() => {}
+                Some(b) if b.len() == f.len() => tie = true,
+                _ => {
+                    best = Some(f);
+                    tie = false;
+                }
+            }
+        }
+        let Some(f) = best.filter(|_| !tie).cloned() else {
+            return t;
+        };
+        let args: Vec<Ty> = (0..f.params()).map(|_| self.s.fresh()).collect();
+        let members = f.members_with(&args);
+        let Some(m) = members.iter().find(|m| m.head() == Some(h)).cloned() else {
+            return t;
+        };
+        self.sub(&t, &m, span);
+        self.sub(&m, &t, span);
+        Ty::Union(members)
     }
 
     /// The pattern types of literals, prefixes, and bit arrays, with their
@@ -628,6 +652,7 @@ impl Checker<'_> {
         };
         let r = self.s.fresh();
         let mut knowns = Vec::new();
+        let mut rets = Vec::new();
         for c in clauses {
             // Every choice of the clause has `C` at its top.
             let known = subject_var.filter(|_| !fitted).and_then(|x| {
@@ -654,6 +679,7 @@ impl Checker<'_> {
             let (t, k) = self.infer_k(&c.body, expected);
             knowns.push(k);
             self.sub(&t, &r, c.body.span);
+            rets.push(t);
             if let Some((x, old, old_args)) = before {
                 match old {
                     Some(o) => self.known.insert(x, o),
@@ -676,6 +702,19 @@ impl Checker<'_> {
                 .to(clause.patterns.last().unwrap().span);
             self.defer_failure(Pat::Or(rows[0].clone()), a, at);
         } else {
+            {
+                // Syntax three §2.6.1: the rows and the branch results, for
+                // the selection table of a function with this body.
+                let table = super::groups::CaseTable {
+                    rows: rows
+                        .iter()
+                        .zip(clauses)
+                        .map(|(choices, c)| (Pat::Or(choices.clone()), c.guard.is_some()))
+                        .collect(),
+                    rets,
+                };
+                self.case_tables.insert((module, span), table);
+            }
             self.cases.push(PendingCase {
                 module,
                 held,
@@ -758,12 +797,12 @@ impl Checker<'_> {
             if self.useful(&earlier, &[q], &[Col::Any]).is_none() {
                 let args: Vec<Ty> = (0..n).map(|_| self.s.fresh()).collect();
                 taken.push(match h {
-                    Head::Fn => Ty::Fn(Box::new(FnTy {
-                        params: args.into_iter().map(|a| (None, a)).collect(),
-                        ret: self.s.fresh(),
-                        err: self.s.fresh(),
-                        env: self.s.fresh(),
-                    })),
+                    Head::Fn => Ty::Fn(Box::new(FnTy::new(
+                        args.into_iter().map(|a| (None, a)).collect(),
+                        self.s.fresh(),
+                        self.s.fresh(),
+                        self.s.fresh(),
+                    ))),
                     h => Ty::Con(h, super::lits::ValueSet::ALL, args),
                 });
             }
@@ -1004,8 +1043,7 @@ impl Checker<'_> {
                                     Some(coverage::scalar_pat(m))
                                 }
                                 Ty::Con(h, _, args) => Some(Pat::Head(*h, args.len())),
-                                Ty::Fn(f) => Some(Pat::Head(Head::Fn, f.params.len())),
-                                Ty::Graph(g) if g.record_only() => Some(Pat::Head(Head::Record, 0)),
+                                Ty::Fn(_) => Some(Pat::Head(Head::Fn, 1)),
                                 _ => None,
                             })
                             .collect(),
@@ -1054,7 +1092,7 @@ impl Checker<'_> {
                         } else if let Some(h) = m.value_head() {
                             let n = match m {
                                 Ty::Con(_, _, xs) => xs.len(),
-                                Ty::Fn(f) => f.params.len(),
+                                Ty::Fn(_) => 1,
                                 _ => 0,
                             };
                             places[at].seen.push((v.clause, v.unguarded, h, n));
@@ -1146,7 +1184,7 @@ impl Checker<'_> {
             }
             PatternKind::Tuple(ps) => {
                 let n = ps.len() as u32;
-                let h = Head::Tuple(n);
+                let h = Head::Shape(super::ShapeId::positional(n));
                 let parts = self.shared(places, at, h, ps.len());
                 let kparts = match known::member(&places[at].known, Some(h)) {
                     Some(Ty::Con(_, _, xs)) => xs,
@@ -1164,7 +1202,10 @@ impl Checker<'_> {
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 places[at].seen.push((v.clause, v.unguarded, h, ps.len()));
-                (Ty::tuple(parts), Pat::Ctor(Ctor::Tuple(n), pats))
+                (
+                    Ty::tuple(parts),
+                    Pat::Ctor(Ctor::Shape(super::ShapeId::positional(n)), pats),
+                )
             }
             PatternKind::List { items, rest } => {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));
@@ -1348,14 +1389,13 @@ mod shared_place_tests {
         std::fs::create_dir(root.path().join("src")).unwrap();
         std::fs::write(
             root.path().join("src/main.i"),
-            r#"
-Pair(A) { Pair(A, A) }
+            r#"Pair(A) = (A, A)
+Start(A) = (A)
+Stop(A) = (A)
 Event(A) = Start(A) | Stop(A)
-Start(A) { Start(A) }
-Stop(A) { Stop(A) }
-Two(A) = (A, A)
-Wrapped(A) { Wrapped(Two(A)) }
-Solo(A) { Solo(A, Int) }
+Two(A) = { (A, A) }
+Wrapped(A) = (Two(A))
+Solo(A) = (A, Int)
 "#,
         )
         .unwrap();
@@ -1403,8 +1443,6 @@ Solo(A) { Solo(A, Int) }
             },
             0
         ));
-        // One constructor per type (syntax three): `Start` and `Stop` are
-        // no longer one family, so their fields are not shared.
         assert!(!c.field_shared(
             CtorRef {
                 ty: id("Stop"),

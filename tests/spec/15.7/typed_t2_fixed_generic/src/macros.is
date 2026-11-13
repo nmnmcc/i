@@ -1,4 +1,15 @@
 (, (= syntax (/ i syntax)) (= fail (/ i fail)))
 (, m)
-(@ macro (: (m A) (-> (A) Int)))
-(@ macro (= m (-> (value) _ { (= t ((. syntax type_of) value)) (| ((. syntax subtype) t `Int) { (-> (. syntax Yes) `7) (-> _ ((. fail raise) ((. syntax SyntaxError) "typed macro cannot choose inside a generic binding" value))) }) })))
+(@ macro (: m (-> [A] (, A) Int)))
+(@ macro
+  (= m
+    (-> (, value) _
+      {(= t ((. syntax type_of) value))
+       (|> ((. syntax subtype) t `Int)
+           (| (-> (, (. syntax Yes)) _ `7)
+             (-> (, _) _
+               ((. fail raise)
+                ((. syntax SyntaxError)
+                 (= message
+                   "typed macro cannot choose inside a generic binding")
+                 (= at value))))))})))

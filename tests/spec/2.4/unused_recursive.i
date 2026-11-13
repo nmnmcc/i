@@ -1,6 +1,5 @@
 // spec: 2.4.1; references from unused bindings count.
 // expect: warning W0504
-
 (
 	testlib = (test) = std/test
 )

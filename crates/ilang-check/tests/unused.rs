@@ -59,7 +59,7 @@ fn record_spreads_and_fields_count_references() {
     assert_eq!(
         names(&[(
             "src/main.i",
-            "(use_record)\nbase = (x: 1)\nvalue = 2\ndead = 3\nuse_record = () { (..base, y: value) }\n"
+            "(\n\tuse_record\n)\nbase = (x = 1)\nvalue = 2\ndead = 3\nuse_record = () { (..base, y = value) }\n"
         )]),
         ["dead"]
     );
@@ -131,15 +131,14 @@ fn hint_requires_test_module_no_value_parameters_and_exact_nil() {
         ("src/main.i", "ordinary = () { Nil }"),
         (
             "test/check.i",
-            r#"
-forgotten = () { assert(True) }
+            r#"forgotten = () { assert(True) }
 explicit = () -> Nil { Nil }
 alias = forgotten
 has_argument = (n: Int) { assert(n > 0) }
 returns_int = () { 1 }
 never_returns = () { panic("stop") }
-union_result = (b: Bool) { b |> { True -> Nil  False -> 1 } }
-with_environment = (a ! Assert) { assert(True) }
+union_result = (b: Bool) { b |> (True) { Nil } | (False) { 1 } }
+with_environment = () <- (a: Assert) { assert(True) }
 "#,
         ),
     ]);
@@ -176,7 +175,7 @@ with_environment = (a ! Assert) { assert(True) }
 fn a_type_spelled_nil_is_not_the_prelude_nil() {
     // Rule 5 says Nil, the nominal prelude type, rather than its spelling.
     assert_eq!(
-        warnings(&[("test/check.i", "Nil { Local }\nf = () { Local }")]),
+        warnings(&[("test/check.i", "Local = ()\nNil = Local\nf = () { Local }")]),
         [("f".into(), "top-level binding `f` is not used".into())]
     );
 }
@@ -187,11 +186,11 @@ fn types_services_constructors_and_external_declarations_are_exempt() {
     assert!(
         names(&[(
             "src/main.i",
-            r#"
-Private { Private(Int) }
+            r#"Private = (Int)
 Alias = String
-Service { Service(run: () -> Nil) }
-@external("env", "f") foreign: () -> Int
+Service = (run = () -> Nil)
+@external("env", "f")
+foreign: () -> Int
 "#
         )])
         .is_empty()
@@ -226,14 +225,15 @@ fn pattern_lengths_and_nested_expression_references_count() {
     assert!(
         names(&[(
             "src/main.i",
-            r#"
-(read)
+            r#"(
+	read
+)
 size = 8
 guard = True
 value = 1
 read = (<<n:u(size)>>) {
-  xs = [value]
-  n |> { 0 ? guard -> xs  _ -> [] }
+	xs = [value]
+	n |> (0 ? guard) { xs } | (_) { [] }
 }
 "#
         )])

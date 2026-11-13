@@ -1,4 +1,4 @@
-// old-syntax-check: E0101
+// old-syntax-check: E0110,E0110,E0101,E0101
 import (task = app/task, net = app/net, i/fail, i/resource)
 copy = (stream) {
   case net.read(stream, 65536) {

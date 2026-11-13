@@ -1,1 +1,1 @@
-bad(A) = (x: A) -> A { bad([x]) }
+bad = <A>(x: A) -> A { bad([x]) }

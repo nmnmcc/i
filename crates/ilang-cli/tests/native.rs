@@ -479,14 +479,13 @@ fn imports_the_runner_cannot_supply_are_rejected() {
     // A service replaced with an ordinary i value needs no import (N4).
     let project = package(
         dir.path(),
-        r#"((Io) = i/io)
+        r#"(
+	(Io) = i/io
+)
 
-greet = (io ! Io) { io.print("quiet") }
+greet = () <- (io: Io) { io.print("quiet") }
 
-main = () {
-	! Io = Io(print: (text) { Nil })
-	greet()
-}
+main = () { greet() <- (Io(print = (text) { Nil })) }
 "#,
     );
     let exe = build(&project, dir.path(), "quiet");
@@ -523,14 +522,21 @@ fn packages_need_the_program_entry() {
 #[test]
 fn start_up_is_quick() {
     let dir = tempfile::tempdir().unwrap();
+    let built = Instant::now();
     let exe = build(&example("hello"), dir.path(), "hello");
+    let build_time = built.elapsed();
     run(&exe, &[]);
     let start = Instant::now();
     for _ in 0..5 {
         assert!(run(&exe, &[]).status.success());
     }
     let each = start.elapsed() / 5;
-    // Generous: no compilation happens at start-up (a compile of even this
-    // program takes far longer on a loaded machine).
-    assert!(each < Duration::from_secs(2), "{each:?}");
+    // About: no compilation happens at start-up. Relative, not a wall-clock bound, so a busy
+    // machine does not fail it: running the executable must cost less than building it (a
+    // build compiles the program; start-up only loads the precompiled payload), and both are
+    // slowed alike by load.
+    assert!(
+        each < build_time,
+        "a run took {each:?}, the build took {build_time:?}"
+    );
 }

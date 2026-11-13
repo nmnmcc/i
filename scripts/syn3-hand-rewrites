@@ -15,18 +15,45 @@ def rewrite(path, edits):
         return
     text = p.read_text()
     for old, new in edits:
+        # Applied already (the conversion runs again on a newer tree).
+        if new in text and old not in text:
+            continue
         if old not in text:
-            sys.exit(f"syn3-hand-rewrites: {path}: expected text not found: {old!r}")
+            sys.exit(f"syn3-hand-rewrites: FAILED: {path}: expected text not found: {old!r}")
         text = text.replace(old, new)
     p.write_text(text)
 
-# §7.3, "a written `! N` that is wider than what the body needs is kept as a
-# type annotation on the binding": the migrator drops the needs of every
-# function literal. This generator provides `Yield` to a body whose need has
-# a row variable, and today's checker cannot show the inferred type (E0515),
-# so the type is written on the binding.
-rewrite("std/test/list_test.i", [(
-    "collect = <A, N>(body: () <- (Yield(A), ..N) -> Nil) -> List(A) {",
-    "collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {",
+# The annotation of `std/test/list_test.i` `collect` (§7.3, a written need
+# wider than the body's) is made by the migrator now (convert.rs `annotated`).
+
+# §7.3 "labelled call of a function": the function is a value (`f = add`),
+# so the text does not show its parameters (note `labelled-call`); stage 4's
+# resolver-aware migrator would make it positional. `add(a, b)`.
+rewrite("tests/spec/10.1/externals.i", [(
+    "core.inspect(f(b = 1, a = 2))",
+    "core.inspect(f(2, 1))",
 )])
+# `! Name = name` gave the key by its written type; `{ … } <- (name)` keys it
+# by the type of `name`, which must be known there (E0225): the type goes on
+# the parameter.
+rewrite("tests/spec/9/environment.i", [(
+    "count = (n, acc, name) {",
+    "count = (n, acc, name: Name) {",
+)])
+# 6/evaluation_order.i tests that call arguments are worked out left to right;
+# its labelled call becomes a local binding (§7.3), which tests the order of
+# statements instead. Syntax three has no labelled call of a function, so the
+# fixture keeps its purpose with the arguments in written order.
+p = root / "tests/spec/6/evaluation_order.i"
+if p.exists():
+    p.write_text(re.sub(r"(?m)^// at: spec/main:\d+:\d+$", "// at: spec/main:11:7", p.read_text(), count=1))
+rewrite("tests/spec/6/evaluation_order.i", [
+    ("// written, also with labels.", "// written."),
+    ("""\t{
+\t\t_syn3_0 = panic("first")
+\t\tpair(panic("second"), _syn3_0)
+\t}
+""", """\tpair(panic("first"), panic("second"))
+"""),
+])
 PY

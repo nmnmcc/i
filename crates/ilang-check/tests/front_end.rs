@@ -15,8 +15,19 @@ fn declared_frames_hide_outer_variables_and_generalize() {
     // §3.10: every declared frame makes fresh variables, while a variable
     // used from an outer frame remains that variable.
     let (_, c) = checked(
-        "outer(A) = (x: A) { inner(A) = (y: A) { y }
- (inner(1), inner(True), x) }\nnested(A) = (x: A) { inner(B) = (y: B, z: A) { (y, z) }  inner(1, x) }\nid(A) = (x: A) { y: A = x  y }\nuses = () { (id(1), id(True)) }",
+        "outer = <A>(x: A) {
+	inner = <A>(y: A) { y }
+	(inner(1), inner(True), x)
+}
+nested = <A>(x: A) {
+	inner = <B>(y: B, z: A) { (y, z) }
+	inner(1, x)
+}
+id = <A>(x: A) {
+	y: A = x
+	y
+}
+uses = () { (id(1), id(True)) }",
         &["outer", "nested", "uses"],
     );
     let p = c.program.as_ref().unwrap();
@@ -48,12 +59,9 @@ fn declared_external_variables_are_general_in_library_declarations() {
         .find(|m| m.path == "i/core")
         .unwrap()
         .source;
-    let text = graph
-        .sources
-        .get(source)
-        .text
-        .replace("inspect: (a) -> String", "inspect(A): (A) -> String");
-    assert!(text.contains("inspect(A)"));
+    let text = graph.sources.get(source).text.clone();
+    // The library already declares `inspect: <A>(A) -> String` (§2.16).
+    assert!(text.contains("inspect: <A>(A) -> String"));
     graph.sources.set_text(source, text);
     let c = ilang_check::check(&graph);
     common::expect_unused(&c.diags, &["f"]);
@@ -69,7 +77,7 @@ fn new_match_is_a_non_generalized_binding_at_the_pattern() {
     // §3.9(a): resolve subject outside p's scope and keep p.span as the
     // binding span. The subject function must still call the top-level f.
     let (_, c) = checked(
-        "f = (x) { x + 1 }\ng = () { (x) { f(x) * 2 } |> { f -> f(1) } }",
+        "f = (x) { x + 1 }\ng = () { (x) { f(x) * 2 } |> (f) { f(1) } }",
         &["g"],
     );
     let p = c.program.as_ref().unwrap();
@@ -109,13 +117,18 @@ fn new_match_is_a_non_generalized_binding_at_the_pattern() {
 
 #[test]
 fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
-    // §3.9(c): no label on the artificial parameter, zero-width at `{`,
-    // and the Case covers clauses only. One clause keeps label_of(p).
-    // Spec §4.8 rule 11 permits values outside Int through the catch-all.
-    let (_, c) = checked(
-        "one = { n -> n }\nmany = { 0 -> 1  _ -> 2 }\nstring_argument = () { many(\"s\") }",
-        &["one", "string_argument"],
-    );
+    // §3.9(c): no label on the artificial parameter, zero-width at the
+    // start of the function, and the Case covers the clauses only. One
+    // clause keeps label_of(p). Spec §4.8 rule 11 permits values outside
+    // Int through the catch-all. Syntax three writes the clauses as a chain
+    // (syntax-3 §2.5) with no `{` around them, so the function starts at
+    // its first branch and the Case runs from the first branch to the end of
+    // the last one.
+    let src = "one = (n) { n }\nmany = (0) { 1 } | (_) { 2 }\nstring_argument = () { many(\"s\") }";
+    let chain = "(0) { 1 } | (_) { 2 }";
+    let chain_start = src.find(chain).unwrap();
+    let chain_end = chain_start + chain.len();
+    let (_, c) = checked(src, &["one", "string_argument"]);
     let p = c.program.as_ref().unwrap();
     let m = p.module(common::module(p, "app/main"));
     for (index, label) in [(0, Some("n")), (1, None)] {
@@ -133,12 +146,24 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
         };
         assert_eq!(actual.as_deref(), label);
         if index == 1 {
+            assert_eq!(f.span.start as usize, chain_start);
             assert_eq!(pattern.span.start, f.span.start);
             assert_eq!(pattern.span.start, pattern.span.end);
             let Stmt::Expr(case) = &f.body.stmts[0] else {
                 panic!()
             };
-            assert!(case.span.start > f.span.start && case.span.end < f.span.end);
+            let ExprKind::Case { subject, .. } = &case.kind else {
+                panic!()
+            };
+            assert_eq!(
+                (subject.span.start, subject.span.end),
+                (f.span.start, f.span.start)
+            );
+            assert_eq!(
+                (case.span.start as usize, case.span.end as usize),
+                (chain_start, chain_end)
+            );
+            assert!(case.span.start >= f.span.start && case.span.end <= f.span.end);
         }
     }
     let lines = c
@@ -158,18 +183,23 @@ fn kept_form_messages_are_independent_checks() {
     // D7 and §3.11 supply these codes and message fragments; no generated
     // expected output defines them.
     for (src, code, message) in [
-        ("f(A) = (x: A(Int)) { x }", "E0230", "takes no arguments"),
-        ("f(A, A) = 1", "E0226", "declared more than once"),
-        ("f(Int) = 1", "E0231", "name of a type"),
-        ("f(A) = (x: a) { x }", "E0201", "not defined"),
+        ("f = <A>(x: A(Int)) { x }", "E0230", "takes no arguments"),
+        ("f = <A, A>() { 1 }", "E0226", "declared more than once"),
+        ("f = <Int>() { 1 }", "E0231", "name of a type"),
+        ("f = <A>(x: a) { x }", "E0201", "not defined"),
         (
             "f = (x: Missing) { x }",
             "E0202",
             "declare it after the name",
         ),
-        ("T { T(Missing) }", "E0202", "declare it in the head"),
-        ("Box(Int) { Box(Int) }", "E0231", "name of a type"),
-        ("Box(a, B) { Box }", "E0232", "an `UpName`"),
+        ("T = { (Missing) }", "E0202", "declare it in the head"),
+        ("Box(Int) = { (Int) }", "E0231", "name of a type"),
+        // Syntax three checks the head by its kind (§3.2): E0101, not E0232.
+        (
+            /* old-syntax-check: E0101 */ "Box(a, B) = ()",
+            "E0101",
+            "only type parameters",
+        ),
         ("Schema(Int) = Int", "E0231", "name of a type"),
         ("f = (x: p.name) { x }", "E0201", "not defined"),
         ("f = (x: m(Int)) { x }", "E0234", "kept for macros"),
@@ -179,7 +209,8 @@ fn kept_form_messages_are_independent_checks() {
             "kept for macros",
         ),
         ("@a.main\nf = () { Nil }", "E0301", "kept for macros"),
-        ("f(A): (A) -> String", "E0308", "kept for macros"),
+        // Syntax three removed the head with type parameters (§3.2).
+        ("f(A): (A) -> String", "E0101", "written on the function"),
     ] {
         let (g, _, diags) = common::check_files(&[("src/main.i", src)]);
         assert!(

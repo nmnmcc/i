@@ -23,12 +23,7 @@ local_mono = () {
 param = (f) { (f(1), f("a")) }
 
 // Inside its own value, a name is not general.
-fact = (n) {
-	n |> {
-		0 -> 1
-		_ -> n * fact(n - 1)
-	}
-}
+fact = (n) { n |> (0) { 1 } | (_) { n * fact(n - 1) } }
 
 loop = (x) { loop(x) }
 

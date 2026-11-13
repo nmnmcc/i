@@ -1,21 +1,23 @@
 // spec: 4.8, 6.12
 // expect: pass
-(main)
-User { User(name: String) }
+(
+	main
+)
+User = (name = String)
+Some(A) = (A)
+None = ()
 Option(A) = Some(A) | None
-Some(A) { Some(A) }
-None { None }
-list_map(A, B) = (xs: List(A), f: (A) -> B) -> List(B) {
-  xs |> {
-    [] -> []
-    [x, ..rest] -> [f(x), ..list_map(rest, f)]
-  }
+list_map = <A, B>(xs: List(A), f: (A) -> B) -> List(B) {
+	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..list_map(rest, f)] }
 }
 
-
 main = () {
-  opts: List(Option(User)) = [Some(User(name: "Ada")), None, Some(User(name: "Bob"))]
-  names = list_map(opts, { Some(u) -> u.name  None -> "" })
-  assert(names == ["Ada", "", "Bob"])
-  Nil
+	opts: List(Option(User)) = [
+		Some(User(name = "Ada")),
+		None,
+		Some(User(name = "Bob")),
+	]
+	names = list_map(opts, (Some(u)) { u.name } | (None) { "" })
+	assert(names == ["Ada", "", "Bob"])
+	Nil
 }

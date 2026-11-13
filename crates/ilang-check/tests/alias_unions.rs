@@ -20,22 +20,22 @@ fn lines(source: &str) -> Vec<String> {
     types.lines(&program, common::module(&program, "app/main"))
 }
 
-/// `n` members: `C0`, and `Ci(A) { Ci(A, E(A)) }` for each other `i`,
+/// `n` members: `C0`, and `Ci(A) = (A, E(A))` for each other `i`,
 /// joined as `E(A)`, with an unannotated recursive match over all of them.
 fn nominal_union(n: usize) -> String {
-    let mut out = vec!["C0 { C0 }".to_string()];
+    let mut out = vec!["C0 = ()".to_string()];
     for i in 1..n {
-        out.push(format!("C{i}(A) {{ C{i}(A, E(A)) }}"));
+        out.push(format!("C{i}(A) = (A, E(A))"));
     }
     let members: Vec<String> = std::iter::once("C0".to_string())
         .chain((1..n).map(|i| format!("C{i}(A)")))
         .collect();
     out.push(format!("E(A) = {}", members.join(" | ")));
     let clauses: Vec<String> = (1..n)
-        .map(|i| format!("\t\tC{i}(a, r) -> a + f0(r)"))
+        .map(|i| format!("\t\t| (C{i}(a, r)) {{ a + f0(r) }}"))
         .collect();
     out.push(format!(
-        "f0 = (e) {{\n\te |> {{\n\t\tC0 -> 0\n{}\n\t}}\n}}",
+        "f0 = (e) {{\n\te |>\n\t\t(C0) {{ 0 }}\n{}\n}}",
         clauses.join("\n")
     ));
     out.push("main = () { f0(C1(1, C0)) }".to_string());
@@ -62,7 +62,7 @@ fn nominal_union_recursive_match_scales() {
             "{n} members took {took:?}, 8 members took {base:?}"
         );
         assert!(
-            lines.contains(&"app/main.f0 : (e: E(Int)) -> Int".to_string()),
+            lines.contains(&"app/main.f0 : (E(Int)) -> Int".to_string()),
             "{n} members: {lines:?}"
         );
     }
@@ -70,17 +70,19 @@ fn nominal_union_recursive_match_scales() {
 
 #[test]
 fn union_is_displayed_by_its_declared_name() {
-    let source = "Some(A) { Some(A) }
-None { None }
+    let source = "Some(A) = (A)
+None = ()
 Option(A) = Some(A) | None
-first = (xs: List(Option(Int))) -> Int { xs |> { [Some(x), ..r] -> x  _ -> 0 } }
-pick = (b: Bool) { b |> { True -> Some(1)  False -> None } }
+first = (xs: List(Option(Int))) -> Int {
+	xs |> ([Some(x), ..r]) { x } | (_) { 0 }
+}
+pick = (b: Bool) { b |> (True) { Some(1) } | (False) { None } }
 main = () { first([pick(True)]) }
 ";
     let lines = lines(source);
     for expected in [
-        "app/main.first : (xs: List(Option(Int))) -> Int",
-        "app/main.pick : (b: Bool) -> Option(1)",
+        "app/main.first : (List(Option(Int))) -> Int",
+        "app/main.pick : (Bool) -> Option(1)",
     ] {
         assert!(lines.contains(&expected.to_string()), "{lines:?}");
     }

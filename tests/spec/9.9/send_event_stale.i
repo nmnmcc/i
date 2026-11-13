@@ -7,7 +7,6 @@
 	i/core
 )
 
-
 main = () {
 	c: task.Channel(Int) = task.scope((_) { task.channel() })
 	event = task.send_event(c, 7)

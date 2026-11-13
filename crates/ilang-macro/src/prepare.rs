@@ -122,6 +122,13 @@ pub(crate) fn import_indices(
         .position(|m| m.package == graph.library && m.path == "i/syntax")
         .expect("loaded graph includes compiler syntax module");
     let mut queue = VecDeque::from([start, prelude, syntax]);
+    // The runtime calls these library modules, so every program has them.
+    queue.extend(ilang_package::library::RUNTIME.iter().map(|&path| {
+        parsed
+            .iter()
+            .position(|m| m.package == graph.library && m.path == path)
+            .unwrap_or_else(|| panic!("loaded graph includes runtime module {path}"))
+    }));
     let mut selected = BTreeSet::new();
     let mut errors = Vec::new();
     while let Some(index) = queue.pop_front() {
@@ -249,35 +256,35 @@ pub fn add_wrapper(
         .collect::<Vec<_>>()
         .join(", ");
     let arguments = args.join(", ");
-    let (item_service, item_row) = if binding.typed {
-        ("  ! syntax.Types = syntax._types()\n", " | syntax.Types")
+    let items = if binding.typed {
+        " <- (syntax._types())"
     } else if position == MacroPosition::Item {
-        ("  ! syntax.Items = syntax._items()\n", " | syntax.Items")
+        " <- (syntax._items())"
     } else {
-        ("", "")
+        ""
     };
     let source = format!(
-        r#"(syntax = i/syntax, fail = i/fail, target = {})
-(_entry)
+        r#"(
+	syntax = i/syntax
+	fail = i/fail
+	target = {}
+)
+(
+	_entry
+)
 _entry = ({parameters}) -> syntax.Syntax {{
-  ! Assert = Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }})
-  ! syntax.Definitions = syntax._definitions()
-{item_service}  ! syntax.Diagnostics = syntax._diagnostics()
-  body = () -> syntax.Syntax ^ syntax.SyntaxError ! Assert | syntax.Definitions{item_row} | syntax.Diagnostics {{ target.{}({arguments}) }}
-  fail.catch(body) |> {{
-    Ok(value) -> value
-    Error(syntax.SyntaxError(message, at)) -> syntax._report_error(message, at)
-  }}
+	{{
+		body = () -> syntax.Syntax {{ target.{}({arguments}) }}
+		fail.catch(body) |>
+			(Ok(value)) {{ value }}
+			| (Error(syntax.SyntaxError(message, at))) {{ syntax._report_error(message, at) }}
+	}} <- (syntax._diagnostics()){items} <- (syntax._definitions()) <- (
+		Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }}),
+	)
 }}
 "#,
         binding.module, binding.name
     );
-    // Transition to syntax three: the wrapper is written in today's syntax.
-    let source = if ilang_syntax::syn3::enabled() {
-        ilang_syntax::syn3::convert_source(&source)
-    } else {
-        source
-    };
     let (ast, diagnostics) = ilang_syntax::parse_module(&source);
     assert!(
         diagnostics.is_empty(),

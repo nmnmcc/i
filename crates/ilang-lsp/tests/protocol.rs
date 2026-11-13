@@ -18,6 +18,10 @@ struct Client {
     next_id: i32,
     /// Notifications received while waiting for something else.
     pending: Vec<Notification>,
+    /// The `/proc` directory of the server's thread, which answers the
+    /// requests: its CPU time is the work of a request, whatever else the
+    /// machine runs.
+    server_thread: Option<std::path::PathBuf>,
 }
 
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -29,7 +33,10 @@ impl Client {
 
     fn with_debounce(debounce: Duration) -> Client {
         let (server, client) = Connection::memory();
+        let (tx, rx) = std::sync::mpsc::channel();
         let handle = std::thread::spawn(move || {
+            tx.send(Path::new("/proc").join(fs::read_link("/proc/thread-self").unwrap()))
+                .unwrap();
             let options = Options {
                 debounce,
                 offline: true,
@@ -41,6 +48,7 @@ impl Client {
             server: Some(handle),
             next_id: 0,
             pending: Vec::new(),
+            server_thread: Some(rx.recv().unwrap()),
         };
         let init = c.request::<lsp::request::Initialize>(json!({ "capabilities": {} }));
         let caps = &init["capabilities"];
@@ -54,6 +62,14 @@ impl Client {
         assert_eq!(caps["textDocumentSync"]["change"], json!(1));
         c.notify::<lsp::notification::Initialized>(json!({}));
         c
+    }
+
+    /// The CPU time that the server's thread has used.
+    fn server_cpu(&self) -> Duration {
+        let dir = self.server_thread.as_ref().expect("a server thread");
+        let stat = fs::read_to_string(dir.join("schedstat")).unwrap();
+        let ns: u64 = stat.split_whitespace().next().unwrap().parse().unwrap();
+        Duration::from_nanos(ns)
     }
 
     fn request<R: lsp::request::Request>(&mut self, params: Value) -> Value {
@@ -165,7 +181,10 @@ fn position_params(uri: &str, line: u32, character: u32) -> Value {
 
 /// The line and UTF-16 character of the `nth` occurrence of `needle`.
 fn find(text: &str, needle: &str, nth: usize) -> (u32, u32) {
-    let (i, _) = text.match_indices(needle).nth(nth).unwrap();
+    let (i, _) = text
+        .match_indices(needle)
+        .nth(nth)
+        .unwrap_or_else(|| panic!("no {needle:?} #{nth} in\n{text}"));
     let before = &text[..i];
     let line = before.matches('\n').count() as u32;
     let col = before[before.rfind('\n').map_or(0, |n| n + 1)..]
@@ -215,7 +234,7 @@ fn file_uri(path: &Path) -> String {
         .to_string()
 }
 
-const MAIN: &str = " (util = app/util)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser { User(name: String, age: Int) }\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n";
+const MAIN: &str = "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n";
 
 const UTIL: &str = " (double)\n\ndouble = (n: Int) -> Int { n * 2 }\n";
 
@@ -235,7 +254,7 @@ fn an_editor_session() {
     let (l, ch) = find(MAIN, "add(1", 0);
     let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch + 1));
     let value = h["contents"]["value"].as_str().unwrap();
-    assert!(value.contains("add: (x: Int, y: Int) -> Int"), "{value}");
+    assert!(value.contains("add: (Int, Int) -> Int"), "{value}");
     assert!(value.contains("Adds two numbers."), "{value}");
     assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
 
@@ -261,7 +280,7 @@ fn an_editor_session() {
     let (l, ch) = find(MAIN, "User)", 0);
     let d = c.request::<lsp::request::GotoDefinition>(position_params(&main, l, ch));
     assert_eq!(d["uri"], main);
-    let (dl, dch) = find(MAIN, "User {", 0);
+    let (dl, dch) = find(MAIN, "User =", 0);
     assert_eq!(d["range"]["start"], json!({ "line": dl, "character": dch }));
 
     // Document symbols.
@@ -338,7 +357,7 @@ fn an_editor_session() {
     let (l, ch) = find(&typing, "util.", 0);
     let r = c.request::<lsp::request::Completion>(position_params(&main, l, ch + 5));
     assert_eq!(r[0]["label"], "double");
-    assert_eq!(r[0]["detail"], "(n: Int) -> Int");
+    assert_eq!(r[0]["detail"], "(Int) -> Int");
 
     // Formatting gives the text of `i fmt` as one edit of the whole document.
     c.change(&main, 7, MAIN);
@@ -527,9 +546,14 @@ fn a_new_document() {
 #[test]
 fn completion_after_an_expression() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Point { Point(x: Int, y: Int) }\n\
-                make = () -> Point { Point(1, 2) }\n\
-                f = (t: Point) {\n  a = make().x\n  b = { t }.y\n  a + b\n}\n";
+    let text = "Point = (x = Int, y = Int)\n\
+                make = () -> Point { Point(x = 1, y = 2) }\n\
+                f = (t: Point) {\n\
+                \ta = make().x\n\
+                \tb = { t }.y\n\
+                \ta + b\n\
+                }\n\
+                ";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -560,8 +584,8 @@ fn completion_after_an_expression() {
 #[test]
 fn typed_macro_argument_completion_without_expansion() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "(m = app/macros)\nPoint { Point(x: Int, y: Int) }\nmain = () {\n  p = Point(1, 2)\n  m.broken(p.x)\n}\n";
-    let macros = "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, broken)\n(@ macro (: (broken A) (-> ((: value A)) A)))\n(@ macro (= broken (-> (value) _ ((. fail raise) ((. syntax SyntaxError) \"never expands\" value)))))\n";
+    let text = "(\n\tm = app/macros\n)\nPoint = (x = Int, y = Int)\nmain = () {\n\tp = Point(x = 1, y = 2)\n\tm.broken(p.x)\n}\n";
+    let macros = "(, (= syntax (/ i syntax)) (= fail (/ i fail)))\n(, broken)\n(@ macro (: broken (-> [A] (, A) A)))\n(@ macro (= broken (-> (, value) _ ((. fail raise) ((. syntax SyntaxError) \"never expands\" value)))))\n";
     package(
         dir.path(),
         &[("src/main.i", text), ("src/macros.is", macros)],
@@ -590,6 +614,19 @@ fn labels(r: &Value) -> Vec<&str> {
         .collect()
 }
 
+/// The requests of a test that must be answered without a check took less than the check that
+/// opened the package. The debounce is 600 seconds, so a request that waited for a check would
+/// not be answered at all before the test's own timeout; this bound catches one that does the
+/// work of a check on every request. It is relative to the first check, with a floor, not a
+/// wall-clock limit.
+fn assert_answered_without_a_check(took: Duration, first_check: Duration) {
+    let limit = first_check.max(Duration::from_millis(500)) * 10;
+    assert!(
+        took < limit,
+        "the requests took {took:?}, the first check took {first_check:?}"
+    );
+}
+
 /// While a package waits to be checked again after a change, hover and go
 /// to definition are answered from the last check where the text around
 /// the position has not changed; elsewhere they wait for a new check,
@@ -601,8 +638,10 @@ fn answers_from_the_last_check() {
     let main = file_uri(&dir.path().join("src/main.i"));
     // Long enough that no check starts by itself during the test.
     let mut c = Client::with_debounce(Duration::from_secs(600));
+    let checking = Instant::now();
     c.open(&main, MAIN);
     assert_eq!(c.diagnostics(&main), unused_diagnostics(MAIN, &["greet"]));
+    let check_time = checking.elapsed();
     let started = Instant::now();
     // A line before everything.
     let edited = format!("\n{MAIN}");
@@ -610,14 +649,16 @@ fn answers_from_the_last_check() {
     let (l, ch) = find(&edited, "add(1", 0);
     let h = c.request::<lsp::request::HoverRequest>(position_params(&main, l, ch + 1));
     let value = h["contents"]["value"].as_str().unwrap();
-    assert!(value.contains("add: (x: Int, y: Int) -> Int"), "{value}");
+    assert!(value.contains("add: (Int, Int) -> Int"), "{value}");
     assert_eq!(h["range"]["start"], json!({ "line": l, "character": ch }));
     let d = c.request::<lsp::request::GotoDefinition>(position_params(&main, l, ch));
     let (dl, dch) = find(&edited, "add =", 0);
     assert_eq!(d["range"]["start"], json!({ "line": dl, "character": dch }));
     // Answered without a check: none has published problems.
     assert!(!c.has_diagnostics(&main));
-    assert!(started.elapsed() < Duration::from_secs(300));
+    // About: these answers need no check. Relative to the first check of the same package (so
+    // a busy machine does not fail it): the three requests together cost less than the check.
+    assert_answered_without_a_check(started.elapsed(), check_time);
     // New bindings at the end. In the new text, hover waits for a check,
     // which publishes the new problem.
     let edited = format!("{edited}extra = add(1, 2)\nbad = nope\n");
@@ -645,11 +686,13 @@ fn completion_after_a_dot_just_written() {
     package(dir.path(), &[("src/main.i", &text), ("src/util.i", UTIL)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::with_debounce(Duration::from_secs(600));
+    let checking = Instant::now();
     c.open(&main, &text);
     assert_eq!(
         c.diagnostics(&main),
         unused_diagnostics(&text, &["greet", "m"])
     );
+    let check_time = checking.elapsed();
     let started = Instant::now();
     for (version, (from, to)) in [("u.name", "u."), ("make().name", "make().")]
         .into_iter()
@@ -663,7 +706,7 @@ fn completion_after_a_dot_just_written() {
         assert_eq!(labels(&r), vec!["name", "age"], "after {to}");
     }
     assert!(!c.has_diagnostics(&main));
-    assert!(started.elapsed() < Duration::from_secs(300));
+    assert_answered_without_a_check(started.elapsed(), check_time);
     c.shutdown();
 }
 
@@ -715,11 +758,14 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("k ="), "k: (f: (A) -> B ^ E ! N, x: A) -> B ^ E ! N");
+    assert_eq!(
+        hover("k ="),
+        "k: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B"
+    );
     assert_eq!(hover("y ="), "y: B");
-    assert_eq!(hover("f, x"), "f: (A) -> B ^ E ! N");
-    assert_eq!(hover("g) {"), "g: (B) -> C ^ E2 ! N2");
-    assert_eq!(hover("f, g"), "f: (A) -> B ^ E ! N");
+    assert_eq!(hover("f, x"), "f: (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(hover("g) {"), "g: (B) <- (Fail(E2), ..N2) -> C");
+    assert_eq!(hover("f, g"), "f: (A) <- (Fail(E), ..N) -> B");
     assert_eq!(hover("x) { g"), "x: A");
     assert_eq!(hover("b) {"), "b: B");
     assert_eq!(hover("a, b"), "a: A");
@@ -754,21 +800,21 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("one"), "one: (x: A) -> 1");
+    assert_eq!(hover("one"), "one: (A) -> 1");
     assert_eq!(hover("x) {\n  y = x"), "x: A");
     assert_eq!(hover("y = x"), "y: A");
     assert_eq!(
         hover("drop2"),
-        "drop2: (x: A, g: (1) -> B ^ E ! N, h: C) -> B ^ E ! N"
+        "drop2: (A, (1) <- (Fail(E), ..N) -> B, C) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(hover("x, g, h"), "x: A");
     assert_eq!(hover("h) {"), "h: C");
     assert_eq!(hover("y = (x, h)"), "y: (A, C)");
     assert_eq!(
         hover("effonly"),
-        "effonly: (f: (A) -> B ^ E ! N, x: A) -> Nil ^ E ! N"
+        "effonly: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> Nil"
     );
-    assert_eq!(hover("f, x) {\n  r"), "f: (A) -> B ^ E ! N");
+    assert_eq!(hover("f, x) {\n  r"), "f: (A) <- (Fail(E), ..N) -> B");
     assert_eq!(hover("r = "), "r: B");
     c.shutdown();
 }
@@ -844,7 +890,7 @@ fn disjoint_comparison_is_a_warning_at_the_comparison() {
 fn macro_expansion_preserves_hover_on_user_argument() {
     let dir = tempfile::tempdir().unwrap();
     let main_text = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
-    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
+    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
     package(
         dir.path(),
         &[("src/main.i", main_text), ("src/macros.is", macro_text)],
@@ -903,7 +949,7 @@ fn semantic_tokens_and_hover_inside_raw_interpolation() {
 fn typed_macro_hover_and_definition_through_call() {
     let dir = tempfile::tempdir().unwrap();
     let source = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
-    let macros = "(, (= syntax (/ i syntax)))\n(, pass)\n/// A typed forwarding macro.\n(@ macro (: (pass A) (-> ((: value A)) A)))\n(@ macro (= pass (-> (value) _ value)))\n";
+    let macros = "(, (= syntax (/ i syntax)))\n(, pass)\n/// A typed forwarding macro.\n(@ macro (: pass (-> [A] (, A) A)))\n(@ macro (= pass (-> (, value) _ value)))\n";
     package(
         dir.path(),
         &[("src/main.i", source), ("src/macros.is", macros)],
@@ -936,13 +982,14 @@ fn typed_macro_hover_and_definition_through_call() {
 
 // ---- Features over a package with modules, tests, and a dependency ----
 
-const LIB_TEXT: &str = "(shout, Tone, Loud(..), Quiet(..))\n\n/// A tone of voice.\nTone = Loud | Quiet\n\nLoud {\n\tLoud\n}\n\nQuiet {\n\tQuiet\n}\n\n/// Makes a text louder.\nshout = (s: String) -> String { s <> \"!\" }\n";
+const LIB_TEXT: &str = "(\n\tshout\n\tTone(..)\n)\n\nLoud = ()\nQuiet = ()\n/// A tone of voice.\nTone = Loud | Quiet\n\n/// Makes a text louder.\nshout = (s: String) -> String { s <> \"!\" }\n";
 
-const SHAPES: &str = "(Shape, Circle(..), Rect(..), area, origin, Clock(..), Box(..))\n\n/// A shape in the plane.\nShape = Circle | Rect\n\nCircle {\n\tCircle(radius: Int)\n}\n\nRect {\n\tRect(width: Int, height: Int)\n}\n\n/// A box of a value.\nBox(A) { Box(item: A) }\n\n/// A clock service.\nClock { Clock(now: () -> Int) }\n\n/// The area of a shape.\narea = (s: Shape) -> Int {\n\ts |> {\n\t\tCircle(radius) -> radius * radius * 3\n\t\tRect(width, height) -> width * height\n\t}\n}\n\n/// The place where shapes start.\norigin: Int = 0\n";
+const SHAPES: &str = "(\n\tShape(..)\n\tarea\n\torigin\n\tClock(..)\n\tBox(..)\n)\n\nCircle = (radius = Int)\nRect = (width = Int, height = Int)\n/// A shape in the plane.\nShape = Circle | Rect\n\n/// A box of a value.\nBox(A) = (item = A)\n\n/// A clock service.\nClock = (now = () -> Int)\n\n/// The area of a shape.\narea = (s: Shape) -> Int {\n\ts |>\n\t\t(Circle(radius = radius)) { radius * radius * 3 }\n\t\t| (Rect(width = width, height = height)) { width * height }\n}\n\n/// The place where shapes start.\norigin: Int = 0\n";
 
-const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(main)\n\n/// How big a shape is.\nsize = (s: Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius: 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
+const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(\n\tmain\n)\n\n/// How big a shape is.\nsize = (s: Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius = 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
 
-const APP_TEST: &str = "(app/shapes)\n\n_check = () { shapes.area(shapes.Circle(radius: 1)) }\n";
+const APP_TEST: &str =
+    "(\n\tapp/shapes\n)\n\n_check = () { shapes.area(shapes.Circle(radius = 1)) }\n";
 
 /// A workspace with the package `app`, which depends on the package `lib`
 /// next to it. With `lisp`, `src/main` of `app` is in the Lisp surface.
@@ -957,9 +1004,9 @@ struct Ws {
 }
 
 fn to_lisp(text: &str) -> String {
-    let (module, diags) = ilang_syntax::parse_module(text);
+    let (module, diags) = ilang_syntax::syn3::parse_module(text);
     assert!(diags.is_empty(), "{diags:?}");
-    ilang_syntax::lisp::print_module(&module)
+    ilang_syntax::syn3::lisp::to_lisp(&module)
 }
 
 fn workspace(lisp: bool) -> Ws {
@@ -1129,16 +1176,18 @@ fn lsp_references_constructor() {
     let ws = workspace(false);
     let mut c = ws.open();
     let refs = references(&mut c, &ws.main, &ws.main_text, "Circle(radius", 0, 0, true);
-    // The constructor's definition and pattern are after the export and the
-    // type `Circle { … }` (syntax three §2.8).
     assert!(
-        refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 3))),
+        refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 0))),
         "{refs:?}"
     );
-    assert!(
-        refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 4))),
-        "{refs:?}"
-    );
+    // `Circle` in `Shape = Circle | Rect` names the labelled type `Circle`,
+    // which is the constructor (syntax three §2.6).
+    for nth in [1, 2] {
+        assert!(
+            refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", nth))),
+            "{refs:?}"
+        );
+    }
     assert!(
         refs.contains(&(ws.main.clone(), range_of(&ws.main_text, "Circle", 0))),
         "{refs:?}"
@@ -1179,7 +1228,7 @@ fn lsp_references_type() {
 fn lsp_references_field_label() {
     let ws = workspace(false);
     let mut c = ws.open();
-    let refs = references(&mut c, &ws.main, &ws.main_text, "radius: 2", 0, 0, true);
+    let refs = references(&mut c, &ws.main, &ws.main_text, "radius = 2", 0, 0, true);
     // The label of the field, the label of the call, the part of the
     // pattern in `area`, and the call in the test.
     assert!(
@@ -1207,12 +1256,14 @@ fn lsp_references_type_parameter() {
     let mut c = Client::start();
     c.open(&ws.shapes, SHAPES);
     c.diagnostics(&ws.shapes);
-    let refs = references(&mut c, &ws.shapes, SHAPES, "A) {", 0, 0, true);
+    let refs = references(&mut c, &ws.shapes, SHAPES, "A) =", 0, 0, true);
+    let (l, ch) = find(SHAPES, "item = A", 0);
+    let use_ = lsp::Range::new(lsp::Position::new(l, ch + 7), lsp::Position::new(l, ch + 8));
     assert_eq!(
         refs,
         vec![
-            (ws.shapes.clone(), range_of(SHAPES, "A) {", 0).with_len(1)),
-            (ws.shapes.clone(), range_of(SHAPES, "A) }", 0).with_len(1)),
+            (ws.shapes.clone(), range_of(SHAPES, "A) =", 0).with_len(1)),
+            (ws.shapes.clone(), use_),
         ]
     );
     c.shutdown();
@@ -1331,7 +1382,7 @@ fn lsp_rename_top_level_across_files() {
     assert!(main.contains("a = surface(s)"), "{main}");
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(
-        shapes.contains("(Shape, Circle(..), Rect(..), surface, origin"),
+        shapes.contains("\tShape(..)\n\tsurface\n\torigin"),
         "{shapes}"
     );
     assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
@@ -1370,20 +1421,19 @@ fn lsp_rename_constructor_and_type() {
     .unwrap();
     let main = apply(&ws.main_text, &edit, &ws.main);
     assert!(
-        main.contains("(Shape, Disk, area)") && main.contains("c = Disk(radius: 2)"),
+        main.contains("(Shape, Disk, area)") && main.contains("c = Disk(radius = 2)"),
         "{main}"
     );
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(
-        shapes.contains("\tDisk(radius: Int)") && shapes.contains("\t\tDisk(radius) ->"),
+        shapes.contains("Disk = (radius = Int)") && shapes.contains("(Disk(radius = radius)) {"),
         "{shapes}"
     );
-    assert!(apply(APP_TEST, &edit, &ws.test).contains("shapes.Disk(radius: 1)"));
+    assert!(apply(APP_TEST, &edit, &ws.test).contains("shapes.Disk(radius = 1)"));
     let edit = rename(&mut c, &ws.main, &ws.main_text, "Shape) ->", 0, 0, "Figure").unwrap();
     let shapes = apply(SHAPES, &edit, &ws.shapes);
-    // `Shape` is a name for the union of `Circle` and `Rect` (syntax three).
     assert!(
-        shapes.contains("(Figure, Circle(..), Rect(..), area")
+        shapes.contains("\tFigure(..)\n\tarea")
             && shapes.contains("Figure = Circle | Rect")
             && shapes.contains("(s: Figure)"),
         "{shapes}"
@@ -1400,23 +1450,23 @@ fn lsp_rename_constructor_and_type() {
 fn lsp_rename_field_keeps_pattern_names() {
     let ws = workspace(false);
     let mut c = ws.open();
-    let edit = rename(&mut c, &ws.main, &ws.main_text, "radius: 2", 0, 0, "size").unwrap();
+    let edit = rename(&mut c, &ws.main, &ws.main_text, "radius = 2", 0, 0, "size").unwrap();
     let shapes = apply(SHAPES, &edit, &ws.shapes);
-    assert!(shapes.contains("Circle(size: Int)"), "{shapes}");
+    assert!(shapes.contains("Circle = (size = Int)"), "{shapes}");
     // The pattern part keeps its local name and gets the new label.
     assert!(
-        shapes.contains("Circle(radius = size) -> radius * radius * 3"),
+        shapes.contains("(Circle(size = radius)) { radius * radius * 3 }"),
         "{shapes}"
     );
-    assert!(apply(&ws.main_text, &edit, &ws.main).contains("Circle(size: 2)"));
+    assert!(apply(&ws.main_text, &edit, &ws.main).contains("Circle(size = 2)"));
     // Renaming that local name keeps the label.
     let mut c2 = Client::start();
     c2.open(&ws.shapes, SHAPES);
     c2.diagnostics(&ws.shapes);
-    let edit = rename(&mut c2, &ws.shapes, SHAPES, "radius) ->", 0, 0, "r").unwrap();
+    let edit = rename(&mut c2, &ws.shapes, SHAPES, "radius)) {", 0, 0, "r").unwrap();
     let shapes = apply(SHAPES, &edit, &ws.shapes);
     assert!(
-        shapes.contains("Circle(r = radius) -> r * r * 3"),
+        shapes.contains("(Circle(radius = r)) { r * r * 3 }"),
         "{shapes}"
     );
     c2.shutdown();
@@ -1490,7 +1540,7 @@ fn lsp_rename_refuses_the_library() {
 fn lsp_rename_refuses_macro_expansion() {
     let dir = tempfile::tempdir().unwrap();
     let main_text = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
-    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
+    let macro_text = "(, (= syntax (/ i syntax)))\n(, pass)\n(@ macro (= pass (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
     package(
         dir.path(),
         &[("src/main.i", main_text), ("src/macros.is", macro_text)],
@@ -1612,10 +1662,8 @@ fn lsp_definition_type_of_a_local() {
     let r = c.request::<lsp::request::GotoTypeDefinition>(pos(&ws.main, &ws.main_text, "c)", 0, 0));
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 2))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
     );
-    // `c = Circle(…)` and the constructor have the type `Circle` (syntax
-    // three §2.8: a constructor's type is its own).
     // Of a constructor: its type.
     let r = c.request::<lsp::request::GotoTypeDefinition>(pos(
         &ws.main,
@@ -1626,7 +1674,7 @@ fn lsp_definition_type_of_a_local() {
     ));
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 2))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
     );
     c.shutdown();
 }
@@ -1645,8 +1693,8 @@ fn lsp_definition_implementation_of_a_type() {
     assert_eq!(
         locations(&r),
         vec![
-            (ws.shapes.clone(), range_of(SHAPES, "Circle", 3)),
-            (ws.shapes.clone(), range_of(SHAPES, "Rect", 3)),
+            (ws.shapes.clone(), range_of(SHAPES, "Circle", 0)),
+            (ws.shapes.clone(), range_of(SHAPES, "Rect", 0)),
         ]
     );
     c.shutdown();
@@ -1655,7 +1703,7 @@ fn lsp_definition_implementation_of_a_type() {
 #[test]
 fn lsp_definition_implementation_of_a_service() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock { Clock(now: () -> Int) }\n\nelapsed = (start: Int, clock ! Clock) { clock.now() - start }\n\nfixed = () {\n\t! Clock = Clock(now: () { 42 })\n\telapsed(40)\n}\n";
+    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nfixed = () { elapsed(40) <- (Clock(now = () { 42 })) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1664,10 +1712,12 @@ fn lsp_definition_implementation_of_a_service() {
     let r = c.request::<lsp::request::GotoImplementation>(pos(&main, text, "Clock)", 0, 0));
     let found = locations(&r);
     assert!(
-        found.contains(&(main.clone(), range_of(text, "Clock(now", 0).with_len(5))),
+        found
+            .iter()
+            .any(|(u, r)| *u == main && r.start == range_of(text, "Clock(now", 0).start),
         "{found:?}"
     );
-    let (l, _) = find(text, "! Clock =", 0);
+    let (l, _) = find(text, "<- (Clock(now", 0);
     assert!(found.iter().any(|(_, r)| r.start.line == l), "{found:?}");
     c.shutdown();
 }
@@ -1711,7 +1761,7 @@ fn lsp_definition_into_a_dependency() {
 }
 
 const MACRO_MAIN: &str = "(m = app/macros)\nmain = () {\n  x = 42\n  m.pass(x)\n}\n";
-const MACROS: &str = "(, (= syntax (/ i syntax)))\n(, pass)\n/// Gives back its argument.\n(@ macro (= pass (-> ((: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
+const MACROS: &str = "(, (= syntax (/ i syntax)))\n(, pass)\n/// Gives back its argument.\n(@ macro (= pass (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n";
 
 #[test]
 fn lsp_definition_of_a_macro_call() {
@@ -1749,10 +1799,9 @@ fn lsp_definition_lisp_surface() {
     );
     let r =
         c.request::<lsp::request::GotoTypeDefinition>(pos(&ws.main, &ws.main_text, "size c", 0, 5));
-    // `c` is a `Circle` (syntax three §2.8).
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 2))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
     );
     c.shutdown();
 }
@@ -1791,7 +1840,7 @@ fn lsp_completion_module_members() {
     c.change(&ws.main, 2, &typing);
     let items = completion(&mut c, &ws.main, &typing, "shapes.\n", 0, 7);
     let area = item(&items, "area");
-    assert_eq!(area.detail.as_deref(), Some("(s: Shape) -> Int"));
+    assert_eq!(area.detail.as_deref(), Some("(Shape) -> Int"));
     item(&items, "origin");
     item(&items, "Circle");
     c.shutdown();
@@ -1800,7 +1849,7 @@ fn lsp_completion_module_members() {
 #[test]
 fn lsp_completion_fields_of_a_value() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Point { Point(x: Int, y: Int) }\n\nf = (p: Point) { p.x }\n";
+    let text = "Point = (x = Int, y = Int)\n\nf = (p: Point) { p.x }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1818,13 +1867,13 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Shape = Circle | Rect | Dot\n\nCircle {\n\tCircle(Int)\n}\n\nRect {\n\tRect(width: Int, height: Int)\n}\n\nDot {\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t\t\n\t}\n}\n";
+    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, text);
     c.diagnostics(&main);
-    let items = completion(&mut c, &main, text, "\t\t\n", 0, 2);
+    let items = completion(&mut c, &main, text, "() { 2", 0, 1);
     let circle = item(&items, "Circle");
     assert_eq!(circle.insert_text.as_deref(), Some("Circle(${1:_})"));
     assert_eq!(
@@ -1846,13 +1895,13 @@ fn lsp_completion_constructors_in_a_match() {
 fn lsp_completion_labels_in_a_call() {
     let ws = workspace(false);
     let mut c = ws.open();
-    let typing = ws.main_text.replace("Circle(radius: 2)", "Circle()");
+    let typing = ws.main_text.replace("Circle(radius = 2)", "Circle()");
     c.change(&ws.main, 2, &typing);
     let items = completion(&mut c, &ws.main, &typing, "Circle()", 0, 7);
-    let radius = item(&items, "radius:");
-    assert_eq!(radius.insert_text.as_deref(), Some("radius: "));
+    let radius = item(&items, "radius =");
+    assert_eq!(radius.insert_text.as_deref(), Some("radius = "));
     assert_eq!(radius.detail.as_deref(), Some("Int"));
-    assert_eq!(items[0].label, "radius:");
+    assert_eq!(items[0].label, "radius =");
     // Locals are there too.
     item(&items, "size");
     c.shutdown();
@@ -1899,21 +1948,40 @@ fn lsp_completion_import_names() {
 #[test]
 fn lsp_completion_services_in_an_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock { Clock(now: () -> Int) }\nPoint = (x: Int)\n\nelapsed = (start: Int, clock ! Clock) { clock.now() - start }\n";
+    let text = "Clock = (now = () -> Int)\nPoint = (x = Int)\nTimer = (wait = () <- (Clock) -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nrun = (c: Clock) { elapsed(1) <- (c) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, text);
     c.diagnostics(&main);
-    let items = completion(&mut c, &main, text, "! Clock)", 0, 2);
+    let items = completion(&mut c, &main, text, "Clock) {", 0, 0);
     assert_eq!(
         items[0].label,
         "Clock",
         "{:?}",
         items.iter().map(|i| &i.label).collect::<Vec<_>>()
     );
-    assert!(!items.iter().any(|i| i.label == "Point"));
-    assert!(!items.iter().any(|i| i.label == "elapsed"));
+    // A service type is an ordinary labelled type (syntax three §2.10.3,
+    // R1), so `Point` may be one; the types used as services come first.
+    let place = |label: &str| items.iter().position(|i| i.label == label);
+    assert!(place("Point").is_some_and(|p| p > 0), "{items:?}");
+    // Values are not services.
+    assert!(
+        !items
+            .iter()
+            .any(|i| i.label == "elapsed" || i.label == "run")
+    );
+    // The need of a function type in a type.
+    let items = completion(&mut c, &main, text, "Clock) -> Int)", 0, 0);
+    assert_eq!(items[0].label, "Clock");
+    assert!(
+        !items
+            .iter()
+            .any(|i| i.label == "elapsed" || i.label == "run")
+    );
+    // After `e <- (` the items are the provided values.
+    let items = completion(&mut c, &main, text, "c) }", 0, 0);
+    item(&items, "c");
     c.shutdown();
 }
 
@@ -1936,7 +2004,7 @@ fn lsp_completion_resolve_gives_documentation() {
     let mut c = ws.open();
     let items = completion(&mut c, &ws.main, &ws.main_text, "a + shapes", 0, 0);
     let size = item(&items, "size").clone();
-    assert_eq!(size.detail.as_deref(), Some("(s: Shape) -> Int"));
+    assert_eq!(size.detail.as_deref(), Some("(Shape) -> Int"));
     let resolved =
         c.request::<lsp::request::ResolveCompletionItem>(serde_json::to_value(&size).unwrap());
     assert_eq!(resolved["documentation"]["value"], "How big a shape is.");
@@ -1980,7 +2048,7 @@ fn lsp_completion_lisp_surface() {
     item(&items, "s");
     item(&items, "size");
     let size = item(&items, "size");
-    assert_eq!(size.detail.as_deref(), Some("(s: Shape) -> Int"));
+    assert_eq!(size.detail.as_deref(), Some("(Shape) -> Int"));
     c.shutdown();
 }
 
@@ -2001,10 +2069,10 @@ fn lsp_signature_of_a_function() {
     c.open(&main, text);
     c.diagnostics(&main);
     let s = signature(&mut c, pos(&main, text, "add(1", 0, 4));
-    assert_eq!(s.signatures[0].label, "add(x: Int, y: Int) -> Int");
+    assert_eq!(s.signatures[0].label, "add(x = Int, y = Int) -> Int");
     assert_eq!(s.active_parameter, Some(0));
     let params = s.signatures[0].parameters.clone().unwrap();
-    assert_eq!(params[1].label, lsp::ParameterLabel::LabelOffsets([12, 18]));
+    assert_eq!(params[1].label, lsp::ParameterLabel::LabelOffsets([13, 20]));
     let s = signature(&mut c, pos(&main, text, "2)", 0, 0));
     assert_eq!(s.active_parameter, Some(1));
     assert!(
@@ -2016,13 +2084,13 @@ fn lsp_signature_of_a_function() {
 #[test]
 fn lsp_signature_with_labels() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "make = (name: String, age: Int) { (name, age) }\n\nmain = () { make(age: 3, name: \"a\") }\n";
+    let text = "make = (name: String, age: Int) { (name, age) }\n\nmain = () { make(\"a\", 3) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, text);
     c.diagnostics(&main);
-    let s = signature(&mut c, pos(&main, text, "age: 3", 0, 5));
+    let s = signature(&mut c, pos(&main, text, "3)", 0, 0));
     assert_eq!(s.active_parameter, Some(1));
     let s = signature(&mut c, pos(&main, text, "\"a\"", 0, 1));
     assert_eq!(s.active_parameter, Some(0));
@@ -2033,9 +2101,8 @@ fn lsp_signature_with_labels() {
 fn lsp_signature_of_a_constructor() {
     let ws = workspace(false);
     let mut c = ws.open();
-    let s = signature(&mut c, pos(&ws.main, &ws.main_text, "radius: 2", 0, 8));
-    // A constructor's type is its own (syntax three §2.8).
-    assert_eq!(s.signatures[0].label, "Circle(radius: Int) -> Circle");
+    let s = signature(&mut c, pos(&ws.main, &ws.main_text, "radius = 2", 0, 9));
+    assert_eq!(s.signatures[0].label, "Circle(radius = Int) -> Shape");
     assert_eq!(s.active_parameter, Some(0));
     c.shutdown();
 }
@@ -2045,7 +2112,7 @@ fn lsp_signature_lisp_surface() {
     let ws = workspace(true);
     let mut c = ws.open();
     let s = signature(&mut c, pos(&ws.main, &ws.main_text, "area s", 0, 5));
-    assert_eq!(s.signatures[0].label, "area(s: Shape) -> Int");
+    assert_eq!(s.signatures[0].label, "area(s = Shape) -> Int");
     assert_eq!(s.active_parameter, Some(0));
     c.shutdown();
 }
@@ -2058,14 +2125,12 @@ fn lsp_hover_type_and_documentation() {
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "area(s)", 0, 1));
     assert!(
-        h.contains("area: (s: Shape) -> Int") && h.contains("The area of a shape."),
+        h.contains("area: (Shape) -> Int") && h.contains("The area of a shape."),
         "{h}"
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "Circle(radius", 0, 1));
     assert!(
-        // The constructor makes a `Circle`, a type without a comment of its
-        // own; the comment is on the union `Shape` (syntax three §2.8).
-        h.contains("Circle: (radius: Int) -> Circle"),
+        h.contains("Circle: (radius: Int) -> Shape") && h.contains("A shape in the plane."),
         "{h}"
     );
     c.shutdown();
@@ -2085,18 +2150,18 @@ fn lsp_hover_value_of_a_constant() {
 #[test]
 fn lsp_hover_errors_and_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock { Clock(now: () -> Int) }\n\nelapsed = (start: Int, clock ! Clock) { clock.now() - start }\n\nparse = (s: String) -> Int ^ String ! Clock { 0 }\n";
+    let text = "Clock = (now = () -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nparse = (s: String) <- (clock: Clock, fail: Fail(String)) -> Int { 0 }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
     c.open(&main, text);
     c.diagnostics(&main);
     let h = hover_text(&mut c, pos(&main, text, "elapsed", 0, 1));
-    assert!(h.contains("Environment: `Clock`"), "{h}");
-    assert!(!h.contains("Errors:"), "{h}");
+    assert!(h.contains("Services: `Clock`"), "{h}");
+    assert!(!h.contains("Possible errors:"), "{h}");
     let h = hover_text(&mut c, pos(&main, text, "parse", 0, 1));
     assert!(
-        h.contains("Errors: `String`") && h.contains("Environment: `Clock`"),
+        h.contains("Possible errors: `String`") && h.contains("Services: `Clock`"),
         "{h}"
     );
     c.shutdown();
@@ -2142,7 +2207,7 @@ fn lsp_hover_lisp_surface() {
     let mut c = ws.open();
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "area s", 0, 1));
     assert!(
-        h.contains("area: (s: Shape) -> Int") && h.contains("The area of a shape."),
+        h.contains("area: (Shape) -> Int") && h.contains("The area of a shape."),
         "{h}"
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "(= a ", 0, 3));
@@ -2293,7 +2358,7 @@ fn lsp_code_action_removes_an_unused_import() {
 #[test]
 fn lsp_code_action_adds_the_missing_clauses() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Shape = Circle | Rect | Dot\n\nCircle {\n\tCircle(Int)\n}\n\nRect {\n\tRect(width: Int, height: Int)\n}\n\nDot {\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t}\n}\n\nmain = () { f(Dot) }\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2307,7 +2372,7 @@ fn lsp_code_action_adds_the_missing_clauses() {
     let actions = code_actions(&mut c, &main, d.range);
     let after = applied(action(&actions, "Add the missing clauses"), text, &main);
     assert!(
-        after.contains("\t\tCircle(1) -> 1\n\t\tCircle(..) -> panic(\"todo\")\n\t\tRect(..) -> panic(\"todo\")\n\t}"),
+        after.contains("| (Circle(1)) { 1 } | (Circle(..)) { panic(\"todo\") } | (Rect(..)) { panic(\"todo\") }"),
         "{after}"
     );
     // The new text checks.
@@ -2461,21 +2526,15 @@ fn lsp_folding_ranges() {
         json!({ "textDocument": { "uri": ws.shapes } }),
     );
     let ranges: Vec<lsp::FoldingRange> = serde_json::from_value(r).unwrap();
-    // A type definition folds (one constructor per type, syntax three).
-    let (shape, _) = find(SHAPES, "Rect {", 0);
-    assert!(
-        ranges
-            .iter()
-            .any(|f| f.start_line == shape && f.end_line == shape + 2),
-        "{ranges:?}"
-    );
     let (area, _) = find(SHAPES, "area = ", 0);
-    let (case, _) = find(SHAPES, "s |> {", 0);
+    let (case, _) = find(SHAPES, "s |>", 0);
     assert!(ranges.iter().any(|f| f.start_line == area), "{ranges:?}");
+    // A match written over several lines as a chain `s |> (p) { … } | …`
+    // folds from its subject to its last branch.
     assert!(
         ranges
             .iter()
-            .any(|f| f.start_line == case && f.end_line == case + 3),
+            .any(|f| f.start_line == case && f.end_line == case + 2),
         "{ranges:?}"
     );
     // Imports.
@@ -2485,6 +2544,7 @@ fn lsp_folding_ranges() {
     );
     let ranges: Vec<lsp::FoldingRange> = serde_json::from_value(r).unwrap();
     assert!(
+        // The header group `( … )` of the imports folds whole.
         ranges.iter().any(|f| f.start_line == 0
             && f.end_line == 3
             && f.kind == Some(lsp::FoldingRangeKind::Imports)),
@@ -2605,7 +2665,7 @@ fn lsp_diagnostics_related_information_and_data() {
     // A problem in the code that a macro made: the template is related.
     let dir = tempfile::tempdir().unwrap();
     let main_text = "(m = app/macros)\nmain = () { m.bad() }\n";
-    let macros = "(, (= syntax (/ i syntax)))\n(, bad)\n(@ macro (= bad (-> () (. syntax Syntax) `(+ 1 \"a\"))))\n";
+    let macros = "(, (= syntax (/ i syntax)))\n(, bad)\n(@ macro (= bad (-> (,) (. syntax Syntax) `(+ 1 \"a\"))))\n";
     package(
         dir.path(),
         &[("src/main.i", main_text), ("src/macros.is", macros)],
@@ -2703,10 +2763,7 @@ fn lsp_diagnostics_only_affected_packages_are_checked_again() {
     let lib = file_uri(&lib_dir.join("src/text.i"));
     c.open(
         &lib,
-        &LIB_TEXT.replace(
-            "(shout, Tone, Loud(..), Quiet(..))",
-            "(Tone, Loud(..), Quiet(..))",
-        ),
+        &LIB_TEXT.replace("(\n\tshout\n\tTone(..)\n)", "(\n\tTone(..)\n)"),
     );
     let diags = c.diagnostics(&ws.main);
     assert!(
@@ -2889,7 +2946,7 @@ fn raw_request(c: &mut Client, method: &str, params: Value) {
     }
 }
 
-const BROKEN: &str = /* old-syntax-check: E0010,E0010,E0101,E0010,E0101,E0010,E0002 */
+const BROKEN: &str = /* old-syntax-check: E0010,E0101,E0010,E0010,E0101,E0010,E0002 */
     "(\n\tutil = app/util\n)\n\nShape { Circle(Int) Rect(\n\nf = (s: Shape, ) {\n\ts |> {\n\t\tCircle(r) -> r +\n\t}\n\tutil.\n}\n\nmain = () { f(Circle(1) \"x\n";
 
 #[test]
@@ -2945,7 +3002,8 @@ fn lsp_latency_on_std() {
     c.open(&uri, &text);
     let started = Instant::now();
     c.diagnostics_within(&uri, Duration::from_secs(900));
-    eprintln!("first check of std: {:?}", started.elapsed());
+    let first_check = started.elapsed();
+    eprintln!("first check of std: {first_check:?}");
     // The first requests after the check, and then the next ones.
     let at = |needle: &str| {
         let (l, ch) = find(&text, needle, 0);
@@ -2959,26 +3017,30 @@ fn lsp_latency_on_std() {
     let mut times = Vec::new();
     for round in 0..3 {
         for (name, p) in [
-            ("hover", at("\nmap(A")),
-            ("definition", at("-> reverse(acc)")),
-            ("completion", at("-> reverse(acc)")),
+            ("hover", at("\nmap = <A")),
+            ("definition", at("{ reverse(acc)")),
+            ("completion", at("{ reverse(acc)")),
         ] {
             let started = Instant::now();
+            let cpu = c.server_cpu();
             let r = match name {
                 "hover" => c.request::<lsp::request::HoverRequest>(p),
                 "definition" => c.request::<lsp::request::GotoDefinition>(p),
                 _ => c.request::<lsp::request::Completion>(p),
             };
-            let took = started.elapsed();
+            let took = c.server_cpu() - cpu;
             assert!(!r.is_null(), "{name}");
-            times.push((round, name, took));
+            times.push((round, name, took, started.elapsed()));
         }
     }
-    eprintln!("latencies on std/list: {times:?}");
-    for (round, name, took) in &times {
+    // The bound is on the CPU time of the server's thread, which answers
+    // the requests: the wall time also counts the other tests and workers
+    // that share the machine.
+    eprintln!("CPU time and wall time of requests on std/list: {times:?}");
+    for (round, name, took, _) in &times {
         assert!(
             *took < Duration::from_millis(200),
-            "{name} took {took:?} in round {round}"
+            "{name} took {took:?} of CPU time in round {round}"
         );
     }
     c.shutdown();
@@ -3002,6 +3064,7 @@ fn lsp_capabilities_are_advertised() {
         server: Some(handle),
         next_id: 0,
         pending: Vec::new(),
+        server_thread: None,
     };
     let init = c.request::<lsp::request::Initialize>(json!({ "capabilities": {} }));
     let caps = &init["capabilities"];
@@ -3035,7 +3098,7 @@ fn lsp_capabilities_are_advertised() {
     c.shutdown();
 }
 
-const MATCH: &str = "Shape = Circle | Rect | Dot\n\nCircle {\n\tCircle(Int)\n}\n\nRect {\n\tRect(width: Int, height: Int)\n}\n\nDot {\n\tDot\n}\n\nf = (s: Shape) {\n\ts |> {\n\t\tDot -> 0\n\t\tCircle(1) -> 1\n\t}\n}\n\nmain = () { f(Dot) }\n";
+const MATCH: &str = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
 
 #[test]
 fn lsp_code_action_missing_clauses_lisp_surface() {
@@ -3074,7 +3137,7 @@ fn lsp_completion_constructors_lisp_surface() {
     c.open(&main, &text);
     c.diagnostics(&main);
     // Before the `}` that ends the clauses.
-    let close = text.find("1)}").unwrap_or_else(|| panic!("{text}")) + 2;
+    let close = text.find("_ 1)").unwrap_or_else(|| panic!("{text}")) + 4;
     let ix = ilang_lsp::position::LineIndex::new(&text);
     let p = ix.position(close as u32);
     let r = c.request::<lsp::request::Completion>(position_params(&main, p.line, p.character));
@@ -3092,7 +3155,7 @@ fn lsp_completion_constructors_lisp_surface() {
 #[test]
 fn formats_lisp_documents_with_the_source_formatter() {
     let dir = tempfile::tempdir().unwrap();
-    let source = "// keep\n(= main (-> () _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n";
+    let source = "// keep\n(= main (-> (,) _ {(= first 1) (= second 2) (= third 3) (+ first (+ second third))}))\n";
     package(dir.path(), &[("src/main.is", source)]);
     let main = file_uri(&dir.path().join("src/main.is"));
     let mut client = Client::start();

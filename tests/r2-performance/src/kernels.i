@@ -9,64 +9,55 @@
 	channel_pair
 )
 
-spin = (n: Int) -> Nil {
-	n |> {
-		0 -> Nil
-		_ -> spin(n - 1)
-	}
-}
+spin = (n: Int) -> Nil { n |> (0) { Nil } | (_) { spin(n - 1) } }
 
-spawns = (s: Scope(Never), n: Int) -> Nil ! Scheduler {
-	n |> {
-		0 -> Nil
-		_ -> {
+spawns = (s: Scope(Never), n: Int) -> Nil {
+	n |>
+		(0) { Nil }
+		| (_) {
 			task.join(task.go(s, () { Nil }))
 			spawns(s, n - 1)
 		}
-	}
 }
 
-yields = (n: Int) -> Nil ! Scheduler {
-	n |> {
-		0 -> Nil
-		_ -> {
+yields = (n: Int) -> Nil {
+	n |>
+		(0) { Nil }
+		| (_) {
 			task.yield()
 			yields(n - 1)
 		}
-	}
 }
 
-sends = (c: Channel(Nil), n: Int) -> Nil ! Scheduler {
-	n |> {
-		0 -> Nil
-		_ -> {
+sends = (c: Channel(Nil), n: Int) -> Nil {
+	n |>
+		(0) { Nil }
+		| (_) {
 			task.send(c, Nil)
 			sends(c, n - 1)
 		}
-	}
 }
 
-receives = (c: Channel(Nil), n: Int) -> Nil ! Scheduler {
-	n |> {
-		0 -> Nil
-		_ -> {
+receives = (c: Channel(Nil), n: Int) -> Nil {
+	n |>
+		(0) { Nil }
+		| (_) {
 			task.receive(c)
 			receives(c, n - 1)
 		}
-	}
 }
 
-empty = (n: Int) -> Int ! Scheduler {
+empty = (n: Int) -> Int {
 	task.scope((_: Scope(Never)) { spin(n) })
 	n
 }
 
-spawn_join = (n: Int) -> Int ! Scheduler {
+spawn_join = (n: Int) -> Int {
 	task.scope((s) { spawns(s, n) })
 	n
 }
 
-switch_pair = (n: Int) -> Int ! Scheduler {
+switch_pair = (n: Int) -> Int {
 	task.scope((s) {
 		child = task.go(s, () { yields(n) })
 		yields(n)
@@ -75,7 +66,7 @@ switch_pair = (n: Int) -> Int ! Scheduler {
 	n
 }
 
-channel_pair = (n: Int) -> Int ! Scheduler {
+channel_pair = (n: Int) -> Int {
 	task.scope((s) {
 		c: Channel(Nil) = task.channel()
 		child = task.go(s, () { sends(c, n) })

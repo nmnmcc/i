@@ -1,10 +1,12 @@
-Alias(A) = (A) -> { (Int) -> Int } ! Assert | Nil
+Alias(A) = (A) <- (Assert, Nil) -> (Int) -> Int
 
-Wide(A, B) = (first_parameter_type: List(A), second_parameter_type: Dict(A, B), third: Int) -> Bool
+Wide(A, B) = (List(A), Dict(A, B), Int) -> Bool
 
-Handler = { (Int) -> Int } | { (String) -> String }
+Handler = { (Int) -> Int } | (String) -> String
 
 @external("env", "log")
 log: (String) -> Nil
 
-apply = (f: (Int) -> Int ^ E ! N, x: Int | Float - Nil & Any) -> Int ^ E ! N { f(x) }
+apply = (f: (Int) <- (Fail(E), N) -> Int, x: Int | Float - Nil & Any) -> Int {
+	f(x)
+}

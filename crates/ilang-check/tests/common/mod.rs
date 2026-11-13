@@ -49,3 +49,22 @@ pub fn def<'a>(program: &'a Program, path: &str, name: &str) -> &'a Def {
     let m = program.module(module(program, path));
     m.defs.iter().find(|d| d.name == name).unwrap()
 }
+
+/// Whether `tests/syn3-pending.txt` lists the test `name` (`file::test`):
+/// it uses a form that a later stage of syntax three removes, and is skipped
+/// until that stage lands. The skip is printed, so it stays visible.
+#[allow(dead_code)]
+pub fn syn3_pending(name: &str) -> bool {
+    let list = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/syn3-pending.txt"),
+    )
+    .unwrap();
+    let listed = list
+        .lines()
+        .filter(|l| !l.starts_with('#'))
+        .any(|l| l.split_whitespace().next() == Some(name));
+    if listed {
+        eprintln!("{name}: skipped, listed in tests/syn3-pending.txt");
+    }
+    listed
+}

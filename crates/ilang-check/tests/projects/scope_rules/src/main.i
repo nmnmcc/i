@@ -10,12 +10,7 @@ g = (h) { h }
 
 uses_param = (x, y) { x + y + z }
 
-clause = (v) {
-	v |> {
-		(p, q) ? p > q -> p
-		(p, _)         -> q
-	}
-}
+clause = (v) { v |> ((p, q) ? p > q) { p } | ((p, _)) { q } }
 
 t: Unknown = 1
 

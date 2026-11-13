@@ -16,25 +16,40 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (String) -> Nil)
+Out = (print = (String) -> Nil)
+
+print = (text: String) <- (out: Out) { out.print(text) }
+
+// §9.9 lets the failure come before or after any one step of the waiting
+// child, so the child repeats its step until the cancellation reaches it.
+yield_forever = () -> Nil {
+	task.yield()
+	yield_forever()
 }
 
-print = (text: String, out ! Out) { out.print(text) }
+sync_forever = () -> Nil {
+	task.sync(
+		task.map(task.always(Nil), (_) { Nil }),
+	)
+	sync_forever()
+}
 
-probe = (label: String, wait: () -> Nil ! task.Scheduler | request.Root) {
+probe = (label: String, wait: () <- (task.Scheduler, request.Root) -> Nil) {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(() {
-					task.send(armed, Nil)
-					wait()
-					panic("cancelled body continued")
-				}, () {
-					task.yield()
-					print(label)
-				})
+				resource.ensure(
+					() {
+						task.send(armed, Nil)
+						wait()
+						panic("cancelled body continued")
+					},
+					() {
+						task.yield()
+						print(label)
+					},
+				)
 			})
 			task.go(s, () {
 				task.receive(armed)
@@ -46,29 +61,27 @@ probe = (label: String, wait: () -> Nil ! task.Scheduler | request.Root) {
 	assert(result == Error("boom"))
 }
 
-
 main = () {
-	probe("yield", () { task.yield() })
+	probe("yield", () { yield_forever() })
 	c: task.Channel(Nil) = task.channel()
 	probe("send", () { task.send(c, Nil) })
 	probe("receive", () { task.receive(c) })
-	probe("sync", () {
-		task.sync(task.map(task.always(Nil), (_) {
-			panic("map ran after cancellation")
-		}))
-	})
+	probe("sync", () { sync_forever() })
 	result = fail.catch(() {
 		task.scope((s) {
 			target = task.go(s, () { task.sync(task.never()) })
 			armed: task.Channel(Nil) = task.channel()
 			task.go(s, () {
-				resource.ensure(() {
-					task.send(armed, Nil)
-					task.join(target)
-				}, () {
-					task.yield()
-					print("join")
-				})
+				resource.ensure(
+					() {
+						task.send(armed, Nil)
+						task.join(target)
+					},
+					() {
+						task.yield()
+						print("join")
+					},
+				)
 			})
 			task.go(s, () {
 				task.receive(armed)

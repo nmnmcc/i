@@ -1,1 +1,1 @@
-f = {}
+f = core.never

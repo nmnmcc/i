@@ -6,22 +6,22 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 // Ordinary recursion that is not in tail position, 100000 calls deep and
 // more.
-depth = (n) {
-	n |> {
-		0 -> 0
-		_ -> 1 + depth(n - 1)
-	}
-}
+depth = (n) { n |> (0) { 0 } | (_) { 1 + depth(n - 1) } }
 
 test("deep", () {
-	check(core.inspect(depth(100000)), "100000")
-	check(core.inspect(depth(300000)), "300000")
+	check(
+		core.inspect(depth(100000)),
+		"100000",
+	)
+	check(
+		core.inspect(depth(300000)),
+		"300000",
+	)
 })

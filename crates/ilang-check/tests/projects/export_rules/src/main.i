@@ -8,8 +8,6 @@
 
 Alias = Int
 
-Real {
-	Real
-}
+Real = ()
 
 x = 1

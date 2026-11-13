@@ -1,65 +1,55 @@
 // A comment at the top of the file.
-
 (
-	i/core
-) // the core
+	i/core // the core
+)
 
+Circle = (radius = Float)
+Square = (side = Float)
+Point = ()
 /// The documentation of a type.
 /// It has two lines.
 Shape = Circle | Square | Point
-
-Circle {
-	Circle(radius: Float)
-}
-
 // round
-Square {
-	Square(side: Float)
-}
-
 // four sides
 // A shape with no area.
-Point {
-	Point
-}
 
 // A comment before the documentation.
 /// The documentation of `area`.
 @deprecated("use size")
 // A comment after an attribute.
-area = (shape) { // after the brace
+area = (shape) {
+	// after the brace
 	// the first statement
-	x = 1   // one
+	x = 1 // one
 	yy = 22 // twenty-two
 
 	// after a blank line
-	zzz = x + // in the middle of an operation
-		yy
+	zzz = x + yy
+	// in the middle of an operation
 	call(
-		x // after the first argument
-		yy
+		x, // after the first argument
+		yy,
 	)
 	list = [
 		// before the first part
-		1
-		2 // two
-		// after the last part
+		1,
+		2, // two
 	]
-	y = shape |> {
+	// after the last part
+	y = shape |>
 		// before a clause
-		Circle(r) -> r *. r // area of a circle
-		Square(s) -> s *. s // area of a square
-		Point     -> 0.0
-		// after the last clause
-	}
+		(Circle(r)) { r *. r }
+		// area of a circle
+		| (Square(s)) { s *. s }
+		// area of a square
+		| (Point) { 0.0 }
+	// after the last clause
 	y
 	// at the end of the block
 }
 
 empty = (x) {
-	x |> {
-		// nothing here
-	}
+	core.never(x)
+	// nothing here
 }
-
 // At the end of the file.

@@ -11,5 +11,7 @@ test("closed_read", () {
 
 test("opaque_alias_export", () {
 	same = (value: Alias) { value }
-	assert(same(privacy.make()) == privacy.make())
+	assert(
+		same(privacy.make()) == privacy.make(),
+	)
 })

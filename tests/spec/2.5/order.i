@@ -6,10 +6,9 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 // `total` needs `double` and `base`, which come later in the source.
@@ -29,14 +28,14 @@ later = 10
 (first, second) = (base + 1, "two")
 
 apply_all = (fs, x) {
-	fs |> {
-		[]          -> []
-		[f, ..rest] -> [f(x), ..apply_all(rest, x)]
-	}
+	fs |> ([]) { [] } | ([f, ..rest]) { [f(x), ..apply_all(rest, x)] }
 }
 
 test("values", () {
 	check(core.inspect(total), "42")
-	check(core.inspect(apply_all(table, 3)), "[13, 30]")
+	check(
+		core.inspect(apply_all(table, 3)),
+		"[13, 30]",
+	)
 	check(core.inspect((first, second)), "(21, \"two\")")
 })

@@ -1,9 +1,12 @@
 // Design counterexample; not run. Host eventually releases gate.
-(i/task, i/request)
+(
+	i/task
+	i/request
+)
 @host("review:gate/v1", "request")
-Gate { Gate(wait: () -> Request(Nil)) }
+Gate = (wait = () -> Request(Nil))
 
-main = (gate ! Gate) {
-  pending = gate.wait()
-  task.run(() { request.await(pending) })
+main = () <- (gate: Gate) {
+	pending = gate.wait()
+	task.run(() { request.await(pending) })
 }

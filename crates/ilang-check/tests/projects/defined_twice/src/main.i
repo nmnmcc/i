@@ -6,23 +6,15 @@ x = 2
 
 z = 3
 
-T = A | BCase
+A = ()
+B = ()
+T = A | B
 
-A {
-	A
-}
+C = ()
+T = C
 
-BCase {
-	B
-}
-
-T {
-	C
-}
-
-U {
-	A
-}
+A = ()
+U = A
 
 B = Int
 

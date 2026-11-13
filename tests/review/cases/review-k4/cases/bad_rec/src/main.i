@@ -1,3 +1,6 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-bad(N) = () { ! S(N) = S(() { use() }, (_: N) { Nil }) use() }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+bad = <N>() { use() <- (S(() { use() }, (_: N) { Nil })) }

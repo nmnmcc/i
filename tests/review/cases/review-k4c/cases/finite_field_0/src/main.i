@@ -1,4 +1,4 @@
-S(N) { S(f: () -> Nil ! N) }
-use(N) = (s ! S(N)) { s.f() }
-run(N) = (body: () -> Nil ! N) { body() }
-helper(N) = () { run(() { use() }) }
+S(N) = (f = () <- N -> Nil)
+use = <N>() <- (s: S(N)) { s.f() }
+run = <N>(body: () <- N -> Nil) { body() }
+helper = <N>() { run(() { use() }) }

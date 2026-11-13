@@ -60,12 +60,12 @@ fn accepts(source: &str, name: &str, expected: &str, unused: &[&str]) {
 fn annotated_and_inferred_service_rows() {
     // Rule 4 unions the callback's N with S(N). Writing that same union
     // must not change the finite principal type (§4.7).
-    for annotation in ["", "-> Nil ! N | S(N)"] {
+    for annotation in ["{", "-> Nil {"] {
         accepts(
-            &"S(N) { S(() -> Nil ! N) }\nuse(N) = (s ! S(N)) -> Nil ! N | S(N) { S(f) = s f() }"
-                .replace("-> Nil ! N | S(N)", annotation),
+            &"S(N) = (() <- N -> Nil)\nuse = <N>() <- (s: S(N)) -> Nil {\n\tS(f) = s\n\tf()\n}"
+                .replace("-> Nil {", annotation),
             "use",
-            "() -> Nil ! N | S(N)",
+            "() <- (S(N), ..N) -> Nil",
             &["use"],
         );
     }
@@ -75,13 +75,13 @@ fn annotated_and_inferred_service_rows() {
 fn generic_service_through_a_helper() {
     // Rules 3 and 5 instantiate use with N=Never; rule 9 removes S(Never).
     accepts(
-        "S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-run(N) = (body: () -> Nil ! N) { body() }
-example = () {
-  ! S(Never) = S(() { Nil }, (_: Never) { Nil })
-  run(() { use() })
-}",
+        "S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+run = <N>(body: () <- N -> Nil) { body() }
+example = () { run(() { use() }) <- (S(() { Nil }, (_: Never) { Nil })) }",
         "example",
         "() -> Nil",
         &["example"],
@@ -92,15 +92,18 @@ example = () {
 fn open_service_row_through_helpers() {
     // Rule 5 carries both requirements through calls; no closed service
     // annotation is needed to make the row finite.
-    for annotation in ["", "-> Nil ! N | S(N)"] {
+    for annotation in ["{", "-> Nil {"] {
         accepts(
-            &"S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-run(N) = (body: () -> Nil ! N) { body() }
-forward(N) = (s ! S(N)) -> Nil ! N | S(N) { run(() { use() }) }"
-                .replace("-> Nil ! N | S(N)", annotation),
+            &"S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+run = <N>(body: () <- N -> Nil) { body() }
+forward = <N>() <- (s: S(N)) -> Nil { run(() { use() }) }"
+                .replace("-> Nil {", annotation),
             "forward",
-            "() -> Nil ! N | S(N)",
+            "() <- (S(N), ..N) -> Nil",
             &["forward"],
         );
     }
@@ -111,29 +114,27 @@ fn several_parameters_and_nested_services() {
     // Rules 4, 5 and 7 apply equally inside nested constructors and with
     // independent value/error/environment parameters. Rule 3 permits
     // independent closed instances of the resulting scheme.
-    for annotation in ["", "-> A ^ E ! N | Outer(A, E, N)"] {
-        let source = "Inner(A, E, N) { Inner((A) -> A ^ E ! N, (N) -> Nil) }
-Outer(A, E, N) { Outer(Inner(A, E, N)) }
-use(A, E, N) = (x: A, s ! Outer(A, E, N)) -> A ^ E ! N | Outer(A, E, N) {
-  Outer(Inner(f, _)) = s
-  f(x)
+    for annotation in ["{", "-> A {"] {
+        let source = "Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> Nil)
+Outer(A, E, N) = (Inner(A, E, N))
+use = <A, E, N>(x: A) <- (s: Outer(A, E, N)) -> A {
+	Outer(Inner(f, _)) = s
+	f(x)
 }
-run(A, E, N) = (body: () -> A ^ E ! N) { body() }
+run = <A, N>(body: () <- N -> A) { body() }
 integer = () {
-  ! Outer(Int, Never, Never) = Outer(Inner((x: Int) { x }, (_: Never) { Nil }))
-  run(() { use(1) })
+	run(() { use(1) }) <- (Outer(Inner((x: Int) { x }, (_: Never) { Nil })))
 }
 boolean = () {
-  ! Outer(Bool, Never, Never) = Outer(Inner((x: Bool) { x }, (_: Never) { Nil }))
-  run(() { use(True) })
+	run(() { use(True) }) <- (Outer(Inner((x: Bool) { x }, (_: Never) { Nil })))
 }"
-        .replace("-> A ^ E ! N | Outer(A, E, N)", annotation);
+        .replace("-> A {", annotation);
         accepts(&source, "integer", "() -> Int", &["integer", "boolean"]);
         accepts(&source, "boolean", "() -> Bool", &["integer", "boolean"]);
         accepts(
             &source,
             "use",
-            "(x: A) -> A ^ E ! N | Outer(A, E, N)",
+            "(A) <- (Fail(E), Outer(A, E, N), ..N) -> A",
             &["integer", "boolean"],
         );
     }
@@ -144,18 +145,25 @@ fn nonempty_stored_environment() {
     // §9.2: a callback takes its dependency at the call site; rule 9
     // removes each installed service, including a service nested in N.
     accepts(
-        "Dependency { Dependency(value: Int) }
-get = (d ! Dependency) { d.value }
-Inner(N) { Inner(() -> Int ! N, (N) -> Nil) }
-read(N) = (s ! Inner(N)) { Inner(f, _) = s f() }
-Outer(N) { Outer(() -> Int ! N, (N) -> Nil) }
-use(N) = (s ! Outer(N)) -> Int ! N | Outer(N) { Outer(f, _) = s f() }
-run(A, N) = (body: () -> A ! N) { body() }
+        "Dependency = (value = Int)
+get = () <- (d: Dependency) { d.value }
+Inner(N) = (() <- N -> Int, (N) -> Nil)
+read = <N>() <- (s: Inner(N)) {
+	Inner(f, _) = s
+	f()
+}
+Outer(N) = (() <- N -> Int, (N) -> Nil)
+use = <N>() <- (s: Outer(N)) -> Int {
+	Outer(f, _) = s
+	f()
+}
+run = <A, N>(body: () <- N -> A) { body() }
 example = () {
-  ! Dependency = Dependency(7)
-  ! Inner(Dependency) = Inner(() { get() }, (_: Dependency) { Nil })
-  ! Outer(Dependency | Inner(Dependency)) = Outer(() { read() }, (_: Dependency | Inner(Dependency)) { Nil })
-  run(() { use() })
+	run(() { use() }) <- (
+		Dependency(value = 7),
+		Inner(() { get() }, (_: Dependency) { Nil }),
+		Outer(() { read() }, (_: Dependency | Inner(Dependency)) { Nil }),
+	)
 }",
         "example",
         "() -> Int",
@@ -167,23 +175,26 @@ example = () {
 fn logging_example() {
     // Std-2 §7: E=String, N=Never. fail.catch reifies the error (§9.3),
     // and rule 9 removes Sink(String, Never).
-    for annotation in ["", "-> Nil ^ E ! N | Sink(E, N)"] {
+    for annotation in ["{", "-> Nil {"] {
         accepts(
-            &"(i/fail)
-Entry { Entry(message: String) }
-Sink(E, N) { Sink((Entry) -> Nil ^ E ! N, (N) -> Nil) }
-make(E, N) = (send: (Entry) -> Nil ^ E ! N) -> Sink(E, N) {
-  Sink(send, (_: N) { Nil })
+            &"(
+	i/fail
+)
+Entry = (message = String)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+make = <E, N>(send: (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
+	Sink(send, (_: N) { Nil })
 }
-write(E, N) = (entry: Entry, sink ! Sink(E, N)) -> Nil ^ E ! N | Sink(E, N) {
-  Sink(send, _) = sink
-  send(entry)
+write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) -> Nil {
+	Sink(send, _) = sink
+	send(entry)
 }
 example = () {
-  ! Sink(String, Never) = make((entry) { fail.raise(entry.message) })
-  fail.catch(() { write(Entry(\"seen\")) })
+	fail.catch(() { write(Entry(message = \"seen\")) }) <- (
+		make((entry) { fail.raise(entry.message) }),
+	)
 }"
-            .replace("-> Nil ^ E ! N | Sink(E, N)", annotation),
+            .replace("-> Nil {", annotation),
             "example",
             "() -> Result(Nil, String)",
             &["example"],
@@ -207,14 +218,15 @@ fn recursive_types_still_fail() {
     // rather than the tautology N <: N | S(N) (§4.5 rule 2).
     for source in [
         "bad = (x) { x(x) }",
-        "S(N) { S(() -> Nil ! N, (N) -> Nil) }
-bad(N) = (s ! S(N)) -> Nil ! N { S(f, _) = s f() }",
-        "S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-bad(N) = () {
-  ! S(N) = S(() { use() }, (_: N) { Nil })
-  use()
-}",
+        // The old case `bad(N) = (s ! S(N)) -> Nil ! N { … f() }` (the whole
+        // environment is exactly N) needs `..env: N` in the service pattern,
+        // which waits for stage E6 of syntax three; it is left out until then.
+        "S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+bad = <N>() { use() <- (S(() { use() }, (_: N) { Nil })) }",
     ] {
         rejects(source, "E0505");
     }
@@ -225,29 +237,35 @@ fn incompatible_service_arguments_still_fail() {
     // Std-2 §7 / §4.5: the input marker keeps N invariant even when
     // Consumer's parameter is contravariant.
     rejects(
-        "Entry { Entry }
-Sink(E, N) { Sink((Entry) -> Nil ^ E ! N, (N) -> Nil) }
-Consumer(A) { Consumer((A) -> Nil) }
+        "Entry = ()
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Consumer(A) = ((A) -> Nil)
 bad = (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }",
         "E0515",
     );
     // §9.2: forms of one service in a row must have equal arguments,
     // including the error argument, regardless of its ordinary variance.
     rejects(
-        "Sink(E, N) { Sink(() -> Nil ^ E ! N, (N) -> Nil) }
-one = (s ! Sink(String, Never)) { Nil }
-two = (s ! Sink(Int, Never)) { Nil }
-bad = () { one() two() }",
+        "Sink(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+one = () <- (s: Sink(String, Never)) { Nil }
+two = () <- (s: Sink(Int, Never)) { Nil }
+bad = () {
+	one()
+	two()
+}",
         "E0515",
     );
     // The same restriction holds when a service is hidden behind the
     // helper's inferred environment row.
     rejects(
-        "Sink(E, N) { Sink(() -> Nil ^ E ! N, (N) -> Nil) }
-one = (s ! Sink(String, Never)) { Nil }
-two = (s ! Sink(Int, Never)) { Nil }
-run(N) = (body: () -> Nil ! N) { body() }
-bad = () { run(() { one() }) two() }",
+        "Sink(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+one = () <- (s: Sink(String, Never)) { Nil }
+two = () <- (s: Sink(Int, Never)) { Nil }
+run = <N>(body: () <- N -> Nil) { body() }
+bad = () {
+	run(() { one() })
+	two()
+}",
         "E0515",
     );
 }
@@ -257,10 +275,14 @@ fn repeated_helpers_keep_a_finite_principal_row() {
     // Repeated rule-3 instantiation and rule-5 forwarding add no service
     // and must preserve the same principal scheme (§4.7).
     let mut source = String::from(
-        "S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-run(N) = (body: () -> Nil ! N) { body() }
-forward_0 = () { run(() { use() }) }\n",
+        "S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+run = <N>(body: () <- N -> Nil) { body() }
+forward_0 = () { run(() { use() }) }
+",
     );
     for n in 1..64 {
         source.push_str(
@@ -272,7 +294,7 @@ forward_0 = () { run(() { use() }) }\n",
     accepts(
         &source,
         "forward_63",
-        "() -> Nil ! N | S(N)",
+        "() <- (S(N), ..N) -> Nil",
         &["forward_63"],
     );
 }

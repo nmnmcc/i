@@ -5,9 +5,17 @@
 	i/task
 )
 
-widen = (
-	e: task.Event(Int, Never, Never)
-) -> task.Event(Int | String, String, task.Scheduler) { e }
+widen = (e: task.Event(Int, Never, Never)) -> task.Event(
+	Int | String,
+	String,
+	task.Scheduler,
+) { e }
 
-
-main = () { assert(task.sync(widen(task.always(7))) == 7) }
+main = () {
+	assert(
+		task.sync(
+			widen(task.always(7)),
+		) ==
+			7,
+	)
+}

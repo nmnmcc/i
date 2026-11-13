@@ -342,6 +342,7 @@ fn expression_values(e: &Expr) -> usize {
         | ExprKind::Error
         | ExprKind::Fn(_) => 1,
         ExprKind::Tuple(items) => pending_values(items),
+        ExprKind::Multi(groups) => pending_values(groups.iter().map(|g| &g.value)),
         ExprKind::Record { base, fields } => pending_values(
             base.iter()
                 .map(Box::as_ref)
@@ -400,6 +401,7 @@ impl Walk {
             | ExprKind::Name(_)
             | ExprKind::Error => {}
             ExprKind::Tuple(items) => items.iter().for_each(|x| self.expr(x)),
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::Record { base, fields } => {
                 if let Some(base) = base {
                     self.expr(base);
@@ -783,6 +785,8 @@ struct Lowerer<'a> {
     packages: HashSet<PackageId>,
     ctors: HashMap<CtorRef, CtorInfo>,
     types: HashMap<TypeId, TypeRepr>,
+    /// The label sets of data, as `ir::Program::shapes`.
+    shapes: std::cell::RefCell<Vec<Vec<String>>>,
     /// The top-level bindings whose value is a function, by their name.
     known: HashMap<DefId, BindingRef>,
     def_funcs: HashMap<DefId, FuncId>,
@@ -832,6 +836,7 @@ impl<'a> Lowerer<'a> {
             packages: HashSet::new(),
             ctors: HashMap::new(),
             types: HashMap::new(),
+            shapes: Default::default(),
             known: HashMap::new(),
             def_funcs: HashMap::new(),
             def_globals: HashMap::new(),
@@ -952,6 +957,26 @@ impl<'a> Lowerer<'a> {
                 || (self.options.tests && self.options.target != ir::Target::Wasi))
     }
 
+    /// A definition of the library package, by module path and name.
+    fn library_def(&self, path: &str, name: &str) -> DefId {
+        let (mi, m) = self
+            .program
+            .modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| m.path == path && m.package == self.graph.library)
+            .unwrap_or_else(|| panic!("library module {path}"));
+        let index = m
+            .defs
+            .iter()
+            .position(|d| d.name == name)
+            .unwrap_or_else(|| panic!("library definition {path}.{name}"));
+        DefId {
+            module: ModuleId(mi as u32),
+            index: index as u32,
+        }
+    }
+
     fn is_library(&self, m: ModuleId) -> bool {
         self.program.module(m).package == self.graph.library
     }
@@ -1033,6 +1058,47 @@ impl<'a> Lowerer<'a> {
     }
 
     fn run(&mut self) {
+        self.run_all();
+        self.out.shapes = self.shapes.take();
+    }
+
+    /// Records that the function of the group closure `value` has a shape
+    /// with labels, so that its closure shows its labels (field 2 of
+    /// `$clo{n}`, syntax-3.md §6.4). The value is a constant closure or the
+    /// closure just made.
+    fn label_shape(&mut self, out: &[Stmt], value: &Atom, id: ShapeId) {
+        let func = match value {
+            Atom::Func(f) => Some(*f),
+            Atom::Local(l) => match out.last() {
+                Some(Stmt::Let {
+                    dst,
+                    value: Value::Closure { func, .. },
+                    ..
+                }) if dst == l => Some(*func),
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(f) = func {
+            self.out.func_shapes.insert(f, id);
+        }
+    }
+
+    /// The index of the label set of a data shape (`ir::Program::shapes`).
+    fn shape_set(&self, shape: ilang_check::types::ShapeId) -> u32 {
+        let labels = shape.labels().to_vec();
+        let mut shapes = self.shapes.borrow_mut();
+        let i = match shapes.iter().position(|l| *l == labels) {
+            Some(i) => i,
+            None => {
+                shapes.push(labels);
+                shapes.len() - 1
+            }
+        };
+        i as u32 + 1
+    }
+
+    fn run_all(&mut self) {
         // Top-level functions are known functions with one value.
         for (mi, m) in self.program.modules.iter().enumerate() {
             for (bi, b) in m.bindings.iter().enumerate() {
@@ -1096,6 +1162,12 @@ impl<'a> Lowerer<'a> {
             return;
         }
         self.entries();
+        for &(wat, module, name) in ir::RUNTIME_CALLS {
+            let def = self.library_def(module, name);
+            let f = self.def_func(def);
+            self.constants.insert(f);
+            self.out.runtime_calls.push((wat, f));
+        }
         while let Some((id, d)) = self.work.pop() {
             let b = self.known[&d];
             let tb = self.program.binding(b);
@@ -2479,6 +2551,40 @@ impl<'a> Lowerer<'a> {
         };
         match module.as_str() {
             "ilang:prelude" if function == "panic" => Ok((Op::Panic, arity)),
+            // The private primitives of `lib/i/bits.i`.
+            "ilang:bits" => Ok((
+                Op::Runtime {
+                    name: match function.as_str() {
+                        "read_unsigned" => "bits_read_unsigned",
+                        "from_unsigned" => "bits_from_unsigned",
+                        _ => return Err(format!("`bits.{function}` is not known")),
+                    },
+                    arity,
+                },
+                arity,
+            )),
+            // The private primitives of `lib/i/big.i`.
+            "ilang:big" => Ok((
+                Op::Runtime {
+                    name: match function.as_str() {
+                        "sign" => "big_sign",
+                        "digits" => "big_digits",
+                        "from_digits" => "big_from_digits",
+                        "size" => "big_size",
+                        "limb" => "big_limb",
+                        "from_top" => "big_from_top",
+                        "builder" => "big_builder",
+                        "put" => "big_put",
+                        "finish" => "big_finish",
+                        "multiply_low" => "big_multiply_low",
+                        "multiply_high" => "big_multiply_high",
+                        "divide_digit" => "big_divide_digit",
+                        _ => return Err(format!("`big.{function}` is not known")),
+                    },
+                    arity,
+                },
+                arity,
+            )),
             "ilang:core" => match CORE.iter().position(|n| n == function) {
                 Some(i) => Ok((
                     Op::Runtime {
@@ -2546,16 +2652,23 @@ impl<'a> Lowerer<'a> {
                 )),
                 _ => Err(format!("`key.{function}` is not known")),
             },
-            "ilang:record" => {
+            "ilang:worker" => {
                 let name = match function.as_str() {
-                    "get" => "record_get",
-                    "put" => "record_put",
-                    "remove" => "record_remove",
-                    "has" => "record_has",
-                    "keys" => "record_keys",
-                    "size" => "record_size",
-                    "texts" => "record_texts",
-                    _ => return Err(format!("`record.{function}` is not known")),
+                    "enabled" => "worker_enabled",
+                    "publish" => "worker_publish",
+                    "claim" => "worker_claim",
+                    "adopt" => "worker_adopt",
+                    "placeholder" => "worker_placeholder",
+                    "away" => "worker_away",
+                    "send" => "worker_send",
+                    "inbox" => "worker_inbox",
+                    "message" => "worker_message",
+                    "pending" => "worker_pending",
+                    "wait" => "worker_wait",
+                    "share_put" => "worker_share_put",
+                    "share_get" => "worker_share_get",
+                    "share_drop" => "worker_share_drop",
+                    _ => return Err(format!("`worker.{function}` is not known")),
                 };
                 Ok((Op::Runtime { name, arity }, arity))
             }
@@ -2660,29 +2773,80 @@ impl<'a> Lowerer<'a> {
             ExprKind::Int(n) => Atom::Int(BigInt::from(n.clone())),
             ExprKind::Float(x) => Atom::Float(*x),
             ExprKind::String(s) => Atom::String(s.clone()),
-            ExprKind::Name(r) => self.name(fx, e, *r),
+            ExprKind::Name(r) => {
+                // A chain name that an expected type narrowed to one shape
+                // group stands for that group's function.
+                let r = self
+                    .typed
+                    .selected_names
+                    .get(&(fx.module, e.span))
+                    .copied()
+                    .unwrap_or(*r);
+                self.name(fx, e, r)
+            }
             ExprKind::Tuple(items) => {
                 let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let_value(fx, out, Value::Tuple(parts), None)
             }
-            ExprKind::Record { base, fields } => {
-                let base = base.as_ref().map(|b| self.expr(fx, out, b));
-                let fields = fields
-                    .iter()
-                    .map(|(label, value)| {
-                        let index = match self.out.labels.iter().position(|x| x == &label.name) {
-                            Some(index) => index,
-                            None => {
-                                self.out.labels.push(label.name.clone());
-                                self.out.labels.len() - 1
+            ExprKind::Multi(groups) => match self.typed.selected_groups.get(&(fx.module, e.span)) {
+                // An expected type chose one shape group: the value is that
+                // group's function.
+                Some(i) => self.expr(fx, out, &groups[*i as usize].value),
+                // A multi-shape value (syntax-3.md §6.4): the closure of
+                // each group with the run-time id of its shape.
+                None => {
+                    let parts = groups
+                        .iter()
+                        .map(|g| {
+                            let set = if g.shape.has_labels() {
+                                self.shape_set(g.shape)
+                            } else {
+                                0
+                            };
+                            let id = crate::ir::shape_id(g.shape.positions(), set);
+                            let value = self.expr(fx, out, &g.value);
+                            if set != 0 {
+                                self.label_shape(out, &value, id);
                             }
-                        };
-                        (LabelConst(index as u32), self.expr(fx, out, value))
-                    })
+                            (id, value)
+                        })
+                        .collect();
+                    let_value(fx, out, Value::Multi(parts), None)
+                }
+            },
+            ExprKind::Record { base, fields } => {
+                // syntax-3 §6.4: the items are worked out in written order,
+                // the spread base first; the data has its parts in canonical
+                // order.
+                let (shape, base_shape) = self.typed.data_shapes[&(fx.module, e.span)];
+                let base = base.as_ref().map(|b| self.expr(fx, out, b));
+                let given: Vec<(String, Atom)> = fields
+                    .iter()
+                    .map(|(label, value)| (label.name.clone(), self.expr(fx, out, value)))
                     .collect();
-                let value = match base {
-                    Some(base) => Value::RecWith(base, fields),
-                    None => Value::RecNew(fields),
+                let mut parts = Vec::with_capacity(shape.len());
+                for key in shape.keys() {
+                    let found = key
+                        .as_ref()
+                        .and_then(|l| given.iter().find(|(g, _)| g == l))
+                        .map(|(_, a)| a.clone());
+                    parts.push(match found {
+                        Some(a) => a,
+                        None => {
+                            let base_shape = base_shape.expect("a key from the spread");
+                            let at = match &key {
+                                Some(l) => base_shape.label_index(l).expect("a spread label"),
+                                None => parts.len().min(base_shape.positions() as usize),
+                            };
+                            let b = base.clone().expect("a spread base");
+                            let_value(fx, out, Value::Field(b, at as u32), None)
+                        }
+                    });
+                }
+                let value = if shape.has_labels() {
+                    Value::Data(self.shape_set(shape), parts)
+                } else {
+                    Value::Tuple(parts)
                 };
                 let_value(fx, out, value, None)
             }
@@ -2704,6 +2868,9 @@ impl<'a> Lowerer<'a> {
                 let s = self.expr(fx, out, subject);
                 return self.case(fx, out, s, clauses, tail);
             }
+            ExprKind::Call { callee, args } if args.iter().any(|a| a.label.is_some()) => {
+                return self.labelled_call(fx, out, e.span, callee, None, args, tail);
+            }
             ExprKind::Call { callee, args } => {
                 let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
                 return self.call(fx, out, e.span, callee, None, &args, tail);
@@ -2713,16 +2880,6 @@ impl<'a> Lowerer<'a> {
                 match self.typed.access.get(&(fx.module, e.span)) {
                     Some(Access::Field(list)) => self.field(fx, out, t, list),
                     Some(Access::Part(k)) => let_value(fx, out, Value::Field(t, *k), None),
-                    Some(Access::Label(label)) => {
-                        let index = match self.out.labels.iter().position(|x| x == label) {
-                            Some(index) => index,
-                            None => {
-                                self.out.labels.push(label.clone());
-                                self.out.labels.len() - 1
-                            }
-                        };
-                        let_value(fx, out, Value::RecGet(t, LabelConst(index as u32)), None)
-                    }
                     None => unreachable!("a checked field has an access"),
                 }
             }
@@ -2950,6 +3107,9 @@ impl<'a> Lowerer<'a> {
         if op == BinOp::Pipe {
             // `a |> f` is `f(a)`, and `a |> f(b)` is `f(a, b)` (§6.9).
             return match &rhs.kind {
+                ExprKind::Call { callee, args } if args.iter().any(|a| a.label.is_some()) => {
+                    self.labelled_call(fx, out, e.span, callee, Some(lhs), args, tail)
+                }
                 ExprKind::Call { callee, args } => {
                     let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
                     self.call(fx, out, e.span, callee, Some(lhs), &args, tail)
@@ -3070,6 +3230,68 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// A call with labelled arguments of a function value (syntax-3.md
+    /// §6.4): the arguments are worked out as written, then passed in the
+    /// canonical order of their shape (positions, then labels in UTF-8
+    /// order), and a multi-shape value dispatches on that shape. Any other
+    /// callee is called as `call` does.
+    #[allow(clippy::too_many_arguments)]
+    fn labelled_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        span: Span,
+        callee: &Expr,
+        first: Option<&Expr>,
+        args: &[hir::Arg],
+        tail: bool,
+    ) -> Option<Atom> {
+        if matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_))) {
+            let args: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
+            return self.call(fx, out, span, callee, first, &args, tail);
+        }
+        let mut positional = Vec::new();
+        let mut labelled: Vec<(String, Atom)> = Vec::new();
+        let mut written = Vec::new();
+        if let Some(a) = first {
+            let v = self.expr(fx, out, a);
+            written.push(v.clone());
+            positional.push(v);
+        }
+        let target = self.target(fx, out, callee);
+        for a in args {
+            let v = self.expr(fx, out, &a.value);
+            written.push(v.clone());
+            match &a.label {
+                Some(l) => labelled.push((l.name.clone(), v)),
+                None => positional.push(v),
+            }
+        }
+        labelled.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+        let labels: Vec<String> = labelled.iter().map(|(l, _)| l.clone()).collect();
+        let shape = ilang_check::types::ShapeId::new(positional.len() as u32, labels);
+        let (target, all) = match target {
+            Target::Callee(Callee::Value(f)) => {
+                let id = crate::ir::shape_id(shape.positions(), self.shape_set(shape));
+                let mut all = positional;
+                all.extend(labelled.into_iter().map(|(_, v)| v));
+                (Target::Callee(Callee::Shaped(f, id)), all)
+            }
+            // A known function takes its arguments in the order the
+            // checker gives (`typed.args`), as `call` does.
+            other => {
+                let all = match self.typed.args.get(&(fx.module, span)) {
+                    Some(order) if order.len() == written.len() => {
+                        order.iter().map(|&i| written[i as usize].clone()).collect()
+                    }
+                    _ => written,
+                };
+                (other, all)
+            }
+        };
+        self.finish_call(fx, out, span, target, all, tail)
+    }
+
     /// A call (§6.6), or `a |> f(…)` with `a` as `first`. The function is
     /// worked out first, then the arguments as they are written (§6.2); for
     /// `|>`, `a` comes before both.
@@ -3098,6 +3320,19 @@ impl<'a> Lowerer<'a> {
             }
             _ => written,
         };
+        self.finish_call(fx, out, span, target, args, tail)
+    }
+
+    /// The call of a worked-out callee with its arguments in order.
+    fn finish_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        span: Span,
+        target: Target,
+        args: Vec<Atom>,
+        tail: bool,
+    ) -> Option<Atom> {
         match target {
             Target::Ctor(c) => {
                 let info = &self.ctors[&c];
@@ -3475,7 +3710,16 @@ impl<'a> Lowerer<'a> {
                 }
             }
             PatternKind::List { items, rest } => {
-                guard(out, Cond::Tag(v.clone(), 6), fail);
+                // Only lists are `$cons` cells, so a first cell proves the
+                // tag. `[]` tests for a cell first, which fails at once on
+                // the cells of a recursion, and the tag after that.
+                let first = items.is_empty();
+                if first {
+                    if rest.is_none() {
+                        guard(out, Cond::Empty(v.clone()), fail);
+                    }
+                    guard(out, Cond::Tag(v.clone(), 6), fail);
+                }
                 let mut cur = v;
                 for item in items {
                     guard(out, Cond::Not(Box::new(Cond::Empty(cur.clone()))), fail);
@@ -3484,6 +3728,7 @@ impl<'a> Lowerer<'a> {
                     cur = let_value(fx, out, Value::ListTail(cur), None);
                 }
                 match rest {
+                    None if first => {}
                     None => guard(out, Cond::Empty(cur), fail),
                     Some(Some(b)) => Self::bind_var(fx, out, b, cur),
                     Some(None) => {}
@@ -3546,8 +3791,10 @@ impl<'a> Lowerer<'a> {
 
     fn head_cond(&self, v: Atom, h: Head) -> Cond {
         match h {
-            Head::Record => Cond::IsRec(v),
-            Head::Tuple(n) => Cond::Tuple(v, n),
+            Head::Shape(shape) if shape.has_labels() => {
+                Cond::Data(v, self.shape_set(shape), shape.len() as u32)
+            }
+            Head::Shape(shape) => Cond::Tuple(v, shape.positions()),
             Head::Fn => Cond::Tag(v, 7),
             Head::Named(TypeRef::Builtin(b)) => Cond::Tag(
                 v,
@@ -3565,7 +3812,6 @@ impl<'a> Lowerer<'a> {
                     BuiltinType::Request => 17,
                     BuiltinType::Ticket => 18,
                     BuiltinType::Never => u32::MAX,
-                    BuiltinType::Record => unreachable!("Record is normalized to the record head"),
                 },
             ),
             Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {
@@ -4033,7 +4279,7 @@ fn abi_json(
         }
     }
     let mut abi = serde_json::json!({
-        "version": 3,
+        "version": 4,
         "entry": entry,
         "tests": tests,
         "exports": map,

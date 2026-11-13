@@ -43,61 +43,72 @@ fn wat(source: &str) -> String {
 
 /// A program that uses every control operation, `fail.catch`,
 /// `resource.ensure` and environment statements.
-const PROGRAM: &str = r#"(i/control, i/core, i/fail, i/resource)
+const PROGRAM: &str = r#"(
+	i/control
+	i/core
+	i/fail
+	i/resource
+)
 
-Name { Name(text: String) }
-Tag { Tag(text: String) }
+Name = (text = String)
+Tag = (text = String)
 
-name = (n ! Name) { n.text }
-tag = (t ! Tag) { t.text }
+name = () <- (n: Name) { n.text }
+tag = () <- (t: Tag) { t.text }
 
 plain = (b) {
-  x = control.suspend(b, (k) { control.resume(k, "v") })
-  x <> name() <> tag()
+	x = control.suspend(b, (k) { control.resume(k, "v") })
+	x <> name() <> tag()
 }
 
 one = (b) {
-  ! Name = Name("one")
-  y = plain(b)
-  y <> "."
+	{
+		y = plain(b)
+		y <> "."
+	} <- (Name(text = "one"))
 }
 
 two = (b) {
-  ! Name = Name("two")
-  ! Tag = Tag("two")
-  y = plain(b)
-  y <> "."
+	{
+		y = plain(b)
+		y <> "."
+	} <- (Name(text = "two"), Tag(text = "two"))
 }
 
 guarded = (b) {
-  r = fail.catch(() {
-    resource.ensure(() {
-      x = control.suspend(b, (k) { control.cancel(k)  "c" })
-      x <> "!"
-    }, () { Nil })
-  })
-  core.inspect(r)
+	r = fail.catch(() {
+		resource.ensure(
+			() {
+				x = control.suspend(b, (k) {
+					control.cancel(k)
+					"c"
+				})
+				x <> "!"
+			},
+			() { Nil },
+		)
+	})
+	core.inspect(r)
 }
 
 nested = () {
-  control.boundary((outer) {
-    control.boundary((inner) {
-      x = control.suspend(outer, (k) { control.resume(k, 1) + 100 })
-      x + 1
-    })
-  })
+	control.boundary((outer) {
+		control.boundary((inner) {
+			x = control.suspend(outer, (k) { control.resume(k, 1) + 100 })
+			x + 1
+		})
+	})
 }
 
-
 main = () {
-  ! Name = Name("main")
-  ! Tag = Tag("main")
-  a = control.boundary((b) { one(b) })
-  c = control.boundary((b) { two(b) })
-  d = control.boundary((b) { guarded(b) })
-  e = nested()
-  core.inspect((a, c, d, e))
-  Nil
+	{
+		a = control.boundary((b) { one(b) })
+		c = control.boundary((b) { two(b) })
+		d = control.boundary((b) { guarded(b) })
+		e = nested()
+		core.inspect((a, c, d, e))
+		Nil
+	} <- (Name(text = "main"), Tag(text = "main"))
 }
 "#;
 
@@ -325,10 +336,11 @@ fn host_seam_kept() {
 #[test]
 fn runtime_alone_validates() {
     let source = format!(
-        "(module {} {} {})",
+        "(module {} {} {} {})",
         ilang_wasm::runtime::TYPES,
         ilang_wasm::runtime::HOST,
-        ilang_wasm::runtime::wat()
+        ilang_wasm::runtime::wat(),
+        ilang_wasm::runtime::LIBRARY_ABSENT
     );
     let module = wat::parse_str(&source).unwrap();
     ilang_wasm::validate(&module).unwrap();
@@ -355,20 +367,23 @@ fn modules_validate() {
 /// final function that suspends to `b2`, and `b0` takes the continuation
 /// k2 of that suspend out of the cancel. Every computation that `put` runs
 /// in needs `Out`, so `main` gives a placeholder `Out` first.
-const CANCEL_OUT: &str = r#"(i/control, i/fail, i/resource)
+const CANCEL_OUT: &str = r#"(
+	i/control
+	i/fail
+	i/resource
+)
 
 // Hands k2 out of the cancel, to the boundary `b0` around it.
-Out { Out(put: (k2: Inner) -> Nil) }
-Inner { Inner(Continuation(Nil, Int, Never, Out)) }
+Out = (put = (Inner) -> Nil)
+Inner = (Continuation(Nil, Int, Never, Out))
+Paused = (Continuation(Nil, Outer, Never, Out))
+Done = ()
 Outer = Paused | Done
-Paused { Paused(Continuation(Nil, Outer, Never, Out)) }
-Done { Done }
-Handed = HandedCase | Lost
-HandedCase { Handed(Inner) }
-Lost { Lost }
+Handed = (Inner)
+Lost = ()
+HandedSum = Handed | Lost
 
-put = (k2, o ! Out) { o.put(k2) }
-
+put = (k2) <- (o: Out) { o.put(k2) }
 "#;
 
 /// `g` of test 12: its frame waits for the ensure, so its record is pending.
@@ -395,87 +410,77 @@ g = (b, b2) {
 /// over lies between the final record and the record of `g`.
 const G_CATCH: &str = r#"// A code frame with a site, and a `fail.catch` that the cancel passes over.
 g = (b, b2) {
-  x = fail.catch(() {
-    resource.ensure(
-      () {
-        control.suspend(b, (k) { Paused(k) })
-        0
-      },
-      () {
-        control.suspend(b2, (k2) {
-          put(Inner(k2))
-          0
-        })
-      },
-    )
-  })
-  x |> {
-    Ok(n) -> n + 1
-  }
+	x = fail.catch(() {
+		resource.ensure(
+			() {
+				control.suspend(b, (k) { Paused(k) })
+				0
+			},
+			() {
+				control.suspend(b2, (k2) {
+					put(Inner(k2))
+					0
+				})
+			},
+		)
+	})
+	x |> (Ok(n)) { n + 1 }
 }
-
 "#;
 
 /// Gives k2.
 const PAUSED: &str = r#"// The cancel of `k` runs the final function, which suspends to `b2`; `b0`
 // takes the continuation k2 of that suspend out of the cancel.
 paused = () {
-  k = { control.boundary((b) {
-    control.boundary((b2) { g(b, b2) })
-    Done
-  }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
-  handed = control.boundary((b0) {
-    ! Out = Out((k2) { control.suspend(b0, (rest) { Handed(k2) }) })
-    control.cancel(k)
-    Lost
-  })
-  handed |> {
-    Handed(Inner(k2)) -> k2
-    Lost -> panic("k2 was not handed out")
-  }
+	k = {
+		control.boundary((b) {
+			control.boundary((b2) { g(b, b2) })
+			Done
+		})
+	} |>
+		(Paused(k)) { k }
+		| (Done) { panic("not paused") }
+	handed = control.boundary((b0) {
+		{
+			control.cancel(k)
+			Lost
+		} <- (Out(put = (k2) { control.suspend(b0, (rest) { Handed(k2) }) }))
+	})
+	handed |>
+		(Handed(Inner(k2))) { k2 }
+		| (Lost) { panic("k2 was not handed out") }
 }
 "#;
 
 /// Test 12: the resume of k2 runs the end of the final function, which
 /// throws the `$cancel` of `k`. Nothing takes it, and the entry stops.
-const MAIN_OUT: &str = r#"
-// The resumed final function ends, and the `$cancel` of `k` goes out of
+const MAIN_OUT: &str = r#"// The resumed final function ends, and the `$cancel` of `k` goes out of
 // the resume, which nothing takes.
-
 main = () {
-  // The computations need `Out`. This one is never called.
-  ! Out = Out((k2) { Nil })
-  control.resume(paused(), Nil)
-  Nil
+	// The computations need `Out`. This one is never called.
+	{
+		control.resume(paused(), Nil)
+		Nil
+	} <- (Out(put = (k2) { Nil }))
 }
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"
+const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Never, Out))
+Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
-Third = ThirdCase | Over
-ThirdCase { Third(Continuation(Nil, Third, Never, Out)) }
-Over { Over }
+ThirdSum = Third | Over
 
-keep = (t) {
-  t |> {
-    Over -> Over
-    t -> t
-  }
-}
+keep = (t) { t |> (Over) { Over } | (t) { t } }
 
 // Not in tail position, so the frame waits.
 inner = (k2) { control.resume(k2, Nil) + 1 }
 
 h = (b3, k2) {
-  control.suspend(b3, (k3) { Third(k3) })
-  inner(k2)
-  Over
+	control.suspend(b3, (k3) { Third(k3) })
+	inner(k2)
+	Over
 }
-
 "#;
 
 /// Test 13: the outer frame of k3 waits.
@@ -493,138 +498,145 @@ o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }
 /// The entry of tests 13 and 15.
 const MAIN_THIRD: &str = r#"// k2 is resumed from frames that a resume of k3 entered, while the outer
 // frame of k3 waits.
-
 main = () {
-  // The computations need `Out`. This one is never called.
-  ! Out = Out((k2) { Nil })
-  k2 = paused()
-  k3 = { control.boundary((b3) { o1(b3, k2) }) } |> {
-    Third(k3) -> k3
-    Over -> panic("not paused")
-  }
-  control.resume(k3, Nil)
-  Nil
+	// The computations need `Out`. This one is never called.
+	{
+		k2 = paused()
+		k3 = { control.boundary((b3) { o1(b3, k2) }) } |>
+			(Third(k3)) { k3 }
+			| (Over) { panic("not paused") }
+		control.resume(k3, Nil)
+		Nil
+	} <- (Out(put = (k2) { Nil }))
 }
 "#;
 
 /// Test 14, resume: the tail call of `h_tail` leaves no frame that keeps
 /// `! Name = Name("in")`, so `g` sees "resumer", against §9.4 rule 3
 /// (section 7a).
-const ENV_TAIL_RESUME: &str = r#"(i/control)
+const ENV_TAIL_RESUME: &str = r#"(
+	i/control
+)
 
-Name { Name(text: String) }
-Paused = PausedCase | Done
-PausedCase { Paused(Continuation(Nil, Paused, Never, Name)) }
-Done { Done }
+Name = (text = String)
+Paused = (Continuation(Nil, PausedSum, Never, Name))
+Done = ()
+PausedSum = Paused | Done
 
-name = (n ! Name) { n.text }
+name = () <- (n: Name) { n.text }
 
 g = (b) {
-  control.suspend(b, (k) { Paused(k) })
-  panic(name())
+	control.suspend(b, (k) { Paused(k) })
+	panic(name())
 }
 
 // The call of `g` is a tail call, so no frame keeps the environment
 // statement when `g` is paused (section 7a of docs/design/lazy-reentry.md).
-h_tail = (b) {
-  ! Name = Name("in")
-  g(b)
-}
-
+h_tail = (b) { g(b) <- (Name(text = "in")) }
 
 main = () {
-  ! Name = Name("start")
-  k = { control.boundary((b) {
-    h_tail(b)
-    Done
-  }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
-  ! Name = Name("resumer")
-  control.resume(k, Nil)
-  Nil
+	{
+		k = {
+			control.boundary((b) {
+				h_tail(b)
+				Done
+			})
+		} |>
+			(Paused(k)) { k }
+			| (Done) { panic("not paused") }
+		{
+			control.resume(k, Nil)
+			Nil
+		} <- (Name(text = "resumer"))
+	} <- (Name(text = "start"))
 }
 "#;
 
 /// Test 14, cancel: the same for the final function of a cancel.
-const ENV_TAIL_CANCEL: &str = r#"(i/control, i/resource)
+const ENV_TAIL_CANCEL: &str = r#"(
+	i/control
+	i/resource
+)
 
-Name { Name(text: String) }
-Paused = PausedCase | Done
-PausedCase { Paused(Continuation(Nil, Paused, Never, Name)) }
-Done { Done }
+Name = (text = String)
+Paused = (Continuation(Nil, PausedSum, Never, Name))
+Done = ()
+PausedSum = Paused | Done
 
-name = (n ! Name) { n.text }
+name = () <- (n: Name) { n.text }
 
 g = (b) {
-  resource.ensure(
-    () { control.suspend(b, (k) { Paused(k) })  Nil },
-    () { panic(name()) },
-  )
+	resource.ensure(
+		() {
+			control.suspend(b, (k) { Paused(k) })
+			Nil
+		},
+		() { panic(name()) },
+	)
 }
 
 // The call of `g` is a tail call, so no frame keeps the environment
 // statement when `g` is paused (section 7a of docs/design/lazy-reentry.md).
-h_tail = (b) {
-  ! Name = Name("in")
-  g(b)
-}
-
+h_tail = (b) { g(b) <- (Name(text = "in")) }
 
 main = () {
-  ! Name = Name("start")
-  k = { control.boundary((b) {
-    h_tail(b)
-    Done
-  }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
-  ! Name = Name("resumer")
-  control.cancel(k)
-  Nil
+	{
+		k = {
+			control.boundary((b) {
+				h_tail(b)
+				Done
+			})
+		} |>
+			(Paused(k)) { k }
+			| (Done) { panic("not paused") }
+		{
+			control.cancel(k)
+			Nil
+		} <- (Name(text = "resumer"))
+	} <- (Name(text = "start"))
 }
 "#;
 
 /// Test 16: the value of `f` of `inner` goes on into the cancelled code.
-const CANCEL_INNER: &str = r#"(i/control, i/resource, (Io) = i/io)
+const CANCEL_INNER: &str = r#"(
+	i/control
+	i/resource
+	(Io) = i/io
+)
 
-Paused = PausedCase | Done
-PausedCase { Paused(Continuation(Nil, Paused, Never, Io)) }
-Done { Done }
+Paused = (Continuation(Nil, PausedSum, Never, Io))
+Done = ()
+PausedSum = Paused | Done
 
-say = (text, io ! Io) { io.print(text) }
+say = (text) <- (io: Io) { io.print(text) }
 
 // During the cancel, the final function suspends to `inner`, which is
 // paused inside `k`; the value of its `f` goes on into the code after it.
 body = (outer) {
-  x = control.boundary((inner) {
-    resource.ensure(
-      () {
-        control.suspend(outer, (k) { Paused(k) })
-        "body"
-      },
-      () {
-        say("final")
-        y = control.suspend(inner, (k2) { "f of inner" })
-        say("final again: " <> y)
-      },
-    )
-  })
-  say("after inner: " <> x)
-  Done
+	x = control.boundary((inner) {
+		resource.ensure(
+			() {
+				control.suspend(outer, (k) { Paused(k) })
+				"body"
+			},
+			() {
+				say("final")
+				y = control.suspend(inner, (k2) { "f of inner" })
+				say("final again: " <> y)
+			},
+		)
+	})
+	say("after inner: " <> x)
+	Done
 }
 
-
-main = (io ! Io) {
-  k = { control.boundary((outer) { body(outer) }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
-  say("cancel")
-  control.cancel(k)
-  say("cancel gave Nil")
+main = () <- (io: Io) {
+	k = { control.boundary((outer) { body(outer) }) } |>
+		(Paused(k)) { k }
+		| (Done) { panic("not paused") }
+	say("cancel")
+	control.cancel(k)
+	say("cancel gave Nil")
 }
 "#;
 
@@ -632,54 +644,62 @@ main = (io ! Io) {
 /// 1). A final function cannot raise an error itself (§9.5), but D15's
 /// cancel through an inner boundary can run ordinary code that raises one.
 /// This is checked against eager, rather than made a conformance rule.
-const ERROR_THROUGH_FINAL: &str = r#"(i/control, i/core, i/fail, i/resource, (Io) = i/io)
+const ERROR_THROUGH_FINAL: &str = r#"(
+	i/control
+	i/core
+	i/fail
+	i/resource
+	(Io) = i/io
+)
 
-Paused = PausedCase | Done
-PausedCase { Paused(Continuation(Nil, Paused, Int, Never)) }
-Done { Done }
-Held = HeldCase | Over
-HeldCase { Held(Continuation(Nil, Held, Never, Never)) }
-Over { Over }
+Paused = (Continuation(Nil, PausedSum, Int, Never))
+Done = ()
+PausedSum = Paused | Done
+Held = (Continuation(Nil, Held, Never, Never))
+Over = ()
+Held = Held | Over
 
 // Cancelling this continuation can return to the code after `inner`,
 // because the final function suspends to `inner` during the cancel (D15).
 paused = () {
-  { control.boundary((outer) {
-    control.boundary((inner) {
-      resource.ensure(
-        () { control.suspend(outer, (k) { Paused(k) })  Nil },
-        () { control.suspend(inner, (k2) { Nil }) },
-      )
-    })
-    fail.raise(7)
-    Done
-  }) } |> {
-    Paused(k) -> k
-    Done -> panic("not paused")
-  }
+	{
+		control.boundary((outer) {
+			control.boundary((inner) {
+				resource.ensure(
+					() {
+						control.suspend(outer, (k) { Paused(k) })
+						Nil
+					},
+					() { control.suspend(inner, (k2) { Nil }) },
+				)
+			})
+			fail.raise(7)
+			Done
+		})
+	} |>
+		(Paused(k)) { k }
+		| (Done) { panic("not paused") }
 }
 
 // `cancel` has no errors in its type. Here it runs the ordinary code
 // after `inner`, whose error passes through this final function's record.
 with = (hold, k) {
-  control.suspend(hold, (k2) { Held(k2) })
-  control.cancel(k)
+	control.suspend(hold, (k2) { Held(k2) })
+	control.cancel(k)
 }
 
-
-main = (io ! Io) {
-  k = paused()
-  r = fail.catch(() {
-    held = control.boundary((hold) {
-      resource.ensure(() { 99 }, () { with(hold, k) })
-      Over
-    })
-    held |> {
-      Held(k2) -> control.resume(k2, Nil)
-      Over -> panic("not held")
-    }
-  })
-  io.print(core.inspect(r))
+main = () <- (io: Io) {
+	k = paused()
+	r = fail.catch(() {
+		held = control.boundary((hold) {
+			resource.ensure(() { 99 }, () { with(hold, k) })
+			Over
+		})
+		held |>
+			(Held(k2)) { control.resume(k2, Nil) }
+			| (Over) { panic("not held") }
+	})
+	io.print(core.inspect(r))
 }
 "#;
 
@@ -690,37 +710,37 @@ fn eager(name: &str) -> (String, &'static str, &'static str, i32) {
         "cancel_out_trace" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, MAIN_OUT].concat(),
             "",
-            "control: boundary is not active\napp/main:17:7\napp/main:59:3\n",
+            "control: boundary is not active\napp/main:20:7\napp/main:61:3\n",
             1,
         ),
         "cancel_out_trace_catch" => (
             [CANCEL_OUT, G_CATCH, PAUSED, MAIN_OUT].concat(),
             "",
-            "control: boundary is not active\napp/main:18:5\napp/main:17:7\napp/main:63:3\n",
+            "control: boundary is not active\napp/main:21:3\napp/main:20:6\napp/main:62:3\n",
             1,
         ),
         "cancel_out_two_trampolines" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, THIRD, O1_PLAIN, MAIN_THIRD].concat(),
             "",
-            "control: boundary is not active\napp/main:17:7\napp/main:66:16\napp/main:70:3\napp/main:75:22\napp/main:88:3\n",
+            "control: boundary is not active\napp/main:20:7\napp/main:64:16\napp/main:68:2\napp/main:72:22\napp/main:83:3\n",
             1,
         ),
         "cancel_out_restores_before_mode2" => (
             [CANCEL_OUT, G_PLAIN, PAUSED, THIRD, O1_ENSURE, MAIN_THIRD].concat(),
             "",
-            "panic: final\napp/main:75:61\napp/main:75:22\napp/main:88:3\n",
+            "panic: final\napp/main:72:61\napp/main:72:22\napp/main:83:3\n",
             1,
         ),
         "env_tail_call_resume" => (
             ENV_TAIL_RESUME.to_string(),
             "",
-            "panic: resumer\napp/main:12:3\napp/main:26:5\napp/main:33:3\n",
+            "panic: resumer\napp/main:14:2\napp/main:25:5\napp/main:32:4\n",
             1,
         ),
         "env_tail_call_cancel" => (
             ENV_TAIL_CANCEL.to_string(),
             "",
-            "panic: resumer\napp/main:13:10\napp/main:28:5\napp/main:35:3\n",
+            "panic: resumer\napp/main:19:8\napp/main:31:5\napp/main:38:4\n",
             1,
         ),
         "cancel_suspends_to_inner_boundary" => (
@@ -1060,37 +1080,61 @@ fn deep_resume() {
 // This gives a complete in-order walk with 2*n+1 values, rather than an
 // exponential number of nodes, while retaining the nested-resume stack.
 fn nested_source(depth: u32) -> String {
-    r#"(i/control)
+    r#"(
+	i/control
+)
+Done = ()
+More = (Int, Continuation(Nil, Step, Never, Never))
 Step = Done | More
-Done { Done }
-More { More(Int, Continuation(Nil, Step, Never, Never)) }
-check = (ok) { ok |> { True -> Nil  False -> panic("tree walk") } }
+check = (ok) { ok |> (True) { Nil } | (False) { panic("tree walk") } }
 emit = (b, n) { control.suspend(b, (k) { More(n, k) }) }
 copy = (b, step) {
-  step |> {
-    Done -> Nil
-    More(v, k) -> { emit(b, v)  copy(b, control.resume(k, Nil)) }
-  }
+	step |>
+		(Done) { Nil }
+		| (More(v, k)) {
+			emit(b, v)
+			copy(b, control.resume(k, Nil))
+		}
 }
 walk = (b, n) {
-  n |> {
-    0 -> emit(b, 0)
-    _ -> {
-      copy(b, control.boundary((child) { walk(child, n - 1)  Done }))
-      emit(b, n)
-      emit(b, -n)
-    }
-  }
+	n |>
+		(0) { emit(b, 0) }
+		| (_) {
+			copy(
+				b,
+				control.boundary((child) {
+					walk(child, n - 1)
+					Done
+				}),
+			)
+			emit(b, n)
+			emit(b, -n)
+		}
 }
-next = (n) { { n > 0 } |> { True -> -n  False -> 1 - n } }
+next = (n) { { n > 0 } |> (True) { -n } | (False) { 1 - n } }
 drive = (step, count, sum, want) {
-  step |> {
-    Done -> { check(count == TreeCount)  check(sum == 0) }
-    More(v, k) -> { check(v == want)  drive(control.resume(k, Nil), count + 1, sum + v, next(want)) }
-  }
+	step |>
+		(Done) {
+			check(count == TreeCount)
+			check(sum == 0)
+		}
+		| (More(v, k)) {
+			check(v == want)
+			drive(control.resume(k, Nil), count + 1, sum + v, next(want))
+		}
 }
 
-main = () { drive(control.boundary((b) { walk(b, TreeDepth)  Done }), 0, 0, 0) }
+main = () {
+	drive(
+		control.boundary((b) {
+			walk(b, TreeDepth)
+			Done
+		}),
+		0,
+		0,
+		0,
+	)
+}
 "#
     .replace("TreeCount", &(2 * depth + 1).to_string())
     .replace("TreeDepth", &depth.to_string())
@@ -1133,12 +1177,19 @@ fn nested_resume_stack() {
 fn recursion_source(paused: bool) -> String {
     let source = bench_source(50_000, 1, false);
     let (source, _) = source.split_once("\nmain =").expect("benchmark entry");
-    let recurse = "rec = (n, body) { n |> { 0 -> body()  _ -> rec(n - 1, body) + 1 } }";
+    let recurse = "rec = (n, body) { n |> (0) { body() } | (_) { rec(n - 1, body) + 1 } }";
     let main = if paused {
-        "done = { Done(n) -> n  _ -> panic(\"not done\") }\n\
-         \nmain = () {\n\
-         k = control.boundary((b) { down(b, 50_000) }) |> { More(_, k) -> k  _ -> panic(\"not paused\") }\n\
-         check(rec(50_000, () { done(control.resume(k, Nil)) }) == 100_000, \"recursion lost a frame\")\n}"
+        "done = (Done(n)) { n } | (_) { panic(\"not done\") }\n\
+         \n\
+         main = () {\n\
+         \tk = control.boundary((b) { down(b, 50_000) }) |>\n\
+         \t\t(More(_, k)) { k }\n\
+         \t\t| (_) { panic(\"not paused\") }\n\
+         \tcheck(\n\
+         \t\trec(50_000, () { done(control.resume(k, Nil)) }) == 100_000,\n\
+         \t\t\"recursion lost a frame\",\n\
+         \t)\n\
+         }"
     } else {
         "\nmain = () { check(rec(50_000, () { 0 }) == 50_000, \"recursion lost a frame\") }"
     };
@@ -1164,36 +1215,49 @@ fn runs_cleanly(source: &str) {
 #[test]
 fn resume_twice_from_new_places() {
     runs_cleanly(
-        r#"(i/control)
-Name { Name(text: String) }
+        r#"(
+	i/control
+)
+Name = (text = String)
+Done = (String)
+More = (String, Continuation(Nil, Step, Never, Name))
 Step = Done | More
-Done { Done(String) }
-More { More(String, Continuation(Nil, Step, Never, Name)) }
-name = (n ! Name) { n.text }
+name = () <- (n: Name) { n.text }
 leaf = (b) {
-  control.suspend(b, (k) { More("start", k) })
-  first = name()
-  control.suspend(b, (k) { More(first, k) })
-  first <> "," <> name()
+	control.suspend(b, (k) { More("start", k) })
+	first = name()
+	control.suspend(b, (k) { More(first, k) })
+	first <> "," <> name()
 }
 inside = (b) {
-  ! Name = Name("inside")
-  x = leaf(b)
-  name() <> "/" <> x
+	{
+		x = leaf(b)
+		name() <> "/" <> x
+	} <- (Name(text = "inside"))
 }
-run = (b) { x = inside(b)  Done(x <> "/" <> name()) }
-check = (ok) { ok |> { True -> Nil  False -> panic("resume environment") } }
+run = (b) {
+	x = inside(b)
+	Done(x <> "/" <> name())
+}
+check = (ok) { ok |> (True) { Nil } | (False) { panic("resume environment") } }
 
 main = () {
-  ! Name = Name("start")
-  k = control.boundary((b) { run(b) }) |> { More(_, k) -> k  _ -> panic("not paused") }
-  ! Name = Name("first")
-  k2 = control.resume(k, Nil) |> { More(s, k) -> { check(s == "inside")  k }  _ -> panic("not paused twice") }
-  ! Name = Name("second")
-  control.resume(k2, Nil) |> {
-    Done(s) -> check(s == "inside/inside,inside/second")
-    _ -> panic("not done")
-  }
+	{
+		k = control.boundary((b) { run(b) }) |>
+			(More(_, k)) { k }
+			| (_) { panic("not paused") }
+		{
+			k2 = control.resume(k, Nil) |>
+				(More(s, k)) {
+					check(s == "inside")
+					k
+				}
+				| (_) { panic("not paused twice") }
+			control.resume(k2, Nil) |>
+				(Done(s)) { check(s == "inside/inside,inside/second") }
+				| (_) { panic("not done") } <- (Name(text = "second"))
+		} <- (Name(text = "first"))
+	} <- (Name(text = "start"))
 }
 "#,
     );
@@ -1205,41 +1269,62 @@ main = () {
 #[test]
 fn counted_frames() {
     runs_cleanly(
-        r#"(i/control, i/core, i/resource)
+        r#"(
+	i/control
+	i/core
+	i/resource
+)
+Done = ()
+More = (String, Continuation(Nil, Step, Never, Never))
 Step = Done | More
-Done { Done }
-More { More(String, Continuation(Nil, Step, Never, Never)) }
-check = (ok) { ok |> { True -> Nil  False -> panic("counted frame") } }
+check = (ok) { ok |> (True) { Nil } | (False) { panic("counted frame") } }
 layer = (b, n) {
-  n |> {
-    0 -> { control.suspend(b, (k) { More("start", k) })  "0" }
-    _ -> {
-      x = layer(b, n - 1)
-      n |> { 4 -> control.suspend(b, (k) { More(x, k) })  _ -> Nil }
-      core.inspect(n) <> x
-    }
-  }
+	n |>
+		(0) {
+			control.suspend(b, (k) { More("start", k) })
+			"0"
+		}
+		| (_) {
+			x = layer(b, n - 1)
+			n |> (4) { control.suspend(b, (k) { More(x, k) }) } | (_) { Nil }
+			core.inspect(n) <> x
+		}
 }
 next = (step, want) {
-  step |> { More(s, k) -> { check(s == want)  k }  Done -> panic("not paused") }
+	step |>
+		(More(s, k)) {
+			check(s == want)
+			k
+		}
+		| (Done) { panic("not paused") }
 }
 
 main = () {
-  text = control.boundary((log) {
-    k = next(control.boundary((b) {
-      resource.ensure(() {
-        x = layer(b, 6)
-        control.suspend(b, (k) { More(x, k) })
-        panic("cancel must not resume")
-      }, () { control.suspend(log, (k) { "final " <> control.resume(k, Nil) }) })
-      Done
-    }), "start")
-    k2 = next(control.resume(k, Nil), "3210")
-    k3 = next(control.resume(k2, Nil), "6543210")
-    control.cancel(k3)
-    "end"
-  })
-  check(text == "final end")
+	text = control.boundary((log) {
+		k = next(
+			control.boundary((b) {
+				resource.ensure(
+					() {
+						x = layer(b, 6)
+						control.suspend(b, (k) { More(x, k) })
+						panic("cancel must not resume")
+					},
+					() {
+						control.suspend(log, (k) {
+							"final " <> control.resume(k, Nil)
+						})
+					},
+				)
+				Done
+			}),
+			"start",
+		)
+		k2 = next(control.resume(k, Nil), "3210")
+		k3 = next(control.resume(k2, Nil), "6543210")
+		control.cancel(k3)
+		"end"
+	})
+	check(text == "final end")
 }
 "#,
     );

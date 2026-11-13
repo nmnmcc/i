@@ -1,23 +1,23 @@
-retry : (times: Int, body: () -> A ^ E ! N) -> A ^ E ! N
-load_user : (id: String) -> String ^ Int
-user : () -> String ^ Int
-elapsed : (start: Int) -> Int ! Clock
+retry : (Int, () <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A
+load_user : (String) <- (Fail(404)) -> String
+user : () <- (Fail(404)) -> String
+elapsed : (Int) <- (Clock) -> Int
 fixed : () -> Int
-collect : (body: () -> Nil ! N | Yield(A)) -> List(A) ! N
+collect : (() <- (Fail(E), Yield(A), ..N) -> Nil) <- (Fail(E), ..N) -> List(A)
 numbers : () -> List(Int)
-my_assert : (c: Bool) -> Nil ! Assert
-catch : (body: () -> A ^ E ! N) -> Result(A, AssertionFailure) ^ E ! N - Assert
+my_assert : (Bool) <- (Assert) -> Nil
+catch : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Assert) -> Result(A, AssertionFailure)
 checked : () -> Result(1, AssertionFailure)
 checked_library : () -> Result("x", AssertionFailure)
-inc : (x: A & Int) -> A
+inc : (A & Int) -> A
 mixed : List(1 | "a")
-94:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)
-101:2: warning[W0502]: this value is not used, and working it out does nothing
+91:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)
+98:2: warning[W0502]: this value is not used, and working it out does nothing
 21:1: warning[W0504]: top-level binding `user` is not used
-32:1: warning[W0504]: top-level binding `fixed` is not used
-54:1: warning[W0504]: top-level binding `numbers` is not used
-62:1: warning[W0504]: top-level binding `my_assert` is not used
-85:1: warning[W0504]: top-level binding `checked` is not used
-92:1: warning[W0504]: top-level binding `checked_library` is not used
-100:1: warning[W0504]: top-level binding `inc` is not used
-108:1: warning[W0504]: top-level binding `mixed` is not used
+29:1: warning[W0504]: top-level binding `fixed` is not used
+51:1: warning[W0504]: top-level binding `numbers` is not used
+59:1: warning[W0504]: top-level binding `my_assert` is not used
+82:1: warning[W0504]: top-level binding `checked` is not used
+89:1: warning[W0504]: top-level binding `checked_library` is not used
+97:1: warning[W0504]: top-level binding `inc` is not used
+105:1: warning[W0504]: top-level binding `mixed` is not used

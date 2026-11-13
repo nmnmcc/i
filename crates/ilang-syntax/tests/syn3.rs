@@ -908,7 +908,7 @@ fn lisp_errors() {
 // ---- §7.3 The converter ----
 
 fn converted(old: &str) -> String {
-    let (module, diags) = ilang_syntax::parse_module(old);
+    let (module, diags) = ilang_syntax::legacy::parser::parse_module_legacy(old);
     assert!(diags.is_empty(), "{old}\n{diags:#?}");
     let lexed = ilang_syntax::lexer::lex(old);
     let (new, _) = convert::convert(&module, Some(&lexed), &convert::Signatures::default());
@@ -1103,13 +1103,13 @@ fn convert_labelled_calls() {
     // A function that the text does not show keeps its labels.
     assert_eq!(converted("x = m.f(1, to: 2)\n"), "x = m.f(1, to = 2)\n");
     // The functions and constructors of an imported module.
-    let (lib, _) = ilang_syntax::parse_module(
+    let (lib, _) = ilang_syntax::legacy::parser::parse_module_legacy(
         "User { User(name: String, age: Int) }\nrange = (from: Int, to: Int) { [] }\n",
     );
     let mut signatures = convert::Signatures::default();
     convert::collect(&lib, "users", &mut signatures);
     let old = "(\n\tu = app/users\n\t(User) = app/users\n)\n\nx = u.range(to: 9, from: 1)\ny = User(\"ada\", 36)\nz = u.User(\"ada\", 36)\n";
-    let (module, _) = ilang_syntax::parse_module(old);
+    let (module, _) = ilang_syntax::legacy::parser::parse_module_legacy(old);
     let (new, notes) = convert::convert(&module, Some(&ilang_syntax::lexer::lex(old)), &signatures);
     assert!(notes.is_empty(), "{notes:#?}");
     assert_eq!(
@@ -1121,7 +1121,7 @@ fn convert_labelled_calls() {
 #[test]
 fn convert_lisp_surface() {
     let old = "(= append (-> (xs ys) _ {(| xs {(-> [] ys) (-> [x .. rest] [x .. (append rest ys)])})}))\n";
-    let (module, diags) = ilang_syntax::lisp::parse_source(old);
+    let (module, diags) = ilang_syntax::lisp::parse_source_legacy(old);
     assert!(diags.is_empty(), "{diags:#?}");
     let (new, _) = convert::convert(&module, None, &convert::Signatures::default());
     let text = lisp::to_lisp(&new);
@@ -1132,4 +1132,35 @@ fn convert_lisp_surface() {
     let (read, diags) = lisp::from_lisp(&text);
     assert!(diags.is_empty(), "{diags:#?}");
     assert_eq!(read, new);
+}
+/// Owner rule: a call whose call depth is greater than 2 is never on one line.
+#[test]
+fn nested_calls_break() {
+    let fmt = |s: &str| {
+        let out = syn3::format(s).unwrap();
+        assert_eq!(syn3::format(&out).unwrap(), out, "the formatter is stable");
+        out
+    };
+    // Depth 2 stays on one line.
+    let two = "main = () { f(g(x)) }\n";
+    assert_eq!(fmt(two), two);
+    // Depth 3 breaks once: the outer call; the inner one has depth 2.
+    assert_eq!(
+        fmt("main = () { stdio.print(int.to_string(eval(Mul(Add(Num(1), Num(5)), Num(7))))) }\n"),
+        "main = () {\n\tstdio.print(\n\t\tint.to_string(eval(Mul(Add(Num(1), Num(5)), Num(7)))),\n\t)\n}\n"
+    );
+    // Depth 4 breaks twice.
+    assert_eq!(
+        fmt("x = a(b(c(d(1))))\n"),
+        "x = a(\n\tb(\n\t\tc(d(1)),\n\t),\n)\n"
+    );
+    // Constructors and data do not count; field access does not add depth.
+    let ctors = "x = f(A(B(C(g(1)))), (1, h(2)))\n";
+    assert_eq!(fmt(ctors), ctors);
+    let fields = "x = f(g(y).z.w)\n";
+    assert_eq!(fmt(fields), fields);
+    // A function literal starts again.
+    let lit = "x = f(g((y) { h(k(y)) }))\n";
+    assert_eq!(fmt(lit), lit);
+    assert_eq!(syn3::call_depth(&value("x = f(g(h(1)))")), 3);
 }

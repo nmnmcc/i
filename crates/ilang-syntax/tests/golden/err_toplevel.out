@@ -1,3 +1,0 @@
-Some(X) = Y
---- errors ---
-E0101 @2:1 expected an item: a type definition, or a binding `pattern = value`, found `1`

@@ -1,6 +1,12 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-run(A,N) = (f: () -> A ! N) { f() }
-forward(N) = (s ! S(N)) { local: () -> Nil ! N | S(N) = () { use() } run(local) }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+run = <A, N>(f: () <- N -> A) { f() }
+forward = <N>() <- (s: S(N)) {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	run(local)
+}
 
-example = () { ! S(Never) = S(() { Nil }, (_: Never) { Nil }) forward() }
+example = () { forward() <- (S(() { Nil }, (_: Never) { Nil })) }

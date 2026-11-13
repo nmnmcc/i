@@ -9,33 +9,20 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-Paused = PausedCase | Done
+Paused = (Continuation(Nil, Paused, Never, Never))
+Done = ()
+Paused = Paused | Done
 
-PausedCase {
-	Paused(Continuation(Nil, Paused, Never, Never))
-}
-
-Done {
-	Done
-}
-
-Held = HeldCase | Over
-
-HeldCase {
-	Held(Continuation(Nil, Held, Never, Never))
-}
-
-Over {
-	Over
-}
+Held = (Continuation(Nil, Held, Never, Never))
+Over = ()
+Held = Held | Over
 
 // Puts `text` in front of the value of the boundary `log`.
 note = (log, text) {
@@ -49,7 +36,6 @@ named = (log, name, body) {
 }
 
 // A cancel goes through a `fail.catch` that waits: it does not stop there.
-
 test("cancel_through_catch", () {
 	r = control.boundary((log) {
 		p = control.boundary((b) {
@@ -60,16 +46,11 @@ test("cancel_through_catch", () {
 						0
 					})
 				})
-				r |> {
-					Ok(x) -> x
-				}
+				r |> (Ok(x)) { x }
 			})
 			Done
 		})
-		p |> {
-			Paused(k) -> control.cancel(k)
-			Done      -> panic("not paused")
-		}
+		p |> (Paused(k)) { control.cancel(k) } | (Done) { panic("not paused") }
 		"end"
 	})
 	check(r, "inner outer end")
@@ -82,24 +63,23 @@ test("cancel_through_catch", () {
 paused_final = (log, h) {
 	named(log, "outer", () {
 		named(log, "inner", () {
-			resource.ensure(() { 0 }, () {
-				control.suspend(h, (k2) { Held(k2) })
-				Nil
-			})
+			resource.ensure(
+				() { 0 },
+				() {
+					control.suspend(h, (k2) { Held(k2) })
+					Nil
+				},
+			)
 		})
 	})
 	Over
 }
 
 // A cancel goes through the record of a final function that waits.
-
 test("cancel_through_final", () {
 	r = control.boundary((log) {
 		held = control.boundary((h) { paused_final(log, h) })
-		held |> {
-			Held(k2) -> control.cancel(k2)
-			Over     -> panic("not held")
-		}
+		held |> (Held(k2)) { control.cancel(k2) } | (Over) { panic("not held") }
 		"end"
 	})
 	check(r, "inner outer end")

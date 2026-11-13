@@ -1,15 +1,5 @@
 (
-	lib = (
-		public
-		secret
-		nothing
-		Opaque
-		Open
-		Shown
-		Hidden
-		Private
-		Missing
-	) = app/lib
+	lib = (public, secret, nothing, Opaque, Open, Shown, Hidden, Private, Missing) = app/lib
 )
 
 a = lib.secret

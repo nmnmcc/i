@@ -7,6 +7,4 @@
 )
 
 @host("test:literal/v1", "request")
-Work {
-	Work(next: () -> Request("ok"))
-}
+Work = (next = () -> Request("ok"))

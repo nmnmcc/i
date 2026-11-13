@@ -19,12 +19,7 @@ bad_arg = () { add("a") }
 
 bad_op = () { 1 + "a" }
 
-bad_guard = (x) {
-	x |> {
-		y ? 1 -> y
-		_     -> 2
-	}
-}
+bad_guard = (x) { x |> (y ? 1) { y } | (_) { 2 } }
 
 // E0502: the number of parameters.
 arity = () { add(1, 2) }
@@ -32,7 +27,7 @@ arity = () { add(1, 2) }
 arity_var = (f) { (f(1), f(1, 2)) }
 
 // E0504: a value that could go to two type variables.
-ambiguous(A, B) = (x: A | B) { x }
+ambiguous = <A, B>(x: A | B) { x }
 
 use_ambiguous = () { ambiguous(1) }
 
@@ -41,25 +36,17 @@ field = (u) { u.name }
 
 part = (t) { t.0 }
 
+Circle = (radius = Float)
+Square = (side = Float)
 // E0512: a field that not every constructor has.
 Shape = Circle | Square
-
-Circle {
-	Circle(radius: Float)
-}
-
-Square {
-	Square(side: Float)
-}
 
 radius = (s: Shape) { s.radius }
 
 // E0509: a top-level binding may not give errors or need an environment.
-Clock {
-	Clock(now: () -> Int)
-}
+Clock = (now = () -> Int)
 
-now = (c ! Clock) { c.now() }
+now = () <- (c: Clock) { c.now() }
 
 top_env = now()
 

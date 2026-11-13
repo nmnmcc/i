@@ -1,4 +1,8 @@
 (, (= syntax (/ i syntax)) (= fail (/ i fail)))
 (, m)
-(@ macro (: m (-> (Int) Int)))
-(@ macro (= m (-> (value) _ ((. fail raise) ((. syntax SyntaxError) "must not execute" value)))))
+(@ macro (: m (-> (, Int) Int)))
+(@ macro
+  (= m
+    (-> (, value) _
+      ((. fail raise)
+       ((. syntax SyntaxError) (= message "must not execute") (= at value))))))

@@ -14,14 +14,14 @@
 use super::{Datum, DatumKind as K};
 use crate::Diagnostic;
 use crate::format::WIDTH;
-use crate::lexer::{Comment, lex_lisp};
+use crate::lexer::Comment;
 use crate::token::Token;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub(super) fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     let document = super::parse(source)?;
-    let lexed = lex_lisp(source);
+    let lexed = crate::lexer::lex3_lisp(source);
     let mut builder = Builder {
         source,
         comments: &lexed.comments,

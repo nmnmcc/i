@@ -1,6 +1,9 @@
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-a(N) = (x: Bool) -> Nil ! N | S(N) { x |> { True -> use() False -> b(True) } }
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+a = (x: Bool) -> Nil { x |> (True) { use() } | (False) { b(True) } }
 wrap = () { run(() { a(True) }) }
-b(N) = (x: Bool) -> Nil ! N | S(N) { x |> { True -> use() False -> a(True) } }
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-run(N) = (body: () -> Nil ! N) { body() }
+b = (x: Bool) -> Nil { x |> (True) { use() } | (False) { a(True) } }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+run = <N>(body: () <- N -> Nil) { body() }

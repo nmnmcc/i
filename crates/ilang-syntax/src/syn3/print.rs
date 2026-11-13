@@ -6,6 +6,15 @@
 //! The text is laid out as in "A prettier printer" (Wadler): a group is on
 //! one line when it fits in [`WIDTH`] columns. Groups `{ }` are put in where
 //! the grammar needs them, so `parse(print(t)) == t`.
+//!
+//! Nested calls (owner rule): the call depth of an expression is the number
+//! of nested function calls on the deepest path through call arguments (a
+//! call of an `UpName` constructor and data literals do not count, field
+//! access and pipes do not add depth, a function literal argument starts
+//! again for its body). A call whose depth is greater than 2 is never on one
+//! line: its arguments go one per line, indented, with the `)` on its own
+//! line, as when a call does not fit the width; the rule applies again to each
+//! argument. A block whose one statement is broken so is over several lines.
 
 use super::ast::*;
 use crate::Diagnostic;
@@ -266,6 +275,46 @@ fn type_level(ty: &Type) -> u8 {
         TypeKind::Inter(_) => 1,
         TypeKind::Diff(_) => 2,
         _ => 3,
+    }
+}
+
+/// The greatest call depth that the formatter lays out on one line.
+pub const MAX_CALL_DEPTH: usize = 2;
+
+/// The call depth of an expression: the number of nested function calls on
+/// the deepest path through call arguments. A call of an `UpName`
+/// constructor and data do not count; field access, pipes and operators do
+/// not add depth; a function literal or a block starts again at 0.
+pub fn call_depth(e: &Expr) -> usize {
+    let items = |items: &[DItem]| {
+        items
+            .iter()
+            .map(|i| match i {
+                DItem::Pos(e) | DItem::Label(_, e) | DItem::Spread(e) => call_depth(e),
+            })
+            .max()
+            .unwrap_or(0)
+    };
+    match &e.kind {
+        ExprKind::Call { callee, args } => {
+            let constructor = matches!(&callee.kind, ExprKind::Name { name, .. }
+                if name.name.starts_with(|c: char| c.is_ascii_uppercase()));
+            items(args) + usize::from(!constructor)
+        }
+        ExprKind::Data(xs) => items(xs),
+        ExprKind::List { items: xs, rest } => xs
+            .iter()
+            .chain(rest.as_deref())
+            .map(call_depth)
+            .max()
+            .unwrap_or(0),
+        ExprKind::Field { target, .. } | ExprKind::Index { target, .. } => call_depth(target),
+        ExprKind::Unary { expr, .. } => call_depth(expr),
+        ExprKind::Binary { lhs, rhs, .. } | ExprKind::Pipe { lhs, rhs } => {
+            call_depth(lhs).max(call_depth(rhs))
+        }
+        ExprKind::Provide { target, services } => call_depth(target).max(call_depth(services)),
+        _ => 0,
     }
 }
 
@@ -911,10 +960,7 @@ impl Printer<'_> {
                 out.push(nest(cat(more)));
                 group(cat(out))
             }
-            ExprKind::Call { callee, args } => {
-                let callee = self.target(callee);
-                cat(vec![callee, self.data(args, true)])
-            }
+            ExprKind::Call { callee, args } => self.call(e, callee, args),
             ExprKind::Provide { target, services } => {
                 let target = self.expr(target, LOWEST);
                 cat(vec![target, t(" <- "), self.expr(services, POSTFIX)])
@@ -982,6 +1028,32 @@ impl Printer<'_> {
                 group(cat(out))
             }
         }
+    }
+
+    /// A call. A call whose call depth ([`call_depth`]) is greater than
+    /// [`MAX_CALL_DEPTH`] is never on one line: its arguments go one per line
+    /// (the layout of a call that does not fit the width).
+    fn call(&mut self, e: &Expr, callee: &Expr, args: &[DItem]) -> Doc {
+        let callee = self.target(callee);
+        if call_depth(e) <= MAX_CALL_DEPTH || args.is_empty() {
+            return cat(vec![callee, self.data(args, true)]);
+        }
+        let parts: Vec<Part> = args.iter().map(|i| self.data_item(i)).collect();
+        let Doc::Group(inner) = self.delimited("(", ")", parts) else {
+            unreachable!("a delimited list with parts is a group")
+        };
+        let Doc::Cat(mut out) = *inner else {
+            unreachable!("a delimited list is a sequence")
+        };
+        // `( nest(Soft part , …) …`: the first line end is always taken.
+        let Doc::Nest(body) = &mut out[1] else {
+            unreachable!("the parts of a delimited list are nested")
+        };
+        let Doc::Cat(body) = &mut **body else {
+            unreachable!("the parts are a sequence")
+        };
+        body[0] = Doc::Hard;
+        cat(vec![callee, group(cat(out))])
     }
 
     fn format(&mut self, format: &Option<Format>) -> Doc {

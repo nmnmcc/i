@@ -210,31 +210,21 @@ file under run/test, rather than silently selecting the host fallback.
 **T4 — Target is an ordinary nominal service value.** Proposed `i/target`:
 
 ```i
-(js = i/js, wasi = i/wasi)
+(
+	js = i/js
+	wasi = i/wasi
+)
 
-(Target, Js(..), NodeJS(..), Wasi(..), Native(..), Host(..))
+(
+	Target(..)
+)
 
+Js = (js = js.Js)
+NodeJS = (js = js.Js)
+Wasi = (wasi = wasi.Wasi)
+Native = ()
+Host = ()
 Target = Js | NodeJS | Wasi | Native | Host
-
-Js {
-  Js(js: js.Js)
-}
-
-NodeJS {
-  NodeJS(js: js.Js)
-}
-
-Wasi {
-  Wasi(wasi: wasi.Wasi)
-}
-
-Native {
-  Native
-}
-
-Host {
-  Host
-}
 ```
 
 Its configured entry provider constructs the actual target. Native is
@@ -246,17 +236,17 @@ embedder's services cannot be enumerated by the compiler.
 This complete example covers all five constructors and needs only Target:
 
 ```i
-(target = i/target)
+(
+	target = i/target
+)
 
-
-main = (t ! target.Target) {
-  t |> {
-    target.Js(_) -> Nil
-    target.NodeJS(_) -> Nil
-    target.Wasi(_) -> Nil
-    target.Native -> Nil
-    target.Host -> Nil
-  }
+main = () <- (t: target.Target) {
+	t |>
+		(target.Js(_)) { Nil }
+		| (target.NodeJS(_)) { Nil }
+		| (target.Wasi(_)) { Nil }
+		| (target.Native) { Nil }
+		| (target.Host) { Nil }
 }
 ```
 
@@ -271,10 +261,11 @@ recognizes only the certified entry binding and its lexical aliases/captures.
 The printing example has its required import:
 
 ```i
-((Io) = i/io)
+(
+	(Io) = i/io
+)
 
-
-main = (io ! Io) { io.print("Hello from i!") }
+main = () <- (io: Io) { io.print("Hello from i!") }
 ```
 
 It works where Io is provided, including the standalone runner and WASI.
@@ -337,25 +328,28 @@ host = "app/main.fallback"
 `src/main.i`:
 
 ```i
-(i/fs, i/request)
+(
+	i/fs
+	i/request
+)
 
-(Settings(..), filesystem, fallback)
+(
+	Settings(..)
+	filesystem
+	fallback
+)
 
-Settings {
-  Settings(read: () -> BitArray ^ fs.FsError ! request.Await | request.Owner)
+Settings = (
+	read = () <- (Fail(fs.FsError), request.Await, request.Owner) -> BitArray,
+)
+
+filesystem = () <- (f: fs.Fs) {
+	Settings(read = () { fs.read_file("settings.txt") <- (f) })
 }
 
-filesystem = (f ! fs.Fs) {
-  Settings(read: () {
-    ! fs.Fs = f
-    fs.read_file("settings.txt")
-  })
-}
+fallback = () { Settings(read = () { <<>> }) }
 
-fallback = () { Settings(read: () { <<>> }) }
-
-
-main = (settings ! Settings) { settings.read() }
+main = () <- (settings: Settings) { settings.read() }
 ```
 
 The principal environment of main is Settings | Await | Owner on every
@@ -476,27 +470,35 @@ metadata fragment is:
 An equivalent user bundle, with no JS or standard-service names in the rule:
 
 ```i
-(i/request, i/resource)
+(
+	i/request
+	i/resource
+)
 
-(Bundle(..), Remote(..), bundle)
+(
+	Bundle(..)
+	Remote(..)
+	bundle
+)
 
 @host("app:remote/v1", "request")
-Remote { Remote(fetch: () -> Request(Int)) }
+Remote = (fetch = () -> Request(Int))
 
-Bundle { Bundle(fetch: () -> Int ! request.Await | request.Owner) }
+Bundle = (fetch = () <- (request.Await, request.Owner) -> Int)
 
-bundle = (remote ! Remote) {
-  Bundle(fetch: () {
-    r = remote.fetch()
-    resource.ensure(
-      () { request.await(r) }
-      () { request.cancel(request.ticket(r)) }
-    )
-  })
+bundle = () <- (remote: Remote) {
+	Bundle(
+		fetch = () {
+			r = remote.fetch()
+			resource.ensure(
+				() { request.await(r) },
+				() { request.cancel(request.ticket(r)) },
+			)
+		},
+	)
 }
 
-
-main = (b ! Bundle) { b.fetch() }
+main = () <- (b: Bundle) { b.fetch() }
 ```
 
 On Host, select Bundle's factory `app/main.bundle` and explicitly register
@@ -522,7 +524,7 @@ host = "app/main.bundle"
 For a synchronous-use export in that module, add this ordinary exported binding:
 
 ```i
-answer = (b ! Bundle) { 7 }
+answer = () <- (b: Bundle) { 7 }
 ```
 
 Include answer in the exports and configure
@@ -734,29 +736,41 @@ elision, role erasure or hidden context provider is permitted.
 **T10 — Config/Await, completely elaborated. [L1]** Proposed `src/main.i`:
 
 ```i
-(i/request, i/resource)
+(
+	i/request
+	i/resource
+)
 
-(Config(..), Remote(..), Bundle(..), make_config, make_await, make_root, make_bundle)
+(
+	Config(..)
+	Remote(..)
+	Bundle(..)
+	make_config
+	make_await
+	make_root
+	make_bundle
+)
 
-Config { Config(label: String) }
+Config = (label = String)
 @host("app:configured/v1", "request")
-Remote { Remote(fetch: () -> Request(Int)) }
-Bundle { Bundle(fetch: () -> Int ! request.Await | request.Owner) }
+Remote = (fetch = () -> Request(Int))
+Bundle = (fetch = () <- (request.Await, request.Owner) -> Int)
 
-make_config = () -> Config { Config("configured") }
-make_await = (cfg ! Config) -> request.Await {
-  request.Await((ticket) {
-    _ = cfg
-    request.wait_any([ticket])
-  })
+make_config = () -> Config { Config(label = "configured") }
+make_await = () <- (cfg: Config) -> request.Await {
+	request.Await(
+		wait = (ticket) {
+			_ = cfg
+			request.wait_any([ticket])
+		},
+	)
 }
-make_root = (k: Key(Nil)) -> request.Root { request.Root(k) }
-make_bundle = (remote ! Remote) -> Bundle {
-  Bundle(fetch: () { request.await_owned(remote.fetch()) })
+make_root = (k: Key(Nil)) -> request.Root { request.Root(key = k) }
+make_bundle = () <- (remote: Remote) -> Bundle {
+	Bundle(fetch = () { request.await_owned(remote.fetch()) })
 }
 
-
-main = (b ! Bundle) -> Int ! request.Await | request.Owner { b.fetch() }
+main = () <- (b: Bundle) -> Int { b.fetch() }
 ```
 
 Complete explicit host cells (standard-library source names are ordinary
@@ -787,32 +801,18 @@ already-typed primitive leaves. It has **no** inferred environment or error:
 
 ```i
 entry_body = (remote: Remote, entry_key: Key(Nil)) -> Int {
-  b = {
-    ! Remote = remote
-    make_bundle()
-  }
-  cfg = make_config()
-  aw = {
-    ! Config = cfg
-    make_await()
-  }
-  root = make_root(entry_key)
-  owner = {
-    ! request.Root = root
-    request.open_owner()
-  }
-  resource.ensure(
-    () {
-      ! Bundle = b
-      ! request.Await = aw
-      ! request.Owner = owner
-      main()
-    }
-    () {
-      request.close_owner(owner)
-      request.close_root(root)
-    }
-  )
+	b = { make_bundle() <- (remote) }
+	cfg = make_config()
+	aw = { make_await() <- (cfg) }
+	root = make_root(entry_key)
+	owner = { request.open_owner() <- (root) }
+	resource.ensure(
+		() { main() <- (b, aw, owner) },
+		() {
+			request.close_owner(owner)
+			request.close_root(root)
+		},
+	)
 }
 ```
 
@@ -831,27 +831,28 @@ against the accepted API, not an executed future-R2 fixture.
 `src/main.i` uses only ordinary nominal values and functions:
 
 ```i
-(Config(..), Session(..), config_from_seed, make_session, with_session)
+(
+	Config(..)
+	Session(..)
+	config_from_seed
+	make_session
+	with_session
+)
 
-Config { Config(label: String) }
-Session { Session(read: () -> String) }
+Config = (label = String)
+Session = (read = () -> String)
 
 config_from_seed = (values: List(Config)) -> Config {
-  values |> {
-    [value] -> value
-    _ -> panic("provider: missing seed")
-  }
+	values |> ([value]) { value } | (_) { panic("provider: missing seed") }
 }
-make_session = (cfg ! Config) -> Session {
-  Session(read: () { cfg.label })
+make_session = () <- (cfg: Config) -> Session {
+	Session(read = () { cfg.label })
 }
-with_session(A, E, N) = (body: () -> A ^ E ! N) -> A ^ E ! N - Config {
-  ! Config = Config("inside")
-  body()
+with_session = <A, N>(body: () <- N -> A) -> A {
+	body() <- (Config(label = "inside"))
 }
 
-
-main = (s ! Session) { s.read() }
+main = () <- (s: Session) { s.read() }
 ```
 
 ```toml
@@ -872,14 +873,10 @@ main. Primitive admission precedes it. The typed ordinary body of its guarded
 continuation is:
 
 ```i
-body = (seed ! Config) -> String {
-  cfg = config_from_seed([seed])
-  service = {
-    ! Config = cfg
-    make_session()
-  }
-  ! Session = service
-  main()
+body = () <- (seed: Config) -> String {
+	cfg = config_from_seed([seed])
+	service = { make_session() <- (cfg) }
+	main() <- (service)
 }
 ```
 
@@ -1051,7 +1048,7 @@ Js service; a custom outgoing converter cannot change an export's ABI.
 need Js. At the request milestone it is an ordinary bundle:
 
 ```i
-Js { Js(sync: JsSync, requests: JsRequests) }
+Js = (sync = JsSync, requests = JsRequests)
 ```
 
 JsSync is the synchronous raw host service (`i:js/v1`); JsRequests is the
@@ -1191,9 +1188,11 @@ promise is a detached i task, and callbacks/re-entry are not authorized here.
 have private constructors with one Int field, e.g. inside i/fs:
 
 ```i
-(File)
+(
+	File
+)
 
-File { File(Int) }
+File = { (Int) }
 ```
 
 Raw resource services pass Int. No JS object or fd itself is an i IO resource.
@@ -1874,22 +1873,20 @@ for cancellation/cleanup, not sleep timing. Run availability tests at O0/O2/O3.
 The shared-constructor package is complete ordinary source plus the new map:
 
 ```i
-(Family, Web(..), NonWeb(..))
+(
+	Family(..)
+)
 
-Foreign {}
+Foreign = Opaque
 @js("(() => { throw Error('must initialize'); })()")
 foreign: Foreign
 
+Web = ()
+NonWeb = ()
 Family = Web | NonWeb
-Web { Web }
-NonWeb { NonWeb }
 
-
-main = (f ! Family) {
-  f |> {
-    Web -> foreign == foreign
-    NonWeb -> True
-  }
+main = () <- (f: Family) {
+	f |> (Web) { foreign == foreign } | (NonWeb) { True }
 }
 ```
 
@@ -1964,13 +1961,15 @@ F4 now snapshots once and rejects shared/detached storage.
 **Cannot be built: constructed errors and mixed request modes.**
 
 ```i
-(i/request)
+(
+	i/request
+)
 
-Value {}
-Thrown { Thrown(Value) }
+Value = Opaque
+Thrown = (Value)
 
 @host("probe:js/v1", "request")
-Bad { Bad(wait: (Value) -> Request(Result(Value, Thrown))) }
+Bad = (wait = (Value) -> Request(Result(Value, Thrown)))
 ```
 
 §10.3 and runtime §5.2 reject this declaration. A1 now returns only opaque
@@ -2004,23 +2003,24 @@ an implementation finding from the cited SDK source, not a run of new APIs.
 **Source conflict and reachability: shadowed Target and startup use.**
 
 ```i
-(js = i/js, target = i/target)
+(
+	js = i/js
+	target = i/target
+)
 
 @js("({})")
 object: js.Value
 
 uses = (t: target.Target) {
-  t |> {
-    target.Js(_) -> { object == object }
-    target.NodeJS(_) -> { object == object }
-    target.Wasi(_) -> True
-    target.Native -> True
-    target.Host -> True
-  }
+	t |>
+		(target.Js(_)) { object == object }
+		| (target.NodeJS(_)) { object == object }
+		| (target.Wasi(_)) { True }
+		| (target.Native) { True }
+		| (target.Host) { True }
 }
 
-
-main = (t ! target.Target) { uses(t) }
+main = () <- (t: target.Target) { uses(t) }
 ```
 
 This program now rejects on WASI: the ordinary parameter of uses is unknown,
@@ -2039,25 +2039,18 @@ and preserves granted raw factories instead.
 The deterministic-analysis witness from the review is retained in full:
 
 ```i
-(js = i/js)
+(
+	js = i/js
+)
 
 @js("(() => { throw Error('unused'); })()")
 unused: js.Value
 
-choose = (b) {
-  b |> {
-    True -> True
-    False -> False
-  }
-}
-
+choose = (b) { b |> (True) { True } | (False) { False } }
 
 main = () {
-  _ = choose(True)
-  choose(False) |> {
-    True -> unused == unused
-    False -> True
-  }
+	_ = choose(True)
+	choose(False) |> (True) { unused == unused } | (False) { True }
 }
 ```
 
@@ -2070,23 +2063,19 @@ it must still initialize unused. The old specialisation choice is removed.
 The smallest substitution witness for an overly broad Target rule is:
 
 ```i
-(js = i/js, target = i/target)
+(
+	js = i/js
+	target = i/target
+)
 
 @js("globalThis")
 foreign: js.Value
 
-inspect = (t ! target.Target) {
-  t |> {
-    target.Native -> foreign == foreign
-    _ -> True
-  }
+inspect = () <- (t: target.Target) {
+	t |> (target.Native) { foreign == foreign } | (_) { True }
 }
 
-
-main = () {
-  ! target.Target = target.Native
-  inspect()
-}
+main = () { inspect() <- (target.Native) }
 ```
 
 On WASI this must reject, because inspect really reads foreign. Its environment
@@ -2103,16 +2092,19 @@ value-flow analysis. It expresses T4 but deliberately rejects the helper forms.
 The Ready-owner test from finding 5, inside an async A1 host fixture, is:
 
 ```i
-(js = i/js, i/request)
+(
+	js = i/js
+	i/request
+)
 
-survives = (promise: js.Value, raw ! js.JsRequests) {
-  r = request.within(() {
-    r = raw.observe(promise)
-    request.wait_any([request.ticket(r)])
-    r
-  })
-  answer = request.take(r)
-  (answer, request.state(r))
+survives = (promise: js.Value) <- (raw: js.JsRequests) {
+	r = request.within(() {
+		r = raw.observe(promise)
+		request.wait_any([request.ticket(r)])
+		r
+	})
+	answer = request.take(r)
+	(answer, request.state(r))
 }
 ```
 
@@ -2189,13 +2181,13 @@ that private path from another package is rejected.
 A concrete termination attack replaces a package with:
 
 ```i
-Cell(A) { Cell }
-make_cell(A) = (next ! Cell(List(A))) -> Cell(A) {
-  _ = next
-  Cell
+Cell(A) = ()
+make_cell = <A>() <- (next: Cell(List(A))) -> Cell(A) {
+	_ = next
+	Cell
 }
 
-main = (c ! Cell(Int)) { Nil }
+main = () <- (c: Cell(Int)) { Nil }
 ```
 
 Selecting make_cell for Cell produces infinitely many distinct instantiated
@@ -2208,10 +2200,11 @@ A concrete lifetime attack replaces T11's with_session body with this
 well-typed ordinary function:
 
 ```i
-with_session(A, E, N) = (body: () -> A ^ E ! N) -> A ^ E ! N - Config {
-  ! Config = Config("inside")
-  _ = body()
-  body()
+with_session = <A, N>(body: () <- N -> A) -> A {
+	{
+		_ = body()
+		body()
+	} <- (Config("inside"))
 }
 ```
 

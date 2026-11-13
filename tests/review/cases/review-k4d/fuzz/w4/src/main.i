@@ -1,50 +1,55 @@
-Dep { Dep(v: Int) }
-get = (d ! Dep) { d.v }
-S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }
-T(N) { T(f: () -> Int ! N, m: (N) -> Nil) }
-us(N) = (s ! S(N)) {
-  S(f = f, ..) = s
-  f()
+Dep = (v = Int)
+get = () <- (d: Dep) { d.v }
+S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+T(N) = (f = () <- N -> Int, m = (N) -> Nil)
+us = <N>() <- (s: S(N)) {
+	S(f = f, ..) = s
+	f()
 }
-ut(N) = (t ! T(N)) {
-  T(f = f, ..) = t
-  f()
+ut = <N>() <- (t: T(N)) {
+	T(f = f, ..) = t
+	f()
 }
-usa(N) = (s ! S(N)) -> Int ! N | S(N) {
-  S(f = f, ..) = s
-  f()
+usa = <N>() <- (s: S(N)) -> Int {
+	S(f = f, ..) = s
+	f()
 }
-run(A, N) = (body: () -> A ! N) { body() }
+run = <A, N>(body: () <- N -> A) { body() }
 h0 = () {
-  ! S(T(T(T(Never)))) = S(f: () { 1 + us() + usa() }, m: (_: T(T(T(Never)))) { Nil })
-  ! T(Never) = T(f: () { run(() { 2 + 2 }) }, m: (_: Never) { Nil })
-  ut()
+	ut() <- (
+		S(f = () { 1 + us() + usa() }, m = (_: T(T(T(Never)))) { Nil }),
+		T(f = () { run(() { 2 + 2 }) }, m = (_: Never) { Nil }),
+	)
 }
 h1 = () {
-  l0_0 = () {
-    ! S(Dep) = S(f: () { get() + ut() }, m: (_: Dep) { Nil })
-    get()
-  }
-  ! S(Never) = S(f: () { get() }, m: (_: Never) { Nil })
-  ! T(S(Never)) = T(f: () { 1 + run(() { h0() + 1 }) + ut() }, m: (_: S(Never)) { Nil })
-  l0_0() + get()
+	l0_0 = () { get() <- (S(f = () { get() + ut() }, m = (_: Dep) { Nil })) }
+	l0_0() + get() <- (
+		S(f = () { get() }, m = (_: Never) { Nil }),
+		T(
+			f = () { 1 + run(() { h0() + 1 }) + ut() },
+			m = (_: S(Never)) { Nil },
+		),
+	)
 }
 h2 = () {
-  l0_0 = () {
-    l1_0 = () {
-      ! T(S(Dep)) = T(f: () { ut() + us() }, m: (_: S(Dep)) { Nil })
-      ! S(Dep) = S(f: () { usa() + usa() + 1 }, m: (_: Dep) { Nil })
-      h0() + ut()
-    }
-    ! S(S(Never)) = S(f: () { l1_0() + 1 + us() }, m: (_: S(Never)) { Nil })
-    usa() + h1()
-  }
-  ! Dep = Dep(v: 1)
-  ! T(Never) = T(f: () { run(() { 2 + 2 + get() }) }, m: (_: Never) { Nil })
-  run(() { get() + l0_0() + us() }) + run(() { us() + 1 })
+	l0_0 = () {
+		l1_0 = () {
+			h0() + ut() <- (
+				T(f = () { ut() + us() }, m = (_: S(Dep)) { Nil }),
+				S(f = () { usa() + usa() + 1 }, m = (_: Dep) { Nil }),
+			)
+		}
+		usa() + h1() <- (
+			S(f = () { l1_0() + 1 + us() }, m = (_: S(Never)) { Nil }),
+		)
+	}
+	run(() { get() + l0_0() + us() }) + run(() { us() + 1 }) <- (
+		Dep(v = 1),
+		T(f = () { run(() { 2 + 2 + get() }) }, m = (_: Never) { Nil }),
+	)
 }
 
 main = () {
-  ut()
-  Nil
+	ut()
+	Nil
 }

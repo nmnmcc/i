@@ -1,13 +1,14 @@
 // spec: 6.12, 7.5
 // expect: compile-error E0512
-(main)
+(
+	main
+)
+Circle = (r = Int)
+Square = (side = Int)
 Shape = Circle | Square
-Circle { Circle(r: Int) }
-Square { Square(side: Int) }
-bad = (s: Shape) { s |> { Circle(..) -> s.r } }
-
+bad = (s: Shape) { s |> (Circle(..)) { s.r } }
 
 main = () {
-  assert(True)
-  Nil
+	assert(True)
+	Nil
 }

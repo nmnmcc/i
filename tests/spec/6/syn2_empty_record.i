@@ -1,8 +1,10 @@
 // spec: 3, 6.1
 // expect: pass
-(main)
-identity = (r: Record) { r }
+(
+	main
+)
+identity = (r: ()) { r }
 main = () {
-  assert(identity(()) == ())
-  Nil
+	assert(identity(()) == ())
+	Nil
 }

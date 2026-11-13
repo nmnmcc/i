@@ -14,10 +14,7 @@ add: (Int, Int) -> Int
 plus: (Int, Int) -> Int
 
 check = (c: Bool, what: String) {
-	c |> {
-		True  -> Nil
-		False -> panic(what)
-	}
+	c |> (True) { Nil } | (False) { panic(what) }
 }
 
 same = (f: (Int, Int) -> Int, g: (Int, Int) -> Int) { f == g }

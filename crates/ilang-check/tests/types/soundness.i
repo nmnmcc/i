@@ -2,16 +2,11 @@
 
 // §4.4 and §9.2: in `M - T` for an environment, the member taken out must
 // be equal to `T`, also when the function is generalized.
-Reader(S) {
-	Reader(get: () -> S)
-}
+Reader(S) = (get = () -> S)
 
-with_int = (body) {
-	! Reader(Int) = Reader(get: () { 1 })
-	body()
-}
+with_int = (body) { body() <- (Reader(get = () { 1 })) }
 
-get_s = (r ! Reader(String)) { r.get() }
+get_s = () <- (r: Reader(String)) { r.get() }
 
 g = () { with_int(() { get_s() }) }
 
@@ -20,9 +15,7 @@ k = () -> String { with_int(() { get_s() }) }
 // §4.4: bounds that a variable has through other variables are put
 // together too: invariant arguments must be equal, and function types
 // must have the same number of parameters.
-Cell(A) {
-	Cell(get: () -> A, set: (A) -> Nil)
-}
+Cell(A) = (get = () -> A, set = (A) -> Nil)
 
 use_int = (c: Cell(Int)) { c.get() + 1 }
 
@@ -46,56 +39,38 @@ arity = (k) {
 }
 
 // A list of function types whose environments have two forms.
-State(S) {
-	State(get: () -> S)
-}
+State(S) = (get = () -> S)
 
-use_state_int = (st ! State(Int)) { 1 }
+use_state_int = () <- (st: State(Int)) { 1 }
 
-use_state_str = (st ! State(String)) { 1 }
+use_state_str = () <- (st: State(String)) { 1 }
 
 nested = [
-	Cell(get: () { () { use_state_int() } }, set: (f) { Nil })
-	Cell(get: () { () { use_state_str() } }, set: (f) { Nil })
+	Cell(get = () { () { use_state_int() } }, set = (f) { Nil }),
+	Cell(get = () { () { use_state_str() } }, set = (f) { Nil }),
 ]
 
 // Rule 11: a type test takes every value of its type constructor.
-Box(A) {
-	Box(value: A)
-}
+Box(A) = (value = A)
 
 unbox = (b: Box(Int)) { b.value }
 
 two_tests = (v: Box(Int | String)) {
-	v |> {
-		x: Box(Int)    -> unbox(x) + 1
-		y: Box(String) -> 0
-	}
+	v |> (x: Box(Int)) { unbox(x) + 1 } | (y: Box(String)) { 0 }
 }
 
 test_then_ctor = (v: Box(Int | String)) {
-	v |> {
-		x: Box(Int) -> unbox(x) + 1
-		Box(..)     -> 0
-	}
+	v |> (x: Box(Int)) { unbox(x) + 1 } | (Box(..)) { 0 }
 }
 
-lists = (l: List(Int | String)) {
-	l |> {
-		x: List(Int) -> x
-		[]           -> []
-	}
-}
+lists = (l: List(Int | String)) { l |> (x: List(Int)) { x } | ([]) { [] } }
 
 test_ok = (v: Box(Int) | String) {
-	v |> {
-		x: Box(Int) -> unbox(x)
-		s: String   -> 0
-	}
+	v |> (x: Box(Int)) { unbox(x) } | (s: String) { 0 }
 }
 
 // §4.5 rule 2: `a & T <: R` when `a <: R`.
-take(A) = (h: () -> A & Int) { h }
+take = <A>(h: () -> A & Int) { h }
 
 p = () { panic("") }
 

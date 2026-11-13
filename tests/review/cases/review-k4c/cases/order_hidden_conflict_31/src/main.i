@@ -1,5 +1,8 @@
-run(N) = (body: () -> Nil ! N) { body() }
-S(A) { S(A) }
-two = (s ! S(String)) { Nil }
-bad = () { run(() { one() }) run(() { two() }) }
-one = (s ! S(Int)) { Nil }
+run = <N>(body: () <- N -> Nil) { body() }
+S(A) = (A)
+two = () <- (s: S(String)) { Nil }
+bad = () {
+	run(() { one() })
+	run(() { two() })
+}
+one = () <- (s: S(Int)) { Nil }

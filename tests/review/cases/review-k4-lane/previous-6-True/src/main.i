@@ -1,15 +1,12 @@
-S(E, N) {
-	S(() -> Nil ^ E ! N)
-}
+S(E, N) = (() <- (Fail(E), ..N) -> Nil)
 
-use(E, N) = (s ! S(E, N)) {
+use = <E, N>() <- (s: S(E, N)) {
 	S(f) = s
 	f()
 }
 
-run(E, N) = (body: () -> Nil ^ E ! N) { body() }
+run = <N>(body: () <- N -> Nil) { body() }
 
-example(E, N) = () { run(() { use() }) }
-
+example = <E, N>() { run(() { use() }) }
 
 main = () { example() }

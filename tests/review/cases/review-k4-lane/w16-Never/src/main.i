@@ -1,16 +1,10 @@
-S(N) {
-	S(f: () -> Int ! N, m: (N) -> Nil)
-}
+S(N) = (f = () <- N -> Int, m = (N) -> Nil)
 
-use(N) = (s ! S(N)) {
+use = <N>() <- (s: S(N)) {
 	S(f = f, ..) = s
 	f()
 }
 
-wrap = (svc) {
-	! S(_) = svc
-	use()
-}
+wrap = (svc) { use() <- (svc) }
 
-
-main = () { assert(wrap(S(f: () { 1 }, m: (_: Never) { Nil })) == 1) }
+main = () { assert(wrap(S(f = () { 1 }, m = (_: Never) { Nil })) == 1) }

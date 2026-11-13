@@ -1,51 +1,46 @@
 // spec: 11.7, 11.6, 9.4
 // expect: stop "panic: after"
-// at: spec/main:32:10
-// at: spec/main:20:7
-// at: spec/main:15:7
-// at: spec/main:40:5
-// at: spec/main:45:11
-(i/control)
+// at: spec/main:32:25
+// at: spec/main:22:6
+// at: spec/main:17:6
+// at: spec/main:36:3
+// at: spec/main:41:8
+(
+	i/control
+)
 
-Paused = PausedCase | Done
-PausedCase { Paused(Continuation(Nil, Paused, Never, Never)) }
-Done { Done }
+Paused = (Continuation(Nil, Paused, Never, Never))
 
+Done = ()
+Paused = Paused | Done
 w1 = (b) {
-  x = w2(b)
-  x
+	x = w2(b)
+	x
 }
 
 w2 = (b) {
-  x = step(b)
-  x
+	x = step(b)
+	x
 }
 
 // After the resume, the segment of `step` makes a tail call.
 step = (b) {
-  control.suspend(b, (k) { Paused(k) })
-  last(3)
+	control.suspend(b, (k) { Paused(k) })
+	last(3)
 }
 
-last = (n) {
-  n |> {
-    0 -> panic("after")
-    _ -> last(n - 1)
-  }
-}
-
+last = (n) { n |> (0) { panic("after") } | (_) { last(n - 1) } }
 
 main = () {
-  p = control.boundary((b) {
-    w1(b)
-    Done
-  })
-  p |> {
-    Paused(k) -> {
-      x = control.resume(k, Nil)
-      x
-    }
-    Done -> panic("not paused")
-  }
-  Nil
+	p = control.boundary((b) {
+		w1(b)
+		Done
+	})
+	p |>
+		(Paused(k)) {
+			x = control.resume(k, Nil)
+			x
+		}
+		| (Done) { panic("not paused") }
+	Nil
 }

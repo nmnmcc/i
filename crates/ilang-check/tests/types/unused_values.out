@@ -1,6 +1,8 @@
-f : (x: Int) -> Int
-warned : (x: Int, y: Float) -> Nil
-not_warned : (x: Int, y: Float) -> Nil
+f : (Int) -> Int
+warned : (Int, Float) -> Nil
+not_warned : (Int, Float) -> Nil
+7:2: warning[W0502]: this value is not used, and working it out does nothing
+8:2: warning[W0502]: this value is not used, and working it out does nothing
 9:2: warning[W0502]: this value is not used, and working it out does nothing
 10:2: warning[W0502]: this value is not used, and working it out does nothing
 11:2: warning[W0502]: this value is not used, and working it out does nothing
@@ -8,7 +10,5 @@ not_warned : (x: Int, y: Float) -> Nil
 13:2: warning[W0502]: this value is not used, and working it out does nothing
 14:2: warning[W0502]: this value is not used, and working it out does nothing
 15:2: warning[W0502]: this value is not used, and working it out does nothing
-16:2: warning[W0502]: this value is not used, and working it out does nothing
-17:2: warning[W0502]: this value is not used, and working it out does nothing
-8:1: warning[W0504]: top-level binding `warned` is not used
-23:1: warning[W0504]: top-level binding `not_warned` is not used
+6:1: warning[W0504]: top-level binding `warned` is not used
+21:1: warning[W0504]: top-level binding `not_warned` is not used

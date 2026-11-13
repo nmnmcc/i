@@ -1,22 +1,18 @@
-Wrap {
-	Wrap(f: (Int) -> Wrap)
-}
+Wrap = (f = (Int) -> Wrap)
 
-Two {
-	Two(f: (Int) -> Two, n: Int)
-}
+Two = (f = (Int) -> Two, n = Int)
 
 // `a |> C` is `C(a)`, and `a |> C(b)` is `C(a, b)` (§6.9), so they are
 // direct values when their parts are (§6.10).
 wrapped = ((n) { wrapped }) |> Wrap
 
-direct = Wrap((n) { direct })
+direct = Wrap(f = (n) { direct })
 
-two = ((n) { two }) |> Two(1)
+two = ((n) { two }) |> Two(f = 1)
 
 local = () {
 	w = ((n) { w }) |> Wrap
-	t = ((n) { t }) |> Two(1)
+	t = ((n) { t }) |> Two(f = 1)
 	(w, t)
 }
 
@@ -25,7 +21,7 @@ id = (x) { x }
 
 not_ctor = ((n) { not_ctor }) |> id
 
-not_direct_arg = ((n) { not_direct_arg }) |> Two(id(1))
+not_direct_arg = ((n) { not_direct_arg }) |> Two(f = id(1))
 
 local_bad = () {
 	v = ((n) { v }) |> id

@@ -5,8 +5,6 @@
 )
 
 @host("test:records/v1")
-Records {
-	Records(get: () -> (name: String))
-}
+Records = (get = () -> (name = String))
 
 test("check", () { Nil })

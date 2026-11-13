@@ -1,3 +1,4 @@
 (, if)
-(= _branches (-> (then else) _ `{(-> True ~then) (-> False ~else)}))
-(@ macro (= if (-> (test then else) _ `(| ~test ~(_branches then else)))))
+(= _branches
+  (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
+(@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))

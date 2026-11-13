@@ -5,5 +5,4 @@
 	i/task
 )
 
-
 main = () { task.sync(task.choose([])) }

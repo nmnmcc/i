@@ -6,16 +6,18 @@
 	(Io) = i/io
 )
 
-forever = () -> Never ! task.Scheduler {
+forever = () -> Never {
 	task.yield()
 	forever()
 }
 
-
-main = (io ! Io) {
-	answer = task.race(() {
-		task.yield()
-		7
-	}, () { resource.ensure(forever, () { io.print("loser cancelled") }) })
+main = () <- (io: Io) {
+	answer = task.race(
+		() {
+			task.yield()
+			7
+		},
+		() { resource.ensure(forever, () { io.print("loser cancelled") }) },
+	)
 	io.print(core.inspect(answer))
 }

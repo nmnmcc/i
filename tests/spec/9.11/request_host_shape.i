@@ -2,4 +2,4 @@
 // expect: compile-error E0320
 // runtime.md 5.2: the Request payload must have an ABI result shape.
 @host("test:request", "request")
-Wrong { Wrong(start: () -> Request(List(Int))) }
+Wrong = (start = () -> Request(List(Int)))

@@ -11,12 +11,9 @@
 )
 
 @host("test:io/v1")
-Out {
-	Out(print: (String) -> Nil)
-}
+Out = (print = (String) -> Nil)
 
-print = (text: String, out ! Out) { out.print(text) }
-
+print = (text: String) <- (out: Out) { out.print(text) }
 
 main = () {
 	callback = control.keep_env((work: (() -> Nil) -> Nil) {
@@ -30,25 +27,31 @@ main = () {
 			work(() { signal(Nil) })
 		})
 	})
-	assert(task.run(() {
-		work = control.keep_env((notify: () -> Nil) {
-			task.scope((inner) {
-				task.go(inner, () {
-					resource.ensure(() {
-						notify()
-						task.sync(task.never())
-					}, () {
-						task.yield()
-						print("foreign-child-final")
+	assert(
+		task.run(() {
+			work = control.keep_env((notify: () -> Nil) {
+				task.scope((inner) {
+					task.go(inner, () {
+						resource.ensure(
+							() {
+								notify()
+								task.sync(task.never())
+							},
+							() {
+								task.yield()
+								print("foreign-child-final")
+							},
+						)
 					})
+					task.sync(task.never())
 				})
-				task.sync(task.never())
 			})
-		})
-		assert(
-			fail.catch(() { callback((notify) { work(notify) }) }) ==
-				Error("callback")
-		)
-		42
-	}) == 42)
+			assert(
+				fail.catch(() { callback((notify) { work(notify) }) }) ==
+					Error("callback"),
+			)
+			42
+		}) ==
+			42,
+	)
 }

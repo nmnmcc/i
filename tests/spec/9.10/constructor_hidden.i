@@ -1,6 +1,5 @@
 // spec: 9.10, 2.4
 // expect: compile-error E0204
-
 (
 	i/random
 )

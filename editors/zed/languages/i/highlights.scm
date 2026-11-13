@@ -15,16 +15,17 @@
 (module_comment) @comment.doc
 (attribute) @attribute
 (bit_format) @type
-(record_field label: (_) @variable.parameter)
-(type_field label: (_) @variable.parameter)
-(argument label: (identifier) @variable.parameter)
+(data_item label: (identifier) @variable.parameter)
+(type_item label: (identifier) @variable.parameter)
+(data_pattern_item key: (identifier) @variable.parameter)
+(parameter key: (identifier) @variable.parameter)
 (typed_pattern pattern: (identifier) @variable.parameter)
-(type_parameter (identifier) @variable.parameter)
+(service_item (identifier) @variable.parameter)
 (field_access field: (identifier) @property)
 (call function: (identifier) @function)
 (call function: (field_access field: (identifier) @function))
 (binding pattern: (identifier) @function value: (function))
-(binding pattern: (identifier) @function value: (clause_block))
+(binding pattern: (identifier) @function value: (branches))
 (type_parameters (type_identifier) @type)
 (module_path) @type
 (import alias: (identifier) @type)
@@ -32,6 +33,6 @@
  (#match? @constant.builtin "^(True|False|Nil)$"))
 ((type_identifier) @type.builtin
  (#match? @type.builtin "^(Record|Int|Float|String|List|BitArray|UtfCodepoint|Never|Bool|Result|Boundary|Continuation|Assert|AssertionFailure)$"))
-["=" "->" "^" "?" "!" "|" "&" ".." "|>" "||" "&&" "==" "!=" "<" "<=" ">" ">=" "<." "<=." ">." ">=." "<>" "+" "-" "+." "-." "*" "/" "%" "*." "/."] @operator
+["=" "->" "<-" "?" "|" "&" ".." "|>" "||" "&&" "==" "!=" "<" "<=" ">" ">=" "<." "<=." ">." ">=." "<>" "+" "-" "+." "-." "*" "/" "%" "*." "/."] @operator
 ["(" ")" "[" "]" "{" "}" "<<" ">>"] @punctuation.bracket
 ["," ":" "."] @punctuation.delimiter

@@ -1,6 +1,0 @@
-spec/stop_lazy_after_catch.check : (got: String, want: String) -> Nil
-spec/stop_lazy_after_catch.show : (x: A) -> String
-spec/stop_lazy_after_catch.inner : (b: Boundary(Paused, Never, Never)) -> Int ? Int
-spec/stop_lazy_after_catch.mid : (b: Boundary(Paused, Never, Never)) -> Int ? Int
-spec/stop_lazy_after_catch.outer : (b: Boundary(Paused, Never, Never)) -> Never
-spec/stop_lazy_after_catch.main : () -> Nil

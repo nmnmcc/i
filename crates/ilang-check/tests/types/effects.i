@@ -4,44 +4,29 @@
 )
 
 // §9.2: environment parameters and environment statements (rule 9).
-Clock {
-	Clock(now: () -> Int)
-}
+Clock = (now = () -> Int)
 
-Log {
-	Log(write: (String) -> Nil)
-}
+Log = (write = (String) -> Nil)
 
-elapsed = (start: Int, clock ! Clock) { clock.now() - start }
+elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
 
-fixed = () {
-	! Clock = Clock(now: () { 42 })
-	elapsed(40)
-}
+fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
 
-logged = (log ! Log) {
+logged = () <- (log: Log) {
 	log.write("start")
 	elapsed(1)
 }
 
 // Only Clock is given; Log is still needed.
-half = () {
-	! Clock = Clock(now: () { 1 })
-	logged()
-}
+half = () { logged() <- (Clock(now = () { 1 })) }
 
 // A service may be any value of its type.
-given = (c: Clock) {
-	! Clock = c
-	elapsed(0)
-}
+given = (c: Clock) { elapsed(0) <- (c) }
 
 // §9.3: errors come together by union.
-Http {
-	Http(get: (String) -> String ^ Int)
-}
+Http = (get = (String) <- (Fail(Int)) -> String)
 
-fetch = (url, http ! Http) { http.get(url) }
+fetch = (url) <- (http: Http) { http.get(url) }
 
 two = () {
 	a = fetch("a")
@@ -64,3 +49,8 @@ pair = (t) {
 head = ([x, ..]) { x }
 
 unwrap = (Ok(v)) -> Int { v }
+
+// Stage 3 keeps D4 (syntax-3.md §2.12, "as today with the multi-constructor
+// `Result`"): `Ok(v)` is fitted to a `Result`, so with a written type that
+// has no needs, the parameter that may fail is an error, as before.
+closed: (Result(Int, String)) -> Int = (Ok(v)) { v }

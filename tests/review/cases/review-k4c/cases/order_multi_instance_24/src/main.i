@@ -1,7 +1,13 @@
-ints = () { ! S(Int,Never) = S((x: Int) { x + 1 }) wrap(1) }
-Dep { Dep }
-run(A,N) = (body: () -> A ! N) { body() }
-use(A,N) = (x: A, s ! S(A,N)) { S(f) = s f(x) }
-S(A,N) { S((A) -> A ! N) }
-wrap(A,N) = (x: A) { local = () { use(x) } run(local) }
-texts = () { ! S(String,Never) = S((x: String) { x <> "!" }) wrap("a") }
+ints = () { wrap(1) <- (S((x: Int) { x + 1 })) }
+Dep = ()
+run = <A, N>(body: () <- N -> A) { body() }
+use = <A, N>(x: A) <- (s: S(A, N)) {
+	S(f) = s
+	f(x)
+}
+S(A, N) = ((A) <- N -> A)
+wrap = <A, N>(x: A) {
+	local = () { use(x) }
+	run(local)
+}
+texts = () { wrap("a") <- (S((x: String) { x <> "!" })) }

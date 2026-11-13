@@ -6,10 +6,9 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 test("ascii", () {
@@ -46,7 +45,12 @@ test("one_character_for_one", () {
 	// A mapping may change the number of bytes: ⱥ is three, Ⱥ is two.
 	check(core.to_upper("ⱥ"), "Ⱥ")
 	check(core.to_lower("Ⱥ"), "ⱥ")
-	check(core.inspect(core.byte_size(core.to_lower("ȺȺ"))), "6")
+	check(
+		core.inspect(
+			core.byte_size(core.to_lower("ȺȺ")),
+		),
+		"6",
+	)
 })
 
 test("outside_the_basic_plane", () {

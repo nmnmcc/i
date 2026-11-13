@@ -1,1 +1,0 @@
-spec/ensure_outer_after.main : () -> Result(Never, Int)

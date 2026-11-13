@@ -1,13 +1,13 @@
 (
 	Opaque
+	Hidden
 	Alias(..)
 	make
 )
 
-Opaque {
-	Hidden(Int)
-}
+Hidden = (Int)
 
+Opaque = Hidden
 value: Opaque = Hidden(1)
 
 Alias = value

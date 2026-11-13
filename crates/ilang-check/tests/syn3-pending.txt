@@ -1,0 +1,6 @@
+# ilang-check tests that use forms a later stage of syntax three removes or
+# replaces (docs/design/syntax-3.md §7.2). Each test named here returns early
+# until that stage lands; the stage then deletes its line and either rewrites
+# the test or removes it. One `file::test` per line, then the stage and reason.
+provider_graph::discriminant_constructor_fields_are_dependency_edges  stage 3: a sum service is a union, rejected by E0225 (§9.2); the discriminant provider needs a union's members
+provider_graph::discriminant_constructor_aliases_resolve_before_validation  stage 3: as above

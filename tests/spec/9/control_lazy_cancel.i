@@ -8,33 +8,20 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-Paused = PausedCase | Done
+Paused = (Continuation(Nil, Paused, Never, Never))
+Done = ()
+Paused = Paused | Done
 
-PausedCase {
-	Paused(Continuation(Nil, Paused, Never, Never))
-}
-
-Done {
-	Done
-}
-
-Held = HeldCase | Over
-
-HeldCase {
-	Held(Continuation(Nil, Held, Never, Never))
-}
-
-Over {
-	Over
-}
+Held = (Continuation(Nil, Held, Never, Never))
+Over = ()
+Held = Held | Over
 
 // Puts `text` in front of the value of the boundary `log`.
 note = (log, text) {
@@ -44,23 +31,24 @@ note = (log, text) {
 // 100 frames, with a `resource.ensure` at depths 10, 50 and 90. The final
 // function at depth 50 suspends to `hold` in the middle.
 layer = (log, hold, b, n) {
-	n |> {
-		0 -> {
+	n |>
+		(0) {
 			control.suspend(b, (k) { Paused(k) })
 			0
 		}
-		10 -> guarded(log, hold, b, n, () { note(log, "final 10") })
-		50 -> guarded(log, hold, b, n, () {
-			note(log, "final 50")
-			control.suspend(hold, (k2) { Held(k2) })
-			note(log, "final 50 again")
-		})
-		90 -> guarded(log, hold, b, n, () { note(log, "final 90") })
-		_ -> {
+		| (10) { guarded(log, hold, b, n, () { note(log, "final 10") }) }
+		| (50) {
+			guarded(log, hold, b, n, () {
+				note(log, "final 50")
+				control.suspend(hold, (k2) { Held(k2) })
+				note(log, "final 50 again")
+			})
+		}
+		| (90) { guarded(log, hold, b, n, () { note(log, "final 90") }) }
+		| (_) {
 			x = layer(log, hold, b, n - 1)
 			x + 1
 		}
-	}
 }
 
 guarded = (log, hold, b, n, with) {
@@ -70,7 +58,6 @@ guarded = (log, hold, b, n, with) {
 
 // A cancel at depth 100 runs the final functions innermost first. One of
 // them suspends, and the cancel goes on when it is resumed later.
-
 test("cancel_deep", () {
 	r = control.boundary((log) {
 		held = control.boundary((hold) {
@@ -78,23 +65,20 @@ test("cancel_deep", () {
 				layer(log, hold, b, 100)
 				Done
 			})
-			p |> {
-				Paused(k) -> control.cancel(k)
-				Done      -> panic("not paused")
-			}
+			p |>
+				(Paused(k)) { control.cancel(k) }
+				| (Done) { panic("not paused") }
 			note(log, "cancelled")
 			Over
 		})
-		held |> {
-			Held(k2) -> {
+		held |>
+			(Held(k2)) {
 				note(log, "resume")
-				{ control.resume(k2, Nil) } |> {
-					Over    -> "end"
-					Held(_) -> "held again"
-				}
+				{ control.resume(k2, Nil) } |>
+					(Over) { "end" }
+					| (Held(_)) { "held again" }
 			}
-			Over -> "not held"
-		}
+			| (Over) { "not held" }
 	})
 	check(r, "final 10 final 50 resume final 50 again final 90 cancelled end")
 })

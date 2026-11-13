@@ -3,27 +3,17 @@
 	std/int
 )
 
+Num = (Int)
+
+Add = (Expr, Expr)
+Mul = (Expr, Expr)
 Expr = Num | Add | Mul
-
-Num {
-	Num(Int)
-}
-
-Add {
-	Add(Expr, Expr)
-}
-
-Mul {
-	Mul(Expr, Expr)
-}
-
 // Inferred: (e: Expr) -> Int
 eval = (e) {
-	e |> {
-		Num(n)    -> n
-		Add(a, b) -> eval(a) + eval(b)
-		Mul(a, b) -> eval(a) * eval(b)
-	}
+	e |>
+		(Num(n)) { n }
+		| (Add(a, b)) { eval(a) + eval(b) }
+		| (Mul(a, b)) { eval(a) * eval(b) }
 }
 
 main = () {

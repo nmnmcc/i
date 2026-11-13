@@ -4,19 +4,9 @@
 	testlib = (test) = std/test
 )
 
-strict = (s: String - "a") {
-	s |> {
-		"b"                   -> 1
-		_: String - "a" - "b" -> 2
-	}
-}
+strict = (s: String - "a") { s |> ("b") { 1 } | (_: String - "a" - "b") { 2 } }
 
-f = (p: (String, Bool)) {
-	p |> {
-		("a", _) -> 0
-		(t, _)   -> strict(t)
-	}
-}
+f = (p: (String, Bool)) { p |> (("a", _)) { 0 } | ((t, _)) { strict(t) } }
 
 test("whole_other_column_is_covered", () {
 	assert(f(("a", False)) == 0)

@@ -8,19 +8,21 @@
 	i/fail
 )
 
-
 main = () {
 	task.scope((s) {
 		gate: task.Channel(Nil) = task.channel()
 		task.go(s, () {
-			resource.ensure(() {
-				task.send(gate, Nil)
-				task.sync(task.never())
-			}, () {
-				t = task.go(s, () { Nil })
-				fail.catch(() { task.join(t) })
-				Nil
-			})
+			resource.ensure(
+				() {
+					task.send(gate, Nil)
+					task.sync(task.never())
+				},
+				() {
+					t = task.go(s, () { Nil })
+					fail.catch(() { task.join(t) })
+					Nil
+				},
+			)
 		})
 		task.receive(gate)
 		fail.raise("boom")

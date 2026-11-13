@@ -1,4 +1,4 @@
-// old-syntax-check: E0108
 // spec: 7.1
-// expect: compile-error E0108
-main = () { "axb" |> { a <> "x" <> b -> a <> b  _ -> "" } }
+// expect: compile-error E0101
+main = () { "axb" |> (a <> "x" <> b) { a <> b } | (_) { "" } }
+// old-syntax-check: E0101

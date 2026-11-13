@@ -379,8 +379,9 @@ impl Query<'_> {
         if patterns.is_empty() {
             return None;
         }
-        // Before the `}` that ends the clauses, on lines of their own.
-        let close = text[..case.span.end as usize].rfind('}')? as u32;
+        // After the last branch of the match: in the Lisp surface the span
+        // of the match ends with its last branch, inside the `)` of its chain.
+        let close = case.span.end;
         let indent = clauses
             .last()
             .map(|c| {
@@ -394,9 +395,9 @@ impl Query<'_> {
         let line_start = text[..close as usize].rfind('\n').map_or(0, |i| i + 1) as u32;
         let own_line = text[line_start as usize..close as usize].trim().is_empty();
         let body = |pat: &str| {
-            let clause = format!("{pat} -> panic(\"todo\")");
+            let clause = format!("| ({pat}) {{ panic(\"todo\") }}");
             if lisp {
-                lisp_clause(&clause).unwrap_or(clause)
+                lisp_clause(pat, "panic(\"todo\")").unwrap_or(clause)
             } else {
                 clause
             }
@@ -566,6 +567,7 @@ impl Query<'_> {
             }
             _ => {}
         });
+        let lisp = self.is_lisp(m);
         let mut out = Vec::new();
         for (b, parameter) in binders {
             if b.span.end as usize > text.len()
@@ -587,6 +589,13 @@ impl Query<'_> {
             if ty.contains('\n') || ty.len() > 80 {
                 continue;
             }
+            // In the Lisp surface the type is written as its rows.
+            let ty = if lisp {
+                let Some(row) = lisp_type(&ty) else { continue };
+                row
+            } else {
+                ty
+            };
             out.push(InlayHint {
                 offset: b.span.end,
                 label: format!(": {ty}"),
@@ -602,26 +611,28 @@ impl Query<'_> {
 /// A type shown in the syntax of §3, in the syntax of the Lisp surface: as
 /// the printer of that surface writes it in an annotation.
 fn lisp_type(ty: &str) -> Option<String> {
-    let (module, diags) = ilang_syntax::parse_module(&format!("x: {ty} = 0\n"));
+    let (module, diags) = ilang_syntax::syn3::parse_module(&format!("x: {ty} = 0\n"));
     if !diags.is_empty() {
         return None;
     }
-    let printed = ilang_syntax::lisp::print_module(&module);
+    let printed = ilang_syntax::syn3::lisp::to_lisp(&module);
     let rest = printed.trim().strip_prefix("(= (: x ")?;
     Some(rest.strip_suffix(") 0)")?.to_string())
 }
 
-/// A clause `p -> e` of the syntax of §6, in the syntax of the Lisp surface,
-/// as its printer writes it.
-pub(crate) fn lisp_clause(clause: &str) -> Option<String> {
-    let (module, diags) =
-        ilang_syntax::parse_module(&format!("f = (s) {{ s |> {{ {clause}  _ -> 0 }} }}\n"));
+/// A branch `(p) { e }` of a match, in the syntax of the Lisp surface, as its
+/// printer writes it.
+pub(crate) fn lisp_clause(pattern: &str, body: &str) -> Option<String> {
+    let (module, diags) = ilang_syntax::syn3::parse_module(&format!(
+        "f = (s) {{ s |> ({pattern}) {{ {body} }} | (_) {{ 0 }} }}\n"
+    ));
     if !diags.is_empty() {
         return None;
     }
-    let printed = ilang_syntax::lisp::print_module(&module);
-    // The clauses are in the `{ }` of the match: `(. s {(-> p e) …})`.
-    let start = printed.find("{(->")? + 1;
+    let printed = ilang_syntax::syn3::lisp::to_lisp(&module);
+    // The branches are the parts of the chain of the match:
+    // `(|> s (| (-> (, p) _ e) …))`.
+    let start = printed.find("(| (->")? + 3;
     let b = printed.as_bytes();
     let mut depth = 0i32;
     let mut quoted = false;
@@ -644,8 +655,11 @@ pub(crate) fn lisp_clause(clause: &str) -> Option<String> {
 
 /// A pattern of the syntax of §7, in the syntax of the Lisp surface.
 pub(crate) fn lisp_pattern(pattern: &str) -> Option<String> {
-    let clause = lisp_clause(&format!("{pattern} -> 0"))?;
-    let inner = clause.strip_prefix("(-> ")?.strip_suffix(" 0)")?;
+    let clause = lisp_clause(pattern, "0")?;
+    let inner = clause.strip_prefix("(-> (, ")?;
+    let inner = inner
+        .strip_suffix(") _ 0)")
+        .or_else(|| inner.strip_suffix(") _ {0})"))?;
     Some(inner.to_string())
 }
 

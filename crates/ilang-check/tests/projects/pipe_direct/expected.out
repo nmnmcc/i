@@ -1,3 +1,3 @@
-src/main.i:26:1: error[E0401]: the value of `not_ctor` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
-src/main.i:28:1: error[E0401]: the value of `not_direct_arg` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
-src/main.i:31:13: error[E0201]: `v` is not defined
+src/main.i:22:1: error[E0401]: the value of `not_ctor` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
+src/main.i:24:1: error[E0401]: the value of `not_direct_arg` is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back
+src/main.i:27:13: error[E0201]: `v` is not defined

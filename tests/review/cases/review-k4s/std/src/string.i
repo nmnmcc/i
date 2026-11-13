@@ -11,7 +11,6 @@
 //// the other trim functions take out the characters of Unicode
 //// Pattern_White_Space: U+0009 to U+000D, U+0020, U+0085, U+200E, U+200F,
 //// U+2028, and U+2029.
-
 (
 	i/core
 	list = std/list
@@ -108,22 +107,30 @@ repeat = (string: String, times: Int) -> String {
 /// string.split("abc", "")      // ["a", "b", "c"]
 /// ```
 split = (string: String, on: String) -> List(String) {
-	on |> {
-		"" -> to_codepoint_strings(string)
-		_ -> {
+	on |>
+		("") { to_codepoint_strings(string) }
+		| (_) {
 			n = core.byte_size(on)
 			go = (from, acc) {
-				core.index_of(string, on, from) |> {
-					Ok(at) -> go(at + n, [byte_range(string, from, at), ..acc])
-					Error(_) -> list.reverse([
-						byte_range(string, from, core.byte_size(string))
-						..acc
-					])
-				}
+				core.index_of(string, on, from) |>
+					(Ok(at)) {
+						go(at + n, [byte_range(string, from, at), ..acc])
+					}
+					| (Error(_)) {
+						list.reverse(
+							[
+								byte_range(
+									string,
+									from,
+									core.byte_size(string),
+								),
+								..acc,
+							],
+						)
+					}
 			}
 			go(0, [])
 		}
-	}
 }
 
 from_reversed = (codepoints: List(UtfCodepoint)) -> String {
@@ -133,10 +140,9 @@ from_reversed = (codepoints: List(UtfCodepoint)) -> String {
 // The bytes of `string` from byte `start` to byte `end`, which are
 // character boundaries, as `core.index_of` gives them.
 byte_range = (string: String, start: Int, end: Int) -> String {
-	core.byte_slice(string, start, end - start) |> {
-		Ok(part) -> part
-		Error(_) -> ""
-	}
+	core.byte_slice(string, start, end - start) |>
+		(Ok(part)) { part }
+		| (Error(_)) { "" }
 }
 
 /// Cuts a string in two at the first place where `on` is, and takes out
@@ -146,20 +152,24 @@ byte_range = (string: String, start: Int, end: Int) -> String {
 /// string.split_once("key=value=x", "=")  // Some(("key", "value=x"))
 /// ```
 split_once = (string: String, on: String) -> Option((String, String)) {
-	on |> {
-		"" -> None
-		_ -> core.index_of(string, on, 0) |> {
-			Ok(at) -> Some((
-				byte_range(string, 0, at)
-				byte_range(
-					string
-					at + core.byte_size(on)
-					core.byte_size(string)
-				)
-			))
-			Error(_) -> None
+	on |>
+		("") { None }
+		| (_) {
+			core.index_of(string, on, 0) |>
+				(Ok(at)) {
+					Some(
+						(
+							byte_range(string, 0, at),
+							byte_range(
+								string,
+								at + core.byte_size(on),
+								core.byte_size(string),
+							),
+						),
+					)
+				}
+				| (Error(_)) { None }
 		}
-	}
 }
 
 /// Cuts a string into lines, at `"\n"` and at `"\r\n"`.
@@ -169,10 +179,7 @@ split_once = (string: String, on: String) -> Option((String, String)) {
 /// ```
 lines = (string: String) -> List(String) {
 	list.map(split(string, "\n"), (line) {
-		ends_with(line, "\r") |> {
-			True  -> drop_end(line, 1)
-			False -> line
-		}
+		ends_with(line, "\r") |> (True) { drop_end(line, 1) } | (False) { line }
 	})
 }
 
@@ -196,13 +203,18 @@ trim = (string: String) -> String { trim_end(trim_start(string)) }
 
 /// The string without white space at the start.
 trim_start = (string: String) -> String {
-	core.from_codepoints(list.drop_while(core.codepoints(string), is_space))
+	core.from_codepoints(
+		list.drop_while(core.codepoints(string), is_space),
+	)
 }
 
 /// The string without white space at the end.
 trim_end = (string: String) -> String {
 	from_reversed(
-		list.drop_while(list.reverse(core.codepoints(string)), is_space)
+		list.drop_while(
+			list.reverse(core.codepoints(string)),
+			is_space,
+		),
 	)
 }
 
@@ -224,10 +236,7 @@ ends_with = (string: String, suffix: String) -> Bool {
 /// string.contains("theory", "ory")  // True
 /// ```
 contains = (does: String, contain: String) -> Bool {
-	core.index_of(does, contain, 0) |> {
-		Ok(_)    -> True
-		Error(_) -> False
-	}
+	core.index_of(does, contain, 0) |> (Ok(_)) { True } | (Error(_)) { False }
 }
 
 /// Puts `with` in the place of every `each` in the string. When `each` is
@@ -237,10 +246,7 @@ contains = (does: String, contain: String) -> Bool {
 /// string.replace("www.example.com", ".", "-")  // "www-example-com"
 /// ```
 replace = (in: String, each: String, with: String) -> String {
-	each |> {
-		"" -> in
-		_  -> join(split(in, each), with)
-	}
+	each |> ("") { in } | (_) { join(split(in, each), with) }
 }
 
 /// `length` codepoints from the codepoint at `at_index`, counting from 0.
@@ -252,48 +258,52 @@ replace = (in: String, each: String, with: String) -> String {
 /// string.slice("hello", -3, 2)  // "ll"
 /// ```
 slice = (string: String, at_index: Int, length: Int) -> String {
-	{ length <= 0 } |> {
-		True -> ""
-		False -> {
+	{ length <= 0 } |>
+		(True) { "" }
+		| (False) {
 			codepoints = core.codepoints(string)
-			start = { at_index < 0 } |> {
-				True  -> list.length(codepoints) + at_index
-				False -> at_index
-			}
-			{ start < 0 } |> {
-				True -> ""
-				False -> core.from_codepoints(
-					list.take(list.drop(codepoints, start), length)
-				)
-			}
+			start = { at_index < 0 } |>
+				(True) { list.length(codepoints) + at_index }
+				| (False) { at_index }
+			{ start < 0 } |>
+				(True) { "" }
+				| (False) {
+					core.from_codepoints(
+						list.take(list.drop(codepoints, start), length),
+					)
+				}
 		}
-	}
 }
 
 /// The string without its first `up_to` codepoints.
 drop_start = (from: String, up_to: Int) -> String {
-	core.from_codepoints(list.drop(core.codepoints(from), up_to))
+	core.from_codepoints(
+		list.drop(core.codepoints(from), up_to),
+	)
 }
 
 /// The string without its last `up_to` codepoints.
 drop_end = (from: String, up_to: Int) -> String {
-	from_reversed(list.drop(list.reverse(core.codepoints(from)), up_to))
+	from_reversed(
+		list.drop(
+			list.reverse(core.codepoints(from)),
+			up_to,
+		),
+	)
 }
 
 /// The first codepoint, as a string, or `None` for `""`.
 first = (string: String) -> Option(String) {
-	core.codepoints(string) |> {
-		[]      -> None
-		[c, ..] -> Some(core.from_codepoints([c]))
-	}
+	core.codepoints(string) |>
+		([]) { None }
+		| ([c, ..]) { Some(core.from_codepoints([c])) }
 }
 
 /// The last codepoint, as a string, or `None` for `""`.
 last = (string: String) -> Option(String) {
-	list.last(core.codepoints(string)) |> {
-		Some(c) -> Some(core.from_codepoints([c]))
-		None    -> None
-	}
+	list.last(core.codepoints(string)) |>
+		(Some(c)) { Some(core.from_codepoints([c])) }
+		| (None) { None }
 }
 
 /// The first codepoint, as a string, and the rest, or `None` for `""`.
@@ -302,10 +312,11 @@ last = (string: String) -> Option(String) {
 /// string.pop_codepoint("abc")  // Some(("a", "bc"))
 /// ```
 pop_codepoint = (string: String) -> Option((String, String)) {
-	core.codepoints(string) |> {
-		[]        -> None
-		[c, ..cs] -> Some((core.from_codepoints([c]), core.from_codepoints(cs)))
-	}
+	core.codepoints(string) |>
+		([]) { None }
+		| ([c, ..cs]) {
+			Some((core.from_codepoints([c]), core.from_codepoints(cs)))
+		}
 }
 
 /// The string from the first place where `before` is. When `before` is not
@@ -315,10 +326,9 @@ pop_codepoint = (string: String) -> Option((String, String)) {
 /// string.crop("The Lone Ranger", "Lone")  // "Lone Ranger"
 /// ```
 crop = (from: String, before: String) -> String {
-	core.index_of(from, before, 0) |> {
-		Ok(at)   -> byte_range(from, at, core.byte_size(from))
-		Error(_) -> from
-	}
+	core.index_of(from, before, 0) |>
+		(Ok(at)) { byte_range(from, at, core.byte_size(from)) }
+		| (Error(_)) { from }
 }
 
 /// The string without `prefix` at its start. When it does not start with
@@ -329,26 +339,26 @@ crop = (from: String, before: String) -> String {
 /// ```
 remove_prefix = (from: String, matching: String) -> String {
 	n = core.byte_size(matching)
-	starts_with(from, matching) |> {
-		True -> core.byte_slice(from, n, core.byte_size(from) - n) |> {
-			Ok(rest) -> rest
-			Error(_) -> from
+	starts_with(from, matching) |>
+		(True) {
+			core.byte_slice(from, n, core.byte_size(from) - n) |>
+				(Ok(rest)) { rest }
+				| (Error(_)) { from }
 		}
-		False -> from
-	}
+		| (False) { from }
 }
 
 /// The string without `suffix` at its end. When it does not end with
 /// `suffix`, the string is the same.
 remove_suffix = (from: String, matching: String) -> String {
 	n = core.byte_size(from) - core.byte_size(matching)
-	ends_with(from, matching) |> {
-		True -> core.byte_slice(from, 0, n) |> {
-			Ok(rest) -> rest
-			Error(_) -> from
+	ends_with(from, matching) |>
+		(True) {
+			core.byte_slice(from, 0, n) |>
+				(Ok(rest)) { rest }
+				| (Error(_)) { from }
 		}
-		False -> from
-	}
+		| (False) { from }
 }
 
 /// The string with every codepoint in upper case, by the simple uppercase
@@ -375,10 +385,9 @@ to_lower = (string: String) -> String { core.to_lower(string) }
 /// string.capitalise("mamouna")  // "Mamouna"
 /// ```
 capitalise = (string: String) -> String {
-	pop_codepoint(string) |> {
-		Some((head, tail)) -> to_upper(head) <> to_lower(tail)
-		None               -> ""
-	}
+	pop_codepoint(string) |>
+		(Some((head, tail))) { to_upper(head) <> to_lower(tail) }
+		| (None) { "" }
 }
 
 /// The codepoints in the other order.
@@ -391,21 +400,20 @@ reverse = (string: String) -> String { from_reversed(core.codepoints(string)) }
 // `length` codepoints of `with`, repeated as needed.
 padding = (length: Int, with: String) -> String {
 	pad = core.codepoints(with)
-	pad |> {
-		[] -> ""
-		_ -> {
+	pad |>
+		([]) { "" }
+		| (_) {
 			go = (n, rest, acc) {
-				{ n <= 0 } |> {
-					True -> from_reversed(acc)
-					False -> rest |> {
-						[]        -> go(n, pad, acc)
-						[c, ..cs] -> go(n - 1, cs, [c, ..acc])
+				{ n <= 0 } |>
+					(True) { from_reversed(acc) }
+					| (False) {
+						rest |>
+							([]) { go(n, pad, acc) }
+							| ([c, ..cs]) { go(n - 1, cs, [c, ..acc]) }
 					}
-				}
 			}
 			go(length, pad, [])
 		}
-	}
 }
 
 /// Puts `with`, repeated, before the string until it has `to` codepoints.
@@ -463,25 +471,21 @@ utf_codepoint_to_int = (codepoint: UtfCodepoint) -> Int {
 /// string.compare("A", "B")              // Less
 /// ```
 compare = (a: String, b: String) -> Order {
-	{ a == b } |> {
-		True  -> Equal
-		False -> compare_bytes(<<a:utf8>>, <<b:utf8>>)
-	}
+	{ a == b } |>
+		(True) { Equal }
+		| (False) { compare_bytes(<<a:utf8>>, <<b:utf8>>) }
 }
 
 compare_bytes = (a: BitArray, b: BitArray) -> Order {
-	(a, b) |> {
-		(<<x, xs:bytes>>, <<y, ys:bytes>>) -> { x == y } |> {
-			True -> compare_bytes(xs, ys)
-			False -> { x < y } |> {
-				True  -> Less
-				False -> Greater
-			}
+	(a, b) |>
+		((<<x, xs:bytes>>, <<y, ys:bytes>>)) {
+			{ x == y } |>
+				(True) { compare_bytes(xs, ys) }
+				| (False) { { x < y } |> (True) { Less } | (False) { Greater } }
 		}
-		(<<>>, <<>>) -> Equal
-		(<<>>, _)    -> Less
-		_            -> Greater
-	}
+		| ((<<>>, <<>>)) { Equal }
+		| ((<<>>, _)) { Less }
+		| (_) { Greater }
 }
 
 /// The text form of any value, as i source (§11.8).
@@ -490,12 +494,9 @@ compare_bytes = (a: BitArray, b: BitArray) -> Order {
 /// string.inspect([1, 2])  // "[1, 2]"
 /// string.inspect("a")     // "\"a\""
 /// ```
-inspect(A) = (term: A) -> String { core.inspect(term) }
+inspect = <A>(term: A) -> String { core.inspect(term) }
 
 /// `None` for `""`, and `Some(string)` for any other string.
 to_option = (string: String) -> Option(String) {
-	string |> {
-		"" -> None
-		_  -> Some(string)
-	}
+	string |> ("") { None } | (_) { Some(string) }
 }

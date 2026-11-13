@@ -19,7 +19,8 @@ fn program(source: &str, opt: Level) -> Program {
         },
     )
     .unwrap();
-    Program::from_bytes(&built.wasm).unwrap()
+    // R2 pins the one-worker FIFO order (multicore D1/D12).
+    Program::from_bytes(&built.wasm).unwrap().with_workers(1)
 }
 
 #[test]
@@ -196,7 +197,7 @@ fn expect_int(outcome: Outcome, expected: i64) {
 fn completion_gates_and_root_accounting_on_the_rust_host() {
     for opt in [Level::O0, Level::O2] {
         let built = fixture(opt);
-        let program = built.host_program().unwrap();
+        let program = built.host_program().unwrap().with_workers(1);
         for _ in 0..200 {
             for name in [
                 "overlap",
@@ -282,7 +283,7 @@ fn seeded_script_replays_200_times_at_each_optimization_level() {
     let mut cross_level = None;
     for opt in [Level::O0, Level::O2] {
         let built = fixture(opt);
-        let program = built.host_program().unwrap();
+        let program = built.host_program().unwrap().with_workers(1);
         let mut instance = program
             .instantiate(HostOptions::new(gate_imports(&built, Default::default())))
             .unwrap();
@@ -344,11 +345,32 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     let begin = source
         .find("@external(\"ilang:control\", \"finalizing\")")
         .unwrap();
-    let end = source[begin..].find("\nFrame {").unwrap() + begin;
+    let end = source[begin..].find("\nFrame = (").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "finalizing(A,R,E,N,B,F,M) = (_k: Continuation(A,R,E,N), _b: Boundary(B,F,M)) -> Bool { False }\n"
+        + "finalizing = <A, R, E, N, B, F, M>(\n\t_k: Continuation(A, R, E, N),\n\t_b: Boundary(B, F, M)\n) -> Bool { False }\n"
+        + &source[end..];
+    let begin = source
+        .find("@external(\"ilang:worker\", \"enabled\")")
+        .unwrap();
+    let end = source[begin..].find("\ndrop_shares = ").unwrap() + begin;
+    let source = source[..begin].to_string()
+        + "worker_enabled = () -> Bool { False }\n\
+           worker_publish = (_job: Job) -> Int { 0 }\n\
+           worker_claim = (_ticket: Int) -> Bool { True }\n\
+           worker_adopt = (_ticket: Int, _task: Int) -> Nil { Nil }\n\
+           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never, Never) { panic(\"no workers\") }\n\
+           worker_away = (_k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool { False }\n\
+           worker_send = (_task: Int, _resume: Resume) -> Nil { Nil }\n\
+           worker_inbox = () -> Int { 0 }\n\
+           worker_message = () -> Remote { panic(\"no workers\") }\n\
+           worker_pending = () -> Bool { False }\n\
+           worker_wait = () -> Nil { Nil }\n\
+           worker_share_put = (_run: Key(Nil), _address: Address, _value: Keyed) -> Nil { Nil }\n\
+           worker_share_get = (_run: Key(Nil), _address: Address) -> List(Keyed) { [] }\n\
+           worker_share_drop = (_run: Key(Nil), _address: Address) -> Nil { Nil }\n"
         + &source[end..];
     assert!(!source.contains("@external(\"ilang:request\""));
+    assert!(!source.contains("@external(\"ilang:worker\""));
     let source = source
         + r#"
 
@@ -393,7 +415,7 @@ fn user_examples_have_documented_outputs() {
                 },
             )
             .unwrap();
-            let program = Program::from_bytes(&built.wasm).unwrap();
+            let program = Program::from_bytes(&built.wasm).unwrap().with_workers(1);
             let log = services::Log::default();
             let printed = log.clone();
             let imports = services::standard(move |text| printed.lock().unwrap().push(text.into()));

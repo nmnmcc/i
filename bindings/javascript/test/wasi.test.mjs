@@ -30,19 +30,50 @@ for (const opt of [0, 2]) {
     try {
       await mkdir(join(dir, 'src'));
       await writeFile(join(dir, 'i.toml'), 'name = "app"\n');
-      await writeFile(join(dir, 'src/main.i'), `
-(i/process, i/stdio, i/core, i/fail, i/fs, i/clock)
+      await writeFile(join(dir, 'src/main.i'), `(
+	i/process
+	i/stdio
+	i/core
+	i/fail
+	i/fs
+	i/clock
+)
 main = () {
- clock.sleep_ns(0)
- assert(fail.catch(() { clock.sleep_ns(-1) }) == Error(clock.ClockError("sleep_ns", "invalid")))
- assert(fail.catch(() { clock.sleep_ns(core.shift_left(1, 100)) }) == Error(clock.ClockError("sleep_ns", "range")))
- assert(process.args() == ["alpha", "beta"])
- assert(process.env("I_WASI_TEST") == "value")
- assert(core.bit_size(process.entropy(32)) == 256)
- assert(fail.catch(() { process.env("MISSING") }) == Error(process.ProcessError("env", "not_found")))
- assert(fail.catch(() { process.entropy(-1) }) == Error(process.ProcessError("entropy", "invalid")))
- assert(fail.catch(() { fs.read_file("/outside/no-preopen") }) == Error(fs.FsError("open", "/outside/no-preopen", "denied")))
- stdio.print("args env entropy ok")
+	clock.sleep_ns(0)
+	assert(
+		fail.catch(() { clock.sleep_ns(-1) }) ==
+			Error(clock.ClockError(operation = "sleep_ns", code = "invalid")),
+	)
+	assert(
+		fail.catch(() { clock.sleep_ns(core.shift_left(1, 100)) }) ==
+			Error(clock.ClockError(operation = "sleep_ns", code = "range")),
+	)
+	assert(process.args() == ["alpha", "beta"])
+	assert(process.env("I_WASI_TEST") == "value")
+	assert(
+		core.bit_size(process.entropy(32)) == 256,
+	)
+	assert(
+		fail.catch(() { process.env("MISSING") }) ==
+			Error(process.ProcessError(operation = "env", code = "not_found")),
+	)
+	assert(
+		fail.catch(() { process.entropy(-1) }) ==
+			Error(
+				process.ProcessError(operation = "entropy", code = "invalid"),
+			),
+	)
+	assert(
+		fail.catch(() { fs.read_file("/outside/no-preopen") }) ==
+			Error(
+				fs.FsError(
+					operation = "open",
+					path = "/outside/no-preopen",
+					code = "denied",
+				),
+			),
+	)
+	stdio.print("args env entropy ok")
 }
 `);
       const wasm = build(dir, 'app', opt);
@@ -56,7 +87,7 @@ test('WASI rejects unavailable Net, Tls and Process at compile time', { timeout:
   const dir = await mkdtemp(join(tmpdir(), 'i-wasi-unavailable-'));
   try {
     await mkdir(join(dir, 'src')); await writeFile(join(dir, 'i.toml'), 'name = "app"\n');
-    for (const [source, service] of [['(i/tls)\nmain = (t ! tls.Tls) { Nil }', 'Tls'], ['(i/process)\nmain = (p ! process.Process) { Nil }', 'Process']]) {
+    for (const [source, service] of [['(\n\ti/tls\n)\nmain = () <- (t: tls.Tls) { Nil }', 'Tls'], ['(\n\ti/process\n)\nmain = () <- (p: process.Process) { Nil }', 'Process']]) {
       await writeFile(join(dir, 'src/main.i'), source);
       const out = spawnSync(cli, ['build', '--project', dir, '--target', 'wasi'], { encoding: 'utf8' });
       assert.notEqual(out.status, 0); assert.match(out.stderr, new RegExp(service)); assert.match(out.stderr, /wasi/i);

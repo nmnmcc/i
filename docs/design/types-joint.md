@@ -133,10 +133,10 @@ T2 K1 says: “Of reads inferred schemes/monotypes, never a narrower flow fact.�
 
 ```i
 copy = (s: String) {
-  x = "a" = s
-  r = ( value: x )
-  y: x = "b"
-  (r.value, y)
+	x = "a" = s
+	r = (value = x)
+	y: x = "b"
+	(r.value, y)
 }
 ```
 
@@ -466,7 +466,7 @@ These are implementation acceptance tests, not claims that this pre-A1 compiler 
 **T-A: literal alias through a record (J1, T2 R2, T3 width).**
 
 ```i
-r = ( method: "GET", port: 8080 )
+r = (method = "GET", port = 8080)
 Config = r
 use = (c: Config) { c.port }
 value = use(r)
@@ -480,13 +480,12 @@ Config is `( method: "GET", port: 8080 )`, value is 8080. `use(( method: "POST",
 
 ```i
 read = (s: String) {
-  s |> {
-    other: String - "a" -> 0
-    key -> {
-      same: key = "a"
-      record.get(( a: 7 ), same)
-    }
-  }
+	s |>
+		(other: String - "a") { 0 }
+		| (key) {
+			same: key = "a"
+			record.get((a = 7), same)
+		}
 }
 ```
 
@@ -495,10 +494,8 @@ It gives 7 for `read("a")` and 0 for `read("b")`; key/same have singleton type `
 **T-D: keys remain identities (J1/J3).**
 
 ```i
-forward(K) = (r: ( K: Int ), key: K) -> Int {
-  record.get(r, key)
-}
-answer = forward(( a: 7 ), "a")
+forward = <K>(r: (k = Int), key: K) -> Int { record.get(r, key) }
+answer = forward((a = 7), "a")
 ```
 
 Value 7. Changing the body to `copy = key` then `record.get(r, copy)` is E0541. Adding `x: key = "a"` in the body is E0543. `Get = record.get` is E0542. Two parameters of the same K passed distinct fixed strings or distinct outer keys give E0541. A singleton expression that records an effect before returning `"a"` runs that effect exactly once, in written argument order, when used as a key; test both a labelled call and a pipe.
@@ -506,12 +503,7 @@ Value 7. Changing the body to `copy = key` then `record.get(r, copy)` is E0541. 
 **T-E: records do not acquire runtime field tests (J5).**
 
 ```i
-bad = (r: (a: Int | String)) {
-  r |> {
-    x: { (a: Int) } -> x.a + 1
-    _ -> 0
-  }
-}
+bad = (r: (a = Int | String)) { r |> (x: (a = Int)) { x.a + 1 } | (_) { 0 } }
 ```
 
 E0501, even with the catch-all: the first test takes all records. The positive version uses `r: Int | ( a: Int )` and `n -> n + 1` as its second clause; it returns the field plus one for a record and the integer plus one otherwise. The second binder is Int. Replacing the record annotation by a completed alias changes neither the test table nor the result. Combine a record clause with `s: String - "a"` and a remaining `"a"` clause; test with an Int rejection where the declared input excludes Int, and with a declared Int branch where it includes it. The string complement must still have its tag guard.
@@ -519,11 +511,11 @@ E0501, even with the catch-all: the first test takes all records. The positive v
 **T-F: invariant generalization (J7).**
 
 ```i
-Cell(A) { Cell(run: (A) -> A) }
-make = () { Cell((x) { x }) }
+Cell(A) = (run = (A) -> A)
+make = () { Cell(run = (x) { x }) }
 int_cell: Cell(Int) = make()
 string_cell: Cell(String) = make()
-nested = () { ( cell: Cell((x) { x }) ) }
+nested = () { (cell = Cell(run = (x) { x })) }
 ```
 
 Both calls are accepted with distinct instances. `nested` keeps a general variable in the invariant child of its covariant record field. `Same = make` is E0533, not a closed alias to `Cell(Never)`. `wrong = (c: Cell(Int)) -> Cell(Never) { c }` fails invariant checking. Also run K1’s service-equality, contravariant, bivariant and stream fixtures after migration to the accepted syntax; do not replace them with a check only of printed variable names.
@@ -531,8 +523,8 @@ Both calls are accepted with distinct instances. `nested` keeps a general variab
 **T-G: completion fixes constraints, not display (J4).**
 
 ```i
-Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }
-make_cell(A) = (x: A) { Cell(get: () { x }, set: (y: A) { Nil }) }
+Cell(A) = (get = () -> A, set = (A) -> Nil)
+make_cell = <A>(x: A) { Cell(get = () { x }, set = (y: A) { Nil }) }
 r = make_cell(1)
 Read = r
 later = () { r.set(2) }
@@ -545,8 +537,8 @@ Read fixes the demanded invariant argument to 1 if the completion batch succeeds
 **T-I: exact forgetting (J8).**
 
 ```i
-Gone(A) = ( ..( a: A, b: Int ), -a )
-empty = (x: Gone(Never)) { x |> {} }
+Gone(A) = { () }
+empty = (x: Gone(Never)) { core.never(x) }
 ```
 
 `Gone(Never)` is Never. In the internal normalization test, normalize Gone(A), then substitute Never: it must also become Never. Replacing A with 1 yields `( b: Int )`. Add an invariant wrapper around Gone(A), and test both polarities. This catches an erased variable even if no runtime value can inhabit its original record. It also ensures T2 cannot cache the result of an inexact open rewrite.

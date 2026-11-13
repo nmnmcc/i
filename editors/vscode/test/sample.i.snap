@@ -1,5 +1,5 @@
 "//"  comment.line.double-slash.i punctuation.definition.comment.i
-" old-syntax-check: E0003,E0106"  comment.line.double-slash.i
+" old-syntax-check: E0101,E0003,E0106,E0101"  comment.line.double-slash.i
 "////"  comment.line.documentation.module.i punctuation.definition.comment.i
 " The module documentation."  comment.line.documentation.module.i
 "("  meta.header.i punctuation.definition.header.begin.i
@@ -31,27 +31,38 @@
 "///"  comment.line.documentation.i punctuation.definition.comment.i
 " A user."  comment.line.documentation.i
 "User"  entity.name.type.i
-"{"  punctuation.brackets.curly.i
-"User"  entity.name.type.i
+"="  keyword.operator.assignment.i
 "("  punctuation.brackets.round.i
 "name"  variable.parameter.i
-":"  punctuation.separator.annotation.i
+"="  keyword.operator.assignment.i
 "String"  support.type.builtin.i
 ","  punctuation.separator.comma.i
 "age"  variable.parameter.i
-":"  punctuation.separator.annotation.i
+"="  keyword.operator.assignment.i
 "Int"  support.type.builtin.i
 ")"  punctuation.brackets.round.i
-"}"  punctuation.brackets.curly.i
 "Shape"  entity.name.type.i
 "("  punctuation.brackets.round.i
 "A"  entity.name.type.i
 ")"  punctuation.brackets.round.i
 "="  keyword.operator.assignment.i
+"<"  keyword.operator.comparison.i
+"B"  entity.name.type.i
+">"  keyword.operator.comparison.i
 "("  punctuation.brackets.round.i
 "A"  entity.name.type.i
 ","  punctuation.separator.comma.i
-"A"  entity.name.type.i
+"B"  entity.name.type.i
+")"  punctuation.brackets.round.i
+"<-"  keyword.operator.provide.i
+"("  punctuation.brackets.round.i
+"Fail"  entity.name.type.i
+"("  punctuation.brackets.round.i
+"String"  support.type.builtin.i
+")"  punctuation.brackets.round.i
+","  punctuation.separator.comma.i
+".."  keyword.operator.spread.i
+"N"  entity.name.type.i
 ")"  punctuation.brackets.round.i
 "->"  keyword.operator.arrow.i
 "A"  entity.name.type.i
@@ -65,18 +76,16 @@
 "\""  string.quoted.double.i punctuation.definition.string.end.i
 ")"  punctuation.brackets.round.i
 "Console"  entity.name.type.i
-"{"  punctuation.brackets.curly.i
-"Console"  entity.name.type.i
+"="  keyword.operator.assignment.i
 "("  punctuation.brackets.round.i
 "print"  variable.parameter.i
-":"  punctuation.separator.annotation.i
+"="  keyword.operator.assignment.i
 "("  punctuation.brackets.round.i
 "String"  support.type.builtin.i
 ")"  punctuation.brackets.round.i
 "->"  keyword.operator.arrow.i
 "Nil"  constant.language.i
 ")"  punctuation.brackets.round.i
-"}"  punctuation.brackets.curly.i
 "@"  storage.type.annotation.i punctuation.definition.annotation.i
 "external"  storage.type.annotation.i
 "("  punctuation.brackets.round.i
@@ -183,6 +192,9 @@
 "\""  string.quoted.double.i punctuation.definition.string.end.i
 "floats"  entity.name.function.definition.i
 "="  keyword.operator.assignment.i
+"<"  keyword.operator.comparison.i
+"A"  entity.name.type.i
+">"  keyword.operator.comparison.i
 "("  punctuation.brackets.round.i
 "x"  variable.parameter.i
 ":"  punctuation.separator.annotation.i
@@ -192,12 +204,6 @@
 ")"  punctuation.brackets.round.i
 "->"  keyword.operator.arrow.i
 "Float"  support.type.builtin.i
-"^"  keyword.operator.error.i
-"fail"  variable.other.i
-"."  punctuation.accessor.i
-"Fail"  entity.name.type.i
-"!"  keyword.operator.environment.i
-"Nil"  constant.language.i
 "{"  punctuation.brackets.curly.i
 "z"  variable.other.i
 "="  keyword.operator.assignment.i
@@ -227,20 +233,28 @@
 ">."  keyword.operator.comparison.float.i
 "4.0"  constant.numeric.float.i
 "|>"  keyword.operator.match.i
-"{"  punctuation.brackets.curly.i
+"("  punctuation.brackets.round.i
 "True"  constant.language.i
-"->"  keyword.operator.arrow.i
+")"  punctuation.brackets.round.i
+"{"  punctuation.brackets.curly.i
 "z"  variable.other.i
+"}"  punctuation.brackets.curly.i
+"|"  keyword.operator.choice.i
+"("  punctuation.brackets.round.i
 "False"  constant.language.i
-"->"  keyword.operator.arrow.i
+")"  punctuation.brackets.round.i
+"{"  punctuation.brackets.curly.i
 "0.0"  constant.numeric.float.i
 "}"  punctuation.brackets.curly.i
 "}"  punctuation.brackets.curly.i
 "main"  entity.name.function.definition.i
 "="  keyword.operator.assignment.i
 "("  punctuation.brackets.round.i
-"io"  variable.other.i
-"!"  keyword.operator.environment.i
+")"  punctuation.brackets.round.i
+"<-"  keyword.operator.provide.i
+"("  punctuation.brackets.round.i
+"io"  variable.parameter.i
+":"  punctuation.separator.annotation.i
 "Console"  entity.name.type.i
 ")"  punctuation.brackets.round.i
 "{"  punctuation.brackets.curly.i
@@ -287,7 +301,7 @@
 "base"  variable.other.i
 ","  punctuation.separator.comma.i
 "name"  variable.parameter.i
-":"  punctuation.separator.annotation.i
+"="  keyword.operator.assignment.i
 "\""  string.quoted.double.i punctuation.definition.string.begin.i
 "x"  string.quoted.double.i
 "\""  string.quoted.double.i punctuation.definition.string.end.i
@@ -305,31 +319,42 @@
 "="  keyword.operator.assignment.i
 "first"  variable.other.i
 "|>"  keyword.operator.match.i
-"{"  punctuation.brackets.curly.i
+"("  punctuation.brackets.round.i
 "0"  constant.numeric.integer.decimal.i
 "|"  keyword.operator.choice.i
 "1"  constant.numeric.integer.decimal.i
-"->"  keyword.operator.arrow.i
+")"  punctuation.brackets.round.i
+"{"  punctuation.brackets.curly.i
 "1"  constant.numeric.integer.decimal.i
+"}"  punctuation.brackets.curly.i
+"|"  keyword.operator.choice.i
+"("  punctuation.brackets.round.i
 "n"  variable.other.i
 "?"  keyword.operator.guard.i
 "n"  variable.other.i
 ">"  keyword.operator.comparison.i
 "10"  constant.numeric.integer.decimal.i
-"->"  keyword.operator.arrow.i
+")"  punctuation.brackets.round.i
+"{"  punctuation.brackets.curly.i
 "n"  variable.other.i
 "%"  keyword.operator.arithmetic.i
 "3"  constant.numeric.integer.decimal.i
+"}"  punctuation.brackets.curly.i
+"|"  keyword.operator.choice.i
+"("  punctuation.brackets.round.i
 "_"  variable.language.discard.i
-"->"  keyword.operator.arrow.i
+")"  punctuation.brackets.round.i
+"{"  punctuation.brackets.curly.i
 "__ignored"  variable.language.discard.i
 "}"  punctuation.brackets.curly.i
+"{"  punctuation.brackets.curly.i
 "1"  constant.numeric.integer.decimal.i
 "|>"  keyword.operator.pipe.i
 "plus"  entity.name.function.call.i
 "("  punctuation.brackets.round.i
 "2"  constant.numeric.integer.decimal.i
 ")"  punctuation.brackets.round.i
+"}"  punctuation.brackets.curly.i
 "=="  keyword.operator.comparison.i
 "3"  constant.numeric.integer.decimal.i
 "!="  keyword.operator.comparison.i
@@ -351,6 +376,10 @@
 "*"  keyword.operator.arithmetic.i
 "2"  constant.numeric.integer.decimal.i
 "}"  punctuation.brackets.curly.i
+")"  punctuation.brackets.round.i
+"<-"  keyword.operator.provide.i
+"("  punctuation.brackets.round.i
+"io"  variable.other.i
 ")"  punctuation.brackets.round.i
 "}"  punctuation.brackets.curly.i
 "test"  entity.name.function.call.i

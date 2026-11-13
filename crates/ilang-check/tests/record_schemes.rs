@@ -10,11 +10,11 @@ fn exported_label_scheme_round_trips_with_cross_module_caller() {
     let (graph, program, diags) = common::check_files(&[
         (
             "src/defs.i",
-            "(i/record)\n(get)\nget(K) = (r: (K: Int), key: K) -> Int { record.get(r, key) }\n",
+            "(\n\tget\n)\nget = <A>(r: (a = A)) -> A { r.a }\n",
         ),
         (
             "src/main.i",
-            "(app/defs)\n(main)\nmain = () { assert(defs.get((a: 1), \"a\") == 1) }\n",
+            "(\n\tapp/defs\n)\n\n(\n\tmain\n)\nmain = () { assert(defs.get((a = 1)) == 1) }\n",
         ),
     ]);
     assert!(diags.is_empty(), "{:?}", graph.sources.render_all(&diags));

@@ -372,7 +372,7 @@ impl<'a> Query<'a> {
                 }],
                 ..ast::Module::default()
             };
-            code.push_str(&ilang_syntax::lisp::print_module(&module));
+            code.push_str(&ilang_syntax::syn3::print_current(&module, true));
         }
         Some(Hover {
             span,
@@ -472,18 +472,41 @@ impl<'a> Query<'a> {
                 notes.push(format!("Declared as `{declared}`"));
             }
         }
-        // The error and environment rows of a function type (§3, §9).
+        // The need of a function type (syntax three §2.10, §6.6): its
+        // `Fail(…)` entries are the possible errors, the rest services.
         let ty = code.split_once(": ").map_or(code, |x| x.1);
-        if let Some((_, rest)) = complete::split_fn_type(ty) {
-            let (rest, env) = split_top(&rest, " ! ");
-            let (_, err) = split_top(rest, " ^ ");
-            // A row that is only a type variable says nothing.
-            let known = |row: &str| !self.is_type_variable_text(row);
-            if let Some(e) = err.filter(|e| known(e)) {
-                notes.push(format!("Errors: `{e}`"));
+        if let Some((_, Some(need), _)) = complete::split_fn_type_need(ty) {
+            let inner = need
+                .strip_prefix('(')
+                .and_then(|x| x.strip_suffix(')'))
+                .unwrap_or(&need);
+            let mut errors = Vec::new();
+            let mut services = Vec::new();
+            let mut rest = inner;
+            loop {
+                let (head, tail) = split_first_top(rest, ", ");
+                let item = head.trim();
+                if let Some(e) = item.strip_prefix("Fail(").and_then(|x| x.strip_suffix(')')) {
+                    // A row that is only a type variable says nothing.
+                    if !self.is_type_variable_text(e) {
+                        errors.push(e.to_string());
+                    }
+                } else if !item.is_empty()
+                    && !item.starts_with("..")
+                    && !self.is_type_variable_text(item)
+                {
+                    services.push(item.to_string());
+                }
+                match tail {
+                    Some(t) => rest = t,
+                    None => break,
+                }
             }
-            if let Some(n) = env.filter(|n| known(n)) {
-                notes.push(format!("Environment: `{n}`"));
+            if !errors.is_empty() {
+                notes.push(format!("Possible errors: `{}`", errors.join(" | ")));
+            }
+            if !services.is_empty() {
+                notes.push(format!("Services: `{}`", services.join(", ")));
             }
         }
         notes
@@ -666,30 +689,33 @@ impl<'a> Query<'a> {
         }
         match &def.body {
             TypeBody::Alias(ty) => format!("{head} = {}", self.show_type(ty)),
-            TypeBody::Custom(cs) if cs.is_empty() => format!("{head} {{}}"),
+            // Syntax three (§2.8): `T = Opaque`, a labelled type `T = (…)`,
+            // or one labelled type per constructor and the sum.
+            TypeBody::Custom(cs) if cs.is_empty() => format!("{head} = Opaque"),
             TypeBody::Custom(cs) => {
-                let cs: Vec<String> = cs
-                    .iter()
-                    .map(|c| {
-                        if c.fields.is_empty() {
-                            return c.name.clone();
-                        }
-                        let fs: Vec<String> = c
-                            .fields
-                            .iter()
-                            .map(|f| match &f.label {
-                                Some(l) => format!("{}: {}", l.name, self.show_type(&f.ty)),
-                                None => self.show_type(&f.ty),
-                            })
-                            .collect();
-                        format!("{}({})", c.name, fs.join(", "))
-                    })
-                    .collect();
-                if cs.iter().map(String::len).sum::<usize>() < 60 {
-                    format!("{head} {{ {} }}", cs.join("  "))
-                } else {
-                    format!("{head} {{\n  {}\n}}", cs.join("\n  "))
+                let data = |c: &crate::hir::CtorDef| -> String {
+                    let fs: Vec<String> = c
+                        .fields
+                        .iter()
+                        .map(|f| match &f.label {
+                            Some(l) => format!("{} = {}", l.name, self.show_type(&f.ty)),
+                            None => self.show_type(&f.ty),
+                        })
+                        .collect();
+                    format!("({})", fs.join(", "))
+                };
+                if let [only] = cs.as_slice()
+                    && only.name == def.name
+                {
+                    return format!("{head} = {}", data(only));
                 }
+                let mut lines: Vec<String> = cs
+                    .iter()
+                    .map(|c| format!("{} = {}", c.name, data(c)))
+                    .collect();
+                let members: Vec<&str> = cs.iter().map(|c| c.name.as_str()).collect();
+                lines.push(format!("{head} = {}", members.join(" | ")));
+                lines.join("\n")
             }
         }
     }
@@ -743,28 +769,11 @@ impl<'a> Query<'a> {
                 let parts: Vec<String> = parts.iter().map(|a| self.show_type(a)).collect();
                 format!("({})", parts.join(", "))
             }
-            TypeKind::Record {
-                base,
-                fields,
-                removed,
-            } => {
-                let mut parts = Vec::new();
-                if let Some(base) = base {
-                    parts.push(format!("..{}", self.show_type(base)));
-                }
-                parts.extend(fields.iter().map(|(name, ty)| {
-                    format!(
-                        "{}: {}",
-                        ilang_syntax::print::record_label(&name.name, name.parameter.is_some()),
-                        self.show_type(ty)
-                    )
-                }));
-                parts.extend(removed.iter().map(|name| {
-                    format!(
-                        "-{}",
-                        ilang_syntax::print::record_label(&name.name, name.parameter.is_some())
-                    )
-                }));
+            TypeKind::Record { fields } => {
+                let parts: Vec<String> = fields
+                    .iter()
+                    .map(|(name, ty)| format!("{}: {}", name.name, self.show_type(ty)))
+                    .collect();
                 format!("({})", parts.join(", "))
             }
             TypeKind::Fn {
@@ -1073,6 +1082,8 @@ impl<'a> Query<'a> {
                 }
             }
         }
+        w.split_written_puns();
+        self.walk_sum_members(m, &mut w.occ);
         self.walk_imports_exports(m, &mut w.occ);
         self.walk_type_params(m, &mut w.occ);
         Occurrences {
@@ -1119,6 +1130,44 @@ impl<'a> Query<'a> {
                     });
                 if let Some(v) = var {
                     occ.push((param.span, Target::TyVar(v)));
+                }
+            }
+        }
+    }
+
+    /// The members of a sum `T = C1 | C2` (syntax three §2.6): each names
+    /// the labelled type `C1`, which is the constructor `C1` of `T` in the
+    /// HIR. The HIR keeps only the definitions of the members, so their
+    /// names in the sum are found in the written item.
+    fn walk_sum_members(&self, m: ModuleId, occ: &mut Vec<(Span, Target)>) {
+        let ast = self.ast(m);
+        let p = self.program;
+        let text = self.written_text(m);
+        for &t in &p.module(m).types {
+            let def = p.ty(t);
+            let TypeBody::Custom(cs) = &def.body else {
+                continue;
+            };
+            let Some(item) = ast
+                .items
+                .iter()
+                .find(|i| matches!(&i.kind, ast::ItemKind::TypeDef(d) if d.name.span == def.span))
+            else {
+                continue;
+            };
+            let rhs = Span::new(def.span.end, item.span.end);
+            for (ci, c) in cs.iter().enumerate() {
+                if item.span.start <= c.span.start && c.span.end <= item.span.end {
+                    continue;
+                }
+                if let Some(s) = find_word(text, rhs, &c.name, false) {
+                    occ.push((
+                        s,
+                        Target::Ctor(CtorRef {
+                            ty: t,
+                            index: ci as u32,
+                        }),
+                    ));
                 }
             }
         }
@@ -1629,24 +1678,20 @@ fn binder_pattern(p: &Pattern, v: VarId) -> Option<&Pattern> {
 }
 
 /// `a sep b` split at the last `sep` outside brackets.
-fn split_top<'s>(s: &'s str, sep: &str) -> (&'s str, Option<&'s str>) {
+fn split_first_top<'s>(s: &'s str, sep: &str) -> (&'s str, Option<&'s str>) {
     let mut depth = 0i32;
     let b = s.as_bytes();
-    let mut last = None;
-    let mut i = 0;
-    while i < b.len() {
+    for i in 0..b.len() {
         match b[i] {
             b'(' | b'[' | b'{' => depth += 1,
             b')' | b']' | b'}' => depth -= 1,
-            _ if depth == 0 && s[i..].starts_with(sep) => last = Some(i),
+            _ if depth == 0 && s[i..].starts_with(sep) => {
+                return (&s[..i], Some(&s[i + sep.len()..]));
+            }
             _ => {}
         }
-        i += 1;
     }
-    match last {
-        Some(i) => (&s[..i], Some(&s[i + sep.len()..])),
-        None => (s, None),
-    }
+    (s, None)
 }
 
 fn with_type(name: &str, ty: Option<&str>) -> String {
@@ -1844,6 +1889,51 @@ impl Walk<'_> {
         }
     }
 
+    /// Syntax three writes the label and the local of a pattern part both,
+    /// `C(label = label)` (`(= label label)` in the Lisp surface), where
+    /// the tree has one binder at the label. The label stays a name of the
+    /// field; the local is the second word.
+    fn split_written_puns(&mut self) {
+        let text = self.text;
+        let bytes = text.as_bytes();
+        for (a, field) in self.labels.clone() {
+            let name = &text[a.start as usize..a.end as usize];
+            let rest = &text[a.end as usize..];
+            let lisp_form = text[..a.start as usize].trim_end().ends_with("(=");
+            let after = rest.trim_start();
+            let after = if lisp_form {
+                after
+            } else {
+                match after.strip_prefix('=') {
+                    Some(x) if !x.starts_with('=') => x.trim_start(),
+                    _ => continue,
+                }
+            };
+            let start = text.len() - after.len();
+            let end = start + name.len();
+            if !after.starts_with(name) || bytes.get(end).is_some_and(|b| is_word_byte(*b)) {
+                continue;
+            }
+            let b = Span::new(start as u32, end as u32);
+            let mut moved = false;
+            for (s, t) in self.occ.iter_mut() {
+                if *s == a
+                    && let Target::Local(v) = t
+                {
+                    if self.binders.get(v) == Some(&a) {
+                        self.binders.insert(*v, b);
+                    }
+                    *s = b;
+                    moved = true;
+                }
+            }
+            if moved {
+                self.labels.retain(|(s, _)| *s != a);
+                self.occ.push((a, field));
+            }
+        }
+    }
+
     fn binder(&mut self, b: &Binder) {
         if b.name.starts_with('%') {
             return;
@@ -1934,10 +2024,7 @@ impl Walk<'_> {
             | TypeKind::Union(ts)
             | TypeKind::Inter(ts)
             | TypeKind::Diff(ts) => ts.iter().for_each(|a| self.ty(a)),
-            TypeKind::Record { base, fields, .. } => {
-                if let Some(base) = base {
-                    self.ty(base);
-                }
+            TypeKind::Record { fields } => {
                 for (_, field) in fields {
                     self.ty(field);
                 }
@@ -2076,6 +2163,7 @@ impl Walk<'_> {
                 }
             }
             ExprKind::TupleIndex { target, .. } => self.expr(target),
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::RecordUpdate {
                 ctor,
                 ctor_span,
@@ -2123,29 +2211,7 @@ fn contains(span: Span, offset: u32) -> bool {
 }
 
 fn pattern_binders(p: &Pattern, out: &mut Vec<Binder>) {
-    match &p.kind {
-        PatternKind::Quote { captures, .. } => {
-            captures.iter().for_each(|(_, p)| pattern_binders(p, out))
-        }
-        PatternKind::Var(b) => out.push(b.clone()),
-        PatternKind::Typed { binder, .. } => out.extend(binder.clone()),
-        PatternKind::Named { binder, pattern } => {
-            out.push(binder.clone());
-            pattern_binders(pattern, out);
-        }
-        PatternKind::Prefix { rest, .. } => out.extend(rest.clone()),
-        PatternKind::Constructor { args: ps, .. }
-        | PatternKind::Tuple(ps)
-        | PatternKind::Error(ps) => ps.iter().for_each(|q| pattern_binders(q, out)),
-        PatternKind::List { items, rest } => {
-            items.iter().for_each(|q| pattern_binders(q, out));
-            if let Some(Some(b)) = rest {
-                out.push(b.clone());
-            }
-        }
-        PatternKind::BitArray(segs) => segs.iter().for_each(|s| pattern_binders(&s.value, out)),
-        _ => {}
-    }
+    crate::hir::pattern_binders(p, &mut |b| out.push(b.clone()));
     out.retain(|b| !b.name.starts_with('%'));
 }
 
@@ -2249,6 +2315,7 @@ impl Scope<'_> {
             ExprKind::Field { target, .. } | ExprKind::TupleIndex { target, .. } => {
                 self.expr(target)
             }
+            ExprKind::Multi(groups) => groups.iter().for_each(|g| self.expr(&g.value)),
             ExprKind::RecordUpdate { base, fields, .. } => {
                 self.expr(base);
                 fields.iter().for_each(|(_, x)| self.expr(x));

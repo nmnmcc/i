@@ -1,4 +1,9 @@
 // typed macro: T6
-(m = spec/macros)
+(
+	m = spec/macros
+)
 f = (x) { m.m(x) }
-main = () { assert(f(1) == 1) assert(f("a") == "a") }
+main = () {
+	assert(f(1) == 1)
+	assert(f("a") == "a")
+}

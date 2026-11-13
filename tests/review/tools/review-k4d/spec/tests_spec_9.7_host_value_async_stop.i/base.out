@@ -1,2 +1,0 @@
-spec/host_value_async_stop.half : () -> Float ! Later
-spec/host_value_async_stop.main : () -> Nil ! Later

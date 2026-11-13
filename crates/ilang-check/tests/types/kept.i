@@ -10,11 +10,11 @@ x2 = 2
 x3 = () { Nil }
 @external("env" <> "", "f")
 ext: () -> Int
-@external(module: "env", function: "f")
+@external(module = "env", function = "f")
 ext2: () -> Int
 @external("env", "f")
 bound = 1
-no_external(A): (A) -> String
+no_external: <A>(A) -> String
 Schema(User, _) = user
 Alias(Int) = Int
-User { User }
+User = ()

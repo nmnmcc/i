@@ -1,10 +1,11 @@
 // spec: 4.3
 // expect: compile-error E0231
-(main)
-Box(Int) { Box(Int) }
-
+(
+	main
+)
+Box(Int) = (Int)
 
 main = () {
-  assert(True)
-  Nil
+	assert(True)
+	Nil
 }

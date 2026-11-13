@@ -314,37 +314,51 @@ test("is_even_large_test", () {
 })
 
 test("is_even_one_false_test", () {
-	assert(core.not(int.is_even(1)))
+	assert(
+		core.not(int.is_even(1)),
+	)
 	Nil
 })
 
 test("is_even_negative_three_false_test", () {
-	assert(core.not(int.is_even(-3)))
+	assert(
+		core.not(int.is_even(-3)),
+	)
 	Nil
 })
 
 test("is_even_large_odd_false_test", () {
-	assert(core.not(int.is_even(10_005)))
+	assert(
+		core.not(int.is_even(10_005)),
+	)
 	Nil
 })
 
 test("is_odd_zero_false_test", () {
-	assert(core.not(int.is_odd(0)))
+	assert(
+		core.not(int.is_odd(0)),
+	)
 	Nil
 })
 
 test("is_odd_two_false_test", () {
-	assert(core.not(int.is_odd(2)))
+	assert(
+		core.not(int.is_odd(2)),
+	)
 	Nil
 })
 
 test("is_odd_negative_two_false_test", () {
-	assert(core.not(int.is_odd(-2)))
+	assert(
+		core.not(int.is_odd(-2)),
+	)
 	Nil
 })
 
 test("is_odd_large_even_false_test", () {
-	assert(core.not(int.is_odd(10_006)))
+	assert(
+		core.not(int.is_odd(10_006)),
+	)
 	Nil
 })
 
@@ -820,47 +834,27 @@ test("bitwise_shift_edge_cases_test", () {
 })
 
 test("range_ascending_test", () {
-	assert(
-		int.range(0, 3, "", (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			"012"
-	)
+	assert(int.range(0, 3, "", (acc, i) { acc <> int.to_string(i) }) == "012")
 	Nil
 })
 
 test("range_descending_test", () {
-	assert(
-		int.range(3, 0, "", (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			"321"
-	)
+	assert(int.range(3, 0, "", (acc, i) { acc <> int.to_string(i) }) == "321")
 	Nil
 })
 
 test("range_empty_test", () {
-	assert(
-		int.range(5, 5, "", (acc, i) {
-			acc <> int.to_string(i)
-		}) ==
-			""
-	)
+	assert(int.range(5, 5, "", (acc, i) { acc <> int.to_string(i) }) == "")
 	Nil
 })
 
 test("range_with_list_prepend_test", () {
-	assert(
-		int.range(1, -2, [], list.prepend) == [-1, 0, 1]
-	)
+	assert(int.range(1, -2, [], list.prepend) == [-1, 0, 1])
 	Nil
 })
 
 test("range_negative_to_positive_test", () {
-	assert(
-		int.range(-2, 2, [], (acc, i) { [i, ..acc] }) ==
-			[1, 0, -1, -2]
-	)
+	assert(int.range(-2, 2, [], (acc, i) { [i, ..acc] }) == [1, 0, -1, -2])
 	Nil
 })
 
@@ -885,9 +879,7 @@ test("power_zero_exponent_test", () {
 
 test("power_big_test", () {
 	assert(int.power(2, 100) == Ok(1267650600228229401496703205376))
-	assert(
-		int.power(10, 30) == Ok(1_000_000_000_000_000_000_000_000_000_000)
-	)
+	assert(int.power(10, 30) == Ok(1_000_000_000_000_000_000_000_000_000_000))
 })
 
 test("power_negative_exponent_test", () {
@@ -898,13 +890,12 @@ test("power_pipe_test", () { assert({ 3 |> int.power(4) } == Ok(81)) })
 
 // Tests for functions that are new in std, or that changed from the old
 // library.
-
 test("parse_more_test", () {
 	assert(int.parse("+7") == Ok(7))
 	assert(int.parse("-0") == Ok(0))
 	assert(
 		int.parse("123456789012345678901234567890") ==
-			Ok(123456789012345678901234567890)
+			Ok(123456789012345678901234567890),
 	)
 	assert(int.parse("") == Error(Nil))
 	assert(int.parse("-") == Error(Nil))
@@ -933,7 +924,9 @@ test("to_base_more_test", () {
 	assert(int.to_base(1, 1) == Error(Nil))
 	big = 1267650600228229401496703205376
 	assert(int.to_base(big, 2) == Ok("1" <> string.repeat("0", 100)))
-	assert(int.parse_base(int.to_base16(big), 16) == Ok(big))
+	assert(
+		int.parse_base(int.to_base16(big), 16) == Ok(big),
+	)
 })
 
 test("digits_more_test", () {
@@ -980,8 +973,5 @@ test("sum_product_long_test", () {
 })
 
 test("range_long_test", () {
-	assert(
-		int.range(0, 1_000_000, 0, int.add) ==
-			499_999_500_000
-	)
+	assert(int.range(0, 1_000_000, 0, int.add) == 499_999_500_000)
 })

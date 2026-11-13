@@ -6,10 +6,11 @@
 )
 
 check = (got: Result(Int, Nil), want: Result(Int, Nil)) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(core.inspect(got) <> " is not " <> core.inspect(want))
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) {
+			panic(core.inspect(got) <> " is not " <> core.inspect(want))
+		}
 }
 
 test("found", () {

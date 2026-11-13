@@ -1,8 +1,6 @@
 // spec: 3, 4.3, 4.7
 // expect: compile-error E0535
-Box(A) {
-	Box(A)
-}
+Box(A) = (A)
 
 value: Int = 1
 

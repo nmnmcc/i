@@ -22,20 +22,32 @@ fn entry(source: &str) {
 #[test]
 fn annotated_local_keeps_the_missing_service() {
     // §4.8 rules 4–5 retain S(N); §10.2 requires it before entry.
-    let source = "S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
+    let source = "S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
 
-main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
+main = <N>() {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	local()
+}";
     entry(source);
-    entry(&source.replace("local: () -> Nil ! N | S(N)", "local"));
+    entry(&source.replace("local: () <- (S(N), ..N) -> Nil", "local"));
 }
 
 #[test]
 fn local_scheme_is_shown_without_an_entry() {
     // §4.7: the finite principal scheme may not disappear from --types.
-    let source = "S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
-main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
+    let source = "S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+main = <N>() {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	local()
+}";
     let (graph, _, _) = common::check_files(&[("src/other.i", source)]);
     let checked = ilang_check::query::check_for_queries(&graph);
     common::expect_unused(&checked.diags, &["main"]);
@@ -44,87 +56,118 @@ main(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
     assert!(
         types
             .lines(&program, common::module(&program, "app/other"))
-            .contains(&"app/other.main : () -> Nil ! N | S(N)".to_string())
+            .contains(&"app/other.main : () <- (S(N), ..N) -> Nil".to_string())
     );
     let query = ilang_check::query::Query::new(&graph, &program, Some(&types));
     let module = common::module(&program, "app/other");
     let local = query
         .type_at(module, source.find("local:").unwrap() as u32)
         .unwrap();
-    assert_eq!(local.code, "local: () -> Nil ! N | S(N)");
+    assert_eq!(local.code, "local: () <- (S(N), ..N) -> Nil");
 }
 
 #[test]
 fn annotation_positions_retain_the_service() {
-    let base = "S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
-run(N) = (body: () -> Nil ! N) { body() }";
+    let base = "S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+run = <N>(body: () <- N -> Nil) { body() }";
     // §4.7 and §4.8: annotations, local generalization and calls cannot
     // remove a requirement. Every case is a finite scheme needing S(N).
     for body in [
-        "helper(N): () -> Nil ! N | S(N) = () { use() }
+        "helper: <N>() <- (S(N), ..N) -> Nil = <N>() { use() }
 
 main = () { helper() }",
-        "helper(N) = () -> Nil ! N | S(N) { use() }
+        "helper = () -> Nil { use() }
 
 main = () { helper() }",
-        "
-main(N) = () { run(() -> Nil ! N | S(N) { use() }) }",
-        "
-main(N) = () { local: () -> Nil ! N | S(N) = () { use() } run(local) }",
-        "
-main(N) = () { run(() { local: () -> Nil ! N | S(N) = () { use() } local() }) }",
+        "main = <N>() { run(() -> Nil { use() }) }",
+        "main = <N>() {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	run(local)
+}",
+        "main = <N>() {
+	run(() {
+		local: () <- (S(N), ..N) -> Nil = () { use() }
+		local()
+	})
+}",
     ] {
         entry(&format!("{base}\n{body}"));
         let inferred = body
-            .replace(": () -> Nil ! N | S(N)", "")
-            .replace("() -> Nil ! N | S(N) {", "() {");
+            .replace(": <N>() <- (S(N), ..N) -> Nil", "")
+            .replace(": () <- (S(N), ..N) -> Nil", "")
+            .replace("() -> Nil {", "() {");
         entry(&format!("{base}\n{inferred}"));
     }
 }
 
 #[test]
 fn two_parameters_retain_the_service() {
-    let base = "S(E, N) { S(() -> Nil ^ E ! N) }
-use(E, N) = (s ! S(E, N)) { S(f) = s f() }
-run(E, N) = (body: () -> Nil ^ E ! N) { body() }";
+    let base = "S(E, N) = (() <- (Fail(E), ..N) -> Nil)
+use = <E, N>() <- (s: S(E, N)) {
+	S(f) = s
+	f()
+}
+run = <N>(body: () <- N -> Nil) { body() }";
     for body in [
-        "
-main(E, N) = () { local: () -> Nil ^ E ! N | S(E, N) = () { use() } local() }",
-        "
-main(E, N) = () { local = () { use() } local() }",
-        "helper(E, N): () -> Nil ^ E ! N | S(E, N) = () { use() }
+        "main = <E, N>() {
+	local: () <- (Fail(E), S(E, N), ..N) -> Nil = () { use() }
+	local()
+}",
+        "main = <E, N>() {
+	local = () { use() }
+	local()
+}",
+        "helper: <E, N>() <- (Fail(E), S(E, N), ..N) -> Nil = <E, N>() { use() }
 
 main = () { helper() }",
-        "
-main(E, N) = () { run(() -> Nil ^ E ! N | S(E, N) { use() }) }",
+        "main = <E, N>() { run(() -> Nil { use() }) }",
     ] {
         entry(&format!("{base}\n{body}"));
         let inferred = body
-            .replace(": () -> Nil ^ E ! N | S(E, N)", "")
-            .replace("() -> Nil ^ E ! N | S(E, N) {", "() {");
+            .replace(": <E, N>() <- (Fail(E), S(E, N), ..N) -> Nil", "")
+            .replace(": () <- (Fail(E), S(E, N), ..N) -> Nil", "")
+            .replace("() -> Nil {", "() {");
         entry(&format!("{base}\n{inferred}"));
     }
 }
 
 #[test]
 fn two_environment_parameters_retain_the_service() {
-    let source = "S(A, B) { S(() -> Nil ! A, () -> Nil ! B) }
-use(A, B) = (s ! S(A, B)) { S(f, g) = s f() g() }
+    let source = "S(A, B) = (() <- A -> Nil, () <- B -> Nil)
+use = <A, B>() <- (s: S(A, B)) {
+	S(f, g) = s
+	f()
+	g()
+}
 
-main(A, B) = () { local: () -> Nil ! A | B | S(A, B) = () { use() } local() }";
+main = <A, B>() {
+	local = () { use() }
+	local()
+}";
+    // The old annotation `() -> Nil ! A | B | S(A, B)` has two row variables,
+    // which syntax three cannot write (one `..N` per need list); only the
+    // inferred form is checked.
     entry(source);
-    entry(&source.replace("local: () -> Nil ! A | B | S(A, B)", "local"));
 }
 
 #[test]
 fn a_captured_row_annotation_can_contain_the_service() {
     // §4.7 allows N to become the more exact finite row A | S(A).
     // Merely making an unused function needs nothing (§4.8 rule 4).
-    let source = "S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
+    let source = "S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
 
-main(N) = () { local: () -> Nil ! N = () { use() } local() }";
+main = <N>() {
+	local: () <- N -> Nil = () { use() }
+	local()
+}";
     entry(source);
     let unused = source.replace("local() }", "Nil }");
     let (graph, _, _) = common::check_files(&[("src/main.i", &unused)]);
@@ -140,18 +183,25 @@ main(N) = () { local: () -> Nil ! N = () { use() } local() }";
     }
     // §9.2 compares service arguments equally even when S is covariant.
     // Supplying S(Dependency) does not supply its callback's Dependency.
-    let dependency = "S(N) { S(() -> Nil ! N) }
-Dependency { Dependency }
-read = (d ! Dependency) { Nil }
-use(N) = (s ! S(N)) { S(f) = s f() }
-apply(N) = () { local: () -> Nil ! N = () { use() } local() }
+    let dependency = "S(N) = (() <- N -> Nil)
+Dependency = ()
+read = () <- (d: Dependency) { Nil }
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+apply = <N>() {
+	local: () <- N -> Nil = () { use() }
+	local()
+}
 
-main = () { ! S(Dependency) = S(() { read() }) apply() }";
+main = () { apply() <- (S(() { read() })) }";
     entry(dependency);
-    let supplied = dependency.replace(
-        "! S(Dependency)",
-        "! Dependency = Dependency\n! S(Dependency)",
-    );
+    // An empty `Dependency = ()` is not a keyed service type in syntax three
+    // (E0225), so the supplied variant gives it a field.
+    let supplied = dependency
+        .replace("Dependency = ()", "Dependency = (value = Int)")
+        .replace("apply() <- (S(", "apply() <- (Dependency(value = 1), S(");
     let (graph, _, _) = common::check_files(&[("src/main.i", &supplied)]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -173,10 +223,19 @@ main = () { ! S(Dependency) = S(() { read() }) apply() }";
 fn finite_exported_schemes_survive_module_boundaries() {
     // §2.4 and §4.7: the text and interface tree must both contain the
     // complete scheme. Reading it in another module must retain S(N).
-    let source = "(S(..), helper)
-S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
-helper(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
+    let source = "(
+	S(..)
+	helper
+)
+S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+helper = <N>() {
+	local: () <- (S(N), ..N) -> Nil = () { use() }
+	local()
+}";
     let (graph, _, _) = common::check_files(&[
         ("src/service.i", source),
         (
@@ -205,6 +264,9 @@ helper(N) = () { local: () -> Nil ! N | S(N) = () { use() } local() }";
         index: index as u32,
     };
     let names = ilang_check::types::type_names(&program, module);
-    assert_eq!(types.scheme_types[&id].text(&names), "() -> Nil ! N | S(N)");
-    assert_eq!(types.schemes[&id], "() -> Nil ! N | S(N)");
+    assert_eq!(
+        types.scheme_types[&id].text(&names),
+        "() <- (S(N), ..N) -> Nil"
+    );
+    assert_eq!(types.schemes[&id], "() <- (S(N), ..N) -> Nil");
 }

@@ -1,23 +1,23 @@
-one : (n: A) -> A
+one : (A) -> A
 many : (A) -> 1 | 2
 blocks : List((A) -> 0 | 1 | 2 | 3)
 loop : (Int) -> Done
 local : () -> Done
 mutual : () -> (Bool, Bool)
-get : (opt: Option(User)) -> String ! Assert
-map : (opts: List(Option(User))) -> List(String)
-list_map : (xs: List(A), f: (A) -> B) -> List(B)
+get : (Option(User)) <- (Assert) -> String
+map : (List(Option(User))) -> List(String)
+list_map : (List(A), (A) -> B) -> List(B)
 expected : () -> String
-f : (x: Int) -> Int
+f : (Int) -> Int
 subject_scope : () -> Int
-empty : (x: Never) -> Never
+empty : (Never) -> Never
 7:1: warning[W0504]: top-level binding `one` is not used
 8:1: warning[W0504]: top-level binding `many` is not used
 9:1: warning[W0504]: top-level binding `blocks` is not used
 11:1: warning[W0504]: top-level binding `local` is not used
 15:1: warning[W0504]: top-level binding `mutual` is not used
-19:1: warning[W0504]: top-level binding `get` is not used
-20:1: warning[W0504]: top-level binding `map` is not used
-26:1: warning[W0504]: top-level binding `expected` is not used
-28:1: warning[W0504]: top-level binding `subject_scope` is not used
-29:1: warning[W0504]: top-level binding `empty` is not used
+22:1: warning[W0504]: top-level binding `get` is not used
+23:1: warning[W0504]: top-level binding `map` is not used
+29:1: warning[W0504]: top-level binding `expected` is not used
+33:1: warning[W0504]: top-level binding `subject_scope` is not used
+34:1: warning[W0504]: top-level binding `empty` is not used

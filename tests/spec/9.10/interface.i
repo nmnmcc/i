@@ -1,6 +1,5 @@
 // spec: 9.10
 // expect: pass
-
 (
 	testlib = (test) = std/test
 	i/random

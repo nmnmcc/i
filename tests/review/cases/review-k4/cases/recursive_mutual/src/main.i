@@ -1,3 +1,3 @@
-Box(A) { Box(A) }
+Box(A) = (A)
 f = () { Box(g()) }
 g = () { f() }

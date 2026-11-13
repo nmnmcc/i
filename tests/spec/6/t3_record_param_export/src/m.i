@@ -1,5 +1,7 @@
-(pick)
-pick(K) = (key: K) -> Int {
-  hidden = (r: (K: Int)) { r }
-  0
+(
+	pick
+)
+pick = <K>(key: K) -> Int {
+	hidden = (r: (k = Int)) { r }
+	0
 }

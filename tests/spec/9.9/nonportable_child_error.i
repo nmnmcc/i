@@ -7,7 +7,6 @@
 	i/fail
 )
 
-
 main = () {
 	control.boundary((b) {
 		fail.catch(() {

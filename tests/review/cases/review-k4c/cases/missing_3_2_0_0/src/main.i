@@ -1,7 +1,13 @@
-Dep { Dep }
-get = (d ! Dep) { Nil }
-run(E,N) = (body: () -> Nil ^ E ! N) { body() }
-S(A,B) { S(f: () -> Nil ! A, g: () -> Nil ! B) }
-use(A,B) = (s ! S(A,B)) { s.f() s.g() }
+Dep = ()
+get = () <- (d: Dep) { Nil }
+run = <N>(body: () <- N -> Nil) { body() }
+S(A, B) = (f = () <- A -> Nil, g = () <- B -> Nil)
+use = <A, B>() <- (s: S(A, B)) {
+	s.f()
+	s.g()
+}
 
-main(A,B) = () { local = () { use() } local() }
+main = <A, B>() {
+	local = () { use() }
+	local()
+}

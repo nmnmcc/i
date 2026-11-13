@@ -1,19 +1,7 @@
 // spec: 7.4
 // expect: compile-error E0516
+Red = ()
 
+Green = ()
 Color = Red | Green
-
-Red {
-	Red
-}
-
-Green {
-	Green
-}
-
-name = (c: Color) {
-	c |> {
-		Red           -> "red"
-		Green ? False -> "green"
-	}
-}
+name = (c: Color) { c |> (Red) { "red" } | (Green ? False) { "green" } }

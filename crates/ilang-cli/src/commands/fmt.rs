@@ -128,45 +128,26 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The other surface of a file, read and written as the tree of syntax
+/// three. The errors of the lowering are reported as `i check` reports them.
 fn convert_to_lisp(
     source: &str,
 ) -> Result<(String, Vec<ilang_syntax::span::Span>), Vec<ilang_syntax::Diagnostic>> {
-    let (module, errors) = ilang_syntax::parse_module(source);
+    let (_, errors) = ilang_syntax::parse_module(source);
     if !errors.is_empty() {
         return Err(errors);
     }
-    let (out, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
-    let (back, errors) = ilang_syntax::lisp::parse_source(&out);
-    if !errors.is_empty() {
-        return Err(errors);
-    }
-    if ilang_syntax::shape::canon(&module) != ilang_syntax::shape::canon(&back) {
-        return Err(vec![ilang_syntax::Diagnostic::new(
-            ilang_syntax::Code::Unexpected,
-            ilang_syntax::span::Span::default(),
-            "the module cannot be represented in the other surface",
-        )]);
-    }
+    let (out, lost) = ilang_syntax::syn3::surface::normal_to_lisp(source)?;
     Ok((ilang_syntax::lisp::format(&out)?, lost))
 }
 
 fn convert_from_lisp(
     source: &str,
 ) -> Result<(String, Vec<ilang_syntax::span::Span>), Vec<ilang_syntax::Diagnostic>> {
-    let document = ilang_syntax::lisp::parse(source)?;
-    let module = ilang_syntax::lisp::parse_module(&document).map_err(|e| vec![e])?;
-    let (out, lost) =
-        ilang_syntax::lisp::normal_with_comments(source, &document).map_err(|e| vec![e])?;
-    let (back, errors) = ilang_syntax::parse_module(&out);
+    let (_, errors) = ilang_syntax::lisp::parse_source(source);
     if !errors.is_empty() {
         return Err(errors);
     }
-    if ilang_syntax::shape::canon(&module) != ilang_syntax::shape::canon(&back) {
-        return Err(vec![ilang_syntax::Diagnostic::new(
-            ilang_syntax::Code::Unexpected,
-            ilang_syntax::span::Span::default(),
-            "the module cannot be represented in the other surface",
-        )]);
-    }
+    let (out, lost) = ilang_syntax::syn3::surface::lisp_to_normal(source)?;
     Ok((format(&out)?, lost))
 }

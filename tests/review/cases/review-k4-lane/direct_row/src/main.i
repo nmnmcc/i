@@ -1,16 +1,9 @@
-Dep {
-	Dep
-}
+Dep = ()
 
-S(N) {
-	S(() -> Nil ! N)
-}
+S(N) = (() <- N -> Nil)
 
-T(N) {
-	T(() -> Nil ! N)
-}
+T(N) = (() <- N -> Nil)
 
 use = (x: T(S(Never) | S(Dep))) { x }
-
 
 main = () { Nil }

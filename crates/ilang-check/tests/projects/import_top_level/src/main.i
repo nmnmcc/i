@@ -5,9 +5,8 @@
 
 v = 2
 
-T {
-	Other
-}
+Other = ()
+T = Other
 
 U = Int
 

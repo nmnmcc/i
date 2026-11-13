@@ -4,6 +4,48 @@
 
 use ilang_wasm::{Error, Options, compile, compile_wat};
 
+#[test]
+fn large_runtime_metadata_has_bounded_initializers() {
+    use ilang_wasm::ir::{Program, SitePos};
+
+    // Expanded test collections carry a note for every source site. Keep a
+    // large collection here without depending on the size of std's tests.
+    let count = 4097;
+    let program = Program {
+        site_modules: (0..130).map(|i| format!("app/module{i}")).collect(),
+        constructors: (0..130).map(|i| format!("Constructor{i}")).collect(),
+        shapes: (0..130).map(|i| vec![format!("field{i}")]).collect(),
+        sites: (0..count)
+            .map(|i| SitePos {
+                module: i % 130,
+                line: i + 1,
+                column: 1,
+            })
+            .collect(),
+        site_notes: (0..count).map(|i| Some(format!("\nnote {i}"))).collect(),
+        ..Default::default()
+    };
+    let text = ilang_wasm::emit::wat(&program);
+    let bytes = wat::parse_str(&text).unwrap();
+    ilang_wasm::validate(&bytes).unwrap();
+    let largest = wasmparser::Parser::new(0)
+        .parse_all(&bytes)
+        .filter_map(|payload| match payload.unwrap() {
+            wasmparser::Payload::CodeSectionEntry(body) => {
+                Some(body.range().end - body.range().start)
+            }
+            _ => None,
+        })
+        .max()
+        .unwrap();
+    // A single array.new_fixed would make a large initializer whose
+    // allocating operands keep thousands of GC values live at once.
+    assert!(
+        largest < 8192,
+        "metadata initializer grew to {largest} bytes"
+    );
+}
+
 fn checked(
     source: &str,
 ) -> (
@@ -60,7 +102,7 @@ fn wasm(source: &str) -> Result<Vec<u8>, Error> {
 #[test]
 fn metered_macro_program_is_valid_wasm() {
     let (graph, c, _dir) = checked(
-        "loop = (n) { n |> { 0 -> [\"x\"] _ -> [\"x\", ..loop(n - 1)] } }\n\nmain = () { loop(3) }\n",
+        "loop = (n) { n |> (0) { [\"x\"] } | (_) { [\"x\", ..loop(n - 1)] } }\n\nmain = () { loop(3) }\n",
     );
     let (wasm, _) = ilang_wasm::compile_macro(
         &graph,
@@ -83,7 +125,7 @@ fn function<'a>(wat: &'a str, name: &str) -> &'a str {
 #[test]
 fn tail_calls_are_return_calls() {
     let text = wat(
-        "loop = (n) {\n   n |> {\n    0 -> 0\n    _ -> loop(n - 1)\n  }\n}\nother = (n) { loop(n) + 1 }\neither = (n) { n == 0 || other(n) == 1 }\nright = (n) { n == 0 || right(n - 1) }\n\nmain = () { (either(1), right(1)) }\n",
+        "loop = (n) { n |> (0) { 0 } | (_) { loop(n - 1) } }\nother = (n) { loop(n) + 1 }\neither = (n) { n == 0 || other(n) == 1 }\nright = (n) { n == 0 || right(n - 1) }\n\nmain = () { (either(1), right(1)) }\n",
     );
     let l = function(&text, "app/main.loop");
     assert!(l.contains("(return_call $f"), "{l}");
@@ -125,7 +167,7 @@ fn metadata() {
     assert_eq!(
         json,
         serde_json::json!({
-            "version": 3,
+            "version": 4,
             "entry": { "name": "app/main.main", "async": false },
             "tests": [],
             "exports": {},
@@ -157,7 +199,7 @@ fn metadata() {
 /// lists every external function, also one that is not used (B.6).
 #[test]
 fn externals_are_imports() {
-    let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (x: Float) -> Float\n";
+    let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (Float) -> Float\n";
     for main in ["main = () { f()  Nil }", "main = () { Nil }"] {
         let bytes = wasm(&format!("{external}f = () {{ sqrt(2.0) }}\n\n{main}\n")).unwrap();
         let mut imports = Vec::new();
@@ -218,10 +260,12 @@ fn calls_that_may_suspend_are_split() {
 
 #[test]
 fn environments() {
-    let text = wat("Clock { Clock(now: () -> Int) }\n\
-         f = (c ! Clock) { c.now() }\n\
-         g = () {\n  ! Clock = Clock(() { 1 })\n  f()\n}\n\
-         \nmain = () { g() }\n");
+    let text = wat("Clock = (now = () -> Int)\n\
+         f = () <- (c: Clock) { c.now() }\n\
+         g = () { f() <- (Clock(now = () { 1 })) }\n\
+         \n\
+         main = () { g() }\n\
+         ");
     // A service's slot is chosen from all services in the compiled program;
     // its read and the corresponding environment statement must agree.
     let f = function(&text, "app/main.f");
@@ -276,7 +320,7 @@ fn many_points(n: usize) -> String {
     for i in 1..=n {
         let p = i - 1;
         s.push_str(&format!(
-            "  a{i} = {{ a{p} % 3 }} |> {{ 0 -> s(b, a{p} + 1)  _ -> a{p} + 2 }}\n"
+            "  a{i} = {{ a{p} % 3 }} |> (0) {{ s(b, a{p} + 1) }} | (_) {{ a{p} + 2 }}\n"
         ));
     }
     s.push_str(&format!(
@@ -300,19 +344,38 @@ fn segments_grow_linearly() {
     let base = size(0);
     let ratio = (large - base) as f64 / (small - base) as f64;
     assert!(ratio < 5.0, "{base} {small} {large}: {ratio}");
-    let start = std::time::Instant::now();
-    wasm(&many_points(200)).unwrap();
-    assert!(start.elapsed().as_secs() < 30);
+    // The time to generate the module must not blow up either. It is a growth ratio, not a
+    // wall-clock bound, so a busy machine does not fail the test: from 50 to 200 points a
+    // polynomial grows by far less than 500 times, an exponential by far more.
+    let time = |n| {
+        let source = many_points(n);
+        let start = std::time::Instant::now();
+        wasm(&source).unwrap();
+        start.elapsed()
+    };
+    let small = time(50).max(std::time::Duration::from_millis(50));
+    let large = time(200);
+    assert!(
+        large < small * 500,
+        "200 points took {large:?}, 50 points took {small:?}"
+    );
 }
 
 /// Spec 4.1/11.4: opaque constructors remain distinct through a shared
 /// wire import. B.2/B.6 still describe each of them as one externref.
 #[test]
 fn opaque_decoders_keep_the_declared_type_on_both_targets() {
-    let source = r#"
-(A, B, same, repeated, different, same_a, echo)
-A {}
-B {}
+    let source = r#"(
+	A
+	B
+	same
+	repeated
+	different
+	same_a
+	echo
+)
+A = Opaque
+B = Opaque
 Alias = A
 @external("opaque", "get")
 get_a: () -> A

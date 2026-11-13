@@ -563,15 +563,14 @@ cleanup; an already-removed alias gives Nil.
 **Forged number and namespace.** This module imports no standard net module:
 
 ```i
-(i/request)
+(
+	i/request
+)
 
 @host("i:net/v1", "request")
-Pretend { Pretend(read: (stream: Int, max_bytes: Int) -> Request(Result(BitArray, String))) }
+Pretend = (read = (Int, Int) -> Request(Result(BitArray, String)))
 
-
-main = (raw ! Pretend) {
-  request.await(raw.read(1, 1))
-}
+main = () <- (raw: Pretend) { request.await(raw.read(1, 1)) }
 ```
 
 Private exports alone do not block it. §3.1 denies automatic binding before any service
@@ -677,20 +676,23 @@ timeouts and plugin cleanup, not only tasks.
 **N-R1 enumeration replacement.** Hold the host gate until after the count:
 
 ```i
-(i/task, i/request)
+(
+	i/task
+	i/request
+)
 @host("review:gate/v1", "request")
-Gate { Gate(wait: () -> Request(Nil)) }
+Gate = (wait = () -> Request(Nil))
 
-main = (gate ! Gate, root ! request.Root) {
-  pending = gate.wait()
-  task.scope((s) {
-    child = task.go(s, () { request.count_root(root) })
-    count = task.join(child)
-    request.cancel(request.ticket(pending))
-    assert(count == 1)
-    assert(request.settled_root(root))
-    request.wait_none_root(root)
-  })
+main = () <- (gate: Gate, root: request.Root) {
+	pending = gate.wait()
+	task.scope((s) {
+		child = task.go(s, () { request.count_root(root) })
+		count = task.join(child)
+		request.cancel(request.ticket(pending))
+		assert(count == 1)
+		assert(request.settled_root(root))
+		request.wait_none_root(root)
+	})
 }
 ```
 
@@ -777,13 +779,16 @@ has no invented task path, and user callbacks may capture any ordinary value.
 by a nested run on the same worker:
 
 ```i
-(i/task, i/request)
+(
+	i/task
+	i/request
+)
 @host("review:gate/v1", "request")
-Gate { Gate(wait: () -> Request(Nil)) }
+Gate = (wait = () -> Request(Nil))
 
-main = (gate ! Gate) {
-  pending = gate.wait()
-  task.run(() { request.await(pending) })
+main = () <- (gate: Gate) {
+	pending = gate.wait()
+	task.run(() { request.await(pending) })
 }
 ```
 

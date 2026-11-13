@@ -139,7 +139,7 @@ Both parsers store this distinction in the core tree **before expanding children
 A head is a custom/built-in type with the right arity, or a transparent alias that expands to one named type or tuple. A head alias must not depend on a value type, contain a hole or have any free variable other than its declared parameters. Each formal parameter occurs at most once, only through named arguments or tuple parts. Replace formal parameters with the corresponding pattern parts. A parameter below a function, union, intersection or difference is E0532. Constant subtrees become exact checks: the source part must be closed and equal in both subtype directions. This supports renaming and tuple projection:
 
 ```i
-Pair(A, B) = (A, B)
+Pair(A, B) = { (A, B) }
 Pair(Tree, _) = parsed
 ```
 
@@ -351,15 +351,14 @@ TypePattern = UpName | "_"
 > - Blocks have no type definitions. An item beginning with `(` or `{` is a value binding; `m.T(…) = v` is also a value binding under §2.2. Import `T` to use it as an alias-pattern head.
 
 ```i
-Codec(D, E) { Codec(decode: (String) -> D, encode: (E) -> String) }
-make(D, E) = (d: (String) -> D, e: (E) -> String) {
-  Codec(decode: d, encode: e)
+Codec(D, E) = (decode = (String) -> D, encode = (E) -> String)
+make = <D, E>(d: (String) -> D, e: (E) -> String) {
+	Codec(decode = d, encode = e)
 }
 size = make((s) { string.length(s) }, (n: Int) { int.to_string(n) })
 Codec(Size, _) = size
 // Size = Int; the distinct encode part is not fixed.
-
-Pair(A, B) = (A, B)
+Pair(A, B) = { (A, B) }
 Pair(Tree, _) = parsed
 // If parsed has the closed type (Ast, List(Warning)), Tree = Ast.
 ```
@@ -481,10 +480,8 @@ These are implementation requirements, not tests reported as passing. Each expec
 A complete, ordinary i fixture for the invariant Cell tests (no host or mutable primitive is required to exercise invariant type constraints):
 
 ```i
-Cell(A) { Cell(get: () -> A, set: (A) -> Nil) }
-cell(A) = (x: A) {
-  Cell(get: () { x }, set: (y: A) { Nil })
-}
+Cell(A) = (get = () -> A, set = (A) -> Nil)
+cell = <A>(x: A) { Cell(get = () { x }, set = (y: A) { Nil }) }
 r = cell(1)
 C = r
 later = () { r.set(2) }
@@ -498,22 +495,20 @@ Use the review's fixture unchanged first, including its initially private LocalS
 
 ```i
 // app/lib
-(Codec, size)
+(
+	Codec
+	size
+)
 
-Codec(D, E) {
-  Codec(decode: (String) -> D, encode: (E) -> String)
-}
+Codec(D, E) = (decode = (String) -> D, encode = (E) -> String)
 
-make(D, E) = (d: (String) -> D, e: (E) -> String) {
-  Codec(decode: d, encode: e)
+make = <D, E>(d: (String) -> D, e: (E) -> String) {
+	Codec(decode = d, encode = e)
 }
 
 id = (x) { x }
 
-size = id(make(
-  (s: String) -> Int { 1 },
-  (n: Int) -> String { "" },
-))
+size = id(make((s: String) -> Int { 1 }, (n: Int) -> String { "" }))
 
 Codec(LocalSize, _) = size
 ```

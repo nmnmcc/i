@@ -4,6 +4,4 @@ value: Int = 1
 
 Alias = value
 
-Box {
-	Box(Alias)
-}
+Box = (Alias)

@@ -3,21 +3,21 @@
 @external("r2:meter/v1", "now")
 now: () -> Float
 
-interval = (body: () -> Nil ! Scheduler) -> Float ! Scheduler {
+interval = (body: () <- (Scheduler) -> Nil) -> Float {
 	start = now()
 	body()
 	now() -. start
 }
 
-timed_empty = (n: Int) -> Float ! Scheduler {
+timed_empty = (n: Int) -> Float {
 	task.scope((_: Scope(Never)) { interval(() { spin(n) }) })
 }
 
-timed_spawn_join = (n: Int) -> Float ! Scheduler {
+timed_spawn_join = (n: Int) -> Float {
 	task.scope((s) { interval(() { spawns(s, n) }) })
 }
 
-timed_switch_pair = (n: Int) -> Float ! Scheduler {
+timed_switch_pair = (n: Int) -> Float {
 	task.scope((s) {
 		child = task.go(s, () { yields(n) })
 		interval(() {
@@ -27,7 +27,7 @@ timed_switch_pair = (n: Int) -> Float ! Scheduler {
 	})
 }
 
-timed_channel_pair = (n: Int) -> Float ! Scheduler {
+timed_channel_pair = (n: Int) -> Float {
 	task.scope((s) {
 		c: Channel(Nil) = task.channel()
 		child = task.go(s, () { sends(c, n) })

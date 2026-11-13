@@ -1,7 +1,5 @@
 // Statements that are not the last and do nothing give W0502 (§6.10).
-Pair {
-	Pair(Int, Int)
-}
+Pair = (Int, Int)
 
 f = (x: Int) { x }
 
@@ -23,9 +21,7 @@ warned = (x: Int, y: Float) {
 not_warned = (x: Int, y: Float) {
 	f(x)
 	x |> f
-	x |> {
-		_ -> 1
-	}
+	x |> (_) { 1 }
 	{
 		z = 1
 		z

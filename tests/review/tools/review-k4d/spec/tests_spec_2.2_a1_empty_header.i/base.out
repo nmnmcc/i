@@ -1,2 +1,0 @@
-test/a1_empty_header.i:4:1: error[E0115]: a file with nothing to import or export leaves the group out
-1 error

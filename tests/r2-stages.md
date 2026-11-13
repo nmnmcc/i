@@ -293,12 +293,15 @@ and src/main.i:
 
 ```i
 // future-track: JP -- provider-closure semantics; currently rejected by R2.
-(Bundle, probe)
-Bundle { Bundle }
+(
+	Bundle
+	probe
+)
+Bundle = ()
 @host("probe", "request")
-Work { Work(start: () -> Request(Int)) }
-make = (work ! Work) { Bundle }
-probe = (bundle ! Bundle) { Nil }
+Work = (start = () -> Request(Int))
+make = () <- (work: Work) { Bundle }
+probe = () <- (bundle: Bundle) { Nil }
 ```
 
 The entry's ordinary inferred environment contains only Bundle. Under the

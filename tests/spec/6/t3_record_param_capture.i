@@ -1,13 +1,20 @@
 // spec: 4.9
 // expect: pass
-(i/record)
-(main)
-f(K) = (r: (K: Int), key: K) -> (K: Int) {
-  h = () { r }
-  h()
+(
+	i/record
+)
+
+(
+	main
+)
+f = <K>(r: (k = Int), key: K) -> (k = Int) {
+	h = () { r }
+	h()
 }
 
 main = () {
-  assert(record.get(f((name: 9), "name"), "name") == 9)
-  Nil
+	assert(
+		record.get(f((name = 9), "name"), "name") == 9,
+	)
+	Nil
 }

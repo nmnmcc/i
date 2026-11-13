@@ -112,34 +112,29 @@ impl Fixture {
     }
 }
 
-const MAIN: &str = r#" (
-  util = app/util
-  (User, greet) = app/user
+const MAIN: &str = r#"(
+	util = app/util
+	(User, greet) = app/user
 )
 
 /// Adds two numbers.
 add = (x, y) {
-  z = x * 2
-  z + y
+	z = x * 2
+	z + y
 }
 
 id = (a) { a }
 
 describe = (u: User) {
-  label = u.name
-  label <> greet(u)
+	label = u.name
+	label <> greet(u)
 }
 
-first = (o) {
-   o |> {
-    Some(v) -> v
-    None -> 0
-  }
-}
+first = (o) { o |> (Some(v)) { v } | (None) { 0 } }
 
+Some(A) = (A)
+None = ()
 Option(A) = Some(A) | None
-Some(A) { Some(A) }
-None { None }
 
 total = util.double(add(1, 2))
 "#;
@@ -150,9 +145,12 @@ const UTIL: &str = r#" (double)
 double = (n: Int) -> Int { n * 2 }
 "#;
 
-const USER: &str = r#" (User(..), greet)
+const USER: &str = r#"(
+	User(..)
+	greet
+)
 
-User { User(name: String, age: Int) }
+User = (name = String, age = Int)
 
 greet = (u: User) { "hi " <> u.name }
 "#;
@@ -171,22 +169,16 @@ fn fixture() -> Fixture {
 #[test]
 fn type_of_top_level_names() {
     let f = fixture();
-    assert_eq!(
-        f.hover("app/main", "add = ", 0),
-        "add: (x: Int, y: Int) -> Int"
-    );
-    assert_eq!(
-        f.hover("app/main", "add(1", 0),
-        "add: (x: Int, y: Int) -> Int"
-    );
-    assert_eq!(f.hover("app/main", "id = ", 0), "id: (a: A) -> A");
+    assert_eq!(f.hover("app/main", "add = ", 0), "add: (Int, Int) -> Int");
+    assert_eq!(f.hover("app/main", "add(1", 0), "add: (Int, Int) -> Int");
+    assert_eq!(f.hover("app/main", "id = ", 0), "id: (A) -> A");
     assert_eq!(f.hover("app/main", "total", 0), "total: Int");
     // A name of another module, after `m.`.
-    assert_eq!(f.hover("app/main", "double", 0), "double: (n: Int) -> Int");
+    assert_eq!(f.hover("app/main", "double", 0), "double: (Int) -> Int");
     // Imported by name.
     assert_eq!(
         f.hover("app/main", "greet(u)", 0),
-        "greet: (u: User) -> String"
+        "greet: (User) -> String"
     );
 }
 
@@ -202,7 +194,7 @@ fn type_of_local_names() {
     // A parameter of any type.
     assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
     assert_eq!(f.hover("app/main", "label = ", 0), "label: String");
-    assert_eq!(f.hover("app/main", "v) -> v", 0), "v: A");
+    assert_eq!(f.hover("app/main", "v)) { v }", 0), "v: A");
     assert_eq!(f.hover("app/main", "o) {", 0), "o: Option(A)");
 }
 
@@ -210,11 +202,12 @@ fn type_of_local_names() {
 fn type_of_other_things() {
     let f = fixture();
     assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Some(A)");
-    assert_eq!(f.hover("app/main", "None ->", 0), "None: None");
+    // A constructor's type is its own (syntax three §2.8).
+    assert_eq!(f.hover("app/main", "None)", 0), "None: None");
     assert_eq!(f.hover("app/main", "name", 0), "name: String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
-        "User { User(name: String, age: Int) }"
+        "User = (name = String, age = Int)"
     );
     assert_eq!(f.hover("app/main", "2\n", 0), "Int");
     assert_eq!(f.hover("app/main", "util.", 0), "module app/util");
@@ -239,7 +232,7 @@ fn definitions() {
         (main.clone(), "y".into())
     );
     assert_eq!(
-        f.definition("app/main", "v\n", 0),
+        f.definition("app/main", "v } |", 0),
         (main.clone(), "v".into())
     );
     // A top-level name of this module and of others.
@@ -347,10 +340,16 @@ fn completions_of_members() {
 fn completions_of_fields_from_inference() {
     let f = Fixture::new(&[(
         "src/main.i",
-        "Point { Point(x: Int, y: Int) }\n\
-         origin = Point(0, 0)\n\
-         f = () {\n  p = origin\n  p.x + origin.y\n}\n\
-         g = (o: Point) {\n  o |> {\n    Point(..) ? True -> o.x\n    _ -> panic(\"unreachable\")\n  }\n}\n",
+        "Point = (x = Int, y = Int)\n\
+         origin = Point(x = 0, y = 0)\n\
+         f = () {\n\
+         \tp = origin\n\
+         \tp.x + origin.y\n\
+         }\n\
+         g = (o: Point) {\n\
+         \to |> (Point(..) ? True) { o.x } | (_) { panic(\"unreachable\") }\n\
+         }\n\
+         ",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     // A local name whose type is inferred.
@@ -376,20 +375,20 @@ fn symbols_of_a_module() {
             ("id", SymbolKind::Function),
             ("describe", SymbolKind::Function),
             ("first", SymbolKind::Function),
-            ("Option", SymbolKind::Type),
             ("Some", SymbolKind::Type),
             ("None", SymbolKind::Type),
+            ("Option", SymbolKind::Type),
             ("total", SymbolKind::Value),
         ]
     );
-    // `Option` is a union (syntax three): its members are types with one
-    // constructor each.
-    let ctors: Vec<&str> = syms[5..7]
+    // `Option` is a union (syntax three §2.8): its members are types with
+    // one constructor each.
+    let ctors: Vec<&str> = syms[4..6]
         .iter()
         .flat_map(|s| s.children.iter().map(|c| c.name.as_str()))
         .collect();
     assert_eq!(ctors, vec!["Some", "None"]);
-    assert_eq!(syms[0].detail.as_deref(), Some("(x: Int, y: Int) -> Int"));
+    assert_eq!(syms[0].detail.as_deref(), Some("(Int, Int) -> Int"));
     // The span is the whole item; the name span is the name.
     let text = f.text("app/main");
     let s = &syms[1];
@@ -411,7 +410,7 @@ fn types_in_a_program_with_errors() {
     )]);
     assert!(f.checked.diags.iter().any(|d| d.is_error()));
     assert_eq!(f.hover("app/main", "m = ", 0), "m: Int");
-    assert_eq!(f.hover("app/main", "f = ", 0), "f: (n: Int) -> Int");
+    assert_eq!(f.hover("app/main", "f = ", 0), "f: (Int) -> Int");
 }
 
 #[test]
@@ -427,15 +426,27 @@ fn types_of_parameters_that_share_a_type_variable() {
     // The parameter type of `f` is the type of `x`, which the scheme names.
     assert_eq!(
         f.hover("app/main", "h3", 0),
-        "h3: (f: (A) -> Int ^ E ! N, x: A) -> Int ^ E ! N"
+        "h3: ((A) <- (Fail(E), ..N) -> Int, A) <- (Fail(E), ..N) -> Int"
     );
-    assert_eq!(f.hover("app/main", "f, x", 0), "f: (A) -> Int ^ E ! N");
-    assert_eq!(f.hover("app/main", "f(x)", 0), "f: (A) -> Int ^ E ! N");
+    assert_eq!(
+        f.hover("app/main", "f, x", 0),
+        "f: (A) <- (Fail(E), ..N) -> Int"
+    );
+    assert_eq!(
+        f.hover("app/main", "f(x)", 0),
+        "f: (A) <- (Fail(E), ..N) -> Int"
+    );
     assert_eq!(f.hover("app/main", "x)", 0), "x: A");
-    assert_eq!(f.hover("app/main", "f, v", 0), "f: (A) -> B ^ E ! N");
+    assert_eq!(
+        f.hover("app/main", "f, v", 0),
+        "f: (A) <- (Fail(E), ..N) -> B"
+    );
     assert_eq!(f.hover("app/main", "v)", 0), "v: A");
     // Not shared: as before.
-    assert_eq!(f.hover("app/main", "f) {", 0), "f: (1) -> A ^ E ! N");
+    assert_eq!(
+        f.hover("app/main", "f) {", 0),
+        "f: (1) <- (Fail(E), ..N) -> A"
+    );
     assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
 }
 
@@ -453,49 +464,54 @@ fn local_types_use_the_names_of_the_scheme() {
     // The value of `f` is `y`, and the value of `k`.
     assert_eq!(
         f.hover("app/main", "k = ", 0),
-        "k: (f: (A) -> B ^ E ! N, x: A) -> B ^ E ! N"
+        "k: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "y = ", 0), "y: B");
     assert_eq!(f.hover("app/main", "y\n}", 0), "y: B");
     assert_eq!(
         f.hover("app/main", "f, x) {\n  y", 0),
-        "f: (A) -> B ^ E ! N"
+        "f: (A) <- (Fail(E), ..N) -> B"
     );
     // The second parameter of `compose` is named as in its scheme.
     let compose = f.hover("app/main", "compose", 0);
     assert_eq!(
         compose,
-        "compose: (f: (A) -> B ^ E ! N, g: (B) -> C ^ E2 ! N2) -> \
-         (x: A) -> C ^ E | E2 ! N | N2"
+        "compose: ((A) <- (Fail(E), ..N) -> B, (B) <- (Fail(E2), ..N2) -> C) -> (A) <- (Fail(E | E2), ..N, ..N2) -> C"
     );
-    assert_eq!(f.hover("app/main", "f, g", 0), "f: (A) -> B ^ E ! N");
-    assert_eq!(f.hover("app/main", "g) {", 0), "g: (B) -> C ^ E2 ! N2");
-    assert_eq!(f.hover("app/main", "x) { g", 0), "x: A");
-    assert_eq!(f.hover("app/main", "g(f(x))", 0), "g: (B) -> C ^ E2 ! N2");
-    // The names of the parameters are not the names of their types.
     assert_eq!(
-        f.hover("app/main", "pairup", 0),
-        "pairup: (a: A, b: B) -> (B, A)"
+        f.hover("app/main", "f, g", 0),
+        "f: (A) <- (Fail(E), ..N) -> B"
     );
+    assert_eq!(
+        f.hover("app/main", "g) {", 0),
+        "g: (B) <- (Fail(E2), ..N2) -> C"
+    );
+    assert_eq!(f.hover("app/main", "x) { g", 0), "x: A");
+    assert_eq!(
+        f.hover("app/main", "g(f(x))", 0),
+        "g: (B) <- (Fail(E2), ..N2) -> C"
+    );
+    // The names of the parameters are not the names of their types.
+    assert_eq!(f.hover("app/main", "pairup", 0), "pairup: (A, B) -> (B, A)");
     assert_eq!(f.hover("app/main", "a, b)", 0), "a: A");
     assert_eq!(f.hover("app/main", "b) {", 0), "b: B");
     assert_eq!(f.hover("app/main", "b, a)", 0), "b: B");
     assert_eq!(
         f.hover("app/main", "twice", 0),
-        "twice: (f: (A | B) -> B & C ^ E ! N) -> (z: A) -> C ^ E ! N"
+        "twice: ((A | B) <- (Fail(E), ..N) -> B & C) -> (A) <- (Fail(E), ..N) -> C"
     );
     assert_eq!(f.hover("app/main", "z) {", 0), "z: A");
     assert_eq!(
         f.hover("app/main", "f(f(z))", 0),
-        "f: (A | B) -> B & C ^ E ! N"
+        "f: (A | B) <- (Fail(E), ..N) -> B & C"
     );
     // `w` is generalized in the block: its own variable is not one of the
     // scheme, and has a name that is not used there.
     assert_eq!(
         f.hover("app/main", "both = ", 0),
-        "both: (f: (A) -> B ^ E ! N, x: A) -> (B, (q: C) -> (C, A)) ^ E ! N"
+        "both: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> (B, (C) -> (C, A))"
     );
-    assert_eq!(f.hover("app/main", "w = ", 0), "w: (q: D) -> (D, A)");
+    assert_eq!(f.hover("app/main", "w = ", 0), "w: (D) -> (D, A)");
     assert_eq!(f.hover("app/main", "q) {", 0), "q: D");
     assert_eq!(f.hover("app/main", "x) {\n  w", 0), "x: A");
 }
@@ -513,23 +529,23 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
          effonly = (f, x) {\n  r = f(x)\n  Nil\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
-    assert_eq!(f.hover("app/main", "one", 0), "one: (x: A) -> 1");
+    assert_eq!(f.hover("app/main", "one", 0), "one: (A) -> 1");
     assert_eq!(f.hover("app/main", "x) {\n  y = x\n  1", 0), "x: A");
     assert_eq!(f.hover("app/main", "y = x\n  1", 0), "y: A");
     assert_eq!(f.hover("app/main", "x\n  1", 0), "x: A");
     assert_eq!(
         f.hover("app/main", "drop =", 0),
-        "drop: (x: A, g: (1) -> B ^ E ! N) -> B ^ E ! N"
+        "drop: (A, (1) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "x, g) {\n  y = x\n  g", 0), "x: A");
     assert_eq!(f.hover("app/main", "y = x\n  g", 0), "y: A");
     assert_eq!(
         f.hover("app/main", "g) {\n  y = x", 0),
-        "g: (1) -> B ^ E ! N"
+        "g: (1) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(
         f.hover("app/main", "drop2", 0),
-        "drop2: (x: A, g: (1) -> B ^ E ! N, h: C) -> B ^ E ! N"
+        "drop2: (A, (1) <- (Fail(E), ..N) -> B, C) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "x, g, h", 0), "x: A");
     assert_eq!(f.hover("app/main", "h) {", 0), "h: C");
@@ -538,14 +554,17 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
     assert_eq!(f.hover("app/main", "h)\n", 0), "h: C");
     assert_eq!(
         f.hover("app/main", "effonly", 0),
-        "effonly: (f: (A) -> B ^ E ! N, x: A) -> Nil ^ E ! N"
+        "effonly: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> Nil"
     );
     assert_eq!(
         f.hover("app/main", "f, x) {\n  r", 0),
-        "f: (A) -> B ^ E ! N"
+        "f: (A) <- (Fail(E), ..N) -> B"
     );
     assert_eq!(f.hover("app/main", "x) {\n  r", 0), "x: A");
-    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f: (A) -> B ^ E ! N");
+    assert_eq!(
+        f.hover("app/main", "f(x)\n  Nil", 0),
+        "f: (A) <- (Fail(E), ..N) -> B"
+    );
     assert_eq!(f.hover("app/main", "r = ", 0), "r: B");
 }
 
@@ -573,9 +592,14 @@ fn completions_of_the_name_being_bound() {
 fn completions_after_any_expression() {
     let f = Fixture::new(&[(
         "src/main.i",
-        "Point { Point(x: Int, y: Int) }\n\
-         make = () -> Point { Point(1, 2) }\n\
-         f = (t: Point) {\n  a = make().x\n  b = { t }.y\n  a + b\n}\n",
+        "Point = (x = Int, y = Int)\n\
+         make = () -> Point { Point(x = 1, y = 2) }\n\
+         f = (t: Point) {\n\
+         \ta = make().x\n\
+         \tb = { t }.y\n\
+         \ta + b\n\
+         }\n\
+         ",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     let cs = f.completions("app/main", "make().x", 7);
@@ -591,7 +615,7 @@ fn completions_after_any_expression() {
 fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
     // A1 §3.12: the made-up binding covers the subject too, and its names
     // enter scope only in the body. Synthetic parameters never appear.
-    let source = "main = () { local = 4\n (x) { local + x } |> { f -> f(local) } }\nmany = { 0 -> 1  _ -> 2 }\nuse_many = () { apply(1,{ 0 -> 1  _ -> 2 }) }\napply = (x, f) { f(x) }";
+    let source = "main = () {\n\tlocal = 4\n\t(x) { local + x } |> (f) { f(local) }\n}\nmany = (0) { 1 } | (_) { 2 }\nuse_many = () { apply(1, (0) { 1 } | (_) { 2 }) }\napply = (x, f) { f(x) }";
     let fixture = Fixture::new(&[("src/main.i", source)]);
     let subject = fixture.completions("app/main", "local + x", 0);
     assert!(subject.iter().any(|(n, _)| n == "local"), "{subject:?}");
@@ -599,7 +623,7 @@ fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
     assert!(!subject.iter().any(|(n, _)| n == "f"), "{subject:?}");
     let body = fixture.completions("app/main", "f(local)", 0);
     assert!(body.iter().any(|(n, _)| n == "f"), "{body:?}");
-    for needle in ["{ 0 ->", ",{ 0 ->"] {
+    for needle in ["(0) { 1 } | (_) { 2 }\n", ", (0) { 1 }"] {
         let at = fixture.at("app/main", needle, 0, 0);
         let query = fixture.query();
         let module = fixture.module("app/main");
@@ -648,8 +672,8 @@ fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
 
 // ---- The queries for references, rename, navigation and code actions ----
 
-const SHAPES_Q: &str = "(Shape, Circle(..), Dot(..), area)\n\nShape = Circle | Dot\n\nCircle {\n  Circle(radius: Int)\n}\n\nDot {\n  Dot\n}\n\narea = (s: Shape) -> Int {\n  s |> {\n    Circle(radius) -> radius * 3\n    Dot -> 0\n  }\n}\n";
-const MAIN_Q: &str = "(\n  (Shape, Circle, area) = app/shapes\n)\n\nmain = () {\n  c = Circle(radius: 2)\n  area(c) + area(Circle(radius: 1))\n}\n";
+const SHAPES_Q: &str = "(\n\tShape(..)\n\tarea\n)\n\nCircle = (radius = Int)\nDot = ()\nShape = Circle | Dot\n\narea = (s: Shape) -> Int {\n\ts |> (Circle(radius = radius)) { radius * 3 } | (Dot) { 0 }\n}\n";
+const MAIN_Q: &str = "(\n\t(Shape, Circle, area) = app/shapes\n)\n\nmain = () {\n\tc = Circle(radius = 2)\n\tarea(c) + area(Circle(radius = 1))\n}\n";
 
 fn shapes_fixture() -> Fixture {
     Fixture::new(&[("src/shapes.i", SHAPES_Q), ("src/main.i", MAIN_Q)])
@@ -690,12 +714,22 @@ fn query_references_follow_identity_across_modules() {
     assert!(found.iter().all(|(_, t)| t == "area"), "{found:?}");
     assert_eq!(refs.iter().filter(|r| r.definition).count(), 1);
     // A field: the label of the definition, the labels of the calls, and
-    // the pattern part, which also binds a local.
-    let at = f.at("app/main", "radius: 2", 0, 0);
+    // the label of the pattern part. Syntax three writes that part
+    // `Circle(radius = radius)`: the label and the local it binds are two
+    // words, so the label is a name of the field only, and the local is
+    // the second word.
+    let at = f.at("app/main", "radius = 2", 0, 0);
     let (owner, _, target) = q.target_at_offset(m, at).unwrap();
     let refs = q.references(&target, owner, &q.own_modules());
     assert_eq!(refs.len(), 4, "{:?}", texts_of(&f, &refs));
-    assert_eq!(refs.iter().filter(|r| r.label_binder).count(), 1);
+    assert_eq!(refs.iter().filter(|r| r.label_binder).count(), 0);
+    let shapes = f.module("app/shapes");
+    let label = f.at("app/shapes", "radius = radius", 0, 0);
+    assert!(refs.iter().any(|r| r.location.span.start == label));
+    let local = f.at("app/shapes", "radius)) {", 0, 0);
+    let (_, span, target) = q.target_at_offset(shapes, local).unwrap();
+    assert_eq!(span.start, local);
+    assert!(matches!(target, ilang_check::query::Target::Local(_)));
 }
 
 #[test]
@@ -710,12 +744,13 @@ fn query_rename_checks_kind_and_scope() {
     let edits = q.rename(m, at, "disk").unwrap();
     assert_eq!(edits.len(), 2);
     assert!(edits.iter().all(|e| e.text == "disk"));
-    // A constructor, in both modules.
-    let at = f.at("app/main", "Circle(radius: 2)", 0, 0);
+    // A constructor, in both modules: the definition, the member of the
+    // sum `Shape = Circle | Dot` (the labelled type `Circle` is the
+    // constructor, syntax three §2.6), the pattern, the import and the two
+    // calls.
+    let at = f.at("app/main", "Circle(radius = 2)", 0, 0);
     let edits = q.rename(m, at, "Disk").unwrap();
-    // The type `Circle` has the constructor's name, so it is renamed too:
-    // its definition, its place in `Shape`, the export and the import.
-    assert_eq!(edits.len(), 8, "{edits:?}");
+    assert_eq!(edits.len(), 6, "{edits:?}");
     // Refused for the library.
     let text = "main = () { panic(\"x\") }\n";
     let g = Fixture::new(&[("src/main.i", text)]);
@@ -728,7 +763,7 @@ fn query_rename_checks_kind_and_scope() {
 
 #[test]
 fn query_missing_clauses_of_a_match() {
-    let text = "Shape = Circle | Dot | Line\n\nCircle {\n  Circle(Int)\n}\n\nDot {\n  Dot\n}\n\nLine {\n  Line\n}\n\nf = (s: Shape) {\n  s |> {\n    Dot -> 0\n    Circle(1) -> 1\n  }\n}\n";
+    let text = "Circle = (Int)\nDot = ()\nLine = ()\nShape = Circle | Dot | Line\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n";
     let f = Fixture::new(&[("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");
@@ -740,7 +775,7 @@ fn query_missing_clauses_of_a_match() {
     assert_eq!(c.patterns, vec!["Circle(..)", "Line"]);
     assert_eq!(
         c.edit.text,
-        "    Circle(..) -> panic(\"todo\")\n    Line -> panic(\"todo\")\n"
+        " | (Circle(..)) { panic(\"todo\") } | (Line) { panic(\"todo\") } "
     );
 }
 
@@ -762,7 +797,7 @@ fn query_type_definition_signature_and_hints() {
     let s = q
         .signature_help(m, f.at("app/main", "area(c)", 0, 5))
         .unwrap();
-    assert_eq!(s.label, "area(s: Shape) -> Int");
+    assert_eq!(s.label, "area(s = Shape) -> Int");
     assert_eq!(s.active, Some(0));
     let hints = q.inlay_hints(m, ilang_syntax::span::Span::new(0, MAIN_Q.len() as u32));
     assert_eq!(hints.len(), 1, "{hints:?}");
@@ -779,7 +814,7 @@ fn query_completion_context() {
         q.completion_context(shapes, f.at("app/shapes", "Shape) ->", 0, 1)),
         CompletionContext::Type
     );
-    match q.completion_context(shapes, f.at("app/shapes", "Dot -> 0", 0, 0)) {
+    match q.completion_context(shapes, f.at("app/shapes", "Dot) { 0 }", 0, 0)) {
         // The members of `Shape = Circle | Dot` (syntax three §2.8).
         CompletionContext::Pattern { types } => assert_eq!(types.len(), 2),
         other => panic!("{other:?}"),
@@ -790,7 +825,7 @@ fn query_completion_context() {
         CompletionContext::Import { names_of: None, .. }
     ));
     assert!(matches!(
-        q.completion_context(main, f.at("app/main", "radius: 2", 0, 0)),
+        q.completion_context(main, f.at("app/main", "radius = 2", 0, 0)),
         CompletionContext::Expression { call: Some(_) }
     ));
 }
@@ -813,4 +848,23 @@ fn query_unused_imports_and_fixes() {
     );
     assert_eq!(fixes.len(), 1);
     assert_eq!(fixes[0].edits[0].text, "(area) = ");
+}
+
+#[test]
+fn incomplete_syntax_three_branch_keeps_constructor_completion() {
+    use ilang_check::query::CompletionContext;
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
+    let f = Fixture::new(&[("src/main.i", text)]);
+    let q = f.query();
+    let m = f.module("app/main");
+    let at = f.at("app/main", "() { 2", 0, 1);
+    let context = q.completion_context(m, at);
+    assert!(matches!(context, CompletionContext::Pattern { .. }), "{context:?}");
+    let completions = q.completions_at(m, at);
+    for (label, insertion) in [("Circle", "Circle(${1:_})"), ("Rect", "Rect(..)"), ("Dot", "Dot")] {
+        let item = completions.iter().find(|item| item.label == label).unwrap();
+        assert_eq!(item.insert.as_deref(), Some(insertion));
+    }
+    let body = f.at("app/main", "() { 2", 0, 5);
+    assert!(!matches!(q.completion_context(m, body), CompletionContext::Pattern { .. }));
 }

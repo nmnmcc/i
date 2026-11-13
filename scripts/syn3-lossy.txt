@@ -1,0 +1,102 @@
+# Files the migrator converts with a loss it reports (scripts/syn3-convert-all fails on
+# any other file with such a note): the kinds of the loss per file. Each is parked
+# (open records, stage 6), rewritten by scripts/syn3-hand-rewrites, or a fixture whose
+# expectation states the error the lost form now gives.
+crates/ilang-check/tests/types/clauses.i empty-match
+crates/ilang-check/tests/types/display.i type-params
+crates/ilang-check/tests/types/known_types.i labelled-call
+crates/ilang-check/tests/types/labels.i labelled-call
+crates/ilang-syntax/tests/format/alignment.i constructor-name-clash
+crates/ilang-syntax/tests/format/comments.i empty-match
+crates/ilang-syntax/tests/format/comments_middle.i labelled-call
+crates/ilang-syntax/tests/format/long_calls.i labelled-call
+crates/ilang-syntax/tests/format/pipelines.i labelled-call
+crates/ilang-syntax/tests/golden/case_head.i empty-match
+crates/ilang-syntax/tests/golden/clauses.i empty-match
+crates/ilang-syntax/tests/golden/exprs.i labelled-call
+lib/i/process.i constructor-name-clash
+lib/i/record.i open-record,string-label
+lib/i/task.i constructor-name-clash
+std/src/http.i constructor-name-clash
+tests/review/cases/review-a1/cases/64_empty_clauses/src/main.i empty-match
+tests/review/cases/review-a1/_loose/cases/64_empty_clauses/original/src/main.i empty-match
+tests/review/cases/review-a1/_loose/runtime-new/64/original/src/main.i empty-match
+tests/review/cases/review-a1/runtime-new/64/src/main.i empty-match
+tests/review/cases/review-k4c/cases/effects_two_3_0/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/effects_two_3_1/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/effects_two_5_0/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/effects_two_5_1/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_3_0_0/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_3_0_1/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_3_0_2/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_3_1_0/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_3_1_1/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_3_1_2/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_4_0_0/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_4_0_1/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_4_0_2/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_4_1_0/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_4_1_1/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_4_1_2/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_6_0_0/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_6_0_1/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_6_0_2/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_6_1_0/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_6_1_1/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/missing_3_6_1_2/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/two_env/src/main.i two-row-variables
+tests/review/cases/review-k4c/cases/two_run/src/main.i two-row-variables
+tests/review/cases/review-rec/_loose/probes/src/main.i open-record
+tests/review/cases/review-runtime/echo-types/src/task.i need-not-named
+tests/review/cases/review-std1/factory/src/main.i need-not-named
+tests/review/cases/review-std1/tree/src/main.i need-not-named
+tests/review/cases/review-std1/variance/src/main.i need-not-named
+tests/spec/10.1/externals.i labelled-call
+tests/spec/11/stop_lazy_after_catch.i constructor-name-clash
+tests/spec/11/stop_lazy_descent.i constructor-name-clash
+tests/spec/11/stop_lazy_nested.i constructor-name-clash
+tests/spec/11/stop_lazy_pending.i constructor-name-clash
+tests/spec/11/stop_lazy_tail.i constructor-name-clash
+tests/spec/2.4/field_privacy_allowed/src/secret.i constructor-name-clash
+tests/spec/6/a1_empty_inhabited.i empty-match
+tests/spec/6/a1_empty_never.i empty-match
+tests/spec/6/a1_labels_and_catchall.i labelled-call
+tests/spec/6/a1_no_label.i labelled-call
+tests/spec/6/t3_record_builder.i open-record,string-label
+tests/spec/6/t3_record_codec.i open-record,string-label
+tests/spec/6/t3_record_cross_module/src/defs.i open-record,string-label
+tests/spec/6/t3_record_cross_module/src/mid.i open-record,string-label
+tests/spec/6/t3_record_inspect.i string-label
+tests/spec/6/t3_record_key_known_fn.i open-record,string-label
+tests/spec/6/t3_record_param_alias.i open-record,string-label
+tests/spec/6/t3_record_param_call.i open-record,string-label
+tests/spec/6/t3_record_param_capture.i open-record,string-label
+tests/spec/6/t3_record_param_export/src/m.i open-record,string-label
+tests/spec/6/t3_record_param_forward.i open-record,string-label
+tests/spec/6/t3_record_param_inner_label.i open-record,string-label
+tests/spec/6/t3_record_param_inner_label_unknown.i open-record,string-label
+tests/spec/6/t3_record_param_key_type.i open-record,string-label
+tests/spec/6/t3_record_param_may_alias.i open-record,string-label
+tests/spec/6/t3_record_param_mismatch.i open-record,string-label
+tests/spec/6/t3_record_param_nested.i open-record,string-label
+tests/spec/6/t3_record_param_recursive.i open-record,string-label
+tests/spec/6/t3_record_param_two_keys_bad.i open-record,string-label
+tests/spec/6/t3_record_param_two_keys.i open-record,string-label
+tests/spec/6/t3_record_param_unknown.i open-record,string-label
+tests/spec/6/t3_record_schema.i open-record,string-label
+tests/spec/6/t3_record_types.i string-label
+tests/spec/9.10/interface.i labelled-call
+tests/spec/9.9/public_schemes.i row-difference
+tests/spec/9/control_lazy_cancel.i constructor-name-clash
+tests/spec/9/control_lazy_cancel_inner_boundary.i constructor-name-clash
+tests/spec/9/control_lazy_ensure.i constructor-name-clash
+tests/spec/9/control_lazy_env.i constructor-name-clash
+tests/spec/9/control_lazy_env_unwind.i constructor-name-clash
+tests/spec/9/control_lazy_long_pending.i constructor-name-clash
+tests/spec/9/control_lazy_skip.i constructor-name-clash
+crates/ilang-check/tests/types/type_params.i lowercase-type-param (the lowercase head `Mixed(a, B)` is no longer in it: syntax three rejects it in the parser, E0101, tested by front_end kept_form_messages_are_independent_checks)
+tests/review/cases/review-runtime/echo-types/src/task.i lowercase-type-param (error fixture: E0232 before, E0101 now)
+tests/review/cases/review-s6/probe/src/main.i lowercase-type-param (error fixture: E0232 before, E0101 now)
+tests/review/cases/review-std1/factory/src/main.i lowercase-type-param (error fixture: E0232 before, E0101 now)
+tests/review/cases/review-std1/tree/src/main.i lowercase-type-param (error fixture: E0232 before, E0101 now)
+tests/review/cases/review-std1/variance/src/main.i lowercase-type-param (error fixture: E0232 before, E0101 now)

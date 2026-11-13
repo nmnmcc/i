@@ -1,5 +1,8 @@
-S(N) { S(() -> Nil ! N) }
-use(N) = (s ! S(N)) { S(f) = s f() }
-closed: () -> Nil ! S(Never) = use
+S(N) = (() <- N -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f) = s
+	f()
+}
+closed: () <- (S(Never)) -> Nil = use
 
-example = () { ! S(Never) = S(() { Nil }) closed() }
+example = () { closed() <- (S(() { Nil })) }

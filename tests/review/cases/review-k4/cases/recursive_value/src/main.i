@@ -1,2 +1,2 @@
-Box(A) { Box(A) }
+Box(A) = (A)
 bad = () { Box(bad()) }

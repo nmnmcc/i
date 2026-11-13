@@ -12,10 +12,7 @@ need_string = (s: String) { s <> "!" }
 
 equal = (a, b) { a == b }
 
-kind = {
-	"a" -> 1
-	"b" -> 2
-}
+kind = ("a") { 1 } | ("b") { 2 }
 
 total = () -> Int {
 	"a" = "a"

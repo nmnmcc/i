@@ -1,2 +1,2 @@
-src/main.i:1:2: error[E0215]: `fail` is exported but not defined in this module; a module path has a `/`, as in `(i/fail)`
-src/other.i:1:2: error[E0215]: `nothere` is exported but not defined in this module
+src/main.i:2:2: error[E0215]: `fail` is exported but not defined in this module; a module path has a `/`, as in `(i/fail)`
+src/other.i:2:2: error[E0215]: `nothere` is exported but not defined in this module

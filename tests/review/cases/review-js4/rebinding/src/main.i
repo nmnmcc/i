@@ -1,15 +1,11 @@
+Web = ()
+Native = ()
 Target = Web | Native
-Web { Web }
-Native { Native }
-read = (t ! Target) { t |> { Web -> 1 Native -> 2 } }
-probe = (t ! Target) {
-  alias = t
-  captured = () { alias |> { Web -> 1 Native -> 2 } }
-  ! Target = Native
-  (captured(), read())
+read = () <- (t: Target) { t |> (Web) { 1 } | (Native) { 2 } }
+probe = () <- (t: Target) {
+	alias = t
+	captured = () { alias |> (Web) { 1 } | (Native) { 2 } }
+	(captured(), read()) <- (Native)
 }
 
-main = () {
-  ! Target = Web
-  assert(probe() == (1, 2))
-}
+main = () { assert(probe() == (1, 2)) <- (Web) }

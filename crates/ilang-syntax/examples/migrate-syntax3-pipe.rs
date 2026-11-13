@@ -14,7 +14,7 @@
 //! Sources are `.i` files, `i` fences in Markdown, and string literals in Rust and
 //! JavaScript that contain `|>` and parse as a module. Literals that contain `|>`
 //! but do not parse are listed on stderr (`unparsed`) for review by hand.
-use ilang_syntax::{ast::*, parser::parse_module_old_pipe as parse_module};
+use ilang_syntax::{ast::*, legacy::parser::parse_module_old_pipe as parse_module};
 use std::{fs, path::Path, process::Command};
 
 // ---- Finding the groups ----

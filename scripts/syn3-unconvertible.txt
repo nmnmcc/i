@@ -1,0 +1,138 @@
+# Files that scripts/syn3-convert-all leaves as they are: neither the syntax before
+# syntax three nor syntax three reads them. They are the parse-error fixtures of
+# the syntax before syntax three; each line is the path and the first message of
+# the old parser. A file that fails and is not here stops the conversion.
+# Lines `path:hash reason` name snippets in strings (the key of
+# scripts/old-syntax-check.json) that are not i or not complete.
+crates/ilang-check/tests/projects/package_deps/lib/test/broken.i expected an item: a type definition, or a binding `pattern = value`, found `this`
+crates/ilang-check/tests/projects/syntax_error/src/main.i `(` is not closed
+crates/ilang-syntax/tests/golden/err_arg_order.i an argument by position may not come after an argument by label
+crates/ilang-syntax/tests/golden/err_arrow_tail.i the nearest `->` cannot take this `^`: it already has one, or `!` came first; put the inner function type in `{ }`
+crates/ilang-syntax/tests/golden/err_attribute_line.i a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have no attribute before the
+crates/ilang-syntax/tests/golden/err_attr_same_line.i expected an item: a type definition, or a binding `pattern = value`, found `=`
+crates/ilang-syntax/tests/golden/err_bang_line.i expected the function body, a `{` on the same line, found `!`
+crates/ilang-syntax/tests/golden/err_block_end.i a block ends with an expression
+crates/ilang-syntax/tests/golden/err_body_next_line.i expected the function body, a `{` on the same line, found `{`
+crates/ilang-syntax/tests/golden/err_brackets.i `(` is not closed
+crates/ilang-syntax/tests/golden/err_clause_tuple_note.i expected `->`, found `}`; a tuple type in a clause pattern is put in `{ }`
+crates/ilang-syntax/tests/golden/err_clause_tuple_type.i the right side of `|>` must be a name, a call, a function, or a clause block
+crates/ilang-syntax/tests/golden/err_discard.i a discard binds nothing, so it may not be used as a value
+crates/ilang-syntax/tests/golden/err_form_feed.i unexpected character U+000C
+crates/ilang-syntax/tests/golden/err_guard_word.i the right side of `|>` must be a name, a call, a function, or a clause block; if this is old syntax: replace `import (…)` and `export (…)` with header
+crates/ilang-syntax/tests/golden/err_header_empty.i a file with nothing to import or export leaves the group out
+crates/ilang-syntax/tests/golden/err_header_order.i the imports come before the exports
+crates/ilang-syntax/tests/golden/err_import_late.i a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file
+crates/ilang-syntax/tests/golden/err_list.i expected an expression, found `,`
+crates/ilang-syntax/tests/golden/err_pattern.i in a pattern, `-` comes before an int literal and `-.` before a float literal
+crates/ilang-syntax/tests/golden/err_pipe_group.i a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a group: `{ e |> { … } } * 10`
+crates/ilang-syntax/tests/golden/err_pipe_target.i the right side of `|>` must be a name, a call, a function, or a clause block
+crates/ilang-syntax/tests/golden/err_record.i expected an expression, found `:`
+crates/ilang-syntax/tests/golden/err_recover.i expected an expression, found `=`
+crates/ilang-syntax/tests/golden/err_segment_type.i expected a name, found `Int`
+crates/ilang-syntax/tests/golden/err_spread.i `..rest` comes after the parts of a list
+crates/ilang-syntax/tests/golden/err_toplevel.i expected an item: a type definition, or a binding `pattern = value`, found `1`
+crates/ilang-syntax/tests/golden/err_trailing.i expected a type, found `,`
+crates/ilang-syntax/tests/golden/err_type_group_break.i a line break directly inside a `{ }` that groups a type is a compile error
+crates/ilang-syntax/tests/golden/literal_errors.i `_` may only be between two digits
+editors/vscode/test/sample.i unknown escape; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> { … }`; write guards with `?` instead 
+tests/review/cases/review-a1/capture/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` w
+tests/review/cases/review-a1/cases/04_header_order/.invalid/src/main.i the imports come before the exports
+tests/review/cases/review-a1/cases/05_empty_header/.invalid/src/main.i a file with nothing to import or export leaves the group out
+tests/review/cases/review-a1/cases/11_attributed_header/.invalid/src/main.i a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and the exports have n
+tests/review/cases/review-a1/cases/21_old_alias_typed_fn/.invalid/src/main.i a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and
+tests/review/cases/review-a1/cases/29_param_shadow/.invalid/src/main.i a block ends with an expression
+tests/review/cases/review-a1/cases/33_lower_constructor_pattern/.invalid/src/main.i expected an expression, found `=`
+tests/review/cases/review-a1/cases/48_new_ungrouped_product/.invalid/src/main.i a match is an operation at level 6, so what comes after the clause block is part of the right side; put the match in a g
+tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/.invalid/src/main.i a discard binds nothing, so it may not be used as a value
+tests/review/cases/review-a1/confirmed/capture-from-old/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, a
+tests/review/cases/review-a1/confirmed/capture-keep-layout/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`
+tests/review/cases/review-a1/confirmed/capture-plain/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and 
+tests/review/cases/review-a1/_loose/capture/original/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `cas
+tests/review/cases/review-a1/_loose/capture/original/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and 
+tests/review/cases/review-a1/_loose/cases/03_mixed_headers/original/.invalid/src/main.i a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this 
+tests/review/cases/review-a1/_loose/cases/04_header_order/original/.invalid/src/main.i the imports come before the exports
+tests/review/cases/review-a1/_loose/cases/05_empty_header/original/.invalid/src/main.i a file with nothing to import or export leaves the group out
+tests/review/cases/review-a1/_loose/cases/11_attributed_header/original/.invalid/src/main.i a group in `( )` with an attribute before it is not a binding, because no `=` follows it; the imports and th
+tests/review/cases/review-a1/_loose/cases/20_old_alias_returns_fn/original/.invalid/src/main.i a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header
+tests/review/cases/review-a1/_loose/cases/21_old_alias_typed_fn/original/.invalid/src/main.i a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header g
+tests/review/cases/review-a1/_loose/cases/25_old_guard_fn/original/.invalid/src/main.i expected an expression, found `:`; if this is old syntax: replace `import (…)` and `export (…)` with header group
+tests/review/cases/review-a1/_loose/cases/29_param_shadow/original/.invalid/src/main.i a block ends with an expression
+tests/review/cases/review-a1/_loose/cases/33_lower_constructor_pattern/original/.invalid/src/main.i expected an expression, found `=`
+tests/review/cases/review-a1/_loose/cases/48_new_ungrouped_product/original/.invalid/src/main.i a match is an operation at level 6, so what comes after the clause block is part of the right side; put 
+tests/review/cases/review-a1/_loose/cases/53_new_tuple_clauses_joined/original/.invalid/src/main.i a discard binds nothing, so it may not be used as a value
+tests/review/cases/review-a1/_loose/cases/56_old_guard_lines/original/.invalid/src/main.i expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` wi
+tests/review/cases/review-a1/_loose/cases/61_old_type_alias_join/original/.invalid/src/main.i expected an item: a type definition, or a binding `pattern = value`, found `=`
+tests/review/cases/review-a1/_loose/confirmed/capture-from-old/once/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header gro
+tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header gro
+tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header
+tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header grou
+tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header 
+tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header 
+tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with hea
+tests/review/cases/review-a1/_loose/confirmed/capture-plain/once/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups
+tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups
+tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/types.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header gr
+tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with he
+tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with hea
+tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with
+tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i expected an expression, found `->`; if this is old syntax: replace `import (…)` and `export (…)` with heade
+tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and 
+tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and 
+tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i expected an expression, found `:`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, an
+tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i expected `->`, found a line break before `if`; if this is old syntax: replace `import (…)` and `export (…)` with header grou
+tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i expected an item: a type definition, or a binding `pattern = value`, found `=`
+tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file; if this is old s
+tests/review/cases/review-a1/runtime/21/.invalid/src/main.i a block ends with an expression; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` w
+tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/.invalid/src/main.i expected an item: a type definition, or a binding `pattern = value`, found `x`; if this 
+tests/review/cases/review-k4c/cases/plain_1/.invalid/src/main.i a block ends with an expression
+tests/review/cases/review-k4c/cases/plain_3/.invalid/src/main.i a block ends with an expression
+tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i expected an expression, found `*`
+tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i expected an expression, found `*`
+tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i expected a pattern, found `=`
+tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i a block ends with an expression
+tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i expected an expression, found `!`
+tests/review/cases/review-native3/field/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` wi
+tests/review/cases/review-native3/injection_control/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case
+tests/review/cases/review-native3/injection_control/.invalid/src/resource.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, an
+tests/review/cases/review-native3/positive/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }`
+tests/review/cases/review-native3/update/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` w
+tests/review/cases/review-rec/_loose/growth/.invalid/src/main.i expected an expression, found `..`
+tests/review/cases/review-rec/_loose/probes/.invalid/src/main.i expected `}`, found `:`
+tests/review/cases/review-rec/_loose/schema-union/.invalid/src/main.i expected an expression, found `:`
+tests/review/cases/review-runtime/echo-types/.invalid/src/main.i expected `,` or `)`, found `=`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … 
+tests/review/cases/review-std1/stream/.invalid/src/stream.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }`
+tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i expected an expression, found `)`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case
+tests/spec/1.7/a1_same_line_negative.i expected a pattern, found `->`
+tests/spec/1.7/a1_same_line_tuple.i a discard binds nothing, so it may not be used as a value
+tests/spec/2.2/a1_empty_header.i a file with nothing to import or export leaves the group out
+tests/spec/2.2/a1_header_order.i the imports come before the exports
+tests/spec/2.2/a1_macro_attribute_same_line.i expected an item: a type definition, or a binding `pattern = value`, found `=`
+tests/spec/3/syn2_old_empty_record_type.i expected a type, found `..`
+tests/spec/3/syn2_old_error_marker.i expected the function body, a `{` on the same line, found `?`
+tests/spec/3/syn2_old_record_type.i expected `}`, found `:`
+tests/spec/6/a1_wrong_pattern.i in a pattern, `-` comes before an int literal and `-.` before a float literal
+tests/spec/6/interpolation_import.i string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns
+tests/spec/6/interpolation_literal_type.i string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns
+tests/spec/6/interpolation_pattern.i string interpolation is not allowed in patterns
+tests/spec/6/interpolation_record_label.i string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns
+tests/spec/6/interpolation_type_label.i string interpolation is only allowed in expressions, not in record labels, attribute arguments, import paths, literal types or patterns
+tests/spec/6/multiline_close.i a multi-line string closing delimiter must be on its own line
+tests/spec/6/multiline_open.i a multi-line string opening delimiter must be followed by a line break
+tests/spec/6/multiline_underindent.i a multi-line string line has less or different indentation than its closing delimiter
+tests/spec/6/raw_string_bad_escape.i unknown escape
+tests/spec/6/raw_string_unterminated.i this string is not closed
+tests/spec/6/syn2_mixed_tuple.i tuples have positional parts only and records have labelled fields only; positions and labels cannot mix
+tests/spec/6/syn2_old_brace_record.i expected an expression, found `:`
+tests/spec/6/syn2_old_mixed_tuple.i tuples have positional parts only and records have labelled fields only; positions and labels cannot mix
+tests/spec/7/suffix_nonliteral.i expected a string literal in a string pattern, found `x`
+tests/spec/7/suffix_two_binders.i a string pattern has exactly one binder; two binders around a literal are not allowed
+crates/ilang-cli/tests/numeric_lowering.rs:d46aee08cc49f6d1 a JSON key "export", not i
+crates/ilang-check/tests/codegen.rs:652bae5f3a18e799 expected `,` or `)`, found `=`
+crates/ilang-check/tests/query.rs:924116554a35a736 expected `,` or `)`, found `=`
+crates/ilang-lsp/tests/protocol.rs:e5b90e5833108100 expected a type, found the end of the file
+crates/ilang-lsp/tests/protocol.rs:0e58de37207aac87 expected an expression, found the end of the file
+crates/ilang-lsp/tests/protocol.rs:361065f87a85de06 expected an expression, found the end of the file
+crates/ilang-lsp/tests/protocol.rs:0e58de37207aac87 expected an expression, found the end of the file
+crates/ilang-lsp/tests/protocol.rs:0f1c00c95cc031e0 expected an expression, found `<`
+crates/ilang-syntax/tests/string_forms.rs:68d70a8fa472acc8 string interpolation is not allowed in patterns
+crates/ilang-syntax/tests/string_forms.rs:f791f2429f546a31 a string pattern has exactly one binder; two binders around a literal are not allowed

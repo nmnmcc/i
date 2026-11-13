@@ -1,7 +1,9 @@
-(i/fail)
-S(E,N) { S(() -> Nil ^ E ! N, (N) -> Nil) }
-use(E,N) = (s ! S(E,N)) { S(f, _) = s f() }
-example = () {
- ! S(Nil,Never) = S(() { Nil }, (_: Never) { Nil })
- fail.catch(() { use() })
+(
+	i/fail
+)
+S(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+use = <E, N>() <- (s: S(E, N)) {
+	S(f, _) = s
+	f()
 }
+example = () { fail.catch(() { use() }) <- (S(() { Nil }, (_: Never) { Nil })) }

@@ -6,10 +6,9 @@
 )
 
 check = (got: String, want: String) {
-	{ got == want } |> {
-		True  -> Nil
-		False -> panic(got <> " is not " <> want)
-	}
+	{ got == want } |>
+		(True) { Nil }
+		| (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -28,8 +27,8 @@ test("small", () {
 test("big", () {
 	two_100 = 1267650600228229401496703205376
 	check(
-		show(two_100 * two_100)
-		"1606938044258990275541962092341162602522202993782792835301376"
+		show(two_100 * two_100),
+		"1606938044258990275541962092341162602522202993782792835301376",
 	)
 	check(show(two_100 - two_100 - 1), "-1")
 	check(show(1073741823 + 1), "1073741824")

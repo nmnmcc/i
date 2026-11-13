@@ -1,1 +1,1 @@
-f = (s: String) { s |> { "a" -> 1 } }
+f = (s: String) { s |> ("a") { 1 } }

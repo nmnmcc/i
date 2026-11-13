@@ -1,2 +1,5 @@
-S(N) { S(() -> Nil ! N) }
-bad(N) = (s ! S(N)) -> Nil ! N { S(f) = s f() }
+S(N) = (() <- N -> Nil)
+bad = <N>() <- (s: S(N)) -> Nil {
+	S(f) = s
+	f()
+}

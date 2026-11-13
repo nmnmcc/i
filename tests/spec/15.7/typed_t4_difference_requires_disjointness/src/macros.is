@@ -1,4 +1,4 @@
 (, (= syntax (/ i syntax)))
 (, m)
-(@ macro (: (m A) (-> (A) (- A Int))))
-(@ macro (= m (-> (value) _ value)))
+(@ macro (: m (-> [A] (, A) (- A Int))))
+(@ macro (= m (-> (, value) _ value)))

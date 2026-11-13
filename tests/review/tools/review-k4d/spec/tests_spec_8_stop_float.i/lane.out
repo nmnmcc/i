@@ -1,2 +1,0 @@
-spec/stop_float.make : (n: Int) -> BitArray
-spec/stop_float.main : () -> Nil

@@ -1,2 +1,2 @@
-Absent { Absent }
-main = (missing ! Absent) { Nil }
+Absent = ()
+main = () <- (missing: Absent) { Nil }

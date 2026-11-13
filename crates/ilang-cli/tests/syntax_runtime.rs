@@ -60,53 +60,51 @@ fn syntax_library_round_trips_through_the_host() {
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
-        r#"
-(
+        r#"(
 	testlib = (test) = std/test
-	i/fail, syntax = i/syntax)
+	i/fail
+	syntax = i/syntax
+)
 @external("test:syntax", "source")
 source: () -> syntax.Syntax
 
-test("exercise", () -> Nil ^ syntax.SyntaxError ! Assert {
-  value = source()
-  assert(source() == value)
-  ! syntax.Definitions = syntax.Definitions((of) { of })
-  assert(syntax.definition(value) == value)
-  assert(syntax.show(value) == "(f x)")
-  syntax.node(value) |> {
-    syntax.Node(syntax.Round([first, second])) -> {
-      syntax.node(value) |> {
-        syntax.Node(syntax.Round([again, _])) -> assert(first == again)
-        _ -> panic("unexpected syntax node")
-      }
-      assert(syntax.show(first) == "f")
-      assert(syntax.show(second) == "x")
-    }
-    _ -> panic("unexpected syntax node")
-  }
-  made = syntax.make(syntax.Node(syntax.Name("made")), value)
-  assert(syntax.show(made) == "made")
-  assert(syntax.same_code(made, made))
-  assert(syntax.show_as(made, syntax.Expression) == "made")
-  pair = syntax.make(syntax.Node(syntax.Round([made, value])), value)
-  assert(syntax.show(pair) == "(made (f x))")
-  fail.catch(() { syntax.make(syntax.Node(syntax.Name("Bad Name")), value) }) |> {
-    Error(syntax.SyntaxError(message, at)) -> {
-      assert(message != "")
-      assert(syntax.same_code(at, value))
-    }
-    Ok(_) -> panic("invalid syntax atom was accepted")
-  }
-  comma = syntax.make(syntax.Node(syntax.Symbol(",")), value)
-  bad = syntax.make(syntax.Node(syntax.Round([comma])), value)
-  fail.catch(() { syntax.show_as(bad, syntax.Expression) }) |> {
-    Error(syntax.SyntaxError(message, at)) -> {
-      assert(message != "")
-      assert(syntax.same_code(at, bad))
-    }
-    Ok(_) -> panic("invalid expression was accepted")
-  }
-  Nil
+test("exercise", () -> Nil {
+	value = source()
+	assert(source() == value)
+	{
+		assert(syntax.definition(value) == value)
+		assert(syntax.show(value) == "(f x)")
+		syntax.node(value) |>
+			(syntax.Node(syntax.Round([first, second]))) {
+				syntax.node(value) |>
+					(syntax.Node(syntax.Round([again, _]))) { assert(first == again) }
+					| (_) { panic("unexpected syntax node") }
+				assert(syntax.show(first) == "f")
+				assert(syntax.show(second) == "x")
+			}
+			| (_) { panic("unexpected syntax node") }
+		made = syntax.make(syntax.Node(syntax.Name("made")), value)
+		assert(syntax.show(made) == "made")
+		assert(syntax.same_code(made, made))
+		assert(syntax.show_as(made, syntax.Expression) == "made")
+		pair = syntax.make(syntax.Node(syntax.Round([made, value])), value)
+		assert(syntax.show(pair) == "(made (f x))")
+		fail.catch(() { syntax.make(syntax.Node(syntax.Name("Bad Name")), value) }) |>
+			(Error(syntax.SyntaxError(message = message, at = at))) {
+				assert(message != "")
+				assert(syntax.same_code(at, value))
+			}
+			| (Ok(_)) { panic("invalid syntax atom was accepted") }
+		comma = syntax.make(syntax.Node(syntax.Symbol(",")), value)
+		bad = syntax.make(syntax.Node(syntax.Round([comma])), value)
+		fail.catch(() { syntax.show_as(bad, syntax.Expression) }) |>
+			(Error(syntax.SyntaxError(message = message, at = at))) {
+				assert(message != "")
+				assert(syntax.same_code(at, bad))
+			}
+			| (Ok(_)) { panic("invalid expression was accepted") }
+		Nil
+	} <- (syntax.Definitions(definition = (of) { of }))
 })
 "#,
     )
@@ -203,14 +201,16 @@ show = () { syntax.show(source()) }
     ilang_cli::build(dir.path(), options).unwrap();
     std::fs::write(
         &main,
-        r#"
-(syntax = i/syntax)
+        r#"(
+	syntax = i/syntax
+)
 @external("test:syntax", "source")
 source: () -> syntax.Syntax
-main = () -> Nil ^ syntax.SyntaxError {
-  ! syntax.Definitions = syntax.Definitions((s) { s })
-  syntax.definition(source())
-  Nil
+main = () -> Nil {
+	{
+		syntax.definition(source())
+		Nil
+	} <- (syntax.Definitions(definition = (s) { s }))
 }
 "#,
     )
@@ -297,31 +297,38 @@ fn compiler_templates_rebuild_through_wasm() {
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
-        r#"
-(
+        r#"(
 	testlib = (test) = std/test
-	syntax = i/syntax)
-make_many = (value: syntax.Syntax, n: Int, acc: List(syntax.Syntax)) -> List(syntax.Syntax) {
-  n |> { 0 -> acc _ -> make_many(value, n - 1, [value, ..acc]) }
-}
+	syntax = i/syntax
+)
+make_many = (value: syntax.Syntax, n: Int, acc: List(syntax.Syntax)) -> List(
+	syntax.Syntax,
+) { n |> (0) { acc } | (_) { make_many(value, n - 1, [value, ..acc]) } }
 count = (items: List(syntax.Syntax), n: Int) -> Int {
-  items |> { [] -> n [_, ..rest] -> count(rest, n + 1) }
+	items |> ([]) { n } | ([_, ..rest]) { count(rest, n + 1) }
 }
 
 test("exercise", () {
-  template = syntax._template(0)
-  first = syntax._template(1)
-  replacement = syntax._template(2)
-  result = syntax._rebuild(template, [first, replacement])
-  combined = syntax._append([first, replacement], [first])
-  assert(syntax.show(syntax._rebuild(template, combined)) == "(f y f)")
-  assert(count(syntax._append(make_many(first, 3000, []), [replacement]), 0) == 3001)
-  assert(syntax.show(result) == "(f y)")
-  syntax.node(result) |> {
-    syntax.Node(syntax.Round([_, child])) -> assert(child == replacement)
-    _ -> panic("unexpected template")
-  }
-  Nil
+	template = syntax._template(0)
+	first = syntax._template(1)
+	replacement = syntax._template(2)
+	result = syntax._rebuild(template, [first, replacement])
+	combined = syntax._append([first, replacement], [first])
+	assert(
+		syntax.show(syntax._rebuild(template, combined)) == "(f y f)",
+	)
+	assert(
+		count(
+			syntax._append(make_many(first, 3000, []), [replacement]),
+			0,
+		) ==
+			3001,
+	)
+	assert(syntax.show(result) == "(f y)")
+	syntax.node(result) |>
+		(syntax.Node(syntax.Round([_, child]))) { assert(child == replacement) }
+		| (_) { panic("unexpected template") }
+	Nil
 })
 "#,
     )
@@ -367,27 +374,28 @@ fn compiler_quote_patterns_capture_nested_nodes_and_splices() {
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
-        r#"
-(
+        r#"(
 	testlib = (test) = std/test
-	syntax = i/syntax)
+	syntax = i/syntax
+)
 
 test("exercise", () {
-  pattern = syntax._template(0)
-  input = syntax._template(1)
-  matched = syntax._match(pattern, input)
-  assert(syntax._match_ok(matched))
-  assert(syntax.show(syntax._match_one(matched, 0)) == "x")
-  syntax._match_many(matched, 1) |> {
-    [a, b] -> {
-      assert(syntax.show(a) == "y")
-      assert(syntax.show(b) == "z")
-    }
-    _ -> panic("wrong splice captures")
-  }
-  failed = syntax._match(pattern, syntax._template(2))
-  assert(syntax._match_ok(failed) == False)
-  Nil
+	pattern = syntax._template(0)
+	input = syntax._template(1)
+	matched = syntax._match(pattern, input)
+	assert(syntax._match_ok(matched))
+	assert(
+		syntax.show(syntax._match_one(matched, 0)) == "x",
+	)
+	syntax._match_many(matched, 1) |>
+		([a, b]) {
+			assert(syntax.show(a) == "y")
+			assert(syntax.show(b) == "z")
+		}
+		| (_) { panic("wrong splice captures") }
+	failed = syntax._match(pattern, syntax._template(2))
+	assert(syntax._match_ok(failed) == False)
+	Nil
 })
 "#,
     )
@@ -430,62 +438,66 @@ fn compiler_definition_service_returns_and_aborts_at_the_query() {
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
-        r#"
-(
+        r#"(
 	testlib = (test) = std/test
-	i/fail, syntax = i/syntax)
+	i/fail
+	syntax = i/syntax
+)
 
-answer = () -> Nil ^ syntax.SyntaxError ! Assert {
-  ! syntax.Definitions = syntax._definitions()
-  answer = syntax.definition(syntax._template(0))
-  assert(syntax.show(answer) == "(Box {(Box Int)})")
-  Nil
+answer = () -> Nil {
+	{
+		answer = syntax.definition(syntax._template(0))
+		assert(syntax.show(answer) == "(Box {(Box Int)})")
+		Nil
+	} <- (syntax._definitions())
 }
 
 test("answer", () { answer() })
 
-test("catchable", () -> Nil ! Assert {
-  ! syntax.Definitions = syntax._definitions()
-  query = syntax._template(1)
-  fail.catch(() { syntax.definition(query) }) |> {
-    Error(syntax.SyntaxError(message, at)) -> {
-      assert(message == "not visible")
-      assert(at == query)
-    }
-    Ok(_) -> panic("expected an error")
-  }
-  Nil
+test("catchable", () -> Nil {
+	{
+		query = syntax._template(1)
+		fail.catch(() { syntax.definition(query) }) |>
+			(Error(syntax.SyntaxError(message = message, at = at))) {
+				assert(message == "not visible")
+				assert(at == query)
+			}
+			| (Ok(_)) { panic("expected an error") }
+		Nil
+	} <- (syntax._definitions())
 })
 
-test("deferred", () -> Nil ! Assert {
-  ! syntax.Definitions = syntax._definitions()
-  fail.catch(() { syntax.definition(syntax._template(2)) })
-  Nil
+test("deferred", () -> Nil {
+	{
+		fail.catch(() { syntax.definition(syntax._template(2)) })
+		Nil
+	} <- (syntax._definitions())
 })
 
 test("notes", () -> Nil {
-  diagnostics = syntax._diagnostics()
-  diagnostics.note("first")
-  diagnostics.note("second")
-  Nil
+	diagnostics = syntax._diagnostics()
+	diagnostics.note("first")
+	diagnostics.note("second")
+	Nil
 })
 
 test("notes_failed", () -> Nil {
-  diagnostics = syntax._diagnostics()
-  diagnostics.note("discard me")
-  syntax._report_error("failed after note", syntax._template(1))
-  Nil
+	diagnostics = syntax._diagnostics()
+	diagnostics.note("discard me")
+	syntax._report_error("failed after note", syntax._template(1))
+	Nil
 })
 
-test("macro_error", () -> Nil ! Assert {
-  fail.catch(() { syntax._report_error("macro failed", syntax._template(1)) })
-  Nil
+test("macro_error", () -> Nil {
+	fail.catch(() { syntax._report_error("macro failed", syntax._template(1)) })
+	Nil
 })
 
-test("compile_error", () -> Nil ! Assert {
-  ! syntax.Definitions = syntax._definitions()
-  fail.catch(() { syntax.definition(syntax._template(3)) })
-  Nil
+test("compile_error", () -> Nil {
+	{
+		fail.catch(() { syntax.definition(syntax._template(3)) })
+		Nil
+	} <- (syntax._definitions())
 })
 "#,
     )
@@ -594,33 +606,39 @@ fn compiler_items_service_buffers_valid_requests_and_rejects_bad_ones() {
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
-        r#"
-(
+        r#"(
 	testlib = (test) = std/test
-	i/fail, syntax = i/syntax)
+	i/fail
+	syntax = i/syntax
+)
 
-test("item", () -> Nil ^ syntax.SyntaxError ! Assert {
-  service = syntax._items()
-  collection = syntax._template(0)
-  target = syntax._template(1)
-  at = syntax._template(2)
-  service.add(collection, target, [("group", "bench"), ("size", "large")], at)
-  service.expose(target)
-  fail.catch(() { service.add(collection, target, [("x", "1"), ("x", "2")], at) }) |> {
-    Error(syntax.SyntaxError(message, at)) -> { assert(message != "") assert(at == syntax._template(2)) }
-    Ok(_) -> panic("duplicate metadata was accepted")
-  }
-  fail.catch(() { service.add(collection, target, [], syntax._template(3)) }) |> {
-    Error(_) -> Nil
-    Ok(_) -> panic("unrelated source location was accepted")
-  }
-  Nil
+test("item", () -> Nil {
+	service = syntax._items()
+	collection = syntax._template(0)
+	target = syntax._template(1)
+	at = syntax._template(2)
+	service.add(collection, target, [("group", "bench"), ("size", "large")], at)
+	service.expose(target)
+	fail.catch(() {
+		service.add(collection, target, [("x", "1"), ("x", "2")], at)
+	}) |>
+		(Error(syntax.SyntaxError(message = message, at = at))) {
+			assert(message != "")
+			assert(at == syntax._template(2))
+		}
+		| (Ok(_)) { panic("duplicate metadata was accepted") }
+	fail.catch(() {
+		service.add(collection, target, [], syntax._template(3))
+	}) |>
+		(Error(_)) { Nil }
+		| (Ok(_)) { panic("unrelated source location was accepted") }
+	Nil
 })
 
-test("not_item", () -> Nil ! Assert {
-  service = syntax._items()
-  fail.catch(() { service.expose(syntax._template(1)) })
-  Nil
+test("not_item", () -> Nil {
+	service = syntax._items()
+	fail.catch(() { service.expose(syntax._template(1)) })
+	Nil
 })
 "#,
     )
@@ -771,29 +789,35 @@ fn compiler_service_budgets_stop_before_observable_contributions() {
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/main.i"),
-        r#"
-(
+        r#"(
 	testlib = (test) = std/test
-	syntax = i/syntax)
+	syntax = i/syntax
+)
 
 note = () {
-  diagnostics = syntax._diagnostics()
-  diagnostics.note("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz")
-  Nil
+	diagnostics = syntax._diagnostics()
+	diagnostics.note("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz")
+	Nil
 }
 
 test("note", () { note() })
 
-test("query", () -> Nil ^ syntax.SyntaxError {
-  ! syntax.Definitions = syntax._definitions()
-  syntax.definition(syntax._template(0))
-  Nil
+test("query", () -> Nil {
+	{
+		syntax.definition(syntax._template(0))
+		Nil
+	} <- (syntax._definitions())
 })
 
-test("item", () -> Nil ^ syntax.SyntaxError {
-  service = syntax._items()
-  service.add(syntax._template(1), syntax._template(2), [], syntax._template(2))
-  Nil
+test("item", () -> Nil {
+	service = syntax._items()
+	service.add(
+		syntax._template(1),
+		syntax._template(2),
+		[],
+		syntax._template(2),
+	)
+	Nil
 })
 "#,
     )

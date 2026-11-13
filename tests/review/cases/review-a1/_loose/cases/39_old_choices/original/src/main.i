@@ -1,1 +1,5 @@
-f = (r: Result(Int, Int)) { case r { Ok(v) | Error(v) -> v } }
+f = (r: Result(Int, Int)) {
+	case
+	r
+	(Ok(v) | Error(v)) { v }
+}

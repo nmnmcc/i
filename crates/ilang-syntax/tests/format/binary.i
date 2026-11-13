@@ -1,10 +1,23 @@
 sum = (a, b) {
-  total = first_long_operand_name + second_long_operand_name - third_long_operand_name + fourth
-  check = first_condition_holds(a) && second_condition_holds(b) || third_condition(a, b) && last
-  floats = first_float_value_name *. second_float_value_name -. third_float_value_name /. two
-  mixed = alpha_value_name * beta_value_name + gamma_value_name * delta_value_name - epsilon_value
-  grouped = { first_long_operand_name - second_long_operand_name } * { third_operand - fourth_value }
-  negative = -first_long_operand_name - -second_long_operand_name - -third_long_operand_name - -x
-  text = "a long string literal that is here" <> some_name_of_a_string <> "another long string"
-  total
+	total = first_long_operand_name +
+		second_long_operand_name -
+		third_long_operand_name +
+		fourth
+	check = first_condition_holds(a) && second_condition_holds(b) ||
+		third_condition(a, b) && last
+	floats = first_float_value_name *. second_float_value_name -.
+		third_float_value_name /. two
+	mixed = alpha_value_name * beta_value_name +
+		gamma_value_name * delta_value_name -
+		epsilon_value
+	grouped = { first_long_operand_name - second_long_operand_name } *
+		{ third_operand - fourth_value }
+	negative = -first_long_operand_name -
+		-second_long_operand_name -
+		-third_long_operand_name -
+		-x
+	text = "a long string literal that is here" <>
+		some_name_of_a_string <>
+		"another long string"
+	total
 }

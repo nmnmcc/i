@@ -5,7 +5,7 @@
   "fileTypes": [
     "i"
   ],
-  "comment": "The syntax of docs/spec.md, \u00a71 to \u00a78.",
+  "comment": "The syntax of docs/spec.md, §1 to §8.",
   "patterns": [
     {
       "include": "#code"
@@ -71,7 +71,7 @@
       ]
     },
     "comments": {
-      "comment": "\u00a71.2: `////` documents the module, `///` the item after it.",
+      "comment": "§1.2: `////` documents the module, `///` the item after it.",
       "patterns": [
         {
           "name": "comment.line.documentation.module.i",
@@ -252,7 +252,7 @@
       ]
     },
     "numbers": {
-      "comment": "\u00a71.6. After `.`, digits are a decimal, never a float: `t.0.1`.",
+      "comment": "§1.6. After `.`, digits are a decimal, never a float: `t.0.1`.",
       "patterns": [
         {
           "name": "constant.numeric.integer.hexadecimal.i",
@@ -277,7 +277,7 @@
       ]
     },
     "bit-array": {
-      "comment": "\u00a78: `<<a, b: u16be, s: utf8>>`. The formats are fixed words.",
+      "comment": "§8: `<<a, b: u16be, s: utf8>>`. The formats are fixed words.",
       "begin": "<<",
       "beginCaptures": {
         "0": {
@@ -306,7 +306,7 @@
     },
     "definition": {
       "comment": "A binding whose value is a function: `name = (a, b) {` or `name = (a) -> T {`.",
-      "match": "^\\s*(_?[a-z][a-z0-9_]*)\\s*(=)(?!=)(?=\\s*\\([^()]*(?:\\([^()]*\\)[^()]*)*\\)\\s*(?:->|\\{))",
+      "match": "^\\s*(_?[a-z][a-z0-9_]*)\\s*(=)(?!=)(?=\\s*(?:<[A-Z][^>]*>)?\\([^()]*(?:\\([^()]*\\)[^()]*)*\\)\\s*(?:->|<-|\\{))",
       "captures": {
         "1": {
           "name": "entity.name.function.definition.i"
@@ -317,19 +317,34 @@
       }
     },
     "label": {
-      "comment": "A label or a type annotation: `name: T`, and labelled arguments `f(in: s)`.",
-      "match": "\\b(_?[a-z][a-z0-9_]*)\\s*(:)(?!:)",
-      "captures": {
-        "1": {
-          "name": "variable.parameter.i"
+      "comment": "A key or a type annotation: `name: T`, and a data label or key after `(` or `,`: `(name = v)`, `C(x = p)`.",
+      "patterns": [
+        {
+          "match": "\\b(_?[a-z][a-z0-9_]*)\\s*(:)(?!:)",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.i"
+            },
+            "2": {
+              "name": "punctuation.separator.annotation.i"
+            }
+          }
         },
-        "2": {
-          "name": "punctuation.separator.annotation.i"
+        {
+          "match": "(?<=[(,])\\s*(_?[a-z][a-z0-9_]*)\\s*(=)(?![=>])",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.i"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.i"
+            }
+          }
         }
-      }
+      ]
     },
     "call": {
-      "comment": "\u00a76.6: `f(\u2026)`, `m.f(\u2026)`.",
+      "comment": "§6.6: `f(…)`, `m.f(…)`.",
       "match": "\\b(_?[a-z][a-z0-9_]*)(?=\\()",
       "captures": {
         "1": {
@@ -338,7 +353,7 @@
       }
     },
     "field": {
-      "comment": "\u00a76.7: `v.f` and `m.x`; `t.0` is a number.",
+      "comment": "§6.7: `v.f` and `m.x`; `t.0` is a number.",
       "match": "(?<=[\\w)\\]}])(\\.)(_?[a-z][a-z0-9_]*)\\b(?!\\s*\\()",
       "captures": {
         "1": {
@@ -354,12 +369,12 @@
       "match": "\\b(?:True|False|Nil)\\b"
     },
     "builtin-types": {
-      "comment": "\u00a74.2, \u00a79.4, \u00a79.6, \u00a712.",
+      "comment": "§4.2, §9.4, §9.6, §12.",
       "name": "support.type.builtin.i",
       "match": "\\b(?:Record|Int|Float|String|List|BitArray|UtfCodepoint|Never|Bool|Result|Boundary|Continuation|Assert|AssertionFailure)\\b"
     },
     "up-name": {
-      "comment": "\u00a71.3: an UpName is a type or a constructor.",
+      "comment": "§1.3: an UpName is a type or a constructor.",
       "patterns": [
         {
           "name": "entity.name.type.i",
@@ -368,7 +383,7 @@
       ]
     },
     "discard": {
-      "comment": "\u00a71.3: `_` and `__name` bind nothing.",
+      "comment": "§1.3: `_` and `__name` bind nothing.",
       "name": "variable.language.discard.i",
       "match": "\\b(?:_|__[a-z0-9_]*)\\b"
     },
@@ -377,15 +392,15 @@
       "match": "\\b_?[a-z][a-z0-9_]*\\b"
     },
     "operators": {
-      "comment": "\u00a71.5, \u00a76.9. Longer tokens first.",
+      "comment": "§1.5, §6.9, syntax three (`<-` services and provide). Longer tokens first.",
       "patterns": [
         {
           "name": "keyword.operator.match.i",
-          "match": "\\|>(?=\\s*\\{)"
+          "match": "\\|>(?=\\s*(?:\\(|$))"
         },
         {
           "name": "keyword.operator.guard.i",
-          "match": "\\?(?=[^\\n]*->)"
+          "match": "\\?"
         },
         {
           "name": "keyword.operator.comparison.float.i",
@@ -394,6 +409,10 @@
         {
           "name": "keyword.operator.arithmetic.float.i",
           "match": "\\+\\.|-\\.|\\*\\.|/\\."
+        },
+        {
+          "name": "keyword.operator.provide.i",
+          "match": "<-"
         },
         {
           "name": "keyword.operator.pipe.i",
@@ -422,14 +441,6 @@
         {
           "name": "keyword.operator.arithmetic.i",
           "match": "\\+|-|\\*|/|%"
-        },
-        {
-          "name": "keyword.operator.error.i",
-          "match": "\\^"
-        },
-        {
-          "name": "keyword.operator.environment.i",
-          "match": "!"
         },
         {
           "name": "keyword.operator.type.intersection.i",
@@ -474,7 +485,7 @@
       ]
     },
     "header": {
-      "comment": "\u00a72.2: a header group at the start of a file; nested groups select imported names.",
+      "comment": "§2.2: a header group at the start of a file; nested groups select imported names.",
       "name": "meta.header.i",
       "begin": "^\\s*(\\()(?![^\\n]*\\)\\s*=)",
       "beginCaptures": {
@@ -531,7 +542,7 @@
       ]
     },
     "type-parameters": {
-      "comment": "\u00a74.7: declared UpName variables on a binding head.",
+      "comment": "§4.7: declared UpName variables on a binding head.",
       "begin": "\\b(_?[a-z][a-z0-9_]*)\\s*(\\()(?=[A-Z][A-Za-z0-9]*(?:\\s*,\\s*[A-Z][A-Za-z0-9]*)*\\s*\\)\\s*[:=])",
       "beginCaptures": {
         "1": {

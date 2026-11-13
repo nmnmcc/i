@@ -1,6 +1,9 @@
-S(N) { S(() -> Nil ! N, (N) -> Nil) }
-use(N) = (s ! S(N)) { S(f, _) = s f() }
-run(A,N) = (body: () -> A ! N) { body() }
+S(N) = (() <- N -> Nil, (N) -> Nil)
+use = <N>() <- (s: S(N)) {
+	S(f, _) = s
+	f()
+}
+run = <A, N>(body: () <- N -> A) { body() }
 f0 = () { run(() { use() }) }
 f1 = () { run(() { f0() }) }
 f2 = () { run(() { f1() }) }
@@ -65,4 +68,3 @@ f60 = () { run(() { f59() }) }
 f61 = () { run(() { f60() }) }
 f62 = () { run(() { f61() }) }
 f63 = () { run(() { f62() }) }
-

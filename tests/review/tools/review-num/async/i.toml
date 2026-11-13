@@ -1,3 +1,0 @@
-name = "asyncprobe"
-[wasm]
-exports = ["asyncprobe/main.work"]
