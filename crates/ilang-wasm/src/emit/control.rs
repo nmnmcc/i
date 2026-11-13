@@ -825,14 +825,17 @@ pub(super) const EFFECTS: &str = r#"
     (local.get $env) (local.get $v) (local.get $mode)))
 ;; Kept slots are ordinary tuple fields, so the general portable walk sees
 ;; every service, including slots unused by the argument's inferred type.
-(func $control_keep_env (param $f eqref) (param $env (ref null $env)) (result eqref)
-  (local $slots (ref $values)) (local $i i32) (local $n i32)
-  (local.set $n (array.len (local.get $env)))
+;; `n` counts service slots only: a light boundary's trailing metadata is
+;; not part of the environment that source code keeps. Force lazy services
+;; so the captured tuple holds their values, including portable values
+;; whose functions do not capture the boundary.
+(func $control_keep_env (param $f eqref) (param $env (ref null $env)) (param $n i32) (result eqref)
+  (local $slots (ref $values)) (local $i i32)
   (local.set $slots (array.new_default $values (local.get $n)))
   (block $done (loop $copy
     (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
     (array.set $values (local.get $slots) (local.get $i)
-      (array.get $env (local.get $env) (local.get $i)))
+      (call $service_force (array.get $env (local.get $env) (local.get $i)) (local.get $env)))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $copy)))
   (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 0)

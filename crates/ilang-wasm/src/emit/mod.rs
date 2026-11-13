@@ -868,7 +868,10 @@ impl<'p> Emitter<'p> {
             Op::Escape => format!("(throw $error (call $escape_payload {a} {b}))"),
             Op::Resume => format!("(call $control_resume {a} {b} {env})"),
             Op::Cancel => format!("(call $control_cancel {a} {env})"),
-            Op::KeepEnv => format!("(call $control_keep_env {a} {env})"),
+            Op::KeepEnv => format!(
+                "(call $control_keep_env {a} {env} (i32.const {}))",
+                self.p.services.max(1)
+            ),
             Op::WaitRequests => format!("(call $request_wait_any {a} {env})"),
             Op::PollRequests => {
                 if self.p.target == Target::Wasi {

@@ -64,12 +64,42 @@ test("an escape to a hand-written light boundary", () {
 	check(show(first_over([1, 2], 4)), "-1")
 })
 
+test("a lazy service keeps its value and function identities", () {
+	same: Result(Bool, Int) = failure.catch(() {
+		left: Fail(Int) = the_fail()
+		right: Fail(Int) = the_fail()
+		left == right && left.raise == right.raise
+	})
+	check(show(same), "Ok(True)")
+	left: Result(Fail(Int), Int) = failure.catch(() { the_fail() })
+	right: Result(Fail(Int), Int) = failure.catch(() { the_fail() })
+	check(show(left == right), "False")
+})
+
+test("light boundary captures stay non-portable", () {
+	r: Result(Fail(Int), Int) = failure.catch(() { the_fail() })
+	check(show(core.portable(r)), "False")
+	check(show(core.portable(r)), "False")
+})
+
+test("a later lazy service does not change an already kept environment", () {
+	r: Result(Result(Int, Int), Int) = failure.catch(() {
+		outer: Fail(Int) = the_fail()
+		control.boundary((b) {
+			kept = control.keep_env((x: Nil) { the_fail() })
+			! Fail(Int) = Fail((error) { control.escape(b, Error(error)) })
+			check(show(kept(Nil) == outer), "True")
+			failure.raise(4)
+			Ok(0)
+		})
+	})
+	check(show(r), "Ok(Error(4))")
+})
+
 test("an inner catch of another E does not take the outer error", () {
 	r: Result(Result(Nil, String), Int) = failure.catch(() {
 		outer: Fail(Int) = the_fail()
-		inner: Result(Nil, String) = failure.catch(() {
-			outer.raise(7)
-		})
+		inner: Result(Nil, String) = failure.catch(() { outer.raise(7) })
 		inner
 	})
 	check(show(r), "Error(7)")
@@ -78,9 +108,7 @@ test("an inner catch of another E does not take the outer error", () {
 test("an inner catch of the same E does not take the outer error", () {
 	r: Result(Result(Nil, Int), Int) = failure.catch(() {
 		outer: Fail(Int) = the_fail()
-		failure.catch(() {
-			outer.raise(1)
-		})
+		failure.catch(() { outer.raise(1) })
 	})
 	check(show(r), "Error(1)")
 	s: Result(Result(Nil, Int), Int) = failure.catch(() {
@@ -90,9 +118,10 @@ test("an inner catch of the same E does not take the outer error", () {
 })
 
 test("a catch inside an ensure", () {
-	r: Result(Nil, Int) = resource.ensure(() {
-		failure.catch(() { failure.raise(1) })
-	}, () { Nil })
+	r: Result(Nil, Int) = resource.ensure(
+		() { failure.catch(() { failure.raise(1) }) }
+		() { Nil }
+	)
 	check(show(r), "Error(1)")
 })
 
