@@ -1112,8 +1112,8 @@ keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail
   opens a resource and attaches `release` to the current `Scope`;
   `resource.scoped(body)` runs `body` with a new `Scope` and runs the attached
   releases in reverse order when `body` ends, also by an error, an escape or a
-  cancel. `resource.ensure` is unchanged. The platform gives every entry a
-  `Scope` (§2.10.11).
+  cancel. `resource.ensure` is unchanged. Scope lifecycle and acquisition
+  checks follow spec §9.5. The platform gives every entry a `Scope` (§2.10.11).
 - `resource.acquire : <A, N>(() <- N -> A, (A) -> Nil) <- (..N, Scope) -> A`.
   A release that needs services is made with `keep` (§2.10.8). This is a std
   API break: today `acquire` takes three arguments with a `use` function.
