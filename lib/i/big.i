@@ -6,9 +6,9 @@
 //// This code reads its digits in base 2^30 in place, by index (`size`,
 //// `limb`), and writes each result once into private construction storage.
 //// Only the text form works on lists of operand digits
-//// (`digits`). Every single-digit calculation is below 2^62, where
-//// the runtime does the arithmetic in 64 bits itself, so this code never
-//// calls itself through the runtime: a digit product is below 2^60.
+//// (`digits`). Digit calculations stay below 2^62, where the runtime
+//// computes in 64 bits. Only Karatsuba composes big arithmetic again,
+//// deliberately, on its smaller subproducts.
 ////
 //// The private primitives are not part of the language (§13).
 

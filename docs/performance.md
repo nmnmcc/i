@@ -334,3 +334,87 @@ times faster at 1, but takes under a second on `std` either way, while
 every rebuild after an edit takes up to 2.7 times longer. For work on the
 type checker with large inputs, `CARGO_PROFILE_DEV_OPT_LEVEL=1` (or a
 release build) gives the fast checker without changing the default.
+
+## Large Int arithmetic in i
+
+Beyond the native fast paths, Int comparison, addition, subtraction,
+multiplication, division and remainder are implemented in `lib/i/big.i`.
+Operands are read by index with
+`size` and `limb`, in base 2^30. Each result is written into fresh private
+construction storage; that storage receives no writes after `finish`.
+Arithmetic does not copy operands into lists. Text conversion still uses
+digit lists.
+
+Multiplication uses Karatsuba on ranges of the original operands when both
+ranges exceed 16 digits and their lengths differ by at most a factor of two.
+Small and unbalanced ranges use product scanning. Division normalizes each
+operand once, estimates a quotient digit and fuses its product with remainder
+subtraction. These algorithms, their loops and carry propagation are i code.
+The only arithmetic intrinsics multiply-add one digit with carry (returning
+its low and high parts separately), or divide two digits by one.
+
+Measurements on 2026-11-13, Linux x86-64, on the shared 16-core host, at O2.
+The i arithmetic is commit `5a2420e6`.
+The baseline is the provided WAT executable at
+`.rd/jp/target/release/i` (SHA-256
+`e4da9d35637d98d37b7056bb4ac9615b86a12de0257933a93c6b0552702caefa`).
+The baseline branch was `lane/jp`, with head `93291533`; the executable was
+used directly, without rebuilding or copying it. Both modules run in the
+same current Wasmtime host. Program compilation and Rust operand construction
+are outside the measured interval.
+
+Times are the median of five alternating batches, in microseconds per
+operation, using Linux process CPU time
+(`clock_gettime(CLOCK_PROCESS_CPUTIME_ID)`), including the guest worker thread.
+Batch sizes are calibrated toward 50 ms of CPU time, capped at 1,048,576
+iterations. The CSV also records wall time; scheduling on the shared host made wall-time ratios noisy. Loop and
+amortized host-call overhead are included. Every batch's final result is
+checked against `num-bigint`.
+
+For bit width `n`, the dividend/first operand is `a = 2^n - 129`. The other
+operand is `a - 1`, so comparison walks the whole number and ordinary division
+has a one-digit quotient. `divide_half` instead uses `2^(n/2) + 123` as the
+divisor, to exercise a long quotient.
+
+| Bits | Operation | WAT µs | i µs | i / WAT |
+|---|---|---:|---:|---:|
+| 100 | `add` | 0.207 | 0.977 | 4.72× |
+| 100 | `compare` | 0.067 | 0.355 | 5.31× |
+| 100 | `multiply` | 0.236 | 6.391 | 27.09× |
+| 100 | `divide` | 2.919 | 3.770 | 1.29× |
+| 100 | `divide_half` | 2.701 | 4.370 | 1.62× |
+| 200 | `add` | 0.208 | 1.333 | 6.39× |
+| 200 | `compare` | 0.069 | 0.463 | 6.75× |
+| 200 | `multiply` | 0.401 | 14.363 | 35.81× |
+| 200 | `divide` | 6.177 | 4.903 | 0.79× |
+| 200 | `divide_half` | 6.361 | 9.534 | 1.50× |
+| 300 | `add` | 0.240 | 1.936 | 8.06× |
+| 300 | `compare` | 0.078 | 0.626 | 8.06× |
+| 300 | `multiply` | 0.585 | 26.142 | 44.72× |
+| 300 | `divide` | 12.524 | 4.181 | 0.33× |
+| 300 | `divide_half` | 9.559 | 14.314 | 1.50× |
+| 8500 | `add` | 1.198 | 38.639 | 32.26× |
+| 8500 | `compare` | 0.699 | 12.728 | 18.20× |
+| 8500 | `multiply` | 230.717 | 9115.392 | 39.51× |
+| 8500 | `divide` | 4971.423 | 117.747 | 0.024× |
+| 8500 | `divide_half` | 3622.384 | 2916.085 | 0.81× |
+
+The [recorded CSV](../tests/performance/big-int/results-2026-11-13.csv)
+also preserves batch sizes and wall times.
+
+All algorithms remain in i even where these measurements show a regression
+against WAT. There is no large-Int arithmetic fallback to WAT.
+
+Reproduce from this worktree, using the shared wrapper:
+
+```sh
+H=/home/agent/Programming/i/.rd/cache/heavy
+BIG_INT_BASE=/home/agent/Programming/i/.rd/jp/target/release/i \
+BIG_INT_ARTIFACTS="$PWD/target/big-int-perf" \
+"$H" direnv exec /home/agent/Programming/i \
+  cargo test -p ilang-cli --test big_int_performance --locked -- --ignored --nocapture
+```
+
+The fixture is `tests/performance/big-int`; the ignored Rust integration test
+builds it with both compilers, retains both Wasm artifacts when
+`BIG_INT_ARTIFACTS` is set, and prints the measurements as CSV.
