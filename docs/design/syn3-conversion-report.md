@@ -778,3 +778,22 @@ source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
 Only eligible completed observations are committed; refused cases remain
 untouched and recording continues.
 The full corpus, two known p1 regressions and pending phase refusals still block landing.
+
+The ongoing recorder refused multi_run: test0 printed its passing result but
+hit the unchanged ten CPU-second bound; its other phases match. A guarded
+retry with the same bound is pending. The first p1 copy has also been refused
+as predicted; its original expectation is untouched.
+
+Six source-unchanged programs need only type-display translations in their
+current observations: stress_plain_1024/128/32/512, finite_never and
+recursive_never. A proposed patch changes six check.stdout fields; all 1,698
+type lines are exact notation translations and every other JSON field is
+byte-preserved. Because the brief permits re-recording only source-changed
+cases, an explicit exception was requested. The patch remains unapplied
+pending the user's answer. No source was changed merely to permit recording.
+
+A total of 800 completed K4 observations have passed the same independent
+source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
+Only eligible completed observations are committed; refused cases remain
+untouched and recording continues.
+The full corpus, two known p1 regressions and pending phase refusals still block landing.

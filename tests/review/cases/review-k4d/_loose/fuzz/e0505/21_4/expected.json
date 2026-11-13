@@ -1,6 +1,6 @@
 {
-  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
-  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
+  "compiler": "841573125dde38a2d59b41f409682a2876ec2b56",
+  "binary_sha256": "50f3b4af8b503528b5ea327235b006dda5686a76a19b0a2e28d728ec39cb9a02",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () -> Int ! Dep\napp/main.us : () -> Int ! N | S(N)\napp/main.ut : () -> Int ! N | T(N)\napp/main.usa : () -> Int ! N | S(N)\napp/main.run : (body: () -> A ! N) -> A ! N\napp/main.h0 : () -> Int ! N | N2 | S(N) | T(N2)\napp/main.h1 : () -> Int ! N | S(N)\napp/main.main : () -> Nil ! Dep | S(Never)\n",
-      "stderr": "src/main.i:27:3: error[E0515]: `T(Dep)` and `T(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:27:41: error[E0501]: `Dep` is not a subtype of `S(Never)` (the type at 27:19 needs it)\n2 errors\n"
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.h0 : () <- (S(N), T(N2), ..N, ..N2) -> Int\napp/main.h1 : () <- (S(N), ..N) -> Int\napp/main.main : () <- (Dep, S(Never)) -> Nil\n",
+      "stderr": "src/main.i:32:49: error[E0501]: `Dep` is not a subtype of `S(Never)` (the type at 32:25 needs it)\nsrc/main.i:37:8: error[E0515]: `T(Dep)` and `T(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n2 errors\n"
     }
   }
 }
