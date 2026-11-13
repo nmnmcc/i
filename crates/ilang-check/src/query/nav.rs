@@ -505,6 +505,9 @@ impl Query<'_> {
         };
         let mut out = Vec::new();
         for s in [ast.imports_span, ast.exports_span].into_iter().flatten() {
+            // The header group `( … )` of syntax three folds whole: the
+            // span of the tree covers only the names inside it.
+            let s = group_around(text, s);
             if lines(s) {
                 out.push(Folding {
                     span: s,
@@ -625,6 +628,21 @@ impl Query<'_> {
 }
 
 /// The letters of `query` are in `name` in the same order.
+/// The span of the group `( … )` around `s` when only blanks separate
+/// them, or else `s`.
+fn group_around(text: &str, s: Span) -> Span {
+    let before = text[..(s.start as usize).min(text.len())].trim_end();
+    let after_at = (s.end as usize).min(text.len());
+    let after = text[after_at..].trim_start();
+    if before.ends_with('(') && after.starts_with(')') {
+        let start = before.len() - 1;
+        let end = text.len() - after.len() + 1;
+        Span::new(start as u32, end as u32)
+    } else {
+        s
+    }
+}
+
 fn fuzzy(name: &str, query: &str) -> bool {
     let mut chars = name.chars();
     query.chars().all(|q| chars.any(|c| c == q))

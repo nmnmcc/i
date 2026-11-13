@@ -717,12 +717,22 @@ fn query_references_follow_identity_across_modules() {
     assert!(found.iter().all(|(_, t)| t == "area"), "{found:?}");
     assert_eq!(refs.iter().filter(|r| r.definition).count(), 1);
     // A field: the label of the definition, the labels of the calls, and
-    // the pattern part, which also binds a local.
+    // the label of the pattern part. Syntax three writes that part
+    // `Circle(radius = radius)`: the label and the local it binds are two
+    // words, so the label is a name of the field only, and the local is
+    // the second word.
     let at = f.at("app/main", "radius = 2", 0, 0);
     let (owner, _, target) = q.target_at_offset(m, at).unwrap();
     let refs = q.references(&target, owner, &q.own_modules());
     assert_eq!(refs.len(), 4, "{:?}", texts_of(&f, &refs));
-    assert_eq!(refs.iter().filter(|r| r.label_binder).count(), 1);
+    assert_eq!(refs.iter().filter(|r| r.label_binder).count(), 0);
+    let shapes = f.module("app/shapes");
+    let label = f.at("app/shapes", "radius = radius", 0, 0);
+    assert!(refs.iter().any(|r| r.location.span.start == label));
+    let local = f.at("app/shapes", "radius)) {", 0, 0);
+    let (_, span, target) = q.target_at_offset(shapes, local).unwrap();
+    assert_eq!(span.start, local);
+    assert!(matches!(target, ilang_check::query::Target::Local(_)));
 }
 
 #[test]
@@ -737,10 +747,13 @@ fn query_rename_checks_kind_and_scope() {
     let edits = q.rename(m, at, "disk").unwrap();
     assert_eq!(edits.len(), 2);
     assert!(edits.iter().all(|e| e.text == "disk"));
-    // A constructor, in both modules.
+    // A constructor, in both modules: the definition, the member of the
+    // sum `Shape = Circle | Dot` (the labelled type `Circle` is the
+    // constructor, syntax three §2.6), the pattern, the import and the two
+    // calls.
     let at = f.at("app/main", "Circle(radius = 2)", 0, 0);
     let edits = q.rename(m, at, "Disk").unwrap();
-    assert_eq!(edits.len(), 5, "{edits:?}");
+    assert_eq!(edits.len(), 6, "{edits:?}");
     // Refused for the library.
     let text = "main = () { panic(\"x\") }\n";
     let g = Fixture::new(&[("src/main.i", text)]);

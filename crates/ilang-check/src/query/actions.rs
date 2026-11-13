@@ -579,6 +579,7 @@ impl Query<'_> {
             }
             _ => {}
         });
+        let lisp = self.is_lisp(m);
         let mut out = Vec::new();
         for (b, parameter) in binders {
             if b.span.end as usize > text.len()
@@ -600,6 +601,13 @@ impl Query<'_> {
             if ty.contains('\n') || ty.len() > 80 {
                 continue;
             }
+            // In the Lisp surface the type is written as its rows.
+            let ty = if lisp {
+                let Some(row) = lisp_type(&ty) else { continue };
+                row
+            } else {
+                ty
+            };
             out.push(InlayHint {
                 offset: b.span.end,
                 label: format!(": {ty}"),

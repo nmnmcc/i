@@ -689,30 +689,33 @@ impl<'a> Query<'a> {
         }
         match &def.body {
             TypeBody::Alias(ty) => format!("{head} = {}", self.show_type(ty)),
-            TypeBody::Custom(cs) if cs.is_empty() => format!("{head} {{}}"),
+            // Syntax three (§2.8): `T = Opaque`, a labelled type `T = (…)`,
+            // or one labelled type per constructor and the sum.
+            TypeBody::Custom(cs) if cs.is_empty() => format!("{head} = Opaque"),
             TypeBody::Custom(cs) => {
-                let cs: Vec<String> = cs
-                    .iter()
-                    .map(|c| {
-                        if c.fields.is_empty() {
-                            return c.name.clone();
-                        }
-                        let fs: Vec<String> = c
-                            .fields
-                            .iter()
-                            .map(|f| match &f.label {
-                                Some(l) => format!("{}: {}", l.name, self.show_type(&f.ty)),
-                                None => self.show_type(&f.ty),
-                            })
-                            .collect();
-                        format!("{}({})", c.name, fs.join(", "))
-                    })
-                    .collect();
-                if cs.iter().map(String::len).sum::<usize>() < 60 {
-                    format!("{head} {{ {} }}", cs.join("  "))
-                } else {
-                    format!("{head} {{\n  {}\n}}", cs.join("\n  "))
+                let data = |c: &crate::hir::CtorDef| -> String {
+                    let fs: Vec<String> = c
+                        .fields
+                        .iter()
+                        .map(|f| match &f.label {
+                            Some(l) => format!("{} = {}", l.name, self.show_type(&f.ty)),
+                            None => self.show_type(&f.ty),
+                        })
+                        .collect();
+                    format!("({})", fs.join(", "))
+                };
+                if let [only] = cs.as_slice()
+                    && only.name == def.name
+                {
+                    return format!("{head} = {}", data(only));
                 }
+                let mut lines: Vec<String> = cs
+                    .iter()
+                    .map(|c| format!("{} = {}", c.name, data(c)))
+                    .collect();
+                let members: Vec<&str> = cs.iter().map(|c| c.name.as_str()).collect();
+                lines.push(format!("{head} = {}", members.join(" | ")));
+                lines.join("\n")
             }
         }
     }
@@ -1096,6 +1099,8 @@ impl<'a> Query<'a> {
                 }
             }
         }
+        w.split_written_puns();
+        self.walk_sum_members(m, &mut w.occ);
         self.walk_imports_exports(m, &mut w.occ);
         self.walk_type_params(m, &mut w.occ);
         Occurrences {
@@ -1142,6 +1147,44 @@ impl<'a> Query<'a> {
                     });
                 if let Some(v) = var {
                     occ.push((param.span, Target::TyVar(v)));
+                }
+            }
+        }
+    }
+
+    /// The members of a sum `T = C1 | C2` (syntax three §2.6): each names
+    /// the labelled type `C1`, which is the constructor `C1` of `T` in the
+    /// HIR. The HIR keeps only the definitions of the members, so their
+    /// names in the sum are found in the written item.
+    fn walk_sum_members(&self, m: ModuleId, occ: &mut Vec<(Span, Target)>) {
+        let ast = self.ast(m);
+        let p = self.program;
+        let text = self.written_text(m);
+        for &t in &p.module(m).types {
+            let def = p.ty(t);
+            let TypeBody::Custom(cs) = &def.body else {
+                continue;
+            };
+            let Some(item) = ast
+                .items
+                .iter()
+                .find(|i| matches!(&i.kind, ast::ItemKind::TypeDef(d) if d.name.span == def.span))
+            else {
+                continue;
+            };
+            let rhs = Span::new(def.span.end, item.span.end);
+            for (ci, c) in cs.iter().enumerate() {
+                if item.span.start <= c.span.start && c.span.end <= item.span.end {
+                    continue;
+                }
+                if let Some(s) = find_word(text, rhs, &c.name, false) {
+                    occ.push((
+                        s,
+                        Target::Ctor(CtorRef {
+                            ty: t,
+                            index: ci as u32,
+                        }),
+                    ));
                 }
             }
         }
@@ -1859,6 +1902,51 @@ impl Walk<'_> {
             if let Some(b) = label_binder(a) {
                 self.labels
                     .push((b.span, Target::Field(vec![(ctor, index as u32)])));
+            }
+        }
+    }
+
+    /// Syntax three writes the label and the local of a pattern part both,
+    /// `C(label = label)` (`(= label label)` in the Lisp surface), where
+    /// the tree has one binder at the label. The label stays a name of the
+    /// field; the local is the second word.
+    fn split_written_puns(&mut self) {
+        let text = self.text;
+        let bytes = text.as_bytes();
+        for (a, field) in self.labels.clone() {
+            let name = &text[a.start as usize..a.end as usize];
+            let rest = &text[a.end as usize..];
+            let lisp_form = text[..a.start as usize].trim_end().ends_with("(=");
+            let after = rest.trim_start();
+            let after = if lisp_form {
+                after
+            } else {
+                match after.strip_prefix('=') {
+                    Some(x) if !x.starts_with('=') => x.trim_start(),
+                    _ => continue,
+                }
+            };
+            let start = text.len() - after.len();
+            let end = start + name.len();
+            if !after.starts_with(name) || bytes.get(end).is_some_and(|b| is_word_byte(*b)) {
+                continue;
+            }
+            let b = Span::new(start as u32, end as u32);
+            let mut moved = false;
+            for (s, t) in self.occ.iter_mut() {
+                if *s == a
+                    && let Target::Local(v) = t
+                {
+                    if self.binders.get(v) == Some(&a) {
+                        self.binders.insert(*v, b);
+                    }
+                    *s = b;
+                    moved = true;
+                }
+            }
+            if moved {
+                self.labels.retain(|(s, _)| *s != a);
+                self.occ.push((a, field));
             }
         }
     }

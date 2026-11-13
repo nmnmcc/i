@@ -18,6 +18,10 @@ struct Client {
     next_id: i32,
     /// Notifications received while waiting for something else.
     pending: Vec<Notification>,
+    /// The `/proc` directory of the server's thread, which answers the
+    /// requests: its CPU time is the work of a request, whatever else the
+    /// machine runs.
+    server_thread: Option<std::path::PathBuf>,
 }
 
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -29,7 +33,10 @@ impl Client {
 
     fn with_debounce(debounce: Duration) -> Client {
         let (server, client) = Connection::memory();
+        let (tx, rx) = std::sync::mpsc::channel();
         let handle = std::thread::spawn(move || {
+            tx.send(Path::new("/proc").join(fs::read_link("/proc/thread-self").unwrap()))
+                .unwrap();
             let options = Options {
                 debounce,
                 offline: true,
@@ -41,6 +48,7 @@ impl Client {
             server: Some(handle),
             next_id: 0,
             pending: Vec::new(),
+            server_thread: Some(rx.recv().unwrap()),
         };
         let init = c.request::<lsp::request::Initialize>(json!({ "capabilities": {} }));
         let caps = &init["capabilities"];
@@ -54,6 +62,14 @@ impl Client {
         assert_eq!(caps["textDocumentSync"]["change"], json!(1));
         c.notify::<lsp::notification::Initialized>(json!({}));
         c
+    }
+
+    /// The CPU time that the server's thread has used.
+    fn server_cpu(&self) -> Duration {
+        let dir = self.server_thread.as_ref().expect("a server thread");
+        let stat = fs::read_to_string(dir.join("schedstat")).unwrap();
+        let ns: u64 = stat.split_whitespace().next().unwrap().parse().unwrap();
+        Duration::from_nanos(ns)
     }
 
     fn request<R: lsp::request::Request>(&mut self, params: Value) -> Value {
@@ -1145,10 +1161,14 @@ fn lsp_references_constructor() {
         refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 0))),
         "{refs:?}"
     );
-    assert!(
-        refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", 2))),
-        "{refs:?}"
-    );
+    // `Circle` in `Shape = Circle | Rect` names the labelled type `Circle`,
+    // which is the constructor (syntax three §2.6).
+    for nth in [1, 2] {
+        assert!(
+            refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", nth))),
+            "{refs:?}"
+        );
+    }
     assert!(
         refs.contains(&(ws.main.clone(), range_of(&ws.main_text, "Circle", 0))),
         "{refs:?}"
@@ -1346,7 +1366,7 @@ fn lsp_rename_top_level_across_files() {
         shapes.contains("\tShape(..)\n\tsurface\n\torigin"),
         "{shapes}"
     );
-    assert!(shapes.contains("surface = (s = Shape)"), "{shapes}");
+    assert!(shapes.contains("surface = (s: Shape)"), "{shapes}");
     let test = apply(APP_TEST, &edit, &ws.test);
     assert!(test.contains("shapes.surface(shapes.Circle"), "{test}");
     c.shutdown();
@@ -1602,7 +1622,7 @@ fn lsp_rename_lisp_surface() {
         main.contains("surface s") && !main.contains("area"),
         "{main}"
     );
-    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s = Shape)"));
+    assert!(apply(SHAPES, &edit, &ws.shapes).contains("surface = (s: Shape)"));
     // A local.
     let edit = rename(&mut c, &ws.main, &ws.main_text, "(= a ", 0, 3, "total").unwrap();
     let main = apply(&ws.main_text, &edit, &ws.main);
@@ -1828,7 +1848,7 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
+    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s: Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1909,7 +1929,7 @@ fn lsp_completion_import_names() {
 #[test]
 fn lsp_completion_services_in_an_environment() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Clock = (now = () -> Int)\nPoint = { (x = Int) }\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n";
+    let text = "Clock = (now = () -> Int)\nPoint = (x = Int)\nTimer = (wait = () <- (Clock) -> Int)\n\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n\nrun = (c: Clock) { elapsed(1) <- (c) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -1922,8 +1942,27 @@ fn lsp_completion_services_in_an_environment() {
         "{:?}",
         items.iter().map(|i| &i.label).collect::<Vec<_>>()
     );
-    assert!(!items.iter().any(|i| i.label == "Point"));
-    assert!(!items.iter().any(|i| i.label == "elapsed"));
+    // A service type is an ordinary labelled type (syntax three §2.10.3,
+    // R1), so `Point` may be one; the types used as services come first.
+    let place = |label: &str| items.iter().position(|i| i.label == label);
+    assert!(place("Point").is_some_and(|p| p > 0), "{items:?}");
+    // Values are not services.
+    assert!(
+        !items
+            .iter()
+            .any(|i| i.label == "elapsed" || i.label == "run")
+    );
+    // The need of a function type in a type.
+    let items = completion(&mut c, &main, text, "Clock) -> Int)", 0, 0);
+    assert_eq!(items[0].label, "Clock");
+    assert!(
+        !items
+            .iter()
+            .any(|i| i.label == "elapsed" || i.label == "run")
+    );
+    // After `e <- (` the items are the provided values.
+    let items = completion(&mut c, &main, text, "c) }", 0, 0);
+    item(&items, "c");
     c.shutdown();
 }
 
@@ -2472,9 +2511,13 @@ fn lsp_folding_ranges() {
     let (case, _) = find(SHAPES, "s |>", 0);
     assert!(ranges.iter().any(|f| f.start_line == area), "{ranges:?}");
     // A match written over several lines as a chain `s |> (p) { … } | …`
-    // gets no folding range of its own yet (the lowered `Case` is not
-    // reported by `folding_ranges`).
-    let _ = case;
+    // folds from its subject to its last branch.
+    assert!(
+        ranges
+            .iter()
+            .any(|f| f.start_line == case && f.end_line == case + 2),
+        "{ranges:?}"
+    );
     // Imports.
     let mut c2 = ws.open();
     let r = c2.request::<lsp::request::FoldingRangeRequest>(
@@ -2482,9 +2525,9 @@ fn lsp_folding_ranges() {
     );
     let ranges: Vec<lsp::FoldingRange> = serde_json::from_value(r).unwrap();
     assert!(
-        // The span of the imports covers their names, inside the `( )`.
-        ranges.iter().any(|f| f.start_line <= 1
-            && f.end_line >= 2
+        // The header group `( … )` of the imports folds whole.
+        ranges.iter().any(|f| f.start_line == 0
+            && f.end_line == 3
             && f.kind == Some(lsp::FoldingRangeKind::Imports)),
         "{ranges:?}"
     );
@@ -2959,21 +3002,25 @@ fn lsp_latency_on_std() {
             ("completion", at("{ reverse(acc)")),
         ] {
             let started = Instant::now();
+            let cpu = c.server_cpu();
             let r = match name {
                 "hover" => c.request::<lsp::request::HoverRequest>(p),
                 "definition" => c.request::<lsp::request::GotoDefinition>(p),
                 _ => c.request::<lsp::request::Completion>(p),
             };
-            let took = started.elapsed();
+            let took = c.server_cpu() - cpu;
             assert!(!r.is_null(), "{name}");
-            times.push((round, name, took));
+            times.push((round, name, took, started.elapsed()));
         }
     }
-    eprintln!("latencies on std/list: {times:?}");
-    for (round, name, took) in &times {
+    // The bound is on the CPU time of the server's thread, which answers
+    // the requests: the wall time also counts the other tests and workers
+    // that share the machine.
+    eprintln!("CPU time and wall time of requests on std/list: {times:?}");
+    for (round, name, took, _) in &times {
         assert!(
             *took < Duration::from_millis(200),
-            "{name} took {took:?} in round {round}"
+            "{name} took {took:?} of CPU time in round {round}"
         );
     }
     c.shutdown();
@@ -2997,6 +3044,7 @@ fn lsp_capabilities_are_advertised() {
         server: Some(handle),
         next_id: 0,
         pending: Vec::new(),
+        server_thread: None,
     };
     let init = c.request::<lsp::request::Initialize>(json!({ "capabilities": {} }));
     let caps = &init["capabilities"];

@@ -87,8 +87,13 @@ impl Query<'_> {
         let mut call: Option<&Expr> = None;
         let mut record = false;
         visit_module(p, m, &mut |n| match n {
+            // Not a hole: the lowering of a provide `e <- (v)` gives each
+            // value `v` the type `_` with the span of the value.
             Node::Type(t)
-                if t.span.start <= start && offset <= t.span.end && t.span.start < t.span.end =>
+                if t.span.start <= start
+                    && offset <= t.span.end
+                    && t.span.start < t.span.end
+                    && !matches!(t.kind, TypeKind::Hole) =>
             {
                 in_type = true
             }
@@ -108,6 +113,14 @@ impl Query<'_> {
             },
             _ => {}
         });
+        // A service pattern `<- (name: S, …)` of a function head, or the
+        // need `<- (S, …)` of a function type (syntax three §2.10.2): a
+        // type there, or the place after `name:`, is a service. After
+        // `e <- (` of a provide the items are values, which are not types
+        // of the tree.
+        if (in_type || before == Some(b':')) && after_need_arrow(text, start) {
+            return CompletionContext::Environment;
+        }
         if in_type {
             return CompletionContext::Type;
         }
@@ -935,6 +948,25 @@ fn prev_byte(text: &str, offset: u32) -> Option<u8> {
 }
 
 /// The text of the line before `offset`.
+/// The position is an item of the group `( … )` that follows a `<-`:
+/// a service pattern or a need.
+fn after_need_arrow(text: &str, offset: u32) -> bool {
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut i = (offset as usize).min(bytes.len());
+    while i > 0 {
+        i -= 1;
+        match bytes[i] {
+            b')' | b']' | b'}' => depth += 1,
+            b'[' | b'{' if depth == 0 => return false,
+            b'(' | b'[' | b'{' if depth > 0 => depth -= 1,
+            b'(' => return text[..i].trim_end().ends_with("<-"),
+            _ => {}
+        }
+    }
+    false
+}
+
 fn line_before(text: &str, offset: u32) -> &str {
     let o = (offset as usize).min(text.len());
     let start = text[..o].rfind(['\n', '\r']).map_or(0, |i| i + 1);
