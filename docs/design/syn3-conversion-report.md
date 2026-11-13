@@ -811,3 +811,13 @@ in the legacy statement. Other locals retain their binding. Both complete
 p1 copies now report exactly E0515; all 26 row-scheme tests and all 20
 lowering tests pass, including single-use/reused-provider regressions.
 The requirement remains reject E0515, and no expectation was re-recorded.
+
+Coordinator b15 item 2: E0523 is the entry-provider plan error, here
+`service std/list_test.Yield(A) must be closed`. The copied std fixture lost
+its generator callback's direct parameter annotation during conversion,
+leaving A open at the native test entry. Restored the original callback type
+on the function literal and the emitter's x:A annotation, using the already
+verified repository std helper. At O0 and O2 the complete test bundle builds
+before CLI runtime filtering, then generator_callbacks_test passes. This is
+not a full runtime run of the copied std suite. No bound or expectation was
+changed, and there is no longer an E0523 compilation failure.
