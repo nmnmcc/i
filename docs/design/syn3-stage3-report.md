@@ -148,3 +148,40 @@ sum to the alias of the union of its members.
   (`Bundle = (value = BundleKind)`); the provider plan wraps the selected
   member (`ConstructionStep::wrap`).
 - The known types of W0503 messages fold declared aliases (`Bool`).
+
+## Landing review, 2026-11-13 evening
+
+The three questioned expectation changes have been traced to their source:
+
+- `projects/import_exported`: the converted library explicitly exports the
+  labelled type `Hidden`, without its constructor, because `Opaque = Hidden`
+  exports an alias that names it. Syntax-three §5.2.1 says, "If the type of an
+  exported definition, or the expansion of an exported name, uses a type
+  defined in this module, that type must be exported too." The import of the
+  type therefore succeeds. Qualified construction and the bare constructor
+  still fail; `Private` still checks an unexported type import. The separate
+  `export_hidden` fixture still rejects an exported alias of a private type.
+  Comments now explain this distinction without changing source coordinates
+  or any expectation.
+- `types/known`: §6.7 says, "`C(..v, label = e)` is an ordinary call whose
+  data has a spread." §2.8 gives `Circle` its own nominal type and one
+  constructor. The former E0517 text claimed its type had other constructors;
+  it no longer applies. `not_known` still rejects the two-member spread
+  (§2.3 requires exactly one known member); `wrong_ctor` still rejects the
+  incompatible `Square` data (it has `side` instead of `radius`). Both errors
+  are retained as E0501. No program changes acceptance here.
+- `types/library.out`: `types/display.rs::tree_with`, in its `Ty::Fn` arm,
+  deliberately reads labels from the parameter data's shape, rather than
+  `FnTy.labels`, which also carries positional binder names. This was
+  introduced by `80bc9296cd`, before the stage-3 merge; the numeric runtime
+  modules had stale goldens after conversion. §2.4 says, "Function types
+  drop the names and the body. The parameter part is a data type" and
+  "Labels are part of the type". Thus `(x: Float)` becomes `(Float)`;
+  real data labels remain `label = T`. The library golden test now documents
+  the cause. Runtime module definitions and expectations are unchanged.
+
+The worktree started clean at `682d1606d`. Wasm and macro package suites
+passed. The requested CLI command reproduced the conversion's known
+`a_captured_service_row_keeps_callback_dependencies` failure; its fix is
+being tracked in `status-convfix.txt`. Remaining landing checks are in
+progress; this paragraph does not claim the branch is green.
