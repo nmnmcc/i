@@ -2949,5 +2949,20 @@
   },
   "crates/ilang-package/tests/git.rs:7d5664697bbe253e": {
     "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:9015630e06ad4e25": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:c47da3d374390ac6": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:7c70477f5fb1c039": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:07c284cd8f2a26a7": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-package/tests/git.rs:d28ff2bb107da518": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
   }
 }

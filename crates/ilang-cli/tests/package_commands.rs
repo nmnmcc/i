@@ -1482,3 +1482,70 @@ fn package_commands_reject_tampered_cache_with_original_sidecar() {
         assert_eq!(read(&cache.with_extension("hash")), sidecar);
     }
 }
+
+#[test]
+fn package_commands_reject_moved_superseded_resolution_input() {
+    let w = World::new();
+    w.repo(
+        "c",
+        &[
+            ("1.0.0", &[("i.toml", "name = \"c\"\n")]),
+            ("1.1.0", &[("i.toml", "name = \"c\"\n")]),
+        ],
+    );
+    w.repo(
+        "a",
+        &[
+            (
+                "1.0.0",
+                &[(
+                    "i.toml",
+                    "name = \"a\"\n[dependencies]\nc = \"example.com/c@1.0.0\"\n",
+                )],
+            ),
+            ("1.1.0", &[("i.toml", "name = \"a\"\n")]),
+        ],
+    );
+    w.repo(
+        "b",
+        &[(
+            "1.0.0",
+            &[(
+                "i.toml",
+                "name = \"b\"\n[dependencies]\na = \"example.com/a@1.1.0\"\n",
+            )],
+        )],
+    );
+    let app = w.project("app", &[
+        ("i.toml", "name = \"app\"\n[dependencies]\na = \"example.com/a@1.0.0\"\nb = \"example.com/b@1.0.0\"\n"),
+        ("src/main.i", include_str!("../../../tests/spec/2.8/mp03_main.i")),
+    ]);
+    let project = app.to_str().unwrap();
+    w.ok(&["check", "--project", project]);
+    let locked = read(&app.join("i.lock"));
+    assert!(
+        locked
+            .lines()
+            .any(|l| l.starts_with("example.com/a 1.0.0 "))
+    );
+    let work = w.path().join("work/a");
+    git(&work, &["tag", "-d", "v1.0.0"]);
+    w.tag(
+        "a",
+        "1.0.0",
+        &[(
+            "i.toml",
+            "name = \"a\"\n[dependencies]\nc = \"example.com/c@1.1.0\"\n",
+        )],
+    );
+    // Each command sees a fresh copy, as on a second computer.
+    for command in ["check", "deps", "update"] {
+        fs::remove_dir_all(w.path().join("cache")).unwrap();
+        let err = w.fails(&[command, "--project", project]);
+        assert!(
+            err.contains("i.lock") && err.contains("example.com/a@1.0.0"),
+            "{err}"
+        );
+        assert_eq!(read(&app.join("i.lock")), locked);
+    }
+}

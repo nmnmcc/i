@@ -532,6 +532,18 @@ fn remove(project: &Path, name: &str) -> Result<ExitCode> {
 // ---- i update ----
 
 fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
+    // Authenticate the current resolution before changing requirements. A
+    // version bump must not hide a moved historical tag (or corrupt cache),
+    // and a no-op update must not report success without checking integrity.
+    let (graph, diags) = load(project, false);
+    if diags.iter().any(|d| {
+        matches!(
+            d.code,
+            ilang_package::code::LOCK_MISMATCH | ilang_package::code::PACKAGE_FILES
+        )
+    }) {
+        return Err(problems(&graph, &diags));
+    }
     let mut file = PackageFile::read(project)?;
     let all: Vec<(bool, manifest::Dependency)> = file
         .manifest

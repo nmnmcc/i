@@ -705,13 +705,17 @@ fn diamond_and_highest_reached_version() {
     // One package for `a`, whoever asks for it.
     let b_a = b_pkg.dependencies.iter().find(|(n, _)| n == "a").unwrap();
     assert_eq!(b_a.1, Some(a_id));
+    // §2.8 pins every consulted manifest, including superseded versions.
     // `e` is reached only through `a@1.0.0`: it has a version, and a line.
     assert_eq!(
         lock_lines(&app),
         [
+            "example.com/x/a 1.0.0",
             "example.com/x/a 1.1.0",
             "example.com/x/b 1.0.0",
+            "example.com/x/c 1.1.0",
             "example.com/x/c 1.2.0",
+            "example.com/x/d 1.2.0",
             "example.com/x/d 1.5.0",
             "example.com/x/e 0.1.0",
         ]
@@ -1226,5 +1230,63 @@ fn cached_package_files_are_verified_on_every_load() {
         );
         assert!(located(&g).is_empty());
         assert_eq!(fs::read(app.join("i.lock")).unwrap(), locked);
+    }
+}
+
+#[test]
+fn lock_pins_superseded_manifests_in_both_test_configurations() {
+    for dev in [false, true] {
+        let w = World::new();
+        let a = w.repo("a");
+        let b = w.repo("b");
+        let c = w.repo("c");
+        c.package("c", &[], "1.0.0");
+        c.package("c", &[], "1.1.0");
+        a.package("a", &["c = \"example.com/c@1.0.0\""], "1.0.0");
+        a.package("a", &[], "1.1.0");
+        b.package("b", &["a = \"example.com/a@1.1.0\""], "1.0.0");
+        let toml = format!(
+            "name = \"app\"\n[dependencies]\na = \"example.com/a@1.0.0\"\n{}b = \"example.com/b@1.0.0\"\n",
+            if dev { "[dev-dependencies]\n" } else { "" }
+        );
+        let app = w.project(
+            "app",
+            &[
+                ("i.toml", &toml),
+                (
+                    "src/main.i",
+                    include_str!("../../../tests/spec/2.8/mp03_main.i"),
+                ),
+            ],
+        );
+        // Even a build without tests pins inputs of the test configuration.
+        let (g, ds) = w.load(&app, false);
+        no_errors(&g, &ds);
+        assert_eq!(
+            lock_lines(&app),
+            [
+                "example.com/a 1.0.0",
+                "example.com/a 1.1.0",
+                "example.com/b 1.0.0",
+                "example.com/c 1.0.0"
+            ]
+        );
+        let locked = fs::read(app.join("i.lock")).unwrap();
+        // Only the historical, superseded input moves. All selected commits stay put.
+        a.package("a", &["c = \"example.com/c@1.1.0\""], "1.0.0");
+        for tests in [false, true] {
+            let mut options = w.options(tests);
+            options.cache = Some(w.path().join(format!("fresh-{tests}")));
+            let (g, ds) = load_with(&app, &options);
+            assert_eq!(errors(&ds), [code::LOCK_MISMATCH], "{ds:?}");
+            assert!(
+                g.sources
+                    .render_all(&ds)
+                    .iter()
+                    .any(|d| d.contains("example.com/a@1.0.0"))
+            );
+            assert!(located(&g).is_empty());
+            assert_eq!(fs::read(app.join("i.lock")).unwrap(), locked);
+        }
     }
 }

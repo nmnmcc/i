@@ -649,7 +649,7 @@ So the versions used change only when an `i.toml` changes. A newer version that 
 
 ### 2.8 The lock file
 
-The file `i.lock` is next to the `i.toml` of the package that is compiled. It has one line for each version of a package with a location that the program uses, when it is compiled with or without its tests, in the order of locations and then versions as UTF-8 bytes:
+The file `i.lock` is next to the `i.toml` of the package that is compiled. It has one line for every version of a package with a location whose manifest minimal version selection reads (§2.7), in either the configuration with tests or the configuration without tests, including versions superseded by a higher reached version, in the order of locations and then versions as UTF-8 bytes:
 
 ```
 github.com/alice/json 1.4.0 9c3e1f0a5b7d2c4e8f6a1b3d5c7e9f0a2b4c6d8e sha256-6d2f…
@@ -658,7 +658,7 @@ github.com/alice/json 1.4.0 9c3e1f0a5b7d2c4e8f6a1b3d5c7e9f0a2b4c6d8e sha256-6d2f
 The parts are the location, the version, the git commit of the tag, and the **hash** of the package, with one space between them. The hash is `sha256-` and the lowercase hex SHA-256 of these bytes: for each file of the package, in the order of their paths as UTF-8 bytes: the path from the package directory, with `/` between the parts; a zero byte; the size of the file as a decimal number; a zero byte; the bytes of the file. The files of the package are the files in the git tree of the commit under the package directory, with their bytes as git keeps them, before any change that a checkout makes to line ends. A symbolic link is a file whose bytes are its target. For a package got by location, `i.toml`, `src`, `test`, and every path below `src` or `test` must not be symbolic links. Source loading does not follow such links, even when their targets are inside the package. A tool cannot publish a package whose committed manifest or source paths contain such a link. Submodules are not part of the package.
 
 - When the files that are got for a package do not have the commit and the hash in `i.lock`, it is an error, and nothing is compiled. So a tag that is moved, or files that are changed on the way, are found.
-- When `i.lock` has no line for a version that is used, the line is added. Lines for versions that are no longer used, with or without the tests, are taken out. So when a version is raised, the line for the old version is taken out and a line for the new one is added.
+- When `i.lock` has no line for a reached version, the line is added. Lines for versions whose manifests are no longer read in either configuration are taken out. Raising a selected version does not remove a lower version that is still reached. Compilation still uses only the selected version of each package and major version (§2.7).
 - A tool may get the files from the repository or from any copy of it, because the hash makes certain they are the same files. Each use verifies the actual file set and bytes against the committed package and the lock. A stored hash alone does not verify a copy. Compilation consumes the verified bytes, without reopening mutable paths.
 
 

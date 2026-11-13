@@ -3,7 +3,8 @@
 //! The packages got by path are read first, by the loader. Then their
 //! dependencies by location are the start of minimal version selection,
 //! which is done twice: without and with the tests of the compiled package.
-//! `i.lock` has a line for each version that either one uses. The versions
+//! `i.lock` pins every version reached by either selection, including
+//! superseded manifests. The versions
 //! of the one that is compiled are loaded.
 
 use crate::git::{self, Git, GitError};
@@ -338,13 +339,10 @@ pub(crate) fn resolve(
                 errors = true;
             }
         }
-        let used: BTreeSet<(PackageKey, Version)> = sel_without
-            .versions
-            .iter()
-            .chain(&sel_with.versions)
-            .map(|(k, v)| (k.clone(), *v))
-            .collect();
-        for (key, version) in used {
+        // Every consulted manifest is a resolution input, even if another
+        // version supersedes it. Pin both configurations' complete closure.
+        let reached: BTreeSet<(PackageKey, Version)> = resolver.reached.keys().cloned().collect();
+        for (key, version) in reached {
             let Some(Ok((commit, _))) = resolver.reached.get(&(key.clone(), version)) else {
                 continue;
             };
