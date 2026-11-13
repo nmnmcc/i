@@ -358,8 +358,8 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
            worker_publish = (_job: Job) -> Int { 0 }\n\
            worker_claim = (_ticket: Int) -> Bool { True }\n\
            worker_adopt = (_ticket: Int, _task: Int) -> Nil { Nil }\n\
-           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never, Never) { panic(\"no workers\") }\n\
-           worker_away = (_k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool { False }\n\
+           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never) { panic(\"no workers\") }\n\
+           worker_away = (_k: Continuation(StepAnswer, Turn, Never)) -> Bool { False }\n\
            worker_send = (_task: Int, _resume: Resume) -> Nil { Nil }\n\
            worker_inbox = () -> Int { 0 }\n\
            worker_message = () -> Remote { panic(\"no workers\") }\n\
