@@ -1788,6 +1788,11 @@ impl Solver {
             Ty::Var(v)
                 if env == Mode::Env
                     && h.iter().all(|m| self.directed(m))
+                    && h.iter().any(|m| {
+                        super::typed_macro::variables(m)
+                            .iter()
+                            .any(|w| self.same_form(&Ty::Var(*v), &Ty::Var(*w)))
+                    })
                     && !self
                         .reach(vec![*v], true)
                         .1

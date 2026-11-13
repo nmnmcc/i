@@ -140,8 +140,8 @@ bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 #[test]
 fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
     // §4.5: L <: v <: U proves v = T when L = T = U. A hole in a
-    // handler fixed to Int must prove the same witness as writing Int.
-    let source = "Svc(A) = (f = () -> A)
+    // invariant handler fixed to Int must prove the same witness as writing Int.
+    let source = "Svc(A) = (f = (A) -> A)
 wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
 	body() <- (svc)
 }";
@@ -292,8 +292,9 @@ use = <N>() <- (s: S(N)) { s.f() }
 wrap = <N>(svc: S(N)) -> Int { use() <- (svc) }",
     );
     // The retained key restriction is shown explicitly; A stays open to
-    // every other service. Difference heads carry only the key (§4.4).
-    assert_eq!(shown["app/main.wrap"], "(S(A)) <- (A - S(Never)) -> Int");
+    // every other service. The retained obligation uses the actual provider
+    // form S(A), as required by the directed P <: S check (§9.2).
+    assert_eq!(shown["app/main.wrap"], "(S(A)) <- (A - S(A)) -> Int");
     types(
         "Dep = (value = Int)\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nwrap = <N>(svc: S(N)) -> Int { use() <- (svc) }\nneed = () <- (d: Dep) { d.value }\nexample = () { wrap(S(f = () { need() })) <- (Dep(value = 1)) }\n",
     );
@@ -693,4 +694,38 @@ fn syntax_three_library_handler_has_no_unhandled_service() {
         }
     }
     assert!(found, "the library handler was checked");
+}
+
+#[test]
+fn a_generator_does_not_export_its_handled_yield_need() {
+    let shown = types(
+        r#"(i/control)
+Yield(A) = (emit = (A) -> Nil)
+collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
+    control.boundary((b) {
+        {
+            body()
+            []
+        } <- (Yield(emit = (x) {
+            control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+        }))
+    })
+}
+main = () { collect(() <- (y: Yield(Int)) { y.emit(1) }) }
+"#,
+    );
+    assert!(!shown["app/main.main"].contains("Yield"), "{shown:?}");
+    assert!(shown["app/main.main"].contains("List(Int)"), "{shown:?}");
+}
+
+#[test]
+fn a_covariant_handler_hole_retains_its_upper_bound() {
+    // P <: S gives A <: Int for a covariant provider, not A = Int.
+    let shown = types(
+        "Svc(A) = (f = () -> A)\nwrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(_)) -> Int { body() <- (svc) }\n",
+    );
+    assert_eq!(
+        shown["app/main.wrap"],
+        "(() <- (Svc(Int), ..N) -> Int, Svc(A & Int)) <- (N - Svc(A & Int)) -> Int"
+    );
 }
