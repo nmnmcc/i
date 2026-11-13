@@ -186,8 +186,9 @@ pub fn convert(
         matches!(&item.kind,
         o::ItemKind::TypeDef(def) if def.name.name == service_fail_name)
     }) || imported.contains_key(&service_fail_name)
+        || local.contains_key(&service_fail_name)
     {
-        service_fail_name.push('_');
+        service_fail_name.push('X');
     }
     let mut cx = Cx {
         service_fail_name,

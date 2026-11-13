@@ -378,3 +378,58 @@ main = () {
     );
     assert!(shown["app/main.main"].contains("Dep"), "{shown:?}");
 }
+
+#[test]
+fn direct_forwarding_keeps_the_provided_services_own_need() {
+    let shown = types(
+        "Dep { Dep(v: Int) }
+get = (d ! Dep) { d.v }
+S(N) { S(f: () -> Int ! N) }
+use(N) = (s ! S(N)) { s.f() }
+run(A,N) = (f: () -> A ! N) { f() }
+fw = () { use() }
+fr = () { run(() { use() }) }
+main = () {
+ ! S(Dep) = S(f: () { get() })
+ fw() + fr()
+ Nil
+}",
+    );
+    assert!(shown["app/main.main"].contains("Dep"), "{shown:?}");
+}
+
+#[test]
+fn annotated_mutual_forwarding_keeps_finite_service_rows() {
+    types(
+        "S(N) { S(() -> Int ! N) }
+use(N) = (s ! S(N)) { S(f) = s f() }
+ping(N) = (n: Int, s ! S(N)) -> Int ! N | S(N) { n |> { 0 -> use() _ -> pong(n - 1) } }
+pong = (n: Int) { ping(n) }",
+    );
+}
+
+#[test]
+fn a_value_argument_cannot_erase_a_shared_row_constraint() {
+    let source = "S(A) { S(value: A) }
+one = (s ! S(Int)) { s.value + 1 }
+run(N) = (f: () -> Int ! N, x: N) { f() }
+bad = () { ! S(Int) = S(value: 1) run(() { one() }, S(value: \"hi\")) }";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("\"hi\"", "2"));
+    types(
+        &source
+            .replace(
+                "one = (s ! S(Int)) { s.value + 1 }",
+                "one = (s ! S(Int | String)) { 1 }",
+            )
+            .replace("\"hi\"", "2"),
+    );
+}

@@ -753,17 +753,7 @@ impl Coalescer<'_> {
                     let upper: Vec<_> = self
                         .members(v)
                         .into_iter()
-                        .flat_map(|m| {
-                            let state = &self.s.vars[m.0 as usize];
-                            // Row-variable inclusions are stored as reverse
-                            // links, not concrete upper bounds. They are
-                            // still operands of this derived meet (§9.2).
-                            state
-                                .upper
-                                .iter()
-                                .cloned()
-                                .chain(state.into.iter().copied().map(Ty::Var))
-                        })
+                        .flat_map(|m| self.s.vars[m.0 as usize].upper.clone())
                         .collect();
                     let parts = upper
                         .iter()

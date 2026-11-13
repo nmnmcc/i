@@ -999,6 +999,14 @@ impl Solver {
     /// through the bounds of variables, but not into type arguments: those
     /// are compared as normal types.
     fn constrain_in(&mut self, l: &Ty, r: &Ty, env: Mode) {
+        // A row also used as an ordinary value must retain that value's
+        // checked form. Keep both inclusions: fitting the need alone would
+        // lose the shared value constraint (§4.7, §4.5 rule 4, §9.2).
+        if env == Mode::Value && l.is_headed() && self.mode(r) == Mode::Env {
+            self.constrain_in(r, l, Mode::Env);
+            self.constrain_in(l, r, Mode::Env);
+            return;
+        }
         if self.rigid_boundary > 0 && self.rigid_constraint(l, r, env) {
             return;
         }
@@ -1188,6 +1196,8 @@ impl Solver {
                     // is a subtype of the form of `l` as a value: argument
                     // constraints go the other way round from values.
                     let before = self.failures.len();
+                    let need = self.known_need_form(l);
+                    let provider = self.known_need_form(r);
                     let vs = self.variances(*h1, a1.len());
                     for (((x, y), v), row) in
                         a1.iter().zip(a2).zip(vs).zip(self.rows(*h1, a1.len()))
@@ -1196,7 +1206,7 @@ impl Solver {
                     }
                     if self.failures.len() > before {
                         self.failures.truncate(before);
-                        self.fail(FailKind::EnvForms, l, r);
+                        self.fail(FailKind::EnvForms, &need, &provider);
                     }
                     return;
                 }
@@ -1521,6 +1531,21 @@ impl Solver {
     /// Keep an undetermined intersection as two upper bounds (§4.4).
     /// A later concrete bound is checked by `add_bound`, also through links.
     fn need_meet(&mut self, x: &Ty, y: &Ty, a: &Ty, b: &Ty, row: Mode, level: u32) -> Ty {
+        // Idempotence and absorption apply to row aliases and inclusions
+        // too; introducing a derived variable can invent a structural cycle.
+        if self.same_form(x, y) {
+            return x.clone();
+        }
+        if row != Mode::Value
+            && let (Ty::Var(u), Ty::Var(v)) = (x, y)
+        {
+            if self.reach(vec![*u], false).0.contains(v) {
+                return x.clone();
+            }
+            if self.reach(vec![*v], false).0.contains(u) {
+                return y.clone();
+            }
+        }
         let meet = self.normalize_mode(Ty::Inter(vec![x.clone(), y.clone()]), row);
         if matches!(meet, Ty::Never) {
             self.fail(FailKind::NeedMeet, a, b);
@@ -1533,6 +1558,15 @@ impl Solver {
         self.var_mut(v).need_meet = Some((a.clone(), b.clone()));
         self.constrain_in(&Ty::Var(v), x, row);
         self.constrain_in(&Ty::Var(v), y, row);
+        // Row inclusion stores variable edges at the receiver. A derived
+        // meet must also retain its actual operands as upper bounds: later
+        // lower bounds must reach both, and coalescing must not confuse
+        // the meet's other receiving rows with its operands (§4.4, §9.2).
+        for operand in [x, y] {
+            if matches!(operand, Ty::Var(_)) && !self.var(v).upper.contains(operand) {
+                self.var_mut(v).upper.push(operand.clone());
+            }
+        }
         Ty::Var(v)
     }
 

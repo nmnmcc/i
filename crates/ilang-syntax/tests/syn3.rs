@@ -1144,4 +1144,6 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     let shown = ilang_syntax::print::print_module(&lowered);
     assert!(shown.contains("! Syn3ServiceFail(E)"), "{shown}");
     assert!(!shown.contains("^ E"), "{shown}");
+    let collision = converted("T { Syn3ServiceFail }\nUse(E) = () -> Nil ! Fail(E)\n");
+    assert!(collision.contains("Syn3ServiceFailX(E)"), "{collision}");
 }
