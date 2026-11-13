@@ -31,11 +31,6 @@ use pre::{
 };
 use std::ops::{Deref, DerefMut};
 
-/// The stack of the thread that resolves: trees made by macros can be far
-/// deeper than a normal stack, and every pass here is plain recursion. The
-/// pages are taken only when they are used.
-const STACK: usize = 1 << 30;
-
 /// The errors of a module that the lowering reported: the forms of syntax
 /// three that this compiler cannot type yet. `lisp` is set for a module
 /// read from the Lisp surface.
@@ -53,23 +48,7 @@ pub fn resolve3(
     modules: &[n::Module],
 ) -> (Program, Vec<Diagnostic>) {
     assert_eq!(parsed.len(), modules.len());
-    on_deep_stack(|| resolve_here(graph, parsed, modules))
-}
-
-/// Stub of `ilang_syntax::syn3::deep::deep` (the integrator's helper, not on
-/// this branch yet): replace every call by it and delete this function.
-fn on_deep_stack<T: Send>(work: impl FnOnce() -> T + Send) -> T {
-    std::thread::scope(|scope| {
-        let handle = std::thread::Builder::new()
-            .name("resolve".into())
-            .stack_size(STACK)
-            .spawn_scoped(scope, work)
-            .expect("the resolver's thread starts");
-        match handle.join() {
-            Ok(out) => out,
-            Err(panic) => std::panic::resume_unwind(panic),
-        }
-    })
+    ilang_syntax::syn3::deep::deep(|| resolve_here(graph, parsed, modules))
 }
 
 fn pres(graph: &PackageGraph, parsed: &[Parsed], modules: &[n::Module]) -> Vec<Pre> {
@@ -191,7 +170,7 @@ pub fn typed_output3(
     ty_var_count: u32,
     checked: &CheckedInputs,
 ) -> Result<(Expr, Program), Vec<Diagnostic>> {
-    on_deep_stack(|| {
+    ilang_syntax::syn3::deep::deep(|| {
         typed_output_here(
             graph,
             parsed,
