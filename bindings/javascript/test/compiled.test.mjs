@@ -28,6 +28,7 @@ test("sync host services and external functions of a compiled module", async () 
   assert.equal(value.call("app/app.lookup", ["name"]), "i");
   assert.throws(() => value.call("app/app.lookup", ["other"]), (error) => error instanceof GuestError && error.value === "no other");
   assert.equal(value.call("app/app.distance", [3, 4]), 5);
+  assert.equal(value.call("app/app.lookup", ["name"]), "i");
   assert.equal(value.unusable, null);
 });
 

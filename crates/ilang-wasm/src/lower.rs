@@ -1565,7 +1565,10 @@ impl<'a> Lowerer<'a> {
             ),
             None,
         );
-        let mut env = Env::Root;
+        // The completion catch supplies Fail before this stub runs. Keep it
+        // while installing the platform services so an ordinary error reaches
+        // provider_finish and ends the entry's request context (§9.3, §10.2).
+        let mut env = Env::Param;
         for &t in &stub.hosts {
             let slot = self.services[&TypeRef::Custom(t)];
             let host = self
@@ -1650,7 +1653,7 @@ impl<'a> Lowerer<'a> {
             out.push(Stmt::TailCall {
                 callee: Callee::Direct(inner),
                 args,
-                env: Env::Root,
+                env: Env::Param,
                 site: None,
             });
         });
