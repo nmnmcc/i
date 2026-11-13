@@ -7,4 +7,4 @@ left_fn_later : List(Int)
 pair : (((User) -> Int, Int)) -> ((User) -> Int, Int)
 left_tuple : ((User) -> Int, Int)
 unknown : (((A) -> Never) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B
-27:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`
+27:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u: User) { u.name }`, or give the function where a type is expected, for example `get_name: (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)
