@@ -150,7 +150,9 @@ fn builtin_rows_keep_builtin_names_and_fresh_parameter_binders() {
     let members = parts(&item[2]);
     let ok = parts(&members[1]);
     let error = parts(&members[2]);
-    assert!(matches!(ok[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Ok"));
+    assert!(
+        matches!(ok[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Ok")
+    );
     assert_eq!(head[1].scope_identity(), ok[1].scope_identity());
     assert_eq!(head[2].scope_identity(), error[1].scope_identity());
 
@@ -267,12 +269,9 @@ fn expanded_rows_identify_only_parameters_with_the_same_scope() {
 
     // The parameters of a polymorphic function type are its own; a
     // qualified name is not a parameter.
-    let answer = expanded_definition_rows(
-        &root("(= (F A) (, (-> [A] (, A) A) (. m A) A))"),
-        13,
-        true,
-    )
-    .unwrap();
+    let answer =
+        expanded_definition_rows(&root("(= (F A) (, (-> [A] (, A) A) (. m A) A))"), 13, true)
+            .unwrap();
     let data = parts(&parts(&answer)[2]);
     let function = parts(&data[1]);
     assert_eq!(parameter(&parts(&function[1])[0]), None);
@@ -302,7 +301,10 @@ fn expanded_rows_keep_the_three_kinds_of_right_side_apart() {
     assert_eq!(show("(= U {Opaque})"), "(= U {Opaque})");
     // Type groups are removed everywhere else.
     assert_eq!(show("(= (U A) {(List {A})})"), "(= (U A) (List A))");
-    assert_eq!(show("(= U (, {(, T1)} (= x {T2})))"), "(= U (, (, T1) (= x T2)))");
+    assert_eq!(
+        show("(= U (, {(, T1)} (= x {T2})))"),
+        "(= U (, (, T1) (= x T2)))"
+    );
     // An alias pattern keeps its head as written and binds nothing.
     let answer = expanded_definition_rows(&root("(= (Elem (List A)) A)"), 21, true).unwrap();
     assert_eq!(answer.show(), "(= (Elem (List A)) A)");
@@ -565,4 +567,39 @@ fn definition_table_answers_a_definition_of_the_new_tree() {
         &2,
         Definition::tree(module.items[0].clone(), of.scope().clone(), true),
     );
+}
+
+/// The integrator's `SourceTree` gives the written item with the spans of
+/// its tokens; the table answers and charges from that datum.
+#[test]
+fn definition_table_answers_from_the_datum_of_the_source_tree() {
+    use ilang_syntax::lisp::definition_schedule::Mode;
+    use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
+    use ilang_syntax::lisp::source_tree::SourceTree;
+    let source = "Pair(A, B) = (left = A, right = List(B))\n";
+    let (module, errors) = syn3::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let of = root("Pair");
+    let tree = SourceTree::new(of.scope(), source);
+    let item = &module.items[0];
+    let datum = tree.item_datum(item.span.0).expect("the written item");
+    let mut table = DefinitionTable::default();
+    table.insert(
+        1,
+        Definition::tree_with_datum(item.clone(), datum, of.scope().clone(), true),
+    );
+    let QueryResult::Answer { syntax, .. } =
+        table.query(&of, Mode::Normal, 3, |_, _| Lookup::Found(1))
+    else {
+        panic!("expected an answer")
+    };
+    assert_eq!(
+        syntax.show(),
+        "(= (Pair A B) (, (= left A) (= right (List B))))"
+    );
+    assert_eq!(syntax.show(), tree_definition(item, of.scope(), 3).show());
+    let head = parts(&parts(&syntax)[1]);
+    assert_eq!(parameter(&head[2]), Some((3, 1)));
+    // The answer is an item of the Lisp surface.
+    assert!(syn3::lisp::item_from_datum(&syntax.to_datum()).is_ok());
 }

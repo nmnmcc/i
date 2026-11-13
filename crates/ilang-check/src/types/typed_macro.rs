@@ -457,12 +457,7 @@ impl TypedMacroQuery {
             module: s.program.module(s.module).source.0,
             marks: Default::default(),
         };
-        self.syntax_rows(
-            s,
-            t,
-            &scope,
-            ilang_syntax::lisp::definitions::NEW_ROWS,
-        )
+        self.syntax_rows(s, t, &scope, ilang_syntax::lisp::definitions::NEW_ROWS)
     }
     /// A type as syntax, in the rows before syntax three or (`new_rows`) in
     /// the rows of syntax-3.md §6.8. The rows differ for function types, for
@@ -693,8 +688,7 @@ impl TypedMacroQuery {
                         Ty::Union(members) => members,
                         one => std::slice::from_ref(one),
                     };
-                    let only_row =
-                        needs.is_empty() && matches!(members, [Ty::Var(_)]);
+                    let only_row = needs.is_empty() && matches!(members, [Ty::Var(_)]);
                     for member in members {
                         if matches!(member, Ty::Var(_)) && !only_row {
                             needs.push(atom(DatumKind::Symbol("..".into())));
@@ -722,7 +716,12 @@ impl TypedMacroQuery {
             }
             Ty::Union(xs) | Ty::Inter(xs) => {
                 let name = if matches!(t, Ty::Union(_)) { "|" } else { "&" };
-                form(name, xs.iter().map(|t| self.syntax_rows(s, t, scope, new_rows)).collect())
+                form(
+                    name,
+                    xs.iter()
+                        .map(|t| self.syntax_rows(s, t, scope, new_rows))
+                        .collect(),
+                )
             }
             Ty::Diff(a, bs) => {
                 let mut xs = vec![self.syntax_rows(s, a, scope, new_rows)];
@@ -1306,7 +1305,10 @@ mod tests {
     #[test]
     fn typed_macro_data_type_rows() {
         let pair = Ty::tuple(vec![int(), string()]);
-        assert_eq!(rows(&pair), ("(, Int String)".into(), "(, Int String)".into()));
+        assert_eq!(
+            rows(&pair),
+            ("(, Int String)".into(), "(, Int String)".into())
+        );
         let mut solver = solver();
         let record = solver.record(vec![
             (super::super::records::Label::name("x"), int()),

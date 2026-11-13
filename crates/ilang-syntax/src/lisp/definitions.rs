@@ -135,13 +135,11 @@ pub fn builtin_definition_rows(
         let syntax = Syntax::written(node, scope, at);
         match syntax.node() {
             Node::Up(name) => match parameters.iter().position(|p| p == name) {
-                Some(parameter) => {
-                    syntax.with_scope_identity(ScopeIdentity::DefinitionParameter {
-                        answer,
-                        parameter: parameter as u32,
-                        name: name.clone(),
-                    })
-                }
+                Some(parameter) => syntax.with_scope_identity(ScopeIdentity::DefinitionParameter {
+                    answer,
+                    parameter: parameter as u32,
+                    name: name.clone(),
+                }),
                 None => syntax.with_scope_identity(ScopeIdentity::Builtin { name: name.clone() }),
             },
             _ => syntax,
@@ -737,9 +735,8 @@ fn check_type_new(root: &Syntax) -> Result<(), SyntaxError> {
                         ("->", _) => {
                             let rest = match rest.first().map(|first| first.node()) {
                                 Some(Node::Square(generics)) => {
-                                    if let Some(other) = generics
-                                        .iter()
-                                        .find(|g| !matches!(g.node(), Node::Up(_)))
+                                    if let Some(other) =
+                                        generics.iter().find(|g| !matches!(g.node(), Node::Up(_)))
                                     {
                                         return fail(other, "expected a type parameter");
                                     }
@@ -886,20 +883,19 @@ fn expanded_definition_new(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
                                 && identity.as_ref() == node.scope_identity()
                         });
                         values.push(match found {
-                            Some((_, _, _, parameter)) if !shadowed => node.with_scope_identity(
-                                ScopeIdentity::DefinitionParameter {
+                            Some((_, _, _, parameter)) if !shadowed => {
+                                node.with_scope_identity(ScopeIdentity::DefinitionParameter {
                                     answer,
                                     parameter: *parameter,
                                     name: name.clone(),
-                                },
-                            ),
+                                })
+                            }
                             _ => node.clone(),
                         });
                         continue;
                     }
                     let children: &[Syntax] = match node.node() {
-                        Node::Round(xs)
-                            if matches!(xs.as_slice(), [dot, _, _] if is_symbol(dot, ".")) =>
+                        Node::Round(xs) if matches!(xs.as_slice(), [dot, _, _] if is_symbol(dot, ".")) =>
                         {
                             values.push(node.clone());
                             continue;
@@ -979,8 +975,11 @@ fn expanded_definition_new(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
         }
         _ => ty(right, &binders, answer),
     };
-    let mut answered =
-        mark_definition_head(body.with_node(Node::Round(result)).as_answer(), answer, true);
+    let mut answered = mark_definition_head(
+        body.with_node(Node::Round(result)).as_answer(),
+        answer,
+        true,
+    );
     if wrappers.is_empty() {
         return Ok(answered);
     }
