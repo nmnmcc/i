@@ -6,10 +6,11 @@ use = <E, N>() <- (s: S(E, N)) { s.f() }
 
 main = <E, N>() {
 	local2 = () {
+		_syn3_0: S(Never, Dep) = S(f = () { get() })
 		{
 			local = () { use() }
 			local()
-		} <- (S(f = () { get() }))
+		} <- (_syn3_0)
 	}
 	run(local2)
 }

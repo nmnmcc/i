@@ -6,8 +6,10 @@ use = <N>() <- (s: S(N)) { s.f() }
 uset = <N>() <- (s: T(N)) { s.f() }
 
 main = () {
+	_syn3_0: S(Dep) = S(f = () { get() })
+	_syn3_1: T(S(Dep)) = T(f = () { use() }, m = (_: S(Dep)) { Nil })
 	{
 		uset()
 		Nil
-	} <- (S(f = () { get() }), T(f = () { use() }, m = (_: S(Dep)) { Nil }))
+	} <- (_syn3_0, _syn3_1)
 }

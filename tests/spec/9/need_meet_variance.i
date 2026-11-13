@@ -4,6 +4,7 @@
 	i/fail
 )
 
+Syn3ServiceFail(E) = Fail(E)
 // The other-direction parameter gives the same union on both paths.
 need_int = () <- (f: Fail(Int)) { Nil }
 need_string = () <- (f: Fail(String)) { Nil }

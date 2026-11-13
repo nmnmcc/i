@@ -16,8 +16,9 @@ one = () <- (s: S(Int)) { Nil }
 two = () <- (s: S(Int)) { Nil }
 
 main = () {
+	_syn3_0: S(Int) = S(1)
 	{
 		used = merge(T(f = one), T(f = two))
 		used.f()
-	} <- (S(1))
+	} <- (_syn3_0)
 }

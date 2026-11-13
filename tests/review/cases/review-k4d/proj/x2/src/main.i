@@ -6,11 +6,15 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-wrap = (body, svc: S(Dep)) { body() <- (svc) }
+wrap = (body, svc: S(Dep)) {
+	_syn3_0: S(Dep) = svc
+	body() <- (_syn3_0)
+}
 
 main = () {
+	_syn3_1: S(Never) = S(f = () { 1 }, m = (_: Never) { Nil })
 	{
 		wrap(() { use() }, S(f = () { get() }, m = (_: Dep) { Nil }))
 		Nil
-	} <- (S(f = () { 1 }, m = (_: Never) { Nil }))
+	} <- (_syn3_1)
 }

@@ -545,3 +545,152 @@ main = () { need() <- (S(run = wrong)) }
     );
     types(&source.replace("(o: Other)", "(o: Dep)"));
 }
+
+#[test]
+fn syntax_three_provision_retains_the_actual_provider_form() {
+    let source = "Read(A) = (get = () -> A)\nwith_int = (body) { service: Read(Int) = Read(get = () -> Int { 1 }) body() <- (service) }\nmain = () { with_int(() <- (r: Read(Int)) { r.get() }) }\n";
+    let shown = types(source);
+    assert!(!shown["app/main.main"].contains("Read"), "{shown:?}");
+    let bad = source.replace(
+        "() <- (r: Read(Int)) { r.get() }",
+        "() <- (r: Read(String)) { r.get() }",
+    );
+    let (graph, _, _) = common::check_files(&[("src/main.i", &bad)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    assert!(
+        !checked.diags.iter().any(|d| d.code == "E0501"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn converted_e1_provider_cases_keep_batch2_check_outcomes() {
+    let cases: &[(&str, &[&str], &str)] = &[
+        (
+            "review-k4/cases/closure_inner_annotation",
+            &["E0515"],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/closure_inner_annotation/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/local_instances_annotated",
+            &["E0515"],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/local_instances_annotated/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/provision_closure_True",
+            &[],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/provision_closure_True/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/provision_direct_True",
+            &[],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/provision_direct_True/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/provision_helper_True",
+            &[],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/provision_helper_True/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/provision_inferred_True",
+            &[],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/provision_inferred_True/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/recursive_env_cov",
+            &["E0505"],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/recursive_env_cov/src/main.i"
+            ),
+        ),
+        (
+            "review-k4/cases/recursive_env_mutual",
+            &["E0505"],
+            include_str!(
+                "../../../tests/review/cases/review-k4/cases/recursive_env_mutual/src/main.i"
+            ),
+        ),
+    ];
+    let mut failures = Vec::new();
+    for (name, expected, source) in cases {
+        let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+        let checked = ilang_check::check(&graph);
+        let actual: std::collections::BTreeSet<_> = checked
+            .diags
+            .iter()
+            .filter(|d| d.is_error())
+            .map(|d| d.code)
+            .collect();
+        let expected: std::collections::BTreeSet<_> = expected.iter().copied().collect();
+        if actual != expected {
+            failures.push(format!(
+                "{name}: expected {expected:?}, got {actual:?}: {:?}",
+                graph.sources.render_all(&checked.diags)
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+#[test]
+fn syntax_three_library_handler_has_no_unhandled_service() {
+    let (graph, _, _) = common::check_files(&[(
+        "src/main.i",
+        "(i/fail)\nmain = () { fail.catch(() { fail.raise(1) }) }\n",
+    )]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    let p = checked.program.as_ref().unwrap();
+    let mut found = false;
+    let typed = checked.types.as_ref().unwrap();
+    for (mi, module) in p.modules.iter().enumerate() {
+        if module.path != "i/fail" {
+            continue;
+        }
+        for (di, def) in module.defs.iter().enumerate() {
+            if def.name != "catch" {
+                continue;
+            }
+            let id = ilang_check::hir::DefId {
+                module: ilang_check::hir::ModuleId(mi as u32),
+                index: di as u32,
+            };
+            found = true;
+            let shown = &typed.scheme_types[&id];
+            let ilang_check::types::ShownType::Fn(function) = shown else {
+                panic!("{shown:#?}");
+            };
+            assert!(function.err.is_none(), "{shown:#?}");
+            assert!(
+                matches!(
+                    function.env.as_ref(),
+                    Some(ilang_check::types::ShownType::Var(_))
+                ),
+                "{shown:#?}"
+            );
+        }
+    }
+    assert!(found, "the library handler was checked");
+}

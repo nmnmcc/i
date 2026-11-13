@@ -18,9 +18,10 @@ make = <N>(f: () <- N -> Int) {
 run = <N>(f: () <- N -> Int) { f() }
 
 main = () {
+	_syn3_0: S(Dep) = S(() { get() })
 	{
 		wrapped = make(() { use() })
 		assert(wrapped(run) == 11)
 		Nil
-	} <- (Dep(11), S(() { get() }))
+	} <- (Dep(11), _syn3_0)
 }

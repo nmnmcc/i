@@ -27,39 +27,48 @@ right = <N>(b: Bool) <- (s: S(Int, Never, N)) {
 }
 
 test("integer", () {
+	_syn3_0: S(Int, Never, Dep) = S((x: Int) { x + get() }, (_: Dep) { Nil })
 	forward(1) |> (8) { Nil } | (other) { panic("wrong result") } <- (
 		Dep(value = 7),
-		S((x: Int) { x + get() }, (_: Dep) { Nil }),
+		_syn3_0,
 	)
 })
 
 test("string", () {
+	_syn3_1: S(String, Never, Never) = S(
+		(x: String) { x <> "!" },
+		(_: Never) { Nil },
+	)
 	forward("a") |> ("a!") { Nil } | (other) { panic("wrong result") } <- (
-		S((x: String) { x <> "!" }, (_: Never) { Nil }),
+		_syn3_1,
 	)
 })
 
 test("error", () {
+	_syn3_2: S(Int, String, Never) = S(
+		(_: Int) { fail.raise("failed") },
+		(_: Never) { Nil },
+	)
 	fail.catch(() { forward(1) }) |>
 		(Error("failed")) { Nil }
-		| (other) { panic("wrong result") } <- (
-		S((_: Int) { fail.raise("failed") }, (_: Never) { Nil }),
-	)
+		| (other) { panic("wrong result") } <- (_syn3_2)
 })
 
 test("mutual", () {
+	_syn3_3: S(Int, Never, Dep) = S((x: Int) { x + get() }, (_: Dep) { Nil })
 	left(True) |> (8) { Nil } | (other) { panic("wrong result") } <- (
 		Dep(value = 7),
-		S((x: Int) { x + get() }, (_: Dep) { Nil }),
+		_syn3_3,
 	)
 })
 
 make = (x: Int) {
 	() {
-		run(() { use(1) }) <- (
-			Dep(value = x),
-			S((n: Int) { n + get() }, (_: Dep) { Nil }),
+		_syn3_4: S(Int, Never, Dep) = S(
+			(n: Int) { n + get() },
+			(_: Dep) { Nil },
 		)
+		run(() { use(1) }) <- (Dep(value = x), _syn3_4)
 	}
 }
 

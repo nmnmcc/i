@@ -7,4 +7,7 @@ use = <N>() <- (s: S(N)) {
 
 fw = () { use() }
 
-main = () { assert(fw() == 1) <- (S(f = () { 1 })) }
+main = () {
+	_syn3_0: S(Never) = S(f = () { 1 })
+	assert(fw() == 1) <- (_syn3_0)
+}

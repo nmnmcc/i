@@ -9,6 +9,9 @@ use = <N>() <- (s: S(N)) {
 	f()
 }
 
-wrap = <N>(body: () <- (S(N), ..N) -> Int) { body() <- (S(f = () { 1 })) }
+wrap = <N>(body: () <- (S(N), ..N) -> Int) {
+	_syn3_0: S(N) = S(f = () { 1 })
+	body() <- (_syn3_0)
+}
 
 main = () { assert(wrap(() { use() }) == 1) <- (Dep(value = 7)) }

@@ -1868,16 +1868,15 @@ Yield(A) = (emit = (A) -> Nil)
 // A generator made with `i/control` (§9.4).
 collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
 	control.boundary((b) {
+		_syn3_0: Yield(A) = Yield(
+			emit = (x) {
+				control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+			},
+		)
 		{
 			body()
 			[]
-		} <- (
-			Yield(
-				emit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
-				},
-			),
-		)
+		} <- (_syn3_0)
 	})
 }
 

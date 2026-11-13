@@ -12,8 +12,10 @@ uset = <N>() <- (s: T(N)) {
 }
 
 main = () {
+	_syn3_0: S(Dep) = S(() { get() })
+	_syn3_1: T(S(Dep)) = T(() { use() })
 	{
 		uset()
 		Nil
-	} <- (S(() { get() }), T(() { use() }))
+	} <- (_syn3_0, _syn3_1)
 }

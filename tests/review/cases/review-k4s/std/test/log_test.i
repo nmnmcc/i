@@ -53,17 +53,21 @@ test("log_delivery", () {
 	producer = () { deliver(original) }
 	trace = control.boundary((b) {
 		{
-			producer()
+			_syn3_0: log.Sink(String, Capture) = log.silent()
 			{
+				producer()
 				{
-					assert(query(log.Info))
-					producer()
-					deliver(entry(log.Warning))
-				} <- (capture_sink())
-			}
-			producer()
-			[]
-		} <- (log.silent()) <- (
+					_syn3_1: log.Sink(String, Capture) = capture_sink()
+					{
+						assert(query(log.Info))
+						producer()
+						deliver(entry(log.Warning))
+					} <- (_syn3_1)
+				}
+				producer()
+				[]
+			} <- (_syn3_0)
+		} <- (
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {
@@ -81,31 +85,35 @@ test("log_delivery", () {
 test("log_lazy", () {
 	trace = control.boundary((b) {
 		{
-			assert(query(log.Info) == False)
-			defer_message(log.Info, () { fail.raise("must not run") })
-			deliver({
-				record(Message)
-				entry(log.Info)
-			})
+			_syn3_2: log.Sink(String, Capture) = log.silent()
 			{
+				assert(query(log.Info) == False)
+				defer_message(log.Info, () { fail.raise("must not run") })
+				deliver({
+					record(Message)
+					entry(log.Info)
+				})
 				{
-					defer_message(log.Info, () {
-						record(Message)
-						"built"
-					})
-					assert(
-						fail.catch(() {
-							defer_message(log.Info, () {
-								record(Message)
-								fail.raise("bad")
-							})
-						}) ==
-							Error("bad"),
-					)
-				} <- (capture_sink())
-			}
-			[]
-		} <- (log.silent()) <- (
+					_syn3_3: log.Sink(String, Capture) = capture_sink()
+					{
+						defer_message(log.Info, () {
+							record(Message)
+							"built"
+						})
+						assert(
+							fail.catch(() {
+								defer_message(log.Info, () {
+									record(Message)
+									fail.raise("bad")
+								})
+							}) ==
+								Error("bad"),
+						)
+					} <- (_syn3_3)
+				}
+				[]
+			} <- (_syn3_2)
+		} <- (
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {
@@ -147,9 +155,15 @@ test("log_filters", () {
 		(threshold, expected) = case
 		trace = control.boundary((b) {
 			{
-				list.each(levels, (level) { deliver(entry(level)) })
-				[]
-			} <- (log.minimum(capture_sink(), threshold)) <- (
+				_syn3_4: log.Sink(String, Capture) = log.minimum(
+					capture_sink(),
+					threshold,
+				)
+				{
+					list.each(levels, (level) { deliver(entry(level)) })
+					[]
+				} <- (_syn3_4)
+			} <- (
 				Capture(
 					record = (event) {
 						control.suspend(b, (k) {
@@ -164,14 +178,15 @@ test("log_filters", () {
 			(inner, inner_levels) = inner_case
 			trace = control.boundary((b) {
 				{
-					list.each(levels, (level) { deliver(entry(level)) })
-					[]
-				} <- (
-					log.minimum(
+					_syn3_5: log.Sink(String, Capture) = log.minimum(
 						log.minimum(capture_sink(), inner),
 						threshold,
-					),
-				) <- (
+					)
+					{
+						list.each(levels, (level) { deliver(entry(level)) })
+						[]
+					} <- (_syn3_5)
+				} <- (
 					Capture(
 						record = (event) {
 							control.suspend(b, (k) {
@@ -192,9 +207,14 @@ test("log_filters", () {
 	})
 	trace = control.boundary((b) {
 		{
-			list.each(levels, (level) { deliver(entry(level)) })
-			[]
-		} <- (log.filter(capture_sink(), (_: log.Level) { True })) <- (
+			_syn3_6: log.Sink(String, Capture) = log.filter(capture_sink(), (
+				_: log.Level
+			) { True })
+			{
+				list.each(levels, (level) { deliver(entry(level)) })
+				[]
+			} <- (_syn3_6)
+		} <- (
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {
@@ -205,15 +225,15 @@ test("log_filters", () {
 		)
 	})
 	assert(trace == list.map(levels, (level) { Sent(entry(level)) }))
-	// L4 requires new_accept before old_accept and short-circuiting.
+	_syn3_7: log.Sink(String, Capture) = log.filter(
+		// L4 requires new_accept before old_accept and short-circuiting.
+		log.make(unreachable, (_: log.Entry) -> Nil { Nil }),
+		(_: log.Level) { False },
+	)
 	{
 		assert(query(log.Info) == False)
 		Nil
-	} <- (
-		log.filter(log.make(unreachable, (_: log.Entry) -> Nil { Nil }), (
-			_: log.Level
-		) { False }),
-	)
+	} <- (_syn3_7)
 })
 
 DeliveryError = (String)
@@ -228,20 +248,21 @@ broken_deliver: (log.Entry) <- (
 test("log_errors", () {
 	trace = control.boundary((b) {
 		{
-			assert(
-				fail.catch(() { broken_deliver(entry(log.Info)) }) ==
-					Error(DeliveryError("hello")),
-			)
-			[]
-		} <- (
-			log.make(
+			_syn3_8: log.Sink(DeliveryError, Capture) = log.make(
 				(_: log.Level) { True },
 				(event) {
 					record(Sent(event))
 					fail.raise(DeliveryError(event.message))
 				},
-			),
-		) <- (
+			)
+			{
+				assert(
+					fail.catch(() { broken_deliver(entry(log.Info)) }) ==
+						Error(DeliveryError("hello")),
+				)
+				[]
+			} <- (_syn3_8)
+		} <- (
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {

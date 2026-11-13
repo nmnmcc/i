@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Parse tracked Lisp files and generated CLI macro fragments with syntax three.
+Run scripts/old-syntax-check first to build the shared parser driver.
+"""
+import os
+from pathlib import Path
+import re
+import runpy
+import subprocess
+
+ROOT = Path(__file__).resolve().parent.parent
+os.chdir(ROOT)
+check = runpy.run_path(str(ROOT / 'scripts/old-syntax-check'))
+files = subprocess.check_output(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.is'], cwd=ROOT, text=True).splitlines()
+files = sorted(set(files))
+sources = [(name, (ROOT / name).read_text()) for name in files]
+for name in ['crates/ilang-cli/tests/macro_run.rs', 'crates/ilang-cli/tests/typed_macros.rs']:
+    host = (ROOT / name).read_text()
+    for start, _, value in check['rust_strings'](host):
+        source = None
+        if value.startswith('(,') and '(@ macro' in value:
+            source = value
+        elif value.startswith('(->'):
+            source = '(@ macro (= m ' + value + '))\n'
+        elif re.match(r'^m \(->', value):
+            source = '(@ macro (: ' + value + '))\n'
+        elif value.startswith('{}(@ macro'):
+            source = value[2:]
+        if source is not None:
+            sources.append((name + ':' + str(host[:start].count('\n') + 1), source))
+tool = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')) / 'debug/examples/parse-snippets'
+if not tool.is_file():
+    raise SystemExit('run scripts/old-syntax-check first to build the parser driver')
+data = b''.join(str(len(source.encode())).encode() + b'\n' + source.encode() for _, source in sources)
+result = subprocess.check_output([str(tool), '--lisp'], input=data).decode().splitlines()
+output = iter(result)
+failures = []
+for (name, _) in sources:
+    diagnostics = [next(output).split(' ', 1) for _ in range(int(next(output)))]
+    if diagnostics:
+        failures.append(name + ': ' + '; '.join(code + ': ' + bytes.fromhex(message).decode() for code, message in diagnostics))
+if failures:
+    raise SystemExit('\n'.join(failures))
+print(f'syn3-lisp-check: {len(files)} tracked .is files and {len(sources)-len(files)} CLI macro source fragments parsed')

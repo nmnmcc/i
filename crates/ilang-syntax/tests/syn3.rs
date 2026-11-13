@@ -1225,3 +1225,49 @@ fn specialized_and_renamed_members_remain_type_aliases() {
         );
     }
 }
+
+#[test]
+fn converted_bound_fail_remains_a_service_parameter() {
+    let text = converted("use(E) = (error: E, handler ! Fail(E)) { handler.raise(error) }\n");
+    let (module, diags) = syn3::parse_lowered(&text);
+    assert!(diags.is_empty(), "{text}\n{diags:#?}");
+    let function = module
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            ilang_syntax::ast::ItemKind::Binding(binding) => match &binding.value.kind {
+                ilang_syntax::ast::ExprKind::Fn(function) => Some(function),
+                _ => None,
+            },
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        function.params.iter().any(|param| matches!(param,
+            ilang_syntax::ast::Param::Env { name, .. } if name.name == "handler"
+        )),
+        "the body still has its bound service: {text}"
+    );
+}
+
+#[test]
+fn specialized_alias_keeps_the_constructors_type_parameter_scope() {
+    let (module, diags) = syn3::parse_lowered("S(N) = (() <- N -> Nil)\nBad = S(Never)\n");
+    assert!(diags.is_empty(), "{diags:#?}");
+    let definitions: Vec<_> = module
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            ilang_syntax::ast::ItemKind::TypeDef(def) => Some(def),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(definitions.len(), 2);
+    assert_eq!(definitions[0].name.name, "S");
+    assert_eq!(definitions[0].params[0].name, "N");
+    assert_eq!(definitions[1].name.name, "Bad");
+    assert!(matches!(
+        definitions[1].body,
+        ilang_syntax::ast::TypeBody::Alias(_)
+    ));
+}

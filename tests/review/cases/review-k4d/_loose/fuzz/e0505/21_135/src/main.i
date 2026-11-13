@@ -21,9 +21,11 @@ h1 = () { run(h0) + run(() { ut() }) }
 main = () {
 	k = () { h1() }
 	w = () {
-		usa() + get() + run(() { us() }) <- (
-			T(f = () { us() + h0() }, m = (_: S(Never)) { Nil }),
+		_syn3_0: T(S(Never)) = T(
+			f = () { us() + h0() },
+			m = (_: S(Never)) { Nil },
 		)
+		usa() + get() + run(() { us() }) <- (_syn3_0)
 	}
 	k() + usa() + w()
 	Nil

@@ -19,10 +19,11 @@ tell = (x: Int) {
 }
 
 main = () {
+	_syn3_0: S(Dep) = S(f = () { get() })
 	{
 		h = () { run(fr) }
 		k = () { run(h) + fw() }
 		k()
 		Nil
-	} <- (S(f = () { get() }))
+	} <- (_syn3_0)
 }

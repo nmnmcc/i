@@ -1,5 +1,5 @@
 // spec: 4.5, 9.2
-// expect: compile-error E0501
+// expect: compile-error E0515
 
 // §4.5 rule 4: Counter(Int) cannot provide Counter(0): Int is not a subtype of 0.
 Counter(A) = (get = () -> A)

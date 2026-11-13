@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "beb26bce4bd21d6901d5b01e517cbbf176652948",
+  "binary_sha256": "054a62b4f1dcd6d72877d717f6b84886dc2df10610984a3d343606841a98f2e7",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : (a: A) -> A ^ E ! N | S(A, E, N)\napp/main.run : (f: () -> A ^ E ! N) -> A ^ E ! N\napp/main.int : () -> Int\napp/main.str : () -> String\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.use : (A) <- (Fail(E), S(A, E, N), ..N) -> A\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.int : () -> Int\napp/main.str : () -> String\napp/main.main : () -> Nil\n",
       "stderr": ""
     },
     "test0": {

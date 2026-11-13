@@ -337,11 +337,13 @@ impl Clone for Stmt {
                         env,
                         service,
                         value,
+                        in_place,
                     } => done.push(Stmt::LetEnv {
                         dst: *dst,
                         env: *env,
                         service: *service,
                         value: value.clone(),
+                        in_place: *in_place,
                     }),
                     Stmt::Unreachable => done.push(Stmt::Unreachable),
                     Stmt::SetCapture {
@@ -511,15 +513,17 @@ impl PartialEq for Stmt {
                         env: b,
                         service: c,
                         value: d,
+                        in_place: i,
                     },
                     Stmt::LetEnv {
                         dst: e,
                         env: f,
                         service: g,
                         value: h,
+                        in_place: j,
                     },
                 ) => {
-                    if a != e || b != f || c != g || d != h {
+                    if a != e || b != f || c != g || d != h || i != j {
                         return false;
                     }
                 }
