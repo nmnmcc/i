@@ -502,3 +502,13 @@ on the current spec. Restored the two future fence tags without changing
 their source or registered diagnostics. Removed one confirmed dead inventory
 identity for the formerly shown hover type with two row variables. Final
 formatter and exact-diagnostic inventory gates will verify this sweep.
+
+Reviewed all parked spec reasons and re-enabled two cases whose intent is
+already closed-data compatible: written item evaluation order and rejection
+of data at the host boundary. The evaluation-order panic anchor moves from
+main's 7:7 to 9:7 after its export header is formatted. Their expected stop
+and E0320 outcomes stay unchanged. The 6/ run now passes 80/80 at O0/O2.
+The remaining 29 parked cases each have an individual reason: 28 rely on
+removed dynamic labels, open Record, record operations or width subtyping;
+one pins a former record-graph TypeView error which is now unreachable.
+Std passes all 2,170 tests at both O0 and O2 after main's memory fix.
