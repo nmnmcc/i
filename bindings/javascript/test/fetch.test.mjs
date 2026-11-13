@@ -51,7 +51,7 @@ headers = (url: String) { checked(() {
  http.header(res.headers, "X-Provider") |> { Some(s) -> s None -> panic("missing response header") }
 }) }
 status = (url: String) { checked(() { http.Status(n) = http.get(url).status\n n }) }
-timeout = (url: String) { checked(() { text(http.send_timeout(http.client(), http.request(http.Method("GET"), url), 20000000)) }) }
+timeout = (url: String) { checked(() { text(http.send_timeout(http.client().send, http.request(http.Method("GET"), url), 20000000)) }) }
 cancel = (url: String) { checked(() { task.race(() { text(http.get(url)) }, () { clock.sleep_ns(100000000)\n "cancelled" }) }) }
 stream = (url: String) { checked(() {
  reader = http.send_stream(http.request(http.Method("GET"), url))
