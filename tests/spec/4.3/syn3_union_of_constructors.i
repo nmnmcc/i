@@ -14,8 +14,8 @@ Shape = Circle | Square
 
 area = (s: Shape) -> Float {
 	s |>
-		(c = Circle(..)) { 3.0 *. c.radius *. c.radius }
-		| (q = Square(..)) { q.side *. q.side }
+		(Circle(..) = c) { 3.0 *. c.radius *. c.radius }
+		| (Square(..) = q) { q.side *. q.side }
 }
 
 flip = (True) { False } | (False) { True }
