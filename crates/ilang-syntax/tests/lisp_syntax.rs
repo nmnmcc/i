@@ -1170,7 +1170,9 @@ fn records_parse_from_lisp_with_fields_spread_and_removal() {
     use ilang_syntax::ast::{ExprKind, TypeKind};
     let empty = ilang_syntax::lisp::parse("()").unwrap();
     let empty = ilang_syntax::lisp::parse_expression(&empty[0]).unwrap();
-    assert!(matches!(&empty.kind, ExprKind::Record { base: None, fields } if fields.is_empty()));
+    // The transitional AST adapter keeps empty data as an empty tuple.
+    // The source reader requires `(,)` (spec §14.3).
+    assert!(matches!(&empty.kind, ExprKind::Tuple(items) if items.is_empty()));
     let values = ilang_syntax::lisp::parse("(.. r (: x 1) (: \"a b\" 2))").unwrap();
     let value = ilang_syntax::lisp::parse_expression(&values[0]).unwrap();
     assert!(

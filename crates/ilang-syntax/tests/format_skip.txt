@@ -1,6 +1,5 @@
 parse crates/ilang-check/tests/projects/package_deps/lib/test/broken.i
 parse crates/ilang-check/tests/projects/syntax_error/src/main.i
-parse crates/ilang-check/tests/types/type_params.i
 parse editors/vscode/test/sample.i
 parse tests/review/cases/review-runtime/echo-types/src/task.i
 parse tests/review/cases/review-s6/probe/src/main.i
