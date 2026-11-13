@@ -202,12 +202,21 @@ impl Prover<'_> {
             (Ty::Con(Head::Shape(shape), values, parts), Ty::Union(_))
                 if mode == Mode::Value && parts.iter().any(|p| matches!(p, Ty::Union(_))) =>
             {
-                let index = parts.iter().position(|p| matches!(p, Ty::Union(_))).unwrap();
-                let Ty::Union(alternatives) = &parts[index] else { unreachable!() };
+                let index = parts
+                    .iter()
+                    .position(|p| matches!(p, Ty::Union(_)))
+                    .unwrap();
+                let Ty::Union(alternatives) = &parts[index] else {
+                    unreachable!()
+                };
                 for alternative in alternatives {
                     let mut selected = parts.clone();
                     selected[index] = alternative.clone();
-                    if !self.sub(&Ty::Con(Head::Shape(*shape), values.clone(), selected), r, mode)? {
+                    if !self.sub(
+                        &Ty::Con(Head::Shape(*shape), values.clone(), selected),
+                        r,
+                        mode,
+                    )? {
                         return Ok(false);
                     }
                 }

@@ -770,9 +770,7 @@ fn ty_vars(t: &Ty, out: &mut Vec<V>) {
         }
         Ty::Fn(f) => {
             ty_vars(&f.param, out);
-            [&f.ret, &f.env]
-                .into_iter()
-                .for_each(|x| ty_vars(x, out));
+            [&f.ret, &f.env].into_iter().for_each(|x| ty_vars(x, out));
         }
         Ty::Diff(a, h) => {
             ty_vars(a, out);

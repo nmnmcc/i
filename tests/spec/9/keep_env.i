@@ -63,12 +63,13 @@ main = () {
 					})
 					control.cancel(k4)
 					control.boundary((boundary) {
+						extra: Extra(Nil, Never, Assert) = Extra(boundary)
 						{
 							f = control.keep_env(pure)
 							assert(
 								core.not(core.portable(f)),
 							)
-						} <- (Name(text = "unused"), Extra(boundary))
+						} <- (Name(text = "unused"), extra)
 					})
 				} <- (Name(text = "canceller"))
 			} <- (Name(text = "final"))

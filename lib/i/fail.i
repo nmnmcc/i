@@ -16,7 +16,7 @@ raise = <E>(error: E) <- (handler: Fail(E)) -> Never { handler.raise(error) }
 
 /// Gives `Ok(value)` when `body` ends with `value`, or `Error(error)` for the
 /// first `error` it raises through `Fail(E)`.
-catch: <A, E, N>(() <- (Fail(E), ..N) -> A) <- N -> Result(A, E) = (body) {
+catch = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> Result(A, E) {
 	control.boundary((b) {
 		Ok(body()) <- (
 			Fail(raise = (error) { control.escape(b, Error(error)) }),

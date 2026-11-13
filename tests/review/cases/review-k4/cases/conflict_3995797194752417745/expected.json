@@ -1,6 +1,6 @@
 {
-  "compiler": "ae2f13b8a553e9309047d74d2101fa0626859a62",
-  "binary_sha256": "f2447ed6524ac42e527ffba7bc86f6ce4166071bc4a0c4ee9ec692f4c1e3ec59",
+  "compiler": "572ae24cbf1e655816df4c2b0e4e658b90eed966",
+  "binary_sha256": "282a07204b470359d591338fddcc41fa04b2ab8634669678527dc7d8c75d3b6b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ^ E ! N) -> A ^ E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(String) | S(Int)\n",
-      "stderr": "src/main.i:6:7: error[E0515]: `String` and `Int` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:6:16: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2)\nsrc/main.i:6:32: error[E0515]: `Int` and `String` must be equal: services in environments are compared with equal arguments, and an environment may not have two forms of one type constructor with different arguments (§4.5 rule 4, §9.2) (the type at 6:21 needs it)\n3 errors\n"
+      "stdout": "app/main.read : () -> String ! S(String)\napp/main.read_int : () -> Int ! S(Int)\napp/main.run : (f: () -> A ^ E ! N) -> A ^ E ! N\napp/main.join : (f: () -> String ! N, g: () -> Int ! N2) -> Int ! N | N2\napp/main.bad : () -> Int ! S(Never)\n",
+      "stderr": "src/main.i:6:32: error[E0515]: the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 6:21 needs it)\n1 error\n"
     }
   }
 }
