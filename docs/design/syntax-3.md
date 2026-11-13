@@ -2237,8 +2237,7 @@ Grammar as §3.4. Then:
 - A data pattern `( … )` matches data of its shape whose parts match its
   items. A positional item matches the next position; `label = p` matches the
   part under `label`; `..` leaves out the other keys; `..r` binds them as data.
-  `..` needs the shape of the matched value to be known (from a type, or from
-  the constructor).
+  The unique-known-shape requirement for `..` is in spec §7.1.
 - `p1 = … = pk` matches what every part matches. Directly inside a data
   pattern, an item that begins with `name =` is a key item.
 - `x: T` is unchanged: a type annotation where it is fitted and not in an
