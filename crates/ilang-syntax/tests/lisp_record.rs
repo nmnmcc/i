@@ -63,7 +63,11 @@ fn record_values_types_and_source_locations_are_preserved() {
     let ExprKind::Data(items) = &ast.kind else {
         panic!()
     };
-    let [DItem::Spread(base), DItem::Label(first, _), DItem::Label(second, _)] = items.as_slice()
+    let [
+        DItem::Spread(base),
+        DItem::Label(first, _),
+        DItem::Label(second, _),
+    ] = items.as_slice()
     else {
         panic!("{items:?}")
     };
@@ -216,12 +220,12 @@ fn expanded_record_labels_keep_their_original_syntax_identity() {
         module: 42,
         marks: BTreeSet::from([7]),
     };
-    let source = one("((: name value))");
+    let source = one("(, (= name value))");
     let root = Syntax::from_datum(&source, &scope);
     let Node::Round(items) = root.node() else {
         panic!()
     };
-    let Node::Round(field) = items[0].node() else {
+    let Node::Round(field) = items[1].node() else {
         panic!()
     };
     let label = field[1].clone();

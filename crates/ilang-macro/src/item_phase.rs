@@ -65,7 +65,12 @@ impl BodyEngine<'_> {
             if file.display.ends_with(".is") {
                 source_item_syntax(item, &self.scope(), &file.text, true)
             } else {
-                self.source_encoder().item(item)
+                ilang_syntax::lisp::source_syntax::normalize_item(
+                    &self
+                        .source_encoder()
+                        .item(item.span)
+                        .expect("written item has its new tree node"),
+                )
             },
             item.span,
         )
@@ -271,6 +276,36 @@ impl BodyEngine<'_> {
         }
         if matches!(item.kind, ItemKind::TypeDef(_)) {
             let (root, root_span) = self.item_root(&item);
+            // The transition tree stores a sum's member fields in its one
+            // item. Preserve each member's new-row root when those fields
+            // contain type macros.
+            let mut member_roots = Vec::new();
+            if ilang_syntax::lisp::syntax::ROWS3 {
+                if let ItemKind::TypeDef(definition) = &item.kind {
+                    if let ilang_syntax::ast::TypeBody::Custom(constructors) = &definition.body {
+                        for constructor in constructors {
+                            if constructor.name.name == definition.name.name {
+                                continue;
+                            }
+                            let member = if self.scoped.is_generated(constructor.name.span) {
+                                self.scoped.definition_origin(
+                                    constructor.name.span,
+                                    &constructor.name.name,
+                                )
+                            } else {
+                                self.source_encoder()
+                                    .definition(&constructor.name.name)
+                                    .map(|(written, datum)| {
+                                        (Syntax::from_datum(&datum, &self.scope()), written.span.0)
+                                    })
+                            };
+                            if let Some(member) = member {
+                                member_roots.push(member);
+                            }
+                        }
+                    }
+                }
+            }
             let start = self.item_replacements.len();
             let ItemKind::TypeDef(definition) = &mut item.kind else {
                 unreachable!()
@@ -305,6 +340,25 @@ impl BodyEngine<'_> {
                     .iter()
                     .map(|(old, new, _)| (*old, *new))
                     .collect::<Vec<_>>();
+                for (member, member_span) in member_roots {
+                    for (old, _, budget) in replacements {
+                        if member_span.start <= old.start && old.end <= member_span.end {
+                            ilang_host::syntax::charge_tree(budget, &member, true).map_err(
+                                |error| Error::Resource {
+                                    error: error.into(),
+                                    macro_name: "type macro".into(),
+                                    call: root.clone(),
+                                    invocation_span: item.span,
+                                },
+                            )?;
+                        }
+                    }
+                    let rewritten = self
+                        .scoped
+                        .rewrite_occurrences(&member, member_span, &spans);
+                    self.scoped
+                        .set_item_override(member_span, rewritten, member_span);
+                }
                 let rewritten = self.scoped.rewrite_occurrences(&root, root_span, &spans);
                 self.scoped
                     .set_item_override(item.span, rewritten.clone(), root_span);

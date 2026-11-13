@@ -47,6 +47,17 @@ fn empty(span: Span) -> Expr {
     }
 }
 
+fn unquoted_expression(datum: &Datum) -> Result<Expr, crate::Diagnostic> {
+    if super::syntax::ROWS3 {
+        crate::syn3::deep::deep(|| {
+            let expression = crate::syn3::lisp::expr_from_datum(datum)?;
+            crate::syn3::lower::lower_expr(&expression)
+        })
+    } else {
+        super::parse_expression(datum)
+    }
+}
+
 struct Lower<'a> {
     scope: Scope,
     templates: &'a mut Vec<Syntax>,
@@ -64,8 +75,9 @@ impl Lower<'_> {
     }
     fn node(&mut self, d: &Datum) -> Expr {
         match &d.kind {
-            DatumKind::Unquote(inner) => super::parse_expression(inner)
-                .expect("the parser validates every unquote expression"),
+            DatumKind::Unquote(inner) => {
+                unquoted_expression(inner).expect("the parser validates every unquote expression")
+            }
             DatumKind::Round(children)
             | DatumKind::Square(children)
             | DatumKind::Curly(children)
@@ -77,7 +89,7 @@ impl Lower<'_> {
                         DatumKind::Splice(inner) => call(
                             "_append",
                             vec![
-                                super::parse_expression(inner)
+                                unquoted_expression(inner)
                                     .expect("the parser validates every splice expression"),
                                 tail,
                             ],

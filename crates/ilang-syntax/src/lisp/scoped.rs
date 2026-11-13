@@ -90,6 +90,50 @@ impl ScopedSource {
     pub fn item_override(&self, item: Span) -> Option<&(Syntax, Span)> {
         self.item_overrides.get(&item)
     }
+
+    /// The complete generated definition that owns a constructor name.
+    /// The old tree may have absorbed this item into a sum, but every
+    /// virtual occurrence still has its original scoped datum.
+    pub fn definition_origin(&self, at: Span, name: &str) -> Option<(Syntax, Span)> {
+        fn head_name(syntax: &Syntax) -> Option<&str> {
+            let mut syntax = syntax;
+            loop {
+                let Node::Round(parts) = syntax.node() else {
+                    return None;
+                };
+                match parts.as_slice() {
+                    [at, _, inner] if matches!(at.node(), Node::Symbol(s) if s == "@") => {
+                        syntax = inner
+                    }
+                    [eq, head, _] if matches!(eq.node(), Node::Symbol(s) if s == "=") => {
+                        return match head.node() {
+                            Node::Up(name) => Some(name),
+                            Node::Round(parts) => match parts.first()?.node() {
+                                Node::Up(name) => Some(name),
+                                _ => None,
+                            },
+                            _ => None,
+                        };
+                    }
+                    _ => return None,
+                }
+            }
+        }
+        self.spans
+            .iter()
+            .filter(|(span, origin)| {
+                span.start <= at.start
+                    && at.end <= span.end
+                    && head_name(&origin.syntax) == Some(name)
+            })
+            .max_by_key(|(span, _)| span.end - span.start)
+            .map(|(span, origin)| {
+                self.item_overrides
+                    .get(span)
+                    .cloned()
+                    .unwrap_or_else(|| (origin.syntax.clone(), *span))
+            })
+    }
     pub fn child_span(&self, parent: Span, index: usize) -> Option<Span> {
         self.children
             .get(&parent)
@@ -523,18 +567,46 @@ impl ScopedSource {
 
     pub fn expression(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<Expr, ScopedError> {
         let datum = self.append(syntax, call_site);
+        if super::syntax::ROWS3 {
+            return crate::syn3::deep::deep(|| {
+                let tree = crate::syn3::lisp::expr_from_datum(&datum)?;
+                crate::syn3::lower::lower_expr(&tree)
+            })
+            .map_err(|error| self.error(error));
+        }
         super::parse_expression(&datum).map_err(|error| self.error(error))
     }
     pub fn pattern(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<Pattern, ScopedError> {
         let datum = self.append(syntax, call_site);
+        if super::syntax::ROWS3 {
+            return crate::syn3::deep::deep(|| {
+                let tree = crate::syn3::lisp::pattern_from_datum(&datum)?;
+                crate::syn3::lower::lower_pattern(&tree)
+            })
+            .map_err(|error| self.error(error));
+        }
         super::parse_pattern(&datum).map_err(|error| self.error(error))
     }
     pub fn ty(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<TypeExpr, ScopedError> {
         let datum = self.append(syntax, call_site);
+        if super::syntax::ROWS3 {
+            return crate::syn3::deep::deep(|| {
+                let tree = crate::syn3::lisp::type_from_datum(&datum)?;
+                crate::syn3::lower::lower_type(&tree)
+            })
+            .map_err(|error| self.error(error));
+        }
         super::parse_type(&datum).map_err(|error| self.error(error))
     }
     pub fn items(&mut self, syntax: &Syntax, call_site: &Syntax) -> Result<Vec<Item>, ScopedError> {
         let datum = self.append(syntax, call_site);
+        if super::syntax::ROWS3 {
+            return crate::syn3::deep::deep(|| {
+                let tree = crate::syn3::lisp::items_from_datum(&datum)?;
+                crate::syn3::lower::lower_items(&tree)
+            })
+            .map_err(|error| self.error(error));
+        }
         super::parse_items(&datum).map_err(|error| self.error(error))
     }
 }

@@ -23,14 +23,25 @@ fn find(datum: &Datum, span: Span) -> Option<&Datum> {
 }
 fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
     let document = super::parse(source).expect("parsed Lisp source remains valid");
-    let datum = document
-        .iter()
-        .find_map(|x| find(x, span))
-        .expect("AST node belongs to a Lisp datum");
-    // The compiler's macro engine still consumes the transitional rows. Use
-    // the same span-preserving adapter as Lisp lowering before normalizing
-    // source datums; otherwise `(-> (,) _ body)` reaches the legacy reader.
-    Syntax::from_datum(&crate::syn3::lisp::unconvert_quote(datum), scope)
+    let mut datum = document.iter().find_map(|x| find(x, span));
+    if datum.is_none() && ROWS3 {
+        // Multi-shape values have a synthetic root in the transition AST.
+        // Recover the source node's span, then use its original datum so
+        // Lisp operator tokens and all occurrence identities stay written.
+        if let Some(syntax) =
+            super::source_tree::SourceTree::read(scope, source, true).expression(span)
+        {
+            datum = document.iter().find_map(|x| find(x, syntax.span()));
+        }
+    }
+    let datum = datum.expect("AST node belongs to a Lisp datum");
+    // Keep the written rows and occurrence spans when macro syntax uses
+    // syntax three. The inactive legacy path needs its old-row adapter.
+    if ROWS3 {
+        Syntax::from_datum(datum, scope)
+    } else {
+        Syntax::from_datum(&crate::syn3::lisp::unconvert_quote(datum), scope)
+    }
 }
 fn symbol(s: &Syntax, expected: &str) -> bool {
     matches!(s.node(), Node::Symbol(value) if value == expected)
@@ -596,6 +607,11 @@ pub fn source_expression_syntax(
 ) -> Syntax {
     if lisp {
         expr(&lisp_source(expr_ast.span, scope, source))
+    } else if ROWS3 {
+        let syntax = super::source_tree::SourceTree::new(scope, source)
+            .expression(expr_ast.span)
+            .expect("a written node belongs to its source tree");
+        normalize_expression(&syntax)
     } else {
         super::expression_syntax(expr_ast, scope, source)
     }
@@ -604,6 +620,11 @@ pub fn source_expression_syntax(
 pub fn source_type_syntax(type_ast: &TypeExpr, scope: &Scope, source: &str, lisp: bool) -> Syntax {
     if lisp {
         ty(&lisp_source(type_ast.span, scope, source))
+    } else if ROWS3 {
+        let syntax = super::source_tree::SourceTree::new(scope, source)
+            .ty(type_ast.span)
+            .expect("a written node belongs to its source tree");
+        normalize_type(&syntax)
     } else {
         super::type_syntax(type_ast, scope, source)
     }
@@ -612,6 +633,11 @@ pub fn source_type_syntax(type_ast: &TypeExpr, scope: &Scope, source: &str, lisp
 pub fn source_item_syntax(item_ast: &Item, scope: &Scope, source: &str, lisp: bool) -> Syntax {
     if lisp {
         item(&lisp_source(item_ast.span, scope, source), &item_ast.kind)
+    } else if ROWS3 {
+        let syntax = super::source_tree::SourceTree::new(scope, source)
+            .item(item_ast.span)
+            .expect("a written node belongs to its source tree");
+        normalize_item(&syntax)
     } else {
         super::item_syntax(item_ast, scope, source)
     }
@@ -625,6 +651,11 @@ pub fn source_pattern_syntax(
 ) -> Syntax {
     if lisp {
         pattern(&lisp_source(pattern_ast.span, scope, source))
+    } else if ROWS3 {
+        let syntax = super::source_tree::SourceTree::new(scope, source)
+            .pattern(pattern_ast.span)
+            .expect("a written node belongs to its source tree");
+        normalize_pattern(&syntax)
     } else {
         super::pattern_syntax(pattern_ast, scope, source)
     }
@@ -647,7 +678,14 @@ mod tests {
             marks: BTreeSet::new(),
         };
         let syntax = source_item_syntax(&module.items[0], &scope, source, true);
-        assert_eq!(syntax.show(), "(test \"quote\" (-> () _ {Nil}))");
+        assert_eq!(
+            syntax.show(),
+            if ROWS3 {
+                "(test \"quote\" (-> (,) _ Nil))"
+            } else {
+                "(test \"quote\" (-> () _ {Nil}))"
+            }
+        );
     }
 
     #[test]

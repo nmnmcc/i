@@ -1227,7 +1227,14 @@ impl Cx {
         let span = e.span.0;
         let kind = match &e.kind {
             n::ExprKind::Quote(q) => {
-                o::ExprKind::Quote(Box::new(super::lisp::unconvert_quote(&q.0)))
+                if crate::lisp::syntax::ROWS3 {
+                    if let Err(error) = super::lisp::quote_captures(&q.0, false) {
+                        self.errors.push(error);
+                    }
+                    o::ExprKind::Quote(q.0.clone())
+                } else {
+                    o::ExprKind::Quote(Box::new(super::lisp::unconvert_quote(&q.0)))
+                }
             }
             n::ExprKind::Int(v) => o::ExprKind::Int(v.clone()),
             n::ExprKind::Float(v) => o::ExprKind::Float(*v),
@@ -1383,6 +1390,22 @@ impl Cx {
     fn pattern(&mut self, p: &n::Pattern) -> o::Pattern {
         let span = p.span.0;
         let kind = match &p.kind {
+            n::PatternKind::Quote(q) if crate::lisp::syntax::ROWS3 => {
+                match super::lisp::quote_captures(&q.datum.0, true) {
+                    Ok(captures) => o::PatternKind::Quote {
+                        datum: q.datum.0.clone(),
+                        template: q.template,
+                        captures: captures
+                            .iter()
+                            .map(|(splice, pattern)| (*splice, self.pattern(pattern)))
+                            .collect(),
+                    },
+                    Err(error) => {
+                        self.errors.push(error);
+                        o::PatternKind::Discard("_".into())
+                    }
+                }
+            }
             n::PatternKind::Quote(q) => {
                 match crate::lisp::parse_pattern(&super::lisp::unconvert_quote(&q.datum.0)) {
                     Ok(p) => p.kind.clone(),
@@ -1644,7 +1667,9 @@ impl Cx {
         }
         let mut params = Vec::new();
         match &f.param.kind {
-            n::TypeKind::Data(items) if items.is_empty() || items.iter().any(|i| !matches!(i, n::TItem::Label(..))) => {
+            n::TypeKind::Data(items)
+                if items.is_empty() || items.iter().any(|i| !matches!(i, n::TItem::Label(..))) =>
+            {
                 for item in items {
                     match item {
                         n::TItem::Pos(t) => params.push(o::FnParamType {

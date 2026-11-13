@@ -296,9 +296,16 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                 item,
                 scope,
                 ready: true,
-                ..
+                source,
             } => {
-                if let Some(document) = &definition.lisp_document {
+                if super::syntax::ROWS3 && definition.lisp_document.is_none() {
+                    let tree = super::source_tree::SourceTree::new(scope, source);
+                    let datum = tree
+                        .item_datum(item.span)
+                        .expect("written definition has its new tree item");
+                    preflight(DefinitionCost::Datum(&datum))?;
+                    super::definitions::tree_definition_from_datum(&datum, scope, answer)
+                } else if let Some(document) = &definition.lisp_document {
                     let datum = document
                         .iter()
                         .find(|datum| datum.span == item.span)

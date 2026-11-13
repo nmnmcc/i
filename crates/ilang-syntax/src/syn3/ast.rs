@@ -583,8 +583,12 @@ mod iterative_drop {
                     }
                 },
                 Part::Pattern(mut kind) => match &mut kind {
-                    PatternKind::Quote(_)
-                    | PatternKind::Var(_)
+                    PatternKind::Quote(quote) => {
+                        for (_, capture) in &mut quote.captures {
+                            pattern(capture, &mut work);
+                        }
+                    }
+                    PatternKind::Var(_)
                     | PatternKind::Discard(_)
                     | PatternKind::Int { .. }
                     | PatternKind::Float { .. }
@@ -655,14 +659,14 @@ mod iterative_drop {
         fn drop(&mut self) {
             if matches!(
                 &self.kind,
-                PatternKind::Quote(_)
-                    | PatternKind::Var(_)
+                PatternKind::Var(_)
                     | PatternKind::Discard(_)
                     | PatternKind::Int { .. }
                     | PatternKind::Float { .. }
                     | PatternKind::String(_)
                     | PatternKind::Prefix { .. }
-            ) {
+            ) || matches!(&self.kind, PatternKind::Quote(quote) if quote.captures.is_empty())
+            {
                 return;
             }
             let mut work = Vec::new();

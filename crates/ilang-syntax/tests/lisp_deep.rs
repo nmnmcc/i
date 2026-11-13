@@ -352,3 +352,28 @@ fn deep_datum_is_read_and_dropped_as_the_new_tree() {
         .join()
         .unwrap();
 }
+
+#[test]
+fn new_quote_capture_patterns_drop_on_a_small_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            use ilang_syntax::syn3::ast as n;
+            let datum = ilang_syntax::lisp::parse("`x").unwrap().datums.remove(0);
+            let mut pattern = n::Pattern::new(n::PatternKind::Var("x".into()), datum.span);
+            for _ in 0..20_000 {
+                pattern = n::Pattern::new(
+                    n::PatternKind::Quote(n::QuotePattern {
+                        datum: n::Quoted(Box::new(datum.clone())),
+                        template: Some(0),
+                        captures: vec![(false, pattern)],
+                    }),
+                    datum.span,
+                );
+            }
+            drop(pattern);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}

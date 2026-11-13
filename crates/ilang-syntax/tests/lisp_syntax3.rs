@@ -617,3 +617,103 @@ fn quotes_and_expansion_checks_work_on_the_rows_of_syntax_three() {
     assert!(validate_expansion(&root("(-> (, x) _ `x)"), &[]).is_err());
     validate_expansion(&root("(= f (-> (, x) (<- _ (, (: db Db))) x))"), &[]).unwrap();
 }
+
+#[test]
+fn source_tree_keeps_operator_tokens_inside_interpolation() {
+    use ilang_syntax::lisp::source_tree::SourceTree;
+    use ilang_syntax::syn3::ast::ItemKind;
+    for source in [
+        "f = (x) { x + 2 }",
+        "f = (_x) { _x + 2 }",
+        r#"f = (x) { "a\(x + 2)b" }"#,
+    ] {
+        let (module, diagnostics) = ilang_syntax::syn3::parse_module(source);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let ItemKind::Bind(binding) = &module.items[0].kind else {
+            panic!()
+        };
+        let syntax = SourceTree::new(&scope(), source)
+            .expression(binding.value.span.0)
+            .unwrap();
+        let mut pending = vec![&syntax];
+        let mut operators = 0;
+        while let Some(node) = pending.pop() {
+            match node.node() {
+                Node::Round(xs) | Node::Curly(xs) | Node::Square(xs) | Node::Bits(xs) => {
+                    pending.extend(xs)
+                }
+                Node::Discard(name) if name == "_x" => {
+                    panic!("a single underscore starts a name, not a discard")
+                }
+                Node::Symbol(symbol) if symbol == "+" => {
+                    let span = node.span();
+                    assert_eq!(&source[span.start as usize..span.end as usize], "+");
+                    operators += 1;
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(operators, 1);
+    }
+}
+
+#[test]
+fn written_sum_member_visibility_survives_transition_absorption() {
+    use ilang_syntax::lisp::source_tree::SourceTree;
+    for (exports, expected) in [
+        ("T", (false, false)),
+        ("C", (true, false)),
+        ("C(..)", (true, true)),
+        ("T(..)", (true, true)),
+    ] {
+        let source = format!("({exports})\nC = (Int)\nD = ()\nT = C | D\n");
+        let tree = SourceTree::new(&scope(), &source);
+        assert_eq!(tree.definition_visibility("C"), Some(expected), "{exports}");
+        let (_, datum) = tree.definition("C").unwrap();
+        assert_eq!(ilang_syntax::lisp::show(&datum), "(= C (, Int))");
+    }
+}
+
+#[test]
+fn source_tree_index_keeps_the_written_operator_and_transition_literal_span() {
+    use ilang_syntax::ast::{ExprKind, ItemKind};
+    use ilang_syntax::lisp::source_tree::SourceTree;
+    let source = "value = pair.12";
+    let (module, diagnostics) = ilang_syntax::parse_module(source);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let ExprKind::TupleIndex { index_span, .. } = binding.value.kind else {
+        panic!()
+    };
+    let syntax = SourceTree::new(&scope(), source)
+        .expression(binding.value.span)
+        .unwrap();
+    let Node::Round(parts) = syntax.node() else {
+        panic!()
+    };
+    let span = parts[0].span();
+    assert_eq!(&source[span.start as usize..span.end as usize], ".");
+    assert_eq!(parts[2].span(), index_span);
+}
+
+#[test]
+fn source_tree_finds_the_original_multi_shape_argument() {
+    use ilang_syntax::{ast, lisp::source_tree::SourceTree};
+    let source = "f = (x) { x } | (x, y) { x + y }";
+    let (module, diagnostics) = ilang_syntax::parse_module(source);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let ast::ItemKind::Binding(binding) = &module.items.last().unwrap().kind else {
+        panic!()
+    };
+    let syntax = SourceTree::new(&scope(), source)
+        .expression(binding.value.span)
+        .unwrap();
+    assert!(
+        syntax.show().starts_with("(| (-> (, x)"),
+        "{}",
+        syntax.show()
+    );
+    assert!(!syntax.show().contains("%multi"));
+}

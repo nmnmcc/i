@@ -116,10 +116,7 @@ fn typed_macro_result_only_variable_cannot_guess() {
 }
 #[test]
 fn typed_macro_labels_and_pipe() {
-    let m = declared(
-        "m (-> (, Int Int) Int)",
-        "(-> (, x y) _ `(+ ~x ~y))",
-    );
+    let m = declared("m (-> (, Int Int) Int)", "(-> (, x y) _ `(+ ~x ~y))");
     checked(
         &m,
         "(m = app/macros)\nmain = () { assert(m.m(1, 2) == 3) assert({ 1 |> m.m(2) } == 3) }",
@@ -547,7 +544,7 @@ fn typed_macro_generic_choice_reports_restriction() {
 #[test]
 fn expansion_and_wasm_are_deterministic() {
     let macros = format!(
-        "{}(@ macro (= twice (-> (e) _ `(+ ~e ~e))))\n",
+        "{}(@ macro (= twice (-> (, e) _ `(+ ~e ~e))))\n",
         ID.replacen("(, identity)", "(, identity twice)", 1)
     );
     let dir = project(

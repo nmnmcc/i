@@ -2,8 +2,7 @@ use ilang_syntax::lisp::{DatumKind, parse, show};
 
 #[test]
 fn datums_round_trip_and_keep_spans() {
-    let source =
-        "// a comment\n(= fact (-> (, n) _ { (* n 0x10) }))\n`(f ~x ~..(map xs (-> (, y) _ `(g ~y))))";
+    let source = "// a comment\n(= fact (-> (, n) _ { (* n 0x10) }))\n`(f ~x ~..(map xs (-> (, y) _ `(g ~y))))";
     let datums = parse(source).unwrap();
     assert_eq!(datums.len(), 2);
     assert_eq!(
@@ -99,15 +98,15 @@ fn macro_quotes_are_core_nodes_and_can_be_formatted() {
 #[test]
 fn quote_splices_are_checked_in_their_written_position() {
     for source in [
-        "(= f (-> () _ `~..xs))",
-        "(= f (-> (`(~..xs x)) _ Nil))",
-        "(= f (-> () _ `(~(+) x)))",
+        "(= f (-> (,) _ `~..xs))",
+        "(= f (-> (, `(~..xs x)) _ Nil))",
+        "(= f (-> (,) _ `(~(+) x)))",
     ] {
-        let doc = parse(source).unwrap();
-        assert!(ilang_syntax::lisp::parse_module(&doc).is_err(), "{source}");
+        let (_, errors) = ilang_syntax::lisp::parse_source(source);
+        assert!(!errors.is_empty(), "{source}");
     }
-    let doc = parse("(= f (-> (`(f ~..xs)) _ Nil))").unwrap();
-    assert!(ilang_syntax::lisp::parse_module(&doc).is_ok());
+    let (_, errors) = ilang_syntax::lisp::parse_source("(= f (-> (, `(f ~..xs)) _ Nil))");
+    assert!(errors.is_empty(), "{errors:?}");
 }
 
 #[test]
@@ -256,9 +255,13 @@ fn both_surfaces_preserve_attributes_and_grouped_result_holes() {
 }
 
 #[test]
-fn a_nonfinal_clause_choice_cannot_end_in_a_type_test() {
-    let doc = parse("(= f { (-> (| (= a (: b Int)) Unit) 1) })").unwrap();
-    assert!(ilang_syntax::lisp::parse_module(&doc).is_err());
+fn a_nonfinal_clause_choice_with_a_type_test_has_no_normal_spelling() {
+    // Spec §14.1 permits a Lisp tree without a normal spelling, but
+    // conversion must refuse it rather than change the choice's meaning.
+    let source = "(= f (-> (, (| (= a (: b Int)) Unit)) _ 1))";
+    let (_, errors) = ilang_syntax::lisp::parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(ilang_syntax::syn3::surface::lisp_to_normal(source).is_err());
 }
 
 #[test]

@@ -60,6 +60,7 @@ pub struct DefinitionWorld {
     parsed: Vec<Arc<Parsed>>,
     next_answer: Arc<AtomicU64>,
     lisp_documents: HashMap<u32, Vec<Datum>>,
+    source_trees: HashMap<u32, std::sync::OnceLock<ilang_syntax::lisp::source_tree::SourceTree>>,
     /// The lexical index of each written source and the length it covers,
     /// built on first use: most worlds never encode most sources.
     source_encoders: HashMap<
@@ -85,6 +86,10 @@ impl DefinitionWorld {
         parsed: Vec<Arc<Parsed>>,
         next_answer: Arc<AtomicU64>,
     ) -> Self {
+        let source_trees = parsed
+            .iter()
+            .map(|p| (p.source.0, std::sync::OnceLock::new()))
+            .collect();
         let lisp_documents = parsed
             .iter()
             .filter_map(|p| {
@@ -121,10 +126,29 @@ impl DefinitionWorld {
             parsed,
             next_answer,
             lisp_documents,
+            source_trees,
             source_encoders,
             current: Mutex::new(None),
         }
     }
+    fn source_tree(&self, parsed: &Parsed) -> &ilang_syntax::lisp::source_tree::SourceTree {
+        let file = self.graph.sources.get(parsed.source);
+        let end = parsed
+            .scoped
+            .as_ref()
+            .map_or(file.text.len(), |s| s.original_len() as usize);
+        self.source_trees[&parsed.source.0].get_or_init(|| {
+            ilang_syntax::lisp::source_tree::SourceTree::read(
+                &Scope {
+                    module: parsed.source.0,
+                    marks: Default::default(),
+                },
+                &file.text[..end],
+                file.display.ends_with(".is"),
+            )
+        })
+    }
+
     fn answer_id(&self) -> u64 {
         self.next_answer
             .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| {
@@ -206,6 +230,15 @@ impl DefinitionWorld {
                     }
                 } else {
                     binders.push(def.name.clone());
+                    if ilang_syntax::lisp::syntax::ROWS3 {
+                        if let TypeBody::Custom(constructors) = &def.body {
+                            for constructor in constructors {
+                                if constructor.name.name != def.name.name {
+                                    binders.push(constructor.name.clone());
+                                }
+                            }
+                        }
+                    }
                 }
                 let ready = !current || snapshot.ready[position];
                 for binder in binders {
@@ -235,6 +268,13 @@ impl DefinitionWorld {
                             .exports
                             .iter()
                             .any(|e| e.name.name == binder.name && e.constructors);
+                    let (exported, constructors_visible) = if ilang_syntax::lisp::syntax::ROWS3 {
+                        self.source_tree(p)
+                            .definition_visibility(&binder.name)
+                            .unwrap_or((exported, constructors_visible))
+                    } else {
+                        (exported, constructors_visible)
+                    };
                     let override_syntax = if current {
                         snapshot.item_overrides.get(&item.span)
                     } else {
@@ -251,6 +291,24 @@ impl DefinitionWorld {
                                         .clone()
                                 })
                             });
+                    let expanded = if ilang_syntax::lisp::syntax::ROWS3
+                        && binder.name != def.name.name
+                    {
+                        scoped.and_then(|source| {
+                            if source.is_generated(binder.span) {
+                                source
+                                    .definition_origin(binder.span, &binder.name)
+                                    .map(|(syntax, _)| syntax)
+                            } else {
+                                let (written, _) = self.source_tree(p).definition(&binder.name)?;
+                                source
+                                    .item_override(written.span.0)
+                                    .map(|(syntax, _)| syntax.clone())
+                            }
+                        })
+                    } else {
+                        expanded
+                    };
                     let n = index.entries.len();
                     index.entries.push(TypeEntry {
                         key: key.clone(),
@@ -296,7 +354,14 @@ impl DefinitionWorld {
                     .names
                     .iter()
                     .filter_map(|name| {
-                        let exported = target_ast.exports.iter().any(|e| e.name.name == name.name);
+                        let exported = if ilang_syntax::lisp::syntax::ROWS3 {
+                            index.modules[&target]
+                                .own
+                                .get(&name.name)
+                                .is_some_and(|id| index.entries[*id].exported)
+                        } else {
+                            target_ast.exports.iter().any(|e| e.name.name == name.name)
+                        };
                         exported
                             .then(|| index.modules[&target].own.get(&name.name).copied())
                             .flatten()
@@ -341,10 +406,10 @@ fn text(s: &Syntax) -> &str {
 }
 fn builtin(name: &str) -> bool {
     BuiltinType::ALL.into_iter().any(|b| b.name() == name)
-        || matches!(
-            name,
-            "Bool" | "Nil" | "Result" | "Assert" | "AssertionFailure"
+        || ilang_syntax::lisp::definitions::builtin_definition_names(
+            ilang_syntax::lisp::definitions::NEW_ROWS,
         )
+        .contains(&name)
 }
 fn error_id(query: &Syntax, kind: &str) -> DefinitionIdentity {
     DefinitionIdentity {
@@ -509,7 +574,11 @@ impl Definitions for DefinitionWorld {
                 return resolution(DefinitionReply::Deferred { at: in_run.clone() }, None);
             }
             let foreign = query.module.is_some() || entry.key.source != from_source;
-            if foreign && !entry.constructors_visible {
+            let same_generated_scope = query.module.is_none()
+                && entry.key.source == snapshot.source
+                && !entry.key.scope.marks.is_empty()
+                && entry.key.scope == *query.name.scope();
+            if foreign && !entry.constructors_visible && !same_generated_scope {
                 let identity = error_id(&query.name, "constructors-hidden");
                 return resolution(
                     DefinitionReply::Error {
@@ -539,6 +608,49 @@ impl Definitions for DefinitionWorld {
                     &parsed.ast
                 };
                 let item = &module.items[entry.position];
+                if ilang_syntax::lisp::syntax::ROWS3 {
+                    let tree = self.source_tree(parsed);
+                    let (written, datum) = tree
+                        .definition(&entry.key.name)
+                        .or_else(|| {
+                            let datum = tree.item_datum(item.span)?;
+                            let written = ilang_syntax::syn3::lisp::item_from_datum(&datum).ok()?;
+                            Some((written, datum))
+                        })
+                        .expect("a written definition has its new tree item");
+                    let mut table = DefinitionTable::default();
+                    table.insert(
+                        (),
+                        Definition::tree_with_datum(
+                            written,
+                            datum,
+                            Scope {
+                                module: parsed.source.0,
+                                marks: Default::default(),
+                            },
+                            true,
+                        ),
+                    );
+                    return match table.query_metered(
+                        result,
+                        mode,
+                        answer,
+                        |_, _| Lookup::Found(()),
+                        |cost| charge_definition(budget, cost).map_err(Into::into),
+                    ) {
+                        Ok(QueryResult::Answer { syntax, .. }) => {
+                            resolution(DefinitionReply::Answer(syntax), early.then_some(key))
+                        }
+                        Err(error) => resolution(
+                            DefinitionReply::CompileError {
+                                message: error.to_string(),
+                                at: query.name,
+                            },
+                            None,
+                        ),
+                        _ => unreachable!("a ready written definition answers its resolved query"),
+                    };
+                }
                 if let Some(document) = self.lisp_documents.get(&parsed.source.0) {
                     let datum = document
                         .iter()

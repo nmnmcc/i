@@ -35,14 +35,20 @@ pub struct TokenIndex {
 impl TokenIndex {
     pub fn new(source: &str) -> TokenIndex {
         let lexed = crate::lexer::lex3(source);
-        TokenIndex {
-            tokens: lexed
-                .tokens
-                .iter()
-                .filter(|t| t.span.start != t.span.end)
-                .map(|t| (t.span, t.kind.text()))
-                .collect(),
+        let mut pending: Vec<_> = lexed.tokens.iter().rev().collect();
+        let mut tokens = Vec::new();
+        while let Some(token) = pending.pop() {
+            if let crate::token::TokenKind::Interpolated(parts) = &token.kind {
+                for part in parts.iter().rev() {
+                    if let crate::token::StringPart::Expr { tokens, .. } = part {
+                        pending.extend(tokens.iter().rev());
+                    }
+                }
+            } else if token.span.start != token.span.end {
+                tokens.push((token.span, token.kind.text()));
+            }
         }
+        TokenIndex { tokens }
     }
 
     /// The first token spelled `text` that lies in `gap`.
@@ -112,7 +118,7 @@ fn spread(next: Span) -> Datum {
 
 /// A name as the reader gives it: `Up`, `_discard`, or `name`.
 fn atom(text: &str, span: Span) -> Datum {
-    let kind = if text.starts_with('_') {
+    let kind = if text == "_" || text.starts_with("__") {
         K::Discard(text.into())
     } else if text.chars().next().is_some_and(char::is_uppercase) {
         K::UpName(text.into())
@@ -546,12 +552,18 @@ fn expr(e: &Expr) -> Datum {
             span,
             [expr(target), name(n)],
         ),
-        ExprKind::Index { target, index } => form(
+        ExprKind::Index { target, index } => form_in(
             ".",
+            Span::new(target.span.0.end, span.end),
             span,
             [
                 expr(target),
-                at(K::Int(index.clone()), Span::new(span.end, span.end)),
+                // Preserve the transition tree's index span so existing
+                // diagnostics keep their location during the rows flip.
+                at(
+                    K::Int(index.clone()),
+                    Span::new(span.end.saturating_sub(1), span.end),
+                ),
             ],
         ),
         ExprKind::Unary { op, expr: e } => form_in(

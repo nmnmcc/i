@@ -65,7 +65,7 @@ pub struct BodyEngine<'a> {
     pub(crate) item_replacements: Vec<(Span, Span, ilang_host::macro_budget::MacroBudget)>,
     pub(crate) run_mark: Arc<std::sync::atomic::AtomicU64>,
     session: &'a mut Session,
-    source_encoder: std::sync::OnceLock<ilang_syntax::lisp::SourceEncoder>,
+    source_encoder: std::sync::OnceLock<ilang_syntax::lisp::source_tree::SourceTree>,
 }
 impl<'a> BodyEngine<'a> {
     pub fn new(
@@ -153,6 +153,11 @@ impl<'a> BodyEngine<'a> {
         locals: &[Local],
         depth: u32,
     ) -> Option<Macro> {
+        // This reserved transition call constructs a multi-shape value. Its
+        // one-byte span belongs to the enclosing chain, not a name atom.
+        if module.is_none() && name.name == ilang_syntax::syn3::lower::MULTI {
+            return None;
+        }
         let module = module.map(|m| self.atom(m));
         self.registry.resolve(
             self.source,
@@ -161,11 +166,13 @@ impl<'a> BodyEngine<'a> {
             &self.locals(locals, depth),
         )
     }
-    pub(crate) fn source_encoder(&self) -> &ilang_syntax::lisp::SourceEncoder {
+    pub(crate) fn source_encoder(&self) -> &ilang_syntax::lisp::source_tree::SourceTree {
         self.source_encoder.get_or_init(|| {
-            ilang_syntax::lisp::SourceEncoder::new(
+            let file = self.graph.sources.get(self.source);
+            ilang_syntax::lisp::source_tree::SourceTree::read(
                 &self.scope(),
-                &self.graph.sources.get(self.source).text,
+                &file.text,
+                file.display.ends_with(".is"),
             )
         })
     }
@@ -177,7 +184,12 @@ impl<'a> BodyEngine<'a> {
         if file.display.ends_with(".is") {
             source_expression_syntax(e, &self.scope(), &file.text, true)
         } else {
-            self.source_encoder().expression(e)
+            ilang_syntax::lisp::source_syntax::normalize_expression(
+                &self
+                    .source_encoder()
+                    .expression(e.span)
+                    .expect("written expression has its new tree node"),
+            )
         }
     }
     pub(crate) fn ty_syntax(&self, ty: &TypeExpr) -> Syntax {
@@ -188,7 +200,12 @@ impl<'a> BodyEngine<'a> {
         if file.display.ends_with(".is") {
             source_type_syntax(ty, &self.scope(), &file.text, true)
         } else {
-            self.source_encoder().ty(ty)
+            ilang_syntax::lisp::source_syntax::normalize_type(
+                &self
+                    .source_encoder()
+                    .ty(ty.span)
+                    .expect("written type has its new tree node"),
+            )
         }
     }
     pub(crate) fn execute(
@@ -462,8 +479,8 @@ impl Hook for BodyEngine<'_> {
                     pending.extend(items);
                     pending.extend(rest.as_deref());
                 }
-                ExprKind::Call { callee, args }
-                    if matches!(&callee.kind, ExprKind::Name { module: None, name } if name.name == ilang_syntax::syn3::lower::MULTI) => {
+                ExprKind::Call { callee, args } if matches!(&callee.kind, ExprKind::Name { module: None, name } if name.name == ilang_syntax::syn3::lower::MULTI) =>
+                {
                     pending.extend(args.iter().map(|arg| &arg.value));
                 }
                 ExprKind::Call { callee, args } if constructor(callee) => {

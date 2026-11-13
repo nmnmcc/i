@@ -54,7 +54,7 @@ const NEW: [(&str, &str); 9] = [
     ),
     (
         "Assert",
-        "(= Assert (, (= fail (-> (, (= failure AssertionFailure)) Never))))",
+        "(= Assert (, (= fail (-> (, AssertionFailure) Never))))",
     ),
 ];
 

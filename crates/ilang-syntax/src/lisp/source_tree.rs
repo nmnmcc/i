@@ -35,7 +35,16 @@ struct Find {
 
 impl Visitor for Find {
     fn expr(&mut self, e: &mut Expr, enter: bool) {
-        if enter && self.kind == Kind::Expr && self.found.is_none() && e.span.0 == self.span {
+        if !enter || self.kind != Kind::Expr || self.found.is_some() {
+            return;
+        }
+        let transition_root = matches!(&e.kind, crate::syn3::ast::ExprKind::Chain(fs)
+            if fs.iter().any(|f| f.params.iter().any(|p| p.key.is_some())
+                || fs.first().is_some_and(|first| first.params.len() != f.params.len())));
+        if e.span.0 == self.span
+            || transition_root
+                && self.span == Span::new(e.span.0.end.saturating_sub(1), e.span.0.end)
+        {
             self.found = Some(expr_datum(e));
         }
     }
@@ -53,7 +62,17 @@ impl Visitor for Find {
 
 impl SourceTree {
     pub fn new(scope: &Scope, source: &str) -> SourceTree {
-        let (module, _) = crate::syn3::parse_module(source);
+        Self::read(scope, source, false)
+    }
+
+    pub fn read(scope: &Scope, source: &str, lisp: bool) -> SourceTree {
+        let (module, _) = crate::syn3::deep::deep(|| {
+            if lisp {
+                crate::syn3::lisp::from_lisp(source)
+            } else {
+                crate::syn3::parse_module(source)
+            }
+        });
         SourceTree {
             scope: scope.clone(),
             module: Mutex::new(module),
@@ -68,7 +87,10 @@ impl SourceTree {
             kind,
             found: None,
         };
-        with_tokens(&self.tokens, || walk::module(&mut module, &mut find));
+        let module: &mut Module = &mut module;
+        crate::syn3::deep::deep(|| {
+            with_tokens(&self.tokens, || walk::module(module, &mut find));
+        });
         find.found.map(|d| Syntax::from_datum(&d, &self.scope))
     }
 
@@ -91,12 +113,65 @@ impl SourceTree {
     pub fn item_datum(&self, span: Span) -> Option<Datum> {
         let module = self.module.lock().expect("the source tree is not poisoned");
         let item: &Item = module.items.iter().find(|i| i.span.0 == span)?;
-        Some(with_tokens(&self.tokens, || item_datum(item)))
+        Some(crate::syn3::deep::deep(|| {
+            with_tokens(&self.tokens, || item_datum(item))
+        }))
     }
 
     /// The written item with this span.
     pub fn item(&self, span: Span) -> Option<Syntax> {
         self.item_datum(span)
             .map(|d| Syntax::from_datum(&d, &self.scope))
+    }
+
+    /// A written type definition, including a member absorbed into a sum
+    /// by the transition lowering.
+    pub fn definition(&self, name: &str) -> Option<(Item, Datum)> {
+        let module = self.module.lock().expect("the source tree is not poisoned");
+        let item = module.items.iter().find(|item| {
+            matches!(&item.kind, crate::syn3::ast::ItemKind::TypeDef(def) if def.name.name == name)
+        })?;
+        Some(crate::syn3::deep::deep(|| {
+            (item.clone(), with_tokens(&self.tokens, || item_datum(item)))
+        }))
+    }
+
+    /// Visibility before the transition lowering absorbs sum members and
+    /// their exports into the sum's old-tree item.
+    pub fn definition_visibility(&self, name: &str) -> Option<(bool, bool)> {
+        use crate::syn3::ast::{ItemKind, TypeKind, TypeRhs};
+        let module = self.module.lock().expect("the source tree is not poisoned");
+        let definition = module.items.iter().find_map(|item| match &item.kind {
+            ItemKind::TypeDef(def) if def.name.name == name => Some(def),
+            _ => None,
+        })?;
+        let mut exported = false;
+        let mut constructors = false;
+        for export in &module.exports {
+            if export.name.name == name {
+                exported = true;
+                constructors |= export.constructors;
+            } else if export.constructors {
+                let sum = module.items.iter().find_map(|item| match &item.kind {
+                    ItemKind::TypeDef(def) if def.name.name == export.name.name => Some(def),
+                    _ => None,
+                });
+                if let Some(def) = sum
+                    && let TypeRhs::Type(ty) = &def.rhs
+                    && let TypeKind::Union(members) = &ty.kind
+                    && members.iter().any(|member| {
+                        matches!(&member.kind,
+                        TypeKind::Named { module: None, name: member, .. } if member.name == name)
+                    })
+                {
+                    exported = true;
+                    constructors = true;
+                }
+            }
+        }
+        Some((
+            exported,
+            constructors || matches!(definition.rhs, TypeRhs::Type(_)),
+        ))
     }
 }

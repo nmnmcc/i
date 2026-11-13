@@ -271,17 +271,17 @@ These are not mechanical, and each changes what a macro sees.
 | 1 inventory | done |
 | 2a `i fmt --to` on the new tree | done |
 | 2b datum builder; `needs_row` | done |
-| 2c rows flip | additive preparation merged; `NEW_ROWS = false`, `ROWS3 = false`; additive prefix GREEN; workspace check, syntax/macro tests and four CLI binaries passed |
+| 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | not started; faE readers are beside the old engine, with no production switch-over |
 | 3 resolver | not started; faD is deliberately not merged in this prefix |
 | 4 deletion | not started |
 
-Readers of the old tree after 2b: everything in §2 except
+Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
 `syn3::lisp::{to_lisp, from_lisp}`) is on the new tree; the macro engine's
 `Syntax` values are still in the rows before syntax three.
 
-Integration checkpoint (lane/fa, 2026-11-13):
+Morning additive checkpoint (lane/fa, 2026-11-13):
 
 - faB `1bd592dd`: built-in definition answers and typed-macro function
   types in the new rows are available beside the old writers. The
@@ -299,11 +299,12 @@ Integration checkpoint (lane/fa, 2026-11-13):
   passed in faF before committing. The conversion inventory is in
   `syn3-final-ast-tests.md`; its post-flip entries are still a checklist.
 
-The integrator's next gate is `cargo check --workspace --all-targets
---locked`, all tests of `ilang-syntax` and `ilang-macro`, and the CLI
-`macro_run`, `typed_macros`, `fmt`, and `lisp` binaries. Step 2c may only
-land as one commit after that same gate passes with the rows enabled.
-Steps 2d, 3 and 4 are outside this integration's authorized scope.
+The evening gate is `cargo check --workspace --all-targets --locked`, all
+`ilang-syntax` and `ilang-macro` tests, CLI `macro_run`, `typed_macros`,
+`fmt`, `lisp`, and `macro_budget`, examples/macro-tests O0, std O0, and spec
+filters `15.7/`, `6/`, `7/`. Step 2c lands as one commit only after this
+passes with rows enabled. The evening follow-up authorizes steps 2d, 3 and
+4 after each preceding gate is green.
 
 The first additive test run exposed a stale `format_skip.txt`: six spec
 fences were already skipped by `parse_module`, but absent from its recorded
@@ -335,10 +336,10 @@ The four requested CLI binaries passed: `fmt` 6, `lisp` 5,
 `macro_run` 57 and `typed_macros` 35 tests (103 total). The additive prefix
 is green with both row switches off. Logs are under `target/fa-integration/` in this worktree.
 
-Step 2c will be attempted separately on `lane/fa-2c`, based on this green
-prefix. It is not part of `lane/fa` unless the same gate passes with the
-new rows enabled. No production engine migration, resolver migration, or
-old-tree deletion is included.
+The morning attempt used `lane/fa-2c`. The evening follow-up resumes the
+preserved patch on `lane/fa`, after merging the conversion lane. No
+production engine migration, resolver migration, or old-tree deletion is
+part of the rows-flip commit.
 
 Evening resumption (18:01, extended deadline 20:30): the complete surviving
 2c patch was preserved in `target/fa-integration/surviving-2c.patch` before
@@ -354,3 +355,86 @@ function is.” The formatter skip entries now name spec fences 1349 and
 1438: whole-data/environment provide still needs E6, while `area` now parses
 through the shape-group lowering. No parser or diagnostic expectation was
 changed to hide that limitation.
+
+Rows-flip attempt (resumed on `lane/fa`, conversion merge `820e6f60`):
+
+- `ROWS3` is on; `NEW_ROWS` follows it. Written `.i` arguments use
+  `SourceTree`, with normalization by position. Written `.is` arguments
+  retain their original datums and scopes. Generated nodes retain their
+  `ScopedSource` origins.
+- Quotes retain §6.8 datums. Unquote expressions and capture patterns are
+  read by the new reader, and macro results are read there and transition
+  lowered. The production engine still traverses the old tree.
+- Definition answers use `Definition::tree_with_datum` for written code.
+  Lookup indexes absorbed sum members and retains their original export
+  visibility. Built-ins accept the names of `builtin_definition_names(true)`.
+  `Assert`'s answer has the unlabelled parameter of spec §9.6.
+- Alias-pattern heads do not become formal type parameters (spec §4.7).
+  The metering test still requires charging before copying/freshening; its
+  written-definition cost is now `Datum`, as planned in §4 step 2c.
+- `TokenIndex` includes interpolation tokens, so operators keep their
+  written spans. A regression covers both ordinary and interpolated `+`.
+- Quote capture patterns participate in the new tree's iterative drop,
+  including the 20,000-deep small-stack regression.
+- The `suite` macro and its review-fixture copy collect provides from the
+  new rows, accept single-expression function bodies, and wrap each test
+  with its services in the same nesting order.
+- The nonfinal type-test choice stays legal Lisp code but has no normal
+  spelling; its test checks refusal by conversion under spec §14.1,
+  rather than retaining an old-row parser restriction.
+
+Old `encode`, `encode_charge`, `to_ast`, `from_ast` and quote-conversion
+helpers remain for legacy/test callers and the transition's old-row branch.
+They are not the production macro argument/result path with the switch on.
+Their deletion is deferred; no test of them was removed or weakened to
+force the flip. Steps 2d, 3 and 4 remain untouched.
+
+The first rows-on syntax run exposed five failures in two binaries: three
+old-encoder tests were accidentally routed through the new source wrapper,
+an alias-pattern head acquired a parameter identity, and a metering
+expectation still required streamed old-row events. These were corrected
+without dropping their assertions. The second syntax/macro run passed,
+including operator-span and sum-member visibility regressions. The first
+rows-on CLI run passed all 103 existing tests. A final gate is pending after
+the quote-capture drop fix and the added production member-query regression;
+the final evening gate below now covers both.
+
+Evening 2c regressions also cover macro arguments that are multi-shape
+functions, in both surfaces. The transition gives these a one-byte `%multi`
+root. Source lookup recovers the written chain; Lisp lookup still returns
+its original datum. The compiler-reserved `%multi` constructor bypasses
+macro name lookup, because its synthetic span belongs to a whole chain,
+not a name atom. This keeps the chain semantics of spec §6.12.
+
+Evening gate progress: workspace check passed; the syntax/macro broad run
+passed except a stale inactive-row assertion and the new multi-shape test's
+choice of hidden item; both focused retries passed. CLI fmt 6, lisp 7,
+macro_budget 9, macro_run 59 passed; typed_macros had 35 passes and one new
+conversion fixture still in old rows. Its deterministic expansion/Wasm
+assertions remain unchanged and the new-row retry passed. Spec `15.7/`
+passed 28 active cases and `6/` passed 78, each at O0/O2, with their existing
+pending lists unchanged. A mistaken worktree direnv invocation of `7/`
+was refused before cargo ran; the corrected wrapper command is running.
+The final broad rerun will cover the multi-shape regression and all fixes.
+
+Final 2c gate (18:48, lane/fa, conversion lane through `dfe2d62d0` in merge
+`52f5e95e`): **GREEN**. Workspace/all-targets check passed. All syntax and
+macro tests passed (215); CLI fmt 6, lisp 7, macro_budget 9, macro_run 60,
+syntax_runtime 10, typed_macros 36 passed (128). Examples passed 13 tests,
+with one existing skip. Std O0 passed all 2,170 tests. Spec filters `15.7/`
+28/28, `6/` 80/80, `7/` 104/104 passed at both O0/O2; the filter uses a
+substring, so `7/` also runs `9.7/`. Existing pending counts are 1, 28, 1.
+Hygiene resolution passed 20/20. Exact commands and raw results are the
+`target/fa-integration/2c-final-*.log` files.
+
+The earlier `7/` run had 102 passes and two stale host-error frame
+coordinates. Conversion commit `db41ca849` maps the same main definitions
+from 15:1 to 12:1 and 14:1 to 11:1; those exact assertions remain. Conversion
+commit `dfe2d62d0` re-enables two closed-data cases; neither was skipped to
+obtain the final gate. Conversion commit `c5918d467` restores future tags
+on the two E6 fences that already failed lowering, so the formatter skip
+inventory no longer lists those future fences.
+
+The rows flip is complete as one commit. Steps 2d, 3 and 4 still require
+separate green gates. A native-engine draft is prepared under `target/`,
+outside the sources used by this completed gate.

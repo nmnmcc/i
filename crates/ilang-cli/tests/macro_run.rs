@@ -2677,3 +2677,112 @@ fn macro_output_over_frame_budget_reports_the_limit() {
         "{stderr}"
     );
 }
+
+#[test]
+fn definition_query_reads_a_member_exported_through_its_sum() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/types.i"),
+        "(m = app/macros)\n(T(..))\nC = (m.typ())\nD = ()\nT = C | D\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        r#"(, (= syntax (/ i syntax)))
+(, inspect typ)
+(@ macro (= typ (-> (,) _ `Int)))
+(@ macro (= inspect (-> (, x) _
+    (|> ((. syntax definition) x)
+        (| (-> (, `(= C (, Int))) _ `42)
+           (-> (, _) _ (panic "expected the written member definition")))))))
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros, types = app/types)\nmain = () { assert(m.inspect(types.C) == 42) }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn definition_query_reads_an_absorbed_generated_sum_member() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        r#"(, (= syntax (/ i syntax)))
+(, emit check typ)
+(@ macro (= typ (-> (,) _ `Int)))
+(@ macro (= check (-> (, x) _
+    (|> ((. syntax definition) x)
+        (| (-> (, `(= C (, Int))) _ `{})
+           (-> (, _) _ (panic "expected the generated member definition")))))))
+(@ macro (= emit (-> (,) _
+    `{(= C (, (typ))) (= D (,)) (= T (| C D)) (check C)})))
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nm.emit()\nmain = () { Nil }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["check", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn multi_shape_arguments_keep_the_written_tree_in_both_surfaces() {
+    for (extension, source) in [
+        (
+            "i",
+            "(m = app/macros)\nf = m.id((x) { x } | (x, y) { x + y })\nmain = () { assert(f(3) == 3) assert(f(3, 4) == 7) }\n",
+        ),
+        (
+            "is",
+            "(, (= m (/ app macros)))\n(= f ((. m id) (| (-> (, x) _ x) (-> (, x y) _ (+ x y)))))\n(= main (-> (,) _ {(assert (== (f 3) 3)) (assert (== (f 3 4) 7))}))\n",
+        ),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(
+            dir.path().join("src/macros.is"),
+            "(, id)\n(@ macro (= id (-> (, e) _ e)))\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join(format!("src/main.{extension}")), source).unwrap();
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["run", "--offline", "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{extension}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}

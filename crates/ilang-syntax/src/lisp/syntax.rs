@@ -144,7 +144,7 @@ pub enum Substitution {
 /// the rows before syntax three; there the positions that syntax three
 /// merged ([`Position::TypeItem`], [`Position::ValueItem`],
 /// [`Position::PatternItem`]) are a field, a call argument and a parameter.
-pub const ROWS3: bool = false;
+pub const ROWS3: bool = true;
 
 /// A position of the grammar that [`Syntax::show_as`] can write: the
 /// fourteen of docs/design/syntax-3.md §6.7, in that order. The number of a

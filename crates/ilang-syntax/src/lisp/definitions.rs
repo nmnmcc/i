@@ -7,7 +7,7 @@ use crate::span::Span;
 /// syntax (`ilang-check`, `types/typed_macro.rs`): `false` answers in the rows
 /// before syntax three, `true` in the rows of syntax-3.md §6.8. Every function
 /// here that depends on the rows has a `_rows` form that takes the choice.
-pub const NEW_ROWS: bool = false;
+pub const NEW_ROWS: bool = super::syntax::ROWS3;
 
 /// Mark only the original parameterized head of a query answer. A parameter
 /// taken out of it cannot bind in another head; copies of the whole head carry
@@ -97,7 +97,7 @@ pub fn builtin_definition_rows(
             "Error" => ("(= (Error E) (, E))", &["E"]),
             "AssertionFailure" => ("(= AssertionFailure (, (= message String)))", &[]),
             "Assert" => (
-                "(= Assert (, (= fail (-> (, (= failure AssertionFailure)) Never))))",
+                "(= Assert (, (= fail (-> (, AssertionFailure) Never))))",
                 &[],
             ),
             _ => return None,
@@ -161,6 +161,16 @@ pub fn source_definition(
     scope: &Scope,
     answer: u64,
 ) -> Syntax {
+    if NEW_ROWS {
+        let syntax = super::source_syntax::source_item_syntax(
+            item,
+            scope,
+            source,
+            source[item.span.start as usize..item.span.end as usize].starts_with('('),
+        );
+        return expanded_definition(&syntax, answer)
+            .expect("a written type definition remains valid");
+    }
     use crate::ast::ItemKind;
     let ItemKind::TypeDef(_) = &item.kind else {
         panic!("definition query requires a type definition")
@@ -185,6 +195,10 @@ pub fn source_definition_from_syntax(
     syntax: &Syntax,
     answer: u64,
 ) -> Syntax {
+    if NEW_ROWS {
+        return expanded_definition(syntax, answer)
+            .expect("a written type definition remains valid");
+    }
     use crate::ast::{ItemKind, TypeBody, TypeExpr, TypeKind};
     use std::collections::HashMap;
     let ItemKind::TypeDef(def) = &item.kind else {
@@ -841,9 +855,23 @@ fn expanded_definition_new(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
 
     type Binder = (String, Scope, Option<ScopeIdentity>, u32);
     let mut binders: Vec<Binder> = Vec::new();
-    if head_parts
-        .iter()
-        .all(|part| matches!(part.node(), Node::Up(_)))
+    // A value-dependent alias binds its head names; those names are not
+    // formal type parameters (spec §4.7).
+    let mut rhs = right;
+    while let Node::Curly(parts) = rhs.node() {
+        let [inner] = parts.as_slice() else {
+            break;
+        };
+        rhs = inner;
+    }
+    let alias_pattern = matches!(rhs.node(), Node::Name(_))
+        || matches!(rhs.node(), Node::Round(parts)
+            if matches!(parts.as_slice(), [dot, _, last]
+                if is_symbol(dot, ".") && matches!(last.node(), Node::Name(_))));
+    if !alias_pattern
+        && head_parts
+            .iter()
+            .all(|part| matches!(part.node(), Node::Up(_)))
     {
         for (index, binder) in head_parts.iter().enumerate() {
             let Node::Up(name) = binder.node() else {

@@ -4,8 +4,11 @@ Integrator note (2026-11-13): this is the helper's conversion inventory,
 including planned post-flip expectations. Before integration, pending edits
 restored tests of the old encoder, scoped reader, built-in definitions and
 `show_as` to the old rows while their production switches remain off. The
-new-reader tests use `syn3::lisp` directly. The post-flip conversions below
-are still a checklist, not a claim that step 2c is enabled or green.
+new-reader tests use `syn3::lisp` directly. Evening integration enables the
+post-flip fixtures with `ROWS3`; the live gate results are recorded in
+`syn3-final-ast.md` §6. The tables below retain the helper's historical
+before/after measurements. Legacy encoder tests still exercise the old
+encoder directly; production macro arguments use the new builder.
 
 Status: inventory and conversion for step 2c (the rows flip) of
 `docs/design/syn3-final-ast.md` (lane/faF, 2026-11-13). Controlling source:
