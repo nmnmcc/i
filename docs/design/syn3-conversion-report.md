@@ -445,3 +445,12 @@ snippets. Token delimiters exclude strings/comments and branch bodies. The
 new query regression checks Circle/Rect/Dot snippets and excludes the body;
 the formerly failing LSP protocol test passes. The 23 CLI binary unit tests
 pass, with the added correlation check verified separately.
+
+The evening package-command run passed 24/27 initially. The three publication
+failures contained only source parameter names in expected displayed types:
+the diagnostics still correctly report changed arity, constructors and
+dependency nominal identities, and still require the same major versions.
+Updated those five signature strings only; the publication retry passes all
+11 tests. All 27 cases now have passing evidence. Determinism passes three
+tests and multicore passes all ten before proceeding with the remaining CLI
+binaries and filtered spec chapters.

@@ -688,11 +688,11 @@ fn publish_compares_the_interface() {
     commit(&dir, "change");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
     assert!(
-        err.contains("changed value api.add: (a: Int, b: Int) -> Int"),
+        err.contains("changed value api.add: (Int, Int) -> Int"),
         "{err}"
     );
     assert!(
-        err.contains("to value api.add: (a: Int, b: Int, c: Int) -> Int"),
+        err.contains("to value api.add: (Int, Int, Int) -> Int"),
         "{err}"
     );
     assert!(err.contains("changed constructors api.Shape"), "{err}");
@@ -992,7 +992,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
     let (ok, out) = try_publish(&w, &dir, &[], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed value api.f: (x: example.com/dep@1:v.V) -> 1"),
+        out.contains("changed value api.f: (example.com/dep@1:v.V) -> 1"),
         "{out}"
     );
     assert!(
@@ -1135,11 +1135,11 @@ fn publish_tells_apart_types_that_are_shown_alike() {
     );
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed value m.h: (x: example.com/u1@1:u.T) -> example.com/u1@1:u.T"),
+        out.contains("changed value m.h: (example.com/u1@1:u.T) -> example.com/u1@1:u.T"),
         "{out}"
     );
     assert!(
-        out.contains("to value m.h: (x: example.com/u2@1:u.T) -> example.com/u2@1:u.T"),
+        out.contains("to value m.h: (example.com/u2@1:u.T) -> example.com/u2@1:u.T"),
         "{out}"
     );
     assert!(out.contains("a new major version"), "{out}");
