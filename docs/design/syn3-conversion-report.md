@@ -797,3 +797,17 @@ source-change, phase-exit, diagnostic-code-set and runtime-stdout audit.
 Only eligible completed observations are committed; refused cases remain
 untouched and recording continues.
 The full corpus, two known p1 regressions and pending phase refusals still block landing.
+
+Coordinator b15 item 1: the lost p1 obligation was caused by generalizing the
+migration's typed provider temporary before its provide. The inferred pure
+service form replaced the old explicit `S(_)` provider contract. Merely
+choosing the checker's known type, or copying the annotation onto a provide
+of the already-generalized variable, did not restore the obligation.
+
+The lowerer now rejoins an immediately preceding typed provider temporary
+with its environment statement when the temporary has exactly one use.
+Both the written contract and original value reach inference together, as
+in the legacy statement. Other locals retain their binding. Both complete
+p1 copies now report exactly E0515; all 26 row-scheme tests and all 20
+lowering tests pass, including single-use/reused-provider regressions.
+The requirement remains reject E0515, and no expectation was re-recorded.

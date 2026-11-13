@@ -336,3 +336,41 @@ main = () {
         ),
     );
 }
+
+#[test]
+fn a_single_use_provider_keeps_its_contract_before_generalization() {
+    let source = "S(N) = (f = () <- N -> Int)\nwrap = (body) { provided: S(_) = S(f = () { 1 }) body() <- (provided) }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[1].kind else {
+        panic!()
+    };
+    let ilang_syntax::ast::ExprKind::Fn(function) = &binding.value.kind else {
+        panic!()
+    };
+    assert_eq!(function.body.stmts.len(), 2);
+    let ilang_syntax::ast::Stmt::Env { ty, value, .. } = &function.body.stmts[0] else {
+        panic!()
+    };
+    assert!(
+        matches!(&ty.kind, ilang_syntax::ast::TypeKind::Named { name, .. } if name.name == "S")
+    );
+    assert!(matches!(
+        &value.kind,
+        ilang_syntax::ast::ExprKind::Call { .. }
+    ));
+
+    let used = source.replace("body() <-", "body(provided) <-");
+    let (module, errors) = ilang_syntax::parse_module(&used);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[1].kind else {
+        panic!()
+    };
+    let ilang_syntax::ast::ExprKind::Fn(function) = &binding.value.kind else {
+        panic!()
+    };
+    assert!(matches!(
+        &function.body.stmts[0],
+        ilang_syntax::ast::Stmt::Bind(_)
+    ));
+}

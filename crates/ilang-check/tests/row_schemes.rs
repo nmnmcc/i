@@ -619,3 +619,49 @@ fn syntax_three_library_handler_has_no_unhandled_service() {
     }
     assert!(found, "the library handler was checked");
 }
+
+#[test]
+fn syntax_three_written_provider_hole_keeps_its_obligation() {
+    let base = "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\n";
+    let positive = format!(
+        "{base}wrap = <N>(body, svc: S(N)) {{ body() <- (svc) }}\nmain = () {{ assert(wrap(() {{ use() }}, S(f = () -> Int {{ 1 }})) == 1) }}\n"
+    );
+    types(&positive);
+    let negative = format!(
+        "{base}wrap = (body) {{ provided: S(_) = S(f = () -> Int {{ 1 }}) body() <- (provided) }}\n"
+    );
+    let (graph, _, _) = common::check_files(&[("src/main.i", &negative)]);
+    let checked = ilang_check::check(&graph);
+    let codes: std::collections::BTreeSet<_> = checked
+        .diags
+        .iter()
+        .filter(|d| d.is_error())
+        .map(|d| d.code)
+        .collect();
+    assert_eq!(
+        codes,
+        ["E0515"].into_iter().collect(),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn converted_p1_keeps_the_uniform_provider_error() {
+    for source in [
+        include_str!("../../../tests/review/cases/review-k4d/_loose/p/p1/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4d/proj/p1/src/main.i"),
+    ] {
+        let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+        let checked = ilang_check::check(&graph);
+        let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
+        assert_eq!(
+            errors.len(),
+            1,
+            "{:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+        assert_eq!(errors[0].code, "E0515");
+        assert!(errors[0].message.contains("S("));
+    }
+}
