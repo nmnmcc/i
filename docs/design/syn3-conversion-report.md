@@ -559,3 +559,13 @@ Authority: spec §9.2, "The merge of two needs is their intersection (§4.4)."
 side is Never, the need cannot be satisfied: it is a compile error (E0515)."
 "A provided value of type P satisfies the need entry S when P <: S (§4.5
 rule 4)." Batch2's runtime/default-worker and fixture changes are preserved.
+
+Merged num4 024ac887 and light-boundary 7c8e490a within their 15-minute
+integration limits. Kept shaped and lazy callees together, retained both
+sets of emitter fields and lowering passes, and adapted lazy closure calls
+to the current shape argument and function-pointer field 9. Converted five
+incoming fixtures, all numeric differential helpers, 316 E1 review shown
+types and 42 exact requirement type fragments. Requirement outcomes and
+error-code lists are unchanged. The queued converter was stopped by its
+own process IDs and rerun using the already-built migrator; that source-only
+run performs no build or compiler/corpus verification.

@@ -78,7 +78,9 @@ pub fn split(p: &mut Program) {
                 unreachable!()
             };
             let env = match value {
-                Value::Call { env, .. } | Value::OpEnv(_, _, env) => *env,
+                Value::Call { env, .. } | Value::OpEnv(_, _, env) | Value::Light { env, .. } => {
+                    *env
+                }
                 _ => Env::Param,
             };
             let after = &live.points[&point];
@@ -265,13 +267,15 @@ pub(crate) fn may_suspend(p: &Program) -> Vec<bool> {
 fn suspends(v: &Value, may: &[bool]) -> bool {
     match v {
         Value::Call {
-            callee: Callee::Value(_) | Callee::Shaped(..),
+            callee: Callee::Value(_) | Callee::Shaped(..) | Callee::Lazy { .. },
             ..
         } => true,
         Value::Call {
             callee: Callee::Direct(f) | Callee::Known { func: f, .. },
             ..
         } => may[f.0 as usize],
+        // A capture goes through a light boundary only from its body.
+        Value::Light { func, .. } => may[func.0 as usize],
         Value::Op(op, _) | Value::OpEnv(op, _, _) => op.suspends(),
         _ => false,
     }
@@ -281,7 +285,7 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
     each_stmt(stmts).any(|s| match s {
         Stmt::Let { value, .. } => suspends(value, may),
         Stmt::TailCall {
-            callee: Callee::Value(_) | Callee::Shaped(..),
+            callee: Callee::Value(_) | Callee::Shaped(..) | Callee::Lazy { .. },
             ..
         } => true,
         Stmt::TailCall {
@@ -605,7 +609,7 @@ fn env_uses(e: Env, f: &mut dyn FnMut(Local)) {
 }
 
 fn call_uses(callee: &Callee, args: &[Atom], env: Env, f: &mut dyn FnMut(Local)) {
-    if let Callee::Value(a) | Callee::Shaped(a, _) | Callee::Known { closure: a, .. } = callee {
+    if let Callee::Value(a) | Callee::Shaped(a, _) | Callee::Known { closure: a, .. } | Callee::Lazy { service: a, .. } = callee {
         atom_uses(a, f);
     }
     args.iter().for_each(|a| atom_uses(a, f));
@@ -630,11 +634,11 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
         Value::Op(_, args) | Value::Finite(_, args) | Value::Tuple(args) => {
             args.iter().for_each(|a| atom_uses(a, f))
         }
-        Value::OpEnv(_, args, env) => {
+        Value::OpEnv(_, args, env) | Value::Light { args, env, .. } => {
             args.iter().for_each(|a| atom_uses(a, f));
             env_uses(*env, f);
         }
-        Value::Service(env, _) => env_uses(*env, f),
+        Value::Service(env, _) | Value::ServiceRaw(env, _) => env_uses(*env, f),
         Value::Closure { captures, .. } => captures.iter().for_each(|a| atom_uses(a, f)),
         Value::Multi(groups) => groups.iter().for_each(|(_, a)| atom_uses(a, f)),
         Value::Record { fields, .. } => fields.iter().for_each(|a| atom_uses(a, f)),
@@ -753,6 +757,7 @@ mod tests {
                 env: Env::Param,
                 service: 1,
                 value: Atom::Nil,
+                in_place: false,
             },
             Stmt::Let {
                 dst: 3,

@@ -1805,8 +1805,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q21$",
       "known_failure": false,
@@ -1818,8 +1818,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q22$",
       "known_failure": false,
@@ -1831,8 +1831,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q23$",
       "known_failure": false,
@@ -1844,8 +1844,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q24$",
       "known_failure": false,
@@ -1857,8 +1857,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q25$",
       "known_failure": false,
@@ -1870,8 +1870,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q26$",
       "known_failure": false,
@@ -1883,8 +1883,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q27$",
       "known_failure": false,
@@ -1896,8 +1896,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q28$",
       "known_failure": false,
@@ -1909,8 +1909,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q29$",
       "known_failure": false,
@@ -1922,8 +1922,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q30$",
       "known_failure": false,
@@ -1935,8 +1935,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q31$",
       "known_failure": false,
@@ -1948,8 +1948,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q32$",
       "known_failure": false,
@@ -1961,8 +1961,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q33$",
       "known_failure": false,
@@ -1974,8 +1974,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q34$",
       "known_failure": false,
@@ -1987,8 +1987,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q35$",
       "known_failure": false,
@@ -2000,8 +2000,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q36$",
       "known_failure": false,
@@ -2013,8 +2013,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q37$",
       "known_failure": false,
@@ -2026,8 +2026,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q38$",
       "known_failure": false,
@@ -2039,8 +2039,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q39$",
       "known_failure": false,
@@ -2052,8 +2052,8 @@
     {
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q40$",
       "known_failure": false,
@@ -2644,8 +2644,8 @@
       "known_failure": false,
       "outcome": "accept",
       "types_contain": [
-        "app/main.use : () -> Int ! N | S(N)",
-        "app/main.fw : () -> Int ! N | S(N)"
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (S(N), ..N) -> Int"
       ],
       "finding": "K4 principal schemes: field and pattern access retain the same callback and service rows",
       "source": "docs/spec.md §4.8 rules 4–5 and 13: function/call environments and fields from the corresponding bound forms; §4.7 principal inference",

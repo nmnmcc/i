@@ -456,6 +456,10 @@ const CORE: &str = r#"
   (local $sp i32) (local $tag i32) (local $n i32)
   (local $xs (ref null $values)) (local $o (ref $obj))
   (local $seen (ref $values)) (local $count i32) (local $bad i32)
+  ;; A light boundary is its environment array. `$env` has the same Wasm
+  ;; array type as `$values`; no other i value is a bare array. Its handle
+  ;; can occur in a closure's captures even though source uses only escape.
+  (if (ref.test (ref $values) (local.get $v)) (then (return (global.get $value_false))))
   ;; BEAM's shared-copy walk also handles constants before allocating work.
   (local.set $tag (call $value_tag (local.get $v)))
   (if (i32.or (i32.and (i32.ge_u (local.get $tag) (i32.const 10))
@@ -482,6 +486,8 @@ const CORE: &str = r#"
     (br_if $done (i32.eqz (local.get $sp)))
     (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
     (local.set $v (array.get $values (local.get $stack) (local.get $sp)))
+    (if (ref.test (ref $values) (local.get $v))
+      (then (local.set $bad (i32.const 1)) (br $done)))
     (local.set $tag (call $value_tag (local.get $v)))
     (br_if $walk (i32.lt_s (local.get $tag) (i32.const 0)))
     (if (i32.or (i32.and (i32.ge_u (local.get $tag) (i32.const 10))
