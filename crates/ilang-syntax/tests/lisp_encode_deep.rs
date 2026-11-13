@@ -682,3 +682,17 @@ fn charge_events_for_interpolation_and_two_sided_string_patterns() {
         direct_charge_events(&encoder.item(item))
     );
 }
+
+#[test]
+fn captured_rest_service_charge_matches_the_encoded_datum() {
+    let source = "keep = <N>() <- (db: Db, ..env: N) { Nil }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let scope = scope();
+    let encoder = ilang_syntax::lisp::SourceEncoder::new(&scope, source);
+    let syntax = encoder.item(&module.items[0]);
+    assert_eq!(
+        planned(&encoder, &module.items[0]),
+        direct_charge_events(&syntax)
+    );
+}

@@ -139,6 +139,12 @@ fn normalize(root: &Syntax, mode: Mode) -> Syntax {
             Mode::Param => {
                 if matches!(node.node(), Node::Round(_)) && xs.len() == 3 && symbol(&xs[0], "!") {
                     modes[2] = Mode::Type;
+                } else if matches!(node.node(), Node::Round(_))
+                    && xs.len() == 4
+                    && symbol(&xs[0], "!")
+                    && symbol(&xs[1], "..")
+                {
+                    modes[3] = Mode::Type;
                 } else {
                     work.push(Task::Enter(node, Mode::Pattern));
                     continue;

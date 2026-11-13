@@ -1454,6 +1454,13 @@ pub fn convert_quote(d: &Datum) -> Datum {
                 let mut services = Vec::new();
                 for p in ps {
                     match round(p, "!") {
+                        Some([dots, x, n]) if symbol(dots) == Some("..") => {
+                            services.push(dots.clone());
+                            services.push(node(
+                                K::Round(vec![sym(":", p.span), x.clone(), convert_quote(n)]),
+                                p.span,
+                            ));
+                        }
                         Some([x, n]) => services.push(node(
                             K::Round(vec![sym(":", p.span), x.clone(), convert_quote(n)]),
                             p.span,
@@ -1632,14 +1639,24 @@ pub fn unconvert_quote(d: &Datum) -> Datum {
             (Some("->"), [arrow, params, ret, body]) if round(params, ",").is_some() => {
                 let mut ps = all(round(params, ",").unwrap());
                 let (result, services) = needs(ret);
+                let mut rest = false;
                 for s in services {
+                    if symbol(&s) == Some("..") {
+                        rest = true;
+                        continue;
+                    }
                     match round(&s, ":") {
-                        Some([x, n]) => ps.push(node(
-                            K::Round(vec![sym("!", s.span), x.clone(), unconvert_quote(n)]),
-                            s.span,
-                        )),
+                        Some([x, n]) => {
+                            let mut parts = vec![sym("!", s.span)];
+                            if rest {
+                                parts.push(sym("..", s.span));
+                            }
+                            parts.extend([x.clone(), unconvert_quote(n)]);
+                            ps.push(node(K::Round(parts), s.span));
+                        }
                         _ => ps.push(unconvert_quote(&s)),
                     }
+                    rest = false;
                 }
                 K::Round(vec![
                     arrow.clone(),

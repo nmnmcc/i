@@ -1348,3 +1348,36 @@ fn typed_macro_type_answers_share_marked_variable_nodes_across_queries() {
     };
     assert!(first[0].identical(&xs[1]));
 }
+
+#[test]
+fn captured_rest_service_survives_both_macro_encoders_and_scoped_decoding() {
+    use ilang_syntax::{
+        ast::{ExprKind, ItemKind, Param},
+        lisp::{self, scoped::ScopedSource},
+    };
+    let source = "f = <N>() <- (db: Db, ..env: N) { Nil }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let check = |expr: &ilang_syntax::ast::Expr| {
+        let ExprKind::Fn(f) = &expr.kind else {
+            panic!()
+        };
+        assert!(matches!(&f.params[0], Param::Env { rest: false, name, .. } if name.name == "db"));
+        assert!(matches!(&f.params[1], Param::Env { rest: true, name, .. } if name.name == "env"));
+    };
+    let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
+    assert_eq!(syntax.show(), "(-> ((! db Db) (! .. env N)) _ {Nil})");
+    let mut expanded = ScopedSource::new(source.into());
+    check(&expanded.expression(&syntax, &syntax).unwrap());
+    let datums = lisp::parse(&syntax.show()).unwrap();
+    let public = ilang_syntax::syn3::lisp::convert_quote(&datums[0]);
+    let internal = ilang_syntax::syn3::lisp::unconvert_quote(&public);
+    check(&lisp::parse_expression(&internal).unwrap());
+    let printed = lisp::print_module(&module);
+    let doc = lisp::parse(&printed).unwrap();
+    let restored = lisp::parse_module(&doc).unwrap();
+    assert!(ilang_syntax::shape::equivalent(&module, &restored));
+}

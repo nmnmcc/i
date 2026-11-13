@@ -415,10 +415,13 @@ pub(super) fn item<E>(
             }
             Param(param) => match param {
                 crate::ast::Param::Pattern(p) => work.push(Pattern(p)),
-                crate::ast::Param::Env { name, ty, .. } => {
-                    bracket(&mut f, &mut work, 3)?;
+                crate::ast::Param::Env { name, ty, rest } => {
+                    bracket(&mut f, &mut work, if *rest { 4 } else { 3 })?;
                     work.push(Type(ty));
                     work.push(Atom(&name.name));
+                    if *rest {
+                        work.push(Atom(".."));
+                    }
                     work.push(Atom("!"));
                 }
             },

@@ -598,12 +598,17 @@ async fn expression_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Expr> {
                 let ps = round(params).ok_or_else(|| bad(params, "function parameters"))?;
                 let mut params = Vec::with_capacity(ps.len());
                 for p in ps {
-                    if let Some([h, n, ty]) = round(p)
-                        && symbol(h, "!")
-                    {
+                    let service = match round(p) {
+                        Some([h, dots, name, ty]) if symbol(h, "!") && symbol(dots, "..") => {
+                            Some((true, name, ty))
+                        }
+                        Some([h, name, ty]) if symbol(h, "!") => Some((false, name, ty)),
+                        _ => None,
+                    };
+                    if let Some((rest, name, ty)) = service {
                         params.push(Param::Env {
-                            rest: false,
-                            name: ident(n)?,
+                            rest,
+                            name: ident(name)?,
                             ty: type_child(s, ty).await?,
                         });
                     } else {

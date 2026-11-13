@@ -897,11 +897,14 @@ impl Encoder<'_> {
                             .iter()
                             .map(|p| match p {
                                 Param::Pattern(p) => self.pattern(p),
-                                Param::Env { name, ty, .. } => self.form(
-                                    "!",
-                                    [self.name(name), self.ty(ty)],
-                                    name.span.to(ty.span),
-                                ),
+                                Param::Env { name, ty, rest } => {
+                                    let mut parts = Vec::new();
+                                    if *rest {
+                                        parts.push(self.symbol("..", name.span));
+                                    }
+                                    parts.extend([self.name(name), self.ty(ty)]);
+                                    self.form("!", parts, name.span.to(ty.span))
+                                }
                             })
                             .collect(),
                     ),

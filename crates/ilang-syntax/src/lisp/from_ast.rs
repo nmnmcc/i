@@ -381,7 +381,13 @@ fn expr(e: &Expr) -> String {
                     ")",
                     f.params.iter().map(|p| match p {
                         Param::Pattern(p) => pattern(p),
-                        Param::Env { name: n, ty, .. } => form("!", [name(n), typ(ty)]),
+                        Param::Env { name: n, ty, rest } => {
+                            if *rest {
+                                form("!", ["..".into(), name(n), typ(ty)])
+                            } else {
+                                form("!", [name(n), typ(ty)])
+                            }
+                        }
                     }),
                 ),
                 f.ret.as_ref().map_or_else(|| "_".into(), result),
