@@ -654,8 +654,8 @@ t = (a, b) = pair
   note; the author's `=:` family is rejected by the owner (answers D2).
 - **Alternatives** `p1 | p2` are allowed only in the items of a parameter
   group (G20); `|` is tighter than `,` and looser than `=`. Every
-  alternative binds the same names. A type test is the last alternative
-  (G21).
+  alternative binds the same names. A type test may precede or follow another
+  alternative (G21); a union annotation is grouped in braces.
 
 ### 2.8 Type definitions
 
@@ -1474,6 +1474,9 @@ Rest      = ".." [ name | discard ] .
   lowercase name followed by `(` is not a pattern.
 - `Rest` is the last item of a `DataPat`, at most once. `PItem` has no rest.
 - `PatArgs` is removed: constructor patterns use `DataPat`.
+- Immediately after `:` in a pattern, `Type` reads an `Inter`, so an
+  outermost `|` belongs to the pattern (P8). Nested types, including the
+  return of a function type, still read a full `Union`.
 
 ### 3.5 Disambiguation rules
 
@@ -1531,10 +1534,17 @@ needs a comma.
 - **P7 Key exception.** Rule 2 of §2.7: inside `DataPat` and `Params`, a
   leading `name =` is a key, never a conjunction; at statement level it is a
   conjunction.
-- **P8 Alternatives and types.** In a `PItem`, `|` separates alternatives,
-  except after a `:` type, where `|` continues the union; a type is read as
-  far right as it goes with no going back (spec §7.1, unchanged). A type in a
-  `PItem` ends at `,`, `?`, or `)`.
+- **P8 Alternatives and types.** The type after `:` in every pattern ends
+  at the outermost `|`: that token always separates pattern alternatives
+  (spec §7.1). A union annotation requires braces, as in
+  `(x: { Int | String })`, `v: { A | B } = e`, and a data-pattern item
+  `C(value = x: { Int | String })`. `(x: Int | y)` is two alternatives,
+  not a union annotation, and fails the rule that alternatives bind the
+  same names; `(x: Int | x)` is valid. `(True | _: Int)` is unchanged.
+  This boundary applies even where alternatives are forbidden. Type
+  definitions `T = A | B`, nested type arguments `List(Int | String)`,
+  `<A>` lists, and the `->` return of a function type are unchanged:
+  `f: (Int) -> Int | String = e` still has a union return type.
 - **P9 Guard.** `?` in `Params` begins the guard, after the last item; the
   guard ends at the matching `)`. `?` in any other pattern is an error.
 - **P10 Types.** In a `DataType`, `name =` is a label; a `name` not followed by
@@ -1611,7 +1621,7 @@ onward are new.
 | G18 | `User(name = "ada")` as a statement | P6(d): a pattern not followed by `=`, so an expression (a call). |
 | G19 | `db ! Db` | The read statement is removed (§2.10); `!` alone is a lexer error (P0). Today `db ! Db = make()` is silently two statements; the migrator rewrites every read into a head pattern (§7.3). |
 | G20 | `(Sat \| Sun, x)` | `\|` is tighter than `,` in a `PItem`. |
-| G21 | `(x: Int \| y)` | P8: `Int \| y` is a type (`y` a value type). A type test is the last alternative: `(True \| _: Int)`. |
+| G21 | `(x: Int \| y)` | P8: two pattern alternatives, `x: Int` and `y`; rejected because they bind different names. `(x: Int \| x)` and `(True \| _: Int)` are valid. A union annotation is `(x: { Int \| String })`. |
 | G22 | `f \| g` with names | Rejected by P4 (D3). |
 | G23 | Bare `None` | A value (D5); `None()` is an error in expressions and patterns. |
 | G24 | `T = (name = String)` against a binding | At the top level an item starting with an `UpName` is a type definition (P12): a labelled type. In a block there are no type definitions: it is a binding with the constructor pattern `T` and the value `(name = String)`, where `String` is an expression, so a compile error ("`String` is a type, not a value"). |
