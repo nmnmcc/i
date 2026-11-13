@@ -1449,13 +1449,21 @@ fetch_client = () <- (f: fetch.Fetch) {
 				stream = (req) {
 					{
 						// Keep Fetch across suspension; task services still come from the caller.
-						reader = fetch_stream(req)
+						reader: (
+							head = Response,
+							read = _,
+							close = _,
+						) = fetch_stream(req)
 						reader
 					} <- (f)
 				},
 				send = (req) {
 					{
-						reader = fetch_stream(req)
+						reader: (
+							head = Response,
+							read = _,
+							close = _,
+						) = fetch_stream(req)
 						resource.ensure(
 							() {
 								h = reader.head
