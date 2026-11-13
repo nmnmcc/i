@@ -30,16 +30,23 @@ main = () {
 				}, () {
 					inner = fail.catch(() {
 						task.scope((cleanup) {
+							started: task.Channel(Nil) = task.channel()
 							target = task.go(cleanup, () {
 								resource.ensure(
-									() { task.sync(task.never()) }
+									() {
+										task.send(started, Nil)
+										task.sync(task.never())
+									}
 									() {
 										task.yield()
 										print("cleanup-child-final")
 									}
 								)
 							})
-							task.go(cleanup, () { fail.raise("cleanup") })
+							task.go(cleanup, () {
+								task.receive(started)
+								fail.raise("cleanup")
+							})
 							task.join(target)
 						})
 					})

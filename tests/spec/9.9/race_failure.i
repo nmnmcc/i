@@ -2,13 +2,15 @@
 // expect: pass
 // runtime.md R5: failure before a successful commit follows ordinary scope
 // failure, while a successful commit suppresses later unobserved errors.
+// The scripted run fixes which branch gets the first turn in each race.
 (
 	i/task
 	i/fail
+	i/random
 )
 
 
-main = () {
+main = () { task.test(random.from_seed(1), [], () {
 	assert(fail.catch(() {
 		task.race(() { fail.raise("first") }, () {
 			task.yield()
@@ -29,4 +31,5 @@ main = () {
 		task.yield()
 		n + 1
 	}) == [2, 3, 4])
+	})
 }

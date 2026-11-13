@@ -4258,7 +4258,7 @@ fn abi_json(
         }
     }
     let mut abi = serde_json::json!({
-        "version": 3,
+        "version": 4,
         "entry": entry,
         "tests": tests,
         "exports": map,

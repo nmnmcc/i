@@ -4,7 +4,7 @@ import { ResourceHost, ResourceError } from "./resources.mjs";
 export { ResourceHost, ResourceContext, ResourceError } from "./resources.mjs";
 const defaultResourceHost = new ResourceHost();
 /**
- * The host side of the binary interface of i, version 3. Language
+ * The host side of the binary interface of i, version 4. Language
  * values live in the guest; this module loads modules and copies values
  * across the host boundary.
  * SPDX-License-Identifier: Apache-2.0
@@ -17,7 +17,9 @@ const kinds = new Set(["nil", "bool", "int", "float", "string", "bit_array", "ex
 /** The canonical order of the members of an error type. */
 const canonical = ["nil", "bool", "int", "float", "string", "bit_array"];
 const namespace = "ilang:host/v1";
-const version = 3;
+const version = 4;
+// Version 4 only adds the runtime imports of multicore workers.
+const oldestVersion = 3;
 export const HOST_VALUE_REASON = "host: value is not correct";
 const wasmTypes = { nil: [], bool: [0x7f], float: [0x7c], int: [0x7f, 0x7f, 0x7f], string: [0x7f, 0x7f], bit_array: [0x7f, 0x7f], externref: [0x6f] };
 const signatureModules = new Map();
@@ -277,13 +279,13 @@ export function readAbi(module, supplied) {
   const fields = ["version", "entry", "tests", "exports", "services", "externals"];
   only(value, fields, "the ABI metadata");
   for (const field of fields) expect(field in value, `The ABI metadata needs the field ${field}`);
-  if (typeof value.version === "number" && value.version < version) {
+  if (typeof value.version === "number" && value.version < oldestVersion) {
     throw new AbiError(`the module uses i ABI version ${value.version}; build it again with this version of i`);
   }
   if (typeof value.version === "number" && value.version > version) {
     throw new AbiError(`the module uses i ABI version ${value.version}, but this host reads version ${version}; update the host`);
   }
-  if (value.version !== version) throw new AbiError(`Unsupported i ABI version ${value.version}`);
+  if (value.version !== version && value.version !== oldestVersion) throw new AbiError(`Unsupported i ABI version ${value.version}`);
   const exports = Object.create(null);
   for (const [name, signature] of Object.entries(plainObject(value.exports === undefined ? {} : value.exports, "ABI exports"))) {
     expect(!reserved(name), `Export ${name} uses a name of the binary interface`);

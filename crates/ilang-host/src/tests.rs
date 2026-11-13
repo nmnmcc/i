@@ -117,7 +117,8 @@ fn stop(outcome: Outcome) -> Stop {
 #[test]
 fn metadata_is_read_from_the_custom_section() {
     let abi = program().abi().clone();
-    assert_eq!(abi.version, ABI_VERSION);
+    // The checked-in fixture is a version 3 module, which this host still reads.
+    assert_eq!(abi.version, ABI_OLDEST);
     assert_eq!(abi.entry, Some(EntryPoint::new("app/main.main")));
     assert_eq!(abi.tests.len(), 6);
     assert!(abi.tests[5].is_async);
@@ -1481,7 +1482,7 @@ fn old_and_new_versions_are_refused() {
             r#"{{"version":{version},"entry":null,"tests":[],"exports":{{}},"services":{{}},"externals":{{}}}}"#
         )
     };
-    for version in [1, ABI_VERSION - 1] {
+    for version in [1, ABI_OLDEST - 1] {
         let error = Abi::from_json(json(version).as_bytes()).unwrap_err();
         assert_eq!(
             format!("{error:#}"),

@@ -107,7 +107,11 @@ use wasmtime::{
     Instance as WasmInstance, Linker, Memory, Module, RootScope, Store, Val, ValType,
 };
 
-pub const ABI_VERSION: u32 = 3;
+pub const ABI_VERSION: u32 = 4;
+/// The oldest ABI version this host reads: version 4 only adds the runtime
+/// imports of multicore workers (`ilang:host/v1` `mc_*`, native.md N3), which a
+/// version 3 module never has.
+pub const ABI_OLDEST: u32 = 3;
 pub const HOST_MODULE: &str = "ilang:host/v1";
 /// The stop reason for a value from the host that is not correct.
 pub const HOST_VALUE_REASON: &str = "host: value is not correct";
@@ -285,7 +289,7 @@ impl Abi {
 
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.version >= ABI_VERSION,
+            self.version >= ABI_OLDEST,
             "the module uses i ABI version {}; build it again with this version of i",
             self.version
         );
