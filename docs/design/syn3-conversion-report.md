@@ -253,5 +253,21 @@ core-tree comparison (§1.6). The comparison now lowers its clone to left-folded
 concatenation, including the empty text prefix for a sole expression. The
 new end-to-end test converts a program to Lisp and back and executes an
 assertion of its string result after each conversion. All **7** Lisp tests
-passed. This last normalization was tested in the debug CLI; the next final
-release rebuild will include it.
+passed. The release rebuild including this normalization also passed.
+
+
+### Lisp macro inputs during the transitional lowering
+
+The remaining CLI sweep found a panic in
+`compile_time_tests::tests_use_each_builds_unmarked_quote_templates`.
+`source_item_syntax` reparsed a syntax-three Lisp item with the legacy
+reader, which rejects the empty data `(,)` in a function head. It now uses
+the item kind already established by parsing. Source datums also pass through
+the same span-preserving `unconvert_quote` adapter as Lisp lowering before
+the transitional macro engine consumes them. This keeps both source surfaces
+on the same compiler tree (§14.1), rather than sending syntax-three rows to
+the old macro-result reader. No source fixture or runtime assertion changed.
+The new unit regression and all three compile-time tests pass, including
+both optimization levels and both source modules' unmarked quote templates.
+The 57 macro-run and 35 typed-macro tests pass after the fix, retaining
+source-position and hygiene checks.
