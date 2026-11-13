@@ -1,5 +1,6 @@
 // spec: 9.3, 9.4, 9.5
 // expect: pass
+// output: cancelled
 (
 	i/control
 	i/fail
@@ -9,6 +10,11 @@
 Done = ()
 Paused = (Continuation(Nil, Step, Fail(String)))
 Step = Done | Paused
+
+@host("test:io/v1")
+Out = (print = (String) -> Nil)
+
+print = (text: String) <- (out: Out) { out.print(text) }
 
 main = () {
 	kept = control.keep_env((b) {
@@ -30,13 +36,20 @@ main = () {
 				control.suspend(b, (k) { Paused(k) })
 				Done
 			},
-			() { fail.raise("cancelled") },
+			// A final may not raise errors (§9.5); observe that it ran instead.
+			() { print("cancelled") },
 		)
 	})
 	second = fail.catch(() { control.boundary((b) { with_final(b) }) })
 	second |>
 		(Ok(Paused(k))) {
-			assert(fail.catch(() { control.cancel(k) }) == Error("cancelled"))
+			assert(
+				fail.catch(() {
+					control.cancel(k)
+					fail.raise("cancelled")
+				}) ==
+					Error("cancelled"),
+			)
 		}
 		| (_) { panic("expected a paused kept final") }
 	// A handler provided inside the paused part still wins over the resumer.
