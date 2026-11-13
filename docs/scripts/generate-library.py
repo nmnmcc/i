@@ -78,7 +78,7 @@ for prefix, directory in [('i', ROOT / 'lib/i'), ('std', ROOT / 'std/src')]:
                 continue
             else:
                 break
-        output = ['---', 'title: ' + json.dumps(module), '---', '', safe('\n'.join(opening)) if opening else 'to be written', '']
+        output = ['---', 'title: ' + json.dumps(module), '---', '', safe('\n'.join(opening)) if any(line.strip() for line in opening) else 'to be written', '']
         exports = next(groups(source), [])
         for name in exports:
             # Attributes may stand between the documentation and the item.
@@ -86,7 +86,7 @@ for prefix, directory in [('i', ROOT / 'lib/i'), ('std', ROOT / 'std/src')]:
             match = re.search(pattern, source)
             output += ['## ' + name, '']
             if not match:
-                output += ['Source declaration not found.', '']
+                output += ['to be written', '', 'Source declaration not found.', '']
                 continue
             before = source[:match.start()].splitlines()
             while before and before[-1].lstrip().startswith('@'):
@@ -94,8 +94,10 @@ for prefix, directory in [('i', ROOT / 'lib/i'), ('std', ROOT / 'std/src')]:
             comments = []
             while before and before[-1].startswith('///') and not before[-1].startswith('////'):
                 comments.append(before.pop()[3:].lstrip())
-            if comments:
+            if any(line.strip() for line in comments):
                 output += [safe('\n'.join(reversed(comments))), '']
+            else:
+                output += ['to be written', '']
             signature = types.get((module, name))
             if signature:
                 output += ['```text', name + ': ' + signature, '```', '']

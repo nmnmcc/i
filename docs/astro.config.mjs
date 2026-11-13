@@ -8,6 +8,8 @@ const grammar = JSON.parse(readFileSync(new URL('../editors/vscode/syntaxes/i.tm
 grammar.name = 'i';
 
 export default defineConfig({
+  site: 'https://i.nmnm.cc',
+  base: '/',
   integrations: [
     fumadocs({
       components: './src/components/mdx.tsx',
