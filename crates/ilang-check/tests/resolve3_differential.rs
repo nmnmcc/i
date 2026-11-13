@@ -15,12 +15,52 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap()
+}
+
+/// Diagnostic display paths are relative to the loaded package, so many
+/// unrelated fixtures are called `src/main.i`. Count the original files,
+/// including a lone fixture copied into a temporary package, separately.
+fn file_key(graph: &PackageGraph, module: &ilang_check::hir::Module, job: &str) -> String {
+    if graph.root == Some(module.package) && job.ends_with(".i") {
+        return job.to_string();
+    }
+    let package = &graph.packages[module.package];
+    let Some(dir) = &package.dir else {
+        return if module.kind == ilang_package::ModuleKind::Prelude {
+            "lib/prelude.i".into()
+        } else {
+            format!("lib/{}.i", module.path)
+        };
+    };
+    let relative = module
+        .path
+        .strip_prefix(&format!("{}/", package.name))
+        .unwrap();
+    let sub = if module.kind == ilang_package::ModuleKind::Test {
+        "test"
+    } else {
+        "src"
+    };
+    let extension = if graph.sources.get(module.source).display.ends_with(".is") {
+        "is"
+    } else {
+        "i"
+    };
+    let file = dir.join(sub).join(relative).with_extension(extension);
+    file.strip_prefix(root())
+        .unwrap_or(&file)
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// The texts that must be equal, by file. The key `<program>` holds the
 /// parts of the program that belong to no module.
 fn texts(
+    job: &str,
     graph: &PackageGraph,
     program: &Program,
     diags: &[Diagnostic],
@@ -50,7 +90,7 @@ fn texts(
                 ));
             }
         }
-        out.insert(graph.sources.get(module.source).display.clone(), text);
+        assert!(out.insert(file_key(graph, module, job), text).is_none());
     }
     let sources: BTreeSet<_> = program.modules.iter().map(|m| m.source).collect();
     let mut text = String::new();
@@ -68,10 +108,7 @@ fn texts(
     };
     text.push_str(&format!(
         "of_sites {:#?}\nalias_patterns {:#?}\nalias_dependencies {:?}\nalias_sources {:?}\n",
-        program.of_sites,
-        program.alias_patterns,
-        program.alias_dependencies,
-        program.alias_sources
+        program.of_sites, program.alias_patterns, program.alias_dependencies, program.alias_sources
     ));
     text.push_str(&format!(
         "prelude {:?} root {:?} host_exports {:?} declared_entries {:?} vars {} ty_vars {} {:?}\n",
@@ -166,9 +203,11 @@ fn compare(name: &str, dir: &Path, totals: &mut Totals) {
             } else {
                 syn3::lower::lower(&module)
             };
-            expected.extend(errors.into_iter().map(|d| {
-                Diagnostic::error(d.code.as_str(), Some(m.source), d.span, d.message)
-            }));
+            expected.extend(
+                errors
+                    .into_iter()
+                    .map(|d| Diagnostic::error(d.code.as_str(), Some(m.source), d.span, d.message)),
+            );
             let parsed = |ast| Parsed {
                 package,
                 path: m.path.clone(),
@@ -194,8 +233,8 @@ fn compare(name: &str, dir: &Path, totals: &mut Totals) {
         .sum::<usize>();
     expected.extend(old_diags);
     let (new_program, new_diags) = resolve::resolve3(&graph, &direct, &modules);
-    let old = texts(&graph, &old_program, &expected, false);
-    let new = texts(&graph, &new_program, &new_diags, false);
+    let old = texts(name, &graph, &old_program, &expected, false);
+    let new = texts(name, &graph, &new_program, &new_diags, false);
     if old == new {
         totals.files.extend(old.into_keys().map(|file| {
             if file == "<program>" {
@@ -206,15 +245,16 @@ fn compare(name: &str, dir: &Path, totals: &mut Totals) {
         }));
         return;
     }
-    let old = texts(&graph, &old_program, &expected, true);
-    let new = texts(&graph, &new_program, &new_diags, true);
-    for (file, text) in &old {
+    let old = texts(name, &graph, &old_program, &expected, true);
+    let new = texts(name, &graph, &new_program, &new_diags, true);
+    for file in old.keys().chain(new.keys()).collect::<BTreeSet<_>>() {
         let key = if file == "<program>" {
             format!("<program of {name}>")
         } else {
             file.clone()
         };
         totals.files.insert(key.clone());
+        let text = old.get(file).map_or("", |t| t.as_str());
         let other = new.get(file).map_or("", |t| t.as_str());
         if text != other && totals.differ.insert(key.clone()) {
             let report = format!("{key} (in {name}): {}", first_difference(text, other));
@@ -230,6 +270,32 @@ fn subdirs(dir: &Path) -> Vec<PathBuf> {
         .collect();
     out.sort();
     out
+}
+
+fn normal_files(dir: &Path, files: &mut BTreeSet<String>) {
+    for path in subdirs(dir) {
+        if path.is_dir() {
+            normal_files(&path, files);
+        } else if path.extension().is_some_and(|e| e == "i") {
+            files.insert(
+                path.strip_prefix(root())
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+    }
+}
+
+fn package_dirs(dir: &Path, packages: &mut Vec<PathBuf>) {
+    if dir.join("i.toml").is_file() {
+        packages.push(dir.to_path_buf());
+    }
+    for path in subdirs(dir) {
+        if path.is_dir() {
+            package_dirs(&path, packages);
+        }
+    }
 }
 
 #[test]
@@ -286,6 +352,23 @@ fn resolve3_differential() {
             }
         }
     }
+    // Packages can also be nested, such as std/bench/std4. Keep the
+    // package context instead of comparing their files in isolation.
+    let existing: BTreeSet<_> = jobs.iter().map(|(_, dir, _)| dir.clone()).collect();
+    let mut packages = Vec::new();
+    for sub in ["std", "examples", "tests/spec"] {
+        package_dirs(&root.join(sub), &mut packages);
+    }
+    for dir in packages {
+        let name = dir
+            .strip_prefix(&root)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        if !existing.contains(&dir) && wanted(&name) {
+            jobs.push((name, dir, None));
+        }
+    }
     // Forms that the packages above write seldom or never: every error of
     // the lowering, sums, keys, provides, row variables.
     if wanted("extra") {
@@ -295,15 +378,25 @@ fn resolve3_differential() {
         for (i, text) in EXTRA.iter().enumerate() {
             let (_, errors) = syn3::parse_module(text);
             if std::env::var("RESOLVE3_SHOW").is_ok() {
-                eprintln!("extra/m{i}: {} syntax errors {:?}", errors.len(), errors.first());
+                eprintln!(
+                    "extra/m{i}: {} syntax errors {:?}",
+                    errors.len(),
+                    errors.first()
+                );
             }
             std::fs::write(dir.path().join(format!("src/m{i}.i")), text).unwrap();
+        }
+        for (i, text) in EXTRA_LISP.iter().enumerate() {
+            let (_, errors) = syn3::lisp::from_lisp(text);
+            assert!(errors.is_empty(), "extra/l{i}: {errors:?}");
+            std::fs::write(dir.path().join(format!("src/l{i}.is")), text).unwrap();
         }
         jobs.push(("extra".into(), dir.path().to_path_buf(), Some(dir)));
     }
     let next = std::sync::atomic::AtomicUsize::new(0);
     let all = std::sync::Mutex::new(Totals::default());
-    let workers = std::thread::available_parallelism().map_or(4, |n| n.get().min(8));
+    // This suite shares the machine with the other compiler lanes.
+    let workers = std::thread::available_parallelism().map_or(2, |n| n.get().min(2));
     std::thread::scope(|scope| {
         for _ in 0..workers {
             scope.spawn(|| {
@@ -333,19 +426,47 @@ fn resolve3_differential() {
     for (_, report) in &totals.reports {
         eprintln!("DIFFERENT {report}\n");
     }
-    let equal = totals.files.len() - totals.differ.len();
+    let files = totals
+        .files
+        .iter()
+        .filter(|f| !f.starts_with("<program of "))
+        .count();
+    let differ = totals
+        .differ
+        .iter()
+        .filter(|f| !f.starts_with("<program of "))
+        .count();
+    let equal = files - differ;
+    let programs = totals.files.len() - files;
+    let programs_equal = programs - (totals.differ.len() - differ);
     eprintln!(
         "resolve3 differential: {equal} files equal / {} total ({} top-level bindings, {} resolver diagnostics, {} lowering errors over {} packages)",
-        totals.files.len(),
+        files,
         totals.bindings,
         totals.diagnostics,
         totals.lowering,
         jobs.len()
     );
+    eprintln!("resolve3 programs: {programs_equal} equal / {programs} total");
+    if only.is_none() {
+        let mut expected = BTreeSet::new();
+        for sub in ["lib", "std", "examples", "tests/spec"] {
+            normal_files(&root.join(sub), &mut expected);
+        }
+        let missing: Vec<_> = expected.difference(&totals.files).collect();
+        assert!(
+            missing.is_empty(),
+            "normal-surface files not compared: {missing:#?}"
+        );
+        eprintln!(
+            "resolve3 coverage: all {} repository .i files compared",
+            expected.len()
+        );
+    }
     assert!(only.is_some() || totals.bindings > 1000 && totals.diagnostics > 0);
     assert!(
         totals.differ.is_empty(),
-        "{} files differ",
+        "{} files or programs differ",
         totals.differ.len()
     );
 }
@@ -369,6 +490,38 @@ const EXTRA: &[&str] = &[
     "f = ((a, ..)) { a }\ng = ((a = b, c)) { c }\nP = (x = Int, y = Int)\nh = (P(..rest)) { rest }\nk = (P(x = (a, b))) { a }\nm = ((a, b) = (c, d)) { a }\nn = (key = x) { x }\np = ([a, ..rest] = whole) { whole }\nq = (\"ab\" <> rest) { rest }\n",
     // Attributes, declarations, heads.
     "@external(\"m\", \"f\")\nf: (Int) -> Int\n@external(\"m\")\ng: (Int) -> Int\n@deprecated(note = \"x\")\nh = 1\n@host(\"ns\")\nSvc = (run = (Int) -> Int)\n@host(\"ns2\")\nBad = (Int)\n@other\nk = 2\nBox(a) = (a)\nWrap(List(A)) = (A)\nAlias(List(A)) = A\nx = 1\nElem(List(A)) = x\nm: <A>(A) -> A\nimport()\n",
+];
+
+/// These rows reach lowering errors which the normal-surface parser
+/// rejects first, and exercise quote captures outside skipped macro bodies.
+const EXTRA_LISP: &[&str] = &[
+    r#"
+(= mixed (, (= a 1) 2))
+(= data (-> (, (, (= a b) c)) _ c))
+(: row (-> (, (= a Int) Int) (<- Int (, (Fail Int) (Fail String) (= a Int)))))
+(= row (-> (,) _ 1))
+(= service (<- (row) (, (= a 1))))
+(= keyed (-> (, (= a x) y) _ x))
+"#,
+    r#"
+(= capture (-> (, `(f ~item)) _ item))
+(= rest (-> (, `(f ~..[first ..rest])) _ first))
+(= nested (-> (, `(f ~`(g ~item))) _ item))
+(= typed (-> (, `(f ~(: item Int))) _ item))
+(= both (-> (, `(f ~(= a b))) _ (, a b)))
+(= tuple (-> (, `(f ~(, a b))) _ (, a b)))
+(= bad_splice (-> (, `(f ~..rest x)) _ rest))
+(= bad_nested (-> (, `(f ~`(g ~..rest x))) _ rest))
+(= quoted `(f ~unknown ~..rest))
+"#,
+    r#"
+(@ macro (: identity (-> [A] (, A) A)))
+(@ macro (= identity (-> (, x) _ x)))
+(@ macro (= guarded (| (-> (? (, x) True) _ x) (-> (, _) _ 0))))
+(@ macro (= wrapped (| (-> (, x y) _ x) (-> (, x y) _ y))))
+(@ macro (= generic (-> [A] (, x) _ x)))
+(@ macro (= bad_pattern (-> (, (, a b)) _ a)))
+"#,
 ];
 
 /// A tree deeper than a normal stack is resolved (the resolver runs in

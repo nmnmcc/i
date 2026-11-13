@@ -3838,6 +3838,62 @@ impl<'a> Resolver<'a> {
         b
     }
 
+    /// The syntax services and template slot of a resolved quote. Both
+    /// syntax-tree resolvers resolve their own capture patterns first.
+    fn resolved_quote(
+        &mut self,
+        template: Option<u32>,
+        captures: Vec<(bool, Pattern)>,
+        span: Span,
+    ) -> PatternKind {
+        if let Some(template) = template {
+            let module = ast::Ident {
+                name: "\0quote-syntax".into(),
+                span,
+            };
+            let name = ast::Ident {
+                name: "Syntax".into(),
+                span,
+            };
+            let syntax = self.lookup_type(Some(&module), &name);
+            let functions: Option<Vec<_>> = [
+                "_template",
+                "_match",
+                "_match_ok",
+                "_match_one",
+                "_match_many",
+            ]
+            .into_iter()
+            .map(|name| {
+                let name = ast::Ident {
+                    name: name.into(),
+                    span,
+                };
+                match self.name(Some(&module), &name) {
+                    ExprKind::Name(ValueRef::Def(def)) => Some(def),
+                    _ => None,
+                }
+            })
+            .collect();
+            match (syntax, functions) {
+                (Some(TypeRef::Custom(syntax)), Some(functions)) => PatternKind::Quote {
+                    template,
+                    syntax,
+                    functions: functions.try_into().expect("five quote services"),
+                    captures,
+                },
+                _ => PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect()),
+            }
+        } else {
+            self.error(
+                code::MACRO_RESERVED,
+                span,
+                "a quote pattern must be evaluated inside a macro",
+            );
+            PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect())
+        }
+    }
+
     fn pattern(
         &mut self,
         p: &ast::Pattern,
@@ -3849,56 +3905,11 @@ impl<'a> Resolver<'a> {
             P::Quote {
                 template, captures, ..
             } => {
-                let captures: Vec<_> = captures
+                let captures = captures
                     .iter()
                     .map(|(many, p)| (*many, self.pattern(p, binders, shared)))
                     .collect();
-                if let Some(template) = template {
-                    let module = ast::Ident {
-                        name: "\0quote-syntax".into(),
-                        span: p.span,
-                    };
-                    let name = ast::Ident {
-                        name: "Syntax".into(),
-                        span: p.span,
-                    };
-                    let syntax = self.lookup_type(Some(&module), &name);
-                    let functions: Option<Vec<_>> = [
-                        "_template",
-                        "_match",
-                        "_match_ok",
-                        "_match_one",
-                        "_match_many",
-                    ]
-                    .into_iter()
-                    .map(|name| {
-                        let name = ast::Ident {
-                            name: name.into(),
-                            span: p.span,
-                        };
-                        match self.name(Some(&module), &name) {
-                            ExprKind::Name(ValueRef::Def(def)) => Some(def),
-                            _ => None,
-                        }
-                    })
-                    .collect();
-                    match (syntax, functions) {
-                        (Some(TypeRef::Custom(syntax)), Some(functions)) => PatternKind::Quote {
-                            template: *template,
-                            syntax,
-                            functions: functions.try_into().expect("five quote services"),
-                            captures,
-                        },
-                        _ => PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect()),
-                    }
-                } else {
-                    self.error(
-                        code::MACRO_RESERVED,
-                        p.span,
-                        "a quote pattern must be evaluated inside a macro",
-                    );
-                    PatternKind::Error(captures.into_iter().map(|(_, p)| p).collect())
-                }
+                self.resolved_quote(*template, captures, p.span)
             }
             P::Var(n) => PatternKind::Var(self.bind(n, p.span, binders, shared)),
             P::Discard(_) => PatternKind::Discard,
