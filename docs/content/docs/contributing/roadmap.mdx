@@ -1,92 +1,112 @@
 ---
 title: Roadmap
-description: Identify available features, recorded gaps, and specific designs still absent from this tree.
+description: Try available features and identify current implementation limits.
 ---
 
-This page describes what the language and tools can do in this tree, then points to recorded gaps and checked examples of unfinished design work. Use it to choose a task; read the standard for the rule and the implementation for its current limits.
-
-Closed data with labelled fields is already available. This complete program prints its field:
+Try a feature and identify a concrete boundary for your next change.
 
 ```i run package=roadmap title="src/main.i"
 (
-	i/stdio
 	i/core
+	(Io) = i/io
 )
-main = () {
+main = () <- (io : Io) {
 	record = (a = 1)
-	stdio.print(core.inspect(record.a))
+	io.print(core.inspect(record.a))
 }
 ```
+
 ```text
 1
 ```
 
-## In this tree
+## Field inference
 
-These groups describe available features, not full conformance to every rule in their chapters. The [gap register](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) records the exceptions.
+```i error E0506 package=roadmap title="src/main.i"
+get = (record) { record.a }
+main = () { Nil }
+```
 
-The [standard](/docs/standard) defines these areas.
+```text
+E0506
+```
 
-| Standard chapters | Available features |
+**Current limits:** field access needs a known shape; structural inference and width subtyping in [records.md](https://github.com/nmnmcc/i/blob/main/docs/design/records.md) are proposals, while [known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) track other type limitations.
+
+The checker uses `Head::Shape`; the proposed `Head::Record`, `Ty::Rec`, and `Ty::Without` variants are absent.
+
+## Extra fields
+
+```i error E0501 package=roadmap title="src/main.i"
+get = (record : (a = Int)) { record.a }
+main = () {
+	get((a = 1, b = 2))
+	Nil
+}
+```
+
+```text
+E0501
+```
+
+## Current library
+
+```i run package=roadmap title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+	std/json
+	std/time
+)
+main = () <- (io : Io) {
+	io.print(core.inspect(json.parse("oops")))
+	io.print(core.inspect(time.divide(time.seconds(1), 0)))
+}
+```
+
+```text
+Error(JsonError(0, "expected value"))
+Error(DivisionByZero)
+```
+
+**Current limits:** [std-v3.md](https://github.com/nmnmcc/i/blob/main/docs/design/std-v3.md) remains a plan: today's `json.parse` and `time.divide` return `Result`, JSON has separate `pretty`, and time lacks the proposed high-level `Clock`; consult [known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) for conformance work.
+
+## Available features
+
+| Area | Available today |
 | --- | --- |
-| 1: words and symbols | Names without keywords, literals, strings with interpolation, and the line rule. |
-| 2: modules | Imports and exports, package manifests, dependencies, lock files, and configured entries. |
-| 3–4: types | Inference, labelled types, aliases, literal types, unions, intersections, differences, and closed data shapes. |
-| 5–7: names, expressions, patterns | Immutable bindings, functions, branches, guards, matching, field access, and data spreads. |
-| 8: bit arrays | Construction and matching with integer, float, byte, and UTF encodings. |
-| 9: effects | Explicit service needs and provision, typed failure, continuations, structured tasks, and host IO. |
-| 10–11: execution | Program entries, tests, host calls, tail calls, stops, and value inspection. |
-| 12–14: built-ins and macros | Core operations, syntax and typed macros, and the Lisp surface. |
+| Source | Names without keywords, literals, interpolation, line rule. |
+| Packages | Imports, exports, manifests, dependencies, locks, configured entries. |
+| Types | Inference, labelled types, aliases, literal types, unions, intersections, differences, closed shapes. |
+| Expressions | Immutable bindings, functions, branches, guards, matching, fields, spreads. |
+| Bits | Construction/matching with integer, float, byte, UTF encodings. |
+| Services | Needs/provision, typed failure, continuations, structured tasks, host IO. |
+| Execution | Entries, tests, host calls, tail calls, stops, inspection. |
+| Macros | Core operations, syntax/typed macros, alternate surface. |
 
-The following command list comes from `i --help` on this tree. Each command has its own help:
+These features have exceptions in the gap register, including task environments/scopes, pattern syntax/usefulness, service rows/resources, Float text, types, macro budgets, and a checked program that traps. [Open work](/docs/contributing#open-work) lists identifiers; [the standard](/docs/standard) defines intended behavior.
 
-| Command | Purpose |
+## Tools
+
+| Commands | Purpose |
 | --- | --- |
-| `i expand` | Print source after macro expansion. |
-| `i check` | Check a package. |
-| `i build` | Build an executable or Wasm module. |
-| `i run` | Build and run an entry. |
-| `i collections` | List checked collection contributions as JSON. |
-| `i run-collection` | Build and run one collection handle. |
-| `i test` | Build and run package tests, with an optional name filter. |
-| `i new` | Make a package with a program and test. |
-| `i add` | Add a dependency and update the lock file. |
-| `i remove` | Remove a dependency and update the lock file. |
-| `i update` | Raise dependencies within their current major version. |
-| `i publish` | Check a package and create a version tag locally. |
-| `i deps` | Print dependencies and their host capabilities. |
-| `i cache` | Inspect and trim the global cache. |
-| `i spec` | Read the standard. |
-| `i lsp` | Run the language server over standard input and output. |
-| `i fmt` | Format sources and convert between the two surfaces. |
-| `i help` | Show command help. |
+| `expand`, `check` | Expanded source; package diagnostics. |
+| `build`, `run`, `test` | Artifacts; entry execution; filtered tests. |
+| `collections`, `run-collection` | JSON contributions; execute one handle. |
+| `new` | Starter program and test. |
+| `add`, `remove` | Dependencies and lock updates. |
+| `update` | Dependency versions within the current major. |
+| `publish` | Package check and local version tag. |
+| `deps`, `cache` | Dependency capabilities; cache inspection/trimming. |
+| `spec`, `lsp` | Standard lookup; server on standard input/output. |
+| `fmt`, `help` | Formatting/surface conversion; command help. |
 
-`i build --help` lists these targets:
+[CLI commands](/docs/guides/cli) gives usage; each command has help.
 
-| Target | Artifact |
-| --- | --- |
-| `native` (default) | One executable for the current operating system and architecture; statically linked on Linux. |
-| `host` (`ilang` alias) | A Wasm module for the i host. |
-| `js` | A Wasm module for the JavaScript target. |
-| `nodejs` | A Wasm module for the Node.js target. |
-| `wasi` | A Wasm module for the WASI target. |
+`i build` targets are `native` (default; one executable, statically linked on Linux), `host` (alias `ilang`), `js`, `nodejs`, and `wasi` (Wasm modules). **Current limits:** browser/Node targets emit Wasm and a binding plan requiring the host SDK; generated loaders and declarations remain unavailable ([DOC3](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
 
-Editor sources provide [VS Code](https://github.com/nmnmcc/i/blob/main/editors/vscode/README.md) highlighting and language-server integration, [Zed](https://github.com/nmnmcc/i/blob/main/editors/zed/README.md) integration, and the [tree-sitter grammar](https://github.com/nmnmcc/i/blob/main/editors/tree-sitter-i/README.md). The server supplies diagnostics, hover, navigation, completion, and formatting.
+[VS Code](https://github.com/nmnmcc/i/blob/main/editors/vscode/README.md), [Zed](https://github.com/nmnmcc/i/blob/main/editors/zed/README.md), and [tree-sitter](https://github.com/nmnmcc/i/blob/main/editors/tree-sitter-i/README.md) sources provide editor support; the server supplies diagnostics, hover, navigation, completion, and formatting.
 
-## Recorded gaps
+## Compiler trees
 
-[spec-known-gaps.md](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) records task environment and scope handling; pattern parsing and usefulness warnings; effect rows and resource scope; Float text; type inference, applications, and polymorphic types; and macro budget accounting. It separately records a program that passes the checker and traps. The [contributing page](/docs/contributing#where-help-is-wanted) groups these tasks by their recorded identifiers.
-
-## Designed, not landed
-
-A note's opening status can describe an older tree. The following claims concern specific parts of a design and have been checked against this tree:
-
-- [records.md](https://github.com/nmnmcc/i/blob/main/docs/design/records.md) proposes structural field inference and width subtyping beyond today's closed data shapes. Its generic field-read idea, written in today's syntax as `get = (r) { r.a }`, is rejected by the supplied compiler with E0506 because the value needs a known type. Passing `(a = 1, b = 2)` to a parameter annotated `(a = Int)` also fails with E0501, rather than forgetting the extra field. Reading the checker also finds `Head::Shape`, with none of the proposed `Head::Record`, `Ty::Rec`, or `Ty::Without` variants. The closed data example above already works; calling all records unimplemented would be wrong.
-- [std-v3.md](https://github.com/nmnmcc/i/blob/main/docs/design/std-v3.md) redesigns the standard library. Two source comparisons show that `std/src` is still the pre-redesign library: [json.i](https://github.com/nmnmcc/i/blob/main/std/src/json.i) has `parse` returning `Result(Json, JsonError)` and a separate `pretty`, while the plan requires a raised `JsonError` and two `print` shapes; [time.i](https://github.com/nmnmcc/i/blob/main/std/src/time.i) has `divide` returning `Result(Duration, TimeError)` and lacks the planned high-level `Clock` type. These source checks establish the status of those changes, not every row of the plan.
-- [ast-hir-merge.md](https://github.com/nmnmcc/i/blob/main/docs/design/ast-hir-merge.md) recommends keeping a syntax tree and HIR while removing the older syntax tree. The [syntax entry point](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/syn3/mod.rs) still calls `lower::lower` and returns the old `ast::Module`; the old tree and conversion remain. That removal has not landed.
-
-Historical reports and plans whose present status is uncertain are omitted from this list. These notes make no promise of a delivery date.
-
-## See also
-
-- [How to send changes](/docs/contributing/how-to-send-changes)
+[ast-hir-merge.md](https://github.com/nmnmcc/i/blob/main/docs/design/ast-hir-merge.md) discusses the tree rewrite. Today's [syntax entry point](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/lib.rs) returns the current `ast::Module` directly, with transition facts; the old syntax-tree conversion described by earlier reports is gone. Notes give no delivery-date promise.
