@@ -67,7 +67,7 @@ fn record_spreads_and_fields_count_references() {
 
 #[test]
 fn entries_tests_and_ordinary_exports_retain_their_helpers() {
-    // Rules 1–2: no warning on public API, entries, tests, or their uses.
+    // No warning on public API, entries, tests, or their uses.
     assert!(
         names(&[
             ("src/main.i", " main = () { helper() }\nhelper = () { Nil }"),
@@ -83,7 +83,7 @@ fn entries_tests_and_ordinary_exports_retain_their_helpers() {
 
 #[test]
 fn test_exports_need_reachable_package_uses() {
-    // Rule 4: importing an export and a reference from a dead function
+    // Importing an export and a reference from a dead function
     // can retain it. A test in another test module can retain it.
     assert_eq!(
         names(&[
@@ -102,7 +102,7 @@ fn test_exports_need_reachable_package_uses() {
 
 #[test]
 fn underscore_suppression_still_counts_body_references() {
-    // Rule 3 suppresses the name; its references still count.
+    // An underscore suppresses the name’s warning; its references still count.
     assert_eq!(
         names(&[(
             "src/main.i",
@@ -126,7 +126,7 @@ fn each_pattern_name_is_checked_without_retaining_its_siblings() {
 
 #[test]
 fn hint_requires_test_module_no_value_parameters_and_exact_nil() {
-    // Rule 5: only a function that could be passed to the test macro gets the hint.
+    // Only a function that could be passed to the test macro gets the hint.
     let ws = warnings(&[
         ("src/main.i", "ordinary = () { Nil }"),
         (
@@ -173,7 +173,7 @@ with_environment = () <- (a : Assert) { assert(True) }
 
 #[test]
 fn a_type_spelled_nil_is_not_the_prelude_nil() {
-    // Rule 5 says Nil, the nominal prelude type, rather than its spelling.
+    // The test hint requires Nil, the nominal prelude type, rather than its spelling.
     assert_eq!(
         warnings(&[("test/check.i", "Local = ()\nNil = Local\nf = () { Local }")]),
         [("f".into(), "top-level binding `f` is not used".into())]
@@ -182,7 +182,7 @@ fn a_type_spelled_nil_is_not_the_prelude_nil() {
 
 #[test]
 fn types_services_constructors_and_external_declarations_are_exempt() {
-    // Rule 6's conservative boundary includes unused type declarations.
+    // The conservative warning boundary includes unused type declarations.
     assert!(
         names(&[(
             "src/main.i",
@@ -221,7 +221,7 @@ api : (annotation) -> annotation = (x) { x }
 
 #[test]
 fn pattern_lengths_and_nested_expression_references_count() {
-    // Rule 2 includes pattern expressions, guards, nested bindings and lists.
+    // References count in pattern expressions, guards, nested bindings and lists.
     assert!(
         names(&[(
             "src/main.i",
@@ -251,7 +251,7 @@ fn broken_programs_do_not_gain_speculative_unused_warnings() {
 
 #[test]
 fn wasm_exports_and_editor_checks_have_the_same_roots() {
-    // Rule 2 names [wasm].exports separately. The resolver currently
+    // [wasm].exports are entry roots too. The resolver currently
     // requires these names to be exported from source modules.
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(

@@ -280,6 +280,13 @@
     "new": "\n/// Value-type edges order already computed expression SCCs. They never\n/// change SCC membership, runtime needs, or initialization.\nfn type_order(\n    p: &mut Program,\n"
   },
   {
+    "file": "crates/ilang-check/src/order.rs",
+    "line": 358,
+    "hash": "232c5adc860735bea7b4427f3527da468049ba61e9eeab4beb0791f6e8e6f836",
+    "old": "        }\n    }\n    // O4: failed components poison their dependents without another error.\n    // Keep the expression SCCs intact; only recovery readiness is propagated.\n    let mut pending = std::collections::VecDeque::from_iter(bad.iter().copied());\n",
+    "new": "        }\n    }\n    // failed components poison their dependents without another error.\n    // Keep the expression SCCs intact; only recovery readiness is propagated.\n    let mut pending = std::collections::VecDeque::from_iter(bad.iter().copied());\n"
+  },
+  {
     "file": "crates/ilang-check/src/providers.rs",
     "line": 1,
     "hash": "92989e44f0ffec66469c6cc3524d209b623ba911250c91c510e4c5ad54f4a505",
@@ -1906,9 +1913,9 @@
   {
     "file": "crates/ilang-check/src/types/infer.rs",
     "line": 471,
-    "hash": "020d7397414348a4e124cd62a1727fb195386a80a2b97305bf2f74d03440a92c",
-    "old": "    }\n\n    /// One group of top-level bindings (§4.7): typed together, then\n    /// generalized together when every value is a direct value.\n    fn group(&mut self, group: &[BindingRef]) {\n",
-    "new": "    }\n\n    /// One group of top-level bindings: typed together, then\n    /// generalized together when every value is a direct value.\n    fn group(&mut self, group: &[BindingRef]) {\n"
+    "hash": "90211425df3a5afcae7d85406c7c180300daa928281aaf7345406d0ed75f5fab",
+    "old": "    }\n\n    /// One group of top-level bindings (§4.7): typed together, then\n    /// generalized together when every value is a direct value.\n    fn group(&mut self, group: &[BindingRef]) {\n        let error_start = self.diags.len();\n        if group.iter().any(|b| self.p.failed_type_groups.contains(b)) {\n            // O4: a dependency-cycle component is Failed before query inference.\n            // Never is only recovery data; no fresh inferred alias is published.\n            for d in group.iter().flat_map(|b| &self.p.binding(*b).defs) {\n",
+    "new": "    }\n\n    /// One group of top-level bindings: typed together, then\n    /// generalized together when every value is a direct value.\n    fn group(&mut self, group: &[BindingRef]) {\n        let error_start = self.diags.len();\n        if group.iter().any(|b| self.p.failed_type_groups.contains(b)) {\n            // a dependency-cycle component is Failed before query inference.\n            // Never is only recovery data; no fresh inferred alias is published.\n            for d in group.iter().flat_map(|b| &self.p.binding(*b).defs) {\n"
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
@@ -2073,6 +2080,13 @@
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
+    "line": 1844,
+    "hash": "58b4733446d9b78570c059b58e62efbce6b0b842017121062295416257257a7a",
+    "old": "    }\n\n    /// Rule 7: a constructor is a function from its fields to its type, with\n    /// the field labels; with no fields it is a value.\n    fn ctor_value(&mut self, c: CtorRef) -> Ty {\n",
+    "new": "    }\n\n    /// A constructor is a function from its fields to its type, with\n    /// the field labels; with no fields it is a value.\n    fn ctor_value(&mut self, c: CtorRef) -> Ty {\n"
+  },
+  {
+    "file": "crates/ilang-check/src/types/infer.rs",
     "line": 1870,
     "hash": "415d58a924462e077ca346c59e62e8b03db58b2c82f823171d6a8bab0e2a7536",
     "old": "    }\n\n    /// The type of `e`, and its known type (§4.8), `Top` when it has none.\n    /// `expected` is the expected type of its place, `Top` for none.\n    pub fn infer_k(&mut self, e: &Expr, expected: &Knowledge) -> (Ty, Knowledge) {\n",
@@ -2227,6 +2241,13 @@
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
+    "line": 2987,
+    "hash": "192a12d755796063a4de23621e10531c9d6877e6e4c15a368b9ceb690bccd279",
+    "old": "    }\n\n    /// Rule 13 for `v.k`: every member of the known type of `v` is data\n    /// with more than k positions.\n    fn tuple_index(\n",
+    "new": "    }\n\n    /// Projection `v.k` requires every member of the known type of `v` is data\n    /// with more than k positions.\n    fn tuple_index(\n"
+  },
+  {
+    "file": "crates/ilang-check/src/types/infer.rs",
     "line": 3008,
     "hash": "fa9a91bea326f1c594e57e8bbaeac64a62c41e4191fe0f894025d976ce0935a3",
     "old": "    }\n\n    /// Rule 13 for `.k` (`Ok(k)`) and `.f` (`Err(f)`) on data (syntax-3\n    /// §2.3): every member of the known type `kv` of the value is data with\n    /// that key, at one place in canonical order; the value has the union\n    /// of those parts.\n",
@@ -2262,10 +2283,10 @@
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
-    "line": 3235,
-    "hash": "f442edae4dc85b2e9518a4335d76d02393d35798657a2a68e9b799b648ae2f89",
-    "old": "\n    /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type\n    /// of the block, and the block has its known type (§4.8).\n    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Knowledge) -> (Ty, Knowledge) {\n        for (i, s) in stmts.iter().enumerate() {\n",
-    "new": "\n    /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type\n    /// of the block, and the block has its known type.\n    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Knowledge) -> (Ty, Knowledge) {\n        for (i, s) in stmts.iter().enumerate() {\n"
+    "line": 3234,
+    "hash": "162e49b41dc912bedbcfe5c08ac9927c4725433e08ee41ae3f6f34578cfb2743",
+    "old": "    // ---- Blocks, functions, and bindings ----\n\n    /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type\n    /// of the block, and the block has its known type (§4.8).\n    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Knowledge) -> (Ty, Knowledge) {\n        for (i, s) in stmts.iter().enumerate() {\n",
+    "new": "    // ---- Blocks, functions, and bindings ----\n\n    /// For `{ s1 … sn e }`, The last expression has the expected type\n    /// of the block, and the block has its known type.\n    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Knowledge) -> (Ty, Knowledge) {\n        for (i, s) in stmts.iter().enumerate() {\n"
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
@@ -2286,7 +2307,7 @@
     "line": 3308,
     "hash": "937408cb2c0201e516842c60714fc438d0898dd67a30fe843de610773dc3e64d",
     "old": "    }\n\n    /// Rule 4: a function expression, and its known type (§4.8). With an\n    /// expected function type with as many parameters, a parameter with no\n    /// type written at its top gets the known type of the matching\n",
-    "new": "    }\n\n    /// Rule 4: a function expression, and its known type. With an\n    /// expected function type with as many parameters, a parameter with no\n    /// type written at its top gets the known type of the matching\n"
+    "new": "    }\n\n    /// A function expression, and its known type. With an\n    /// expected function type with as many parameters, a parameter with no\n    /// type written at its top gets the known type of the matching\n"
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
@@ -2818,7 +2839,7 @@
     "line": 580,
     "hash": "874aca4ebb3fcc65c3ecc07b5720c760d709d90f9a465dabe21fee51bedb203d",
     "old": "    }\n\n    // ---- case (rules 11 and 12) ----\n\n    /// Rule 11, and the known type of a `case` (§4.8): the union of the\n    /// known types of its clause expressions, which have the expected type\n    /// of the `case`.\n",
-    "new": "    }\n\n    // ---- Match constraints and narrowing ----\n\n    /// Rule 11, and the known type of a `case`: the union of the\n    /// known types of its clause expressions, which have the expected type\n    /// of the `case`.\n"
+    "new": "    }\n\n    // ---- Match constraints and narrowing ----\n\n    /// The known type of a `case` is the union of the\n    /// known types of its clause expressions, which have the expected type\n    /// of the `case`.\n"
   },
   {
     "file": "crates/ilang-check/src/types/pattern.rs",
@@ -2836,10 +2857,10 @@
   },
   {
     "file": "crates/ilang-check/src/types/pattern.rs",
-    "line": 667,
-    "hash": "fd5fc593918b961aabeb50ebb0aa2ff88abd1db273f3c0f4aed3bfb8e99cc0da",
-    "old": "        }\n        // Rule 12: each catch-all gets `B - H`, and its known type less the\n        // members that are taken (§4.8).\n        for k in 0..v.catches.len() {\n            let c = &v.catches[k];\n",
-    "new": "        }\n        // Rule 12: each catch-all gets `B - H`, and its known type less the\n        // members that are taken.\n        for k in 0..v.catches.len() {\n            let c = &v.catches[k];\n"
+    "line": 666,
+    "hash": "80366b69271c06b2a55d74e8c9331666fe3fee56ef2ecc4f651da8be74a7fafd",
+    "old": "            }\n        }\n        // Rule 12: each catch-all gets `B - H`, and its known type less the\n        // members that are taken (§4.8).\n        for k in 0..v.catches.len() {\n            let c = &v.catches[k];\n",
+    "new": "            }\n        }\n        // Each catch-all gets `B - H`, and its known type less the\n        // members that are taken.\n        for k in 0..v.catches.len() {\n            let c = &v.catches[k];\n"
   },
   {
     "file": "crates/ilang-check/src/types/pattern.rs",
@@ -2864,6 +2885,13 @@
   },
   {
     "file": "crates/ilang-check/src/types/pattern.rs",
+    "line": 780,
+    "hash": "5dcea7a51c19a97e6f3f2bc834b9ea87dc928115ff89d517ec7d31225c404b69",
+    "old": "    }\n\n    /// Rule 12: the type of the catch-all `id` of choice `choice` of clause\n    /// `ci`, at `place`: `B - H`, with `H` the type constructors that the\n    /// earlier clauses without a guard take there. \"Every value that the\n",
+    "new": "    }\n\n    /// The type of the catch-all `id` of choice `choice` of clause\n    /// `ci`, at `place`: `B - H`, with `H` the type constructors that the\n    /// earlier clauses without a guard take there. \"Every value that the\n"
+  },
+  {
+    "file": "crates/ilang-check/src/types/pattern.rs",
     "line": 875,
     "hash": "13627408ab2d5f734a32c4c09e40194287e505d2a3ceb2180d110ad01ef9d606",
     "old": "    }\n\n    /// Checks the coverage (§7.4) of a `case`, and warns about the clauses\n    /// that are never used, with the types that inference found.\n    pub fn check_case(&mut self, c: PendingCase) {\n",
@@ -2885,10 +2913,17 @@
   },
   {
     "file": "crates/ilang-check/src/types/pattern.rs",
-    "line": 1142,
-    "hash": "30c82243ed840dcc5aefe77e00f6bdfb979b7348ba617609392c64e3ada0066a",
-    "old": "                    // constructors of `T`, so those values must be in `T`:\n                    // `B <: T | r - T`.\n                    // §7.1: custom types with no constructors cannot be\n                    // told apart at run time, so for a type test they all\n                    // count as one type constructor: a test of one takes\n",
-    "new": "                    // constructors of `T`, so those values must be in `T`:\n                    // `B <: T | r - T`.\n                    // Custom types with no constructors cannot be\n                    // told apart at run time, so for a type test they all\n                    // count as one type constructor: a test of one takes\n"
+    "line": 1139,
+    "hash": "09f20b49e46ce8af4efda451d38a75ab06fdf26e18fff588164f8839a01fef69",
+    "old": "                        }\n                    }\n                    // Rule 11: the test takes every value of the type\n                    // constructors of `T`, so those values must be in `T`:\n                    // `B <: T | r - T`.\n                    // §7.1: custom types with no constructors cannot be\n                    // told apart at run time, so for a type test they all\n                    // count as one type constructor: a test of one takes\n",
+    "new": "                        }\n                    }\n                    // The test takes every value of the type\n                    // constructors of `T`, so those values must be in `T`:\n                    // `B <: T | r - T`.\n                    // Custom types with no constructors cannot be\n                    // told apart at run time, so for a type test they all\n                    // count as one type constructor: a test of one takes\n"
+  },
+  {
+    "file": "crates/ilang-check/src/types/pattern.rs",
+    "line": 1179,
+    "hash": "762d47919c6f7de0c933b4d9d9f65b140c824f97d49f1d1ce13958237034c647",
+    "old": "                let mut parts = vec![Pat::Wild(None); fields.len()];\n                let matched = self.match_fields(q.span, &fields, args, *spread);\n                // Rule 11: `..` counts as a catch-all at the places of the\n                // fields that it leaves out.\n                if *spread && v.unguarded {\n",
+    "new": "                let mut parts = vec![Pat::Wild(None); fields.len()];\n                let matched = self.match_fields(q.span, &fields, args, *spread);\n                // `..` counts as a catch-all at the places of the\n                // fields that it leaves out.\n                if *spread && v.unguarded {\n"
   },
   {
     "file": "crates/ilang-check/src/types/pattern.rs",
@@ -3648,10 +3683,10 @@
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
-    "line": 60,
-    "hash": "0446c5a86e67879498c8ac2588dd01d5da436198e476432c2ef9892cc727ddab",
-    "old": "fn annotated_and_inferred_service_rows() {\n    // Rule 4 unions the callback's N with S(N). Writing that same union\n    // must not change the finite principal type (§4.7).\n    for annotation in [\"{\", \"-> Nil {\"] {\n        accepts(\n",
-    "new": "fn annotated_and_inferred_service_rows() {\n    // Rule 4 unions the callback's N with S(N). Writing that same union\n    // must not change the finite principal type.\n    for annotation in [\"{\", \"-> Nil {\"] {\n        accepts(\n"
+    "line": 59,
+    "hash": "a47b0ddaad59e767d3177d02784d1eddb6dd7601b65db79889aa838e84782117",
+    "old": "#[test]\nfn annotated_and_inferred_service_rows() {\n    // Rule 4 unions the callback's N with S(N). Writing that same union\n    // must not change the finite principal type (§4.7).\n    for annotation in [\"{\", \"-> Nil {\"] {\n        accepts(\n",
+    "new": "#[test]\nfn annotated_and_inferred_service_rows() {\n    // Function inference unions the callback's N with S(N). Writing that same union\n    // must not change the finite principal type.\n    for annotation in [\"{\", \"-> Nil {\"] {\n        accepts(\n"
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
@@ -3659,6 +3694,20 @@
     "hash": "26d0b476a3ab333b68a21d0787ef33e4de1d9519fb201a7044e49d8f4e1f6002",
     "old": "#[test]\nfn generic_service_through_a_helper() {\n    // Rules 3 and 5 instantiate use with N=Never; rule 9 removes S(Never).\n    accepts(\n        \"S(N) = (() <- N -> Nil, (N) -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> Nil) { body() }\\nexample = () { run(() { use() }) <- (S(() { Nil }, (_ : Never) { Nil })) }\",\n",
     "new": "#[test]\nfn generic_service_through_a_helper() {\n    // Instantiation with N=Never lets provision remove S(Never).\n    accepts(\n        \"S(N) = (() <- N -> Nil, (N) -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> Nil) { body() }\\nexample = () { run(() { use() }) <- (S(() { Nil }, (_ : Never) { Nil })) }\",\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/generic_services.rs",
+    "line": 85,
+    "hash": "c9a8900ad8458d3a83940f59bb9412d075087d603e4c22b28fcb197845cb865e",
+    "old": "#[test]\nfn open_service_row_through_helpers() {\n    // Rule 5 carries both requirements through calls; no closed service\n    // annotation is needed to make the row finite.\n    for annotation in [\"{\", \"-> Nil {\"] {\n",
+    "new": "#[test]\nfn open_service_row_through_helpers() {\n    // Calls carry both requirements through calls; no closed service\n    // annotation is needed to make the row finite.\n    for annotation in [\"{\", \"-> Nil {\"] {\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/generic_services.rs",
+    "line": 100,
+    "hash": "e47bbb27f7e036f844fb0171e5c63074d9c65c093090e4b69bd299f74489c198",
+    "old": "#[test]\nfn several_parameters_and_nested_services() {\n    // Rules 4, 5 and 7 apply equally inside nested constructors and with\n    // independent value/error/environment parameters. Rule 3 permits\n    // independent closed instances of the resulting scheme.\n    for annotation in [\"{\", \"-> A {\"] {\n",
+    "new": "#[test]\nfn several_parameters_and_nested_services() {\n    // Inference constraints apply equally inside nested constructors and with\n    // independent value/error/environment parameters. Instantiation permits\n    // independent closed instances of the resulting scheme.\n    for annotation in [\"{\", \"-> A {\"] {\n"
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
@@ -3833,7 +3882,7 @@
     "line": 217,
     "hash": "8798534475c023866e675df1f2cbe72d29ecec03d31610c96ca57fe55289c9fc",
     "old": "#[test]\nfn guarded_list_heads_leave_tail_items_unrestricted() {\n    // Std-1b report §5: rule 11 must pass catch-all slack to every\n    // homogeneous list item, including items reached through the rest.\n    let (ds, _) = check(\n",
-    "new": "#[test]\nfn guarded_list_heads_leave_tail_items_unrestricted() {\n    // Rule 11 must pass catch-all slack to every\n    // homogeneous list item, including items reached through the rest.\n    let (ds, _) = check(\n"
+    "new": "#[test]\nfn guarded_list_heads_leave_tail_items_unrestricted() {\n    // Match inference must pass catch-all slack to every\n    // homogeneous list item, including items reached through the rest.\n    let (ds, _) = check(\n"
   },
   {
     "file": "crates/ilang-check/tests/literal_types.rs",
@@ -3962,6 +4011,13 @@
     "new": "#[test]\nfn disjoint_guards_do_not_narrow_or_cover() {\n    // even an always-true guard does not cover a value.\n    for source in [\n        \"f = (x : 1) { x |> (_ ? x == 2) { 0 } }\\n\",\n"
   },
   {
+    "file": "crates/ilang-check/tests/projects/attr_deprecated/src/lib.i",
+    "line": 8,
+    "hash": "c1d487fb111a115ddf8db6af9f6ddfe9df15e3651a543903dba062eaea4e8d19",
+    "old": "old = 1\n\n// A type and its constructor have one name (stage 3, syntax-3.md §2.8).\n@deprecated(\"use New\")\nOld = ()\n",
+    "new": "old = 1\n\n// A type and its same-named constructor share deprecation warnings.\n@deprecated(\"use New\")\nOld = ()\n"
+  },
+  {
     "file": "crates/ilang-check/tests/provider_graph.rs",
     "line": 544,
     "hash": "6f09a68cdc4c9fe8778282b0a88b8f60c043d4cbdaa82ca2ee240f4ded617b5e",
@@ -4034,9 +4090,9 @@
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 4,
-    "hash": "f1c752fd1432d009e9602d82e651fbac0cec47bdc27d895eaad95d5531796145",
-    "old": "#[test]\nfn stage_three_provider_diagnostics_match_landed_conversion() {\n    // §9.2: a supplied value must satisfy the needed form by subtyping;\n    // incompatible same-key requirements have an empty intersection.\n    // Keep every diagnostic from landed tip cc26b8d9, including its source\n",
-    "new": "#[test]\nfn stage_three_provider_diagnostics_match_landed_conversion() {\n    // A supplied value must satisfy the needed form by subtyping;\n    // incompatible same-key requirements have an empty intersection.\n    // Keep every diagnostic from landed tip cc26b8d9, including its source\n"
+    "hash": "cdc31e2c87f89cfb4df9d53739780803af15d18dd5282fe307381524e80ac047",
+    "old": "#[test]\nfn stage_three_provider_diagnostics_match_landed_conversion() {\n    // §9.2: a supplied value must satisfy the needed form by subtyping;\n    // incompatible same-key requirements have an empty intersection.\n    // Keep every diagnostic from landed tip cc26b8d9, including its source\n    // binding. Pin total errors and E0515 counts independently of the saved\n    // messages. The full fourteen-project guard is in CLI providers tests:\n",
+    "new": "#[test]\nfn stage_three_provider_diagnostics_match_landed_conversion() {\n    // A supplied value must satisfy the needed form by subtyping;\n    // incompatible same-key requirements have an empty intersection.\n    // Retain each diagnostic and its source\n    // binding. Pin total errors and E0515 counts independently of the saved\n    // messages. The full fourteen-project guard is in CLI providers tests:\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4114,6 +4170,13 @@
     "hash": "baa48092549aaad1f42670ad4617fbbfc413c238b8657cb5fecd44cca1aaf487",
     "old": "#[test]\nfn instantiated_output_rows_are_checked_even_when_unused() {\n    // §9.2 forbids two S forms in the returned callback's environment,\n    // whether it is invoked or left unused. §4.8 unions the two rows.\n    let source = \"S(A) = (A)\\nT(N) = (f = () <- N -> Nil)\\nmerge = <N, M>(a : T(N), b : T(M)) {\\n\\tT(\\n\\t\\tf = () {\\n\\t\\t\\ta.f()\\n\\t\\t\\tb.f()\\n\\t\\t},\\n\\t)\\n}\\none = () <- (s : S(Int)) { Nil }\\ntwo = () <- (s : S(String)) { Nil }\\n\\nmain = () {\\n\\tunused = merge(T(f = one), T(f = two))\\n\\tNil\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/main.i\", source)]);\n",
     "new": "#[test]\nfn instantiated_output_rows_are_checked_even_when_unused() {\n    // Two S forms are forbidden in the returned callback's environment,\n    // whether it is invoked or left unused. The two rows are unioned.\n    let source = \"S(A) = (A)\\nT(N) = (f = () <- N -> Nil)\\nmerge = <N, M>(a : T(N), b : T(M)) {\\n\\tT(\\n\\t\\tf = () {\\n\\t\\t\\ta.f()\\n\\t\\t\\tb.f()\\n\\t\\t},\\n\\t)\\n}\\none = () <- (s : S(Int)) { Nil }\\ntwo = () <- (s : S(String)) { Nil }\\n\\nmain = () {\\n\\tunused = merge(T(f = one), T(f = two))\\n\\tNil\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/main.i\", source)]);\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/row_schemes.rs",
+    "line": 257,
+    "hash": "bc61c90fc1a19eb4962611d65cf6b2069747a47e9f16a5328f140799f0e43bed",
+    "old": "#[test]\nfn function_type_joins_preserve_scalar_error_inclusion() {\n    // Rule 8 still governs scalar error value sets when function types\n    // are joined; the row mode must reach merge_arg as well as calls.\n    types(\n",
+    "new": "#[test]\nfn function_type_joins_preserve_scalar_error_inclusion() {\n    // Subtype comparison governs scalar error value sets when function types\n    // are joined; the row mode must reach merge_arg as well as calls.\n    types(\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4207,6 +4270,41 @@
     "new": "#[test]\nfn shown_names_skip_types_and_ignore_written_variable_names() {\n    // First-use names skip unqualified types and never keep the\n    // spelling of a declared variable. Error/environment roles keep E/N.\n    let dir = tempfile::tempdir().unwrap();\n"
   },
   {
+    "file": "crates/ilang-check/tests/types/labels.i",
+    "line": 1,
+    "hash": "2735335e5c29bc6734363f1742a1dd382cc01d92db9f0ebc811d4debe19bb680",
+    "old": "// §6.6: migrated function heads take positional arguments; constructor\n// data keeps explicit labels (syntax three §2.3, §2.4).\nUser = (name = String, age = Int)\n\n",
+    "new": "// Positional function parameters differ from constructor fields; constructor\n// data keeps explicit labels so calls retain their complete shape.\nUser = (name = String, age = Int)\n\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/types/labels.i",
+    "line": 40,
+    "hash": "b32ab5631390096f92b8f90d2697fb8d6de4527e1538cfe2b06626a0932597a6",
+    "old": "\nmissing = make(\"b\")\n// Calls through a labelled function value are valid (syntax three stage 10).\nparam = (f) { f(x = 1) }\n\n",
+    "new": "\nmissing = make(\"b\")\n// Calls through a function value retain the labelled argument shape.\nparam = (f) { f(x = 1) }\n\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/types/labels.i",
+    "line": 48,
+    "hash": "421a889f03a26eda18ddf5b256b230a63a57e3ab37b2cf7382a67236b8f1e5c2",
+    "old": "}\n\n// Positional calls use known function types (§4.8).\n// A name that is not generalized gets its type from its value.\nid = (x) { x }\n",
+    "new": "}\n\n// Positional calls use known function types.\n// A name that is not generalized gets its type from its value.\nid = (x) { x }\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/types/labels.i",
+    "line": 85,
+    "hash": "a1d13d8beb4f2457ab30f1806eed5bb2458813cd9d7f14a5ad6e65b14b1caca6",
+    "old": "pong = (m : Int) { m |> (0) { 0 } | (_) { ping(m - 1) } }\n\n// A written positional signature determines the call interface (§6.6).\nwins : (Int) -> Int = (y) { y }\n\n",
+    "new": "pong = (m : Int) { m |> (0) { 0 } | (_) { ping(m - 1) } }\n\n// A written positional signature determines the call interface.\nwins : (Int) -> Int = (y) { y }\n\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/types/syn3_fn_shapes.i",
+    "line": 1,
+    "hash": "86c131265a8f138848182aa7d0c30b915c61f0d5e9342d583b144aed2bf568f8",
+    "old": "// Syntax three stage 7: functions of different shapes in one list have the\n// parameter `Never`.\nxs = [(a) { a }, (a, b) { a }]\n",
+    "new": "// Functions of different shapes in one list must retain the\n// parameter `Never`.\nxs = [(a) { a }, (a, b) { a }]\n"
+  },
+  {
     "file": "crates/ilang-check/tests/types_joint.rs",
     "line": 1,
     "hash": "488dcf401ddaf822831c4db5fed8ea7d2e6c5ca53057786d6bce86662ed5e1dd",
@@ -4250,10 +4348,52 @@
   },
   {
     "file": "crates/ilang-check/tests/unused.rs",
+    "line": 68,
+    "hash": "637ab96f5e7850950f190b254da9f46a8d20fe6c6106a8f5c3fb48109a2c5739",
+    "old": "#[test]\nfn entries_tests_and_ordinary_exports_retain_their_helpers() {\n    // Rules 1–2: no warning on public API, entries, tests, or their uses.\n    assert!(\n        names(&[\n",
+    "new": "#[test]\nfn entries_tests_and_ordinary_exports_retain_their_helpers() {\n    // No warning on public API, entries, tests, or their uses.\n    assert!(\n        names(&[\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/unused.rs",
+    "line": 84,
+    "hash": "cc822d3463b1883d0c35e8401e7265cddf14fdedf42eebe55eed4f6149cca41b",
+    "old": "#[test]\nfn test_exports_need_reachable_package_uses() {\n    // Rule 4: importing an export and a reference from a dead function\n    // can retain it. A test in another test module can retain it.\n    assert_eq!(\n",
+    "new": "#[test]\nfn test_exports_need_reachable_package_uses() {\n    // Importing an export and a reference from a dead function\n    // can retain it. A test in another test module can retain it.\n    assert_eq!(\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/unused.rs",
+    "line": 103,
+    "hash": "ad529818fe4055b86dcdbc8a2de35f33f8475128d9972cf5f0d4137d3e52368a",
+    "old": "#[test]\nfn underscore_suppression_still_counts_body_references() {\n    // Rule 3 suppresses the name; its references still count.\n    assert_eq!(\n        names(&[(\n",
+    "new": "#[test]\nfn underscore_suppression_still_counts_body_references() {\n    // An underscore suppresses the name’s warning; its references still count.\n    assert_eq!(\n        names(&[(\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/unused.rs",
     "line": 115,
     "hash": "38a6bbb4a7d4548235ebec15accdd2c1b403beb7582cd83bbe482c96e2212e6c",
     "old": "#[test]\nfn each_pattern_name_is_checked_without_retaining_its_siblings() {\n    // §2.4.1: using one pattern name retains references, not sibling names.\n    assert_eq!(\n        names(&[(\n",
     "new": "#[test]\nfn each_pattern_name_is_checked_without_retaining_its_siblings() {\n    // Using one pattern name retains references, not sibling names.\n    assert_eq!(\n        names(&[(\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/unused.rs",
+    "line": 127,
+    "hash": "873513042228eaeb5ccd1a0ec2a28e90fc69b3bb80ab4aa4131e2adf58de7418",
+    "old": "#[test]\nfn hint_requires_test_module_no_value_parameters_and_exact_nil() {\n    // Rule 5: only a function that could be passed to the test macro gets the hint.\n    let ws = warnings(&[\n        (\"src/main.i\", \"ordinary = () { Nil }\"),\n",
+    "new": "#[test]\nfn hint_requires_test_module_no_value_parameters_and_exact_nil() {\n    // Only a function that could be passed to the test macro gets the hint.\n    let ws = warnings(&[\n        (\"src/main.i\", \"ordinary = () { Nil }\"),\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/unused.rs",
+    "line": 174,
+    "hash": "887e4793b0aa44249aa200d8419fc186195d5040a48167ec42dba2870f8cf2f7",
+    "old": "#[test]\nfn a_type_spelled_nil_is_not_the_prelude_nil() {\n    // Rule 5 says Nil, the nominal prelude type, rather than its spelling.\n    assert_eq!(\n        warnings(&[(\"test/check.i\", \"Local = ()\\nNil = Local\\nf = () { Local }\")]),\n",
+    "new": "#[test]\nfn a_type_spelled_nil_is_not_the_prelude_nil() {\n    // The test hint requires Nil, the nominal prelude type, rather than its spelling.\n    assert_eq!(\n        warnings(&[(\"test/check.i\", \"Local = ()\\nNil = Local\\nf = () { Local }\")]),\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/unused.rs",
+    "line": 183,
+    "hash": "a374e6ce3ac8527138f16cf25fd15bd33c7d64034488f9284b780b0d74fa5dc5",
+    "old": "#[test]\nfn types_services_constructors_and_external_declarations_are_exempt() {\n    // Rule 6's conservative boundary includes unused type declarations.\n    assert!(\n        names(&[(\n",
+    "new": "#[test]\nfn types_services_constructors_and_external_declarations_are_exempt() {\n    // The conservative warning boundary includes unused type declarations.\n    assert!(\n        names(&[(\n"
   },
   {
     "file": "crates/ilang-check/tests/unused.rs",
@@ -4264,10 +4404,17 @@
   },
   {
     "file": "crates/ilang-check/tests/unused.rs",
-    "line": 253,
-    "hash": "7dcb0195ee2b14f6dcc4944349468a57c60804dc34b6145aec22ab82a91268ca",
-    "old": "fn wasm_exports_and_editor_checks_have_the_same_roots() {\n    // Rule 2 names [wasm].exports separately. The resolver currently\n    // requires these names to be exported from source modules (§10.2).\n    let dir = tempfile::tempdir().unwrap();\n    std::fs::write(\n",
-    "new": "fn wasm_exports_and_editor_checks_have_the_same_roots() {\n    // Rule 2 names [wasm].exports separately. The resolver currently\n    // requires these names to be exported from source modules.\n    let dir = tempfile::tempdir().unwrap();\n    std::fs::write(\n"
+    "line": 222,
+    "hash": "304255108caf0a7f02731e2907bb8291b4d38a0210623070f52b78112644bbe0",
+    "old": "#[test]\nfn pattern_lengths_and_nested_expression_references_count() {\n    // Rule 2 includes pattern expressions, guards, nested bindings and lists.\n    assert!(\n        names(&[(\n",
+    "new": "#[test]\nfn pattern_lengths_and_nested_expression_references_count() {\n    // References count in pattern expressions, guards, nested bindings and lists.\n    assert!(\n        names(&[(\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/unused.rs",
+    "line": 252,
+    "hash": "5181cfb2c14ca89b9502b51fb100a577cb52c38efdd8b3e7af19bf1a6acca42c",
+    "old": "#[test]\nfn wasm_exports_and_editor_checks_have_the_same_roots() {\n    // Rule 2 names [wasm].exports separately. The resolver currently\n    // requires these names to be exported from source modules (§10.2).\n    let dir = tempfile::tempdir().unwrap();\n    std::fs::write(\n",
+    "new": "#[test]\nfn wasm_exports_and_editor_checks_have_the_same_roots() {\n    // [wasm].exports are entry roots too. The resolver currently\n    // requires these names to be exported from source modules.\n    let dir = tempfile::tempdir().unwrap();\n    std::fs::write(\n"
   },
   {
     "file": "crates/ilang-check/tests/value_types.rs",
@@ -4282,6 +4429,13 @@
     "hash": "1bce80452227902f17b8abb902123deb9e27a400d8c1e0a94b348b300475b5ec",
     "old": "#[test]\nfn closed_aliases_and_patterns_complete_eagerly() {\n    // R2/P4: a closed scalar is read exactly; permanent binders are aliases.\n    let (_, c) = good(\n        \"value : Int = 1\\nRead = value\\nPair(A, B) = { (A, B) }\\np : (Int, String) = (1, \\\"a\\\")\\nPair(Left, Right) = p\\nComposite(A) = { (A, value) }\\nuse = (x : Read, y : Left) { x + y }\",\n",
     "new": "#[test]\nfn closed_aliases_and_patterns_complete_eagerly() {\n    // a closed scalar is read exactly; permanent binders are aliases.\n    let (_, c) = good(\n        \"value : Int = 1\\nRead = value\\nPair(A, B) = { (A, B) }\\np : (Int, String) = (1, \\\"a\\\")\\nPair(Left, Right) = p\\nComposite(A) = { (A, value) }\\nuse = (x : Read, y : Left) { x + y }\",\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/value_types.rs",
+    "line": 127,
+    "hash": "97bdff16f703a739fc09e2449a1e7c966eae9d8c4fc02e02624941065feeb6e0",
+    "old": "#[test]\nfn type_edges_do_not_change_runtime_needs_or_generalization() {\n    // O2: a depends on b only for inference; b still has no runtime need a.\n    let (_, c) = good(\"a = (x : b) { x }\\nb : Int = 1\");\n    let p = c.program.as_ref().unwrap();\n",
+    "new": "#[test]\nfn type_edges_do_not_change_runtime_needs_or_generalization() {\n    // a depends on b only for inference; b still has no runtime need a.\n    let (_, c) = good(\"a = (x : b) { x }\\nb : Int = 1\");\n    let p = c.program.as_ref().unwrap();\n"
   },
   {
     "file": "crates/ilang-check/tests/value_types.rs",
@@ -4397,6 +4551,13 @@
   },
   {
     "file": "crates/ilang-check/tests/value_types.rs",
+    "line": 805,
+    "hash": "61b5c72da3bd01c4c6e0dc8d052f950933cd18a1fc1eceb08df99195bdea7744",
+    "old": "#[test]\nfn invalid_components_fail_dependents_without_cascading_diagnostics() {\n    // O4: downstream annotations/aliases propagate Failed, never infer Never.\n    let src = \"a = (x : b) {x}\\nb = a(1)\\nc : b = 1\\nD = c\\nanswer : Int = 42\";\n    let (g, _) = checked(&[(\"src/main.i\", src)]);\n",
+    "new": "#[test]\nfn invalid_components_fail_dependents_without_cascading_diagnostics() {\n    // downstream annotations/aliases propagate Failed, never infer Never.\n    let src = \"a = (x : b) {x}\\nb = a(1)\\nc : b = 1\\nD = c\\nanswer : Int = 42\";\n    let (g, _) = checked(&[(\"src/main.i\", src)]);\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/value_types.rs",
     "line": 826,
     "hash": "90f3d4c46148e8c2e1964a065f724ecabafedb75550d4879fa633295d99fe189",
     "old": "#[test]\nfn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {\n    // R2/P4: a skip can leave a quantified part alone only at own completion.\n    let (_, c) = good(\n        \"id = (x) { x }\\nPair(A, B) = { (A, B) }\\none : Int = 1\\nv = (id, one)\\nPair(_, Number) = v\",\n",
@@ -4408,6 +4569,13 @@
     "hash": "e0427dfd7fc049c07a5212934c82bd8a12e529e4e056d933c31496bb4e1ba1c9",
     "old": "    ]);\n    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));\n    // P4 cannot discard the Nil alternative to find a convenient named head.\n    bad(\n        \"Box(A) = (A)\\nv : { Box(Int) | Nil } = Box(1)\\nBox(_) = v\",\n",
     "new": "    ]);\n    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));\n    // Completion cannot discard the Nil alternative to find a convenient named head.\n    bad(\n        \"Box(A) = (A)\\nv : { Box(Int) | Nil } = Box(1)\\nBox(_) = v\",\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/value_types.rs",
+    "line": 871,
+    "hash": "400ddac4abe04d2db9299b4cd5ec2a14779bc70cf177097e22dc598c2f9d8243",
+    "old": "#[test]\nfn dependency_diagnostics_keep_reader_span_alias_chain_and_return_path() {\n    // O3: preserve the annotation and a real dependency path through aliases.\n    let src = \"Alias = b\\na = (x : Alias) {x}\\nb = a(1)\";\n    let (_, c) = checked(&[(\"src/main.i\", src)]);\n",
+    "new": "#[test]\nfn dependency_diagnostics_keep_reader_span_alias_chain_and_return_path() {\n    // preserve the annotation and a real dependency path through aliases.\n    let src = \"Alias = b\\na = (x : Alias) {x}\\nb = a(1)\";\n    let (_, c) = checked(&[(\"src/main.i\", src)]);\n"
   },
   {
     "file": "crates/ilang-cli/build.rs",
@@ -4814,6 +4982,34 @@
     "hash": "31a78ab5fe10379adaa5b4e89f815fbcec21825117af605eb65283728c54fb1b",
     "old": "//! The seventh SYN2 decision: package-scoped conventional and named entries.\nuse ilang_cli::{BuildOptions, Level, Target, build, build_entry};\nuse std::path::Path;\n",
     "new": "//! Entry lookup is package-scoped for conventional and named entries.\nuse ilang_cli::{BuildOptions, Level, Target, build, build_entry};\nuse std::path::Path;\n"
+  },
+  {
+    "file": "crates/ilang-cli/tests/entries.rs",
+    "line": 33,
+    "hash": "23779debc610f8519e6999332ba7d24270d67066860acb1a479b4bfd31573ade",
+    "old": "#[test]\nfn default_and_private_named_function_keep_the_existing_metadata_shape() {\n    // Rule 2 and ruling [entries]: only src/main.main is the default;\n    // named entries may point at an unexported function in another module.\n    let dir = project(\n",
+    "new": "#[test]\nfn default_and_private_named_function_keep_the_existing_metadata_shape() {\n    // Only src/main.main is the default;\n    // named entries may point at an unexported function in another module.\n    let dir = project(\n"
+  },
+  {
+    "file": "crates/ilang-cli/tests/entries.rs",
+    "line": 61,
+    "hash": "6fb506131cab62b9e5c898eeeb81cd1cb92c57567d9f94bd6a551be03b4e8a1d",
+    "old": "#[test]\nfn missing_default_and_other_module_main_have_no_entry() {\n    // Rules 4/5: main has no special meaning in other modules.\n    let dir = project(\"name = \\\"app\\\"\\n\", &[(\"src/tools.i\", \"main = (x) { x }\")]);\n    assert_eq!(entry(dir.path(), None), None);\n",
+    "new": "#[test]\nfn missing_default_and_other_module_main_have_no_entry() {\n    // main has no special meaning in other modules.\n    let dir = project(\"name = \\\"app\\\"\\n\", &[(\"src/tools.i\", \"main = (x) { x }\")]);\n    assert_eq!(entry(dir.path(), None), None);\n"
+  },
+  {
+    "file": "crates/ilang-cli/tests/entries.rs",
+    "line": 67,
+    "hash": "25e6a1ece9d7851253f66e678c46934d6f7e189e23d4dbf70e4bb216af66e743",
+    "old": "#[test]\nfn every_declared_target_is_checked_and_selection_must_exist() {\n    // Rule 5: value parameters are an error, even for an unselected target.\n    let dir = project(\n        \"name = \\\"app\\\"\\n[entries]\\nbad = \\\"tools.work\\\"\\n\",\n",
+    "new": "#[test]\nfn every_declared_target_is_checked_and_selection_must_exist() {\n    // Value parameters are an error, even for an unselected target.\n    let dir = project(\n        \"name = \\\"app\\\"\\n[entries]\\nbad = \\\"tools.work\\\"\\n\",\n"
+  },
+  {
+    "file": "crates/ilang-cli/tests/entries.rs",
+    "line": 93,
+    "hash": "7afad86ffe2b7553fe96faca7329a455615f4c56554fb4c08336fef462ca4e99",
+    "old": "#[test]\nfn dependency_conventions_and_entry_tables_have_no_effect() {\n    // Rule 5: dependency package entries and main functions are ignored.\n    let root = tempfile::tempdir().unwrap();\n    let dep = root.path().join(\"dep\");\n",
+    "new": "#[test]\nfn dependency_conventions_and_entry_tables_have_no_effect() {\n    // Dependency package entries and main functions are ignored.\n    let root = tempfile::tempdir().unwrap();\n    let dep = root.path().join(\"dep\");\n"
   },
   {
     "file": "crates/ilang-cli/tests/expansion_sites.rs",

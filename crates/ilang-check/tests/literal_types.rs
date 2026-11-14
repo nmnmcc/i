@@ -216,7 +216,7 @@ fn empty_optional_accumulator_requires_a_written_tuple_shape() {
 
 #[test]
 fn guarded_list_heads_leave_tail_items_unrestricted() {
-    // Rule 11 must pass catch-all slack to every
+    // Match inference must pass catch-all slack to every
     // homogeneous list item, including items reached through the rest.
     let (ds, _) = check(
         r#"probe = (xs : List(Int)) -> Nil {

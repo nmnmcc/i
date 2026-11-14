@@ -357,7 +357,7 @@ fn type_order(
             }
         }
     }
-    // O4: failed components poison their dependents without another error.
+    // failed components poison their dependents without another error.
     // Keep the expression SCCs intact; only recovery readiness is propagated.
     let mut pending = std::collections::VecDeque::from_iter(bad.iter().copied());
     while let Some(i) = pending.pop_front() {

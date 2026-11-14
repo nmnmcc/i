@@ -126,7 +126,7 @@ fn closed_aliases_and_patterns_complete_eagerly() {
 
 #[test]
 fn type_edges_do_not_change_runtime_needs_or_generalization() {
-    // O2: a depends on b only for inference; b still has no runtime need a.
+    // a depends on b only for inference; b still has no runtime need a.
     let (_, c) = good("a = (x : b) { x }\nb : Int = 1");
     let p = c.program.as_ref().unwrap();
     let m = common::module(p, "app/main");
@@ -806,7 +806,7 @@ fn alias_exports_preserve_constructor_privacy() {
 
 #[test]
 fn invalid_components_fail_dependents_without_cascading_diagnostics() {
-    // O4: downstream annotations/aliases propagate Failed, never infer Never.
+    // downstream annotations/aliases propagate Failed, never infer Never.
     let src = "a = (x : b) {x}\nb = a(1)\nc : b = 1\nD = c\nanswer : Int = 42";
     let (g, _) = checked(&[("src/main.i", src)]);
     let c = query::check_for_queries(&g);
@@ -872,7 +872,7 @@ fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
 
 #[test]
 fn dependency_diagnostics_keep_reader_span_alias_chain_and_return_path() {
-    // O3: preserve the annotation and a real dependency path through aliases.
+    // preserve the annotation and a real dependency path through aliases.
     let src = "Alias = b\na = (x : Alias) {x}\nb = a(1)";
     let (_, c) = checked(&[("src/main.i", src)]);
     let d = c

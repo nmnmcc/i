@@ -58,7 +58,7 @@ fn accepts(source: &str, name: &str, expected: &str, unused: &[&str]) {
 
 #[test]
 fn annotated_and_inferred_service_rows() {
-    // Rule 4 unions the callback's N with S(N). Writing that same union
+    // Function inference unions the callback's N with S(N). Writing that same union
     // must not change the finite principal type.
     for annotation in ["{", "-> Nil {"] {
         accepts(
@@ -84,7 +84,7 @@ fn generic_service_through_a_helper() {
 
 #[test]
 fn open_service_row_through_helpers() {
-    // Rule 5 carries both requirements through calls; no closed service
+    // Calls carry both requirements through calls; no closed service
     // annotation is needed to make the row finite.
     for annotation in ["{", "-> Nil {"] {
         accepts(
@@ -99,8 +99,8 @@ fn open_service_row_through_helpers() {
 
 #[test]
 fn several_parameters_and_nested_services() {
-    // Rules 4, 5 and 7 apply equally inside nested constructors and with
-    // independent value/error/environment parameters. Rule 3 permits
+    // Inference constraints apply equally inside nested constructors and with
+    // independent value/error/environment parameters. Instantiation permits
     // independent closed instances of the resulting scheme.
     for annotation in ["{", "-> A {"] {
         let source = "Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> Nil)\nOuter(A, E, N) = (Inner(A, E, N))\nuse = <A, E, N>(x : A) <- (s : Outer(A, E, N)) -> A {\n\tOuter(Inner(f, _)) = s\n\tf(x)\n}\nrun = <A, N>(body : () <- N -> A) { body() }\ninteger = () {\n\trun(() { use(1) }) <- (Outer(Inner((x : Int) { x }, (_ : Never) { Nil })))\n}\nboolean = () {\n\trun(() { use(True) }) <- (Outer(Inner((x : Bool) { x }, (_ : Never) { Nil })))\n}"

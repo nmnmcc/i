@@ -579,7 +579,7 @@ impl Checker<'_> {
 
     // ---- Match constraints and narrowing ----
 
-    /// Rule 11, and the known type of a `case`: the union of the
+    /// The known type of a `case` is the union of the
     /// known types of its clause expressions, which have the expected type
     /// of the `case`.
     pub fn case(
@@ -659,7 +659,7 @@ impl Checker<'_> {
                 held.extend(self.sub_case(&b, &want, at));
             }
         }
-        // Rule 12: each catch-all gets `B - H`, and its known type less the
+        // Each catch-all gets `B - H`, and its known type less the
         // members that are taken.
         for k in 0..v.catches.len() {
             let c = &v.catches[k];
@@ -773,7 +773,7 @@ impl Checker<'_> {
         (r, self.kunion_knowledge(knowns))
     }
 
-    /// Rule 12: the type of the catch-all `id` of choice `choice` of clause
+    /// The type of the catch-all `id` of choice `choice` of clause
     /// `ci`, at `place`: `B - H`, with `H` the type constructors that the
     /// earlier clauses without a guard take there. "Every value that the
     /// clause pattern matches" is any value at the other places: the types
@@ -1132,7 +1132,7 @@ impl Checker<'_> {
                             places[at].seen.push((v.clause, v.unguarded, h, n));
                         }
                     }
-                    // Rule 11: the test takes every value of the type
+                    // The test takes every value of the type
                     // constructors of `T`, so those values must be in `T`:
                     // `B <: T | r - T`.
                     // Custom types with no constructors cannot be
@@ -1172,7 +1172,7 @@ impl Checker<'_> {
                 let kctor = places[at].known.member(h);
                 let mut parts = vec![Pat::Wild(None); fields.len()];
                 let matched = self.match_fields(q.span, &fields, args, *spread);
-                // Rule 11: `..` counts as a catch-all at the places of the
+                // `..` counts as a catch-all at the places of the
                 // fields that it leaves out.
                 if *spread && v.unguarded {
                     for (i, field) in fields.iter().enumerate() {

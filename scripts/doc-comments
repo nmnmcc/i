@@ -19,11 +19,15 @@ import tempfile
 
 ROOT = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip())
 SOURCE_EXT = (".rs", ".i", ".is")
+# These checker fixtures contain migration prose, not recorded formatter inputs.
+EXTRA_I = ('crates/ilang-check/tests/projects/attr_deprecated/src/lib.i', 'crates/ilang-check/tests/types/labels.i', 'crates/ilang-check/tests/types/syn3_fn_shapes.i')
+
 REF = re.compile(r"§|spec\.md", re.I)
 PROCESS = re.compile(
     r"(?-i:\b(?:TODO|FIXME|XXX)\b)|\b(?:[Ss]tages? [0-9E]|[Pp]hases? [0-9])"
     r"|\bsyntax[ -]three\b|\bsyntax-3\.md\b|\bold tree\b|\blower\.rs\b"
-    r"|\b(?:coordinator|compiler lanes|gate tree)\b|\blane/[A-Za-z0-9_-]+", re.I
+    r"|\b(?:coordinator|compiler lanes|gate tree)\b|\blane/[A-Za-z0-9_-]+"
+    r"|\brules? [0-9]|^\s*[A-Z][0-9]{1,2}[a-z]?(?:/[A-Z][0-9]{1,2})*:\s", re.I
 )
 PROTECTED = re.compile(
     r"^\s*//+\s*(?:spec|expect|at|output|type|old-syntax-check|test-macro-migrate|stdout|stderr|exit|args)\s*:"
@@ -317,7 +321,7 @@ def comment_lines(path, t):
 def tracked():
     paths = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
     return [p for p in paths if p.endswith(".rs") or
-            (p.startswith(("std/", "lib/")) and p.endswith((".i", ".is")))]
+            (p.startswith(("std/", "lib/")) and p.endswith((".i", ".is"))) or p in EXTRA_I]
 
 
 def read(path):
@@ -445,7 +449,7 @@ def inventory(base=None):
             continue
         text = revision(base, path) if base else read(path)
         comments, strings = lex(path, text)
-        scope = "rust" if path.endswith(".rs") else "library"
+        scope = "rust" if path.endswith(".rs") else "library" if path.startswith(("std/", "lib/")) else "fixture"
         example_text = {text for block in doc_examples(path, text) for text in block}
         for line in comment_lines(path, text):
             example = (line.doc and (line.text[1:] if line.text.startswith(" ") else line.text) in example_text)

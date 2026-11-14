@@ -5,7 +5,7 @@ mod common;
 fn stage_three_provider_diagnostics_match_landed_conversion() {
     // A supplied value must satisfy the needed form by subtyping;
     // incompatible same-key requirements have an empty intersection.
-    // Keep every diagnostic from landed tip cc26b8d9, including its source
+    // Retain each diagnostic and its source
     // binding. Pin total errors and E0515 counts independently of the saved
     // messages. The full fourteen-project guard is in CLI providers tests:
     // two projects need their std dependency and test-macro expansion.
@@ -256,7 +256,7 @@ fn instantiated_output_rows_are_checked_even_when_unused() {
 
 #[test]
 fn function_type_joins_preserve_scalar_error_inclusion() {
-    // Rule 8 still governs scalar error value sets when function types
+    // Subtype comparison governs scalar error value sets when function types
     // are joined; the row mode must reach merge_arg as well as calls.
     types(
         "(\n\ti/fail\n)\none = () -> Nil { fail.raise(1) }\ntwo = () -> Nil { fail.raise(2) }\npick = (b : Bool) { b |> (True) { one } | (False) { two } }",

@@ -14,8 +14,8 @@ string literal, including embedded i and WAT programs.
 The baseline audit found 1,204 Rust comment lines with 1,343 section marks
 and five `spec.md` paths; all are gone. In `std/` and `lib/`, 68 comment lines
 contained 74 section marks; all are gone. The stale-comment detector found
-329 prose lines before and zero after. The two unchanged format-name mentions
-inside the migrator's protected usage example are counted separately. No
+540 prose lines before and zero after. The two unchanged format-name mentions
+inside the migrator's protected usage example are counted separately. The three checker fixtures also lose six section marks on five comment lines. No
 TODO/FIXME/XXX comments existed or were retained. Five dormant Python recipes
 contained 231 commented code lines; the recipes and their run instructions are
 removed, with their invariant descriptions retained.
@@ -64,7 +64,7 @@ scripts/doc-comments check --proof "$base" --i-bin target/release/i
 ```
 
 The proof lexes every existing tracked Rust file, plus `.i` and `.is` files under
-`std/` and `lib/`. Tokens include exact string and character literals; Rust
+`std/` and `lib/`, plus the three checker fixtures listed in `EXTRA_I`. Tokens include exact string and character literals; Rust
 whitespace is ignored, while i line breaks are retained. A separate comparison
 keeps all seven fenced or indented Rustdoc example blocks byte-identical, including
 their fence attributes. The migrator's fenced command-usage example retains two
@@ -74,7 +74,9 @@ remain in the audited sources. Library documentation's obsolete signature copies
 and dormant Python recipes were removed; registered tests and executable test
 bodies are unchanged. The map preserves the exact removed recipe text.
 
-This is the full verification command sequence. Run heavy commands sequentially.
+This is the full verification command sequence. The documentation example npm
+script is expanded into its three phases so its runtime checks can hold one heavy
+slot with `--jobs 1`, without nesting the generator’s own heavy std check. Run heavy commands sequentially.
 `check-snippets` and the documentation generator/build scripts acquire the heavy
 wrapper for their own Rust builds and standard-library checks, so run those
 scripts directly in the development environment. `I_SNIPPET_PARSER` avoids another
@@ -93,9 +95,14 @@ git submodule update --init crates/ilang-binaryen/binaryen
 "$H" ./target/release/i test --project std --opt 2
 direnv exec /home/agent/Programming/i scripts/check-snippets
 python3 -I scripts/check-snippets-test
-"$H" direnv exec /home/agent/Programming/i cargo test -p ilang-syntax --test spec --test format --test lisp_syntax --test lisp_syntax3 --test lisp_definition_rows --test syn3 --test syn3_lower --locked
+"$H" direnv exec /home/agent/Programming/i cargo test -p ilang-syntax --test format --test lisp_syntax --test lisp_syntax3 --test lisp_definition_rows --test syn3 --test syn3_lower --locked
+"$H" direnv exec /home/agent/Programming/i cargo test -p ilang-syntax --test spec --locked -- spec_blocks_parse
 "$H" direnv exec /home/agent/Programming/i cargo test -p ilang-check --test library --test query --locked
-(cd docs && I_BIN="$OLDPWD/target/release/i" I_SNIPPET_PARSER="$OLDPWD/target/debug/examples/parse-snippets" direnv exec /home/agent/Programming/i npm run check:examples)
+CMX2_I="$PWD/target/release/i"
+CMX2_PARSER="$PWD/target/debug/examples/parse-snippets"
+(cd docs && direnv exec /home/agent/Programming/i npm run generate)
+(cd docs && I_SNIPPET_PARSER="$CMX2_PARSER" direnv exec /home/agent/Programming/i python3 scripts/check-examples.py)
+(cd docs && "$H" direnv exec /home/agent/Programming/i env I_BIN="$CMX2_I" python3 scripts/run-examples.py --no-placeholders --jobs 1)
 (cd docs && direnv exec /home/agent/Programming/i npm run build)
 ```
 

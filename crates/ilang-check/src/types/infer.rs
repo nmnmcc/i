@@ -474,7 +474,7 @@ impl<'a> Checker<'a> {
     fn group(&mut self, group: &[BindingRef]) {
         let error_start = self.diags.len();
         if group.iter().any(|b| self.p.failed_type_groups.contains(b)) {
-            // O4: a dependency-cycle component is Failed before query inference.
+            // a dependency-cycle component is Failed before query inference.
             // Never is only recovery data; no fresh inferred alias is published.
             for d in group.iter().flat_map(|b| &self.p.binding(*b).defs) {
                 self.defs.insert(*d, Scheme::mono(Ty::Never));
@@ -1835,7 +1835,7 @@ impl<'a> Checker<'a> {
             .collect()
     }
 
-    /// Rule 7: a constructor is a function from its fields to its type, with
+    /// A constructor is a function from its fields to its type, with
     /// the field labels; with no fields it is a value.
     fn ctor_value(&mut self, c: CtorRef) -> Ty {
         let targs = self.fresh_args(c.ty);
@@ -2978,7 +2978,7 @@ impl<'a> Checker<'a> {
         (self.union(parts, name.span), k)
     }
 
-    /// Rule 13 for `v.k`: every member of the known type of `v` is data
+    /// Projection `v.k` requires every member of the known type of `v` is data
     /// with more than k positions.
     fn tuple_index(
         &mut self,
@@ -3225,7 +3225,7 @@ impl<'a> Checker<'a> {
 
     // ---- Blocks, functions, and bindings ----
 
-    /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type
+    /// For `{ s1 … sn e }`, The last expression has the expected type
     /// of the block, and the block has its known type.
     pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Knowledge) -> (Ty, Knowledge) {
         for (i, s) in stmts.iter().enumerate() {
@@ -3299,7 +3299,7 @@ impl<'a> Checker<'a> {
         (nil.clone(), Knowledge::certain(nil))
     }
 
-    /// Rule 4: a function expression, and its known type. With an
+    /// A function expression, and its known type. With an
     /// expected function type with as many parameters, a parameter with no
     /// type written at its top gets the known type of the matching
     /// parameter.
