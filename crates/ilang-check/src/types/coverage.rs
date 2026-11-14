@@ -1432,8 +1432,8 @@ pub(crate) fn fit_pat(p: &Program, q: &Pattern) -> Pat {
                 .map(|a| a.map_or(Pat::Wild(None), |a| fit_pat(p, a)))
                 .collect(),
         ),
-        PatternKind::Tuple(ps) => Pat::Ctor(
-            Ctor::Shape(super::ShapeId::positional(ps.len() as u32)),
+        PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => Pat::Ctor(
+            Ctor::Shape(q.data_shape().unwrap()),
             ps.iter().map(|a| fit_pat(p, a)).collect(),
         ),
         PatternKind::List { items, rest } => list(

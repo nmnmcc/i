@@ -1360,6 +1360,7 @@ impl<'a> Checker<'a> {
             PatternKind::Named { pattern, .. } => self.check_pattern_places(pattern, pol),
             PatternKind::Constructor { args: ps, .. }
             | PatternKind::Tuple(ps)
+            | PatternKind::Data { parts: ps, .. }
             | PatternKind::Error(ps)
             | PatternKind::List { items: ps, .. } => {
                 for x in ps {

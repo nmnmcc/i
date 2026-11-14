@@ -97,7 +97,7 @@ struct Visit<'p> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Step {
     Field(CtorRef, u32),
-    Part(u32, u32),
+    Part(super::ShapeId, u32),
     Item(u32),
     Rest,
 }
@@ -175,13 +175,13 @@ impl Checker<'_> {
     fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
         if catch_all(q) {
             self.bind_catch_all(q, b, in_case);
-        } else if let PatternKind::Tuple(ps) = &q.kind
+        } else if let PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } = &q.kind
             && !in_case
         {
             // The parts of a fitted tuple are fitted one by one, so that a
             // constructor part may fail as at the top: `(Ok(a), Ok(b)) = …`.
             let parts: Vec<Ty> = ps.iter().map(|_| self.s.fresh()).collect();
-            self.sub(b, &Ty::tuple(parts.clone()), q.span);
+            self.sub(b, &Ty::data(q.data_shape().unwrap(), parts.clone()), q.span);
             for (p, t) in ps.iter().zip(&parts) {
                 self.fit_in(p, t, in_case);
             }
@@ -259,9 +259,10 @@ impl Checker<'_> {
                     self.family(t, ctor.ty, q.span)
                 }
             }
-            PatternKind::Tuple(ps) => {
-                Ty::tuple(ps.iter().map(|x| self.param_in(x, in_case)).collect())
-            }
+            PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => Ty::data(
+                q.data_shape().unwrap(),
+                ps.iter().map(|x| self.param_in(x, in_case)).collect(),
+            ),
             PatternKind::List { items, rest } => {
                 let e = self.s.fresh();
                 for x in items {
@@ -1219,9 +1220,9 @@ impl Checker<'_> {
                     Pat::Ctor(Ctor::Custom(*ctor), parts),
                 )
             }
-            PatternKind::Tuple(ps) => {
-                let n = ps.len() as u32;
-                let h = Head::Shape(super::ShapeId::positional(n));
+            PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => {
+                let shape = q.data_shape().unwrap();
+                let h = Head::Shape(shape);
                 let parts = self.shared(places, at, h, ps.len());
                 let kdata = places[at].known.member(h);
                 let mut pats = Vec::new();
@@ -1229,17 +1230,14 @@ impl Checker<'_> {
                     let c = self.child(
                         places,
                         at,
-                        Step::Part(n, i as u32),
+                        Step::Part(shape, i as u32),
                         parts[i].clone(),
                         kdata.part(i),
                     );
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 places[at].seen.push((v.clause, v.unguarded, h, ps.len()));
-                (
-                    Ty::tuple(parts),
-                    Pat::Ctor(Ctor::Shape(super::ShapeId::positional(n)), pats),
-                )
+                (Ty::data(shape, parts), Pat::Ctor(Ctor::Shape(shape), pats))
             }
             PatternKind::List { items, rest } => {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));
@@ -1342,6 +1340,7 @@ fn ctor_binders(p: &Pattern, out: &mut Vec<(VarId, Option<CtorRef>)>) {
         }
         PatternKind::Constructor { args: ps, .. }
         | PatternKind::Tuple(ps)
+        | PatternKind::Data { parts: ps, .. }
         | PatternKind::Error(ps) => ps.iter().for_each(|q| ctor_binders(q, out)),
         PatternKind::List { items, .. } => items.iter().for_each(|q| ctor_binders(q, out)),
         PatternKind::BitArray(segs) => segs.iter().for_each(|s| ctor_binders(&s.value, out)),

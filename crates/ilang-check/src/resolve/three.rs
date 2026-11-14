@@ -2896,8 +2896,9 @@ impl<'a, 't> R3<'a, 't> {
             }
             P::Data(items) => {
                 for item in items {
-                    if let n::DPItem::Pos(p) = item {
-                        self.binders(p, out);
+                    match item {
+                        n::DPItem::Pos(p) | n::DPItem::Key(_, p) => self.binders(p, out),
+                        n::DPItem::Rest(_) => {}
                     }
                 }
             }
@@ -3129,16 +3130,38 @@ impl<'a, 't> R3<'a, 't> {
                     None => PatternKind::Error(parts),
                 }
             }
-            // Keys and a rest in a data pattern are errors of this stage.
-            P::Data(items) => PatternKind::Tuple(
-                items
-                    .iter()
-                    .filter_map(|item| match item {
-                        n::DPItem::Pos(a) => Some(self.pattern(a, binders, shared)),
-                        _ => None,
-                    })
-                    .collect(),
-            ),
+            P::Data(items) => {
+                let mut positions = Vec::new();
+                let mut labels = std::collections::BTreeMap::new();
+                for item in items {
+                    match item {
+                        n::DPItem::Pos(a) => positions.push(self.pattern(a, binders, shared)),
+                        n::DPItem::Key(l, a) => {
+                            let part = self.pattern(a, binders, shared);
+                            if labels.insert(l.name.clone(), part).is_some() {
+                                self.r.error(
+                                    code::PATTERN_FIELDS,
+                                    l.span.0,
+                                    "this field is matched more than once (§7.1)",
+                                );
+                            }
+                        }
+                        // Rest patterns remain a pre-validation error.
+                        n::DPItem::Rest(_) => {}
+                    }
+                }
+                if labels.is_empty() {
+                    PatternKind::Tuple(positions)
+                } else {
+                    let shape =
+                        crate::types::ShapeId::new(positions.len() as u32, labels.keys().cloned());
+                    positions.extend(labels.into_values());
+                    PatternKind::Data {
+                        shape,
+                        parts: positions,
+                    }
+                }
+            }
             P::List { items, rest } => {
                 let items = items
                     .iter()

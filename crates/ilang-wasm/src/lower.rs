@@ -308,6 +308,7 @@ fn pattern_values(p: &Pattern) -> usize {
         PatternKind::Named { pattern, .. } => 1 + pattern_values(pattern),
         PatternKind::Constructor { args, .. }
         | PatternKind::Tuple(args)
+        | PatternKind::Data { parts: args, .. }
         | PatternKind::Error(args) => 1 + args.iter().map(pattern_values).sum::<usize>(),
         PatternKind::List { items, .. } => 1 + items.iter().map(pattern_values).sum::<usize>(),
         PatternKind::BitArray(segments) => {
@@ -570,9 +571,9 @@ impl Walk {
                 self.pattern(pattern);
             }
             PatternKind::Prefix { rest, .. } => rest.iter().for_each(|b| self.binder(b)),
-            PatternKind::Constructor { args, .. } | PatternKind::Tuple(args) => {
-                args.iter().for_each(|a| self.pattern(a))
-            }
+            PatternKind::Constructor { args, .. }
+            | PatternKind::Tuple(args)
+            | PatternKind::Data { parts: args, .. } => args.iter().for_each(|a| self.pattern(a)),
             PatternKind::List { items, rest } => {
                 items.iter().for_each(|a| self.pattern(a));
                 if let Some(Some(b)) = rest {
@@ -4168,8 +4169,9 @@ impl<'a> Lowerer<'a> {
                     self.pattern(fx, out, arg, f, fail);
                 }
             }
-            PatternKind::Tuple(parts) => {
-                guard(out, Cond::Tuple(v.clone(), parts.len() as u32), fail);
+            PatternKind::Tuple(parts) | PatternKind::Data { parts, .. } => {
+                let cond = self.head_cond(v.clone(), Head::Shape(p.data_shape().unwrap()));
+                guard(out, cond, fail);
                 for (i, part) in parts.iter().enumerate() {
                     let f = let_value(fx, out, Value::Field(v.clone(), i as u32), None);
                     self.pattern(fx, out, part, f, fail);
@@ -4515,7 +4517,9 @@ impl<'a> Lowerer<'a> {
         match &p.kind {
             PatternKind::Var(_) | PatternKind::Discard | PatternKind::Typed { .. } => true,
             PatternKind::Named { pattern, .. } => self.plain(pattern),
-            PatternKind::Tuple(parts) => parts.iter().all(|x| self.plain(x)),
+            PatternKind::Tuple(parts) | PatternKind::Data { parts, .. } => {
+                parts.iter().all(|x| self.plain(x))
+            }
             PatternKind::Constructor { ctor, args, .. } => {
                 matches!(&self.program.ty(ctor.ty).body, TypeBody::Custom(cs) if cs.len() == 1)
                     && args.iter().all(|x| self.plain(x))
@@ -4628,7 +4632,7 @@ impl<'a> Lowerer<'a> {
                 Self::bind_var(fx, out, binder, v.clone());
                 self.bind(fx, out, pattern, v);
             }
-            PatternKind::Tuple(parts) => {
+            PatternKind::Tuple(parts) | PatternKind::Data { parts, .. } => {
                 for (i, part) in parts.iter().enumerate() {
                     let f = let_value(fx, out, Value::Field(v.clone(), i as u32), None);
                     self.bind(fx, out, part, f);

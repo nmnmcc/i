@@ -627,6 +627,11 @@ pub enum PatternKind {
         spread: bool,
     },
     Tuple(Vec<Pattern>),
+    /// Closed data, with parts in canonical key order (§7.1).
+    Data {
+        shape: crate::types::ShapeId,
+        parts: Vec<Pattern>,
+    },
     /// `rest`: `None` is no rest; `Some(None)` is `..` or `.._`.
     List {
         items: Vec<Pattern>,
@@ -635,6 +640,19 @@ pub enum PatternKind {
     BitArray(Vec<Segment<Pattern>>),
     /// A pattern that could not be resolved, with its resolved parts.
     Error(Vec<Pattern>),
+}
+
+impl Pattern {
+    /// The complete shape of a closed data pattern.
+    pub fn data_shape(&self) -> Option<crate::types::ShapeId> {
+        match &self.kind {
+            PatternKind::Tuple(parts) => {
+                Some(crate::types::ShapeId::positional(parts.len() as u32))
+            }
+            PatternKind::Data { shape, .. } => Some(*shape),
+            _ => None,
+        }
+    }
 }
 
 // ---- Order (§2.5, §4.7) ----
@@ -907,6 +925,7 @@ pub fn children<'a>(node: Node<'a>, mut f: impl FnMut(Node<'a>)) {
             PatternKind::Named { pattern, .. } => f(Node::Pattern(pattern)),
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
+            | PatternKind::Data { parts: args, .. }
             | PatternKind::Error(args)
             | PatternKind::List { items: args, .. } => {
                 args.iter().for_each(|p| f(Node::Pattern(p)))
@@ -972,6 +991,7 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
             PatternKind::Named { pattern: p, .. } => pattern(p, f),
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
+            | PatternKind::Data { parts: args, .. }
             | PatternKind::Error(args) => {
                 for p in args {
                     pattern(p, f);
@@ -1120,6 +1140,7 @@ pub fn visit_expr_mut(e: &mut Expr, visit: &mut impl FnMut(&mut Expr) -> bool) {
             PatternKind::Named { pattern: p, .. } => pattern(p, f),
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
+            | PatternKind::Data { parts: args, .. }
             | PatternKind::Error(args)
             | PatternKind::List { items: args, .. } => {
                 for p in args {

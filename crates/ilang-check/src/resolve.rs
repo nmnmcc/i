@@ -2708,6 +2708,7 @@ fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec
         }
         PatternKind::Constructor { args: ps, .. }
         | PatternKind::Tuple(ps)
+        | PatternKind::Data { parts: ps, .. }
         | PatternKind::Error(ps)
         | PatternKind::List { items: ps, .. } => {
             ps.iter().for_each(|a| top_annotations(a, exported, out))

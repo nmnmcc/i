@@ -146,6 +146,8 @@ list_parts = (xs : List(Int)) {
 
 main = () {
 	pair = (4, 5)
+	(name = name, age = _) = (name = "Ada", age = 36)
+	stdio.print(name)
 	(a, __unused) = pair
 	(left, right) = whole = pair
 	stdio.print(core.inspect((a, left, right, whole)))
@@ -159,10 +161,13 @@ main = () {
 ```
 
 ```text
+Ada
 (4, 4, 5, (4, 5))
 (8, 0)
 ((0, []), (2, []), (2, [3]))
 ```
+
+A keyed data pattern matches each labelled part by its key: `(name = name, age = _)` binds `name` and discards the age. The labels may be written in either order.
 
 A name pattern binds the matched value. A discard, either `_` or a name starting with two underscores, matches without binding a name. The tuple pattern `(a, __unused)` takes two positions from `pair` and keeps only the first.
 
@@ -318,7 +323,7 @@ Multiplication binds more tightly than addition, giving `14`; braces change the 
 
 ## Current limits
 
-The standard also allows a pattern to name the labelled parts of data, as in `(name = name, age = _)` ([§7.1](/docs/standard/generated/chapter-7#section-7-1)). The compiler on this tree refuses such a pattern with E0101; until that is fixed, read a labelled part with `.name`. Rest patterns for data (`..rest` inside `( )`) are refused in the same way; list rests work as shown above. Both differences are recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (DOC1, P13).
+Rest patterns for data (`..rest` inside `( )`) are still refused; list rests work as shown above. This difference is recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (P13).
 
 ## See also
 

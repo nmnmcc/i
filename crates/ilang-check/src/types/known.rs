@@ -629,7 +629,9 @@ impl Checker<'_> {
             PatternKind::String(_) | PatternKind::Prefix { .. } => prim(BuiltinType::String),
             PatternKind::BitArray(_) => prim(BuiltinType::BitArray),
             PatternKind::Constructor { ctor, .. } => Head::Named(TypeRef::Custom(ctor.ty)),
-            PatternKind::Tuple(ps) => Head::Shape(super::ShapeId::positional(ps.len() as u32)),
+            PatternKind::Tuple(_) | PatternKind::Data { .. } => {
+                Head::Shape(q.data_shape().unwrap())
+            }
             PatternKind::List { .. } => Head::Named(TypeRef::Builtin(BuiltinType::List)),
             PatternKind::Error(_) => return Ty::Top,
         };
@@ -716,8 +718,8 @@ impl Checker<'_> {
                     self.fit_known(arg, &k, in_case);
                 }
             }
-            PatternKind::Tuple(ps) => {
-                let data = b.member(Head::Shape(super::ShapeId::positional(ps.len() as u32)));
+            PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => {
+                let data = b.member(Head::Shape(q.data_shape().unwrap()));
                 for (i, x) in ps.iter().enumerate() {
                     self.fit_known(x, &data.part(i), in_case);
                 }

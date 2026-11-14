@@ -1709,6 +1709,7 @@ fn binder_pattern(p: &Pattern, v: VarId) -> Option<&Pattern> {
         }
         PatternKind::Constructor { args: ps, .. }
         | PatternKind::Tuple(ps)
+        | PatternKind::Data { parts: ps, .. }
         | PatternKind::Error(ps) => ps.iter().find_map(|q| binder_pattern(q, v)),
         PatternKind::List { items, .. } => items.iter().find_map(|q| binder_pattern(q, v)),
         _ => None,
@@ -2023,9 +2024,9 @@ impl Walk<'_> {
                 self.pattern_labels(p, *ctor, args);
                 args.iter().for_each(|a| self.pattern(a));
             }
-            PatternKind::Tuple(ps) | PatternKind::Error(ps) => {
-                ps.iter().for_each(|a| self.pattern(a))
-            }
+            PatternKind::Tuple(ps)
+            | PatternKind::Data { parts: ps, .. }
+            | PatternKind::Error(ps) => ps.iter().for_each(|a| self.pattern(a)),
             PatternKind::List { items, rest } => {
                 items.iter().for_each(|a| self.pattern(a));
                 if let Some(Some(b)) = rest {

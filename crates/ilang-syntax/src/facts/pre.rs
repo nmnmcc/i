@@ -1030,13 +1030,19 @@ impl Cx {
                 }
             }
             n::PatternKind::Data(items) => {
+                let mut keyed = false;
                 for item in items {
                     match item {
-                        n::DPItem::Pos(p) => self.pattern(p),
-                        n::DPItem::Key(l, _) => self.error(
-                            l.span.0,
-                            "a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-                        ),
+                        n::DPItem::Pos(p) => {
+                            if keyed {
+                                self.error(p.span.0, "an item by position may not come after an item by label (§7.1)");
+                            }
+                            self.pattern(p);
+                        }
+                        n::DPItem::Key(_, p) => {
+                            keyed = true;
+                            self.pattern(p);
+                        }
                         n::DPItem::Rest(_) => self.error(
                             span,
                             "a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
