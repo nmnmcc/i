@@ -174,7 +174,7 @@ fn cache_command_reports_collects_and_cleans() {
     assert_eq!(modules(&cache), 0);
     assert_eq!(entries(&cache, "cranelift-function"), 0);
     let status = cache_cmd(&["status"]);
-    assert!(status.contains("total : 0 entries"), "{status}");
+    assert!(status.contains("total: 0 entries"), "{status}");
 }
 
 #[test]

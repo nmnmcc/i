@@ -173,3 +173,15 @@ its merge checkpoint. Initial Rust exit101 remains recorded, not hidden.
 This is the compiling checkpoint for the f61 test-only merge and the four
 builtin-test shape repairs. Root Rust remains760 successful tests plus four
 pending repaired assertions; no failed compiler diagnostic golden.
+
+11:58 CLI compile_cache: two tests pass, cache_command_reports_collects_and_cleans
+fails at its final status assertion. Incoming mechanical annotation commit
+6b2cc2221 changed the English UI assertion from `total: 0 entries` to
+`total : 0 entries`; the producer in commands/cache.rs remains
+`println!("total: {entries} entries, ...")`, unchanged from the old green head.
+The captured failing output is exactly `total: 0 entries, 0 B`. Restore that
+single assertion's original text; this is status prose, not a type annotation
+(spec §1.7 restricts the rule to a colon introducing a type). No production or
+diagnostic behavior changes, and cache counts/GC/clean assertions remain.
+The first whole CLI invocation retains the failure; run the complete cache
+binary again after it finishes. The independent warm/cold/cache-off tests pass.
