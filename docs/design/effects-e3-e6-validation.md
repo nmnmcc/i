@@ -1,120 +1,86 @@
 # Effects landing verification, 2026-11-15
 
-**Superseded performance claim:** e975c5e93 is not landable. The four wide-case splices below concealed a checker regression and are withdrawn. Fresh isolated phases pass after the repair; full revalidation is tracked in [the performance report](effects-e4-performance.md). The earlier results below are historical.
+Branch **lane/e4**. Production source is `7575ae5a5`, atop `e975c5e93`,
+with main through `7c0652fad` merged. **All requested final gates pass.**
+The earlier e975 LANDABLE claim and four performance-censor justifications
+are withdrawn. The cubic checker defect is repaired; all four wide cases
+have fresh passing check/O0/O2 observations at their saved bounds.
 
-Branch **lane/e4**, source checkpoint `867bd364157433bb8f6c2bf52a11ca2cbc5ec334`. Main through
-`7c0652fad` is merged. **All final required gates are green**, with the
-explicit bounded corpus censors listed below. The final report commit changes
-only this verification record; production source has not changed since the
-release build at `62af4eac4`. No test or assertion is deleted or weakened.
+The final report commit changes documentation and observation metadata;
+production source and release binary stay unchanged throughout verification.
+Release SHA256:
+`795bb7f8e15dbbd9369774cef5e898d0dec1e7b8c1eb13862ff1b118fdbb96f8`.
+No test or assertion is deleted or weakened, and no skip/ignore is added.
 
-All compiler/build/test commands use
-`H=/home/agent/Programming/i/.rd/cache/heavy`, with only one command running
-or waiting for this worker. Cargo uses `direnv exec /home/agent/Programming/i`.
-Defaults are `CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0
-CARGO_INCREMENTAL=0 RUST_TEST_THREADS=2 BINARYEN_CORES=1`. The snippet script
-runs directly because it acquires H internally. Static observation audits
-and whitespace checks do not launch a compiler.
+## Final results
 
-## Final gates
-
-The workspace test driver performs `cargo test --workspace --locked --no-run
---message-format=json`, then executes all 118 binaries, six at a time with
-two Rust test threads each. The value-types binary retains every test and
-uses two CPUs to bound its own parallel worker pool; there is no filter or
-new ignore. It passes all 31 tests, including the complete spec and std
-reverse-order/recovery checks (3,099.47s). Whole spec passes **536/536 at
-O0 and O2**. The default six existing Rust ignores and 29 pending spec cases
-are unchanged from main.
-
-Every command below passed in its final run. Logs are local worktree
-artifacts; earlier diagnosed failures remain recorded in the history below.
-
-| Command | Final result | Log |
-|---|---|---|
-| `$H direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked` | Workspace/all targets passed | `target/e4-gate-workspace-check-final.log` |
-| `E4_TEST_LOG_DIR=/home/agent/Programming/i/.rd/e4/target/e4-land-rust-logs $H direnv exec /home/agent/Programming/i python3 -u target/e4-ptest.py --workspace` | 118 binaries, 0 failed; value-types 31; spec 536/536 both opts | `target/e4-gate-workspace-tests-final.log` |
-| `I_BIN=/home/agent/Programming/i/.rd/e4/target/release/i $H direnv exec /home/agent/Programming/i python3 docs/scripts/run-examples-test` | 14 contract tests passed | `target/e4-gate-docs-runner-contract-final.log` |
-| `$H direnv exec /home/agent/Programming/i ./target/release/i test --project std --opt 0` | 2171 passed, 0 failed | `target/e4-gate-std-final-o0.log` |
-| `$H direnv exec /home/agent/Programming/i ./target/release/i test --project std --opt 2` | 2171 passed, 0 failed | `target/e4-gate-std-final-o2.log` |
-| `$H direnv exec /home/agent/Programming/i ./target/release/i test --project examples/macro-tests --opt 0` | 19 passed, 0 failed, 1 intentional skip | `target/e4-gate-examples-macro-tests-final-o0.log` |
-| `$H direnv exec /home/agent/Programming/i ./target/release/i test --project examples/macro-tests --opt 2` | 19 passed, 0 failed, 1 intentional skip | `target/e4-gate-examples-macro-tests-final-o2.log` |
-| `$H direnv exec /home/agent/Programming/i ./target/release/i test --project bench --opt 0` | 19 passed, 0 failed | `target/e4-gate-bench-final-o0.log` |
-| `$H direnv exec /home/agent/Programming/i ./target/release/i test --project bench --opt 2` | 19 passed, 0 failed | `target/e4-gate-bench-final-o2.log` |
-| `$H direnv exec /home/agent/Programming/i scripts/test-generation --mode short --binary ./target/release/i` | 32 attempts: 20 accepted/12 model rejections; 64 permutations/32 annotation removals; 0 failures | `target/e4-gate-generation-final.log` |
-| `$H direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings` | Workspace/all targets, -D warnings passed | `target/e4-gate-clippy-final.log` |
-| `$H direnv exec /home/agent/Programming/i cargo fmt --all --check` | All Rust formatting passed | `target/e4-gate-rustfmt-final.log` |
-| `$H direnv exec /home/agent/Programming/i ./target/release/i fmt --check bench std lib examples` | bench/std/lib/examples formatting passed | `target/e4-gate-ifmt-final.log` |
-| `direnv exec /home/agent/Programming/i scripts/check-snippets` | 5215 literals/blocks; exact diagnostic expectations; 48 .is/101 macro fragments; 4 existing future tracks | `target/e4-gate-snippets-final.log` |
-| `$H direnv exec /home/agent/Programming/i python3 -I scripts/check-snippets-test` | 10 passed | `target/e4-gate-snippets-tests-final.log` |
-| `$H direnv exec /home/agent/Programming/i python3 -I scripts/qa/corpus-test` | 5 passed | `target/e4-gate-corpus-runner-tests-final.log` |
-| `$H direnv exec /home/agent/Programming/i python3 docs/scripts/check-placeholders-test` | 5 passed | `target/e4-gate-docs-placeholders-test-final.log` |
-| `$H direnv exec /home/agent/Programming/i python3 docs/scripts/check-spec-links-test` | 5 passed | `target/e4-gate-docs-citation-test-final.log` |
-| `I_BIN=/home/agent/Programming/i/.rd/e4/target/release/i $H direnv exec /home/agent/Programming/i python3 docs/scripts/run-examples.py --jobs 2 --no-placeholders` | 110 authored examples passed, including exact type/output/error assertions | `target/e4-gate-docs-examples-corrected-final.log` |
-
-The first 110-example run passed 109 and differed only in the home page's
-printed order of the same error union. §4.4 says “Order has no effect”.
-The exact expected type now reads Fail(process.ProcessError | BadPort),
-retaining both errors, every other service key, and all BadPort/runtime
-assertions. The complete corrected 110-example run passes; no program or
-compiler changes are used to repair that expectation.
-
-## Runtime artifacts and additional verification
-
-| Command through H | Result |
+| Gate | Result |
 |---|---|
-| `cargo build --release --locked -p ilang-cli` | Passed after the final runtime repair; current production source is byte-identical. |
-| `I=$PWD/target/release/i bash scripts/build-abi-fixture.sh` | ABI5 compiled, external-Fail O0/O2, R2 O0/O2 and all law artifacts regenerated and Wasm-validated; hand-written ABI3 fixtures unchanged. |
-| `DEV_VERIFY_SKIP_CORPUS=1 ILANG_BROWSER_PORT=4194 scripts/dev-verify js` | 123/123 Node; 69/69 browser checks across Chromium/Firefox/WebKit, no skips; fetch/hypot reuse/external-Fail and all runnable R2 laws at both opts. |
-| `cargo test --doc -p ilang-check -p ilang-wasm -p ilang-host -p ilang-cli --locked` | Passed; Rust documentation source has not changed since. |
-| `git diff --check` (direct static check) | Passed. |
+| Workspace all-targets check and clippy `-D warnings` | Pass |
+| Full workspace Rust tests | All 118 binaries pass, including all 31 value-types tests and the reverse-order/recovery properties |
+| Whole spec | 536/536 at both O0 and O2; 29 existing pending cases unchanged |
+| Std | 2171/2171 at O0 and O2 |
+| JavaScript verification | 123 Node and 69 browser checks, no new skip; Chromium/Firefox/WebKit |
+| ABI fixture generation | Built and Wasm-validated from this same release compiler; ABI5 generated artifacts, hand-written ABI3 fixtures retained |
+| Short generation | 32 attempts, 20 accepted/12 model rejections; 64 permutations/32 annotation removals; no failures |
+| Documentation examples | All 110 pass exact type/output/error assertions; runner contracts 14/14 |
+| Macro examples and bench | Both language opts pass; one existing intentional macro-example skip remains |
+| Rust and i formatting | Pass; i checks bench/std/lib/examples |
+| Snippets | Direct script passes its exact diagnostic checks and existing future tracks |
+| Doctests and verification-script self-tests | Pass |
+| Full corpus | All 1973 selected, 554 rejected checks/1419 accepted checks, no checker timeout, same two registered XFAILs |
+| Exact preservation against e975 | 1971 byte-identical outcomes plus only two corrected formerly carried check displays; no new acceptance/error/runtime difference |
+| Semantic and requirement guards | 34 exact semantic/Scheduler cases; all 395 applicable requirements, no new failure |
 
-The release binary SHA256 is
-`9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c`.
-All 1,973 raw corpus observations carry this same digest. No production source
-or binary changed between that run and the final gates. The test and report
-commits do not require another artifact regeneration or JS run.
+All build/check/runtime/corpus commands use
+`/home/agent/Programming/i/.rd/cache/heavy`, one command at a time. Cargo and
+tooling use `direnv exec /home/agent/Programming/i`. The snippet script runs
+directly because it acquires the wrapper internally. The full Rust run uses
+opt-level 1 with debug assertions and overflow checks explicitly enabled,
+retains all tests, and bounds the long property worker pool to two CPUs.
+The entire checker unit suite also passes at default opt-level 0.
+The six existing Rust ignores and all existing pending cases remain unchanged.
 
-## Full corpus and exact preservation audit
+Every command, its result/log, before/after growth, and three-run pinned
+main/fixed timing table is in
+[the performance report](effects-e4-performance.md). The complete corpus
+rulings and 919 original plus 65 additional display judgments remain in
+[the corpus audit](effects-e3-e6-corpus.md).
 
-| Command | Result |
-|---|---|
-| `UPDATE=1 BINARYEN_CORES=1 $H direnv exec /home/agent/Programming/i scripts/review-corpus run --binary ./target/release/i --keep-bounds --jobs 6 --case-list target/e4-full-corpus-cases.json` | All 1,973 selected: 554 rejected checks/1416 accepted/3 checker censors; 2 baseline XFAILs. Initial failures were withdrawn-rule requirements and resource censors, explicitly diagnosed below. |
-| `$H direnv exec /home/agent/Programming/i python3 -u target/e4-retry-corpus-censors.py` | Nine isolated same-bound resource retries plus 19 exact ruling/type guards. Every guard passes; five resource cases clear, four remain censored. Each child uses UPDATE=1, jobs1, keep-bounds and an exact case-list/filter. |
-| `python3 /home/agent/Programming/i/.rd/cache/splice.py` (direct observation-only operation) | Six timed phases restored in four records; four dependent unstarted runtime phases carried individually; no whole-file timeout restore. |
-| `python3 target/e4-current-corpus-audit.py --base 5307a664e --restore-fingerprints` | Every bound unchanged; 977 identical observations restore only fingerprint fields, byte-exactly;972 display/24 semantic changes fully explained. |
-| `python3 target/e4-audit-saved-requirements.py` | The unmodified current matcher AST rechecks all 395 applicable saved requirements: 0 failures, 2 existing XFAILs. This does not claim fresh completion of spliced phases. |
-| `python3 target/e4-exact-semantic-guard.py` | 34/34 exact checks:all 24 semantic code/count/site sets, all 31 original-plus-m3 verdicts, and three Scheduler-leak programs. |
-| `python3 target/e4-current-display-analysis.py` | All 972 current display cases classified; all 919 original display identities retained, plus 65 additional display cases; no unclassified prose/site changes. |
-| Static production/binary and ignore/pending comparisons | Source unchanged since 62af4eac4; every raw observation matches the binary digest; no new Rust ignore and no pending-spec-manifest change. |
+## Fresh observations and the extra isolated retry
 
-The controlling paragraphs, every non-timeout verdict, all 919 original
-one-line display judgments and all 65 current additions are in
-[the corpus audit](effects-e3-e6-corpus.md). There are **zero unexplained
-semantic changes**. Concrete provider errors and their locations are retained;
-only quoted-rule carrier/whole-inhabitance summaries disappear.
+The four wide cases replace six previously spliced and four carried phases
+with fresh passing observations at their original 10/60-second bounds.
+The complete run and earlier isolated jobs-1 run both pass all twelve phases.
 
-## Not freshly completed and default skips
+The stronger exact audit catches one additional full-run O2 timeout:
+`review-t1/stress-keys-2000`, bound 10s. Its paired isolated run observes main
+also timing out, while fixed O2 passes in 5.773 wall seconds / 5.692 CPU
+seconds. All fixed outcomes exactly equal e975. Only the failed test2 phase
+is replaced by that fresh same-binary observation; no old phase is restored.
+Every completed full-run phase is retained.
 
-The following bounded phases are not claimed as fresh passes. Every saved
-bound is retained, and phase-level provenance is in the corpus audit:
+All 1973 initial raw observations carry the release digest above, as does
+the fresh retry. Reconstructing this actual run plus that fresh phase exactly
+matches every final saved outcome. Only fingerprint metadata is restored in
+1969 otherwise-identical files, with byte-exact checks; the four wide files
+retain fresh producer metadata. All bounds are unchanged. The existing
+baseline resource observations remain exactly e975 and are not claimed as
+newly passing phases.
 
-| Case | Bound | Censored/unstarted phases |
-|---|---:|---|
-| review-k4/perf/wide_generic_1024 | 10s | test0,test2; isolated check completed |
-| review-k4/perf/wide_generic_2048 | 60s | check; test0,test2 unstarted |
-| review-k4c/cases/stress_wide_1024 | 10s | test0,test2; completed full-run check retained |
-| review-k4c/cases/stress_wide_open_1024 | 10s | check; test0,test2 unstarted |
+No requested gate is omitted. The full Rust suite is not additionally repeated
+at opt-level 0; all assertions and overflow checks remain enabled at opt-level 1.
+`perf` is unavailable; direct own-child instruction sampling finds 81.16% in
+`Norm::env_in` (inlined `meet_forms`), supported by timing counters and the
+2048-entry operation-count regression. No flaky timing assertion is added.
 
-The pre-existing vendored-std and std3-bench test censors remain censors.
-Registered intentional divergence is checked by its expected bounded timeout,
-not recorded as a new failure. Six existing Rust ignores (four literal-stress
-unit benchmarks and two performance routines), 29 pending spec cases, four
-future-track snippet entries and the macro example's intentional skip remain.
-No new skip/ignore/censor requirement is introduced. All other requested gates
-are complete; no compiler or std work remains for this handoff.
+## Historical preparation (the e975 performance claim is withdrawn)
 
-## Recorded preparation history
+The dated checkpoints below preserve the earlier command history. Statements
+about splicing or classifying the four wide cases as resource censors are
+superseded by the fresh results above and were not sound landing evidence.
+The old phases are not reused in this repair.
+
 
 The following dated checkpoints preserve every earlier command and diagnosed
 failure. Their in-progress statements are historical; the final results above

@@ -1,38 +1,37 @@
 # E3–E6 corpus integration audit
 
-**Superseded performance claim:** e975c5e93 is not landable. The four wide-case splices below concealed a checker regression and are withdrawn. Fresh isolated phases pass after the repair; full revalidation is tracked in [the performance report](effects-e4-performance.md). The earlier results below are historical.
+Main through `7c0652fad` is merged. The pinned observation base remains
+`5307a664e`; intervening main commits change only documentation and its gates.
+The current compiler source is `7575ae5a5`, the performance repair atop
+`e975c5e93`. The earlier e975 LANDABLE claim and its four performance-censor
+justifications are withdrawn; those cases exposed a cubic checker defect.
 
-The final full observation uses main `5307a664e` as the pinned record base.
-Main through `7c0652fad` is merged; the intervening commits change only
-documentation and its gates, with identical compiler, library, corpus sources,
-requirements and saved observations. The observed compiler/library tree is
-`040109cb3` (release built after `62af4eac4`); the later commits add only
-regression checks, ruled requirements, documentation and generated fixtures.
+All **1,973 cases** ran again with `--jobs 6`, `BINARYEN_CORES=1` and
+`--keep-bounds`: 554 rejected checks, 1419 accepted checks, no checker timeout,
+the same two registered XFAILs and no runner failures. A stronger exact audit
+caught one additional O2 timeout; its fresh isolated retry is described below.
+No old observation phase is restored. After that fresh retry:
 
-All **1,973 cases** ran with `--jobs 6`, `BINARYEN_CORES=1` and
-`--keep-bounds`. Nine new resource censors received an isolated same-bound
-retry. All nineteen revised ruling/type requirements pass their filtered
-reruns. After the phase splices below, comparison with the pinned base gives:
-
-| Observation class | Cases | Result |
+| Observation class, relative to pinned main | Cases | Result |
 |---|---:|---|
-| Identical outcomes | 977 | Restore only compiler/binary fingerprint fields after proving every outcome and other metadata field equal; serialization equals the old bytes. |
-| Display changes | 972 | Same phases, exits, diagnostic codes/counts/sites/predicates and runtime stdout; explanations below. This includes 260 cases with changed target-diagnostic wording. |
-| Semantic changes | 24 | Every changed diagnostic or phase is covered by the case table and quoted paragraphs below. |
-| Unexplained semantic changes | 0 | No unexplained acceptance, rejection or lost diagnostic is recorded. |
+| Identical outcomes | 975 | Outcomes and bounds exactly match; metadata-only restoration is checked byte for byte. |
+| Display changes | 974 | Same phases, exits, diagnostic codes/counts/sites/predicates and runtime stdout; includes 260 target-diagnostic wording cases. Two formerly carried checks now show their actual existing E3 type. |
+| Semantic changes | 24 | The previously quoted case table below remains unchanged. |
+| Unexplained semantic changes | 0 | No new acceptance, rejection, lost diagnostic or runtime change is introduced by the performance repair. |
 
-Every saved `bound_seconds` is unchanged. Six timed phases are restored by
-the coordinator's `splice.py`. Four dependent runtime phases that could not
-start after a censored checker retain their old observations individually.
-These are **unverified phases**, not fresh passing runs. Completed phases of
-the merged binary are retained, including when a later retry is censored.
-No whole-file timeout restore is used.
+Comparison with **e975c5e93** is stricter: **1971 exactly identical outcomes**,
+plus only the two formerly carried check displays. Every saved bound is
+unchanged. The complete raw run and the isolated replacement phase use release
+SHA256 `795bb7f8e15dbbd9369774cef5e898d0dec1e7b8c1eb13862ff1b118fdbb96f8`.
+Reconstructing those fresh observations exactly equals all final saved outcomes.
+Only the fingerprint fields of 1969 otherwise-identical files are restored;
+all four wide cases keep their fresh producer metadata.
 
-The current requirement matcher, cloned from `scripts/qa/corpus.py` without
-changes, rechecks all **395 applicable requirements** over the saved
-observations: zero failures, the same two registered XFAILs. This is an audit
-of observations after the required splices, not a claim to have uncensored
-those four stress cases. Full gate commands and results are in
+The unchanged requirement matcher rechecks **395 applicable requirements**:
+zero failures, the same two registered XFAILs. All **34 exact semantic and
+Scheduler guards** pass. Existing baseline resource observations remain exactly
+e975; they are not claimed as new passing phases. See
+[the performance repair and complete commands](effects-e4-performance.md) and
 [the landing verification](effects-e3-e6-validation.md).
 
 ## Owner decisions and repaired defects
@@ -252,45 +251,40 @@ passes every JavaScript engine at both levels. The existing nested-run final
 law retains every exact output and Error assertion. WAT evidence and all
 123 Node / 69 browser results are in [the JS audit](effects-e4-js.md).
 
-## Resource observations and phase splices
+## Fresh resource observations and corrected carried displays
 
-All nine newly censored cases were rerun alone at the exact saved bound.
-`stress-keys-2000`, `cancel_error_final`, `nonportable_result`, `senders_1000`
-and `tasks_1000` recover every required exit. Nonportable-result retains its
-original run0/run2 exit 1 and passing test phases; the other four pass all
-phases. No retry changes a program or an assertion.
+The six spliced phases and four carried phases of the four wide cases are
+removed. Every phase below is observed fresh with the fixed release binary,
+both in the complete run and in the earlier isolated jobs-1 run. The original
+bounds remain in force; no old passing result is copied into a timeout.
 
-| Remaining case | Bound | Fresh evidence and individually retained phases |
+| Case | Saved CPU bound | Fresh check / test0 / test2 |
 |---|---:|---|
-| `review-k4/perf/wide_generic_1024` | 10s | Isolated check completes with the current principal types. test0/test2 remain censored; splice only those baseline phases. |
-| `review-k4/perf/wide_generic_2048` | 60s | Both checker attempts censored. Splice the old check; carry its unstarted test0/test2 observations individually. No fresh completion is claimed. |
-| `review-k4c/cases/stress_wide_1024` | 10s | Full-run check completes; test0/test2 censor. Isolated checker also censors. Keep the completed merged check and full-run censored phases, then splice only test0/test2. |
-| `review-k4c/cases/stress_wide_open_1024` | 10s | Both checker attempts censored. Splice the old check and individually carry the unstarted test0/test2 observations. |
+| `review-k4/perf/wide_generic_1024` | 10s | 0 / 0 / 0 |
+| `review-k4/perf/wide_generic_2048` | 60s | 0 / 0 / 0 |
+| `review-k4c/cases/stress_wide_1024` | 10s | 0 / 0 / 0 |
+| `review-k4c/cases/stress_wide_open_1024` | 10s | 0 / 0 / 0 |
 
-The full and isolated raw observations are retained locally before splicing.
-The splice audit verifies each changed entry equals exactly the corresponding
-baseline phase; every completed merged phase and every non-outcome field is
-unchanged. `splice.py` restores six timed phases across these four files;
-the four unstarted phases above are carried separately, never by restoring a
-whole file. JSON formatting and fingerprint restoration change no observation.
-The pre-existing vendored-std and std3-bench test censors remain censors;
-intentional divergence cases retain their registered divergence requirements.
+The exact e975 comparison also catches `review-t1/stress-keys-2000` test2 timing
+out in the full run at its 10s bound. A paired isolated run keeps that bound:
+main's test2 also times out; the fixed binary completes test2 in 5.773 wall
+seconds (5.506 user + 0.186 system). All its fresh outcomes exactly equal e975.
+Only the failed test2 phase is replaced by that fresh same-binary observation;
+the completed full-run check and test0 remain untouched. The fresh full-run
+snapshot and paired retry are retained separately. No old phase is spliced.
 
-Commands (H is `/home/agent/Programming/i/.rd/cache/heavy`):
+Both formerly carried checks show a D1 display correction already present in
+the unmodified old e4 executable:
 
-| Command | Result |
-|---|---|
-| `UPDATE=1 BINARYEN_CORES=1 $H direnv exec /home/agent/Programming/i scripts/review-corpus run --binary ./target/release/i --keep-bounds --jobs 6 --case-list target/e4-full-corpus-cases.json` | All 1,973 selected once: 554 rejected checks, 1,416 accepted, 3 checker censors, 2 baseline XFAILs. Initial failures are the subsequently replaced R4 requirements and resource censors. |
-| `$H direnv exec /home/agent/Programming/i python3 -u target/e4-retry-corpus-censors.py` | Nine isolated resource retries, then 19 exact ruling/type guards; every guard passes. Child runs use `UPDATE=1`, `--jobs 1`, `--keep-bounds`, a one-case list and exact `--filter CASE`. Four stress cases remain censored as listed. |
-| `python3 /home/agent/Programming/i/.rd/cache/splice.py` | Six timed phases across four records; complete phase-level provenance checked. |
-| `python3 target/e4-current-corpus-audit.py --base 5307a664e --restore-fingerprints` | All bounds equal; 977 unchanged outcomes restore fingerprint fields byte-exactly; 972 display and 24 explained semantic cases. |
-| `python3 target/e4-audit-saved-requirements.py` | Clone of the unmodified current matcher: all 395 applicable saved-observation requirements pass, 2 existing XFAILs. |
-| `python3 target/e4-current-display-analysis.py` | All 972 display cases assigned to the groups below; no unclassified diagnostic prose or location. |
+| Case | Old copied `app/main.run` type | Fresh type | Controlling paragraph |
+|---|---|---|---|
+| `review-k4/perf/wide_generic_2048` | `(() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil` | `(() <- N -> Nil) <- N -> Nil` | R1, syntax-three §6.1: “One need row. `err` is removed (stage E3): errors are the `Fail(E)` entry of `env`.” N is the complete need row; no new meaning or diagnostic changes. |
+| `review-k4c/cases/stress_wide_open_1024` | `(() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil` | `(() <- N -> Nil) <- N -> Nil` | R1, syntax-three §6.1: “One need row. `err` is removed (stage E3): errors are the `Fail(E)` entry of `env`.” N is the complete need row; no new meaning or diagnostic changes. |
 
-The runner's E0505 repair permits a cycle only when that case independently
-requires E0505; b10 still independently requires its provider error. Five
-Python regressions cover both errors, either missing error, unexpected cycles
-and warning-only output. No semantic requirement is removed.
+The fresh full run is followed by an exact all-1973 outcome comparison with
+e975 and a byte-exact metadata restoration. The 395 requirements and all 34
+semantic guards pass. These checks prove that the performance repair changes
+no other observation; none of the earlier error expectations is weakened.
 
 ## Display groups
 
@@ -301,7 +295,7 @@ D10 describes restored real keys separately from carrier removal or bounds.
 
 | Group | Current cases | Display change and controlling paragraph |
 |---|---:|---|
-| D1 | 845 | The independent error carrier disappears: opaque `(Fail(E), ..N)` callbacks become N, and complete callback rows combine directly. R1 (syntax-three §6.1: “One need row … err is removed”); §4.7 governs resulting inferred names. Written service keys remain. |
+| D1 | 847 | The independent error carrier disappears: opaque `(Fail(E), ..N)` callbacks become N, and complete callback rows combine directly. R1 (syntax-three §6.1: “One need row … err is removed”); §4.7 governs resulting inferred names. Written service keys remain. |
 | D2 | 150 | Directed bounds and now-ordinary shared parameters simplify: S(N & A) becomes S(N), a consumer uses its incoming A, and redundant result/need variables coalesce. R1/R3; §4.7: “type variables that have no effect on the meaning are taken out”; §4.5 rule 4 and §9.2 preserve provider subtyping. D10 separately accounts for added real keys. |
 | D3 | 9 | Only canonical variable names change; each scheme is equal up to renaming. R1 and §4.7 simplification; no nominal constructor changes. |
 | D4 | 260 | The removed provider planner’s “missing service” / “must be closed” wording becomes the concrete constructor key “T is not provided by the target native”. Same E0523 counts, sites and rejected phases. R6 (syntax-three §2.10.11). |
@@ -459,9 +453,9 @@ quoted rule above; resource notes identify observations not freshly completed.
 | `review-k4/perf/plain_chain_256` | D1 |
 | `review-k4/perf/plain_chain_512` | D1 |
 | `review-k4/perf/plain_chain_64` | D1 |
-| `review-k4/perf/wide_generic_1024` | D1; resource phases retained as listed above |
+| `review-k4/perf/wide_generic_1024` | D1; fresh check/O0/O2 pass at the saved bound |
 | `review-k4/perf/wide_generic_128` | D1 |
-| `review-k4/perf/wide_generic_2048` | Identical outcome; no expectation update; resource phases retained as listed above |
+| `review-k4/perf/wide_generic_2048` | D1; formerly carried check now shows the existing complete N row; fresh check/O0/O2 pass |
 | `review-k4/perf/wide_generic_256` | D1 |
 | `review-k4/perf/wide_generic_512` | D1 |
 | `review-k4/perf/wide_generic_64` | D1 |
@@ -903,11 +897,11 @@ quoted rule above; resource notes identify observations not freshly completed.
 | `review-k4c/cases/stress_row_128` | D1 |
 | `review-k4c/cases/stress_row_32` | D1 |
 | `review-k4c/cases/stress_row_512` | D1 |
-| `review-k4c/cases/stress_wide_1024` | Identical outcome; no expectation update; resource phases retained as listed above |
+| `review-k4c/cases/stress_wide_1024` | Identical outcome; fresh check/O0/O2 pass at the saved bound |
 | `review-k4c/cases/stress_wide_128` | Identical outcome; no expectation update |
 | `review-k4c/cases/stress_wide_32` | Identical outcome; no expectation update |
 | `review-k4c/cases/stress_wide_512` | Identical outcome; no expectation update |
-| `review-k4c/cases/stress_wide_open_1024` | Identical outcome; no expectation update; resource phases retained as listed above |
+| `review-k4c/cases/stress_wide_open_1024` | D1; formerly carried check now shows the existing complete N row; fresh check/O0/O2 pass |
 | `review-k4c/cases/stress_wide_open_128` | D1 |
 | `review-k4c/cases/stress_wide_open_32` | D1 |
 | `review-k4c/cases/stress_wide_open_512` | D1 |

@@ -2962,5 +2962,8 @@
   },
   "crates/ilang-check/tests/row_schemes.rs:be6a0ac8f8bb9ed4": {
     "not_source": "Rust format template completed with the actual shipped Stream, Step and Sink declarations before checking."
+  },
+  "crates/ilang-check/src/types/display.rs:a81e88c3ce345716": {
+    "not_source": "Rust format string for the synthetic solver type names in the 2048-entry operation-count regression"
   }
 }
