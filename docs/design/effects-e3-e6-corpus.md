@@ -163,22 +163,15 @@ only_runner: (() <- (task.Scheduler) -> Nil) <- (task.Runner) -> Nil =
 This must typecheck under §9.9; it currently rejects with E0501,
 `task.Scheduler is not a subtype of task.Runner`. The corresponding test
 wrapper also rejects with E0501 against Fail(ScheduleError) | Runner.
-The initial lane ownership rule prohibits editing
-`lib/i/**`; the coordinator status file requests the E6/library owner's
-repair or a scope change. No failing regression is disguised as a passing
-test and no expectation is rerecorded to bless this contract discrepancy.
-
-The unapplied [four-signature proposal and two regression fixtures](effects-e3-e6-task-run.patch)
-separates the internally supplied services from residual N in `make_start`,
-`execute_body`, `execute`, and `run`. An isolated copy of the module
-typechecks the Runner-only run/test cases and a positive case also supplying Dep;
-omitting Dep still rejects with E0501. The copy replaces the 17 privileged
-runtime imports with Never-returning stubs of their original types, so this
-is a type-only proposal check, not a rebuilt compiler or a runtime test.
-Apply it with `git apply --unidiff-zero effects-e3-e6-task-run.patch`; the
-application check and proposed-source formatting both pass. The
-library owner still needs to apply it, rebuild the embedded library, and
-run the actual regression and runtime gates.
+The coordinator authorized the library repair on 2026-11-14. The four-signature
+repair is now applied to `lib/i/task.i`, retaining main's stage-three Runner and
+Scheduler representations. Three §9.9 fixtures check the Runner-only run/test
+contracts, rejection of an unrelated unprovided `Dep`, and the actual events
+program. A CLI regression checks the latter's printed entry type exactly:
+`app/main.main : () <- (Assert, task.Runner) -> Nil`.
+The original [proposal](effects-e3-e6-task-run.patch) is retained as an audit
+artifact. Verification of the merged compiler and these regressions is pending
+the heavy runs after 20:30; the older results below describe the previous hash.
 
 ## Verification and display groups
 

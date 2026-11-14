@@ -1201,7 +1201,7 @@ complete = <A, E, N>(
 }
 
 make_start: <A, E, N>(
-	() <- (Fail(E), ..N) -> A,
+	() <- (Fail(E), Scheduler, Runner, request.Await, ..N) -> A,
 	Key(Result(A, E)),
 	Key(E),
 	Bool,
@@ -3937,7 +3937,7 @@ map_concurrently = <A, B, N>(xs : List(A), f : (A) <- N -> B) -> List(B) {
 }
 
 execute_body: <A, E, N>(
-	() <- (Fail(E), ..N) -> A,
+	() <- (Fail(E), Scheduler, Runner, request.Await, request.Owner, request.Root, ..N) -> A,
 	Runner,
 	rng.Generator,
 	Policy,
@@ -4054,7 +4054,7 @@ execute_body: <A, E, N>(
 		}
 }
 
-run = <A, N>(body : () <- N -> A) <- (runner : Runner) -> A {
+run = <A, N>(body : () <- (Scheduler, Runner, request.Await, request.Owner, request.Root, ..N) -> A) <- (runner : Runner) -> A {
 	runner.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
 		| (AttachedRunner(..) = attached) {
@@ -4103,7 +4103,7 @@ scope_call: <A, E, N>(
 }
 
 execute: <A, E, N>(
-	() <- (Fail(E), ..N) -> A,
+	() <- (Fail(E), Scheduler, Runner, request.Await, request.Owner, request.Root, ..N) -> A,
 	Runner,
 	rng.Generator,
 	Policy,
