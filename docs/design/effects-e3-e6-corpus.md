@@ -152,3 +152,57 @@ The isolated timeout reruns, remaining per-group updates, exact 919-case
 display classifications and fingerprint-only restoration follow. Until they
 finish this section is an audit in progress, not a claim that the full
 requested corpus integration is green.
+
+<!-- display-inventory -->
+
+## Display-only groups recorded so far
+
+Every listed observation has equal phase sets, phase exits, diagnostic code
+multisets (including duplicate counts), and runtime stdout. Only the checker
+types or diagnostic text change. Groups overlap. The original coordinator
+run has 919 display-only cases; this checkpoint records the first 33 after
+complete bounded reruns. Remaining per-group runs are still in progress.
+
+| Group | Cases so far | Exact displayed change and controlling paragraph |
+|---|---:|---|
+| D1 | 27 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain, and the redundant independently generalized error variable disappears. R1 (syntax-three §6.1); any subsequent variable renumbering follows §4.7. |
+| D2 | 2 | Directed residual-need simplification: e.g. `(Sink(A, N), ..N)` becomes `(Sink(A, Never))` for a pure stored callback; error variables are ordinary arguments and may be renamed E → A. The Sink key and entry rejection remain. R1 and spec §4.7 simplification / §9.2 directed satisfaction. |
+| D4 | 14 | E5 replaces `provider target native … missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 count, site and failing phases. R6 (§2.10.11). |
+
+One line per reviewed case:
+
+| Case | Display explanation |
+|---|---|
+| `review-k4-lane/closed_handler_hole` | D1 |
+| `review-k4-lane/handler-hole-False-False` | D1 |
+| `review-k4-lane/handler-hole-True-False` | D1 |
+| `review-k4-lane/handler-hole-True-True` | D1 |
+| `review-k4-lane/previous-0-False` | D4 |
+| `review-k4-lane/previous-0-True` | D4 |
+| `review-k4-lane/previous-1-False` | D1, D4 |
+| `review-k4-lane/previous-2-False` | D1, D4 |
+| `review-k4-lane/previous-2-True` | D1, D4 |
+| `review-k4-lane/previous-3-False` | D1, D4 |
+| `review-k4-lane/previous-3-True` | D1, D4 |
+| `review-k4-lane/previous-4-False` | D2, D4 |
+| `review-k4-lane/previous-4-True` | D2, D4 |
+| `review-k4-lane/previous-5-False` | D4 |
+| `review-k4-lane/previous-5-True` | D4 |
+| `review-k4-lane/previous-6-False` | D1, D4 |
+| `review-k4-lane/previous-6-True` | D1, D4 |
+| `review-k4-lane/previous-chain-64` | D1, D4 |
+| `review-k4-lane/w1-Dep` | D1 |
+| `review-k4-lane/w1-Never` | D1 |
+| `review-k4-lane/w10-Never` | D1 |
+| `review-k4-lane/w12-Dep` | D1 |
+| `review-k4-lane/w12-Never` | D1 |
+| `review-k4-lane/w13-Dep` | D1 |
+| `review-k4-lane/w13-Never` | D1 |
+| `review-k4-lane/w2-Dep` | D1 |
+| `review-k4-lane/w2-Never` | D1 |
+| `review-k4-lane/w3-Dep` | D1 |
+| `review-k4-lane/w3-Never` | D1 |
+| `review-k4-lane/w4-Dep` | D1 |
+| `review-k4-lane/w4-Never` | D1 |
+| `review-k4-lane/w5-Dep` | D1 |
+| `review-k4-lane/w5-Never` | D1 |
