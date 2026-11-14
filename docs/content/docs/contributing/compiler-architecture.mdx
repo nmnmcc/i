@@ -1,27 +1,63 @@
 ---
 title: Compiler architecture
-description: Follow source text through the compiler and host.
+description: Trace the compiler pipeline and find an existing implementation to follow for a change.
 ---
 
-This page follows a program from source text to execution and names the files and data structures used at each stage. Start with the CLI pipeline when tracing a change across stages.
+This page follows source text through the compiler and host. It names the entry points and data structures at each boundary, then gives starting files and existing examples for common changes.
 
-## Packages and syntax
+## The path of a program
 
-`crates/ilang-cli/src/lib.rs` exposes `load` and `build`, using `BuildOptions` and returning `Built`. `crates/ilang-package/src/lib.rs` loads manifests and modules into a `PackageGraph`, with `Sources`, `Package`, and diagnostics. Its `manifest.rs` and `modules.rs` handle package files and module discovery.
+This diagram follows the normal source surface. The parser lexes internally; the checking and compilation wrappers also collect diagnostics at their boundaries.
 
-`crates/ilang-syntax/src/lib.rs` exposes `parse_module`. The `syn3` parser produces the syntax-three tree in `crates/ilang-syntax/src/syn3/ast.rs` and lowers it through `crates/ilang-syntax/src/syn3/lower.rs` to the older `ast::Module` in `crates/ilang-syntax/src/ast.rs`. The old tree and `lower.rs` are planned to go as the tree rewrite proceeds; they are present here.
+```text
+source text
+  -- lexer::lex3 --> tokens (Lexed)
+  -- Parser::module inside syn3::parse_module --> syn3::ast::Module
+  -- syn3::lower::lower --> ast::Module (older syntax tree)
+  -- resolve_parsed / resolve::resolve --> hir::Program
+  -- types::check_selected --> types::Typed alongside hir::Program
+  -- lower::lower_tests_numeric (including control::split) --> ir::Program
+  -- emit::wat / wat::parse_str --> Wasm bytes
+  -- ilang_cli::optimize / ilang_binaryen::optimize --> optimized Wasm
+  -- Built::host_program / Program::from_bytes --> host Program
+  -- Program::run_entry --> Outcome
+```
 
-## Checking and macros
+At optimisation level 0 the CLI returns the unoptimized bytes. At levels 2 and 3 it calls Binaryen and validates the result.
 
-`crates/ilang-check/src/lib.rs` parses the graph into `Parsed` modules, resolves names into `hir::Program`, and returns `Checked` with type information and diagnostics. `crates/ilang-check/src/resolve.rs`, `hir.rs`, and `types/mod.rs` are entry points to resolution, the high-level intermediate representation, and types.
+## Packages and source
 
-`crates/ilang-macro/src/lib.rs` organizes compile-time macro programs and expansion. Its `prepare.rs`, `run.rs`, and `session.rs` are starting points for execution; `item_phase.rs` and `typed.rs` handle expansion phases. Macros interact with checking rather than forming a separate final compiler stage.
+[The CLI library](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/src/lib.rs) exposes `load` and `build`, with `BuildOptions` and `Built`. [The package loader](https://github.com/nmnmcc/i/blob/main/crates/ilang-package/src/lib.rs) assembles a `PackageGraph`, containing packages, modules, and `Sources`. Its [manifest reader](https://github.com/nmnmcc/i/blob/main/crates/ilang-package/src/manifest.rs) and [module discovery](https://github.com/nmnmcc/i/blob/main/crates/ilang-package/src/modules.rs) are the starting points for package layout changes.
 
-## Wasm and host
+## Syntax
 
-`crates/ilang-wasm/src/lib.rs` exposes `compile` and related entry points. `lower.rs` translates checked code into the intermediate form in `ir.rs`; `control.rs` handles suspending calls, and `emit.rs` emits Wasm. The runtime is in `crates/ilang-wasm/src/runtime`. `crates/ilang-binaryen/src/lib.rs` invokes the linked Binaryen library for optimization.
+[lexer.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/lexer.rs) produces tokens and spans. [syn3/parse.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/syn3/parse.rs) builds the tree defined in [syn3/ast.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/syn3/ast.rs). The public `ilang_syntax::parse_module` calls `syn3::parse_lowered`, which uses [syn3/lower.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/syn3/lower.rs) to produce the older [ast.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/ast.rs) tree read by the checker. The old tree and this syntax lowering are planned to go in the tree rewrite; they are present here.
 
-`crates/ilang-host/src/lib.rs` embeds Wasmtime. A `Program` describes the compiled module and its interface; an `Instance` executes it and calls return an `Outcome`. `crates/ilang-cli/src/main.rs` selects commands, and `crates/ilang-runner/src/main.rs` starts native packages. The language server in `crates/ilang-lsp/src/lib.rs` uses checker queries and the syntax formatter for editor requests.
+## Resolution and checking
+
+[The checker entry points](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/lib.rs) assemble `Parsed` modules, resolve them, and return `Checked`, with an optional `hir::Program`, optional `types::Typed`, and diagnostics. [resolve.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/resolve.rs) resolves names; [order.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/order.rs) orders top-level values. [hir.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/hir.rs) defines resolved identifiers, expressions, and patterns. [types/mod.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/types/mod.rs) defines solver types and dispatches checking.
+
+## Macros
+
+[ilang-macro](https://github.com/nmnmcc/i/blob/main/crates/ilang-macro/src/lib.rs) coordinates macro preparation, execution, and expansion. [session.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-macro/src/session.rs), [item_phase.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-macro/src/item_phase.rs), and [typed.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-macro/src/typed.rs) are useful entry points. `Prepared` holds macro bindings and syntax templates; `Session` tracks invocation marks and expansion depth, and `Transaction` holds effects until validation succeeds. Expansion transforms parsed modules and calls back into checking.
+
+## Wasm and optimization
+
+[ilang-wasm's entry points](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/lib.rs) accept HIR and `Typed`. [lower.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/lower.rs) produces the A-normal intermediate form defined in [ir.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/ir.rs). [control.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/control.rs) splits functions around suspending calls. [emit/mod.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/emit/mod.rs) emits WAT, which is encoded to Wasm and validated. [ilang-binaryen](https://github.com/nmnmcc/i/blob/main/crates/ilang-binaryen/src/lib.rs) invokes the linked optimizer.
+
+## Host and tools
+
+[ilang-host](https://github.com/nmnmcc/i/blob/main/crates/ilang-host/src/lib.rs) embeds Wasmtime. `Program` holds a compiled module and interface; `Instance` executes it, and a call returns an `Outcome`. [The CLI](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/src/main.rs) selects commands; [the native runner](https://github.com/nmnmcc/i/blob/main/crates/ilang-runner/src/main.rs) starts packaged executables. [The language server](https://github.com/nmnmcc/i/blob/main/crates/ilang-lsp/src/server.rs) answers editor requests using [checker queries](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/query.rs) and the syntax formatter.
+
+## Where to start for a kind of change
+
+| Change | Existing example to follow |
+| --- | --- |
+| A diagnostic | Start with the stable `code` constants in [check/lib.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/lib.rs). In [resolve.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/resolve.rs), `module_of` emits `UNKNOWN_NAME` (E0201), with a span and a message, when a module name cannot be found. Add a diagnostic case in the relevant test layer. |
+| A built-in/core function | Follow `bit_size`: its declaration is in [lib/i/core.i](https://github.com/nmnmcc/i/blob/main/lib/i/core.i), its name and runtime mapping are in `CORE` and `CORE_FUNCS` in [wasm/lower.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/lower.rs), and `$core_bit_size` is implemented in [runtime/core.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/runtime/core.rs). [runtime/tests.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/runtime/tests.rs) exercises it. |
+| A std function | Follow `bool.not` in [std/src/bool.i](https://github.com/nmnmcc/i/blob/main/std/src/bool.i): export, doc comment, and an ordinary function body. [std/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/std/test/bool_test.i) has the corresponding true/false tests. |
+| A formatter rule | [syn3/print.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/syn3/print.rs) contains the layout rules; `data_item` writes labelled items as `name = value`, and `data` chooses their layout. Follow `formatter_layout` in [tests/syn3.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/tests/syn3.rs) and its formatting stability checks. |
+| An LSP feature | Follow `hover` in [server.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-lsp/src/server.rs): advertise the capability, handle the request, query the checked program, and convert positions and ranges. [protocol.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-lsp/tests/protocol.rs) includes `hover_on_a_local_name_uses_the_names_of_the_scheme`. |
 
 ## See also
 
