@@ -4,9 +4,7 @@
 // Rule 4: the caller's Yield(Int | String) is a value subtype of the
 // Yield(Int) that the function needs.
 Yield(A) = (emit = (A) -> Nil)
-
 Narrow = () <- (Yield(Int)) -> Nil
-
 Wide = () <- (Yield(Int | String)) -> Nil
 
 fit = (f : Narrow) -> Wide { f }

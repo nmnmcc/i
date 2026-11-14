@@ -104,9 +104,12 @@ fn two_environment_parameters_retain_the_service() {
 
 #[test]
 fn a_captured_row_annotation_can_contain_the_service() {
+    // E3 removes the old error channel. 73f725713 inserted Fail(Never)
+    // only to suppress its synthetic carrier; Decision 2 makes that a real
+    // key, so restore the pre-conversion annotation rather than erase it.
     // §4.7 allows N to become the more exact finite row A | S(A).
     // Merely making an unused function needs nothing (§4.8 rule 4).
-    let source = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- (Fail(Never), ..N) -> Nil = () { use() }\n\tlocal()\n}";
+    let source = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}";
     entry(source);
     let unused = source.replace("\tlocal()\n}", "\tNil\n}");
     assert_ne!(source, unused);
@@ -123,7 +126,7 @@ fn a_captured_row_annotation_can_contain_the_service() {
     }
     // §9.2 fits the provided service by ordinary value subtyping.
     // Supplying S(Dependency) does not supply its callback's Dependency.
-    let dependency = "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- (Fail(Never), ..N) -> Nil = () { use() }\n\tlocal()\n}\n\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }";
+    let dependency = "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}\n\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }";
     entry(dependency);
     // An empty `Dependency = ()` is not a keyed service type in syntax three
     // (E0225), so the supplied variant gives it a field.

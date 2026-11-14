@@ -40,9 +40,9 @@ f8 : (Wrap, UtfCodepoint, Never) -> Id(List(Int))
 @external("a", "f9")
 f9 : (Int | String, (Int, Int)) -> Int
 
-// No errors and no environment.
+// §10.1: an external permits Fail(E), but never an unrelated service.
 @external("a", "f4")
-f4 : () <- (Fail(String)) -> Int
+f4 : () <- (Assert) -> Int
 
 @external("a", "f10")
 f10 : () <- (Fail(Int), Assert) -> Int

@@ -32,7 +32,8 @@ description: "Fast enough, complete enough, easy to read, and light: a small fun
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -87,7 +88,8 @@ port 8080
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -137,7 +139,8 @@ src/probe.i:8:1: error[E0501]: `app.BadPort` is not a subtype of `Never`
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -184,7 +187,8 @@ describe = () { app.read_port() |> (0) { "off" } | (1) { "one" } }
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -236,7 +240,8 @@ BadPort(..)
 )
 BadPort=()
 read_port=() {
-int.parse(process.env("PORT")) |>
+text = process.env("PORT")
+fail.catch(() { int.parse(text) }) |>
 (Ok(port) ? port > 0 && port < 65536) { port }
 | (_) { fail.raise(BadPort) }
 }
@@ -261,7 +266,8 @@ fail.catch(read_port) |>
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -304,7 +310,8 @@ main = () {
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -375,7 +382,8 @@ pass hello/format_test.matching and overloading
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -389,7 +397,7 @@ main = () {
 </details>
 
 ```text
-hello/main.read_port : () <- (Fail(BadPort | process.ProcessError), i/request.Await, i/request.Owner, process.Environment) -> Int
+hello/main.read_port : () <- (Fail(process.ProcessError | BadPort), i/request.Await, i/request.Owner, process.Environment) -> Int
 hello/main.main : () <- (Fail(stdio.StdioError), i/request.Await, i/request.Owner, process.Environment, stdio.Stdio) -> Nil
 ```
 
@@ -410,7 +418,8 @@ hello/main.main : () <- (Fail(stdio.StdioError), i/request.Await, i/request.Owne
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -465,7 +474,8 @@ pass hello/main_test.rejects a bad port
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -510,7 +520,8 @@ invalid PORT
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -572,7 +583,8 @@ pass hello/tasks_test.joined reads
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }

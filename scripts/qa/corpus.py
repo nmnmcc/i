@@ -38,6 +38,13 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def diagnostic_codes_match(text, wanted, expected_cycle=False):
+    actual = set(re.findall(r'error\[([^]]+)\]', text))
+    # A cycle must not stand in for an unrelated semantic rejection. Cases
+    # that explicitly require the cycle error (§4.7) must be able to pass.
+    return bool(actual.intersection(wanted)) and ('E0505' not in actual or 'E0505' in wanted or expected_cycle)
+
+
 def git(*args):
     return subprocess.check_output(['git', *args], cwd=ROOT, text=True).strip()
 
@@ -185,7 +192,10 @@ def invoke(binary, project, command, bound):
     # timeout. Wall time is only a backstop for a process that waits without using the CPU.
     argv = [str(binary), *command, '--offline', '--project', str(project)]
     started = time.monotonic()
-    env = dict(os.environ, NO_COLOR='1', TERM='dumb', RAYON_NUM_THREADS='1')
+    # The CPU bound covers all threads. Binaryen has its own pool and ignores
+    # Rayon's limit, so leave parallelism to the runner's --jobs rather than
+    # starting one optimizer worker per machine core in every child process.
+    env = dict(os.environ, NO_COLOR='1', TERM='dumb', RAYON_NUM_THREADS='1', BINARYEN_CORES='1')
     # A slower machine (a CI runner) scales every bound; the expectations were recorded locally.
     bound = bound * float(os.environ.get('CORPUS_BOUND_SCALE', '1'))
     cpu = max(1, math.ceil(bound))
@@ -366,6 +376,7 @@ def run_corpus(args):
     pool = ThreadPoolExecutor(max_workers=args.jobs)
     for n, (case, result, bound) in enumerate(pool.map(observe_case, cases)):
         applicable = [r for r in requirements['requirements'] if re.search(r['pattern'], case['id'])]
+        expected_cycle = any('E0505' in r.get('diagnostic_codes', []) and r.get('phase') != 'entry' for r in applicable)
         expected_path = ROOT / case['project'] / 'expected.json'
         if update:
             dump(expected_path, {'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': bound, 'outcome': result})
@@ -413,8 +424,7 @@ def run_corpus(args):
                 met = False
             if requirement.get('diagnostic_codes'):
                 diagnostic_text = '\n'.join(v['stderr'] for v in result.values()) if requirement.get('phase') == 'entry' else check['stderr']
-                actual_codes = set(re.findall(r'error\[([^]]+)\]', diagnostic_text))
-                met = met and bool(actual_codes.intersection(requirement['diagnostic_codes'])) and 'E0505' not in actual_codes
+                met = met and diagnostic_codes_match(diagnostic_text, requirement['diagnostic_codes'], expected_cycle)
             for fragment in requirement.get('types_contain', []):
                 met = met and fragment in check['stdout']
             if 'run_stdout' in requirement:

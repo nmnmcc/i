@@ -2912,8 +2912,16 @@ fn type_macro_keeps_its_standalone_need_channel() {
                     };
         let actual = migration_syntax::print::print_module(&lowered);
         assert_eq!(cases[case]["source"].as_str().unwrap(), text);
+        // Syntax-three §6.1: err is removed; errors are ordinary Fail
+        // entries of the one need. Project only that deleted synthetic
+        // carrier from the independent historical oracle. Keep every
+        // macro/standalone-type/grouping boundary byte for byte.
+        let historical = cases[case]["expected_old"].as_str().unwrap();
+        assert_eq!(historical.matches(", N%E").count(), usize::from(case < 2));
+        let expected = historical.replace(", N%E", "").replace(" ^ N%E", "");
+        assert!(!actual.contains("N%E"), "removed carrier: {actual}");
         assert_eq!(
-            actual, cases[case]["expected_old"].as_str().unwrap(),
+            actual, expected,
             "expansion must retain its lowering boundary: {text}"
         );
     }

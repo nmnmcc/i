@@ -276,17 +276,6 @@ fn former_keywords_are_package_and_dependency_names() {
 }
 
 #[test]
-fn provider_empty_tables_are_valid() {
-    for parse in [parse_manifest, parse_dependency_manifest] {
-        assert!(
-            parse("name = \"app\"\n[providers]\n[provider_adapters]\n")
-                .1
-                .is_empty()
-        );
-    }
-}
-
-#[test]
 fn dotted_entry_paths_are_relative_modules() {
     let (manifest, diagnostics) =
         parse_manifest("name = \"app\"\n[entries]\nworker = \"tools.jobs.work\"\n");
@@ -295,4 +284,20 @@ fn dotted_entry_paths_are_relative_modules() {
     assert_eq!(entries[0].1.module, "tools.jobs");
     assert_eq!(entries[0].1.function, "work");
     assert!(!codes("name = \"app\"\n[entries]\nworker = \"app/tools.work\"\n").is_empty());
+}
+
+// Provider tables have no meaning after E5, including in dependencies.
+#[test]
+fn former_provider_tables_do_not_choose_entries_or_dependencies() {
+    for parse in [parse_manifest, parse_dependency_manifest] {
+        let baseline = parse("name = \"app\"\n").0.unwrap();
+        for tables in [
+            "[providers]\n[provider_adapters]\n",
+            "[providers.\"dep/main.S\"]\nhost = \"app/main.fake\"\n",
+        ] {
+            let (manifest, diagnostics) = parse(&format!("name = \"app\"\n{tables}"));
+            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+            assert_eq!(manifest.unwrap(), baseline);
+        }
+    }
 }

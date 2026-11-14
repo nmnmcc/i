@@ -1,6 +1,6 @@
 {
-  "compiler": "58a356366381d557c52d27afe70e2dc49496fea3",
-  "binary_sha256": "938d9d0476130f259aa42a3a211d6271a3278a36c67d9faf51011a62d3499775",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.use : () <- (S(A, N), ..N) -> A\napp/main.example : () -> Int\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:6:1: error[E0515]: the service requirements `S(String, Never)` and `S(Int, S(String, Never))` have an empty intersection and cannot be satisfied (§4.4, §9.2)\nsrc/main.i:6:11: error[E0515]: `S(String, Never)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:12:12: error[E0515]: `S(String, Never)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:12:21: error[E0515]: `S(_, _)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:15:8: error[E0515]: `S(String, Never)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n5 errors\n"
+      "stderr": "src/main.i:6:11: error[E0515]: `S(String, Never)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:12:12: error[E0225]: two explicit services or two spreads in provided data have one service key (§9.2)\nsrc/main.i:12:12: error[E0515]: `S(String, Never)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:12:21: error[E0515]: `S(_, _)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:15:8: error[E0515]: `S(String, Never)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n5 errors\n"
     }
   }
 }

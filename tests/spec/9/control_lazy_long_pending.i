@@ -15,7 +15,7 @@ check = (got : String, want : String) {
 
 show = (x) { core.inspect(x) }
 
-More = (Continuation(Nil, Gen, Never, Never))
+More = (Continuation(Nil, Gen, Never))
 End = ()
 Gen = More | End
 
@@ -49,7 +49,7 @@ test("cancel_long_pending", () {
 	)
 })
 
-Step = (Continuation(Nil, StepSum, Int, Never))
+Step = (Continuation(Nil, StepSum, Fail(Int)))
 Fin = ()
 StepSum = Step | Fin
 
