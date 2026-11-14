@@ -160,17 +160,18 @@ requested corpus integration is green.
 Every listed observation has equal phase sets, phase exits, diagnostic code
 multisets (including duplicate counts), and runtime stdout. Only the checker
 types or diagnostic text change. Groups overlap. The original coordinator
-run has 919 display-only cases; this checkpoint records 586 after
+run has 919 display-only cases; this checkpoint records 802 after
 complete bounded reruns. Remaining per-group runs are still in progress.
 CPU-censored observations retain their old baselines and are not counted
 as completed display-only reruns.
 
 | Group | Cases so far | Exact displayed change and controlling paragraph |
 |---|---:|---|
-| D1 | 562 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain. Merging two callbacks combines their whole rows, without a separate `Fail(E | E2)` carrier. R1 (syntax-three §6.1); subsequent variable renumbering follows §4.7. |
-| D2 | 99 | Directed bounds are shown without redundant variables: read-only `S(N & A)` becomes `S(N)`; a consumer of argument `A` needs `S(A)` rather than a separate bound `S(B)`; a pure stored callback closes its residual N to Never. Inferred E/A labels can change. Spec §4.7 simplification, §4.5 rule 4 needs direction, §9.2 provider subtyping; R1 removes the independent error bounds. |
-| D4 | 202 | E5 replaces planner messages such as `missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 multiset, source sites and failing phases. R6 (§2.10.11). |
+| D1 | 770 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain. Merging two callbacks combines their whole rows, without a separate `Fail(E | E2)` carrier. R1 (syntax-three §6.1); subsequent variable renumbering follows §4.7. |
+| D2 | 120 | Directed bounds are shown without redundant variables: read-only `S(N & A)` becomes `S(N)`; a consumer of argument `A` needs `S(A)` rather than a separate bound `S(B)`; a pure stored callback closes its residual N to Never. Inferred E/A labels can change. Spec §4.7 simplification, §4.5 rule 4 needs direction, §9.2 provider subtyping; R1 removes the independent error bounds. |
+| D4 | 238 | E5 replaces planner messages such as `missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 multiset, source sites and failing phases. R6 (§2.10.11). |
 | D5 | 3 | Recovery diagnostics retain a known String argument: `S(_, _)` becomes `S(String, _)` against the same incompatible `S(1, Never)`. Same E0515 site and invariant mismatch; ordinary incoming bounds survive single-row inference. R1, spec §4.7 monomorphic variables show their incoming types, §4.5 rule 4 and §9.2. |
+| D7 | 5 | The single-row solver reports the incompatible leaf instead of the enclosing recovery summary: g_ann_Never/g_inf_Never show `_` against Never instead of `S(_)`; pl44 shows `_` against the required Int instead of `Cov(_)` against Never. Each E0501 remains at the same callback and annotation sites, with the same count; every separate provider error also remains. R1 changes the constraint graph, while spec §4.5 rule 4 still forbids the needed effect in a pure callback; §4.7 governs displayed incoming bounds. These are recovery projections of the same rejection, not newly accepted annotations. |
 
 One line per reviewed case:
 
@@ -762,3 +763,219 @@ One line per reviewed case:
 | `review-k4c/cases/stress_wide_open_32` | D1, D2 |
 | `review-k4c/cases/stress_wide_open_512` | D1, D2 |
 | `review-k4c/cases/two_run` | D1 |
+| `review-k4d/_loose/fuzz/bad/run_44_188` | D1, D2 |
+| `review-k4d/_loose/fuzz/bad/run_44_361` | D1, D2 |
+| `review-k4d/_loose/fuzz/e0505/21_139` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_177` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_194` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_253` | D1 |
+| `review-k4d/_loose/fuzz/e0505/21_268` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_269` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_272` | D1 |
+| `review-k4d/_loose/fuzz/e0505/21_3` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_36` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_4` | D1 |
+| `review-k4d/_loose/fuzz/e0505/21_55` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_78` | D1, D4 |
+| `review-k4d/_loose/fuzz/e0505/21_84` | D1, D4 |
+| `review-k4d/_loose/p/a2` | D1 |
+| `review-k4d/_loose/p/a3` | D4 |
+| `review-k4d/_loose/p/b2` | D1, D4 |
+| `review-k4d/_loose/p/b3` | D1, D4 |
+| `review-k4d/_loose/p/b4` | D1, D4 |
+| `review-k4d/_loose/p/b5` | D1 |
+| `review-k4d/_loose/p/b6` | D1, D4 |
+| `review-k4d/_loose/p/b7` | D1, D4 |
+| `review-k4d/_loose/p/b8` | D1, D2, D4 |
+| `review-k4d/_loose/p/b9` | D1, D2, D4 |
+| `review-k4d/_loose/p/d2` | D2 |
+| `review-k4d/_loose/p/e1` | D1, D2 |
+| `review-k4d/_loose/p/e2` | D1, D2 |
+| `review-k4d/_loose/p/g_ann_Never` | D7 |
+| `review-k4d/_loose/p/g_inf_Never` | D7 |
+| `review-k4d/_loose/p/p1` | D1, D2 |
+| `review-k4d/_loose/p/q1` | D1, D2 |
+| `review-k4d/_loose/p/q10` | D1 |
+| `review-k4d/_loose/p/q11` | D1 |
+| `review-k4d/_loose/p/q12` | D1 |
+| `review-k4d/_loose/p/q13` | D1 |
+| `review-k4d/_loose/p/q14` | D1 |
+| `review-k4d/_loose/p/q15` | D1 |
+| `review-k4d/_loose/p/q16` | D1 |
+| `review-k4d/_loose/p/q17` | D1 |
+| `review-k4d/_loose/p/q18` | D1 |
+| `review-k4d/_loose/p/q19` | D1 |
+| `review-k4d/_loose/p/q2` | D1 |
+| `review-k4d/_loose/p/q20` | D1 |
+| `review-k4d/_loose/p/q3` | D1 |
+| `review-k4d/_loose/p/q4` | D1 |
+| `review-k4d/_loose/p/q5` | D1 |
+| `review-k4d/_loose/p/q6` | D1, D2 |
+| `review-k4d/_loose/p/q7` | D1 |
+| `review-k4d/_loose/p/q8` | D1 |
+| `review-k4d/_loose/p/q9` | D1 |
+| `review-k4d/_loose/p/r1` | D1, D4 |
+| `review-k4d/_loose/p/r2` | D1, D4 |
+| `review-k4d/_loose/p/r3` | D1, D4 |
+| `review-k4d/_loose/p/r4` | D1 |
+| `review-k4d/_loose/p/r4b` | D1 |
+| `review-k4d/_loose/p/r4c` | D1 |
+| `review-k4d/_loose/p/r5` | D1, D4 |
+| `review-k4d/_loose/p/w1` | D1 |
+| `review-k4d/_loose/p/w10` | D1 |
+| `review-k4d/_loose/p/w12` | D1 |
+| `review-k4d/_loose/p/w13` | D1 |
+| `review-k4d/_loose/p/w2` | D1 |
+| `review-k4d/_loose/p/w3` | D1 |
+| `review-k4d/_loose/p/w4` | D1 |
+| `review-k4d/_loose/p/w5` | D1 |
+| `review-k4d/_loose/p/x2` | D1 |
+| `review-k4d/_loose/p/x3` | D1 |
+| `review-k4d/_loose/p/x5` | D1 |
+| `review-k4d/_loose/p/x7` | D1 |
+| `review-k4d/_loose/p/x8` | D1 |
+| `review-k4d/_loose/p/z2` | D1 |
+| `review-k4d/_loose/spec/tests_spec_11_stop_tail_service` | D1 |
+| `review-k4d/_loose/spec/tests_spec_9_generic_service_rows` | D1, D2 |
+| `review-k4d/fuzz/m0` | D1 |
+| `review-k4d/fuzz/m11` | D1 |
+| `review-k4d/fuzz/m13` | D1 |
+| `review-k4d/fuzz/m14` | D1 |
+| `review-k4d/fuzz/m15` | D1 |
+| `review-k4d/fuzz/m16` | D1 |
+| `review-k4d/fuzz/m21` | D1 |
+| `review-k4d/fuzz/m31` | D1 |
+| `review-k4d/fuzz/m34` | D1, D4 |
+| `review-k4d/fuzz/m35` | D1 |
+| `review-k4d/fuzz/pl44` | D1, D2, D7 |
+| `review-k4d/fuzz/pl45` | D1, D2 |
+| `review-k4d/fuzz/pl46` | D1, D2 |
+| `review-k4d/fuzz/w1` | D1, D4 |
+| `review-k4d/fuzz/w2` | D1 |
+| `review-k4d/fuzz/w3` | D1 |
+| `review-k4d/fuzz/w4` | D1 |
+| `review-k4d/perf/chain1000` | D1 |
+| `review-k4d/perf/chain200` | D1 |
+| `review-k4d/perf/chain4000` | D1 |
+| `review-k4d/perf/mutual300` | D1 |
+| `review-k4d/perf/runchain1000` | D1 |
+| `review-k4d/perf/runchain200` | D1 |
+| `review-k4d/perf/runchain4000` | D1 |
+| `review-k4d/perf/twice1000` | D1 |
+| `review-k4d/perf/twice200` | D1 |
+| `review-k4d/perf/twice4000` | D1 |
+| `review-k4d/perm/p0` | D1 |
+| `review-k4d/perm/p1` | D1 |
+| `review-k4d/perm/p10` | D1 |
+| `review-k4d/perm/p11` | D1 |
+| `review-k4d/perm/p12` | D1 |
+| `review-k4d/perm/p13` | D1 |
+| `review-k4d/perm/p14` | D1 |
+| `review-k4d/perm/p15` | D1 |
+| `review-k4d/perm/p16` | D1 |
+| `review-k4d/perm/p17` | D1 |
+| `review-k4d/perm/p18` | D1 |
+| `review-k4d/perm/p19` | D1 |
+| `review-k4d/perm/p2` | D1 |
+| `review-k4d/perm/p20` | D1 |
+| `review-k4d/perm/p21` | D1 |
+| `review-k4d/perm/p22` | D1 |
+| `review-k4d/perm/p23` | D1 |
+| `review-k4d/perm/p24` | D1 |
+| `review-k4d/perm/p25` | D1 |
+| `review-k4d/perm/p26` | D1 |
+| `review-k4d/perm/p27` | D1 |
+| `review-k4d/perm/p28` | D1 |
+| `review-k4d/perm/p29` | D1 |
+| `review-k4d/perm/p3` | D1 |
+| `review-k4d/perm/p30` | D1 |
+| `review-k4d/perm/p31` | D1 |
+| `review-k4d/perm/p32` | D1 |
+| `review-k4d/perm/p33` | D1 |
+| `review-k4d/perm/p34` | D1 |
+| `review-k4d/perm/p35` | D1 |
+| `review-k4d/perm/p36` | D1 |
+| `review-k4d/perm/p37` | D1 |
+| `review-k4d/perm/p38` | D1 |
+| `review-k4d/perm/p39` | D1 |
+| `review-k4d/perm/p4` | D1 |
+| `review-k4d/perm/p40` | D1 |
+| `review-k4d/perm/p41` | D1 |
+| `review-k4d/perm/p42` | D1 |
+| `review-k4d/perm/p43` | D1 |
+| `review-k4d/perm/p44` | D1 |
+| `review-k4d/perm/p45` | D1 |
+| `review-k4d/perm/p46` | D1 |
+| `review-k4d/perm/p47` | D1 |
+| `review-k4d/perm/p48` | D1 |
+| `review-k4d/perm/p49` | D1 |
+| `review-k4d/perm/p5` | D1 |
+| `review-k4d/perm/p50` | D1 |
+| `review-k4d/perm/p51` | D1 |
+| `review-k4d/perm/p52` | D1 |
+| `review-k4d/perm/p53` | D1 |
+| `review-k4d/perm/p54` | D1 |
+| `review-k4d/perm/p55` | D1 |
+| `review-k4d/perm/p56` | D1 |
+| `review-k4d/perm/p57` | D1 |
+| `review-k4d/perm/p58` | D1 |
+| `review-k4d/perm/p59` | D1 |
+| `review-k4d/perm/p6` | D1 |
+| `review-k4d/perm/p7` | D1 |
+| `review-k4d/perm/p8` | D1 |
+| `review-k4d/perm/p9` | D1 |
+| `review-k4d/proj/a2` | D1 |
+| `review-k4d/proj/a3` | D4 |
+| `review-k4d/proj/b2` | D1, D4 |
+| `review-k4d/proj/b3` | D1, D4 |
+| `review-k4d/proj/b4` | D1, D4 |
+| `review-k4d/proj/b5` | D1 |
+| `review-k4d/proj/b6` | D1, D4 |
+| `review-k4d/proj/b7` | D1, D4 |
+| `review-k4d/proj/b8` | D1, D2, D4 |
+| `review-k4d/proj/b9` | D1, D2, D4 |
+| `review-k4d/proj/d2` | D2 |
+| `review-k4d/proj/e1` | D1, D2 |
+| `review-k4d/proj/e2` | D1, D2 |
+| `review-k4d/proj/g_ann_Never` | D7 |
+| `review-k4d/proj/g_inf_Never` | D7 |
+| `review-k4d/proj/p1` | D1, D2 |
+| `review-k4d/proj/q11` | D1 |
+| `review-k4d/proj/q12` | D1 |
+| `review-k4d/proj/q13` | D1 |
+| `review-k4d/proj/q14` | D1 |
+| `review-k4d/proj/q15` | D1 |
+| `review-k4d/proj/q16` | D1 |
+| `review-k4d/proj/q17` | D1 |
+| `review-k4d/proj/q18` | D1 |
+| `review-k4d/proj/q19` | D1 |
+| `review-k4d/proj/q2` | D1 |
+| `review-k4d/proj/q20` | D1 |
+| `review-k4d/proj/q3` | D1 |
+| `review-k4d/proj/q4` | D1 |
+| `review-k4d/proj/q5` | D1 |
+| `review-k4d/proj/q6` | D1, D2 |
+| `review-k4d/proj/q7` | D1 |
+| `review-k4d/proj/q8` | D1 |
+| `review-k4d/proj/q9` | D1 |
+| `review-k4d/proj/r1` | D1, D4 |
+| `review-k4d/proj/r2` | D1, D4 |
+| `review-k4d/proj/r3` | D1, D4 |
+| `review-k4d/proj/r4` | D1 |
+| `review-k4d/proj/r4b` | D1 |
+| `review-k4d/proj/r4c` | D1 |
+| `review-k4d/proj/r5` | D1, D4 |
+| `review-k4d/proj/w1` | D1 |
+| `review-k4d/proj/w10` | D1 |
+| `review-k4d/proj/w12` | D1 |
+| `review-k4d/proj/w13` | D1 |
+| `review-k4d/proj/w2` | D1 |
+| `review-k4d/proj/w3` | D1 |
+| `review-k4d/proj/w4` | D1 |
+| `review-k4d/proj/w5` | D1 |
+| `review-k4d/proj/x2` | D1 |
+| `review-k4d/proj/x3` | D1 |
+| `review-k4d/proj/x5` | D1 |
+| `review-k4d/proj/x7` | D1 |
+| `review-k4d/proj/x8` | D1 |
+| `review-k4d/proj/z2` | D1 |
