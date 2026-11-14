@@ -53,13 +53,13 @@ deliberately unformatted `i format` inputs. The corresponding formatter-output
 unparseable fragments and declared parser-error examples stay unchanged as
 they do under `i fmt`. Generated pages and unrelated Scheme fences are ignored.
 
-For `i error` and `i types`, it updates a following transcript's explicit
+For `i error` and `i types`, it updates a following transcript's line-leading
 `file.i:line:column` or `file.is:line:column` locations only when the referenced
 nonblank source line is identical after the edit. Columns and messages are
 preserved. Locations in unchanged/external files stay untouched. It refuses
 undeclared syntax errors, malformed or unclosed fences, CRLF files, inline
 header content needing a nonblank-line edit, ambiguous/out-of-range local
-locations, unqualified transcript positions, and runtime transcript locations
+locations, embedded local locations, unqualified positions, and runtime locations
 that would need review. All pages are validated before any write; a refusal
 writes nothing. Build the compiler first or set `I_BIN`; this script never
 builds it. Its failing fixture, exact fixed output and refusal/idempotence

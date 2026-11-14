@@ -7,7 +7,7 @@ are included when they parse as modules. Generated pages are regenerated from
 their sources. Other layout, code, prose, fence markers and indentation stay
 unchanged. Formatter-output text fences follow the same rule.
 
---write also maps file:line:column locations in i error / i types transcripts
+--write also maps line-leading file:line:column locations in error/types transcripts
 through the inserted/removed blank lines, keeping columns and messages.
 Unknown locations stay unchanged; ambiguous local locations are refused.
 Invalid fragments and declared syntax-error examples stay unchanged, just as
@@ -29,7 +29,8 @@ import tempfile
 from example_fences import fences, generated, i_info
 
 ROOT = Path(__file__).resolve().parents[2]
-LOCATION = re.compile(r'(?P<file>[\w./-]+\.is?):(?P<line>\d+):(?P<col>\d+)')
+LOCATION = re.compile(r'(?m)^(?P<prefix>[ \t]*)(?P<file>[\w./-]+\.is?):(?P<line>\d+):(?P<col>\d+)')
+ANY_LOCATION = re.compile(r'(?P<file>[\w./-]+\.is?):\d+:\d+')
 RUNTIME_LOCATION = re.compile(r'[\w./-]+:\d+:\d+')
 CODE = re.compile(r'error\[(E\d+)\]')
 SHORT_LOCATION = re.compile(r'(?<![\w./:-])\d+:\d+(?!\d)')
@@ -250,9 +251,14 @@ def prepare(pages, binary):
                 if old not in maps[name]:
                     raise Refusal(f'{page}:{output.line}: cannot map {match[0]} to an unchanged source line')
                 new = maps[name][old]
-                if new != old:
-                    positions.append(f'{page}:{output.line}: {name}:{old}:{match["col"]} -> {name}:{new}:{match["col"]}')
-                return f'{name}:{new}:{match["col"]}'
+                if new == old:
+                    return match[0]
+                positions.append(f'{page}:{output.line}: {name}:{old}:{match["col"]} -> {name}:{new}:{match["col"]}')
+                return f'{match["prefix"]}{name}:{new}:{match["col"]}'
+            leading = {match.start('file') for match in LOCATION.finditer(output.source)}
+            if any(match['file'] in maps and match.start('file') not in leading
+                   for match in ANY_LOCATION.finditer(output.source)):
+                raise Refusal(f'{page}:{output.line}: embedded local locations need explicit review')
             if SHORT_LOCATION.search(output.source):
                 raise Refusal(f'{page}:{output.line}: unqualified transcript positions need explicit review')
             new = LOCATION.sub(remap, output.source)

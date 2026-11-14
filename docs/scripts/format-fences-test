@@ -95,15 +95,32 @@ class FenceTests(unittest.TestCase):
         mark = chr(96) * 3
         source = (f'{mark}scheme file=src/more.is\n(, value)\n(= value 1)\n{mark}\n\n'
                   f'{mark}i types title="src/main.i"\nmain=1\n{mark}\n\n'
-                  f'{mark}text\nsrc/more.is:2:4: value : Int\nexternal/file.i:2:4: unchanged\n{mark}\n')
+                  f'{mark}text\n  src/more.is:2:4: value : Int\nsrc/more.is:01:04: unchanged header\nexternal/file.i:2:4: unchanged\n{mark}\n')
         with tempfile.TemporaryDirectory() as tmp:
             page = Path(tmp) / 'page.md'
             page.write_text(source)
             result = self.invoke(page, write=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn('src/more.is:3:4: value : Int', page.read_text())
+            self.assertIn('  src/more.is:3:4: value : Int', page.read_text())
+            self.assertIn('src/more.is:01:04: unchanged header', page.read_text())
             self.assertIn('external/file.i:2:4: unchanged', page.read_text())
             self.assertEqual(self.invoke(page).returncode, 0)
+
+    def test_embedded_position_text_is_not_rewritten(self):
+        mark = chr(96) * 3
+        source = '\n'.join([
+            mark + 'i error E0501', '(value)', 'value=1', mark, '',
+            mark + 'text',
+            'src/main.i:2:1: error[E0501]: literal "src/main.i:2:1"',
+            mark, '',
+        ])
+        with tempfile.TemporaryDirectory() as tmp:
+            page = Path(tmp) / 'page.md'
+            page.write_text(source)
+            result = self.invoke(page, write=True)
+            self.assertEqual(result.returncode, 2, (result.stdout, result.stderr))
+            self.assertIn('embedded local locations', result.stderr)
+            self.assertEqual(page.read_text(), source)
 
     def test_refusal_is_atomic(self):
         bad_sources = [
