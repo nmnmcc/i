@@ -125,3 +125,34 @@ run is in progress with all value-types properties and the whole spec suite;
 no skip is added. Subsequent serialized gates cover current documentation,
 std O0/O2, examples/macro-tests and bench O0/O2, short generation, workspace
 clippy, both formatters, snippets and the gate self-tests. Final results follow.
+
+
+The final whole spec suite passes **536/536 at O0 and O2**, with the unchanged
+29 pending entries. The final row-scheme binary passes all 50 tests; typed
+macros pass all 44, the macro oracle all 66, control-lazy all 17 and checker
+goldens all 5. At this checkpoint 115 Rust binaries have completed with no
+failures; the longest properties remain in progress.
+
+`python3 target/e4-exact-semantic-guard.py` independently verifies all 24
+semantic case code/count/site sets, all 31 original-plus-m3 verdicts and the
+three original Scheduler-leak programs: **34/34 pass**. In particular it pins
+all four b1 provider locations, both m3 provider sites, the surviving b10
+cycle/provider errors, every z3/z5 provider error and each distinct S/T/Dep
+entry diagnostic. No generic diagnostic-code matcher substitutes for those
+exact preservation checks.
+
+
+The completed final Rust gate is green: **118 binaries, zero failures**.
+Value-types passes all 31 tests, including the full reverse-order/recovery
+property and standard-library permutation checks (3,099.47s). The default
+six existing ignores are four checker unit routines and two performance
+routines; no ignore or spec-pending entry is added.
+
+The new documentation runner's 14 contract tests pass. Its 110 authored
+examples initially give 109 passes and one exact printed-type mismatch:
+home read_port shows Fail(process.ProcessError | BadPort) while the expected
+text lists those same members in the other order. Spec §4.4: “Order has no
+effect”. Preserve the exact type assertion, every error and service key,
+and every runtime output/BadPort assertion; change only that union member
+ordering. The complete 110-example corrected rerun follows the serialized
+gates; no compiler or program source changes for this correction.

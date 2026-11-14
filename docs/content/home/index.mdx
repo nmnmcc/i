@@ -397,7 +397,7 @@ main = () {
 </details>
 
 ```text
-hello/main.read_port : () <- (Fail(BadPort | process.ProcessError), i/request.Await, i/request.Owner, process.Environment) -> Int
+hello/main.read_port : () <- (Fail(process.ProcessError | BadPort), i/request.Await, i/request.Owner, process.Environment) -> Int
 hello/main.main : () <- (Fail(stdio.StdioError), i/request.Await, i/request.Owner, process.Environment, stdio.Stdio) -> Nil
 ```
 
