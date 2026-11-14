@@ -11,6 +11,23 @@ The goal is that a program never passes the checker and then traps at run time b
 
 The [standard](/docs/standard/generated/introduction) is the definition. It says that a compiler or program that does not keep to it is wrong, and that the present compiler does not yet implement everything in it. Read the relevant section before changing behavior.
 
+## Where help is wanted
+
+The [known-gap register](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) gives concrete conformance tasks. Start by reading the cited spec paragraph and writing a regression case:
+
+| Area | Recorded work |
+| --- | --- |
+| Tasks and continuations | C03: remove a captured scope from the caller's chain correctly; C04: retain only the environment needed by a captured computation. |
+| Patterns | P13: implement data-rest patterns and their unique-known-shape check; P15: report never-used branches in the recorded coverage cases. |
+| Services and resources | EF10: implement the specified row projection; EF11: implement the specified resource scope lifecycle and API. These are gaps, not available APIs. |
+| Types | T12: normalize unequal invariant intersections to Never; T13: recognize impossible data consistently; T14: reject non-hole arguments on the right of a written difference; T15: retain invariance for unused labelled-type parameters; T16: check well-formed type applications; T23: check written polymorphic function types inside data. |
+| Text and macros | SX16: make negative Float inspection produce the specified spelling; MP08: charge macro work and frames according to source-level rules. |
+| Soundness | T8/F2: prevent a relaxed written type parameter from giving an invalid known result type to callers. Whether written parameters should instead be rigid remains open. |
+
+The register names external review probes, not fixture paths in this repository. It says each probe should become a regression case when its gap is implemented. Do not assume there is already a case to update.
+
+Documentation has a concrete starting point too: the [site landing page](https://github.com/nmnmcc/i/blob/main/docs/src/pages/index.astro) still contains placeholder introductory copy. The [library-page generator](https://github.com/nmnmcc/i/blob/main/docs/scripts/generate-library.py) also has fallbacks for missing source documentation. Improve the source documentation rather than editing generated pages.
+
 ## See also
 
 - [The standard: introduction](/docs/standard/generated/introduction)
