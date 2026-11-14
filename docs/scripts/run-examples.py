@@ -54,6 +54,8 @@ class Example:
     filename: str | None = None
     environment: dict = field(default_factory=dict)
     compare_test_output: bool = False
+    # Identical source text can belong to different attached fences.
+    file_lines: dict = field(default_factory=dict, compare=False)
 
 
 def read_page(page):
@@ -82,10 +84,12 @@ def read_page(page):
                 safe_file(path)
                 if not path.startswith(('src/', 'test/')) or Path(path).suffix not in ('.i', '.is'):
                     raise ValueError('an example source must be a .i or .is file under src/ or test/')
-            files = {name: fence.source for name, fence in
-                     (supporting if kind == 'shown' else pending).items()}
+            attachments = supporting if kind == 'shown' else pending
+            files = {name: fence.source for name, fence in attachments.items()}
+            file_lines = {name: fence.line for name, fence in attachments.items()}
             if kind == 'shown':
                 files.pop(path, None)
+                file_lines.pop(path, None)
             pending.clear()
             output = ''
             options = i_options(block.info)[1]
@@ -102,7 +106,8 @@ def read_page(page):
             package = options.get('package')
             environment = {key[4:]: value for key, value in options.items() if key.startswith('env.')}
             examples.append(Example(page, block.line, kind, block.source, files, output, codes,
-                                    package, path, environment, compare_test_output))
+                                    package, path, environment, compare_test_output,
+                                    file_lines=file_lines))
         except ValueError as error:
             failures.append(Failure(page, block.line, 'a valid example fence', str(error)))
     for name, block in pending.items():

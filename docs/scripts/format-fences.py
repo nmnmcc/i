@@ -221,9 +221,9 @@ def prepare(pages, binary):
                 changes.append(f'{page}:{block.line}: header blank lines')
     runner = load_runner()
     for page, (_, blocks, edits) in documents.items():
-        changed_sources = {blocks[n].source: new for n, new in edits.items()}
+        changed_fences = {blocks[n].line: new for n, new in edits.items()}
         # Bare spec fragments have no execution metadata and no transcripts.
-        if not changed_sources or page == ROOT / 'docs/spec.md':
+        if not changed_fences or page == ROOT / 'docs/spec.md':
             continue
         examples, failures, _ = runner.read_page(page)
         if failures:
@@ -234,8 +234,10 @@ def prepare(pages, binary):
             filename = example.filename or (f'test/{runner.page_name(page)}_test.i'
                                              if testing else 'src/main.i')
             sources = {**example.files, filename: example.source}
-            maps = {name: line_map(source, changed_sources[source])
-                    for name, source in sources.items() if source in changed_sources}
+            origins = {**example.file_lines, filename: example.line}
+            maps = {name: line_map(source, changed_fences[origins[name]])
+                    for name, source in sources.items()
+                    if origins.get(name) in changed_fences}
             n = by_line[example.line]
             if not maps or n + 1 == len(blocks) or blocks[n + 1].info != 'text':
                 continue
