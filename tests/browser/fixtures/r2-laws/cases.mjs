@@ -70,6 +70,7 @@ export default [
   { name: "9.9/stop_in_final", entry: "app/s9_9_stop_in_final.r2_probe", expectation: "stop \"panic: final\"", output: null },
   { name: "9.9/task_index", entry: "app/s9_9_task_index.r2_probe", expectation: "pass", output: null },
   { name: "9.9/task_run_environment_type", entry: "app/s9_9_task_run_environment_type.r2_probe", expectation: "pass", output: null },
+  { name: "9.9/task_run_error_after_resumes", entry: "app/s9_9_task_run_error_after_resumes.r2_probe", expectation: "pass", output: null },
   { name: "9.9/task_run_supplied_services", entry: "app/s9_9_task_run_supplied_services.r2_probe", expectation: "pass", output: null },
   { name: "9.9/tasks", entry: "app/s9_9_tasks.r2_probe", expectation: "pass", output: null },
   { name: "9.9/test_needs_fake", entry: "app/s9_9_test_needs_fake.r2_probe", expectation: "stop \"panic: task: test needs fake IO\"", output: ["echo real"] },

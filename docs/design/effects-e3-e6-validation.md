@@ -88,3 +88,9 @@ check pass. The vendored check initially failed 15 cascading errors from its
 stale callback-shaped Sink marker; restoring the specified ordinary (N)->Nil
 marker makes the second check pass without a test change. ABI regeneration
 and complete JS rerun follow; the full corpus has not run yet.
+
+Final runtime ABI regeneration passes. Complete JS gate passes: Node 123/123,
+browser 69/69 (Chromium, Firefox, WebKit), with no skips. All R2 laws run at
+O0/O2, including the new Sample/Fail three-resume case, and all original final
+and cancellation output assertions remain. The full 1,973-case corpus is next,
+with jobs=6, BINARYEN_CORES=1 and --keep-bounds; no LANDABLE claim until reviewed.
