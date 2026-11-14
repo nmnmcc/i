@@ -1405,9 +1405,14 @@ impl Cx<'_> {
                 target: Box::new(self.expr(target)),
                 name: id(name),
             },
-            o::ExprKind::TupleIndex { target, index, .. } => n::ExprKind::Index {
+            o::ExprKind::TupleIndex {
+                target,
+                index,
+                index_span,
+            } => n::ExprKind::Index {
                 target: Box::new(self.expr(target)),
                 index: index.clone(),
+                index_span: (*index_span).into(),
             },
             o::ExprKind::RecordUpdate {
                 constructor,

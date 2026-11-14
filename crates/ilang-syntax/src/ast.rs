@@ -345,6 +345,8 @@ pub enum ExprKind {
     Index {
         target: Box<Expr>,
         index: BigUint,
+        /// The written decimal token, also after a trip through Lisp rows.
+        index_span: Sp,
     },
     Unary {
         op: UnOp,

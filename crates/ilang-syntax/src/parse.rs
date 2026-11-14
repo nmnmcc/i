@@ -843,10 +843,12 @@ impl Parser<'_> {
                         name: self.name()?,
                     },
                     T::Int(index) => {
+                        let index_span = self.tok().span.into();
                         self.bump();
                         ExprKind::Index {
                             target: Box::new(e),
                             index,
+                            index_span,
                         }
                     }
                     _ => return self.error("a label or a decimal after `.`"),

@@ -552,19 +552,15 @@ fn expr(e: &Expr) -> Datum {
             span,
             [expr(target), name(n)],
         ),
-        ExprKind::Index { target, index } => form_in(
+        ExprKind::Index {
+            target,
+            index,
+            index_span,
+        } => form_in(
             ".",
-            Span::new(target.span.0.end, span.end),
+            gap(target.span.0, index_span.0),
             span,
-            [
-                expr(target),
-                // Preserve the transition tree's index span so existing
-                // diagnostics keep their location during the rows flip.
-                at(
-                    K::Int(index.clone()),
-                    Span::new(span.end.saturating_sub(1), span.end),
-                ),
-            ],
+            [expr(target), at(K::Int(index.clone()), index_span.0)],
         ),
         ExprKind::Unary { op, expr: e } => form_in(
             match op {
@@ -1491,6 +1487,7 @@ fn expr_of(d: &Datum) -> R<Expr> {
                         (_, K::Int(index)) => ExprKind::Index {
                             target: Box::new(expr_of(t)?),
                             index: index.clone(),
+                            index_span: n.span.into(),
                         },
                         _ => return err(n, "expected a label or a decimal after the target"),
                     },

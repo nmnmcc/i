@@ -2236,10 +2236,14 @@ impl<'a, 't> R3<'a, 't> {
                     },
                 }
             }
-            E::Index { target, index } => ExprKind::TupleIndex {
+            E::Index {
+                target,
+                index,
+                index_span,
+            } => ExprKind::TupleIndex {
                 target: Box::new(self.expr(target)),
                 index: index.clone(),
-                index_span: Span::new(span.end.saturating_sub(1), span.end),
+                index_span: index_span.0,
             },
             E::Unary { op, expr } => ExprKind::Unary {
                 op: *op,
