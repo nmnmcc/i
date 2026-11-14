@@ -3,9 +3,9 @@ use std::collections::HashMap;
 
 use ilang_check::{Parsed, hygiene};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, SourceId};
-use ilang_syntax::ast::{ItemKind, Pattern};
 use ilang_syntax::lisp::{
-    expansion::{self, MacroDefinition},
+    expansion::MacroDefinition,
+    expansion3 as expansion,
     syntax::{Node, Syntax},
 };
 
@@ -279,30 +279,22 @@ fn own(graph: &PackageGraph, p: &Parsed) -> Result<Module, Vec<Diagnostic>> {
             .collect::<Vec<_>>()
     })?;
     let mut module = Module::default();
-    for item in &p.ast.items {
-        let mut names = Vec::new();
-        match &item.kind {
-            ItemKind::Binding(binding) => binding_names(&binding.pattern, &mut names),
-            ItemKind::Declaration { name, .. } => names.push((name.name.as_str(), name.span)),
-            _ => {}
+    for (name, span) in crate::registry3::value_names(&p.ast) {
+        if let Some(origin) = p.scoped.as_ref().and_then(|scoped| scoped.origin(span))
+            && !origin.syntax.scope().marks.is_empty()
+        {
+            module.generated.push(hygiene::Binding {
+                text: name.to_owned(),
+                scope: origin.syntax.scope().clone(),
+                identity: origin.syntax.scope_identity().cloned(),
+                target: Value::Other,
+            });
+            continue;
         }
-        for (name, span) in names {
-            if let Some(origin) = p.scoped.as_ref().and_then(|scoped| scoped.origin(span))
-                && !origin.syntax.scope().marks.is_empty()
-            {
-                module.generated.push(hygiene::Binding {
-                    text: name.to_owned(),
-                    scope: origin.syntax.scope().clone(),
-                    identity: origin.syntax.scope_identity().cloned(),
-                    target: Value::Other,
-                });
-                continue;
-            }
-            let exported = p.ast.exports.iter().any(|e| e.name.name == name);
-            module
-                .values
-                .insert(name.to_owned(), (Value::Other, exported));
-        }
+        let exported = p.ast.exports.iter().any(|e| e.name.name == name);
+        module
+            .values
+            .insert(name.to_owned(), (Value::Other, exported));
     }
     for definition in defs {
         let exported = p.ast.exports.iter().any(|e| e.name.name == definition.name);
@@ -318,8 +310,4 @@ fn own(graph: &PackageGraph, p: &Parsed) -> Result<Module, Vec<Diagnostic>> {
         );
     }
     Ok(module)
-}
-
-fn binding_names<'a>(pattern: &'a Pattern, out: &mut Vec<(&'a str, ilang_syntax::span::Span)>) {
-    crate::body_walk::for_each_binder(pattern, |name, span| out.push((name, span)));
 }

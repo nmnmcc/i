@@ -109,9 +109,21 @@ def identity(path, source):
 
 NEXT_SYNTAX = (
     "tests/syn3/",
-    "crates/ilang-syntax/src/syn3/",
+    "crates/ilang-syntax/src/ast.rs",
+    "crates/ilang-syntax/src/parse.rs",
+    "crates/ilang-syntax/src/print.rs",
+    "crates/ilang-syntax/src/print/",
+    "crates/ilang-syntax/src/walk.rs",
+    "crates/ilang-syntax/src/rows.rs",
+    "crates/ilang-syntax/src/rows/",
+    "crates/ilang-syntax/src/facts.rs",
+    "crates/ilang-syntax/src/facts/",
+    "crates/ilang-syntax/src/group.rs",
+    "crates/ilang-syntax/src/surface.rs",
+    "crates/ilang-syntax/src/deep.rs",
+    "crates/ilang-syntax/src/syn3.rs",
     "crates/ilang-syntax/tests/syn3",
-    "crates/ilang-syntax/examples/migrate-syntax3",
+    "crates/ilang-syntax/examples/legacy/",
     "crates/ilang-syntax/examples/support/legacy/",
 )
 

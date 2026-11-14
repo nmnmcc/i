@@ -870,9 +870,10 @@ fn bench_source(depth: u32, rounds: u32, capture_only: bool) -> String {
     let end = module
         .items
         .iter()
-        .find(|item| matches!(item.kind, ilang_syntax::ast::ItemKind::MacroItem { .. }))
+        .find(|item| matches!(item.kind, ilang_syntax::ast::ItemKind::Macro { .. }))
         .expect("benchmark has test registration calls")
         .span
+        .0
         .start as usize;
     let import = module
         .imports
@@ -885,7 +886,8 @@ fn bench_source(depth: u32, rounds: u32, capture_only: bool) -> String {
                 .eq(["std", "test"])
         })
         .expect("benchmark imports its test macros")
-        .span;
+        .span
+        .0;
     let source = format!(
         "{}{}",
         &source[..import.start as usize],

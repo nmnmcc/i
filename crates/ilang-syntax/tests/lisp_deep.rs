@@ -1,3 +1,5 @@
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::ast::{ExprKind, PatternKind, TypeKind};
 use ilang_syntax::lisp::{Datum, DatumKind as K, parse_expression, parse_pattern, parse_type};
 use ilang_syntax::span::Span;
@@ -319,6 +321,59 @@ fn deep_quoted_lisp_text_restores_context_and_spans() {
             let errors = ilang_syntax::lisp::parse(&bad).unwrap_err();
             assert_eq!(errors[0].span.start as usize, n);
             assert!(errors[0].message.contains("only allowed inside a quote"));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+/// A macro result deeper than the host stack is read into the tree of
+/// syntax three, and the tree is dropped, without overflowing.
+#[test]
+fn deep_datum_is_read_and_dropped_as_the_new_tree() {
+    use ilang_syntax::lisp::{Datum, DatumKind as K};
+    use ilang_syntax::syn3::{deep::deep, lisp::expr_from_datum};
+    let at = |kind| Datum {
+        kind,
+        span: Default::default(),
+        docs: Vec::new(),
+    };
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(move || {
+            let mut datum = at(K::Name("x".into()));
+            for _ in 0..50_000 {
+                datum = at(K::Round(vec![at(K::Name("f".into())), datum]));
+            }
+            let tree = deep(|| expr_from_datum(&datum)).unwrap();
+            let again = deep(|| ilang_syntax::syn3::lisp::expr_datum(&tree));
+            assert!(again.span == datum.span);
+            drop(tree);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn new_quote_capture_patterns_drop_on_a_small_stack() {
+    std::thread::Builder::new()
+        .stack_size(256 * 1024)
+        .spawn(|| {
+            use ilang_syntax::syn3::ast as n;
+            let datum = ilang_syntax::lisp::parse("`x").unwrap().datums.remove(0);
+            let mut pattern = n::Pattern::new(n::PatternKind::Var("x".into()), datum.span);
+            for _ in 0..20_000 {
+                pattern = n::Pattern::new(
+                    n::PatternKind::Quote(n::QuotePattern {
+                        datum: n::Quoted(Box::new(datum.clone())),
+                        template: Some(0),
+                        captures: vec![(false, pattern)],
+                    }),
+                    datum.span,
+                );
+            }
+            drop(pattern);
         })
         .unwrap()
         .join()

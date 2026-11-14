@@ -1,14 +1,15 @@
-use ilang_syntax::lisp::{DatumKind, normal_source, parse, print_module, show};
+#[path = "oracle.rs"]
+mod ilang_syntax;
+use ilang_syntax::lisp::{DatumKind, parse, show};
 
 #[test]
 fn datums_round_trip_and_keep_spans() {
-    let source =
-        "// a comment\n(= fact (-> (n) _ { (* n 0x10) }))\n`(f ~x ~..(map xs (-> (y) _ `(g ~y))))";
+    let source = "// a comment\n(= fact (-> (, n) _ { (* n 0x10) }))\n`(f ~x ~..(map xs (-> (, y) _ `(g ~y))))";
     let datums = parse(source).unwrap();
     assert_eq!(datums.len(), 2);
     assert_eq!(
         &source[datums[0].span.start as usize..datums[0].span.end as usize],
-        "(= fact (-> (n) _ { (* n 0x10) }))"
+        "(= fact (-> (, n) _ { (* n 0x10) }))"
     );
     for datum in datums {
         let printed = show(&datum);
@@ -88,26 +89,26 @@ fn quote_rules_are_checked() {
 
 #[test]
 fn macro_quotes_are_core_nodes_and_can_be_formatted() {
-    let source = "(@ macro (= when (-> (condition body) _ `(if ~condition ~body))))\n";
-    let doc = parse(source).unwrap();
-    let module = ilang_syntax::lisp::parse_module(&doc).unwrap();
-    let printed = print_module(&module);
+    let source = "(@ macro (= when (-> (, condition body) _ `(if ~condition ~body))))\n";
+    let (module, errors) = ilang_syntax::syn3::lisp::from_lisp(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let printed = ilang_syntax::syn3::lisp::to_lisp(&module);
     assert!(printed.contains("`(if ~condition ~body)"), "{printed}");
-    assert!(normal_source(&doc).is_err());
+    assert!(ilang_syntax::syn3::surface::lisp_to_normal(source).is_err());
 }
 
 #[test]
 fn quote_splices_are_checked_in_their_written_position() {
     for source in [
-        "(= f (-> () _ `~..xs))",
-        "(= f (-> (`(~..xs x)) _ Nil))",
-        "(= f (-> () _ `(~(+) x)))",
+        "(= f (-> (,) _ `~..xs))",
+        "(= f (-> (, `(~..xs x)) _ Nil))",
+        "(= f (-> (,) _ `(~(+) x)))",
     ] {
-        let doc = parse(source).unwrap();
-        assert!(ilang_syntax::lisp::parse_module(&doc).is_err(), "{source}");
+        let (_, errors) = ilang_syntax::lisp::parse_source(source);
+        assert!(!errors.is_empty(), "{source}");
     }
-    let doc = parse("(= f (-> (`(f ~..xs)) _ Nil))").unwrap();
-    assert!(ilang_syntax::lisp::parse_module(&doc).is_ok());
+    let (_, errors) = ilang_syntax::lisp::parse_source("(= f (-> (, `(f ~..xs)) _ Nil))");
+    assert!(errors.is_empty(), "{errors:?}");
 }
 
 #[test]
@@ -150,9 +151,8 @@ fn compiler_preparation_registers_nested_quote_pattern_templates() {
     use ilang_syntax::ast::{ExprKind, ItemKind, Param, PatternKind};
     use ilang_syntax::lisp::quote_lower::lower_expression_quotes;
     use ilang_syntax::lisp::syntax::Node;
-    let mut module =
-        ilang_syntax::lisp::parse_module(&parse("(= f (-> (`(f ~`(g ~x))) _ x))").unwrap())
-            .unwrap();
+    let (mut module, errors) = ilang_syntax::lisp::parse_source("(= f (-> (, `(f ~`(g ~x))) _ x))");
+    assert!(errors.is_empty(), "{errors:?}");
     let mut templates = Vec::new();
     lower_expression_quotes(&mut module, 7, &mut templates);
     assert_eq!(templates.len(), 2);
@@ -232,12 +232,11 @@ fn nested_quote_captures_use_the_parser_work_stack() {
 
 #[test]
 fn invalid_datums_do_not_make_core_items() {
-    for source in ["(= x (1 .. 2))", "(= x [.. 1])"] {
-        let document = parse(source).unwrap();
-        assert!(
-            ilang_syntax::lisp::parse_module(&document).is_err(),
-            "{source}"
-        );
+    // `(1 .. 2)` is the call `1(..2)` in the rows of §6.8, so the spread
+    // with nothing after it stands for the call that is not one.
+    for source in ["(= x (1 ..))", "(= x [.. 1])"] {
+        let (_, errors) = ilang_syntax::lisp::parse_source(source);
+        assert!(!errors.is_empty(), "{source}");
     }
 }
 
@@ -246,8 +245,9 @@ fn both_surfaces_preserve_attributes_and_grouped_result_holes() {
     for source in ["@m() x = 1", "@m call(1)", "f = () -> { _ } { 1 }"] {
         let (module, errors) = ilang_syntax::parse_module(source);
         assert!(errors.is_empty(), "{source}: {errors:?}");
-        let lisp = print_module(&module);
-        let back = ilang_syntax::lisp::parse_module(&parse(&lisp).unwrap()).unwrap();
+        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(source).unwrap();
+        let (back, errors) = ilang_syntax::lisp::parse_source(&lisp);
+        assert!(errors.is_empty(), "{source}\n{lisp}: {errors:?}");
         assert_eq!(
             ilang_syntax::shape::canon(&module),
             ilang_syntax::shape::canon(&back),
@@ -256,6 +256,9 @@ fn both_surfaces_preserve_attributes_and_grouped_result_holes() {
     }
 }
 
+// Retain the historical decoder's rejection beside the native row test.
+// Syntax-three §6.8 replaces the clause-block rows; neither decoder may
+// silently turn this nonfinal type test into another normal pattern.
 #[test]
 fn a_nonfinal_clause_choice_cannot_end_in_a_type_test() {
     let doc = parse("(= f { (-> (| (= a (: b Int)) Unit) 1) })").unwrap();
@@ -263,12 +266,22 @@ fn a_nonfinal_clause_choice_cannot_end_in_a_type_test() {
 }
 
 #[test]
+fn a_nonfinal_clause_choice_with_a_type_test_has_no_normal_spelling() {
+    // Spec §14.1 permits a Lisp tree without a normal spelling, but
+    // conversion must refuse it rather than change the choice's meaning.
+    let source = "(= f (-> (, (| (= a (: b Int)) Unit)) _ 1))";
+    let (_, errors) = ilang_syntax::lisp::parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(ilang_syntax::syn3::surface::lisp_to_normal(source).is_err());
+}
+
+#[test]
 fn direct_decode_accepts_expression_function_bodies() {
-    let source = "(= plus_one (-> (x) _ (+ x 1)))";
-    let document = parse(source).unwrap();
-    let module = ilang_syntax::lisp::parse_module(&document).unwrap();
+    let source = "(= plus_one (-> (, x) _ (+ x 1)))";
+    let (module, errors) = ilang_syntax::lisp::parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(module.items[0].span.start, 0);
-    let normal = normal_source(&document).unwrap();
+    let (normal, _) = ilang_syntax::syn3::surface::lisp_to_normal(source).unwrap();
     let (again, errors) = ilang_syntax::parse_module(&normal);
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(
@@ -279,10 +292,9 @@ fn direct_decode_accepts_expression_function_bodies() {
 
 #[test]
 fn conversion_preserves_comments_before_items_and_statements() {
+    use ilang_syntax::syn3::surface::{lisp_to_normal, normal_to_lisp};
     let source = "// item\nf = () {\n  // statement\n  x = 1\n  x // trailing\n}\n";
-    let (module, errors) = ilang_syntax::parse_module(source);
-    assert!(errors.is_empty(), "{errors:?}");
-    let (lisp, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
+    let (lisp, lost) = normal_to_lisp(source).unwrap();
     assert!(lisp.contains("// item\n(= f"), "{lisp}");
     assert!(lisp.contains("// statement\n(= x 1)"), "{lisp}");
     assert_eq!(lost.len(), 1);
@@ -290,13 +302,7 @@ fn conversion_preserves_comments_before_items_and_statements() {
         &source[lost[0].start as usize..lost[0].end as usize],
         "// trailing"
     );
-    let back = ilang_syntax::lisp::parse_module(&parse(&lisp).unwrap()).unwrap();
-    assert_eq!(
-        ilang_syntax::shape::canon(&module),
-        ilang_syntax::shape::canon(&back)
-    );
-    let doc = parse(&lisp).unwrap();
-    let (normal, lost) = ilang_syntax::lisp::normal_with_comments(&lisp, &doc).unwrap();
+    let (normal, lost) = lisp_to_normal(&lisp).unwrap();
     assert!(lost.is_empty(), "{lost:?}");
     assert!(normal.contains("// item\nf ="), "{normal}");
     assert!(normal.contains("// statement\nx = 1"), "{normal}");
@@ -314,13 +320,11 @@ fn lisp_formatter_keeps_all_comments_and_is_idempotent() {
 
 #[test]
 fn comment_anchors_do_not_match_text_inside_documentation() {
-    let source = "/// Example: (= f (-> () _ {1}))\n// item\nf = () { 1 }\n";
-    let (module, errors) = ilang_syntax::parse_module(source);
-    assert!(errors.is_empty(), "{errors:?}");
-    let (out, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
+    let source = "/// Example: (= f (-> (,) _ 1))\n// item\nf = () { 1 }\n";
+    let (out, lost) = ilang_syntax::syn3::surface::normal_to_lisp(source).unwrap();
     assert!(lost.is_empty(), "{lost:?}");
     assert!(
-        out.contains("/// Example: (= f (-> () _ {1}))\n\n// item\n(= f"),
+        out.contains("/// Example: (= f (-> (,) _ 1))\n\n// item\n(= f"),
         "{out}"
     );
 }
@@ -328,9 +332,7 @@ fn comment_anchors_do_not_match_text_inside_documentation() {
 #[test]
 fn comments_remain_with_repeated_statements() {
     let source = "f = () {\n// first\nlog(1)\n// second\nlog(1)\nNil\n}\n";
-    let (module, errors) = ilang_syntax::parse_module(source);
-    assert!(errors.is_empty(), "{errors:?}");
-    let (out, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
+    let (out, lost) = ilang_syntax::syn3::surface::normal_to_lisp(source).unwrap();
     assert!(lost.is_empty(), "{lost:?}");
     assert!(out.contains("// first\n(log 1)"), "{out}");
     assert!(out.contains("// second\n(log 1)"), "{out}");
@@ -340,11 +342,37 @@ fn comments_remain_with_repeated_statements() {
 #[test]
 fn comments_survive_a_group_that_disappears() {
     let source = "f = () {\n  {\n    // inner\n    1\n  }\n}\n";
-    let (module, errors) = ilang_syntax::parse_module(source);
-    assert!(errors.is_empty(), "{errors:?}");
-    let (out, lost) = ilang_syntax::lisp::print_with_comments(source, &module);
+    let (out, lost) = ilang_syntax::syn3::surface::normal_to_lisp(source).unwrap();
     assert!(lost.is_empty(), "{lost:?}");
     assert!(out.contains("// inner\n1"), "{out}");
+}
+
+#[test]
+fn comments_before_header_groups_and_many_statements_are_kept_in_order() {
+    use ilang_syntax::syn3::surface::{lisp_to_normal, normal_to_lisp};
+    let mut source = String::from("// imports\n(i/list)\n// exports\n(f)\nf = () {\n");
+    for n in 0..2000 {
+        source.push_str(&format!("\t// c{n}\n\tx\n"));
+    }
+    source.push_str("}\n");
+    let (lisp, lost) = normal_to_lisp(&source).unwrap();
+    assert!(lost.is_empty(), "{lost:?}");
+    assert!(
+        lisp.contains("// imports\n(, (/ i list))"),
+        "{}",
+        &lisp[..200]
+    );
+    assert!(lisp.contains("// exports\n(, f)"), "{}", &lisp[..200]);
+    let (normal, lost) = lisp_to_normal(&lisp).unwrap();
+    assert!(lost.is_empty(), "{lost:?}");
+    for text in [&lisp, &normal] {
+        let mut at = 0;
+        for n in 0..2000 {
+            let wanted = format!("// c{n}\n");
+            let found = text[at..].find(&wanted).expect("comment remains in order");
+            at += found + wanted.len();
+        }
+    }
 }
 
 #[test]
@@ -373,9 +401,9 @@ choose = (x) { x |> (0) { "zero" } | (_) { "other" } }
 "#;
     let (module, diagnostics) = ilang_syntax::parse_module(source);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
-    let lisp = print_module(&module);
-    let datums = parse(&lisp).unwrap();
-    let again = ilang_syntax::lisp::parse_module(&datums).unwrap();
+    let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(source).unwrap();
+    let (again, errors) = ilang_syntax::lisp::parse_source(&lisp);
+    assert!(errors.is_empty(), "{lisp}: {errors:?}");
     assert_eq!(
         ilang_syntax::print::print_module(&module),
         ilang_syntax::print::print_module(&again),
@@ -437,23 +465,81 @@ fn check_corpus(dir: &std::path::Path) {
                     path.display()
                 ));
             }
-            continue;
-            #[allow(unreachable_code)]
-            let lisp = print_module(&module);
-            match parse(&lisp)
-                .and_then(|d| ilang_syntax::lisp::parse_module(&d).map_err(|e| vec![e]))
-            {
-                Ok(back)
-                    if ilang_syntax::shape::canon(&module) == ilang_syntax::shape::canon(&back) => {
-                }
-                Ok(back) => failures.push(format!(
-                    "{}: direct tree differs\n{lisp}\nBACK:\n{}",
-                    path.display(),
-                    print_module(&back)
-                )),
-                Err(e) => failures.push(format!("{}: direct decode {e:?}\n{lisp}", path.display())),
-            }
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+fn without_spans(d: &ilang_syntax::lisp::Datum) -> ilang_syntax::lisp::Datum {
+    use DatumKind as K;
+    let all = |xs: &[ilang_syntax::lisp::Datum]| xs.iter().map(without_spans).collect();
+    ilang_syntax::lisp::Datum {
+        kind: match &d.kind {
+            K::Round(xs) => K::Round(all(xs)),
+            K::Square(xs) => K::Square(all(xs)),
+            K::Curly(xs) => K::Curly(all(xs)),
+            K::Bits(xs) => K::Bits(all(xs)),
+            K::Quote(x) => K::Quote(Box::new(without_spans(x))),
+            K::Unquote(x) => K::Unquote(Box::new(without_spans(x))),
+            K::Splice(x) => K::Splice(Box::new(without_spans(x))),
+            other => other.clone(),
+        },
+        span: Default::default(),
+        docs: Vec::new(),
+    }
+}
+
+/// The datum built from the tree is the datum that the reader gives for its
+/// text: the macro engine can use either.
+#[test]
+fn tree_datums_are_the_datums_of_their_text() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std/src");
+    let mut files = 0;
+    for entry in std::fs::read_dir(root).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|e| e != "i") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).unwrap();
+        let (module, errors) = ilang_syntax::syn3::parse_module(&source);
+        assert!(errors.is_empty(), "{}: {errors:?}", path.display());
+        files += 1;
+        for item in &module.items {
+            let built = ilang_syntax::syn3::lisp::item_datum(item);
+            let text = show(&built);
+            let read = parse(&text).unwrap_or_else(|e| panic!("{}: {text}: {e:?}", path.display()));
+            assert_eq!(read.len(), 1, "{text}");
+            assert!(
+                without_spans(&built) == without_spans(&read[0]),
+                "{}: {text}",
+                path.display()
+            );
+        }
+    }
+    assert!(files > 20, "{files}");
+}
+
+#[test]
+fn tree_datums_keep_the_spans_of_written_names() {
+    let source = "f = (count: Int) { other.g(count, Some(1)) }\n";
+    let (module, errors) = ilang_syntax::syn3::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let datum = ilang_syntax::syn3::lisp::item_datum(&module.items[0]);
+    let mut pending = vec![&datum];
+    let mut names = Vec::new();
+    while let Some(d) = pending.pop() {
+        match &d.kind {
+            DatumKind::Round(xs)
+            | DatumKind::Square(xs)
+            | DatumKind::Curly(xs)
+            | DatumKind::Bits(xs) => pending.extend(xs),
+            DatumKind::Name(n) | DatumKind::UpName(n) => {
+                assert_eq!(&source[d.span.start as usize..d.span.end as usize], n);
+                names.push(n.as_str());
+            }
+            _ => {}
+        }
+    }
+    names.sort();
+    assert_eq!(names, ["Int", "Some", "count", "count", "f", "g", "other"]);
 }

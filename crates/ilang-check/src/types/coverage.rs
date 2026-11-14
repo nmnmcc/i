@@ -1133,7 +1133,7 @@ impl Checker<'_> {
                     true
                 }
                 Pat::Ctor(Ctor::Lit(Lit::Str(s)), _) if b == BuiltinType::String => {
-                    out.push(ilang_syntax::print::string_literal(s));
+                    out.push(ilang_syntax::syn3::string_literal(s));
                     true
                 }
                 _ => false,
@@ -1289,17 +1289,17 @@ impl Checker<'_> {
             Pat::Ctor(Ctor::Lit(l), _) => match l {
                 Lit::Int(s) => s.clone(),
                 Lit::Float(b) => format!("{:?}", f64::from_bits(*b)),
-                Lit::Str(s) => ilang_syntax::print::string_literal(s),
+                Lit::Str(s) => ilang_syntax::syn3::string_literal(s),
                 Lit::Prefix(p, z) => {
                     let start = if p.is_empty() && !z.is_empty() {
                         "_".into()
                     } else {
-                        format!("{} <> _", ilang_syntax::print::string_literal(p))
+                        format!("{} <> _", ilang_syntax::syn3::string_literal(p))
                     };
                     if z.is_empty() {
                         start
                     } else {
-                        format!("{start} <> {}", ilang_syntax::print::string_literal(z))
+                        format!("{start} <> {}", ilang_syntax::syn3::string_literal(z))
                     }
                 }
                 Lit::Bits => "<<..>>".into(),

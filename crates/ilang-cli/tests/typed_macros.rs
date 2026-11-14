@@ -475,7 +475,7 @@ fn typed_macro_forwarding_keeps_original_value_type_reads() {
 fn typed_macro_argument_binder_cannot_escape() {
     let m = declared(
         "m (-> (, (-> (, Int) Int)) Int)",
-        "(-> (, value) _ (|> value (| (-> (, `(-> (, ~parameter) ~ret {~body})) _ body) (-> (, _) _ value))))",
+        "(-> (, value) _ (|> value (| (-> (, `(-> (, ~parameter) ~ret ~body)) _ body) (-> (, _) _ value))))",
     );
     reject(
         &m,
@@ -487,7 +487,7 @@ fn typed_macro_argument_binder_cannot_escape() {
 fn typed_macro_partial_argument_rebuild_retains_original_binders() {
     let m = declared(
         "m (-> (, (-> (, Int) Int)) (-> (, Int) Int))",
-        "(-> (, value) _ (|> value (| (-> (, `(-> (, ~parameter) ~ret {~body})) _ `(-> (, ~parameter) ~ret {~body})) (-> (, _) _ value))))",
+        "(-> (, value) _ (|> value (| (-> (, `(-> (, ~parameter) ~ret ~body)) _ `(-> (, ~parameter) ~ret ~body)) (-> (, _) _ value))))",
     );
     checked(
         &m,

@@ -15,7 +15,6 @@ use ilang_host::{
 };
 use ilang_package::{ModuleKind, PackageGraph};
 use ilang_syntax::{
-    ast::{ItemKind, TypeBody, TypeExpr, TypeKind},
     lisp::{
         Datum, DatumKind,
         definition_schedule::Mode,
@@ -24,6 +23,7 @@ use ilang_syntax::{
         syntax::{Node, Scope, ScopeIdentity, Syntax},
     },
     span::Span,
+    syn3::ast::ItemKind,
 };
 use std::collections::HashMap;
 use std::sync::{
@@ -60,15 +60,7 @@ pub struct DefinitionWorld {
     parsed: Vec<Arc<Parsed>>,
     next_answer: Arc<AtomicU64>,
     lisp_documents: HashMap<u32, Vec<Datum>>,
-    /// The lexical index of each written source and the length it covers,
-    /// built on first use: most worlds never encode most sources.
-    source_encoders: HashMap<
-        u32,
-        (
-            usize,
-            std::sync::OnceLock<ilang_syntax::lisp::SourceEncoder>,
-        ),
-    >,
+    source_trees: HashMap<u32, std::sync::OnceLock<ilang_syntax::lisp::source_tree::SourceTree>>,
     current: Mutex<Option<(u32, u64, Arc<Index>)>>,
 }
 impl DefinitionWorld {
@@ -85,6 +77,10 @@ impl DefinitionWorld {
         parsed: Vec<Arc<Parsed>>,
         next_answer: Arc<AtomicU64>,
     ) -> Self {
+        let source_trees = parsed
+            .iter()
+            .map(|p| (p.source.0, std::sync::OnceLock::new()))
+            .collect();
         let lisp_documents = parsed
             .iter()
             .filter_map(|p| {
@@ -103,28 +99,33 @@ impl DefinitionWorld {
                 })
             })
             .collect();
-        let source_encoders = parsed
-            .iter()
-            .filter_map(|p| {
-                let file = graph.sources.get(p.source);
-                (!file.display.ends_with(".is")).then(|| {
-                    let end = p
-                        .scoped
-                        .as_ref()
-                        .map_or(file.text.len(), |scoped| scoped.original_len() as usize);
-                    (p.source.0, (end, std::sync::OnceLock::new()))
-                })
-            })
-            .collect();
         Self {
             graph: graph.clone(),
             parsed,
             next_answer,
             lisp_documents,
-            source_encoders,
+            source_trees,
             current: Mutex::new(None),
         }
     }
+    fn source_tree(&self, parsed: &Parsed) -> &ilang_syntax::lisp::source_tree::SourceTree {
+        let file = self.graph.sources.get(parsed.source);
+        let end = parsed
+            .scoped
+            .as_ref()
+            .map_or(file.text.len(), |s| s.original_len() as usize);
+        self.source_trees[&parsed.source.0].get_or_init(|| {
+            ilang_syntax::lisp::source_tree::SourceTree::read(
+                &Scope {
+                    module: parsed.source.0,
+                    marks: Default::default(),
+                },
+                &file.text[..end],
+                file.display.ends_with(".is"),
+            )
+        })
+    }
+
     fn answer_id(&self) -> u64 {
         self.next_answer
             .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| {
@@ -138,7 +139,7 @@ impl DefinitionWorld {
             .find(|p| p.source.0 == source)
             .map(AsRef::as_ref)
     }
-    fn target(&self, p: &Parsed, import: &ilang_syntax::ast::ImportItem) -> Option<u32> {
+    fn target(&self, p: &Parsed, import: &ilang_syntax::syn3::ast::Import) -> Option<u32> {
         let package = &self.graph.packages[p.package];
         let first = &import.path.first()?.name;
         let id = if first == "i" {
@@ -199,24 +200,17 @@ impl DefinitionWorld {
                 let ItemKind::TypeDef(def) = &item.kind else {
                     continue;
                 };
-                let mut binders = Vec::new();
-                if def.alias_pattern {
-                    for part in &def.head {
-                        pattern_binders(part, &mut binders);
-                    }
-                } else {
-                    binders.push(def.name.clone());
-                }
+                let binders = crate::definition_world3::type_binders(def);
                 let ready = !current || snapshot.ready[position];
                 for binder in binders {
                     let atom = scoped
-                        .and_then(|s| s.origin(binder.span))
+                        .and_then(|s| s.origin(binder.span.0))
                         .map(|origin| origin.syntax.clone())
                         .unwrap_or_else(|| {
                             Syntax::from_datum(
                                 &Datum {
                                     kind: DatumKind::UpName(binder.name.clone()),
-                                    span: binder.span,
+                                    span: binder.span.0,
                                     docs: Vec::new(),
                                 },
                                 &scope,
@@ -226,26 +220,33 @@ impl DefinitionWorld {
                         source: p.source.0,
                         scope: atom.scope().clone(),
                         name: binder.name.clone(),
-                        span: binder.span,
+                        span: binder.span.0,
                         builtin: false,
                     };
                     let exported = module.exports.iter().any(|e| e.name.name == binder.name);
-                    let constructors_visible = !matches!(def.body, TypeBody::Custom(_))
+                    let constructors_visible = !crate::definition_world3::has_own_constructors(def)
                         || module
                             .exports
                             .iter()
                             .any(|e| e.name.name == binder.name && e.constructors);
-                    let override_syntax = if current {
-                        snapshot.item_overrides.get(&item.span)
+                    let (exported, constructors_visible) = if ilang_syntax::lisp::syntax::ROWS3 {
+                        self.source_tree(p)
+                            .definition_visibility(&binder.name)
+                            .unwrap_or((exported, constructors_visible))
                     } else {
-                        scoped.and_then(|source| source.item_override(item.span))
+                        (exported, constructors_visible)
+                    };
+                    let override_syntax = if current {
+                        snapshot.item_overrides.get(&item.span.0)
+                    } else {
+                        scoped.and_then(|source| source.item_override(item.span.0))
                     };
                     let expanded =
                         override_syntax
                             .map(|(syntax, _)| syntax.clone())
                             .or_else(|| {
-                                scoped.filter(|s| s.is_generated(item.span)).map(|s| {
-                                    s.origin(item.span)
+                                scoped.filter(|s| s.is_generated(item.span.0)).map(|s| {
+                                    s.origin(item.span.0)
                                         .expect("generated type item retains its origin")
                                         .syntax
                                         .clone()
@@ -261,10 +262,10 @@ impl DefinitionWorld {
                         expanded,
                     });
                     if atom.scope().marks.is_empty() {
-                        names.own.entry(binder.name).or_insert(n);
+                        names.own.entry(binder.name.clone()).or_insert(n);
                     } else if current {
                         index.generated.push(Binding {
-                            text: binder.name,
+                            text: binder.name.clone(),
                             scope: atom.scope().clone(),
                             identity: atom.scope_identity().cloned(),
                             target: n,
@@ -296,7 +297,14 @@ impl DefinitionWorld {
                     .names
                     .iter()
                     .filter_map(|name| {
-                        let exported = target_ast.exports.iter().any(|e| e.name.name == name.name);
+                        let exported = if ilang_syntax::lisp::syntax::ROWS3 {
+                            index.modules[&target]
+                                .own
+                                .get(&name.name)
+                                .is_some_and(|id| index.entries[*id].exported)
+                        } else {
+                            target_ast.exports.iter().any(|e| e.name.name == name.name)
+                        };
                         exported
                             .then(|| index.modules[&target].own.get(&name.name).copied())
                             .flatten()
@@ -317,22 +325,6 @@ impl DefinitionWorld {
     }
 }
 
-fn pattern_binders(ty: &TypeExpr, output: &mut Vec<ilang_syntax::ast::Ident>) {
-    let mut pending = vec![ty];
-    while let Some(ty) = pending.pop() {
-        match &ty.kind {
-            TypeKind::Named {
-                module: None,
-                name,
-                args,
-            } if args.is_empty() => output.push(name.clone()),
-            TypeKind::Named { args, .. } | TypeKind::Tuple(args) => {
-                pending.extend(args.iter().rev())
-            }
-            _ => {}
-        }
-    }
-}
 fn text(s: &Syntax) -> &str {
     match s.node() {
         Node::Up(s) | Node::Name(s) => s,
@@ -341,18 +333,10 @@ fn text(s: &Syntax) -> &str {
 }
 fn builtin(name: &str) -> bool {
     BuiltinType::ALL.into_iter().any(|b| b.name() == name)
-        || matches!(
-            name,
-            "Bool"
-                | "True"
-                | "False"
-                | "Nil"
-                | "Result"
-                | "Ok"
-                | "Error"
-                | "Assert"
-                | "AssertionFailure"
+        || ilang_syntax::lisp::definitions::builtin_definition_names(
+            ilang_syntax::lisp::definitions::NEW_ROWS,
         )
+        .contains(&name)
 }
 fn error_id(query: &Syntax, kind: &str) -> DefinitionIdentity {
     DefinitionIdentity {
@@ -517,7 +501,11 @@ impl Definitions for DefinitionWorld {
                 return resolution(DefinitionReply::Deferred { at: in_run.clone() }, None);
             }
             let foreign = query.module.is_some() || entry.key.source != from_source;
-            if foreign && !entry.constructors_visible {
+            let same_generated_scope = query.module.is_none()
+                && entry.key.source == snapshot.source
+                && !entry.key.scope.marks.is_empty()
+                && entry.key.scope == *query.name.scope();
+            if foreign && !entry.constructors_visible && !same_generated_scope {
                 let identity = error_id(&query.name, "constructors-hidden");
                 return resolution(
                     DefinitionReply::Error {
@@ -547,48 +535,49 @@ impl Definitions for DefinitionWorld {
                     &parsed.ast
                 };
                 let item = &module.items[entry.position];
-                if let Some(document) = self.lisp_documents.get(&parsed.source.0) {
-                    let datum = document
+                let datum = if let Some(document) = self.lisp_documents.get(&parsed.source.0) {
+                    document
                         .iter()
-                        .find(|datum| datum.span == item.span)
-                        .expect("written Lisp type has its source datum");
-                    charge_definition(budget, DefinitionCost::Datum(datum)).map(|()| {
-                        let syntax = Syntax::from_datum(
-                            datum,
-                            &Scope {
-                                module: parsed.source.0,
-                                marks: Default::default(),
-                            },
-                        );
-                        ilang_syntax::lisp::definitions::expanded_definition(&syntax, answer)
-                            .expect("written Lisp type remains valid")
-                    })
+                        .find(|datum| datum.span == item.span.0)
+                        .expect("written Lisp type has its source datum")
+                        .clone()
                 } else {
-                    let (end, encoder) = self
-                        .source_encoders
-                        .get(&parsed.source.0)
-                        .expect("written source has a lexical index");
-                    let encoder = encoder.get_or_init(|| {
-                        ilang_syntax::lisp::SourceEncoder::new(
-                            &Scope {
-                                module: parsed.source.0,
-                                marks: Default::default(),
-                            },
-                            &self.graph.sources.get(parsed.source).text[..*end],
-                        )
-                    });
-                    encoder
-                        .visit_item_charge(item, |event| {
-                            charge_definition(budget, DefinitionCost::Event(event))
-                        })
-                        .map(|()| {
-                            ilang_syntax::lisp::definitions::source_definition_from_syntax(
-                                item,
-                                &encoder.item(item),
-                                answer,
-                            )
-                        })
-                }
+                    self.source_tree(parsed)
+                        .item_datum(item.span.0)
+                        .expect("a written definition has its new tree item")
+                };
+                let mut table = DefinitionTable::default();
+                table.insert(
+                    (),
+                    Definition::tree_with_datum(
+                        item.clone(),
+                        datum,
+                        Scope {
+                            module: parsed.source.0,
+                            marks: Default::default(),
+                        },
+                        true,
+                    ),
+                );
+                return match table.query_metered(
+                    result,
+                    mode,
+                    answer,
+                    |_, _| Lookup::Found(()),
+                    |cost| charge_definition(budget, cost).map_err(Into::into),
+                ) {
+                    Ok(QueryResult::Answer { syntax, .. }) => {
+                        resolution(DefinitionReply::Answer(syntax), early.then_some(key))
+                    }
+                    Err(error) => resolution(
+                        DefinitionReply::CompileError {
+                            message: error.to_string(),
+                            at: query.name,
+                        },
+                        None,
+                    ),
+                    _ => unreachable!("a ready written definition answers its resolved query"),
+                };
             };
             match construction {
                 Ok(syntax) => resolution(DefinitionReply::Answer(syntax), early.then_some(key)),
@@ -683,18 +672,13 @@ impl DefinitionWorld {
             p.scoped.as_ref()
         };
         module.items.iter().any(|item| {
-            if name.span().start < item.span.start || name.span().end > item.span.end {
+            if name.span().start < item.span.0.start || name.span().end > item.span.0.end {
                 return false;
             }
-            let params: &[ilang_syntax::ast::Ident] = match &item.kind {
-                ItemKind::TypeDef(def) => &def.params,
-                ItemKind::Binding(binding) => &binding.type_params,
-                ItemKind::Declaration { type_params, .. } => type_params,
-                ItemKind::MacroItem { .. } => &[],
-            };
+            let params = crate::definition_world3::type_parameters(item);
             params.iter().any(|parameter| {
                 let scope = scoped
-                    .and_then(|s| s.origin(parameter.span))
+                    .and_then(|s| s.origin(parameter.span.0))
                     .map(|origin| origin.syntax.scope().clone())
                     .unwrap_or_else(|| Scope {
                         module: p.source.0,

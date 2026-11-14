@@ -1,19 +1,21 @@
 //! Definition-query answers with caller-supplied hygienic name resolution.
 use super::definition_schedule::Mode;
-use super::definitions::{
-    TypeQuery, builtin_definition, freshen_parameters, source_definition_from_syntax, type_query,
-};
+use super::definitions::{TypeQuery, builtin_definition, freshen_parameters, type_query};
 use super::syntax::{Scope, Syntax};
-use crate::ast::{Item, ItemKind};
 use std::collections::HashMap;
 use std::hash::Hash;
 
 /// One definition, retained in its written form until it is ready.
 #[derive(Clone)]
 pub enum Definition {
-    Written {
-        item: Box<Item>,
-        source: String,
+    /// A written definition in the tree of syntax three, answered in the
+    /// rows of syntax-3.md §6.8 whatever `NEW_ROWS` says. Made by
+    /// [`Definition::tree`] or [`Definition::tree_with_datum`]; this is the
+    /// form that replaces `Written` when the engine reads the new tree.
+    Tree {
+        item: Box<crate::syn3::ast::Item>,
+        /// The item in the rows of §6.8.
+        datum: Box<super::Datum>,
         scope: Scope,
         ready: bool,
     },
@@ -27,6 +29,32 @@ pub enum Definition {
     Builtin {
         name: String,
     },
+}
+
+impl Definition {
+    /// A written type definition of the new tree. Its rows are made by
+    /// `syn3::lisp::item_datum`.
+    pub fn tree(item: crate::syn3::ast::Item, scope: Scope, ready: bool) -> Self {
+        let datum = crate::syn3::lisp::item_datum(&item);
+        Self::tree_with_datum(item, datum, scope, ready)
+    }
+
+    /// A written type definition of the new tree with its rows given: the
+    /// written datum of a Lisp file, or the output of a builder that knows
+    /// the tokens (so that the spans of symbols are those of the source).
+    pub fn tree_with_datum(
+        item: crate::syn3::ast::Item,
+        datum: super::Datum,
+        scope: Scope,
+        ready: bool,
+    ) -> Self {
+        Definition::Tree {
+            item: Box::new(item),
+            datum: Box::new(datum),
+            scope,
+            ready,
+        }
+    }
 }
 
 /// Hygienic lookup decides lexical shadowing, visibility, marks and whether
@@ -68,7 +96,6 @@ pub enum DefinitionCost<'a> {
     Syntax(&'a Syntax),
     Builtin(&'a str),
     /// One streamed charge for a written definition's encoded shape.
-    Event(super::SyntaxCharge),
     /// Already parsed Lisp item, without constructing Syntax nodes.
     Datum(&'a super::Datum),
 }
@@ -76,40 +103,16 @@ pub enum DefinitionCost<'a> {
 const TEMPLATE_ANSWER: u64 = u64::MAX;
 struct Entry {
     definition: Definition,
-    lisp_document: Option<Vec<super::Datum>>,
-    source_encoder: Option<super::SourceEncoder>,
 }
 impl Entry {
     fn new(definition: Definition) -> Self {
-        if let Definition::Written { item, .. } = &definition {
+        if let Definition::Tree { item, .. } = &definition {
             assert!(
-                matches!(item.kind, ItemKind::TypeDef(_)),
+                matches!(item.kind, crate::syn3::ast::ItemKind::TypeDef(_)),
                 "definition table accepts type definitions only"
             );
         }
-        let lisp_document = match &definition {
-            Definition::Written { item, source, .. }
-                if source[item.span.start as usize..item.span.end as usize].starts_with('(') =>
-            {
-                Some(
-                    super::parse(source)
-                        .expect("parsed Lisp source remains valid")
-                        .datums,
-                )
-            }
-            _ => None,
-        };
-        let source_encoder = match &definition {
-            Definition::Written { source, scope, .. } if lisp_document.is_none() => {
-                Some(super::SourceEncoder::new(scope, source))
-            }
-            _ => None,
-        };
-        Self {
-            definition,
-            lisp_document,
-            source_encoder,
-        }
+        Self { definition }
     }
 }
 
@@ -138,7 +141,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             .get_mut(key)
             .expect("definition identity must be registered");
         match &mut definition.definition {
-            Definition::Written { ready: current, .. }
+            Definition::Tree { ready: current, .. }
             | Definition::Expanded { ready: current, .. } => *current = ready,
             Definition::Builtin { .. } => panic!("builtin definitions are always ready"),
         }
@@ -156,7 +159,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
         assert!(
             matches!(
                 definition,
-                Definition::Written { ready: true, .. } | Definition::Expanded { ready: true, .. }
+                Definition::Tree { ready: true, .. } | Definition::Expanded { ready: true, .. }
             ),
             "a finished definition must be ready"
         );
@@ -239,36 +242,20 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
             .get(&key)
             .expect("resolved definition identity must be registered");
         let syntax = match &definition.definition {
-            Definition::Written { ready: false, .. }
-            | Definition::Expanded { ready: false, .. } => {
+            Definition::Tree { ready: false, .. } | Definition::Expanded { ready: false, .. } => {
                 return Ok(QueryResult::Deferred {
                     at: parsed.name.clone(),
                 });
             }
-            Definition::Written {
-                item,
+
+            Definition::Tree {
+                datum,
                 scope,
                 ready: true,
                 ..
             } => {
-                if let Some(document) = &definition.lisp_document {
-                    let datum = document
-                        .iter()
-                        .find(|datum| datum.span == item.span)
-                        .expect("written Lisp type has its source datum");
-                    preflight(DefinitionCost::Datum(datum))?;
-                    let syntax = Syntax::from_datum(datum, scope);
-                    super::definitions::expanded_definition(&syntax, answer)
-                        .expect("written Lisp type remains valid")
-                } else {
-                    let encoder = definition
-                        .source_encoder
-                        .as_ref()
-                        .expect("written source has a lexical index");
-                    encoder
-                        .visit_item_charge(item, |event| preflight(DefinitionCost::Event(event)))?;
-                    source_definition_from_syntax(item, &encoder.item(item), answer)
-                }
+                preflight(DefinitionCost::Datum(datum))?;
+                super::definitions::tree_definition_from_datum(datum, scope, answer)
             }
             Definition::Expanded {
                 syntax,
@@ -287,18 +274,9 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                 .as_answer()
             }
             Definition::Builtin { name } => {
-                if matches!(
-                    name.as_str(),
-                    "Bool"
-                        | "True"
-                        | "False"
-                        | "Nil"
-                        | "Result"
-                        | "Ok"
-                        | "Error"
-                        | "Assert"
-                        | "AssertionFailure"
-                ) {
+                if super::definitions::builtin_definition_names(super::definitions::NEW_ROWS)
+                    .contains(&name.as_str())
+                {
                     preflight(DefinitionCost::Builtin(name))?;
                 }
                 match builtin_definition(name, parsed.name.scope(), parsed.name.span(), answer) {

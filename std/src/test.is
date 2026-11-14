@@ -31,51 +31,64 @@
   (-> (, xs ys) _
     (|> xs
         (| (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))
+(= statements_of
+  (-> (, body) _
+    (|> body
+        (| (-> (, `(-> (,) _ {~..statements})) _ statements)
+          (-> (, `(-> (,) _ ~statement)) _ [statement])
+          (-> (, _) _ (panic "suite body must be a zero-argument function"))))))
+(= provide
+  (-> (, target env) _
+    (|> env
+        (| (-> (, []) _ target)
+          (-> (, [services .. rest]) _
+            (provide `(<- ~target ~services) rest))))))
+(= suite_statement
+  (-> (, prefix statement env) _
+    (|>
+     statement
+     (| (-> (, `(<- ~target ~services)) _
+          (|> target
+              (| (-> (, `{~..children}) _
+                   (suite_items prefix children [services .. env]))
+                (-> (, _) _
+                  (suite_statement prefix target [services .. env])))))
+       (-> (, `(suite ~name ~body)) _
+         (suite_items (<> (<> prefix (text name)) " / ")
+                      (statements_of body)
+                      env))
+       (-> (, `((. ~module suite) ~name ~body)) _
+         (suite_items (<> (<> prefix (text name)) " / ")
+                      (statements_of body)
+                      env))
+       (-> (, `(~callee ~name ~cases ~body)) _
+         {(= full
+            ((. syntax make)
+             ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
+             name))
+          (= wrapped `(-> (, case_value) _ ~(provide `(~body case_value) env)))
+          [`(~callee ~full ~cases ~wrapped)]})
+       (-> (, `(~callee ~name ~body)) _
+         {(= full
+            ((. syntax make)
+             ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
+             name))
+          (= wrapped `(-> (,) _ ~(provide `(~body) env)))
+          [`(~callee ~full ~wrapped)]})
+       (-> (, _) _
+         (panic
+          "suite body expects tests, suites, and environment statements"))))))
 (= suite_items
   (-> (, prefix statements env) _
-    (|>
-     statements
-     (| (-> (, []) _ [])
-       (-> (, [statement .. rest]) _
-         (|>
-          statement
-          (| (-> (, `(! ~service ~value)) _
-               (suite_items prefix rest (append env [statement])))
-            (-> (, `(suite ~name (-> (,) _ {~..children}))) _
-              (append
-               (suite_items (<> (<> prefix (text name)) " / ") children env)
-               (suite_items prefix rest env)))
-            (-> (, `((. ~module suite) ~name (-> (,) _ {~..children}))) _
-              (append
-               (suite_items (<> (<> prefix (text name)) " / ") children env)
-               (suite_items prefix rest env)))
-            (-> (, `(~callee ~name ~cases ~body)) _
-              {(= full
-                 ((. syntax make)
-                  ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
-                  name))
-               (= wrapped `(-> (, case_value) _ {~..env (~body case_value)}))
-               [`(~callee ~full ~cases ~wrapped)
-                ..
-                (suite_items prefix rest env)]})
-            (-> (, `(~callee ~name ~body)) _
-              {(= full
-                 ((. syntax make)
-                  ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
-                  name))
-               (= wrapped `(-> (,) _ {~..env (~body)}))
-               [`(~callee ~full ~wrapped) .. (suite_items prefix rest env)]})
-            (-> (, _) _
-              (panic
-               "suite body expects tests, suites, and environment statements")))))))))
+    (|> statements
+        (| (-> (, []) _ [])
+          (-> (, [statement .. rest]) _
+            (append (suite_statement prefix statement env)
+                    (suite_items prefix rest env)))))))
 (@ macro
   (= suite
     (-> (, name body) _
-      (|> body
-          (| (-> (, `(-> (,) _ {~..statements})) _
-               `{~..(suite_items (<> (text name) " / ") statements [])})
-            (-> (, _) _
-              (panic "suite body must be a zero-argument function")))))))
+      `{~..(suite_items (<> (text name) " / ") (statements_of body) [])})))
 (= case_items
   (-> (, prefix cases body index) (<- _ (, (: items (. syntax Items))))
     (|> cases

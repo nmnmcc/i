@@ -1,8 +1,9 @@
-use ilang_macro::body_walk::{self, Hook, Local};
 use ilang_syntax::{
     ast::{Expr, ExprKind, ItemKind, Stmt},
     span::Span,
 };
+use migration_syntax as ilang_syntax;
+use migration_syntax::macro_body_walk::{self as body_walk, Hook, Local};
 
 fn expression(source: &str) -> Expr {
     let (module, diags) = ilang_syntax::parse_module(&format!("f = () {{ {source} }}"));

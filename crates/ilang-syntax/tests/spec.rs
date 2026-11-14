@@ -1,6 +1,8 @@
 //! Every ```i block of `docs/spec.md` parses as syntax three without errors,
 //! and its print parses to the same tree.
 
+#[path = "oracle.rs"]
+mod ilang_syntax;
 fn blocks(spec: &str) -> Vec<(usize, String)> {
     let mut out = Vec::new();
     let mut current: Option<(usize, String)> = None;

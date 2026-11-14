@@ -42,8 +42,8 @@ use ilang_check::hir::{self, *};
 use ilang_check::providers::{self, ResolvedArgument, ResolvedPlan, Scope, Supply};
 use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
-use ilang_syntax::ast::{BinOp, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
+use ilang_syntax::syn3::ast::{BinOp, UnOp};
 use num_bigint::BigInt;
 use std::collections::{BTreeSet, HashMap, HashSet};
 

@@ -1,6 +1,9 @@
 //! Expanded code points to written arguments or its call and template (§9).
 mod common;
 
+// Parsed.ast holds the syntax-three tree (final-ast step 2d).
+use common::tree::new as tree;
+
 use ilang_check::query::{Query, check_parsed_for_queries};
 use ilang_syntax::lisp::{
     Datum, DatumKind,
@@ -39,23 +42,15 @@ fn template_error_uses_call_site_and_related_template_and_suppresses_warnings() 
         .source;
     let module = parsed.iter_mut().find(|p| p.path == "app/main").unwrap();
     let ms = module.source;
-    let ilang_syntax::ast::ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!()
-    };
-    let ilang_syntax::ast::ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!()
-    };
-    let Some(ilang_syntax::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
-        panic!()
-    };
-    let call_span = last.span;
+    let last = tree::last_expression(&mut module.ast, 0);
+    let call_span = tree::span(last);
     let call = syntax("fake", ms.0, call_span, &[]);
     let template_span = Span::new(3, 10);
     let generated = syntax("missing", ts.0, template_span, &[9]);
     let mut scoped = ScopedSource::new(main.into());
-    let expanded = scoped.expression(&generated, &call).unwrap();
-    let generated_span = expanded.span;
-    scoped.inherit_call_chain(expanded.span, call_span, "fake");
+    let expanded = scoped.expression3(&generated, &call).unwrap();
+    let generated_span = tree::span(&expanded);
+    scoped.inherit_call_chain(tree::span(&expanded), call_span, "fake");
     *last = expanded;
     graph.sources.set_text(ms, scoped.text().into());
     module.scoped = Some(scoped);
@@ -107,23 +102,15 @@ fn argument_location_and_query_use_written_source() {
         .source;
     let module = parsed.iter_mut().find(|p| p.path == "app/main").unwrap();
     let ms = module.source;
-    let ilang_syntax::ast::ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!()
-    };
-    let ilang_syntax::ast::ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!()
-    };
-    let Some(ilang_syntax::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
-        panic!()
-    };
-    let call_span = last.span;
+    let last = tree::last_expression(&mut module.ast, 0);
+    let call_span = tree::span(last);
     let x_offset = main.rfind('x').unwrap() as u32;
     let call = syntax("fake", ms.0, call_span, &[]);
     let argument = syntax("x", ms.0, Span::new(x_offset, x_offset + 1), &[]);
     let mut scoped = ScopedSource::new(main.into());
-    let expanded = scoped.expression(&argument, &call).unwrap();
-    let generated_span = expanded.span;
-    scoped.inherit_call_chain(expanded.span, call_span, "fake");
+    let expanded = scoped.expression3(&argument, &call).unwrap();
+    let generated_span = tree::span(&expanded);
+    scoped.inherit_call_chain(tree::span(&expanded), call_span, "fake");
     *last = expanded;
     graph.sources.set_text(ms, scoped.text().into());
     module.scoped = Some(scoped);
@@ -181,24 +168,16 @@ fn nested_template_error_uses_outer_call_and_both_template_locations() {
         .source;
     let module = parsed.iter_mut().find(|p| p.path == "app/main").unwrap();
     let ms = module.source;
-    let ilang_syntax::ast::ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!()
-    };
-    let ilang_syntax::ast::ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!()
-    };
-    let Some(ilang_syntax::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
-        panic!()
-    };
-    let call_span = last.span;
+    let last = tree::last_expression(&mut module.ast, 0);
+    let call_span = tree::span(last);
     let call = syntax("first", ms.0, call_span, &[]);
     let mut scoped = ScopedSource::new(main.into());
     let inner = syntax("second", first.0, Span::new(3, 9), &[1]);
-    let intermediate = scoped.expression(&inner, &call).unwrap();
-    scoped.inherit_call_chain(intermediate.span, call_span, "first");
+    let intermediate = scoped.expression3(&inner, &call).unwrap();
+    scoped.inherit_call_chain(tree::span(&intermediate), call_span, "first");
     let missing = syntax("missing", second.0, Span::new(3, 10), &[2]);
-    let result = scoped.expression(&missing, &inner).unwrap();
-    scoped.inherit_call_chain(result.span, intermediate.span, "second");
+    let result = scoped.expression3(&missing, &inner).unwrap();
+    scoped.inherit_call_chain(tree::span(&result), tree::span(&intermediate), "second");
     *last = result;
     graph.sources.set_text(ms, scoped.text().into());
     module.scoped = Some(scoped);
@@ -234,21 +213,13 @@ fn template_name_hover_and_definition_navigate_across_modules() {
         .source;
     let module = parsed.iter_mut().find(|p| p.path == "app/main").unwrap();
     let ms = module.source;
-    let ilang_syntax::ast::ItemKind::Binding(binding) = &mut module.ast.items[0].kind else {
-        panic!()
-    };
-    let ilang_syntax::ast::ExprKind::Fn(function) = &mut binding.value.kind else {
-        panic!()
-    };
-    let Some(ilang_syntax::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
-        panic!()
-    };
-    let call_span = last.span;
+    let last = tree::last_expression(&mut module.ast, 0);
+    let call_span = tree::span(last);
     let call = syntax("fake", ms.0, call_span, &[]);
     let reference = syntax("helper", ts.0, Span::new(3, 9), &[7]);
     let mut scoped = ScopedSource::new(main.into());
-    let expanded = scoped.expression(&reference, &call).unwrap();
-    scoped.inherit_call_chain(expanded.span, call_span, "fake");
+    let expanded = scoped.expression3(&reference, &call).unwrap();
+    scoped.inherit_call_chain(tree::span(&expanded), call_span, "fake");
     *last = expanded;
     graph.sources.set_text(ms, scoped.text().into());
     module.scoped = Some(scoped);

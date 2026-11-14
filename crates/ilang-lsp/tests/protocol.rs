@@ -2983,7 +2983,7 @@ fn lsp_every_offset_of_broken_files() {
         &[
             ("src/main.i", BROKEN),
             ("src/util.i", util),
-            ("src/lisp.is", "(= f (-> (x) _ {(+ x\n"),
+            ("src/lisp.is", "(= f (-> (, x) _ {(+ x\n"),
         ],
     );
     let main = file_uri(&dir.path().join("src/main.i"));
@@ -2992,8 +2992,8 @@ fn lsp_every_offset_of_broken_files() {
     c.open(&main, BROKEN);
     assert!(!c.diagnostics(&main).is_empty());
     every_request_everywhere(&mut c, &main, BROKEN);
-    c.open(&lisp, "(= f (-> (x) _ {(+ x\n");
-    every_request_everywhere(&mut c, &lisp, "(= f (-> (x) _ {(+ x\n");
+    c.open(&lisp, "(= f (-> (, x) _ {(+ x\n");
+    every_request_everywhere(&mut c, &lisp, "(= f (-> (, x) _ {(+ x\n");
     c.shutdown();
 }
 

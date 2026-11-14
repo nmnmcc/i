@@ -1,5 +1,7 @@
 //! Layout properties for both source surfaces, using the CLI conversion path's
 //! comment-preserving encoder and the existing canonical core-tree comparison.
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::{
     format::{TAB_WIDTH, WIDTH},
     lexer::lex_lisp,

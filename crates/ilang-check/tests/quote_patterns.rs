@@ -10,7 +10,7 @@ fn quote_pattern_captures_typecheck_and_a_fallback_is_reachable() {
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let mut templates = Vec::new();
     for module in &mut parsed {
-        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+        ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
             &mut module.ast,
             module.source.0,
             &mut templates,
@@ -41,7 +41,7 @@ fn nested_captures_choices_and_guards_typecheck() {
         assert!(diagnostics.is_empty(), "{body}: {diagnostics:?}");
         let mut templates = Vec::new();
         for module in &mut parsed {
-            ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+            ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
                 &mut module.ast,
                 module.source.0,
                 &mut templates,
@@ -64,7 +64,7 @@ fn quote_choice_requires_the_same_capture_bindings() {
     let (mut parsed, _) = ilang_check::parse(&graph);
     let mut templates = Vec::new();
     for module in &mut parsed {
-        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+        ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
             &mut module.ast,
             module.source.0,
             &mut templates,
@@ -88,7 +88,7 @@ fn quote_capture_must_be_a_pattern_for_syntax() {
     let (mut parsed, _) = ilang_check::parse(&graph);
     let mut templates = Vec::new();
     for module in &mut parsed {
-        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+        ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
             &mut module.ast,
             module.source.0,
             &mut templates,
@@ -113,7 +113,7 @@ fn fitted_quote_patterns_are_refutable() {
     let (mut parsed, _) = ilang_check::parse(&graph);
     let mut templates = Vec::new();
     for module in &mut parsed {
-        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+        ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
             &mut module.ast,
             module.source.0,
             &mut templates,

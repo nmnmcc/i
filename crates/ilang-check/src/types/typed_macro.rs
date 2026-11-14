@@ -530,6 +530,12 @@ impl TypedMacroQuery {
             module: s.program.module(s.module).source.0,
             marks: Default::default(),
         };
+        self.syntax_rows(s, t, &scope, ilang_syntax::lisp::definitions::NEW_ROWS)
+    }
+    /// A type as syntax, in the rows before syntax three or (`new_rows`) in
+    /// the rows of syntax-3.md §6.8. The rows differ for function types, for
+    /// records with named fields and for the empty tuple.
+    fn syntax_rows(&self, s: &mut QueryState, t: &Ty, scope: &Scope, new_rows: bool) -> Syntax {
         let atom = |kind| {
             Syntax::from_datum(
                 &Datum {
@@ -537,7 +543,7 @@ impl TypedMacroQuery {
                     span: Span::new(0, 0),
                     docs: Vec::new(),
                 },
-                &scope,
+                scope,
             )
             .as_answer()
         };
@@ -558,11 +564,25 @@ impl TypedMacroQuery {
                 .into_iter()
                 .zip(parts)
                 .map(|(label, t)| match label {
-                    Some(name) => form(":", vec![atom(DatumKind::String(name)), self.syntax(s, t)]),
-                    None => self.syntax(s, t),
+                    Some(name) => form(
+                        if new_rows { "=" } else { ":" },
+                        vec![
+                            atom(if new_rows {
+                                DatumKind::Name(name)
+                            } else {
+                                DatumKind::String(name)
+                            }),
+                            self.syntax_rows(s, t, scope, new_rows),
+                        ],
+                    ),
+                    None => self.syntax_rows(s, t, scope, new_rows),
                 })
                 .collect();
-            return round(fields);
+            return if new_rows {
+                form(",", fields)
+            } else {
+                round(fields)
+            };
         }
         match t {
             Ty::Top | Ty::Both(..) => {
@@ -611,13 +631,15 @@ impl TypedMacroQuery {
                         .items()
                         .map(|v| {
                             let lit = if b == BuiltinType::Int {
-                                ilang_syntax::ast::LitValue::Int(v.parse().expect("integer type"))
+                                ilang_syntax::syn3::ast::LitValue::Int(
+                                    v.parse().expect("integer type"),
+                                )
                             } else {
-                                ilang_syntax::ast::LitValue::Str(v.to_string())
+                                ilang_syntax::syn3::ast::LitValue::Str(v.to_string())
                             };
                             let text = lit.text();
                             let d = ilang_syntax::lisp::parse(&text).expect("literal type prints");
-                            Syntax::from_datum(&d.datums[0], &scope).as_answer()
+                            Syntax::from_datum(&d.datums[0], scope).as_answer()
                         })
                         .collect();
                     return if xs.len() == 1 {
@@ -664,23 +686,24 @@ impl TypedMacroQuery {
                     Head::Shape(_) => atom(DatumKind::Symbol(",".into())),
                     _ => unreachable!("type constructor"),
                 };
-                let base = if args.is_empty() {
+                let base = if args.is_empty() && !(new_rows && matches!(h, Head::Shape(_))) {
                     name
                 } else {
+                    // In the rows of §6.8 the empty data type is `(,)`.
                     let mut xs = vec![name];
-                    xs.extend(args.iter().map(|t| self.syntax(s, t)));
+                    xs.extend(args.iter().map(|t| self.syntax_rows(s, t, scope, new_rows)));
                     round(xs)
                 };
                 if !values.is_all() {
                     let mut xs = vec![base];
                     for v in values.items() {
                         let lit = if t.scalar() == Some(BuiltinType::Int) {
-                            ilang_syntax::ast::LitValue::Int(v.parse().expect("integer"))
+                            ilang_syntax::syn3::ast::LitValue::Int(v.parse().expect("integer"))
                         } else {
-                            ilang_syntax::ast::LitValue::Str(v.to_string())
+                            ilang_syntax::syn3::ast::LitValue::Str(v.to_string())
                         };
                         let d = ilang_syntax::lisp::parse(&lit.text()).expect("literal");
-                        xs.push(Syntax::from_datum(&d.datums[0], &scope));
+                        xs.push(Syntax::from_datum(&d.datums[0], scope));
                     }
                     form("-", xs)
                 } else {
@@ -695,32 +718,73 @@ impl TypedMacroQuery {
                     .iter()
                     .enumerate()
                     .map(|(i, t)| {
-                        let t = self.syntax(s, t);
+                        let t = self.syntax_rows(s, t, scope, new_rows);
                         if let Some(l) = f.label(i) {
-                            form(":", vec![atom(DatumKind::Name(l)), t])
+                            form(
+                                if new_rows { "=" } else { ":" },
+                                vec![atom(DatumKind::Name(l)), t],
+                            )
                         } else {
                             t
                         }
                     })
                     .collect();
-                let mut ret = self.syntax(s, &f.ret);
-                if f.err != Ty::Never {
-                    let err = self.syntax(s, &f.err);
-                    ret = form("^", vec![ret, err]);
+                let mut ret = self.syntax_rows(s, &f.ret, scope, new_rows);
+                if new_rows {
+                    // `(-> (, T…) (<- R (, (Fail E) N… .. V)))` (§6.8): the
+                    // reverse of `Cx::needs_row` in `syn3/lower.rs`. The
+                    // error row is the entry `(Fail E)`; each member of the
+                    // environment is an entry, and a member that is a type
+                    // variable is a row variable, `.. V`. Needs that are one
+                    // row variable and nothing else are written `(<- R V)`.
+                    let mut needs = Vec::new();
+                    if f.err != Ty::Never {
+                        let err = self.syntax_rows(s, &f.err, scope, new_rows);
+                        needs.push(round(vec![atom(DatumKind::UpName("Fail".into())), err]));
+                    }
+                    let members: &[Ty] = match &f.env {
+                        Ty::Never => &[],
+                        Ty::Union(members) => members,
+                        one => std::slice::from_ref(one),
+                    };
+                    let only_row = needs.is_empty() && matches!(members, [Ty::Var(_)]);
+                    for member in members {
+                        if matches!(member, Ty::Var(_)) && !only_row {
+                            needs.push(atom(DatumKind::Symbol("..".into())));
+                        }
+                        needs.push(self.syntax_rows(s, member, scope, new_rows));
+                    }
+                    if only_row {
+                        let row = needs.pop().expect("the row variable");
+                        ret = form("<-", vec![ret, row]);
+                    } else if !needs.is_empty() {
+                        ret = form("<-", vec![ret, form(",", needs)]);
+                    }
+                    form("->", vec![form(",", params), ret])
+                } else {
+                    if f.err != Ty::Never {
+                        let err = self.syntax_rows(s, &f.err, scope, new_rows);
+                        ret = form("^", vec![ret, err]);
+                    }
+                    if f.env != Ty::Never {
+                        let env = self.syntax_rows(s, &f.env, scope, new_rows);
+                        ret = form("!", vec![ret, env]);
+                    }
+                    form("->", vec![round(params), ret])
                 }
-                if f.env != Ty::Never {
-                    let env = self.syntax(s, &f.env);
-                    ret = form("!", vec![ret, env]);
-                }
-                form("->", vec![round(params), ret])
             }
             Ty::Union(xs) | Ty::Inter(xs) => {
                 let name = if matches!(t, Ty::Union(_)) { "|" } else { "&" };
-                form(name, xs.iter().map(|t| self.syntax(s, t)).collect())
+                form(
+                    name,
+                    xs.iter()
+                        .map(|t| self.syntax_rows(s, t, scope, new_rows))
+                        .collect(),
+                )
             }
             Ty::Diff(a, bs) => {
-                let mut xs = vec![self.syntax(s, a)];
-                xs.extend(bs.iter().map(|t| self.syntax(s, t)));
+                let mut xs = vec![self.syntax_rows(s, a, scope, new_rows)];
+                xs.extend(bs.iter().map(|t| self.syntax_rows(s, t, scope, new_rows)));
                 form("-", xs)
             }
         }
@@ -1067,6 +1131,225 @@ mod tests {
             _ => unreachable!(),
         });
         assert_eq!(bundle, again);
+    }
+    fn rows_query(signature: Ty) -> TypedMacroQuery {
+        TypedMacroQuery {
+            id: 1,
+            parser: OnceLock::new(),
+            state: Mutex::new(QueryState {
+                solver: solver(),
+                signature,
+                expressions: HashMap::new(),
+                inputs: Vec::new(),
+                argument_order: Vec::new(),
+                substitution: HashMap::new(),
+                observed: HashSet::new(),
+                arena: HandleArena::new(),
+                answers: HashMap::new(),
+                program: Arc::new(Program::default()),
+                reads: super::super::value_types::Reads::default(),
+                tyvars: HashMap::new(),
+                module: ModuleId(0),
+                fixed: HashSet::new(),
+                effects: HashMap::new(),
+            }),
+        }
+    }
+    /// The type as a typed macro sees it, in the old and in the new rows.
+    fn rows(t: &Ty) -> (String, String) {
+        let query = rows_query(t.clone());
+        let scope = Scope {
+            module: 0,
+            marks: Default::default(),
+        };
+        let mut s = query.state.lock().unwrap();
+        let old = query.syntax_rows(&mut s, t, &scope, false).show();
+        let new = query.syntax_rows(&mut s, t, &scope, true).show();
+        (old, new)
+    }
+    fn function(params: Vec<(Option<&str>, Ty)>, ret: Ty, err: Ty, env: Ty) -> Ty {
+        Ty::Fn(Box::new(FnTy::new(
+            params
+                .into_iter()
+                .map(|(label, t)| (label.map(Into::into), t))
+                .collect(),
+            ret,
+            err,
+            env,
+        )))
+    }
+    fn builtin(b: BuiltinType) -> Ty {
+        Ty::named(TypeRef::Builtin(b), Vec::new())
+    }
+    #[test]
+    fn typed_macro_function_type_rows_without_errors_or_needs() {
+        let t = function(vec![], int(), Ty::Never, Ty::Never);
+        assert_eq!(rows(&t), ("(-> () Int)".into(), "(-> (,) Int)".into()));
+        let t = function(
+            vec![(None, int()), (Some("x"), string())],
+            int(),
+            Ty::Never,
+            Ty::Never,
+        );
+        assert_eq!(
+            rows(&t),
+            (
+                "(-> (Int (: x String)) Int)".into(),
+                "(-> (, Int (= x String)) Int)".into()
+            )
+        );
+        // A function type as a parameter and as a result.
+        let inner = function(vec![(None, int())], string(), Ty::Never, Ty::Never);
+        let t = function(vec![(None, inner.clone())], inner, Ty::Never, Ty::Never);
+        assert_eq!(
+            rows(&t),
+            (
+                "(-> ((-> (Int) String)) (-> (Int) String))".into(),
+                "(-> (, (-> (, Int) String)) (-> (, Int) String))".into()
+            )
+        );
+    }
+    #[test]
+    fn typed_macro_function_type_rows_with_errors_and_needs() {
+        let float = builtin(BuiltinType::Float);
+        // Errors only.
+        let t = function(vec![(None, int())], int(), string(), Ty::Never);
+        assert_eq!(
+            rows(&t),
+            (
+                "(-> (Int) (^ Int String))".into(),
+                "(-> (, Int) (<- Int (, (Fail String))))".into()
+            )
+        );
+        // One need.
+        let t = function(vec![(None, int())], int(), Ty::Never, float.clone());
+        assert_eq!(
+            rows(&t),
+            (
+                "(-> (Int) (! Int Float))".into(),
+                "(-> (, Int) (<- Int (, Float)))".into()
+            )
+        );
+        // Several needs.
+        let both = Ty::Union(vec![float.clone(), string()]);
+        let t = function(vec![(None, int())], int(), Ty::Never, both.clone());
+        assert_eq!(
+            rows(&t),
+            (
+                "(-> (Int) (! Int (| Float String)))".into(),
+                "(-> (, Int) (<- Int (, Float String)))".into()
+            )
+        );
+        // Errors and needs: the `Fail` entry is first.
+        let failure = Ty::Union(vec![int(), string()]);
+        let t = function(vec![(Some("x"), int())], int(), failure, both);
+        assert_eq!(
+            rows(&t),
+            (
+                "(-> ((: x Int)) (! (^ Int (| Int String)) (| Float String)))".into(),
+                "(-> (, (= x Int)) (<- Int (, (Fail (| Int String)) Float String)))".into()
+            )
+        );
+    }
+    #[test]
+    fn typed_macro_function_type_rows_with_row_variables() {
+        let mut solver = solver();
+        let row = solver.fresh();
+        let error = solver.fresh();
+        let float = builtin(BuiltinType::Float);
+        // Needs that are one row variable.
+        let t = function(vec![(None, int())], int(), Ty::Never, row.clone());
+        let (old, new) = rows(&t);
+        assert_eq!(old, "(-> (Int) (! Int A0))");
+        assert_eq!(new, "(-> (, Int) (<- Int A0))");
+        // A row variable beside a service, and beside `Fail`.
+        let env = Ty::Union(vec![row.clone(), float]);
+        let t = function(vec![(None, int())], int(), Ty::Never, env.clone());
+        assert_eq!(rows(&t).1, "(-> (, Int) (<- Int (, .. A0 Float)))");
+        let t = function(vec![(None, int())], int(), string(), row.clone());
+        assert_eq!(rows(&t).1, "(-> (, Int) (<- Int (, (Fail String) .. A0)))");
+        // An error variable is the argument of `Fail`, not a row.
+        let t = function(vec![(None, int())], int(), error, env);
+        let (old, new) = rows(&t);
+        assert_eq!(old, "(-> (Int) (! (^ Int A0) (| A1 Float)))");
+        assert_eq!(new, "(-> (, Int) (<- Int (, (Fail A0) .. A1 Float)))");
+    }
+    /// The new rows are types of the Lisp surface, and the needs read back
+    /// as the two rows they were made from: `Cx::needs_row` is the reverse.
+    #[test]
+    fn typed_macro_function_type_rows_are_read_back_by_the_lowering() {
+        use migration_syntax::ast::{TypeBody, TypeKind as Old};
+        let float = builtin(BuiltinType::Float);
+        let cases = [
+            (Ty::Never, Ty::Never, None, None),
+            (string(), Ty::Never, Some("String"), None),
+            (Ty::Never, float.clone(), None, Some("Float")),
+            (string(), float.clone(), Some("String"), Some("Float")),
+            (
+                Ty::Union(vec![int(), string()]),
+                Ty::Union(vec![float, string()]),
+                Some("(| Int String)"),
+                Some("(| Float String)"),
+            ),
+        ];
+        for (err, env, want_err, want_env) in cases {
+            let t = function(vec![(None, int()), (Some("x"), string())], int(), err, env);
+            let (_, new) = rows(&t);
+            let source = format!("(= T {new})");
+            let (module, errors) = migration_syntax::lisp::parse_source(&source);
+            assert!(errors.is_empty(), "{source}: {errors:?}");
+            let migration_syntax::ast::ItemKind::TypeDef(def) = &module.items[0].kind else {
+                panic!("{source}: a type definition")
+            };
+            let TypeBody::Alias(alias) = &def.body else {
+                panic!("{source}: a name")
+            };
+            let Old::Fn {
+                params,
+                ret,
+                err,
+                env,
+            } = &alias.kind
+            else {
+                panic!("{source}: a function type")
+            };
+            assert_eq!(params.len(), 2, "{source}");
+            assert!(matches!(&ret.kind, Old::Named { name, .. } if name.name == "Int"));
+            let show = |t: &Option<Box<migration_syntax::ast::TypeExpr>>| {
+                t.as_ref().map(|t| match &t.kind {
+                    Old::Named { name, .. } => name.name.clone(),
+                    Old::Union(members) => {
+                        let names: Vec<_> = members
+                            .iter()
+                            .map(|m| match &m.kind {
+                                Old::Named { name, .. } => name.name.clone(),
+                                _ => panic!("a named member"),
+                            })
+                            .collect();
+                        format!("(| {})", names.join(" "))
+                    }
+                    _ => panic!("{source}: a named type or a union"),
+                })
+            };
+            assert_eq!(show(err).as_deref(), want_err, "{source}");
+            assert_eq!(show(env).as_deref(), want_env, "{source}");
+        }
+    }
+    #[test]
+    fn typed_macro_data_type_rows() {
+        let pair = Ty::tuple(vec![int(), string()]);
+        assert_eq!(
+            rows(&pair),
+            ("(, Int String)".into(), "(, Int String)".into())
+        );
+        let record = Ty::record(vec![("x".into(), int()), ("y".into(), string())]);
+        assert_eq!(
+            rows(&record),
+            (
+                "((: \"x\" Int) (: \"y\" String))".into(),
+                "(, (= x Int) (= y String))".into()
+            )
+        );
     }
     #[test]
     fn typed_macro_query_cache_uses_graph_bundle_and_fixation_state() {

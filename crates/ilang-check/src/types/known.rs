@@ -774,7 +774,7 @@ impl Checker<'_> {
                         }
                         ExprKind::BitArray(_) => values.push(prim(BuiltinType::BitArray)),
                         ExprKind::Unary {
-                            op: ilang_syntax::ast::UnOp::Neg,
+                            op: ilang_syntax::syn3::ast::UnOp::Neg,
                             expr,
                         } if neg_literal(expr).is_some() => {
                             values.push(scalar_literal(
@@ -783,8 +783,8 @@ impl Checker<'_> {
                             ));
                         }
                         ExprKind::Unary { op, .. } => values.push(prim(match op {
-                            ilang_syntax::ast::UnOp::Neg => BuiltinType::Int,
-                            ilang_syntax::ast::UnOp::NegFloat => BuiltinType::Float,
+                            ilang_syntax::syn3::ast::UnOp::Neg => BuiltinType::Int,
+                            ilang_syntax::syn3::ast::UnOp::NegFloat => BuiltinType::Float,
                         })),
                         ExprKind::Tuple(items) => {
                             todo.push(Task::Tuple(items.len()));

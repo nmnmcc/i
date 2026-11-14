@@ -9,6 +9,8 @@
 //!   documentation.
 
 mod common;
+#[path = "oracle.rs"]
+mod ilang_syntax;
 
 use ilang_syntax::format::format;
 use ilang_syntax::{lex, parse_module};

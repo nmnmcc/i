@@ -784,6 +784,7 @@ version = "0.1.0"
 dependencies = [
  "ilang-package",
  "ilang-syntax",
+ "ilang-syntax-migration",
  "num-bigint 0.5.1",
  "num-traits",
  "petgraph",
@@ -806,6 +807,7 @@ dependencies = [
  "ilang-macro",
  "ilang-package",
  "ilang-syntax",
+ "ilang-syntax-migration",
  "ilang-wasm",
  "num-bigint 0.5.1",
  "rcgen",
@@ -865,6 +867,7 @@ dependencies = [
  "ilang-host",
  "ilang-package",
  "ilang-syntax",
+ "ilang-syntax-migration",
  "ilang-wasm",
 ]
 
@@ -889,9 +892,19 @@ dependencies = [
 name = "ilang-syntax"
 version = "0.1.0"
 dependencies = [
+ "ilang-syntax-migration",
  "num-bigint 0.5.1",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "ilang-syntax-migration"
+version = "0.1.0"
+dependencies = [
+ "ilang-syntax",
+ "num-bigint 0.5.1",
+ "serde_json",
 ]
 
 [[package]]
