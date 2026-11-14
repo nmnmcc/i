@@ -1,5 +1,190 @@
 ---
 title: Values and data
+description: Define names and build immutable numbers, strings, records, tuples, lists, and labelled values.
 ---
 
-to be written
+Values are the things a program works with: numbers, text, functions, and data built from other values. This page shows how to bind a value to a name, combine values, and inspect the result. You can use these forms to describe the data your functions receive and return.
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	answer = 42
+	stdio.print(core.inspect(answer))
+}
+```
+
+```text
+42
+```
+
+## Names and definitions
+
+`answer = 42` is a binding: it gives the name `answer` the value `42`. A local name is available from the next statement to the end of its block. Names use lowercase letters, digits, and underscores, starting with a lowercase letter or one underscore; `answer`, `line_count`, and `_unused` are examples. Types and constructors start with an uppercase letter.
+
+There are no keywords. `main` is a name, and `=` is the symbol for a binding. A comment starts with `//` and ends at the line end. The braces around the body of `main` form a block; its final expression gives its value.
+
+`core.inspect` takes any value and returns its text form as a `String`. Here, `stdio.print` prints that string. Inspection is useful when learning a new data form: it shows strings with quotes, lists with brackets, and constructors by name.
+
+## Integers and floats
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	whole = 1_000 + 0x10
+	ratio = 7.0 /. 2.0
+	stdio.print(core.inspect((whole, 7 / 2, 7 % 2, -7 / 2)))
+	stdio.print(core.inspect((ratio, 1.5 +. 2.0, -.1.5)))
+	stdio.print(
+		core.inspect((7 > 2, 1.5 <. 2.0, core.to_float(7))),
+	)
+}
+```
+
+```text
+(1016, 3, 1, -3)
+(3.5, 3.5, -1.5)
+(True, True, 7.0)
+```
+
+An `Int` is a whole number of any size; it does not overflow. Write decimal digits, or use `0x`, `0o`, and `0b` for hexadecimal, octal, and binary. Underscores separate digit groups. Integer arithmetic uses `+`, `-`, `*`, `/`, and `%`; division rounds toward zero, and `%` gives the remainder.
+
+A `Float` is a finite binary64 number. Its arithmetic uses separate operators: `+.`, `-.`, `*.`, and `/.`. Negation is `-` for an integer and `-.` for a float. Integer comparisons use `<`, `<=`, `>`, and `>=`; float comparisons add a dot. There is no implicit conversion between the two number types; `core.to_float` converts an integer explicitly.
+
+## Strings and interpolation
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	name = "Ada"
+	greeting = "Hello, \(name)!"
+	lines = "first\nsecond"
+	raw = #"C:\notes"#
+	stdio.print(greeting)
+	stdio.print("count: \(core.inspect(3))")
+	stdio.print(core.inspect(lines))
+	stdio.print(raw)
+}
+```
+
+```text
+Hello, Ada!
+count: 3
+"first\nsecond"
+C:\notes
+```
+
+A `String` holds Unicode text. Double quotes enclose an ordinary string, escapes such as `\n` represent special characters, and `<>` joins strings. Interpolation writes an expression inside `\(…)`. That expression must already return a string: `name` does, while the integer `3` needs `core.inspect` first.
+
+A multi-line string opens with three quotes followed immediately by a line break. The closing quotes stand on their own line. Their indentation is removed from each content line; the opening and closing line breaks are left out of the value. The inspected output above makes the remaining line break visible as `\n`.
+
+Raw strings put matching hashes around the quotes. In the one-hash example, the backslash in `C:\notes` stays literal; an active escape or interpolation would start with `\#`. See [Appendix C](/docs/standard/generated/chapter-appendix-c) for the complete string grammar.
+
+## Records, tuples, and updates
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	original = (name = "Ada", score = 4)
+	updated = (..original, score = original.score + 1)
+	pair = (original.name, updated.score)
+	stdio.print(core.inspect(original))
+	stdio.print(core.inspect(updated))
+	stdio.print(core.inspect((pair.0, pair.1)))
+	stdio.print(core.inspect(("one")))
+}
+```
+
+```text
+(name = "Ada", score = 4)
+(name = "Ada", score = 5)
+("Ada", 5)
+("one")
+```
+
+A **record** is data with labelled fields, such as `name` and `score`. Read a field with `.name`. A **tuple** is data with numbered positions; `.0` reads its first position. Both are forms of data written with parentheses, and positions count from zero. Labels name fields, rather than creating local bindings.
+
+Every value is immutable, including every record, list, and string. “Changing” a record means making another record. The spread `..original` copies its fields into new data; the later `score = …` replaces that field in the new value. The original record still has score `4`, as the first output line shows.
+
+An empty data value is `()`. One positional item still makes data: `("one")` is a one-position tuple, whose inspected form retains the parentheses. Use braces to group an expression rather than putting it in a tuple.
+
+## Lists, booleans, and labelled data
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+Present(A) = (A)
+Absent = ()
+Maybe(A) = Present(A) | Absent
+
+main = () {
+	tail = [2, 3]
+	numbers = [1, ..tail]
+	found : Maybe(Int) = Present(7)
+	stdio.print(core.inspect((numbers, tail, [1, "one"])))
+	stdio.print(core.inspect((found, Absent)))
+	stdio.print(
+		core.inspect((True && False, True || False, core.not(True))),
+	)
+}
+```
+
+```text
+([1, 2, 3], [2, 3], [1, "one"])
+(Present(7), Absent)
+(False, True, False)
+```
+
+A list is an ordered sequence written `[a, b, c]`. `[]` is empty, and `[x, ..tail]` puts `x` before the items of `tail`, leaving `tail` unchanged. List items may have a union type, so the mixed list above contains both an integer and a string.
+
+The boolean values are `True` and `False`, with type `Bool`. `&&` and `||` combine them and skip their right operand when the left determines the answer; `core.not` reverses a boolean. Equality uses `==`, and inequality uses `!=`.
+
+A **labelled type** gives data its own identity. `Present(A) = (A)` defines a labelled type and its constructor `Present`, which wraps a value. `Absent = ()` defines a labelled value with no fields: write `Absent`, without calling it. `Maybe(A)` names the closed union `Present(A) | Absent`; its values come from those two alternatives. The [types page](/docs/tour/types-and-inference) explains the difference between naming a union and defining a labelled type.
+
+## Bit arrays
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	packet = <<65, 2:u3>>
+	stdio.print(core.inspect(packet))
+	stdio.print(
+		core.inspect(core.bit_size(packet)),
+	)
+}
+```
+
+```text
+<<65, 2:u3>>
+11
+```
+
+A bit array is a sequence of bits, written between `<<` and `>>`. An unmarked integer segment takes eight bits; `:u3` takes three unsigned bits, so this value has eleven bits. Bit arrays support explicit widths, byte order, and text encodings; see [standard §8](/docs/standard/generated/chapter-8) for those formats.
+
+## See also
+
+- [Literals and names, standard §1](/docs/standard/generated/chapter-1#section-1-6).
+- [Types and data, standard §4](/docs/standard/generated/chapter-4#section-4-1), [expressions, §6](/docs/standard/generated/chapter-6#section-6-4), and [text forms, §11.8](/docs/standard/generated/chapter-11#section-11-8).
+- Next: [Functions and branches](/docs/tour/functions-and-branches).
