@@ -87,3 +87,7 @@
 
 # Quantifies over removed open Record rather than one closed shape (§2.3).
 6/t3_record_types.i
+
+# POLY1: written polymorphic operands currently stop at the stage-7 gate.
+4.6/written_poly_union.i
+4.6/written_poly_union_arity.i
