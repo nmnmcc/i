@@ -3,7 +3,7 @@ title: Types and inference
 description: Name types, write annotations, define generic functions, and inspect the types inferred by the checker.
 ---
 
-Types describe the values a program can accept and return. The checker infers types from definitions and their uses, and checks any annotations you write. This page shows how to name types, distinguish structural data from labelled values, write generic functions, and see the checker's result.
+Describe interfaces with annotations and inspect what the checker infers for the rest.
 
 ```i run package=tour title="src/main.i"
 (
@@ -23,9 +23,9 @@ main = () {
 5
 ```
 
-No type is written here. The `+` operator requires integers, so `increment` accepts an integer and returns an integer. Inference still checks the program; leaving out an annotation does not leave a value unchecked.
+Inference checks unannotated code too; integer operators constrain their arguments.
 
-## Definitions: names and labelled types
+## Type names
 
 ```i run package=tour title="src/main.i"
 (
@@ -50,68 +50,32 @@ main = () {
 ((x = 3, y = 4), (3, 4), (x = 3, y = 4), Hidden)
 ```
 
-A type definition starts with an uppercase name and `=`. An **alias** is another name for an existing type. The written right side determines whether a definition makes an alias or a new labelled type:
+Braces make `Point` a transparent alias; `ScreenPoint` has a distinct identity and a constructor.
 
-- `Point = { (x = Int, y = Int) }` names a record type: the braces group the data type, making a transparent alias.
-- `ScreenPoint = (x = Int, y = Int)` defines a new labelled type and a constructor named `ScreenPoint`.
-- `Hidden = ()` defines a labelled type whose constructor is the value `Hidden`.
-- `Position = Point | Hidden` names a union of the two existing types.
+`Position` adds no constructor, while `Hidden` is already a value; a matching raw record belongs to `Point`, but cannot stand in for `ScreenPoint`.
 
-A union alias adds no constructor. A `Position` is already a record of type `Point` or the value `Hidden`; there is no `Position(…)` wrapper. The same rule applies to `T = A | B`: it names a union, even when `A` and `B` are labelled types.
-
-A record type is **structural**: its positions, labels, and the types under those keys describe it. `raw` needs no constructor call to belong to `Point`. A labelled type has its own identity even when its fields match a record or another labelled type. `ScreenPoint` constructs that identity; a raw record with the same fields is not a `ScreenPoint`.
-
-Data types write labels with `=`, as `x = Int`. Value annotations use `:`, as `raw : Point`. Both raw and labelled data support field access when the checker knows the fields and the constructor is visible. The example reads `labelled.x` and `labelled.y` rather than taking it apart.
-
-## Inferring the evaluator
-
-The repository's `examples/tour/src/main.i` uses the same type forms to describe arithmetic expressions. Here is that file unchanged:
+## Labelled inspection
 
 ```i run package=tour title="src/main.i"
 (
+	i/core
 	i/stdio
-	std/int
 )
 
-Num = (Int)
-
-Add = (Expr, Expr)
-Mul = (Expr, Expr)
-Expr = Num | Add | Mul
-// Inferred: (e: Expr) -> Int
-eval = (e) {
-	e |>
-		(Num(n)) { n }
-		| (Add(a, b)) { eval(a) + eval(b) }
-		| (Mul(a, b)) { eval(a) * eval(b) }
-}
+ScreenPoint = (x = Int, y = Int)
 
 main = () {
-	sum = Add(Num(1), Num(5))
-	expr = Mul(sum, Num(7))
-	expr |> eval |> int.to_string |> stdio.print
+	stdio.print(core.inspect(ScreenPoint(x = 3, y = 4)))
 }
 ```
 
 ```text
-42
+ScreenPoint(3, 4)
 ```
 
-`Expr` names the union of three labelled types. `Add` and `Mul` contain other expressions, so these definitions describe a recursive tree. `eval` takes that tree apart with the constructor patterns introduced on the [functions page](/docs/tour/functions-and-branches#pipelines).
+Current limits: inspection drops labelled fields’ names (DOC2), a recorded compiler gap ([known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
 
-No parameter or result annotation is written on `eval`. Its branches tell the checker that it accepts `Expr` and returns `Int`: `Num` holds an integer, while `Add` and `Mul` combine recursive results with integer operators.
-
-To inspect that inferred type, run:
-
-```sh
-i check --types | head -n 1
-```
-
-```text
-tour/main.eval : (Expr) -> Int
-```
-
-## Annotations and unions
+## Annotations
 
 ```i run package=tour title="src/main.i"
 (
@@ -140,15 +104,11 @@ seven
 7
 ```
 
-Write `name : Type = value` to annotate a binding. Parameter annotations look like `(x : Int)`, and a result annotation follows the parameter group as `-> Int`. A function type writes parameter types without parameter names: `(Int) -> String`.
+Braces keep a union inside an annotation; a named union avoids that grouping.
 
-After a `:` that introduces a type, the annotation ends at an outermost `|`. Put a union annotation inside braces: `value : { Int | String }`. A function annotation with a union result needs the same grouping: `choose : (Bool) -> { Int | String }`. Without the braces, the `|` would end that annotation.
+Field labels use `=`, while annotations use `:`; `i fmt` spaces both symbols alike.
 
-A named alias also avoids an outermost `|`: `show` uses `NumberOrText`. Type definitions such as `NumberOrText = Int | String` are not annotations and read the full union directly. Space `:` like `=`, with one space on each side; `i fmt` applies this layout.
-
-Annotations constrain inference rather than converting a value. Writing `count : Int = 7` accepts an integer value; writing the same annotation on a string produces a type error. Union annotations let a value belong to any of their members, while a branch type test selects the member used in its body.
-
-## Generic functions and type parameters
+## Type parameters
 
 ```i run package=tour title="src/main.i"
 (
@@ -175,11 +135,9 @@ main = () {
 (Box(5), Box("five"))
 ```
 
-`A` is a type parameter: a name for a type used within the definition. A generic type declares parameters in its head, as `Box(A)`. A generic function declares them before its parameter group, as `<A>(x : A) -> A`. That `A` is in scope throughout the function, including its body.
+`A` is in scope throughout the generic function, including its body; a generic type declares its parameters in its head.
 
-`identity` gives back the value it receives, and the calls use it with both an integer and a string. `wrap` gives a `Box` containing the argument, so its result is `Box(A)`. These examples use the written parameter to describe the relationship between input and output.
-
-## Seeing inferred types
+## Inferred parameters
 
 ```i run package=tour title="src/main.i"
 (
@@ -208,10 +166,17 @@ main = () {
 ([1, 2], 3)
 ```
 
-Run this command in the scratch project, whose package name is `tour`; it prints the first five lines of the checker's type listing:
+An unannotated function can be generic too.
 
-```sh
-i check --types | head -n 5
+## Literal types
+
+```i types package=tour title="src/main.i"
+identity = (x) { x }
+count = 7
+word = "seven"
+numbers = [1, 2]
+add_one = (x) { x + 1 }
+main = () { (identity(count), identity(word), numbers, add_one(2)) }
 ```
 
 ```text
@@ -220,15 +185,67 @@ tour/main.count : 7
 tour/main.word : "seven"
 tour/main.numbers : List(1 | 2)
 tour/main.add_one : (Int) -> Int
+tour/main.main : () -> (7, "seven", List(1 | 2), Int)
 ```
 
-Without `head`, `i check --types` prints every top-level name, including `main`. The name before `:` identifies the package, module, and binding. Inferred type parameters appear in the printed type even when no parameters were written in the source: the unannotated `identity` works for both calls.
+Run `i check --types` for the complete listing.
 
-Integers and strings have literal types. `count` has the type `7`, and `word` has the type `"seven"`, each containing exactly that value. List inference combines its item types, giving `List(1 | 2)`. These values can be used where `Int`, `String`, or `List(Int)` is expected. An integer operator gives the whole type `Int`, which explains the result of `add_one`.
+The literal types `7` and `"seven"` each contain one value, usable as `Int` or `String`; the list also fits `List(Int)`.
 
-Some operations need a known type, including reading fields from a function argument. An annotation can supply that information, as `raw : Point` did above. Use annotations to state an interface or make the required shape clear, and use `--types` to inspect what the checker derives.
+Integer arithmetic widens its result to `Int`.
 
-## A type mismatch
+## Recursive types
+
+```i run package=tour title="src/main.i"
+(
+	i/stdio
+	std/int
+)
+
+Num = (Int)
+
+Add = (Expr, Expr)
+Mul = (Expr, Expr)
+Expr = Num | Add | Mul
+eval = (e) {
+	e |>
+		(Num(n)) { n }
+		| (Add(a, b)) { eval(a) + eval(b) }
+		| (Mul(a, b)) { eval(a) * eval(b) }
+}
+
+main = () {
+	sum = Add(Num(1), Num(5))
+	expr = Mul(sum, Num(7))
+	expr |> eval |> int.to_string |> stdio.print
+}
+```
+
+```text
+42
+```
+
+`Add` and `Mul` contain expressions themselves; the [constructor patterns](/docs/tour/functions-and-branches#constructor-patterns) expose the recursive parts.
+
+## Evaluator inference
+
+```i types package=tour title="src/main.i"
+Num = (Int)
+Add = (Expr, Expr)
+Mul = (Expr, Expr)
+Expr = Num | Add | Mul
+eval = (e) {
+	e |> (Num(n)) { n } | (Add(a, b)) { eval(a) + eval(b) } | (Mul(a, b)) { eval(a) * eval(b) }
+}
+```
+
+```text
+tour/main.eval : (Expr) -> Int
+```
+
+The same evaluator needs no parameter or result annotation; its patterns and integer operators supply the constraints.
+
+## Type mismatch
 
 ```i error E0501 package=tour title="src/main.i"
 main = () {
@@ -237,12 +254,34 @@ main = () {
 }
 ```
 
-`i check` reports **E0501**: “`"seven"` is not a subtype of `Int`”. The string value does not belong to the annotated type, so the module does not pass checking. Supply an integer or change the annotation to describe the intended value.
+```text
+E0501
+```
 
-## Current limits
+An annotation constrains a value; it does not convert it.
 
-The standard says the text form of a value of a labelled type keeps its labels, for example `User(age = 36, name = "ada")`. The compiler on this tree prints the parts without their labels, so `core.inspect` of such a value shows `ScreenPoint(3, 4)`. This is a recorded difference from the standard ([known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md), DOC2), not the intended output.
+## Field access
 
-## See also
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
 
-Next: [Services and errors](/docs/tour/services-and-errors).
+Point = { (x = Int, y = Int) }
+x_of = (point : Point) { point.x }
+
+main = () {
+	stdio.print(core.inspect(x_of((x = 3, y = 4))))
+}
+```
+
+```text
+3
+```
+
+An argument annotation supplies the field information needed for access; labelled fields also require a visible constructor.
+
+## Further reading
+
+[Services and errors](/docs/tour/services-and-errors).

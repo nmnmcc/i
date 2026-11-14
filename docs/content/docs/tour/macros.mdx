@@ -3,19 +3,13 @@ title: Macros
 description: Use a package macro, write a small syntax macro, and inspect its expansion.
 ---
 
-A macro is an i function that runs in the compiler, taking code as data and returning code as data. You can use one through a normal package import, then inspect the code it produces. The test macro is a useful first example: this complete `test/example_test.i` registers a test with `std/test`.
+Generate code at compile time, then use it through ordinary module imports.
 
-```i test package=tour title="test/example_test.i"
+```i test stdout=exact package=tour title="test/example_test.i"
 (
 	testlib = (test) = std/test
 )
 test("addition", () { assert(2 + 3 == 5) })
-```
-
-Run it in a package named `tour` with a path dependency on `std` and `[test] collection = "std/test.tests"` in `i.toml`:
-
-```sh
-i test --opt 0
 ```
 
 ```text
@@ -23,26 +17,86 @@ pass tour/example_test.addition
 1 passed, 0 failed
 ```
 
-`test` is a macro exported by the package, not a keyword. The import uses `testlib` as the module name and brings `test` into scope as a separate name. The macro creates a test function and registers it in the package's test collection. `assert` uses the assertion service supplied by the test runner. See [services and errors](/docs/tour/services-and-errors) for that distinction.
+`test` registers a function in the package’s test collection; `assert` uses the runner’s assertion service. The manifest needs `std` and `[test] collection = "std/test.tests"`.
 
-## The Lisp surface
-
-i has two surfaces for the same core tree. Ordinary `.i` files use the syntax shown so far. `.is` files use the Lisp surface: the first item of a parenthesised form identifies the form. Module paths omit the extension, so either surface can import the other.
-
-In the complete definition below, `(, twice)` is the exports header, `(= twice …)` binds a name, and `(-> (, value) _ …)` is a one-argument function with an inferred result. A backtick quotes code; `~value` inserts the argument's syntax into that template. Braces hold a block. Line breaks in the Lisp surface are whitespace, so the formatter may put a short definition on one line.
-
-## A small syntax macro
-
-Create `src/macros.is` in a package named `tour`:
+## A syntax template
 
 ```scheme file=src/macros.is title="src/macros.is"
 (, twice)
 (@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
 ```
 
-The macro inserts its argument into a binding and adds the bound value to itself. Its argument arrives as syntax, without being evaluated by the compiler as an ordinary function argument. The returned code evaluates the expression once at run time. The `@macro` attribute exists only in `.is` files; a macro is used from another module, not the module that defines it.
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+	(twice) = tour/macros
+)
+main = () <- (io : Io) { io.print(core.inspect(twice(21))) }
+```
 
-Use it from `src/main.i` in the same package:
+```text
+42
+```
+
+In `.is`, `(, twice)` exports, `=` binds, and `->` constructs a function; braces hold a block and line breaks are whitespace. The backtick quotes syntax, `~value` inserts argument syntax, and `_` infers the result. `@macro` definitions require `.is` and a separate importing module; `.i` and `.is` share a core tree and can import each other without filename extensions.
+
+## Expanded code
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+)
+main = () <- (io : Io) {
+	io.print(core.inspect({
+		saved = 21
+		saved + saved
+	}))
+}
+```
+
+```text
+42
+```
+
+`i expand --to i src/main.i` shows this block in place of `twice(21)`. The default `--to is` is needed for quotations; `--trace` prints individual expansions to standard error.
+
+## One evaluation
+
+```scheme file=src/macros.is title="src/macros.is"
+(, twice)
+(@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+	(twice) = tour/macros
+)
+main = () <- (io : Io) {
+	value = () {
+		io.print("argument")
+		21
+	}
+	io.print(core.inspect(twice(value())))
+}
+```
+
+```text
+argument
+42
+```
+
+Arguments arrive as syntax; the generated program decides when to evaluate them.
+
+## Caller names
+
+```scheme file=src/macros.is title="src/macros.is"
+(, twice)
+(@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
+```
 
 ```i run package=tour title="src/main.i"
 (
@@ -52,9 +106,7 @@ Use it from `src/main.i` in the same package:
 )
 main = () <- (io : Io) {
 	saved = 10
-	io.print(
-		core.inspect(twice(saved + 1)),
-	)
+	io.print(core.inspect(twice(saved + 1)))
 }
 ```
 
@@ -62,48 +114,33 @@ main = () <- (io : Io) {
 22
 ```
 
-These two files form one complete example: the macro is defined in the Lisp surface and used in the normal surface.
+This is hygiene: caller syntax keeps its scope, while each expansion gives generated syntax a fresh mark. Expansion output spells both names `saved`, hiding that distinction; labels are compared by text.
 
-## Inspecting the expansion
+## Definition names
 
-From that project directory, run the actual expansion command:
-
-```sh
-i expand --to i src/main.i
+```scheme file=src/macros.is title="src/macros.is"
+(, twice)
+(= _double (-> (, value) _ (+ value value)))
+(@ macro (= twice (-> (, value) _ `(_double ~value))))
 ```
 
-```text
-// tour/main
+```i run package=tour title="src/main.i"
 (
 	(Io) = i/io
 	i/core
 	(twice) = tour/macros
 )
-
-main = () <- (io : Io) {
-	saved = 10
-	io.print(
-		core.inspect({
-			saved = saved + 1
-			saved + saved
-		}),
-	)
-}
+_double = (_) { 0 }
+main = () <- (io : Io) { io.print(core.inspect(twice(21))) }
 ```
 
-`--to i` selects the normal surface for the output. The default is `--to is`; a module containing quotations needs that surface. `--trace` also prints individual macro runs to standard error. Expansion shows the binding introduced by `twice` and the addition that replaced the call.
+```text
+42
+```
 
-## Names and hygiene
+Template references resolve in the defining module. Macros have no host file, network, or clock services; expansion is deterministic and budgeted. **Current limits:** budget metering differs from the specified accounting ([MP08](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
 
-**Hygiene** means generated names keep their own scope rather than accidentally capturing caller names. Here the caller and the template both bind a name spelled `saved`. The expression inserted from the caller still uses the caller's `saved`, so it computes `10 + 1`. The two references made by the template use the generated binding, giving `11 + 11`.
-
-The expansion prints the same spelling for these names; their distinct scopes are retained in the syntax tree. The specification defines this with a fresh mark for each expansion. Code from macro arguments retains its original scope, while generated code receives the expansion's mark. References made in a template resolve in the defining module under those rules; labels are compared by text.
-
-Macros have no host services for reading files, the network or the time. The standard requires the same result for the same inputs on every machine and places limits on each expansion. Start with a syntax macro like this one before adding typed macros, type queries, item generation or diagnostics.
-
-## The repository tour's `if` macro
-
-The complete [`examples/tour/src/sugar.is`](https://github.com/nmnmcc/i/blob/main/examples/tour/src/sugar.is) defines `if` as a macro, rather than a language keyword. These two files are copied unchanged from the repository tour.
+## Selected branches
 
 ```scheme file=src/sugar.is title="src/sugar.is"
 (, if)
@@ -112,19 +149,25 @@ The complete [`examples/tour/src/sugar.is`](https://github.com/nmnmcc/i/blob/mai
 (@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
 ```
 
-```i test package=tour title="test/sugar_test.i"
+```i test stdout=exact package=tour title="test/sugar_test.i"
 (
 	testlib = (test) = std/test
+	i/fail
 	sugar = (if) = tour/sugar
 )
-
 sign = (n) { if(n < 0, "negative", "not negative") }
-
-test("if is a macro", () { assert(sign(-1) == "negative") })
+test("if is a macro", () {
+	assert(sign(-1) == "negative")
+	assert(sign(0) == "not negative")
+	assert(fail.catch(() { if(True, 42, fail.raise("unused")) }) == Ok(42))
+})
 ```
 
-`_branches` makes a two-branch function that matches `True` or `False`. The `if` template pipes the test expression into those branches. The branch expressions remain code until the selected branch runs. The test imports the macro from `tour/sugar` and uses it inside `sign`, just as it uses `test` from `std/test`.
+```text
+pass tour/sugar_test.if is a macro
+1 passed, 0 failed
+```
 
-## See also
+`_branches` builds the branch function at expansion time; only the selected expression runs at runtime.
 
 Continue with [packages](/docs/tour/packages).
