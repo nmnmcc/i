@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Regression tests for header-only fence checks, fixes and refusals."""
+import importlib.util
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+SCRIPTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPTS))
+spec = importlib.util.spec_from_file_location('format_fences', SCRIPTS / 'format-fences.py')
+formatter = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(formatter)
+FIXTURES = SCRIPTS / 'format-fences-fixtures'
+
+
+class FenceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.binary = formatter.compiler()
+
+    def invoke(self, path, write=False):
+        return subprocess.run([sys.executable, str(SCRIPTS / 'format-fences.py'),
+                               *(['--write'] if write else []), str(path)],
+                              env={**os.environ, 'I_BIN': self.binary},
+                              capture_output=True, text=True)
+
+    def test_fixture_fails_then_fixes_exactly_and_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            page = Path(tmp) / 'page.mdx'
+            shutil.copyfile(FIXTURES / 'failing.mdx', page)
+            before = page.read_bytes()
+            result = self.invoke(page)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(page.read_bytes(), before, 'check must not write')
+            result = self.invoke(page, write=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(page.read_bytes(), (FIXTURES / 'expected.mdx').read_bytes())
+            once = page.read_bytes()
+            self.assertEqual(self.invoke(page).returncode, 0)
+            self.assertEqual(self.invoke(page, write=True).returncode, 0)
+            self.assertEqual(page.read_bytes(), once)
+
+    def test_indented_long_fence_keeps_raw_nonblank_lines(self):
+        source = '  ````i check\n  (\n  \ti/core\n  )\n  // next\n  @inline\n  value=1\n  ````\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            page = Path(tmp) / 'page.md'
+            page.write_text(source)
+            result = self.invoke(page, write=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(page.read_text(), source.replace('  )\n', '  )\n\n'))
+            self.assertEqual(self.invoke(page).returncode, 0)
+
+    def test_single_both_and_absent_groups_comments_attributes_and_eof(self):
+        for lisp, headers in [
+            (False, '(\n\ti/core\n)'),
+            (False, '(\n\tvalue\n)'),
+            (False, '(\n\ti/core\n)\n(\n\tvalue\n)'),
+            (True, '(, (/ i core))'),
+            (True, '(, value)'),
+            (True, '(, (/ i core))\n(, value)'),
+        ]:
+            for gap in ['\n', '\n\n', '\n\n\n\n']:
+                for body in ['', '// end\n', ('(@ inline (= value 1))\n' if lisp
+                                             else '// item\n@inline\nvalue=1\n')]:
+                    source = headers + gap + body
+                    with tempfile.TemporaryDirectory() as tmp:
+                        file = Path(tmp) / ('source.is' if lisp else 'source.i')
+                        file.write_text(source)
+                        result = subprocess.run([self.binary, 'fmt', str(file)], capture_output=True, text=True)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        pretty = file.read_text()
+                    fixed = formatter.header_gaps(source, pretty, lisp)
+                    self.assertTrue(formatter.blank_only(source, fixed))
+                    self.assertEqual(formatter.header_gaps(fixed, pretty, lisp), fixed)
+                    self.assertNotIn('\n\n\n', fixed)
+                    self.assertTrue(fixed.endswith('\n') and not fixed.endswith('\n\n'))
+                    if body:
+                        self.assertIn('\n\n' + body, fixed)
+        self.assertEqual(formatter.header_gaps('value=1\n', 'value = 1\n', False), 'value=1\n')
+
+    def test_declared_parser_error_and_fragment_remain_unchanged(self):
+        source = '```i error E0101\nvalue =\n```\n\n```i\nvalue =\n```\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            page = Path(tmp) / 'page.md'
+            page.write_text(source)
+            result = self.invoke(page, write=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(page.read_text(), source)
+
+    def test_types_transcript_maps_supporting_file_and_keeps_external_location(self):
+        mark = chr(96) * 3
+        source = (f'{mark}scheme file=src/more.is\n(, value)\n(= value 1)\n{mark}\n\n'
+                  f'{mark}i types title="src/main.i"\nmain=1\n{mark}\n\n'
+                  f'{mark}text\nsrc/more.is:2:4: value : Int\nexternal/file.i:2:4: unchanged\n{mark}\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            page = Path(tmp) / 'page.md'
+            page.write_text(source)
+            result = self.invoke(page, write=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('src/more.is:3:4: value : Int', page.read_text())
+            self.assertIn('external/file.i:2:4: unchanged', page.read_text())
+            self.assertEqual(self.invoke(page).returncode, 0)
+
+    def test_refusal_is_atomic(self):
+        bad_sources = [
+            '```i check\n(i/core) value=1\n```\n',
+            '```i check\nvalue =\n```\n',
+            '```i check\nvalue = 1\n',
+            '```i error E0501\n(value)\nvalue=1\n```\n\n```text\nsrc/main.i:99:1: error[E0501]: sample\n```\n',
+            '```i error E0501\n(value)\nvalue=1\n```\n\n```text\nsrc/main.i:2:1: error[E0501]: type at 2:1\n```\n',
+            '```i test-fails\n(value)\nvalue=1\n```\n\n```text\napp/main:2:1\n```\n',
+        ]
+        for source in bad_sources:
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as tmp:
+                good = Path(tmp) / 'a.md'
+                bad = Path(tmp) / 'z.md'
+                good.write_text('```i check\n(value)\nvalue=1\n```\n')
+                bad.write_text(source)
+                before = good.read_bytes(), bad.read_bytes()
+                result = self.invoke(Path(tmp), write=True)
+                self.assertEqual(result.returncode, 2, (result.stdout, result.stderr))
+                self.assertEqual((good.read_bytes(), bad.read_bytes()), before)
+
+    def test_nested_fence_and_other_languages_are_untouched(self):
+        source = '````text\n```i check\n(value)\nvalue=1\n```\n````\n\n```scheme\n(display "hello")\n```\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            page = Path(tmp) / 'page.md'
+            page.write_text(source)
+            self.assertEqual(self.invoke(page, write=True).returncode, 0)
+            self.assertEqual(page.read_text(), source)
+
+
+if __name__ == '__main__':
+    unittest.main()

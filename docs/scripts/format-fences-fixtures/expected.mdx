@@ -1,0 +1,45 @@
+The fixer preserves this prose and the compact input below.
+
+~~~i error E0501 title="src/main.i"
+(
+	i/core
+)
+
+(
+	value
+)
+
+value : core.Int = "bad"
+~~~
+
+~~~text
+src/main.i:9:20: error[E0501]: "bad" is not a subtype of Int
+1 error
+~~~
+
+```scheme file=src/more.is
+(, (/ i core))
+
+// next header
+(, value)
+
+(= value 1)
+```
+
+```i format
+(value)
+
+value=1
+```
+
+```text
+(
+	value
+)
+
+value = 1
+```
+
+```i check
+main=() {1}
+```
