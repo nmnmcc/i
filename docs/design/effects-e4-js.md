@@ -159,3 +159,32 @@ were not run by this lane. The full snippet gate was also not run; the focused
 snippet audit covers all sources and registrations changed here. The general D16
 compiler gap is unchanged; this fetch adapter uses the retained-frame pattern
 required by runtime §6.3. No test is skipped, removed, or weakened.
+
+
+## 2026-11-14 owner-ruling follow-up: external Fail needs
+
+Syntax-three §2.10.12 says the function type of an `@external` declaration
+“may have no need, or exactly `<- (Fail(E))` with a host-passable `E`”, and
+“The glue reads `Fail` from `$env` and calls its `raise` with the host’s error.”
+Spec §10.3 restricts errors to the six scalar ABI kinds, excluding opaque
+references. The resolver still rejected every external need. It now accepts
+exactly this case and retains all other need/error-shape rejections. The old
+negative f4 fixture uses Assert instead; a new positive pins Fail(String),
+its actual HostFn error list, and four independently invalid alternatives.
+The external project golden now reports two complete invalid-need errors;
+the obsolete separate-channel diagnostics are removed under E3 §6.1.
+
+The external import’s Wasm signature already carries error slots, but its ABI
+JSON omitted them. The new native execution regression exposed this exact
+mismatch (six expected result slots versus three declared ones). Emit the
+error list and use the existing typed reply path in both hosts. ABI5 permits
+these errors; ABI3/4 retain their prior error-free external contract and the
+existing invalid-metadata tests. Rust provides `fallible_external`; JS uses
+`GuestError`, as for host services. Ordinary host failures still stop.
+
+The new `external-fail` fixture keeps the existing compiled hypot program
+unchanged and exercises success, the exact error value, and another success
+on the same instance at O0/O2. The generation script builds its artifacts;
+no binary or bindings file is edited by hand. Native O0/O2 execution and the
+three checker-project tests pass. Node/browser execution and generated
+artifacts are pending at this source commit; this is not a landable claim.

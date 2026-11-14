@@ -134,3 +134,16 @@ test("the module rejects an inline Int whose sign does not match its value", asy
     assert.throws(() => value.exports["app/ints.echo"](sign, n, 0), WebAssembly.RuntimeError);
   }
 });
+
+for (const opt of [0, 2]) test(`compiled external Fail uses the caller at O${opt}`, async () => {
+  const bytes = await readFile(new URL(`../../../tests/browser/fixtures/external-fail-o${opt}.wasm`, import.meta.url));
+  const value = await instantiate(bytes, { imports: { "app:fallible/v1": { value: (text) => {
+    if (text === "bad") throw new GuestError("from-host");
+    return 42n;
+  } } } });
+  assert.deepEqual(value.abi.externals["app:fallible/v1"].value.errors, ["string"]);
+  assert.equal(value.call("app/main.call", ["good"]), 42n);
+  assert.throws(() => value.call("app/main.call", ["bad"]), (error) => error instanceof GuestError && error.value === "from-host");
+  assert.equal(value.call("app/main.call", ["good"]), 42n);
+  assert.equal(value.unusable, null);
+});

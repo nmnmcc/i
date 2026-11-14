@@ -4594,6 +4594,7 @@ fn abi_json(
                 serde_json::json!({
                     "params": names(&x.abi.params),
                     "result": x.abi.result.name(),
+                    "errors": names(&x.abi.errors),
                 }),
             ),
             ImportKind::Service | ImportKind::AsyncService => (

@@ -1694,7 +1694,7 @@ impl<'a, 't> R3<'a, 't> {
                         let before = self.diags.len();
                         self.external_type(&t);
                         if self.diags.len() == before
-                            && let Some(f) = self.host_fn(&t, false)
+                            && let Some(f) = self.host_fn(&t, true)
                         {
                             self.p.external_fns.insert(
                                 DefId {
