@@ -50,7 +50,7 @@ main = () {
 ((x = 3, y = 4), (3, 4), (x = 3, y = 4), Hidden)
 ```
 
-A type definition starts with an uppercase name and `=`. Its written right side determines what it defines:
+A type definition starts with an uppercase name and `=`. An **alias** is another name for an existing type. The written right side determines whether a definition makes an alias or a new labelled type:
 
 - `Point = { (x = Int, y = Int) }` names a record type: the braces group the data type, making a transparent alias.
 - `ScreenPoint = (x = Int, y = Int)` defines a new labelled type and a constructor named `ScreenPoint`.
@@ -62,6 +62,54 @@ A union alias adds no constructor. A `Position` is already a record of type `Poi
 A record type is **structural**: its positions, labels, and the types under those keys describe it. `raw` needs no constructor call to belong to `Point`. A labelled type has its own identity even when its fields match a record or another labelled type. `ScreenPoint` constructs that identity; a raw record with the same fields is not a `ScreenPoint`.
 
 Data types write labels with `=`, as `x = Int`. Value annotations use `:`, as `raw : Point`. Both raw and labelled data support field access when the checker knows the fields and the constructor is visible. The example reads `labelled.x` and `labelled.y` rather than taking it apart.
+
+## Inferring the evaluator
+
+The repository's `examples/tour/src/main.i` uses the same type forms to describe arithmetic expressions. Here is that file unchanged:
+
+```i run package=tour title="src/main.i"
+(
+	i/stdio
+	std/int
+)
+
+Num = (Int)
+
+Add = (Expr, Expr)
+Mul = (Expr, Expr)
+Expr = Num | Add | Mul
+// Inferred: (e: Expr) -> Int
+eval = (e) {
+	e |>
+		(Num(n)) { n }
+		| (Add(a, b)) { eval(a) + eval(b) }
+		| (Mul(a, b)) { eval(a) * eval(b) }
+}
+
+main = () {
+	sum = Add(Num(1), Num(5))
+	expr = Mul(sum, Num(7))
+	expr |> eval |> int.to_string |> stdio.print
+}
+```
+
+```text
+42
+```
+
+`Expr` names the union of three labelled types. `Add` and `Mul` contain other expressions, so these definitions describe a recursive tree. `eval` takes that tree apart with the constructor patterns introduced on the [functions page](/docs/tour/functions-and-branches#pipelines).
+
+No parameter or result annotation is written on `eval`. Its branches tell the checker that it accepts `Expr` and returns `Int`: `Num` holds an integer, while `Add` and `Mul` combine recursive results with integer operators.
+
+To inspect that inferred type, run:
+
+```sh
+i check --types | head -n 1
+```
+
+```text
+tour/main.eval : (Expr) -> Int
+```
 
 ## Annotations and unions
 
@@ -94,7 +142,7 @@ seven
 
 Write `name : Type = value` to annotate a binding. Parameter annotations look like `(x : Int)`, and a result annotation follows the parameter group as `-> Int`. A function type writes parameter types without parameter names: `(Int) -> String`.
 
-After a `:` that introduces a type, the annotation ends at an outermost `|`. Put a union annotation inside braces: `value : { Int | String }`. A function annotation with a union result needs the same grouping: `choose : (Bool) -> { Int | String }`. Without the braces, the `|` would end that annotation. Brackets inside the type read the full union syntax, so the record type `(value = Int | String)` does not need extra braces around its field type.
+After a `:` that introduces a type, the annotation ends at an outermost `|`. Put a union annotation inside braces: `value : { Int | String }`. A function annotation with a union result needs the same grouping: `choose : (Bool) -> { Int | String }`. Without the braces, the `|` would end that annotation.
 
 A named alias also avoids an outermost `|`: `show` uses `NumberOrText`. Type definitions such as `NumberOrText = Int | String` are not annotations and read the full union directly. Space `:` like `=`, with one space on each side; `i fmt` applies this layout.
 
@@ -129,7 +177,7 @@ main = () {
 
 `A` is a type parameter: a name for a type used within the definition. A generic type declares parameters in its head, as `Box(A)`. A generic function declares them before its parameter group, as `<A>(x : A) -> A`. That `A` is in scope throughout the function, including its body.
 
-`identity` gives back the value it receives, and the calls use it with both an integer and a string. `wrap` gives a `Box` containing the argument, so its result is `Box(A)`. These examples use the written parameter to describe the relationship between input and output. Whether a written type parameter is rigid remains open.
+`identity` gives back the value it receives, and the calls use it with both an integer and a string. `wrap` gives a `Box` containing the argument, so its result is `Box(A)`. These examples use the written parameter to describe the relationship between input and output.
 
 ## Seeing inferred types
 

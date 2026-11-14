@@ -36,7 +36,7 @@ Replace `src/main.i` with the complete example above, then run it from the proje
 i run
 ```
 
-The output is the text shown immediately below the example. Keep this project for the rest of the tour: replace `src/main.i` with each complete program in turn. The examples on the first four pages use the built-in `i/…` modules and need no extra dependency. A later page explains any additional files its example needs.
+The output is the text shown immediately below the example. Keep this project for the rest of the tour: replace `src/main.i` with each complete program in turn. Most examples on the first four pages use only the language-library modules under `i/…`. The evaluator examples also import `std/int`. For those examples, move the existing `std` entry in `i.toml` from `[dev-dependencies]` to `[dependencies]`, and set its path to the `std` directory in your checkout of the i repository. The [first-program guide](/docs/getting-started/first-program) explains the generated manifest.
 
 A fence marked `i run` is a complete program. A fence marked `i error` is a complete program that the checker rejects on purpose; use `i check` for it and compare the diagnostic with the explanation. Do not combine the programs into one file: each defines its own names and usually its own `main`.
 
@@ -58,6 +58,8 @@ Formatting makes the line breaks and spaces consistent, which helps when compari
 6. [Concurrency](/docs/tour/concurrency) introduces structured tasks and communication between them.
 7. [Macros](/docs/tour/macros) shows how i code works with code.
 8. [Packages](/docs/tour/packages) explains modules, dependencies, and the package file.
+
+The complete tour program is [examples/tour in the repository](https://github.com/nmnmcc/i/blob/main/examples/tour); the functions and types pages reuse its evaluator and pipeline.
 
 The pages build on one another, so follow the order on a first reading. Afterward, use the standard links at the end of each page for exact grammar and rules. The tour teaches a small working program at a time; the standard defines the language in full.
 
