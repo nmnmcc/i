@@ -1,5 +1,29 @@
 ---
 title: Compiler architecture
+description: Follow source text through the compiler and host.
 ---
 
-to be written
+This page follows a program from source text to execution and names the files and data structures used at each stage. Start with the CLI pipeline when tracing a change across stages.
+
+## Packages and syntax
+
+`crates/ilang-cli/src/lib.rs` exposes `load` and `build`, using `BuildOptions` and returning `Built`. `crates/ilang-package/src/lib.rs` loads manifests and modules into a `PackageGraph`, with `Sources`, `Package`, and diagnostics. Its `manifest.rs` and `modules.rs` handle package files and module discovery.
+
+`crates/ilang-syntax/src/lib.rs` exposes `parse_module`. The `syn3` parser produces the syntax-three tree in `crates/ilang-syntax/src/syn3/ast.rs` and lowers it through `crates/ilang-syntax/src/syn3/lower.rs` to the older `ast::Module` in `crates/ilang-syntax/src/ast.rs`. The old tree and `lower.rs` are planned to go as the tree rewrite proceeds; they are present here.
+
+## Checking and macros
+
+`crates/ilang-check/src/lib.rs` parses the graph into `Parsed` modules, resolves names into `hir::Program`, and returns `Checked` with type information and diagnostics. `crates/ilang-check/src/resolve.rs`, `hir.rs`, and `types/mod.rs` are entry points to resolution, the high-level intermediate representation, and types.
+
+`crates/ilang-macro/src/lib.rs` organizes compile-time macro programs and expansion. Its `prepare.rs`, `run.rs`, and `session.rs` are starting points for execution; `item_phase.rs` and `typed.rs` handle expansion phases. Macros interact with checking rather than forming a separate final compiler stage.
+
+## Wasm and host
+
+`crates/ilang-wasm/src/lib.rs` exposes `compile` and related entry points. `lower.rs` translates checked code into the intermediate form in `ir.rs`; `control.rs` handles suspending calls, and `emit.rs` emits Wasm. The runtime is in `crates/ilang-wasm/src/runtime`. `crates/ilang-binaryen/src/lib.rs` invokes the linked Binaryen library for optimization.
+
+`crates/ilang-host/src/lib.rs` embeds Wasmtime. A `Program` describes the compiled module and its interface; an `Instance` executes it and calls return an `Outcome`. `crates/ilang-cli/src/main.rs` selects commands, and `crates/ilang-runner/src/main.rs` starts native packages. The language server in `crates/ilang-lsp/src/lib.rs` uses checker queries and the syntax formatter for editor requests.
+
+## See also
+
+- [The standard: binary interface](/docs/standard/generated/chapter-appendix-b)
+- [Design notes](/docs/contributing/design-notes)
