@@ -3283,7 +3283,7 @@ impl<'a> Checker<'a> {
                 } => {
                     let saved = self.row_value_allowed;
                     self.row_value_allowed = true;
-                    let (v, k) = self.infer_k(value, &Ty::Top);
+                    let (v, k) = self.infer_k(value, &Knowledge::unknown());
                     self.row_value_allowed = saved;
                     self.effects.push(Effects::default());
                     let a = self.block(&stmts[i + 1..], *span, expected);
@@ -3310,7 +3310,7 @@ impl<'a> Checker<'a> {
                             .env_supplies
                             .insert((self.module, *span), super::EnvSupply::Row(keys));
                         rest
-                    } else if let Ty::Con(Head::Shape(shape), _, parts) = &k
+                    } else if let Ty::Con(Head::Shape(shape), _, parts) = &k.hint
                         && !shape.has_labels()
                     {
                         let mut keys = Vec::new();
