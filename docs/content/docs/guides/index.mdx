@@ -1,19 +1,17 @@
 ---
 title: Guides
-description: Complete tasks with the command line, files, HTTP, tests, builds, and Wasm hosts.
+description: Build commands, handle files and requests, test code, and package programs.
 ---
 
-These guides take a small project from source to a working result. Each assumes that you have installed `i`, can run a project with `i.toml`, and have read the [tour](/docs/tour). Use the tour for language concepts; use a guide when you have a task to finish.
+Build commands, handle files and requests, test code, and package programs.
 
-- [CLI](/docs/guides/cli) builds and tests a command with arguments, options, help, and logging; it assumes [functions and branches](/docs/tour/functions-and-branches), [services and errors](/docs/tour/services-and-errors), and a checkout containing `std/`.
-- [Files](/docs/guides/files) writes, reads, and removes a file and handles a missing path; it assumes [values and data](/docs/tour/values-and-data), services and errors, and permission to write in the project directory.
-- [HTTP service](/docs/guides/http-service) serves JSON over a local socket and tests the same handler without networking; it assumes services and errors, [concurrency](/docs/tour/concurrency), `std/`, and `curl`.
-- [Testing](/docs/guides/testing) adds unit tests, generated cases, and a fake service to a project; it assumes functions and branches, services and errors, and `std/`.
-- [Packaging](/docs/guides/packaging) builds a native executable or Wasm module and explains dependency integrity; it assumes [packages](/docs/tour/packages) and a working compiler.
-- [JS and WASI interop](/docs/guides/js-and-wasi-interop) runs a built module in a WASI runtime and loads a host module from JavaScript; it assumes packaging, the repository checkout, Node.js with the required Wasm features, and Wasmtime for the Wasmtime command.
+| Task | Prerequisites |
+| --- | --- |
+| [CLI](/docs/guides/cli) | [Functions](/docs/tour/functions-and-branches), [services](/docs/tour/services-and-errors), `std/` |
+| [Files](/docs/guides/files) | [Values](/docs/tour/values-and-data), services, a writable project directory |
+| [HTTP service](/docs/guides/http-service) | Services, [concurrency](/docs/tour/concurrency), `std/`, `curl` |
+| [Testing](/docs/guides/testing) | Functions, services, `std/` |
+| [Packaging](/docs/guides/packaging) | [Packages](/docs/tour/packages), a working compiler |
+| [Host and WASI interop](/docs/guides/js-and-wasi-interop) | Packaging, repository checkout, Node with the required Wasm features, Wasmtime for its command |
 
-Examples that use `std` show a path dependency on the checkout. Keep the example project beside `std/`, or change the path in its manifest. `i/…` modules come with the compiler.
-
-## See also
-
-Start with [CLI](/docs/guides/cli), or choose the task you need above.
+Start with [installation](/docs/getting-started/install), a project containing `i.toml`, and the [tour](/docs/tour). Place guide projects beside `std/`, or adjust their manifest's path dependency; `i/…` modules come with the compiler.
