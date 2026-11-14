@@ -43,7 +43,7 @@
   .carousel-slide > p { font-size: .9375rem; }
   .carousel-controls { margin-bottom: 1.5rem; }
   .home-page figure.shiki pre { font-size: .75rem; }
-  .hero-example figure.shiki pre, .hero-example figure.shiki pre code { font-size: .65rem; tab-size: 2; }
+  .hero-example figure.shiki pre, .hero-example figure.shiki pre code { font-size: .75rem; tab-size: 2; }
 }
 @media (prefers-reduced-motion: no-preference) { .carousel-track { scroll-behavior: smooth; } }
 @media (prefers-reduced-motion: reduce) { .carousel-track { scroll-behavior: auto; } }
