@@ -1141,15 +1141,24 @@ impl Norm<'_> {
     /// value intersection. The solver has checked invariant arguments.
     fn meet_forms(&self, ms: Vec<Ty>) -> Vec<Ty> {
         let mut out: Vec<Ty> = Vec::new();
+        // A merge preserves this key: its constructor stays the same and
+        // intersecting equal value sets leaves the value set unchanged.
+        // Keep the first position, and merge duplicates in input order.
+        let mut by_form = HashMap::default();
         for m in ms {
-            if m.head().is_some()
-                && let Some(i) = out
-                    .iter()
-                    .position(|o| o.head() == m.head() && o.values() == m.values())
-            {
-                let old = std::mem::replace(&mut out[i], Ty::Never);
-                out[i] = self.merge(old, m, false);
-                continue;
+            if let Some(head) = m.head() {
+                let key = (head, m.values().clone());
+                match by_form.entry(key) {
+                    std::collections::hash_map::Entry::Occupied(entry) => {
+                        let i = *entry.get();
+                        let old = std::mem::replace(&mut out[i], Ty::Never);
+                        out[i] = self.merge(old, m, false);
+                        continue;
+                    }
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(out.len());
+                    }
+                }
             }
             out.push(m);
         }
@@ -1543,6 +1552,21 @@ impl Norm<'_> {
                     })
             });
             if !drop {
+                // An extremum replacing a variable that occurs once, by
+                // itself, introduces no variable or companion dependency.
+                // These substitutions commute: do consecutive
+                // independent steps together, before normalizing again.
+                // Keep the original barrier for naming, shared variables,
+                // and members of nontrivial unions/intersections.
+                let independent = matches!(by, Ty::Top | Ty::Never)
+                    && o.pos + o.neg == 1
+                    && with.is_some_and(|w| {
+                        !w.alone && w.groups.iter().all(|(group, _)| group.len() == 1)
+                    });
+                if independent {
+                    out.push((v, by));
+                    continue;
+                }
                 if out.is_empty() {
                     out.push((v, by));
                 }
@@ -2493,6 +2517,55 @@ mod lazy_display_tests {
 
     fn vars(s: &mut Solver, n: usize) -> Vec<V> {
         (0..n).map(|_| s.fresh_at(1)).collect()
+    }
+
+    #[test]
+    fn independent_service_arguments_are_simplified_in_one_step() {
+        // A need with distinct constructors used to eliminate one argument
+        // per pass, rescanning the whole wide need after each substitution.
+        // Assert the operation count, not elapsed time, for 2,048 entries.
+        let n = 2048;
+        let mut s = Solver::new(
+            (0..n)
+                .map(|i| (crate::hir::TypeId(i), vec![Variance::Co]))
+                .collect(),
+            (0..n).map(|i| format!("S{i:04}")).collect(),
+        );
+        let vs = vars(&mut s, n as usize);
+        let services = |argument: &dyn Fn(usize) -> Ty| {
+            Ty::Union(
+                (0..n)
+                    .map(|i| {
+                        Ty::named(
+                            TypeRef::Custom(crate::hir::TypeId(i)),
+                            vec![argument(i as usize)],
+                        )
+                    })
+                    .collect(),
+            )
+        };
+        let result = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let t = Ty::Fn(Box::new(FnTy::new(
+            Vec::new(),
+            result.clone(),
+            services(&|i| Ty::Var(vs[i])),
+        )));
+        let mut trace = Steps {
+            start: Ty::Never,
+            steps: Vec::new(),
+            members: HashMap::default(),
+        };
+        let actual = simplify_steps(&s, &t, None, Opts::default(), Some(&mut trace)).unwrap();
+        assert_eq!(trace.steps.len(), 1);
+        assert_eq!(trace.steps[0].len(), n as usize);
+        assert_eq!(
+            actual,
+            Ty::Fn(Box::new(FnTy::new(
+                Vec::new(),
+                result,
+                services(&|_| Ty::Top),
+            )))
+        );
     }
 
     #[test]

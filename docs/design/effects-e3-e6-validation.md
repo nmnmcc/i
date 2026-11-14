@@ -1,5 +1,7 @@
 # Effects landing verification, 2026-11-15
 
+**Superseded performance claim:** e975c5e93 is not landable. The four wide-case splices below concealed a checker regression and are withdrawn. Fresh isolated phases pass after the repair; full revalidation is tracked in [the performance report](effects-e4-performance.md). The earlier results below are historical.
+
 Branch **lane/e4**, source checkpoint `867bd364157433bb8f6c2bf52a11ca2cbc5ec334`. Main through
 `7c0652fad` is merged. **All final required gates are green**, with the
 explicit bounded corpus censors listed below. The final report commit changes

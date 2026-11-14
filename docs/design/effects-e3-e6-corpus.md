@@ -1,5 +1,7 @@
 # E3–E6 corpus integration audit
 
+**Superseded performance claim:** e975c5e93 is not landable. The four wide-case splices below concealed a checker regression and are withdrawn. Fresh isolated phases pass after the repair; full revalidation is tracked in [the performance report](effects-e4-performance.md). The earlier results below are historical.
+
 The final full observation uses main `5307a664e` as the pinned record base.
 Main through `7c0652fad` is merged; the intervening commits change only
 documentation and its gates, with identical compiler, library, corpus sources,
