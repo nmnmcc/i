@@ -1,5 +1,114 @@
 ---
 title: JS and WASI interop
+description: Run a WASI command and load a host module with the repository's JavaScript SDK.
 ---
 
-to be written
+This guide runs a built module in a WASI runtime and loads a host module from JavaScript using the repository's host code. These are paths exercised by the repository's CI. It assumes [packaging](/docs/guides/packaging), a repository checkout, and a Wasm engine supporting garbage collection, typed function references, tail calls, and exception handling with `exnref`.
+
+Create `guide-interop/` at the root of the checkout. Use this `i.toml`:
+
+```toml
+name = "guide_interop"
+
+[dependencies]
+
+[wasm]
+exports = ["guide_interop/main.add"]
+```
+
+Put this complete source in `src/main.i`:
+
+```i file=src/main.i
+(
+	i/stdio
+)
+
+(
+	add
+)
+add = (a : Int, b : Int) -> Int { a + b }
+main = () { stdio.print("hello from Wasm") }
+```
+
+The program entry prints a fixed line. The configured host export adds two integers. Commands below run from `guide-interop/`. All builds and host runs on this page were checked by hand at `--opt 0` and `--opt 2`; they are not automated `run` fences.
+
+## Run under WASI
+
+Build a WASI preview 1 command:
+
+```sh
+i build --target wasi --opt 2
+```
+
+```text
+built ./build/guide_interop.wasm
+```
+
+Run it in Wasmtime:
+
+```sh
+wasmtime run build/guide_interop.wasm
+```
+
+```text
+hello from Wasm
+```
+
+Or use the repository's Node WASI runner:
+
+```sh
+node --no-warnings ../bindings/javascript/wasi-run.mjs build/guide_interop.wasm
+```
+
+```text
+hello from Wasm
+```
+
+The Node command uses `node:wasi`; `--no-warnings` suppresses Node's experimental-API notice. This example was checked with Node 26.11.1 and Wasmtime 49.0.2. The module's `_start` initializes it and runs the program entry. A normal return exits with status 0. `scripts/wasi-smoke` exercises this path in CI at both optimization levels, including a stop that exits with status 1.
+
+This example needs no filesystem grant. Programs using WASI files need explicitly preopened directories; the runner accepts a JSON options argument with `preopens`, `args`, and `env`. WASI provides standard streams, clock, entropy, arguments, environment, and filesystem adapters. An unmet need for networking, TLS, process spawning, or the working directory is rejected for this target. See [Appendix B.7](/docs/standard/generated/chapter-appendix-b#section-b-7) for the supported services and path rules.
+
+## Load a module from JavaScript
+
+Build the same source for the repository's host SDK:
+
+```sh
+i build --target host --opt 2
+```
+
+```text
+built ./build/guide_interop.wasm
+```
+
+This replaces the WASI module at that path. It also writes `build/guide_interop.bindings.json`. Put this JavaScript in `host.mjs`:
+
+```js
+import { readFile } from "node:fs/promises";
+import { instantiate } from "../bindings/javascript/ilang.mjs";
+
+const app = await instantiate(
+  await readFile(new URL("./build/guide_interop.wasm", import.meta.url)),
+  { standardServices: true },
+);
+await app.run();
+console.log(app.call("guide_interop/main.add", [20n, 22n]).toString());
+```
+
+```sh
+node host.mjs
+```
+
+```text
+hello from Wasm
+42
+```
+
+`instantiate` reads ABI metadata, supplies the runtime imports, links the selected services, and initializes the module once. `standardServices: true` provides the SDK's standard Node services, including the output used here. `run` calls the program entry. `call` selects the configured export by its full name. JavaScript `bigint` values represent i integers; the returned integer is converted to text for printing.
+
+The SDK handles value encoding, buffers, and the asynchronous entry protocol. Await the entry as above so any asynchronous work finishes before the next call. `bindings/javascript/test/host.test.mjs` checks these host operations; `scripts/bench-abi.mjs` uses the same SDK for compiled host exports. The CI `js` job runs the JavaScript tests; the `i` job runs the WASI smoke script.
+
+Keep the host build and WASI build distinct when integrating them into a larger project: the SDK reads the host ABI metadata, while a WASI runtime starts a command. Use separate `--out` paths when both artifacts need to remain available.
+
+## See also
+
+Read [the host boundary, §10](/docs/standard/generated/chapter-10) for exportable types and [Appendix B](/docs/standard/generated/chapter-appendix-b) for encoding and entry protocols. Return to the [guide index](/docs/guides), or see [building and testing](/docs/contributing/building-and-testing) to work on the hosts and their checks.

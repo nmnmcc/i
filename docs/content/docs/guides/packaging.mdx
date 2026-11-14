@@ -1,5 +1,122 @@
 ---
 title: Packaging
+description: Build native executables and Wasm modules, and understand dependency integrity.
 ---
 
-to be written
+This guide builds a project into a native executable, a WASI command module, and a module for an embedding host. It also explains what dependency records and repeatable macro execution guarantee. It assumes the tour's [packages](/docs/tour/packages) and an installed compiler.
+
+Create a directory `guide-build/` with this `i.toml`:
+
+```toml
+name = "guide_build"
+
+[dependencies]
+```
+
+Put this program in `src/main.i`:
+
+```i run
+(
+	i/stdio
+)
+main = () { stdio.print("ready") }
+```
+
+```text
+ready
+```
+
+Run all commands below from `guide-build/`. This program needs only the compiler's `i/stdio` module, with no downloaded dependency.
+
+## Build a native executable
+
+```sh
+i build --opt 2
+```
+
+```text
+built ./build/guide_build
+```
+
+The build message goes to standard error. Run the resulting executable directly:
+
+```sh
+./build/guide_build
+```
+
+```text
+ready
+```
+
+The default `native` target produces one executable containing the runtime and the program compiled ahead of time. Running it does not require the `i` compiler. It is built for the building machine's operating system and architecture; this command does not cross-compile. The filename comes from the package name, or the selected entry name when building a named entry.
+
+## Build a Wasm module
+
+For a WASI preview 1 runtime, select `wasi`:
+
+```sh
+i build --target wasi --opt 2
+```
+
+```text
+built ./build/guide_build.wasm
+```
+
+For example, with Wasmtime installed:
+
+```sh
+wasmtime run build/guide_build.wasm
+```
+
+```text
+ready
+```
+
+For an embedding host, select `host`. Choose a different output name to keep both modules:
+
+```sh
+i build --target host --opt 2 --out build/guide_host.wasm
+ls build/guide_host.wasm build/guide_host.bindings.json
+```
+
+```text
+built build/guide_host.wasm
+build/guide_host.bindings.json
+build/guide_host.wasm
+```
+
+The host build also writes a binding-plan sidecar. Keep it with the module for hosts that authorize its declarations. The host module uses the binary interface in Appendix B; it needs a host such as the repository's JavaScript SDK. A WASI command has a different entry protocol. The [interop guide](/docs/guides/js-and-wasi-interop) runs both kinds.
+
+These builds and executions were checked by hand at `--opt 0` and `--opt 2` using the same source. `--out` chooses the output file. Without it, Wasm targets use `build/<package-name>.wasm`; separate output paths keep one target from replacing another target's module.
+
+## Keep dependency inputs
+
+For projects using `std`, use a path dependency as shown in the other guides. A path is resolved relative to `i.toml`; its contents remain local inputs and are not pinned by `i.lock`.
+
+Dependencies fetched by location use git tags of the form `vmajor.minor.patch`. Minimal version selection chooses the highest version reached by dependency requirements within each package and major version. Publishing a newer tag alone does not raise a project's requirements.
+
+Commit `i.toml` and `i.lock` together. A lock record contains a location, version, git commit, and `sha256-` package hash. Records include every version whose manifest is reached in either the normal or test configuration, even when a higher reached version is selected for compilation. The hash covers sorted package paths, file lengths, and committed bytes. The loader verifies the actual cached files and consumes the verified snapshot. A changed tag or mismatched package fails loading. This example has no located dependencies, so it has no lock records to show.
+
+## Check a repeated build
+
+Build the same WASI source twice with the same compiler and optimization level:
+
+```sh
+i build --target wasi --opt 2 --out build/first.wasm
+i build --target wasi --opt 2 --out build/second.wasm
+cmp build/first.wasm build/second.wasm && echo 'identical Wasm'
+```
+
+```text
+built build/first.wasm
+built build/second.wasm
+identical Wasm
+```
+
+This comparison was also checked at level 0. It demonstrates identical bytes for these local repeated builds. It does not establish identical artifacts across compiler versions, platforms, or optimization levels.
+
+The standard gives macros controlled compile-time services, a fresh state per run, and a portable `hash` definition (§14.9). Reusing a macro result requires identical inputs. These rules and verified package inputs support repeatable compilation; they do not specify that every native executable is byte-identical across build environments. The repository's compiler-release archive scripts have separate timestamp and archive-normalization rules, described in `docs/release.md`.
+
+## See also
+
+Read [versions and lock files, §§2.7–2.8](/docs/standard/generated/chapter-2#section-2-7), [running macros, §14.9](/docs/standard/generated/chapter-14#section-14-9), and [the binary interface](/docs/standard/generated/chapter-appendix-b). Continue with [JS and WASI interop](/docs/guides/js-and-wasi-interop). To work on packaging itself, see [building and testing the repository](/docs/contributing/building-and-testing).
