@@ -56,7 +56,9 @@ fn fold_accumulator_keeps_its_inferred_record_bound() {
 
 #[test]
 fn service_parameter_can_return_the_provided_integer() {
-    let project = fixture("4.8", "f1_accept_acc2");
+    // The same program as tests/spec/4.8/f1_accept_acc2, which asserts the result because the spec harness gives
+    // no stdio service. Here it prints, and the printed result is checked.
+    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/projects/f1_print_acc2");
     let out = invoke(&project, &["check"]);
     assert!(
         out.status.success(),
