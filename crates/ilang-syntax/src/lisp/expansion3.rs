@@ -399,6 +399,8 @@ mod tests {
             "@macro\nm = (a) -> Syntax { a } | (b) { b }",
             "@macro\nm = <A>(a) { a }",
             "@macro\nm = <A>(a : A) { a } | (b, c) { b }",
+            // The interface comparison retains the separate mixed-data error.
+            // old-syntax-check: E0101
             "@macro\nm : { (Int, x = Int) | (Int) } -> Int\n@macro\nm = (x = a) { a } | (b) { b }",
             "@macro\nm = 1",
             "@macro\n(a, b) = (1, 2)",

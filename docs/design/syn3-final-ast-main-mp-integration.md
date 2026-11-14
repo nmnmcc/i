@@ -2,8 +2,10 @@
 
 Branch: lane/fa. Merge parent: origin/main9b80611373944e7855ee77420b2e384bf523250b.
 Previous green prefix:2d124a5c85bc4d90427c322ed94be43d672a205a.
-Checkpoint19:10: workspace/Rust/reader/CLI pass; spec/snippets gate in progress.
-Final phase results and the landable hash are recorded in shared status-fa.txt.
+**Targeted merge gate GREEN at19:18:02 HKT.** Main9b806113 is merged.
+Compiler implementation is unchanged from74dc0b2f1815a5aa19d0b54102db95738af75238.
+The final follow-up changes only this report, a test comment and its exact
+negative snippet registry entry. Final hash is in shared status-fa.txt.
 
 Main's MP01–MP16 and F1 behavior is authoritative. Production lower.rs and
 old tree remain deleted. No incoming test or corpus fixture is weakened,
@@ -89,3 +91,60 @@ failure. A19:10 status line records this exact remaining set. This commit
 is a compiling/tested checkpoint; final green is reported only after the
 remaining commands complete. All phase commands/results are in
 `target/fa-main/results.txt` and matching `.command`/`.log` files.
+
+## Final results
+
+- Workspace `cargo check --workspace --all-targets --locked`:PASS.
+- Requested Rust packages:725 passed,0 failed,4 existing ignored. The
+  value_types integration binary is omitted as requested; the existing
+  recovery-test skip is retained. Syntax follow-up:29 library+48 integration
+  PASS; all four crates' doctests PASS.
+- CLI compile_cache3, known_type_regressions3, macro_run66,
+  package_commands34:all PASS unchanged.
+- Spec filters4.8/,9/,14:31/141/14 cases PASS at both O0/O2. The14 substring
+  covers14/ and all MP fixtures14.5–14.9, including labelled/multiple shape
+  groups, typed diagnostics, absent-definition retries and portable hashing.
+- Ordinary direct check-snippets built a fresh driver, then reported one
+  new intentionally invalid mixed-signature probe with unregistered E0101.
+  The probe tests main's definition metadata despite the separate unchanged
+  stage6 mixed-data rejection; it was never a positive program fixture.
+  Register that exact full diagnostic and an adjacent negative-case marker;
+  direct `scripts/check-snippets --reuse-parser` PASS19:18:02:5129 blocks,
+  48 Lisp files,101 macro fragments,5 unchanged future-track entries.
+  No compiler producer, source literal, assertion or main fixture is changed
+  by this registration. No expectation is blindly regenerated.
+- Main's added macro/syntax test bodies remain byte-identical; all other
+  incoming fixtures are imported unchanged. Production lower/old reader
+  paths remain absent, and origin/main9b806113 is an ancestor.
+- No std suite, corpus or full CLI suite was run. No required check remains
+  pending. The19:10 pending status and19:11 merged checkpoint were posted;
+  the final MERGED-MAIN green status follows this documentation commit.
+
+## Exact phase commands
+
+H is /home/agent/Programming/i/.rd/cache/heavy. All cargo commands below
+use that wrapper. Source formatting is nonbuilding and snippets is direct.
+
+`$H direnv exec /home/agent/Programming/i cargo test -p ilang-syntax -p ilang-macro -p ilang-check -p ilang-package --locked --lib --bins --test alias_unions --test body_walk --test body_walk3 --test coalescing --test codegen --test compiler_entries --test diagnostic_traps --test expanded_modules --test expansion_origins --test field_privacy --test format --test front_end --test generic_services --test git --test hir --test hir_deep --test hygiene --test hygiene_resolve --test known_facts --test lex --test library --test lisp_datum --test lisp_deep --test lisp_definition_rows --test lisp_encode_deep --test lisp_format --test lisp_record --test lisp_syntax --test lisp_syntax3 --test literal_types --test load --test lock --test macro_names --test macro_sandbox --test manifest --test mvs --test oracle --test parser_deep --test projects --test provider_graph --test providers --test query --test quote_patterns --test record_schemes --test row_schemes --test spec --test string_forms --test syn3 --test syn3_lower --test tree_helpers --test types --test types_joint --test unused --test unused_audit -- --skip spec_corpus_reverse_order_and_recovery --test-threads=4`
+
+`$H direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked`
+
+`$H direnv exec /home/agent/Programming/i cargo test -p ilang-syntax --lib --test lisp_syntax --locked -- --test-threads=4`
+
+`$H direnv exec /home/agent/Programming/i cargo test -p ilang-syntax -p ilang-macro -p ilang-check -p ilang-package --doc --locked`
+
+`$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --locked --test macro_run --test known_type_regressions --test package_commands --test compile_cache -- --test-threads=4`
+
+`$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 4.8/`
+
+`$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 9/`
+
+`$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 14`
+
+`scripts/check-snippets`
+
+Final snippet retry: `scripts/check-snippets --reuse-parser` (exit0).
+Initial workspace check attempts and the first differential failure are
+preserved in target/fa-main/check*.log and rust1.log; the complete successful
+Rust retry is rust.log. Phase timings/exits are results.txt. No failure is
+hidden by replacing an expectation or deleting a test.

@@ -957,3 +957,12 @@ requested Rust packages (value_types omitted), reader follow-up/doctests and
 CLI cache3/known3/macro66/package34 pass. Spec4.8/9/14 and direct snippets
 remain active/pending; final phase results follow in shared status-fa.txt.
 See [the main integration report](syn3-final-ast-main-mp-integration.md).
+
+Nov14 19:18:02: merged-main9b806113 targeted gate is fully GREEN:
+workspacealltargets; Rustsyntax/macro/check/package725/0 (value_types omitted,
+prior recovery skip retained); readerfollow-up29+48/doctests; CLI3+3+66+34;
+spec4.8/9/14:31/141/14 bothopts; directsnippets5129+48+101. One newly added
+invalid mixed-signature cross-reader input now pins its unchanged E0101 in
+the snippet registry. No producer/assertion/main fixture changes. Compiler
+implementation stays at74dc0b2f; final report/registry commit hash follows in
+status-fa.txt with MERGED-MAIN. No required work is pending.

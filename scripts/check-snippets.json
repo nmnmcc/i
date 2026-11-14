@@ -3195,5 +3195,11 @@
   },
   "crates/ilang-package/tests/git.rs:d28ff2bb107da518": {
     "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-syntax/src/lisp/expansion3.rs:a46e80fc91b8e9e9": {
+    "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
+    "diagnostics": [
+      "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)"
+    ]
   }
 }
