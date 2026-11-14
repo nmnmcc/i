@@ -1,5 +1,27 @@
 ---
 title: Building and testing
+description: Set up the development environment and choose the checks for a change.
 ---
 
-to be written
+This page describes the development shell and the test layers. Use the relevant layer while working, then use the repository verification script to check the wider change.
+
+The repository uses Nix and Devenv. The workflow's **Build the release i** step runs `devenv shell -- cargo build --release --locked -p ilang-cli`. Binaryen is a submodule built from source and linked into the CLI; its first build takes a few minutes, and later builds reuse it. The shell also supplies the pinned Rust toolchain and tools described in [development.md](https://github.com/nmnmcc/i/blob/main/docs/development.md).
+
+## Test layers
+
+Rust crate tests and fixtures exercise individual components. The spec suite in `tests/spec` checks language and runtime cases at optimisation levels 0 and 2. Add a single module as `tests/spec/<section>/<case>.i`, or a package directory there with an `i.toml`. Its header names the spec section and an expectation: pass, a compile error code, a warning code, or a stop message. Output and stop-location lines can also be checked. The full header format is documented at the start of `crates/ilang-cli/tests/spec.rs`.
+
+The i verification part runs `i test --project std --opt 0` and `i test --project std --opt 2`, using its built release binary. It also checks formatting, tests `examples/hello` and `bench` at both levels, runs the WASI smoke check, and runs short generated tests.
+
+The review corpus under `tests/review` preserves independent review projects. `manifest.json` records origin and controlling rules; `inventory.json` accounts for source occurrences. `expected.json` files record observed results; `requirements.json` records requirements and known defects separately. `scripts/review-corpus` compares shown types, diagnostics, tests, and main output through the public CLI. An observation is not proof of conformance. Change a recorded expectation only with the spec paragraph that requires the change; review the semantic requirement independently and promote a known failure when it is fixed.
+
+## CI and cost
+
+`scripts/dev-verify` defines the checks. CI runs its `rust-lint`, `rust-test`, `i`, `js`, and `editors` parts, builds the release CLI, runs the review corpus in ten shards, and builds the documentation site with link and example checks. The Rust test job is split into checker, spec, CLI, and remaining crates; the script says an unsplit job would take close to an hour. The corpus and full verification can be long. The repository does not give a general memory estimate for these checks; available memory depends on the build and job selection.
+
+The workflow step **Verify rust-lint** runs `devenv shell -- ./scripts/dev-verify rust-lint`; **Verify rust-test** runs `devenv shell -- ./scripts/dev-verify rust-test`. The **Verify i (without the review corpus)** step runs `devenv shell -- ./scripts/dev-verify i` with a supplied release binary and the corpus skipped; a separate corpus job runs it in shards. See [CI](https://github.com/nmnmcc/i/blob/main/.github/workflows/ci.yml) and [testing.md](https://github.com/nmnmcc/i/blob/main/docs/testing.md) for details.
+
+## See also
+
+- [The standard: tests](/docs/standard/generated/chapter-10#section-10-2)
+- [Compiler architecture](/docs/contributing/compiler-architecture)
