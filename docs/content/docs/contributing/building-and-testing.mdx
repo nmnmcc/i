@@ -1,5 +1,165 @@
 ---
 title: Building and testing
+description: Set up the development shell and run the test layer that exercises your change.
 ---
 
-to be written
+This page gives commands for the development environment and each test layer. Run commands from the repository root. Start with a filtered test while working, then choose the wider verification parts for the files you changed.
+
+## Development shell and CLI
+
+The setup in [development.md](https://github.com/nmnmcc/i/blob/main/docs/development.md) fetches Binaryen and enters the pinned Nix/Devenv environment:
+
+```sh
+git submodule update --init crates/ilang-binaryen/binaryen
+devenv shell
+```
+
+Build the CLI with the command used inside the workflow's **Build the release i** step:
+
+```sh
+cargo build --release --locked -p ilang-cli
+```
+
+Binaryen is built from source and linked into the CLI. Its first build takes a few minutes; later builds reuse it. The shell supplies Rust, Node.js, Python, CMake, Wasmtime, wasm-tools, and the Playwright browsers. The remaining CLI commands use `I` for the release binary built above:
+
+```sh
+I=target/release/i
+```
+
+## Rust crate tests
+
+Crate tests exercise components and their fixtures. CI's **Verify rust-test** step uses the `rust-test` part of [scripts/dev-verify](https://github.com/nmnmcc/i/blob/main/scripts/dev-verify). With its `check` group selected, it runs the checker crate tests:
+
+```sh
+cargo test -p ilang-check --locked
+```
+
+CI selects four groups through `DEV_VERIFY_TEST_GROUP`: `check`, `spec`, `cli`, and `rest`. The script says one unsplit job would take close to an hour. This is a broad check; use a filtered spec case for a first regression.
+
+## Spec cases
+
+[crates/ilang-cli/tests/spec.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/tests/spec.rs) compiles and runs each selected case at optimisation levels 0 and 2 and compares both with its header. Run one existing case:
+
+```sh
+cargo test -p ilang-cli --test spec --locked -- a1_entry_exports
+```
+
+A case is a module under `tests/spec`, grouped by section, or a package directory with `i.toml`. The header begins with `spec:` and `expect:` comments. Expectations are `pass`, `compile-error` plus a code, `warning` plus a code, or `stop` plus its first message line. `output:` checks emitted text; `at:` checks further stop-message lines. Package-case headers use `#` in the manifest instead of `//` in a module. Add a distinct case next to a related one; the runner discovers it without a registration list. The [first-change walkthrough](/docs/contributing/how-to-send-changes#a-first-change-step-by-step) shows an actual case and filtered output.
+
+## Standard library and runtime tests
+
+The workflow's **Verify i (without the review corpus)** step runs the `i` part of `scripts/dev-verify`. It checks formatting, then tests std, hello, and bench at both levels. The std commands are:
+
+```sh
+"$I" test --project std --opt 0
+"$I" test --project std --opt 2
+"$I" test --project examples/hello --opt 0
+"$I" test --project examples/hello --opt 2
+"$I" test --project bench --opt 0
+"$I" test --project bench --opt 2
+```
+
+During development, the CLI's name filter selects one module's tests. These two commands were also checked with the supplied compiler:
+
+```sh
+"$I" test --project std --opt 0 bool_test
+"$I" test --project std --opt 2 bool_test
+```
+
+The filter applies to test names; it does not promise to check or compile only that module. The same CI part runs the WASI smoke tests and short generated tests:
+
+```sh
+./scripts/wasi-smoke "$I"
+./scripts/test-generation --mode short --binary "$I"
+```
+
+The smoke script exercises WASI builds in Wasmtime and Node. Generated tests compare finite models and O0/O2 outcomes; they preserve source and observations on failure. See [testing.md](https://github.com/nmnmcc/i/blob/main/docs/testing.md) for the families and model limits.
+
+## Review corpus
+
+The corpus runner uses public `check --types`, `test`, and `run` commands. It compares diagnostics, shown types, and test and main outcomes at both levels. CI's **Review corpus, shard … of …** step runs ten shards; this is its command with the first matrix value substituted:
+
+```sh
+./scripts/review-corpus run --binary target/release/i --shard 1/10 --jobs 4
+```
+
+Each project keeps its source, manifest, and observation record together. For example, [review-native/fake](https://github.com/nmnmcc/i/blob/main/tests/review/cases/review-native/fake/i.toml) has this layout:
+
+```text
+tests/review/cases/review-native/fake/
+  i.toml
+  src/main.i
+  expected.json
+```
+
+This is an abbreviated excerpt from its [expected.json](https://github.com/nmnmcc/i/blob/main/tests/review/cases/review-native/fake/expected.json), retaining the exact check-phase fields. The full record also contains compiler identity and `test0`, `run0`, `test2`, and `run2` observations:
+
+```text
+  "kind": "observation; semantic requirements are separate",
+  "bound_seconds": 10.0,
+  "outcome": {
+    "check": {
+      "command": [
+        "check",
+        "--types"
+      ],
+      "exit": 0,
+      "stdout": "review/main.now : () <- (Clock) -> Int\nreview/main.main : () <- (Assert) -> Nil\n",
+      "stderr": ""
+    },
+```
+
+[manifest.json](https://github.com/nmnmcc/i/blob/main/tests/review/manifest.json) records origins and controlling rules; [inventory.json](https://github.com/nmnmcc/i/blob/main/tests/review/inventory.json) accounts for source occurrences. [requirements.json](https://github.com/nmnmcc/i/blob/main/tests/review/requirements.json) separately records known defects and required behavior. Observation budgets are resource caps, not performance guarantees. A censored timeout is not a passing termination check.
+
+Change a recorded expectation only with the spec paragraph that requires the change. Agreement at both levels can preserve a shared compiler defect. Review the semantic requirement independently and promote a known failure when it is fixed. Regeneration is explicit; see the testing guide before updating records.
+
+## Formatting, lint, and other gates
+
+The workflow's **Verify rust-lint** step runs formatting, Clippy, and snippet checks through this part:
+
+```sh
+./scripts/dev-verify rust-lint
+```
+
+The snippet checks run by that part are:
+
+```sh
+scripts/check-snippets
+python3 -I scripts/check-snippets-test
+```
+
+Its Rust formatting and lint commands are:
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+```
+
+The i part checks source formatting with:
+
+```sh
+"$I" fmt --check lib std bench examples
+```
+
+The script accepts `rust`, `rust-lint`, `rust-test`, `snippets`, `i`, `js`, and `editors`. With no argument it runs `rust`, `i`, `js`, and `editors` in order. CI's **Verify js** and **Verify editors** steps run these parts in the development shell:
+
+```sh
+./scripts/dev-verify js
+./scripts/dev-verify editors
+```
+
+The first runs JavaScript SDK and browser tests; the second checks the VS Code extension, tree-sitter grammar and queries, and Zed extension. CI's **Install and build the site** step runs these from `docs`:
+
+```sh
+npm ci
+npm run build
+npm run check:links
+npm run check:examples
+```
+
+The full verification and corpus can be long. The repository gives no general memory estimate for these layers. The command definitions and current job split are in [scripts/dev-verify](https://github.com/nmnmcc/i/blob/main/scripts/dev-verify) and [ci.yml](https://github.com/nmnmcc/i/blob/main/.github/workflows/ci.yml); they are more detailed than the development overview.
+
+## See also
+
+- [The standard: tests](/docs/standard/generated/chapter-10#section-10-2)
+- [How to send changes](/docs/contributing/how-to-send-changes)

@@ -9,7 +9,10 @@ data changed. Run the default command again after changing parser or driver
 Rust sources. The reuse option requires the existing driver in its build path.
 
 The extractor reads every tracked `.i` file and every fenced `i` block in
-Markdown. Its Rust lexer decodes ordinary and raw string literals, skipping
+Markdown. A `scheme` fence whose `file=` or `title=` names a `.is` file is
+parsed by the same driver with `--lisp`. Other Scheme fences and non-source
+fences such as `toml file=i.toml` are outside the i-source inventory.
+Its Rust lexer decodes ordinary and raw string literals, skipping
 comments and character literals. Its JavaScript lexer decodes strings and
 templates, skipping comments. Source-shaped decoded literals are candidates;
 `scripts/check-snippets.json` records reviewed ambiguous literals, templates
@@ -20,6 +23,12 @@ or missing registered literal makes its entry stale and fails the check.
 Registered literals also force extraction of header-only replacements and
 other fragments that do not have the shape of a complete binding.
 The fixture application's source is read as `.i`, including its browser inputs.
+
+The existing path-prefix exclusion for separately checked syntax sources also
+excludes `docs/scripts/run-examples-fixtures/`. Those Markdown files are runner
+test inputs, including deliberately malformed syntax and unknown fence kinds;
+`docs/scripts/run-examples-test` checks their positive and negative outcomes.
+They are not documentation and do not get expected-error registry entries.
 
 An intentionally invalid source has `old-syntax-check: E0101,E0108` (its actual
 ordered codes) in an adjacent comment. Use `//` in an i file, `/* */` immediately

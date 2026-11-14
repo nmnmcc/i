@@ -1,5 +1,41 @@
 ---
 title: Repository layout
+description: Find the compiler crates, libraries, tests, and supporting tools.
 ---
 
-to be written
+This page maps the repository so you can find the source or test for a change. The workspace includes every crate under `crates/`.
+
+| Directory | Contents |
+| --- | --- |
+| `crates` | Rust workspace crates listed below. |
+| `lib/i` | Language library modules under the `i/` paths. |
+| `std` | Standard library package and its tests. |
+| `tests/spec` | Cases organized by standard section. |
+| `tests/review` | Independent review projects, observations, and requirements. |
+| `tests` | Spec and review cases and other test fixtures. |
+| `examples` | Example packages. |
+| `editors` | VS Code and Zed support and the tree-sitter grammar. |
+| `docs` | Standard, development documents, design notes, and this site. |
+| `scripts` | Verification, corpus, generation, and development tools. |
+| `bench` | Benchmark package and tests. |
+| `bindings` | Host bindings, including the JavaScript SDK. |
+| `licenses` | Licenses of included third-party code. |
+| `.github` | Repository workflows, including CI. |
+
+| Crate | Responsibility |
+| --- | --- |
+| `ilang-syntax` | Tokens, parsing, syntax trees, and formatting. |
+| `ilang-package` | Package files, modules, dependencies, and the package graph. |
+| `ilang-check` | Name resolution, top-level order, and type inference. |
+| `ilang-macro` | Compile-time syntax macro programs and expansion. |
+| `ilang-wasm` | WasmGC code generation and runtime. |
+| `ilang-binaryen` | Binaryen optimization of WasmGC modules. |
+| `ilang-host` | Wasmtime embedding of the i binary interface. |
+| `ilang-cli` | The `i` command and its load, check, build, and run pipeline. |
+| `ilang-lsp` | Language server diagnostics and editor operations. |
+| `ilang-runner` | Native package runner to which `i build` appends a program. |
+
+## See also
+
+- [The standard: packages and modules](/docs/standard/generated/chapter-2#section-2-1)
+- [Building and testing](/docs/contributing/building-and-testing)

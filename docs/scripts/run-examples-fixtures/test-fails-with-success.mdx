@@ -1,0 +1,11 @@
+```i test-fails package=fixture_tests title="test/success_test.i"
+(
+	testlib = (test) = std/test
+)
+test("passes", () { assert(True) })
+```
+
+```text
+pass fixture_tests/success_test.passes
+1 passed, 0 failed
+```

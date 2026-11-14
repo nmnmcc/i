@@ -4,11 +4,14 @@ import { Home } from '@/components/home';
 import { docsRoute } from '@/lib/shared';
 ---
 
-<Layout title="i documentation" description="to be written">
+<Layout title="i documentation" description="A small, statically typed functional language that compiles to WebAssembly GC.">
   <Home client:load pathname={Astro.url.pathname} params={Astro.params}>
     <div class="p-4 flex flex-col items-center justify-center text-center flex-1">
       <h1 class="text-xl font-bold mb-2">i documentation</h1>
-      <p class="text-fd-muted-foreground mb-4">to be written</p>
+      <p class="text-fd-muted-foreground mb-4 max-w-xl">
+        i is a small, statically typed functional language that compiles to WebAssembly GC. It has no keywords, its values
+        are immutable, and its concurrency is structured.
+      </p>
       <a
         class="text-sm bg-fd-primary text-fd-primary-foreground rounded-full font-medium px-4 py-2.5"
         href={docsRoute}
