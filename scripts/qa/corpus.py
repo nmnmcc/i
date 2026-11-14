@@ -192,7 +192,10 @@ def invoke(binary, project, command, bound):
     # timeout. Wall time is only a backstop for a process that waits without using the CPU.
     argv = [str(binary), *command, '--offline', '--project', str(project)]
     started = time.monotonic()
-    env = dict(os.environ, NO_COLOR='1', TERM='dumb', RAYON_NUM_THREADS='1')
+    # The CPU bound covers all threads. Binaryen has its own pool and ignores
+    # Rayon's limit, so leave parallelism to the runner's --jobs rather than
+    # starting one optimizer worker per machine core in every child process.
+    env = dict(os.environ, NO_COLOR='1', TERM='dumb', RAYON_NUM_THREADS='1', BINARYEN_CORES='1')
     # A slower machine (a CI runner) scales every bound; the expectations were recorded locally.
     bound = bound * float(os.environ.get('CORPUS_BOUND_SCALE', '1'))
     cpu = max(1, math.ceil(bound))
