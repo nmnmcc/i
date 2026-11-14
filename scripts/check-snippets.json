@@ -3080,17 +3080,6 @@
     ],
     "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
   },
-  "crates/ilang-check/src/resolve/differential.rs:5c74a67df3474805": {
-    "diagnostics": [
-      "E0101: a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-      "E0101: a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-      "E0110: an item by position may not come after an item by label",
-      "E0101: a named rest `..name` in a pattern needs stage 6 of syntax three, which this compiler does not have yet",
-      "E0101: a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name",
-      "E0101: two patterns joined by `=` that are not names need stage 9 of syntax three, which this compiler does not have yet"
-    ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
-  },
   "crates/ilang-check/src/resolve/differential.rs:3520187651d4a622": {
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters",
@@ -3201,5 +3190,42 @@
     "diagnostics": [
       "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)"
     ]
+  },
+  "crates/ilang-check/src/resolve/differential.rs:158a229e560736bb": {
+    "diagnostics": [
+      "E0101: a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0101: a named rest `..name` in a pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0101: two patterns joined by `=` that are not names need stage 9 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "§7.1 keyed data and nested constructor data now have spec tests. This remaining EXTRA program retains exactly the data-rest, named-rest and two-nonname-conjunction gates."
+  },
+  "crates/ilang-cli/tests/docfix_diagnostics.rs:498de9d34c9581c7": {
+    "not_source": "Diagnostic-message assertion containing a filename and line/column; not i source."
+  },
+  "crates/ilang-cli/tests/docfix_diagnostics.rs:fdf024a384e5141d": {
+    "not_source": "Diagnostic-message assertion containing a filename and line/column; not i source."
+  },
+  "tests/spec/4.6/written_poly_union.i:ffec57640d8b2422": {
+    "track": true,
+    "diagnostics": [
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate."
+  },
+  "tests/spec/4.6/written_poly_union_arity.i:c57418d50290abcb": {
+    "track": true,
+    "diagnostics": [
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate."
+  },
+  "tests/spec/7/keyed_data_order.i:e5cf9ef0b4293e28": {
+    "diagnostics": [
+      "E0110: an item by position may not come after an item by label",
+      "E0101: an item by position may not come after an item by label (§7.1)"
+    ],
+    "reason": "§7.1 still forbids a position after a label. Migrated from the old differential EXTRA probe, preserving the parser and pre-validation rejections."
   }
 }

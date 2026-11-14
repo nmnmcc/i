@@ -272,11 +272,13 @@ fn compare_inner(name: &str, dir: &Path, totals: &mut Totals, prepare_quotes: bo
     // oracle. Keep checking its refusal and the native resolver's exact
     // errors; the spec runner checks inference and both runtime levels.
     if name.starts_with("tests/spec/7/keyed_data") {
-        assert!(
-            expected
-                .iter()
-                .any(|d| d.message.contains("a key in a data pattern needs stage 6"))
-        );
+        assert!(expected.iter().any(|d| {
+            d.message.contains("a key in a data pattern needs stage 6")
+                || (name.ends_with("keyed_data_constructor_bad.i")
+                    || name.ends_with("keyed_data_constructor_missing.i"))
+                    && d.message
+                        .contains("a pattern inside a labelled field needs stage 4")
+        }));
         let errors: Vec<_> = new_diags
             .iter()
             .filter(|d| d.is_error())
@@ -594,11 +596,14 @@ const EXTRA: &[&str] = &[
     // Row variables and function types.
     // old-syntax-check: E0101,E0110,E0101,E0107,E0101
     "run = <A, N>(body: () <- N -> A) -> A { body() }\ncatch = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> A { body() }\nboth: <A, N>(() <- (..N) -> A) -> A = (body) { body() }\nlocal = () { inner = <N>(f: () <- N -> Int) { f() }  inner }\nbad = () { <A>(a: A) { a } }\nt: ((a = Int, Int)) -> Int = (x) { 1 }\nu: { Int | Float } -> Int = (x) { 1 }\nv: (x = Int, ..Int) -> Int = (x) { 1 }\nw: () <- (Fail(Int), Fail(Float), a = Int) -> Int = () { 1 }\n",
-    // Patterns that this stage cannot type. The old keyed-data probe is
+    // Patterns that this stage cannot type. The nested constructor-data
+    // probe now has checked type/shape failures in keyed_data_constructor_bad.i
+    // (§7.1), alongside the positive keyed_data_constructor.i cases.
+    // The old keyed-data probe is
     // now tests/spec/7/keyed_data_order.i and keyed_data_order_lisp:
     // §7.1 accepts keys, but still rejects a position after a label.
-    // old-syntax-check: E0101,E0101,E0110,E0101,E0101,E0101
-    "f = ((a, ..)) { a }\nP = (x = Int, y = Int)\nh = (P(..rest)) { rest }\nk = (P(x = (a, b))) { a }\nm = ((a, b) = (c, d)) { a }\nn = (key = x) { x }\np = ([a, ..rest] = whole) { whole }\nq = (\"ab\" <> rest) { rest }\n",
+    // old-syntax-check: E0101,E0101,E0101
+    "f = ((a, ..)) { a }\nP = (x = Int, y = Int)\nh = (P(..rest)) { rest }\nm = ((a, b) = (c, d)) { a }\nn = (key = x) { x }\np = ([a, ..rest] = whole) { whole }\nq = (\"ab\" <> rest) { rest }\n",
     // Attributes, declarations, heads.
     // old-syntax-check: E0101,E0101
     "@external(\"m\", \"f\")\nf: (Int) -> Int\n@external(\"m\")\ng: (Int) -> Int\n@deprecated(note = \"x\")\nh = 1\n@host(\"ns\")\nSvc = (run = (Int) -> Int)\n@host(\"ns2\")\nBad = (Int)\n@other\nk = 2\nBox(a) = (a)\nWrap(List(A)) = (A)\nAlias(List(A)) = A\nx = 1\nElem(List(A)) = x\nm: <A>(A) -> A\nimport()\n",

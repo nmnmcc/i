@@ -1,2 +1,3 @@
 (= data (-> (, (, (= a b) c)) _ c))
 (= main (-> (,) _ Nil))
+// parser-error: E0101: an item by position may not come after an item by label (§7.1)
