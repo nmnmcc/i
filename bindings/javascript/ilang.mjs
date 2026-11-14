@@ -202,7 +202,7 @@ function only(value, fields, location) {
   for (const field of Object.keys(value)) expect(fields.includes(field), `Unknown field ${field} in ${location}`);
 }
 
-function descriptor(value, location, external = false) {
+function descriptor(value, location, external = false, abiVersion = version) {
   plainObject(value, location);
   only(value, ["params", "result", "errors", "async"], location);
   expect(Array.isArray(value.params), `Invalid params at ${location}`);
@@ -215,7 +215,7 @@ function descriptor(value, location, external = false) {
   }
   const isAsync = value.async ?? false;
   expect(typeof isAsync === "boolean", `Invalid async at ${location}`);
-  if (external) expect(!errors.length && !isAsync, `${location} cannot have errors or be async`);
+  if (external) expect((abiVersion >= 5 || !errors.length) && !isAsync, `${location} may report errors at ABI5 and cannot be async`);
   return Object.freeze({ params: Object.freeze([...value.params]), result: value.result, errors: Object.freeze([...errors]), async: isAsync });
 }
 
@@ -230,13 +230,13 @@ function entryPoint(value, location) {
 
 const reserved = (name) => ["memory", "ilang_alloc", "ilang_free", "ilang_start", "ilang_continue"].includes(name) || name.startsWith("ilang_resume:") || name.startsWith("ilang_result:");
 
-function functions(value, location, external) {
+function functions(value, location, external, abiVersion = version) {
   const result = Object.create(null);
   for (const [module, entries] of Object.entries(plainObject(value === undefined ? {} : value, location))) {
     expect(module !== namespace, `${namespace} is reserved for the runtime imports`);
     result[module] = Object.create(null);
     for (const [name, signature] of Object.entries(plainObject(entries, `${location} ${module}`))) {
-      result[module][name] = descriptor(signature, `${location} ${module} ${name}`, external);
+      result[module][name] = descriptor(signature, `${location} ${module} ${name}`, external, abiVersion);
     }
     Object.freeze(result[module]);
   }
@@ -298,7 +298,7 @@ export function readAbi(module, supplied) {
     expect(!(point.name in exports) && !reserved(point.name), `${point.name} cannot be an entry point`);
   }
   const services = functions(value.services, "service", false);
-  const externals = functions(value.externals, "external", true);
+  const externals = functions(value.externals, "external", true, value.version);
   for (const [module, entries] of Object.entries(externals)) {
     for (const name of Object.keys(entries)) expect(!services[module]?.[name], `${module} ${name} is both a service function and an external`);
   }
@@ -1025,7 +1025,7 @@ export async function instantiate(source, options = {}) {
               }
               return undefined;
             }
-            const answer = kind === "service" ? reply(fn, args) : { value: fn(...args) };
+            const answer = kind === "service" || signature.errors.length ? reply(fn, args) : { value: fn(...args) };
             bridge.liveContext();
             expect(signature.result === "externref" || !answer.value || typeof answer.value.then !== "function", `${moduleName} ${name} is not async; it must not give a Promise`);
             const values = bridge.lowerReply(signature, answer);

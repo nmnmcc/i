@@ -15,7 +15,7 @@ check = (got : String, want : String) {
 
 show = (x) { core.inspect(x) }
 
-Paused(B) = (Continuation(Nil, PausedSum(B), Never, Never), B)
+Paused(B) = (Continuation(Nil, PausedSum(B), Never), B)
 Done = ()
 PausedSum(B) = Paused(B) | Done
 

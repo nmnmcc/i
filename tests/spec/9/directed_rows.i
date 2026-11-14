@@ -4,7 +4,7 @@
 	testlib = (test) = std/test
 	i/control
 	i/core
-	i/failure
+	i/fail
 )
 
 check = (got : String, want : String) { assert(got == want) }
@@ -13,8 +13,8 @@ show = (x) { core.inspect(x) }
 
 // Rule A: a need is met by a form that is a subtype of it as a value, and
 // two forms of one service in a row are one entry.
-need_int = () -> Nil { failure.raise(1) }
-need_string = () -> Nil { failure.raise("s") }
+need_int = () -> Nil { fail.raise(1) }
+need_string = () -> Nil { fail.raise("s") }
 
 Syn3ServiceFail(E) = Fail(E)
 
@@ -42,13 +42,13 @@ collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 emit = <A>(x : A) <- (y : Yield(A)) { y.emit(x) }
 
 test("a wider Fail meets a narrower need", () {
-	r : Result(Nil, Int | String) = failure.catch(() { both() })
+	r : Result(Nil, Int | String) = fail.catch(() { both() })
 	check(show(r), "Error(1)")
 })
 
 test("two needs of Fail are one entry", () {
-	a : Result(Nil, Int | String) = failure.catch(() { either(0) })
-	b : Result(Nil, Int | String) = failure.catch(() { either(1) })
+	a : Result(Nil, Int | String) = fail.catch(() { either(0) })
+	b : Result(Nil, Int | String) = fail.catch(() { either(1) })
 	check(show(a), "Error(1)")
 	check(show(b), "Error(\"s\")")
 })
@@ -62,8 +62,8 @@ test("a generator of two types", () {
 })
 
 test("errors of a nested catch", () {
-	r = failure.catch(() {
-		inner = failure.catch(() { need_int() })
+	r = fail.catch(() {
+		inner = fail.catch(() { need_int() })
 		check(show(inner), "Error(1)")
 		need_string()
 	})

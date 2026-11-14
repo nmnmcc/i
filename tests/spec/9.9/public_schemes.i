@@ -8,7 +8,7 @@
 	i/request
 )
 
-go : <A, E, N>(task.Scope(E), () <- (Fail(E), ..N) -> A) <- (
+go : <A, E, N>(task.Group(E), () <- (Fail(E), ..N) -> A) <- (
 	task.Scheduler,
 	..N,
 ) -> task.Task(A, E) = task.go

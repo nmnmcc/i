@@ -95,15 +95,22 @@ A written `() -> String` would leave `Greeting` unsupplied and be rejected. Need
 
 ## Returned errors
 
+A `Result` keeps success or failure as a value, with `Ok(value)` and `Error(error)`. It is built in. `std/int.parse` returns an integer and needs `Fail(Nil)` for invalid input. Use `fail.catch` to keep either outcome as `Result(Int, Nil)` data.
+
 ```i run package=tour title="src/main.i"
 (
+	i/fail
 	i/core
 	(Io) = i/io
 	std/int
 )
 main = () <- (io : Io) {
-	io.print(core.inspect(int.parse("42")))
-	io.print(core.inspect(int.parse("oops")))
+	io.print(
+		core.inspect(fail.catch(() { int.parse("42") })),
+	)
+	io.print(
+		core.inspect(fail.catch(() { int.parse("oops") })),
+	)
 }
 ```
 
@@ -112,7 +119,7 @@ Ok(42)
 Error(Nil)
 ```
 
-`Result` is built in; `std/int.parse` uses `Nil` as its error value. Neither case leaves the computation early.
+`Result` is built in. The two catches store success or failure as data; neither caught outcome leaves the computation early. `std/int.parse` itself raises `Nil` through `Fail(Nil)` for invalid input.
 
 ## Missing values
 
@@ -169,7 +176,8 @@ The callback delays work until `fail.catch` has installed `Fail(E)`; error value
 	std/result
 )
 main = () <- (io : Io) {
-	answer = fail.catch(() { result.to_error(int.parse("oops")) })
+	parsed = fail.catch(() { int.parse("oops") })
+	answer = fail.catch(() { result.to_error(parsed) })
 	io.print(core.inspect(answer))
 }
 ```

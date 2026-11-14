@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	i/core
 	dict = std/dict
@@ -736,11 +737,11 @@ test("to_utf_codepoints_basic_test", () {
 		string.to_codepoints("gleam") ==
 			{
 				(Ok(g), Ok(l), Ok(e), Ok(a), Ok(m)) = (
-					string.utf_codepoint(103),
-					string.utf_codepoint(108),
-					string.utf_codepoint(101),
-					string.utf_codepoint(97),
-					string.utf_codepoint(109),
+					fail.catch(() { string.utf_codepoint(103) }),
+					fail.catch(() { string.utf_codepoint(108) }),
+					fail.catch(() { string.utf_codepoint(101) }),
+					fail.catch(() { string.utf_codepoint(97) }),
+					fail.catch(() { string.utf_codepoint(109) }),
 				)
 				[g, l, e, a, m]
 			},
@@ -757,10 +758,10 @@ test("to_utf_codepoints_rainbow_flag_test", () {
 			Ok(zero_width_joiner),
 			Ok(rainbow),
 		) = (
-			string.utf_codepoint(127_987),
-			string.utf_codepoint(65_039),
-			string.utf_codepoint(8205),
-			string.utf_codepoint(127_752),
+			fail.catch(() { string.utf_codepoint(127_987) }),
+			fail.catch(() { string.utf_codepoint(65_039) }),
+			fail.catch(() { string.utf_codepoint(8205) }),
+			fail.catch(() { string.utf_codepoint(127_752) }),
 		)
 		[waving_white_flag, variant_selector_16, zero_width_joiner, rainbow]
 	}
@@ -793,9 +794,9 @@ test("from_utf_codepoints_abc_test", () {
 	assert(
 		string.from_codepoints({
 			(Ok(a), Ok(b), Ok(c)) = (
-				string.utf_codepoint(97),
-				string.utf_codepoint(98),
-				string.utf_codepoint(99),
+				fail.catch(() { string.utf_codepoint(97) }),
+				fail.catch(() { string.utf_codepoint(98) }),
+				fail.catch(() { string.utf_codepoint(99) }),
 			)
 			[a, b, c]
 		}) ==
@@ -806,65 +807,65 @@ test("from_utf_codepoints_abc_test", () {
 
 test("utf_codepoint_negative_test", () {
 	// Less than the lower bound on valid codepoints
-	Error(_) = string.utf_codepoint(-1)
+	Error(_) = fail.catch(() { string.utf_codepoint(-1) })
 	Nil
 })
 
 test("utf_codepoint_zero_test", () {
 	// The lower bound on valid codepoints
-	Ok(_) = string.utf_codepoint(0)
+	Ok(_) = fail.catch(() { string.utf_codepoint(0) })
 	Nil
 })
 
 test("utf_codepoint_max_test", () {
 	// The upper bound for valid code points
-	Ok(_) = string.utf_codepoint(1_114_111)
+	Ok(_) = fail.catch(() { string.utf_codepoint(1_114_111) })
 	Nil
 })
 
 test("utf_codepoint_above_max_test", () {
 	// Greater than the upper bound on valid codepoints
-	Error(_) = string.utf_codepoint(1_114_112)
+	Error(_) = fail.catch(() { string.utf_codepoint(1_114_112) })
 	Nil
 })
 
 test("utf_codepoint_nonchar_fffe_test", () {
 	// Non-characters U+FFFE and U+FFFF are valid codepoints.  See (#778).
-	Ok(_) = string.utf_codepoint(65_534)
+	Ok(_) = fail.catch(() { string.utf_codepoint(65_534) })
 	Nil
 })
 
 test("utf_codepoint_nonchar_ffff_test", () {
-	Ok(_) = string.utf_codepoint(65_535)
+	Ok(_) = fail.catch(() { string.utf_codepoint(65_535) })
 	Nil
 })
 
 test("utf_codepoint_below_high_surrogate_test", () {
 	// One less than the lowest "High-surrogate code point"
-	Ok(_) = string.utf_codepoint(55_295)
+	Ok(_) = fail.catch(() { string.utf_codepoint(55_295) })
 	Nil
 })
 
 test("utf_codepoint_high_surrogate_test", () {
 	// Lowest value of the "High-surrogate code point" (U+D800 to U+DBFF)
-	Error(_) = string.utf_codepoint(55_296)
+	Error(_) = fail.catch(() { string.utf_codepoint(55_296) })
 	Nil
 })
 
 test("utf_codepoint_low_surrogate_test", () {
 	// Highest value of the "Low-surrogate code point" (U+DC00 to U+DFFF)
-	Error(_) = string.utf_codepoint(57_343)
+	Error(_) = fail.catch(() { string.utf_codepoint(57_343) })
 	Nil
 })
 
 test("utf_codepoint_above_low_surrogate_test", () {
 	// One greater than the highest "Low-surrogate code point"
-	Ok(_) = string.utf_codepoint(57_344)
+	Ok(_) = fail.catch(() { string.utf_codepoint(57_344) })
 	Nil
 })
 
 test("bit_array_utf_codepoint_test", () {
-	Ok(snake) = string.utf_codepoint(128_013)
+	Ok(snake) = fail.catch(() { string.utf_codepoint(128_013) })
 	expected = <<"🐍":utf8>>
 	assert(<<snake:utf8_codepoint>> == expected)
 	Nil
@@ -873,7 +874,7 @@ test("bit_array_utf_codepoint_test", () {
 test("utf_codepoint_to_int_test", () {
 	assert(
 		string.utf_codepoint_to_int({
-			Ok(ordinal_value) = string.utf_codepoint(128_013)
+			Ok(ordinal_value) = fail.catch(() { string.utf_codepoint(128_013) })
 			ordinal_value
 		}) ==
 			128_013,
@@ -1950,10 +1951,10 @@ test("codepoints_test", () {
 	assert(string.from_codepoints(cps) == "hé😀")
 	assert(string.to_codepoint_strings("hé😀") == ["h", "é", "😀"])
 	assert(
-		result.is_error(string.utf_codepoint(0xD800)),
+		result.is_error(fail.catch(() { string.utf_codepoint(0xD800) })),
 	)
 	assert(
-		result.is_ok(string.utf_codepoint(0x10FFFF)),
+		result.is_ok(fail.catch(() { string.utf_codepoint(0x10FFFF) })),
 	)
 })
 

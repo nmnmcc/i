@@ -3,7 +3,7 @@
 //// Level { Debug Info Warning Failure }
 //// Entry { Entry(level: Level, message: String, fields: List((String,String)),
 ////               at: Option(time.Instant)) }
-//// Sink(E,N) { Sink((Level)->Bool, (Entry)->Nil ? E ! N, (N)->Nil) }
+//// Sink(E,N) retains invariant N through the unused (N)->Nil marker.
 //// Interface:
 //// make(E,N): (accept: (Level)->Bool, send: (Entry)->Nil ? E ! N)->Sink(E,N)
 //// silent(N): ()->Sink(Never,N)
@@ -110,7 +110,7 @@ write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	accept(entry.level) |> (True) { send(entry) } | (False) { Nil }
 }
 
-lazy = <E, N>(level : Level, message : () <- N -> String) <- (
+lazy = <E, F, N>(level : Level, message : () <- (Fail(F), ..N) -> String) <- (
 	sink : Sink(E, N),
 ) {
 	Sink(accept, send, _) = sink
