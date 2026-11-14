@@ -185,3 +185,136 @@ single assertion's original text; this is status prose, not a type annotation
 diagnostic behavior changes, and cache counts/GC/clean assertions remain.
 The first whole CLI invocation retains the failure; run the complete cache
 binary again after it finishes. The independent warm/cold/cache-off tests pass.
+
+12:11 read-only formatting gate PASS on the current compiler/source. These
+commands only parse/print files and do not compile or run i programs; they
+run alongside the single wrapped CLI test job. Every build/test/clippy remains
+wrapped and serial. The source formatter is the fresh debug i built by the
+current CLI invocation; production code is unchanged since9e2764006.
+
+```sh
+direnv exec /home/agent/Programming/i cargo fmt --all -- --check
+direnv exec /home/agent/Programming/i cargo fmt --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml -- --check
+./target/debug/i fmt --check lib std bench examples
+```
+
+## 12:15 handoff
+
+No fully green new-base hash is available at this checkpoint. The committed
+candidate is c257c44a715f18b77a6882c9db94d7e8fbf28e73; production frontend code remains9e2764006. Workspace check,
+strict clippy, exact HIR/diagnostic differential, checker/LSP/macro targets,
+check-snippets and all formatting checks pass. Four original Rust failures
+were mixed Result/Ok test shapes and are repaired/compiled; their complete
+syntax binary retry is selected with CLI. CLI reported totals are[211, 1, 2]
+(including child-harness reporting), with the sole known cache UI expectation
+failure repaired exactly in the candidate. The rest of CLI, cache retry,
+release/examples/std O0/O2, four spec chapters, short generation and private
+package checks remain pending. Runtime plus shared queue/load consumed the
+handoff window; none of the required checks is dropped.
+
+Tyalt now1a6453d33 additionally contains the shared HIR backend environment-
+ancestor continuation fix, a new chapter9 regression and raw-line/stop/CLI
+fixture corrections. It must be merged and validated before final green.
+
+## Latest merge1a6453d33 (12:16)
+
+Merge applied while the already-compiled first CLI run continues. Its only
+conflict was the appended snippet dictionary: preserve all local entries and
+apply the three incoming key additions/removal (two substring/prose contexts,
+no expected error entry removed). Current CLI output is from the pre-backend-
+fix binary and is recorded as such. This merge is staged until compilation.
+
+The shared HIR-only control.rs change retains transitive environment parents
+in continuation join parameters, using the same parent walk already used for
+frame capture. It has no syntax-tree dependency or deleted-file port. Add its
+control unit regression to local validation and compile a fresh binary before
+the remaining examples/std/spec/generation. Root frontend/diagnostic code is
+unchanged. The new chapter9 continuation_environment_join fixture runs with
+that gate. No implementation from a deleted AST path is dropped.
+
+The incoming package_commands assertion changes `io: Io` to canonical
+`io : Io` in a template-source search; the active old test binary reports the
+old string at its assertion. Retain the exact search against the unchanged
+new formatter and rerun that complete binary. Cache-prose correction matches
+the already committed local repair.
+
+Raw CR/CRLF fixtures are restored byte for byte; the annotation formatting
+script now reads/writes bytes and explicitly excludes three diagnostic-sensitive
+spacing/line-ending fixtures from rewriting, while checking equality. These
+changes restore lexical test intent; no error line is deleted.
+
+Five incoming stop-coordinate corrections come from canonical type-colon
+spacing before the stop expression (all messages and the other frames retained):
+
+| Fixture | Before | After |
+|---|---|---|
+|11/stop_tail_assert|spec/main:8:23|spec/main:8:24|
+|11/stop_tail_library|spec/main:11:21|spec/main:11:22|
+|2.5/order_go|spec/main:18:19|spec/main:18:20|
+|2.5/stop_in_start|spec/main:11:58|spec/main:11:59|
+|9/light_boundary_kept_raise|spec/main:14:31|spec/main:14:32|
+
+These are source-format coordinates, not a relaxed comparison. The chapter9
+stop case remains in the requested gate; the other incoming cases are outside
+the specified chapters and their exact header edits are disclosed here.
+
+12:25: the exact provider comparison found two required §6.8 presentation
+changes in each of mixed_install_12 and mixed_install_6, rather than a lost
+diagnostic. Their saved snapshots predate the rows flip. The expansion
+changes from `(-> () _ {((-> () _ {(. (bad) {(-> 2 Nil) (-> other
+(panic other))})}))})` to `(-> (,) _ {((-> (,) _ (|> (bad) (| (->
+(, 2) _ Nil) (-> (, other) _ (panic other))))))})`. This is exactly
+syntax-3 §6.8, Expressions and statements, Function/Chain/Pipe rows. The
+section 7 migration table says: “Parameters `(a b)` become `(, a b)` and
+`()` becomes `(,)`; the pipe `(| e f)` becomes `(|> e f)`”.
+The following clause-block/match migration in the same paragraph accounts
+for every remaining symbol. In each expansion the panic call begins at
+zero-based byte52 before,68 after: the related virtual String-need coordinate
+18:72 becomes18:88. These are appended expansion coordinates, not moved
+user-source spans. The primary16:1 and16:61 spans stay identical.
+All six/seven complete errors and all five/six provider errors remain pinned
+exactly; the four added exact correction entries preserve all other text.
+This is an explained, design-required representation change, not a new
+checker behavior or a normalization of the comparison. Focused verification
+of both projects and the full fourteen-project assertion follows.
+
+The body-block difference in the same expansion is also specified by §6.8:
+“A function body is any one expression (O20): `{ … }` is one of them, a block,
+but a body need not be one.” The native function holds the pipe expression
+as its body directly; this accounts for removal of the old extra `{ … }`.
+No type constraint, warning filter, diagnostic mapping rule or user program
+is changed by this fixture adaptation. The producer remains unmodified.
+
+Additional light audits (PASS): both raw fixtures equal
+`git show refs/remotes/origin/main:<path>` byte for byte, with the SHA256s in
+the incoming stop-position proof; production old-tree/lower paths remain
+absent; existing22 provider corrections remain byte-equivalent parsed JSON;
+all four native-row corrections retain primary coordinates and full error
+prefixes. Direct `rustfmt` without direnv was unavailable (command not found);
+the retry through `direnv exec ... rustfmt --edition 2024 --check
+crates/ilang-cli/tests/providers.rs` passes. `git diff --cached --check`
+flags the intentionally restored CRLF fixture as trailing whitespace; raw
+line endings must stay unchanged, so they are not stripped.
+
+The final gate is serialized in target/fa-r3/tyalt-final-gate.sh. It waits
+for the first CLI parent (1374984) to exit before entering any heavy wrapper.
+It then runs current workspace check/clippy, every Wasm library unit test
+(including the newly merged continuation regression), complete cache/package/
+provider binaries, a fresh release compiler, examples, both std levels, all
+four requested chapters, short generation, private all-targets/unit checks,
+and the three formatting gates. Every command and exit has its own
+`tyalt-final-*.command`/`.log` and a results.txt entry. Independent checks
+continue if another test fails; compilation/release failures stop dependent
+checks. No heavy command overlaps or is queued by this lane while another
+heavy command is active. The snippets command remains direct.
+
+12:36 compiling milestone: final workspace all-target check PASS (14.22s),
+strict all-target clippy PASS, every Wasm unit test PASS including transitive
+continuation environment capture. The complete first CLI invocation exits101
+with exactly the cache-prose, canonical-template-search and native-row fixture
+failures described above; no other target fails. Syntax library29 and the
+complete repaired lisp_syntax46 pass, so the original Rust gate plus repaired
+cases totals764 pass,4 existing ignored,1 requested recovery skip. The three
+complete CLI binaries are now being rebuilt/rerun against the late backend
+and the exact explained fixture repairs. This checkpoint is compiling, not
+claimed fully green until the remaining runtime/generation gate finishes.

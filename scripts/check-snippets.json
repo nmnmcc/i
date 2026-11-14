@@ -597,9 +597,6 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "crates/ilang-cli/tests/package_commands.rs:5888b0d352a6a1b0": {
-    "not_source": "search text in a test: the head of the template main"
-  },
   "crates/ilang-cli/tests/package_commands.rs:baccf998e7fb47a5": {
     "not_source": "search text in a test: a label of a host service"
   },
@@ -3142,5 +3139,11 @@
   },
   "crates/ilang-syntax/tests/lisp_syntax3.rs:47fd209da841119d": {
     "not_source": "Rust export-header format template; the test substitutes each concrete export before parsing"
+  },
+  "crates/ilang-cli/tests/compile_cache.rs:817df942588a36b5": {
+    "not_source": "cache status prose checked with contains(), not an i annotation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:993694097be64fea": {
+    "not_source": "search text in a test: the head of the template main"
   }
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One i fmt invocation over every repository .i/.is file, with tree equality.
 Invalid syntax fixtures are left unchanged by i fmt and included in the proof.
-The one-binding warning fixture keeps its diagnostic-sensitive double space.
+Diagnostic fixtures keep their significant spacing and raw CR/CRLF bytes.
 """
 import argparse
 import gzip
@@ -25,18 +25,22 @@ def main():
     paths = sorted(set(subprocess.check_output(
         ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.i', '*.is'],
         cwd=ROOT, text=True).splitlines()))
-    before = [dict(path=path, source=(ROOT / path).read_text(), lisp=path.endswith('.is'), kind='file') for path in paths]
+    before = [dict(path=path, source=(ROOT / path).read_bytes().decode(), lisp=path.endswith('.is'), kind='file') for path in paths]
     old = MIGRATE['parse'](before, args.driver)
     with gzip.open(args.baseline, 'wt') as f:
         for item, tree in zip(before, old):
             f.write(json.dumps(dict(item, result=tree), ensure_ascii=False) + '\n')
     result = subprocess.run([str(args.binary), 'fmt', *paths], cwd=ROOT, text=True, capture_output=True)
     args.baseline.with_suffix('.fmt.log').write_text(result.stdout + result.stderr)
-    preserved = ['tests/spec/1.7/one_binding_warning.i']
+    preserved = [
+        'tests/spec/1.7/one_binding_warning.i',
+        'tests/spec/1.1/binding_text_cr.i',
+        'tests/spec/1.1/binding_text_crlf.i',
+    ]
     for item in before:
         if item['path'] in preserved:
-            (ROOT / item['path']).write_text(item['source'])
-    after = [dict(item, source=(ROOT / item['path']).read_text()) for item in before]
+            (ROOT / item['path']).write_bytes(item['source'].encode())
+    after = [dict(item, source=(ROOT / item['path']).read_bytes().decode()) for item in before]
     new = MIGRATE['parse'](after, args.driver)
     entries = []
     for a, b, x, y in zip(before, after, old, new):
@@ -46,6 +50,8 @@ def main():
                             before_sha256=MIGRATE['digest'](a['source']), after_sha256=MIGRATE['digest'](b['source']),
                             tree_sha256=MIGRATE['digest'](xt), equal=xt == yt,
                             diagnostics=x['diagnostics'], diagnostics_equal=x['diagnostics'] == y['diagnostics']))
+    assert all((ROOT / item['path']).read_bytes() == item['source'].encode()
+               for item in before if item['path'] in preserved)
     differences = [i for i in entries if not i['equal'] or not i['diagnostics_equal']]
     report = dict(files=len(entries), changed=sum(i['changed'] for i in entries),
                   invalid=sum(bool(i['diagnostics']) for i in entries), fmt_exit=result.returncode,
