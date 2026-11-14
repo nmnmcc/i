@@ -3,7 +3,7 @@
 //// Level { Debug Info Warning Failure }
 //// Entry { Entry(level: Level, message: String, fields: List((String,String)),
 ////               at: Option(time.Instant)) }
-//// Sink(E,N) keeps its residual row in an unused callback type.
+//// Sink(E,N) retains invariant N through the unused (N)->Nil marker.
 //// Interface:
 //// make(E,N): (accept: (Level)->Bool, send: (Entry)->Nil ? E ! N)->Sink(E,N)
 //// silent(N): ()->Sink(Never,N)
@@ -29,7 +29,7 @@
 //// filter checks the new predicate before the old predicate; send is unchanged.
 //// minimum accepts levels at or above its threshold. silent always rejects.
 //// These factories are pure. enabled followed by write performs two checks.
-//// Sink's E is covariant and its stored N invariant. The unused callback marker
+//// Sink's E is covariant and its stored N invariant. The unused (N)->Nil marker
 //// is never called. Replacements need equal service arguments; N cannot contain
 //// the same Sink(E,N) recursively. Capture a concrete downstream sink instead.
 ////
@@ -79,11 +79,7 @@ Entry = (
 	at = Option(time.Instant),
 )
 
-Sink(E, N) = (
-	(Level) -> Bool,
-	(Entry) <- (Fail(E), ..N) -> Nil,
-	(() <- N -> Nil) -> Nil,
-)
+Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
 
 make = <E, N>(
 	accept : (Level) -> Bool,

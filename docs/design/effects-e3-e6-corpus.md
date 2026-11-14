@@ -175,6 +175,16 @@ retains its empty-meet error by giving Source a required A value field
 (§4.1, R8); function-only inhabited meets retain independent positive tests.
 Both std levels pass 2,171 tests each. Full Rust and corpus gates follow.
 
+The fresh vendored check exposed one remaining stale declaration: Sink's
+third field was `(() <- N -> Nil) -> Nil`, although `make` already supplies
+`(_ : N) { Nil }`. Restore exactly std-2 §6.3 L5: “E is covariant; N is
+invariant through the unused `(N)->Nil` marker”. Its fifteen recursive/type
+recovery errors disappear and the vendored std check passes. No test body,
+assertion, algorithm or IO API is changed. This is category c, not approval
+to record a rejected vendored suite. The native nested-run, three-resume
+Sample/Fail, keep_env and Runner-only contract fixtures also pass both opts;
+clippy and the complete snippet gate pass after their explained migrations.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**

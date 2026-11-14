@@ -77,3 +77,14 @@ both levels. Short generation passes; its 8-seed counts and full report are in
 `target/e4-gate-generation.log`. JS is Node122/123; browsers were not reached
 because the Node law failed. Clippy's one fixture-initializer warning and the
 obsolete E3/E6 snippet registrations are patched for rerun.
+
+At 62af4eac4 the targeted native spec cases typed_final_fresh_scope,
+task_run_error_after_resumes, keep_env and task_run_supplied_services all pass
+at O0/O2. Exact macro-oracle, control-record and external-metadata tests pass.
+Workspace/all-targets clippy passes with -D warnings. Direct snippets pass:
+5,158 extracted blocks/literals, 4 existing future-track entries; Lisp check
+covers 48 .is files and 101 macro fragments. Release rebuild and shipped std
+check pass. The vendored check initially failed 15 cascading errors from its
+stale callback-shaped Sink marker; restoring the specified ordinary (N)->Nil
+marker makes the second check pass without a test change. ABI regeneration
+and complete JS rerun follow; the full corpus has not run yet.
