@@ -193,7 +193,7 @@ Usage: greet
   --count, -c VALUE	Number of greetings
 
 error: MissingArgument("--count")
-guide_cli/main:17:1
+guide_cli/main:18:1
 ```
 
 This run exits with status 1. `cli.run` writes the parse error and usage to standard error, then raises the error. The runner reports the error that reaches the entry. All three shell runs above were checked at both optimization levels.
