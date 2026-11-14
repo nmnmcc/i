@@ -36,6 +36,8 @@ struct SourceExport {
 }
 #[cfg(test)]
 mod differential;
+mod hints;
+pub use hints::missing_module_message;
 #[cfg(test)]
 #[allow(dead_code)]
 mod legacy;
@@ -288,6 +290,9 @@ impl<'a> Resolver<'a> {
         if matches!(code, code::UNKNOWN_NAME | code::MACRO_RESERVED)
             && let Some(hint) = ilang_syntax::old_syntax_hint(&self.graph.sources.get(source).text)
         {
+            if message.ends_with('.') {
+                message.pop();
+            }
             message.push_str("; ");
             message.push_str(hint);
         }
@@ -635,7 +640,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::NO_MODULE,
                 item.span,
-                format!("there is no module `{written}`"),
+                self.missing_module_message(&written),
             );
             return None;
         };
@@ -1188,7 +1193,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::UNKNOWN_NAME,
                     m.span,
-                    format!("there is no module `{}`", m.name),
+                    self.undefined_name_message(&m.name, true),
                 );
                 None
             }
@@ -1371,11 +1376,9 @@ impl<'a> Resolver<'a> {
             _ => None,
         };
         if head.is_none() {
-            self.error(
-                code::ENV_TYPE,
-                t.span,
-                "a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)",
-            );
+            let mut message = "a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)".to_string();
+            message.push_str(&self.same_named_type_hint(t));
+            self.error(code::ENV_TYPE, t.span, message);
         }
         head
     }
@@ -2050,7 +2053,7 @@ impl<'a> Resolver<'a> {
                     self.error(
                         code::UNKNOWN_NAME,
                         m.span,
-                        format!("`{}` is not defined", m.name),
+                        self.undefined_name_message(&m.name, false),
                     );
                     ExprKind::Error
                 }
@@ -2101,7 +2104,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::UNKNOWN_NAME,
                     name.span,
-                    format!("`{}` is not defined", name.name),
+                    self.undefined_name_message(&name.name, false),
                 );
                 ExprKind::Error
             }

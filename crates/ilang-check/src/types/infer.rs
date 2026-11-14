@@ -20,6 +20,17 @@ use ilang_syntax::syn3::ast::{BinOp, UnOp, resolved::Ident};
 use num_traits::ToPrimitive;
 use std::collections::{HashMap, HashSet};
 
+fn scalar_requirement(ty: &Ty) -> bool {
+    match ty {
+        Ty::Con(Head::Named(_), ..) | Ty::Fn(_) => true,
+        Ty::Union(parts) | Ty::Inter(parts) => {
+            !parts.is_empty() && parts.iter().all(scalar_requirement)
+        }
+        Ty::Diff(base, _) => scalar_requirement(base),
+        _ => false,
+    }
+}
+
 /// The names of the custom types as the module `m` writes them: the types
 /// of other modules with the name of their module (§2.3).
 pub(super) fn type_names(p: &Program, m: ModuleId) -> Vec<String> {
@@ -1545,6 +1556,13 @@ impl<'a> Checker<'a> {
         if let Some(o) = other {
             message.push_str(&format!(" (the type at {} needs it)", self.position(o)));
         }
+        if code == code::TYPE_MISMATCH
+            && f.lhs.head() == Some(Head::Shape(super::ShapeId::positional(1)))
+            && scalar_requirement(&f.rhs)
+            && let Some(hint) = self.parenthesized_data_hint(span)
+        {
+            message.push_str(&hint);
+        }
         if let Some(fixed) = self.fix_notes.iter().find_map(|v| self.reads.fixed.get(v)) {
             let module = self.p.module(fixed.module);
             let text = &self.sources.get(module.source).text;
@@ -1556,6 +1574,28 @@ impl<'a> Checker<'a> {
         }
         self.fix_notes.clear();
         self.error(code, span, message);
+    }
+
+    /// Only offer a grouping repair for written, one-position data at the
+    /// diagnostic's expression span, never for call arguments or type syntax.
+    fn parenthesized_data_hint(&self, span: Span) -> Option<String> {
+        use ilang_syntax::syn3::{ast, parse_expr, print_expr};
+        let text = &self.sources.get(self.p.module(self.module).source).text;
+        let source = text.get(span.start as usize..span.end as usize)?;
+        if !source.starts_with('(') {
+            return None;
+        }
+        let expression = parse_expr(source).ok()?;
+        let ast::ExprKind::Data(items) = &expression.kind else {
+            return None;
+        };
+        let [ast::DItem::Pos(inner)] = items.as_slice() else {
+            return None;
+        };
+        Some(format!(
+            ". Parentheses construct one-item data. Use braces `{{ }}` to group an expression: `{{ {} }}`.",
+            print_expr(inner)
+        ))
     }
 
     pub fn union(&mut self, ms: Vec<Ty>, span: Span) -> Ty {

@@ -1,0 +1,156 @@
+(
+	i/process
+	i/fs
+	i/net
+	i/task
+	i/core
+	i/fail
+	i/stdio
+	i/bit_array
+	std/json
+	std/int
+	std/list
+	std/path
+)
+
+Job = (name = String, url = String)
+Outcome = Success | Failure
+Success = (value = Int)
+Failure = ()
+
+InputError = ()
+
+read_manifest = (file : String) -> Result(List(Job), InputError) {
+	fail.catch(() {
+		bytes = fs.read_file(file)
+		text = bit_array.to_string(bytes) |>
+			(Ok(value)) { value }
+			| (Error(_)) { fail.raise(InputError) }
+		json.parse(text) |>
+			(Ok(value)) { value }
+			| (Error(_)) { fail.raise(InputError) }
+		value |> (json.Array(jobs)) { decode_jobs(jobs) }
+		| (_) { fail.raise(InputError) }
+	})
+}
+
+decode_jobs = (values : List(json.Json)) -> List(Job) {
+	decode_jobs_loop(values, [], [])
+}
+
+decode_jobs_loop = (values : List(json.Json), seen : List(String), out : List(Job)) -> List(Job) {
+	values |> ([]) { list.reverse(out) }
+		| ([value, ..rest]) {
+			value |> (json.Object(_)) {
+				name_json = json.field(value, "name") |> (Some(v)) { v } | (None) { fail.raise(InputError) }
+				url_json = json.field(value, "url") |> (Some(v)) { v } | (None) { fail.raise(InputError) }
+				name_json |> (json.Text(name)) {
+					url_json |> (json.Text(url)) {
+						{ valid_job_name(name) && core.not(list.contains(seen, name)) } |>
+							(True) {
+								decode_jobs_loop(rest, [name, ..seen], [Job(name = name, url = url), ..out])
+							}
+							| (False) { fail.raise(InputError) }
+					}
+					| (_) { fail.raise(InputError) }
+				}
+				| (_) { fail.raise(InputError) }
+			}
+			| (_) { fail.raise(InputError) }
+		}
+}
+
+valid_job_name = (name : String) -> Bool {
+	chars = core.codepoints(name)
+	length = list.length(chars)
+	{ length >= 1 && length <= 12 } &&
+		first_lower(chars) &&
+		list.all(chars, (char) {
+			n = core.codepoint_to_int(char)
+			(n >= 97 && n <= 122) || (n >= 48 && n <= 57)
+		})
+}
+
+first_lower = (chars : List(UtfCodepoint)) -> Bool {
+	chars |> ([first, .._]) {
+		n = core.codepoint_to_int(first)
+		n >= 97 && n <= 122
+	}
+	| ([]) { False }
+}
+
+parse_integer_token = (text : String) -> Result(Int, Nil) {
+	int.parse(text) |> (Ok(value)) {
+		canonical = int.to_string(value)
+		{ canonical == text || text == "+" <> canonical } |>
+			(True) { Ok(value) }
+			| (False) { Error(Nil) }
+	}
+	| (Error(_)) { Error(Nil) }
+}
+
+decode_response = (text : String) -> Result(Int, Nil) {
+	json.parse(text) |> (Ok(value)) {
+		value |> (json.Object(_)) {
+			json.field(value, "value") |>
+				(Some(json.Text(token))) {
+					parse_integer_token(token) |> (Ok(number)) {
+						{ number >= -1000 && number <= 1000 } |>
+							(True) { Ok(number) }
+							| (False) { Error(Nil) }
+					}
+					| (Error(_)) { Error(Nil) }
+				}
+				| (_) { Error(Nil) }
+		}
+		| (_) { Error(Nil) }
+	}
+	| (Error(_)) { Error(Nil) }
+}
+
+remove_part = (output : String, name : String) {
+	part_file = path.join([output, name <> ".part"])
+	fail.catch(() { fs.remove(part_file) })
+	Nil
+}
+
+process_job = (job : Job, output : String) -> Outcome {
+	part = path.join([output, job.name <> ".part"])
+	target = path.join([output, job.name <> ".txt"])
+	fail.catch(() {
+		job.url |> ("bad-url") { fail.raise(InputError) } | (_) { Nil }
+		fail.raise(InputError)
+	}) |>
+		(Ok(_)) { remove_part(output, job.name)  Failure }
+		| (Error(_)) { remove_part(output, job.name)  Failure }
+}
+
+run_jobs = (jobs : List(Job), output : String) -> List(String) {
+	task.map_concurrently(jobs, (job) {
+		result = process_job(job, output)
+		result |>
+			(Success(value)) { "OK " <> job.name <> " " <> int.to_string(value) }
+			| (Failure) { "ERROR " <> job.name }
+	})
+}
+
+main = () {
+	args = process.args()
+	args |> ([manifest, output]) {
+		read_manifest(manifest) |>
+			(Ok(jobs)) {
+				lock = path.join([output, ".batchlock"])
+				lock_result = fail.catch(() { fs.mkdir(lock) })
+				lock_result |>
+					(Ok(_)) {
+						results = run_jobs(jobs, output)
+						fail.catch(() { fs.remove(lock) })
+						list.each(results, stdio.print)
+						stdio.print("DONE " <> int.to_string(list.length(jobs)))
+					}
+					| (Error(_)) { stdio.print("ERROR LOCK") }
+			}
+			| (Error(_)) { stdio.print("ERROR INPUT") }
+	}
+	| (_) { stdio.print("ERROR INPUT") }
+}

@@ -2615,7 +2615,7 @@
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected `,` or `)`, found `=`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: i has no `!` operator. To negate a Boolean `x`, import `i/core` and write `core.not(x)`.",
       "E0101: expected an expression, found `!`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected `,`, `?` or `)`, found `!`"
@@ -2637,7 +2637,7 @@
   "tests/review/cases/review-native3/positive/.invalid/src/main.i:05223b2c9df25096": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: i has no `!` operator. To negate a Boolean `x`, import `i/core` and write `core.not(x)`.",
       "E0101: expected an expression, found `!`"
     ]
   },
@@ -3201,5 +3201,9 @@
     "diagnostics": [
       "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)"
     ]
+  },
+  "crates/ilang-cli/tests/diagnostic_repairs.rs:74282c580560b9e5": {
+    "reason": "TOML manifest for the archived-program CLI tests, not i source.",
+    "not_source": true
   }
 }

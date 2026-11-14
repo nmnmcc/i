@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.f : (A) -> 1 | 2\n",
-      "stderr": "src/main.i:1:21: error[E0501]: `(True)` is not a subtype of `Bool`\n1 error\n"
+      "stderr": "src/main.i:1:21: error[E0501]: `(True)` is not a subtype of `Bool`. Parentheses construct one-item data. Use braces `{ }` to group an expression: `{ True }`.\n1 error\n"
     }
   }
 }

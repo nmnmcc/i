@@ -1,0 +1,106 @@
+(
+	i/process
+	i/fs
+	i/core
+	i/stdio
+	std/bit_array
+	std/json
+	std/string
+	std/int
+)
+
+parse_amount = (value) {
+	value |> (json.Text(text)) {
+		digit = (c) {
+			n = core.codepoint_to_int(c)
+			n >= 48 && n <= 57
+		}
+		unsigned = string.remove_prefix(string.remove_prefix(text, "+"), "-")
+		valid = unsigned != "" && list.all(core.codepoints(unsigned), digit)
+		valid |> (True) {
+			int.parse(text) |>
+				(Ok(n)) {
+					{ n >= 0 && n <= 1000 } |>
+						(True) { Some(n) }
+						| (False) { None }
+				}
+				| (Error(_)) { None }
+		}
+		| (False) { None }
+	}
+	| (_) { None }
+}
+
+process_record = (line, balance) {
+	json.parse(line) |>
+		(Ok(json.Object(fields))) {
+			list.key_find(fields, "op") |>
+				(Some(json.Text("reset"))) { (True, balance) }
+				| (Some(json.Text("credit"))) {
+					list.key_find(fields, "amount") |> parse_amount |>
+						(Some(amount)) { (True, balance + amount) }
+						| (_) { (False, balance) }
+				}
+				| (Some(json.Text("debit"))) {
+					list.key_find(fields, "amount") |> parse_amount |>
+						(Some(amount) ? balance >= amount) {
+							(True, balance - amount)
+						}
+						| (_) { (False, balance) }
+				}
+				| (_) { (False, balance) }
+		}
+		| (_) { (False, balance) }
+}
+
+walk = (lines, balance, errors, output) {
+	lines |> ([]) {
+		(output, balance, errors)
+	}
+	| ([line, ..rest]) {
+		(success, next) = process_record(line, balance)
+		state =
+			success
+				|> (True) {
+					(output <> "OK " <> int.to_string(next) <> "\n", next, errors)
+				}
+				| (False) {
+					(
+						output <> "ERROR " <> int.to_string(balance) <> "\n",
+						balance,
+						errors + 1,
+					)
+				}
+		walk(rest, state.1, state.2, state.0)
+	}
+}
+
+main = () {
+	args = process.args()
+	args |> ([path]) {
+		fail.catch(() { fs.read_file(path) }) |>
+			(Ok(bytes)) {
+				bit_array.to_string(bytes) |>
+					(Ok(text)) {
+						lines =
+							{ text == "" } |> (True) { [] } | (False) {
+								parts = string.split(text, "\n")
+								{ string.ends_with(text, "\n") } |>
+									(True) {
+										list.take(parts, list.length(parts) - 1)
+									}
+									| (False) { parts }
+							}
+						(output, balance, errors) = walk(lines, 0, 0, "")
+						stdio.write(<<output:utf8>>)
+						stdio.print(
+							"TOTAL " <> int.to_string(balance) <> " ERRORS " <>
+								int.to_string(errors),
+						)
+					}
+					| (_) { stdio.print("ERROR INPUT") }
+			}
+			| (_) { stdio.print("ERROR INPUT") }
+	}
+	| (_) { stdio.print("ERROR INPUT") }
+}

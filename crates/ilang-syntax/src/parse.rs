@@ -24,6 +24,7 @@ pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
     let module = parser.module();
     let mut diags = lexed.diagnostics.clone();
     diags.append(&mut parser.diags);
+    explain_prefix_bangs(&mut diags);
     diags.sort_by_key(|d| d.span.start);
     diags.dedup();
     (module, diags)
@@ -51,10 +52,30 @@ fn parse_with<X>(
     diags.append(&mut parser.diags);
     match result {
         Ok(x) if diags.is_empty() => Ok(x),
-        Ok(_) => Err(diags),
+        Ok(_) => {
+            explain_prefix_bangs(&mut diags);
+            Err(diags)
+        }
         Err(d) => {
             diags.push(d);
+            explain_prefix_bangs(&mut diags);
             Err(diags)
+        }
+    }
+}
+
+/// The parser knows whether `!` was used as an expression. Keep the lexer's
+/// service-syntax advice for other positions, and change only its wording at
+/// expression errors, preserving both diagnostics and their spans.
+fn explain_prefix_bangs(diags: &mut [Diagnostic]) {
+    let spans: Vec<_> = diags
+        .iter()
+        .filter(|d| d.message == "expected an expression, found `!`")
+        .map(|d| d.span)
+        .collect();
+    for d in diags {
+        if d.code == Code::UnexpectedChar && spans.contains(&d.span) {
+            d.message = "i has no `!` operator. To negate a Boolean `x`, import `i/core` and write `core.not(x)`.".into();
         }
     }
 }

@@ -1,0 +1,102 @@
+(
+	i/process
+	i/fs
+	i/stdio
+	i/fail
+	i/core
+	std/bit_array
+	std/json
+	std/list
+	std/int
+	(Some, None) = std/option
+	(Process, Fs, Stdio) = i/process
+)
+
+read_manifest = (path) {
+	fs.read_file(path) |>
+		(Ok(bytes)) {
+			bit_array.to_string(bytes) |>
+				(Ok(text)) {
+					json.parse(text) |>
+						(Ok(value)) {
+							json.as_array(value) |>
+								(Some(items)) {
+									list.try_map(items, json.as_string) |>
+										(Ok(paths)) { Ok(paths) }
+										| (Error(_)) { Error("invalid manifest") }
+								}
+								| (None) { Error("invalid manifest") }
+						}
+						| (Error(_)) { Error("invalid manifest") }
+				}
+				| (Error(_)) { Error("invalid manifest") }
+		}
+		| (Error(_)) { Error("manifest read failed") }
+}
+
+append_sources = (paths, file, total) {
+	paths |>
+		([]) { Ok(total) }
+		| ([path, ..rest]) {
+			fs.read_file(path) |>
+				(Ok(bytes)) {
+					fs.open(file, fs.Append) |>
+						(Ok(handle)) {
+							write_result = fail.catch(() { fs.write(handle, bytes) })
+							close_result = fail.catch(() { fs.close(handle) })
+							write_result |>
+								(Ok(_)) {
+									close_result |>
+										(Ok(_)) {
+											append_sources(
+												rest,
+												file,
+												total + core.bit_size(bytes) / 8,
+											)
+										}
+										| (Error(_)) { Error("write failed") }
+								}
+								| (Error(_)) {
+									close_result
+									Error("write failed")
+								}
+						}
+						| (Error(_)) { Error("open failed") }
+				}
+				| (Error(_)) { Error("read failed") }
+		}
+}
+
+run_job = (paths, destination, part) {
+	fail.catch(() {
+		fs.write_file(part, <<>>)
+		append_sources(paths, part, 0) |>
+			(Ok(total)) {
+				fs.rename(part, destination)
+				Ok(total)
+			}
+			| (Error(_)) { Error("copy failed") }
+	})
+}
+
+main = () <- (process : Process, fs : Fs, stdio : Stdio) {
+	process.args() |>
+		(Ok([manifest, destination])) {
+			read_manifest(manifest) |>
+				(Ok(paths)) {
+					lock = destination <> ".lock"
+					part = destination <> ".part"
+					fs.mkdir(lock) |>
+						(Ok(_)) {
+							run_job(paths, destination, part) |>
+								(Ok(total)) { stdio.print("OK " <> int.to_string(total)) }
+								| (Error(_)) { stdio.print("ERROR") }
+							fail.catch(() { fs.remove(part) })
+							fail.catch(() { fs.remove(lock) })
+						}
+						| (Error(_)) { stdio.print("ERROR") }
+				}
+				| (Error(_)) { stdio.print("ERROR") }
+		}
+		| (_) { stdio.print("ERROR") }
+}

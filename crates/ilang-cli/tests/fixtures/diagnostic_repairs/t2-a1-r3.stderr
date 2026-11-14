@@ -1,0 +1,2 @@
+src/main.i:46:40: error[E0201]: `core` is not defined. Import `i/core` to use the module `core`.
+1 error

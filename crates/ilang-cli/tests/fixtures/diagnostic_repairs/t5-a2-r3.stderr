@@ -1,0 +1,2 @@
+src/main.i:9:2: error[E0210]: there is no module `i/bit_array`. Import `std/bit_array` instead; that module exists.
+1 error

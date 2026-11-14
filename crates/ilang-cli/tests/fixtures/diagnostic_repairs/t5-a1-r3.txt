@@ -1,0 +1,192 @@
+(
+	i/process
+	i/fs
+	i/net
+	i/core
+	i/stdio
+	i/fail
+	(Some, None, Option) = std/option
+	std/bit_array
+	std/json
+	std/int
+	std/list
+)
+
+Job = (name = String, url = String)
+
+digit_value = (c : UtfCodepoint) -> Int {
+	n = core.codepoint_to_int(c)
+	{
+		n >= 48 && n <= 57
+	} |> (True) { n - 48 }
+		| (False) { -1 }
+}
+
+if_negative = (value : Int, negative : Bool) -> Int {
+	negative |> (True) { -value } | (False) { value }
+}
+
+parse_integer_digits = (cps : List(UtfCodepoint), value : Int, index : Int, negative : Bool) -> Result(Int, Nil) {
+	cps |>
+		([]) {
+			{ index > 0 } |> (True) { Ok(if_negative(value, negative)) }
+				| (False) { Error(Nil) }
+		}
+		| ([c, ..rest]) {
+			d = digit_value(c)
+			{
+				d >= 0
+			} |> (True) {
+				parse_integer_digits(rest, value * 10 + d, index + 1, negative)
+			}
+				| (False) { Error(Nil) }
+		}
+}
+
+parse_integer_token = (text : String) -> Result(Int, Nil) {
+	core.codepoints(text) |>
+		([]) { Error(Nil) }
+		| ([first, ..rest]) {
+			n = core.codepoint_to_int(first)
+			{
+				n == 43 || n == 45
+			} |>
+				(True) {
+					{
+						rest == []
+					} |> (True) { Error(Nil) }
+						| (False) {
+							parse_integer_digits(rest, 0, 0, n == 45)
+						}
+				}
+				| (False) {
+					parse_integer_digits(
+						core.codepoints(text),
+						0,
+						0,
+						False,
+					)
+				}
+		}
+}
+
+field_string = (fields : List((String, json.Json)), key : String) -> Option(String) {
+	fields |>
+		([]) { None }
+		| ([(name, value), ..rest]) {
+			{
+				name == key
+			} |> (True) {
+				value |> (json.Text(text)) { Some(text) } | (_) { None }
+			}
+				| (False) { field_string(rest, key) }
+		}
+}
+
+valid_name_tail = (cps : List(UtfCodepoint)) -> Bool {
+	cps |>
+		([]) { True }
+		| ([c, ..rest]) {
+			n = core.codepoint_to_int(c)
+			{
+				(n >= 97 && n <= 122) || (n >= 48 && n <= 57)
+			} && valid_name_tail(rest)
+		}
+}
+
+valid_name = (name : String) -> Bool {
+	core.codepoints(name) |>
+		([first, ..rest]) {
+			head = core.codepoint_to_int(first)
+			{
+				head >= 97 && head <= 122 && valid_name_tail(rest)
+			}
+		}
+		| (_) { False }
+}
+
+name_length_ok = (name : String) -> Bool {
+	core.codepoints(name) |>
+		([_, _, _, _, _, _, _, _, _, _, _, _, .._]) { False }
+		| (_) { True }
+}
+
+parse_jobs = (values : List(json.Json), seen : List(String), jobs : List(Job)) -> Result(List(Job), Nil) {
+	values |>
+		([]) { Ok(jobs) }
+		| ([value, ..rest]) {
+			value |> (json.Object(fields)) {
+				field_string(fields, "name") |> (Some(name)) {
+					field_string(fields, "url") |> (Some(url)) {
+						{
+							valid_name(name) &&
+								name_length_ok(name) &&
+								list.contains(seen, name) == False
+						} |> (True) {
+							parse_jobs(
+								rest,
+								[name, ..seen],
+								[Job(name = name, url = url), ..jobs],
+							)
+						}
+							| (False) { Error(Nil) }
+					}
+						| (_) { Error(Nil) }
+				}
+					| (_) { Error(Nil) }
+			}
+				| (_) { Error(Nil) }
+		}
+}
+
+fetch_one = (job : Job, outdir : String) -> String {
+	{
+		job.url == "bad-url"
+	} |> (True) { "ERROR " <> job.name }
+		| (False) { "ERROR " <> job.name }
+}
+
+run_jobs = (jobs : List(Job), outdir : String) -> List(String) {
+	[]
+}
+
+main = () {
+	args_result = fail.catch(() { process.args() })
+	args_result |>
+		(Error(_)) { stdio.print("ERROR INPUT") }
+		| (Ok(args)) {
+			args |>
+				([manifest, outdir]) {
+					checked = fail.catch(() {
+						bytes = fs.read_file(manifest)
+						Ok(source) = bit_array.to_string(bytes)
+						json.parse(source)
+					})
+					checked |>
+						(Ok(Ok(json.Array(values)))) {
+							parse_jobs(values, [], []) |>
+								(Error(_)) { stdio.print("ERROR INPUT") }
+								| (Ok(reversed)) {
+									jobs = list.reverse(reversed)
+									locked = fail.catch(() {
+										fs.mkdir(outdir <> "/.batchlock")
+									})
+									locked |>
+										(Error(_)) { stdio.print("ERROR LOCK") }
+										| (Ok(_)) {
+											results = run_jobs(jobs, outdir)
+											list.each(results, stdio.print)
+											stdio.print(
+												"DONE " <> int.to_string(
+													list.length(jobs),
+												),
+											)
+											fs.remove(outdir <> "/.batchlock")
+										}
+								}
+						}
+						| (_) { stdio.print("ERROR INPUT") }
+				}
+				| (_) { stdio.print("ERROR INPUT") }
+		}
+}

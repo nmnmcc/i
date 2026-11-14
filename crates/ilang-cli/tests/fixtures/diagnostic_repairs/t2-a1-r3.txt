@@ -1,0 +1,60 @@
+(
+	fs = i/fs
+	stdio = i/stdio
+	process = i/process
+	fail = i/fail
+	bit_array = std/bit_array
+	json = std/json
+)
+
+main = () {
+	args = process.args()
+	args |>
+		([manifest_path, destination_path]) {
+			manifest_result = fail.catch(() { fs.read_file(manifest_path) })
+			manifest_result |>
+				(Ok(manifest_bytes)) {
+					bit_array.to_string(manifest_bytes) |>
+						(Ok(manifest_text)) {
+							json.parse(manifest_text) |>
+								(Ok(json.Array(source_paths))) {
+									run(source_paths, destination_path)
+								}
+								| (_) { stdio.print("ERROR") }
+						}
+						| (_) { stdio.print("ERROR") }
+				}
+				| (_) { stdio.print("ERROR") }
+		}
+		| (_) { stdio.print("ERROR") }
+}
+
+run = (source_paths, destination_path) {
+	lock_path = destination_path <> ".lock"
+	part_path = destination_path <> ".part"
+	fail.catch(() { fs.mkdir(lock_path) }) |>
+		(Ok(_)) {
+			result = fail.catch(() {
+				fs.write_file(part_path, <<>>)
+				bytes = append_sources(source_paths, part_path, 0)
+				fs.rename(part_path, destination_path)
+				bytes
+			})
+			fs.remove(part_path)
+			fs.remove(lock_path)
+			result |>
+				(Ok(count)) { stdio.print("OK " <> core.inspect(count)) }
+				| (_) { stdio.print("ERROR") }
+		}
+		| (_) { stdio.print("ERROR") }
+}
+
+append_sources = (paths, part_path, count) {
+	paths |>
+		([]) { count }
+		| ([path, ..rest]) {
+			bytes = fs.read_file(path)
+			fs.write_file(part_path, bytes)
+			append_sources(rest, part_path, count + bit_array.byte_size(bytes))
+		}
+}

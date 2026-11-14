@@ -1,0 +1,3 @@
+src/main.i:92:5: error[E0501]: `(Bool)` is not a subtype of `Bool`. Parentheses construct one-item data. Use braces `{ }` to group an expression: `{ n >= 97 && n <= 122 }`.
+src/main.i:92:30: error[E0501]: `(Bool)` is not a subtype of `Bool`. Parentheses construct one-item data. Use braces `{ }` to group an expression: `{ n >= 48 && n <= 57 }`.
+2 errors

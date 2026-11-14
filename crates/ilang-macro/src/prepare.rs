@@ -206,7 +206,12 @@ pub(crate) fn import_indices(
                     ilang_check::code::NO_MODULE,
                     Some(module.source),
                     import.span.0,
-                    format!("there is no module `{path}`"),
+                    ilang_check::resolve::missing_module_message(
+                        graph,
+                        module.package,
+                        module.kind,
+                        &path,
+                    ),
                 ));
                 continue;
             };

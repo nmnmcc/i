@@ -1,0 +1,18 @@
+src/main.i:19:29: error[E0201]: `list` is not defined. Import `std/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = std/property` to use `list`.
+src/main.i:24:16: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
+src/main.i:25:19: error[E0201]: `None` is not defined. Import `(None) = std/option` to use `None`.
+src/main.i:27:20: error[E0201]: `None` is not defined. Import `(None) = std/option` to use `None`.
+src/main.i:29:15: error[E0201]: `None` is not defined. Import `(None) = std/option` to use `None`.
+src/main.i:31:10: error[E0201]: `None` is not defined. Import `(None) = std/option` to use `None`.
+src/main.i:37:4: error[E0201]: `list` is not defined. Import `std/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = std/property` to use `list`.
+src/main.i:38:6: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
+src/main.i:39:8: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
+src/main.i:40:6: error[E0201]: `list` is not defined. Import `std/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = std/property` to use `list`.
+src/main.i:41:8: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
+src/main.i:44:8: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
+src/main.i:45:6: error[E0201]: `list` is not defined. Import `std/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = std/property` to use `list`.
+src/main.i:46:8: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
+src/main.i:81:3: error[E0201]: `fail` is not defined. Import `i/fail` to use the module `fail`.
+src/main.i:90:11: error[E0201]: `list` is not defined. Import `std/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = std/property` to use `list`.
+src/main.i:90:28: error[E0201]: `list` is not defined. Import `std/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = std/property` to use `list`.
+17 errors
