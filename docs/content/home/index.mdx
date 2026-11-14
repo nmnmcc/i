@@ -30,6 +30,7 @@ description: "Fast enough, complete enough, easy to read, and light: a small fun
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -86,6 +87,7 @@ port 8080
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -109,6 +111,7 @@ main = () {
 (
 	pure
 )
+
 pure : () -> Int = () { app.read_port() }
 ```
 
@@ -137,6 +140,7 @@ src/probe.i:8:1: error[E0501]: `app.BadPort` is not a subtype of `Never`
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -160,6 +164,7 @@ main = () {
 (
 	describe
 )
+
 describe = () { app.read_port() |> (0) { "off" } | (1) { "one" } }
 ```
 
@@ -188,6 +193,7 @@ src/probe.i:8:17: error[E0516]: the clauses do not cover every value of the subj
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -211,6 +217,7 @@ main = () {
 (
 	bad
 )
+
 bad = () { app.read_port() + "one" }
 ```
 
@@ -242,6 +249,7 @@ std/int
 read_port
 BadPort(..)
 )
+
 BadPort=()
 read_port=() {
 int.parse(process.env("PORT")) |>
@@ -267,6 +275,7 @@ fail.catch(read_port) |>
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -311,6 +320,7 @@ main = () {
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -333,6 +343,7 @@ main = () {
 	std/int
 	app = hello/main
 )
+
 format =
 	(0) { "off" }
 	| (port) { "port " <> int.to_string(port) }
@@ -383,6 +394,7 @@ pass hello/format_test.matching and overloading
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -418,6 +430,7 @@ hello/main.main : () <- (Fail(stdio.StdioError), i/request.Await, i/request.Owne
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -441,6 +454,7 @@ main = () {
 	i/fail
 	app = hello/main
 )
+
 read = (text) {
 	fail.catch(app.read_port) <- (
 		process.Environment(env = (_) { request.ready(Ok(text)) }),
@@ -473,6 +487,7 @@ pass hello/main_test.rejects a bad port
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -519,6 +534,7 @@ invalid PORT
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -542,6 +558,7 @@ main = () {
 	i/stdio
 	app = hello/main
 )
+
 test("joined reads", () {
 	ports = task.both(app.read_port, app.read_port)
 	stdio.print(core.inspect(ports))
@@ -582,6 +599,7 @@ pass hello/tasks_test.joined reads
 	read_port
 	BadPort(..)
 )
+
 BadPort = ()
 read_port = () {
 	int.parse(process.env("PORT")) |>
@@ -599,6 +617,7 @@ main = () {
 
 ```scheme file=src/macros.is title="src/macros.is"
 (, twice)
+
 (@ macro (: twice (-> (, Int) Int)))
 (@ macro (= twice (-> (, value) _ `(+ ~value ~value))))
 ```
@@ -611,6 +630,7 @@ main = () {
 	app = hello/main
 	hello/macros
 )
+
 test("typed expansion", () {
 	port = app.read_port()
 	stdio.print(

@@ -11,6 +11,7 @@ A **task** is a computation scheduled alongside other computations. Concurrency 
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	answer = task.scope((s) {
 		first = task.go(s, () { 20 })
@@ -45,6 +46,7 @@ For independent computations, `task.both` joins two children and returns their r
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	values = task.map_concurrently([3, 1, 2], (n) { n * 10 })
 	io.print(core.inspect(values))
@@ -74,6 +76,7 @@ When a scope body or child raises an error, the scope cancels its body and child
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	answer = fail.catch(() {
 		task.scope((s) {
@@ -103,6 +106,7 @@ To observe a child's cleanup, first make sure it has started. A **channel** pass
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	answer = fail.catch(() {
 		task.scope((s) {

@@ -23,6 +23,7 @@ Put this complete program in `src/main.i`:
 	std/path
 	std/bit_array
 )
+
 main = () {
 	file = path.join([".", "guide-note.txt"])
 	fs.write_file(file, <<"hello from a file":utf8>>)
@@ -54,6 +55,7 @@ Replace `src/main.i` with this program. It creates and removes its own file firs
 	i/stdio
 	std/path
 )
+
 main = () {
 	file = path.join([".", "guide-missing.txt"])
 	// Create and remove it so the missing-file case is repeatable.

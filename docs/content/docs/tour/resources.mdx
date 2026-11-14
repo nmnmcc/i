@@ -10,6 +10,7 @@ A resource is a value whose use must end with a release, such as an open file or
 	i/resource
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	resource.acquire(
 		() {
@@ -60,6 +61,7 @@ A **final function** is a cleanup callback installed around a computation. **Unw
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	answer = fail.catch(() {
 		resource.ensure(

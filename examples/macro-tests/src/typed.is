@@ -1,5 +1,7 @@
 (, (= syntax (/ i syntax)) (= fail (/ i fail)) (= core (/ i core)))
+
 (, to_text assert_eq)
+
 (= int_text (-> (, (: value Int)) String ((. core inspect) value)))
 /// Convert an Int or String expression, checking its type at expansion time.
 (@ macro (: to_text (-> [A] (, A) String)))

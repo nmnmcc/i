@@ -9,6 +9,7 @@ A macro is an i function that runs in the compiler, taking code as data and retu
 (
 	testlib = (test) = std/test
 )
+
 test("addition", () { assert(2 + 3 == 5) })
 ```
 
@@ -37,6 +38,7 @@ Create `src/macros.is` in a package named `tour`:
 
 ```scheme file=src/macros.is title="src/macros.is"
 (, twice)
+
 (@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
 ```
 
@@ -50,6 +52,7 @@ Use it from `src/main.i` in the same package:
 	i/core
 	(twice) = tour/macros
 )
+
 main = () <- (io : Io) {
 	saved = 10
 	io.print(
@@ -107,6 +110,7 @@ The complete [`examples/tour/src/sugar.is`](https://github.com/nmnmcc/i/blob/mai
 
 ```scheme file=src/sugar.is title="src/sugar.is"
 (, if)
+
 (= _branches
   (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
 (@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))

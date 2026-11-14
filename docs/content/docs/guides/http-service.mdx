@@ -32,6 +32,7 @@ A handler takes an `http.Request` and returns an `http.Response`. Put this compl
 (
 	handle
 )
+
 User = (name = String)
 user_schema = () {
 	schema.field(
@@ -83,6 +84,7 @@ Put this complete test in `test/handler_test.i`:
 	std/http
 	guide_http/handler
 )
+
 test("health and missing route", () {
 	health = handler.handle(http.request(http.Method("GET"), "/health"))
 	assert(health.status == http.Status(200))
@@ -150,6 +152,7 @@ Keep `src/handler.i` exactly as above. Add this complete `src/main.i` to the sam
 	std/http
 	guide_http/handler
 )
+
 main = () {
 	listener = net.listen("127.0.0.1", 18080)
 	stdio.print("listening on 127.0.0.1:18080")

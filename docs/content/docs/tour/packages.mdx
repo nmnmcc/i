@@ -11,6 +11,7 @@ Put the reusable function in `src/greeting.i`:
 (
 	message
 )
+
 message = (name : String) -> String { "hello, " <> name }
 ```
 
@@ -21,6 +22,7 @@ Use it from `src/main.i`:
 	(Io) = i/io
 	greeting = tour/greeting
 )
+
 main = () <- (io : Io) { io.print(greeting.message("reader")) }
 ```
 
@@ -99,6 +101,7 @@ Export the library's function from `app/words/src/greeting.i`:
 (
 	message
 )
+
 message = (name : String) -> String { "hello, " <> name }
 ```
 
@@ -118,6 +121,7 @@ Use it in `app/src/main.i`. Run `i run` from `app/`:
 	(Io) = i/io
 	greeting = util/greeting
 )
+
 main = () <- (io : Io) { io.print(greeting.message("package")) }
 ```
 

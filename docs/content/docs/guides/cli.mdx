@@ -31,6 +31,7 @@ Put the description in `src/options.i`. `cli.map2` combines the positional name 
 	Options(..)
 	parser
 )
+
 Options = (name = String, count = Int)
 parser = () {
 	cli.map2(cli.argument("name", "Name to greet", cli.text), cli.option(
@@ -49,6 +50,7 @@ The parser accepts an explicit list of strings. Put this complete file in `test/
 	std/cli
 	guide_cli/options
 )
+
 test("parses arguments", () {
 	assert(
 		cli.parse(options.parser(), ["Ada", "--count=2"]) ==
@@ -111,6 +113,7 @@ Add this complete `src/main.i` to the same project. Keep `src/options.i` unchang
 	(None) = std/option
 	guide_cli/options
 )
+
 greet = (name, count) {
 	{ count > 0 } |>
 		(True) {
