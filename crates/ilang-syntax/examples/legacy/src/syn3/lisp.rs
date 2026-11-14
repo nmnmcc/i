@@ -244,10 +244,8 @@ fn split_result(ret: &Datum) -> (&Datum, Option<&Datum>, Option<&Datum>) {
     }
 }
 
-/// The reverse of [`convert_quote`]: a quoted datum in the source rows is
-/// rewritten to the older rows, which the macro engine of this stage reads
-/// (the transition front keeps the current tree, so the syntax that a macro
-/// sees and gives is in the older rows).
+/// Legacy macro fixtures exchange the older row notation, so reversing
+/// [`convert_quote`] must preserve the shape of their quoted data.
 pub fn unconvert_quote(d: &Datum) -> Datum {
     let span = d.span;
     let all = |xs: &[Datum]| xs.iter().map(unconvert_quote).collect::<Vec<_>>();

@@ -934,7 +934,7 @@ pub(super) fn format_prim(name: &str) -> Option<BuiltinType> {
     })
 }
 
-/// Widen known literal facts only in covariant parts (literal-types decision 7).
+/// Only covariant facts may widen without changing callback requirements.
 pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
     match t {
         Ty::Never => Ty::Top,
@@ -1102,7 +1102,7 @@ mod literal_known_tests {
 
     #[test]
     fn hidden_inputs_and_recursive_widening() {
-        // decision 7: callback outputs and environments, not callback inputs.
+        // Hidden callback outputs and needs may widen; input requirements must stay exact.
         let s = super::super::solve::Solver::new(Default::default(), Vec::new());
         let f = FnTy::new(
             vec![(

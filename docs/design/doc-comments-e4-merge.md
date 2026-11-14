@@ -54,19 +54,56 @@ No language-rule references or TODOs were retained in audited comments. The
 seven Rustdoc blocks are unchanged; none is an executable Rust doctest. Two
 format-name mentions inside the migrator usage example remain protected.
 
-The nonheavy checks before the merge commit produced:
+The final nonheavy checks produced:
 
 ```text
 comment policy: 0 unapproved reference or stale-comment lines
 proof scope: new enforcing test crates/ilang-cli/tests/doc_comments.rs
 comment-only proof: 439 source files, 245 changed, 0 differ beyond comments
 rustdoc proof: 7 fenced/indented example blocks, no changes
-recorded 1631 contextual rewrites in 245 files
-replayed exactly 1631, refused 0
-Python cleanup regression suite: Ran 8 tests; OK
+recorded 1640 contextual rewrites in 245 files
+replayed exactly 1640, refused 0
+Python cleanup regression suite: Ran 9 tests; OK
 Snippet checker regression suite: Ran 10 tests; OK
 ```
 
 The decision to preserve all executable text follows the coordinator's
 comment-only scope and the spec's comments paragraph: “Comments have no effect
 on the meaning of a program.” The cleanup introduces no language decision.
+
+Release validation against merge commit `25b8a3363` succeeded:
+
+```text
+H direnv exec /home/agent/Programming/i cargo build --locked --release -p ilang-cli --bin i
+    Finished `release` profile [optimized] target(s) in 2m 05s
+```
+
+Here and in the command sequence, `H` denotes
+`/home/agent/Programming/i/.rd/cache/heavy`. Unit/binary tests select all ten workspace crates. A separate
+`-p ilang-syntax-migration --lib` invocation covers the excluded helper
+library, whose sources are also part of the comment cleanup.
+
+The initial expanded unit command included
+`-p ilang-syntax-migration --lib --bins` as well as all ten workspace crates.
+It exited 101 while compiling the excluded `migrate-syntax3-pipe` test binary:
+
+```text
+error[E0063]: missing fields `group` and `spread` in initializer of `ilang_syntax::ast::Stmt`
+error[E0063]: missing field `rest` in initializer of `ilang_syntax::ast::Param`
+error: could not compile `ilang-syntax-migration` (bin "migrate-syntax3-pipe" test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+```
+
+Both constructors are in `examples/legacy/support/legacy/parser.rs`; their
+executable tokens are unchanged from e4, as the source-token proof confirms.
+The coordinator's code-retention instruction prevents repairing these AST
+initializers in the comment lane. The adjusted verification tests all ten
+workspace packages with `--lib --bins` and separately tests the migration
+helper's library with `--lib`; the excluded helper binary is a reported
+baseline limitation, not a changed expectation or weakened test.
+
+The final review also removed bare numbered decision labels and two descriptions
+of a former migration stage. The policy matcher now rejects those forms, with a
+regression test that keeps legitimate runtime tracing and decision-tree prose
+allowed. Its expanded detector counts 584 stale-comment lines at e4 and zero in
+the cleaned tree. The exact replay map contains 1,640 entries in 245 files.

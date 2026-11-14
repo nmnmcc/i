@@ -74,7 +74,7 @@ fn check_export(source: &str, export: bool) -> (Vec<(String, String)>, Vec<Strin
 
 #[test]
 fn expressions_do_not_widen_or_compute_arithmetic() {
-    // Decision 4/5: values are never widened; operators give whole types;
+    // Literal precision belongs to values; arithmetic produces whole types;
     // unary minus sees only an unsigned literal through brace groups.
     let (ds, lines) =
         check("a = 0x10\nb = -{{1}}\nc = -{-1}\nd = 1 + 1\ne = [1, 2]\nf = [1, \"a\"]\n");
@@ -106,7 +106,7 @@ fn missing_values_report_coverage_and_later_constraints_are_kept() {
 
 #[test]
 fn scalar_matches_infer_literals_but_fitting_keeps_whole_types() {
-    // Decision 6: a literal pattern is exact only in a real match.
+    // A literal may narrow a match, while fitting must retain the full input type.
     let (ds, lines) = check("kind = (\"a\") { 1 } | (\"b\") { 2 }\nfit = (\"a\") { 1 }\n");
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
@@ -153,7 +153,7 @@ fn shared_fields_do_not_infer_an_empty_parameter() {
 
 #[test]
 fn unknown_parts_and_all_hidden_input_directions_are_conservative() {
-    // Decision 7: unknown parts contribute Top, including generalized variables;
+    // Unknown parts contribute Top, including generalized variables;
     // callback results, returned functions, environments and setters are hidden.
     let (ds, _) = check(
         r#"(

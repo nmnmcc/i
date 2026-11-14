@@ -57,6 +57,15 @@ class Boundaries(unittest.TestCase):
         source = '// old-syntax-check: E0101\nlet x = 1;\n'
         self.assertFalse(doc.equivalent('test.rs', source, source.replace('E0101', 'E0001')))
 
+    def test_policy_rejects_obsolete_review_labels(self):
+        for text in ['literal-types decision 7', 'literal-types decision 12',
+                     'type (Decision 1 / EF09)',
+                     'the engine of this stage', 'the transition front']:
+            self.assertIsNotNone(doc.PROCESS.search(text), text)
+        for text in ['trace a compiler stage', 'a decision tree',
+                     'the service row must retain its constructor key']:
+            self.assertIsNone(doc.PROCESS.search(text), text)
+
     def test_replay_refuses_stale_or_unsafe_entries(self):
         source = 'let x = 1; // old\n'
         entry = dict(file='test.rs', line=1, hash=doc.hsh(source),

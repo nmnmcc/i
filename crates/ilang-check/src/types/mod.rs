@@ -372,7 +372,7 @@ mod literal_representation_tests {
     #[cfg(debug_assertions)]
     #[should_panic]
     fn only_int_and_string_carry_sets() {
-        // literal-types decision 3: Float has no literal types.
+        // Float must never acquire a literal value set.
         Ty::lit(
             BuiltinType::Float,
             ValueSet::only([Arc::from("1")]).unwrap(),

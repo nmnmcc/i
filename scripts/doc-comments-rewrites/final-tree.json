@@ -2220,10 +2220,10 @@
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
-    "line": 2386,
-    "hash": "cc50f2a1865aac490d46f450d6ad765378f2205a551dcd3cde262a9431cac862",
-    "old": "                // type (Decision 1 / EF09). Binding that same row value to\n                // another row-typed parameter is forwarding, not inspecting\n                // or spreading it as ordinary data (§9.4). Use the actual\n                // formal type; a structural hint is not evidence (F1).\n                let saved_row = self.row_value_allowed;\n",
-    "new": "                // type (Decision 1 / EF09). Binding that same row value to\n                // another row-typed parameter is forwarding, not inspecting\n                // or spreading it as ordinary data. Use the actual\n                // formal type; a structural hint is not evidence (F1).\n                let saved_row = self.row_value_allowed;\n"
+    "line": 2384,
+    "hash": "ddd16862aaa41c3c786c744ec2a0fb232eefb90f5b480dc7c0c59a10bdf0a643",
+    "old": "                };\n                // A need variable can also name a function parameter's\n                // type (Decision 1 / EF09). Binding that same row value to\n                // another row-typed parameter is forwarding, not inspecting\n                // or spreading it as ordinary data (§9.4). Use the actual\n                // formal type; a structural hint is not evidence (F1).\n                let saved_row = self.row_value_allowed;\n                self.row_value_allowed = !ctor\n",
+    "new": "                };\n                // A need variable can also name a function parameter's\n                // type. Binding that same row value to\n                // another row-typed parameter is forwarding, not inspecting\n                // or spreading it as ordinary data. Use the actual\n                // formal type; a structural hint is not evidence.\n                let saved_row = self.row_value_allowed;\n                self.row_value_allowed = !ctor\n"
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
@@ -2639,6 +2639,20 @@
     "new": "}\n\n/// The type of the value of a segment with the format `name`, when\n/// there is such a format.\npub(super) fn format_prim(name: &str) -> Option<BuiltinType> {\n"
   },
   {
+    "file": "crates/ilang-check/src/types/known.rs",
+    "line": 935,
+    "hash": "fbbcf6ce585750828d1b2bc4287b9a979c1bdc0a4621dcf8b61dfcadd6ee9f60",
+    "old": "}\n\n/// Widen known literal facts only in covariant parts (literal-types decision 7).\npub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {\n    match t {\n",
+    "new": "}\n\n/// Only covariant facts may widen without changing callback requirements.\npub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {\n    match t {\n"
+  },
+  {
+    "file": "crates/ilang-check/src/types/known.rs",
+    "line": 1103,
+    "hash": "25cdd9e57e1768f4f9f51f3425fdb9d3bec13799b3ee8156d1e042bf9e38a68c",
+    "old": "    #[test]\n    fn hidden_inputs_and_recursive_widening() {\n        // decision 7: callback outputs and environments, not callback inputs.\n        let s = super::super::solve::Solver::new(Default::default(), Vec::new());\n        let f = FnTy::new(\n",
+    "new": "    #[test]\n    fn hidden_inputs_and_recursive_widening() {\n        // Hidden callback outputs and needs may widen; input requirements must stay exact.\n        let s = super::super::solve::Solver::new(Default::default(), Vec::new());\n        let f = FnTy::new(\n"
+  },
+  {
     "file": "crates/ilang-check/src/types/lits.rs",
     "line": 53,
     "hash": "85ef18f5b5fbb862629f64f24c8409449d4bea84859bad40916d396396480c6a",
@@ -2658,6 +2672,13 @@
     "hash": "3e026edd3c90b901e0212174ddef1c15e7ec4333eab221c3d65af2a293b9735e",
     "old": "    #[test]\n    fn bulk_join_matches_the_infinite_domain_model() {\n        // §9's batch join must preserve §4's set algebra, including\n        // duplicate streams, cofinite inputs and the outside value ★.\n        let sets: Vec<_> = (0..16)\n",
     "new": "    #[test]\n    fn bulk_join_matches_the_infinite_domain_model() {\n        // The batch join must preserve the set algebra, including\n        // duplicate streams, cofinite inputs and the outside value ★.\n        let sets: Vec<_> = (0..16)\n"
+  },
+  {
+    "file": "crates/ilang-check/src/types/lits.rs",
+    "line": 707,
+    "hash": "57c1dc967c0db4f419810c87830a6b0a49f34d2917b9380ec50229d4266d1a59",
+    "old": "    #[test]\n    fn canonical_literal_values() {\n        // literal-types decision 12: decimal numbers and decoded scalars.\n        let hex = BigUint::parse_bytes(b\"10\", 16).unwrap();\n        assert_eq!(int_text(false, &hex), \"16\");\n",
+    "new": "    #[test]\n    fn canonical_literal_values() {\n        // Canonical literal identity uses decimal numbers and decoded scalar sequences.\n        let hex = BigUint::parse_bytes(b\"10\", 16).unwrap();\n        assert_eq!(int_text(false, &hex), \"16\");\n"
   },
   {
     "file": "crates/ilang-check/src/types/mod.rs",
@@ -2707,6 +2728,13 @@
     "hash": "fe47c0c1b2b0c4261cc77aa846bdf6b2bad24718a65bd26261fb712f0e3545a5",
     "old": "    #[test]\n    fn scalar_sets_survive_child_mapping() {\n        // literal-types §4: \"No helper rebuilds a Con with a default set.\"\n        let set = ValueSet::except([Arc::from(\"a\")]);\n        let literal = Ty::lit(BuiltinType::String, set.clone());\n",
     "new": "    #[test]\n    fn scalar_sets_survive_child_mapping() {\n        // \"No helper rebuilds a Con with a default set.\"\n        let set = ValueSet::except([Arc::from(\"a\")]);\n        let literal = Ty::lit(BuiltinType::String, set.clone());\n"
+  },
+  {
+    "file": "crates/ilang-check/src/types/mod.rs",
+    "line": 373,
+    "hash": "fff4787db18d912b5e7a878225b317c2edd24c4360f95983516dd35f3d612e62",
+    "old": "    #[should_panic]\n    fn only_int_and_string_carry_sets() {\n        // literal-types decision 3: Float has no literal types.\n        Ty::lit(\n            BuiltinType::Float,\n",
+    "new": "    #[should_panic]\n    fn only_int_and_string_carry_sets() {\n        // Float must never acquire a literal value set.\n        Ty::lit(\n            BuiltinType::Float,\n"
   },
   {
     "file": "crates/ilang-check/src/types/mod.rs",
@@ -4033,10 +4061,24 @@
   },
   {
     "file": "crates/ilang-check/tests/literal_types.rs",
+    "line": 75,
+    "hash": "2371e51cd1be35e5e65bd451a794c28678de15d1b6375b7fb8230b57cde12249",
+    "old": "#[test]\nfn expressions_do_not_widen_or_compute_arithmetic() {\n    // Decision 4/5: values are never widened; operators give whole types;\n    // unary minus sees only an unsigned literal through brace groups.\n    let (ds, lines) =\n",
+    "new": "#[test]\nfn expressions_do_not_widen_or_compute_arithmetic() {\n    // Literal precision belongs to values; arithmetic produces whole types;\n    // unary minus sees only an unsigned literal through brace groups.\n    let (ds, lines) =\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/literal_types.rs",
     "line": 94,
     "hash": "afef0163772788611b8237a2f34c1189e907098a0fd6d5f23481395e8ec11dda",
     "old": "#[test]\nfn missing_values_report_coverage_and_later_constraints_are_kept() {\n    // §5.3: immediate Values is replaced by E0516; a later binding adds E0501.\n    let (ds, _) = check(\"f = (n : Int) { n |> (0) { \\\"zero\\\" } | (1) { \\\"one\\\" } }\\n\");\n    assert_eq!(ds.len(), 1, \"{ds:?}\");\n",
     "new": "#[test]\nfn missing_values_report_coverage_and_later_constraints_are_kept() {\n    // Immediate Values is replaced by E0516; a later binding adds E0501.\n    let (ds, _) = check(\"f = (n : Int) { n |> (0) { \\\"zero\\\" } | (1) { \\\"one\\\" } }\\n\");\n    assert_eq!(ds.len(), 1, \"{ds:?}\");\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/literal_types.rs",
+    "line": 107,
+    "hash": "c5dabdd9e72b6600681add1915cd2c54772246f14bb3fd410a13f1032838c2c5",
+    "old": "#[test]\nfn scalar_matches_infer_literals_but_fitting_keeps_whole_types() {\n    // Decision 6: a literal pattern is exact only in a real match.\n    let (ds, lines) = check(\"kind = (\\\"a\\\") { 1 } | (\\\"b\\\") { 2 }\\nfit = (\\\"a\\\") { 1 }\\n\");\n    assert!(ds.is_empty(), \"{ds:?}\");\n",
+    "new": "#[test]\nfn scalar_matches_infer_literals_but_fitting_keeps_whole_types() {\n    // A literal may narrow a match, while fitting must retain the full input type.\n    let (ds, lines) = check(\"kind = (\\\"a\\\") { 1 } | (\\\"b\\\") { 2 }\\nfit = (\\\"a\\\") { 1 }\\n\");\n    assert!(ds.is_empty(), \"{ds:?}\");\n"
   },
   {
     "file": "crates/ilang-check/tests/literal_types.rs",
@@ -4051,6 +4093,13 @@
     "hash": "9f45bee6a7841daf323325876ec2d0d1f47c47df430ce5baaef606272205bfc9",
     "old": "#[test]\nfn shared_fields_do_not_infer_an_empty_parameter() {\n    // §5.3: repeated written parameters keep String and require coverage.\n    let (ds, lines) = check(\n        \"Pair(A) = (A, A)\\nk = (p) { p |> (Pair(\\\"a\\\", \\\"x\\\")) { 1 } | (Pair(\\\"b\\\", \\\"y\\\")) { 2 } }\\nx = () { k(Pair(\\\"a\\\", \\\"x\\\")) }\\n\",\n",
     "new": "#[test]\nfn shared_fields_do_not_infer_an_empty_parameter() {\n    // Repeated written parameters keep String and require coverage.\n    let (ds, lines) = check(\n        \"Pair(A) = (A, A)\\nk = (p) { p |> (Pair(\\\"a\\\", \\\"x\\\")) { 1 } | (Pair(\\\"b\\\", \\\"y\\\")) { 2 } }\\nx = () { k(Pair(\\\"a\\\", \\\"x\\\")) }\\n\",\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/literal_types.rs",
+    "line": 154,
+    "hash": "f83bb2f2cb56a05bf9fd476fe4fc2fce4cc3fe27aec7d2abe8dbd8a80121cd07",
+    "old": "#[test]\nfn unknown_parts_and_all_hidden_input_directions_are_conservative() {\n    // Decision 7: unknown parts contribute Top, including generalized variables;\n    // callback results, returned functions, environments and setters are hidden.\n    let (ds, _) = check(\n",
+    "new": "#[test]\nfn unknown_parts_and_all_hidden_input_directions_are_conservative() {\n    // Unknown parts contribute Top, including generalized variables;\n    // callback results, returned functions, environments and setters are hidden.\n    let (ds, _) = check(\n"
   },
   {
     "file": "crates/ilang-check/tests/literal_types.rs",
@@ -4261,6 +4310,13 @@
     "hash": "2113b76f035b13be435e53663e6c1a3278a5ed386cf6ca4cb52aa50a2afca8cc",
     "old": "#[test]\nfn new_match_scopes_cover_subjects_and_hide_synthetic_names() {\n    // A1 §3.12: the made-up binding covers the subject too, and its names\n    // enter scope only in the body. Synthetic parameters never appear.\n    let source = \"main = () {\\n\\tlocal = 4\\n\\t(x) { local + x } |> (f) { f(local) }\\n}\\nmany = (0) { 1 } | (_) { 2 }\\nuse_many = () { apply(1, (0) { 1 } | (_) { 2 }) }\\napply = (x, f) { f(x) }\";\n",
     "new": "#[test]\nfn new_match_scopes_cover_subjects_and_hide_synthetic_names() {\n    // The made-up binding covers the subject too, and its names\n    // enter scope only in the body. Synthetic parameters never appear.\n    let source = \"main = () {\\n\\tlocal = 4\\n\\t(x) { local + x } |> (f) { f(local) }\\n}\\nmany = (0) { 1 } | (_) { 2 }\\nuse_many = () { apply(1, (0) { 1 } | (_) { 2 }) }\\napply = (x, f) { f(x) }\";\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/query.rs",
+    "line": 608,
+    "hash": "2c44cb8d360422bc9493af04d2c13e8288b9d4e8771e263b86dbbc029da165b0",
+    "old": "#[test]\nfn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {\n    // Decision 11: the hover is limited; Typed::schemes and package text stay full.\n    let lits = (0..14).map(|i| format!(\"\\\"m{i:02}\\\"\")).collect::<Vec<_>>();\n    let source = format!(\"Modes = {}\\nxs = [{}]\\n\", lits.join(\" | \"), lits.join(\", \"));\n",
+    "new": "#[test]\nfn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {\n    // Limit hover text for readability; schemes and package text must stay lossless.\n    let lits = (0..14).map(|i| format!(\"\\\"m{i:02}\\\"\")).collect::<Vec<_>>();\n    let source = format!(\"Modes = {}\\nxs = [{}]\\n\", lits.join(\" | \"), lits.join(\", \"));\n"
   },
   {
     "file": "crates/ilang-check/tests/query.rs",
@@ -4492,6 +4548,13 @@
     "hash": "7a45eb15522931b7f3cc97faf66a9267d4629d77a5f7e0560892b2c47b60655e",
     "old": "#[test]\nfn catch_cannot_split_a_fail_entry_into_the_residual_row() {\n    // §2.10.4 Q1-B: choosing E = Int and N = Fail(String) would allow\n    // an Error(String) to escape with the claimed Result(Nil, Int) type.\n    let source = \"(i/fail)\\nsplit: (() <- (Fail(Int | String)) -> Nil) <- (Fail(String)) -> Result(Nil, Int) = (body) { fail.catch(body) }\\n\";\n",
     "new": "#[test]\nfn catch_cannot_split_a_fail_entry_into_the_residual_row() {\n    // Choosing E = Int and N = Fail(String) would allow\n    // an Error(String) to escape with the claimed Result(Nil, Int) type.\n    let source = \"(i/fail)\\nsplit: (() <- (Fail(Int | String)) -> Nil) <- (Fail(String)) -> Result(Nil, Int) = (body) { fail.catch(body) }\\n\";\n"
+  },
+  {
+    "file": "crates/ilang-check/tests/row_schemes.rs",
+    "line": 496,
+    "hash": "9ea901a28a590f65c94c7d738c423fa8672bcb272c143a5dc5a68afc716f5e9e",
+    "old": "#[test]\nfn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {\n    // Decision 2 (EF03/T4) removes universal-entry erasure. Preserve the\n    // original unused-head source as a negative case beside a real raise;\n    // a provider, not choosing E = Never, makes the pure callback valid.\n    let unused = \"unused = <E>() <- (handler: Fail(E)) { Nil }\\nrun = (f: () -> Nil) { f() }\\nmain = () { run(() { unused() }) }\\n\";\n    let provided = unused.replace(\n",
+    "new": "#[test]\nfn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {\n    // An unused Fail entry still requires its provider; choosing E = Never\n    // must not erase the service key. Check both unused and raised entries.\n    let unused = \"unused = <E>() <- (handler: Fail(E)) { Nil }\\nrun = (f: () -> Nil) { f() }\\nmain = () { run(() { unused() }) }\\n\";\n    let provided = unused.replace(\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -7037,9 +7100,9 @@
   {
     "file": "crates/ilang-syntax/examples/legacy/src/syn3/lisp.rs",
     "line": 245,
-    "hash": "878335c594b3d45ef0ba0ab4a1691957ef02a4d3045f50ab90420b19af2d7b17",
-    "old": "}\n\n/// The reverse of [`convert_quote`]: a quoted datum in the rows of §6.8 is\n/// rewritten to the older rows, which the macro engine of this stage reads\n/// (the transition front keeps the current tree, so the syntax that a macro\n",
-    "new": "}\n\n/// The reverse of [`convert_quote`]: a quoted datum in the source rows is\n/// rewritten to the older rows, which the macro engine of this stage reads\n/// (the transition front keeps the current tree, so the syntax that a macro\n"
+    "hash": "cea4fd50c1f6ce52b2307fcd9c7aea764f9faffca8d14a8db11ab03b5cea05b0",
+    "old": "}\n\n/// The reverse of [`convert_quote`]: a quoted datum in the rows of §6.8 is\n/// rewritten to the older rows, which the macro engine of this stage reads\n/// (the transition front keeps the current tree, so the syntax that a macro\n/// sees and gives is in the older rows).\npub fn unconvert_quote(d: &Datum) -> Datum {\n    let span = d.span;\n",
+    "new": "}\n\n/// Legacy macro fixtures exchange the older row notation, so reversing\n/// [`convert_quote`] must preserve the shape of their quoted data.\npub fn unconvert_quote(d: &Datum) -> Datum {\n    let span = d.span;\n"
   },
   {
     "file": "crates/ilang-syntax/examples/legacy/src/syn3/lower.rs",

@@ -607,7 +607,7 @@ fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
 
 #[test]
 fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
-    // Decision 11: the hover is limited; Typed::schemes and package text stay full.
+    // Limit hover text for readability; schemes and package text must stay lossless.
     let lits = (0..14).map(|i| format!("\"m{i:02}\"")).collect::<Vec<_>>();
     let source = format!("Modes = {}\nxs = [{}]\n", lits.join(" | "), lits.join(", "));
     let f = Fixture::new(&[("src/main.i", &source)]);

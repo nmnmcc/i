@@ -2372,10 +2372,10 @@ impl<'a> Checker<'a> {
                     None => Knowledge::unknown(),
                 };
                 // A need variable can also name a function parameter's
-                // type (Decision 1 / EF09). Binding that same row value to
+                // type. Binding that same row value to
                 // another row-typed parameter is forwarding, not inspecting
                 // or spreading it as ordinary data. Use the actual
-                // formal type; a structural hint is not evidence (F1).
+                // formal type; a structural hint is not evidence.
                 let saved_row = self.row_value_allowed;
                 self.row_value_allowed = !ctor
                     && matches!((&f, &to), (Ty::Fn(ft), Some(to))

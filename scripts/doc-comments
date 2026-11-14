@@ -27,6 +27,7 @@ PROCESS = re.compile(
     r"(?-i:\b(?:TODO|FIXME|XXX)\b)|\b(?:[Ss]tages? [0-9E]|[Pp]hases? [0-9])"
     r"|\bsyntax[ -]three\b|\bsyntax-3\.md\b|\bold tree\b|\blower\.rs\b"
     r"|\b(?:coordinator|compiler lanes|gate tree)\b|\blane/[A-Za-z0-9_-]+"
+    r"|\b(?:decision [0-9]+|EF[0-9]+|this stage|transition front)\b"
     r"|\brules? [0-9]|^\s*[A-Z][0-9]{1,2}[a-z]?(?:/[A-Z][0-9]{1,2})*:\s", re.I
 )
 PROTECTED = re.compile(

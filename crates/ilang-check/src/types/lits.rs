@@ -704,7 +704,7 @@ mod tests {
 
     #[test]
     fn canonical_literal_values() {
-        // literal-types decision 12: decimal numbers and decoded scalars.
+        // Canonical literal identity uses decimal numbers and decoded scalar sequences.
         let hex = BigUint::parse_bytes(b"10", 16).unwrap();
         assert_eq!(int_text(false, &hex), "16");
         assert_eq!(int_text(true, &BigUint::from(0u8)), "0");

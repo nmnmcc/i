@@ -495,9 +495,8 @@ fn a_directed_handler_restriction_without_a_stated_entry_is_hidden() {
 
 #[test]
 fn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {
-    // Decision 2 (EF03/T4) removes universal-entry erasure. Preserve the
-    // original unused-head source as a negative case beside a real raise;
-    // a provider, not choosing E = Never, makes the pure callback valid.
+    // An unused Fail entry still requires its provider; choosing E = Never
+    // must not erase the service key. Check both unused and raised entries.
     let unused = "unused = <E>() <- (handler: Fail(E)) { Nil }\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { unused() }) }\n";
     let provided = unused.replace(
         "unused() })",
