@@ -185,7 +185,7 @@ pub fn for_each_span(expression: &Expr, visit: impl FnMut(Span)) {
 
 /// Whether an expression at one of the `holes` stands inside a function
 /// of the expression: a chain, but not the branches of a match
-/// (`a |> F1 | F2`, the old tree's `Case`).
+/// (`a |> F1 | F2`).
 pub fn hole_inside_function(expression: &Expr, mut is_hole: impl FnMut(Span) -> bool) -> bool {
     struct Delayed<F> {
         depth: usize,

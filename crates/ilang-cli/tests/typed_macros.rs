@@ -429,8 +429,8 @@ fn typed_macro_forwarding_effect_rows_graph_differential() {
 }
 #[test]
 fn typed_macro_members_give_each_closed_data_member_once() {
-    // syntax-3 stage 6: a union of closed data has one member per shape
-    // (§2.3, §6.2); it is no longer one record graph.
+    // A union of closed data has one member per shape;
+    // it is no longer one record graph.
     let m = declared(
         "m (-> [A] (, A) A)",
         "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax members) t) (| (-> (, [one two]) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"closed data members not one per shape\") (= at value))))))})",

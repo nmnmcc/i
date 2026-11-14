@@ -1,4 +1,4 @@
-//! Position-directed printing of the final syntax-three tree.
+//! Printing needs a grammar position so a datum keeps its intended meaning.
 use super::{Datum, DatumKind as K, Document};
 use crate::span::Span;
 use crate::{Code, Diagnostic};
@@ -27,8 +27,8 @@ fn deeper_than(d: &Datum, limit: usize) -> bool {
     false
 }
 
-/// A datum of the rows of syntax three (docs/design/syntax-3.md §6.8) as
-/// text of the normal surface, read for one position of §6.7. The reader and
+/// A datum of the source rows as
+/// normal-surface text, read for a grammar position. The reader and
 /// the printer recurse, so a deep datum is handled on a deep stack.
 pub(super) fn show_as3(d: &Datum, position: super::syntax::Position) -> Result<String> {
     if deeper_than(d, DIRECT_DEPTH) {

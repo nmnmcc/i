@@ -1,4 +1,4 @@
-//! Name resolution for target provider plans (§2.6.1).
+//! Name resolution for target provider plans.
 //!
 //! A plan is resolved using the package which declared each cell, not the
 //! package whose entry eventually uses it.
@@ -147,8 +147,8 @@ pub struct ConstructionStep {
     pub scope: Scope,
     pub role: Role,
     pub request_mode: bool,
-    /// A discriminant service that wraps a union (syntax-3.md §2.8: a
-    /// service is one labelled type): the constructor of the service whose
+    /// A service must be one labelled type, so a union supply needs the
+    /// discriminant constructor of the service whose
     /// one field holds the value that `supply` makes.
     pub wrap: Option<hir::CtorRef>,
 }
@@ -280,7 +280,7 @@ pub fn resolve_program_plans(
 }
 
 /// WASI emits one command; test bodies are still source-checked, but have no
-/// construction plan on that target (§B.7).
+/// construction plan on that target.
 pub fn entry_is_eligible(p: &Program, entry: DefId, target: Target) -> bool {
     target != Target::Wasi || p.module(entry.module).kind != ModuleKind::Test
 }

@@ -93,7 +93,7 @@ fn expressions_do_not_widen_or_compute_arithmetic() {
 
 #[test]
 fn missing_values_report_coverage_and_later_constraints_are_kept() {
-    // §5.3: immediate Values is replaced by E0516; a later binding adds E0501.
+    // Immediate Values is replaced by E0516; a later binding adds E0501.
     let (ds, _) = check("f = (n : Int) { n |> (0) { \"zero\" } | (1) { \"one\" } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "E0516");
@@ -125,7 +125,7 @@ fn scalar_matches_infer_literals_but_fitting_keeps_whole_types() {
 
 #[test]
 fn equality_diagnostics_distinguish_the_operator() {
-    // §5.4: disjoint constants give False for == and True for !=.
+    // Disjoint constants give False for == and True for !=.
     for (op, result) in [("==", "False"), ("!=", "True")] {
         let (ds, _) = check(&format!("x = 1 {op} 2\n"));
         assert_eq!(ds.len(), 1, "{ds:?}");
@@ -139,7 +139,7 @@ fn equality_diagnostics_distinguish_the_operator() {
 
 #[test]
 fn shared_fields_do_not_infer_an_empty_parameter() {
-    // §5.3: repeated written parameters keep String and require coverage.
+    // Repeated written parameters keep String and require coverage.
     let (ds, lines) = check(
         "Pair(A) = (A, A)\nk = (p) { p |> (Pair(\"a\", \"x\")) { 1 } | (Pair(\"b\", \"y\")) { 2 } }\nx = () { k(Pair(\"a\", \"x\")) }\n",
     );
@@ -185,7 +185,7 @@ f = () {
 
 #[test]
 fn prefix_witness_does_not_match_a_prefix_row() {
-    // §5.5 concrete witnesses: after empty string and "a" prefix, choose "b".
+    // Concrete witnesses: after the empty string and the prefix "a", choose "b".
     let (ds, _) = check("f = (s : String) { s |> (\"\") { 0 } | (\"a\" <> _) { 1 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "E0516");
@@ -194,14 +194,14 @@ fn prefix_witness_does_not_match_a_prefix_row() {
 
 #[test]
 fn inferred_host_export_cannot_receive_a_restricted_scalar() {
-    // Decision 9/§5.8: the host validates form only; inferred input sets must be All.
+    // The host validates form only; inferred input sets must be All.
     let (ds, _) = check_export("(\n\tf\n)\nf = (\"a\") { 1 } | (\"b\") { 2 }\n", true);
     assert!(ds.iter().any(|d| d.0 == "E0521"), "{ds:?}");
 }
 
 #[test]
 fn empty_optional_accumulator_requires_a_written_tuple_shape() {
-    // Coordinator ruling: keep rule 13 and decision 7; the unannotated
+    // Projection requires a known type; the unannotated
     // reduced example is a rejection, and the acceptance example is annotated.
     let source = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -216,7 +216,7 @@ fn empty_optional_accumulator_requires_a_written_tuple_shape() {
 
 #[test]
 fn guarded_list_heads_leave_tail_items_unrestricted() {
-    // Std-1b report §5: rule 11 must pass catch-all slack to every
+    // Rule 11 must pass catch-all slack to every
     // homogeneous list item, including items reached through the rest.
     let (ds, _) = check(
         r#"probe = (xs : List(Int)) -> Nil {
@@ -233,7 +233,7 @@ fn guarded_list_heads_leave_tail_items_unrestricted() {
 
 #[test]
 fn grouped_negatives_supply_the_same_written_group_facts() {
-    // Decision 5 and §6.10: groups do not change directness or known literal facts.
+    // Groups do not change directness or known literal facts.
     for value in ["1", "-1", "-{1}", "-{{1}}"] {
         let (ds, _) = check(&format!("pair = ({value}, f)\nf = () {{ pair.0 == 2 }}\n"));
         assert_eq!(ds.len(), 1, "{value}: {ds:?}");
@@ -245,7 +245,7 @@ fn grouped_negatives_supply_the_same_written_group_facts() {
 
 #[test]
 fn shared_list_items_need_coverage_but_an_option_parameter_keeps_literals() {
-    // §5.3: shared places get whole scalars; a once-occurring Some(A) keeps literals.
+    // Shared places get whole scalars; a once-occurring Some(A) keeps literals.
     let (ds, lines) = check(
         "(\n\t(Option, Some, None) = std/option\n)\nk = (Some(\"a\")) { 1 } | (None) { 2 }\n",
     );
@@ -268,7 +268,7 @@ fn shared_list_items_need_coverage_but_an_option_parameter_keeps_literals() {
 
 #[test]
 fn nested_missing_values_are_one_coverage_error() {
-    // §5.3 explicitly requires one E0516 rather than E0501 for immediate Values.
+    // One E0516 is required rather than E0501 for immediate Values.
     for (source, witness) in [
         (
             "f = (r : Result(Int, Nil)) { r |> (Ok(0)) { 1 } | (Error(_)) { 2 } }",
@@ -288,7 +288,7 @@ fn nested_missing_values_are_one_coverage_error() {
 
 #[test]
 fn written_literals_and_negative_differences_constrain_calls() {
-    // §3 and §10: at a primary, minus builds a literal; after a type it subtracts.
+    // At a primary, minus builds a literal; after a type it subtracts.
     for (annotation, accepted, rejected) in [
         ("Int - -1", "1", "-1"),
         ("Int - 1", "-1", "1"),
@@ -305,7 +305,7 @@ fn written_literals_and_negative_differences_constrain_calls() {
 
 #[test]
 fn typed_complements_keep_the_head_and_cover_cross_columns() {
-    // §5.5: each excluded scalar value has its own specialization.
+    // Each excluded scalar value has its own specialization.
     let cases = [
         (
             "f = (s : String) { s |> (\"a\") { 0 } | (x : String - \"a\") { 1 } }",
@@ -342,7 +342,7 @@ fn typed_complements_keep_the_head_and_cover_cross_columns() {
 
 #[test]
 fn narrowing_checks_the_entire_row_and_ignores_guards() {
-    // §5.3: only a fully covered candidate row may be removed. The fast
+    // Only a fully covered candidate row may be removed. The fast
     // path is reserved for a literal alone at the top place of the real row.
     for (pattern, catch, annotation, accept) in [
         ("\"a\"", "t", "String", true),
@@ -381,7 +381,7 @@ fn narrowing_checks_the_entire_row_and_ignores_guards() {
 
 #[test]
 fn prefix_after_complement_does_not_erase_other_columns() {
-    // §5.5: an excluded string starting with a prefix prevents treating
+    // An excluded string starting with a prefix prevents treating
     // that Except row as covering the whole prefix.
     let source = "h = (n : Int) { n }\nf = (p : (String, Int)) {\n\tp |> ((x : String - \"ab\", _)) { 0 } | ((\"a\" <> r, t)) { h(t) } | (_) { 2 }\n}\n";
     let (ds, _) = check(source);
@@ -396,7 +396,7 @@ fn prefix_after_complement_does_not_erase_other_columns() {
 
 #[test]
 fn host_directions_expand_aliases_and_same_scalar_unions() {
-    // Decision 9/§5.8: i may send literal sets; host values must be whole.
+    // i may send literal sets; host values must be whole.
     let (ds, _) = check(
         "Level = \"info\" | \"warn\"\n@external(\"test\", \"log\")\nlog : (Level | \"error\") -> Nil\n",
     );
@@ -421,8 +421,8 @@ fn host_directions_expand_aliases_and_same_scalar_unions() {
 
 #[test]
 fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
-    // Spec §10.3: outgoing scalar members allow any value set; incoming
-    // members must have all values. §4.2/§4.4 define set operations.
+    // Outgoing scalar members allow any value set; incoming
+    // members must have all values. Union, intersection and difference define the sets.
     // These four programs are the independent review's reproductions.
     for source in [
         "One = {1 | 2} - 2\n@external(\"app\", \"write\")\nwrite : (One) -> Nil\n",
@@ -478,7 +478,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         assert!(ds.is_empty(), "{ty}: {ds:?}");
     }
     // The old environments `! Int - Int` and `! String - String` cannot be
-    // written: a need list holds named service types only (syntax-3 §3.1).
+    // written: a need list holds named service types only.
     let (ds, _) = check("@host(\"app\")\nSvc = (get = () <- (Never) -> String)\n");
     assert!(ds.is_empty(), "Never: {ds:?}");
     for empty in ["1 - 1", "Int & String"] {
@@ -523,7 +523,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
 
 #[test]
 fn literal_values_use_numeric_and_decoded_scalar_identity() {
-    // Decision 12 and §11.4: canonical numbers, decoded strings, no NFC normalization.
+    // Canonical numbers, decoded strings, no NFC normalization.
     for (ty, accepted, rejected) in [
         ("0x10", "16", "17"),
         ("-0", "0", "1"),
@@ -543,7 +543,7 @@ fn literal_values_use_numeric_and_decoded_scalar_identity() {
 
 #[test]
 fn shared_parameters_require_all_combinations_of_a_written_finite_set() {
-    // §5.3: inference keeps a shared head whole; written finite sets constrain coverage.
+    // Inference keeps a shared head whole; written finite sets constrain coverage.
     let (ds, _) = check(
         "Pair(A) = (A, A)\nf = (p : Pair(\"a\" | \"b\")) {\n\tp |> (Pair(\"a\", \"a\")) { 0 } | (Pair(\"b\", \"b\")) { 1 }\n}\n",
     );
@@ -557,7 +557,7 @@ fn shared_parameters_require_all_combinations_of_a_written_finite_set() {
 
 #[test]
 fn whole_known_bounds_keep_non_covariant_literal_parts_as_holes() {
-    // Decision 7/rule 13: copying a known function, invariant cell or
+    // Copying a known function, invariant cell or
     // contravariant sink must not impose whole String in the wrong direction.
     let source = r#"Sink(A) = (put = (A) -> Nil)
 Cell(A) = (get = () -> A, set = (A) -> Nil)
@@ -580,7 +580,7 @@ q = apply("a", ("a") { 1 } | ("b") { 2 }).1
 
 #[test]
 fn one_clause_choices_are_fitted_and_never_constructor_flow() {
-    // Spec §4.8 fitting / §6.12: literals stay whole; choices have no label.
+    // Literals stay whole when fitted; choices have no label.
     let (ds, lines) = check("f = (0 | 1) { 2 }\n");
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
@@ -589,17 +589,17 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
             .any(|l| l.ends_with("f : (Int) <- (Assert) -> 2")),
         "{lines:?}"
     );
-    // §7.5: fitting does not narrow the original subject to a constructor.
+    // Fitting does not narrow the original subject to a constructor.
     let (ds, _) = check(
         "Yes = (value = Int)\nNo = ()\nT = Yes | No\nf = (r : T) { r |> (Yes(_) | Yes(_)) { r.value } }\n",
     );
     assert!(ds.iter().any(|d| d.0 == "E0512"), "{ds:?}");
-    // §4.8 / §6.12: opaque tests still constrain all values of that head.
+    // Opaque tests still constrain all values of that head.
     let (ds, _) = check(
         "Box(A) = (A)\nf = (r : { Box(Int | String) | Int }) { r |> (0 | _ : Box(Int)) { Nil } }\n",
     );
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
-    // §6.12: fitting binds a monotype, without the binding's generalization.
+    // Fitting binds a monotype, without the binding's generalization.
     let (ds, _) = check(
         "id = <A>(x : A) { x }\nf = () { id |> (g | g) { (g(1) + 1, g(\"a\") <> \"b\") } }\n",
     );
@@ -608,15 +608,13 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
 
 #[test]
 fn fitted_choices_keep_the_deferred_binding_error() {
-    // Joint J4/J5: a fitted group (one branch, no guard) is not checked for
-    // coverage, so this is never E0516. Syntax three: `-> Int` on a function
-    // literal leaves its needs to inference (syntax-3 §2.10.1, "the whole
-    // need, inferred"), and
+    // a fitted group (one branch, no guard) is not checked for
+    // coverage, so this is never E0516. A written `-> Int` on a function
+    // literal leaves its needs to inference, and
     // "a group with one branch and no guard ... when it may fail it reports
-    // to `Assert`" (spec §6.12), so `f` needs `Assert` instead of the old
+    // to `Assert`", so `f` needs `Assert` instead of the old
     // E0501. No value of the known type `"b"` matches `"a" | "c"`: "a branch
-    // that can never be used gives a compile warning" (spec §6.12; syntax-3
-    // §2.12, D4), W0505.
+    // that can never be used gives a compile warning", W0505.
     let (ds, lines) = check("s = \"b\"\nf = () -> Int { s |> (\"a\" | \"c\") { 1 } }\n");
     assert_eq!(
         ds.iter().map(|d| d.0.as_str()).collect::<Vec<_>>(),
@@ -633,7 +631,7 @@ fn fitted_choices_keep_the_deferred_binding_error() {
 
 #[test]
 fn everyday_disjoint_equalities_warn_without_widening() {
-    // W520/§6.9: comparisons keep Bool and exact operand types, with a warning.
+    // Comparisons keep Bool and exact operand types, with a warning.
     // Explicit broad interfaces still avoid the warning.
     for source in [
         "x = 1\nf = () { x == 2 }\n",
@@ -670,7 +668,7 @@ fn everyday_disjoint_equalities_warn_without_widening() {
 
 #[test]
 fn disjoint_guards_do_not_narrow_or_cover() {
-    // W520/§6.9 and §7.4: even an always-true guard does not cover a value.
+    // even an always-true guard does not cover a value.
     for source in [
         "f = (x : 1) { x |> (_ ? x == 2) { 0 } }\n",
         "f = (x : 1) { x |> (_ ? x != 2) { 0 } }\n",

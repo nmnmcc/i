@@ -1,14 +1,14 @@
 //// Functions for `List(A)`, the built-in type of lists that may not be
 //// changed.
 ////
-//// Every function that walks a whole list is tail-recursive (§11.6), so it
+//// Every function that walks a whole list is tail-recursive, so it
 //// works on lists of any length without using more stack. Functions that
 //// build a new list build it in reverse and then turn it round, which takes
 //// one more pass.
 ////
 //// Functions that may find nothing give an `Option` (`first`, `find`,
 //// `at`, …). Functions that take a function as an argument have the errors
-//// and the environment of that function (`^ E ! N`), so the argument may
+//// and service needs of that function, so the argument may
 //// itself raise errors or need services.
 (
 	dict = (Dict) = std/dict

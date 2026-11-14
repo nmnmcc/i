@@ -202,7 +202,7 @@ fn type_of_local_names() {
 fn type_of_other_things() {
     let f = fixture();
     assert_eq!(f.hover("app/main", "Some(v)", 0), "Some : (A) -> Some(A)");
-    // A constructor's type is its own (syntax three §2.8).
+    // A constructor's type is its own.
     assert_eq!(f.hover("app/main", "None)", 0), "None : None");
     assert_eq!(f.hover("app/main", "name", 0), "name : String");
     assert_eq!(
@@ -349,7 +349,7 @@ fn completions_of_fields_from_inference() {
     // A top-level name.
     let cs = f.completions("app/main", "origin.y", 7);
     assert_eq!(labels(&cs), vec!["x", "y"]);
-    // A name known to be made by a constructor (§7.5).
+    // A name known to be made by a constructor.
     let cs = f.completions("app/main", "o.x", 2);
     assert_eq!(labels(&cs), vec!["x", "y"]);
 }
@@ -372,7 +372,7 @@ fn symbols_of_a_module() {
             ("total", SymbolKind::Value),
         ]
     );
-    // `Option` is a union (syntax three §2.8): its members are types with
+    // `Option` is a union: its members are types with
     // one constructor each.
     let ctors: Vec<&str> = syms[4..6]
         .iter()
@@ -600,7 +600,7 @@ fn completions_after_any_expression() {
 
 #[test]
 fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
-    // A1 §3.12: the made-up binding covers the subject too, and its names
+    // The made-up binding covers the subject too, and its names
     // enter scope only in the body. Synthetic parameters never appear.
     let source = "main = () {\n\tlocal = 4\n\t(x) { local + x } |> (f) { f(local) }\n}\nmany = (0) { 1 } | (_) { 2 }\nuse_many = () { apply(1, (0) { 1 } | (_) { 2 }) }\napply = (x, f) { f(x) }";
     let fixture = Fixture::new(&[("src/main.i", source)]);
@@ -701,7 +701,7 @@ fn query_references_follow_identity_across_modules() {
     assert!(found.iter().all(|(_, t)| t == "area"), "{found:?}");
     assert_eq!(refs.iter().filter(|r| r.definition).count(), 1);
     // A field: the label of the definition, the labels of the calls, and
-    // the label of the pattern part. Syntax three writes that part
+    // the label of the pattern part. The source syntax writes that part
     // `Circle(radius = radius)`: the label and the local it binds are two
     // words, so the label is a name of the field only, and the local is
     // the second word.
@@ -733,7 +733,7 @@ fn query_rename_checks_kind_and_scope() {
     assert!(edits.iter().all(|e| e.text == "disk"));
     // A constructor, in both modules: the definition, the member of the
     // sum `Shape = Circle | Dot` (the labelled type `Circle` is the
-    // constructor, syntax three §2.6), the pattern, the import and the two
+    // constructor), the pattern, the import and the two
     // calls.
     let at = f.at("app/main", "Circle(radius = 2)", 0, 0);
     let edits = q.rename(m, at, "Disk").unwrap();
@@ -778,7 +778,7 @@ fn query_type_definition_signature_and_hints() {
             [types[0].span.start as usize..types[0].span.end as usize]
             .to_string(),
         // `c = Circle(…)` has the type `Circle`: a constructor's type is its
-        // own (syntax three §2.8).
+        // own.
         "Circle"
     );
     let s = q
@@ -802,7 +802,7 @@ fn query_completion_context() {
         CompletionContext::Type
     );
     match q.completion_context(shapes, f.at("app/shapes", "Dot) { 0 }", 0, 0)) {
-        // The members of `Shape = Circle | Dot` (syntax three §2.8).
+        // The members of `Shape = Circle | Dot`.
         CompletionContext::Pattern { types } => assert_eq!(types.len(), 2),
         other => panic!("{other:?}"),
     }

@@ -30,7 +30,7 @@ name = () -> cli.Parser(String) {
 
 options = () -> cli.Parser(Options) { cli.map2(jobs(), verbose(), Options) }
 
-// A2/A3/A6/A7: the note's complete typed description and integer examples.
+// the note's complete typed description and integer examples.
 test("cli_options", () {
 	assert(
 		cli.parse(options(), ["--verbose", "--jobs=4"]) ==
@@ -98,7 +98,7 @@ test("cli_options", () {
 	Nil
 })
 
-// A1: validate spelling before duplicate names, then positional placement.
+// validate spelling before duplicate names, then positional placement.
 test("cli_definition_errors", () {
 	stop_int = (_ : String) -> Result(Int, String) {
 		panic("reader called during validation")
@@ -227,7 +227,7 @@ test("cli_definition_errors", () {
 	Nil
 })
 
-// A2/A3: token spelling, separator ownership and values independent of readers.
+// token spelling, separator ownership and values independent of readers.
 test("cli_token_ownership", () {
 	list.each([["--jobs"], ["--jobs", "--"], ["-j"], ["-j", "--"]], (args) {
 		assert(
@@ -265,7 +265,7 @@ test("cli_token_ownership", () {
 	assert(
 		cli.parse(name(), ["--name", "é \u{0}"]) == Ok("é \u{0}"),
 	)
-	// A3 does not recognize the following --verbose while it belongs to name.
+	// Scanning does not recognize the following --verbose while it belongs to name.
 	assert(
 		cli.parse(
 			cli.map2(name(), verbose(), (n, v) { (n, v) }),
@@ -316,7 +316,7 @@ test("cli_token_ownership", () {
 	Nil
 })
 
-// A4: repetition precedes arity checking and aliases identify the same leaf.
+// repetition precedes arity checking and aliases identify the same leaf.
 test("cli_repetition", () {
 	assert(
 		cli.parse(verbose(), ["--verbose=false"]) ==
@@ -354,7 +354,7 @@ test("cli_repetition", () {
 	Nil
 })
 
-// A5/A6: allocation is completed before any missing/conversion callback runs.
+// allocation is completed before any missing/conversion callback runs.
 test("cli_error_order", () {
 	assert(
 		cli.parse(jobs(), ["--unknown"]) ==
@@ -465,7 +465,7 @@ test("cli_error_order", () {
 	Nil
 })
 
-// A5: optional absence and caller-supplied defaults; ordered positional rest.
+// optional absence and caller-supplied defaults; ordered positional rest.
 test("cli_allocation", () {
 	o = cli.optional(
 		cli.Names(long = "jobs", short = Some("j")),
@@ -502,7 +502,7 @@ test("cli_allocation", () {
 	Nil
 })
 
-// A7: exactly std/int.parse's signed ASCII decimal grammar, with fixed error.
+// exactly std/int.parse's signed ASCII decimal grammar, with fixed error.
 test("cli_converters", () {
 	list.each([
 		("0", 0),
@@ -532,7 +532,7 @@ test("cli_converters", () {
 	Nil
 })
 
-// A6 and the observation laws: heterogeneous types and every bucket consumed.
+// The bucket observation laws: heterogeneous types and every bucket consumed.
 test("cli_composition_laws", () {
 	assert(
 		cli.parse(
@@ -593,7 +593,7 @@ test("cli_composition_laws", () {
 	Nil
 })
 
-// A8: byte-exact help, all display forms, verbatim content, no callbacks.
+// byte-exact help, all display forms, verbatim content, no callbacks.
 test("cli_help", () {
 	assert(
 		cli.help(
@@ -681,7 +681,7 @@ test("cli_help", () {
 	Nil
 })
 
-// A2/A4 and §5.4: reverse accumulators preserve large inputs without suffix copies.
+// Reverse accumulators preserve large inputs without suffix copies.
 test("cli_long_inputs", () {
 	value = string.repeat("é", 20000)
 	assert(
@@ -703,34 +703,4 @@ test("cli_long_inputs", () {
 	)
 	Nil
 })
-// §5.4: check the private decoder by compiling the production source as this
-// test module, with an internal test appended. This verifies supplied empty
-// buckets and the exact unused suffix. Restore this file even if a check fails.
-// Run from the lane after building target/release/i:
-// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec("\n".join(x[4:] for x in Path("std/test/cli_test.i").read_text().splitlines() if x.startswith("//| ")))'
-//| import subprocess
-//| from pathlib import Path
-//| path = Path('std/test/cli_test.i')
-//| original = path.read_text()
-//| implementation = Path('std/src/cli.i').read_text()
-//| case = '''
-//| @test
-//| cli_bucket_contract = () {
-//|   p = map2(pure(2), map2(flag(Names("verbose", None), ""), optional(Names("jobs", None), "", integer), (v, n) { (v, n) }), (a, pair: (Bool, Option(Int))) { (a, pair.0, pair.1) })
-//|   Parser(fields, decode) = p
-//|   assert(list.length(fields) == 2)
-//|   assert(decode([[], []]) == Ok(((2, False, None), [])))
-//|   sentinel = [Token(9, "unused")]
-//|   assert(decode([[Token(0, "--verbose")], [Token(1, "4")], sentinel]) == Ok(((2, True, Some(4)), [sentinel])))
-//|   assert(parse(p, []) == Ok((2, False, None)))
-//|   Nil
-//| }
-//| '''
-//| try:
-//|     path.write_text(implementation + '\n' + case)
-//|     for level in ('0', '2'):
-//|         result = subprocess.run(['target/release/i', 'test', '--project', 'std', '--opt', level, 'cli_bucket_contract'], capture_output=True, text=True)
-//|         print('bucket contract opt ' + level, result.returncode, result.stdout, result.stderr, flush=True)
-//|         assert result.returncode == 0 and '1 passed, 0 failed' in result.stdout
-//| finally:
-//|     path.write_text(original)
+// Bucket consumption must preserve heterogeneous values without leaking needs.

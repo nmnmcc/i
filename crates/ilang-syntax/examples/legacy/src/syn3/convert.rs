@@ -1,11 +1,6 @@
-//! The converter from the current tree to the tree of syntax three
-//! (docs/design/syntax-3.md §7.3, the purely syntactic rows, and the services
-//! amendment: `^ E ! N` becomes `<- (..N, Fail(E))`, environment parameters
-//! become the service group of the head, `! T = e` becomes a provided block,
-//! and binding-head type parameters move to the function value).
-//!
-//! Forms that need the resolver are converted as far as the text allows and
-//! reported in a [`Note`], so the conversion never fails.
+//! Converts legacy source forms while preserving evaluation order and the
+//! scopes of service bindings. Forms needing resolver facts are handled by
+//! the resolver-aware migration tool.
 
 use super::ast as n;
 use crate::ast as o;
@@ -47,7 +42,7 @@ fn add(list: &mut Vec<Labels>, labels: Labels) {
     }
 }
 
-/// The label of a parameter (spec §6.11): the last name in the `=` chain at
+/// The label of a parameter: the last name in the `=` chain at
 /// the top of its pattern.
 fn param_label(p: &o::Pattern) -> Option<String> {
     match &p.kind {
@@ -434,7 +429,7 @@ impl Cx<'_> {
         }
     }
 
-    /// §7.3: a call of a function with arguments by label becomes
+    /// A call of a function with arguments by label becomes
     /// positional, in parameter order. `piped` is set when the call is the
     /// right side of `|>`, which gives it its first argument. Returns `None`
     /// when the function is not known from the text.
@@ -567,7 +562,7 @@ impl Cx<'_> {
             if !e.constructors
                 && let Some(others) = members.get(e.name.name.as_str())
             {
-                // §7.3: `T` alone becomes `T, C1, C2` (types only).
+                // `T` alone becomes `T, C1, C2` (types only).
                 for c in others {
                     if !exported.contains(c.name.as_str()) {
                         exports.push(n::Export {
@@ -752,10 +747,10 @@ impl Cx<'_> {
         }
     }
 
-    /// §7.3 rows 1 to 5. The last definition keeps the name of the type.
+    /// The last definition retains the union name so references still resolve.
     fn type_def(&mut self, def: &o::TypeDef, span: Span) -> Vec<n::TypeDef> {
         // The old syntax read a lowercase type parameter and rejected it
-        // (E0232); syntax three rejects the head in the parser (E0101, §3.2).
+        //; the source parser rejects the head earlier.
         // The converted file no longer parses, so say so.
         for p in &def.params {
             if p.name.starts_with(|c: char| c.is_ascii_lowercase()) {
@@ -874,7 +869,7 @@ impl Cx<'_> {
         let saved = (self.vars.len(), self.absorbed.len());
         self.vars
             .extend(b.type_params.iter().map(|p| p.name.clone()));
-        // §7.3: a type parameter all of whose uses go away is dropped: uses
+        // A type parameter all of whose uses go away is dropped: uses
         // in the `^` and `!` parts of the function literal itself, and whole
         // `^ E` parts of function types that have a row variable.
         let mut kept: Vec<&o::Ident> = Vec::new();
@@ -1018,7 +1013,7 @@ impl Cx<'_> {
                     value,
                     span: env_span,
                 } => {
-                    // §7.3: consecutive statements whose values are direct
+                    // Consecutive statements whose values are direct
                     // values are one provide; others nest, because a later
                     // value may need an earlier service.
                     let mut provided = vec![self.provided(ty, value, &mut out)];
@@ -1123,7 +1118,7 @@ impl Cx<'_> {
                     key: None,
                     choices: vec![self.pattern(p, true)],
                 }),
-                // §7.3: the service pattern, in parameter order.
+                // The service pattern, in parameter order.
                 o::Param::Env { name, ty } => services.push(n::SItem {
                     rest: false,
                     name: id(name),
@@ -1135,7 +1130,7 @@ impl Cx<'_> {
         if let Some(r) = &f.ret {
             ret = Some(self.ty(&r.value));
             if r.err.is_some() || r.env.is_some() {
-                // §7.3: the needs of a function literal are left to
+                // The needs of a function literal are left to
                 // inference; a written need that is wider than what the body
                 // needs is no longer stated.
                 self.note(
@@ -1159,7 +1154,7 @@ impl Cx<'_> {
     fn clause(&mut self, c: &o::Clause) -> n::Function {
         let mut choices: Vec<n::Pattern> =
             c.patterns.iter().map(|p| self.pattern(p, true)).collect();
-        // G21: a type test is the last alternative.
+        // a type test is the last alternative.
         let typed = |p: &n::Pattern| match &p.kind {
             n::PatternKind::Typed { .. } => true,
             n::PatternKind::And(parts) => {
@@ -1476,7 +1471,7 @@ impl Cx<'_> {
     // ---- Patterns ----
 
     /// `item` is set directly inside a data pattern, a constructor pattern
-    /// or a parameter group, where a leading `name =` is a key (P7): the
+    /// or a parameter group, where a leading `name =` is a key: the
     /// alias names go after the pattern.
     fn pattern(&mut self, p: &o::Pattern, item: bool) -> n::Pattern {
         let kind = match &p.kind {
@@ -1572,7 +1567,7 @@ impl Cx<'_> {
         n::Pattern::new(kind, p.span)
     }
 
-    /// Spec §7.1: fields without labels are matched by position, the others
+    /// Fields without labels are matched by position, the others
     /// by the last name in the chain of `=` of each part.
     fn ctor_pattern(
         &mut self,
@@ -1700,7 +1695,7 @@ impl Cx<'_> {
 
     // ---- Types ----
 
-    /// The needs for `^ err ! env` (§7.3): `Fail(err)`, the members of
+    /// The needs for `^ err ! env`: `Fail(err)`, the members of
     /// `env` one by one, and `..N` for a row variable.
     fn row(&mut self, err: Option<&o::TypeExpr>, env: Option<&o::TypeExpr>) -> Vec<n::TItem> {
         let mut items = Vec::new();
@@ -1732,7 +1727,7 @@ impl Cx<'_> {
                 {
                     // Bare Fail(E) in transition needs denotes the old ^ E
                     // channel. A transparent alias keeps an ordinary ! Fail(E)
-                    // in the service row, without changing its type (§4.3).
+                    // in the service row, without changing its type.
                     self.service_fail_used = true;
                     ordinary_fail = true;
                     let o::TypeKind::Named { args, .. } = &m.kind else {
@@ -1782,7 +1777,7 @@ impl Cx<'_> {
         {
             // The alias still occupies Fail's key. Suppress the transition
             // lowerer's synthetic legacy error carrier for the other row.
-            // Fail(Never) is a dropped need entry (§9.2), so this marker
+            // Fail(Never) is a dropped need entry, so this marker
             // preserves the old empty error channel without another service.
             out.push(n::TItem::Pos(named(
                 "Fail",
@@ -1881,7 +1876,7 @@ impl Cx<'_> {
     }
 }
 
-/// A direct value (spec §6.10), as far as the text shows: a literal, a
+/// A direct value, as far as the text shows: a literal, a
 /// name, a function, or data and constructor calls of direct values.
 fn is_direct(e: &o::Expr) -> bool {
     use o::ExprKind as E;
@@ -2108,7 +2103,7 @@ fn type_names<'a>(t: &'a o::TypeExpr, out: &mut HashSet<&'a str>) {
     out.extend(all);
 }
 
-/// §7.3: "a written `! N` that is wider than what the body needs is kept as a
+/// "a written `! N` that is wider than what the body needs is kept as a
 /// type annotation on the binding". Without the checker the converter cannot
 /// compare, so it keeps the annotation where the need is certainly not the
 /// body's own: the written needs of the function have a row variable that a

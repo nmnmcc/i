@@ -147,7 +147,7 @@ pub fn run(
     // leave a partial source document on stdout.
     let mut output = String::new();
     for module in modules {
-        // spec §6.8: "a quote and a macro definition have no normal spelling".
+        // "a quote and a macro definition have no normal spelling".
         if to != "is" && lisp_only(&module.ast) {
             bail!(
                 "{}: a quotation or a macro definition has no normal spelling; use --to is for quotations or other Lisp-only forms",
@@ -179,7 +179,7 @@ pub fn run(
 }
 
 /// Whether a module has a quotation or a macro definition, which only the
-/// Lisp surface can write (spec §6.8).
+/// Lisp surface can write.
 fn lisp_only(module: &ilang_syntax::syn3::ast::Module) -> bool {
     use ilang_syntax::syn3::ast::{Expr, ExprKind, Pattern, PatternKind};
     use ilang_syntax::syn3::walk::{self, Visitor};

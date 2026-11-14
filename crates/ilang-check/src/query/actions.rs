@@ -14,7 +14,7 @@ pub struct CodeFix {
     pub preferred: bool,
 }
 
-/// The clauses that a match lacks to cover every value (§7.4).
+/// The clauses that a match lacks to cover every value.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MissingClauses {
     /// The patterns of the clauses to add, as they are written.
@@ -42,7 +42,7 @@ impl Query<'_> {
         let text = self.written_text(m);
         let ast = self.ast(m);
         // A module that is imported already gets the name in its import:
-        // one module is imported once (§2.3).
+        // one module is imported once.
         if let Some(n) = name
             && let Some(item) = ast.imports.iter().find(|i| {
                 i.path
@@ -316,7 +316,7 @@ impl Query<'_> {
         })
     }
 
-    /// The clauses that the match around `span` lacks (§7.4): one for each
+    /// The clauses that the match around `span` lacks: one for each
     /// constructor of the subject type that no clause without a guard
     /// covers, or `_` when the subject has no constructors.
     pub fn missing_clauses(&self, m: ModuleId, span: Span) -> Option<MissingClauses> {
@@ -608,7 +608,7 @@ impl Query<'_> {
     }
 }
 
-/// A type shown in the syntax of §3, in the syntax of the Lisp surface: as
+/// A type shown in i syntax, in the syntax of the Lisp surface: as
 /// the printer of that surface writes it in an annotation.
 fn lisp_type(ty: &str) -> Option<String> {
     let (module, diags) =
@@ -654,7 +654,7 @@ pub(crate) fn lisp_clause(pattern: &str, body: &str) -> Option<String> {
     None
 }
 
-/// A pattern of the syntax of §7, in the syntax of the Lisp surface.
+/// A pattern written in i syntax, in the syntax of the Lisp surface.
 pub(crate) fn lisp_pattern(pattern: &str) -> Option<String> {
     let clause = lisp_clause(pattern, "0")?;
     let inner = clause.strip_prefix("(-> (, ")?;

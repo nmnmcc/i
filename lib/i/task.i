@@ -1,4 +1,4 @@
-//// Structured tasks, rendezvous channels and events (§9.9).
+//// Structured tasks, rendezvous channels and events.
 (
 	i/control
 	i/key
@@ -109,7 +109,7 @@ Sent = (Int)
 
 Start = (body = (Scheduler) -> Completion, ticket = Int)
 
-/// What a task on another worker tells the scheduler (native N7/N8): its
+/// What a task on another worker tells the scheduler: its
 /// next step with the `finalizing` answers of its frames, or its end.
 Remote = Stepped | Exited | Woken
 
@@ -128,7 +128,7 @@ Resume = (
 	run = Key(Nil),
 )
 
-/// A published task record (multicore D8, native N7). The claiming worker
+/// A published task record. The claiming worker
 /// runs `begin(job)` and later `resume`; the record holds the complete start
 /// function with its kept services, the task's path, run, root and runner.
 Job = (
@@ -1370,7 +1370,7 @@ remote_resume = (
 }
 
 /// Publish the record of a new task of the entry run when more than one
-/// worker runs (D8). A nested run keeps its tasks (runtime §6.5).
+/// worker runs. A nested run keeps its tasks.
 publish = (s : State, task_path : List(Int), start : Start) -> Start {
 	{ s.scripted || core.not(s.top) || core.not(worker_enabled()) } |>
 		(True) { start }

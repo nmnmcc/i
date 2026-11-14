@@ -52,8 +52,6 @@ impl Hash for Lits {
 impl ValueSet {
     pub const ALL: Self = Self(None);
 
-    // Source literals start using these constructors in stage 7. Until then
-    // their behavior is tested without adding unused production entry points.
     pub fn only(items: impl IntoIterator<Item = Arc<str>>) -> Option<Self> {
         Self::from_set(false, Set::from_items(items))
     }
@@ -604,7 +602,7 @@ mod tests {
 
     #[test]
     fn exhaustive_infinite_domain_model() {
-        // literal-types §10: F(X), E(X), All, and an outside value ★.
+        // F(X), E(X), All, and an outside value ★.
         let sets: Vec<_> = (0..16)
             .flat_map(|mask| {
                 [
@@ -646,7 +644,7 @@ mod tests {
 
     #[test]
     fn bulk_join_matches_the_infinite_domain_model() {
-        // §9's batch join must preserve §4's set algebra, including
+        // The batch join must preserve the set algebra, including
         // duplicate streams, cofinite inputs and the outside value ★.
         let sets: Vec<_> = (0..16)
             .flat_map(|mask| {

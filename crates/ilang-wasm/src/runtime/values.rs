@@ -17,7 +17,7 @@ pub fn wat(references: bool) -> String {
     source
 }
 
-/// §14.9 uses a portable value stream. Nominal type and label-set numbers
+/// Portable values need a stable wire encoding. Nominal type and label-set numbers
 /// are allocation identities of this compiler, so they cannot enter it.
 /// Opaque identities, including compiler Syntax handles, share token 7.
 pub(crate) fn portable_macro_hash(text: &str) -> String {

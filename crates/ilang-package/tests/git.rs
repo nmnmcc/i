@@ -705,7 +705,7 @@ fn diamond_and_highest_reached_version() {
     // One package for `a`, whoever asks for it.
     let b_a = b_pkg.dependencies.iter().find(|(n, _)| n == "a").unwrap();
     assert_eq!(b_a.1, Some(a_id));
-    // §2.8 pins every consulted manifest, including superseded versions.
+    // Every consulted manifest is pinned, including superseded versions.
     // `e` is reached only through `a@1.0.0`: it has a version, and a line.
     assert_eq!(
         lock_lines(&app),
@@ -1121,7 +1121,7 @@ fn transitive_problems_say_where_they_come_from() {
     assert!(!app.join("i.lock").exists());
 }
 
-/// MP01: a committed link must not let an unchanged lock read outside bytes.
+/// a committed link must not let an unchanged lock read outside bytes.
 #[cfg(unix)]
 #[test]
 fn located_source_links_cannot_escape_the_hashed_tree() {

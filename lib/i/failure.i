@@ -1,4 +1,4 @@
-//// Errors as a service (§9.3): `Fail(E)`, `raise` and `catch` are
+//// Errors as a service: `Fail(E)`, `raise` and `catch` are
 //// ordinary library code over `control.boundary` and `control.escape`.
 (
 	i/control

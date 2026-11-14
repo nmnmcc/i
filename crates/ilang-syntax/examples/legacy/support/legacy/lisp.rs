@@ -1,4 +1,4 @@
-//! The pre-syntax-three datum reader, private to migration tools.
+//! The legacy datum reader, private to migration tools.
 use ilang_syntax::lisp::{Datum, DatumKind, Document};
 use ilang_syntax::token::{Token, TokenKind as T};
 use ilang_syntax::{Code, Diagnostic};

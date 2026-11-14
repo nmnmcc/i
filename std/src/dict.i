@@ -1,9 +1,9 @@
 //// Dictionaries: maps from keys to values that may not be changed.
 ////
 //// A `Dict(k, v)` is a hash trie. The key of every entry is hashed with
-//// `core.hash` (§13), and the hash picks a path through a tree with four
+//// `core.hash`, and the hash picks a path through a tree with four
 //// branches at each level, two bits of the hash for each level. Keys are
-//// compared with `==` (§11.4), so any value may be a key and no compare
+//// compared with `==`, so any value may be a key and no compare
 //// function is needed. `get`, `insert`, and `delete` take O(log n) steps.
 ////
 //// The tree of a set of keys has only one form, whatever order the keys

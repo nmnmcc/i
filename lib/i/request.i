@@ -1,4 +1,4 @@
-//// Typed requests, cancellation groups and replaceable waits (§9.11).
+//// Typed requests, cancellation groups and replaceable waits.
 (
 	i/resource
 )

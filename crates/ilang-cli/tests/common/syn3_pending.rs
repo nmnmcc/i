@@ -1,5 +1,4 @@
-//! Tests parked until a later stage of syntax three (docs/design/syntax-3.md
-//! §7.2): the names listed in `tests/syn3-pending.txt` return early.
+//! Tests listed in `tests/syn3-pending.txt` return early.
 
 /// Whether the test `file::test` is listed in `tests/syn3-pending.txt`; it
 /// then returns early, and says so on stderr.

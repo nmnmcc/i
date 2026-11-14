@@ -96,7 +96,7 @@ impl ScopedSource {
     }
 
     /// The complete generated definition that owns a constructor name.
-    /// The old tree may have absorbed this item into a sum, but every
+    /// The legacy representation can absorb this item into a sum, but every
     /// virtual occurrence still has its original scoped datum.
     pub fn definition_origin(&self, at: Span, name: &str) -> Option<(Syntax, Span)> {
         fn head_name(syntax: &Syntax) -> Option<&str> {
@@ -445,9 +445,9 @@ impl ScopedSource {
         }
     }
 
-    // ---- The same conversions to the tree of syntax three ----
+    // ---- The same conversions to the source tree ----
     //
-    // The datum is read in the rows of syntax three (§6.8) by plain
+    // The datum is read in the source rows by plain
     // recursive readers: the caller is on a deep stack (`syn3::deep`).
 
     pub fn expression3_metered(

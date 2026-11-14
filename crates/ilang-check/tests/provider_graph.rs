@@ -543,7 +543,7 @@ fn adapter_types_are_checked_even_without_reached_roles() {
 }
 #[test]
 fn discriminant_constructor_fields_are_dependency_edges() {
-    // A service is one labelled type (syntax-3.md §2.8, §9.2), so the
+    // A service is one labelled type, so the
     // discriminant service wraps the union of its targets' values.
     let source = "On = (Part)\nOff = ()\nBundleKind = On | Off\nBundle = (value = BundleKind)\nPart = ()\npart = () { Part }\n\nmain = () <- (b : Bundle) { Nil }";
     let plan = format!(
@@ -617,7 +617,7 @@ fn adapter_service_list_order_does_not_change_its_type() {
 
 #[test]
 fn discriminant_constructor_aliases_resolve_before_validation() {
-    // A service is one labelled type (syntax-3.md §2.8, §9.2), so the
+    // A service is one labelled type, so the
     // discriminant service wraps the union of its targets' values.
     let source = "On = (Part)\nOff = ()\nBundleKind = On | Off\nBundle = (value = BundleKind)\nPart = ()\npart = () { Part }\nselected = On\nalias = selected\n\nmain = () <- (b : Bundle) { Nil }";
     let plan = format!(

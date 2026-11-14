@@ -64,7 +64,7 @@ g = (n) { f(n) }
     // `a` calls `b`, which reads `c`: both first. The rest in source order.
     assert_eq!(init, ["b", "c", "a", "even", "f", "g"]);
 
-    // Needs and full needs (§2.5).
+    // Needs and full needs.
     let needs = order::needs(&program, main);
     assert_eq!(needs[0].0.iter().copied().collect::<Vec<_>>(), [1, 2]); // a
     assert!(needs[1].0.is_empty()); // b: direct, `c` is in a function body

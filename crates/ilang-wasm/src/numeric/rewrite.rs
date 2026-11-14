@@ -62,7 +62,7 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
         Value::Service(e, _) | Value::ServiceRaw(e, _) => env(e, map),
         Value::Closure { captures, .. } => captures.iter_mut().for_each(map),
         // A multi-shape value is opaque to numeric lowering: its groups are
-        // reached only through their reference entries (syntax-3.md §6.4).
+        // reached only through their reference entries.
         Value::Multi(groups) => groups.iter_mut().for_each(|(_, a)| map(a)),
         Value::Record { fields, .. } => fields.iter_mut().for_each(map),
         Value::Data(_, fields) => fields.iter_mut().for_each(map),

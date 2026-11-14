@@ -53,7 +53,7 @@
 //!
 //! The host uses the copying collector, with a GC heap that starts at
 //! [`GC_HEAP`] (256 MiB). On the benchmarks of `bench/` (lists of a million
-//! elements, docs/performance.md) it is as fast as the null collector,
+//! elements) it is as fast as the null collector,
 //! while DRC is 2 to 10 times slower (`list.sort` of 1M Ints: 59 s with
 //! DRC, 6.1 s copying, 5.8 s null).
 //!
@@ -273,7 +273,8 @@ impl Abi {
         Ok(found)
     }
 
-    /// Parses and checks metadata in the JSON form of the `ilang.abi` section. Every field must be
+    /// Parses and checks metadata in the JSON form of the `ilang.abi` section.
+    /// Every field must be
     /// there; `entry` is `null` when the program has no entry.
     pub fn from_json(json: &[u8]) -> Result<Self> {
         let value: serde_json::Value =
@@ -782,7 +783,7 @@ struct State {
     failure: Option<anyhow::Error>,
     /// The requests of async host functions that are outstanding.
     requests: Requests,
-    /// The pool of a multicore entry (multicore D8, native N7).
+    /// The pool of a multicore entry.
     workers: Option<Arc<workers::Pool>>,
 }
 
@@ -834,7 +835,7 @@ pub struct Program {
     provider_registrations: Vec<ProviderRegistration>,
     macro_static_cost: Option<(u64, u64)>,
     /// Workers of an entry run ([`worker_count`]); more than one needs
-    /// epoch-instrumented code (native N12).
+    /// epoch-instrumented code.
     workers: usize,
     /// The engine is epoch-instrumented, so every store needs a deadline.
     epochs: bool,
@@ -1227,8 +1228,8 @@ impl Program {
         self
     }
 
-    /// Runs entries on at most `workers` workers (multicore D12: the host's
-    /// choice). One worker keeps the FIFO fast path (native N10).
+    /// Runs entries on at most `workers` workers (the host’s
+    /// choice). One worker keeps the FIFO fast path.
     pub fn with_workers(mut self, workers: usize) -> Self {
         self.workers = if self.epochs { workers.max(1) } else { 1 };
         self
@@ -1326,7 +1327,7 @@ impl Program {
             },
         );
         if self.epochs {
-            // Only remote workers are ever interrupted (native N12).
+            // Only remote workers are ever interrupted.
             store.set_epoch_deadline(1 << 62);
         }
         let instance = {

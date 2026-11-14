@@ -409,7 +409,7 @@ impl Encoder<'_> {
             .take_while(|t| t.span.start <= range.end)
             .find(|t| t.span.end <= range.end && matches(&t.kind))
             .map(|t| t.span)
-            // The tree is lowered from syntax three, so a symbol of its
+            // The tree came through the migration adapter, so a symbol of its
             // rows may not be written; it is placed at the start of its node.
             .unwrap_or(Span::new(range.start, range.start))
     }

@@ -1,6 +1,6 @@
 //! The constraint solver: type variables with levels and bounds, as in
 //! Simple-sub, extended with the unions, intersections, and differences of
-//! §4.4 and with the variance of type parameters (§4.5).
+//! sets, and with the variance of type parameters.
 //!
 //! Every variable has a level, and lower and upper bounds. `constrain(l, r)`
 //! keeps `l <: r` true for every bound that is added, so the bounds of a
@@ -11,7 +11,7 @@
 use super::{FnTy, Head, Ty, V, Variance};
 use crate::hir::{BuiltinType, TypeId, TypeRef};
 // The maps and sets of the solver hold small keys and are on the hot path:
-// a fast hash is much quicker than the default one (docs/performance.md).
+// a fast hash is much quicker than the default one.
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::HashMap as StdHashMap;
 
@@ -75,7 +75,7 @@ impl<T: Clone> ExactSizeIterator for ParamModes<T> {}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct VarState {
     pub level: u32,
-    /// A row keeps rule 4's member comparison even inside type arguments.
+    /// A row retains directed member comparison even inside type arguments.
     pub row: Mode,
     /// A difference imposes a same-form obligation even if an annotation
     /// hides the difference from the result type.
@@ -85,12 +85,12 @@ pub(crate) struct VarState {
     pub need_meet: Option<(Ty, Ty)>,
     pub lower: Vec<Ty>,
     pub upper: Vec<Ty>,
-    /// The name written in an annotation (§4.7), kept when it is shown.
+    /// The name written in an annotation, kept when it is shown.
     pub name: Option<String>,
     /// Values may come to the variable from outside the constraints: it is
     /// the type of a parameter, a written type variable, or the result of a
     /// function that is not known. Its lower bounds are then not all its
-    /// values (§7.3, §7.4).
+    /// values.
     pub input: bool,
     /// The variables that have this one as an upper bound: their values
     /// come to it too, but they are not among its lower bounds.
@@ -106,14 +106,14 @@ pub(crate) enum FailKind {
     /// Only an Int/String value-set inclusion failed.
     Values,
     /// Two forms of a type constructor whose parameter does not change, with
-    /// arguments that cannot be equal (§4.4).
+    /// arguments that cannot be equal.
     Invariant,
     /// Two forms of one type constructor in an environment, with arguments
-    /// that cannot be equal (§9.2).
+    /// that cannot be equal.
     EnvForms,
-    /// A need meet has incompatible concrete upper bounds (§9.2).
+    /// A need meet has incompatible concrete upper bounds.
     NeedMeet,
-    /// A value could go to more than one type variable of a union (§4.4).
+    /// A value could go to more than one type variable of a union.
     Ambiguous,
 }
 
@@ -559,7 +559,7 @@ impl Solver {
         &mut self.vars[v.0 as usize]
     }
 
-    /// The variances of the parameters of a head (§4.5 rules 6 and 7).
+    /// The variances of the parameters of a head.
     pub fn variances(&self, h: Head, n: usize) -> ParamModes<Variance> {
         if n == 0 {
             return ParamModes::repeated(Variance::Inv, 0);
@@ -626,10 +626,10 @@ impl Solver {
         self.observed_shape = false;
     }
 
-    /// Makes `N` **in** `M` true for two environments (§4.5 rule 4): every
+    /// Makes `N` **in** `M` true for two environments: every
     /// member of `N` is a type variable that is a subtype of `M`, or has a
     /// member of `M` with the same type constructor that satisfies it as
-    /// a value. Needs compare services in reverse (§4.5 rule 4).
+    /// a value. Needs compare services in reverse.
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
         self.constrain_in(l, r, Mode::Env);
     }
@@ -768,7 +768,7 @@ impl Solver {
     /// Store it there, so generalizing a member cannot lose a restriction
     /// that was reached only through a reverse inclusion link.
     fn handle(&mut self, v: V, h: &Ty) {
-        // Error-row scalar subtraction removes values (§4.4, §4.5 rule 8).
+        // Error-row scalar subtraction removes values.
         // It does not install a service with an equal value set.
         if self.var(v).row == Mode::Row && h.scalar().is_some() {
             return;
@@ -998,13 +998,13 @@ impl Solver {
         hidden
     }
 
-    /// `l <: r`, or `l` in `r` when `env` (§4.5 rule 4). The mode goes
+    /// `l <: r`, or `l` in `r` when `env`. The mode goes
     /// through the bounds of variables, but not into type arguments: those
     /// are compared as normal types.
     fn constrain_in(&mut self, l: &Ty, r: &Ty, env: Mode) {
         // A row also used as an ordinary value must retain that value's
         // checked form. Keep both inclusions: fitting the need alone would
-        // lose the shared value constraint (§4.7, §4.5 rule 4, §9.2).
+        // lose the shared value constraint.
         if env == Mode::Value && l.is_headed() && self.mode(r) == Mode::Env {
             self.constrain_in(r, l, Mode::Env);
             self.constrain_in(l, r, Mode::Env);
@@ -1040,7 +1040,7 @@ impl Solver {
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
             return;
         }
-        // §4.5 rule 3: subtracting members never adds values. The
+        // Subtracting members never adds values. The
         // difference's separate same-form obligation remains in the scheme.
         if let Ty::Diff(a, _) = l
             && (a.as_ref() == r
@@ -1049,7 +1049,7 @@ impl Solver {
         {
             return;
         }
-        // §4.5 rule 2: these are inclusions, not recursive bounds such as
+        // These are inclusions, not recursive bounds such as
         // `n <: n | S(n)`. Recording them would invent an occurs cycle.
         if matches!(l, Ty::Var(_)) && matches!(r, Ty::Union(ms) if ms.contains(l)) {
             return;
@@ -1133,8 +1133,8 @@ impl Solver {
                 self.constrain_in(&l2, r, env);
             }
             (Ty::Inter(ms), _) => {
-                // `a & T <: R` is true when `T <: R` or when `a <: R`
-                // (§4.5 rule 2). The members that are not type variables
+                // `a & T <: R` is true when `T <: R` or when `a <: R`.
+                // The members that are not type variables
                 // are tried first; when they fail, each variable is tried.
                 // Only the members with a type constructor are put together
                 // into one: the others (variables, differences, unions that
@@ -1226,7 +1226,7 @@ impl Solver {
                 }
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
-                // syntax-3 §6.1: one data parameter; a call of another
+                // One data parameter; a call of another
                 // shape is a mismatch of the parameter data.
                 self.constrain(&g.param, &f.param);
                 self.constrain(&f.ret, &g.ret);
@@ -1250,9 +1250,9 @@ impl Solver {
     }
 
     /// Adds a bound to a variable. Two bounds with the same type
-    /// constructor are one member (§4.4): two upper bounds by intersection,
+    /// constructor are one member: two upper bounds by intersection,
     /// two lower bounds by union. Arguments that do not change must be
-    /// equal, needs merge by the value intersection (§9.2), and function
+    /// equal, needs merge by the value intersection, and function
     /// types must have the same number of parameters. This holds
     /// for every bound that the variable has through other variables, not
     /// only for its own: with `x <: y <: Cell(String)` and `x <: Cell(Int)`,
@@ -1498,7 +1498,7 @@ impl Solver {
                         // ones (rule A). Only invariant arguments can
                         // disagree; the rest is checked through the
                         // bounds that the entries reach.
-                        // The meet of two same-direction arguments (§4.4) is
+                        // The meet of two same-direction arguments is
                         // an error when it is `Never` and neither is. With
                         // an argument not known yet, `a & T` stays as it is
                         // and is checked when the binding is done.
@@ -1531,7 +1531,7 @@ impl Solver {
             && self.variances(*h, args.len()).all(|x| x != Variance::Inv))
     }
 
-    /// Keep an undetermined intersection as two upper bounds (§4.4).
+    /// Keep an undetermined intersection as two upper bounds.
     /// A later concrete bound is checked by `add_bound`, also through links.
     fn need_meet(&mut self, x: &Ty, y: &Ty, a: &Ty, b: &Ty, row: Mode, level: u32) -> Ty {
         // Idempotence and absorption apply to row aliases and inclusions
@@ -1564,7 +1564,7 @@ impl Solver {
         // Row inclusion stores variable edges at the receiver. A derived
         // meet must also retain its actual operands as upper bounds: later
         // lower bounds must reach both, and coalescing must not confuse
-        // the meet's other receiving rows with its operands (§4.4, §9.2).
+        // the meet's other receiving rows with its operands.
         for operand in [x, y] {
             if matches!(operand, Ty::Var(_)) && !self.var(v).upper.contains(operand) {
                 self.var_mut(v).upper.push(operand.clone());
@@ -1574,7 +1574,7 @@ impl Solver {
     }
 
     /// A value-produced argument is known at completion from its lower
-    /// bounds. Inputs and still-open sources remain undetermined (§4.7).
+    /// bounds. Inputs and still-open sources remain undetermined.
     fn known_need_members(&self, t: &Ty) -> Option<Vec<Ty>> {
         match t {
             Ty::Never => None,
@@ -1684,7 +1684,7 @@ impl Solver {
 
     /// `l <: m1 | m2 | …` for an `l` with a type constructor: the member
     /// with the same type constructor, or else the one member that is a type
-    /// variable (§4.4).
+    /// variable.
     fn route(&mut self, l: &Ty, ms: &[Ty], env: Mode) {
         let mut flat = Vec::new();
         flatten_union(ms, &mut flat);
@@ -1990,7 +1990,7 @@ impl Solver {
         }
     }
 
-    // ---- Unions, intersections, and differences (§4.4) ----
+    // ---- Unions, intersections, and differences ----
 
     /// `m1 | m2 | …`, with the members of one type constructor put together:
     /// arguments that go in the same direction by union, in the other
@@ -2000,7 +2000,7 @@ impl Solver {
         self.union_mode(ms, Mode::Value)
     }
 
-    /// Merge needs by their value intersection (§9.2, §4.4). The row is
+    /// Merge needs by their value intersection. The row is
     /// represented internally by a union of its keyed service entries.
     pub fn env_union(&mut self, ms: Vec<Ty>) -> Ty {
         self.union_mode(ms, Mode::Env)
@@ -2024,7 +2024,7 @@ impl Solver {
                     .iter()
                     .any(|m| matches!(m, Ty::Con(_, _, args) if !args.is_empty())))
         {
-            // Check forms hidden behind a row variable too (§9.2). The
+            // Check forms hidden behind a row variable too. The
             // collector adds no requirement to the returned union; it
             // makes add_bound compare all its services, also later ones.
             // With only one unknown row and services without arguments,
@@ -2076,8 +2076,8 @@ impl Solver {
                         out.push(m);
                         continue;
                     }
-                    // Two forms of a service: their arguments must be equal
-                    // (§9.2). When they are not, both stay, as they are.
+                    // Two forms of a service: their arguments must be equal.
+                    // When they are not, both stay, as they are.
                     let before = self.failures.len();
                     let old = std::mem::replace(&mut out[i], Ty::Never);
                     out[i] = self.merge(old, m.clone(), true, mode);
@@ -2100,8 +2100,8 @@ impl Solver {
     }
 
     /// `m1 & m2 & …`: members with different type constructors give
-    /// `Never`; members with one are put together the other way round
-    /// (§4.4). `a & T` with a type variable stays.
+    /// `Never`; members with one are put together the other way round.
+    /// `a & T` with a type variable stays.
     pub fn inter(&mut self, ms: Vec<Ty>) -> Ty {
         self.normalize_mode(Ty::Inter(ms), Mode::Value)
     }
@@ -2114,7 +2114,7 @@ impl Solver {
                 m => flat.push(m),
             }
         }
-        // `{ A | B } & C` is `A & C | B & C` (§4.4), for a union whose
+        // `{ A | B } & C` is `A & C | B & C`, for a union whose
         // members all have a type constructor. A union with a variable as a
         // member stays: its parts could not be told apart.
         if let Some(i) = flat.iter().position(|m| match m {
@@ -2165,7 +2165,7 @@ impl Solver {
 
     /// Two members with one type constructor, as one: by union when `union`,
     /// and by intersection when not. A union of need entries instead takes
-    /// the value intersection of the services (§9.2).
+    /// the value intersection of the services.
     fn merge(&mut self, a: Ty, b: Ty, union: bool, mode: Mode) -> Ty {
         match (a, b) {
             (Ty::Con(h, values, xs), Ty::Con(_, other, ys))
@@ -2241,7 +2241,7 @@ impl Solver {
                 let f = *f;
                 let g = *g;
                 // Functions of different shapes put together by union have
-                // the parameter `Never` (syntax-3 §6.1).
+                // the parameter `Never`.
                 let labels = f
                     .labels
                     .iter()
@@ -2250,7 +2250,7 @@ impl Solver {
                     .collect();
                 let param = self.merge_arg(f.param, g.param, Variance::Contra, union, Mode::Value);
                 // The environments of two function types are put together
-                // as environments (§4.4, §9.2).
+                // as environments.
                 let env = if union {
                     self.union_mode(vec![f.env, g.env], Mode::Env)
                 } else {
@@ -2281,14 +2281,14 @@ impl Solver {
         }
     }
 
-    /// `a - h1 - h2 - …` (§4.4). A member of `a` whose type constructor is
+    /// `a - h1 - h2 - …`. A member of `a` whose type constructor is
     /// in `h` is taken out, and it must be a subtype of that member of `h`.
     pub fn diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
         self.diff_mode(a, h, Mode::Value)
     }
 
     /// Remove the services provided by `T` from the need `M`; the provider
-    /// must satisfy each removed entry as a value (§9.2, §4.5 rule 4).
+    /// must satisfy each removed entry as a value.
     pub fn env_diff(&mut self, a: Ty, h: Vec<Ty>) -> Ty {
         self.diff_mode(a, h, Mode::Env)
     }
@@ -2424,7 +2424,7 @@ impl Solver {
         }
     }
 
-    /// §4.4: in `a - H`, a value of `a` whose type constructor is in `H`
+    /// In `a - H`, a value of `a` whose type constructor is in `H`
     /// must be in that member of `H` (equal to it, in an environment). This
     /// is a constraint as soon as the difference is made: `a <: H | r`,
     /// with a new variable `r` for the other values.
@@ -2454,7 +2454,7 @@ impl Solver {
 }
 
 impl Solver {
-    /// §4.7: whether a type has itself inside it through a type variable:
+    /// Whether a type has itself inside it through a type variable:
     /// from one of `roots`, as an output or as an input, the bounds that
     /// coalescing follows (lower bounds of outputs, upper bounds of inputs)
     /// come back to it through a type constructor. A cycle is reported
@@ -2484,7 +2484,7 @@ impl Solver {
     }
 
     /// Remove redundant bounds before deciding that a type is recursive.
-    /// If T <: v <: T (or v <: Never), v is exactly T (§4.5). Its old
+    /// If T <: v <: T (or v <: Never), v is exactly T. Its old
     /// bounds have already been propagated through T by constrain_in.
     /// Otherwise v <: u implies v <: u | T, also through variable chains.
     /// These rewrites preserve every solution; they introduce no variables
@@ -2910,7 +2910,9 @@ pub(crate) fn flatten_union(ms: &[Ty], out: &mut Vec<Ty>) {
     }
 }
 
-/// §4.5 rule 7.
+/// Returns the variance of each parameter of a built-in type: `List(a)` is covariant;
+/// `Continuation(A, R, N)` is contravariant in `A` and covariant in `R` and `N`;
+/// `Boundary(R, N)` is invariant.
 pub(crate) fn builtin_variance(b: BuiltinType) -> Vec<Variance> {
     builtin_variance_values(b).to_vec()
 }
@@ -2948,8 +2950,8 @@ mod literal_tests {
 
     #[test]
     fn closed_data_preserves_need_direction_inside_nominal_arguments() {
-        // The former record-prover probe now uses closed labelled data.
-        // §4.5 rule 4 compares the provider in reverse as a value.
+        // Closed labelled data must retain the directed provider comparison.
+        // The provider is contravariant, so its value comparison is reversed.
         let mut s = solver();
         let (outer, service) = (TypeId(10), TypeId(11));
         s.variance.insert(outer, vec![Variance::Co]);
@@ -2996,7 +2998,7 @@ mod literal_tests {
 
     #[test]
     fn literal_subtyping_and_right_difference() {
-        // literal-types §5.1 rule 1 and §10's solver cases.
+        // A literal set is a subtype of another when each of its values is in the other.
         for (a, b, ok) in [
             (strings(&["a"]), strings(&["a", "b"]), true),
             (strings(&["a", "b"]), except(&[]), true),
@@ -3028,7 +3030,7 @@ mod literal_tests {
 
     #[test]
     fn route_only_the_uncovered_values() {
-        // §5.1 rule 3: S <: X | v iff S - X <: v.
+        // `S <: X | v` iff `S - X <: v`.
         let mut s = solver();
         let v = s.fresh();
         s.constrain(&except(&[]), &Ty::Union(vec![strings(&["a"]), v.clone()]));
@@ -3063,7 +3065,7 @@ mod literal_tests {
 
     #[test]
     fn difference_left_all_three_splits_and_later_bounds() {
-        // §5.1 rule 4: subset, disjoint, and partially overlapping sets.
+        // Subset, disjoint, and partially overlapping sets.
         for (source, expected) in [
             (strings(&["a"]), Vec::new()),
             (strings(&["b"]), vec![strings(&["b"])]),
@@ -3092,7 +3094,7 @@ mod literal_tests {
 
     #[test]
     fn scalar_boolean_algebra_and_never_intersections() {
-        // §5.1 rules 5–7; assertions follow the set equations in §4.
+        // Intersection and difference of literal sets follow the set equations.
         let mut s = solver();
         assert_eq!(s.inter(vec![strings(&["a"]), strings(&["b"])]), Ty::Never);
         assert_eq!(
@@ -3120,7 +3122,7 @@ mod literal_tests {
 
     #[test]
     fn bounds_fuse_without_losing_constraints() {
-        // §5.1 rule 8: one bound for 1000 literals, and all propagated checks.
+        // One bound for 1000 literals, and all propagated checks.
         let mut s = solver();
         let v = s.fresh();
         for i in 0..1000 {
@@ -3203,7 +3205,7 @@ mod literal_tests {
 
     #[test]
     fn service_providers_do_not_widen_needed_literal_arguments() {
-        // §4.5 rule 4: Counter(Int) is not a subtype of the needed Counter(0).
+        // Counter(Int) is not a subtype of the needed Counter(0).
         let counter = TypeId(0);
         let make = |arg| Ty::named(TypeRef::Custom(counter), vec![arg]);
         let zero = Ty::lit(BuiltinType::Int, ValueSet::only([Arc::from("0")]).unwrap());
@@ -3222,7 +3224,7 @@ mod literal_tests {
 
     #[test]
     fn ordinary_bounds_do_not_skip_a_later_environment_check() {
-        // §5.1 rule 1 requires equality in env mode, even if ordinary
+        // Env mode requires equality of the literal sets, even if ordinary
         // subtyping already accepted the same literal as a lower bound.
         let mut s = solver();
         let v = s.fresh();
@@ -3235,7 +3237,7 @@ mod literal_tests {
     }
     #[test]
     fn environment_difference_checks_each_use_without_reversing_provider_direction() {
-        // §9.2: P must be a subtype of S. A cached handler installation
+        // P must be a subtype of S. A cached handler installation
         // must not suppress the conflict when the row is used again.
         let reader = TypeId(0);
         let make = |arg| Ty::named(TypeRef::Custom(reader), vec![arg]);
@@ -3269,7 +3271,7 @@ mod literal_stress_tests {
     use crate::types::{Head, Ty};
 
     fn stress(part: &str, n: usize) {
-        // literal-types §9: check real programs and observe peak counts,
+        // Check real programs and observe peak counts,
         // not just the final (possibly simplified) type of a definition.
         let dir = tempfile::tempdir().unwrap();
         let script =
@@ -3303,7 +3305,7 @@ mod literal_stress_tests {
             solver.peak_bound_count
         );
         if part == "calls" {
-            // §6.10: the local function must be indirect and monomorphic.
+            // The local function must be indirect and monomorphic.
             let module = p
                 .modules
                 .iter()

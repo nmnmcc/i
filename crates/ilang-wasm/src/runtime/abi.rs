@@ -1,4 +1,4 @@
-//! Value encodings at the host boundary (spec Appendix B.2 and B.3).
+//! Value encodings at the host boundary (the encodings of values and buffers).
 //!
 //! `$abi_*_in` functions read a value that the host gave: export parameters
 //! and import results. They copy it onto the GC heap and stop with
@@ -10,10 +10,10 @@
 //! Inline Ints (nonzero sign, count 0) have no buffer. Every actual buffer
 //! that the host gives, also an empty one (a zero `Int`,
 //! a `String` of length 0, a `BitArray` of 0 bits), must be inside memory:
-//! its address plus its size is at most the size of memory (B.2). The
+//! its address plus its size is at most the size of memory. The
 //! buffers of the results of an import are freed whenever their address is
 //! not 0, also when they are empty: the host may make them with
-//! `ilang_alloc(0)` (B.1, B.3).
+//! `ilang_alloc(0)`.
 
 pub fn wat(references: bool) -> String {
     if references {

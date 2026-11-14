@@ -1,4 +1,4 @@
-//! The host boundary in the generated module (§9.7, §10.2, B.4, B.5):
+//! The host boundary in the generated module:
 //! import calls and their answers, async entry points, and the
 //! `ilang_resume:…` exports. It calls control (`control.rs`) only through
 //! `$host_boundary` and `$host_resume_k`.
@@ -627,7 +627,7 @@ const PROVIDERS: &str = r#"
 "#;
 
 impl<'p> Emitter<'p> {
-    /// Starts an import of an async host service (B.4) with a new request
+    /// Starts an import of an async host service with a new request
     /// id from the request table, returning the cell immediately.
     pub(super) fn host_start(
         &mut self,
@@ -647,7 +647,7 @@ impl<'p> Emitter<'p> {
         )
     }
 
-    /// Calls an import (B.2, B.3): the arguments are encoded in new buffers
+    /// Calls an import: the arguments are encoded in new buffers
     /// through the globals `$hp…`, the results go to the globals `$hr…`, and
     /// the buffers of the arguments are freed.
     pub(super) fn host_call(&mut self, i: ImportId, args: &[Atom]) -> String {
@@ -655,7 +655,7 @@ impl<'p> Emitter<'p> {
     }
 
     /// `host_call`, with `first` as the code of a first Wasm argument
-    /// before the encoded arguments (the request id of B.4), or empty.
+    /// before the encoded arguments as the async request id, or empty.
     fn host_call_with(&mut self, i: ImportId, first: &str, args: &[Atom]) -> String {
         let program: &'p Program = self.p;
         let x = &program.imports[i as usize];
@@ -703,8 +703,8 @@ impl<'p> Emitter<'p> {
         code
     }
 
-    /// The value of the results of an import in the globals `$hr…` (B.2):
-    /// the value, or the error thrown. The result buffers are freed (B.3);
+    /// The value of the results of an import in the globals `$hr…`:
+    /// the value, or the error thrown. The result buffers are freed;
     /// a value that is not correct stops.
     pub(super) fn host_reply(&self, i: ImportId, result: AbiType) -> String {
         let x = &self.p.imports[i as usize];
@@ -819,7 +819,7 @@ impl<'p> Emitter<'p> {
         out
     }
 
-    /// An async entry point (B.5): it runs in a root boundary and gives a
+    /// An async entry point: it runs in a root boundary and gives a
     /// status; `ilang_result:name` gives its results when it has ended.
     pub(super) fn async_export(&mut self, name: &str, e: &Export, body: FuncId) {
         let (sig, converted) = match &e.abi {
@@ -883,7 +883,7 @@ impl<'p> Emitter<'p> {
         self.out.push_str(&f);
     }
 
-    /// `ilang_resume:namespace:label` of each async import (B.5): the
+    /// `ilang_resume:namespace:label` of each async import: the
     /// request id comes first, then the answer of the host, which goes to
     /// the globals of the import, and the program goes on. Calling it with
     /// an id that is not outstanding, or that another import started, traps.

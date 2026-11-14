@@ -4,7 +4,7 @@
 //! Pattern code must use `bits_has`, `bits_float_finite`, or `bits_read_utf`
 //! before extracting a potentially invalid segment. Failed UTF decoding is a
 //! normal match failure, whereas invalid construction stops the program with
-//! one of the `bit array:` reasons of spec §11.7.
+//! one of the `bit array:` reasons of the stop messages.
 
 pub fn wat() -> String {
     WAT.to_owned()
@@ -1015,7 +1015,7 @@ mod tests {
         ] {
             for little in [false, true] {
                 for width in [16, 32, 64] {
-                    // A half that is not finite stops instead (spec §8.3).
+                    // A half that is not finite stops instead.
                     if width == 16 && half & 0x7c00 == 0x7c00 {
                         continue;
                     }

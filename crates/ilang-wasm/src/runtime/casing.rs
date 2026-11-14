@@ -1,4 +1,4 @@
-//! `core.to_upper` and `core.to_lower` (spec §13): the simple case mappings
+//! `core.to_upper` and `core.to_lower`: the simple case mappings
 //! of Unicode, one codepoint to one codepoint, with no locale.
 //!
 //! The tables are in `case_tables.rs`, made by `scripts/gen-case-tables.py`.

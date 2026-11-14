@@ -1,7 +1,7 @@
-//! Expanded code points to written arguments or its call and template (§9).
+//! Expanded code points to written arguments or its call and template.
 mod common;
 
-// Parsed.ast holds the syntax-three tree (final-ast step 2d).
+// Parsed.ast holds the source tree (source nodes retain their identities).
 use common::tree::new as tree;
 
 use ilang_check::query::{Query, check_parsed_for_queries};

@@ -1,4 +1,4 @@
-//! T1/T2 contracts from types-joint J1-J7 and §4. T3-only rules wait for T3.
+//! Contracts of joint inference over groups of bindings.
 mod common;
 use ilang_check::{Checked, check, code, hir::*, order, query, types};
 use ilang_package::{Diagnostic, PackageGraph};
@@ -38,7 +38,7 @@ fn alias(c: &Checked, name: &str) -> String {
 
 #[test]
 fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
-    // §2.2: no reconstruction defaults an existing Con's set to All.
+    // No reconstruction defaults an existing Con's set to All.
     let (_, c) = good(
         "v = \"GET\"\nx : v = \"GET\"\nMethod = v\nBox(A) = (value = A)\nboxed = Box(value = 8080)\nBox(Port) = boxed\nPair(A, B) = { (A, B) }\nparts = (\"GET\", 8080)\nPair(Verb, Number) = parts\nchoice = True |> (True) { Box(value = 1) } | (False) { Box(value = 2) }\nBox(Choice) = choice\nConfig(A, B) = (method = A, port = B)\nconfig = Config(method = \"GET\", port = 8080)\nConfigType = config\nagain : ConfigType = Config(method = \"GET\", port = 8080)",
     );
@@ -74,7 +74,7 @@ fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
 
 #[test]
 fn j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls() {
-    // J2: inferred access parts come from the bound forms, known parts separately.
+    // inferred access parts come from the bound forms, known parts separately.
     good(
         "Box(A) = (value = A)\ncopy = (s : String) {\n\tx = \"a\" = s\n\tp = (Box(value = x), 0).0.value\n\tq : p = \"b\"\n\tq\n}\nanswer = () { copy(\"a\") }",
     );
@@ -118,7 +118,7 @@ fn j4_literal_fixation_orders_completion_and_rejects_later_widening() {
     let source = "Cell(A) = (get = () -> A, set = (A) -> Nil)\nmake = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nr=make(1)\nRead=r\nlater=(){r.set(2)}";
     bad(source, code::TYPE_MISMATCH);
     good(&source.replace("r=make(1)", "r : Cell(Int)=make(1)"));
-    // The earlier annotation-demand ruling still applies; T1's literal is now 1.
+    // An annotation demand must survive completion even for a known literal.
     good("id=(x){x}\nv=id(1)\nx : v=1");
     bad("id=(x){x}\nv=id(1)\nx : v=2", code::TYPE_MISMATCH);
     let source = "Box(A) = (A)\nid=(x){x}\nx : Both=(1,2)\nBoth={(First,Second)}\nBox(Second)=b\nb=id(Box(2))\nFirst=a\na=id(1)";
@@ -214,7 +214,7 @@ fn joint_queries_keep_full_literal_aliases_and_nested_head_targets() {
 
 #[test]
 fn closed_substitution_survives_cached_literal_algebra() {
-    // Joint §2.2 and J4: substitute completed reads before exact normalization.
+    // Completed reads are substituted before exact normalization.
     let source = "id=(x){x}\nn=id(1)\nDifference(A)=A-n\nIntersection(A)=A&n\nf=(x : Difference(1|2)){x}\ng=(x : Intersection(1|2)){x}\na=f(2)\nb=g(1)";
     good(source);
     bad(&source.replace("a=f(2)", "a=f(1)"), code::TYPE_MISMATCH);

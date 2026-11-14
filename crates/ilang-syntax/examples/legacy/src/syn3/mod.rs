@@ -2,7 +2,7 @@ pub use syntax3::syn3::*;
 pub mod convert;
 pub mod lisp;
 pub mod lower;
-/// Reads a normal-surface file of syntax three into the current tree.
+/// Reads a normal-surface file of the source syntax into the current tree.
 pub fn parse_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagnostic>) {
     let (module, mut diags) = parse_module(source);
     let (lowered, more) = lower::lower(&module);
@@ -11,7 +11,7 @@ pub fn parse_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagnostic
     (lowered, diags)
 }
 
-/// Reads a Lisp-surface file of syntax three into the current tree.
+/// Reads a Lisp-surface file of the source syntax into the current tree.
 pub fn parse_lisp_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagnostic>) {
     let (module, mut diags) = lisp::from_lisp(source);
     let (lowered, more) = lower::lower_lisp(&module);
@@ -20,7 +20,7 @@ pub fn parse_lisp_lowered(source: &str) -> (crate::ast::Module, Vec<crate::Diagn
     (lowered, diags)
 }
 
-/// Prints a current tree (an expanded module) as syntax three: the normal
+/// Prints a current tree (an expanded module) in the source syntax: the normal
 /// surface, or the Lisp surface with `lisp`.
 pub fn print_current(module: &crate::ast::Module, lisp: bool) -> String {
     let (module, _) = convert::convert(module, None, &convert::Signatures::default());

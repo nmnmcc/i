@@ -3,7 +3,7 @@
 // Gleam lexer (https://github.com/gleam-lang/gleam, Apache-2.0, see
 // licenses/gleam-LICENCE). SPDX-FileCopyrightText: 2020 The Gleam contributors
 
-//! The lexer (§1): tokens, the line rule (§1.7), and bracket pairs.
+//! The lexer: tokens, the line rule, and bracket pairs.
 
 use ilang_syntax::lexer::{Comment, DocComment, Lexed};
 use ilang_syntax::span::Span;
@@ -21,13 +21,13 @@ pub fn lex_lisp(source: &str) -> Lexed {
     lex_surface(source, true, false)
 }
 
-/// Lex a syntax-three file (docs/design/syntax-3.md): `<-` is one token, and
+/// Lex a current file: `<-` is one token, and
 /// a line that begins with `<A, …>(` begins a statement.
 pub fn lex3(source: &str) -> Lexed {
     lex_surface(source, false, true)
 }
 
-/// Lex a syntax-three Lisp-surface file.
+/// Lex a current Lisp-surface file.
 pub fn lex3_lisp(source: &str) -> Lexed {
     lex_surface(source, true, true)
 }
@@ -66,7 +66,7 @@ fn lex_surface(source: &str, lisp: bool, syn3: bool) -> Lexed {
     }
 }
 
-/// §1.7: a line end is a break when the token before it can end an expression
+/// A line end is a break when the token before it can end an expression
 /// and the token after it can begin a statement.
 fn mark_breaks(tokens: &mut [Token], syn3: bool) {
     for i in 1..tokens.len() {
@@ -76,7 +76,7 @@ fn mark_breaks(tokens: &mut [Token], syn3: bool) {
     }
 }
 
-/// Syntax three: `<` followed by `UpName { , UpName } > (` begins the type
+/// `<` followed by `UpName { , UpName } > (` begins the type
 /// parameters of a function. Returns the index of the `(`.
 pub(crate) fn generics_end(tokens: &[Token], at: usize) -> Option<usize> {
     if tokens.get(at)?.kind != T::Lt {
@@ -309,7 +309,7 @@ impl Lexer<'_> {
 
     fn symbol(&mut self, c: u8) -> Option<T> {
         if self.syn3 && !self.lisp && (c == b'^' || c == b'!' && self.at(1) != b'=') {
-            // Syntax three P0: `^` and `!` alone are no symbols of i.
+            // The token boundary matters here: `^` and `!` alone are no symbols of i.
             let span = Span::new(self.pos as u32, self.pos as u32 + 1);
             self.error(
                 Code::UnexpectedChar,
@@ -373,7 +373,7 @@ impl Lexer<'_> {
         Some(kind)
     }
 
-    /// §1.3: names, discards, and UpNames.
+    /// Names, discards, and UpNames.
     fn word(&mut self) -> T {
         let start = self.pos;
         while is_word(self.at(0)) {
@@ -447,7 +447,7 @@ impl Lexer<'_> {
         T::Int(value.unwrap_or_default())
     }
 
-    /// The `decimal` after `.`: `t.0.1` is `(t.0).1` (§1.5).
+    /// The `decimal` after `.`: `t.0.1` is `(t.0).1`.
     fn tuple_index(&mut self) -> T {
         let start = self.pos;
         let digits = self.digits(10, false);
@@ -455,7 +455,7 @@ impl Lexer<'_> {
         Self::int(digits.filter(|_| ok), 10)
     }
 
-    /// §1.6: int and float literals.
+    /// Int and float literals.
     fn number(&mut self) -> T {
         let start = self.pos;
         let radix = match (self.at(0), self.at(1)) {

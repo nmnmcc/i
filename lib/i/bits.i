@@ -1,4 +1,4 @@
-//// Integer segments of bit arrays (§8.3, §8.4) that do not fit 63 bits.
+//// Integer segments of bit arrays that do not fit 63 bits.
 //// The runtime reads and writes narrower segments itself, with its fixed
 //// width primitives, and calls these functions for the others.
 ////
@@ -8,7 +8,7 @@
 //// significant bit first; the last group may be shorter.
 ////
 //// The two private primitives read and write at most 14 bits, big endian.
-//// They are not part of the language (§13).
+//// They are not part of the language.
 (
 	i/core
 )

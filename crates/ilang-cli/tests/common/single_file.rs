@@ -1,4 +1,4 @@
-//! A spec file is an ordinary src/main.i, including its item macros.
+//! A case of the conformance suite is an ordinary src/main.i, including its item macros.
 use std::path::Path;
 
 pub fn write(dir: &Path, _stem: &str, source: &str) {

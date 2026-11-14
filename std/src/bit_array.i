@@ -146,7 +146,7 @@ int_order = (a : Int, b : Int) -> Order {
 		| (False) { { a < b } |> (True) { Less } | (False) { Greater } }
 }
 
-/// The text form of the bit array (§11.8).
+/// The text form of the bit array.
 ///
 /// ```i
 /// bit_array.inspect(<<1, 2:u2>>)  // "<<1, 2:u2>>"

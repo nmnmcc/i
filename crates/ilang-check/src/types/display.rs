@@ -1,6 +1,6 @@
-//! Showing a type (§4.7): coalescing the bounds of the type variables into
+//! Showing a type: coalescing the bounds of the type variables into
 //! unions and intersections (Simple-sub), simplifying the result, naming the
-//! variables, and writing it in the syntax of §3.
+//! variables, and writing it in i syntax.
 //!
 //! Simplification removes a variable that is only in output places (it is
 //! `Never`) or only in input places (it has no effect), and puts together a
@@ -11,7 +11,7 @@
 
 use super::solve::{Mode, Solver};
 use super::{FnTy, Head, ShownFn, ShownType, Ty, V, Variance};
-// Fast hashing for the small keys of coalescing (docs/performance.md).
+// Fast hashing for the small keys of coalescing.
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 /// What a shown type keeps.
@@ -22,12 +22,12 @@ pub(crate) struct Opts {
     /// union of the types that come to it.
     pub mono: bool,
     /// Written variables are kept, also on one side only: a declared type
-    /// is shown as it is written (§10.1).
+    /// is shown as it is written.
     pub written: bool,
 }
 
 /// The shown type scheme of `t`. `Err` when the type has itself inside it
-/// through a type variable (§4.7).
+/// through a type variable.
 pub(crate) fn scheme(s: &Solver, t: &Ty, opts: Opts) -> Result<ShownType, ()> {
     let t = simplify_with(s, t, None, opts)?;
     Ok(Namer::new(s).show(s, &t))
@@ -713,7 +713,7 @@ impl Coalescer<'_> {
     }
 
     /// `env`: the type is an environment, whose members have arguments that
-    /// are compared as equal (§4.5 rule 4), so they are both outputs and
+    /// are compared as equal, so they are both outputs and
     /// inputs.
     fn go(&mut self, t: &Ty, pos: bool, depth: u32, env: bool) -> Ty {
         let env = env || self.s.is_row(t);
@@ -739,7 +739,8 @@ impl Coalescer<'_> {
                         .any(|m| self.s.vars[m.0 as usize].need_meet.is_some())
                 {
                     // A marked variable denotes its derived meet, not a
-                    // further free parameter: §4.4 keeps `a & T` itself.
+                    // further free parameter: the intersection must retain `a &
+                    // T` itself.
                     if let Some(t) = self.memo.get(&(v, pos, env)) {
                         return t.clone();
                     }
@@ -806,7 +807,7 @@ impl Coalescer<'_> {
                 #[allow(clippy::mutable_key_type)]
                 let mut expanded_bounds = HashSet::default();
                 if mono {
-                    // Not generalized: the types that come to it (§4.7).
+                    // Not generalized: the types that come to it.
                     for m in self.members(v) {
                         let st = &solver.vars[m.0 as usize];
                         for b in &st.lower {
@@ -930,7 +931,7 @@ impl Coalescer<'_> {
 /// An argument that does not change, with its bounds as an output and as
 /// an input, is shown as one type: the input side, which every value that
 /// comes there is in, and which is enough for every use there; when the
-/// input side has nothing, the output side (§4.5 rules 6 and 7).
+/// input side has nothing, the output side.
 pub(crate) fn both(t: &Ty) -> Ty {
     match t {
         Ty::Both(a, b) => {
@@ -1071,7 +1072,7 @@ impl Norm<'_> {
     }
 
     /// An environment: two forms of one type constructor are not put
-    /// together, because their arguments must be equal (§9.2).
+    /// together, because their arguments must be equal.
     fn env(&self, t: Ty) -> Ty {
         self.env_in(t, false)
     }
@@ -1251,7 +1252,7 @@ impl Norm<'_> {
                 m => flat.push(m),
             }
         }
-        // `{ A | B } & C` is `A & C | B & C` (§4.4), for unions of types
+        // `{ A | B } & C` is `A & C | B & C`, for unions of types
         // with type constructors.
         let (unions, rest): (Vec<Ty>, Vec<Ty>) =
             flat.into_iter().partition(|m| matches!(m, Ty::Union(_)));
@@ -1552,7 +1553,7 @@ impl Norm<'_> {
             {
                 return Some((*w, Ty::Var(v)));
             }
-            // §4.7: a variable on one side only has no effect, also a
+            // A variable on one side only has no effect, also a
             // written one, but not in a declared type.
             if !self.written {
                 return Some((v, if o.neg == 0 { Ty::Never } else { Ty::Top }));
@@ -1591,9 +1592,9 @@ impl Norm<'_> {
                 .is_some_and(|s| s.name.is_some())
     }
 
-    /// Invariant arguments count on both sides (§4.5 rules 6 and 7), even
+    /// Invariant arguments count on both sides, even
     /// when normalization has collapsed their equal `Both` forms. In an
-    /// environment, every argument is invariant (§4.5 rule 4).
+    /// environment, every argument is invariant.
     fn walk<'a>(
         &self,
         t: &'a Ty,
@@ -1617,8 +1618,8 @@ impl Norm<'_> {
                     record(occ, order, *v, pos, together.then_some((group, i)));
                 }
                 Ty::Union(_) | Ty::Inter(_) => self.walk(m, pos, occ, order, env),
-                // Only the type constructors of `H` matter in `A - H`
-                // (§4.4), so the variables in `H` are not counted.
+                // Only the type constructors of `H` matter in `A - H`,
+                // so the variables in `H` are not counted.
                 Ty::Diff(a, _) => match &**a {
                     Ty::Var(v) => record(occ, order, *v, pos, None),
                     a => self.walk(a, pos, occ, order, env),
@@ -2175,7 +2176,7 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
         }
         Ty::Con(_, _, parts) => ShownType::Tuple(all(parts, name)),
         Ty::Fn(f) => {
-            // syntax-3 §6.1: a parameter that is not data of one shape is
+            // A parameter that is not data of one shape is
             // shown as a group: `{ Never } -> A`.
             let (params, group) = match f.parts() {
                 Some(parts) => {
@@ -2220,14 +2221,14 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
     }
 }
 
-/// The text of a type (§3), with the names of the custom types `tn`.
+/// The text of a type, with the names of the custom types `tn`.
 fn render(t: &Ty, name: &mut dyn FnMut(V) -> String, tn: &[String]) -> String {
     tree(t, name).text_limited(tn, 12)
 }
 
 /// `t` with the variables of `H` in each difference that are nowhere else
 /// changed to `Top`, shown `_`: only the type constructors of `H` matter
-/// there (§4.4), and such a variable has no other effect.
+/// there, and such a variable has no other effect.
 fn holes(t: &Ty) -> Ty {
     let mut outside = HashSet::default();
     outer_vars(t, &mut outside);
@@ -2287,10 +2288,10 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
     }
 }
 
-// ---- Known types (§4.8) ----
+// ---- Known types ----
 
 /// The known type of a name with the type scheme `t`, whose variables
-/// deeper than `level` are general: the scheme in its simpler form (§4.7).
+/// deeper than `level` are general: the scheme in its simpler form.
 /// A variable that is not general is not known, so it is `_` (`Top`).
 pub(crate) fn known(s: &Solver, t: &Ty, level: u32) -> Ty {
     match simplify(s, t, Some(level)) {
@@ -2300,7 +2301,7 @@ pub(crate) fn known(s: &Solver, t: &Ty, level: u32) -> Ty {
 }
 
 /// `known`, but with the variables that are not general kept, for the
-/// matching that gives them types (§4.8).
+/// matching that gives them types.
 pub(crate) fn known_keep(s: &Solver, t: &Ty, level: u32) -> Ty {
     match simplify(s, t, Some(level)) {
         Ok(t) => known_norm(s, &both(&t)),
@@ -2308,8 +2309,8 @@ pub(crate) fn known_keep(s: &Solver, t: &Ty, level: u32) -> Ty {
     }
 }
 
-/// The known type of a name of another module (§4.8): its type scheme in
-/// the simpler form of §4.7, where a variable that is not generalized is
+/// The known type of a name of another module: its type scheme in
+/// the simple form of a type scheme, where a variable that is not generalized is
 /// the union of the types that come to it.
 pub(crate) fn known_shown(s: &Solver, t: &Ty) -> Ty {
     let opts = Opts {
@@ -2350,7 +2351,7 @@ fn known_ops(s: &Solver) -> Norm<'_> {
     }
 }
 
-/// The union of known types (§4.4), with no constraints: `_` in a union is
+/// The union of known types, with no constraints: `_` in a union is
 /// `_`, because a part that is not known makes the union not known.
 pub(crate) fn known_union(s: &Solver, ms: Vec<Ty>) -> Ty {
     known_ops(s).union(ms)
@@ -2418,7 +2419,7 @@ mod literal_display_tests {
     }
     #[test]
     fn set_normalization_and_full_text() {
-        // literal-types §5.7: subset-based Top, exact differences and number ordering.
+        // Subset-based Top, exact differences and number ordering.
         let s = Solver::new(Default::default(), Vec::new());
         let a = lit(BuiltinType::String, &["a"]);
         assert_eq!(
@@ -2471,7 +2472,7 @@ mod lazy_display_tests {
     #[test]
     fn shown_and_scheme_is_shown_and_scheme() {
         // The checker simplifies the scheme of a definition once for its
-        // text and for the check of the types it uses (§2.4): both must be
+        // text and for the check of the types it uses: both must be
         // what `shown` and `scheme` give on their own.
         let mut s = Solver::new(Default::default(), Vec::new());
         let vs = vars(&mut s, 3);

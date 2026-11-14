@@ -1,12 +1,12 @@
-//! Syntax three, stage 4 (docs/design/syntax-3.md §7.2 row 4, §7.3): labels
-//! in today's syntax. Resolver-aware: each package is checked with
+//! Resolver-aware label migration, applied to sources
+//! in the legacy syntax. Resolver-aware: each package is checked with
 //! `ilang_check::syn3_facts` on, and the written places it records are
 //! rewritten by span, as small textual edits:
 //!
 //! - a call of a function that is not a constructor with arguments by label
 //!   becomes a call by position, in parameter order; when that order would
 //!   change the order in which arguments that are not direct values are
-//!   worked out (spec §6.2, §6.10), the arguments written first are bound to
+//!   worked out, the arguments written first are bound to
 //!   fresh `_syn3_N` locals in a group block;
 //! - a constructor call gives every labelled field by label;
 //! - a part of a constructor pattern matched by label writes its label
@@ -15,7 +15,7 @@
 //!
 //! Usage: `migrate-syntax3-labels [--check] [--lib] PROJECT...`. A project is
 //! a directory with an `i.toml`, or a single `.i` file that is checked as
-//! `src/main.i` of a package `spec` (as the spec suite does). Only files of
+//! `src/main.i` of a package named like the one of the conformance suite. Only files of
 //! the project's own package are edited; with `--lib`, the modules of the
 //! library `i` (`lib/`) too, read from disk. `--check` edits nothing and
 //! exits 1 when an edit is due. Running it again changes nothing. A file
@@ -383,7 +383,7 @@ fn round_groups(repo: &Path, project: &Path, lib: bool) -> Vec<Group> {
 }
 
 /// The arguments of the call whose callee ends at `from` and which ends at
-/// `end`, read from the text: commas and breaks separate them (spec §6.1).
+/// `end`, read from the text: commas and breaks separate them.
 fn written_args(text: &str, from: usize, end: usize) -> Option<Vec<ArgFact>> {
     let b = text.as_bytes();
     let mut i = from;

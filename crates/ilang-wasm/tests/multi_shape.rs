@@ -1,4 +1,4 @@
-//! Multi-shape function values at run time (syntax-3.md §2.6.5, §6.4): a
+//! Multi-shape function values at run time: a
 //! `$multi` holds one ordinary closure per shape group, and every indirect
 //! call site dispatches on the shape of its argument data when the callee is
 //! not a closure of its arity. The programs here are written directly in the

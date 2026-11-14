@@ -1,4 +1,4 @@
-//! The printer and formatter of syntax three. One layout engine serves both:
+//! The printer and formatter of the source syntax. One layout engine serves both:
 //! [`print_module`] writes a tree with no source, [`print_with_comments`]
 //! puts the comments of a source back at the items, statements, branches and
 //! data items they stood before or after, and [`format`] is the formatter.
@@ -50,7 +50,7 @@ pub fn print_with_comments(module: &Module, source: &str, comments: &[Comment]) 
     render(&doc)
 }
 
-/// Formats a syntax-three source file. Syntax errors leave it untouched.
+/// Formats a source file. Syntax errors leave it untouched.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     let (module, diags) = crate::parse::parse_module(source);
     if !diags.is_empty() {

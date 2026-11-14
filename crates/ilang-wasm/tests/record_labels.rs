@@ -1,4 +1,4 @@
-//! records §16 step 2: runtime label ordering equals Rust's UTF-8 order.
+//! The runtime orders labels as Rust orders their UTF-8 bytes.
 
 use std::{cmp::Ordering, env, path::PathBuf, process::Command};
 
@@ -15,7 +15,7 @@ fn string(value: &str) -> String {
 
 #[test]
 fn record_labels_have_the_same_order_in_rust_and_the_runtime() {
-    // Fixed labels, quoting and Unicode follow records §4.1 and §9.3.
+    // Labels are written in UTF-8 byte order, quoted when they need it.
     let labels = [
         "",
         "\0",

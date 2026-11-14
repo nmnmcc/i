@@ -59,11 +59,11 @@ fn recovery_order_invariant(files: &[(&str, &str)]) {
 
 #[test]
 fn annotation_instances_and_local_sharing() {
-    // R1: each completed generalized source occurrence is a fresh instance.
+    // each completed generalized source occurrence is a fresh instance.
     good(
         "id = (x) { x }\ntwice = (f : id, n : Int) { f(f(n)) }\nuse = () { (twice(id, 3), twice(id, 4)) }",
     );
-    // R1: a source parameter's one stored monotype is shared in its body.
+    // a source parameter's one stored monotype is shared in its body.
     good(
         "f = (xs : List(Int)) { acc : xs = []  acc }\nfitted = (s : String) { x = \"a\" = s  y : x = \"b\"  y }",
     );
@@ -101,7 +101,7 @@ fn pending_scopes_and_identity_shadowing() {
 
 #[test]
 fn closed_aliases_and_patterns_complete_eagerly() {
-    // R2/P4: a closed scalar is read exactly; permanent binders are aliases.
+    // a closed scalar is read exactly; permanent binders are aliases.
     let (_, c) = good(
         "value : Int = 1\nRead = value\nPair(A, B) = { (A, B) }\np : (Int, String) = (1, \"a\")\nPair(Left, Right) = p\nComposite(A) = { (A, value) }\nuse = (x : Read, y : Left) { x + y }",
     );
@@ -152,7 +152,7 @@ fn type_edges_do_not_change_runtime_needs_or_generalization() {
 
 #[test]
 fn early_contexts_preserve_dependency_provenance() {
-    // K3/J6: even a completed Int alias remains forbidden at early uses.
+    // even a completed Int alias remains forbidden at early uses.
     for src in [
         "n : Int = 1\nA = n\nBox = (A)",
         "n : Int = 1\nA = n\n@external(\"env\",\"f\")\nf : (A) -> Int",
@@ -166,7 +166,7 @@ fn early_contexts_preserve_dependency_provenance() {
 
 #[test]
 fn source_module_alias_is_the_foreign_closed_read_boundary() {
-    // R7: library completion may fix decode while leaving encode live.
+    // library completion may fix decode while leaving encode live.
     let lib = "(\n\tCodec\n\tsize\n)\nCodec(D, E) = (decode = (String) -> D, encode = (E) -> String)\nmake = <D, E>(d : (String) -> D, e : (E) -> String) {\n\tCodec(decode = d, encode = e)\n}\nid = (x) { x }\nsize = id(make((s : String) -> Int { 1 }, (n : Int) -> String { \"\" }))\nCodec(LocalSize, _) = size";
     let client = "((Codec) = app/lib)\nCodec(RemoteSize,_) = lib.size";
     recovery_order_invariant(&[("src/lib.i", lib), ("src/client.i", client)]);
@@ -178,7 +178,7 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
         "{:?}",
         g.sources.render_all(&c.diags)
     );
-    // P5/R7: later written patterns are still original completion demands.
+    // later written patterns are still original completion demands.
     let own = [
         lib,
         "\nuse = (value : LocalSize) {value}\nCodec(Again,_) = size",
@@ -225,7 +225,7 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
     let p = c.program.as_ref().unwrap();
     let (_, ds) = types::check(p, &g.sources);
     assert!(!ds.iter().any(Diagnostic::is_error));
-    // R7's guidance should prefer an exported transitive alias over a private one.
+    // Inference guidance should prefer an exported transitive alias over a private one.
     let lib = [
         lib.replace(
             "(\n\tCodec\n\tsize\n\tLocalSize\n)",
@@ -246,7 +246,7 @@ fn source_module_alias_is_the_foreign_closed_read_boundary() {
 
 #[test]
 fn query_recovery_keeps_unrelated_results() {
-    // O4/X4: explicit recovery permits failed reads, never invented aliases.
+    // Explicit recovery permits failed reads, never invented aliases.
     let (g, _) = checked(&[(
         "src/main.i",
         "a = (x : b) { x }\nb = a(1)\nanswer : Int = 42",
@@ -258,7 +258,7 @@ fn query_recovery_keeps_unrelated_results() {
 
 #[test]
 fn expanded_places_and_constant_head_alias_parts() {
-    // K2: checking only each Of misses the union surrounding two local holders.
+    // checking only each Of misses the union surrounding two local holders.
     bad(
         "pick = <A, B>(a : A, b : B, c : Bool) {\n\tresult = c |> (True) { a } | (False) { b }\n\t(result, a, b)\n}\nuse = (f : pick) { f }",
         code::TYPE_PLACE,
@@ -267,7 +267,7 @@ fn expanded_places_and_constant_head_alias_parts() {
         "f = (a,b) { g = (x : List(a | b)) { x }  g }",
         code::TYPE_PLACE,
     );
-    // P2: exact constants are observations; they cannot fill a source hole.
+    // exact constants are observations; they cannot fill a source hole.
     good("Tail(A) = { (A, Int) }\np : (String, Int) = (\"a\", 1)\nTail(Text) = p");
     bad(
         "Tail(A) = { (A, Int) }\np : (String, String) = (\"a\", \"b\")\nTail(Text) = p",
@@ -285,7 +285,7 @@ fn expanded_places_and_constant_head_alias_parts() {
 
 #[test]
 fn imported_pattern_binders_are_never_reclassified() {
-    // P1/P3: an imported User changes the collision, never the item kind.
+    // an imported User changes the collision, never the item kind.
     let files = [
         ("src/types.i", "(\n\tUser\n)\nUser = Opaque"),
         (
@@ -356,7 +356,7 @@ fn r7_closed_source_annotations_and_direct_roots() {
 
 #[test]
 fn exported_aliases_cannot_leak_private_nominal_types() {
-    // X2: the source value being public does not export a private nominal type.
+    // the source value being public does not export a private nominal type.
     bad(
         "(\n\tAlias\n)\nSecret = ()\nvalue = Secret\nAlias = value",
         code::EXPORT_HIDDEN_TYPE,
@@ -370,7 +370,7 @@ fn exported_aliases_cannot_leak_private_nominal_types() {
 
 #[test]
 fn query_sources_heads_binders_and_outline() {
-    // X4: each written role has a different navigation target.
+    // each written role has a different navigation target.
     let src = "Pair(A, B) = { (A, B) }\nvalue : (Int, String) = (1, \"a\")\nPair(Left, Right) = value\nuse = (x : Left) { x }";
     let (g, c) = good(src);
     let p = c.program.as_ref().unwrap();
@@ -392,7 +392,7 @@ fn query_sources_heads_binders_and_outline() {
 
 #[test]
 fn a_consumer_cannot_fix_the_library() {
-    // R3/X3: adding only a consumer Of demand leaves the library interface intact.
+    // adding only a consumer Of demand leaves the library interface intact.
     let lib = "(\n\tCell\n\tr\n\treset\n)\nCell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nr = cell(1)\nput = <A>(c : Cell(A), value : A) { c.set(value) }\nreset = () { put(r, \"s\") }";
     let (g, base) = checked(&[("src/lib.i", lib)]);
     assert!(
@@ -436,7 +436,7 @@ fn a_consumer_cannot_fix_the_library() {
 
 #[test]
 fn fixation_keeps_constraints_and_rejects_earlier_weak_parts() {
-    // R5: an ordinary generic helper avoids a narrowed known-field fact.
+    // an ordinary generic helper avoids a narrowed known-field fact.
     let prefix = "Cell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nput = <A>(c : Cell(A), value : A) { c.set(value) }\nr = cell(1)\n";
     good(&[prefix, "later = () {put(r,\"s\")}"].concat());
     let src = [prefix, "Read = r\nlater = () {put(r,\"s\")}"].concat();
@@ -504,7 +504,7 @@ fn every_bad_dependency_component_recovers_without_publishing_aliases() {
 
 #[test]
 fn alias_formals_and_written_holes_are_instantiated_per_use() {
-    // R2 closes the Of part; ordinary written formals/holes keep their rules.
+    // Completion closes the Of part; ordinary written formals/holes keep their rules.
     good(
         "port : Int = 1\nT = { (port, _) }\nf = () {\n\ta : T = (1, \"s\")\n\tb : T = (2, 3)\n\t(a, b)\n}",
     );
@@ -582,13 +582,15 @@ fn standard_library_reverse_order_and_recovery_preserve_types() {
     assert_eq!(normal.alias_types, reversed.alias_types);
 }
 
-/// Outcome of one spec case in `spec_corpus_reverse_order_and_recovery`.
+/// Outcome of one case of the language corpus in
+/// `spec_corpus_reverse_order_and_recovery`.
 enum SpecCase {
     Compared,
     Rejected,
 }
 
-/// Checks one spec case (a `.i` file or a project directory) in normal and
+/// Checks one case of the language corpus (a `.i` file or a project directory)
+/// in normal and
 /// reversed type-tie order. Each case is loaded into its own package graph, so
 /// the result does not depend on any other case.
 fn spec_case_reverse_order_and_recovery(path: &std::path::Path) -> Result<SpecCase, String> {
@@ -765,11 +767,11 @@ fn spec_corpus_reverse_order_and_recovery() {
 
 #[test]
 fn alias_exports_preserve_constructor_privacy() {
-    // X1: Alias(..) is the same alias export as Alias, not constructor access.
+    // Alias(..) is the same alias export as Alias, not constructor access.
     for exports in ["(Secret, Public)", "(Secret, Public(..))"] {
         let lib = [
             exports,
-            // Stage 3 (§2.8): a type and its constructor have one name, so
+            // A type and its constructor have one name, so
             // the exported type `Secret` is the labelled type itself, with
             // its constructor not exported.
             "\nSecret = (Int)\nvalue : Secret = Secret(1)\nPublic = value",
@@ -825,7 +827,7 @@ fn invalid_components_fail_dependents_without_cascading_diagnostics() {
 
 #[test]
 fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
-    // R2/P4: a skip can leave a quantified part alone only at own completion.
+    // a skip can leave a quantified part alone only at own completion.
     let (_, c) = good(
         "id = (x) { x }\nPair(A, B) = { (A, B) }\none : Int = 1\nv = (id, one)\nPair(_, Number) = v",
     );
@@ -847,7 +849,7 @@ fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
         ),
     ]);
     assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));
-    // P4 cannot discard the Nil alternative to find a convenient named head.
+    // Completion cannot discard the Nil alternative to find a convenient named head.
     bad(
         "Box(A) = (A)\nv : { Box(Int) | Nil } = Box(1)\nBox(_) = v",
         code::TYPE_PATTERN_MISMATCH,

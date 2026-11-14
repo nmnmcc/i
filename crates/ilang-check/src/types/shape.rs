@@ -1,4 +1,4 @@
-//! Data shapes (syntax-3 §2.3, §6.2): the number of positions and the set
+//! Data shapes: the number of positions and the set
 //! of labels of some data. A shape is interned once per process, so that a
 //! [`ShapeId`] is a small copyable head part. Parts of a data value or type
 //! are kept in canonical order: the positions, then the labels in UTF-8

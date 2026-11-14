@@ -569,7 +569,7 @@ pub fn run(p: &mut Program) {
             }
         });
         // Projected products repay expansion by removing their objects/arrays.
-        // §9.3 permits this bounded heuristic; the collective worker limit stays 2x.
+        // The bound is a heuristic; the collective worker limit stays 2x.
         let extra = size * if projections { 2 } else { 1 };
         let limit = if i < source_count {
             size + extra

@@ -1,5 +1,5 @@
-//! The syntax-three fixtures of `tests/syn3`, read by the default parser.
-//! The library is round-tripped through the syntax-three printer first,
+//! Fixtures in `tests/syn3` use the default parser so they exercise production syntax.
+//! The library is round-tripped through the source printer first,
 //! preserving the source tree and comments.
 //!
 //! A fixture is a package directory with any of:
@@ -32,7 +32,7 @@ fn sources(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Checks the library against the syntax-three printer.
+/// Checks the library against the source printer.
 fn round_trip_library() {
     let lib = repository().join("lib");
     let mut files = Vec::new();

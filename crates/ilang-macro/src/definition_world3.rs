@@ -1,10 +1,10 @@
-//! The parts of `definition_world` that read the tree, on the tree of
-//! syntax three: what a type definition binds, whether its constructor is
+//! Definition queries need to agree on what a type definition binds, whether
+//! its constructor is
 //! hidden outside its module, and the type parameters of an item.
 //!
-//! In the tree of syntax three a sum `T = C1 | C2` and its members
+//! In the source tree a sum `T = C1 | C2` and its members
 //! `C1 = (…)`, `C2 = (…)` are three items, and each is a definition of its
-//! own (syntax-3.md §6.8; the lowering makes one definition of them). The
+//! own, so definition queries must retain all three items. The
 //! table of the definitions (`lisp::definition_table`) and the rows of the
 //! answers are not part of this module.
 use ilang_syntax::syn3::ast::{
@@ -43,7 +43,7 @@ pub fn pattern_binders<'a>(ty: &'a Type, output: &mut Vec<&'a Ident>) {
                 args,
             } if args.is_empty() => output.push(name),
             TypeKind::Named { args, .. } => pending.extend(args.iter().rev()),
-            // The old tree's tuple: data with positional items only, and
+            // Tuple handling requires positional data only, and
             // at least one.
             TypeKind::Data(items)
                 if !items.is_empty() && items.iter().all(|i| matches!(i, TItem::Pos(_))) =>
@@ -125,7 +125,7 @@ mod tests {
     use super::*;
     use migration_syntax::ast as old;
 
-    /// The answers on the tree of syntax three and on its lowering.
+    /// The answers on the source tree and on its lowering.
     #[test]
     fn answers_agree_with_the_lowered_tree() {
         let source = "\

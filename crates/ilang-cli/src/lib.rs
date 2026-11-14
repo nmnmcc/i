@@ -10,19 +10,19 @@ pub use ilang_wasm::Target;
 /// What to build.
 #[derive(Clone, Copy, Debug)]
 pub struct BuildOptions {
-    /// Compile the tests of the package (§10.2).
+    /// Compile the tests of the package.
     pub tests: bool,
     pub opt: Level,
-    /// Do not use the network to get packages (§2.7); `ILANG_OFFLINE` in
+    /// Do not use the network to get packages; `ILANG_OFFLINE` in
     /// the environment also turns this on.
     pub offline: bool,
-    /// The host to build for (B.7).
+    /// The host to build for.
     pub target: ilang_wasm::Target,
 }
 
 /// A module that was built.
 pub struct Built {
-    /// The `name` of the package (§2.6).
+    /// The `name` of the package.
     pub name: String,
     pub wasm: Vec<u8>,
     /// Compiler provenance outside ABI v3, bound to the optimized artifact.
@@ -63,7 +63,7 @@ pub const RUNNER: &[u8] = include_bytes!(env!("ILANG_RUNNER"));
 pub const RUNNER_TARGET: &str = env!("ILANG_RUNNER_TARGET");
 
 impl Built {
-    /// A native package (docs/design/native.md, N2): a copy of [`RUNNER`]
+    /// A native package: a copy of [`RUNNER`]
     /// with this module compiled for the runner's target triple.
     pub fn native_package(&self, name: &str) -> anyhow::Result<Vec<u8>> {
         ilang_host::native::package(
@@ -112,7 +112,7 @@ impl std::error::Error for BuildError {}
 /// Diagnostics, migration guidance for parse errors, and old-version notes.
 pub fn diagnostic_lines(graph: &PackageGraph, diags: &[Diagnostic]) -> Vec<String> {
     let mut lines = graph.sources.render_all(diags);
-    // The syntax-three reader reports the error at the token that cannot
+    // The source reader reports the error at the token that cannot
     // follow. Keep the migration guidance on that error path, without
     // reserving ordinary names such as `case` and `if` in the grammar.
     for module in graph.packages.iter().flat_map(|package| &package.modules) {
@@ -741,13 +741,13 @@ pub fn test_options_with_templates(
     options
 }
 
-/// Runs one test in a new instance (§10.2), with the standard host services.
+/// Runs one test in a new instance, with the standard host services.
 pub fn run_test(program: &ilang_host::Program, name: &str) -> ilang_host::TestResult {
     run_test_with(program, name, test_options())
 }
 
-/// Runs one test in a new instance (§10.2) with these host services, on one
-/// `ilang` thread. An async test is waited for (B.5).
+/// Runs one test in a new instance with these host services, on one
+/// `ilang` thread. An async test is waited for until it ends.
 pub fn run_test_with(
     program: &ilang_host::Program,
     name: &str,

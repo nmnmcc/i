@@ -1,4 +1,4 @@
-//! The text form of a Float (§11.8) is i code, `lib/i/float_text.i`, which
+//! The text form of a Float is i code, `lib/i/float_text.i`, which
 //! the runtime calls for every inspected Float. These tests compile one
 //! program at O0 and at O2 with scalar lowering, and compare its text with a
 //! reference written independently in Rust: fixed presentations of the
@@ -10,7 +10,7 @@ use num_bigint::BigInt;
 
 // Fixed presentations, with hexadecimal IEEE encodings for subnormal
 // endpoints and the neighbours of 1, and each side of every limit of the
-// long form in spec §11.8.
+// long form of a Float.
 const CASES: &[(u64, &str)] = &[
     (0x0000_0000_0000_0000, "0.0"),
     (0x8000_0000_0000_0000, "-0.0"),
@@ -134,7 +134,7 @@ fn shortest(value: f64) -> (String, i32) {
     (best.unwrap().0.to_string(), k)
 }
 
-/// The text form of spec §11.8, written independently of the runtime.
+/// The text form of a Float, written independently of the runtime.
 fn reference(value: f64) -> String {
     if value == 0.0 {
         return if value.is_sign_negative() {

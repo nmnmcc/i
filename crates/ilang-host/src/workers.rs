@@ -1,22 +1,22 @@
-//! Native multicore workers (multicore.md D1/D8/D12, native.md N5/N7/N8/N10/N12).
+//! Native multicore workers.
 //!
 //! One module, N instances. The instance of the entry is worker 0; its i
-//! scheduler is the one authority of the run's shared state (N8's one lock:
+//! scheduler is the one authority of the run's shared state (a single lock:
 //! scopes, joins, channels, shares, cancellation). Workers 1..N-1 each have
 //! their own `Store` on their own OS thread, with the same host functions.
 //!
 //! At `go` the scheduler encodes a portable task record into one shared
-//! queue (`mc_publish`, N7). A record is claimed once: by the maker
+//! queue (`mc_publish`). A record is claimed once: by the maker
 //! (`mc_claim`), which runs its retained original, or by a worker, which
 //! decodes it and runs the task there to its next step (`ilang_mc_begin`).
 //! Each step goes to worker 0 as a message (`mc_inbox`, `mc_message`); the
 //! answer goes back to the worker that holds the task's stack (`mc_send`,
-//! `ilang_mc_resume`). A started task never moves (N6). Values that cannot
+//! `ilang_mc_resume`). A started task never moves. Values that cannot
 //! move travel as tokens of their worker; a record that holds tokens of a
 //! worker is published for that worker only.
 //!
 //! The worker count comes from `I_WORKERS`, else from the available cores.
-//! One worker keeps the FIFO fast path: no queue, no encoding (N10).
+//! One worker keeps the FIFO fast path: no queue, no encoding.
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -70,7 +70,7 @@ fn available_memory() -> Option<u64> {
     Some(kib * 1024)
 }
 
-/// The key id prefix of a worker (D6): worker w takes ids above
+/// The key id prefix of a worker: worker w takes ids above
 /// `(w + 1) << 56`, and a new instance of the same worker a new generation.
 pub(crate) fn id_prefix(worker: usize, generation: u64) -> i64 {
     (((worker as u64 + 1) << 56) | ((generation & 0xffff) << 40)) as i64
@@ -116,7 +116,7 @@ struct PoolState {
     spawned: usize,
     shutdown: bool,
     broken: bool,
-    /// The first stop of a task on a worker (N12).
+    /// The first stop of a task on a worker.
     stop: Option<String>,
     /// Steps run per worker: index 0 is worker 0.
     ran: Vec<u64>,
@@ -142,7 +142,7 @@ pub(crate) struct Pool {
     module: Module,
     abi: Abi,
     options: HostOptions,
-    /// The resource context of the live invocation, shared by all workers (N9.1).
+    /// The resource context of the live invocation, shared by all workers.
     resources: Mutex<Option<ResourceContext>>,
     remote: usize,
     abandon: Arc<AtomicBool>,
@@ -187,7 +187,7 @@ impl Pool {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// The epoch ticker lets shutdown stop a worker that computes (N12).
+    /// The epoch ticker lets shutdown stop a worker that computes.
     fn ensure_ticker(self: &Arc<Self>) {
         let mut ticker = self.ticker.lock().unwrap_or_else(|e| e.into_inner());
         if ticker.is_some() {
@@ -858,7 +858,7 @@ pub(crate) fn define_home(linker: &mut Linker<State>) -> Result<()> {
     fn pool(caller: &Caller<'_, State>) -> Option<Arc<Pool>> {
         caller.data().workers.clone()
     }
-    /// A stop on another worker stops the run with its message (N12).
+    /// A stop on another worker stops the run with its message.
     fn stop(caller: &mut Caller<'_, State>, message: String) -> wasmtime::Error {
         caller.data_mut().stop_message.get_or_insert(message);
         wasmtime::Error::from_anyhow(anyhow!("a task on another worker stopped"))

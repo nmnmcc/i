@@ -1,21 +1,5 @@
-//// Structured entries and call-time sink services. See std-2.md §6/§7.
-//// Level(..), Entry(..) export constructors; Sink(E,N) hides its constructor.
-//// Level { Debug Info Warning Failure }
-//// Entry { Entry(level: Level, message: String, fields: List((String,String)),
-////               at: Option(time.Instant)) }
-//// Sink(E,N) { Sink((Level)->Bool, (Entry)->Nil ? E ! N, (N)->Nil) }
-//// Interface:
-//// make(E,N): (accept: (Level)->Bool, send: (Entry)->Nil ? E ! N)->Sink(E,N)
-//// silent(N): ()->Sink(Never,N)
-//// filter(E,N): (sink: Sink(E,N), accept: (Level)->Bool)->Sink(E,N)
-//// minimum(E,N): (sink: Sink(E,N), level: Level)->Sink(E,N)
-//// enabled(E,N): (level: Level)->Bool ! Sink(E,N)
-//// write(E,N): (entry: Entry)->Nil ? E ! N | Sink(E,N)
-//// lazy(E,F,N): (level: Level, message: ()->String ? F ! N)->Nil ? E | F ! N | Sink(E,N)
-//// format: (entry: Entry)->String
-//// stderr/stdout: () -> Sink for the corresponding stream
-//// file: (path: String) -> Sink appending formatted lines
-//// timestamped: (entry: Entry) -> Entry, reading the Unix clock
+//// Structured entries and call-time sink services.
+//// Sink constructors stay private so delivery goes through the service laws.
 ////
 //// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;
 //// fields preserve order and duplicate keys. Timestamps are explicit Unix
@@ -45,7 +29,8 @@
 //// Service laws compare delivery observations, not closure equality: accepted
 //// entries arrive in sequential call order; filter(s,always_true) preserves
 //// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback
-//// termination guarantee is added. Generic client use awaits the §7 compiler
+//// termination guarantee is added. Generic client code needs compiler support
+//// for generic sink calls.
 //// IO adapters are explicit and use the same sink service.
 (
 	i/core
@@ -114,7 +99,7 @@ enabled = <E, N>(level : Level) <- (sink : Sink(E, N)) -> Bool {
 	accept(level)
 }
 
-// Inferred returns retain the exact public error and environment rows (§7).
+// Inferred returns retain the exact public error and environment rows.
 write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(accept, send, _) = sink
 	accept(entry.level) |> (True) { send(entry) } | (False) { Nil }

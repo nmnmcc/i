@@ -1,5 +1,5 @@
-//! Facts for the syntax-three label migration (docs/design/syntax-3.md §7.2
-//! stage 4, §7.3): the checker records, while it resolves and type checks,
+//! Facts for the resolver-aware label migration: the checker records, while it
+//! resolves and type checks,
 //! the written places that `migrate-syntax3-labels` rewrites. Recording is
 //! off unless a tool turns it on; the facts never change what is checked.
 
@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// An argument as written: the span of its label, when it has one, and of
-/// its value, and whether the value is a direct value (spec §6.10).
+/// its value, and whether the value is a direct value.
 #[derive(Clone, Debug)]
 pub struct ArgFact {
     pub label: Option<Span>,
@@ -55,7 +55,7 @@ pub enum Fact {
         to: Vec<usize>,
     },
     /// A part of a constructor pattern matched to the field `label` by
-    /// label, whose top is a name or `name: T` (§7.1).
+    /// label, whose top is a name or `name: T`.
     PatternPart {
         file: File,
         span: Span,
@@ -87,7 +87,7 @@ pub fn take() -> Vec<Fact> {
     std::mem::take(&mut *FACTS.lock().expect("syntax-three facts"))
 }
 
-/// Spec §6.10: an expression made without running any code.
+/// An expression made without running any code.
 pub fn direct(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Int(_)

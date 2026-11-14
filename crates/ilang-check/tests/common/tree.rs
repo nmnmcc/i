@@ -1,14 +1,8 @@
-//! The places of a module that the tests change by hand, for the two trees.
-//!
-//! `old` is the tree before syntax three (`ilang_syntax::ast`), which
-//! `Parsed.ast` holds today. `new` is the tree of syntax three
-//! (`ilang_syntax::syn3::ast`), with the same functions, so that a test moves
-//! to the new tree by changing `tree::old` to `tree::new`
-//! (docs/design/syn3-final-ast.md, step 2d). `tests/tree_helpers.rs` checks
-//! that the two give the same place: a change through `new`, lowered, is the
-//! change through `old`.
+//! Test adapters let one assertion inspect either a legacy migration node or
+//! the compiler's source node. `tests/tree_helpers.rs` checks that mutations
+//! through the source adapter survive conversion to the legacy representation.
 
-/// The tree before syntax three.
+/// The tree in the legacy syntax.
 pub mod old {
     use ilang_syntax::ast::{Expr, ExprKind, Ident, ItemKind, Module, PatternKind, Stmt, TypeExpr};
     use ilang_syntax::span::Span;
@@ -95,7 +89,7 @@ pub mod old {
     }
 }
 
-/// The tree of syntax three.
+/// The tree of the source syntax.
 pub mod new {
     use ilang_syntax::span::Span;
     use ilang_syntax::syn3::ast::{

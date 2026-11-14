@@ -1,4 +1,4 @@
-//! `call` on the tree of syntax three: extracts macro call candidates
+//! `call` on the source tree: extracts macro call candidates
 //! without evaluating or traversing arguments.
 //!
 //! The candidates are those of `call` on the lowered tree: a call whose

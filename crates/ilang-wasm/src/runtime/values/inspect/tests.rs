@@ -1,4 +1,4 @@
-//! The text form of values (spec §11.8), run with the whole runtime.
+//! The text form of values, run with the whole runtime.
 
 use crate::runtime::literal;
 use crate::runtime::tests::{Checks, STUB_HOST, run_export};

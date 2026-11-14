@@ -1,4 +1,4 @@
-//! The seventh SYN2 decision: package-scoped conventional and named entries.
+//! Entry lookup is package-scoped for conventional and named entries.
 use ilang_cli::{BuildOptions, Level, Target, build, build_entry};
 use std::path::Path;
 

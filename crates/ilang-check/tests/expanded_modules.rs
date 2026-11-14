@@ -1,7 +1,7 @@
 //! Expanded modules must enter the same resolver and checker as parsed source.
 mod common;
 
-// Parsed.ast holds the syntax-three tree (final-ast step 2d).
+// Parsed.ast holds the source tree (source nodes retain their identities).
 use common::tree::new as tree;
 
 #[test]

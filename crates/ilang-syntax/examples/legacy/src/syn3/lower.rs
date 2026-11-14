@@ -1,27 +1,10 @@
-//! The transition front of syntax three (docs/design/syntax-3.md §7.2,
-//! stage 8): a syntax-three tree is lowered to the current tree, which the
-//! resolver reads. This is the reverse of `convert`, form by form.
+//! Adapter to the legacy representation retained by migration tools and
+//! differential tests. Unsupported forms must fail before downstream passes
+//! see a partial tree.
 //!
-//! The checker of this stage is today's, so the forms that only the later
-//! stages can type are compile errors here, each naming its stage: a chain
-//! with several shape groups (stage 9), `..name: N` in a service pattern
-//! (stage E6), a key on a parameter (stage 9), keys in data patterns
-//! (stage 6).
-//!
-//! Three things have no spelling in today's syntax and are passed on as
-//! follows:
-//! - `e <- (s1, s2)` becomes the block `{ ! _ = s1  ! _ = s2  e }`: an
-//!   environment statement whose type is `_` takes its key from the known
-//!   type of its value (the checker reads it so).
-//! - A written `-> R` of a function literal leaves the needs to inference:
-//!   it becomes `-> R ^ _ ! _`, which the checker reads as "inferred".
-//! - `<- N` or `<- (..N, …)` with no `Fail` entry in the signature of a
-//!   binding with the type parameter `N` carries the errors in `N`: it
-//!   becomes `^ N%E ! N`, with `N%E` one more type parameter of the binding.
-//!
-//! Type definitions (§2.8, stage 3): `C(A) = (…)` is today's one-constructor
-//! type `C(A) { C(…) }`, and a sum `T(A) = C1(A) | C2` is the alias of the
-//! union of such types, which the checker reads as a sum.
+//! Data definitions become one-constructor definitions; aliases keep their
+//! name. Calls preserve written evaluation order, and provision becomes
+//! service bindings around the provided expression.
 
 use super::ast as n;
 use crate::ast as o;
@@ -29,12 +12,12 @@ use crate::span::Span;
 use crate::{Code, Diagnostic};
 use std::collections::{HashMap, HashSet};
 
-/// Lowers a module of syntax three to the current tree.
+/// Lowers a module of the source syntax to the current tree.
 pub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
     lower_surface(m, false)
 }
 
-/// Lowers a module read from the Lisp surface. There a match is today's
+/// Lowers a module read from the Lisp surface. There a match is the legacy
 /// pipe into a clause block, as the Lisp rows of today read it.
 pub fn lower_lisp(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
     lower_surface(m, true)
@@ -386,7 +369,7 @@ struct Cx {
     rows: Vec<Row>,
     fresh: usize,
     /// The module imports nothing under the name `core`, so `core.never`
-    /// is the empty match (§2.13).
+    /// is the empty match.
     core_free: bool,
     /// The chain being lowered is one shape group of a multi chain: its
     /// branches have one shape and may have keys.
@@ -409,7 +392,7 @@ fn shape_of(f: &n::Function) -> (usize, Vec<&str>) {
 }
 
 /// The branches of a chain by shape, in the order of the first branch of
-/// each group (§2.5).
+/// each group.
 fn shape_groups(fs: &[n::Function]) -> Vec<Vec<n::Function>> {
     let mut groups: Vec<Vec<n::Function>> = Vec::new();
     for f in fs {
@@ -443,7 +426,7 @@ fn canonical(f: &n::Function) -> Vec<&n::PItem> {
     items
 }
 
-/// The label under which a shape is written in the transition tree: the
+/// The label under which a shape is written in the HIR input representation: the
 /// number of positions and then each label after a comma.
 pub fn shape_text(positions: usize, labels: &[&str]) -> String {
     let mut text = positions.to_string();
@@ -455,7 +438,7 @@ pub fn shape_text(positions: usize, labels: &[&str]) -> String {
 }
 
 /// The label of the one parameter of a multi-shape function type in the
-/// transition tree.
+/// HIR input representation.
 pub const DATA: &str = "%data";
 
 /// The callee of the transition form of a multi chain (see `multi_expr`).
@@ -514,8 +497,7 @@ fn name_expr(name: &str, span: Span) -> o::Expr {
     )
 }
 
-/// The transition form of a multi-shape value (deleted in stage 12, when
-/// the resolver reads the syntax-three tree): a call of the reserved name
+/// The legacy adapter represents a multi-shape value as a call of a reserved name
 /// [`MULTI`] with one argument per shape group, whose label is the group's
 /// shape ([`shape_text`]) and whose value is the group's function.
 fn multi_expr(groups: Vec<(String, o::Expr)>, span: Span) -> o::Expr {
@@ -645,7 +627,7 @@ impl Cx {
         }
     }
 
-    /// The items. Each definition is lowered alone (§2.8, stage 3): a data
+    /// Each definition is lowered independently: a data
     /// definition `C(A) = (…)` is a type with one constructor of its name,
     /// and `T = C1 | … | Ck` is the alias for the union of those types.
     fn items(&mut self, items: &[n::Item]) -> Vec<o::Item> {
@@ -873,7 +855,7 @@ impl Cx {
         let mut generics: Vec<&n::Ident> = Vec::new();
         if let n::ExprKind::Chain(fs) = &b.value.kind {
             // Branches may share a name; a name written twice in one list
-            // is kept twice, so that the resolver reports it (E0226).
+            // is kept twice, so that the resolver reports it.
             for f in fs {
                 let before = generics.len();
                 for g in &f.generics {
@@ -968,7 +950,7 @@ impl Cx {
     }
 
     fn block(&mut self, b: &n::Block) -> o::Block {
-        // A provide that ends a block is today's environment statements
+        // A provide that ends a block is the legacy environment statements
         // before the rest of that block.
         let mut stmts = Vec::new();
         for (i, s) in b.stmts.iter().enumerate() {
@@ -999,7 +981,7 @@ impl Cx {
     }
 
     /// A binding as one or more bindings of the current tree. A multi chain
-    /// bound to one name with no written type (§2.6.1) becomes one hidden
+    /// bound to one name with no written type becomes one hidden
     /// binding per shape group and then the name itself, bound to the
     /// multi-shape value of those groups.
     fn bindings(&mut self, b: &n::Binding, top: bool, macro_groups: bool) -> Vec<o::Binding> {
@@ -1064,7 +1046,7 @@ impl Cx {
     }
 
     /// `e <- (s1, s2)`: the environment statements and then `e`. Every
-    /// service is worked out in the outer environment (§2.10.5): when there
+    /// service is worked out in the outer environment: when there
     /// are several and one is not a name, each is bound to a fresh local
     /// first, so that no service sees another.
     fn provide(&mut self, target: &n::Expr, services: &n::Expr) -> Vec<o::Stmt> {
@@ -1135,7 +1117,7 @@ impl Cx {
     fn params_of(&mut self, f: &n::Function, params: &mut Vec<o::Param>) {
         let mut fails = 0;
         for s in f.services.iter().flatten() {
-            // `name: Fail(E)` is today's error part (`ret`).
+            // `name: Fail(E)` is the legacy error part (`ret`).
             if fail_of(s).is_some() {
                 fails += 1;
                 if fails == 2 {
@@ -1470,7 +1452,7 @@ impl Cx {
             },
             n::ExprKind::Data(items) => {
                 // `()` is the empty data, a value and a pattern of the type
-                // `()` (§7.1 row 7): an empty tuple, as its pattern is.
+                // `()`: an empty tuple, as its pattern is.
                 if items.iter().all(|i| matches!(i, n::DItem::Pos(_))) {
                     o::ExprKind::Tuple(
                         items
@@ -1552,7 +1534,7 @@ impl Cx {
                 rhs: Box::new(self.expr(rhs)),
             },
             n::ExprKind::Pipe { lhs, rhs } => match &rhs.kind {
-                // A match (§2.11): one position per branch.
+                // A match: one position per branch.
                 n::ExprKind::Chain(fs)
                     if (!self.lisp
                         || self.generated_from.is_some_and(|start| span.start >= start))
@@ -1710,7 +1692,7 @@ impl Cx {
         pat(kind, span)
     }
 
-    /// `p1 = p2 = …`: today's chain of names around one pattern. With
+    /// `p1 = p2 = …`: the legacy chain of names around one pattern. With
     /// `label`, the chain ends in the label of a constructor field.
     fn and(&mut self, parts: &[n::Pattern], label: Option<&n::Ident>, span: Span) -> o::Pattern {
         let mut names: Vec<o::Ident> = Vec::new();
@@ -1729,7 +1711,7 @@ impl Cx {
         }
         let mut inner = match (label, core) {
             (Some(l), Some(core)) => match core.kind.clone() {
-                // `key = name: T`: today's `name = key: T`.
+                // `key = name: T`: the legacy `name = key: T`.
                 o::PatternKind::Typed { binder: b, ty: t } => {
                     if b.name != l.name && !b.discard {
                         names.insert(0, ident(b.name.clone(), b.span));
@@ -1797,12 +1779,12 @@ impl Cx {
 
     // ---- Types ----
 
-    /// The needs written after `<-` as the two rows of today's function
+    /// The needs written after `<-` as the two rows of the legacy function
     /// type: the error channel and the environment. This is the only place
     /// where a need becomes a row: a `Fail(E)` entry is the error `E`, every
     /// other entry is a member of the environment, and `..N` (or `<- N`) is
     /// the row variable `N`, which also carries the errors when the
-    /// signature writes no `Fail` beside it (§7.3).
+    /// signature writes no `Fail` beside it.
     fn needs_row(
         &mut self,
         services: Option<&n::Type>,
@@ -1848,7 +1830,7 @@ impl Cx {
             // `<- N`: a row variable.
             Some((_, t)) => need(self, t, true),
         }
-        // The errors that a row variable carries (§7.3).
+        // The errors that a row variable carries.
         if err.is_none()
             && let Some(row) = row
             && let Some(found) = self.rows.iter_mut().rev().find(|r| r.name == row)

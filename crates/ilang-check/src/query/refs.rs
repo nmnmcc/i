@@ -95,8 +95,8 @@ impl Query<'_> {
         modules: &[ModuleId],
     ) -> Vec<Reference> {
         let mut refs = self.references_of(target, owner, modules);
-        // A type with one constructor of its own name is one thing (syntax
-        // three §2.8): an import or export of the name refers to both.
+        // A type and its same-named constructor share import and export uses,
+        // so renaming must keep both identities together.
         let twin = match self.canonical(owner, target.clone()) {
             Target::Ctor(c) if self.program.ty(c.ty).name == self.ctor_name(c) => {
                 Some(Target::Type(TypeRef::Custom(c.ty)))
@@ -362,7 +362,7 @@ impl Query<'_> {
             let lisp = self.is_lisp(loc.module);
             let written = self.written_text(loc.module);
             let text = &written[loc.span.start as usize..loc.span.end as usize];
-            // Syntax three writes the label of a pattern part itself,
+            // Source patterns write the label of a pattern part itself,
             // `C(label = local)`: the label is renamed in place.
             let labelled = !lisp && {
                 let after = written[loc.span.end as usize..].trim_start();
@@ -743,7 +743,7 @@ impl Query<'_> {
     }
 }
 
-/// `UpName` (§1.3).
+/// `UpName`.
 pub fn is_up_name(s: &str) -> bool {
     let mut chars = s.chars();
     matches!(chars.next(), Some('A'..='Z')) && chars.all(|c| c.is_ascii_alphanumeric())

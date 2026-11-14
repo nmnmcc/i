@@ -224,7 +224,7 @@ fn corpus() -> Vec<Case> {
     for (x, expected) in [(-1.0, -0.5), (1.0, 0.0)] {
         cases.push(float_case("{ a = { x <. 0.0 } |> (True) { x } | (False) { \"s\" }\na |> (v: Float) { v +. 0.5 } | (_) { 0.0 } }", x, expected));
     }
-    // N5: exact rounded chains under dominating bounds, and chains whose
+    // exact rounded chains under dominating bounds, and chains whose
     // middle result overflows even though the final expression would be finite.
     for n in 0..24 {
         let x = n as f64 * 0.125 - 1.5;
@@ -263,7 +263,7 @@ fn corpus() -> Vec<Case> {
         };
         cases.push(float_case("bounded_float(x)", x, expected));
     }
-    // N4: carry the current accumulator through promotion and demotion. The
+    // carry the current accumulator through promotion and demotion. The
     // effect trace checks that leaving a guarded worker never replays a step.
     for n in 0..24 {
         let x = BigInt::from(1073741823_i64 - n);
@@ -295,7 +295,7 @@ fn corpus() -> Vec<Case> {
         1073741822.into(),
         1073741825.into(),
     ));
-    // N3: cross-call pairs, structural and nominal numeric records, including
+    // cross-call pairs, structural and nominal numeric records, including
     // joins and repeated projections. Shapes carry actual labels/constructors.
     for n in 0..24 {
         let x = n as f64 * 0.125 - 1.5;
@@ -321,7 +321,7 @@ fn corpus() -> Vec<Case> {
         ));
         cases.push(float_case(&format!("{{ r = {{ x <. 0.0 }} |> (True) {{ (a = x, b = {n}.0) }} | (False) {{ (a = x, b = {}.0) }}\nr.a +. r.b }}", n + 1), x, x + if x < 0.0 { n as f64 } else { (n + 1) as f64 }));
     }
-    // N2: cross-call scalar chains and closures with different captures share
+    // cross-call scalar chains and closures with different captures share
     // code without sharing identity or the capture values.
     for n in 0..32 {
         let x = n as f64 * 0.125 - 2.0;

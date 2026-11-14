@@ -1,4 +1,4 @@
-//! The simple case mappings of Unicode, as range tables (spec §13).
+//! The simple case mappings of Unicode, as range tables.
 //!
 //! Made by `scripts/gen-case-tables.py` from
 //! `crates/ilang-wasm/unicode/UnicodeData.txt`. Do not change this file by

@@ -1,24 +1,16 @@
-//! Name resolution of the syntax-three tree (`ilang_syntax::syn3::ast`),
-//! with no lowering to the tree before it (docs/design/syn3-final-ast.md,
-//! step 3). [`resolve3`] gives the HIR and the diagnostics that
-//! `resolve(lower(module))` gives; the test `resolve3_differential` holds
-//! the two paths equal.
+//! Name resolution reads source nodes directly, so their spans and macro
+//! identities survive into HIR. Scopes, lookups and whole-program checks are
+//! shared with the other resolver helpers.
 //!
-//! Every function here reads the new tree and is the twin of the function
-//! of the same name in `resolve.rs`; what does not read a tree (scopes,
-//! lookups, the rules about the whole program) is shared with it. The rows
-//! of §1 of the note are here as code:
-//!
-//! - a sum is the union right after its member data definitions
-//!   ([`pre::sums`], `type_shape`);
-//! - a chain is a function, a function of `%arg` over a match, or a
-//!   function of fresh parameters over a match (`chain`);
+//! Source forms need these HIR representations:
+//! - a sum follows its member data definitions ([`pre::sums`], `type_shape`);
+//! - a chain is a function over a match (`chain`);
 //! - a pipe into a chain is a match (`case`);
-//! - `e <- (s1, s2)` is environment statements before `e` (`flatten_provide`);
+//! - a provide evaluates its services before its body (`flatten_provide`);
 //! - needs become rows in one place ([`R3::needs_row`]).
 //!
-//! The errors of the forms that this compiler cannot type yet are found by
-//! [`pre::pre`], before anything is resolved.
+//! [`pre::pre`] reports unsupported forms before resolution, so invalid forms
+//! cannot leave partially resolved definitions.
 
 mod groups;
 mod pre;
@@ -44,7 +36,7 @@ pub fn lowering_errors(module: &n::Module, lisp: bool) -> Vec<ilang_syntax::Diag
     })
 }
 
-/// Resolves the modules of a graph from their syntax-three trees. `parsed`
+/// Resolves the modules of a graph from their source trees. `parsed`
 /// gives the place of each module in the graph and its expansion origins;
 /// its `ast` is not read. The diagnostics start with the errors of
 /// [`lowering_errors`], module by module.
@@ -188,7 +180,7 @@ fn resolve_here(
     (r.p, r.diags)
 }
 
-/// [`typed_output`] for an expression of the syntax-three tree. The
+/// [`typed_output`] for an expression of the source tree. The
 /// expression stands alone: it is a macro result, so it has no fresh names
 /// of a module and no binding around it.
 #[allow(clippy::too_many_arguments)]
@@ -311,7 +303,7 @@ fn typed_output_here(
     }
 }
 
-/// The resolver, reading the syntax-three trees of the modules.
+/// The resolver, reading the source trees of the modules.
 struct R3<'a, 't> {
     r: Resolver<'a>,
     modules: &'t [n::Module],
@@ -435,7 +427,7 @@ fn quote_captures(
     })
 }
 
-/// `{ e }` with one expression is a group (§6.10): it is `e`. A provide of
+/// `{ e }` with one expression is a group: it is `e`. A provide of
 /// no service is its target.
 fn ungroup(e: &n::Expr) -> &n::Expr {
     match group_inner(e) {
@@ -496,7 +488,7 @@ fn is_macro(a: &n::Attribute) -> bool {
 
 /// The syntax macros that a module defines: the name and whether it has a
 /// typed signature; or the problems of their definitions.
-/// 2d: this is `lisp::expansion::definitions` on the new tree.
+/// Definition expansion must retain source-node identities.
 type MacroDefinitions = Result<Vec<(String, bool)>, Vec<(Span, String)>>;
 fn definitions(module: &n::Module, pre: &Pre) -> MacroDefinitions {
     ilang_syntax::lisp::expansion3::definitions(module, pre.lisp)
@@ -581,7 +573,7 @@ impl<'a, 't> R3<'a, 't> {
         }
     }
 
-    // ---- Phase 1: top-level definitions ----
+    // ---- top-level definitions ----
 
     fn collect(&mut self, m: ModuleId) {
         self.cur = m;
@@ -969,7 +961,7 @@ impl<'a, 't> R3<'a, 't> {
         id
     }
 
-    /// §2.2 and §10: the attributes `list` of an item.
+    /// The attributes `list` of an item.
     fn attributes(&mut self, item: &n::Item, list: &[&n::Attribute]) -> Attrs {
         let mut out = Attrs::default();
         let mut seen = HashSet::new();
@@ -1119,7 +1111,7 @@ impl<'a, 't> R3<'a, 't> {
         true
     }
 
-    // ---- Phase 2: imports (§2.3) ----
+    // ---- imports ----
 
     fn imports(&mut self, m: ModuleId) {
         self.cur = m;
@@ -1178,7 +1170,7 @@ impl<'a, 't> R3<'a, 't> {
         self.scopes[mi] = scope;
     }
 
-    // ---- Phase 3: type definitions (§4.3) ----
+    // ---- type definitions ----
 
     fn type_defs(&mut self, m: ModuleId) {
         self.cur = m;
@@ -1195,7 +1187,7 @@ impl<'a, 't> R3<'a, 't> {
             let Slot::Type(id) = slot else {
                 continue;
             };
-            // §4.3: read a reserved head in full, but do not resolve its body.
+            // Read a reserved head in full, but do not resolve its body.
             if !shape.head.is_empty() {
                 self.error(
                     code::TYPE_PARAM_FORM,
@@ -1280,7 +1272,7 @@ impl<'a, 't> R3<'a, 't> {
         }
     }
 
-    /// §9.7: the form of the host services.
+    /// The form of the host services.
     fn host_forms(&mut self) {
         for mi in 0..self.parsed.len() {
             let m = ModuleId(mi as u32);
@@ -1561,7 +1553,7 @@ impl<'a, 't> R3<'a, 't> {
                     )
                 } else {
                     // Data with labels: only the labelled items (the others
-                    // are an error of this stage).
+                    // are currently unsupported).
                     let fields: Vec<(&n::Ident, &n::Type)> = items
                         .iter()
                         .filter_map(|i| match i {
@@ -1644,12 +1636,12 @@ impl<'a, 't> R3<'a, 't> {
         }
     }
 
-    /// The needs written after `<-` as the two rows of today's function
+    /// The needs written after `<-` as the two rows of the legacy function
     /// type: the error channel and the environment. This is the only place
     /// where a need becomes a row: a `Fail(E)` entry is the error `E`, every
     /// other entry is a member of the environment, and `..N` (or `<- N`) is
     /// the row variable `N`, which also carries the errors when the
-    /// signature writes no `Fail` beside it (§7.3): its error is then the
+    /// signature writes no `Fail` beside it: its error is then the
     /// type parameter `N%E` of the binding ([`Pre::row_err`]).
     fn needs_row(&mut self, f: &n::FnType, span: Span) -> (Option<Type>, Option<Type>) {
         fn need<'x>(
@@ -1690,7 +1682,7 @@ impl<'a, 't> R3<'a, 't> {
         }
         let err = match err {
             Some(t) => Some(self.ty(t)),
-            // The errors that a row variable carries (§7.3).
+            // The errors that a row variable carries.
             None => self.pre().row_err.get(&addr(f)).map(|row| {
                 let carried = n::Type::new(
                     n::TypeKind::Named {
@@ -1714,7 +1706,7 @@ impl<'a, 't> R3<'a, 't> {
         (err, env)
     }
 
-    // ---- Phase 4: values ----
+    // ---- values ----
 
     fn values(&mut self, m: ModuleId) {
         self.cur = m;
@@ -1729,7 +1721,7 @@ impl<'a, 't> R3<'a, 't> {
                     let vars = self.push_declared_frame(&type_params);
                     let t = self.ty(ty);
                     self.ty_frames.pop();
-                    // Intrinsic library operations are not host imports (§2.1).
+                    // Intrinsic library operations are not host imports.
                     let intrinsic = self.p.typed_macros.contains(&DefId {
                         module: m,
                         index: d,
@@ -1787,7 +1779,7 @@ impl<'a, 't> R3<'a, 't> {
 
     /// A binding, at the top level or in a block. Gives back the binders of
     /// its pattern; in a block, the caller makes them visible from the next
-    /// statement (§6.10).
+    /// statement.
     fn binding(&mut self, b: &n::Binding, top: bool) -> (Binding, Vec<Binder>) {
         let source = self.p.module(self.cur).source;
         let file = self.graph.sources.get(source);
@@ -1838,7 +1830,7 @@ impl<'a, 't> R3<'a, 't> {
         let pattern = self.vpat(pattern, &mut binders, None);
         self.pending.pop();
         let value = if direct && !top {
-            // §6.10: the names may be used inside the function bodies of a
+            // The names may be used inside the function bodies of a
             // direct value.
             let frame = Frame {
                 names: binders
@@ -1872,7 +1864,7 @@ impl<'a, 't> R3<'a, 't> {
         (binding, binders)
     }
 
-    /// §6.10: a direct value is made without running code.
+    /// A direct value is made without running code.
     fn is_direct(&self, e: &n::Expr) -> bool {
         use n::ExprKind as E;
         let e = ungroup(e);
@@ -1928,7 +1920,7 @@ impl<'a, 't> R3<'a, 't> {
                     && is_constructor(callee)
                     && items(args)
             }
-            // §6.9: `a |> C` is `C(a)`, and `a |> C(b)` is `C(a, b)`.
+            // A constructor pipe inserts the piped value before written arguments.
             E::Pipe { lhs, rhs } => {
                 !matches!(&rhs.kind, E::Chain(fs) if is_match(fs, self.pre().lisp))
                     && self.is_direct(lhs)
@@ -2120,7 +2112,7 @@ impl<'a, 't> R3<'a, 't> {
             ),
             E::Block(b) => ExprKind::Block(self.block(b)),
             E::Chain(fs) => self.chain(fs, span),
-            // `core.never(x)`: the match of `x` with no branch (§2.13).
+            // `core.never(x)`: the match of `x` with no branch.
             E::Call { args, .. } if self.pre().never.contains(&addr(e)) => {
                 let subject = match &args[0] {
                     n::DItem::Pos(e) | n::DItem::Label(_, e) | n::DItem::Spread(e) => self.expr(e),
@@ -2200,7 +2192,7 @@ impl<'a, 't> R3<'a, 't> {
                     span,
                 })
             }
-            // `core.never`: the function with no branch (§2.13).
+            // `core.never`: the function with no branch.
             E::Field { .. } if self.pre().never.contains(&addr(e)) => {
                 let synthetic = Span::new(span.start, span.start);
                 let function = VFn {
@@ -2261,7 +2253,7 @@ impl<'a, 't> R3<'a, 't> {
                 self.group_call_native(&table, &callee, Some(first), args, span)
             }
             E::Pipe { lhs, rhs } => match &rhs.kind {
-                // A match (§2.11): one position per branch.
+                // A match: one position per branch.
                 E::Chain(fs) if matched_pipe => {
                     let clauses: Vec<VClause> = fs.iter().map(|f| self.vclause(f, 1)).collect();
                     self.case(&VSubject::Expr(lhs), &clauses, span)
@@ -2277,7 +2269,7 @@ impl<'a, 't> R3<'a, 't> {
     }
 
     /// The labelled items of data with labels; the others are an error of
-    /// this stage.
+    /// this representation.
     fn fields(&mut self, items: &[n::DItem]) -> Vec<(o::Ident, Expr)> {
         let mut out = Vec::new();
         for i in items {
@@ -2295,7 +2287,7 @@ impl<'a, 't> R3<'a, 't> {
         })
     }
 
-    /// A chain as a value (§2.5): a function, or a function over a match of
+    /// A chain as a value: a function, or a function over a match of
     /// its branches.
     fn chain(&mut self, fs: &[n::Function], span: Span) -> ExprKind {
         let synthetic = Span::new(span.start, span.start);
@@ -2441,7 +2433,7 @@ impl<'a, 't> R3<'a, 't> {
             && clause.guard.is_none()
             && clause.patterns.len() == 1
         {
-            // §3.9: the subject precedes the new scope; no type frame,
+            // The subject precedes the new scope; no type frame,
             // no generalization, and the binding stops at the pattern.
             let value = self.subject(subject);
             let mut binders = Vec::new();
@@ -2495,7 +2487,7 @@ impl<'a, 't> R3<'a, 't> {
     }
 
     /// `e <- (s1, s2)`: the environment statements and then `e`. Every
-    /// service is worked out in the outer environment (§2.10.5): when there
+    /// service is worked out in the outer environment: when there
     /// are several and one is not a name, each is bound to a fresh local
     /// first, so that no service sees another.
     fn flatten_provide<'x>(
@@ -2659,7 +2651,7 @@ impl<'a, 't> R3<'a, 't> {
         stmts
     }
 
-    /// §6.8 and §6.11.
+    /// Parameters bind before the body so body references use their scope.
     fn function(&mut self, f: &VFn, span: Span) -> Function {
         let mut params = Vec::new();
         let mut env_heads: Vec<TypeRef> = Vec::new();
@@ -2701,7 +2693,7 @@ impl<'a, 't> R3<'a, 't> {
         for s in &f.envs {
             let name = id(&s.name);
             let ty = self.ty(&s.ty);
-            // §9.2: two environment parameters of one function may
+            // Two environment parameters of one function may
             // not have the same type constructor.
             if let Some(head) = self.env_type(&ty) {
                 if env_heads.contains(&head) {
@@ -2869,7 +2861,7 @@ impl<'a, 't> R3<'a, 't> {
         })
     }
 
-    /// The names a pattern binds, in order, with repeats (§7.2).
+    /// The names a pattern binds, in order, with repeats.
     fn binders(&self, p: &n::Pattern, out: &mut Vec<(String, Span)>) {
         use n::PatternKind as P;
         match &p.kind {
@@ -2932,7 +2924,7 @@ impl<'a, 't> R3<'a, 't> {
         }
     }
 
-    /// The label of a parameter (§6.11): the last name in the `=` chain at
+    /// The label of a parameter: the last name in the `=` chain at
     /// the top of its pattern.
     fn vpat_label(&self, p: &VPat) -> Option<String> {
         fn of(p: &n::Pattern) -> Option<String> {
@@ -3021,7 +3013,7 @@ impl<'a, 't> R3<'a, 't> {
         }
     }
 
-    /// A part of a constructor pattern. §7.1: `label = label` writes the
+    /// A part of a constructor pattern. `label = label` writes the
     /// label of a part and binds the name once.
     fn ctor_part(
         &mut self,
@@ -3116,7 +3108,7 @@ impl<'a, 't> R3<'a, 't> {
                             parts.push(self.ctor_part(&plan, binders, shared));
                         }
                         n::DPItem::Rest(None) => spread = true,
-                        // A named rest is an error of this stage.
+                        // A named rest is currently unsupported.
                         n::DPItem::Rest(Some(_)) => {}
                     }
                 }
@@ -3129,7 +3121,7 @@ impl<'a, 't> R3<'a, 't> {
                     None => PatternKind::Error(parts),
                 }
             }
-            // Keys and a rest in a data pattern are errors of this stage.
+            // Keys and rest items in data patterns are currently unsupported.
             P::Data(items) => PatternKind::Tuple(
                 items
                     .iter()
@@ -3155,7 +3147,7 @@ impl<'a, 't> R3<'a, 't> {
                 let mut out = Vec::new();
                 for s in segs {
                     let value = self.pattern(&s.value, binders, shared);
-                    // §8.4: a length may use names of earlier segments.
+                    // A length may use names of earlier segments.
                     let frame = Frame {
                         names: binders
                             .iter()
@@ -3437,8 +3429,8 @@ pub(super) fn normalize_module(
 }
 
 /// Source facts shared with editor queries while the HIR retains absorbed sums.
-/// This reads the new tree, including the implicit error row parameters, without
-/// constructing the old tree.
+/// This reads the source tree, including the implicit error row parameters, without
+/// constructing a second syntax tree.
 pub(crate) type SourceFacts = (
     HashMap<(Span, Span), Vec<n::resolved::Ident>>,
     HashMap<usize, usize>,

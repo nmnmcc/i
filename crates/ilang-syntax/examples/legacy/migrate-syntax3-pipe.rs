@@ -1,19 +1,6 @@
-//! Syntax three, stage 5 (`docs/design/syntax-3.md` §7.2): in today's syntax, group
-//! every `a |> f OP b` as `{ a |> f } OP b` and every `a OP b |> f` as
-//! `a OP { b |> f }`, where OP is at precedence levels 1 to 5. Afterwards `|>` can
-//! move to the weakest level without changing any program.
-//!
-//! The edits are pure insertions of `{ ` and ` }` at expression spans; the text between
-//! them is untouched. A group that is already written is a `Block` node and is not
-//! touched again, so the tool is idempotent and can be re-run after merging other lanes.
-//!
-//! Usage (from the repository root):
-//!   cargo run --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --bin migrate-syntax3-pipe -- [--check] [--quiet] [FILE...]
-//! Without files it reads every tracked `.i`, `.md`, `.rs`, `.js` and `.mjs` file.
-//! `--check` writes nothing and exits 1 when an edit is due.
-//! Sources are `.i` files, `i` fences in Markdown, and string literals in Rust and
-//! JavaScript that contain `|>` and parse as a module. Literals that contain `|>`
-//! but do not parse are listed on stderr (`unparsed`) for review by hand.
+//! Groups pipe expressions before changing their precedence, so migration
+//! preserves the grouping of the legacy input. Existing groups prevent a
+//! second run from wrapping the same expression again.
 #[path = "support/legacy/mod.rs"]
 mod legacy;
 
@@ -189,7 +176,7 @@ impl Finder<'_> {
 }
 
 /// The insertions `(position, text)` that group one module, or `None` when the
-/// source is not a module of today's syntax.
+/// source is not a module of the legacy syntax.
 fn insertions(src: &str) -> Option<Vec<(usize, &'static str)>> {
     let (module, diags) = parse_module(src);
     if !diags.is_empty() {

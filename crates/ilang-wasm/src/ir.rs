@@ -1,7 +1,7 @@
 //! A small intermediate form between the resolved program (HIR) and Wasm.
 //!
 //! It is in A-normal form: every operand is an [`Atom`] (a local, a global, or
-//! a literal), so the order of evaluation (§6.2) is fixed by the order of the
+//! a literal), so the order of evaluation is fixed by the order of the
 //! statements, and every call can be a tail call once its arguments are known.
 //! Control flow is structured, as in Wasm: blocks that a `Break` leaves, `If`,
 //! and statements that end a function (`Return`, `TailCall`, `Unreachable`).
@@ -9,7 +9,8 @@
 //! Semantic values and generic call boundaries use `eqref` (see `runtime/mod.rs`).
 //! At O2/O3, numeric workers use separate f64 signatures; source closures keep
 //! the generic entry. `emit::numeric` selects per-definition scalar encodings
-//! and materializes canonical values at escapes and on actual capture. A few internal locals hold
+//! and materializes canonical values at escapes and on actual capture. A few
+//! internal locals hold
 //! i64 or i32 positions and widths in bit array patterns.
 //!
 //! # Calling convention
@@ -17,11 +18,11 @@
 //! A function of n parameters is the Wasm type
 //! `$fn_n = (func (param (ref null $obj) (ref null $env) eqref×n) (result eqref))`.
 //! The first parameter is its closure; its captures are the `$values` array
-//! in field 5 of the closure. The second is the environment (§9.2). A
+//! in field 5 of the closure. The second is the environment. A
 //! closure is a `$clo_n`, a subtype of `$clo` with tag 7, its shape in field
 //! 2, a worker identity in field 8, and its code reference in field 9.
 //!
-//! # The environment (§9.2)
+//! # The environment
 //!
 //! An environment is a `$env`, a GC array of `eqref` with one slot for each
 //! service type constructor of the program, by its service id. Slot
@@ -29,9 +30,9 @@
 //! place of the call: the `$env` parameter of the function, or the local made
 //! by the last environment statement of an enclosing block (`LetEnv`), which
 //! copies the array and sets one slot. Entry points start with the root
-//! environment, which has the `Assert` of the runtime (§9.6).
+//! environment, which has the `Assert` of the runtime.
 //!
-//! # Errors and unwinding (§9.3, §9.5)
+//! # Errors and unwinding
 //!
 //! Errors are the Wasm exception `$error (param eqref)`. Unwinding a
 //! cancelled continuation is the exception `$cancel (param eqref)`, whose
@@ -40,7 +41,7 @@
 //! exception again. No handler takes anything else, so a stop (a trap) never
 //! runs handlers.
 //!
-//! # Control (§9.4)
+//! # Control
 //!
 //! Frames are captured lazily, with the exception `$capture`. `suspend`
 //! throws it with a capture object; every frame between it and its boundary
@@ -62,17 +63,17 @@
 //! the rest of the function stays where it is. See `control.rs` and
 //! `emit.rs`.
 //!
-//! # The host boundary (§9.7, §10, Appendix B)
+//! # The host boundary
 //!
 //! Each [`Import`] has a function of the program that calls it, with the
-//! encoding of B.2 ([`Value::HostCall`]); an import of external functions has
-//! one for each declaration, so that two declarations are two values
-//! (§11.4). An async entry point runs inside a
+//! wire encoding ([`Value::HostCall`]); an import of external functions has
+//! one for each declaration, so that two declarations are two values.
+//! An async entry point runs inside a
 //! root boundary; a function of an async host service starts its import
 //! ([`Value::HostStart`]), suspends to that boundary with `control.suspend`,
 //! and reads the answer when its `ilang_resume:…` export resumes it
-//! ([`Value::HostReply`]). So the control machinery of §9.4 saves the frames
-//! while the program waits.
+//! ([`Value::HostReply`]). So the control machinery (`control.suspend` and
+//! `control.resume`) saves the frames while the program waits.
 
 /// The library functions written in i that the runtime calls: the WAT name
 /// of a runtime function with the same `eqref` parameters and an `eqref`
@@ -92,7 +93,7 @@ pub const RUNTIME_CALLS: &[(&str, &str, &str)] = &[
     ("$bits_read_int_wide", "i/bits", "read_int"),
 ];
 
-/// The service id of `Assert` (§9.6).
+/// The service id of `Assert`.
 pub const ASSERT_SERVICE: u32 = 0;
 
 use num_bigint::BigInt;
@@ -101,9 +102,9 @@ use num_bigint::BigInt;
 pub type Local = u32;
 /// A label of a `Block`.
 pub type Label = u32;
-/// An index in the site table (§11.7). With [`TAIL_SITE`], it is a **tail
+/// An index in the site table. With [`TAIL_SITE`], it is a **tail
 /// site**: the position of a call in tail position, which is printed only
-/// as the first position of a stop (§11.7).
+/// as the first position of a stop.
 pub type Site = u32;
 
 /// The flag of a tail site.
@@ -140,7 +141,7 @@ pub enum LocalType {
     Env,
 }
 
-/// The environment that a call gets (§9.2).
+/// The environment that a call gets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Env {
     /// The environment of the running function.
@@ -222,7 +223,7 @@ pub enum Op {
     Catch,
     /// `resource.ensure(body, with)`.
     Ensure,
-    /// `control.boundary(body)` (§9.4).
+    /// `control.boundary(body)`.
     Boundary,
     /// `control.suspend(b, f)`: it throws `$capture`.
     Suspend,
@@ -240,7 +241,7 @@ pub enum Op {
 }
 
 impl Op {
-    /// Whether the operation may stop the program (§11.7), so that its
+    /// Whether the operation may stop the program, so that its
     /// position must be on the shadow stack.
     pub fn may_stop(self) -> bool {
         matches!(
@@ -295,7 +296,7 @@ impl Op {
     }
 }
 
-/// The run-time id of a shape of argument data (syntax-3.md §6.4): `n` for
+/// The run-time id of a shape of argument data: `n` for
 /// `n` positions; for a shape with labels, `set << 32 | n`, where `set` is the
 /// index of its label set as data has it ([`Program::shapes`], from 1), so
 /// every such id is at least 2^32. A closure keeps the id of its shape in
@@ -316,7 +317,7 @@ pub enum Callee {
     Known { func: FuncId, closure: Atom },
     /// A function value called with argument data of `n` positions, `n` the
     /// number of arguments: `call_ref` when it is a `$clo{n}`, else the
-    /// dispatch of a multi-shape value on the shape (syntax-3.md §6.4).
+    /// dispatch of a multi-shape value on the shape.
     Value(Atom),
     /// Field `field` of the value of a service, called: `service` is the
     /// slot as read from the environment (`Value::ServiceRaw`). When the
@@ -365,7 +366,7 @@ pub enum Value {
     Finite(Op, Vec<Atom>),
     /// An operation that calls i code with this environment.
     OpEnv(Op, Vec<Atom>, Env),
-    /// A light boundary (syntax-3 §2.10.7, O30): `control.boundary(f)` where
+    /// A light boundary: `control.boundary(f)` where
     /// `f` is a function literal whose parameter is used only as the first
     /// argument of `control.escape`. `func` is the literal's code, lifted:
     /// its parameters are the boundary, then the literal's captures, so no
@@ -377,7 +378,7 @@ pub enum Value {
         args: Vec<Atom>,
         env: Env,
     },
-    /// The service with this id in the environment (§9.2).
+    /// The service with this id in the environment.
     Service(Env, u32),
     /// The slot of the service with this id in the environment, as it is:
     /// a light boundary that stands for a value is not made into it. Only
@@ -388,12 +389,12 @@ pub enum Value {
         captures: Vec<Atom>,
         patched: bool,
     },
-    /// A multi-shape function value (syntax-3.md §2.6.5, §6.4): the shape id
+    /// A multi-shape function value: the shape id
     /// and the closure of each group, in the order of the groups. The
     /// closures are ordinary function values, each of its own shape.
     Multi(Vec<(ShapeId, Atom)>),
     Tuple(Vec<Atom>),
-    /// Data with labels (syntax-3 §6.4): a tuple whose field 1 is the index
+    /// Data with labels: a tuple whose field 1 is the index
     /// of its label set in [`Program::shapes`], with its parts in canonical
     /// order.
     Data(u32, Vec<Atom>),
@@ -409,7 +410,7 @@ pub enum Value {
     ListTail(Atom),
     /// The string after removing its prefix and suffix byte counts.
     StringSuffix(Atom, u32, u32),
-    // Making bit arrays (§8.3). Widths are in bits.
+    // Making bit arrays. Widths are in bits.
     BitsEmpty,
     BitsConcat(Atom, Atom),
     BitsFromInt {
@@ -430,7 +431,7 @@ pub enum Value {
     },
     BitsTake(Atom, Num),
     BitsWhole(Atom),
-    // Matching bit arrays (§8.4).
+    // Matching bit arrays.
     BitsReadInt {
         bits: Atom,
         start: Num,
@@ -449,23 +450,23 @@ pub enum Value {
         start: Num,
         length: Num,
     },
-    // The host boundary (§9.7, §10.1, B.2–B.4).
+    // The host boundary.
     /// Calls the import with the arguments, and gives its value or throws
-    /// its error. A value that is not correct stops (B.2).
+    /// its error. A value that is not correct stops.
     HostCall {
         import: ImportId,
         args: Vec<Atom>,
         result: AbiType,
     },
     /// Starts the async import with the arguments, and records that the
-    /// host may answer it (B.4). Its value is the typed request cell.
+    /// host may answer it. Its value is the typed request cell.
     HostStart {
         import: ImportId,
         args: Vec<Atom>,
         result: AbiType,
     },
     /// The answer of the async import, given to its `ilang_resume:…`
-    /// export (B.5): its value, or its error thrown.
+    /// export: its value, or its error thrown.
     HostReply(ImportReply),
 }
 
@@ -485,14 +486,14 @@ pub enum NumValue {
     /// The number of bits of a bit array.
     BitsLength(Atom),
     /// The length of a segment when a bit array is made: the Int times
-    /// `unit`; stops when it is negative (§8.3).
+    /// `unit`; stops when it is negative.
     LengthOf(Atom, u32),
     /// The length of a `bits(n)` or `bytes(n)` segment when a bit array is
     /// made: as `LengthOf`, but a length that no bit array can have is
-    /// still a number, so that the value is too short (§8.3).
+    /// still a number, so that the value is too short.
     TakeLength(Atom, u32),
     /// The length of a segment in a pattern: the Int times `unit`, or -1
-    /// when it is negative or too big, which never matches (§8.4).
+    /// when it is negative or too big, which never matches.
     WidthOf(Atom, u32),
 }
 
@@ -524,7 +525,7 @@ pub enum Cond {
     /// A list that is `[]`; the value is a list.
     Empty(Atom),
     Equal(Atom, Atom),
-    /// The value is this Int, Float, or String: a literal pattern (§7.2).
+    /// The value is this Int, Float, or String: a literal pattern.
     IsInt(Atom, BigInt),
     IsFloat(Atom, f64),
     IsString(Atom, String),
@@ -584,9 +585,9 @@ pub enum Stmt {
     Break(Label),
     /// Leaves the function with the value.
     Return(Atom),
-    /// A call in tail position (§11.6): the frame is gone first. Its site,
+    /// A call in tail position: the frame is gone first. Its site,
     /// a tail site, is the first position of a stop until the callee works
-    /// out an expression of its own (§11.7). Library code has none, and
+    /// out an expression of its own. Library code has none, and
     /// passes on the tail site of its own call.
     TailCall {
         callee: Callee,
@@ -595,7 +596,7 @@ pub enum Stmt {
         site: Option<Site>,
     },
     /// `dst` is `env` with the service `value` in the slot `service`: an
-    /// environment statement (§6.10, §9.2).
+    /// environment statement.
     LetEnv {
         dst: Local,
         env: Env,
@@ -608,7 +609,7 @@ pub enum Stmt {
     },
     Unreachable,
     /// Fills a capture of a closure made by a direct value, once the names of
-    /// its binding are bound (§6.10).
+    /// its binding are bound.
     SetCapture {
         closure: Local,
         index: u32,
@@ -616,7 +617,7 @@ pub enum Stmt {
     },
     SetGlobal(GlobalId, Atom),
     /// `dst = value`, as `Let`, for a call that may suspend in a function
-    /// that may suspend (§9.4): a `$capture` that goes through the call gets
+    /// that may suspend: a `$capture` that goes through the call gets
     /// the frame record of `point`. Made by `control.rs`.
     Suspendable {
         dst: Local,
@@ -643,21 +644,21 @@ pub struct Func {
     /// The types of the locals; the first `arity` are the parameters.
     pub locals: Vec<LocalType>,
     pub body: Vec<Stmt>,
-    /// Whether the function has a frame on the shadow stack (§11.7).
+    /// Whether the function has a frame on the shadow stack.
     pub frame: bool,
 }
 
-/// A call that may suspend in a function that may suspend (§9.4), and how
+/// A call that may suspend in a function that may suspend, and how
 /// its frame is captured and rebuilt. Its segment and re-entry function have
 /// the locals of the function `func`. The frame record keeps the slot of the
-/// frame on the shadow stack, which the re-entry puts back (§11.7).
+/// frame on the shadow stack, which the re-entry puts back.
 #[derive(Clone, Debug)]
 pub struct Point {
     pub func: FuncId,
     /// The environment of the call. The environment statements between the
     /// function's environment and this one (`Point::delta`) are kept in the
     /// frame record, so that the frames inside it get them when they are
-    /// re-entered (§9.4 rule 3).
+    /// re-entered.
     pub env: Env,
     /// The value of the call.
     pub dst: Local,
@@ -667,7 +668,7 @@ pub struct Point {
     /// The environment locals of the function that the re-entry rebuilds
     /// from the environment where the continuation is resumed, in order:
     /// `dst` is the environment `from` with the service `service`, whose
-    /// value is in the frame record (§9.4 rule 3).
+    /// value is in the frame record.
     pub envs: Vec<EnvLink>,
     /// The rest of the function after the call.
     pub segment: Vec<Stmt>,
@@ -676,7 +677,7 @@ pub struct Point {
 }
 
 /// The code after an `If` or a `Block` that has a point in it, in a
-/// function that may suspend (§9.4): segments go on with it as a tail call,
+/// function that may suspend: segments go on with it as a tail call,
 /// so that the code after it is in one place and not in every segment. It
 /// has the locals of the function `func`.
 #[derive(Clone, Debug)]
@@ -754,7 +755,7 @@ impl FuncKind {
     }
 }
 
-/// How an export of the binary interface gives and takes values (B.2).
+/// How an export of the binary interface gives and takes values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AbiType {
     Nil,
@@ -781,7 +782,7 @@ impl AbiType {
     }
 }
 
-/// How a host export takes and gives values (B.2).
+/// How a host export takes and gives values.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExportAbi {
     pub params: Vec<AbiType>,
@@ -798,24 +799,25 @@ pub struct Export {
     /// `None` for the program entry and tests: no parameters and no results.
     pub abi: Option<ExportAbi>,
     /// For the program entry and tests: the site of the binding, the only
-    /// position of the stop for an error that comes to it (§11.7).
+    /// position of the stop for an error that comes to it.
     pub site: Option<Site>,
-    /// For an async entry point (§10.2, B.5): a function of one parameter,
+    /// For an async entry point: a function of one parameter,
     /// the root boundary, whose captures are the arguments; it calls the
     /// entry point with them.
     pub async_body: Option<FuncId>,
 }
 
-/// What an import of the host is (B.4).
+/// The kinds of import of the host: an external function, a function of a host
+/// service, an async function of a host service, and the WASI adapters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImportKind {
     External,
     Service,
     /// A function of an async host service: no results; the answer comes
-    /// through `ilang_resume:…` (B.5).
+    /// through `ilang_resume:…`.
     AsyncService,
     /// `print` of the standard service, `Io` of `i/io`, on the WASI target:
-    /// the module defines it, with `fd_write` to the standard output (B.7).
+    /// the module defines it, with `fd_write` to the standard output.
     WasiStdout,
     /// Checked, blocking preview-1 capability adapter.
     WasiAdapter,
@@ -829,7 +831,7 @@ pub enum Target {
     #[default]
     Native,
     Host,
-    /// A WASI preview 1 command, which runs in a stock Wasmtime (B.7).
+    /// A WASI preview 1 command, which runs in a stock Wasmtime.
     Wasi,
 }
 
@@ -845,7 +847,7 @@ impl Target {
         }
     }
 
-    /// The name in the metadata (B.6).
+    /// The name in the metadata.
     pub fn name(self) -> &'static str {
         match self {
             Target::Js | Target::Nodejs | Target::Native | Target::Host => "ilang",
@@ -854,7 +856,7 @@ impl Target {
     }
 }
 
-/// A Wasm import of a function of the host (B.4).
+/// A Wasm import of a function of the host.
 #[derive(Clone, Debug)]
 pub struct Import {
     pub module: String,
@@ -866,7 +868,7 @@ pub struct Import {
     pub awaited: bool,
 }
 
-/// A chosen host registration (§9.7): each entry constructs its record of
+/// A chosen host registration: each entry constructs its record of
 /// import closures as a leaf of its provider graph.
 #[derive(Clone, Debug)]
 pub struct HostService {
@@ -905,9 +907,9 @@ pub struct Program {
     /// The functions whose parameter data has labels, with their shape. Every
     /// other function of `n` parameters has the shape of `n` positions.
     pub func_shapes: std::collections::BTreeMap<FuncId, ShapeId>,
-    /// The points of the calls that may suspend (§9.4).
+    /// The points of the calls that may suspend.
     pub points: Vec<Point>,
-    /// The joins of the segments of the points (§9.4).
+    /// The joins of the segments of the points.
     pub joins: Vec<Join>,
     /// The functions with one constant closure, used by `Atom::Func`.
     pub constants: Vec<FuncId>,
@@ -916,7 +918,7 @@ pub struct Program {
     pub runtime_calls: Vec<(&'static str, FuncId)>,
     /// The number of globals for top-level values.
     pub globals: u32,
-    /// The number of service ids, at least 1 for `Assert` (§9.2).
+    /// The number of service ids, at least 1 for `Assert`.
     pub services: u32,
     /// The service ids that a light boundary may provide lazily (its handle
     /// stands for the value, `Value::Light`): reads of them force it.
@@ -933,20 +935,20 @@ pub struct Program {
     pub sites: Vec<SitePos>,
     /// Optional template/call-chain notes, parallel to `sites`.
     pub site_notes: Vec<Option<String>>,
-    /// The module paths of the site table, by module index (§11.7).
+    /// The module paths of the site table, by module index.
     pub site_modules: Vec<String>,
     /// The constructor names, from `FIRST_CONSTRUCTOR` on.
     pub constructors: Vec<String>,
-    /// The `ilang.abi` metadata (B.6).
+    /// The `ilang.abi` metadata.
     pub abi_json: String,
-    /// The functions that the host gives (B.4).
+    /// The functions that the host gives.
     pub imports: Vec<Import>,
-    /// The host services of the root environment (§9.7).
+    /// The host services of the root environment.
     pub host_services: Vec<HostService>,
     /// The host the module is made for.
     pub target: Target,
     /// On the WASI target: the export of the program entry, which `_start`
-    /// calls after `ilang_start` (B.7).
+    /// calls after `ilang_start`.
     pub entry: Option<String>,
 }
 

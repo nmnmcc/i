@@ -15,12 +15,12 @@
 //// between: (start: Instant, end: Instant) -> Duration
 //// compare_instants: (first: Instant, second: Instant) -> Order
 ////
-//// T1: Unit constructors multiply by 1, 10^6, 10^9, 60*10^9 and 3600*10^9.
+//// Unit constructors multiply by 1, 10^6, 10^9, 60*10^9 and 3600*10^9.
 //// Every Int is accepted, including negative counts; no overflow or clamping.
-//// T2: add, subtract and scale use exact integer arithmetic. divide rejects
+//// add, subtract and scale use exact integer arithmetic. divide rejects
 //// zero with Error(DivisionByZero), otherwise rounds toward zero, including
 //// negative divisors. compare uses numeric order.
-//// T3: Instant zero is 1970-01-01T00:00:00Z. between(a,b) is b-a, shift adds
+//// Instant zero is 1970-01-01T00:00:00Z. between(a,b) is b-a, shift adds
 //// a duration, and unix_nanoseconds reverses from_unix_nanoseconds. Instants
 //// cannot be added to one another. Equality compares canonical payloads.
 ////

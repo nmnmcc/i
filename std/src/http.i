@@ -86,9 +86,8 @@ Status = (Int)
 
 Headers = (List((String, String)))
 RawHeaders = (List((String, BitArray)))
-/// Before stage 3 this sum was `Headers`, with a constructor of that
-/// name; a member is now a type of its own (syntax-3.md §2.8, §7.3 manual
-/// list), so the sum is `AnyHeaders`.
+/// Header values may be text or raw bytes, so callers can preserve their
+/// original representation.
 AnyHeaders = Headers | RawHeaders
 
 Request = (
@@ -1345,7 +1344,7 @@ native_client = () <- (n : net.Net, t : tls.Tls) {
 				},
 				send = (req) {
 					{
-						// Keep the raw service bindings across suspension (spec 9.4).
+						// Keep the raw service bindings across suspension.
 						res = provider.send(req)
 						res
 					} <- (n, t)

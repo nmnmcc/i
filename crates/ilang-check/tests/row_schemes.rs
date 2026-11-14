@@ -3,7 +3,7 @@ mod common;
 
 #[test]
 fn stage_three_provider_diagnostics_match_landed_conversion() {
-    // §9.2: a supplied value must satisfy the needed form by subtyping;
+    // A supplied value must satisfy the needed form by subtyping;
     // incompatible same-key requirements have an empty intersection.
     // Keep every diagnostic from landed tip cc26b8d9, including its source
     // binding. Pin total errors and E0515 counts independently of the saved
@@ -72,8 +72,8 @@ fn types(source: &str) -> std::collections::BTreeMap<String, String> {
 
 #[test]
 fn mutual_service_rows_have_canonical_member_and_variable_order() {
-    // §4.7 gives a group's bindings their principal schemes together;
-    // §4.4 makes union commutative. Declaration order changes neither.
+    // A group's bindings get their principal schemes together, and union is
+    // commutative. Declaration order changes neither.
     let defs = [
         "S(N) = (f = () <- N -> Int)",
         "T(N) = (f = () <- N -> Int)",
@@ -91,7 +91,7 @@ fn mutual_service_rows_have_canonical_member_and_variable_order() {
 
 #[test]
 fn a_hidden_handler_obligation_is_rejected_at_the_definition() {
-    // §4.4: “When the parameter does not change, Ai and Bi must be equal”.
+    // “When the parameter does not change, Ai and Bi must be equal”.
     // An invariant service still retains a hidden same-form obligation.
     let source = "Svc(A) = (A, (A) -> Nil)\nwrap : <N>(() <- (Fail(Never), ..N) -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (body, svc) { body() <- (svc) }";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
@@ -108,7 +108,7 @@ fn a_hidden_handler_obligation_is_rejected_at_the_definition() {
 
 #[test]
 fn a_constructor_with_one_form_has_no_hidden_form_restriction() {
-    // §9.2: a constructor without parameters has only one service form.
+    // A constructor without parameters has only one service form.
     // Omitting its subtraction cannot hide an argument equality.
     types(
         "Only = ()\nwrap = <N>(body : () <- N -> Nil) -> Nil { body() <- (Only) }\nexample = () { wrap(() { Nil }) }",
@@ -117,7 +117,7 @@ fn a_constructor_with_one_form_has_no_hidden_form_restriction() {
 
 #[test]
 fn closed_row_aliases_merge_by_the_defined_direction() {
-    // §4.4: “when they have the same one, it is that type constructor
+    // “when they have the same one, it is that type constructor
     // with each pair of arguments put together the other way round”.
     // A row parameter follows the same rule as any other parameter.
     let source = "Dep = ()\nS(N) = (() <- N -> Nil)\nT(N) = (() <- N -> Nil)\nBad = T(S(Never) | S(Dep))\nuse = (x : Bad) { x }";
@@ -125,7 +125,7 @@ fn closed_row_aliases_merge_by_the_defined_direction() {
         types(source),
         types(&source.replace("S(Never) | S(Dep)", "S(Never)"))
     );
-    // Variance still applies to the row as a whole, as F2 explicitly says.
+    // Variance still applies to the row as a whole, for directed subtyping.
     types(
         "Other = ()\nS(A) = (A)\nT(N) = (() <- N -> Nil)\nwiden = (x : T(S(Int))) -> T(S(Int) | Other) { x }",
     );
@@ -133,7 +133,7 @@ fn closed_row_aliases_merge_by_the_defined_direction() {
 
 #[test]
 fn equivalent_nested_row_orders_do_not_change_handler_acceptance() {
-    // §4.4 defines unions as sets. F1's proof must use type equality,
+    // Unions are sets. The proof must use type equality,
     // including alias equality and union order, rather than source text.
     let base = "Dep = ()\nExtra = ()\nSvc(R) = (() <- R -> Nil)\nwrap : <N>(\n\t() <- (Svc(Extra | Dep), ..N) -> Nil,\n\tSvc(Dep | Extra),\n) <- N -> Nil = (body, svc) {\n    provided : Svc(Extra | Dep) = svc\n    body() <- (provided)\n}";
     let before = types(base);
@@ -146,7 +146,7 @@ fn equivalent_nested_row_orders_do_not_change_handler_acceptance() {
 
 #[test]
 fn row_kind_survives_an_alias_without_algebra() {
-    // F2 requires N to remain a row even when a function alias is copied
+    // Row validation requires N to remain a row even when a function alias is copied
     // without normalization. Its value positions must compare Svc's
     // arguments equally before generalization can combine the forms.
     for need in ["(Fail(Never), ..N)", "(Fail(N))"] {
@@ -164,7 +164,7 @@ fn row_kind_survives_an_alias_without_algebra() {
 
 #[test]
 fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
-    // §4.5: both bounds fix the handler hole to the same form.
+    // Both bounds fix the handler hole to the same form.
     for inferred in [false, true] {
         let head = if inferred {
             "wrap = <N>(body : () <- (Fail(Never), Svc(Int), ..N) -> Int, svc : Svc(Int))"
@@ -185,7 +185,7 @@ fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
 
 #[test]
 fn written_row_algebra_keeps_its_mode_before_normalization() {
-    // §4.4: “When the parameter does not change, Ai and Bi must be equal”.
+    // “When the parameter does not change, Ai and Bi must be equal”.
     // Keep the original algebra/alias coverage with an invariant row
     // parameter; directed parameters now follow ordinary intersection.
     let head = "Dep = ()
@@ -227,7 +227,7 @@ Alias(N) = T(N)
         types(&alias.replace("S(Never) | S(Dep)", "S(Never)"))
     );
     // Value unions keep ordinary variance; distinct row constructors may
-    // also coexist. Neither is a same-form collision under rule 4.
+    // also coexist. Neither is a collision between two forms of one service type.
     types(&format!(
         "{head}value = (x : {{ S(Never) | S(Dep) }}) {{ x }}
 "
@@ -240,8 +240,8 @@ Alias(N) = T(N)
 
 #[test]
 fn instantiated_output_rows_are_checked_even_when_unused() {
-    // §9.2 forbids two S forms in the returned callback's environment,
-    // whether it is invoked or left unused. §4.8 unions the two rows.
+    // Two S forms are forbidden in the returned callback's environment,
+    // whether it is invoked or left unused. The two rows are unioned.
     let source = "S(A) = (A)\nT(N) = (f = () <- N -> Nil)\nmerge = <N, M>(a : T(N), b : T(M)) {\n\tT(\n\t\tf = () {\n\t\t\ta.f()\n\t\t\tb.f()\n\t\t},\n\t)\n}\none = () <- (s : S(Int)) { Nil }\ntwo = () <- (s : S(String)) { Nil }\n\nmain = () {\n\tunused = merge(T(f = one), T(f = two))\n\tNil\n}";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
@@ -265,7 +265,7 @@ fn function_type_joins_preserve_scalar_error_inclusion() {
 
 #[test]
 fn a_directed_row_handler_keeps_the_callback_row_open() {
-    // §4.4: the need is an intersection; §4.5 rule 6 also determines
+    // The need is an intersection; function subtyping also determines
     // the direction of N. Handling S(N) must not put S(N) inside N.
     let shown = types(
         "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s : S(N)) {\n\tS(f = f, ..) = s\n\tf()\n}\nwrap : <N>(S(N)) <- (Fail(Never), ..N) -> Int = (svc) { use() <- (svc) }",
@@ -275,7 +275,7 @@ fn a_directed_row_handler_keeps_the_callback_row_open() {
 
 #[test]
 fn a_function_union_shows_the_intersection_of_its_service_needs() {
-    // §4.4 puts function environments together by the need merge of §9.2.
+    // Function environments combine by merging their service needs.
     let shown = types(
         "Yield(A) = ((A) -> Nil)\none = () <- (s : Yield(Int)) { Nil }\ntwo = () <- (s : Yield(String)) { Nil }\nfns = [one, two]",
     );
@@ -287,7 +287,7 @@ fn a_function_union_shows_the_intersection_of_its_service_needs() {
 
 #[test]
 fn equal_invariant_arguments_do_not_block_other_argument_meets() {
-    // §4.4: invariant arguments must be equal; the remaining arguments
+    // Invariant arguments must be equal; the remaining arguments
     // still follow their defined directions in the same service entry.
     let shown = types(
         "Cell(I, A) = (state = I, put = (I) -> Nil, value = A)\none = () <- (s : Cell(Int, Int)) { Nil }\ntwo = () <- (s : Cell(Int, 1)) { Nil }\nboth = () {\n\tone()\n\ttwo()\n}",
@@ -297,7 +297,7 @@ fn equal_invariant_arguments_do_not_block_other_argument_meets() {
 
 #[test]
 fn an_undetermined_need_argument_keeps_its_intersection() {
-    // §4.4: “a & T, with a type variable a, stays as it is.” The service
+    // “a & T, with a type variable a, stays as it is.” The service
     // meet must not constrain the ordinary value parameter A to Int.
     let shown = types(
         "Read(A) = (value = A)\nneed_int = () <- (r : Read(Int)) { Nil }\nboth = <A>(x : A) <- (r : Read(A)) {\n\tneed_int()\n\tx\n}",
@@ -322,7 +322,7 @@ fn closed_constructor_arguments_still_report_an_empty_need_meet() {
 
 #[test]
 fn inferred_handlers_keep_future_provider_constraints() {
-    // §9.2: a provided value must be a subtype of the needed service.
+    // A provided value must be a subtype of the needed service.
     // Generalizing an inferred row must retain that obligation for callers.
     let source = "S(A) = (value = A)\nread = () <- (s : S(String)) { s.value <> \"!\" }\nwith = <A>(x : A, f) { provided : S(A) = S(value = x) f() <- (provided) }\nmain = () {\n\twith(1, read)\n\tNil\n}";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
@@ -345,7 +345,7 @@ fn higher_order_entry_keeps_unprovided_service() {
 
 #[test]
 fn nested_forwarding_keeps_the_provided_services_own_need() {
-    // §9.2: providing S(Dep) handles S, not the Dep needed by its method.
+    // Providing S(Dep) handles S, not the Dep needed by its method.
     let shown = types(
         "Dep = (v = Int)\nget = () <- (d : Dep) { d.v }\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s : S(N)) { s.f() }\nrun = <A, N>(f : () <- N -> A) { f() }\nfw = () { use() }\nfr = () { run(() { use() }) }\nmain = () {\n\t{\n\t\th = () { run(fr) }\n\t\tk = () { run(h) + fw() }\n\t\tk()\n\t\tNil\n\t} <- (S(f = () { get() }))\n}",
     );
@@ -676,7 +676,7 @@ fn a_closed_provider_alias_retains_all_reader_diagnostics() {
 
 #[test]
 fn named_function_provider_keeps_call_and_binding_diagnostics() {
-    // §9.2: changing an inline provider function to a named helper must
+    // Changing an inline provider function to a named helper must
     // retain the same call and binding obligations. The lowering boundary
     // fix sees inline function expressions; this case also needs cached-row
     // validation when the closed provider contains only a function name.
@@ -706,7 +706,7 @@ fn named_function_provider_keeps_call_and_binding_diagnostics() {
 
 #[test]
 fn provider_conflicts_keep_call_and_binding_diagnostics() {
-    // Spec §9.2: a provided P satisfies a need S only when P <: S.
+    // A provided P satisfies a need S only when P <: S.
     // Both the call obligation and the enclosing binding must retain the
     // Reader(String)/Reader(Int) conflict; keeping only the call loses reports.
     let source = include_str!("types/soundness.i");

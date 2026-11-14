@@ -1,0 +1,628 @@
+#!/usr/bin/env python3
+"""Audit and replay comment-only cleanup.
+
+Derived from lane/cmx's comment lexers; the current tool cannot edit messages.
+`record --base REV --output MAP` records reviewed changes with exact context.
+`apply --all` validates every map before writing; stale entries are errors.
+`check --proof REV --i-bin target/release/i` also compares canonical Lisp output.
+"""
+import argparse
+import collections
+import difflib
+import hashlib
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip())
+SOURCE_EXT = (".rs", ".i", ".is")
+REF = re.compile(r"§|spec\.md", re.I)
+PROCESS = re.compile(
+    r"(?-i:\b(?:TODO|FIXME|XXX)\b)|\b(?:[Ss]tages? [0-9E]|[Pp]hases? [0-9])"
+    r"|\bsyntax[ -]three\b|\bsyntax-3\.md\b|\bold tree\b|\blower\.rs\b"
+    r"|\b(?:coordinator|compiler lanes|gate tree)\b|\blane/[A-Za-z0-9_-]+", re.I
+)
+PROTECTED = re.compile(
+    r"^\s*//+\s*(?:spec|expect|at|output|type|old-syntax-check|test-macro-migrate|stdout|stderr|exit|args)\s*:"
+    r"|^\s*//+\s*(?:\S+:\d+:\d+:\s*)?(?:error|warning)\[[EW]\d+\]"
+)
+
+class Comment:
+    __slots__ = ("start", "end", "doc", "embedded", "block")
+
+    def __init__(self, start, end, doc="", embedded=False, block=False):
+        self.start, self.end, self.doc, self.embedded, self.block = start, end, doc, embedded, block
+
+
+class Str:
+    __slots__ = ("start", "end")
+
+    def __init__(self, start, end):
+        self.start, self.end = start, end
+
+
+EMBED_LINE = re.compile(r"(?m)(?:^[ \t]*|(?<=[ \t]))(?:;;|//(?=[ \t]|$)).*$")
+IDENT = re.compile(r"[A-Za-z0-9_]")
+
+
+def embedded(text, s):
+    """Finds WAT and i comments inside a multi-line string literal."""
+    body = text[s.start : s.end]
+    if "\n" not in body:
+        return []
+    out = []
+    for m in EMBED_LINE.finditer(body):
+        line_start = body.rfind("\n", 0, m.start()) + 1
+        before = body[line_start : m.start()]
+        # a `//` after other text must be after whitespace and not inside a quoted URL
+        if "://" in body[max(0, m.start() - 8) : m.start() + 3]:
+            continue
+        out.append(Comment(s.start + m.start(), s.start + m.end(), "", True))
+    return out
+
+
+def lex_rust(t):
+    cs, ss = [], []
+    n, i = len(t), 0
+    while i < n:
+        c = t[i]
+        if c == "/" and t.startswith("//", i):
+            j = t.find("\n", i)
+            j = n if j < 0 else j
+            head = t[i : i + 4]
+            doc = "outer" if head.startswith("///") and not head.startswith("////") else "inner" if head.startswith("//!") else ""
+            cs.append(Comment(i, j, doc))
+            i = j
+        elif c == "/" and t.startswith("/*", i):
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if t.startswith("/*", j):
+                    depth += 1
+                    j += 2
+                elif t.startswith("*/", j):
+                    depth -= 1
+                    j += 2
+                else:
+                    j += 1
+            head = t[i : i + 4]
+            doc = "outer" if head.startswith("/**") and not head.startswith(("/***", "/**/")) else "inner" if head.startswith("/*!") else ""
+            cs.append(Comment(i, j, doc, block=True))
+            i = j
+        elif c in "rbc" and (i == 0 or not IDENT.match(t[i - 1])) and re.compile(r'[bc]?r(#*)"').match(t, i):
+            m = re.compile(r'[bc]?r(#*)"').match(t, i)
+            close = '"' + m.group(1)
+            j = t.find(close, m.end())
+            j = n if j < 0 else j + len(close)
+            ss.append(Str(i, j))
+            i = j
+        elif c == '"' or (c in "bc" and t.startswith(c + '"', i) and (i == 0 or not IDENT.match(t[i - 1]))):
+            j = i + (2 if c in "bc" else 1)
+            while j < n and t[j] != '"':
+                j += 2 if t[j] == "\\" else 1
+            j = min(j + 1, n)
+            ss.append(Str(i, j))
+            i = j
+        elif c == "'":
+            if i + 1 < n and t[i + 1] == "\\":
+                j = t.find("'", i + 3)
+                i = n if j < 0 else j + 1
+            elif i + 2 < n and t[i + 2] == "'":
+                i += 3
+            else:
+                i += 1
+        else:
+            i += 1
+    return cs, ss
+
+
+def lex_js(t):
+    cs, ss = [], []
+    n = len(t)
+
+    def code(i, until_brace):
+        depth = 0
+        prev = ""
+        while i < n:
+            c = t[i]
+            if c == "/" and t.startswith("//", i):
+                j = t.find("\n", i)
+                j = n if j < 0 else j
+                cs.append(Comment(i, j, "", False))
+                i = j
+            elif c == "/" and t.startswith("/*", i):
+                j = t.find("*/", i + 2)
+                j = n if j < 0 else j + 2
+                doc = "outer" if t.startswith("/**", i) and not t.startswith("/**/", i) else ""
+                cs.append(Comment(i, j, doc, block=True))
+                i = j
+            elif c in "'\"":
+                j = i + 1
+                while j < n and t[j] != c and t[j] != "\n":
+                    j += 2 if t[j] == "\\" else 1
+                ss.append(Str(i, j + 1))
+                i, prev = j + 1, "x"
+            elif c == "`":
+                j = i + 1
+                while j < n and t[j] != "`":
+                    if t[j] == "\\":
+                        j += 2
+                    elif t.startswith("${", j):
+                        j = code(j + 2, True)
+                    else:
+                        j += 1
+                ss.append(Str(i, j + 1))
+                i, prev = j + 1, "x"
+            elif c == "/" and prev in ("", "(", ",", "=", ":", "[", "!", "&", "|", "?", "{", "}", ";", "\n"):
+                j = i + 1
+                incls = False
+                while j < n and t[j] != "\n":
+                    if t[j] == "\\":
+                        j += 2
+                        continue
+                    if t[j] == "[":
+                        incls = True
+                    elif t[j] == "]":
+                        incls = False
+                    elif t[j] == "/" and not incls:
+                        break
+                    j += 1
+                i, prev = j + 1, "x"
+            else:
+                if until_brace:
+                    if c == "{":
+                        depth += 1
+                    elif c == "}":
+                        if depth == 0:
+                            return i + 1
+                        depth -= 1
+                if not c.isspace():
+                    prev = c
+                elif c == "\n" and prev == "":
+                    prev = ""
+                i += 1
+        return i
+
+    code(0, False)
+    return cs, ss
+
+
+def lex_i(t):
+    cs, ss = [], []
+    n = len(t)
+
+    def code(i, until_paren):
+        depth = 0
+        while i < n:
+            c = t[i]
+            if c == "/" and t.startswith("//", i):
+                j = t.find("\n", i)
+                j = n if j < 0 else j
+                head = t[i : i + 5]
+                k = len(head) - len(head.lstrip("/"))
+                doc = "mod" if k >= 4 else "outer" if k == 3 else ""
+                cs.append(Comment(i, j, doc))
+                i = j
+            elif c == "#" or c == '"':
+                m = re.compile(r'(#*)"').match(t, i)
+                if not m:
+                    i += 1
+                    continue
+                h = m.group(1)
+                triple = t.startswith('"""', m.end() - 1)
+                q = '"""' if triple else '"'
+                close = q + h
+                j = m.end() - 1 + len(q)
+                while j < n:
+                    if t.startswith(close, j):
+                        break
+                    if t[j] == "\\" and t.startswith("\\" + h + "(", j):
+                        j = code(j + 2 + len(h), True)
+                        continue
+                    if t[j] == "\\":
+                        j += 2
+                        continue
+                    if not triple and t[j] == "\n":
+                        break
+                    j += 1
+                end = min(j + len(close), n)
+                ss.append(Str(i, end))
+                i = end
+            else:
+                if until_paren:
+                    if c == "(":
+                        depth += 1
+                    elif c == ")":
+                        if depth == 0:
+                            return i + 1
+                        depth -= 1
+                i += 1
+        return i
+
+    code(0, False)
+    return cs, ss
+
+
+def lex(path, t):
+    if path.endswith(".rs"):
+        cs, ss = lex_rust(t)
+    elif path.endswith((".mjs", ".ts")):
+        cs, ss = lex_js(t)
+    else:
+        cs, ss = lex_i(t)
+    # Interpolation lexers visit expressions inside strings to find their end;
+    # none of those comments may be changed as part of the containing literal.
+    cs = [c for c in cs if not any(s.start <= c.start < s.end for s in ss)]
+    cs.sort(key=lambda c: c.start)
+    return cs, ss
+
+
+# ---------------------------------------------------------------- comment lines
+
+class Line:
+    def __init__(self, path, no, line, c, text, marker):
+        self.path, self.no, self.line, self.c = path, no, line, c
+        self.text = text  # the comment text after the marker
+        self.marker = marker
+        self.tags = set()
+        self.safe = None
+
+
+def marker_of(raw, c):
+    """Splits the comment line segment into marker and text."""
+    m = re.match(r"(?://+!?|/\*+!?|\*|;;)", raw)
+    if c.embedded:
+        m = re.match(r";;|//", raw)
+    if c.block:
+        m = re.match(r"(?:/\*+!?|\*(?!/))?", raw)
+    return (m.group(0) if m else ""), raw[m.end() if m else 0 :]
+
+
+def comment_lines(path, t):
+    cs, ss = lex(path, t)
+    starts = [0]
+    for m in re.finditer("\n", t):
+        starts.append(m.end())
+    import bisect
+
+    out = []
+    for c in cs:
+        a = c.start
+        while a < c.end:
+            ln = bisect.bisect_right(starts, a) - 1
+            ls = starts[ln]
+            le = t.find("\n", a)
+            le = len(t) if le < 0 else le
+            b = min(c.end, le)
+            raw = t[a:b]
+            if c.block:
+                raw = raw.rstrip()
+                if raw.endswith("*/"):
+                    raw = raw[:-2].rstrip()
+                if not raw.strip():
+                    a = le + 1
+                    continue
+            mk, txt = marker_of(raw.lstrip() if c.block and a > c.start else raw, c)
+            L = Line(path, ln + 1, t[ls:le], c, txt, mk)
+            L.col = (a - ls, b - ls)
+            L.doc = c.doc
+            out.append(L)
+            a = le + 1
+    return out
+
+
+
+def tracked():
+    paths = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
+    return [p for p in paths if p.endswith(".rs") or
+            (p.startswith(("std/", "lib/")) and p.endswith((".i", ".is")))]
+
+
+def read(path):
+    return (ROOT / path).read_bytes().decode()
+
+
+def revision(base, path):
+    return subprocess.check_output(["git", "show", f"{base}:{path}"], cwd=ROOT).decode()
+
+
+def hsh(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def erase(path, text):
+    """Replace comments with separating blanks, preserving physical newlines."""
+    comments, _ = lex(path, text)
+    for c in reversed(comments):
+        text = text[:c.start] + re.sub(r"[^\r\n]", " ", text[c.start:c.end]) + text[c.end:]
+    return text
+
+
+# Longest punctuation and complete words keep `a b` distinct from `ab`, and
+# `< <` distinct from `<<`. Literals, including whitespace inside them, are exact.
+TOKEN = re.compile(
+    r"(?:r\#)?[^\W\d]\w*|[0-9][\w.]*(?:[eE][+-]?[0-9_]+)?"
+    r"|::|->|<-|=>|\.\.=|\.\.\.|\.\.|<<=?|>>=?|[!=<>+*/%&|^-]=|&&|\|\||\|>|<>"
+    r"|[^\s]", re.UNICODE
+)
+CHAR = re.compile(r"b?'(?:\\(?:x[0-9a-fA-F]{2}|u\{[0-9a-fA-F_]+\}|.)|[^'\\])'", re.S)
+
+
+def strip(path, text):
+    """Token stream ignoring comments and Rust whitespace; i keeps line breaks."""
+    text = erase(path, text)
+    _, strings = lex(path, text)
+    starts = {s.start: s.end for s in strings}
+    out = []
+    i = 0
+    newline = False
+    while i < len(text):
+        if text[i].isspace():
+            newline |= text[i] in "\r\n"
+            i += 1
+            continue
+        if not path.endswith(".rs") and out and newline:
+            out.append(("break", ""))
+        newline = False
+        end = starts.get(i)
+        char = CHAR.match(text, i) if path.endswith(".rs") else None
+        if end is not None:
+            out.append(("literal", text[i:end]))
+        elif char:
+            end = char.end()
+            out.append(("literal", char.group()))
+        else:
+            token = TOKEN.match(text, i)
+            assert token, (path, i)
+            end = token.end()
+            out.append(("token", token.group()))
+        i = end
+    return out
+
+
+def doc_examples(path, text):
+    """Keep fenced and indented rustdoc examples, including language attributes."""
+    blocks = []
+    block = []
+    last = None
+    for line in comment_lines(path, text):
+        if line.doc:
+            if last is not None and (line.no != last.no + 1 or line.doc != last.doc):
+                blocks.append(block)
+                block = []
+            block.append(line.text[1:] if line.text.startswith(" ") else line.text)
+            last = line
+        else:
+            if block:
+                blocks.append(block)
+                block = []
+            last = None
+    if block:
+        blocks.append(block)
+    examples = []
+    for block in blocks:
+        fence = None
+        code = []
+        for line in block:
+            match = re.match(r"\s*(`{3,}|~{3,})", line)
+            if fence:
+                code.append(line)
+                if match and match[1][0] == fence[0] and len(match[1]) >= len(fence):
+                    examples.append(tuple(code))
+                    code, fence = [], None
+            elif match:
+                if code:
+                    examples.append(tuple(code))
+                code, fence = [line], match[1]
+            elif line.startswith(("    ", "\t")):
+                code.append(line)
+            elif code:
+                examples.append(tuple(code))
+                code = []
+        if code:
+            examples.append(tuple(code))
+    return examples
+
+
+def directives(path, text):
+    return [line.text for line in comment_lines(path, text) if not line.doc and PROTECTED.search(line.line.lstrip())]
+
+
+def equivalent(path, old, new):
+    return (strip(path, old) == strip(path, new)
+            and directives(path, old) == directives(path, new)
+            and (not path.endswith(".rs") or doc_examples(path, old) == doc_examples(path, new)))
+
+
+def inventory(base=None):
+    counts = collections.Counter()
+    hits = []
+    baseline = set(subprocess.check_output(["git", "ls-tree", "-r", "--name-only", base], cwd=ROOT, text=True).splitlines()) if base else None
+    for path in tracked():
+        if baseline is not None and path not in baseline:
+            continue
+        text = revision(base, path) if base else read(path)
+        comments, strings = lex(path, text)
+        scope = "rust" if path.endswith(".rs") else "library"
+        example_text = {text for block in doc_examples(path, text) for text in block}
+        for line in comment_lines(path, text):
+            example = (line.doc and (line.text[1:] if line.text.startswith(" ") else line.text) in example_text)
+            if REF.search(line.text):
+                counts[scope + "_reference_lines"] += 1
+                counts[scope + "_section_marks"] += line.text.count("§")
+                counts[scope + "_spec_paths"] += len(re.findall(r"spec\.md", line.text, re.I))
+            if PROCESS.search(line.text):
+                counts["protected_example_stale_lines" if example else "stale_or_todo_lines"] += 1
+            if (REF.search(line.text) or PROCESS.search(line.text)) and not example and not PROTECTED.search(line.line.lstrip()):
+                hits.append((path, line.no, line.text.strip()))
+        if path.endswith(".rs"):
+            for string in strings:
+                body = text[string.start:string.end]
+                if "§" in body:
+                    counts["rust_string_literals_with_section_marks"] += 1
+                    counts["rust_string_section_marks"] += body.count("§")
+                    if "\n" in body:
+                        counts["multiline_rust_literals_with_section_marks"] += 1
+                    elif "/tests/" in path or path.endswith("/tests.rs"):
+                        counts["test_string_literals_with_section_marks"] += 1
+                    elif path.endswith("/solve.rs"):
+                        counts["test_assertion_literals_in_solve"] += 1
+                    else:
+                        counts["diagnostic_message_literals_with_section_marks"] += 1
+    return dict(sorted(counts.items())), hits
+
+
+def cmd_scan(args):
+    counts, hits = inventory(args.base)
+    print(json.dumps(counts, indent=2))
+    if args.lines:
+        for path, no, text in hits:
+            print(f"{path}:{no}: {text}")
+    return 0
+
+
+def cmd_record(args):
+    entries = []
+    baseline = set(subprocess.check_output(["git", "ls-tree", "-r", "--name-only", args.base], cwd=ROOT, text=True).splitlines())
+    for path in tracked():
+        if path not in baseline:
+            continue
+        old, new = revision(args.base, path), read(path)
+        if old == new:
+            continue
+        if not equivalent(path, old, new):
+            raise SystemExit(f"refused: {path}: tokens, directives or doc examples changed")
+        before, after = old.splitlines(keepends=True), new.splitlines(keepends=True)
+        matcher = difflib.SequenceMatcher(None, before, after, autojunk=False)
+        for group in matcher.get_grouped_opcodes(2):
+            a, b = group[0][1], group[-1][2]
+            c, d = group[0][3], group[-1][4]
+            oldpart, newpart = "".join(before[a:b]), "".join(after[c:d])
+            if old.count(oldpart) != 1:
+                raise SystemExit(f"refused: {path}:{a+1}: context is not unique")
+            entries.append(dict(file=path, line=a+1, hash=hsh(oldpart), old=oldpart, new=newpart))
+    Path(args.output).write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n")
+    print(f"recorded {len(entries)} contextual rewrites in {len({e['file'] for e in entries})} files")
+
+
+def prepare(entries, sources):
+    """Validate the complete transaction before any mutation."""
+    output = dict(sources)
+    for entry in entries:
+        path, old, new = entry["file"], entry["old"], entry["new"]
+        if hsh(old) != entry["hash"]:
+            raise ValueError(f"{path}: bad old-text hash")
+        if path not in output or output[path].count(old) != 1:
+            raise ValueError(f"{path}:{entry.get('line', '?')}: stale or ambiguous context")
+        output[path] = output[path].replace(old, new, 1)
+    for path in sources:
+        if not equivalent(path, sources[path], output[path]):
+            raise ValueError(f"{path}: changes tokens, directives or doc examples")
+    return output
+
+
+def cmd_apply(args):
+    maps = sorted((ROOT / "scripts/doc-comments-rewrites").glob("*.json")) if args.all else [Path(args.rewrites)]
+    entries = [entry for path in maps for entry in json.loads(path.read_text())]
+    paths = sorted({e["file"] for e in entries})
+    try:
+        sources = {p: revision(args.verify_replay, p) if args.verify_replay else read(p) for p in paths}
+        output = prepare(entries, sources)
+        if args.verify_replay:
+            mismatches = [p for p in paths if output[p] != read(p)]
+            if mismatches:
+                raise ValueError(f"replay differs from working tree: {mismatches}")
+    except (OSError, ValueError) as error:
+        print(f"refused without writing: {error}")
+        return 1
+    if not (args.dry_run or args.verify_replay):
+        for path in paths:
+            (ROOT / path).write_bytes(output[path].encode())
+    print(f"{'replayed exactly' if args.verify_replay else 'validated' if args.dry_run else 'applied'} {len(entries)}, refused 0")
+    return 0
+
+
+def canonical_i(base, paths, binary):
+    heavy = ROOT.parent / "cache/heavy"
+    if not heavy.is_file():
+        raise ValueError(f"heavy wrapper missing: {heavy}")
+    with tempfile.TemporaryDirectory(prefix="cmx2-i-proof-") as temporary:
+        roots = [Path(temporary) / side for side in ("before", "after")]
+        for path in paths:
+            for root, text in zip(roots, (revision(base, path), read(path))):
+                dest = root / path
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(erase(path, text))
+        command = [str(heavy), str(Path(binary).resolve()), "fmt", "--to", "is", *map(str, roots)]
+        subprocess.run(command, cwd=ROOT, check=True)
+        changed = []
+        for path in paths:
+            left, right = [(root / path).with_suffix(".is").read_bytes() for root in roots]
+            if left != right:
+                changed.append(path)
+        print(f"i fmt --to is proof: {len(paths)} files, {len(changed)} differ")
+        return changed
+
+
+def cmd_check(args):
+    counts, hits = inventory()
+    for path, no, text in hits:
+        print(f"{path}:{no}: {text}")
+    print(f"comment policy: {len(hits)} unapproved reference or stale-comment lines")
+    problems = len(hits)
+    if args.proof:
+        checked = changed = doctests = 0
+        ipaths = []
+        baseline = set(subprocess.check_output(["git", "ls-tree", "-r", "--name-only", args.proof], cwd=ROOT, text=True).splitlines())
+        for path in tracked():
+            if path not in baseline:
+                # New tooling has its own tests; it is not a compiler-source rewrite.
+                print(f"proof scope: new support file {path}")
+                continue
+            old, new = revision(args.proof, path), read(path)
+            checked += 1
+            doctests += len(doc_examples(path, old)) if path.endswith(".rs") else 0
+            if old != new:
+                changed += 1
+                if not path.endswith(".rs"):
+                    ipaths.append(path)
+            if not equivalent(path, old, new):
+                print(f"not comment-only: {path}")
+                problems += 1
+        print(f"comment-only proof: {checked} source files, {changed} changed, {problems-len(hits)} differ beyond comments")
+        print(f"rustdoc proof: {doctests} fenced/indented example blocks, no changes" if problems == len(hits) else "rustdoc proof: inspect failures above")
+        if args.i_bin:
+            problems += len(canonical_i(args.proof, ipaths, args.i_bin))
+    return bool(problems)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    scan = commands.add_parser("scan")
+    scan.add_argument("--base")
+    scan.add_argument("--lines", action="store_true")
+    scan.set_defaults(run=cmd_scan)
+    record = commands.add_parser("record")
+    record.add_argument("--base", required=True)
+    record.add_argument("--output", required=True)
+    record.set_defaults(run=cmd_record)
+    apply = commands.add_parser("apply")
+    maps = apply.add_mutually_exclusive_group(required=True)
+    maps.add_argument("--all", action="store_true")
+    maps.add_argument("--rewrites")
+    apply.add_argument("--dry-run", action="store_true")
+    apply.add_argument("--verify-replay", metavar="BASE", help="replay in memory from BASE and compare every result with the working tree")
+    apply.set_defaults(run=cmd_apply)
+    check = commands.add_parser("check")
+    check.add_argument("--proof")
+    check.add_argument("--i-bin")
+    check.set_defaults(run=cmd_check)
+    args = parser.parse_args()
+    return args.run(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

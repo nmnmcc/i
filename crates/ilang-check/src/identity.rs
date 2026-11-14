@@ -2,13 +2,14 @@
 //! module in that package, and its name. Two types of a program are the
 //! same type when they have the same identity; across two versions of a
 //! program, as `i publish` compares them, a type keeps its identity when it
-//! stays in the same place (§2.7).
+//! stays in the same place.
 
 use crate::hir::{Program, TypeId};
 use ilang_package::{PackageGraph, PackageId};
 use std::path::PathBuf;
 
-/// What a package is (§2.7).
+/// What a package is: a location and a major version, or a directory for a path
+/// dependency.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PackageIdentity {
     /// The library package `i`.
@@ -16,7 +17,7 @@ pub enum PackageIdentity {
     /// The package that is compiled.
     Root,
     /// A package got by location: the location, with its `//dir`, and the
-    /// major version. A new major version is another package (§2.7).
+    /// major version. A new major version is another package.
     Location { location: String, major: u64 },
     /// A path dependency: its canonical directory.
     Path(PathBuf),

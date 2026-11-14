@@ -1,5 +1,5 @@
-//! Written-source facts used by editor queries. This index deliberately keeps
-//! no expression or type tree: the compiler's tree is syntax three.
+//! Editor queries retain written-source facts without another expression or
+//! type tree, so the compiler's source nodes remain the authority for spans.
 use super::*;
 use ilang_syntax::syn3::{self, ast as n, ast::resolved::Ident};
 

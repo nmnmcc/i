@@ -102,7 +102,7 @@ fn codegen_data() {
     );
     assert_eq!(by_text(&typed.args, m, "5 |> minus(1)"), &vec![0, 1]);
     assert_eq!(by_text(&typed.args, m, "minus(1, 2)"), &vec![0, 1]);
-    // Whole-head tests have All values (types-joint §2.2).
+    // Whole-head tests have All values.
     let int = Head::Named(TypeRef::Builtin(BuiltinType::Int));
     let string = Head::Named(TypeRef::Builtin(BuiltinType::String));
     assert_eq!(
@@ -156,21 +156,21 @@ fn codegen_data() {
             true, true, true, true, false, true, true, false, true, true, true, true
         ]
     );
-    // The field of each part of a constructor pattern (§7.1): every field
+    // The field of each part of a constructor pattern: every field
     // has a label, so the parts go by label: `name` is field 1 and `lives`
     // field 0.
     assert_eq!(
         by_text(&typed.pattern_fields, m, "Cat(name = name, lives = l)"),
         &vec![1, 0]
     );
-    // Which patterns of bindings and parameters may fail (§7.3).
+    // Which patterns of bindings and parameters may fail.
     assert_eq!(by_text(&typed.may_fail, m, "Ok(v)"), &true);
     assert_eq!(by_text(&typed.may_fail, m, "(a, b)"), &false);
     assert_eq!(
         by_text(&typed.may_fail, m, "Cat(name = name, lives = l)"),
         &false
     );
-    // A host export, with its errors in the canonical order (B.2).
+    // A host export, with its errors in the canonical order.
     let sigs: Vec<(&DefId, &HostSignature)> = typed.host_exports.iter().collect();
     assert_eq!(sigs.len(), 1);
     assert_eq!(sigs[0].1.params[0], HostType::Int);

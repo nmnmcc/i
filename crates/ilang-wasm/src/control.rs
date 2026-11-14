@@ -1,4 +1,4 @@
-//! Splitting the functions that may suspend (§9.4), after lowering.
+//! Splitting the functions that may suspend, after lowering.
 //!
 //! Frames are captured lazily, and re-entered lazily: a resume rebuilds only
 //! the innermost frame (see `ir.rs`): nothing is saved until
@@ -11,7 +11,7 @@
 //! - the environment locals that the rest of the function uses are not
 //!   kept: the frame record keeps the values of their environment
 //!   statements, and they are made again from the environment of the place
-//!   of `resume` (§9.4 rule 3);
+//!   of `resume`;
 //! - the **segment** is the rest of the function after the call: the rest
 //!   of its statement list, then a [`Stmt::Join`] to the [`Join`] of the
 //!   `If` or `Block` around it, which is the rest of the function after that

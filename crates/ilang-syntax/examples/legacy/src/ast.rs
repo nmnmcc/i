@@ -22,7 +22,7 @@ impl std::ops::Deref for RecordLabel {
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Module {
-    /// The `////` comments of the file (§1.2), one entry per line.
+    /// The `////` comments of the file, one entry per line.
     pub doc: Vec<String>,
     pub imports: Vec<ImportItem>,
     pub exports: Vec<ExportItem>,
@@ -32,7 +32,7 @@ pub struct Module {
     pub exports_span: Option<Span>,
 }
 
-/// `[alias =] [(A, b) =] a/b/c` (§2.3).
+/// `[alias =] [(A, b) =] a/b/c`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImportItem {
     pub alias: Option<Ident>,
@@ -41,7 +41,7 @@ pub struct ImportItem {
     pub span: Span,
 }
 
-/// `name`, `T`, or `T(..)` (§2.4).
+/// `name`, `T`, or `T(..)`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExportItem {
     pub name: Ident,
@@ -58,7 +58,7 @@ pub struct Item {
     pub span: Span,
 }
 
-/// `@[module.]name[(args)]` (§2.2). `args` holds the arguments when every
+/// `@[module.]name[(args)]`. `args` holds the arguments when every
 /// one is a string literal with no label and there is at least one; `call`
 /// holds them, with the span of the `( )`, in every other case with `( )`.
 #[derive(Clone, Debug, PartialEq)]
@@ -74,13 +74,13 @@ pub struct Attribute {
 pub enum ItemKind {
     TypeDef(TypeDef),
     Binding(Binding),
-    /// `name[(A, …)]: Type` (§2.5, §10.1).
+    /// `name[(A, …)]: Type`.
     Declaration {
         name: Ident,
         type_params: Vec<Ident>,
         ty: TypeExpr,
     },
-    /// `[module.]name(args)` at the top level, kept for macros (§2.2).
+    /// `[module.]name(args)` at the top level, kept for macros.
     MacroItem {
         module: Option<Ident>,
         name: Ident,
@@ -88,12 +88,12 @@ pub enum ItemKind {
     },
 }
 
-/// `T(A, B) { C1 C2 }` or `T(A) = Type` (§4.3). `params` holds a head of
+/// `T(A, B) { C1 C2 }` or `T(A) = Type`. `params` holds a head of
 /// plain `UpName`s with no module and no arguments. `head` holds any other head,
 /// and `params` is then empty.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeDef {
-    /// Frozen from the written RHS before expansion (§4.3).
+    /// Frozen from the written RHS before expansion.
     pub alias_pattern: bool,
     pub name: Ident,
     pub params: Vec<Ident>,
@@ -121,20 +121,20 @@ pub struct Field {
     pub span: Span,
 }
 
-/// `pattern = value`, or `name(A, …)[: T] = value` (§2.5, §6.10).
+/// `pattern = value`, or `name(A, …)[: T] = value`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Binding {
     pub pattern: Pattern,
     pub value: Expr,
     pub span: Span,
-    /// The type variables declared after the name (§4.7).
+    /// The type variables declared after the name.
     pub type_params: Vec<Ident>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stmt {
     Bind(Binding),
-    /// `! T = e` (§6.10, §9.2).
+    /// `! T = e`.
     Env {
         ty: TypeExpr,
         value: Expr,
@@ -165,7 +165,7 @@ pub enum ExprKind {
     Float(f64),
     String(String),
     /// `x`, `C`, or `m.C`. `m.x` is a `Field`, because the parser does not
-    /// know whether `m` is a module (§2.3).
+    /// know whether `m` is a module.
     Name {
         module: Option<Ident>,
         name: Ident,
@@ -183,12 +183,12 @@ pub enum ExprKind {
     BitArray(Vec<Segment<Expr>>),
     Block(Block),
     Fn(Box<Function>),
-    /// The match `e |> { … }` (§6.12).
+    /// The match `e |> { … }`.
     Case {
         subject: Box<Expr>,
         clauses: Vec<Clause>,
     },
-    /// A clause block that is not the right side of `|>` (§6.12).
+    /// A clause block that is not the right side of `|>`.
     Clauses(Vec<Clause>),
     Call {
         callee: Box<Expr>,
@@ -203,7 +203,7 @@ pub enum ExprKind {
         index: BigUint,
         index_span: Span,
     },
-    /// `C(..base, f: e)` (§6.7).
+    /// `C(..base, f: e)`.
     RecordUpdate {
         constructor: Box<Expr>,
         base: Box<Expr>,
@@ -234,7 +234,7 @@ pub struct Clause {
     pub span: Span,
 }
 
-/// `(params) -> A ^ E ! N { body }` (§6.8).
+/// `(params) -> A ^ E ! N { body }`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Function {
     pub params: Vec<Param>,
@@ -253,14 +253,14 @@ pub struct RetType {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Param {
     Pattern(Pattern),
-    /// `name ! T` (§6.11).
+    /// `name ! T`.
     Env {
         name: Ident,
         ty: TypeExpr,
     },
 }
 
-/// A part of a bit array (§8.1).
+/// A part of a bit array.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Segment<T> {
     pub value: T,
@@ -300,7 +300,7 @@ pub enum PatternKind {
     },
     Var(String),
     Discard(String),
-    /// `x: T` (§7.1).
+    /// `x: T`.
     Typed {
         binder: Binder,
         ty: TypeExpr,
@@ -361,12 +361,12 @@ pub enum TypeKind {
         name: Ident,
         args: Vec<TypeExpr>,
     },
-    /// `name` or `a.x` with a lowercase `x`, kept for the type of a value (§3).
+    /// `name` or `a.x` with a lowercase `x`, kept for the type of a value.
     ValueOf {
         module: Option<Ident>,
         name: Ident,
     },
-    /// `[a.]m(args)` with a lowercase `m`, kept for macros (§3).
+    /// `[a.]m(args)` with a lowercase `m`, kept for macros.
     Call {
         module: Option<Ident>,
         name: Ident,
@@ -394,7 +394,7 @@ pub enum TypeKind {
     Diff(Vec<TypeExpr>),
 }
 
-/// A type-call argument is a type, including a literal type (§3).
+/// A type-call argument is a type, including a literal type.
 pub type TypeArg = TypeExpr;
 
 pub use crate::syn3::ast::LitValue;

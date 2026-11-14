@@ -1,4 +1,4 @@
-//// Arbitrary precision Int arithmetic beyond the small range (§11.2): the
+//// Arbitrary precision Int arithmetic beyond the small range: the
 //// runtime adds, subtracts, multiplies, divides, compares and writes small
 //// Ints itself, and calls these functions when an operand is large.
 ////
@@ -10,7 +10,7 @@
 //// computes in 64 bits. Only Karatsuba composes big arithmetic again,
 //// deliberately, on its smaller subproducts.
 ////
-//// The private primitives are not part of the language (§13).
+//// The private primitives are not part of the language.
 (
 	i/core
 )
@@ -541,7 +541,7 @@ max = (a : Int, b : Int) -> Int { { a > b } |> (True) { a } | (False) { b } }
 
 min = (a : Int, b : Int) -> Int { { a < b } |> (True) { a } | (False) { b } }
 
-/// `a / b`, rounded toward zero; 0 when `b` is 0 (§11.2).
+/// `a / b`, rounded toward zero; 0 when `b` is 0.
 divide = (a : Int, b : Int) -> Int {
 	s = sign(a) * sign(b)
 	{ s == 0 } |>
@@ -552,7 +552,7 @@ divide = (a : Int, b : Int) -> Int {
 		}
 }
 
-/// `a % b`, with the sign of `a`; 0 when `b` is 0 (§11.2).
+/// `a % b`, with the sign of `a`; 0 when `b` is 0.
 remainder = (a : Int, b : Int) -> Int {
 	sa = sign(a)
 	{ sa * sign(b) == 0 } |>

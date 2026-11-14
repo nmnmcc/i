@@ -5,10 +5,9 @@
 //! - `ir`: the intermediate form, in A-normal form, and the calling
 //!   convention.
 //! - `lower`: from the checked program to the intermediate form.
-//! - `control`: finds the calls that may suspend and splits their functions
-//!   (§9.4).
+//! - `control`: finds the calls that may suspend and splits their functions.
 //! - `emit`: from the intermediate form to a Wasm module with the binary
-//!   interface of Appendix B.
+//!   interface: the imports, the exports and the `ilang.abi` metadata.
 //!
 //! Numeric emission can select local scalar encodings at O2/O3. The existing
 //! `ilang-binaryen` pipeline performs the remaining Wasm optimization.
@@ -83,7 +82,8 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// Compiles a checked program with no errors to a Wasm module (Appendix B).
+/// Compiles a checked program with no errors to a Wasm module with the binary
+/// interface that hosts call.
 /// The module is checked with `wasmparser`.
 pub fn compile(
     graph: &PackageGraph,
@@ -246,7 +246,7 @@ pub fn compile_macro(
     mut options: Options,
 ) -> Result<(Vec<u8>, Vec<serde_json::Value>), Error> {
     // Macro evaluation is always on the compiler host, independently of the
-    // target of the program being compiled (meta §8).
+    // target of the program being compiled.
     options.target = Target::Host;
     let (ir, bindings) =
         lower::lower_with_bindings(graph, program, typed, options).map_err(Error::Diagnostics)?;
@@ -283,8 +283,9 @@ fn compile_metered(
     Ok((wasm, bindings))
 }
 
-/// The Wasm features of Appendix B.1, and the small ones every engine with
-/// them has.
+/// The Wasm features that a module needs (garbage collection, typed function
+/// references, tail calls, and exception handling with `exnref`), and the small
+/// ones every engine with them has.
 pub fn features() -> wasmparser::WasmFeatures {
     use wasmparser::WasmFeatures as F;
     F::MUTABLE_GLOBAL

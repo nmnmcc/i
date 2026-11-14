@@ -35,7 +35,7 @@ fn node(kind: K, span: Span) -> Datum {
 }
 
 /// Rewrites a quoted datum written with the older Lisp rows to the rows of
-/// §6.8, as far as the datum shows its position: functions get data-form
+/// As far as the datum shows its position: functions get data-form
 /// parameters and a service pattern, function types a data type and needs,
 /// clause blocks become chains, the pipe and the match get the head `|>`,
 /// and records become data. Labels `(: x e)` in calls and environment
@@ -237,7 +237,7 @@ fn split_result(ret: &Datum) -> (&Datum, Option<&Datum>, Option<&Datum>) {
     }
 }
 
-/// The reverse of [`convert_quote`]: a quoted datum in the rows of §6.8 is
+/// The reverse of [`convert_quote`]: a quoted datum in the source rows is
 /// rewritten to the older rows, which the macro engine of this stage reads
 /// (the transition front keeps the current tree, so the syntax that a macro
 /// sees and gives is in the older rows).

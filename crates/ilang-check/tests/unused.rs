@@ -1,4 +1,4 @@
-//! Interpretation checks for scope UNUSED rules 1–6 and spec §2.4.1.
+//! Interpretation checks for the unused top-level binding warning.
 //! Expected names below come from the root/reference rules, not goldens.
 mod common;
 
@@ -114,7 +114,7 @@ fn underscore_suppression_still_counts_body_references() {
 
 #[test]
 fn each_pattern_name_is_checked_without_retaining_its_siblings() {
-    // §2.4.1: using one pattern name retains references, not sibling names.
+    // Using one pattern name retains references, not sibling names.
     assert_eq!(
         names(&[(
             "src/main.i",
@@ -199,7 +199,7 @@ foreign : () -> Int
 
 #[test]
 fn value_type_reads_are_uses_even_without_runtime_calls() {
-    // §2.4.1 counts references in types; exempt type definitions are roots.
+    // References in types count; exempt type definitions are roots.
     assert!(
         names(&[(
             "src/main.i",
@@ -252,7 +252,7 @@ fn broken_programs_do_not_gain_speculative_unused_warnings() {
 #[test]
 fn wasm_exports_and_editor_checks_have_the_same_roots() {
     // Rule 2 names [wasm].exports separately. The resolver currently
-    // requires these names to be exported from source modules (§10.2).
+    // requires these names to be exported from source modules.
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),

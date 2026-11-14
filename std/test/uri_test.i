@@ -7,7 +7,7 @@
 	(Some, None) = std/option
 )
 
-// U3 and §6.3: every successful route to Uri preserves raw spelling.
+// Every successful route to Uri preserves raw spelling.
 round_trip = (u : uri.Uri) -> Nil {
 	assert(
 		uri.parse(uri.to_string(u)) == Ok(u),
@@ -95,7 +95,7 @@ test("uri_raw_parts", () {
 	Nil
 })
 
-// U1/U8 selection and translation, including byte counts rather than codepoints.
+// Selection and translation count bytes rather than Unicode scalars.
 test("uri_parse_errors", () {
 	cases = [
 		(
@@ -491,7 +491,7 @@ test("uri_build_errors", () {
 			),
 		),
 	]
-	// U8 build checks query grammar before the path's cross-field constraints.
+	// URI construction checks query grammar before the path's cross-field constraints.
 	assert(
 		uri.build(
 			uri.Parts(
@@ -517,7 +517,7 @@ test("uri_build_errors", () {
 	Nil
 })
 
-// RFC 3986 §5.4 normal and abnormal examples; strict http:g behavior.
+// RFC 3986, section 5.4: normal and abnormal resolution examples; strict http:g behavior.
 test("uri_rfc_resolution", () {
 	base = parse_good("http://a/b/c/d;p?q")
 	cases = [
@@ -574,7 +574,7 @@ test("uri_rfc_resolution", () {
 		assert(uri.to_string(u) == expected)
 		round_trip(u)
 	})
-	// U5: no inherited base fragment; empty authority paths merge with a slash.
+	// no inherited base fragment; empty authority paths merge with a slash.
 	Ok(u) = uri.resolve(parse_good("x://h#old"), parse_good("a"))
 	assert(uri.to_string(u) == "x://h/a")
 	round_trip(u)
@@ -741,8 +741,9 @@ test("uri_forms", () {
 	Nil
 })
 
-// Generated valid Parts use U4's preservation law; short arbitrary ASCII
-// strings use U1/U3, without treating self-produced expectations as grammar.
+// Generated valid Parts use the component preservation law; short arbitrary ASCII
+// strings use independent grammar checks, without treating self-produced
+// expectations as grammar.
 test("uri_generated_round_trips", () {
 	schemes = [None, Some("x"), Some("HTTP+1.-")]
 	authorities = [

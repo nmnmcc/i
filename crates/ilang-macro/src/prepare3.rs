@@ -1,5 +1,5 @@
 //! The parts of `prepare` and `project` that read or write the tree, on
-//! the tree of syntax three.
+//! the source tree.
 use ilang_syntax::lisp::{expansion::MacroDefinition, quote_lower3, syntax::Syntax};
 use ilang_syntax::syn3::ast::{
     Attribute, Binding, Expr, ExprKind, Item, ItemKind, Module, Pattern, PatternKind,

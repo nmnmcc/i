@@ -17,7 +17,7 @@ pub enum CompletionContext {
         names_of: Option<ModuleId>,
         start: u32,
     },
-    /// After `!`: a service type (§9.2).
+    /// A service position requires a named service type.
     Environment,
     /// A type.
     Type,
@@ -129,7 +129,7 @@ impl Query<'_> {
             _ => {}
         });
         // A service pattern `<- (name: S, …)` of a function head, or the
-        // need `<- (S, …)` of a function type (syntax three §2.10.2): a
+        // need `<- (S, …)` of a function type: a
         // type there, or the place after `name:`, is a service. After
         // `e <- (` of a provide the items are values, which are not types
         // of the tree.
@@ -192,7 +192,7 @@ impl Query<'_> {
         clauses: &[Clause],
     ) -> Vec<TypeId> {
         // The members of the subject's type (a sum is a union of
-        // one-constructor types, syntax three §2.8), then the types of the
+        // one-constructor types), then the types of the
         // constructors that the clauses name.
         let mut out = Vec::new();
         let types = match &subject.kind {
@@ -230,10 +230,10 @@ impl Query<'_> {
             }
         }
         // When the subject's type is not known, the members of the declared
-        // union of a named constructor's type (syntax three §2.8), in the
+        // union of a named constructor's type, in the
         // union's order: the former constructors of its sum.
         // When the subject's known members are all in the declared union of
-        // a named constructor's type (syntax three §2.8), the members of that
+        // a named constructor's type, the members of that
         // union in written order: the former constructors of its sum.
         if let Some(&first) = named.first() {
             let union = self.union_of(first);
@@ -311,7 +311,8 @@ impl Query<'_> {
     }
 
     /// The modules that a module may import, by the path it writes them
-    /// with (§2.1), with their exports as documentation.
+    /// with (a package name, then the path under `src/`), with their exports as
+    /// documentation.
     fn import_completions(&self, m: ModuleId, replace: Span) -> Vec<Completion> {
         let mut out = Vec::new();
         for (i, _) in self.program.modules.iter().enumerate() {
@@ -346,8 +347,8 @@ impl Query<'_> {
         out
     }
 
-    /// The path that module `m` writes to import `t`, when it may import it
-    /// (§2.1): a module of its package, of the library, or of a dependency,
+    /// The path that module `m` writes to import `t`, when it may import it:
+    /// a module of its package, of the library, or of a dependency,
     /// and a test module only from a test module.
     pub fn import_path(&self, m: ModuleId, t: ModuleId) -> Option<String> {
         let p = self.program;
@@ -451,7 +452,7 @@ impl Query<'_> {
         out
     }
 
-    /// The types that may be services (§9.2): named custom types that are
+    /// The types that may be services: named custom types that are
     /// not records. Those used as services in the program come first.
     fn service_completions(&self, m: ModuleId) -> Vec<Completion> {
         let p = self.program;
@@ -920,7 +921,7 @@ pub(crate) fn split_fn_type(t: &str) -> Option<(Vec<String>, String)> {
 }
 
 /// The parameter items, the need (the text after `<-`, if any) and the
-/// result of a shown function type `(P) <- S -> R` (syntax three §3.1).
+/// result of a shown function type `(P) <- S -> R`.
 pub(crate) fn split_fn_type_need(t: &str) -> Option<(Vec<String>, Option<String>, String)> {
     let t = t.trim();
     let t = t
@@ -1050,7 +1051,7 @@ fn line_before(text: &str, offset: u32) -> &str {
 }
 
 /// Whether the cursor is inside the parentheses directly following a
-/// syntax-three branch join or match pipe. Tokens keep comments and strings
+/// source branch join or match pipe. Tokens keep comments and strings
 /// from inventing a head, and the delimiter stack excludes branch bodies.
 fn in_source_branch_head(text: &str, offset: u32) -> bool {
     use ilang_syntax::token::TokenKind as T;

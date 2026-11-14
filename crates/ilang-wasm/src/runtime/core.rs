@@ -1,4 +1,4 @@
-//! Float operators and the functions of `i/core` (spec §11.3, §13).
+//! Float operators and the functions of `i/core`.
 //!
 //! Every function here takes and gives `eqref` values, so the code generator
 //! can call them directly or wrap them as function values.

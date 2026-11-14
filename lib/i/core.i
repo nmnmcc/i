@@ -1,4 +1,4 @@
-//// The operations that are not written in i (§13).
+//// The operations that are not written in i.
 (
 	not
 	to_float
@@ -140,7 +140,7 @@ bit_array_to_string : (BitArray) -> Result(String, Nil)
 @external("ilang:core", "bit_array_concat")
 bit_array_concat : (List(BitArray)) -> BitArray
 
-/// The text form of the value (§11.8).
+/// The text form of the value.
 @external("ilang:core", "inspect")
 inspect : <A>(A) -> String
 

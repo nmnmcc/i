@@ -1,21 +1,20 @@
-//! Type inference (§4.7, §4.8) with effects (§9.2–§9.6): algebraic
+//! Type inference with effects: algebraic
 //! subtyping in the style of Simple-sub (Parreaux, ICFP 2020; the theory is
 //! MLsub, Dolan and Mycroft, POPL 2017), with the unions, intersections,
-//! and differences of §4.4, the variance of §4.5, and the `^ E ! N` parts of
-//! function types.
+//! and differences of sets, parameter variance, and service needs.
 //!
 //! - `solve.rs`: type variables with levels and bounds, `constrain`, and the
-//!   smart constructors that merge unions by type constructor (§4.4).
+//!   smart constructors that merge unions by type constructor.
 //! - `infer.rs`: the typing rules for expressions, blocks, functions, and
-//!   bindings (§4.8 rules 1–10 and 14).
-//! - `pattern.rs`: patterns, fitting, `case` by places (rule 11),
-//!   narrowing (rule 12), and known constructors (§7.5).
+//!   bindings.
+//! - `pattern.rs`: patterns, fitting, `case` by places,
+//!   narrowing, and known constructors.
 //! - `coverage.rs`: Maranget's usefulness algorithm, for "can not fail"
-//!   (§7.3), "taken" (rule 12), coverage and "never used" (§7.4).
-//! - `known.rs`: known types and expected types (§4.8), found from what
+//!   (a pattern that matches every value), "taken", coverage and "never used" clauses.
+//! - `known.rs`: known types and expected types, found from what
 //!   is written, in the order of inference.
 //! - `display.rs`: coalescing, simplification, and the text of a type in
-//!   the syntax of §3.
+//!   i syntax.
 //! - `shown.rs`: a shown type as a tree ([`ShownType`]), and its text.
 
 mod alias;
@@ -53,12 +52,12 @@ use std::collections::HashMap;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct V(pub u32);
 
-/// The type constructor of a member (§4.4). All function types are one
+/// The type constructor of a member. All function types are one
 /// head, and so are the tuples of one size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Head {
     Named(TypeRef),
-    /// Data of one shape: tuples, records and `()` (syntax-3 §6.2).
+    /// Data of one shape: tuples, records and `()`.
     Shape(ShapeId),
     Fn,
 }
@@ -80,7 +79,7 @@ pub(crate) enum Ty {
     Fn(Box<FnTy>),
     Union(Vec<Ty>),
     Inter(Vec<Ty>),
-    /// `A - H`: the members of `H` are not type variables (§4.4).
+    /// `A - H`: the members of `H` are not type variables.
     Diff(Box<Ty>, Vec<Ty>),
     Never,
     Top,
@@ -93,14 +92,14 @@ pub(crate) enum Ty {
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Ty>() <= 48);
 
-/// A function type with one data parameter (syntax-3 §6.1).
+/// A function type with one data parameter.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct FnTy {
     /// The argument data: data of one shape, a union of data of several
     /// shapes, `Never` (no call is possible), or a type variable.
     pub param: Ty,
     /// The labels of the positions of the parameter, for labelled calls and
-    /// display only: they have no effect on subtyping (§4.6).
+    /// display only: they have no effect on subtyping.
     pub labels: Vec<Option<String>>,
     pub ret: Ty,
     pub err: Ty,
@@ -110,7 +109,7 @@ pub(crate) struct FnTy {
 impl FnTy {
     /// A function type whose parameter is a tuple of these parts.
     pub fn new(params: Vec<(Option<String>, Ty)>, ret: Ty, err: Ty, env: Ty) -> FnTy {
-        // The transition tree writes a multi-shape function type as one
+        // The HIR input representation writes a multi-shape function type as one
         // parameter with the reserved label `%data`: its type is the
         // parameter data type itself.
         if matches!(params.as_slice(), [(Some(l), _)] if l == groups::DATA) {
@@ -186,7 +185,7 @@ impl Ty {
         }
     }
 
-    /// Replace a scalar's set, keeping empty distinct from All (§4.2).
+    /// Replace a scalar's set, keeping empty distinct from All.
     pub fn with_values(&self, values: Option<lits::ValueSet>) -> Ty {
         let b = self.scalar().expect("only Int and String have value sets");
         values.map_or(Ty::Never, |values| Ty::lit(b, values))
@@ -353,7 +352,7 @@ mod literal_representation_tests {
 
     #[test]
     fn scalar_sets_survive_child_mapping() {
-        // literal-types §4: "No helper rebuilds a Con with a default set."
+        // "No helper rebuilds a Con with a default set."
         let set = ValueSet::except([Arc::from("a")]);
         let literal = Ty::lit(BuiltinType::String, set.clone());
         let mut solver = Solver::new(Default::default(), Vec::new());
@@ -387,7 +386,7 @@ mod literal_representation_tests {
     }
 }
 
-/// How a type parameter changes with its type (§4.5 rules 6 and 7).
+/// How a type parameter changes with its type.
 /// `Bi` is a parameter that is not used, only while variances are found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Variance {
@@ -415,15 +414,15 @@ impl Variance {
     }
 }
 
-/// How `v.f` or `v.k` reads a part of its value (§4.8 rule 13).
+/// How `v.f` or `v.k` reads a part of its value.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Access {
-    /// `v.f`: each constructor that may have made `v` (§6.7), with the
+    /// `v.f`: each constructor that may have made `v`, with the
     /// index of its field with the label `f`. At run time, the constructor
     /// of the value picks one.
     Field(Vec<(CtorRef, u32)>),
     /// `v.k` or `v.f` on data: the part at index `k` in canonical order,
-    /// whatever the shape (syntax-3 §2.3).
+    /// whatever the shape.
     Part(u32),
 }
 
@@ -452,7 +451,7 @@ pub struct Typed {
     pub data_shapes: HashMap<(ModuleId, Span), (ShapeId, Option<ShapeId>)>,
     /// Each multi-shape function expression that an expected type narrows
     /// to one of its shape groups, by its span: the index of that group.
-    /// Its value is that group's function alone (syntax three §2.6.4).
+    /// Its value is that group's function alone.
     pub selected_groups: HashMap<(ModuleId, Span), u32>,
     /// Each use of the name of a chain with several shape groups that an
     /// expected type narrows to one group, by its span: the binding of
@@ -468,12 +467,12 @@ pub struct Typed {
     /// Exact alias graphs for semantic interface comparison.
     pub alias_artifacts: HashMap<crate::hir::TypeId, AliasArtifact>,
     /// The type scheme of each top-level name, simplified and shown in the
-    /// syntax of §3 (§4.7).
+    /// i syntax.
     pub schemes: HashMap<DefId, String>,
     /// Human-facing text; full scheme trees and interfaces stay exact.
     pub scheme_hovers: HashMap<DefId, String>,
     /// The type scheme of each exported top-level name and of each
-    /// declaration (§10.1), whether exported or not: the type of
+    /// declaration, whether exported or not: the type of
     /// `schemes`, simplified and named in the same way, as a tree whose
     /// named types are known by their `TypeRef`, not by the names that
     /// a module gives them. `schemes[d]` is
@@ -486,7 +485,7 @@ pub struct Typed {
     pub provider_scheme_artifacts: HashMap<DefId, SchemeArtifact>,
     /// Full graph schemes, including their retained bounds and obligations.
     pub scheme_artifacts: HashMap<DefId, SchemeArtifact>,
-    /// §7.5: each use of a name that is known to be made by a constructor,
+    /// Each use of a name that is known to be made by a constructor,
     /// by the span of the `Name` expression.
     pub known_ctors: HashMap<(ModuleId, Span), CtorRef>,
     /// Each `Field` and `TupleIndex` expression that type checks, by its
@@ -495,33 +494,33 @@ pub struct Typed {
     /// Each call whose arguments could be put in their places, by the span
     /// of its `Call` expression, or
     /// of the `Binary` `|>` expression for `a |> f(…)` and `a |> f`: for
-    /// each parameter in order, the index of the argument that goes to it
-    /// (§6.6). Arguments count in the order they are written, with the
-    /// left side of `|>` first; they are worked out in that order (§6.2).
+    /// each parameter in order, the index of the argument that goes to it.
+    /// Arguments count in the order they are written, with the
+    /// left side of `|>` first; they are worked out in that order.
     pub args: HashMap<(ModuleId, Span), Vec<u32>>,
     /// Each type test `x: T` or `_: T` in a `case` clause pattern, by the
     /// span of the `Typed` pattern: the type constructors of the members of
-    /// `T`, which are tested at run time (§7.1).
+    /// `T`, which are tested at run time.
     pub type_tests: HashMap<(ModuleId, Span), Vec<TestMember>>,
     /// The type constructor of the service of each environment parameter,
     /// by the span of its name, and of each environment statement, by the
-    /// span of the statement (§9.2). Aliases are expanded.
+    /// span of the statement. Aliases are expanded.
     pub services: HashMap<(ModuleId, Span), TypeRef>,
-    /// Whether each top-level binding was generalized (§4.7): its value is
+    /// Whether each top-level binding was generalized: its value is
     /// a direct value, as are the values of its group.
     pub generalized: HashMap<BindingRef, bool>,
     /// Each constructor pattern `C(p1, …)`, by the span of the pattern: for
     /// each part, in the order written, the index of the field it is
-    /// matched to (§7.1). A part that matches no field has `u32::MAX`.
+    /// matched to. A part that matches no field has `u32::MAX`.
     pub pattern_fields: HashMap<(ModuleId, Span), Vec<u32>>,
     /// Each pattern of a binding and each parameter pattern, by the span of
-    /// the pattern: whether it may fail for the type of its value (§7.3),
-    /// so that it reports to `Assert` (§6.10, §6.11).
+    /// the pattern: whether it may fail for the type of its value,
+    /// so that it reports to `Assert`.
     pub may_fail: HashMap<(ModuleId, Span), bool>,
-    /// The signature of each host export (§10.2, B.2) whose types the host
+    /// The signature of each host export whose types the host
     /// can take.
     pub host_exports: HashMap<DefId, HostSignature>,
-    /// Service constructors in each entry's inferred environment (§10.2),
+    /// Service constructors in each entry's inferred environment,
     /// used to bind the chosen body instances during lowering.
     pub entry_services: HashMap<DefId, Vec<crate::hir::TypeId>>,
     /// The complete inferred environment of each entry, including ordinary
@@ -533,7 +532,7 @@ pub struct Typed {
     pub locals: Option<std::sync::Arc<LocalTypes>>,
 }
 
-/// The solver after inference, with the type and the known type (§4.8) of
+/// The solver after inference, with the type and the known type of
 /// every name bound by a pattern or a parameter, so that the type of a
 /// local name can be shown when it is asked for.
 pub struct LocalTypes {
@@ -555,7 +554,7 @@ impl std::fmt::Debug for LocalTypes {
 }
 
 impl LocalTypes {
-    /// The type of a name, simplified and shown in the syntax of §3: the
+    /// The type of a name, simplified and shown in i syntax: the
     /// types of the values that come to it (its output side). When no value
     /// is known to come to it, as for a parameter, what its values must be
     /// for its uses (its input side).
@@ -614,14 +613,14 @@ impl LocalTypes {
     }
 
     /// The constructors that may have made the value before the dot of the
-    /// field access `v.f` with this span, from its known type (§4.8, §6.7),
+    /// field access `v.f` with this span, from its known type,
     /// whatever `v` is: the fields that may be written after the dot.
     pub fn field_ctors(&self, module: ModuleId, span: Span) -> Option<&[CtorRef]> {
         self.fields.get(&(module, span)).map(Vec::as_slice)
     }
 
-    /// The named types that are members of the known type of a name (§4.8),
-    /// or else of its inferred type: where its fields come from (§6.7).
+    /// The named types that are members of the known type of a name,
+    /// or else of its inferred type: where its fields come from.
     pub fn named_types(&self, v: crate::hir::VarId) -> Vec<TypeRef> {
         let heads = |t: &Ty| -> Vec<TypeRef> {
             known::members(t)
@@ -653,7 +652,7 @@ impl LocalTypes {
     }
 }
 
-/// A type that the host can take (§10.3), as one part of a host export.
+/// A type that the host can take, as one part of a host export.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum HostType {
     Nil,
@@ -666,7 +665,7 @@ pub enum HostType {
     Opaque(crate::hir::TypeId),
 }
 
-/// The types of a host export (B.2): its parameters, its value, and the
+/// The types of a host export: its parameters, its value, and the
 /// members of its errors in the canonical order (`Nil`, `Bool`, `Int`,
 /// `Float`, `String`, `BitArray`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -704,7 +703,7 @@ impl Typed {
 
 /// The name of each custom type, by `TypeId`, as the types of the names of
 /// the module `module` are shown in [`Typed::schemes`]: the name alone for
-/// a type of the module, of the prelude, or put in by an import (§2.3);
+/// a type of the module, of the prelude, or put in by an import;
 /// `alias.Name` for a type of an imported module; else `module/path.Name`.
 pub fn type_names(program: &Program, module: ModuleId) -> Vec<String> {
     infer::type_names(program, module)

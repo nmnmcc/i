@@ -1,4 +1,4 @@
-//! The shadow stack of source sites and the stop messages of spec §11.7.
+//! The shadow stack of source sites and the stop messages.
 //!
 //! The protocol for the code generator is in the documentation of the
 //! `runtime` module. A stop builds the whole message as a String value, copies

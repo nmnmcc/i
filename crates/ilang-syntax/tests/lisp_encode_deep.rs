@@ -351,7 +351,7 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
                 let parsed = ilang_syntax::lisp::parse(&printed).unwrap();
                 // The independent printer is only a reference where its own
                 // output decodes to the same tree (it predates the service
-                // forms of syntax three).
+                // forms of the source syntax).
                 if ilang_syntax::lisp::parse_module(&parsed).is_ok_and(|back| {
                     ilang_syntax::shape::canon(&back) != ilang_syntax::shape::canon(&expected)
                 }) || ilang_syntax::lisp::parse_module(&parsed).is_err()
@@ -641,7 +641,7 @@ fn records_preserve_labels_spreads_and_streamed_cost() {
                 Node::Symbol(symbol) if matches!(symbol.as_str(), ":" | ".." | "-") => {
                     let span = node.span();
                     let text = &source[span.start as usize..span.end as usize];
-                    // Syntax three writes a record field `label = value`; the
+                    // The source printer writes a record field `label = value`; the
                     // `:` of its Lisp form has no text of its own.
                     assert!(
                         text == symbol || symbol == ":" && (text.is_empty() || text == "="),

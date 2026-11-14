@@ -1056,7 +1056,7 @@ mod tests {
     #[test]
     fn show_as_reports_the_offending_nested_syntax() {
         // The empty data `(,)` is not an expression of the rows before
-        // syntax three; in the rows of syntax three it is one, and the empty
+        // the legacy encoding; in the source rows it is one, and the empty
         // Round is not.
         let (source, offending) = if ilang_syntax::lisp::syntax::ROWS3 {
             ("(f ())", "()")
@@ -1090,7 +1090,7 @@ mod tests {
                 marks: BTreeSet::new(),
             },
         );
-        // These read `(f x)` alike in the rows before and of syntax three.
+        // These read `(f x)` alike in the rows before and of the source syntax.
         for (id, position, expected) in [
             (4, Position::Type, "f(x)"),
             (5, Position::TypeItem, "f(x)"),

@@ -1,5 +1,6 @@
 //! The structured i scheduler on the real Rust host. Completion gates and
-//! invocation teardown are tested separately from spec output expectations.
+//! invocation teardown are tested separately from the output expectations of
+//! the conformance cases.
 
 use ilang_cli::{BuildOptions, Level, build};
 use ilang_host::{HostOptions, Outcome, Program, services};
@@ -19,7 +20,7 @@ fn program(source: &str, opt: Level) -> Program {
         },
     )
     .unwrap();
-    // R2 pins the one-worker FIFO order (multicore D1/D12).
+    // R2 pins the one-worker FIFO order.
     Program::from_bytes(&built.wasm).unwrap().with_workers(1)
 }
 
@@ -331,7 +332,7 @@ fn seeded_script_replays_200_times_at_each_optimization_level() {
 
 #[test]
 fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
-    // runtime.md R2 explicitly orders already-observed failures, independently
+    // Already-observed failures are ordered explicitly, independently
     // of their observation order. Seed the private typed storage directly in
     // a source copy; the IO and continuation queries are unused by this pure unit probe.
     let source = include_str!("../../../lib/i/task.i");

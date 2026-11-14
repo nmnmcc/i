@@ -1,4 +1,4 @@
-//! Type-only dependencies must not introduce evaluation (T2 O2/joint §8).
+//! Type-only dependencies must not introduce evaluation.
 use ilang_package::Diagnostic;
 
 #[test]

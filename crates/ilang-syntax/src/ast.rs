@@ -1,8 +1,5 @@
-//! The syntax tree of syntax three (docs/design/syntax-3.md §3, with the
-//! services amendment: `<-` in types, heads and calls, `<A>(…)` generics).
-//!
-//! Every node keeps its span in an [`Sp`], which never takes part in
-//! equality, so `parse(print(t)) == t` compares trees and not positions.
+//! Source nodes retain spans for diagnostics, but [`Sp`] excludes spans from
+//! equality so round trips compare structure independently of positions.
 
 use crate::lisp::Datum;
 use crate::span::Span;
@@ -42,7 +39,7 @@ pub enum BinOp {
 }
 
 impl BinOp {
-    /// The level of §6.9, from 1 (weakest) to 8.
+    /// The precedence level of the operator, from 1 (weakest) to 8.
     pub fn level(self) -> u8 {
         use BinOp::*;
         match self {
@@ -239,15 +236,15 @@ pub enum ItemKind {
     },
 }
 
-/// `Name [ (head) ] = right side` (§2.8). The head is read as type patterns;
+/// `Name [ (head) ] = right side`. The head is read as type patterns;
 /// the kind follows from the written right side.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeDef {
     pub name: Ident,
     pub head: Vec<Type>,
     pub rhs: TypeRhs,
-    /// Classification of the written right side, before type expansion
-    /// (spec §4.7). Replacing the right side never reclassifies the head.
+    /// Classification of the written right side, before type expansion.
+    /// Replacing the right side never reclassifies the head.
     pub alias_pattern: bool,
 }
 
@@ -324,7 +321,7 @@ pub enum ExprKind {
     },
     BitArray(Vec<Segment<Expr>>),
     Block(Block),
-    /// `F1 | F2 | …`, one or more function literals (§2.5).
+    /// `F1 | F2 | …`, one or more function literals.
     Chain(Vec<Function>),
     /// `callee(items)`: the argument is data.
     Call {
@@ -356,7 +353,7 @@ pub enum ExprKind {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
-    /// `a |> f`, `a |> f(b)`, and the match `a |> F1 | F2` (§2.11).
+    /// `a |> f`, `a |> f(b)`, and the match `a |> F1 | F2`.
     Pipe {
         lhs: Box<Expr>,
         rhs: Box<Expr>,

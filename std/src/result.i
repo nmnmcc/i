@@ -1,7 +1,7 @@
-//// Functions for the built-in type `Result(A, E) { Ok(A) Error(E) }`.
+//// Functions for the built-in type `Result(A, E) = Ok(A) | Error(E)`.
 ////
 //// A `Result` is an error kept as a value. i also has errors as effects
-//// (`^ E` in a function type, `i/fail`): `to_error` and `catch` go from one
+//// (the `Fail(E)` service from `i/fail`): `to_error` and `catch` go from one
 //// form to the other.
 (
 	i/fail
@@ -181,7 +181,7 @@ to_option = <A, E>(result : Result(A, E)) -> Option(A) {
 }
 
 /// The value of an `Ok`. For `Error(x)`, the computation ends with the
-/// error `x` (§9.3), which `catch` or `i/fail` can take.
+/// error `x`, which `catch` or `i/fail` can take.
 to_error = <A, E>(result : Result(A, E)) -> A { fail.from_result(result) }
 
 /// Does `body`, and gives `Ok` with its value, or `Error` with the error it

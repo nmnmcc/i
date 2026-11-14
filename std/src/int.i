@@ -1,6 +1,6 @@
 //// Functions for `Int`, the type of whole numbers of any size.
 ////
-//// Ints never overflow (§11.2). `a / b` rounds toward zero, `a % b` has the
+//// Ints never overflow. `a / b` rounds toward zero, `a % b` has the
 //// sign of `a`, and both are `0` when `b` is `0`. The functions `divide`,
 //// `remainder`, `modulo`, and `floor_divide` give `Error(Nil)` for `0`
 //// instead.

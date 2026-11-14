@@ -1,7 +1,7 @@
 //! The runtime that the code generator links into every program.
 //!
 //! It is hand-written WAT. Language values live on the Wasm GC heap; linear
-//! memory is used only for buffers at the host boundary (spec Appendix B).
+//! memory is used only for buffers at the host boundary (the binary interface).
 //!
 //! # Putting a module together
 //!
@@ -11,8 +11,8 @@
 //! 2. the runtime imports, then the imports of host services and external
 //!    functions (the text format puts every import before any definition).
 //!    The runtime imports are [`HOST`] (`ilang:host/v1` `panic` and
-//!    `reference_id`, spec B.4) on the target of the binary interface. On
-//!    the WASI target (B.7) they are [`WASI_HOST`]
+//!    `reference_id`) on the target of the binary interface. On
+//!    the WASI target they are [`WASI_HOST`]
 //!    (`wasi_snapshot_preview1` `fd_write` and `proc_exit`), and
 //!    [`WASI_REFERENCE_ID_IMPORT`] only when a type of an import or export
 //!    is a host reference;
@@ -59,7 +59,7 @@
 //! Code outside `values.rs` goes through lists only with `$list_is_empty`,
 //! `$list_head` and `$list_tail`. A list cell is a lean `$cons`, one small
 //! object where an `$obj` with a `$values` array would be two big ones:
-//! programs make many of them (docs/performance.md).
+//! programs make many of them.
 //!
 //! `$obj` is not final, so the code generator may declare subtypes of it, for
 //! example closures with a typed function reference of their own after the
@@ -78,7 +78,7 @@
 //! closure plus the current call-site environment. Generic closure references,
 //! host adapters and continuation results retain the canonical value protocol.
 //!
-//! # Shadow stack and stop messages (spec §11.7)
+//! # Shadow stack and stop messages
 //!
 //! Stop messages need the source positions of the running calls. The code
 //! generator keeps them on a shadow stack of site ids: the growable GC array
@@ -97,7 +97,7 @@
 //!   call is gone, and its site goes to the callee as a tail site. Library
 //!   code gives -1, and passes on the tail site of its own slot.
 //! - A **tail site** is stored as `-2 - site`: the position of a call in tail
-//!   position, also of a library function (spec §11.7). A stop prints it
+//!   position, also of a library function. A stop prints it
 //!   only when it would be the first position.
 //! - Where an exception is caught (`try_table`), restore the depth saved with
 //!   `$shadow_depth` when the handler was entered: `call $shadow_restore`.
@@ -117,7 +117,7 @@
 //!   data segment (little-endian i32 triples).
 //! - the second array holds, per module index, the module path as a String
 //!   value, already with the `location@major ` prefix when the package has a
-//!   location (spec §11.7).
+//!   location.
 //!
 //! A site line is `module path:line:column`. Ids out of range are not printed.
 //!
@@ -167,7 +167,7 @@
 //! | String literals | `$string_from_bytes (ref $bytes)` |
 //! | String prefix patterns | `$string_starts_with (s, prefix) -> i32`, `$string_suffix (s, start i32)` |
 //!
-//! The functions of `i/core` (spec §13), with the specified behaviour:
+//! The functions of `i/core`, with the specified behaviour:
 //!
 //! | `i/core` | Function |
 //! |---|---|
@@ -186,7 +186,7 @@
 //! | `index_of` | `$core_index_of (s, find, from) -> Result`: Knuth–Morris–Pratt, linear time |
 //! | `bit_array_concat` | `$core_bit_array_concat (list)`: one copy |
 //!
-//! Bit arrays (spec §8). Construction:
+//! Bit arrays. Construction:
 //!
 //! | Segment | Function |
 //! |---|---|
@@ -203,7 +203,7 @@
 //! matches), `$bits_read_int`, `$bits_float_finite`, `$bits_read_float`,
 //! `$bits_read_utf`, `$bits_slice` and `$bits_match_equal`; see `bitarrays.rs`.
 //!
-//! # The host boundary (Appendix B.2, B.3)
+//! # The host boundary
 //!
 //! Values from the host stop with `host: value is not correct` when they are
 //! not correct, including buffers outside memory and bit arrays whose bits
@@ -268,14 +268,14 @@ pub const TYPES: &str = r#"
 (type $unpend (func))
 "#;
 
-/// The runtime imports (spec B.4) on the target of the binary interface.
+/// The runtime imports on the target of the binary interface.
 /// Nothing else is imported from `ilang:host/v1`.
 pub const HOST: &str = r#"
 (import "ilang:host/v1" "panic" (func $host_panic (param i32 i32)))
 (import "ilang:host/v1" "reference_id" (func $host_reference_id (param externref) (result i64)))
 "#;
 
-/// The imports of the WASI target (B.7), in the place of [`HOST`]. The
+/// The imports of the WASI target, in the place of [`HOST`]. The
 /// definitions that go with them are [`WASI_RUNTIME`].
 pub const WASI_HOST: &str = r#"
 (import "wasi_snapshot_preview1" "fd_write" (func $wasi_fd_write (param i32 i32 i32 i32) (result i32)))
@@ -283,7 +283,7 @@ pub const WASI_HOST: &str = r#"
 "#;
 
 /// On the WASI target, the `reference_id` import of [`HOST`], for a program
-/// that a host reference can come into (B.7).
+/// that a host reference can come into.
 pub const WASI_REFERENCE_ID_IMPORT: &str = r#"
 (import "ilang:host/v1" "reference_id" (func $host_reference_id (param externref) (result i64)))
 "#;
@@ -296,7 +296,7 @@ pub const WASI_REFERENCE_ID: &str = r#"
  (unreachable))
 "#;
 
-/// The definitions of the WASI target (B.7): `panic` writes the stop
+/// The definitions of the WASI target: `panic` writes the stop
 /// message and a line feed to the standard error and ends the process with
 /// exit code 1; `$wasi_line` writes a text and a line feed to a file
 /// descriptor. A write that fails is given up, as a write to a closed pipe.

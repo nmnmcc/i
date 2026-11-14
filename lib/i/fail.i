@@ -1,4 +1,4 @@
-//// Errors (§9.3).
+//// Errors.
 (
 	raise
 	catch

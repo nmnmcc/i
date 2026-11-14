@@ -1,5 +1,5 @@
 //! The written code of a normal-surface file as macro syntax: the node of
-//! the syntax-three tree at a span, as a datum of the §6.8 rows with the
+//! the source tree at a span, as a datum of the source rows with the
 //! spans of the written names and operators.
 use super::Datum;
 use super::syntax::{Scope, Syntax};
@@ -94,7 +94,7 @@ impl SourceTree {
         find.found.map(|d| Syntax::from_datum(&d, &self.scope))
     }
 
-    /// Encode an already available syntax-three node with this source's
+    /// Encode an already available source node with this source's
     /// lexical index. No token lookup reparses the source or mutates the index.
     pub fn with_tokens<T>(&self, f: impl FnOnce() -> T) -> T {
         with_tokens(&self.tokens, f)
@@ -143,7 +143,7 @@ impl SourceTree {
     }
 
     /// Visibility before the transition lowering absorbs sum members and
-    /// their exports into the sum's old-tree item.
+    /// their exports into the sum's legacy item.
     pub fn definition_visibility(&self, name: &str) -> Option<(bool, bool)> {
         use crate::syn3::ast::{ItemKind, TypeKind, TypeRhs};
         let module = self.module.lock().expect("the source tree is not poisoned");

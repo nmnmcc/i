@@ -18,7 +18,7 @@ use ilang_syntax::syn3::ast::{DItem, Expr, ExprKind, Ident, Item, Pattern, Stmt,
 
 /// A node that a macro can take as an argument.
 pub trait Encode {
-    /// The node in the rows of syntax three (§6.8), with the spans of
+    /// The node in the source rows, with the spans of
     /// `syn3::lisp::*_datum`.
     fn datum(&self) -> Datum;
     fn span(&self) -> Span;

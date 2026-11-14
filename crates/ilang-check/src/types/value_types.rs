@@ -1,5 +1,5 @@
 //! Permanent value reads use immutable candidates and checked solver trials
-//! (§4.7; value-types R3–R7). Nothing here inspects a runtime value.
+//! (a binding's type is inferred once). Nothing here inspects a runtime value.
 use super::infer::Checker;
 use super::solve::Solver;
 use super::{FnTy, Head, ShownType, Ty, V};
@@ -1427,7 +1427,7 @@ pub(super) fn replace_vars(t: &Ty, map: &HashMap<V, Ty>) -> Ty {
 
 impl Checker<'_> {
     /// Whole-annotation checking precedes instantiation and never reads a live
-    /// variable bound (K2). Only the stored principal structural scheme counts.
+    /// variable bound. Only the stored principal structural scheme counts.
     pub(super) fn check_value_places(&mut self, t: &Type, pol: super::solve::Pol) {
         fn written(
             c: &Checker<'_>,
@@ -1688,7 +1688,7 @@ mod tests {
     }
     #[test]
     fn closure_follows_reverse_edges_and_collapses_pure_cycles() {
-        // R4.1: the only concrete predecessor is visible through `from`.
+        // the only concrete predecessor is visible through `from`.
         let mut s = solver();
         let v = s.fresh_at(0);
         let w = s.fresh_at(0);
@@ -1710,7 +1710,7 @@ mod tests {
     }
     #[test]
     fn closure_does_not_equate_a_predecessor_with_its_wider_successor() {
-        // R5: v <: w is retained, and never becomes w <: v.
+        // v <: w is retained, and never becomes w <: v.
         let mut s = solver();
         let v = s.fresh_at(0);
         let w = s.fresh_at(0);
@@ -1730,7 +1730,7 @@ mod tests {
     }
     #[test]
     fn failed_literal_trial_restores_fused_bounds_and_ownership() {
-        // Joint J4: T1's fused scalar bounds belong to the entire T2 trial.
+        // Fused scalar bounds belong to the entire completion trial.
         let mut s = solver();
         let v = s.fresh_at(0);
         let one = Ty::literal(&super::super::LitValue::Int(1.into()));
@@ -1798,7 +1798,7 @@ mod tests {
     }
     #[test]
     fn normalized_same_head_bounds_retain_each_original_argument() {
-        // P4: match the one normalized member; R5: skips keep live variables.
+        // Match the one normalized member; skipped parts retain live variables.
         let mut s = solver();
         let root = s.fresh_at(0);
         let left = s.fresh_at(0);
@@ -1836,7 +1836,7 @@ mod tests {
     }
     #[test]
     fn shape_checks_keep_skipped_identities_and_observe_earlier_links() {
-        // P4: traversing a weak tuple checks its original skeleton. A skip
+        // traversing a weak tuple checks its original skeleton. A skip
         // keeps the very same argument, even when it aliases a demanded part.
         let mut s = solver();
         let root = s.fresh_at(0);
@@ -1855,7 +1855,7 @@ mod tests {
         trial.constrain(&int(), &Ty::Var(root));
         assert!(!trial.failures.is_empty());
 
-        // R3/R5: an old variable reached only through a function environment
+        // an old variable reached only through a function environment
         // is observed during trial propagation; failed trials change nothing.
         let mut s = solver();
         let old = s.fresh_at(0);

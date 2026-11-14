@@ -5,8 +5,9 @@
 //! Every node keeps its span; spans are byte ranges in the file of the
 //! module that holds the node (`Module::source`).
 //!
-//! §2.4 for the inferred type of an exported binding, and the rules of
-//! §10.2 and §10.3 that need the inferred type of an entry point, are
+//! The rule that the inferred type of an exported binding may use only exported
+//! types, and the rules that an entry point has a type its kind allows (a test
+//! gives `Nil`; a host export takes and gives only types the host can take), are
 //! checked by type inference (`types/infer.rs`); resolution checks the
 //! written types.
 
@@ -60,7 +61,7 @@ pub struct Program {
     /// with several shape groups: the call itself names the group.
     pub chain_uses: Vec<DefId>,
     /// The hidden group bindings of each top-level name bound to a chain
-    /// with several shape groups (syntax three §2.5), in group order.
+    /// with several shape groups, in group order.
     pub chain_groups: std::collections::HashMap<DefId, Vec<(crate::types::ShapeId, DefId)>>,
     pub typed_macros: std::collections::HashSet<DefId>,
     pub(crate) typed_macro_shapes: std::collections::HashMap<DefId, Vec<crate::types::ShapeId>>,
@@ -74,7 +75,7 @@ pub struct Program {
     pub failed_reads: std::collections::HashSet<OfId>,
     /// Expression SCC members invalidated by a type-dependency cycle.
     pub failed_type_groups: std::collections::HashSet<BindingRef>,
-    /// Written value reads and structural extraction items (§4.3, §4.7).
+    /// Written value reads and structural extraction items.
     pub of_sites: Vec<OfSite>,
     pub alias_patterns: Vec<AliasPattern>,
     /// Direct alias dependencies and their reverse closure, computed once.
@@ -83,12 +84,12 @@ pub struct Program {
     pub value_aliases: Option<std::collections::HashSet<TypeId>>,
     pub modules: Vec<Module>,
     pub types: Vec<TypeDef>,
-    /// The module of the built-in names (§12), in the package `i`.
+    /// The module of the built-in names, in the package `i`.
     pub prelude: Option<ModuleId>,
     /// The package that is compiled: its entry and consumer-selected bindings are
-    /// entry points (§10.2).
+    /// entry points.
     pub root: Option<PackageId>,
-    /// The host exports (§10.2): the names in `[wasm].exports` of the
+    /// The host exports: the names in `[wasm].exports` of the
     /// compiled package that are exported functions of a module.
     pub host_exports: Vec<DefId>,
     /// Default and declared program entries, including unselected entries.
@@ -100,20 +101,20 @@ pub struct Program {
     pub ty_var_names: Vec<String>,
     /// Filled by `order.rs`.
     pub order: Order,
-    /// The functions of the host services (§9.7), by the service type and
+    /// The functions of the host services, by the service type and
     /// the index of the field, when their types are correct.
     pub host_fns: std::collections::HashMap<(TypeId, u32), HostFn>,
-    /// The external functions outside the package `i` (§10.1), when their
+    /// The external functions outside the package `i`, when their
     /// types are correct.
     pub external_fns: std::collections::HashMap<DefId, HostFn>,
 }
 
-/// A function at the host boundary (§9.7, §10.1), with the parts of B.2.
+/// A host function retains its wire signature so callers and emitters agree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostFn {
     pub params: Vec<crate::types::HostType>,
     pub result: crate::types::HostType,
-    /// The members of the errors, in the canonical order of B.2.
+    /// Error members keep canonical wire order so their tags remain stable.
     pub errors: Vec<crate::types::HostType>,
     /// Preserve Result(A, Never) as distinct from a plain answer.
     pub request_result: bool,
@@ -181,9 +182,9 @@ pub struct Module {
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// The modules that this module imports.
     pub imports: Vec<ModuleId>,
-    /// The name that each import gives to its module (§2.3).
+    /// The name that each import gives to its module.
     pub import_names: Vec<(String, ModuleId)>,
-    /// The types that imports put into this module by name (§2.3).
+    /// The types that imports put into this module by name.
     pub imported_types: Vec<TypeId>,
     /// The top-level value names: names bound by top-level bindings, and
     /// declarations.
@@ -208,7 +209,7 @@ pub enum DefKind {
     /// A name bound by the pattern of `Module::bindings[binding]`. `var` is
     /// the variable of that name in the pattern.
     Binding { binding: u32, var: VarId },
-    /// `@external("module", "function") name: Type` (§10.1). Modules that
+    /// `@external("module", "function") name: Type`. Modules that
     /// start with `ilang:` are operations of the runtime, only in package `i`.
     External {
         module: String,
@@ -224,7 +225,7 @@ pub struct TopBinding {
     pub binding: Binding,
     /// The names it binds, in pattern order.
     pub defs: Vec<DefId>,
-    /// Program entry (§10.2).
+    /// Program entry.
     pub main: bool,
 }
 
@@ -237,9 +238,9 @@ pub struct TypeDef {
     pub params: Vec<(String, TyVarId)>,
     pub body: TypeBody,
     pub exported: bool,
-    /// Exported as `T(..)` (§2.4).
+    /// Exported as `T(..)`.
     pub constructors_exported: bool,
-    /// `@host("namespace")` or `@host("namespace", "async")` (§9.7).
+    /// `@host("namespace")` or `@host("namespace", "async")`.
     pub host: Option<Host>,
     pub deprecated: Option<String>,
 }
@@ -270,7 +271,7 @@ pub struct FieldDef {
     pub ty: Type,
 }
 
-// ---- Types (§3) ----
+// ---- Types ----
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BuiltinType {
@@ -324,7 +325,7 @@ impl BuiltinType {
         }
     }
 
-    /// The number of type parameters (§4.2, §4.5 rule 7).
+    /// The number of type parameters.
     pub fn arity(self) -> usize {
         match self {
             BuiltinType::List | BuiltinType::Key | BuiltinType::Request => 1,
@@ -365,16 +366,16 @@ pub enum TypeKind {
     /// `_`.
     Hole,
     Tuple(Vec<Type>),
-    /// Closed labelled data (syntax-3 §2.3): `(name: String, age: Int)`.
+    /// Closed labelled data: `(name = String, age = Int)`.
     Record {
         fields: Vec<(Ident, Type)>,
     },
     Fn {
         params: Vec<FnParamType>,
         ret: Box<Type>,
-        /// `None` is `? Never` (§3).
+        /// An absent error row has no possible failures.
         err: Option<Box<Type>>,
-        /// `None` is `! Never` (§3).
+        /// An absent service row requires no services.
         env: Option<Box<Type>>,
     },
     Union(Vec<Type>),
@@ -390,19 +391,19 @@ pub struct FnParamType {
     pub ty: Type,
 }
 
-// ---- Expressions (§6) ----
+// ---- Expressions ----
 
-/// `pattern = value` (§6.10), at the top level or in a block.
+/// `pattern = value`, at the top level or in a block.
 #[derive(Clone, Debug)]
 pub struct Binding {
     pub pattern: Pattern,
     pub value: Expr,
-    /// The value is a direct value (§6.10): the binding is generalized
-    /// (§4.7), and its names may be used inside the function bodies of the
+    /// The value is a direct value: the binding is generalized,
+    /// and its names may be used inside the function bodies of the
     /// value.
     pub direct: bool,
     /// The type variables written in the annotations of this binding that
-    /// are not variables of an outer binding (§4.7). They are generalized
+    /// are not variables of an outer binding. They are generalized
     /// with it.
     pub ty_vars: Vec<TyVarId>,
     pub span: Span,
@@ -411,7 +412,7 @@ pub struct Binding {
 #[derive(Clone, Debug)]
 pub enum Stmt {
     Bind(Binding),
-    /// `! T = e` (§6.10, §9.2). `ty` is one named type.
+    /// A provided service has one named type for its environment key.
     Env {
         ty: Type,
         value: Expr,
@@ -441,7 +442,7 @@ pub enum ValueRef {
     /// another (as an imported name, or as `module.name`). Built-in values
     /// (`panic`, `assert`) are top-level names of the prelude.
     Def(DefId),
-    /// A constructor, used as a value or a function (§6.3).
+    /// A constructor, used as a value or a function.
     Ctor(CtorRef),
 }
 
@@ -484,7 +485,7 @@ pub enum ExprKind {
         index: BigUint,
         index_span: Span,
     },
-    /// `C(..base, f: e)` (§6.7).
+    /// `C(..base, f: e)`.
     RecordUpdate {
         ctor: CtorRef,
         ctor_span: Span,
@@ -530,7 +531,7 @@ pub struct Clause {
     pub span: Span,
 }
 
-/// `(params) -> A ^ E ! N { body }` (§6.8).
+/// Resolved functions retain separate result, error and service rows.
 #[derive(Clone, Debug)]
 pub struct Function {
     pub params: Vec<Param>,
@@ -550,10 +551,10 @@ pub struct RetType {
 pub enum Param {
     Pattern {
         pattern: Pattern,
-        /// The label (§6.11): the last name in the `=` chain at the top.
+        /// The label: the last name in the `=` chain at the top.
         label: Option<String>,
     },
-    /// `name ! T` (§6.11). `ty` is one named type.
+    /// A service parameter has one named type for its environment key.
     Env { var: VarId, name: Ident, ty: Type },
 }
 
@@ -620,7 +621,7 @@ pub enum PatternKind {
         rest: Option<Binder>,
     },
     /// `C(p, …)`, `C(p, ..)`. The parts are as written; matching them to
-    /// fields by position and label (§7.1) is left to type checking.
+    /// fields by position and label is left to type checking.
     Constructor {
         ctor: CtorRef,
         args: Vec<Pattern>,
@@ -637,14 +638,14 @@ pub enum PatternKind {
     Error(Vec<Pattern>),
 }
 
-// ---- Order (§2.5, §4.7) ----
+// ---- Order ----
 
 #[derive(Clone, Debug, Default)]
 pub struct Order {
-    /// The groups of top-level bindings (§4.7), each after the groups it
+    /// The groups of top-level bindings, each after the groups it
     /// uses. Modules come after the modules they import.
     pub groups: Vec<Vec<BindingRef>>,
-    /// The order in which top-level values are worked out (§2.5).
+    /// The order in which top-level values are worked out.
     pub init: Vec<BindingRef>,
 }
 
@@ -1097,7 +1098,8 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
     expr(&b.value, f);
 }
 
-/// Visit expressions in evaluation syntax order; returning false preserves a checked hole.
+/// Visit expressions in evaluation syntax order; returning false preserves a
+/// checked hole.
 pub fn visit_expr_mut(e: &mut Expr, visit: &mut impl FnMut(&mut Expr) -> bool) {
     if !visit(e) {
         return;

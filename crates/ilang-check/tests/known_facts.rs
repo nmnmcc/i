@@ -1,4 +1,4 @@
-//! F1: hidden-input hints cannot remove possible runtime behavior.
+//! hidden-input hints cannot remove possible runtime behavior.
 mod common;
 
 use ilang_package::Diagnostic;

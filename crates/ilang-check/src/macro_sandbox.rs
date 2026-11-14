@@ -5,7 +5,7 @@ use ilang_package::PackageId;
 use std::collections::{BTreeSet, VecDeque};
 
 /// External declarations from outside `i` reachable from the macro entries or
-/// from non-direct initializers in the compiled macro modules (§8). `modules`
+/// from non-direct initializers in the compiled macro modules. `modules`
 /// is the compiler-selected import closure for this macro program.
 pub fn foreign_externals(
     program: &Program,

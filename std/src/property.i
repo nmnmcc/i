@@ -10,7 +10,8 @@
 //// child-list construction. `smallest` is the best value on that path, not a
 //// global minimum. User thunks may diverge. Integer children cost logarithmic
 //// space; list children can require quadratic copying. Ancestors may remain
-//// reachable through closures. See docs/design/std-3.md P1–P9 for the protocol.
+//// reachable through closures. Generators store a draw function that is called
+//// with a non-negative size.
 (
 	i/core
 	i/random

@@ -25,7 +25,7 @@ fn has_algebra(t: &Ty) -> bool {
     }
 }
 
-/// Labelled data (closed records, syntax-3 §2.3) is compared semantically in
+/// Labelled data (closed records) is compared semantically in
 /// interfaces, as open records were.
 fn has_record(t: &Ty) -> bool {
     match t {

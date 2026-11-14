@@ -1,4 +1,4 @@
-//// Final functions (§9.5).
+//// Final functions.
 (
 	ensure
 	acquire

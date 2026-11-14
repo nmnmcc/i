@@ -1,4 +1,4 @@
-//! Execution of the checked provider graph (§2.6.1), through real Wasm entries.
+//! Execution of the checked provider graph, through real Wasm entries.
 use ilang_cli::{BuildOptions, Level, Target, build};
 use ilang_host::{Outcome, Value};
 
@@ -34,15 +34,13 @@ fn row(service: &str, factory: &str) -> String {
 
 #[test]
 fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
-    // §9.2 checks every use of a supplied service, including cached handlers.
+    // Every use of a supplied service is checked, including cached handlers.
     // Use each real manifest: mixed_install_12 and mixed_install_6 import
     // std/test and must expand their macros before comparing diagnostics.
-    // These counts come from landed tip cc26b8d9, not a stage-three recording.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
-    // Formatting changes source coordinates. Pin those exact corrections separately
-    // until the coordinator records the corpus on the gate tree; retain the full
-    // diagnostic comparison, including every resulting coordinate. The two
-    // mixed_install cases also pin the required syntax-three §6.8 expansion
+    // Formatting changes source coordinates. A separate coordinate map keeps
+    // the comparison complete, including every resulting coordinate. The two
+    // mixed_install cases also pin the required Lisp expansion
     // rows: data parameters, pipe/match and chain heads. The String need in
     // their appended virtual source moves 16 columns with the panic call;
     // every written-source span and every error is preserved.

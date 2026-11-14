@@ -1,4 +1,4 @@
-//// One operation to pause a computation and go on with it later (§9.4).
+//// One operation to pause a computation and go on with it later.
 (
 	boundary
 	suspend
@@ -34,7 +34,7 @@ escape : <R, E, N>(Boundary(R, E, N), R) -> Never
 @external("ilang:control", "resume")
 resume : <A, R, E, N>(Continuation(A, R, E, N), A) <- (Fail(E), ..N) -> R
 
-/// Unwinds the paused computation (§9.5).
+/// Unwinds the paused computation.
 @external("ilang:control", "cancel")
 cancel : <A, R, E, N>(Continuation(A, R, E, N)) <- N -> Nil
 

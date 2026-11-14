@@ -1,4 +1,4 @@
-//! Every ```i block of `docs/spec.md` parses as syntax three without errors,
+//! Every language-definition example parses without errors,
 //! and its print parses to the same tree.
 
 #[path = "oracle.rs"]

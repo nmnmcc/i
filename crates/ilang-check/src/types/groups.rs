@@ -1,4 +1,4 @@
-//! Shape groups of functions (syntax three §2.5, §2.6).
+//! Shape groups of functions.
 //!
 //! A function takes one data value: `FnTy::param` is its parameter data
 //! type. A function of one shape with no labels has data of that shape
@@ -7,9 +7,8 @@
 
 use super::{FnTy, Head, ShapeId, Ty};
 
-/// The label of the one parameter of a multi-shape function type in the
-/// transition syntax tree (`syn3/lower.rs`): its type is the parameter data
-/// type itself.
+/// A reserved parameter label lets HIR retain the whole parameter data type
+/// when a function accepts several shapes.
 pub(crate) const DATA: &str = "%data";
 
 /// The function type takes data of several shapes, or of a shape with
@@ -49,7 +48,7 @@ pub(crate) fn group_data(shape: ShapeId, parts: &[Ty]) -> Ty {
     Ty::data(shape, parts.to_vec())
 }
 
-// ---- Selection of branches (syntax three §2.6.2 to §2.6.7) ----
+// ---- Selection of branches ----
 
 use super::coverage::{Col, Ctor, Lit, Pat};
 use super::infer::{Checker, Scheme};
@@ -67,8 +66,8 @@ pub(crate) struct CaseTable {
     pub rets: Vec<Ty>,
 }
 
-/// The selection table of one shape group with several branches or a guard
-/// (§2.6.1), read from the group's written function.
+/// The selection table of one shape group with several branches or a guard,
+/// read from the group's written function.
 pub(crate) struct BranchTable {
     /// The number of parts of the group's shape.
     arity: usize,
@@ -237,7 +236,7 @@ impl Checker<'_> {
     }
 
     /// The selection table that a name has: its own, or that of the name it
-    /// is a direct alias of (§2.6.7).
+    /// is a direct alias of.
     fn branch_table(&self, e: &Expr) -> Option<Rc<BranchTable>> {
         let ExprKind::Name(mut r) = e.kind else {
             return None;
@@ -294,10 +293,10 @@ impl Checker<'_> {
         }
     }
 
-    /// §2.6.2 step 4: the branches that the known types of the argument
+    /// The branches that the known types of the argument
     /// parts do not skip. Branch `i` is skipped when at some key `k` the
-    /// known type `K_k` and `W_i,k - T_i,k` are disjoint (spec §4.5 rule
-    /// 3): `W_i,k` is the written pattern type of the branch at `k` and
+    /// known type `K_k` and `W_i,k - T_i,k` are disjoint: `W_i,k` is the
+    /// written pattern type of the branch at `k` and
     /// `T_i,k` the members taken there by the earlier branches without a
     /// guard. A part with no known type skips nothing; guarded branches are
     /// selected like the others and take nothing.
@@ -333,7 +332,7 @@ impl Checker<'_> {
         let mut own = Vec::new();
         alternatives(&choice[k], &mut own);
         let catch_all = own.iter().any(|a| matches!(a, Pat::Wild(_)));
-        // The candidates (§2.6.2 "Taken"): the type constructors, the
+        // The candidates: the type constructors, the
         // literal values and the type-test members written here or at this
         // key in an earlier branch without a guard.
         let mut candidates: Vec<Pat> = Vec::new();
@@ -417,7 +416,7 @@ impl Checker<'_> {
         })
     }
 
-    /// `F_sel` (§2.6.2 step 6) over the selected branches: an instance of
+    /// `F_sel` over the selected branches: an instance of
     /// the group's function type whose result is the union of the results
     /// of those branches.
     fn selected_fn(&mut self, table: &BranchTable, selected: &[usize], span: Span) -> Option<FnTy> {
@@ -444,7 +443,7 @@ impl Checker<'_> {
         })
     }
 
-    /// §2.6.2: the type of the callee at a direct call `f(d)` of a name
+    /// The type of the callee at a direct call `f(d)` of a name
     /// with a table, from the known types of the argument parts, in the
     /// order of the parameters. `None` when every branch is selected: the
     /// callee has the type of its whole group.
@@ -476,7 +475,7 @@ impl Checker<'_> {
             .map(|f| Ty::Fn(Box::new(f)))
     }
 
-    /// §2.6.4: a name with a table, used where one function type is
+    /// A name with a table, used where one function type is
     /// expected. A chain with several shape groups is the group of the
     /// expected shape; in a group, the branches are selected with the
     /// expected parameter types as the known types.

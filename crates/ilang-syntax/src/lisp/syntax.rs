@@ -137,17 +137,11 @@ pub enum Substitution {
     Many(Vec<Syntax>),
 }
 
-/// Whether `Syntax` values are in the rows of syntax three
-/// (docs/design/syntax-3.md §6.8). This is the one switch of step 2c of
-/// docs/design/syn3-final-ast.md for the parts of this directory that read
-/// rows: [`Syntax::show_as`] and `source_syntax`. While it is off they read
-/// the rows before syntax three; there the positions that syntax three
-/// merged ([`Position::TypeItem`], [`Position::ValueItem`],
-/// [`Position::PatternItem`]) are a field, a call argument and a parameter.
+/// Row selection must agree between [`Syntax::show_as`] and `source_syntax`
+/// so a datum is interpreted in the same position by both readers.
 pub const ROWS3: bool = true;
 
-/// A position of the grammar that [`Syntax::show_as`] can write: the
-/// fourteen of docs/design/syntax-3.md §6.7, in that order. The number of a
+/// Position numbers are shared with the host, so their order is stable. The number of a
 /// position ([`Position::id`]) is the one that `lib/i/syntax.i`
 /// (`position_id`) and the host share.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -584,7 +578,7 @@ impl Syntax {
         super::show_tree(self)
     }
     /// The code in the normal surface, read for `position`: in the rows of
-    /// syntax three when [`ROWS3`] is on, else in the rows before it.
+    /// source encoding when [`ROWS3`] is on, otherwise in the legacy encoding.
     pub fn show_as(&self, position: Position) -> Result<String, SyntaxError> {
         self.show_as_rows3(position)
     }
@@ -606,8 +600,8 @@ impl Syntax {
         Ok(())
     }
 
-    /// [`Syntax::show_as`] in the rows of syntax three (§6.8): the datum is
-    /// read for `position` by the reader of syntax three and written by its
+    /// [`Syntax::show_as`] in the source rows: the datum is
+    /// read for `position` by the reader of the source syntax and written by its
     /// printer. The tree may be of any depth.
     pub fn show_as_rows3(&self, position: Position) -> Result<String, SyntaxError> {
         self.no_type_view()?;
@@ -895,7 +889,7 @@ fn same_origin_tree(a: &Syntax, b: &Syntax) -> bool {
     true
 }
 
-/// Validate the authority and datum restrictions on one macro result (§4.3).
+/// Validate the authority and datum restrictions on one macro result.
 /// The inputs must be the syntax arguments of that run. Mark changes preserve
 /// node origins; rebuilding even an identical attribute does not.
 pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), SyntaxError> {

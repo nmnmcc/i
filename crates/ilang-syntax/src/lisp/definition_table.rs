@@ -8,13 +8,13 @@ use std::hash::Hash;
 /// One definition, retained in its written form until it is ready.
 #[derive(Clone)]
 pub enum Definition {
-    /// A written definition in the tree of syntax three, answered in the
-    /// rows of syntax-3.md §6.8 whatever `NEW_ROWS` says. Made by
+    /// A written definition in the source tree, answered in the
+    /// source rows regardless of `NEW_ROWS`. Made by
     /// [`Definition::tree`] or [`Definition::tree_with_datum`]; this is the
-    /// form that replaces `Written` when the engine reads the new tree.
+    /// form used by the engine when it reads source nodes.
     Tree {
         item: Box<crate::syn3::ast::Item>,
-        /// The item in the rows of §6.8.
+        /// The item in the source rows.
         datum: Box<super::Datum>,
         scope: Scope,
         ready: bool,
@@ -32,14 +32,14 @@ pub enum Definition {
 }
 
 impl Definition {
-    /// A written type definition of the new tree. Its rows are made by
+    /// A written type definition of the source tree. Its rows are made by
     /// `syn3::lisp::item_datum`.
     pub fn tree(item: crate::syn3::ast::Item, scope: Scope, ready: bool) -> Self {
         let datum = crate::syn3::lisp::item_datum(&item);
         Self::tree_with_datum(item, datum, scope, ready)
     }
 
-    /// A written type definition of the new tree with its rows given: the
+    /// A written type definition of the source tree with its rows given: the
     /// written datum of a Lisp file, or the output of a builder that knows
     /// the tokens (so that the spans of symbols are those of the source).
     pub fn tree_with_datum(

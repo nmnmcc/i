@@ -1,6 +1,5 @@
-//! The typing rules of §4.8 for expressions, blocks, functions, and
-//! bindings, with the errors `E` and the environment `N` of each expression
-//! (§9.2, §9.3).
+//! The typing rules for expressions, blocks, functions, and
+//! bindings, with the errors `E` and the environment `N` of each expression.
 //!
 //! The `E` and `N` of the expression being typed are gathered in a stack of
 //! `Effects`: a call adds the `E` and `N` of its callee, and a function or
@@ -21,7 +20,7 @@ use num_traits::ToPrimitive;
 use std::collections::{HashMap, HashSet};
 
 /// The names of the custom types as the module `m` writes them: the types
-/// of other modules with the name of their module (§2.3).
+/// of other modules with the name of their module.
 pub(super) fn type_names(p: &Program, m: ModuleId) -> Vec<String> {
     let here = p.module(m);
     p.types
@@ -63,7 +62,7 @@ struct Effects {
     env: Vec<Ty>,
 }
 
-/// The custom types of §4.2 and §9.6 that the rules use.
+/// The built-in custom types that the rules use.
 pub(super) struct Builtins {
     /// `True` and `False`, the members of `Bool = True | False`.
     pub true_: TypeRef,
@@ -110,23 +109,23 @@ pub(crate) struct Checker<'a> {
     in_callee: bool,
     recursive_bindings: HashSet<VarId>,
     /// The type written at the top of the pattern that binds a name: its
-    /// type is shown as written (§2.4).
+    /// type is shown as written.
     pub written: HashMap<VarId, Type>,
-    /// The known type of each name (§4.8), where it is used now.
+    /// The known type of each name, where it is used now.
     pub kvars: HashMap<VarId, Knowledge>,
     effects: Vec<Effects>,
     pub b: Builtins,
     alias_depth: u32,
     /// Fixed variables reached by the current written constraint, for diagnostics.
     fix_notes: Vec<super::V>,
-    /// §7.5: the names known to be made by a constructor, where they are
+    /// The names known to be made by a constructor, where they are
     /// used now.
     pub known: HashMap<VarId, CtorRef>,
-    /// §7.5: a subject name inside a clause `C(…)`: the type arguments of
+    /// A subject name inside a clause `C(…)`: the type arguments of
     /// the pattern type at the top place, which its value is in there.
     pub known_args: HashMap<VarId, Vec<Ty>>,
     /// The type variables of known types that are generalized variables of
-    /// type schemes: they stand for any type (§4.8).
+    /// type schemes: they stand for any type.
     pub kgen: HashSet<super::V>,
     /// The names of the group being typed.
     group_defs: HashSet<DefId>,
@@ -136,7 +135,7 @@ pub(crate) struct Checker<'a> {
     numeric_param_handles: HashMap<(ModuleId, Span), Ty>,
     pub(super) query_binder_handles: HashMap<(ModuleId, Span), Ty>,
     /// The `case` expressions of the group being typed, whose coverage is
-    /// checked with the types that inference finds (§4.8 rule 11).
+    /// checked with the types that inference finds.
     pub cases: Vec<super::pattern::PendingCase>,
     /// Keep the solver and the types of the local names (`Typed::locals`).
     pub keep_locals: bool,
@@ -149,11 +148,11 @@ pub(crate) struct Checker<'a> {
     pending_failures: Vec<PendingFailure>,
     pub shared_fields: HashMap<CtorRef, Vec<bool>>,
     /// The rule-11 cases typed in the binding being checked, by span: what
-    /// a selection table is made from (syntax three §2.6.1).
+    /// a selection table is made from.
     pub(super) case_tables: HashMap<(ModuleId, Span), groups::CaseTable>,
     /// The selection tables of the names bound to a group function.
     pub(super) branch_tables: HashMap<ValueRef, std::rc::Rc<groups::BranchTable>>,
-    /// The local names bound by `g = name` (direct aliases, §2.6.7).
+    /// The local names bound by `g = name` (direct aliases).
     pub(super) local_aliases: HashMap<VarId, ValueRef>,
     pending_typed: Vec<PendingTyped>,
     checked_holes: HashMap<Span, (Ty, Knowledge)>,
@@ -249,10 +248,10 @@ impl<'a> Checker<'a> {
     pub fn run_selected(mut self, selected: &[(DefId, bool)]) -> (Typed, Vec<Diagnostic>) {
         let p = self.p;
         self.prepare_aliases();
-        // Declarations have their written types (§10.1), generalized.
+        // Declarations have their written types, generalized.
         for (mi, m) in p.modules.iter().enumerate() {
             self.set_module(ModuleId(mi as u32));
-            // Field types are output places (§4.5 rule 6).
+            // Field types are output places.
             for t in &m.types {
                 if let TypeBody::Custom(ctors) = &p.ty(*t).body {
                     for c in ctors {
@@ -306,7 +305,7 @@ impl<'a> Checker<'a> {
                 self.note_binding(&b.binding);
             }
         }
-        // Groups, in the order of their uses (§4.7).
+        // Groups, in the order of their uses.
         self.initialize_reads();
         for module in crate::order::module_order(p) {
             self.set_module(module);
@@ -323,7 +322,7 @@ impl<'a> Checker<'a> {
         }
         self.report_coalescing(Span::default());
         self.entry_points(selected);
-        // The shown type schemes (§4.7).
+        // The shown type schemes.
         let mut typed = std::mem::take(&mut self.out);
         let artifact_schemes = p
             .modules
@@ -470,7 +469,7 @@ impl<'a> Checker<'a> {
         (typed, self.diags)
     }
 
-    /// One group of top-level bindings (§4.7): typed together, then
+    /// One group of top-level bindings: typed together, then
     /// generalized together when every value is a direct value.
     fn group(&mut self, group: &[BindingRef]) {
         let error_start = self.diags.len();
@@ -503,7 +502,7 @@ impl<'a> Checker<'a> {
                 holders.push((*d, v));
             }
         }
-        // §4.8: inside the group, its names are known only from what is
+        // Inside the group, its names are known only from what is
         // written.
         for b in group {
             self.set_module(b.module);
@@ -527,7 +526,7 @@ impl<'a> Checker<'a> {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
             let (err, env) = self.pop_effects(binding.span);
-            // §2.5: a top-level binding may not give errors or need an
+            // A top-level binding may not give errors or need an
             // environment.
             for (t, what) in [(err, "give errors"), (env, "need an environment")] {
                 self.s.constrain(&t, &Ty::Never);
@@ -547,7 +546,7 @@ impl<'a> Checker<'a> {
             self.check_occurs(mark, binding.span);
         }
         self.s.level = 0;
-        // §4.7: the names of the group are linked to their values, all of
+        // The names of the group are linked to their values, all of
         // them, before any is generalized.
         let mark = self.occurs_mark();
         let mut types = Vec::new();
@@ -569,7 +568,7 @@ impl<'a> Checker<'a> {
             self.set_module(d.module);
             self.check_occurs(mark, *span);
         }
-        // Literal-types §5.3: settle every fitted binding with all group
+        // Settle every fitted binding with all group
         // values, in its original effect frame, before generalization.
         for pending in std::mem::take(&mut self.pending_failures) {
             self.set_module(pending.module);
@@ -592,9 +591,8 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        // A completion candidate is a read-only view of the principal type,
-        // not a generalized scheme. T2 can generate its ordinary batch
-        // constraints from this view before the U3 publication barrier.
+        // Completion reads the principal type before generalization so its
+        // batch constraints are included before publication.
         let candidates = types
             .iter()
             .map(|(d, _, t, _)| {
@@ -614,7 +612,7 @@ impl<'a> Checker<'a> {
                 )
             })
             .collect();
-        // Coverage can add ordinary constraints too. It precedes both T2's
+        // Coverage can add ordinary constraints too. It precedes both the
         // completion batch and the final discharge of union obligations.
         for c in std::mem::take(&mut self.cases) {
             self.check_case(c);
@@ -675,7 +673,7 @@ impl<'a> Checker<'a> {
             self.set_module(b.module);
             self.fit_known(&top.binding.pattern, &k, false);
             if direct {
-                // §4.8: outside its group, a generalized name has its type
+                // Outside its group, a generalized name has its type
                 // scheme as its known type, with the parts of the known
                 // type of its value for the variables that are not
                 // generalized.
@@ -935,7 +933,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// §10.2: the entry points of the compiled package: the program entry,
+    /// The entry points of the compiled package: the program entry,
     /// the tests, and the host exports.
     fn entry_points(&mut self, selected: &[(DefId, bool)]) {
         let p = self.p;
@@ -1001,7 +999,7 @@ impl<'a> Checker<'a> {
         true
     }
 
-    /// §10.2 and §10.3 for one entry point, with its inferred type: a test
+    /// Checks one entry point, with its inferred type: a test
     /// gives `Nil`; a host export takes and gives types that the host can
     /// take. Target provider planning validates its inferred environment later.
     fn entry_point(&mut self, d: DefId, require_nil: bool, export: bool) {
@@ -1095,7 +1093,7 @@ impl<'a> Checker<'a> {
         let errors_ok = error_members.iter().all(|m| {
             matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.true_ || *r == self.b.false_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
-        // B.2: the signature that the code generator encodes.
+        // The emitter needs the canonical wire signature rather than the source type.
         let params: Option<Vec<HostType>> = f
             .parts()
             .and_then(|ps| ps.iter().map(|p| self.host_part(p)).collect());
@@ -1134,7 +1132,7 @@ impl<'a> Checker<'a> {
     }
 
     /// The part of a host export signature for a type that the host can
-    /// take (§10.3, B.2).
+    /// take.
     fn host_part(&self, t: &Ty) -> Option<HostType> {
         Some(match t {
             Ty::Union(_) if *t == self.b.bool_ => HostType::Bool,
@@ -1160,9 +1158,8 @@ impl<'a> Checker<'a> {
         })
     }
 
-    /// §10.3: a type that the host can take. `Never` is not one, as for
-    /// the functions of host services (§9.7) and external functions
-    /// (§10.1).
+    /// A type that the host can take. `Never` is not one, as for
+    /// the functions of host services and external functions.
     fn host_type(&self, t: &Ty) -> bool {
         match t {
             Ty::Union(_) => *t == self.b.bool_,
@@ -1203,7 +1200,7 @@ impl<'a> Checker<'a> {
             .push(Diagnostic::warning(code, Some(source), span, message));
     }
 
-    /// §2.4: the inferred type of an exported binding may not use a type
+    /// The inferred type of an exported binding may not use a type
     /// of its module that is not exported. A written type at the top of
     /// its pattern is checked by name resolution.
     ///
@@ -1249,7 +1246,7 @@ impl<'a> Checker<'a> {
                 .is_some_and(|t| !value_dependent(self.p, t))
     }
 
-    /// §4.4: in a written type, a union with two or more type variables as
+    /// In a written type, a union with two or more type variables as
     /// members may only be in an output place, and an intersection with a
     /// type variable only in an input place. `pol` is the place of `t`.
     pub(super) fn check_places(&mut self, t: &Type, pol: Pol, depth: u32) {
@@ -1371,7 +1368,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Sets the module whose code is typed or shown: types of other modules
-    /// are shown with the name of their module (§3).
+    /// are shown with the name of their module.
     pub fn set_module(&mut self, m: ModuleId) {
         if self.module == m && !self.s.type_names.is_empty() {
             return;
@@ -1386,7 +1383,7 @@ impl<'a> Checker<'a> {
         (self.s.vars.len(), self.s.touched.len())
     }
 
-    /// §4.7: reports a type that has itself inside it, among the variables
+    /// Reports a type that has itself inside it, among the variables
     /// made or given bounds since `mark`.
     pub fn check_occurs(&mut self, mark: (usize, usize), span: Span) {
         let mut roots: Vec<super::V> = (mark.0..self.s.vars.len())
@@ -1436,7 +1433,7 @@ impl<'a> Checker<'a> {
         self.flush(span, None);
     }
 
-    /// Hold the failures of rule 11 that its own coverage check reports
+    /// Hold failures that the match coverage check reports
     /// instead: value-set failures, and a labelled type of the subject that no
     /// pattern at the place takes while a pattern takes another member of a
     /// union it is declared in (see `uncovered_member`).
@@ -1451,10 +1448,8 @@ impl<'a> Checker<'a> {
         held.into_iter().map(|f| (f, span)).collect()
     }
 
-    /// `l <: r` for the one clause of a match: what its pattern does not take
-    /// is reported as the error of §7.4 when the clause may fail
-    /// (`defer_failure`), as it was when the members of a sum were
-    /// constructors of one type (see `uncovered_member`).
+    /// Missing members of a fitted match are coverage failures, so they must
+    /// reach `defer_failure` rather than produce an extra subtype error.
     pub fn sub_fitted_match(&mut self, l: &Ty, r: &Ty, span: Span) {
         self.fix_notes = self.fixed_reached(l, r);
         self.s.constrain(l, r);
@@ -1469,11 +1464,8 @@ impl<'a> Checker<'a> {
     /// A failure `C <: P` of a match subject where `C` is a labelled type
     /// that no pattern at the place takes, and some pattern there takes
     /// another member of a declared union with `C` (`True` against `False`,
-    /// both in `Bool = True | False`). Before stage 3 these were constructors
-    /// of one type, so `B <: P` held and the only error was the one of §7.4;
-    /// a sum is now a union of such types (syntax-3.md §2.8), and the coverage
-    /// error in a match is unchanged (§5.2.8 rule 11), so that error is
-    /// given alone. A labelled type with no union in common with the
+    /// both in `Bool = True | False`). Missing members of that union must
+    /// produce only the coverage error. A labelled type with no union in common with the
     /// patterns (`Some` against `Ok`) is still a type error.
     pub(crate) fn uncovered_member(&self, f: &super::solve::Failure) -> bool {
         if f.kind != FailKind::Mismatch {
@@ -1564,14 +1556,14 @@ impl<'a> Checker<'a> {
         t
     }
 
-    /// The union of environments (§9.2).
+    /// The union of environments.
     fn env_union(&mut self, ms: Vec<Ty>, span: Span) -> Ty {
         let t = self.s.env_union(ms);
         self.flush(span, None);
         t
     }
 
-    /// `N` in `M` for two environments (§4.5 rule 4), with problems reported
+    /// `N` in `M` for two environments, with problems reported
     /// at `span`, and `other` the place of the written type.
     fn sub_env(&mut self, l: &Ty, r: &Ty, span: Span, other: Option<Span>) {
         self.fix_notes = self.fixed_reached(l, r);
@@ -1610,7 +1602,7 @@ impl<'a> Checker<'a> {
 
     // ---- Written types ----
 
-    /// A written type in inference (§4.7): `_` is a new variable, and a
+    /// A written type in inference: `_` is a new variable, and a
     /// type variable is the variable of its binding. `local` gives the type
     /// parameters of a definition.
     pub fn conv(&mut self, t: &Type, local: &HashMap<TyVarId, Ty>) -> Ty {
@@ -1748,7 +1740,7 @@ impl<'a> Checker<'a> {
         result
     }
 
-    /// `t` with the aliases at its top expanded (§4.3).
+    /// `t` with the aliases at its top expanded.
     pub fn expand(&self, t: &Type) -> Type {
         let mut cur = t.clone();
         for _ in 0..64 {
@@ -1869,7 +1861,7 @@ impl<'a> Checker<'a> {
         self.infer_k(e, &Knowledge::unknown()).0
     }
 
-    /// The type of `e`, and its known type (§4.8), `Top` when it has none.
+    /// The type of `e`, and its known type, `Top` when it has none.
     /// `expected` is the expected type of its place, `Top` for none.
     pub fn infer_k(&mut self, e: &Expr, expected: &Knowledge) -> (Ty, Knowledge) {
         if let Some((ty, known)) = self.checked_holes.get(&e.span).cloned() {
@@ -1931,7 +1923,7 @@ impl<'a> Checker<'a> {
                 }
                 let scheme = self.defs.get(d).cloned();
                 let k = match self.p.def(*d).kind {
-                    // §4.8: an imported name, and a member `m.x` of an
+                    // An imported name, and a member `m.x` of an
                     // imported module, have their type scheme.
                     DefKind::Binding { var, .. }
                         if d.module != self.module && !self.group_defs.contains(d) =>
@@ -1969,7 +1961,7 @@ impl<'a> Checker<'a> {
                 (t, Knowledge::certain(self.ctor_known(*c)))
             }
             ExprKind::Tuple(items) => {
-                // A part has the matching part of the expected type (§4.8).
+                // A part has the matching part of the expected type.
                 let shape = super::ShapeId::positional(items.len() as u32);
                 let data = expected.member(Head::Shape(shape));
                 let parts: Vec<_> = (0..items.len()).map(|i| data.part(i)).collect();
@@ -1981,7 +1973,7 @@ impl<'a> Checker<'a> {
                 (Ty::tuple(ts), Knowledge::tuple(ks))
             }
             ExprKind::Record { base, fields } => {
-                // syntax-3 §2.3: closed labelled data. A spread `..e` gives
+                // Closed labelled data. A spread `..e` gives
                 // every key of `e`, whose known type has one data member.
                 if base.is_none() && fields.is_empty() {
                     self.out.empty_records.insert((self.module, e.span));
@@ -2157,12 +2149,12 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Rule 8 and §6.9.
+    /// Types a binary operator expression, including the pipe.
     fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> (Ty, Knowledge) {
         use BinOp::*;
         if op == Pipe {
             // `a |> f(b)` is `f(a, b)`, and `a |> f` is `f(a)`: `a` is the
-            // first argument, with its expected type (§4.8).
+            // first argument, with its expected type.
             let first = Some(lhs);
             return match &rhs.kind {
                 ExprKind::Call { callee, args } => self.call(callee, first, args, span),
@@ -2192,7 +2184,7 @@ impl<'a> Checker<'a> {
         };
         let (lt, lk) = self.infer_k(lhs, &Knowledge::unknown());
         let (rt, rk) = self.infer_k(rhs, &Knowledge::unknown());
-        // §6.9: `==` on values of disjoint known types would always give the
+        // `==` on values of disjoint known types would always give the
         // same result.
         if matches!(op, Eq | NotEq) && known::disjoint(&lk.fact, &rk.fact) {
             let (l, r) = (
@@ -2253,7 +2245,7 @@ impl<'a> Checker<'a> {
         };
         let typed_signature = f.clone();
         let kfn = known::one_fn(&kf.hint).filter(|k| !groups::is_multi(k));
-        // Syntax three §2.6.5: a call with labels through a value constrains
+        // A call with labels through a value constrains
         // the argument data, whose shape is read from the call, against the
         // member of that shape.
         if kfn.is_none()
@@ -2264,7 +2256,7 @@ impl<'a> Checker<'a> {
         }
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
-        // §6.6: the parameter that each argument goes to.
+        // The parameter that each argument goes to.
         let ctor = matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)));
         if !ctor && let Some(a) = args.iter().find_map(|a| a.label.as_ref()) {
             self.error(
@@ -2298,7 +2290,7 @@ impl<'a> Checker<'a> {
         } else {
             Some((0..n).collect())
         };
-        // §4.8: an argument has the expected type of its parameter, with the
+        // An argument has the expected type of its parameter, with the
         // type variables that matching the other arguments fixes. Function
         // expressions with a parameter with no written type are typed after
         // the others, and are left out of that matching.
@@ -2391,7 +2383,7 @@ impl<'a> Checker<'a> {
             }
             _ => Knowledge::unknown(),
         };
-        // Syntax three §2.6.2: a direct call of a name with a selection
+        // A direct call of a name with a selection
         // table has the type of the branches that the known types of the
         // arguments select.
         let f = if args.iter().all(|a| a.label.is_none()) {
@@ -2413,7 +2405,7 @@ impl<'a> Checker<'a> {
                 ft.ret.clone()
             }
             Ty::Fn(ft) => {
-                // syntax-3 §6.1: the argument data of another shape is a
+                // The argument data of another shape is a
                 // mismatch of the parameter.
                 let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
                 self.sub2(&data, &ft.param, span, callee.span);
@@ -2562,7 +2554,7 @@ impl<'a> Checker<'a> {
         (r, Knowledge::unknown())
     }
 
-    /// A multi-shape function value (syntax three §2.6.4, §2.6.5). With an
+    /// A multi-shape function value. With an
     /// expected type that is one function type whose shape the value has,
     /// it is the function of that shape group. In every other place it has
     /// the type `{ B_g1 | … | B_gm } -> R_all` over its groups, and no
@@ -2591,7 +2583,7 @@ impl<'a> Checker<'a> {
                 _ => (0..g.shape.len()).map(|_| self.s.fresh_input()).collect(),
             };
             // The results and the needs of every group are those of the
-            // value (the need is shared by all branches, §2.5).
+            // value (the need is shared by all branches).
             let part = FnTy::new(
                 parts.iter().map(|p| (None, p.clone())).collect(),
                 ret.clone(),
@@ -2612,7 +2604,7 @@ impl<'a> Checker<'a> {
         )
     }
 
-    /// Records a call for the syntax-three label migration (`syn3_facts`).
+    /// Records a call for the resolver-aware label migration (`syn3_facts`).
     #[allow(clippy::too_many_arguments)]
     fn syn3_call_fact(
         &self,
@@ -2657,7 +2649,7 @@ impl<'a> Checker<'a> {
         });
     }
 
-    /// §6.6: arguments by position go to the first parameters, and
+    /// Arguments by position go to the first parameters, and
     /// arguments by label to the parameter with that label. Gives the
     /// parameter of each argument.
     fn place(
@@ -2736,7 +2728,7 @@ impl<'a> Checker<'a> {
         ok.then_some(to)
     }
 
-    /// §7.5: records a use of a name that is known to be made by a
+    /// Records a use of a name that is known to be made by a
     /// constructor.
     fn note_use(&mut self, v: VarId, span: Span) {
         if let Some(c) = self.known.get(&v) {
@@ -2756,13 +2748,13 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// The constructor that the name `e` is known to be made by (§7.5).
+    /// The constructor that the name `e` is known to be made by, if any.
     fn known_ctor(&self, e: &Expr) -> Option<CtorRef> {
         self.known.get(&self.name_var(e)?).copied()
     }
 
     /// The type arguments of the value of the name `e` inside a clause that
-    /// makes it known to be made by a constructor (§7.5).
+    /// makes it known to be made by a constructor.
     fn known_ctor_args(&self, e: &Expr) -> Option<Vec<Ty>> {
         self.known_args.get(&self.name_var(e)?).cloned()
     }
@@ -2800,14 +2792,14 @@ impl<'a> Checker<'a> {
         self.field_ctors.insert((self.module, span), ctors);
     }
 
-    /// Rule 13 and §6.7 for `v.f`: every constructor that may have made `v`
+    /// Types `v.f`: every constructor that may have made `v`
     /// has a field with the label `f`, and `v.f` has the union of their
     /// types.
     fn field(&mut self, target: &Expr, name: &Ident, span: Span) -> (Ty, Knowledge) {
         let (t, kv) = self.infer_k(target, &Knowledge::unknown());
         let members = known::members(&kv.hint);
         let known_ctor = self.known_ctor(target);
-        // syntax-3 §2.3: `d.f` on data reads the part with the label `f`.
+        // `d.f` on data reads the part with the label `f`.
         if known_ctor.is_none()
             && !members.is_empty()
             && members
@@ -2883,7 +2875,7 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        // §2.4/§6.7: selection takes apart this constructor's value.
+        // Selection takes apart this constructor's value.
         if let Some((c, _)) = ctors.iter().find(|(c, _)| {
             let ty = self.p.ty(c.ty);
             ty.module != self.module && !ty.constructors_exported
@@ -2932,10 +2924,10 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        // The type of `v` is a subtype of its known type (rule 13), and of
+        // The type of `v` is a subtype of its known type, and of
         // the type of the constructor that made it. The field types are
         // those of the forms of these types in that bound. Inside a clause
-        // that makes the subject `v` known to be made by `C` (§7.5), the
+        // that makes the subject `v` known to be made by `C`, the
         // value is in the pattern type of the clause, and the type of `v`
         // is not changed, because outside the clause it may have values of
         // other types.
@@ -3007,8 +2999,8 @@ impl<'a> Checker<'a> {
         self.data_part(target, &t, &kv, Ok(k), index_span, span)
     }
 
-    /// Rule 13 for `.k` (`Ok(k)`) and `.f` (`Err(f)`) on data (syntax-3
-    /// §2.3): every member of the known type `kv` of the value is data with
+    /// For `.k` (`Ok(k)`) and `.f` (`Err(f)`) on data, every member of
+    /// the known type `kv` of the value is data with
     /// that key, at one place in canonical order; the value has the union
     /// of those parts.
     fn data_part(
@@ -3093,7 +3085,7 @@ impl<'a> Checker<'a> {
         (self.union(parts, key_span), self.kunion_knowledge(kparts))
     }
 
-    /// §6.7: `C(..base, f: e)`.
+    /// Types the record update `C(..base, f: e)`.
     fn record_update(
         &mut self,
         ctor: CtorRef,
@@ -3115,8 +3107,8 @@ impl<'a> Checker<'a> {
                 ),
             );
         }
-        // Inside a clause that makes the subject `v` known to be made by `C`
-        // (§7.5), the value is in the pattern type of the clause, whose
+        // Inside a clause that makes the subject `v` known to be made by `C`,
+        // the value is in the pattern type of the clause, whose
         // arguments are `old`; the type of `v` is not changed (as in
         // `field`).
         let narrowed = match self.known_ctor(base) {
@@ -3169,7 +3161,7 @@ impl<'a> Checker<'a> {
                 self.sub(&old_fields[i].1, &new_fields[i].1, base.span);
             }
         }
-        // §4.8: the known type of the call of `C` with the given fields and
+        // The known type of the call of `C` with the given fields and
         // the other fields of `v`.
         let base = bk.member(Head::Named(TypeRef::Custom(ctor.ty)));
         let ks: Vec<Knowledge> = given
@@ -3189,7 +3181,7 @@ impl<'a> Checker<'a> {
         (Ty::named(TypeRef::Custom(ctor.ty), new), k)
     }
 
-    /// §8.2: the type of the value of a segment.
+    /// The type of the value of a segment.
     pub fn format(&mut self, f: Option<&Format>, span: Span) -> Ty {
         let Some(f) = f else {
             return self.prim(BuiltinType::Int);
@@ -3234,7 +3226,7 @@ impl<'a> Checker<'a> {
     // ---- Blocks, functions, and bindings ----
 
     /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type
-    /// of the block, and the block has its known type (§4.8).
+    /// of the block, and the block has its known type.
     pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Knowledge) -> (Ty, Knowledge) {
         for (i, s) in stmts.iter().enumerate() {
             match s {
@@ -3251,7 +3243,7 @@ impl<'a> Checker<'a> {
                     }
                 }
                 Stmt::Env { ty, value, span } if matches!(ty.kind, TypeKind::Hole) => {
-                    // Syntax three, `r <- (e1)` (§2.10.2): the key is the
+                    // For `r <- (e1)`, the key is the
                     // type constructor of the known type of `e1`.
                     let (v, k) = self.infer_k(value, &Knowledge::unknown());
                     let provider = [&v, &k.hint].into_iter().find_map(|t| match t {
@@ -3271,7 +3263,7 @@ impl<'a> Checker<'a> {
                     let a = self.block(&stmts[i + 1..], *span, expected);
                     let (err, env) = self.pop_effects(*span);
                     self.add_err(err);
-                    // E1, §9.2: remove this provider's form, retaining its
+                    // Remove this provider's form, retaining its
                     // directed obligation on the remaining row. Replacing it
                     // with the needed form loses that obligation and can hide
                     // a generic handler or report a value error at the call.
@@ -3307,7 +3299,7 @@ impl<'a> Checker<'a> {
         (nil.clone(), Knowledge::certain(nil))
     }
 
-    /// Rule 4: a function expression, and its known type (§4.8). With an
+    /// Rule 4: a function expression, and its known type. With an
     /// expected function type with as many parameters, a parameter with no
     /// type written at its top gets the known type of the matching
     /// parameter.
@@ -3378,8 +3370,8 @@ impl<'a> Checker<'a> {
                 self.check_places(t, Pol::Pos, 0);
             }
         }
-        // Syntax three (transition front): `-> R ^ _ ! _` is a written
-        // result whose needs are left to inference.
+        // HIR holes in both need rows preserve a written result while leaving
+        // the function's needs to inference.
         let hole = |t: &Option<Type>| matches!(t, Some(t) if matches!(t.kind, TypeKind::Hole));
         let inferred_needs = f.ret.as_ref().is_some_and(|r| hole(&r.err) && hole(&r.env));
         let ret = f.ret.as_ref().map(|r| {
@@ -3397,7 +3389,7 @@ impl<'a> Checker<'a> {
                 .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Env));
             (value, err, env)
         });
-        // §4.8: the body of a function with a written `->` part has that
+        // The body of a function with a written `->` part has that
         // type as its expected type.
         let body_expected = f.ret.as_ref().map_or_else(Knowledge::unknown, |r| {
             Knowledge::certain(self.kconv(&r.value, &HashMap::new()))
@@ -3425,7 +3417,7 @@ impl<'a> Checker<'a> {
                 Ty::Fn(Box::new(FnTy::new(params, value, err, env)))
             }
             (Some((value, rerr, renv)), Some(written)) => {
-                // §6.8: the written `->` part is the type after the
+                // The written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
                 // `Assert` when a parameter may fail.
                 let body_span = match f.body.stmts.last() {
@@ -3460,7 +3452,7 @@ impl<'a> Checker<'a> {
         (t, known)
     }
 
-    /// Rule 10 for a binding in a block, and rule 14.
+    /// Local bindings generalize only after their dependencies have been checked.
     fn local_binding(&mut self, b: &Binding) {
         let mark = self.occurs_mark();
         let direct = b.direct;
@@ -3476,8 +3468,8 @@ impl<'a> Checker<'a> {
         }
         let mut holders = Vec::new();
         if direct {
-            // §6.10: inside its own value, a name is not general, and it is
-            // known only from what is written (§4.8).
+            // Inside its own value, a name is not general, and it is
+            // known only from what is written.
             for v in &binders {
                 let h = self.s.fresh();
                 self.locals.insert(*v, Scheme::mono(h.clone()));
@@ -3525,7 +3517,7 @@ impl<'a> Checker<'a> {
             for v in &binders {
                 if let Some(s) = self.locals.get(v).cloned() {
                     let ty = self.generalize(&s.ty, level, b.pattern.span);
-                    // §4.8: a generalized name has its type scheme, with the
+                    // A generalized name has its type scheme, with the
                     // parts of the known type of its value for the
                     // variables that are not generalized.
                     let value = self
@@ -3585,8 +3577,7 @@ impl<'a> Checker<'a> {
     }
 
     /// A fitted pattern that no value of the known type `ty` matches can
-    /// never match (spec §4.8 fitting, §6.12 "a branch that can never be
-    /// used gives a compile warning"; syntax three §2.12 and D4): the
+    /// never match; it gives
     /// warning W0505. A constructor pattern is warned about once, when it is
     /// fitted (`fit`).
     fn warn_never_matches(&mut self, row: &super::coverage::Pat, ty: &Ty, span: Span) {
@@ -3681,7 +3672,7 @@ impl<'a> Checker<'a> {
                     .iter()
                     .map(|x| self.rebuild(x, level, map, true))
                     .collect();
-                // The scheme keeps the constraint of the difference (§4.4):
+                // The scheme keeps the constraint of the difference:
                 // a new variable has no bounds, so it is given again.
                 if let Ty::Var(v) = &a
                     && self.s.vars[v.0 as usize].level > level
@@ -3750,7 +3741,7 @@ fn has_both(t: &Ty) -> bool {
     }
 }
 
-/// §10.3: the built-in types that the host can take.
+/// The built-in types that the host can take.
 fn host_builtin(b: BuiltinType) -> bool {
     matches!(
         b,
@@ -3759,7 +3750,7 @@ fn host_builtin(b: BuiltinType) -> bool {
 }
 
 /// A parameter used as an environment or error row stays a row through
-/// other constructors and aliases (§4.5). The finite mode table grows
+/// other constructors and aliases. The finite mode table grows
 /// to a fixed point, independently of declaration order.
 fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
     fn walk(
@@ -3855,7 +3846,7 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
     }
 }
 
-/// §4.5 rules 6 and 7: the variance of every parameter of every custom
+/// The variance of every parameter of every custom
 /// type, from the definitions, by a fixpoint over all of them.
 pub(super) fn variances(p: &Program) -> HashMap<TypeId, Vec<Variance>> {
     let mut table: HashMap<TypeId, Vec<Variance>> = HashMap::new();
@@ -3959,10 +3950,10 @@ fn walk_variance(
 }
 
 /// Whether working out an expression can do nothing but make its value: it
-/// has no call, no `case`, no block, and no operation that may stop (§11.3).
+/// has no call, no `case`, no block, and no operation that may stop.
 /// Such an expression is a mistake as a statement that is not the last, as
 /// in `assert 1 + 1 == 3`, which is the two statements `assert` and
-/// `1 + 1 == 3` (§1.7).
+/// `1 + 1 == 3`.
 fn has_no_effect(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Int(_)

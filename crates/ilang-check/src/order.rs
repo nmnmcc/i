@@ -1,5 +1,5 @@
-//! The order of top-level values (§2.5) and the groups of top-level
-//! bindings (§4.7).
+//! The order of top-level values and the groups of top-level
+//! bindings.
 //!
 //! For a binding `b` of a module, `uses(b)` are the bindings of this module
 //! whose names are in its value, and `outside(b)` are those used outside the
@@ -61,7 +61,7 @@ pub fn references(pattern: &Pattern, value: &Expr) -> Vec<(DefId, bool)> {
     out
 }
 
-/// The needs and full needs of every top-level binding of a module (§2.5),
+/// The needs and full needs of every top-level binding of a module,
 /// as indexes in `Module::bindings`.
 pub fn needs(program: &Program, m: ModuleId) -> Vec<(BTreeSet<u32>, BTreeSet<u32>)> {
     let module = program.module(m);
@@ -215,7 +215,7 @@ struct TypeRead {
 }
 
 /// Value-type edges order already computed expression SCCs. They never
-/// change SCC membership, runtime needs, or initialization (§2.5, §4.7).
+/// change SCC membership, runtime needs, or initialization.
 fn type_order(
     p: &mut Program,
     groups: Vec<Vec<BindingRef>>,

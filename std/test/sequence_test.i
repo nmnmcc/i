@@ -16,7 +16,7 @@ check = (s : sequence.Sequence(Int), xs : List(Int)) -> Nil {
 	Nil
 }
 
-// std-1 §4.3's example table, Q1 and Q2, including saved source versions.
+// The example table of the sequence documentation, including saved source versions.
 test("sequence_examples", () {
 	empty = sequence.new()
 	assert(sequence.first(empty) == None)
@@ -56,7 +56,7 @@ test("sequence_examples", () {
 	Nil
 })
 
-// §4.3 laws compare observable elements, never private representation equality.
+// Sequence laws compare observable elements, never private representation equality.
 check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
 	a = sequence.from_list(xs)
 	b = sequence.from_list(ys)
@@ -187,7 +187,7 @@ test("sequence_callback_errors", () {
 	Nil
 })
 
-// A fixed generator branches from retained versions, as required by §4.3.
+// A fixed generator branches from retained versions, which must stay unchanged.
 prng = (seed : Int) -> Int { { seed * 1664525 + 1013904223 } % 4294967296 }
 
 model = (
@@ -467,7 +467,7 @@ test("sequence_callback_types_and_order", () {
 	Nil
 })
 
-// Q4 and §4.3: unrelated shapes compare by elements. Both repeated insertion
+// Unrelated shapes compare by elements. Both repeated insertion
 // directions exercise full digits, promoted middle nodes, and retained roots.
 test("sequence_independent_histories", () {
 	xs = numbers(512)
@@ -498,147 +498,4 @@ test("sequence_independent_histories", () {
 	})
 	Nil
 })
-// Development checks for std-1 §4.3. The Python program below temporarily adds
-// private rank/cache audits, then counts helper entries as node work. It restores
-// both owned files in finally, even when a check fails. No production exports or
-// costs change. Counts are deterministic operation counts, not timings.
-// Run from this lane with:
-// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec("\n".join(x[4:] for x in Path("std/test/sequence_test.i").read_text().splitlines() if x.startswith("//| ")))'
-//| import os, re, subprocess
-//| from pathlib import Path
-//| src = Path('std/src/sequence.i')
-//| test = Path('std/test/sequence_test.i')
-//| original_src, original_test = src.read_text(), test.read_text()
-//| compiler = '/home/agent/Programming/i/.rd/cache/bin/i-1df2fe0'
-//| header = re.compile(r'(?m)^([a-z_]\w*(?:\([^\n]*\))? = \([\s\S]*?\) -> [^\n{]+) \{')
-//| def effect(h, service):
-//|     if ' ! ' in h.rsplit(') -> ', 1)[-1]:
-//|         return h + ' | ' + service
-//|     return h + ' ! ' + service
-//| def exports(s, extra):
-//|     return s.replace('\n\tSequence\n', '\n\tSequence\n\t' + extra + '\n', 1)
-//| def run(filter):
-//|     subprocess.run([compiler, 'test', '--project', 'std', '--opt', '0', filter], check=True)
-//| audit = '''
-//| audit(A) = (s: Sequence(A)) -> Nil ! Assert {
-//|   Sequence(t) = s
-//|   audit_tree(t, 0)
-//|   Nil
-//| }
-//| audit_node(A) = (x: Node(A), rank: Int) -> Int ! Assert {
-//|   x |> {
-//|     Leaf(_) -> { assert(rank == 0) 1 }
-//|     Branch2(n, a, b) -> {
-//|       assert(rank > 0)
-//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1)
-//|       assert(n == actual)
-//|       actual
-//|     }
-//|     Branch3(n, a, b, c) -> {
-//|       assert(rank > 0)
-//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1) + audit_node(c, rank - 1)
-//|       assert(n == actual)
-//|       actual
-//|     }
-//|   }
-//| }
-//| audit_digit(A) = (xs: List(Node(A)), rank: Int) -> Int ! Assert {
-//|   n = list.length(xs)
-//|   assert(n >= 1 && n <= 4)
-//|   list.fold(xs, 0, (acc, x) { acc + audit_node(x, rank) })
-//| }
-//| audit_tree(A) = (t: Tree(A), rank: Int) -> Int ! Assert {
-//|   t |> {
-//|     EmptyTree -> 0
-//|     Single(x) -> audit_node(x, rank)
-//|     Deep(n, left, middle, right) -> {
-//|       actual = audit_digit(left, rank) + audit_tree(middle, rank + 1) + audit_digit(right, rank)
-//|       assert(n == actual)
-//|       actual
-//|     }
-//|   }
-//| }
-//| '''
-//| edit_args = {
-//|   'new': '', 'wrap': 'item', 'from_list': 'items', 'push_front': 'to, item',
-//|   'push_back': 'to, item', 'pop_front': 'from', 'pop_back': 'from',
-//|   'set': 'in, index, value', 'append': 'first, second', 'split': 'sequence, at',
-//|   'take': 'from, up_to', 'drop': 'from, up_to', 'reverse': 'sequence', 'map': 'over, with'
-//| }
-//| def audit_edit(match):
-//|     h = match[1]
-//|     name = h.split('(', 1)[0]
-//|     h = effect(h, 'Assert')
-//|     if name not in edit_args:
-//|         return h + ' {'
-//|     checks = 'audit(result)'
-//|     if name == 'set':
-//|         checks = 'result |> { None -> Nil Some(s) -> audit(s) }'
-//|     elif name.startswith('pop_'):
-//|         checks = 'result |> { None -> Nil Some((_, s)) -> audit(s) }'
-//|     elif name == 'split':
-//|         checks = '(a, b) = result\n audit(a)\n audit(b)'
-//|     wrappers.append(h + ' {\n result = unchecked_' + name + '(' + edit_args[name] + ')\n ' + checks + '\n result\n}\n')
-//|     return h.replace(name, 'unchecked_' + name, 1) + ' {'
-//| try:
-//|     wrappers = []
-//|     variant = header.sub(audit_edit, original_src)
-//|     src.write_text(exports(variant, 'audit') + audit + '\n'.join(wrappers))
-//|     # All generated/edit results are audited, including every small/model edit.
-//|     # Large drains already run in the normal suite; omit their quadratic audits.
-//|     test.write_text(original_test.replace('drain(s, 0, n)', '{ n <= 257 } |> { True -> drain(s, 0, n) False -> Nil }'))
-//|     print('Private invariant audit: ranks, cached leaf counts, bounded nonempty digits', flush=True)
-//|     run('sequence')
-//|     def meter(match):
-//|         return effect(match[1], 'Meter') + ' {\n touch()'
-//|     variant = header.sub(meter, original_src)
-//|     # Count the unbounded local loops too, so a flattening regression is visible.
-//|     variant = re.sub(r'(go = \([^\n]*\) \{)', r'\1\n touch()', variant)
-//|     src.write_text(exports(variant, 'Meter(..)') + '''
-//| Meter { Meter(touch: () -> Nil) }
-//| touch = (meter ! Meter) -> Nil ! Meter { meter.touch() }
-//| ''')
-//|     test.write_text('''
-//| (i/control, i/core, (Io) = i/io, sequence = std/sequence, list = std/list)
-//| count = (body: () -> Nil ! sequence.Meter) -> Int {
-//|   control.boundary((b) {
-//|     ! sequence.Meter = sequence.Meter(() {
-//|       control.suspend(b, (k) { 1 + control.resume(k, Nil) })
-//|     })
-//|     body()
-//|     0
-//|   })
-//| }
-//| height = (n: Int) -> Int { { n <= 1 } |> { True -> 1 False -> 1 + height(n / 2) } }
-//| @test
-//| sequence_node_counts = (io ! Io) {
-//|   ! sequence.Meter = sequence.Meter(() { Nil })
-//|   list.each([16, 64, 256, 1024, 4096, 16384, 65536, 100000], (n) {
-//|     s = sequence.from_list(list.range(0, n - 1))
-//|     small = sequence.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9])
-//|     list.each([0, n / 4, n / 2, n - 1], (i) {
-//|       a = count(() { sequence.at(s, i) Nil })
-//|       b = count(() { sequence.set(s, i, -1) Nil })
-//|       c = count(() { sequence.split(s, i) Nil })
-//|       // §4.3 requires height work, not these particular implementation constants.
-//|       assert(a <= 80 * height(n))
-//|       assert(b <= 80 * height(n))
-//|       assert(c <= 160 * height(n))
-//|       io.print(core.inspect((n, i, a, b, c)))
-//|     })
-//|     alias = count(() { sequence.append(s, s) Nil })
-//|     left = count(() { sequence.append(s, small) Nil })
-//|     right = count(() { sequence.append(small, s) Nil })
-//|     assert(alias <= 160 * height(n))
-//|     assert(left <= 160 * height(n))
-//|     assert(right <= 160 * height(n))
-//|     io.print(core.inspect((n, alias, left, right)))
-//|   })
-//|   Nil
-//| }
-//| ''')
-//|     print('Counts: (length, index, at, set, split); (length, append_alias, append_short_right, append_short_left)', flush=True)
-//|     run('sequence_node_counts')
-//| finally:
-//|     src.write_text(original_src)
-//|     test.write_text(original_test)
+// Cached sizes, ranks and bounded digits are the private sequence invariants.

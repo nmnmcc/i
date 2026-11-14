@@ -6,10 +6,8 @@
 
 use super::ast::*;
 
-/// Puts a group `{ e }` where the grammar of syntax three reads an operand
-/// of a stronger level than `e` has: today's `|>` is stronger than `<>` and
-/// the comparisons, and is the weakest operator now (§7.3, stage 5's row).
-/// A group is a block in the tree, so the converter writes it.
+/// An operand weaker than its enclosing operator needs an explicit group
+/// to preserve the tree when printed. Groups are blocks in the source tree.
 pub fn regroup(module: &mut Module) {
     for item in &mut module.items {
         for a in &mut item.attributes {

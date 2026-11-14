@@ -27,8 +27,8 @@ impl fmt::Debug for Span {
 }
 
 /// Finds the line and column of a byte offset. Lines count from 1. Columns
-/// count Unicode scalar values from 1 (§11.7). `\r\n`, `\r`, and `\n` all end
-/// a line (§1.1).
+/// count Unicode scalar values from 1. `\r\n`, `\r`, and `\n` all end
+/// a line.
 pub struct LineIndex<'a> {
     source: &'a str,
     line_starts: Vec<u32>,

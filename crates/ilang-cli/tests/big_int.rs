@@ -59,7 +59,7 @@ fn programs() -> Vec<(u8, Program)> {
         .collect()
 }
 
-/// The text of §11.8 for the tuple of `apply`, worked out with `num-bigint`.
+/// The text form for the tuple of `apply`, worked out with `num-bigint`.
 fn expected(a: &BigInt, b: &BigInt) -> String {
     let zero = BigInt::from(0);
     let (q, r) = if *b == zero {

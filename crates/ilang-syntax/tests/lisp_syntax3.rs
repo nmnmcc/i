@@ -1,6 +1,5 @@
-//! `Syntax::show_as` in the rows of syntax three (docs/design/syntax-3.md
-//! §6.7 and §6.8): the counterparts of the `show_as` cases of `lisp_syntax`,
-//! and one case for every position and every row.
+//! Position-directed printing must agree with the parser for each kind of
+//! datum. These cases cover the same positions as `lisp_syntax`.
 #[path = "oracle.rs"]
 mod ilang_syntax;
 use ilang_syntax::lisp::{
@@ -113,7 +112,7 @@ fn show_as_distinguishes_chains_pipes_and_matches() {
         "s |> (0) { 1 } | (_) { 2 }"
     );
     assert_eq!(shown("(|> e f)", Position::Expression), "e |> f");
-    // The rows before syntax three are not read.
+    // The rows in the legacy syntax are not read.
     refused("(| a f)", Position::Expression);
     refused("(-> (y) Int y)", Position::Expression);
     refused("{ (-> (= a (, x)) (-> (y) Int y)) }", Position::Expression);
@@ -294,7 +293,7 @@ fn typed_macro_type_view_has_no_text() {
     assert!(nested.show_as_rows3(Position::Expression).is_err());
 }
 
-/// Every row of §6.8, and the rows that it leaves as they were, by position.
+/// Every datum form must round-trip in each supported grammar position.
 #[test]
 fn show_as_writes_every_row_in_its_position() {
     use Position::*;
@@ -575,8 +574,8 @@ fn show_as_refuses_what_a_position_does_not_read() {
 }
 
 /// `validate_expansion` and `match_quote` do not read rows: they see the
-/// attribute form and the brackets, which syntax three keeps. These are the
-/// cases of `lisp_syntax` with the forms of §6.8.
+/// attribute form and the brackets, which the source syntax keeps. These are the
+/// counterparts of the cases in `lisp_syntax`.
 #[test]
 fn quotes_and_expansion_checks_work_on_the_rows_of_syntax_three() {
     use ilang_syntax::lisp::syntax::Substitution;
@@ -599,7 +598,7 @@ fn quotes_and_expansion_checks_work_on_the_rows_of_syntax_three() {
         result.show_as_rows3(Position::FunctionResult).unwrap(),
         "<- (log : Log)"
     );
-    // A pattern of the rows before syntax three takes the `,` as a parameter.
+    // A pattern of the legacy rows takes the `,` as a parameter.
     let old = root("`(-> (~..params) ~result ~body)");
     let captures = old.match_quote(&value).unwrap().unwrap();
     assert!(matches!(&captures[0].value, Substitution::Many(items) if items.len() == 3));

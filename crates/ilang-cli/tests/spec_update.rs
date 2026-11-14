@@ -3,7 +3,7 @@ mod spec_header;
 
 #[test]
 fn regeneration_preserves_crlf_and_every_byte_after_the_header() {
-    // A1 §8: keep CRLF and the bare CR in the program; only stop/at lines change.
+    // Keep CRLF and the bare CR in the program; only stop/at lines change.
     let header = "// spec: 11.7\r\n// expect: stop \"old\"\r\n// at: spec/main:5:1\r\n// output: unchanged\r\n";
     let body = "\r\nmain = () { 1\r+ 2  Nil }\r\n// at: this is outside the header\r\n";
     let source = format!("{header}{body}");
@@ -23,7 +23,7 @@ fn regeneration_preserves_crlf_and_every_byte_after_the_header() {
 
 #[test]
 fn regeneration_rejects_trimmed_values_and_changed_frame_counts() {
-    // A1 §8 requires a failure rather than silently trimming actual values.
+    // Extra actual values must cause failure rather than be silently trimmed.
     let source = "# spec: 11.7\n# expect: stop \"old\"\n# at: spec/main:1:1\nname = \"spec\"\n";
     for value in [" new", "new ", "new\nline", "new\rline"] {
         assert!(spec_header::rewrite(source, "#", value, &["spec/main:2:1".into()]).is_err());

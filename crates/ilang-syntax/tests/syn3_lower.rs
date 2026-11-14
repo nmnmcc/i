@@ -1,5 +1,5 @@
-//! The transition front of syntax three (docs/design/syntax-3.md §7.2,
-//! stage 8): a syntax-three text lowers to the tree that today's text gives.
+//! The migration adapter must preserve the legacy representation expected by
+//! downstream checks, including generated names, types and service bindings.
 
 #[path = "oracle.rs"]
 mod ilang_syntax;
@@ -8,8 +8,8 @@ use migration_syntax::legacy;
 use ilang_syntax::print::print_module;
 use ilang_syntax::syn3;
 
-/// `new` (syntax three) lowers to the tree of `old` (today's syntax), as
-/// today's printer shows both.
+/// `new`  lowers to the tree of `old` (the legacy syntax), as
+/// the legacy printer shows both.
 fn same(new: &str, old: &str) {
     let (module, diags) = syn3::parse_lowered(new);
     assert!(diags.is_empty(), "{new}\n{diags:#?}");
@@ -18,7 +18,7 @@ fn same(new: &str, old: &str) {
     assert_eq!(print_module(&module), print_module(&expected), "{new}");
 }
 
-/// The lowered tree of `new`, as today's printer shows it.
+/// The lowered tree of `new`, as the legacy printer shows it.
 fn shown(new: &str) -> String {
     let (module, diags) = syn3::parse_lowered(new);
     assert!(diags.is_empty(), "{new}\n{diags:#?}");
@@ -35,9 +35,9 @@ fn bad(new: &str, needle: &str) {
 
 #[test]
 fn type_definitions() {
-    // Stage 3 (§2.8): each data definition is a type with one constructor,
+    // Each data definition has one constructor,
     // and a sum is the alias of the union of those types. `Option(..)`
-    // stays as written; the checker exports each member with it (§5.2.1).
+    // stays as written; the checker exports each member with it.
     same(
         "(\n\tOption(..)\n\tShape\n\tCircle\n\tSquare\n)\n\nSome(A) = (A)\nNone = ()\nOption(A) = Some(A) | None\n\nCircle = (radius = Float)\nSquare = (Float)\nShape = Circle | Square\n\nUser = (name = String, age = Int)\n\nHandle = Opaque\n\nPair(A) = { (A, A) }\n\nName = String\n",
         "(\n\tOption(..)\n\tShape\n\tCircle\n\tSquare\n)\n\nSome(A) {\n\tSome(A)\n}\n\nNone {\n\tNone\n}\n\nOption(A) = Some(A) | None\n\nCircle {\n\tCircle(radius : Float)\n}\n\nSquare {\n\tSquare(Float)\n}\n\nShape = Circle | Square\n\nUser {\n\tUser(name : String, age : Int)\n}\n\nHandle {}\n\nPair(A) = (A, A)\n\nName = String\n",
@@ -46,10 +46,8 @@ fn type_definitions() {
 
 #[test]
 fn constructor_named_like_its_sum() {
-    // Before stage 3 a sum could have a constructor of its own name. Now
-    // the member is a type of its own and two definitions of one name are
-    // an error (§2.8), so the member has another name; the lowering keeps
-    // each definition as it is.
+    // A member has its own type, so sharing its name with the union would
+    // create duplicate definitions. Conversion must retain distinct names.
     same(
         "Inherit = ()\nDirectoryCase = (String)\nDirectory = Inherit | DirectoryCase\n",
         "Inherit {\n\tInherit\n}\n\nDirectoryCase {\n\tDirectoryCase(String)\n}\n\nDirectory = Inherit | DirectoryCase\n",
@@ -78,7 +76,7 @@ fn calls_data_and_patterns() {
 
 #[test]
 fn empty_data_has_the_same_tree_on_both_surfaces() {
-    // Spec §14.3: "(,) is the empty data in the positions of values,
+    // "(,) is the empty data in the positions of values,
     // types and patterns. The empty () has no position."
     let (normal, diags) = syn3::parse_lowered("empty = ()\n");
     assert!(diags.is_empty(), "{diags:#?}");
@@ -99,7 +97,7 @@ fn services_and_needs() {
 
 #[test]
 fn provides() {
-    // `! _ = e` is not written in today's syntax: only the front makes it.
+    // `! _ = e` is not written in the legacy syntax: only the front makes it.
     let text = shown(
         "check = () {\n\t{\n\t\tu = find_user(\"1\")\n\t\tassert(u.name == \"ada\")\n\t} <- (fake_db, quiet_log)\n}\n\nn = () { 1 + f(2) <- (s) }\n",
     );
@@ -128,7 +126,7 @@ fn several_positions() {
     assert!(text.contains("(%arg1, %arg2)"), "{text}");
 }
 
-/// Stage 9: a chain with several shape groups, or with a label in its
+/// A chain with several shape groups, or with a label in its
 /// shape, is one hidden binding for each group and then the name, bound to
 /// the transition form of the multi-shape value. The parts of a shape are
 /// in canonical order: the positions, then the labels by name.
@@ -179,8 +177,8 @@ fn forms_of_later_stages_are_errors() {
 fn lisp_surface_round_trip() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../std/src/test.is");
     let source = std::fs::read_to_string(path).unwrap();
-    // The repository file is in today's rows until the conversion commit,
-    // and in the rows of syntax three after it.
+    // Accept either input encoding so the migration adapter can compare
+    // repository sources without changing the file under test.
     let Ok(document) = ilang_syntax::lisp::parse(&source) else {
         return;
     };
@@ -223,7 +221,7 @@ fn repeated_type_parameter_kept() {
 
 #[test]
 fn one_member_alias_keeps_a_type_written_as_a_type() {
-    // `Alias(N) = T(N)` is an alias (§2.8, kind 4); `T` keeps its type.
+    // `Alias(N) = T(N)` is an alias; `T` keeps its type.
     same(
         "Dep = ()\nT(N) = (N)\nAlias(N) = T(N)\nf = (x : T(Dep)) { x }\n",
         "Dep { Dep }\nT(N) { T(N) }\nAlias(N) = T(N)\nf = (x : T(Dep)) { x }\n",
@@ -233,7 +231,7 @@ fn one_member_alias_keeps_a_type_written_as_a_type() {
         "T(N) { T(N) }\nAlias(N) = T(N)\ng = (x : Alias(Int)) { x }\ny : T(Int) = T(1)\n",
     );
     // Not written as a type elsewhere, the member is still a type of its
-    // own (stage 3): the alias names it.
+    // own: the alias names it.
     same(
         "DivisionByZero = ()\nTimeError = DivisionByZero\n",
         "DivisionByZero { DivisionByZero }\nTimeError = DivisionByZero\n",
@@ -249,7 +247,7 @@ fn fail_in_a_function_head_is_its_error_part() {
     use ilang_syntax::ast::{ExprKind, ItemKind, Param, TypeKind};
 
     // `name: Fail(E)` in a head is the error part `^ E`, as in a need of a
-    // function type (§2.10.6): no service parameter `Fail`.
+    // function type: no service parameter `Fail`.
     let text = shown(
         "load = (id : String) <- (clock : Clock, fail : Fail(String)) -> Int { 1 }\n\nkeep = () <- (fail : Fail(Int)) { 1 }\n\nboth = (0) <- (fail : Fail(Int)) { 1 } | (n : Int) -> Int { n }\n",
     );
@@ -319,7 +317,7 @@ fn labelled_function_type_parameters_keep_their_data_keys() {
 
 #[test]
 fn migrated_captured_row_provider_keeps_its_written_contract() {
-    // §4.7: annotations participate in inference. §9.2: the provided
+    // Annotations participate in inference. The provided
     // value must satisfy the needed service by subtyping. Dropping the
     // old provider's S(Dependency) contract changes those constraints.
     let old = "S(N) { S(() -> Nil ! N) }\nDependency { Dependency }\nread = (d ! Dependency) { Nil }\nuse(N) = (s ! S(N)) { S(f) = s f() }\napply(N) = () { local : () -> Nil ! N = () { use() } local() }\nmain = () { ! S(Dependency) = S(() { read() }) apply() }";
@@ -392,7 +390,7 @@ fn a_single_use_provider_keeps_its_contract_for_resolution() {
 fn a_closed_function_provider_keeps_its_generalization_boundary() {
     use ilang_syntax::ast::{ExprKind, ItemKind, Stmt, TypeKind};
 
-    // §4.7/§4.8: preserve the closed function value's scheme and the
+    // Preserve the closed function value's scheme and the
     // actual-provider checks deferred through it. Open contracts are
     // independently pinned by a_single_use_provider_keeps_its_contract_for_resolution.
     let source = "Reader(A) = (get = () -> A)\nwith_int = (body) { provided : Reader(Int) = Reader(get = () -> Int { 1 }) body() <- (provided) }";
