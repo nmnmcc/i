@@ -1,4 +1,11 @@
-Current result: **steps 2c, 2d, 3 and 4 are green**. The full native
+Current integration: tyalt046550bd (main1bdea694, stage3 and colon precedence)
+compiles, passes strict clippy and check-snippets; its full Rust/runtime gate
+is in progress. Tyaltf61f812c9 test-only follow-up is merged pending its CLI
+compilation checkpoint. See [the integration report](syn3-final-ast-tyalt-integration.md).
+The earlier full-green result below is for base68b720e9 at5e7ef6e56;
+it is not a full-green claim about the new main integration.
+
+Previous-base result: **steps 2c, 2d, 3 and 4 are green**. The full native
 resolver prefix is 6de9a39b655edc8fad9dd7e14a848e359df22915. Stage 12
 and the deletion are integrated on lane/fa (via lane/fa-delete).
 The complete deletion matrix and exact commands are recorded at the end

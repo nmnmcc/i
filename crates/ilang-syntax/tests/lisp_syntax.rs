@@ -397,7 +397,7 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
         panic!("head")
     };
     assert!(
-        matches!(head[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Ok")
+        matches!(head[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Result")
     );
     assert!(matches!(
         head[1].scope_identity(),
@@ -414,6 +414,9 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
     let Node::Round(ok) = members[1].node() else {
         panic!("member")
     };
+    assert!(
+        matches!(ok[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Ok")
+    );
     assert_eq!(head[1].scope_identity(), ok[1].scope_identity());
     let Node::Round(parts2) = second.node() else {
         panic!("item")
@@ -478,9 +481,8 @@ fn copied_definition_freshens_its_binders_and_uses_together() {
     let Node::Round(members) = parts[2].node() else {
         panic!("body")
     };
-    let Node::Round(ok) = members[1].node() else {
-        panic!("member")
-    };
+    assert!(matches!(members[0].node(), Node::Symbol(s) if s == ","));
+    let ok = &members[1];
     assert!(matches!(
         head[1].scope_identity(),
         Some(ScopeIdentity::DefinitionParameter {
@@ -489,7 +491,7 @@ fn copied_definition_freshens_its_binders_and_uses_together() {
             ..
         })
     ));
-    assert_eq!(head[1].scope_identity(), ok[1].scope_identity());
+    assert_eq!(head[1].scope_identity(), ok.scope_identity());
     assert!(matches!(
         head[0].scope_identity(),
         Some(ScopeIdentity::Builtin { .. })
@@ -1100,7 +1102,7 @@ fn rewriting_a_definition_head_cannot_forge_parameter_binding_authority() {
     let unchanged = item[1].replace_children(head.clone());
     assert_eq!(unchanged.definition_head(), Some(30));
     let replacement = Syntax::make(Node::Up("A".into()), &head[1]).unwrap();
-    let changed = item[1].replace_children(vec![head[0].clone(), replacement, head[2].clone()]);
+    let changed = item[1].replace_children(vec![head[0].clone(), replacement]);
     assert_eq!(changed.definition_head(), None);
 }
 
@@ -1134,14 +1136,13 @@ fn duplicate_definition_heads_are_freshened_with_all_uses() {
         let Node::Round(members) = parts[2].node() else {
             panic!("members")
         };
-        let Node::Round(ctor) = members[1].node() else {
-            panic!("member")
-        };
+        assert!(matches!(members[0].node(), Node::Symbol(s) if s == ","));
+        let ctor = &members[1];
         assert_eq!(parts[1].definition_head(), Some(id));
         assert!(
             matches!(head[1].scope_identity(), Some(ScopeIdentity::DefinitionParameter { answer, parameter: 0, .. }) if *answer == id)
         );
-        assert_eq!(head[1].scope_identity(), ctor[1].scope_identity());
+        assert_eq!(head[1].scope_identity(), ctor.scope_identity());
     }
 }
 

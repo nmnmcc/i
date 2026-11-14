@@ -75,5 +75,27 @@
       "path": "crates/ilang-check/tests/types/known_choices.out",
       "source_locations_only": true
     }
-  ]
+  ],
+  "final_pending_audit": {
+    "final-audit": {
+      "contexts": 29864,
+      "excluded": 0,
+      "pending": 0,
+      "differences": []
+    },
+    "inline-final-audit": {
+      "contexts": 37822,
+      "excluded": 11,
+      "pending": 0,
+      "differences": []
+    }
+  },
+  "provider_locations": {
+    "projects": 14,
+    "changed_diagnostics": 22,
+    "source_trees_compared": 14,
+    "differences": [],
+    "fixture": "crates/ilang-cli/tests/providers_format_locations.json",
+    "corpus_expected_json_untouched": true
+  }
 }

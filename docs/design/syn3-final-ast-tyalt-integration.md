@@ -102,3 +102,74 @@ Strict clippy command (exit0,26.03s after queue):
 `$H direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings`.
 The only warning belongs to the excluded private historical printer helper.
 Final diagnostic golden audit against tyalt: zero .out/.expect.json differences.
+
+## Follow-up tyalt head f61f812c9
+
+Tyalt advanced during the Rust gate. Its only changes are the provider-test
+coordinate fixture/assertions and annotation proof JSON; no production source
+changes. Merged without conflicts before CLI, so the complete CLI gate will
+compile and execute the new assertions. Current Rust targets are unaffected.
+This test-only merge compiles in the complete CLI invocation (11:51,48.18s). The
+branch reference will be checked again at the end.
+
+All22 corrections across14 projects preserve every error code and all message
+text except source coordinates. An initial audit assuming message text had no
+coordinates caught the related `type at 32:25` → `32:26` reference; the complete
+audit now checks primary and related source spans. This normalization is an
+audit only: providers.rs still compares the exact full resulting strings,
+every coordinate and the full error multiset. The reason for every move is
+incoming canonical annotation braces/formatting, independently recorded by
+tyalt's annotation-stage3-proof.json. No diagnostic is removed or masked.
+
+| Project | Primary before | Primary after | Related source coordinates |
+|---|---|---|---|
+| review-k4d/_loose/fuzz/e0505/21_4 | `src/main.i:32:49` | `src/main.i:32:50` | 32:25 → 32:26 |
+| review-k4d/fuzz/m21 | `src/main.i:24:7` | `src/main.i:24:7` | 22:25 → 22:26 |
+| review-k4d/fuzz/m32 | `src/main.i:26:52` | `src/main.i:29:53` | 26:24 → 29:25 |
+| review-k4d/fuzz/m32 | `src/main.i:34:9` | `src/main.i:37:9` | unchanged |
+| review-k4d/fuzz/m32 | `src/main.i:35:8` | `src/main.i:38:8` | unchanged |
+| review-k4d/fuzz/m32 | `src/main.i:35:17` | `src/main.i:38:17` | unchanged |
+| review-k4d/fuzz/m32 | `src/main.i:35:8` | `src/main.i:38:8` | unchanged |
+| review-k4d/fuzz/m32 | `src/main.i:34:9` | `src/main.i:37:9` | unchanged |
+| review-k4d/fuzz/m32 | `src/main.i:34:18` | `src/main.i:37:18` | unchanged |
+| review-k4d/fuzz/m32 | `src/main.i:35:17` | `src/main.i:38:17` | unchanged |
+| review-k4d/fuzz/w2 | `src/main.i:23:7` | `src/main.i:23:7` | 21:28 → 21:29 |
+| review-k4d/fuzz/w4 | `src/main.i:31:46` | `src/main.i:34:47` | 31:22 → 34:23 |
+| review-k4d/fuzz/w4 | `src/main.i:59:7` | `src/main.i:62:7` | 57:22 → 60:23 |
+| review-k4d/fuzz/w4 | `src/main.i:47:9` | `src/main.i:50:9` | 45:22 → 48:23 |
+| review-k4d/fuzz/w4 | `src/main.i:21:7` | `src/main.i:21:7` | 19:31 → 19:32 |
+| review-k4d/fuzz/w4 | `src/main.i:28:52` | `src/main.i:31:53` | 28:21 → 31:22 |
+| review-k4d/fuzz/w4 | `src/main.i:43:9` | `src/main.i:46:9` | 41:25 → 44:26 |
+| review-k4d/fuzz/w4 | `src/main.i:34:7` | `src/main.i:37:7` | 32:25 → 35:26 |
+| review-k4d/fuzz/w4 | `src/main.i:39:9` | `src/main.i:42:9` | unchanged |
+| review-k4d/fuzz/w4 | `src/main.i:61:6` | `src/main.i:64:6` | unchanged |
+| review-k4d/fuzz/w4 | `src/main.i:61:11` | `src/main.i:64:11` | unchanged |
+| review-k4d/fuzz/w4 | `src/main.i:55:20` | `src/main.i:58:20` | unchanged |
+
+11:11: strict resolver HIR/diagnostic differential PASS (complete repository
+comparison, unchanged assertions), along with deep and prepared-quote cases.
+Remaining Rust integration tests continue; this is not the full gate yet.
+
+11:46 full Rust run:760 pass, four existing ignored, requested recovery skip;
+four failures confined to lisp_syntax's builtin-definition tests. The conflict
+resolution mixed an alias Result(A,E) head with an Ok expectation, and incoming
+Ok(A) inputs with the previous Result constructor-list body paths. Corrected
+the test adaptations: retain Result's two-parameter alias/Ok-use identity test
+(and explicitly assert builtin Ok identity), while the copied/duplicated Ok
+cases follow their §6.8 body `(, A)` directly. The authority-forgery test keeps
+the one-parameter head shape. No assertion intent is removed, and no compiler
+implementation or diagnostic expectation changes. Design §2.8/§6.8 requires
+separate one-constructor definitions, not the former sum constructor list.
+
+The syntax retry is selected explicitly alongside all42 sequential CLI test
+binaries plus CLI unit targets in one wrapped Cargo invocation; four harness
+threads per binary, with only one binary active. This obeys the coordinator's
+one-binary-at-a-time option while retaining one heavy command per worker.
+The retry also recompiles the incoming f61 provider assertion update before
+its merge checkpoint. Initial Rust exit101 remains recorded, not hidden.
+
+11:51: all selected CLI targets and the repaired syntax target compile in
+48.18s; CLI library tests pass2/2, main-unit and42 integration binaries follow.
+This is the compiling checkpoint for the f61 test-only merge and the four
+builtin-test shape repairs. Root Rust remains760 successful tests plus four
+pending repaired assertions; no failed compiler diagnostic golden.

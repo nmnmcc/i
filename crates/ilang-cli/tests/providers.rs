@@ -39,6 +39,11 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
     // std/test and must expand their macros before comparing diagnostics.
     // These counts come from landed tip cc26b8d9, not a stage-three recording.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
+    // Formatting changes source coordinates. Pin those exact corrections separately
+    // until the coordinator records the corpus on the gate tree; retain the full
+    // diagnostic comparison, including every resulting coordinate.
+    let locations: serde_json::Value =
+        serde_json::from_str(include_str!("providers_format_locations.json")).unwrap();
     for (case, count, provider_count) in [
         ("review-k4d/_loose/fuzz/e0505/21_4", 3, 2),
         ("review-k4d/_loose/p/b1", 5, 5),
@@ -66,6 +71,7 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
             .unwrap()
             .lines()
             .filter(|line| line.contains("error["))
+            .map(str::to_owned)
             .collect();
         assert_eq!(expected.len(), count, "landed diagnostic count: {case}");
         assert_eq!(
@@ -86,7 +92,20 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
         let mut actual: Vec<_> = stderr
             .lines()
             .filter(|line| line.contains("error["))
+            .map(str::to_owned)
             .collect();
+        for correction in locations[case].as_array().unwrap() {
+            let before = correction["before"].as_str().unwrap();
+            let after = correction["after"].as_str().unwrap();
+            if let Some(line) = expected.iter_mut().find(|line| line.as_str() == before) {
+                *line = after.to_owned();
+            } else {
+                assert!(
+                    expected.iter().any(|line| line == after),
+                    "stale coordinate correction: {case}: {before}"
+                );
+            }
+        }
         expected.sort_unstable();
         actual.sort_unstable();
         assert_eq!(actual, expected, "{case}");
