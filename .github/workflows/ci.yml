@@ -347,6 +347,7 @@ jobs:
         run: |
           devenv shell -- npm ci
           devenv shell -- npm run build
+          devenv shell -- npm run check:placeholders
           devenv shell -- npm run check:links
           devenv shell -- npm run check:rendering
           devenv shell -- npm run check:examples

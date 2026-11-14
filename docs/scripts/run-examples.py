@@ -52,6 +52,8 @@ class Example:
     codes: frozenset = frozenset()
     package: str | None = None
     filename: str | None = None
+    environment: dict = field(default_factory=dict)
+    compare_test_output: bool = False
 
 
 def read_page(page):
@@ -86,7 +88,9 @@ def read_page(page):
                 files.pop(path, None)
             pending.clear()
             output = ''
-            if kind in ('run', 'test-fails'):
+            options = i_options(block.info)[1]
+            compare_test_output = kind == 'test' and options.get('stdout') == 'exact'
+            if kind in ('run', 'test-fails') or compare_test_output:
                 following = index + 1
                 # A failure transcript may show the reproduction command first.
                 if kind == 'test-fails':
@@ -95,8 +99,10 @@ def read_page(page):
                 if following >= len(blocks) or blocks[following].info != 'text' or not blocks[following].closed:
                     raise ValueError(kind + ' needs a closed text fence after it')
                 output = blocks[following].source
-            package = i_options(block.info)[1].get('package')
-            examples.append(Example(page, block.line, kind, block.source, files, output, codes, package, path))
+            package = options.get('package')
+            environment = {key[4:]: value for key, value in options.items() if key.startswith('env.')}
+            examples.append(Example(page, block.line, kind, block.source, files, output, codes,
+                                    package, path, environment, compare_test_output))
         except ValueError as error:
             failures.append(Failure(page, block.line, 'a valid example fence', str(error)))
     for name, block in pending.items():
@@ -159,9 +165,9 @@ def prepare(example, project):
     return main
 
 
-def invoke(command, project, timeout):
+def invoke(command, project, timeout, environment=None):
     """Kill the compiler and any children together when the deadline expires."""
-    env = {**os.environ, 'NO_COLOR': '1', 'RAYON_NUM_THREADS': '1', 'BINARYEN_CORES': '1'}
+    env = {**os.environ, 'NO_COLOR': '1', 'RAYON_NUM_THREADS': '1', 'BINARYEN_CORES': '1', **(environment or {})}
     with subprocess.Popen(command, cwd=project, env=env, stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE, start_new_session=True) as process:
         try:
@@ -196,7 +202,7 @@ def run_example(example, binary, timeout=TIMEOUT):
                 command += ['--opt', str(opt)]
             label = example.kind + (f' --opt {opt}' if opt is not None else '')
             expected = {'run': f'exit 0 and stdout={example.output!r}',
-                        'test': 'exit 0 (all tests pass)',
+                        'test': (f'exit 0 and stdout={example.output!r}' if example.compare_test_output else 'exit 0 (all tests pass)'),
                         'test-fails': f'nonzero exit and stdout={example.output!r}',
                         'check': 'exit 0 and no diagnostics',
                         'shown': 'exit 0 and no diagnostics',
@@ -206,7 +212,7 @@ def run_example(example, binary, timeout=TIMEOUT):
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError('example deadline expired')
-                status, stdout, stderr = invoke(command, project, remaining)
+                status, stdout, stderr = invoke(command, project, remaining, example.environment)
             except (OSError, TimeoutError) as error:
                 failures.append(Failure(example.page, example.line, f'{label}: {expected}', str(error)))
                 continue
@@ -214,7 +220,7 @@ def run_example(example, binary, timeout=TIMEOUT):
             if example.kind == 'run':
                 passed = status == 0 and output_matches(example.output, stdout)
             elif example.kind == 'test':
-                passed = status == 0
+                passed = status == 0 and (not example.compare_test_output or stdout == example.output)
             elif example.kind == 'test-fails':
                 passed = status > 0 and stdout == example.output
             elif example.kind in ('check', 'shown'):

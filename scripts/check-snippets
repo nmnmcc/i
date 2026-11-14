@@ -167,6 +167,8 @@ def snippets():
 
 
 def parser_driver():
+    if os.environ.get('I_SNIPPET_PARSER'):
+        return Path(os.environ['I_SNIPPET_PARSER']).resolve()
     return Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/examples/parse-snippets"
 
 
@@ -231,7 +233,7 @@ def main():
         if heavy.is_file():
             command = [str(heavy), "direnv", "exec", str(shell)] + command
             break
-    if "--reuse-parser" in sys.argv:
+    if "--reuse-parser" in sys.argv or os.environ.get('I_SNIPPET_PARSER'):
         if not parser_driver().is_file():
             raise SystemExit("--reuse-parser requires the driver from an earlier check-snippets run")
     else:

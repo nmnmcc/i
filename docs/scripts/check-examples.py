@@ -3,6 +3,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import os
 from paths import ROOT, SPEC_PATH
 import subprocess
 import sys
@@ -63,7 +64,11 @@ command = ['cargo', 'build', '-p', 'ilang-syntax', '--example', 'parse-snippets'
 heavy = ROOT.parent / 'cache/heavy'
 if heavy.is_file():
     command = [str(heavy), 'direnv', 'exec', str(ROOT.parent.parent)] + command
-subprocess.run(command, cwd=ROOT, check=True)
+if os.environ.get('I_SNIPPET_PARSER'):
+    if not checker.parser_driver().is_file():
+        raise SystemExit('I_SNIPPET_PARSER must name an existing parser driver')
+else:
+    subprocess.run(command, cwd=ROOT, check=True)
 results = {}
 for lisp in (False, True):
     group = [(index, item[3]) for index, item in enumerate(items) if bool(item[5]) == lisp]

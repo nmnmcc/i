@@ -1,0 +1,536 @@
+---
+title: i — values, failures, and services
+description: A small functional language with inferred static types, compiling to WasmGC.
+---
+
+<div className="home-page">
+<section className="home-hero" aria-labelledby="home-title">
+<div className="hero-copy">
+<p className="home-eyebrow">The i programming language</p>
+<h1 id="home-title">Values, failures and services,<br />checked as one program.</h1>
+<p className="hero-position">Small · functional · statically typed · inferred · WasmGC</p>
+<p className="hero-explanation">Read a port from the environment, check it, then print it or handle a typed failure. No parameter, result, or service annotations.</p>
+<div className="home-actions">
+<a className="home-button home-button-primary" href="/docs/tour">Read the tour <span aria-hidden="true">→</span></a>
+<a className="home-button" href="#start">Install and try i</a>
+</div>
+<p className="home-caption">One source file. Follow it through matching, a test double, concurrent calls, and a typed macro.</p>
+</div>
+<div className="hero-example home-program">
+<p className="program-label"><span className="program-dot" aria-hidden="true"></span>Input: PORT=8080</p>
+```i run package=hello env.PORT=8080 title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+```text
+port 8080
+```
+<p className="example-note"><code>BadPort</code> names the parse or range failure. <code>catch</code> turns a raised error into a result the program can match.</p>
+</div>
+</section>
+
+<section className="home-intro" aria-labelledby="why-i">
+<p className="home-eyebrow">Read the program’s checks</p>
+<h2 id="why-i">Why i: the parts carry each other.</h2>
+<p>The port flows from the environment through a parser into matching branches. Its result, service needs, and failures are checked together. Each example below keeps <code>src/main.i</code> unchanged and builds on it.</p>
+<nav className="system-links" aria-label="The language connections">
+<a href="#branches">Functions and inference</a><span aria-hidden="true">→</span>
+<a href="#needs">Needs and tests</a><span aria-hidden="true">→</span>
+<a href="#tasks">Tasks</a><span aria-hidden="true">→</span>
+<a href="#macros">Macros</a>
+</nav>
+</section>
+
+<section className="home-topic" aria-labelledby="branches">
+<div className="topic-copy">
+<p className="home-step">01 / Follow a value through a decision</p>
+<h2 id="branches">Matching and overloading use one <code>|</code>.</h2>
+<p>The formatter has a branch for zero, another for a port, and one for a host and port together. A pipeline calls the same function. i has no keywords: <code>if</code> here is an ordinary binding.</p>
+<p>Values and bindings are immutable. Parameter and result types can be inferred, while calls remain checked. This same call checking accepts the service supplied in <a href="#needs">Needs and tests</a> and checks the arguments passed to <a href="#macros">Macros</a>.</p>
+<a className="home-text-link" href="/docs/tour/functions-and-branches">Learn functions and branches →</a>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-1#section-1-4">§1.4</a> · <a href="/docs/standard/generated/chapter-4#section-4-7">§4.7</a> · <a href="/docs/standard/generated/chapter-6#section-6-12">§6.12</a></p>
+</div>
+<div className="home-program">
+<details className="shared-source">
+<summary>The same src/main.i from the first example</summary>
+
+```i file=src/main.i title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```i test package=hello stdout=exact env.PORT=8080 title="test/format_test.i"
+(
+	testlib = (test) = std/test
+	i/stdio
+	std/int
+	app = hello/main
+)
+format =
+	(0) { "off" }
+	| (port) { "port " <> int.to_string(port) }
+	| (host, port) { host <> ":" <> int.to_string(port) }
+test("matching and overloading", () {
+	if = app.read_port()
+	stdio.print(0 |> format)
+	stdio.print(format(if))
+	stdio.print(format("localhost", if))
+})
+```
+
+```text
+off
+port 8080
+localhost:8080
+pass hello/format_test.matching and overloading
+1 passed, 0 failed
+```
+</div>
+</section>
+
+<section className="home-topic" aria-labelledby="needs">
+<div className="topic-copy">
+<p className="home-step">02 / Provide a service, control the run</p>
+<h2 id="needs">A test double uses the same need.</h2>
+<p>The port reader needs the environment service. Here <code>&lt;-</code> supplies an ordinary <code>Environment</code> value whose function returns the chosen input. The reader itself is unchanged; the test does not read the process environment.</p>
+<p>The checker accepts a supplied service by the same subtype rule it uses for an argument. Dependency injection and test doubles use that one rule. Raising <code>BadPort</code> adds a typed <code>Fail</code> need; catching supplies its handler.</p>
+<p>That connects <a href="#branches">Functions and inference</a> to error handling. The test checks the returned result for both bad text and an out-of-range number. <a href="#tasks">Tasks</a> carry those service and error requirements too.</p>
+<a className="home-text-link" href="/docs/tour/services-and-errors">Learn services and errors →</a>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-2">§9.2</a> · <a href="/docs/standard/generated/chapter-9#section-9-3">§9.3</a> · <a href="/docs/standard/generated/chapter-9#section-9-6">§9.6</a></p>
+</div>
+<div className="home-program">
+<details className="shared-source">
+<summary>The same src/main.i from the first example</summary>
+
+```i file=src/main.i title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```i test package=hello stdout=exact title="test/main_test.i"
+(
+	testlib = (test) = std/test
+	i/request
+	i/process
+	i/fail
+	app = hello/main
+)
+read = (text) {
+	fail.catch(app.read_port) <- (
+		process.Environment(env = (_) { request.ready(Ok(text)) }),
+	)
+}
+test("reads a port", () { assert(read("8080") == Ok(8080)) })
+test("rejects a bad port", () {
+	assert(read("oops") == Error(app.BadPort))
+	assert(read("65536") == Error(app.BadPort))
+})
+```
+
+```text
+pass hello/main_test.reads a port
+pass hello/main_test.rejects a bad port
+2 passed, 0 failed
+```
+<details className="failure-run">
+<summary>Run the unchanged program with PORT=oops</summary>
+
+```i run package=hello env.PORT=oops title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+```text
+invalid PORT
+```
+
+</details>
+</div>
+</section>
+
+<section className="home-topic" aria-labelledby="tasks">
+<div className="topic-copy">
+<p className="home-step">03 / Keep the work’s lifetime together</p>
+<h2 id="tasks">The same function can become a task.</h2>
+<p>A task cannot outlive its scope. Here <code>task.both</code> joins two child calls to the port reader before returning their results. Output happens after both calls have finished.</p>
+<p>The children are <a href="#branches">ordinary functions</a>. Their service needs and error types follow the same <a href="#needs">needs and error rules</a> as the first call. Concurrency keeps those requirements when the computation is composed.</p>
+<a className="home-text-link" href="/docs/tour/concurrency">Learn structured tasks →</a>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-9">§9.9</a></p>
+</div>
+<div className="home-program">
+<details className="shared-source">
+<summary>The same src/main.i from the first example</summary>
+
+```i file=src/main.i title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```i test package=hello stdout=exact env.PORT=8080 title="test/tasks_test.i"
+(
+	testlib = (test) = std/test
+	i/task
+	i/core
+	i/stdio
+	app = hello/main
+)
+test("joined reads", () {
+	ports = task.both(app.read_port, app.read_port)
+	stdio.print(core.inspect(ports))
+})
+```
+
+```text
+(8080, 8080)
+pass hello/tasks_test.joined reads
+1 passed, 0 failed
+```
+</div>
+</section>
+
+<section className="home-topic" aria-labelledby="macros">
+<div className="topic-copy">
+<p className="home-step">04 / Extend code under the same checks</p>
+<h2 id="macros">Generated code keeps the type check.</h2>
+<p>A typed macro declares a signature. Its call is checked against that signature, and its generated result is checked against the instantiated signature too.</p>
+<p>The macro operates on the checked port value from the same program. That connects <a href="#branches">function types and inference</a> to code generation. Its implementation is a checked i function with compile-time <a href="#needs">service needs</a>, imported by the ordinary module rules.</p>
+<p>The <code>.is</code> file uses i’s Lisp surface. The test calls its macro from the normal <code>.i</code> surface.</p>
+<a className="home-text-link" href="/docs/tour/macros">Learn macros and the two surfaces →</a>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-14#section-14-1">§14.1</a> · <a href="/docs/standard/generated/chapter-14#section-14-8">§14.8</a></p>
+</div>
+<div className="home-program">
+<details className="shared-source">
+<summary>The same src/main.i from the first example</summary>
+
+```i file=src/main.i title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```scheme file=src/macros.is title="src/macros.is"
+(, twice)
+(@ macro (: twice (-> (, Int) Int)))
+(@ macro (= twice (-> (, value) _ `(+ ~value ~value))))
+```
+
+```i test package=hello stdout=exact env.PORT=8080 title="test/macros_test.i"
+(
+	testlib = (test) = std/test
+	i/core
+	i/stdio
+	app = hello/main
+	hello/macros
+)
+test("typed expansion", () {
+	port = app.read_port()
+	stdio.print(
+		core.inspect(macros.twice(port)),
+	)
+})
+```
+
+```text
+16160
+pass hello/macros_test.typed expansion
+1 passed, 0 failed
+```
+</div>
+</section>
+
+<section className="home-topic home-check" aria-labelledby="invalid-edit">
+<div className="topic-copy">
+<p className="home-step">One invalid edit</p>
+<h2 id="invalid-edit">Inference still checks the call.</h2>
+<p>Try to add text to the port reader’s integer result. The compiler refuses it. This is the same result checked in <a href="#branches">the formatter</a> and passed to <a href="#macros">the typed macro</a>.</p>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-4#section-4-8">§4.8</a></p>
+</div>
+<div className="home-program">
+<details className="shared-source">
+<summary>The same src/main.i from the first example</summary>
+
+```i file=src/main.i title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```i error E0501 package=hello title="src/probe.i"
+(
+	app = hello/main
+)
+
+(
+	bad
+)
+bad = () { app.read_port() + "one" }
+```
+
+```text
+src/probe.i:8:30: error[E0501]: `"one"` is not a subtype of `Int`
+1 error
+```
+</div>
+</section>
+
+<section className="home-start" aria-labelledby="start">
+<div className="start-copy">
+<p className="home-eyebrow">Install and run the first program</p>
+<h2 id="start">Try the same source.</h2>
+<p>From a source checkout, use the repository’s Nix and devenv development shell:</p>
+
+```sh
+git submodule update --init crates/ilang-binaryen/binaryen
+devenv shell
+cargo build --release
+```
+
+<p>Add <code>target/release</code> to your <code>PATH</code>. Create the project at the root of the checkout:</p>
+
+```sh
+i new hello
+```
+
+<p>Save the first example as <code>hello/src/main.i</code> and its test-double example as <code>hello/test/main_test.i</code>, replacing the generated files. Use the manifest shown here, then run:</p>
+
+```sh
+cd hello
+PORT=8080 i run
+i test
+```
+
+<div className="home-actions">
+<a className="home-button" href="/docs/getting-started/install">Installation guide →</a>
+<a className="home-text-link" href="/docs/getting-started/first-program">First-project walkthrough →</a>
+</div>
+</div>
+<div className="home-program first-program">
+
+```toml title="hello/i.toml"
+name = "hello"
+
+[dependencies]
+std = { path = "../std" }
+
+[test]
+collection = "std/test.tests"
+```
+
+<h3 id="hosts">One source, different hosts.</h3>
+<p>i compiles to WasmGC. The same source can run natively or as a WASI command. A JavaScript host uses the repository’s Host SDK today; follow the interop guide for its build and loading steps.</p>
+<p>The targets connect <a href="#needs">service needs</a> to the host that provides them. The types checked in <a href="#branches">ordinary calls</a> still apply.</p>
+<a className="home-text-link" href="/docs/guides/js-and-wasi-interop">JS and WASI interop →</a>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-7">§9.7</a> · <a href="/docs/standard/generated/chapter-appendix-b">Appendix B</a></p>
+<details className="host-steps">
+<summary>Build the same program for WASI and a JavaScript host</summary>
+
+<p>From <code>hello/</code>, build the WASI command and give it the same input:</p>
+
+```sh
+i build --target wasi --opt 2
+```
+
+<p>Run it with the same environment input:</p>
+
+```sh
+wasmtime run --env PORT=8080 build/hello.wasm
+```
+
+```text
+port 8080
+```
+
+<p>For JavaScript, build a host module:</p>
+
+```sh
+i build --target host --opt 2
+```
+
+<p>Write <code>hello/host.mjs</code> using the repository’s SDK:</p>
+
+```js title="host.mjs"
+import { readFile } from "node:fs/promises";
+import { instantiate } from "../bindings/javascript/ilang.mjs";
+
+const app = await instantiate(
+  await readFile(new URL("./build/hello.wasm", import.meta.url)),
+  { standardServices: true },
+);
+await app.run();
+```
+
+```sh
+PORT=8080 node host.mjs
+```
+
+```text
+port 8080
+```
+
+<p>Both builds and host runs were checked at optimization levels 0 and 2. The interop guide explains the host requirements and the current build artifacts.</p>
+</details>
+</div>
+</section>
+
+<section className="home-next" aria-labelledby="where-next">
+<p className="home-eyebrow">Choose your next step</p>
+<h2 id="where-next">Keep following the connections.</h2>
+<div className="next-grid">
+<a href="/docs/tour"><span className="next-index">01</span><strong>Tour</strong><span>Learn the language through complete programs.</span><span className="next-arrow" aria-hidden="true">↗</span></a>
+<a href="/docs/guides"><span className="next-index">02</span><strong>Guides</strong><span>Build a command, test a service, or work with files and HTTP.</span><span className="next-arrow" aria-hidden="true">↗</span></a>
+<a href="/docs/library"><span className="next-index">03</span><strong>Library</strong><span>Find the modules and their source declarations.</span><span className="next-arrow" aria-hidden="true">↗</span></a>
+<a href="/docs/standard"><span className="next-index">04</span><strong>The standard</strong><span>Read the rules that define i.</span><span className="next-arrow" aria-hidden="true">↗</span></a>
+<a href="/docs/contributing"><span className="next-index">05</span><strong>Contribute</strong><span>Work on the compiler, libraries, tests, or documentation.</span><span className="next-arrow" aria-hidden="true">↗</span></a>
+</div>
+<p className="home-footnote">i is in development. The <a href="https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md">known-gap register</a> records differences between the compiler and the standard. Find the <a href="https://github.com/nmnmcc/i">source repository on GitHub</a>.</p>
+</section>
+</div>

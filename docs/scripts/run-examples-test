@@ -50,6 +50,10 @@ class RunnerTests(unittest.TestCase):
             'failing-shown': 1,
             'passing-shown-unchecked': 0,
             'failing-shown-unchecked': 1,
+            'passing-environment': 0,
+            'failing-environment': 2,
+            'passing-test-output': 0,
+            'failing-test-output': 2,
         }
         for name, count in expected.items():
             with self.subTest(fixture=name):
@@ -92,6 +96,19 @@ class RunnerTests(unittest.TestCase):
                 '  source = "error[E9999]: quoted"\n'
                 '  src/main.i:2:1: note: related error[E9999]: quoted\n')
         self.assertEqual(runner.DIAGNOSTIC.findall(text), ['E0201'])
+
+    def test_home_page_reuses_the_exact_program(self):
+        page = SCRIPTS.parent / 'content/home/index.mdx'
+        blocks = list(runner.fences(page.read_text()))
+        primary = next(block.source for block in blocks if runner.i_info(block.info)
+                       and runner.i_info(block.info)[0] == 'run')
+        copies = [block.source for block in blocks if runner.i_info(block.info)
+                  and runner.i_info(block.info)[:2] == ('file', 'src/main.i')]
+        self.assertGreaterEqual(len(copies), 4)
+        self.assertTrue(all(source == primary for source in copies))
+        examples, failures, _ = runner.read_page(page)
+        self.assertFalse(failures)
+        self.assertTrue(all(example.compare_test_output for example in examples if example.kind == 'test'))
 
     def test_project_setup(self):
         examples, _, _ = runner.read_page(FIXTURES / 'passing.mdx')
@@ -157,7 +174,8 @@ class RunnerTests(unittest.TestCase):
                      'i run package=i', 'i run package=Upper', 'i run package=one package=two',
                      'i shown', 'i check file=src/main.i', 'i file=src/a.is',
                      'i file=i.toml', 'i title="data.txt"', 'scheme file=src/a.i',
-                     'toml file=src/a.i', 'toml file=i.toml package=wrong'):
+                     'toml file=src/a.i', 'toml file=i.toml package=wrong',
+                     'i run stdout=exact', 'i test stdout=wrong', 'i file=src/a.i env.PORT=8080'):
             with self.subTest(info=info), self.assertRaises(ValueError):
                 runner.i_info(info)
         for path in ('../a.i', '/tmp/a.i', 'src/../a.i', './a.i', 'src\\a.i'):

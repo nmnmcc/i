@@ -1,32 +1,22 @@
 ---
-title: Home
-description: Learn i and find its language and library references.
+title: Documentation
+description: Choose a route through the tour, practical guides, library reference, and language standard.
 ---
 
-i is a small, statically typed functional language that compiles to WebAssembly GC. It runs natively, in JavaScript hosts, and on WASI. It has no keywords: words are names, and forms use brackets and symbols. Values and bindings are immutable. Functions can need services, which callers provide with `<-`. Concurrency is structured, so a task does not outlive its scope.
+Start with a complete program, then follow the rules behind it. The [home page](/) connects the examples; these pages let you work through them in detail.
 
-This complete program prints a greeting:
+## Start here
 
-```i run package=index title="src/main.i"
-(
-	(Io) = i/io
-)
+- [Install i](/docs/getting-started/install), then [create your first program](/docs/getting-started/first-program).
+- [Take the tour](/docs/tour) if you already know another programming language. Begin with [values and data](/docs/tour/values-and-data), then [functions and branches](/docs/tour/functions-and-branches).
+- Continue to [services and errors](/docs/tour/services-and-errors), [structured tasks](/docs/tour/concurrency), and [macros](/docs/tour/macros) to follow their connections.
 
-main = () <- (io : Io) { io.print("Hello, i!") }
-```
-```text
-Hello, i!
-```
+## Build something
 
-`Io` is the standard service for input and output; the entry point receives it from the environment and calls `print`. See [services and errors](/docs/tour/services-and-errors) for how needs work.
+Use the [guides](/docs/guides) for a concrete task: [a CLI](/docs/guides/cli), [files](/docs/guides/files), [an HTTP service](/docs/guides/http-service), [tests and test doubles](/docs/guides/testing), or [JS and WASI interop](/docs/guides/js-and-wasi-interop).
 
-- [Getting started](/docs/getting-started) covers installation, a first project, and editors.
-- [The tour](/docs/tour) introduces the language to programmers.
-- [Guides](/docs/guides) cover practical tasks.
-- [Contributing](/docs/contributing) explains how to take part in development.
+## Look up a rule or a function
 
-The [library reference](/docs/library) describes modules, and [the standard](/docs/standard) defines the language. i is in development; the compiler does not yet implement everything in the standard.
-
-## See also
-
-[Words and symbols](/docs/standard/generated/chapter-1) · [Install](/docs/getting-started/install)
+- [Library reference](/docs/library): find a module and its source declarations.
+- [The standard](/docs/standard): read the language definition, including [types](/docs/standard/generated/chapter-4) and [effects](/docs/standard/generated/chapter-9).
+- [Contributing](/docs/contributing): work on the compiler, library, tests, or these pages. The [known-gap register](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) records differences between the current compiler and the standard.

@@ -45,7 +45,7 @@ def i_options(info):
     words, options = [], {}
     for word in shlex.split(info)[1:]:
         key, separator, value = word.partition('=')
-        if separator and key in ('title', 'package', 'file'):
+        if separator and (key in ('title', 'package', 'file', 'stdout') or re.fullmatch(r'env\.[A-Za-z_][A-Za-z0-9_]*', key)):
             if key in options or not value:
                 raise ValueError(f'expected one nonempty {key}=')
             options[key] = value
@@ -54,6 +54,10 @@ def i_options(info):
     package = options.get('package')
     if package is not None and (not re.fullmatch(r'_?[a-z][a-z0-9_]*', package) or package == 'i'):
         raise ValueError('package= must be a package name other than i; got ' + repr(package))
+    if 'stdout' in options and (options['stdout'] != 'exact' or words != ['test']):
+        raise ValueError('stdout=exact is supported on test fences')
+    if any(key.startswith('env.') for key in options) and not words:
+        raise ValueError('env.NAME= needs an example kind')
     return words, options
 
 

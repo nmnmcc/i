@@ -1,23 +1,18 @@
 ---
 import Layout from '@/layouts/Layout.astro';
 import { Home } from '@/components/home';
-import { docsRoute } from '@/lib/shared';
+import { getEntry, render } from 'astro:content';
+import '@/styles/home.css';
+
+const home = await getEntry('home', 'index.mdx');
+if (!home) throw new Error('The checked home-page content is missing.');
+const { Content } = await render(home);
 ---
 
-<Layout title="i documentation" description="A small, statically typed functional language that compiles to WebAssembly GC.">
+<Layout title={home.data.title} description={home.data.description}>
   <Home client:load pathname={Astro.url.pathname} params={Astro.params}>
-    <div class="p-4 flex flex-col items-center justify-center text-center flex-1">
-      <h1 class="text-xl font-bold mb-2">i documentation</h1>
-      <p class="text-fd-muted-foreground mb-4 max-w-xl">
-        i is a small, statically typed functional language that compiles to WebAssembly GC. It has no keywords, its values
-        are immutable, and its concurrency is structured.
-      </p>
-      <a
-        class="text-sm bg-fd-primary text-fd-primary-foreground rounded-full font-medium px-4 py-2.5"
-        href={docsRoute}
-      >
-        Open Docs
-      </a>
+    <div class="home-content">
+      <Content />
     </div>
   </Home>
 </Layout>

@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+"""Regressions for the built-site visible-text placeholder gate."""
+import importlib.util
+from pathlib import Path
+import subprocess
+import sys
+import unittest
+
+SCRIPTS = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location('placeholders', SCRIPTS / 'check-placeholders.py')
+checker = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(checker)
+
+
+class PlaceholderTests(unittest.TestCase):
+    def test_ignored_content_and_word_boundaries(self):
+        self.assertEqual(checker.check_file(SCRIPTS / 'placeholder-fixtures/passing/index.html'), [])
+
+    def test_visible_fixture_fails(self):
+        findings = checker.check_file(SCRIPTS / 'placeholder-fixtures/failing/index.html')
+        self.assertEqual([word for _, word, _ in findings], ['TO BE WRITTEN', 'TODO', 'TBD', 'TODO'])
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'check-placeholders.py'),
+                                 '--dist', str(SCRIPTS / 'placeholder-fixtures/failing')],
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('4 matches.', result.stdout)
+        self.assertIn('index.html:3:', result.stderr)
+
+    def test_code_and_hidden_body_text_are_checked(self):
+        parser = checker.VisibleText()
+        parser.feed('<body><pre><code>TODO</code></pre><p hidden>TBD</p><p>to&nbsp;be written</p></body>')
+        self.assertEqual(len(list(parser.findings())), 3)
+
+    def test_block_boundaries_do_not_make_new_words(self):
+        parser = checker.VisibleText()
+        parser.feed('<body><p>TO</p><p>DO</p></body>')
+        self.assertEqual(list(parser.findings()), [])
+
+    def test_source_line_inside_multiline_text(self):
+        parser = checker.VisibleText()
+        parser.feed('<body><pre>complete\ncomplete\nTODO</pre></body>')
+        self.assertEqual(list(parser.findings())[0][0], 3)
+
+
+if __name__ == '__main__':
+    unittest.main()

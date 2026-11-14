@@ -7,6 +7,8 @@ After a successful driver build, `scripts/check-snippets --reuse-parser`
 reruns the complete normal and Lisp validation when only snippets or registry
 data changed. Run the default command again after changing parser or driver
 Rust sources. The reuse option requires the existing driver in its build path.
+Set `I_SNIPPET_PARSER` to an existing driver from the same tree to use it without
+any Cargo build, including in the documentation parser check and Lisp inventory.
 
 The extractor reads every tracked `.i` file and every fenced `i` block in
 Markdown. A `scheme` fence whose `file=` or `title=` names a `.is` file is

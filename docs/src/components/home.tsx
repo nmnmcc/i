@@ -2,6 +2,7 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { DefaultNotFound } from 'fumadocs-ui/layouts/home/not-found';
 import { Provider, type ProviderProps } from '@/components/provider';
 import { baseOptions } from '@/lib/layout.shared';
+import { docsRoute } from '@/lib/shared';
 
 /**
  * The React island of pages in the home layout, the content is passed as children.
@@ -9,7 +10,7 @@ import { baseOptions } from '@/lib/layout.shared';
 export function Home({ children, ...props }: ProviderProps) {
   return (
     <Provider {...props}>
-      <HomeLayout {...baseOptions()}>{children}</HomeLayout>
+      <HomeLayout {...baseOptions()} links={[{ text: 'Docs', url: docsRoute }]}>{children}</HomeLayout>
     </Provider>
   );
 }

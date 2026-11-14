@@ -1,0 +1,11 @@
+```i test package=transcript stdout=exact title="test/example_test.i"
+(
+	testlib = (test) = std/test
+)
+test("answer", () { assert(6 * 7 == 42) })
+```
+
+```text
+pass transcript/example_test.answer
+1 passed, 0 failed
+```
