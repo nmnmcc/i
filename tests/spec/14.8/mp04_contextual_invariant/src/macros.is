@@ -1,0 +1,4 @@
+(, (= syntax (/ i syntax)) (= key (/ i key)) (= fail (/ i fail)))
+(, make)
+(@ macro (: make (-> [A] (,) (Key A))))
+(@ macro (= make (-> (,) _ {(= sig ((. syntax signature))) (|> sig (| (-> (, `(-> ~params ~result)) _ (|> ((. syntax subtype) result `(Key Int)) (| (-> (, (. syntax Yes)) _ `((. key new))) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message "expected result is not Key(Int)") (= at sig))))))) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message "expected result is not Key(Int)") (= at sig))))))})))

@@ -537,6 +537,31 @@ impl Cx {
                     let sum = member_of.values().any(|s| *s == i);
                     self.type_def(def, sum);
                 }
+                n::ItemKind::Bind(_)
+                    if item
+                        .attributes
+                        .iter()
+                        .any(|a| a.module.is_none() && a.name.name == "macro") =>
+                {
+                    // MP10/MP11 retain the written macro interface. Validate
+                    // its compiler view after ordinary shape grouping instead
+                    // of diagnosing the interface's labels as unsupported.
+                    let mut compiler_item = item.clone();
+                    compiler_item
+                        .attributes
+                        .retain(|a| a.module.is_some() || a.name.name != "macro");
+                    let compiler_module = n::Module {
+                        items: vec![compiler_item],
+                        ..Default::default()
+                    };
+                    let compiler_module =
+                        super::groups::module(&compiler_module, &mut self.transition.clone());
+                    for item in &compiler_module.items {
+                        if let n::ItemKind::Bind(b) = &item.kind {
+                            self.binding(b);
+                        }
+                    }
+                }
                 n::ItemKind::Bind(b) => self.binding(b),
                 n::ItemKind::Decl { ty: t, .. } => match &t.kind {
                     n::TypeKind::Fn(f) if !f.generics.is_empty() => self.fn_type(f, t.span.0, true),

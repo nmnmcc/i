@@ -166,6 +166,13 @@ pub fn module(module: &n::Module, transition: &mut Transition) -> n::Module {
     module.items = std::mem::take(&mut module.items)
         .into_iter()
         .flat_map(|mut item| {
+            if item
+                .attributes
+                .iter()
+                .any(|a| a.module.is_none() && a.name.name == "macro")
+            {
+                return vec![item];
+            }
             let n::ItemKind::Bind(binding) = &item.kind else {
                 return vec![item];
             };
@@ -215,7 +222,15 @@ pub fn module(module: &n::Module, transition: &mut Transition) -> n::Module {
             exports
         })
         .collect();
-    walk::module(&mut module, &mut normalize);
+    for item in &mut module.items {
+        if !item
+            .attributes
+            .iter()
+            .any(|a| a.module.is_none() && a.name.name == "macro")
+        {
+            walk::item(item, &mut normalize);
+        }
+    }
     module
 }
 pub fn expression(e: &n::Expr, transition: &mut Transition) -> n::Expr {

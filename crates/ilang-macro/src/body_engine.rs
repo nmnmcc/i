@@ -169,12 +169,25 @@ impl<'a> BodyEngine<'a> {
         if mac.source == self.source {
             return Err(Error::SameModule(invocation_span));
         }
+        let (definition, target) =
+            mac.definition
+                .variant(&args, item.as_ref(), call)
+                .map_err(|error| Error::Run {
+                    failure: Failure::Syntax(error),
+                    macro_name: mac.definition.name.clone(),
+                    call: call.clone(),
+                    invocation_span,
+                })?;
         let phase = match position {
             MacroPosition::Item => 0,
             MacroPosition::Expression => 1,
             MacroPosition::Type => 2,
         };
-        let key = (mac.source.0, mac.definition.name.clone(), phase);
+        let key = (
+            mac.source.0,
+            format!("{}:{target}", mac.definition.name),
+            phase,
+        );
         if !self.session.compiled.contains_key(&key) {
             let mut graph = self.graph.clone();
             let mut parsed = prepare::import_closure(&graph, self.parsed, mac.source)
@@ -188,7 +201,9 @@ impl<'a> BodyEngine<'a> {
             let binding = prepared
                 .bindings
                 .iter()
-                .find(|b| b.module == module.path && b.name == mac.definition.name)
+                .find(|b| {
+                    b.module == module.path && b.name == mac.definition.name && b.target == target
+                })
                 .expect("registered macro must be prepared");
             let (path, name) = prepare::add_wrapper(&mut graph, &mut parsed, binding, position);
             let wrapper_source = parsed.last().expect("wrapper module was added").source;
@@ -237,7 +252,7 @@ impl<'a> BodyEngine<'a> {
         let result = self
             .session
             .run(
-                &mac.definition,
+                &definition,
                 &args,
                 item,
                 call,

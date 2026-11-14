@@ -1,0 +1,5 @@
+(, id select)
+(@ macro (: id (-> (, (= value Int)) Int)))
+(@ macro (= id (| (-> (, (= value x)) _ x) (-> (, (= value y)) _ y))))
+(@ macro (: select (-> (, (= left Int) (= right String)) Int)))
+(@ macro (= select (| (-> (, (= left x) (= right y)) _ x) (-> (, (= left x) (= right y)) _ x))))

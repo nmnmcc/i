@@ -54,6 +54,8 @@ pub struct BindingRef {
 
 #[derive(Clone, Debug, Default)]
 pub struct Program {
+    /// Stable package identities for semantic ordering in compiler queries.
+    pub(crate) package_identities: Vec<crate::identity::PackageIdentity>,
     /// The top-level names that are the callee of a direct call of a chain
     /// with several shape groups: the call itself names the group.
     pub chain_uses: Vec<DefId>,
@@ -61,6 +63,7 @@ pub struct Program {
     /// with several shape groups (syntax three §2.5), in group order.
     pub chain_groups: std::collections::HashMap<DefId, Vec<(crate::types::ShapeId, DefId)>>,
     pub typed_macros: std::collections::HashSet<DefId>,
+    pub(crate) typed_macro_shapes: std::collections::HashMap<DefId, Vec<crate::types::ShapeId>>,
     pub typed_expander: Option<std::sync::Arc<dyn crate::typed_macro::Expander>>,
     pub(crate) expansion_names: Option<std::sync::Arc<crate::resolve::ExpansionNames>>,
     pub(crate) expansion_scopes:

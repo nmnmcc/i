@@ -422,6 +422,7 @@ pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagn
 /// A package with a location that a program uses, in the cache.
 #[derive(Clone, Debug)]
 pub(crate) struct Located {
+    pub(crate) files: std::sync::Arc<Vec<lock::PackageFile>>,
     pub(crate) location: PackageLocation,
     pub(crate) dir: PathBuf,
 }
@@ -577,7 +578,7 @@ impl Loader {
         }
         self.stack.pop();
         let tests = is_root && self.tests;
-        let (modules, diags) = modules::collect(self, &manifest.name, &dir, tests, None);
+        let (modules, diags) = modules::collect(self, &manifest.name, &dir, tests, None, None);
         self.graph.packages[id].modules = modules;
         self.diags.extend(diags);
         Some(id)
@@ -608,8 +609,13 @@ impl Loader {
             return Some(id);
         }
         let shown = format!("{}@{}", loc.location, loc.version);
+        let files = self.located.as_ref()?.get(&key)?.files.clone();
         let dir = &dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-        let Ok(text) = std::fs::read_to_string(dir.join("i.toml")) else {
+        let text = files
+            .iter()
+            .find(|f| f.path == "i.toml")
+            .and_then(|f| String::from_utf8(f.bytes.clone()).ok());
+        let Some(text) = text else {
             self.diags.push(Diagnostic::error(
                 code::NO_PACKAGE,
                 from_source,
@@ -652,7 +658,8 @@ impl Loader {
         let deps = self.dependencies(id, &manifest, false, dir, source);
         self.graph.packages[id].dependencies = deps;
         self.stack.pop();
-        let (modules, diags) = modules::collect(self, &manifest.name, dir, false, Some(&shown));
+        let (modules, diags) =
+            modules::collect(self, &manifest.name, dir, false, Some(&shown), Some(&files));
         self.graph.packages[id].modules = modules;
         self.diags.extend(diags);
         Some(id)

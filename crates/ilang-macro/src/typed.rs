@@ -170,12 +170,15 @@ impl Driver {
             })
             .expect("resolved typed call has source syntax");
         let written = crate::call3::expression(&original).expect("typed expression is a call");
-        let mut arguments: Vec<_> =
-            crate::body_engine3::expression_arguments(&written, |e| syntax_for(p, &self.graph, e))
-                .into_iter()
-                .map(|arg| arg.syntax)
-                .collect();
+        let written_arguments =
+            crate::body_engine3::expression_arguments(&written, |e| syntax_for(p, &self.graph, e));
+        let written_labels: Vec<_> = written_arguments.iter().map(|a| a.label.clone()).collect();
+        let mut arguments: Vec<_> = written_arguments.into_iter().map(|a| a.syntax).collect();
         let order = query.argument_order();
+        let labels: Vec<_> = order
+            .iter()
+            .map(|i| written_labels[*i as usize].clone())
+            .collect();
         arguments = order
             .iter()
             .map(|i| arguments[*i as usize].clone())
@@ -307,10 +310,8 @@ impl Driver {
         let args = arguments
             .iter()
             .cloned()
-            .map(|syntax| MacroArgument {
-                label: None,
-                syntax,
-            })
+            .zip(labels)
+            .map(|(syntax, label)| MacroArgument { label, syntax })
             .collect();
         let (result, budget, transactions) = engine
             .execute(&mac, args, &call, span, None, MacroPosition::Expression)

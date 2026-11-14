@@ -10,7 +10,7 @@
 //!   guard, one choice per parameter), or when it is not a clause block
 //!   (several positions, or a written need or result). In the second case
 //!   the lowering names the parameters itself, so they take no label.
-use super::expansion::MacroDefinition;
+use super::expansion::{MacroDefinition, MacroVariant};
 use super::syntax::SyntaxError;
 use crate::syn3::ast::{
     Attribute, Binding, ExprKind, Function, Item, ItemKind, Module, PatternKind, TItem, Type,
@@ -24,7 +24,7 @@ fn is_macro(a: &Attribute) -> bool {
 
 /// The type parameters that the lowering puts on a binding.
 pub fn has_type_parameters(binding: &Binding) -> bool {
-    let on_chain = matches!(&binding.value.kind, ExprKind::Chain(fs) if fs.iter().any(|f| !f.generics.is_empty()));
+    let on_chain = matches!(&binding.value.kind, ExprKind::Chain(fs) if matches!(fs.as_slice(), [f] if plain(f) && !f.generics.is_empty()));
     let on_type = matches!(&binding.pattern.kind, PatternKind::Typed { ty, .. }
         if matches!(&ty.kind, TypeKind::Fn(f) if !f.generics.is_empty()));
     on_chain || on_type
@@ -124,39 +124,75 @@ pub fn definitions(module: &Module, lisp: bool) -> Result<Vec<MacroDefinition>, 
             continue;
         }
         let functions = match &binding.value.kind {
-            ExprKind::Chain(fs) if !clause_block(fs) => fs,
+            ExprKind::Chain(fs) => fs,
             _ => {
                 errors.push(error(
-                    "a macro binding needs a function expression",
+                    "a macro binding needs a function expression or shape branches",
                     binding.value.span.0,
                 ));
                 continue;
             }
         };
         let mut parameters = Vec::new();
+        let mut labels = Vec::new();
+        let mut variants = Vec::new();
         let mut valid = true;
-        match functions.as_slice() {
-            [function] if plain(function) => {
-                for parameter in &function.params {
-                    let p = &parameter.choices[0];
-                    match &p.kind {
-                        PatternKind::Var(name) => parameters.push(name.clone()),
-                        PatternKind::Typed { binder, .. } if !binder.discard => {
-                            parameters.push(binder.name.clone())
-                        }
-                        _ => {
-                            errors.push(error("a macro parameter must be a name", p.span.0));
-                            valid = false;
-                        }
+        if let [function] = functions.as_slice()
+            && plain(function)
+        {
+            let mut params: Vec<_> = function.params.iter().collect();
+            params.sort_by(|a, b| {
+                a.key
+                    .as_ref()
+                    .map(|k| &k.name)
+                    .cmp(&b.key.as_ref().map(|k| &k.name))
+            });
+            for parameter in params {
+                let p = &parameter.choices[0];
+                match &p.kind {
+                    PatternKind::Var(name) => parameters.push(name.clone()),
+                    PatternKind::Typed { binder, .. } if !binder.discard => {
+                        parameters.push(binder.name.clone())
+                    }
+                    _ => {
+                        errors.push(error(
+                            "a macro parameter must be a name, optionally with an explicit label",
+                            p.span.0,
+                        ));
+                        valid = false;
+                        continue;
                     }
                 }
+                let label = parameter.key.as_ref().map(|k| k.name.clone());
+                if label
+                    .as_ref()
+                    .is_some_and(|l| labels.contains(&Some(l.clone())))
+                {
+                    errors.push(error("a macro parameter label is repeated", p.span.0));
+                    valid = false;
+                }
+                labels.push(label);
             }
-            // The lowering makes a function of fresh parameters over a
-            // match. Their names cannot be written, so no label names them.
-            _ => parameters.extend(
-                (0..functions.first().map_or(0, |f| f.params.len()))
-                    .map(|i| format!("%arg{}", i + 1)),
-            ),
+        } else {
+            let mut shapes: Vec<Vec<Option<String>>> = Vec::new();
+            for function in functions {
+                let shape = function_shape(function);
+                if !shapes.contains(&shape) {
+                    shapes.push(shape);
+                }
+            }
+            for (i, shape) in shapes.into_iter().enumerate() {
+                variants.push(MacroVariant {
+                    target: format!("{name}%g{i}"),
+                    parameters: (0..shape.len()).map(|j| format!("argument{j}")).collect(),
+                    labels: shape,
+                });
+            }
+            if let Some(first) = variants.first() {
+                parameters = first.parameters.clone();
+                labels = first.labels.clone();
+            }
+            variants.sort_by(|a, b| a.labels.cmp(&b.labels));
         }
         let signature = module.items.iter().position(
             |other| matches!(&other.kind, ItemKind::Decl { name: declared, .. } if declared.name == *name),
@@ -191,18 +227,20 @@ pub fn definitions(module: &Module, lisp: bool) -> Result<Vec<MacroDefinition>, 
                 }
                 match &ty.kind {
                     TypeKind::Fn(f) => {
-                        // A parameter that is not written as data is an
-                        // error of the lowering, which leaves no parameter.
-                        let count = match &f.param.kind {
-                            TypeKind::Data(items) => items
-                                .iter()
-                                .filter(|i| !matches!(i, TItem::Spread(_)))
-                                .count(),
-                            _ => 0,
-                        };
-                        if count != parameters.len() {
-                            errors.push(error("a typed macro implementation must have one parameter for each signature parameter", item.span.0));
-                            valid = false;
+                        if let Some(mut advertised) = signature_shapes(&f.param) {
+                            let mut implemented = if variants.is_empty() {
+                                vec![labels.clone()]
+                            } else {
+                                variants.iter().map(|v| v.labels.clone()).collect()
+                            };
+                            advertised.sort();
+                            advertised.dedup();
+                            implemented.sort();
+                            implemented.dedup();
+                            if !advertised.iter().all(|shape| implemented.contains(shape)) {
+                                errors.push(error("a typed macro implementation must have one parameter for each signature parameter in every parameter-data shape, with matching explicit labels",item.span.0));
+                                valid = false;
+                            }
                         }
                     }
                     _ => {
@@ -220,6 +258,8 @@ pub fn definitions(module: &Module, lisp: bool) -> Result<Vec<MacroDefinition>, 
                 item: index,
                 name: name.clone(),
                 parameters,
+                labels,
+                variants,
                 signature,
             });
         }
@@ -228,6 +268,67 @@ pub fn definitions(module: &Module, lisp: bool) -> Result<Vec<MacroDefinition>, 
         Ok(found)
     } else {
         Err(errors)
+    }
+}
+
+/// Canonical ordinary call shape, preserving explicit labels only.
+pub fn function_shape(f: &Function) -> Vec<Option<String>> {
+    let mut labels: Vec<_> = f
+        .params
+        .iter()
+        .map(|p| p.key.as_ref().map(|k| k.name.clone()))
+        .collect();
+    labels.sort();
+    labels
+}
+fn signature_shapes(ty: &Type) -> Option<Vec<Vec<Option<String>>>> {
+    // Mirror main's signature projection: a directly written parameter data
+    // lists its parts; data inside a union uses its lowered record/tuple view.
+    // Unsupported mixed/spread data keeps the lowering diagnostics, without
+    // gaining a second, different macro-shape diagnostic here.
+    fn nested(ty: &Type) -> Option<Vec<Vec<Option<String>>>> {
+        Some(match &ty.kind {
+            TypeKind::Data(items) => {
+                let mut labels =
+                    if !items.is_empty() && items.iter().all(|i| matches!(i, TItem::Pos(_))) {
+                        vec![None; items.len()]
+                    } else {
+                        items
+                            .iter()
+                            .filter_map(|i| match i {
+                                TItem::Label(k, _) => Some(Some(k.name.clone())),
+                                _ => None,
+                            })
+                            .collect()
+                    };
+                labels.sort();
+                vec![labels]
+            }
+            TypeKind::Union(xs) => {
+                let mut out = Vec::new();
+                for x in xs {
+                    out.extend(nested(x)?);
+                }
+                out
+            }
+            _ => return None,
+        })
+    }
+    if let TypeKind::Data(items) = &ty.kind
+        && (items.is_empty() || items.iter().any(|i| !matches!(i, TItem::Label(..))))
+    {
+        let mut labels: Vec<_> = items
+            .iter()
+            .filter_map(|i| match i {
+                TItem::Pos(_) => Some(None),
+                TItem::Label(k, _) => Some(Some(k.name.clone())),
+                TItem::Spread(_) => None,
+            })
+            .collect();
+        labels.sort();
+        Some(vec![labels])
+    } else {
+        nested(ty)
     }
 }
 
@@ -258,8 +359,16 @@ mod tests {
                 assert_eq!(a.len(), b.len(), "{source}");
                 for (a, b) in a.iter().zip(b) {
                     assert_eq!(
-                        (a.item, &a.name, a.signature),
-                        (b.item, &b.name, b.signature)
+                        (
+                            module.items[a.item].span.0,
+                            &a.name,
+                            a.signature.map(|i| module.items[i].span.0)
+                        ),
+                        (
+                            lowered.items[b.item].span,
+                            &b.name,
+                            b.signature.map(|i| lowered.items[i].span)
+                        )
                     );
                     assert_eq!(a.parameters.len(), b.parameters.len(), "{source}");
                     if !b.parameters.iter().any(|p| p.starts_with('%')) {
@@ -289,6 +398,8 @@ mod tests {
             "@macro\nm = (a, 0) { a } | (a, b) { b }",
             "@macro\nm = (a) -> Syntax { a } | (b) { b }",
             "@macro\nm = <A>(a) { a }",
+            "@macro\nm = <A>(a : A) { a } | (b, c) { b }",
+            "@macro\nm : { (Int, x = Int) | (Int) } -> Int\n@macro\nm = (x = a) { a } | (b) { b }",
             "@macro\nm = 1",
             "@macro\n(a, b) = (1, 2)",
             "@macro(\"x\")\nm = (a) { a }",

@@ -948,3 +948,12 @@ change and every known diagnostic location/row change is explained in
 all command results and repaired initial failures. No implementation or
 required gate remains pending. Landable documentation hash follows in
 shared status-fa.txt; production source is unchanged since e840c135b.
+
+Nov14 19:10: origin/main9b806113 is integrated for MP01–MP16 and F1, with
+main behavior authoritative. Native macro interfaces, groups, explicit
+labels, typed shapes/package identities and function-value entries are
+ported; production lower/old tree stay deleted. Workspace all-target check,
+requested Rust packages (value_types omitted), reader follow-up/doctests and
+CLI cache3/known3/macro66/package34 pass. Spec4.8/9/14 and direct snippets
+remain active/pending; final phase results follow in shared status-fa.txt.
+See [the main integration report](syn3-final-ast-main-mp-integration.md).

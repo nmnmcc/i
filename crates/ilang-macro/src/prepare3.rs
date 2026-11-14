@@ -43,12 +43,91 @@ pub fn compiler_module(
             module.items[index].kind = placeholder(&module.items[index]);
         }
     }
+    let mut groups = Vec::new();
     for definition in definitions {
-        module.items[definition.item]
-            .attributes
-            .retain(|a| !is_macro(a));
+        let item = &mut module.items[definition.item];
+        item.attributes.retain(|a| !is_macro(a));
+        let ItemKind::Bind(binding) = &mut item.kind else {
+            continue;
+        };
+        let ExprKind::Chain(functions) = &mut binding.value.kind else {
+            continue;
+        };
+        if definition.variants.is_empty() {
+            for function in functions {
+                canonical(function);
+            }
+        } else {
+            let mut values = Vec::new();
+            for variant in &definition.variants {
+                let mut fs: Vec<_> = functions
+                    .iter()
+                    .filter(|f| ilang_syntax::lisp::expansion3::function_shape(f) == variant.labels)
+                    .cloned()
+                    .collect();
+                for f in &mut fs {
+                    canonical(f);
+                }
+                let first = fs[0].span.0;
+                let cover = first.to(fs.last().unwrap().span.0);
+                let at = ilang_syntax::span::Span::new(first.start, first.start + 1);
+                groups.push(Item {
+                    doc: Vec::new(),
+                    attributes: Vec::new(),
+                    span: item.span,
+                    kind: ItemKind::Bind(Binding {
+                        pattern: Pattern::new(PatternKind::Var(variant.target.clone()), at),
+                        value: Expr::new(ExprKind::Chain(fs), cover),
+                        span: binding.span,
+                    }),
+                });
+                let mut shape = variant
+                    .labels
+                    .iter()
+                    .filter(|x| x.is_none())
+                    .count()
+                    .to_string();
+                for label in variant.labels.iter().flatten() {
+                    shape.push(',');
+                    shape.push_str(label);
+                }
+                values.push(ilang_syntax::ast::DItem::Label(
+                    ilang_syntax::ast::Ident::new(shape, at),
+                    Expr::new(
+                        ExprKind::Name {
+                            module: None,
+                            name: ilang_syntax::ast::Ident::new(&variant.target, at),
+                        },
+                        at,
+                    ),
+                ));
+            }
+            binding.value.kind = ExprKind::Call {
+                callee: Box::new(Expr::new(
+                    ExprKind::Name {
+                        module: None,
+                        name: ilang_syntax::ast::Ident::new("%multi", binding.value.span.0),
+                    },
+                    binding.value.span.0,
+                )),
+                args: values,
+            };
+        }
     }
+    module.items.extend(groups);
     quote_lower3::lower_expression_quotes(module, module_id, templates)
+}
+
+fn canonical(function: &mut ilang_syntax::ast::Function) {
+    function.params.sort_by(|a, b| {
+        a.key
+            .as_ref()
+            .map(|k| &k.name)
+            .cmp(&b.key.as_ref().map(|k| &k.name))
+    });
+    for param in &mut function.params {
+        param.key = None;
+    }
 }
 
 #[cfg(test)]

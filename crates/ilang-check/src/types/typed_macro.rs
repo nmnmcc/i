@@ -198,6 +198,93 @@ fn observe(s: &Solver, t: &Ty, fixed: &HashSet<V>, parts: Option<&FnTy>) -> Hash
     }
     result
 }
+/// Scope-free printing is insufficient for nominal types with equal names.
+/// Set children are sorted recursively so spelling order never breaks ties.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum MemberKey {
+    Never,
+    Top,
+    Variable(u32),
+    Builtin(String, Vec<String>, bool, Vec<MemberKey>),
+    Named(
+        crate::identity::TypeIdentity,
+        Vec<String>,
+        bool,
+        Vec<MemberKey>,
+    ),
+    Data(Vec<Option<String>>, Vec<MemberKey>),
+    Function(
+        Box<MemberKey>,
+        Box<MemberKey>,
+        Box<MemberKey>,
+        Box<MemberKey>,
+    ),
+    Union(Vec<MemberKey>),
+    Intersection(Vec<MemberKey>),
+    Difference(Box<MemberKey>, Vec<MemberKey>),
+    Both(Box<MemberKey>, Box<MemberKey>),
+}
+fn member_key(program: &Program, t: &Ty) -> MemberKey {
+    let keys = |xs: &[Ty]| {
+        xs.iter()
+            .map(|t| member_key(program, t))
+            .collect::<Vec<_>>()
+    };
+    let set = |xs: &[Ty]| {
+        let mut xs = keys(xs);
+        xs.sort();
+        xs.dedup();
+        xs
+    };
+    match t {
+        Ty::Never => MemberKey::Never,
+        Ty::Top => MemberKey::Top,
+        Ty::Var(v) => MemberKey::Variable(v.0),
+        Ty::Con(h, values, args) => {
+            let args = keys(args);
+            let literals = values.items().map(|v| v.to_string()).collect();
+            match h {
+                Head::Named(TypeRef::Builtin(b)) => {
+                    MemberKey::Builtin(b.name().into(), literals, values.is_finite(), args)
+                }
+                Head::Named(TypeRef::Custom(id)) => {
+                    let def = program.ty(*id);
+                    let module = program.module(def.module);
+                    MemberKey::Named(
+                        crate::identity::TypeIdentity {
+                            package: program.package_identities[module.package].clone(),
+                            module: module
+                                .path
+                                .split_once('/')
+                                .map_or(module.path.as_str(), |(_, p)| p)
+                                .into(),
+                            name: def.name.clone(),
+                        },
+                        literals,
+                        values.is_finite(),
+                        args,
+                    )
+                }
+                Head::Shape(shape) => MemberKey::Data(shape.keys(), args),
+                Head::Fn => unreachable!("functions have Ty::Fn"),
+            }
+        }
+        Ty::Fn(f) => MemberKey::Function(
+            Box::new(member_key(program, &f.param)),
+            Box::new(member_key(program, &f.ret)),
+            Box::new(member_key(program, &f.err)),
+            Box::new(member_key(program, &f.env)),
+        ),
+        Ty::Union(xs) => MemberKey::Union(set(xs)),
+        Ty::Inter(xs) => MemberKey::Intersection(set(xs)),
+        Ty::Diff(base, xs) => MemberKey::Difference(Box::new(member_key(program, base)), set(xs)),
+        Ty::Both(a, b) => MemberKey::Both(
+            Box::new(member_key(program, a)),
+            Box::new(member_key(program, b)),
+        ),
+    }
+}
+
 impl TypedMacroQuery {
     pub(super) fn new(
         c: &Checker<'_>,
@@ -395,9 +482,16 @@ impl TypedMacroQuery {
         }
         let mut ts = Vec::new();
         split(t, &mut ts);
-        let mut answer: Vec<_> = ts.iter().map(|t| self.syntax(&mut s, t)).collect();
-        answer.sort_by_key(Syntax::show);
-        Ok(answer)
+        let mut answer: Vec<_> = ts
+            .iter()
+            .map(|t| {
+                let identity = member_key(&s.program, t);
+                let syntax = self.syntax(&mut s, t);
+                ((syntax.show(), identity), syntax)
+            })
+            .collect();
+        answer.sort_by(|(a, _), (b, _)| a.cmp(b));
+        Ok(answer.into_iter().map(|(_, syntax)| syntax).collect())
     }
     fn read(&self, s: &mut QueryState, syntax: &Syntax) -> Result<Ty, String> {
         let mut work = vec![syntax];
@@ -956,6 +1050,13 @@ mod tests {
         assert!(replay.failures.is_empty());
         replay.constrain(&a, &string());
         assert!(!replay.failures.is_empty());
+    }
+    #[test]
+    fn member_identity_ignores_nested_set_order() {
+        let program = Program::default();
+        let left = Ty::tuple(vec![Ty::Union(vec![int(), string()])]);
+        let right = Ty::tuple(vec![Ty::Union(vec![string(), int()])]);
+        assert_eq!(member_key(&program, &left), member_key(&program, &right));
     }
     #[test]
     fn typed_macro_observation_keeps_shared_invariant_identity() {

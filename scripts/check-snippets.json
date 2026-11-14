@@ -3145,5 +3145,55 @@
   },
   "crates/ilang-cli/tests/package_commands.rs:993694097be64fea": {
     "not_source": "search text in a test: the head of the template main"
+  },
+  "crates/ilang-check/tests/known_facts.rs:74282c580560b9e5": {
+    "not_source": "TOML package manifest format used by the regression helper"
+  },
+  "crates/ilang-cli/tests/entries.rs:45557712f76a42e4": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/entries.rs:8d7768dd6917cb79": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:090fdb1b01bba12a": {
+    "reason": "Render the MP13 Rust format! template with its first item order and unescape Rust braces; the unit test exercises all three rendered variants.",
+    "substitutions": [
+      [
+        "{items}",
+        "m.inspect(T)\nm.emit(T)"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/package_commands.rs:07c284cd8f2a26a7": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:2571ce03d469bbde": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:7c70477f5fb1c039": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:9015630e06ad4e25": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:c47da3d374390ac6": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-package/tests/git.rs:2571ce03d469bbde": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-package/tests/git.rs:7d5664697bbe253e": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-package/tests/git.rs:d28ff2bb107da518": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
   }
 }

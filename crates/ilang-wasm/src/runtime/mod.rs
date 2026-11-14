@@ -391,6 +391,10 @@ pub(crate) fn wat_for_expansion_sites(references: bool, expansion_sites: bool) -
     runtime.get_or_init(|| runtime_wat(references, expansion_sites))
 }
 
+pub(crate) fn portable_macro_hash(text: &str) -> String {
+    values::portable_macro_hash(text)
+}
+
 fn runtime_wat(references: bool, expansion_sites: bool) -> String {
     [
         MEMORY.to_owned(),

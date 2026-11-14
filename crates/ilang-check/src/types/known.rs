@@ -1,4 +1,4 @@
-//! Known types and expected types (§4.8).
+//! Known facts, structural access hints and expected types (§4.8).
 //!
 //! A known type is found from what is written, by a walk over the
 //! expression that goes with inference, in its order: groups in the order
@@ -14,6 +14,53 @@ use super::lits::ValueSet;
 use super::{FnTy, Head, Ty, V};
 use crate::hir::*;
 use std::collections::HashMap;
+
+/// Structural hints support checked access bounds; facts alone may eliminate
+/// runtime possibilities. Hidden inputs can invalidate a hint's constructor.
+#[derive(Clone, Debug)]
+pub(super) struct Knowledge {
+    pub hint: Ty,
+    pub fact: Ty,
+}
+
+impl Knowledge {
+    pub fn certain(t: Ty) -> Self {
+        Self {
+            hint: t.clone(),
+            fact: t,
+        }
+    }
+
+    pub fn unknown() -> Self {
+        Self::certain(Ty::Top)
+    }
+
+    pub fn map(&self, f: impl Fn(&Ty) -> Ty) -> Self {
+        Self {
+            hint: f(&self.hint),
+            fact: f(&self.fact),
+        }
+    }
+
+    pub fn tuple(parts: Vec<Self>) -> Self {
+        let (hints, facts) = parts.into_iter().map(|k| (k.hint, k.fact)).unzip();
+        Self {
+            hint: Ty::tuple(hints),
+            fact: Ty::tuple(facts),
+        }
+    }
+
+    pub fn member(&self, h: Head) -> Self {
+        self.map(|t| member(t, Some(h)).unwrap_or(Ty::Top))
+    }
+
+    pub fn part(&self, i: usize) -> Self {
+        self.map(|t| match t {
+            Ty::Con(_, _, xs) => xs.get(i).cloned().unwrap_or(Ty::Top),
+            _ => Ty::Top,
+        })
+    }
+}
 
 /// The types each type variable gets by matching (§4.8).
 pub(super) type Sigma = HashMap<V, Vec<Ty>>;
@@ -147,6 +194,31 @@ impl Checker<'_> {
                             }
                         })
                         .collect(),
+                )
+            })
+            .collect()
+    }
+
+    pub fn kunion_knowledge(&self, ms: Vec<Knowledge>) -> Knowledge {
+        let (hints, facts) = ms.into_iter().map(|k| (k.hint, k.fact)).unzip();
+        Knowledge {
+            hint: self.kunion(hints),
+            fact: self.kunion(facts),
+        }
+    }
+
+    /// A hidden input may supply any constructor, not just more literals.
+    pub fn fact_sigma(&self, sigma: &Sigma, hidden: &[V]) -> Sigma {
+        sigma
+            .iter()
+            .map(|(v, ts)| {
+                (
+                    *v,
+                    if hidden.contains(v) {
+                        vec![Ty::Top]
+                    } else {
+                        ts.clone()
+                    },
                 )
             })
             .collect()
@@ -383,7 +455,14 @@ impl Checker<'_> {
     /// form, where a variable that is not generalized is replaced by the
     /// matching part of `value`, the known type of the value of the
     /// binding, or else by `_`.
-    pub fn scheme_known(&mut self, t: &Ty, level: u32, value: &Ty) -> Ty {
+    pub fn scheme_known(&mut self, t: &Ty, level: u32, value: &Knowledge) -> Knowledge {
+        Knowledge {
+            hint: self.scheme_known_ty(t, level, &value.hint),
+            fact: self.scheme_known_ty(t, level, &value.fact),
+        }
+    }
+
+    fn scheme_known_ty(&mut self, t: &Ty, level: u32, value: &Ty) -> Ty {
         let simple = display::known_keep(&self.s, t, level);
         let general = |c: &Self, v: &V| c.s.vars.get(v.0 as usize).is_some_and(|x| x.level > level);
         let mut sigma = Sigma::new();
@@ -496,22 +575,36 @@ impl Checker<'_> {
     /// The known type of a call of a function with the known type `f`, with
     /// arguments of the known types `args`, in the order of the parameters
     /// (§4.8): every type variable of its result gets a type by matching.
-    pub fn call_known(&self, f: &FnTy, args: &[Ty]) -> Ty {
+    pub fn call_known(&self, f: &Knowledge, args: &[Knowledge]) -> Knowledge {
+        let hints: Vec<_> = args.iter().map(|k| k.hint.clone()).collect();
+        let facts: Vec<_> = args.iter().map(|k| k.fact.clone()).collect();
+        Knowledge {
+            hint: one_fn(&f.hint).map_or(Ty::Top, |f| self.call_known_ty(&f, &hints, false)),
+            fact: one_fn(&f.fact).map_or(Ty::Top, |f| self.call_known_ty(&f, &facts, true)),
+        }
+    }
+
+    fn call_known_ty(&self, f: &FnTy, args: &[Ty], factual: bool) -> Ty {
         let mut sigma = Sigma::new();
         if let Some(parts) = f.parts() {
             for (p, k) in parts.iter().zip(args) {
                 self.match_k(p, k, &mut sigma, 0);
             }
         }
-        let sigma = self.whole_sigma(&sigma, &self.hidden_inputs(f));
+        let sigma = if factual {
+            let whole = self.whole_sigma(&sigma, &self.hidden_inputs(f));
+            self.fact_sigma(&whole, &unshown_inputs(&self.s, f))
+        } else {
+            self.whole_sigma(&sigma, &self.hidden_inputs(f))
+        };
         self.ksubst(&f.ret, &sigma, false).unwrap_or(Ty::Top)
     }
 
     /// Gives a name of a pattern its known type. In a `case`, the choices of
     /// a clause bind one name together, so it gets the union.
-    pub fn kbind(&mut self, var: VarId, k: Ty, in_case: bool) {
+    pub fn kbind(&mut self, var: VarId, k: Knowledge, in_case: bool) {
         let k = match self.kvars.get(&var) {
-            Some(old) if in_case => self.kunion(vec![old.clone(), k]),
+            Some(old) if in_case => self.kunion_knowledge(vec![old.clone(), k]),
             _ => k,
         };
         self.kvars.insert(var, k);
@@ -520,13 +613,17 @@ impl Checker<'_> {
     /// The known type that `x` gets in `x = q`, when the value has the
     /// known type `b`: the member of `b` with the type constructor of the
     /// pattern type of `q`, or what is written in `q` (§4.8).
-    pub fn member_for(&self, q: &Pattern, b: &Ty) -> Ty {
+    pub fn member_for(&self, q: &Pattern, b: &Knowledge) -> Knowledge {
+        b.map(|t| self.member_for_ty(q, t))
+    }
+
+    fn member_for_ty(&self, q: &Pattern, b: &Ty) -> Ty {
         let prim = |t| Head::Named(TypeRef::Builtin(t));
         let head = match &q.kind {
             PatternKind::Quote { syntax, .. } => Head::Named(TypeRef::Custom(*syntax)),
             PatternKind::Var(_) | PatternKind::Discard => return b.clone(),
             PatternKind::Typed { ty, .. } => return self.kconv(ty, &HashMap::new()),
-            PatternKind::Named { pattern, .. } => return self.member_for(pattern, b),
+            PatternKind::Named { pattern, .. } => return self.member_for_ty(pattern, b),
             PatternKind::Int { .. } => prim(BuiltinType::Int),
             PatternKind::Float { .. } => prim(BuiltinType::Float),
             PatternKind::String(_) | PatternKind::Prefix { .. } => prim(BuiltinType::String),
@@ -548,7 +645,7 @@ impl Checker<'_> {
     /// `b`; any other pattern takes the member of `b` with its type
     /// constructor, and its parts get the parts of that member. `x: T` gets
     /// `T`, whatever the value.
-    pub fn fit_known(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
+    pub fn fit_known(&mut self, q: &Pattern, b: &Knowledge, in_case: bool) {
         let prim = |t| Ty::named(TypeRef::Builtin(t), Vec::new());
         match &q.kind {
             PatternKind::Quote {
@@ -561,7 +658,7 @@ impl Checker<'_> {
                     } else {
                         one.clone()
                     };
-                    self.fit_known(pattern, &ty, in_case);
+                    self.fit_known(pattern, &Knowledge::certain(ty), in_case);
                 }
             }
             PatternKind::Var(x) => self.kbind(x.var, b.clone(), in_case),
@@ -570,7 +667,7 @@ impl Checker<'_> {
                 ty,
             } => {
                 let k = self.kconv(ty, &HashMap::new());
-                self.kbind(x.var, k, in_case);
+                self.kbind(x.var, Knowledge::certain(k), in_case);
             }
             PatternKind::Named { binder, pattern } => {
                 let k = self.member_for(pattern, b);
@@ -578,18 +675,19 @@ impl Checker<'_> {
                 self.fit_known(pattern, b, in_case);
             }
             PatternKind::Prefix { rest: Some(x), .. } => {
-                self.kbind(x.var, prim(BuiltinType::String), in_case);
+                self.kbind(
+                    x.var,
+                    Knowledge::certain(prim(BuiltinType::String)),
+                    in_case,
+                );
             }
             PatternKind::Constructor { ctor, args, spread } => {
-                let args_k = match member(b, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
-                    Some(Ty::Con(_, _, xs)) => Some(xs),
-                    _ => None,
-                };
+                let kctor = b.member(Head::Named(TypeRef::Custom(ctor.ty)));
                 let n = match &self.p.ty(ctor.ty).body {
                     TypeBody::Custom(cs) => cs[ctor.index as usize].fields.len(),
                     TypeBody::Alias(_) => 0,
                 };
-                let fields: Vec<(Option<String>, Ty)> = (0..n)
+                let fields: Vec<(Option<String>, Knowledge)> = (0..n)
                     .map(|i| {
                         let label = match &self.p.ty(ctor.ty).body {
                             TypeBody::Custom(cs) => cs[ctor.index as usize].fields[i]
@@ -598,41 +696,40 @@ impl Checker<'_> {
                                 .map(|l| l.name.clone()),
                             TypeBody::Alias(_) => None,
                         };
-                        let k = match &args_k {
-                            Some(xs) => self.field_known(*ctor, i, Some(xs)),
-                            None => Ty::Top,
-                        };
+                        let k = kctor.map(|t| match t {
+                            Ty::Con(_, _, xs) => self.field_known(*ctor, i, Some(xs)),
+                            _ => Ty::Top,
+                        });
                         (label, k)
                     })
                     .collect();
-                for (arg, i) in self.match_fields(q.span, &fields, args, *spread) {
+                for (arg, i) in self.match_fields(
+                    q.span,
+                    &fields
+                        .iter()
+                        .map(|(l, k)| (l.clone(), k.hint.clone()))
+                        .collect::<Vec<_>>(),
+                    args,
+                    *spread,
+                ) {
                     let k = fields[i].1.clone();
                     self.fit_known(arg, &k, in_case);
                 }
             }
             PatternKind::Tuple(ps) => {
-                let parts = match member(
-                    b,
-                    Some(Head::Shape(super::ShapeId::positional(ps.len() as u32))),
-                ) {
-                    Some(Ty::Con(_, _, xs)) => xs,
-                    _ => vec![Ty::Top; ps.len()],
-                };
-                for (x, k) in ps.iter().zip(&parts) {
-                    self.fit_known(x, k, in_case);
+                let data = b.member(Head::Shape(super::ShapeId::positional(ps.len() as u32)));
+                for (i, x) in ps.iter().enumerate() {
+                    self.fit_known(x, &data.part(i), in_case);
                 }
             }
             PatternKind::List { items, rest } => {
-                let list = member(b, Some(Head::Named(TypeRef::Builtin(BuiltinType::List))));
-                let e = match &list {
-                    Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
-                    _ => Ty::Top,
-                };
+                let list = b.member(Head::Named(TypeRef::Builtin(BuiltinType::List)));
+                let e = list.part(0);
                 for x in items {
                     self.fit_known(x, &e, in_case);
                 }
                 if let Some(Some(x)) = rest {
-                    self.kbind(x.var, list.unwrap_or(Ty::Top), in_case);
+                    self.kbind(x.var, list, in_case);
                 }
             }
             PatternKind::BitArray(segs) => {
@@ -641,12 +738,12 @@ impl Checker<'_> {
                         None => prim(BuiltinType::Int),
                         Some(f) => format_prim(&f.name.name).map_or(Ty::Top, prim),
                     };
-                    self.fit_known(&s.value, &k, in_case);
+                    self.fit_known(&s.value, &Knowledge::certain(k), in_case);
                 }
             }
             PatternKind::Error(ps) => {
                 for x in ps {
-                    self.fit_known(x, &Ty::Top, in_case);
+                    self.fit_known(x, &Knowledge::unknown(), in_case);
                 }
             }
             _ => {}
@@ -697,7 +794,7 @@ impl Checker<'_> {
                             [Stmt::Expr(x)] => todo.push(Task::Visit(x)),
                             _ => values.push(Ty::Top),
                         },
-                        ExprKind::Fn(f) => values.push(self.fn_known(f, &[], Ty::Top)),
+                        ExprKind::Fn(f) => values.push(self.fn_known_ty(f, &[], Ty::Top)),
                         _ => values.push(Ty::Top),
                     }
                 }
@@ -715,7 +812,22 @@ impl Checker<'_> {
     /// parameter, the type written at its top, or else the one from the
     /// expected type in `expected`, or else `_`; and the written `->` part,
     /// or else `body`.
-    pub fn fn_known(&self, f: &Function, expected: &[Ty], body: Ty) -> Ty {
+    pub fn fn_known(&self, f: &Function, expected: &[Knowledge], body: Knowledge) -> Knowledge {
+        Knowledge {
+            hint: self.fn_known_ty(
+                f,
+                &expected.iter().map(|k| k.hint.clone()).collect::<Vec<_>>(),
+                body.hint,
+            ),
+            fact: self.fn_known_ty(
+                f,
+                &expected.iter().map(|k| k.fact.clone()).collect::<Vec<_>>(),
+                body.fact,
+            ),
+        }
+    }
+
+    fn fn_known_ty(&self, f: &Function, expected: &[Ty], body: Ty) -> Ty {
         let local = HashMap::new();
         let params = f
             .params
@@ -752,13 +864,15 @@ impl Checker<'_> {
             Some(t) => self.kconv(t, &HashMap::new()),
             None => self.written_known(&b.value),
         };
-        self.fit_known(&b.pattern, &k, false);
+        self.fit_known(&b.pattern, &Knowledge::certain(k), false);
     }
 
     /// The expected type of the value of a binding (§4.8): `T` when the
     /// pattern has `x: T` at its top.
-    pub fn binding_expected(&self, b: &Binding) -> Ty {
-        top_written(&b.pattern).map_or(Ty::Top, |t| self.kconv(t, &HashMap::new()))
+    pub fn binding_expected(&self, b: &Binding) -> Knowledge {
+        Knowledge::certain(
+            top_written(&b.pattern).map_or(Ty::Top, |t| self.kconv(t, &HashMap::new())),
+        )
     }
 }
 
@@ -870,6 +984,14 @@ pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
     }
 }
 
+/// Inputs absent even after all argument facts (including callback results)
+/// have been matched: the service environment and a later caller's inputs.
+fn unshown_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
+    let mut unshown = f.clone();
+    unshown.param = Ty::tuple(Vec::new());
+    hidden_inputs(s, &unshown)
+}
+
 /// Inputs not shown by a covariant structural part of an actual argument.
 pub(super) fn hidden_inputs(s: &super::solve::Solver, f: &FnTy) -> Vec<V> {
     fn walk(s: &super::solve::Solver, t: &Ty, given: bool, shown: bool, out: &mut Vec<V>) {
@@ -949,6 +1071,52 @@ pub(super) fn neg_literal(mut e: &Expr) -> Option<String> {
 #[cfg(test)]
 mod literal_known_tests {
     use super::*;
+    #[test]
+    fn hidden_values_erase_constructors_but_keep_access_hints_and_outer_shapes() {
+        let program = Program::default();
+        let sources = ilang_package::Sources::default();
+        let mut c = Checker::new(&program, &sources);
+        let a = c.s.fresh();
+        let zero = Knowledge::certain(scalar_literal(BuiltinType::Int, "0".into()));
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let identity = Knowledge::certain(Ty::Fn(Box::new(FnTy::new(
+            vec![(None, a.clone())],
+            a.clone(),
+            Ty::Never,
+            Ty::Never,
+        ))));
+        assert_eq!(
+            c.call_known(&identity, std::slice::from_ref(&zero)).fact,
+            zero.fact
+        );
+        let service = Knowledge::certain(Ty::Fn(Box::new(FnTy::new(
+            vec![(None, a.clone())],
+            Ty::tuple(vec![a.clone()]),
+            Ty::Never,
+            a.clone(),
+        ))));
+        let result = c.call_known(&service, std::slice::from_ref(&zero));
+        assert_eq!(result.hint, Ty::tuple(vec![int]));
+        assert_eq!(result.fact, Ty::tuple(vec![Ty::Top]));
+        let later = Knowledge::certain(Ty::Fn(Box::new(FnTy::new(
+            vec![(None, a.clone())],
+            Ty::Fn(Box::new(FnTy::new(
+                vec![(None, a.clone())],
+                a,
+                Ty::Never,
+                Ty::Never,
+            ))),
+            Ty::Never,
+            Ty::Never,
+        ))));
+        let result = c.call_known(&later, &[zero]);
+        assert_eq!(
+            one_fn(&result.fact).unwrap().param,
+            Ty::tuple(vec![Ty::Top])
+        );
+        assert_eq!(one_fn(&result.fact).unwrap().ret, Ty::Top);
+    }
+
     #[test]
     fn hidden_inputs_and_recursive_widening() {
         // decision 7: callback outputs and environments, not callback inputs.

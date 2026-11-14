@@ -344,9 +344,16 @@ pub fn check_tests(graph: &mut PackageGraph, collection: Option<&str>) -> Projec
             let check = ilang_syntax::trace::stage("check");
             let mut checked = ilang_check::check_resolved_selected(graph, program, diags, &roots);
             drop(check);
-            if let Some(typed) = &checked.types
+            if let (Some(program), Some(typed)) = (&checked.program, &checked.types)
                 && !checked.diags.iter().any(Diagnostic::is_error)
             {
+                // Pre-inference collection discovery cannot validate aliases or
+                // computed values. Validate all targets once their types exist.
+                match collections::resolve(&expanded.parsed, program, typed, &expanded.transactions)
+                {
+                    Ok(found) => entries = found,
+                    Err(errors) => checked.diags.extend(errors),
+                }
                 for entry in &mut entries {
                     entry.signature = typed
                         .schemes

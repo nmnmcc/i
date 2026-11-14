@@ -291,7 +291,7 @@ pub fn check_compiler_exports(
             "a macro program cannot execute an external declaration outside package i (§8)",
         ));
     }
-    let mut checked = check_resolved(graph, Some(program), diags);
+    let mut checked = check_resolved_inner(graph, Some(program), diags, &[], false);
     if let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
         for &entry in &program.host_exports {
             if typed
@@ -359,11 +359,23 @@ fn check_resolved(
 
 pub fn check_resolved_selected(
     graph: &PackageGraph,
+    program: Option<hir::Program>,
+    diags: Vec<Diagnostic>,
+    selected: &[(hir::DefId, bool)],
+) -> Checked {
+    check_resolved_inner(graph, program, diags, selected, true)
+}
+
+fn check_resolved_inner(
+    graph: &PackageGraph,
     mut program: Option<hir::Program>,
     mut diags: Vec<Diagnostic>,
     selected: &[(hir::DefId, bool)],
+    ordinary: bool,
 ) -> Checked {
-    if let Some(p) = &program {
+    // Compiler wrappers are checked by macro_sandbox above. Their module
+    // initializers may construct shape dispatchers from compiler functions.
+    if ordinary && let Some(p) = &program {
         let targets: Vec<_> = selected.iter().map(|(target, _)| *target).collect();
         capabilities::check_selected(p, graph, &targets, &mut diags);
     }

@@ -1,6 +1,6 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "c829216203ac222f43092428007a9c3026b14ac8",
+  "binary_sha256": "ed435649d4ef75158514981103ad983a059a299cca0d40f850c8e4598b401473",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(B & A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.twice : (() <- (Fail(E), ..N) -> Int) <- (Fail(E), ..N) -> Int\napp/main.with_int : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Svc(Int)) -> A\napp/main.with_dep : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Dep) -> A\napp/main.with_cov : (() <- (Fail(E), ..N) -> A, B) <- (Fail(E), N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () -> Never\napp/main.h1 : () -> 1\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:28:30: error[E0501]: `Dep` is not a subtype of `Never` (the type at 28:22 needs it)\n1 error\n"
+      "stderr": "src/main.i:28:31: error[E0501]: `Dep` is not a subtype of `Never` (the type at 28:23 needs it)\n1 error\n"
     }
   }
 }

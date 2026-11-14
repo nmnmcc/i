@@ -1,5 +1,9 @@
 use super::syntax::SyntaxError;
-pub use syntax3::lisp::expansion::{ExpansionSession, MacroArgument, MacroDefinition};
+pub use syntax3::lisp::expansion::{
+    ExpansionSession, MacroArgument, MacroDefinition, MacroVariant,
+};
+/// Find and validate source macro definitions. The type checker subsequently
+/// verifies the Syntax argument, result, error, and environment types.
 pub fn definitions(
     module: &crate::ast::Module,
     lisp: bool,
@@ -60,30 +64,93 @@ pub fn definitions(
             ));
             continue;
         }
-        let ExprKind::Fn(function) = &binding.value.kind else {
-            errors.push(error(
-                "a macro binding needs a function expression",
-                binding.value.span,
-            ));
-            continue;
+        let (function, mut variants) = match &binding.value.kind {
+            ExprKind::Fn(function) => (Some(function.as_ref()), Vec::new()),
+            ExprKind::Clauses(_) => (
+                None,
+                vec![MacroVariant {
+                    target: name.clone(),
+                    parameters: vec!["argument".into()],
+                    labels: vec![None],
+                }],
+            ),
+            ExprKind::Call { callee, args } if matches!(&callee.kind, ExprKind::Name { module: None, name } if name.name == crate::syn3::lower::MULTI) =>
+            {
+                let mut variants = Vec::new();
+                for arg in args {
+                    let Some(shape) = &arg.label else { continue };
+                    let ExprKind::Name {
+                        module: None,
+                        name: target,
+                    } = &arg.value.kind
+                    else {
+                        continue;
+                    };
+                    let mut parts = shape.name.split(',');
+                    let positions = parts
+                        .next()
+                        .and_then(|s| s.parse::<usize>().ok())
+                        .unwrap_or(0);
+                    let mut labels = vec![None; positions];
+                    labels.extend(parts.map(|s| Some(s.to_owned())));
+                    variants.push(MacroVariant {
+                        target: target.name.clone(),
+                        parameters: (0..labels.len()).map(|i| format!("argument{i}")).collect(),
+                        labels,
+                    });
+                }
+                (None, variants)
+            }
+            _ => {
+                errors.push(error(
+                    "a macro binding needs a function expression or shape branches",
+                    binding.value.span,
+                ));
+                continue;
+            }
         };
         let mut parameters = Vec::new();
+        let mut labels = Vec::new();
         let mut valid = true;
-        for parameter in &function.params {
-            match parameter {
-                Param::Env { .. } => {}
-                Param::Pattern(p) => match &p.kind {
-                    PatternKind::Var(name) => parameters.push(name.clone()),
-                    PatternKind::Typed { binder, .. } if !binder.discard => {
-                        parameters.push(binder.name.clone())
-                    }
-                    _ => {
-                        errors.push(error("a macro parameter must be a name", p.span));
-                        valid = false;
-                    }
-                },
+        for parameter in function.into_iter().flat_map(|f| &f.params) {
+            let Param::Pattern(p) = parameter else {
+                continue;
+            };
+            let (label, p) = match &p.kind {
+                PatternKind::Named { name, pattern } if name.name.starts_with("%macro_label:") => (
+                    Some(name.name.trim_start_matches("%macro_label:").to_owned()),
+                    pattern.as_ref(),
+                ),
+                _ => (None, p),
+            };
+            match &p.kind {
+                PatternKind::Var(name) => parameters.push(name.clone()),
+                PatternKind::Typed { binder, .. } if !binder.discard => {
+                    parameters.push(binder.name.clone())
+                }
+                _ => {
+                    errors.push(error(
+                        "a macro parameter must be a name, optionally with an explicit label",
+                        p.span,
+                    ));
+                    valid = false;
+                    continue;
+                }
             }
+            if label
+                .as_ref()
+                .is_some_and(|label| labels.contains(&Some(label.clone())))
+            {
+                errors.push(error("a macro parameter label is repeated", p.span));
+                valid = false;
+            }
+            labels.push(label);
         }
+        if let Some(first) = variants.first() {
+            parameters = first.parameters.clone();
+            labels = first.labels.clone();
+        }
+        variants.sort_by(|a, b| a.labels.cmp(&b.labels));
         let signature = module.items.iter().position(|other| matches!(&other.kind, ItemKind::Declaration { name: declared, .. } if declared.name == *name));
         if let Some(index) = signature {
             let declaration = &module.items[index];
@@ -127,11 +194,22 @@ pub fn definitions(
                     valid = false;
                 }
                 match &ty.kind {
-                    crate::ast::TypeKind::Fn { params, .. } if params.len() == parameters.len() => {
-                    }
-                    crate::ast::TypeKind::Fn { .. } => {
-                        errors.push(error("a typed macro implementation must have one parameter for each signature parameter", item.span));
-                        valid = false;
+                    crate::ast::TypeKind::Fn { params, .. } => {
+                        if let Some(mut advertised) = signature_shapes(params) {
+                            let mut implemented = if variants.is_empty() {
+                                vec![labels.clone()]
+                            } else {
+                                variants.iter().map(|v| v.labels.clone()).collect()
+                            };
+                            advertised.sort();
+                            advertised.dedup();
+                            implemented.sort();
+                            implemented.dedup();
+                            if !advertised.iter().all(|shape| implemented.contains(shape)) {
+                                errors.push(error("a typed macro implementation must have one parameter for each signature parameter in every parameter-data shape, with matching explicit labels", item.span));
+                                valid = false;
+                            }
+                        }
                     }
                     _ => {
                         errors.push(error(
@@ -148,6 +226,8 @@ pub fn definitions(
                 item: index,
                 name: name.clone(),
                 parameters,
+                labels,
+                variants,
                 signature,
             });
         }
@@ -156,5 +236,51 @@ pub fn definitions(
         Ok(found)
     } else {
         Err(errors)
+    }
+}
+
+/// Recover directly written shapes; resolved aliases are checked by inference,
+/// where declared type parameters and imported names have binding identities.
+fn signature_shapes(params: &[crate::ast::FnParamType]) -> Option<Vec<Vec<Option<String>>>> {
+    use crate::ast::{TypeExpr, TypeKind};
+    fn shapes(ty: &TypeExpr) -> Option<Vec<Vec<Option<String>>>> {
+        Some(match &ty.kind {
+            TypeKind::Tuple(xs) => vec![vec![None; xs.len()]],
+            TypeKind::Record {
+                base: None,
+                fields,
+                removed,
+            } if removed.is_empty() => {
+                let mut labels = fields
+                    .iter()
+                    .map(|(l, _)| Some(l.name.clone()))
+                    .collect::<Vec<_>>();
+                labels.sort();
+                vec![labels]
+            }
+            TypeKind::Union(xs) => {
+                let mut out = Vec::new();
+                for x in xs {
+                    out.extend(shapes(x)?);
+                }
+                out
+            }
+            _ => return None,
+        })
+    }
+    if let [param] = params
+        && param
+            .label
+            .as_ref()
+            .is_some_and(|l| l.name == crate::syn3::lower::DATA)
+    {
+        shapes(&param.ty)
+    } else {
+        let mut labels = params
+            .iter()
+            .map(|p| p.label.as_ref().map(|l| l.name.clone()))
+            .collect::<Vec<_>>();
+        labels.sort();
+        Some(vec![labels])
     }
 }

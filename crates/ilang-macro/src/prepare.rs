@@ -8,6 +8,8 @@ use ilang_syntax::lisp::{expansion3 as expansion, syntax::Syntax};
 pub struct MacroBinding {
     pub module: String,
     pub name: String,
+    /// Compiler-local shape-group binding; ordinary macros target their name.
+    pub target: String,
     pub parameters: Vec<String>,
     pub typed: bool,
 }
@@ -60,12 +62,38 @@ pub fn prepare(graph: &PackageGraph, parsed: &mut [Parsed]) -> Result<Prepared, 
             .map(|d| Diagnostic::error(d.code.as_str(), Some(module.source), d.span, d.message)),
         );
         for definition in definitions {
-            bindings.push(MacroBinding {
-                module: module.path.clone(),
-                name: definition.name,
-                parameters: definition.parameters,
-                typed: definition.signature.is_some(),
-            });
+            let span = module.ast.items[definition.item].span;
+            let variants = if definition.variants.is_empty() {
+                vec![ilang_syntax::lisp::expansion::MacroVariant {
+                    target: definition.name.clone(),
+                    parameters: definition.parameters,
+                    labels: definition.labels,
+                }]
+            } else {
+                definition.variants
+            };
+            for variant in variants {
+                if variant.target != definition.name
+                    && !module
+                        .ast
+                        .exports
+                        .iter()
+                        .any(|e| e.name.name == variant.target)
+                {
+                    module.ast.exports.push(ilang_syntax::ast::Export {
+                        name: ilang_syntax::ast::Ident::new(&variant.target, span.0),
+                        constructors: false,
+                        span,
+                    });
+                }
+                bindings.push(MacroBinding {
+                    module: module.path.clone(),
+                    name: definition.name.clone(),
+                    target: variant.target,
+                    parameters: variant.parameters,
+                    typed: definition.signature.is_some(),
+                });
+            }
         }
     }
     if !errors.is_empty() {
@@ -275,7 +303,21 @@ _entry = ({parameters}) -> syntax.Syntax {{
 "#,
         binding.module, binding.name
     );
-    let (ast, diagnostics) = ilang_syntax::syn3::parse_module(&source);
+    let (mut ast, diagnostics) = ilang_syntax::syn3::parse_module(&source);
+    // Transition group names contain `%` and have no source spelling.
+    struct Select<'a>(&'a str, &'a str);
+    impl ilang_syntax::walk::Visitor for Select<'_> {
+        fn expr(&mut self, e: &mut ilang_syntax::ast::Expr, enter: bool) {
+            if enter
+                && let ilang_syntax::ast::ExprKind::Field { target, name } = &mut e.kind
+                && matches!(&target.kind, ilang_syntax::ast::ExprKind::Name { module: None, name } if name.name == "target")
+                && name.name == self.0
+            {
+                name.name = self.1.into();
+            }
+        }
+    }
+    ilang_syntax::walk::module(&mut ast, &mut Select(&binding.name, &binding.target));
     assert!(
         diagnostics.is_empty(),
         "compiler macro wrapper must parse: {diagnostics:?}"

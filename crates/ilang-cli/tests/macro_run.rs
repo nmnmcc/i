@@ -639,9 +639,11 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
     );
     let definition = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "keep".into(),
         parameters: vec!["x".into()],
+        labels: vec![None],
     };
     let mut session = Session::default();
     let expanded = session
@@ -715,9 +717,11 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
     let definition = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "wrap".into(),
         parameters: vec!["x".into()],
+        labels: vec![None],
     };
     let argument = input();
     let templates: Arc<[Syntax]> = prepared.templates.into();
@@ -1887,9 +1891,21 @@ fn checked_collection_validates_targets_and_duplicates() {
     assert_eq!(good.len(), 1);
     assert_eq!(program.def(good[0].target).name, "good");
     assert_eq!(good[0].data[0].1, "example");
+    // §6.6 and §14.5 call the initialized value, so an alias is a valid
+    // target. Keep scalar, nonempty-parameter and duplicate targets invalid.
+    let alias = collections::resolve(
+        &parsed,
+        program,
+        typed,
+        &[transaction(vec![request("alias")])],
+    )
+    .unwrap();
+    assert_eq!(alias.len(), 1);
+    assert_eq!(program.def(alias[0].target).name, "alias");
+    assert_eq!(alias[0].data[0].1, "example");
     for requests in [
         vec![request("bad")],
-        vec![request("alias")],
+        vec![request("anchor")],
         vec![request("good"), request("good")],
     ] {
         assert!(collections::resolve(&parsed, program, typed, &[transaction(requests)]).is_err());
@@ -2901,4 +2917,119 @@ fn type_macro_keeps_its_standalone_need_channel() {
             "expansion must retain its lowering boundary: {text}"
         );
     }
+}
+
+#[test]
+fn portable_macro_hash_matches_the_specification_vectors() {
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.9/mp09_portable_hash");
+    let (mut graph, ds) = ilang_cli::load(&project, false, true);
+    assert!(
+        !ds.iter().any(ilang_package::Diagnostic::is_error),
+        "{ds:?}"
+    );
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
+        "{}",
+        graph.sources.render_all(&checked.diags).join("\n")
+    );
+}
+
+#[test]
+fn syntax_macro_call_labels_require_explicit_parameter_labels() {
+    for (case, pass) in [("mp10_positional", false), ("mp10_explicit_label", true)] {
+        let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/spec/14.5")
+            .join(case);
+        let (mut graph, ds) = ilang_cli::load(&project, false, true);
+        assert!(
+            !ds.iter().any(ilang_package::Diagnostic::is_error),
+            "{ds:?}"
+        );
+        let checked = ilang_macro::project::check(&mut graph);
+        let errors = graph.sources.render_all(&checked.diags).join("\n");
+        assert_eq!(
+            !checked
+                .diags
+                .iter()
+                .any(ilang_package::Diagnostic::is_error),
+            pass,
+            "{errors}"
+        );
+        if !pass {
+            assert!(errors.contains("label does not match"), "{errors}");
+        }
+    }
+}
+
+#[test]
+fn unresolved_current_module_definitions_wait_for_item_expansion_to_settle() {
+    let macros = include_str!("../../../tests/spec/14.7/mp13_forward_definition/src/macros.is");
+    for items in [
+        "m.inspect(T)\nm.emit(T)",
+        "m.emit(T)\nm.inspect(T)",
+        "m.inspect(Missing)\nm.emit(T)",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"probe\"\n").unwrap();
+        std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
+        std::fs::write(
+            dir.path().join("src/main.i"),
+            format!("(m = probe/macros)\n{items}\nmain = () {{ Nil }}\n"),
+        )
+        .unwrap();
+        let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);
+        assert!(
+            !ds.iter().any(ilang_package::Diagnostic::is_error),
+            "{ds:?}"
+        );
+        let checked = ilang_macro::project::check(&mut graph);
+        let errors = graph.sources.render_all(&checked.diags).join("\n");
+        if items.contains("Missing") {
+            assert!(
+                checked
+                    .diags
+                    .iter()
+                    .any(ilang_package::Diagnostic::is_error),
+                "{errors}"
+            );
+            assert!(
+                errors.contains("Missing") && errors.contains("no definition"),
+                "{errors}"
+            );
+        } else {
+            assert!(
+                !checked
+                    .diags
+                    .iter()
+                    .any(ilang_package::Diagnostic::is_error),
+                "{errors}"
+            );
+        }
+    }
+}
+
+#[test]
+fn marked_local_parameter_can_shadow_a_macro_module_top_level_name() {
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.6/mp16_local_shadowing");
+    let (mut graph, ds) = ilang_cli::load(&project, false, true);
+    assert!(
+        !ds.iter().any(ilang_package::Diagnostic::is_error),
+        "{ds:?}"
+    );
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
+        "{}",
+        graph.sources.render_all(&checked.diags).join("\n")
+    );
 }

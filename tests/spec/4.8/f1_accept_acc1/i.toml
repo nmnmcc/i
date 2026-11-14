@@ -1,0 +1,11 @@
+# spec: 4.8
+# expect: pass
+# entry: accept
+name = "probe"
+version = "0.1.0"
+
+[dependencies]
+std = { path = "../../../../std" }
+
+[entries]
+accept = "driver.main"

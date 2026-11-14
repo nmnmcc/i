@@ -25,7 +25,12 @@ fn resolve_lowered(graph: &PackageGraph, parsed: &[Parsed]) -> (Program, Vec<Dia
     let mut r = Resolver {
         graph,
         parsed,
-        p: Program::default(),
+        p: Program {
+            package_identities: (0..graph.packages.len())
+                .map(|id| crate::identity::package_identity(graph, id))
+                .collect(),
+            ..Program::default()
+        },
         diags: Vec::new(),
         generated_values: Vec::new(),
         generated_types: Vec::new(),
@@ -443,23 +448,24 @@ impl<'a> Resolver<'a> {
             }
         }
         let placeholder_var = VarId(u32::MAX);
-        let typed: HashSet<_> = migration_syntax::lisp::expansion::definitions(ast, lisp)
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|d| d.signature.is_some())
-            .map(|d| d.name)
-            .collect();
+        let typed_definitions: HashMap<_, _> =
+            migration_syntax::lisp::expansion::definitions(ast, lisp)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|d| d.signature.is_some())
+                .map(|d| (d.name.clone(), d))
+                .collect();
+        let typed: HashSet<_> = typed_definitions.keys().cloned().collect();
         for item in &ast.items {
             let typed_declaration = matches!(&item.kind, ast::ItemKind::Declaration { name, .. } if typed.contains(&name.name));
-            if item
-                .attributes
-                .iter()
-                .any(|a| a.module.is_none() && a.name.name == "macro")
-                && !typed_declaration
+            if item.attributes.iter().any(|a| {
+                a.module.is_none() && matches!(a.name.name.as_str(), "macro" | "%macro_group")
+            }) && !typed_declaration
             {
                 let mut remaining = item.clone();
                 remaining.attributes.retain(|attribute| {
-                    !(attribute.module.is_none() && attribute.name.name == "macro")
+                    !(attribute.module.is_none()
+                        && matches!(attribute.name.name.as_str(), "macro" | "%macro_group"))
                 });
                 for attribute in &remaining.attributes {
                     if attribute.module.is_none() && attribute.name.name == "main" {
@@ -627,10 +633,33 @@ impl<'a> Resolver<'a> {
                     self.add_def(m, &name.name, name.span, kind, &attrs);
                     if self.p.module(m).defs.len() > before {
                         if typed_declaration {
-                            self.p.typed_macros.insert(DefId {
+                            let id = DefId {
                                 module: m,
                                 index: before as u32,
-                            });
+                            };
+                            self.p.typed_macros.insert(id);
+                            let definition = &typed_definitions[&name.name];
+                            let labels = if definition.variants.is_empty() {
+                                vec![definition.labels.clone()]
+                            } else {
+                                definition
+                                    .variants
+                                    .iter()
+                                    .map(|v| v.labels.clone())
+                                    .collect()
+                            };
+                            self.p.typed_macro_shapes.insert(
+                                id,
+                                labels
+                                    .into_iter()
+                                    .map(|labels| {
+                                        crate::types::ShapeId::new(
+                                            labels.iter().filter(|l| l.is_none()).count() as u32,
+                                            labels.into_iter().flatten(),
+                                        )
+                                    })
+                                    .collect(),
+                            );
                         }
                         Slot::Decl(before as u32)
                     } else {
@@ -893,14 +922,20 @@ impl<'a> Resolver<'a> {
         let mut names = Vec::new();
         ast_binders(&b.pattern, &mut names);
         let written = "a program entry";
-        let ast::ExprKind::Fn(f) = &ungroup(&b.value).kind else {
+        // Aliases and computed function values are validated after inference.
+        // Keep definite literal errors available even during resolver recovery.
+        let value = &ungroup(&b.value).kind;
+        if matches!(
+            value,
+            ast::ExprKind::Int(_) | ast::ExprKind::Float(_) | ast::ExprKind::String(_)
+        ) {
             self.error(
                 code::ENTRY_FORM,
                 span,
-                format!("{written} is on a binding whose value is a function expression"),
+                format!("{written} must be a function value"),
             );
             return false;
-        };
+        }
         if names.len() != 1 {
             self.error(
                 code::ENTRY_FORM,
@@ -909,7 +944,9 @@ impl<'a> Resolver<'a> {
             );
             return false;
         }
-        if f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_))) {
+        if let ast::ExprKind::Fn(f) = value
+            && f.params.iter().any(|p| matches!(p, ast::Param::Pattern(_)))
+        {
             self.error(
                 code::ENTRY_PARAMS,
                 span,

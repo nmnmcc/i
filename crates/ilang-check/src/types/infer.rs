@@ -8,7 +8,7 @@
 
 use super::display;
 use super::groups;
-use super::known;
+use super::known::{self, Knowledge};
 use super::solve::{FailKind, Mode, Pol, Solver, builtin_variance};
 use super::{FnTy, Head, HostSignature, HostType, Ty, Typed, Variance};
 use crate::code;
@@ -90,7 +90,7 @@ struct PendingTyped {
     argument_types: Vec<Ty>,
     input_spans: HashSet<Span>,
     locals: HashMap<VarId, Scheme>,
-    known: HashMap<VarId, Ty>,
+    known: HashMap<VarId, Knowledge>,
 }
 
 pub(crate) struct Checker<'a> {
@@ -113,7 +113,7 @@ pub(crate) struct Checker<'a> {
     /// type is shown as written (§2.4).
     pub written: HashMap<VarId, Type>,
     /// The known type of each name (§4.8), where it is used now.
-    pub kvars: HashMap<VarId, Ty>,
+    pub kvars: HashMap<VarId, Knowledge>,
     effects: Vec<Effects>,
     pub b: Builtins,
     alias_depth: u32,
@@ -156,8 +156,8 @@ pub(crate) struct Checker<'a> {
     /// The local names bound by `g = name` (direct aliases, §2.6.7).
     pub(super) local_aliases: HashMap<VarId, ValueRef>,
     pending_typed: Vec<PendingTyped>,
-    checked_holes: HashMap<Span, (Ty, Ty)>,
-    expression_known: HashMap<(ModuleId, Span), Ty>,
+    checked_holes: HashMap<Span, (Ty, Knowledge)>,
+    expression_known: HashMap<(ModuleId, Span), Knowledge>,
     pub(super) expression_effects: HashMap<(ModuleId, Span), (Ty, Ty)>,
     pub(super) typed_handles: super::typed_macro::HandleArena,
     typed_generalized_roots: HashSet<super::V>,
@@ -273,6 +273,32 @@ impl<'a> Checker<'a> {
                         module: ModuleId(mi as u32),
                         index: di as u32,
                     };
+                    if let Some(implemented) = p.typed_macro_shapes.get(&id)
+                        && let Ty::Fn(f) = &t
+                    {
+                        let parameter = self
+                            .s
+                            .normalize_mode(f.param.clone(), super::solve::Mode::Value);
+                        let advertised: Option<Vec<_>> = known::members(&parameter)
+                            .iter()
+                            .map(|member| match member {
+                                Ty::Con(Head::Shape(shape), _, _) => Some(*shape),
+                                _ => None,
+                            })
+                            .collect();
+                        if let Some(mut advertised) = advertised {
+                            let mut implemented = implemented.clone();
+                            // ShapeId allocation order is irrelevant to set equality.
+                            advertised.sort_by_key(|s| s.keys());
+                            advertised.dedup();
+                            implemented.sort_by_key(|s| s.keys());
+                            implemented.dedup();
+                            if !advertised.iter().all(|shape| implemented.contains(shape)) {
+                                self.error(code::ATTRIBUTE_PLACE, d.span,
+                                    "a typed macro implementation must have one parameter for each signature parameter in every parameter-data shape, with matching explicit labels");
+                            }
+                        }
+                    }
                     self.defs.insert(id, Scheme { level: 0, ty: t });
                 }
             }
@@ -427,7 +453,7 @@ impl<'a> Checker<'a> {
             typed.locals = Some(std::sync::Arc::new(super::LocalTypes {
                 diagnosed: self.diags.iter().any(Diagnostic::is_error),
                 types: self.locals.into_iter().map(|(v, s)| (v, s.ty)).collect(),
-                known: self.kvars,
+                known: self.kvars.into_iter().map(|(v, k)| (v, k.fact)).collect(),
                 fields: self.field_ctors,
                 s: std::sync::Mutex::new(self.s),
             }));
@@ -660,7 +686,11 @@ impl<'a> Checker<'a> {
                     let Some(s) = self.defs.get(d).cloned() else {
                         continue;
                     };
-                    let value = self.kvars.get(&var).cloned().unwrap_or(Ty::Top);
+                    let value = self
+                        .kvars
+                        .get(&var)
+                        .cloned()
+                        .unwrap_or_else(Knowledge::unknown);
                     let k = self.scheme_known(&s.ty, 0, &value);
                     self.kvars.insert(var, k);
                 }
@@ -788,7 +818,7 @@ impl<'a> Checker<'a> {
                             self.expression_known
                                 .get(&(call.module, *old))
                                 .cloned()
-                                .unwrap_or(Ty::Top),
+                                .unwrap_or_else(Knowledge::unknown),
                         ),
                     ))
                 })
@@ -912,6 +942,13 @@ impl<'a> Checker<'a> {
         let Some(root) = p.root else {
             return;
         };
+        let invalid: HashSet<_> = p
+            .declared_entries
+            .iter()
+            .copied()
+            .filter(|&d| matches!(p.def(d).kind, DefKind::Binding { .. }))
+            .filter(|&d| !self.entry_value(d))
+            .collect();
         let mut entries = Vec::new();
         for m in p.modules.iter().filter(|m| m.package == root) {
             for b in m.bindings.iter().filter(|b| b.main) {
@@ -921,8 +958,47 @@ impl<'a> Checker<'a> {
         entries.extend(p.host_exports.iter().map(|d| (*d, false, true)));
         entries.extend(selected.iter().map(|(d, nil)| (*d, *nil, false)));
         for (d, require_nil, export) in entries {
-            self.entry_point(d, require_nil, export);
+            if !invalid.contains(&d)
+                && (export || p.declared_entries.contains(&d) || self.entry_value(d))
+            {
+                self.entry_point(d, require_nil, export);
+            }
         }
+    }
+
+    /// Entries call initialized values, so shape validation belongs to typing.
+    fn entry_value(&mut self, d: DefId) -> bool {
+        self.set_module(d.module);
+        let def = self.p.def(d);
+        let (name, span) = (def.name.clone(), def.span);
+        let Some(scheme) = self.defs.get(&d) else {
+            return false;
+        };
+        let opts = display::Opts {
+            mono: true,
+            written: false,
+        };
+        let Ok(t) = display::shown(&self.s, &scheme.ty, opts) else {
+            self.report_coalescing(span);
+            return false;
+        };
+        let Ty::Fn(f) = display::both(&t) else {
+            self.error(
+                code::ENTRY_TYPE,
+                span,
+                format!("entry `{name}` must be a function value (§10.2)"),
+            );
+            return false;
+        };
+        if !matches!(&f.param, Ty::Con(Head::Shape(shape), _, _) if shape.is_empty()) {
+            self.error(
+                code::ENTRY_PARAMS,
+                span,
+                format!("entry `{name}` has no parameters but environment parameters (§10.2)"),
+            );
+            return false;
+        }
+        true
     }
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test
@@ -1790,12 +1866,12 @@ impl<'a> Checker<'a> {
     // ---- Expressions ----
 
     pub fn infer(&mut self, e: &Expr) -> Ty {
-        self.infer_k(e, &Ty::Top).0
+        self.infer_k(e, &Knowledge::unknown()).0
     }
 
     /// The type of `e`, and its known type (§4.8), `Top` when it has none.
     /// `expected` is the expected type of its place, `Top` for none.
-    pub fn infer_k(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
+    pub fn infer_k(&mut self, e: &Expr, expected: &Knowledge) -> (Ty, Knowledge) {
         if let Some((ty, known)) = self.checked_holes.get(&e.span).cloned() {
             return (ty, known);
         }
@@ -1825,8 +1901,8 @@ impl<'a> Checker<'a> {
         result
     }
 
-    fn infer_k_inner(&mut self, e: &Expr, expected: &Ty) -> (Ty, Ty) {
-        let same = |t: Ty| (t.clone(), t);
+    fn infer_k_inner(&mut self, e: &Expr, expected: &Knowledge) -> (Ty, Knowledge) {
+        let same = |t: Ty| (t.clone(), Knowledge::certain(t));
         match &e.kind {
             ExprKind::Int(n) => same(known::scalar_literal(BuiltinType::Int, n.to_string())),
             ExprKind::Float(_) => same(self.prim(BuiltinType::Float)),
@@ -1837,7 +1913,13 @@ impl<'a> Checker<'a> {
                     Some(s) => self.instantiate(&s),
                     None => self.s.fresh_input(),
                 };
-                (t, self.kvars.get(v).cloned().unwrap_or(Ty::Top))
+                (
+                    t,
+                    self.kvars
+                        .get(v)
+                        .cloned()
+                        .unwrap_or_else(Knowledge::unknown),
+                )
             }
             ExprKind::Name(ValueRef::Def(d)) => {
                 if self.p.typed_macros.contains(d) && !self.in_callee {
@@ -1855,17 +1937,26 @@ impl<'a> Checker<'a> {
                         if d.module != self.module && !self.group_defs.contains(d) =>
                     {
                         self.note_use(var, e.span);
-                        scheme.map_or(Ty::Top, |s| self.other_known(&s.ty))
+                        // A displayed weak type can reflect only earlier callers'
+                        // lower bounds. Preserve the definition's facts across imports.
+                        let fact = self.kvars.get(&var).map_or(Ty::Top, |k| k.fact.clone());
+                        Knowledge {
+                            hint: scheme.map_or(Ty::Top, |s| self.other_known(&s.ty)),
+                            fact,
+                        }
                     }
                     DefKind::Binding { var, .. } => {
                         self.note_use(var, e.span);
-                        self.kvars.get(&var).cloned().unwrap_or(Ty::Top)
+                        self.kvars
+                            .get(&var)
+                            .cloned()
+                            .unwrap_or_else(Knowledge::unknown)
                     }
-                    DefKind::External { .. } => scheme.map_or(Ty::Top, |s| {
+                    DefKind::External { .. } => Knowledge::certain(scheme.map_or(Ty::Top, |s| {
                         let k = display::known(&self.s, &s.ty, s.level);
                         self.note_general(&k);
                         k
-                    }),
+                    })),
                 };
                 let t = match self.defs.get(d).cloned() {
                     Some(s) => self.instantiate(&s),
@@ -1875,21 +1966,19 @@ impl<'a> Checker<'a> {
             }
             ExprKind::Name(ValueRef::Ctor(c)) => {
                 let t = self.ctor_value(*c);
-                (t, self.ctor_known(*c))
+                (t, Knowledge::certain(self.ctor_known(*c)))
             }
             ExprKind::Tuple(items) => {
                 // A part has the matching part of the expected type (§4.8).
                 let shape = super::ShapeId::positional(items.len() as u32);
-                let parts = match known::members(expected).as_slice() {
-                    [Ty::Con(Head::Shape(n), _, xs)] if *n == shape => xs.clone(),
-                    _ => vec![Ty::Top; items.len()],
-                };
+                let data = expected.member(Head::Shape(shape));
+                let parts: Vec<_> = (0..items.len()).map(|i| data.part(i)).collect();
                 let (ts, ks) = items
                     .iter()
                     .zip(&parts)
                     .map(|(x, p)| self.infer_k(x, p))
                     .unzip();
-                (Ty::tuple(ts), Ty::tuple(ks))
+                (Ty::tuple(ts), Knowledge::tuple(ks))
             }
             ExprKind::Record { base, fields } => {
                 // syntax-3 §2.3: closed labelled data. A spread `..e` gives
@@ -1897,17 +1986,19 @@ impl<'a> Checker<'a> {
                 if base.is_none() && fields.is_empty() {
                     self.out.empty_records.insert((self.module, e.span));
                 }
-                let base_types = base.as_ref().map(|b| (b, self.infer_k(b, &Ty::Top)));
+                let base_types = base
+                    .as_ref()
+                    .map(|b| (b, self.infer_k(b, &Knowledge::unknown())));
                 let base_shape = match &base_types {
                     Some((b, (_, bk))) => {
-                        let data: Vec<_> = known::members(bk)
+                        let data: Vec<_> = known::members(&bk.hint)
                             .into_iter()
                             .filter(|m| matches!(m.head(), Some(Head::Shape(_))))
                             .collect();
-                        match (known::members(bk).len(), data.as_slice()) {
+                        match (known::members(&bk.hint).len(), data.as_slice()) {
                             (1, [Ty::Con(Head::Shape(shape), _, _)]) => Some(*shape),
                             _ => {
-                                let k = display::show_known(&self.s, bk);
+                                let k = display::show_known(&self.s, &bk.hint);
                                 self.error(
                                     code::NEEDS_KNOWN_TYPE,
                                     b.span,
@@ -1915,16 +2006,18 @@ impl<'a> Checker<'a> {
                                         "a spread `..e` needs a known type for `e` with exactly one member, which is data (§2.3), but it has `{k}`"
                                     ),
                                 );
-                                return (self.s.fresh(), Ty::Top);
+                                return (self.s.fresh(), Knowledge::unknown());
                             }
                         }
                     }
                     None => None,
                 };
                 let mut names = HashSet::new();
-                let mut given: Vec<(String, Ty, Ty)> = Vec::new();
-                let expected_data = match known::members(expected).as_slice() {
-                    [Ty::Con(Head::Shape(shape), _, xs)] => Some((*shape, xs.clone())),
+                let mut given: Vec<(String, Ty, Knowledge)> = Vec::new();
+                let expected_data = match known::members(&expected.hint).as_slice() {
+                    [Ty::Con(Head::Shape(shape), _, _)] => {
+                        Some((*shape, expected.member(Head::Shape(*shape))))
+                    }
                     _ => None,
                 };
                 for (name, value) in fields {
@@ -1938,23 +2031,23 @@ impl<'a> Checker<'a> {
                     let expected_field = match &expected_data {
                         Some((shape, xs)) => shape
                             .label_index(&name.name)
-                            .map_or(Ty::Top, |i| xs[i].clone()),
-                        None => Ty::Top,
+                            .map_or_else(Knowledge::unknown, |i| xs.part(i)),
+                        None => Knowledge::unknown(),
                     };
                     let (ty, known) = self.infer_k(value, &expected_field);
                     if !given.iter().any(|(g, _, _)| *g == name.name) {
                         given.push((name.name.clone(), ty, known));
                     }
                 }
-                let (mut keys, mut types, mut knowns): (Vec<Option<String>>, Vec<Ty>, Vec<Ty>) =
-                    (Vec::new(), Vec::new(), Vec::new());
+                let (mut keys, mut types, mut knowns): (
+                    Vec<Option<String>>,
+                    Vec<Ty>,
+                    Vec<Knowledge>,
+                ) = (Vec::new(), Vec::new(), Vec::new());
                 if let (Some(shape), Some((b, (bt, bk)))) = (base_shape, &base_types) {
                     let parts: Vec<Ty> = (0..shape.len()).map(|_| self.s.fresh()).collect();
                     self.sub(bt, &Ty::data(shape, parts.clone()), b.span);
-                    let kparts = match known::members(bk).as_slice() {
-                        [Ty::Con(_, _, xs)] => xs.clone(),
-                        _ => vec![Ty::Top; shape.len()],
-                    };
+                    let kparts: Vec<_> = (0..shape.len()).map(|i| bk.part(i)).collect();
                     for ((key, t), k) in shape.keys().into_iter().zip(parts).zip(kparts) {
                         if key
                             .as_ref()
@@ -1978,19 +2071,23 @@ impl<'a> Checker<'a> {
                 let mut order: Vec<usize> = (0..keys.len()).collect();
                 order.sort_by(|&a, &b| keys[a].cmp(&keys[b]));
                 let t = Ty::data(shape, order.iter().map(|&i| types[i].clone()).collect());
-                let k = Ty::data(shape, order.iter().map(|&i| knowns[i].clone()).collect());
+                let ordered: Vec<_> = order.iter().map(|&i| knowns[i].clone()).collect();
+                let k = Knowledge {
+                    hint: Ty::data(shape, ordered.iter().map(|k| k.hint.clone()).collect()),
+                    fact: Ty::data(shape, ordered.iter().map(|k| k.fact.clone()).collect()),
+                };
                 self.out
                     .data_shapes
                     .insert((self.module, e.span), (shape, base_shape));
                 (t, k)
             }
             ExprKind::List { items, rest } => {
-                let head = Some(Head::Named(TypeRef::Builtin(BuiltinType::List)));
-                let (item_exp, list_exp) = match known::members(expected).as_slice() {
-                    [m @ Ty::Con(_, _, xs)] if m.head() == head && xs.len() == 1 => {
-                        (xs[0].clone(), m.clone())
+                let head = Head::Named(TypeRef::Builtin(BuiltinType::List));
+                let (item_exp, list_exp) = match known::members(&expected.hint).as_slice() {
+                    [m @ Ty::Con(_, _, xs)] if m.head() == Some(head) && xs.len() == 1 => {
+                        (expected.member(head).part(0), expected.member(head))
                     }
-                    _ => (Ty::Top, Ty::Top),
+                    _ => (Knowledge::unknown(), Knowledge::unknown()),
                 };
                 let t = self.s.fresh();
                 let mut ks = Vec::new();
@@ -2003,12 +2100,11 @@ impl<'a> Checker<'a> {
                 if let Some(r) = rest {
                     let (rt, rk) = self.infer_k(r, &list_exp);
                     self.sub(&rt, &list, r.span);
-                    ks.push(match known::member(&rk, head) {
-                        Some(Ty::Con(_, _, xs)) if xs.len() == 1 => xs[0].clone(),
-                        _ => Ty::Top,
-                    });
+                    ks.push(rk.member(head).part(0));
                 }
-                let k = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![self.kunion(ks)]);
+                let k = self
+                    .kunion_knowledge(ks)
+                    .map(|t| Ty::named(TypeRef::Builtin(BuiltinType::List), vec![t.clone()]));
                 (list, k)
             }
             ExprKind::BitArray(segs) => {
@@ -2057,12 +2153,12 @@ impl<'a> Checker<'a> {
                 }
             }
             ExprKind::Binary { op, lhs, rhs } => self.binary(*op, lhs, rhs, e.span),
-            ExprKind::Error => (self.s.fresh_input(), Ty::Top),
+            ExprKind::Error => (self.s.fresh_input(), Knowledge::unknown()),
         }
     }
 
     /// Rule 8 and §6.9.
-    fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> (Ty, Ty) {
+    fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> (Ty, Knowledge) {
         use BinOp::*;
         if op == Pipe {
             // `a |> f(b)` is `f(a, b)`, and `a |> f` is `f(a)`: `a` is the
@@ -2094,14 +2190,14 @@ impl<'a> Checker<'a> {
             ),
             Pipe => unreachable!(),
         };
-        let (lt, lk) = self.infer_k(lhs, &Ty::Top);
-        let (rt, rk) = self.infer_k(rhs, &Ty::Top);
+        let (lt, lk) = self.infer_k(lhs, &Knowledge::unknown());
+        let (rt, rk) = self.infer_k(rhs, &Knowledge::unknown());
         // §6.9: `==` on values of disjoint known types would always give the
         // same result.
-        if matches!(op, Eq | NotEq) && lk != Ty::Top && rk != Ty::Top && known::disjoint(&lk, &rk) {
+        if matches!(op, Eq | NotEq) && known::disjoint(&lk.fact, &rk.fact) {
             let (l, r) = (
-                display::show_known(&self.s, &lk),
-                display::show_known(&self.s, &rk),
+                display::show_known(&self.s, &lk.fact),
+                display::show_known(&self.s, &rk.fact),
             );
             let (operator, result) = if op == Eq {
                 ("==", "False")
@@ -2119,11 +2215,11 @@ impl<'a> Checker<'a> {
                 let ms = known::members(t);
                 ms.len() == 1 && ms[0].values().is_finite() && ms[0].values().items().count() == 1
             };
-            let message = if single(&lk) && single(&rk) {
+            let message = if single(&lk.fact) && single(&rk.fact) {
                 format!(
                     "both sides are constants, `{l}` and `{r}`, which can never be equal, so `{operator}` is always `{result}` (§6.9)"
                 )
-            } else if finite(&lk) && finite(&rk) {
+            } else if finite(&lk.fact) && finite(&rk.fact) {
                 format!(
                     "the values `{l}` and `{r}` can never be equal, so `{operator}` is always `{result}` (§6.9)"
                 )
@@ -2138,19 +2234,25 @@ impl<'a> Checker<'a> {
             self.sub(&lt, &want, lhs.span);
             self.sub(&rt, &want, rhs.span);
         }
-        (result.clone(), result)
+        (result.clone(), Knowledge::certain(result))
     }
 
-    fn call(&mut self, callee: &Expr, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
+    fn call(
+        &mut self,
+        callee: &Expr,
+        first: Option<&Expr>,
+        args: &[Arg],
+        span: Span,
+    ) -> (Ty, Knowledge) {
         let was_callee = std::mem::replace(&mut self.in_callee, true);
-        let (f, kf) = self.infer_k(callee, &Ty::Top);
+        let (f, kf) = self.infer_k(callee, &Knowledge::unknown());
         self.in_callee = was_callee;
         let typed_definition = match callee.kind {
             ExprKind::Name(ValueRef::Def(d)) if self.p.typed_macros.contains(&d) => Some(d),
             _ => None,
         };
         let typed_signature = f.clone();
-        let kfn = known::one_fn(&kf).filter(|k| !groups::is_multi(k));
+        let kfn = known::one_fn(&kf.hint).filter(|k| !groups::is_multi(k));
         // Syntax three §2.6.5: a call with labels through a value constrains
         // the argument data, whose shape is read from the call, against the
         // member of that shape.
@@ -2158,7 +2260,7 @@ impl<'a> Checker<'a> {
             && args.iter().any(|a| a.label.is_some())
             && !matches!(callee.kind, ExprKind::Name(ValueRef::Ctor(_)))
         {
-            return self.shaped_call(&f, first, args, span);
+            return self.shaped_call(&f, first, args, span, typed_definition);
         }
         let skip = usize::from(first.is_some());
         let n = skip + args.len();
@@ -2217,8 +2319,13 @@ impl<'a> Checker<'a> {
             .chain(args.iter().map(|a| &a.value))
             .collect();
         let spans: Vec<Span> = values.iter().map(|a| a.span).collect();
-        let mut typed: Vec<Option<(Ty, Ty)>> = vec![None; n];
+        let mut typed: Vec<Option<(Ty, Knowledge)>> = vec![None; n];
         let mut sigma = known::Sigma::new();
+        let mut fact_sigma = known::Sigma::new();
+        let fact_fn = known::one_fn(&kf.fact);
+        let fact_hidden = fact_fn
+            .as_ref()
+            .map_or_else(Vec::new, |k| self.hidden_inputs(k));
         let hidden = kfn
             .as_ref()
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
@@ -2228,21 +2335,38 @@ impl<'a> Checker<'a> {
                     continue;
                 }
                 let expected = match &params {
-                    Some(ps) => self
-                        .ksubst(&ps[i], &self.whole_sigma(&sigma, &hidden), true)
-                        .unwrap_or(Ty::Top),
-                    None => Ty::Top,
+                    Some(ps) => Knowledge {
+                        hint: self
+                            .ksubst(&ps[i], &self.whole_sigma(&sigma, &hidden), true)
+                            .unwrap_or(Ty::Top),
+                        fact: fact_fn
+                            .as_ref()
+                            .and_then(|f| f.parts())
+                            .and_then(|ps| ps.get(to.as_ref()?[i]))
+                            .and_then(|p| {
+                                self.ksubst(p, &self.fact_sigma(&fact_sigma, &fact_hidden), true)
+                            })
+                            .unwrap_or(Ty::Top),
+                    },
+                    None => Knowledge::unknown(),
                 };
                 let (t, k) = self.infer_k(a, &expected);
                 if let (Some(ps), false) = (&params, later) {
-                    self.match_k(&ps[i], &k, &mut sigma, 0);
+                    self.match_k(&ps[i], &k.hint, &mut sigma, 0);
+                    if let Some(p) = fact_fn
+                        .as_ref()
+                        .and_then(|f| f.parts())
+                        .and_then(|ps| ps.get(to.as_ref().unwrap()[i]))
+                    {
+                        self.match_k(p, &k.fact, &mut fact_sigma, 0);
+                    }
                 }
                 typed[i] = Some((t, k));
             }
         }
-        let typed: Vec<(Ty, Ty)> = typed.into_iter().flatten().collect();
+        let typed: Vec<(Ty, Knowledge)> = typed.into_iter().flatten().collect();
         let Some(to) = to else {
-            return (self.s.fresh(), Ty::Top);
+            return (self.s.fresh(), Knowledge::unknown());
         };
         if crate::syn3_facts::on()
             && let Some(k) = &kfn
@@ -2261,16 +2385,17 @@ impl<'a> Checker<'a> {
             .collect();
         let known = match &kfn {
             Some(k) if k.arity() == Some(n) => {
-                let ks: Vec<Ty> = order.iter().map(|g| typed[*g as usize].1.clone()).collect();
-                self.call_known(k, &ks)
+                let ks: Vec<Knowledge> =
+                    order.iter().map(|g| typed[*g as usize].1.clone()).collect();
+                self.call_known(&kf, &ks)
             }
-            _ => Ty::Top,
+            _ => Knowledge::unknown(),
         };
         // Syntax three §2.6.2: a direct call of a name with a selection
         // table has the type of the branches that the known types of the
         // arguments select.
         let f = if args.iter().all(|a| a.label.is_none()) {
-            let ks: Vec<Ty> = typed.iter().map(|x| x.1.clone()).collect();
+            let ks: Vec<Ty> = typed.iter().map(|x| x.1.fact.clone()).collect();
             self.select_at_call(callee, &ks, span).unwrap_or(f)
         } else {
             f
@@ -2345,14 +2470,21 @@ impl<'a> Checker<'a> {
     /// A call through a value with labelled arguments: the argument data
     /// has the shape that the call writes, with its parts in canonical
     /// order.
-    fn shaped_call(&mut self, f: &Ty, first: Option<&Expr>, args: &[Arg], span: Span) -> (Ty, Ty) {
+    fn shaped_call(
+        &mut self,
+        f: &Ty,
+        first: Option<&Expr>,
+        args: &[Arg],
+        span: Span,
+        typed_definition: Option<DefId>,
+    ) -> (Ty, Knowledge) {
         let mut positions: Vec<Ty> = Vec::new();
         let mut labelled: Vec<(String, Ty)> = Vec::new();
         if let Some(first) = first {
-            positions.push(self.infer_k(first, &Ty::Top).0);
+            positions.push(self.infer_k(first, &Knowledge::unknown()).0);
         }
         for a in args {
-            let t = self.infer_k(&a.value, &Ty::Top).0;
+            let t = self.infer_k(&a.value, &Knowledge::unknown()).0;
             match &a.label {
                 None => positions.push(t),
                 Some(l) if labelled.iter().any(|(g, _)| *g == l.name) => {
@@ -2386,7 +2518,48 @@ impl<'a> Checker<'a> {
         self.sub(f, &Ty::Fn(Box::new(want)), span);
         self.add_err(e);
         self.add_env(n);
-        (r, Ty::Top)
+        if let Some(definition) = typed_definition {
+            let values: Vec<_> = first
+                .into_iter()
+                .chain(args.iter().map(|a| &a.value))
+                .collect();
+            let mut input_spans = HashSet::new();
+            for value in &values {
+                let mut expression = (*value).clone();
+                visit_expr_mut(&mut expression, &mut |e| {
+                    input_spans.insert(e.span);
+                    true
+                });
+                for binder in expression_binders(value) {
+                    input_spans.insert(binder.span);
+                }
+            }
+            let mut order: Vec<_> = first
+                .into_iter()
+                .map(|_| None)
+                .chain(
+                    args.iter()
+                        .map(|a| a.label.as_ref().map(|l| l.name.as_str())),
+                )
+                .enumerate()
+                .collect();
+            order.sort_by(|(i, a), (j, b)| a.cmp(b).then(i.cmp(j)));
+            self.out.args.insert(
+                (self.module, span),
+                order.into_iter().map(|(i, _)| i as u32).collect(),
+            );
+            self.pending_typed.push(PendingTyped {
+                definition,
+                module: self.module,
+                span,
+                signature: f.clone(),
+                argument_types: parts,
+                input_spans,
+                locals: self.locals.clone(),
+                known: self.kvars.clone(),
+            });
+        }
+        (r, Knowledge::unknown())
     }
 
     /// A multi-shape function value (syntax three §2.6.4, §2.6.5). With an
@@ -2394,8 +2567,8 @@ impl<'a> Checker<'a> {
     /// it is the function of that shape group. In every other place it has
     /// the type `{ B_g1 | … | B_gm } -> R_all` over its groups, and no
     /// known type.
-    fn multi(&mut self, gs: &[MultiGroup], expected: &Ty, span: Span) -> (Ty, Ty) {
-        if let [Ty::Fn(want)] = known::members(expected).as_slice()
+    fn multi(&mut self, gs: &[MultiGroup], expected: &Knowledge, span: Span) -> (Ty, Knowledge) {
+        if let [Ty::Fn(want)] = known::members(&expected.hint).as_slice()
             && !groups::is_multi(want)
             && let Some(n) = want.arity()
         {
@@ -2410,7 +2583,7 @@ impl<'a> Checker<'a> {
         let (ret, err, env) = (self.s.fresh(), self.s.fresh(), self.s.fresh());
         let mut data = Vec::new();
         for g in gs {
-            let (t, _) = self.infer_k(&g.value, &Ty::Top);
+            let (t, _) = self.infer_k(&g.value, &Knowledge::unknown());
             let parts: Vec<Ty> = match &t {
                 Ty::Fn(f) if f.arity() == Some(g.shape.len()) => {
                     f.parts().expect("data parameter").to_vec()
@@ -2435,7 +2608,7 @@ impl<'a> Checker<'a> {
         };
         (
             Ty::Fn(Box::new(groups::with_data(param, ret, err, env))),
-            Ty::Top,
+            Knowledge::unknown(),
         )
     }
 
@@ -2603,13 +2776,13 @@ impl<'a> Checker<'a> {
 
     /// For editors: the constructors that may have made the value of `v` in
     /// `v.f`, whose fields may be written after the dot, whatever `f` is.
-    fn note_field_ctors(&mut self, known_ctor: Option<CtorRef>, kv: &Ty, span: Span) {
+    fn note_field_ctors(&mut self, known_ctor: Option<CtorRef>, kv: &Knowledge, span: Span) {
         let ctors = match known_ctor {
             Some(c) => vec![c],
-            None if *kv == Ty::Top => return,
+            None if kv.hint == Ty::Top => return,
             None => {
                 let mut out = Vec::new();
-                for m in known::members(kv) {
+                for m in known::members(&kv.hint) {
                     match &m {
                         Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) => {
                             if let TypeBody::Custom(cs) = &self.p.ty(*id).body {
@@ -2630,9 +2803,9 @@ impl<'a> Checker<'a> {
     /// Rule 13 and §6.7 for `v.f`: every constructor that may have made `v`
     /// has a field with the label `f`, and `v.f` has the union of their
     /// types.
-    fn field(&mut self, target: &Expr, name: &Ident, span: Span) -> (Ty, Ty) {
-        let (t, kv) = self.infer_k(target, &Ty::Top);
-        let members = known::members(&kv);
+    fn field(&mut self, target: &Expr, name: &Ident, span: Span) -> (Ty, Knowledge) {
+        let (t, kv) = self.infer_k(target, &Knowledge::unknown());
+        let members = known::members(&kv.hint);
         let known_ctor = self.known_ctor(target);
         // syntax-3 §2.3: `d.f` on data reads the part with the label `f`.
         if known_ctor.is_none()
@@ -2650,13 +2823,13 @@ impl<'a> Checker<'a> {
             self.note_field_ctors(known_ctor, &kv, span);
         }
         if let Some(c) = known_ctor {
-            let args = match known::member(&kv, Some(Head::Named(TypeRef::Custom(c.ty)))) {
+            let args = match known::member(&kv.hint, Some(Head::Named(TypeRef::Custom(c.ty)))) {
                 Some(Ty::Con(_, _, xs)) => Some(xs),
                 _ => None,
             };
             ctors.push((c, args));
         } else {
-            if kv == Ty::Top {
+            if kv.hint == Ty::Top {
                 self.error(
                     code::NEEDS_KNOWN_TYPE,
                     name.span,
@@ -2665,9 +2838,9 @@ impl<'a> Checker<'a> {
                         name.name
                     ),
                 );
-                return (self.s.fresh(), Ty::Top);
+                return (self.s.fresh(), Knowledge::unknown());
             }
-            for m in known::members(&kv) {
+            for m in known::members(&kv.hint) {
                 let custom = match &m {
                     Ty::Con(Head::Named(TypeRef::Custom(id)), _, xs) => {
                         match &self.p.ty(*id).body {
@@ -2679,7 +2852,7 @@ impl<'a> Checker<'a> {
                 };
                 let Some((id, xs, count)) = custom else {
                     let (k, m) = (
-                        display::show_known(&self.s, &kv),
+                        display::show_known(&self.s, &kv.hint),
                         display::show_known(&self.s, &m),
                     );
                     self.error(
@@ -2690,7 +2863,7 @@ impl<'a> Checker<'a> {
                             name.name
                         ),
                     );
-                    return (self.s.fresh(), Ty::Top);
+                    return (self.s.fresh(), Knowledge::unknown());
                 };
                 if count == 0 {
                     let tname = &self.p.ty(id).name;
@@ -2699,7 +2872,7 @@ impl<'a> Checker<'a> {
                         name.span,
                         format!("`{tname}` has no constructors, so its values have no fields"),
                     );
-                    return (self.s.fresh(), Ty::Top);
+                    return (self.s.fresh(), Knowledge::unknown());
                 }
                 for i in 0..count {
                     let c = CtorRef {
@@ -2755,7 +2928,7 @@ impl<'a> Checker<'a> {
                         )
                     };
                     self.error(code::NO_FIELD, name.span, message);
-                    return (self.s.fresh(), Ty::Top);
+                    return (self.s.fresh(), Knowledge::unknown());
                 }
             }
         }
@@ -2767,9 +2940,9 @@ impl<'a> Checker<'a> {
         // is not changed, because outside the clause it may have values of
         // other types.
         let narrowed = known_ctor.and_then(|_| self.known_ctor_args(target));
-        let mut forms: Vec<Ty> = match kv {
+        let mut forms: Vec<Ty> = match &kv.hint {
             Ty::Top => Vec::new(),
-            _ => known::members(&kv)
+            _ => known::members(&kv.hint)
                 .iter()
                 .map(|m| self.known_bound(m))
                 .collect(),
@@ -2795,9 +2968,18 @@ impl<'a> Checker<'a> {
         let ks = ctors
             .iter()
             .zip(&found)
-            .map(|((c, args), (_, i))| self.field_known(*c, *i as usize, args.as_deref()))
+            .map(|((c, args), (_, i))| {
+                let fact = kv.fact.clone();
+                Knowledge {
+                    hint: self.field_known(*c, *i as usize, args.as_deref()),
+                    fact: match known::member(&fact, Some(Head::Named(TypeRef::Custom(c.ty)))) {
+                        Some(Ty::Con(_, _, xs)) => self.field_known(*c, *i as usize, Some(&xs)),
+                        _ => Ty::Top,
+                    },
+                }
+            })
             .collect();
-        let k = self.kunion(ks);
+        let k = self.kunion_knowledge(ks);
         self.out
             .access
             .insert((self.module, span), super::Access::Field(found));
@@ -2806,15 +2988,21 @@ impl<'a> Checker<'a> {
 
     /// Rule 13 for `v.k`: every member of the known type of `v` is data
     /// with more than k positions.
-    fn tuple_index(&mut self, target: &Expr, k: u32, index_span: Span, span: Span) -> (Ty, Ty) {
-        let (t, kv) = self.infer_k(target, &Ty::Top);
-        if kv == Ty::Top {
+    fn tuple_index(
+        &mut self,
+        target: &Expr,
+        k: u32,
+        index_span: Span,
+        span: Span,
+    ) -> (Ty, Knowledge) {
+        let (t, kv) = self.infer_k(target, &Knowledge::unknown());
+        if kv.hint == Ty::Top {
             self.error(
                 code::NEEDS_KNOWN_TYPE,
                 index_span,
                 "`.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`",
             );
-            return (self.s.fresh(), Ty::Top);
+            return (self.s.fresh(), Knowledge::unknown());
         }
         self.data_part(target, &t, &kv, Ok(k), index_span, span)
     }
@@ -2827,11 +3015,11 @@ impl<'a> Checker<'a> {
         &mut self,
         target: &Expr,
         t: &Ty,
-        kv: &Ty,
+        kv: &Knowledge,
         key: Result<u32, &str>,
         key_span: Span,
         span: Span,
-    ) -> (Ty, Ty) {
+    ) -> (Ty, Knowledge) {
         let key_text = match key {
             Ok(k) => k.to_string(),
             Err(f) => f.to_string(),
@@ -2840,7 +3028,7 @@ impl<'a> Checker<'a> {
         let mut parts = Vec::new();
         let mut kparts = Vec::new();
         let mut index: Option<usize> = None;
-        for m in known::members(kv) {
+        for m in known::members(&kv.hint) {
             let found = match (&m, key) {
                 (Ty::Con(Head::Shape(shape), _, _), Ok(k)) => {
                     (k < shape.positions()).then_some(k as usize)
@@ -2848,7 +3036,7 @@ impl<'a> Checker<'a> {
                 (Ty::Con(Head::Shape(shape), _, _), Err(f)) => shape.label_index(f),
                 _ => {
                     let (whole, m) = (
-                        display::show_known(&self.s, kv),
+                        display::show_known(&self.s, &kv.hint),
                         display::show_known(&self.s, &m),
                     );
                     self.error(
@@ -2858,7 +3046,7 @@ impl<'a> Checker<'a> {
                             "`.{key_text}` needs every member of the known type `{whole}` of its value to be data (§4.8 rule 13), but `{m}` is not"
                         ),
                     );
-                    return (self.s.fresh(), Ty::Top);
+                    return (self.s.fresh(), Knowledge::unknown());
                 }
             };
             let Some(i) = found else {
@@ -2868,10 +3056,10 @@ impl<'a> Checker<'a> {
                     key_span,
                     format!("the data `{m}` has no part `{key_text}` (§2.3)"),
                 );
-                return (self.s.fresh(), Ty::Top);
+                return (self.s.fresh(), Knowledge::unknown());
             };
             if index.is_some_and(|j| j != i) {
-                let whole = display::show_known(&self.s, kv);
+                let whole = display::show_known(&self.s, &kv.hint);
                 self.error(
                     code::NO_FIELD,
                     key_span,
@@ -2879,13 +3067,10 @@ impl<'a> Checker<'a> {
                         "the part `{key_text}` is at different places in the members of `{whole}`; read it after a type test"
                     ),
                 );
-                return (self.s.fresh(), Ty::Top);
+                return (self.s.fresh(), Knowledge::unknown());
             }
             index = Some(i);
-            let Ty::Con(_, _, xs) = &m else {
-                unreachable!("a data member")
-            };
-            kparts.push(xs[i].clone());
+            kparts.push(kv.member(m.head().unwrap()).part(i));
             let form = self.known_bound(&m);
             if let Ty::Con(_, _, ys) = &form {
                 parts.push(ys[i].clone());
@@ -2898,14 +3083,14 @@ impl<'a> Checker<'a> {
                 key_span,
                 format!("`.{key_text}` needs a known type for its value (§4.8 rule 13)"),
             );
-            return (self.s.fresh(), Ty::Top);
+            return (self.s.fresh(), Knowledge::unknown());
         };
         let bound = self.union(forms, target.span);
         self.sub(t, &bound, target.span);
         self.out
             .access
             .insert((self.module, span), super::Access::Part(index as u32));
-        (self.union(parts, key_span), self.kunion(kparts))
+        (self.union(parts, key_span), self.kunion_knowledge(kparts))
     }
 
     /// §6.7: `C(..base, f: e)`.
@@ -2915,10 +3100,10 @@ impl<'a> Checker<'a> {
         ctor_span: Span,
         base: &Expr,
         fields: &[(Ident, Expr)],
-    ) -> (Ty, Ty) {
-        let (bt, bk) = self.infer_k(base, &Ty::Top);
+    ) -> (Ty, Knowledge) {
+        let (bt, bk) = self.infer_k(base, &Knowledge::unknown());
         let TypeBody::Custom(ctors) = &self.p.ty(ctor.ty).body else {
-            return (self.s.fresh(), Ty::Top);
+            return (self.s.fresh(), Knowledge::unknown());
         };
         if ctors.len() != 1 && self.known_ctor(base) != Some(ctor) {
             let cname = ctors[ctor.index as usize].name.clone();
@@ -2953,9 +3138,9 @@ impl<'a> Checker<'a> {
         };
         let old_fields = self.ctor_fields(ctor, &old);
         let new_fields = self.ctor_fields(ctor, &new);
-        let mut given: Vec<Option<Ty>> = vec![None; new_fields.len()];
+        let mut given: Vec<Option<Knowledge>> = vec![None; new_fields.len()];
         for (label, e) in fields {
-            let (t, k) = self.infer_k(e, &Ty::Top);
+            let (t, k) = self.infer_k(e, &Knowledge::unknown());
             match new_fields
                 .iter()
                 .position(|f| f.0.as_deref() == Some(&label.name))
@@ -2986,19 +3171,21 @@ impl<'a> Checker<'a> {
         }
         // §4.8: the known type of the call of `C` with the given fields and
         // the other fields of `v`.
-        let base_args = match known::member(&bk, Some(Head::Named(TypeRef::Custom(ctor.ty)))) {
-            Some(Ty::Con(_, _, xs)) => Some(xs),
-            _ => None,
-        };
-        let ks: Vec<Ty> = given
+        let base = bk.member(Head::Named(TypeRef::Custom(ctor.ty)));
+        let ks: Vec<Knowledge> = given
             .into_iter()
             .enumerate()
-            .map(|(i, g)| g.unwrap_or_else(|| self.field_known(ctor, i, base_args.as_deref())))
+            .map(|(i, g)| {
+                g.unwrap_or_else(|| {
+                    base.map(|t| match t {
+                        Ty::Con(_, _, xs) => self.field_known(ctor, i, Some(xs)),
+                        _ => Ty::Top,
+                    })
+                })
+            })
             .collect();
-        let k = match known::one_fn(&self.ctor_known(ctor)) {
-            Some(f) => self.call_known(&f, &ks),
-            None => Ty::Top,
-        };
+        let ctor_k = Knowledge::certain(self.ctor_known(ctor));
+        let k = self.call_known(&ctor_k, &ks);
         (Ty::named(TypeRef::Custom(ctor.ty), new), k)
     }
 
@@ -3048,7 +3235,7 @@ impl<'a> Checker<'a> {
 
     /// Rule 9: `{ s1 … sn e }`. The last expression has the expected type
     /// of the block, and the block has its known type (§4.8).
-    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Ty) -> (Ty, Ty) {
+    pub fn block(&mut self, stmts: &[Stmt], span: Span, expected: &Knowledge) -> (Ty, Knowledge) {
         for (i, s) in stmts.iter().enumerate() {
             match s {
                 Stmt::Bind(b) => self.local_binding(b),
@@ -3066,8 +3253,8 @@ impl<'a> Checker<'a> {
                 Stmt::Env { ty, value, span } if matches!(ty.kind, TypeKind::Hole) => {
                     // Syntax three, `r <- (e1)` (§2.10.2): the key is the
                     // type constructor of the known type of `e1`.
-                    let (v, k) = self.infer_k(value, &Ty::Top);
-                    let provider = [&v, &k].into_iter().find_map(|t| match t {
+                    let (v, k) = self.infer_k(value, &Knowledge::unknown());
+                    let provider = [&v, &k.hint].into_iter().find_map(|t| match t {
                         Ty::Con(super::Head::Named(r), ..) => Some((*r, t.clone())),
                         _ => None,
                     });
@@ -3117,21 +3304,29 @@ impl<'a> Checker<'a> {
         // The last statement is not an expression: reported by the parser.
         let _ = span;
         let nil = Ty::named(self.b.nil, Vec::new());
-        (nil.clone(), nil)
+        (nil.clone(), Knowledge::certain(nil))
     }
 
     /// Rule 4: a function expression, and its known type (§4.8). With an
     /// expected function type with as many parameters, a parameter with no
     /// type written at its top gets the known type of the matching
     /// parameter.
-    fn function(&mut self, f: &Function, expected: &Ty) -> (Ty, Ty) {
+    fn function(&mut self, f: &Function, expected: &Knowledge) -> (Ty, Knowledge) {
         let count = f
             .params
             .iter()
             .filter(|p| matches!(p, Param::Pattern { .. }))
             .count();
-        let expected: Vec<Ty> = match known::members(expected).as_slice() {
-            [Ty::Fn(g)] if g.arity() == Some(count) => g.parts().expect("data parameter").to_vec(),
+        let expected: Vec<Knowledge> = match known::members(&expected.hint).as_slice() {
+            [Ty::Fn(g)] if g.arity() == Some(count) => (0..count)
+                .map(|i| {
+                    expected.map(|t| {
+                        known::one_fn(t)
+                            .and_then(|g| g.parts().and_then(|ps| ps.get(i)).cloned())
+                            .unwrap_or(Ty::Top)
+                    })
+                })
+                .collect(),
             _ => Vec::new(),
         };
         let mut params = Vec::new();
@@ -3148,8 +3343,11 @@ impl<'a> Checker<'a> {
                     self.s.mark_inputs(start);
                     fails |= self.binding_may_fail(pattern, &t);
                     let k = match known::top_written(pattern) {
-                        Some(ty) => self.kconv(ty, &HashMap::new()),
-                        None => expected.get(params.len()).cloned().unwrap_or(Ty::Top),
+                        Some(ty) => Knowledge::certain(self.kconv(ty, &HashMap::new())),
+                        None => expected
+                            .get(params.len())
+                            .cloned()
+                            .unwrap_or_else(Knowledge::unknown),
                     };
                     self.fit_known(pattern, &k, false);
                     params.push((label.clone(), t));
@@ -3160,7 +3358,7 @@ impl<'a> Checker<'a> {
                     if let Some(super::Head::Named(r)) = t.head() {
                         self.out.services.insert((self.module, name.span), r);
                     }
-                    let k = self.kconv(ty, &HashMap::new());
+                    let k = Knowledge::certain(self.kconv(ty, &HashMap::new()));
                     self.kvars.insert(*var, k);
                     self.locals.insert(*var, Scheme::mono(t.clone()));
                     env_tys.push(t);
@@ -3201,10 +3399,9 @@ impl<'a> Checker<'a> {
         });
         // §4.8: the body of a function with a written `->` part has that
         // type as its expected type.
-        let body_expected = f
-            .ret
-            .as_ref()
-            .map_or(Ty::Top, |r| self.kconv(&r.value, &HashMap::new()));
+        let body_expected = f.ret.as_ref().map_or_else(Knowledge::unknown, |r| {
+            Knowledge::certain(self.kconv(&r.value, &HashMap::new()))
+        });
         self.effects.push(Effects::default());
         self.function_depth += 1;
         let (a, body_known) = self.block(&f.body.stmts, f.body.span, &body_expected);
@@ -3331,7 +3528,11 @@ impl<'a> Checker<'a> {
                     // §4.8: a generalized name has its type scheme, with the
                     // parts of the known type of its value for the
                     // variables that are not generalized.
-                    let value = self.kvars.get(v).cloned().unwrap_or(Ty::Top);
+                    let value = self
+                        .kvars
+                        .get(v)
+                        .cloned()
+                        .unwrap_or_else(Knowledge::unknown);
                     let known = self.scheme_known(&ty, level, &value);
                     self.kvars.insert(*v, known);
                     self.locals.insert(*v, Scheme { level, ty });

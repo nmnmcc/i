@@ -102,7 +102,12 @@ fn resolve_here(
         r: Resolver {
             graph,
             parsed,
-            p: Program::default(),
+            p: Program {
+                package_identities: (0..graph.packages.len())
+                    .map(|id| crate::identity::package_identity(graph, id))
+                    .collect(),
+                ..Program::default()
+            },
             diags,
             generated_values: Vec::new(),
             generated_types: Vec::new(),
@@ -485,28 +490,6 @@ fn plain_call(args: &[n::DItem]) -> bool {
     !matches!(args.first(), Some(n::DItem::Spread(_)))
 }
 
-fn has_hole(t: &n::Type) -> bool {
-    let items = |items: &[n::TItem]| {
-        items.iter().any(|i| match i {
-            n::TItem::Pos(t) | n::TItem::Label(_, t) | n::TItem::Spread(t) => has_hole(t),
-        })
-    };
-    match &t.kind {
-        n::TypeKind::Hole => true,
-        n::TypeKind::Lit(_) | n::TypeKind::ValueOf { .. } => false,
-        n::TypeKind::Named { args, .. } | n::TypeKind::Call { args, .. } => {
-            args.iter().any(has_hole)
-        }
-        n::TypeKind::Data(i) => items(i),
-        n::TypeKind::Union(ts) | n::TypeKind::Inter(ts) | n::TypeKind::Diff(ts) => {
-            ts.iter().any(has_hole)
-        }
-        n::TypeKind::Fn(f) => {
-            has_hole(&f.param) || has_hole(&f.ret) || f.services.as_ref().is_some_and(has_hole)
-        }
-    }
-}
-
 fn is_macro(a: &n::Attribute) -> bool {
     a.module.is_none() && a.name.name == "macro"
 }
@@ -514,157 +497,15 @@ fn is_macro(a: &n::Attribute) -> bool {
 /// The syntax macros that a module defines: the name and whether it has a
 /// typed signature; or the problems of their definitions.
 /// 2d: this is `lisp::expansion::definitions` on the new tree.
-type MacroDefinitions = Result<Vec<(String, bool)>, Vec<(Span, &'static str)>>;
-
+type MacroDefinitions = Result<Vec<(String, bool)>, Vec<(Span, String)>>;
 fn definitions(module: &n::Module, pre: &Pre) -> MacroDefinitions {
-    let live: Vec<&n::Item> = module
-        .items
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| !pre.member_of.contains_key(i))
-        .map(|(_, item)| item)
-        .collect();
-    let mut found = Vec::new();
-    let mut errors = Vec::new();
-    for item in &live {
-        let attributes: Vec<&n::Attribute> =
-            item.attributes.iter().filter(|a| is_macro(a)).collect();
-        if attributes.is_empty() {
-            continue;
-        }
-        let attr = attributes[0];
-        if !pre.lisp {
-            errors.push((attr.span.0, "a syntax macro must be defined in a .is file"));
-            continue;
-        }
-        if attributes.len() != 1 || attr.args.is_some() {
-            errors.push((attr.span.0, "@macro is given once without arguments"));
-            continue;
-        }
-        if let n::ItemKind::Decl { name, .. } = &item.kind {
-            let implemented = live.iter().any(|other| {
-                matches!(&other.kind, n::ItemKind::Bind(b)
-                    if matches!(&b.pattern.kind, n::PatternKind::Var(n) if n == &name.name))
-                    && other.attributes.iter().any(is_macro)
-            });
-            if !implemented {
-                errors.push((
-                    item.span.0,
-                    "a typed macro signature needs an @macro implementation",
-                ));
-            }
-            continue;
-        }
-        let n::ItemKind::Bind(binding) = &item.kind else {
-            errors.push((item.span.0, "@macro needs a binding"));
-            continue;
-        };
-        let name = match &binding.pattern.kind {
-            n::PatternKind::Var(name) => name,
-            n::PatternKind::Typed { binder, .. } if !binder.discard => &binder.name,
-            _ => {
-                errors.push((binding.pattern.span.0, "a macro binding needs one name"));
-                continue;
-            }
-        };
-        if pre
-            .type_params
-            .get(&addr(binding))
-            .is_some_and(|p| !p.is_empty())
-        {
-            errors.push((
-                binding.pattern.span.0,
-                "a macro binding cannot declare type variables",
-            ));
-            continue;
-        }
-        let function = match &binding.value.kind {
-            n::ExprKind::Chain(fs) if chain_kind(fs) != ChainKind::Clauses => fs,
-            _ => {
-                errors.push((
-                    binding.value.span.0,
-                    "a macro binding needs a function expression",
-                ));
-                continue;
-            }
-        };
-        let mut parameters = 0;
-        let mut valid = true;
-        if chain_kind(function) == ChainKind::Plain {
-            for p in &function[0].params {
-                match &p.choices[0].kind {
-                    n::PatternKind::Var(_) => parameters += 1,
-                    n::PatternKind::Typed { binder, .. } if !binder.discard => parameters += 1,
-                    _ => {
-                        errors.push((p.choices[0].span.0, "a macro parameter must be a name"));
-                        valid = false;
-                    }
-                }
-            }
-        } else {
-            parameters = function[0].params.len();
-        }
-        let signature = live.iter().position(
-            |other| matches!(&other.kind, n::ItemKind::Decl { name: declared, .. } if declared.name == *name),
-        );
-        if let Some(index) = signature {
-            let declaration = live[index];
-            if declaration
-                .attributes
-                .iter()
-                .any(|a| a.module.is_none() && matches!(a.name.name.as_str(), "external" | "js"))
-            {
-                errors.push((
-                    declaration.span.0,
-                    "a typed macro signature cannot have @external or @js",
-                ));
-                valid = false;
-            }
-            if !declaration.attributes.iter().any(is_macro) {
-                errors.push((declaration.span.0, "a typed macro signature needs @macro"));
-                valid = false;
-            }
-            if let n::ItemKind::Decl { ty, .. } = &declaration.kind {
-                if has_hole(ty) {
-                    errors.push((
-                        declaration.span.0,
-                        "a typed macro signature must be fully written without _",
-                    ));
-                    valid = false;
-                }
-                match &ty.kind {
-                    n::TypeKind::Fn(f) => {
-                        let count = match &f.param.kind {
-                            n::TypeKind::Data(items) => items
-                                .iter()
-                                .filter(|i| !matches!(i, n::TItem::Spread(_)))
-                                .count(),
-                            _ => 0,
-                        };
-                        if count != parameters {
-                            errors.push((item.span.0, "a typed macro implementation must have one parameter for each signature parameter"));
-                            valid = false;
-                        }
-                    }
-                    _ => {
-                        errors.push((
-                            declaration.span.0,
-                            "a typed macro signature must be a full function type",
-                        ));
-                        valid = false;
-                    }
-                }
-            }
-        }
-        if valid {
-            found.push((name.clone(), signature.is_some()));
-        }
-    }
-    if errors.is_empty() {
-        Ok(found)
-    } else {
-        Err(errors)
-    }
+    ilang_syntax::lisp::expansion3::definitions(module, pre.lisp)
+        .map(|ds| {
+            ds.into_iter()
+                .map(|d| (d.name, d.signature.is_some()))
+                .collect()
+        })
+        .map_err(|es| es.into_iter().map(|e| (e.span, e.message)).collect())
 }
 
 impl<'a, 't> R3<'a, 't> {
@@ -752,16 +593,18 @@ impl<'a, 't> R3<'a, 't> {
         let found = definitions(ast, pre);
         if let Err(errors) = &found {
             for (span, message) in errors {
-                self.error(code::ATTRIBUTE_PLACE, *span, *message);
+                self.error(code::ATTRIBUTE_PLACE, *span, message.clone());
             }
         }
         let placeholder_var = VarId(u32::MAX);
-        let typed: HashSet<String> = found
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|(_, signature)| *signature)
-            .map(|(name, _)| name)
-            .collect();
+        let typed_definitions: HashMap<_, _> =
+            ilang_syntax::lisp::expansion3::definitions(ast, pre.lisp)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|d| d.signature.is_some())
+                .map(|d| (d.name.clone(), d))
+                .collect();
+        let typed: HashSet<String> = typed_definitions.keys().cloned().collect();
         for (index, item) in self.live(m) {
             let typed_declaration =
                 matches!(&item.kind, n::ItemKind::Decl { name, .. } if typed.contains(&name.name));
@@ -946,10 +789,33 @@ impl<'a, 't> R3<'a, 't> {
                     self.add_def(m, &name.name, name.span.0, kind, &attrs);
                     if self.p.module(m).defs.len() > before {
                         if typed_declaration {
-                            self.p.typed_macros.insert(DefId {
+                            let id = DefId {
                                 module: m,
                                 index: before as u32,
-                            });
+                            };
+                            self.p.typed_macros.insert(id);
+                            let definition = &typed_definitions[&name.name];
+                            let labels = if definition.variants.is_empty() {
+                                vec![definition.labels.clone()]
+                            } else {
+                                definition
+                                    .variants
+                                    .iter()
+                                    .map(|v| v.labels.clone())
+                                    .collect()
+                            };
+                            self.p.typed_macro_shapes.insert(
+                                id,
+                                labels
+                                    .into_iter()
+                                    .map(|ls| {
+                                        crate::types::ShapeId::new(
+                                            ls.iter().filter(|l| l.is_none()).count() as u32,
+                                            ls.into_iter().flatten(),
+                                        )
+                                    })
+                                    .collect(),
+                            );
                         }
                         Slot::Decl(before as u32)
                     } else {
@@ -1219,17 +1085,18 @@ impl<'a, 't> R3<'a, 't> {
         let mut names = Vec::new();
         self.binders(&b.pattern, &mut names);
         let written = "a program entry";
-        let function = match &ungroup(&b.value).kind {
-            n::ExprKind::Chain(fs) if chain_kind(fs) != ChainKind::Clauses => fs,
-            _ => {
-                self.error(
-                    code::ENTRY_FORM,
-                    span,
-                    format!("{written} is on a binding whose value is a function expression"),
-                );
-                return false;
-            }
-        };
+        let value = &ungroup(&b.value).kind;
+        if matches!(
+            value,
+            n::ExprKind::Int(_) | n::ExprKind::Float(_) | n::ExprKind::String(_)
+        ) {
+            self.error(
+                code::ENTRY_FORM,
+                span,
+                format!("{written} must be a function value"),
+            );
+            return false;
+        }
         if names.len() != 1 {
             self.error(
                 code::ENTRY_FORM,
@@ -1238,7 +1105,10 @@ impl<'a, 't> R3<'a, 't> {
             );
             return false;
         }
-        if !function[0].params.is_empty() {
+        if let n::ExprKind::Chain(function) = value
+            && chain_kind(function) != ChainKind::Clauses
+            && !function[0].params.is_empty()
+        {
             self.error(
                 code::ENTRY_PARAMS,
                 span,

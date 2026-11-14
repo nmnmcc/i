@@ -293,9 +293,11 @@ fn macro_arguments_match_labels_and_attribute_items() {
     use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
     let m = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "m".into(),
         parameters: vec!["first".into(), "second".into(), "item".into()],
+        labels: vec![Some("first".into()), Some("second".into()), None],
     };
     let argument = |label: Option<&str>, text: &str| MacroArgument {
         label: label.map(str::to_string),
@@ -1426,4 +1428,41 @@ fn native_written_definition(
     let tree = ilang_syntax::lisp::source_tree::SourceTree::read(&scope, &source, lisp);
     let datum = tree.item_datum(item.span).expect("same written datum");
     ilang_syntax::lisp::definition_table::Definition::tree_with_datum(native, datum, scope, ready)
+}
+
+#[test]
+fn macro_parameter_labels_are_explicit_and_survive_alpha_renaming() {
+    use ilang_syntax::lisp::{expansion::definitions, parse_source};
+    for local in ["value", "renamed"] {
+        let (module, errors) = parse_source(&format!(
+            "(@ macro (= id (-> (, (= label {local})) _ {local})))"
+        ));
+        assert!(errors.is_empty(), "{errors:?}");
+        let defs = definitions(&module, true).unwrap();
+        assert_eq!(defs[0].parameters, [local]);
+        assert_eq!(defs[0].labels, [Some("label".into())]);
+    }
+    let (module, errors) = parse_source("(@ macro (= id (-> (, value) _ value)))");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(definitions(&module, true).unwrap()[0].labels, [None]);
+}
+
+#[test]
+fn typed_macro_shapes_are_checked_even_when_a_missing_shape_is_never_called() {
+    use ilang_syntax::lisp::{expansion::definitions, parse_source};
+    let source = include_str!("../../../tests/spec/14.8/mp11_missing_shape/src/macros.is");
+    let (module, errors) = parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(
+        definitions(&module, true)
+            .unwrap_err()
+            .iter()
+            .any(|e| e.message.contains("every parameter-data shape"))
+    );
+    let source = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/macros.is");
+    let (module, errors) = parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let definitions = definitions(&module, true).unwrap();
+    assert_eq!(definitions.len(), 1);
+    assert_eq!(definitions[0].variants.len(), 2);
 }
