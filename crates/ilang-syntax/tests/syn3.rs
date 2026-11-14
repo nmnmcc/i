@@ -135,9 +135,16 @@ fn service_types() {
 
 #[test]
 fn removed_error_channel_has_its_diagnostic() {
-    let (_, diags) = syn3::parse_module("f: (Int) -> Int ^ String\n");
+    // Keep main's P0 diagnostic for the already-invalid surface spelling;
+    // E3 removes the internal channel without changing this error.
+    let source = "f: (Int) -> Int ^ String\n";
+    let caret = source.find('^').unwrap() as u32;
+    let (_, diags) = syn3::parse_module(source);
     assert!(
-        diags.iter().any(|d| d.code.as_str() == "E0116"),
+        diags.iter().any(|d| d.code.as_str() == "E0101"
+            && d.span == ilang_syntax::span::Span::new(caret, caret + 1)
+            && d.message
+                .contains("errors and services are written after `<-`")),
         "{diags:?}"
     );
     ok("f: (Int) <- (Fail(String)) -> Int\n");
