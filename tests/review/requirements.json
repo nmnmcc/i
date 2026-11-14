@@ -3567,7 +3567,7 @@
       "known_failure": false,
       "outcome": "accept",
       "finding": "E1: local providers satisfy independent callback needs by value subtyping",
-      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4).\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both. Owner decision 2 withdraws universal-entry removal; these explicit providers supply the retained keys.",
       "origin": "docs/design/effects-e1-corpus.md"
     },
     {
@@ -3575,7 +3575,7 @@
       "known_failure": false,
       "outcome": "accept",
       "finding": "E1: local providers satisfy independent callback needs by value subtyping",
-      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4).\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both. Owner decision 2 withdraws universal-entry removal; these explicit providers supply the retained keys.",
       "origin": "docs/design/effects-e1-corpus.md"
     },
     {
@@ -3583,7 +3583,7 @@
       "known_failure": false,
       "outcome": "accept",
       "finding": "E1: local providers satisfy independent callback needs by value subtyping",
-      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4).\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both. Owner decision 2 withdraws universal-entry removal; these explicit providers supply the retained keys.",
       "origin": "docs/design/effects-e1-corpus.md"
     },
     {

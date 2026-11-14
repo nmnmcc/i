@@ -1,5 +1,13 @@
 # E4 integration with main
 
+The integration checkpoints below are historical. The 2026-11-14 owner
+rulings supersede universal-entry removal (Decision 2) and the ban on finals
+raising (Decision 9); Decision 15 still forbids releases on a stop. Their
+current implementation and full gate results are in
+[the corpus audit](effects-e3-e6-corpus.md) and
+[the landing verification](effects-e3-e6-validation.md). The old removal
+sentence quoted below is not a current justification for dropping a key.
+
 Current base: origin/main `e44514d46690ea9e25486c95a34d616fcf86f6a8`.
 Current merge: `636380d50352c574dedcba58c157056a3c624562`.
 All requested affected gates are green on this base.
