@@ -83,5 +83,312 @@
       "sha256": "ce2a25f224bb7f83f29c207cffe5a0c8016a298ae17780dc254e024a28f5f6ee",
       "intentional_new_rule_examples": 11
     }
-  ]
+  ],
+  "site_proof": {
+    "examples": 33,
+    "pending_sites": 0,
+    "differences": [],
+    "old_reader": "e44514d4",
+    "baseline": "tyalt-main-site-old.jsonl.gz",
+    "sha256": "b0797c1afac0ac5fdd6462d90718e10725b0d1fb5ca7f3d6aafcb4d31551c93f",
+    "entries": [
+      {
+        "path": "docs/content/docs/standard/generated/chapter-1.mdx",
+        "start": 4948,
+        "source_sha256": "222bf61b7855eb5cab9c538d7d071d4e35a07d987f0d4facbf59944cdcf2983d",
+        "tree_sha256": "906896466cbd29315d339dd37466abf5a75f81119ad6e8fd95f0a67ad5d79654",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-10.mdx",
+        "start": 1412,
+        "source_sha256": "8216d73d8d7556552a4d733e4186711f4b9ef8abd026443b1a37188c2072f1ad",
+        "tree_sha256": "b6d8029b766e78e39117daf76d6d03c9a392aed11ebfdd243051f61e011723fa",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-10.mdx",
+        "start": 12655,
+        "source_sha256": "c5a12539f9159036d084b503fefe46cc9274fd1929c40aa74bb32fd610b43ab3",
+        "tree_sha256": "36ca923faff82586a51bc1fe79fb40e53dc29c2b227c2134759d226c2507097b",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-14.mdx",
+        "start": 8213,
+        "source_sha256": "d25aaf7bd343c97d7164e810db8c275b6b1ec47905f47ae79c5cac6e188f82f9",
+        "tree_sha256": "dfddac39023d2a3db67908e1e35952b1a620bedd1fe1a783e3c6ec41618ea059",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-14.mdx",
+        "start": 19920,
+        "source_sha256": "49434f52835922d4a4b6625f5c1270221ea45f9427b72b2ef679c8828841899e",
+        "tree_sha256": "e8f895311dc227a79fae7fc534907b1610edb99747d9a7639f1d012355182273",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-14.mdx",
+        "start": 22609,
+        "source_sha256": "5db078f812d3d664fe8cc21955ee99b8203aeb14061d8647d874f7d68611a219",
+        "tree_sha256": "c07963e6ef478e081d1199218dd438c6d87afa22debb5e999bca96ca024d602f",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-14.mdx",
+        "start": 26801,
+        "source_sha256": "beea51cc4a331771022959480b6c92db59c06a9b0667607df5b507704aa011bd",
+        "tree_sha256": "6b76d7e94546e16f1f7ce47cdf5569a713503e17d2d1096de4cfbad35131688c",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-2.mdx",
+        "start": 3012,
+        "source_sha256": "c1729c1e585ea7e185ba8e1679d2355b83e06080ecab8997069b786e84bcad5b",
+        "tree_sha256": "b6b2b65d29434096f7139309782371372a966b8097e18193b154c96c9bcbe015",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-2.mdx",
+        "start": 6561,
+        "source_sha256": "401b46c91984c19fb35d92c6d673403f3921980042e68a67d2947f7d959bcc7b",
+        "tree_sha256": "2611d3f76f5de36fc61f7cec8ad3e671f12a803832489b7735ff169339284cb9",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-4.mdx",
+        "start": 3314,
+        "source_sha256": "a12d9a52fd63111466debc146258e2353e76dd79a4eaeb28d667cf5e2b636653",
+        "tree_sha256": "5ef4726a19a8cf9b5f151dec379706191a9da24711a30518b850cf023c6ce8cc",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-4.mdx",
+        "start": 10343,
+        "source_sha256": "4409bb3d9079ee988bc17026d30fb7d696fad778609dff660be1ff401f4f49a8",
+        "tree_sha256": "e5d02ded59e9992fbfe54c29c2644981cd2c981eb3446a9bd28b6ad19408225e",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-4.mdx",
+        "start": 16607,
+        "source_sha256": "c75f990aca470312f92b8e0f68bb66fea935114336893387bca6bceae34fc939",
+        "tree_sha256": "7ad268264e77644ef76fe97a30cdc16ff53d1b490ab01f047bd6c175fc2dc989",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-4.mdx",
+        "start": 22035,
+        "source_sha256": "798718edce8bfc97c72b99b15c92fc454a49eebb1a52b2ad1b94d67133ea8348",
+        "tree_sha256": "28e5d6f6ff105b18c75495f7c361367829dc9f1e415c33d62c3925e227a9ba52",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-4.mdx",
+        "start": 46790,
+        "source_sha256": "93604f9b9bccdf8431d1e37bae969ed20c118369aa367e9b60c0e09442d6e025",
+        "tree_sha256": "31e0db1ce0c209e72286a277e2fd09b0bb5469371e7598afedf8392d34603bdc",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-6.mdx",
+        "start": 14816,
+        "source_sha256": "e488dc3514af33ee2408d0c888862d8fb366e9ba15cf335af8fd2a1fb8d57a90",
+        "tree_sha256": "de35d140972a6765ccfad706f7e65216137a0f2c0074bda34ffeeb90a952c759",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-6.mdx",
+        "start": 16773,
+        "source_sha256": "287920d2a61ce858ba14904dafa22761820d41b5a82c4363c7d67390ecc7b1cc",
+        "tree_sha256": "84cb3b1855242f69e10cb14fcedd1446987aee5d7a5b1a1e5e8036b372c4bfc2",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-7.mdx",
+        "start": 10631,
+        "source_sha256": "7959a955fb2eac10bd28b950085c0ebb6626775e6ec7f51ed7270d0b5e12c085",
+        "tree_sha256": "f9f9bd96791afe5f7c0b3afed5381578a1a183c94b155d8288df0b84d4d0a9ee",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 755,
+        "source_sha256": "d61dd92a9813f7699779b0962a55445d0f515d5535100df5513aa696648bbd61",
+        "tree_sha256": "6a146297519795b1a3bf6023ce3134fcef5a4b8f4e47359c7e8e428a161c7ec8",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 3180,
+        "source_sha256": "bee5060de1548b4718c48c64c094988ce242faee6b8921b1656af0bae0b6f3b4",
+        "tree_sha256": "cf99e92a33c4f569277b10fac5b01bd4b6344b95168db7937a61f0b892555a59",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 6024,
+        "source_sha256": "635717e8fed499d1a7c475a03c2a26a8cc0d831a625934840e8f282160eefbb7",
+        "tree_sha256": "9a2a21060b1d57ed58503a139d5c951b49f542d7307a02d46dcc5366f84bea5b",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 6493,
+        "source_sha256": "1d31fa1e3d80b6c511e18f9fe09ff1c48aa601b82912f07bbddb4e27c0a6a424",
+        "tree_sha256": "09dc8b5f5f15bd650cf7c720a232af16b08cbec1d72ba563c6fa8164bc74a323",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 7064,
+        "source_sha256": "5aae9c9a5ac4e3f9a790af42a3f9723bca7087fe397dc4f95c4455ff7b098cfa",
+        "tree_sha256": "e445fee91cff527129ee3ad2822afc2425925fd00ac094272b96e9977a5250f5",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 7849,
+        "source_sha256": "ff1ac6e54ec2ff95ed35b060b7dccc7df8c96de3efb2fa96790fbd7703da37a4",
+        "tree_sha256": "628011217bea232839fac112596721b0441e673351aeed9e80b280e61214cfce",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 8185,
+        "source_sha256": "eb095b8e1cebf8eb66e092cef11205c9adc4db5de1cbe608f8bde4758623f179",
+        "tree_sha256": "2b38a292bdf5fea7f4d4c5f8b9c5c75b99e0ca909a6739bb273ddbec4f919373",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 13229,
+        "source_sha256": "57e42e29c5dea7ec0ff9257b36f86aae552e8869c3219d6e50b12baa7d210557",
+        "tree_sha256": "f1553f9a3526eed410240be6e7aec3cfdbd2a1db8f797c8ede40b350460c1c53",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 13557,
+        "source_sha256": "f7301983eaf86b7254e6417612a50c880346dc2d5a819c4bd40e9c20e9e81c6e",
+        "tree_sha256": "a698b3bef4d5ab42fd0367eb8f297a21ad92e8dc164643e748c6c96b701f3c11",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 16767,
+        "source_sha256": "d6fdfeb8cc43c346c904e79bf37594a7fd93072f805c13d147f30a9689b1abb5",
+        "tree_sha256": "add49b4cc51f504a2b7314c36dbb5bde9159d226328a78bdbec56d60220d4a4d",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 17031,
+        "source_sha256": "541f9a20d09fb0030f06e07fc762303b429223dbd0239af192d73a574b3db690",
+        "tree_sha256": "10264ddaaa6e41f00c2936439aff04bd80e1fefe2f36841407e361617b9f7967",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 17493,
+        "source_sha256": "7d859d53f98e6567a38483170a9ee24e6ce303bdee6697846d081eef059d22f4",
+        "tree_sha256": "5ad62c61bc639b73e846318f1cbbbaa6a6fdbc5184b005668e1d9c3f81858df0",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 18003,
+        "source_sha256": "8826291ef2e8a1ab247dc55ceafdd1412dae5dd35ab740cd8162300ef3cab694",
+        "tree_sha256": "4979d7764be86f7c57394b07bb8dcbd279f4ff71827c3d884d1d070ec58e9f47",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 19782,
+        "source_sha256": "bedb60a14864397079df4680d0141bf988dae0c7884066d7cfdd5632b73cc4e8",
+        "tree_sha256": "78466e5132d9a0118568b9b6380397b82d216b6f81227d40b7030f4ae9527b28",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 57910,
+        "source_sha256": "f1593542964fc4e8a5a271fd705e5273e140028b05562c1515a4a732e3856aff",
+        "tree_sha256": "64a99e3109a4796958336a9208ffc1bdd2d2aa2aa4d352f5cb663f7c9236e40d",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      },
+      {
+        "path": "docs/content/docs/standard/generated/chapter-9.mdx",
+        "start": 69239,
+        "source_sha256": "b257fc3bccc05dac27ab108ef432d22a935bcfd7262f27181eca92f6ab0362af",
+        "tree_sha256": "97ae795785db95072e47b45500e953f73498dd1ff4f5e8f33b7a3069b4e6db15",
+        "equal": true,
+        "diagnostics_equal": true,
+        "pending_sites": 0
+      }
+    ]
+  }
 }
