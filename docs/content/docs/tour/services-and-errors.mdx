@@ -3,7 +3,7 @@ title: Services and errors
 description: Take services from a caller, provide test implementations, and handle errors and optional values.
 ---
 
-A service supplies operations that a function needs from its caller. This page shows how to take and provide services, replace one in a test, and handle expected failures. It builds on [functions and branches](/docs/tour/functions-and-branches) and [types and inference](/docs/tour/types-and-inference).
+Take services from your caller, substitute test implementations, and handle failures as values.
 
 ```i run package=tour title="src/main.i"
 (
@@ -16,15 +16,9 @@ main = () <- (io : Io) { io.print("hello") }
 hello
 ```
 
-## Taking and providing services
+`i run` supplies `Io`, assertions, a top-level failure handler, and the scheduler to `main`; importing a service type does not create an implementation. `io.print` appends a line feed.
 
-A service is an ordinary labelled value, usually a record of functions. `Io` is defined in `i/io` with a `print` function. The head `<- (io : Io)` takes that service and gives it the local name `io`. A **need** is the services a function takes from its caller. The function's type is `() <- (Io) -> Nil`: parameters, need, then result. `io.print` writes its string and a line feed.
-
-`main` in `src/main.i` is the default program entry. `i run` provides the native platform services, including `Io`, assertions, a top-level failure handler, and the task scheduler. Your own services must be supplied by your program. Importing a service type makes its name available; it does not create an implementation.
-
-A need is the intersection of its service requirements. A function that uses two services needs both. Entries are keyed by their type constructors, so their order does not matter. The name `io` is local to the function; callers provide an `Io`, without a label called `io`.
-
-For the next examples, use a package named `tour`. Define your own service in `src/greeting.i`:
+## A caller’s service
 
 ```i file=src/greeting.i title="src/greeting.i"
 (
@@ -34,8 +28,6 @@ For the next examples, use a package named `tour`. Define your own service in `s
 Greeting = (read = () -> String)
 message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 ```
-
-Then provide an implementation at the call:
 
 ```i run package=tour title="src/main.i"
 (
@@ -51,13 +43,9 @@ main = () <- (io : Io) {
 hello, reader
 ```
 
-`message` has type `() <- (Greeting) -> String`. The expression after `<-` supplies the service for that call. The service's function returns a string without needing another service. The call has its `Greeting`, while `main` takes `Io` from its caller. The clock test below provides a service to an entire block.
+A service is an ordinary labelled value; `<-` gives this call its `Greeting`. Calls without an explicit provision pass their needs to the caller.
 
-A function that calls `message` also needs `Greeting`, unless it provides one. The checker example below shows what happens when a written function type leaves that need out.
-
-## A second implementation for a test
-
-Use the same `src/greeting.i` above. Here it is attached again so this test is a complete example:
+## A test implementation
 
 ```i file=src/greeting.i title="src/greeting.i"
 (
@@ -68,7 +56,7 @@ Greeting = (read = () -> String)
 message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 ```
 
-```i test package=tour title="test/greeting_test.i"
+```i test stdout=exact package=tour title="test/greeting_test.i"
 (
 	testlib = (test) = std/test
 	(Greeting, message) = tour/greeting
@@ -78,21 +66,34 @@ test("a fake greeting", () {
 })
 ```
 
-The fake is another value of `Greeting`. The application function needs no testing switch. `test` comes from `std/test`; [macros](/docs/tour/macros) explains how it registers the test. The project needs `std` and `[test] collection = "std/test.tests"` in its manifest.
-
-The checker rejects a function promised to need nothing when its body leaves a service unsupplied:
-
-```i error E0501 package=tour title="src/main.i"
-Greeting = (read = () -> String)
-message = () <- (g : Greeting) -> String { g.read() }
-main : () -> String = () { message() }
+```text
+pass tour/greeting_test.a fake greeting
+1 passed, 0 failed
 ```
 
-The real diagnostic is: `` `Greeting` is not a subtype of `Never` `` (E0501). The annotation on `main` promises no need. Provide a `Greeting` inside it, or allow the service in the function's type and supply it at a caller.
+The test runner supplies assertions; the project manifest needs `std` and `[test] collection = "std/test.tests"`. The [macros page](/docs/tour/macros) shows test registration.
 
-## Errors and missing values
+## Forwarded needs
 
-A `Result` keeps success or failure as a value, with `Ok(value)` and `Error(error)`. It is built in. On this tree, `std/int.parse` returns `Result(Int, Nil)`: a parsed integer, or an error whose value is `Nil`.
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+)
+Greeting = (read = () -> String)
+message = () <- (g : Greeting) -> String { g.read() }
+welcome : () <- (Greeting) -> String = () { message() <> "!" }
+main = () <- (io : Io) {
+	io.print(welcome() <- (Greeting(read = () { "hello" })))
+}
+```
+
+```text
+hello!
+```
+
+A written `() -> String` would leave `Greeting` unsupplied and produce E0501. Needs combine by service type, independently of local names or order.
+
+## Returned errors
 
 ```i run package=tour title="src/main.i"
 (
@@ -101,12 +102,8 @@ A `Result` keeps success or failure as a value, with `Ok(value)` and `Error(erro
 	std/int
 )
 main = () <- (io : Io) {
-	io.print(
-		core.inspect(int.parse("42")),
-	)
-	io.print(
-		core.inspect(int.parse("oops")),
-	)
+	io.print(core.inspect(int.parse("42")))
+	io.print(core.inspect(int.parse("oops")))
 }
 ```
 
@@ -115,7 +112,9 @@ Ok(42)
 Error(Nil)
 ```
 
-An `Option` represents a value that may be absent. It comes from `std/option`, with `Some(value)` and `None`. `std/list.first` returns one:
+`Result` is built in; `std/int.parse` uses `Nil` as its error value. Neither case leaves the computation early.
+
+## Missing values
 
 ```i run package=tour title="src/main.i"
 (
@@ -124,13 +123,9 @@ An `Option` represents a value that may be absent. It comes from `std/option`, w
 	std/list
 )
 main = () <- (io : Io) {
-	io.print(
-		core.inspect(list.first([7, 8])),
-	)
+	io.print(core.inspect(list.first([7, 8])))
 	empty : List(Int) = []
-	io.print(
-		core.inspect(list.first(empty)),
-	)
+	io.print(core.inspect(list.first(empty)))
 }
 ```
 
@@ -139,11 +134,9 @@ Some(7)
 None
 ```
 
-Match either form with the branches introduced earlier. A failed parse and an empty list return ordinary values; neither jumps out of the computation.
+`Option` comes from `std/option`. Match its cases with the [branches](/docs/tour/functions-and-branches) used earlier.
 
-## Raising and catching errors
-
-A raised error ends a computation through the service `Fail(E)`, where `E` is its error type. `fail.catch` supplies a handler, calls the computation, and returns `Ok` for success or `Error` for a raised error:
+## Raised errors
 
 ```i run package=tour title="src/main.i"
 (
@@ -152,9 +145,7 @@ A raised error ends a computation through the service `Fail(E)`, where `E` is it
 	(Io) = i/io
 )
 main = () <- (io : Io) {
-	io.print(
-		core.inspect(fail.catch(() { 42 })),
-	)
+	io.print(core.inspect(fail.catch(() { 42 })))
 	answer = fail.catch(() { fail.raise("bad input") })
 	io.print(core.inspect(answer))
 }
@@ -165,7 +156,9 @@ Ok(42)
 Error("bad input")
 ```
 
-The zero-argument function passed to `catch` delays the computation until its handler is ready. An error can be any value, including a string. Standard-library APIs have not all changed to this form: choose explicitly when to turn a returned `Result` into a raised error with `result.to_error`:
+The callback delays work until `fail.catch` has installed `Fail(E)`; error values can have any type. An unhandled error terminates the program.
+
+## Result conversion
 
 ```i run package=tour title="src/main.i"
 (
@@ -185,13 +178,11 @@ main = () <- (io : Io) {
 Error(Nil)
 ```
 
-An assertion failure reports a programming mistake through the separate `Assert` service. A **stop** terminates execution, for example after `panic`. A stop is not an error and is not caught by `fail.catch`. An unhandled raised error reaching the program entry also terminates the program.
+An assertion reports a programming mistake through `Assert`. A stop, such as `panic`, terminates execution and escapes `fail.catch`.
 
-## The repository tour's clock test
+## A fixed clock
 
-This complete file is [the clock test in `examples/tour`](https://github.com/nmnmcc/i/blob/main/examples/tour/test/clock_test.i), unchanged. `Clock` is a service with a `now` function. The test provides its own implementation of a clock: a function returning the fixed value `40`. It uses no wall clock.
-
-```i test package=tour title="test/clock_test.i"
+```i test stdout=exact package=tour title="test/clock_test.i"
 (
 	testlib = (test) = std/test
 	i/fail
@@ -201,7 +192,6 @@ Clock = (now = () -> Int)
 
 Late = (by = Int)
 
-// Inferred: (deadline: Int) -> Int ^ Late ! Clock
 remaining = (deadline) <- (clock : Clock) {
 	deadline - clock.now() |>
 		(left ? left < 0) { fail.raise(Late(by = 0 - left)) }
@@ -218,8 +208,11 @@ test("a test gives its own clock", () {
 })
 ```
 
-Providing after a block supplies its calls. With the fixed clock, `remaining(42)` returns `2`, while `remaining(30)` raises `Late(by = 10)`, which the test catches. Both paths use the same service value. The source comment preserves an older type display; in the notation used here, `remaining` has type `(Int) <- (Clock, Fail(Late)) -> Int`.
+```text
+pass tour/clock_test.a test gives its own clock
+1 passed, 0 failed
+```
 
-## See also
+Provision after a block supplies its calls, including the nested callback. **Current limits:** printed labelled errors omit field labels ([DOC2](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
 
 Continue with [resources](/docs/tour/resources).

@@ -3,7 +3,53 @@ title: Resources
 description: Acquire a value, release it after use, and understand unwinding on this tree.
 ---
 
-A resource is a value whose use must end with a release, such as an open file or connection. This tree offers callback-based `resource.acquire` and `resource.ensure`. You can put cleanup around a computation and see when it runs, including when the computation raises an [error](/docs/tour/services-and-errors).
+Release acquired values after use, including when a computation raises an error.
+
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	resource.acquire(
+		() { "handle" },
+		(name) { io.print("release " <> name) },
+		(name) { io.print("use " <> name) },
+	)
+}
+```
+
+```text
+use handle
+release handle
+```
+
+Strings stand in for handles so these examples need no files. **Current limits:** use callbacks; resource `Scope` and `resource.scoped` are unavailable ([EF11](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+
+## A returned value
+
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = resource.acquire(
+		() { 40 },
+		(_) { io.print("released") },
+		(n) { n + 2 },
+	)
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+released
+42
+```
+
+## Nested acquisitions
 
 ```i run package=tour title="src/main.i"
 (
@@ -41,17 +87,31 @@ close outer
 done
 ```
 
-## Acquisition and release
+## A final callback
 
-`resource.acquire` takes three functions: `open`, `release`, and `use`. It calls `open`, passes the acquired value to `use`, and releases that value after `use` ends. Its result is the result of `use`. The strings here stand in for handles so that the output shows the order without relying on a machine's files.
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = resource.ensure(
+		() { 42 },
+		() { io.print("final") },
+	)
+	io.print(core.inspect(answer))
+}
+```
 
-The outer acquisition happens first. The inner acquisition happens during its use. The inner release finishes before the outer release, and both finish before `done` is printed. This nesting makes each resource's lifetime visible in the program. If opening raises an error, that acquisition has not yet installed a release.
+```text
+final
+42
+```
 
-These are ordinary library calls and functions. There is no special resource statement to learn. `resource.acquire` on this tree takes the `use` callback; it does not attach a release to a resource scope. The resource `Scope` and `resource.scoped` API described in the current standard are not implemented here.
+A final can use services, but cannot raise an error. `ensure` also runs it when a control escape unwinds the body.
 
-## Release on failure
-
-A **final function** is a cleanup callback installed around a computation. **Unwinding** runs installed finals from the innermost computation to the outermost when execution leaves early. `resource.ensure(body, final)` runs the final after a normal return and when an error or control escape unwinds the body. `acquire` uses it to install the release after a successful open.
+## A failed use
 
 ```i run package=tour title="src/main.i"
 (
@@ -87,12 +147,33 @@ final
 Error("failed")
 ```
 
-The error skips the rest of the use callback. Unwinding releases the handle, then runs the enclosing final, and only then returns `Error("failed")` from `fail.catch`. The printed order proves that catching the error does not skip release.
+[Task cancellation](/docs/tour/concurrency) also unwinds finals and waits for cleanup; a stop runs none of them.
 
-A final may use services, as the printing callbacks do, but may not raise an error. [Structured task cancellation](/docs/tour/concurrency) also unwinds installed finals and waits for cleanup to finish.
+## A failed acquisition
 
-On a stop, releases and other final functions do not run.
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	i/fail
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = fail.catch(() {
+		resource.acquire(
+			() -> String { fail.raise("cannot open") },
+			(name) { io.print("release " <> name) },
+			(name) { io.print("use " <> name) },
+		)
+	})
+	io.print(core.inspect(answer))
+}
+```
 
-## See also
+```text
+Error("cannot open")
+```
+
+Release is installed only after acquisition succeeds.
 
 Continue with [concurrency](/docs/tour/concurrency).
