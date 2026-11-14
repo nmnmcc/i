@@ -912,7 +912,10 @@ impl Coalescer<'_> {
             Ty::Inter(ms) => Ty::Inter(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
             Ty::Diff(a, h) => Ty::Diff(
                 Box::new(self.go(a, pos, depth, env)),
-                h.iter().map(|m| self.go(m, pos, depth, env)).collect(),
+                // A need difference records the supplied value form. Its
+                // arguments follow value variance, not required-service
+                // variance (§9.2); keep the actual bounds of annotation holes.
+                h.iter().map(|m| self.go(m, pos, depth, false)).collect(),
             ),
             Ty::Both(a, b) => Ty::Both(
                 Box::new(self.go(a, true, depth, env)),

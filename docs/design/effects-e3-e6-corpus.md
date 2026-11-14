@@ -89,6 +89,33 @@ Sink requirement (std-2 §7: finite, closed instantiations). The vendored copy
 receives the same migration. The release build, workspace check and std
 check are green; full runtime gates are next.
 
+The first final-AST row run passed 45/47 tests. Its two failures were a stale
+total diagnostic count (main already includes the extra duplicate-key error)
+and handler-hole display: a removed entry denotes the supplied value, so
+coalescing its arguments must follow ordinary value variance, not required
+service variance (§9.2). Keep the original exact-witness equality assertion
+and repair the display walk. Restore main's separate four-site provider
+regression inadvertently omitted during conflict resolution; every E0515
+location remains pinned. The fourteen-project guard now starts with main's
+actual total counts while retaining all independently pinned provider counts.
+
+Decision 2 also requires removing conversion-only ghost keys from fixtures.
+`73f725713^` shows the captured-row coalescing source wrote `() <- N -> Nil`;
+that commit inserted `Fail(Never)` only to prevent the old lowerer inventing
+`N%E`. Restore the original annotation now that E3 removes that carrier. The
+spec-example generator likewise originally wrote only Yield and N (before
+`947cc442d`), so its pure callback does not gain a new Fail service. This
+does not erase any actual written key: genuine `Fail(Never)` requirements
+remain in the missing-provider and returned-callback regressions.
+
+Decision 1 makes the two original covariant Sink-error meet sources valid:
+`Sink(Never, Never)` contains a callback and is inhabited. Retain both sources
+as positive cases; their negative controls add a required E value field,
+whose Never intersection is empty (§4.1). Preserve the original invariant
+need-coercion rejection. The display-error fixture similarly uses a required
+State value field; the bottom-returning-method positive remains independently
+covered. These changes preserve each negative test's incompatibility intent.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**

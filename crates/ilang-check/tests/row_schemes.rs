@@ -13,7 +13,7 @@ fn stage_three_provider_diagnostics_match_landed_conversion() {
     for (case, count, provider_count) in [
         ("review-k4/cases/provision_closure_False", 1, 1),
         ("review-k4d/_loose/p/x8", 2, 2),
-        ("review-k4d/_loose/p/b1", 5, 5),
+        ("review-k4d/_loose/p/b1", 6, 5),
     ] {
         let dir = root.join(case);
         let source = std::fs::read_to_string(dir.join("src/main.i")).unwrap();
@@ -1108,4 +1108,29 @@ fn mixed_recursive_need_parameters_can_be_forwarded_as_values() {
         let shown = types(source);
         assert!(shown["app/main.bad"].contains("S("), "{shown:?}");
     }
+}
+
+#[test]
+fn provider_conflicts_keep_call_and_binding_diagnostics() {
+    // Spec §9.2: a provided P satisfies a need S only when P <: S.
+    // Both the call obligation and the enclosing binding must retain the
+    // Reader(String)/Reader(Int) conflict; keeping only the call loses reports.
+    let source = include_str!("types/soundness.i");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+    let mut sites: Vec<_> = diags
+        .iter()
+        .filter(|d| {
+            d.code == "E0515"
+                && d.message.contains("Reader(String)")
+                && d.message.contains("Reader(Int)")
+        })
+        .map(|d| ilang_syntax::span::LineIndex::new(source).line_col(d.span.start))
+        .collect();
+    sites.sort();
+    assert_eq!(
+        sites,
+        [(14, 5), (14, 19), (16, 5), (16, 29)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
 }
