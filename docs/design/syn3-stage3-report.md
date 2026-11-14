@@ -1,7 +1,7 @@
 # Syntax three, stage 3: report
 
-Package-interface follow-up, 2026-11-14: **expanded CLI verification in
-progress**. The earlier green CLI matrix covered `check`, `providers`,
+Package-interface follow-up, 2026-11-14: **READY for coordinator rerun
+on supplied main `e44514d4`**. The earlier green CLI matrix covered `check`, `providers`,
 `commands`, `typed_macros`, `macro_run`, and the requested spec filters.
 `package_commands` was not in that matrix; its obsolete constructor-family
 assertion is a real coverage gap. The follow-up runs its complete binary,
@@ -560,3 +560,47 @@ The fixture now exports `Shape, Circle, Square, Dot`, each without `(..)`,
 so only the constructors are hidden and the removed-value/interface/tag
 checks remain meaningful. The resolver's E0227 is retained. A complete
 whole-package retry follows; no expectation is changed to accept E0227.
+
+### Final package-interface follow-up verification
+
+The whole `package_commands` binary passes **27/27**, including the exact
+four-item interface report, explicit type exports in the hiding fixture,
+removed Circle/Square constructor set, major-version refusal, removed-value
+check and all four unchanged tag assertions. Tested fix/merge commit:
+`915b0aa53988d0b4ac11bbb50e1856ad64b5f340`.
+
+All **40 other regular CLI integration binaries and both unit targets**
+pass: 311 tests, zero failures, 2 existing benchmark ignores, no
+filtered tests. This includes the new `ispec` binary and reruns the five
+previously selected binaries on supplied coordinator main. The spec binary
+passes the requested `4.3/`, `6/`, `7/`, `9/`, `15.7/` filters; its unfiltered
+suite remains coordinator-owned. Thus all 42 integration binaries are
+accounted for under the requested spec policy. Workspace all-target check,
+workspace format check, imported `diagnostic_traps` and `syn3` regressions,
+and workspace all-feature clippy pass too. The command/result ledger is
+shared cache `report-s3-r5.md`; raw logs and progressive JSON use prefix
+`s3-r5-`. The initial whole-package failure is preserved and explained.
+The first expanded CLI aggregate exits 101 only for the unchanged alias-chain
+wall-time guard (1024 forward: 6.1757s vs 1.4531s control, bound 3x). Its
+unchanged full-binary retry passes all 7 sizes 64..4096 in both orders,
+maximum ratio 1.345x. CPU/wall profiles at 512/1024 are 1.02–1.07x and
+1.03–1.11x controls, consistent with shared timing variation. The original
+CPU time was not recorded, so no stronger cause is claimed. The benchmark
+source, bound and default debug compiler are unchanged; debug binary hashes
+match across profiling/retry. Both raw failure and successful retry timings
+remain in `s3-r5-cli-reconciled.json` and the logs. The aggregate 101 remains
+in the ledger; only its failed target is reconciled after the targeted retry.
+
+Stage-three lowering is byte-identical to the prior READY tree, and every
+one of the fourteen provider source/expected pairs is byte-identical to
+`e44514d4`. No constructor absorption is restored. No saved corpus observation or
+checker golden is re-recorded by this follow-up; incoming main baseline
+updates are imported unchanged. The first queued command was deliberately
+cancelled before Cargo started to include main's new CLI test; the first
+real package run's E0227 prompted the required explicit TYPE exports,
+without weakening compiler diagnostics or test assertions.
+
+The earlier std/corpus/generation/other-crate matrix remains historical on
+`cc26b8d9`; this latest brief asks for expanded CLI verification. The
+coordinator owns the complete merged-tree gate and main landing. Existing
+opt-in benchmark ignores are retained and not forced.
