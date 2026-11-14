@@ -171,8 +171,8 @@ fn forms_of_later_stages_are_errors() {
     bad("f = (x) { g(x) <- env }\n", "stage E6");
 }
 
-/// The Lisp surface: `std/src/test.is`, converted and read back, is the
-/// tree that the file gives today (quotes included).
+/// Round-tripping the library macro must retain its quotes as well as the
+/// surrounding source tree.
 #[test]
 fn lisp_surface_round_trip() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../std/src/test.is");

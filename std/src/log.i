@@ -29,8 +29,7 @@
 //// Service laws compare delivery observations, not closure equality: accepted
 //// entries arrive in sequential call order; filter(s,always_true) preserves
 //// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback
-//// termination guarantee is added. Generic client code needs compiler support
-//// for generic sink calls.
+//// termination guarantee is added.
 //// IO adapters are explicit and use the same sink service.
 (
 	i/core

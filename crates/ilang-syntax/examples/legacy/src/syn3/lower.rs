@@ -18,7 +18,7 @@ pub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
 }
 
 /// Lowers a module read from the Lisp surface. There a match is the legacy
-/// pipe into a clause block, as the Lisp rows of today read it.
+/// pipe into a clause block, as the legacy Lisp reader expects.
 pub fn lower_lisp(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
     lower_surface(m, true)
 }
@@ -27,7 +27,7 @@ fn lower_surface(m: &n::Module, lisp: bool) -> (o::Module, Vec<Diagnostic>) {
     lower_expanded(m, lisp, None)
 }
 
-/// Step 2d boundary: written Lisp keeps its transition spelling, while
+/// Written Lisp retains its source spelling, while
 /// expansion results use the same expression reader as standalone results.
 /// The source map gives the start of the virtual expansion suffix.
 pub fn lower_expanded(

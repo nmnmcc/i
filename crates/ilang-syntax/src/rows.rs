@@ -1583,8 +1583,8 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
             name: upper(d)?,
             args: None,
         },
-        // Step 2c: `read_pattern(d)?`, when the lowering no longer checks the
-        // quote in the legacy rows.
+        // Keep unread quotes intact so validation can report their original
+        // source rather than an incomplete capture pattern.
         K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),
         K::Square(parts) => {
             let mut items = Vec::new();

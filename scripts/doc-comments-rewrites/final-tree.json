@@ -5685,10 +5685,24 @@
   },
   {
     "file": "crates/ilang-macro/src/body_walk3.rs",
+    "line": 578,
+    "hash": "a3e57c10d5ced4feaa208adb8417a2804acea548e8123dcad92fa8b58fd65d5d",
+    "old": "            DPItem::Pos(p) => Some(Task::Pattern(p)),\n            DPItem::Key(label, p) => Some(Task::Keyed(label, p)),\n            // `..name` is an error of the lowering today; the name is bound.\n            DPItem::Rest(Some(rest)) if !rest.discard => {\n                Some(Task::Binder(&rest.name, rest.span.0))\n",
+    "new": "            DPItem::Pos(p) => Some(Task::Pattern(p)),\n            DPItem::Key(label, p) => Some(Task::Keyed(label, p)),\n            // Traversal retains rest binders even when later validation rejects them.\n            DPItem::Rest(Some(rest)) if !rest.discard => {\n                Some(Task::Binder(&rest.name, rest.span.0))\n"
+  },
+  {
+    "file": "crates/ilang-macro/src/body_walk3.rs",
     "line": 593,
     "hash": "d9cc5c5a0ba1522e5f90754a50dd3e7ef45a201adcf823d893b31f49140b9807",
     "old": "                continue;\n            }\n            // `key = pattern` in a constructor pattern is the old tree's\n            // chain of names that ends in the label: the label is bound.\n            Task::Keyed(label, pattern) => {\n                let single = std::slice::from_ref(pattern);\n",
     "new": "                continue;\n            }\n            // A keyed constructor pattern binds the label after its other names.\n            Task::Keyed(label, pattern) => {\n                let single = std::slice::from_ref(pattern);\n"
+  },
+  {
+    "file": "crates/ilang-macro/src/body_walk3.rs",
+    "line": 617,
+    "hash": "4eec51b1440f7f14e85fc0efcf12979a36c16fb9acaeb315117c96c865d74a5c",
+    "old": "                        visit(&label.name, label.span.0);\n                    }\n                    // A pattern inside a labelled field is an error of the\n                    // lowering today, which then binds no label.\n                    Some(_) => {\n                        names.for_each(|(name, span)| visit(name, span));\n",
+    "new": "                        visit(&label.name, label.span.0);\n                    }\n                    // Nested field patterns retain their own binders; the label\n                    // itself is not another binder in this form.\n                    Some(_) => {\n                        names.for_each(|(name, span)| visit(name, span));\n"
   },
   {
     "file": "crates/ilang-macro/src/body_walk3.rs",
@@ -6659,9 +6673,16 @@
   {
     "file": "crates/ilang-syntax/examples/legacy/src/syn3/lower.rs",
     "line": 30,
-    "hash": "078ba5ee1763f37365fbfaae1cb6a31ac80ad24751d6381ff7b3ca16b9d81586",
-    "old": "use std::collections::{HashMap, HashSet};\n\n/// Lowers a module of syntax three to the current tree.\npub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {\n    lower_surface(m, false)\n}\n\n/// Lowers a module read from the Lisp surface. There a match is today's\n/// pipe into a clause block, as the Lisp rows of today read it.\npub fn lower_lisp(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {\n",
-    "new": "use std::collections::{HashMap, HashSet};\n\n/// Lowers a module of the source syntax to the current tree.\npub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {\n    lower_surface(m, false)\n}\n\n/// Lowers a module read from the Lisp surface. There a match is the legacy\n/// pipe into a clause block, as the Lisp rows of today read it.\npub fn lower_lisp(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {\n"
+    "hash": "fc533b875c7b1c69c9e4cfab9c393f0a0f0212ee69222fa760887dcda9b2f4de",
+    "old": "use std::collections::{HashMap, HashSet};\n\n/// Lowers a module of syntax three to the current tree.\npub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {\n    lower_surface(m, false)\n}\n\n/// Lowers a module read from the Lisp surface. There a match is today's\n/// pipe into a clause block, as the Lisp rows of today read it.\npub fn lower_lisp(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {\n    lower_surface(m, true)\n",
+    "new": "use std::collections::{HashMap, HashSet};\n\n/// Lowers a module of the source syntax to the current tree.\npub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {\n    lower_surface(m, false)\n}\n\n/// Lowers a module read from the Lisp surface. There a match is the legacy\n/// pipe into a clause block, as the legacy Lisp reader expects.\npub fn lower_lisp(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {\n    lower_surface(m, true)\n"
+  },
+  {
+    "file": "crates/ilang-syntax/examples/legacy/src/syn3/lower.rs",
+    "line": 45,
+    "hash": "25fdabe0489441a42acfd9797ae5a805a6dceedd15dd8aff68c000c2b7539f8c",
+    "old": "}\n\n/// Step 2d boundary: written Lisp keeps its transition spelling, while\n/// expansion results use the same expression reader as standalone results.\n/// The source map gives the start of the virtual expansion suffix.\n",
+    "new": "}\n\n/// Written Lisp retains its source spelling, while\n/// expansion results use the same expression reader as standalone results.\n/// The source map gives the start of the virtual expansion suffix.\n"
   },
   {
     "file": "crates/ilang-syntax/examples/legacy/src/syn3/lower.rs",
@@ -8107,10 +8128,10 @@
   },
   {
     "file": "crates/ilang-syntax/src/rows.rs",
-    "line": 1588,
-    "hash": "dd1a593f90ec8093b958f8c9173bf1d62e10caf9496b33ab992e21f471a832cc",
-    "old": "        },\n        // Step 2c: `read_pattern(d)?`, when the lowering no longer checks the\n        // quote in the rows before syntax three.\n        K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),\n        K::Square(parts) => {\n",
-    "new": "        },\n        // Step 2c: `read_pattern(d)?`, when the lowering no longer checks the\n        // quote in the legacy rows.\n        K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),\n        K::Square(parts) => {\n"
+    "line": 1587,
+    "hash": "f9e64c0b5da9900a7422409c1705804307df73d2f4384f7beb00ee0fe1562ac4",
+    "old": "            args: None,\n        },\n        // Step 2c: `read_pattern(d)?`, when the lowering no longer checks the\n        // quote in the rows before syntax three.\n        K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),\n        K::Square(parts) => {\n",
+    "new": "            args: None,\n        },\n        // Keep unread quotes intact so validation can report their original\n        // source rather than an incomplete capture pattern.\n        K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),\n        K::Square(parts) => {\n"
   },
   {
     "file": "crates/ilang-syntax/src/rows/position.rs",
@@ -8660,10 +8681,10 @@
   },
   {
     "file": "crates/ilang-syntax/tests/syn3_lower.rs",
-    "line": 180,
-    "hash": "e7a63adcc4fa8bb69837cb8b713da2454e2ff4c7c220bb841443360c849acf38",
-    "old": "    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../std/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // The repository file is in today's rows until the conversion commit,\n    // and in the rows of syntax three after it.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n",
-    "new": "    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../std/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // Accept either input encoding so the migration adapter can compare\n    // repository sources without changing the file under test.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n"
+    "line": 174,
+    "hash": "da8cfa2fe21fd476fc56362a5c6cb0c8e9e1f63d1d272e01dda66d6d4baaa91d",
+    "old": "}\n\n/// The Lisp surface: `std/src/test.is`, converted and read back, is the\n/// tree that the file gives today (quotes included).\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../std/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // The repository file is in today's rows until the conversion commit,\n    // and in the rows of syntax three after it.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n",
+    "new": "}\n\n/// Round-tripping the library macro must retain its quotes as well as the\n/// surrounding source tree.\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../std/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // Accept either input encoding so the migration adapter can compare\n    // repository sources without changing the file under test.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n"
   },
   {
     "file": "crates/ilang-syntax/tests/syn3_lower.rs",
@@ -10511,7 +10532,7 @@
     "line": 46,
     "hash": "28d44316df1e2632ab1358369c7d321ccb971799f77c2cf8a469eaa068646ca0",
     "old": "//// entries arrive in sequential call order; filter(s,always_true) preserves\n//// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback\n//// termination guarantee is added. Generic client use awaits the §7 compiler\n//// IO adapters are explicit and use the same sink service.\n(\n",
-    "new": "//// entries arrive in sequential call order; filter(s,always_true) preserves\n//// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback\n//// termination guarantee is added. Generic client code needs compiler support\n//// for generic sink calls.\n//// IO adapters are explicit and use the same sink service.\n(\n"
+    "new": "//// entries arrive in sequential call order; filter(s,always_true) preserves\n//// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback\n//// termination guarantee is added.\n//// IO adapters are explicit and use the same sink service.\n(\n"
   },
   {
     "file": "std/src/log.i",

@@ -318,10 +318,15 @@ def comment_lines(path, t):
 
 
 
+def in_scope(path):
+    return (not Path(path).is_absolute() and ".." not in Path(path).parts and
+            (path.endswith(".rs") or path in EXTRA_I or
+             (path.startswith(("std/", "lib/")) and path.endswith((".i", ".is")))))
+
+
 def tracked():
     paths = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
-    return [p for p in paths if p.endswith(".rs") or
-            (p.startswith(("std/", "lib/")) and p.endswith((".i", ".is"))) or p in EXTRA_I]
+    return [p for p in paths if in_scope(p)]
 
 
 def read(path):
@@ -492,6 +497,8 @@ def cmd_record(args):
     baseline = set(subprocess.check_output(["git", "ls-tree", "-r", "--name-only", args.base], cwd=ROOT, text=True).splitlines())
     for path in tracked():
         if path not in baseline:
+            if path != "crates/ilang-cli/tests/doc_comments.rs":
+                raise SystemExit(f"refused: unexpected added source {path}")
             continue
         old, new = revision(args.base, path), read(path)
         if old == new:
@@ -516,6 +523,8 @@ def prepare(entries, sources):
     output = dict(sources)
     for entry in entries:
         path, old, new = entry["file"], entry["old"], entry["new"]
+        if not in_scope(path):
+            raise ValueError(f"{path}: outside the comment cleanup scope")
         if hsh(old) != entry["hash"]:
             raise ValueError(f"{path}: bad old-text hash")
         if path not in output or output[path].count(old) != 1:
@@ -580,10 +589,17 @@ def cmd_check(args):
         checked = changed = doctests = 0
         ipaths = []
         baseline = set(subprocess.check_output(["git", "ls-tree", "-r", "--name-only", args.proof], cwd=ROOT, text=True).splitlines())
+        missing = {path for path in baseline if in_scope(path)} - set(tracked())
+        for path in sorted(missing):
+            print(f"not comment-only: removed source {path}")
+            problems += 1
         for path in tracked():
             if path not in baseline:
-                # New tooling has its own tests; it is not a compiler-source rewrite.
-                print(f"proof scope: new support file {path}")
+                if path == "crates/ilang-cli/tests/doc_comments.rs":
+                    print(f"proof scope: new enforcing test {path}")
+                else:
+                    print(f"not comment-only: unexpected added source {path}")
+                    problems += 1
                 continue
             old, new = revision(args.proof, path), read(path)
             checked += 1

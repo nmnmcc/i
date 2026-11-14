@@ -68,6 +68,9 @@ class Boundaries(unittest.TestCase):
             doc.prepare([dict(entry, new='let x = 2;\n')], {'test.rs': source})
         with self.assertRaises(ValueError):
             doc.prepare([dict(entry, hash='stale')], {'test.rs': source})
+        for path in ['../outside.rs', '/outside.rs', 'Cargo.toml']:
+            with self.assertRaises(ValueError):
+                doc.prepare([dict(entry, file=path)], {path: source})
 
 
 if __name__ == '__main__':

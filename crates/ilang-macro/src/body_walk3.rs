@@ -577,7 +577,7 @@ pub fn for_each_binder<'a>(pattern: &'a Pattern, mut visit: impl FnMut(&'a str, 
         pending.extend(items.iter().rev().filter_map(|item| match item {
             DPItem::Pos(p) => Some(Task::Pattern(p)),
             DPItem::Key(label, p) => Some(Task::Keyed(label, p)),
-            // `..name` is an error of the lowering today; the name is bound.
+            // Traversal retains rest binders even when later validation rejects them.
             DPItem::Rest(Some(rest)) if !rest.discard => {
                 Some(Task::Binder(&rest.name, rest.span.0))
             }
@@ -615,8 +615,8 @@ pub fn for_each_binder<'a>(pattern: &'a Pattern, mut visit: impl FnMut(&'a str, 
                         names.for_each(|(name, span)| visit(name, span));
                         visit(&label.name, label.span.0);
                     }
-                    // A pattern inside a labelled field is an error of the
-                    // lowering today, which then binds no label.
+                    // Nested field patterns retain their own binders; the label
+                    // itself is not another binder in this form.
                     Some(_) => {
                         names.for_each(|(name, span)| visit(name, span));
                         pending.extend(
