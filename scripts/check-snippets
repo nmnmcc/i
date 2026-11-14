@@ -117,7 +117,7 @@ NEXT_SYNTAX = (
 
 def snippets():
     registered = json.loads(DATA.read_text())
-    paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.i", "*.md", "*.rs", "*.js", "*.mjs"], cwd=ROOT, text=True).splitlines()
+    paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.i", "*.md", "*.mdx", "*.rs", "*.js", "*.mjs"], cwd=ROOT, text=True).splitlines()
     for path in sorted(set(paths)):
         file = ROOT / path
         if not file.is_file():
@@ -128,7 +128,7 @@ def snippets():
         text = file.read_bytes().decode()
         if path.endswith(".i"):
             yield dict(path=path, line=1, source=re.sub(r"(?m)^// old-syntax-check:.*\n?", "", text), start=0, end=len(text), host=text, kind="file")
-        elif path.endswith(".md"):
+        elif path.endswith((".md", ".mdx")):
             for m in re.finditer(r"(?m)^```i(?:[ \t][^\n]*)?\n(.*?)^```[ \t]*$", text, re.S):
                 yield dict(path=path, line=text[:m.start()].count("\n") + 1, source=m[1], start=m.start(), end=m.end(), host=text, kind="markdown")
         else:

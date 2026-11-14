@@ -19,7 +19,7 @@ M=runpy.run_path(str(ROOT/'scripts/migrate-annotations'))
 
 
 def inline(hosts=None):
-    for path in ['README.md', 'docs/spec.md', *sorted(str(p.relative_to(ROOT)) for p in (ROOT/'docs/design').glob('*.md'))]:
+    for path in ['README.md', 'docs/spec.md', *sorted(str(p.relative_to(ROOT)) for p in (ROOT/'docs').rglob('*') if p.suffix in ('.md', '.mdx') and p != ROOT/'docs/spec.md')]:
         if hosts is not None and path not in hosts:
             continue
         host=hosts[path] if hosts is not None else (ROOT/path).read_text()
@@ -38,7 +38,7 @@ def main():
     args=p.parse_args()
     archive=subprocess.check_output(['git','archive',args.before],cwd=ROOT)
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        hosts={m.name:tar.extractfile(m).read().decode() for m in tar if m.isfile() and m.name.endswith(('.i','.is','.rs','.md','.js','.mjs','.py','.json'))}
+        hosts={m.name:tar.extractfile(m).read().decode() for m in tar if m.isfile() and m.name.endswith(('.i','.is','.rs','.md','.mdx','.js','.mjs','.py','.json'))}
     config=json.loads(hosts['scripts/check-snippets.json'])
     before=list(M['inventory'](hosts,config))+list(inline(hosts))
     after=list(M['inventory']())+list(inline())
