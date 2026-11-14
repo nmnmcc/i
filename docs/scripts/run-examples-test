@@ -58,6 +58,11 @@ class RunnerTests(unittest.TestCase):
             'failing-types': 1,
             'passing-format': 0,
             'failing-format': 1,
+            'passing-project': 0,
+            'failing-project-output': 2,
+            'missing-project': 1,
+            'passing-error-output': 0,
+            'failing-error-output': 1,
         }
         for name, count in expected.items():
             with self.subTest(fixture=name):
@@ -103,18 +108,32 @@ class RunnerTests(unittest.TestCase):
 
     def test_home_page_reuses_the_exact_program(self):
         page = SCRIPTS.parent / 'content/home/index.mdx'
-        blocks = list(runner.fences(page.read_text()))
-        primary = next(block.source for block in blocks if runner.i_info(block.info)
-                       and runner.i_info(block.info)[0] == 'run')
-        copies = [block.source for block in blocks if runner.i_info(block.info)
-                  and runner.i_info(block.info)[:2] == ('file', 'src/main.i')]
-        self.assertGreaterEqual(len(copies), 4)
-        self.assertTrue(all(source == primary for source in copies))
         examples, failures, _ = runner.read_page(page)
         self.assertFalse(failures)
-        self.assertEqual([example.source for example in examples if example.kind == 'types'], [primary])
-        self.assertEqual([example.output for example in examples if example.kind == 'format'], [primary])
+        primary = next(example.source for example in examples if example.kind == 'run')
+        shared = [example.shared_files for example in examples if example.kind == 'test']
+        self.assertEqual(len(shared), 4)
+        self.assertTrue(all(files['src/main.i'] == primary for files in shared))
         self.assertTrue(all(example.compare_test_output for example in examples if example.kind == 'test'))
+
+    def test_shared_project_is_local_and_primary_overrides_it(self):
+        examples, errors, _ = runner.read_page(FIXTURES / 'passing-project.mdx')
+        self.assertFalse(errors)
+        with tempfile.TemporaryDirectory() as scratch:
+            project = Path(scratch)
+            runner.prepare(examples[0], project)
+            self.assertEqual((project / 'src/main.i').read_text(), examples[0].source)
+            self.assertTrue((project / 'src/helper.i').is_file())
+        with tempfile.TemporaryDirectory() as scratch:
+            page = Path(scratch) / 'page.mdx'
+            page.write_text('')
+            with self.assertRaises(ValueError):
+                runner.project_sources(page, '../elsewhere')
+            shared = Path(scratch) / 'shared'
+            shared.mkdir()
+            (shared / 'escape.i').symlink_to(SCRIPTS / 'run-examples.py')
+            with self.assertRaises(ValueError):
+                runner.project_sources(page, 'shared')
 
     def test_project_setup(self):
         examples, _, _ = runner.read_page(FIXTURES / 'passing.mdx')
@@ -181,7 +200,7 @@ class RunnerTests(unittest.TestCase):
                      'i shown', 'i check file=src/main.i', 'i file=src/a.is',
                      'i file=i.toml', 'i title="data.txt"', 'scheme file=src/a.i',
                      'toml file=src/a.i', 'toml file=i.toml package=wrong',
-                     'i run stdout=exact', 'i test stdout=wrong', 'i file=src/a.i env.PORT=8080'):
+                     'i run stdout=exact', 'i error E0201 stderr=wrong', 'i run stderr=exact', 'i run project=../outside', 'i run project=/tmp/project', 'i file=src/a.i project=shared', 'i test stdout=wrong', 'i file=src/a.i env.PORT=8080'):
             with self.subTest(info=info), self.assertRaises(ValueError):
                 runner.i_info(info)
         for path in ('../a.i', '/tmp/a.i', 'src/../a.i', './a.i', 'src\\a.i'):
@@ -210,6 +229,7 @@ class RunnerTests(unittest.TestCase):
                        '```i file=src/a.i\na = 1\n```\n```i file=src/a.i\na = 2\n```\n',
                        '```i file=../escape\ndata\n```\n',
                        '```i types\n(answer)\nanswer = 42\n```\n',
+                       '```i error E0201 stderr=exact\nmain = () { missing }\n```\n',
                        '```i format\n(answer)\nanswer = 42\n```\n'):
             with tempfile.TemporaryDirectory() as scratch:
                 page = Path(scratch) / 'page.md'

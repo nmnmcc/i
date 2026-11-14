@@ -4,6 +4,8 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+import tempfile
+from page_prose import prose_words, example_count, budget
 from spec_links import References, is_spec_target, measure, unlink_spec_references
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -21,7 +23,7 @@ class ReferenceTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(SCRIPTS / 'check-spec-links.py'),
                                  '--dist', str(FIXTURES / 'failing')], capture_output=True, text=True)
         self.assertEqual(result.returncode, 1)
-        self.assertIn('5 over limit.', result.stdout)
+        self.assertIn('5 failures;', result.stdout)
         for area in ('index.html', 'tour', 'getting-started', 'guides', 'library'):
             self.assertIn(area, result.stderr)
 
@@ -50,6 +52,82 @@ class ReferenceTests(unittest.TestCase):
                          'See `https://example.org/docs/spec.md`')
         self.assertEqual(unlink_spec_references('`https://example.org/docs/spec.md`'),
                          '`https://example.org/docs/spec.md`')
+
+    def test_prose_ignores_code_and_chrome_but_counts_inline_code(self):
+        html = '<nav>outside navigation</nav><article id="nd-page"><h1>Two words</h1>'
+        html += '<p>A <code>value</code>.</p><pre>not counted here</pre>'
+        html += '<figure class="shiki"><figcaption>filename</figcaption><pre>code</pre></figure>'
+        html += '<button>Copy text</button><span class="sr-only">assistive label</span>'
+        html += '<div hidden>hidden prose</div><p>Last word.</p></article>'
+        self.assertEqual(prose_words(html), 6)
+        self.assertEqual(prose_words('<main id="nd-home-layout"><div class="home-page">Inside</div>Outside</main>'), 2)
+
+    def test_home_hash_links_and_hard_prose_limit(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            dist = Path(scratch)
+            home = dist / 'index.html'
+            home.write_text('<main data-page-content>' + 'word ' * 221 + '<a href="#slide">next</a></main>')
+            result = measure(home, dist)
+            self.assertTrue(result['failed'])
+            self.assertEqual(result['words'], 222)
+            self.assertEqual(len(result['failures']), 2)
+            home.write_text('<main data-page-content>' + 'word ' * 220 + '</main>')
+            self.assertFalse(measure(home, dist)['failed'])
+
+    def test_each_budget_is_warned_then_enforced(self):
+        cases = [('tour', 451, 6), ('getting-started', 301, 0), ('guides', 501, 0),
+                 ('library', 251, 3), ('standard', 251, 3), ('contributing', 501, 0)]
+        with tempfile.TemporaryDirectory() as scratch:
+            dist, content = Path(scratch) / 'dist', Path(scratch) / 'content'
+            for group, words, examples in cases:
+                with self.subTest(area=group):
+                    page = dist / 'docs' / group / 'index.html'
+                    page.parent.mkdir(parents=True, exist_ok=True)
+                    page.write_text('<article id="nd-page">' + 'word ' * words + '</article>')
+                    source = content / 'docs' / group / 'index.mdx'
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    source.write_text('```i run\nmain = () { Nil }\n```\n```text\n```\n' * examples)
+                    result = measure(page, dist, content)
+                    self.assertFalse(result['failed'])
+                    self.assertEqual(result['examples'], examples)
+                    self.assertEqual(len(result['warnings']), 1)
+                    self.assertTrue(measure(page, dist, content, [group])['failed'])
+
+    def test_tour_minimum_and_index_range(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            dist, content = Path(scratch) / 'dist', Path(scratch) / 'content'
+            for group, counts in [('tour', (5, 6)), ('library', (2, 3, 5, 6)), ('standard', (2, 3, 5, 6))]:
+                page = dist / 'docs' / group / 'index.html'
+                page.parent.mkdir(parents=True, exist_ok=True)
+                page.write_text('<main data-page-content>Short.</main>')
+                source = content / 'docs' / group / 'index.mdx'
+                source.parent.mkdir(parents=True, exist_ok=True)
+                for count in counts:
+                    source.write_text('```i test\nmain = () { Nil }\n```\n' * count)
+                    result = measure(page, dist, content, [group])
+                    self.assertEqual(result['failed'], count < (6 if group == 'tour' else 3) or (group != 'tour' and count > 5))
+
+    def test_generated_future_fragments_are_not_runtime_examples(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            content = Path(scratch)
+            source = content / 'docs/standard/generated/chapter-1.mdx'
+            source.parent.mkdir(parents=True)
+            source.write_text('```i future-SYN3\nnot executable\n```\n')
+            self.assertEqual(example_count(Path('docs/standard/generated/chapter-1/index.html'), content), 0)
+
+    def test_cli_warns_until_area_switch_is_enabled(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            dist, content = Path(scratch) / 'dist', Path(scratch) / 'content'
+            page = dist / 'docs/tour/index.html'
+            page.parent.mkdir(parents=True)
+            page.write_text('<body>Short.</body>')
+            command = [sys.executable, str(SCRIPTS / 'check-spec-links.py'), '--dist', str(dist), '--content', str(content)]
+            warning = subprocess.run(command, text=True, capture_output=True)
+            self.assertEqual(warning.returncode, 0)
+            self.assertIn('warning:', warning.stderr)
+            enforced = subprocess.run(command + ['--enforce-area', 'tour'], text=True, capture_output=True)
+            self.assertEqual(enforced.returncode, 1)
+
 
 
 if __name__ == '__main__':

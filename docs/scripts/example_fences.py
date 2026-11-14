@@ -45,17 +45,23 @@ def i_options(info):
     words, options = [], {}
     for word in shlex.split(info)[1:]:
         key, separator, value = word.partition('=')
-        if separator and (key in ('title', 'package', 'file', 'stdout') or re.fullmatch(r'env\.[A-Za-z_][A-Za-z0-9_]*', key)):
+        if separator and (key in ('title', 'package', 'file', 'stdout', 'stderr', 'project') or re.fullmatch(r'env\.[A-Za-z_][A-Za-z0-9_]*', key)):
             if key in options or not value:
                 raise ValueError(f'expected one nonempty {key}=')
             options[key] = value
         else:
             words.append(word)
+    if 'project' in options:
+        safe_file(options['project'])
+        if not words:
+            raise ValueError('project= needs an example kind')
     package = options.get('package')
     if package is not None and (not re.fullmatch(r'_?[a-z][a-z0-9_]*', package) or package == 'i'):
         raise ValueError('package= must be a package name other than i; got ' + repr(package))
     if 'stdout' in options and (options['stdout'] != 'exact' or words != ['test']):
         raise ValueError('stdout=exact is supported on test fences')
+    if 'stderr' in options and (options['stderr'] != 'exact' or not words or words[0] != 'error'):
+        raise ValueError('stderr=exact is supported on error fences')
     if any(key.startswith('env.') for key in options) and not words:
         raise ValueError('env.NAME= needs an example kind')
     return words, options
@@ -77,7 +83,7 @@ def i_info(info):
     if language != 'i':
         if path is None:
             return None
-        if words or 'package' in options:
+        if words or any(key not in ('file', 'title') for key in options):
             raise ValueError('a non-i supporting fence needs only file= and title=')
         if language == 'scheme' and not path.endswith('.is'):
             raise ValueError('scheme file= must name a .is module')
