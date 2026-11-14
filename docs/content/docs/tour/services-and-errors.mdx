@@ -91,7 +91,7 @@ main = () <- (io : Io) {
 hello!
 ```
 
-A written `() -> String` would leave `Greeting` unsupplied and produce E0501. Needs combine by service type, independently of local names or order.
+A written `() -> String` would leave `Greeting` unsupplied and be rejected. Needs combine by service type, independently of local names or order.
 
 ## Returned errors
 
@@ -213,6 +213,6 @@ pass tour/clock_test.a test gives its own clock
 1 passed, 0 failed
 ```
 
-Provision after a block supplies its calls, including the nested callback. **Current limits:** printed labelled errors omit field labels ([DOC2](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+Provision after a block supplies its calls, including the nested callback. The current compiler omits field labels when printing labelled errors.
 
 Continue with [resources](/docs/tour/resources).
