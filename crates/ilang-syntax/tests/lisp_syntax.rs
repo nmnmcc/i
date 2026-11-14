@@ -1450,10 +1450,39 @@ fn captured_rest_service_survives_both_macro_encoders_and_scoped_decoding() {
         assert!(matches!(&f.params[1], Param::Env { rest: true, name, .. } if name.name == "env"));
     };
     let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
-    assert_eq!(syntax.show(), "(-> ((! db Db) (! .. env N)) _ {Nil})");
+    // Main's native encoder preserves the written generic head. Decode it
+    // in its binding, where those parameters belong (§4.7), not as a
+    // detached polymorphic expression.
+    assert_eq!(
+        syntax.show(),
+        "(-> [N] (,) (<- _ (, (: db Db) .. (: env N))) Nil)"
+    );
     let mut expanded = ScopedSource::new(source.into());
-    check(&expanded.expression(&syntax, &syntax).unwrap());
-    let datums = lisp::parse(&syntax.show()).unwrap();
+    assert!(
+        expanded
+            .expression(&syntax, &syntax)
+            .unwrap_err()
+            .message
+            .contains("value of a binding")
+    );
+    let item = lisp::source_syntax::source_item_syntax(
+        &module.items[0],
+        root("env").scope(),
+        source,
+        false,
+    );
+    let decoded = expanded.items(&item, &item).unwrap();
+    let ItemKind::Binding(binding) = &decoded[0].kind else {
+        panic!()
+    };
+    check(&binding.value);
+    // The migration oracle retains its separate old-tree encoder too.
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let encoded = lisp::expression_syntax(&binding.value, root("env").scope(), source);
+    assert_eq!(encoded.show(), "(-> ((! db Db) (! .. env N)) _ {Nil})");
+    let datums = lisp::parse(&encoded.show()).unwrap();
     let public = ilang_syntax::syn3::lisp::convert_quote(&datums[0]);
     let internal = ilang_syntax::syn3::lisp::unconvert_quote(&public);
     check(&lisp::parse_expression(&internal).unwrap());
@@ -1482,9 +1511,19 @@ fn a_captured_rest_row_can_still_be_provided_after_macro_decoding() {
         assert!(matches!(&f.params[1], Param::Env { rest: true, .. }));
         assert!(matches!(&f.body.stmts[0], Stmt::Env { spread: true, .. }));
     };
-    let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
+    check(&binding.value);
+    let syntax = lisp::source_syntax::source_item_syntax(
+        &module.items[0],
+        root("env").scope(),
+        source,
+        false,
+    );
     let mut expanded = ScopedSource::new(source.into());
-    check(&expanded.expression(&syntax, &syntax).unwrap());
+    let decoded = expanded.items(&syntax, &syntax).unwrap();
+    let ItemKind::Binding(binding) = &decoded[0].kind else {
+        panic!()
+    };
+    check(&binding.value);
     let printed = lisp::print_module(&module);
     let doc = lisp::parse(&printed).unwrap();
     let restored = lisp::parse_module(&doc).unwrap();
@@ -1521,11 +1560,19 @@ fn macro_round_trips_preserve_written_provide_groups() {
         let ItemKind::Binding(binding) = &module.items[0].kind else {
             panic!()
         };
-        let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
+        let syntax = lisp::source_syntax::source_item_syntax(
+            &module.items[0],
+            root("env").scope(),
+            source,
+            false,
+        );
         let mut expanded = ScopedSource::new(source.into());
-        let decoded = expanded.expression(&syntax, &syntax).unwrap();
+        let decoded = expanded.items(&syntax, &syntax).unwrap();
+        let ItemKind::Binding(decoded) = &decoded[0].kind else {
+            panic!()
+        };
         assert!(
-            ilang_syntax::shape::equivalent_expression(&binding.value, &decoded),
+            ilang_syntax::shape::equivalent_expression(&binding.value, &decoded.value),
             "{source}: {}",
             syntax.show()
         );

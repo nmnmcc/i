@@ -719,7 +719,7 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 Paused = (Continuation(Nil, PausedSum, Fail(Int)))
 Done = ()
 PausedSum = Paused | Done
-Held = (Continuation(Nil, HeldSum, Never))
+Held = (Continuation(Nil, HeldSum, Fail(Int)))
 Over = ()
 HeldSum = Held | Over
 

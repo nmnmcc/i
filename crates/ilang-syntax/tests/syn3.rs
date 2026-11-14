@@ -141,11 +141,17 @@ fn removed_error_channel_has_its_diagnostic() {
     let source = "f: (Int) -> Int ^ String\n";
     let caret = source.find('^').unwrap() as u32;
     let (_, diags) = syn3::parse_module(source);
+    assert_eq!(
+        diags.iter().map(|d| d.code.as_str()).collect::<Vec<_>>(),
+        ["E0001", "E0101"]
+    );
     assert!(
-        diags.iter().any(|d| d.code.as_str() == "E0101"
-            && d.span == ilang_syntax::span::Span::new(caret, caret + 1)
-            && d.message
-                .contains("errors and services are written after `<-`")),
+        diags
+            .iter()
+            .any(|d| d.code == ilang_syntax::Code::UnexpectedChar
+                && d.span == ilang_syntax::span::Span::new(caret, caret + 1)
+                && d.message
+                    .contains("errors and services are written after `<-`")),
         "{diags:?}"
     );
     ok("f: (Int) <- (Fail(String)) -> Int\n");

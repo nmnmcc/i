@@ -753,14 +753,14 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("k ="), "k: ((A) <- N -> B, A) <- N -> B");
-    assert_eq!(hover("y ="), "y: B");
-    assert_eq!(hover("f, x"), "f: (A) <- N -> B");
-    assert_eq!(hover("g) {"), "g: (B) <- N2 -> C");
-    assert_eq!(hover("f, g"), "f: (A) <- N -> B");
-    assert_eq!(hover("x) { g"), "x: A");
-    assert_eq!(hover("b) {"), "b: B");
-    assert_eq!(hover("a, b"), "a: A");
+    assert_eq!(hover("k ="), "k : ((A) <- N -> B, A) <- N -> B");
+    assert_eq!(hover("y ="), "y : B");
+    assert_eq!(hover("f, x"), "f : (A) <- N -> B");
+    assert_eq!(hover("g) {"), "g : (B) <- N2 -> C");
+    assert_eq!(hover("f, g"), "f : (A) <- N -> B");
+    assert_eq!(hover("x) { g"), "x : A");
+    assert_eq!(hover("b) {"), "b : B");
+    assert_eq!(hover("a, b"), "a : A");
     c.shutdown();
 }
 
@@ -794,16 +794,16 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(hover("one"), "one: (A) -> 1");
-    assert_eq!(hover("x) {\n  y = x"), "x: A");
-    assert_eq!(hover("y = x"), "y: A");
-    assert_eq!(hover("drop2"), "drop2: (A, (1) <- N -> B, C) <- N -> B");
-    assert_eq!(hover("x, g, h"), "x: A");
-    assert_eq!(hover("h) {"), "h: C");
-    assert_eq!(hover("y = (x, h)"), "y: (A, C)");
-    assert_eq!(hover("effonly"), "effonly: ((A) <- N -> B, A) <- N -> Nil");
-    assert_eq!(hover("f, x) {\n  r"), "f: (A) <- N -> B");
-    assert_eq!(hover("r = "), "r: B");
+    assert_eq!(hover("one"), "one : (A) -> 1");
+    assert_eq!(hover("x) {\n  y = x"), "x : A");
+    assert_eq!(hover("y = x"), "y : A");
+    assert_eq!(hover("drop2"), "drop2 : (A, (1) <- N -> B, C) <- N -> B");
+    assert_eq!(hover("x, g, h"), "x : A");
+    assert_eq!(hover("h) {"), "h : C");
+    assert_eq!(hover("y = (x, h)"), "y : (A, C)");
+    assert_eq!(hover("effonly"), "effonly : ((A) <- N -> B, A) <- N -> Nil");
+    assert_eq!(hover("f, x) {\n  r"), "f : (A) <- N -> B");
+    assert_eq!(hover("r = "), "r : B");
     c.shutdown();
 }
 

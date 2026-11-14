@@ -457,12 +457,22 @@ fn an_enclosing_type_parameter_keeps_a_provider_contract_open() {
     let ExprKind::Fn(inner) = &nested.value.kind else {
         panic!()
     };
-    let Stmt::Env { ty, .. } = &inner.body.stmts[0] else {
-        panic!("open provider was generalized before its provide")
+    // FA keeps the source binding until resolution, so macro name scope
+    // sees it too. Both resolvers then preserve the open provider contract.
+    let Stmt::Bind(provider) = &inner.body.stmts[0] else {
+        panic!()
+    };
+    let ilang_syntax::ast::PatternKind::Typed { ty, .. } = &provider.pattern.kind else {
+        panic!()
     };
     assert!(matches!(&ty.kind, TypeKind::Named { name, args, .. }
         if name.name == "S" && matches!(&args[0].kind,
             TypeKind::Named { name, .. } if name.name == "N")));
+    let Stmt::Env { ty, value, .. } = &inner.body.stmts[1] else {
+        panic!()
+    };
+    assert!(matches!(ty.kind, TypeKind::Hole));
+    assert!(matches!(&value.kind, ExprKind::Name { name, .. } if name.name == "provided"));
     let printed = print_module(&module);
     assert!(printed.contains("failure ! Fail(E)"), "{printed}");
     assert!(!printed.contains('^'), "{printed}");

@@ -270,9 +270,11 @@ fn record_kinds() {
     };
     assert!(local(&two[1]) < local(&two[3]), "{two:?}");
     assert_ne!(two[0], two[2], "two services: {two:?}");
+    // E3 (§2.10.6): catch is ordinary Fail data and a control boundary,
+    // so it uses provider records, not a special error-channel frame.
+    assert!(all(&text, "(struct.new $frame (ref.func $catch_reenter)").is_empty());
     // The runtime records: no slot (-1), and their kinds.
     for (reenter, kind) in [
-        ("$catch_reenter", 4),
         ("$ensure_reenter", 2),
         // Bit 5 marks finalizer re-entry for cancellation shielding; Wasm's
         // i32 shift uses the low five bits, so it dispatches like kind 5.
@@ -655,7 +657,7 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 Paused = (Continuation(Nil, PausedSum, Fail(Int)))
 Done = ()
 PausedSum = Paused | Done
-Held = (Continuation(Nil, HeldSum, Never))
+Held = (Continuation(Nil, HeldSum, Fail(Int)))
 Over = ()
 HeldSum = Held | Over
 
@@ -681,7 +683,7 @@ paused = () {
 		| (Done) { panic("not paused") }
 }
 
-// `cancel` has no errors in its type. Here it runs the ordinary code
+// `cancel` forwards the continuation need. Here it runs the ordinary code
 // after `inner`, whose error passes through this final function's record.
 with = (hold, k) {
 	control.suspend(hold, (k2) { Held(k2) })
