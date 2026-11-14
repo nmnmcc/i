@@ -152,3 +152,14 @@
   .system-links a { padding: .45rem .55rem; }
 }
 @media (prefers-reduced-motion: reduce) { .home-page .home-button { transition: none; } }
+
+.home-guardrails { padding: 3.5rem 0; border-top: 1px solid var(--home-rule); }
+.home-guardrails > p:not(.home-eyebrow) { max-width: 48rem; color: var(--color-fd-muted-foreground); }
+.guard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.5rem; margin-top: 2rem; }
+.guard-grid article { min-width: 0; }
+.home-page h3 { margin: 1.2rem 0 .8rem; font-size: 1.1rem; line-height: 1.4; }
+.guard-grid p { font-size: .9rem; line-height: 1.7; color: var(--color-fd-muted-foreground); }
+@media (max-width: 800px) {
+  .guard-grid { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .home-guardrails { padding-block: 2.5rem; }
+}

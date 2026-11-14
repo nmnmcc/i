@@ -45,6 +45,11 @@ Example fences in authored pages use these info strings:
 - `i test-fails`: `i test` must exit nonzero at both levels, with stdout exactly
   equal to the following `text` fence. A reproduction `sh` fence may precede it.
 - `i check`: complete `src/main.i` that checks without diagnostics.
+- `i types`: complete module checked with `i check --types --offline`; the next
+  `text` fence must match its entire stdout exactly, with no diagnostics. This
+  runs once because type checking has no optimization level.
+- `i format`: unformatted complete module; `i fmt` formats the primary file and
+  the next `text` fence must match the resulting file exactly. Runs once.
 - `i error E0123 E0456`: complete module whose check reports exactly that code set.
 - `i shown file=src/main.i`: a complete file checked with `i check`, without
   running it. Includes earlier `file=` blocks on the same page, including those

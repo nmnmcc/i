@@ -97,12 +97,12 @@ def i_info(info):
         return words[0], path or title or 'src/main.i', frozenset()
     if path:
         raise ValueError('file= belongs to a supporting file or a shown block')
-    if words[0] in ('run', 'test', 'test-fails', 'check') and len(words) == 1:
+    if words[0] in ('run', 'test', 'test-fails', 'check', 'types', 'format') and len(words) == 1:
         return words[0], title, frozenset()
     if words[0] == 'error' and len(words) > 1 and all(
             re.fullmatch(r'[EW]\d{4}', word) for word in words[1:]):
         return 'error', title, frozenset(words[1:])
-    raise ValueError('expected run, test, test-fails, check, error <codes…>, shown file=<path>, shown-unchecked, or file=<path>; got '
+    raise ValueError('expected run, test, test-fails, check, types, format, error <codes…>, shown file=<path>, shown-unchecked, or file=<path>; got '
                      + repr(' '.join(words)))
 
 

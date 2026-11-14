@@ -54,6 +54,10 @@ class RunnerTests(unittest.TestCase):
             'failing-environment': 2,
             'passing-test-output': 0,
             'failing-test-output': 2,
+            'passing-types': 0,
+            'failing-types': 1,
+            'passing-format': 0,
+            'failing-format': 1,
         }
         for name, count in expected.items():
             with self.subTest(fixture=name):
@@ -108,6 +112,8 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue(all(source == primary for source in copies))
         examples, failures, _ = runner.read_page(page)
         self.assertFalse(failures)
+        self.assertEqual([example.source for example in examples if example.kind == 'types'], [primary])
+        self.assertEqual([example.output for example in examples if example.kind == 'format'], [primary])
         self.assertTrue(all(example.compare_test_output for example in examples if example.kind == 'test'))
 
     def test_project_setup(self):
@@ -165,7 +171,7 @@ class RunnerTests(unittest.TestCase):
         for info in ('scheme', 'scheme title="not-a-project-file"', 'toml', 'text'):
             self.assertIsNone(runner.i_info(info))
         self.assertEqual(runner.i_info('i error E0201 E0301 E0201')[2], {'E0201', 'E0301'})
-        for kind in ('run', 'test', 'test-fails', 'check', 'error E0201'):
+        for kind in ('run', 'test', 'test-fails', 'check', 'types', 'format', 'error E0201'):
             info = f'i {kind} package=hello title="src/main.i"'
             self.assertEqual(runner.i_options(info)[1]['package'], 'hello')
             self.assertEqual(runner.i_info(info)[1], 'src/main.i')
@@ -202,7 +208,9 @@ class RunnerTests(unittest.TestCase):
     def test_page_errors(self):
         for source in ('```i check\nmain = () { Nil }\n',
                        '```i file=src/a.i\na = 1\n```\n```i file=src/a.i\na = 2\n```\n',
-                       '```i file=../escape\ndata\n```\n'):
+                       '```i file=../escape\ndata\n```\n',
+                       '```i types\n(answer)\nanswer = 42\n```\n',
+                       '```i format\n(answer)\nanswer = 42\n```\n'):
             with tempfile.TemporaryDirectory() as scratch:
                 page = Path(scratch) / 'page.md'
                 page.write_text(source)

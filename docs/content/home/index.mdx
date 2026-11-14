@@ -1,14 +1,14 @@
 ---
-title: i — values, failures, and services
-description: A small functional language with inferred static types, compiling to WasmGC.
+title: i — the language for the rest of us
+description: i pairs WasmGC for native, WASI and JavaScript hosts with services, typed errors, structured concurrency and macros, code without keywords and with inferred types, and one standard and one tool.
 ---
 
 <div className="home-page">
 <section className="home-hero" aria-labelledby="home-title">
 <div className="hero-copy">
 <p className="home-eyebrow">The i programming language</p>
-<h1 id="home-title">Values, failures and services,<br />checked as one program.</h1>
-<p className="hero-position">Small · functional · statically typed · inferred · WasmGC</p>
+<h1 id="home-title">The language for the rest of us</h1>
+<p className="hero-position">i pairs WasmGC for native, WASI and JavaScript hosts with services, typed errors, structured concurrency and macros, code without keywords and with inferred types, and one standard and one tool.</p>
 <p className="hero-explanation">Read a port from the environment, check it, then print it or handle a typed failure. No parameter, result, or service annotations.</p>
 <div className="home-actions">
 <a className="home-button home-button-primary" href="/docs/tour">Read the tour <span aria-hidden="true">→</span></a>
@@ -60,6 +60,230 @@ port 8080
 <a href="#tasks">Tasks</a><span aria-hidden="true">→</span>
 <a href="#macros">Macros</a>
 </nav>
+</section>
+
+<section className="home-guardrails" aria-labelledby="checked-boundaries">
+<p className="home-eyebrow">What the compiler refuses</p>
+<h2 id="checked-boundaries">Code that cannot hide.</h2>
+<p>Failures, service needs, and the values a match accepts are checked together. These refused edits use the same port reader.</p>
+<div className="guard-grid">
+<article className="home-program">
+<h3>An unhandled failure stays in the type.</h3>
+<p>A caller cannot promise to need nothing while leaving <code>Fail</code> unhandled. This explicit <code>() -&gt; Int</code> promise is rejected. Handle the failure, or let the need remain in the caller’s inferred type.</p>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-4#section-4-6">§4.6</a> · <a href="/docs/standard/generated/chapter-9#section-9-3">§9.3</a></p>
+<details className="shared-source">
+<summary>The same src/main.i from the first example</summary>
+
+```i file=src/main.i title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```i error E0501 package=hello title="src/probe.i"
+(
+	app = hello/main
+)
+
+(
+	pure
+)
+pure : () -> Int = () { app.read_port() }
+```
+
+```text
+src/probe.i:8:1: error[E0501]: `app.BadPort` is not a subtype of `Never`
+1 error
+```
+
+</article>
+<article className="home-program">
+<h3>A multi-branch match must cover its subject.</h3>
+<p>Values are immutable. Matching selects a result; it does not change the subject. The reader returns an integer, and these branches leave <code>2</code> uncovered.</p>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-11#section-11-1">§11.1</a> · <a href="/docs/standard/generated/chapter-7#section-7-4">§7.4</a></p>
+<details className="shared-source">
+<summary>The same src/main.i from the first example</summary>
+
+```i file=src/main.i title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```i error E0516 package=hello title="src/probe.i"
+(
+	app = hello/main
+)
+
+(
+	describe
+)
+describe = () { app.read_port() |> (0) { "off" } | (1) { "one" } }
+```
+
+```text
+src/probe.i:8:17: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `2`
+1 error
+```
+
+</article>
+<article className="home-program" id="invalid-edit">
+<h3>Inference still checks every use.</h3>
+<p>The reader has no result annotation. Adding text to its integer result is still rejected: the same check applies in the <a href="#branches">formatter</a> and the <a href="#macros">typed macro</a>.</p>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-4#section-4-8">§4.8</a></p>
+<details className="shared-source">
+<summary>The same src/main.i from the first example</summary>
+
+```i file=src/main.i title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```i error E0501 package=hello title="src/probe.i"
+(
+	app = hello/main
+)
+
+(
+	bad
+)
+bad = () { app.read_port() + "one" }
+```
+
+```text
+src/probe.i:8:30: error[E0501]: `"one"` is not a subtype of `Int`
+1 error
+```
+
+</article>
+<article className="home-program">
+<h3>A service use appears in the need.</h3>
+<p>Reading the environment adds <code>Environment</code>; printing adds <code>Stdio</code>. The <a href="#inferred-needs">checked type listing</a> below shows both. The test double supplies the same service directly, through <code>&lt;-</code>.</p>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-2">§9.2</a> · <a href="/docs/standard/generated/chapter-9#section-9-7">§9.7</a></p>
+<h3>One format, checked too.</h3>
+<p>The same <code>i</code> tool checks, formats, tests, runs and builds a project. Compare the first program before and after <code>i fmt</code>:</p>
+<p className="spec-link"><a href="/docs/standard/generated/chapter-1#section-1-7">§1.7</a> · <a href="/docs/standard/generated/chapter-2#section-2-6">§2.6</a></p>
+<details className="shared-source">
+<summary>Unformatted input and the checked formatter output</summary>
+
+```i format package=hello title="src/main.i"
+(
+i/process
+i/fail
+i/stdio
+std/int
+)
+
+(
+read_port
+BadPort(..)
+)
+BadPort=()
+read_port=() {
+int.parse(process.env("PORT")) |>
+(Ok(port) ? port > 0 && port < 65536) { port }
+| (_) { fail.raise(BadPort) }
+}
+main=() {
+fail.catch(read_port) |>
+(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+```text
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+</article>
+</div>
+<p className="home-footnote">One <a href="/docs/standard">standard</a> defines the language; <a href="/docs/standard/generated/chapter-2#section-2-6">§2.6</a> defines the project tool. Read the site’s text index at <a href="/llms.txt">llms.txt</a> or the complete documentation at <a href="/llms-full.txt">llms-full.txt</a>.</p>
 </section>
 
 <section className="home-topic" aria-labelledby="branches">
@@ -142,6 +366,43 @@ pass hello/format_test.matching and overloading
 <p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-2">§9.2</a> · <a href="/docs/standard/generated/chapter-9#section-9-3">§9.3</a> · <a href="/docs/standard/generated/chapter-9#section-9-6">§9.6</a></p>
 </div>
 <div className="home-program">
+<h3 id="inferred-needs">The needs were inferred.</h3>
+<p>These are the two lines printed by <code>i check --types</code> for the first program. <code>read_port</code> needs <code>Environment</code> and can raise <code>BadPort</code> or <code>ProcessError</code>. <code>main</code> catches those errors; its output can still raise <code>StdioError</code>. Both use the request services <code>Await</code> and <code>Owner</code>.</p>
+<details className="shared-source">
+<summary>The unchanged source checked for this type listing</summary>
+
+```i types package=hello title="src/main.i"
+(
+	i/process
+	i/fail
+	i/stdio
+	std/int
+)
+
+(
+	read_port
+	BadPort(..)
+)
+BadPort = ()
+read_port = () {
+	int.parse(process.env("PORT")) |>
+		(Ok(port) ? port > 0 && port < 65536) { port }
+		| (_) { fail.raise(BadPort) }
+}
+main = () {
+	fail.catch(read_port) |>
+		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
+		| (Error(_)) { stdio.print("invalid PORT") }
+}
+```
+
+</details>
+
+```text
+hello/main.read_port : () <- (Fail(BadPort | process.ProcessError), i/request.Await, i/request.Owner, process.Environment) -> Int
+hello/main.main : () <- (Fail(stdio.StdioError), i/request.Await, i/request.Owner, process.Environment, stdio.Stdio) -> Nil
+```
+
 <details className="shared-source">
 <summary>The same src/main.i from the first example</summary>
 
@@ -362,62 +623,6 @@ test("typed expansion", () {
 16160
 pass hello/macros_test.typed expansion
 1 passed, 0 failed
-```
-</div>
-</section>
-
-<section className="home-topic home-check" aria-labelledby="invalid-edit">
-<div className="topic-copy">
-<p className="home-step">One invalid edit</p>
-<h2 id="invalid-edit">Inference still checks the call.</h2>
-<p>Try to add text to the port reader’s integer result. The compiler refuses it. This is the same result checked in <a href="#branches">the formatter</a> and passed to <a href="#macros">the typed macro</a>.</p>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-4#section-4-8">§4.8</a></p>
-</div>
-<div className="home-program">
-<details className="shared-source">
-<summary>The same src/main.i from the first example</summary>
-
-```i file=src/main.i title="src/main.i"
-(
-	i/process
-	i/fail
-	i/stdio
-	std/int
-)
-
-(
-	read_port
-	BadPort(..)
-)
-BadPort = ()
-read_port = () {
-	int.parse(process.env("PORT")) |>
-		(Ok(port) ? port > 0 && port < 65536) { port }
-		| (_) { fail.raise(BadPort) }
-}
-main = () {
-	fail.catch(read_port) |>
-		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
-		| (Error(_)) { stdio.print("invalid PORT") }
-}
-```
-
-</details>
-
-```i error E0501 package=hello title="src/probe.i"
-(
-	app = hello/main
-)
-
-(
-	bad
-)
-bad = () { app.read_port() + "one" }
-```
-
-```text
-src/probe.i:8:30: error[E0501]: `"one"` is not a subtype of `Int`
-1 error
 ```
 </div>
 </section>
