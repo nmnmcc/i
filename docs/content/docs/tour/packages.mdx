@@ -70,7 +70,7 @@ These manifest fields are supported on this tree:
 | `[entries]` | Named entries, mapped to `"module.path.function"` relative to the package. |
 | `[wasm] exports` | Functions callable by the embedding host, written as `"package/module.function"`. |
 | `[wasm] synchronous` | The subset of host exports declared synchronous. |
-| `providers`, `provider_adapters` | Target provider plans; see §2.6.1 for their schema. |
+| `providers`, `provider_adapters` | Target provider plans for selecting host services. |
 
 The default program entry is `main` in `src/main.i`. A named entry supplements it and is selected with `i run NAME` or `i build NAME`. Program arguments follow `--`. A library package can have source modules without a program entry.
 
@@ -141,4 +141,6 @@ Version selection takes the greatest of the minimum versions requested for each 
 
 ## See also
 
-Read [modules and packages (§2)](/docs/standard/generated/chapter-2), [provider plans (§2.6.1)](/docs/standard/generated/chapter-2#section-2-6-1), and [the lock file (§2.8)](/docs/standard/generated/chapter-2#section-2-8). Continue with the [guides](/docs/guides), or [contribute to the language](/docs/contributing).
+Continue with the [guides](/docs/guides), or [contribute to the language](/docs/contributing).
+
+The exact rules are in the [specification](/docs/standard/generated/chapter-2).

@@ -129,7 +129,7 @@ main = () {
 
 A multi-line string opens with three quotes followed immediately by a line break. The closing quotes stand on their own line. Their indentation is removed from each content line; the opening and closing line breaks are left out of the value. The inspected output makes the remaining line break visible as `\n`. The formatter rewrites this string as `"first\nsecond"`, using an escape for the line break.
 
-See [Appendix C](/docs/standard/generated/chapter-appendix-c) for the complete string grammar, including raw strings and other escapes.
+Strings also have raw forms and other escapes.
 
 ## Records, tuples, and updates
 
@@ -265,10 +265,8 @@ main = () {
 11
 ```
 
-A bit array is a sequence of bits, written between `<<` and `>>`. An unmarked integer segment takes eight bits; `:u3` takes three unsigned bits, so this value has eleven bits. Bit arrays support explicit widths, byte order, and text encodings; see [standard §8](/docs/standard/generated/chapter-8) for those formats.
+A bit array is a sequence of bits, written between `<<` and `>>`. An unmarked integer segment takes eight bits; `:u3` takes three unsigned bits, so this value has eleven bits. Bit arrays support explicit widths, byte order, and text encodings.
 
 ## See also
 
-- [Literals and names, standard §1](/docs/standard/generated/chapter-1#section-1-6).
-- [Types and data, standard §4](/docs/standard/generated/chapter-4#section-4-1), [expressions, §6](/docs/standard/generated/chapter-6#section-6-4), and [text forms, §11.8](/docs/standard/generated/chapter-11#section-11-8).
-- Next: [Functions and branches](/docs/tour/functions-and-branches).
+Next: [Functions and branches](/docs/tour/functions-and-branches).

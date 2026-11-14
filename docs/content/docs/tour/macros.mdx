@@ -99,7 +99,7 @@ main = () <- (io : Io) {
 
 The expansion prints the same spelling for these names; their distinct scopes are retained in the syntax tree. The specification defines this with a fresh mark for each expansion. Code from macro arguments retains its original scope, while generated code receives the expansion's mark. References made in a template resolve in the defining module under those rules; labels are compared by text.
 
-Macros have no host services for reading files, the network or the time. The standard requires the same result for the same inputs on every machine and places limits on each expansion. Start with a syntax macro like this one; typed macros, type queries, item generation and diagnostics have additional contracts in §14.
+Macros have no host services for reading files, the network or the time. The standard requires the same result for the same inputs on every machine and places limits on each expansion. Start with a syntax macro like this one before adding typed macros, type queries, item generation or diagnostics.
 
 ## The repository tour's `if` macro
 
@@ -127,4 +127,4 @@ test("if is a macro", () { assert(sign(-1) == "negative") })
 
 ## See also
 
-Read [macros and the two surfaces (§14)](/docs/standard/generated/chapter-14), especially [hygiene (§14.6)](/docs/standard/generated/chapter-14#section-14-6). Continue with [packages](/docs/tour/packages).
+Continue with [packages](/docs/tour/packages).

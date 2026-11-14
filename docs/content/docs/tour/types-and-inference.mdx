@@ -241,10 +241,8 @@ main = () {
 
 ## Current limits
 
-The standard says the text form of a value of a labelled type keeps its labels, for example `User(age = 36, name = "ada")` ([§11.8](/docs/standard/generated/chapter-11#section-11-8)). The compiler on this tree prints the parts without their labels, so `core.inspect` of such a value shows `ScreenPoint(3, 4)`. This is a recorded difference from the standard ([known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md), DOC2), not the intended output.
+The standard says the text form of a value of a labelled type keeps its labels, for example `User(age = 36, name = "ada")`. The compiler on this tree prints the parts without their labels, so `core.inspect` of such a value shows `ScreenPoint(3, 4)`. This is a recorded difference from the standard ([known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md), DOC2), not the intended output.
 
 ## See also
 
-- [Type syntax, standard §3](/docs/standard/generated/chapter-3).
-- [Type definitions, §4.3](/docs/standard/generated/chapter-4#section-4-3) and [inference, §4.7](/docs/standard/generated/chapter-4#section-4-7).
-- Next: [Services and errors](/docs/tour/services-and-errors).
+Next: [Services and errors](/docs/tour/services-and-errors).
