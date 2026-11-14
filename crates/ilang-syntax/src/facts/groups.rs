@@ -165,7 +165,7 @@ pub fn module(module: &n::Module, transition: &mut Transition) -> n::Module {
     let mut hidden = Vec::new();
     module.items = std::mem::take(&mut module.items)
         .into_iter()
-        .flat_map(|mut item| {
+        .flat_map(|item| {
             if item
                 .attributes
                 .iter()
@@ -173,15 +173,24 @@ pub fn module(module: &n::Module, transition: &mut Transition) -> n::Module {
             {
                 return vec![item];
             }
-            let n::ItemKind::Bind(binding) = &item.kind else {
+            let n::Item {
+                doc,
+                attributes,
+                span,
+                kind: n::ItemKind::Bind(binding),
+            } = item
+            else {
                 return vec![item];
             };
-            let expanded = normalize.binding(binding.clone());
-            let mut items = Vec::new();
+            // The item is already owned: move its binding through normalization
+            // instead of copying the entire value twice more.
+            let original = match &binding.pattern.kind {
+                n::PatternKind::Var(name) => Some(name.clone()),
+                _ => None,
+            };
+            let mut expanded = normalize.binding(binding);
             if expanded.len() > 1 {
-                let n::PatternKind::Var(original) = &binding.pattern.kind else {
-                    unreachable!()
-                };
+                let original = original.expect("only a named chain produces hidden groups");
                 for b in &expanded[..expanded.len() - 1] {
                     let n::PatternKind::Var(group) = &b.pattern.kind else {
                         unreachable!()
@@ -189,20 +198,22 @@ pub fn module(module: &n::Module, transition: &mut Transition) -> n::Module {
                     hidden.push((original.clone(), group.clone()));
                 }
             }
-            let last = expanded.len() - 1;
-            for (i, binding) in expanded.into_iter().enumerate() {
-                if i == last {
-                    item.kind = n::ItemKind::Bind(binding);
-                    items.push(item.clone());
-                } else {
-                    items.push(n::Item {
-                        doc: Vec::new(),
-                        attributes: Vec::new(),
-                        span: binding.span,
-                        kind: n::ItemKind::Bind(binding),
-                    });
-                }
-            }
+            let last = expanded.pop().expect("a binding keeps its public item");
+            let mut items: Vec<_> = expanded
+                .into_iter()
+                .map(|binding| n::Item {
+                    doc: Vec::new(),
+                    attributes: Vec::new(),
+                    span: binding.span,
+                    kind: n::ItemKind::Bind(binding),
+                })
+                .collect();
+            items.push(n::Item {
+                doc,
+                attributes,
+                span,
+                kind: n::ItemKind::Bind(last),
+            });
             items
         })
         .collect();

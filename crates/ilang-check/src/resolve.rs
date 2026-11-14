@@ -47,7 +47,7 @@ pub(crate) use three::source_facts;
 /// shared with the transition resolver; no old syntax nodes are constructed.
 pub fn resolve(graph: &PackageGraph, parsed: &[crate::Parsed]) -> (Program, Vec<Diagnostic>) {
     ilang_syntax::syn3::deep::deep(|| {
-        let modules: Vec<_> = parsed.iter().map(|p| p.ast.clone()).collect();
+        let modules: Vec<_> = parsed.iter().map(|p| &p.ast).collect();
         resolve_native(graph, parsed, &modules, false)
     })
 }
@@ -57,12 +57,13 @@ pub fn resolve3(
     parsed: &[crate::Parsed],
     modules: &[ilang_syntax::syn3::ast::Module],
 ) -> (Program, Vec<Diagnostic>) {
-    resolve_native(graph, parsed, modules, true)
+    let modules: Vec<_> = modules.iter().collect();
+    resolve_native(graph, parsed, &modules, true)
 }
 fn resolve_native(
     graph: &PackageGraph,
     parsed: &[crate::Parsed],
-    modules: &[ilang_syntax::syn3::ast::Module],
+    modules: &[&ilang_syntax::syn3::ast::Module],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
     ilang_syntax::syn3::deep::deep(|| {
