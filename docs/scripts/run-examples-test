@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Contract tests, using I_BIN or the tree's compiler for the fixture programs."""
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stderr, redirect_stdout
+import importlib.util
+import io
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import tomllib
+import unittest
+from unittest.mock import patch
+
+SCRIPTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPTS))
+spec = importlib.util.spec_from_file_location('run_examples', SCRIPTS / 'run-examples.py')
+runner = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = runner
+spec.loader.exec_module(runner)
+FIXTURES = SCRIPTS / 'run-examples-fixtures'
+
+
+class RunnerTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.binary = runner.compiler()
+
+    def test_compiler_fixtures(self):
+        expected = {
+            'passing': 0,
+            'failing-run': 2,
+            'failing-test': 2,
+            'failing-check': 1,
+            'failing-error': 1,
+            'missing-text': 1,
+            'orphan-file': 1,
+            'unknown-kind': 1,
+            'error-with-no-diagnostics': 1,
+            'check-with-warning': 1,
+            'test-with-no-tests': 0,
+            'run-with-nonzero-exit': 2,
+        }
+        for name, count in expected.items():
+            with self.subTest(fixture=name):
+                examples, failures, counts = runner.read_page(FIXTURES / (name + '.mdx'))
+                with ThreadPoolExecutor(max_workers=4) as pool:
+                    for errors in pool.map(lambda example: runner.run_example(example, self.binary), examples):
+                        failures.extend(errors)
+                self.assertEqual(len(failures), count, '\n'.join(map(str, failures)))
+                if name == 'passing':
+                    self.assertEqual(dict(counts), dict(run=2, test=1, check=2, error=1, file=4, fragment=1))
+                if name == 'failing-run':
+                    self.assertIn('--opt 0', str(failures[0]))
+                    self.assertIn('--opt 2', str(failures[1]))
+                    self.assertIn('actual\\n', str(failures[0]))
+                    for failure in failures:
+                        self.assertIn('exit 0,', failure.actual)
+                if name == 'failing-test':
+                    for failure in failures:
+                        self.assertIn('1 failed', failure.actual)
+                if name == 'failing-error':
+                    self.assertIn("codes=['E0301']", str(failures[0]))
+                    self.assertIn("codes=['E0201']", str(failures[0]))
+                for failure in failures:
+                    self.assertRegex(str(failure), r'\.mdx:\d+: expected .+; actual .+')
+
+    def test_precise_stdout(self):
+        for expected, actual in [('a', 'a'), ('a\n', 'a'), ('a', 'a\n'), ('', '\n')]:
+            self.assertTrue(runner.output_matches(expected, actual))
+        for expected, actual in [('a', 'a\n\n'), ('a\n', 'a\n\n'), ('a\n', 'a \n'), ('a\n', '\na\n'), ('', ' '), ('', '\n\n')]:
+            self.assertFalse(runner.output_matches(expected, actual))
+
+    def test_diagnostic_headers_only(self):
+        text = ('src/main.i:1:1: error[E0201]: E0301 is mentioned\n'
+                '  source = "error[E9999]: quoted"\n'
+                '  src/main.i:2:1: note: related error[E9999]: quoted\n')
+        self.assertEqual(runner.DIAGNOSTIC.findall(text), ['E0201'])
+
+    def test_project_setup(self):
+        examples, _, _ = runner.read_page(FIXTURES / 'passing.mdx')
+        with tempfile.TemporaryDirectory() as scratch:
+            project = Path(scratch)
+            runner.prepare(examples[1], project)
+            manifest = tomllib.loads((project / 'i.toml').read_text())
+            self.assertEqual(manifest['name'], 'passing')
+            self.assertEqual(manifest['test']['collection'], 'std/test.tests')
+            self.assertEqual(manifest['dev-dependencies']['std']['path'], str(runner.ROOT / 'std'))
+            self.assertTrue((project / 'src/helper.i').is_file())
+            self.assertTrue((project / 'src/lisp.is').is_file())
+            self.assertTrue((project / 'test/passing_test.i').is_file())
+        with tempfile.TemporaryDirectory() as scratch:
+            project = Path(scratch)
+            runner.prepare(examples[-1], project)
+            self.assertEqual(tomllib.loads((project / 'i.toml').read_text())['name'], 'passing')
+        self.assertEqual(runner.page_name(Path('first-program.mdx')), 'first_program')
+        self.assertEqual(runner.page_name(Path('2-values.mdx')), 'page_2_values')
+
+    def test_compiler_selection_and_build_queue(self):
+        with patch.dict(os.environ, {'I_BIN': str(self.binary)}), patch('subprocess.run') as build:
+            self.assertEqual(runner.compiler(), self.binary)
+            build.assert_not_called()
+        with tempfile.TemporaryDirectory() as scratch, patch.dict(os.environ, {}, clear=True):
+            root = Path(scratch) / 'lane'
+            root.mkdir()
+            heavy = Path(scratch) / 'cache/heavy'
+            heavy.parent.mkdir()
+            heavy.touch()
+            with patch.object(runner, 'ROOT', root), patch('subprocess.run') as build:
+                self.assertEqual(runner.compiler(), root / 'target/release/i')
+                command = build.call_args.args[0]
+                self.assertEqual(command[:4], [str(heavy), 'direnv', 'exec', str(root.parent.parent)])
+                self.assertIn('--offline', command)
+                self.assertIn('--release', command)
+                self.assertEqual(build.call_args.kwargs, {'cwd': root, 'check': True})
+
+    def test_fence_structure(self):
+        text = '````text\n```i run\nnot an example\n```\n````\n  ~~~i check\n  (answer)\n  answer = 42\n  ~~~~\n'
+        blocks = list(runner.fences(text))
+        self.assertEqual(len(blocks), 2)
+        self.assertEqual(blocks[1].line, 6)
+        self.assertEqual(blocks[1].source, '(answer)\nanswer = 42\n')
+
+    def test_info_strings(self):
+        for info in ('i file=src/a.i', 'i file="src/a.i"', 'i title="src/a.i"',
+                     'i file=src/a.i title="src/a.i"'):
+            self.assertEqual(runner.i_info(info), ('file', 'src/a.i', frozenset()))
+        self.assertEqual(runner.i_info('i error E0201 E0301 E0201')[2], {'E0201', 'E0301'})
+        for info in ('i run extra', 'i error', 'i error not_a_code', 'i mystery',
+                     'i file=a.i title="b.i"', 'i file=', 'i title="unterminated'):
+            with self.subTest(info=info), self.assertRaises(ValueError):
+                runner.i_info(info)
+        for path in ('../a.i', '/tmp/a.i', 'src/../a.i', './a.i', 'src\\a.i'):
+            with self.assertRaises(ValueError):
+                runner.safe_file(path)
+
+    def test_discovery_and_placeholders(self):
+        with tempfile.TemporaryDirectory() as scratch, patch.object(runner, 'ROOT', Path(scratch)):
+            content = Path(scratch) / 'docs/content'
+            content.mkdir(parents=True)
+            (content / 'a.md').write_text('```i check\n(answer)\nanswer = 42\n```\n')
+            (content / 'b.mdx').write_text('to be written\n')
+            (content / 'meta.json').write_text('{"description": "to be written"}\n')
+            (content / 'nested/generated').mkdir(parents=True)
+            (content / 'nested/generated/ignored.mdx').write_text('to be written\n```i mystery\n```\n')
+            examples, failures, _ = runner.check_content(content)
+            self.assertEqual(len(examples), 1)
+            self.assertFalse(failures)
+            self.assertEqual(len(runner.check_content(content, no_placeholders=True)[1]), 2)
+            self.assertFalse(runner.check_content(content, ['b.mdx'])[0])
+            for pattern in ('a.md', 'content/a.md', 'docs/content/a.md'):
+                self.assertEqual(len(runner.check_content(content, [pattern])[0]), 1)
+
+    def test_page_errors(self):
+        for source in ('```i check\nmain = () { Nil }\n',
+                       '```i file=src/a.i\na = 1\n```\n```i file=src/a.i\na = 2\n```\n',
+                       '```i file=../escape\ndata\n```\n'):
+            with tempfile.TemporaryDirectory() as scratch:
+                page = Path(scratch) / 'page.md'
+                page.write_text(source)
+                self.assertTrue(runner.read_page(page)[1])
+
+    def test_timeout(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            binary = Path(scratch) / 'sleeping-compiler'
+            binary.write_text('#!/usr/bin/env python3\nimport time\ntime.sleep(10)\n')
+            binary.chmod(0o755)
+            example = runner.Example(FIXTURES / 'passing.mdx', 1, 'check', '(answer)\nanswer = 42\n')
+            failures = runner.run_example(example, binary, timeout=0.1)
+            self.assertEqual(len(failures), 1)
+            self.assertIn('timed out', str(failures[0]))
+
+    def test_cli_exit_and_summary(self):
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'run-examples.py'), '--page', '**/no-such-page.mdx'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn('No executable documentation examples found.', result.stdout)
+        for kind in runner.KINDS:
+            self.assertIn(f'{kind}: 0 fences', result.stdout)
+
+    def test_cli_failure_status(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            content = root / 'docs/content'
+            content.mkdir(parents=True)
+            (content / 'missing.mdx').write_text((FIXTURES / 'missing-text.mdx').read_text())
+            output, errors = io.StringIO(), io.StringIO()
+            with patch.object(runner, 'ROOT', root), patch.object(sys, 'argv', ['run-examples.py']), \
+                    redirect_stdout(output), redirect_stderr(errors):
+                self.assertTrue(runner.main())
+            self.assertIn('missing.mdx:1: expected', errors.getvalue())
+            self.assertIn('1 failures', output.getvalue())
+
+
+if __name__ == '__main__':
+    unittest.main()

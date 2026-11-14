@@ -20,8 +20,20 @@ jobs:
     name: Build and check documentation
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_INCREMENTAL: 0
+      I_BIN: ${{ github.workspace }}/target/debug/i
     steps:
+      - name: Free disk space for the compiler build
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
+            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
+            /usr/local/share/chromium /usr/lib/jvm
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
         with:
           extra-conf: |
@@ -33,6 +45,16 @@ jobs:
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
         run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: docs-${{ hashFiles('Cargo.lock') }}
+          cmd-format: devenv shell -- {0}
+          cache-directories: ~/.cache/ccache
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # This workflow has no release artifact. A dev compiler avoids release
+      # optimization work; the same target also holds the snippet parser.
+      - name: Build the example compiler
+        run: devenv shell -- cargo build --locked -p ilang-cli
       - name: Build and check
         working-directory: docs
         run: |

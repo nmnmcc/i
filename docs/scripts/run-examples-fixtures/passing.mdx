@@ -1,0 +1,79 @@
+```i run
+(
+	(Io) = i/io
+)
+
+main = () <- (io : Io) { io.print("hello") }
+```
+
+```text
+hello
+```
+
+```i file=src/helper.i title="src/helper.i"
+(
+	answer
+)
+
+answer = 42
+```
+
+```i file="src/lisp.is"
+(, answer)
+(= answer 42)
+```
+
+```i test
+(
+	tests = (test) = std/test
+	passing/helper
+	passing/lisp
+)
+
+test("both surfaces", () { assert(helper.answer == lisp.answer) })
+```
+
+```i check
+(
+	answer
+)
+
+answer = 42
+```
+
+```i error E0201
+(
+	answer
+)
+
+answer = unknown
+```
+
+```i title="data.txt"
+This is project data, not i source.
+```
+
+```i run title="src/main.i"
+main = () { Nil }
+```
+
+```text
+```
+
+```i file=i.toml
+name = "overridden_by_the_page_name"
+
+[dependencies]
+```
+
+```i check
+(
+	answer
+)
+
+answer = 42
+```
+
+```i
+answer = 42
+```
