@@ -14,6 +14,7 @@
     "prebuild": "npm run generate",
     "predev": "npm run generate",
     "check:links": "python3 scripts/check-links.py",
+    "check:placeholders": "python3 scripts/check-placeholders-test && python3 scripts/check-placeholders.py",
     "check:rendering": "python3 scripts/check-example-rendering.py",
     "check:examples": "npm run generate && python3 scripts/check-examples.py && python3 scripts/run-examples.py --no-placeholders"
   },

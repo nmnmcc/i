@@ -15,18 +15,41 @@ checks fenced i examples with the repository's parser and snippet registry,
 then executes complete examples against the tree's compiler.
 `npm run check:rendering` verifies the built i blocks' titles and highlighted
 source, including that execution metadata stays out of the displayed code.
+After building, `npm run check:placeholders` runs its negative-fixture tests
+and scans every HTML file in `dist`, including generated library pages.
+It rejects `to be written` without regard to case or intervening HTML whitespace,
+and the whole words `TODO` and `TBD` (in that case). It checks body text, including
+code, `noscript`, and text in elements marked `hidden`. It ignores HTML comments,
+attribute values, and the contents of `head`, `script`, `style`, and `template`.
+Inline element boundaries preserve words; block boundaries act as whitespace.
+This is a text check, not a CSS visibility calculation. Neither generated pages
+nor any particular route is excluded. Both docs workflows run it after building.
 Generation also runs before `npm run dev`. The standard's location is defined
 by `SPEC_PATH` in `scripts/paths.py` for the planned relocation.
 Generated pages are not edited by hand.
+
+The home page is rendered from `content/home/index.mdx`, a separate Fumadocs
+collection that uses the same code blocks and themes as the docs. Both parser
+checks and the example runner read it. Its repeated `src/main.i` attachments
+are checked for exact equality by `scripts/run-examples-test`.
+Set `I_SNIPPET_PARSER` to an existing `parse-snippets` driver from the same tree
+to run the parser checks without a Cargo build.
 
 Example fences in authored pages use these info strings:
 
 - `i run`: complete `src/main.i`; the next fence is `text`, with exact stdout
   (one trailing newline is tolerated). Runs at `--opt 0` and `--opt 2`.
 - `i test`: complete `test/<page>_test.i`; every test must pass at both levels.
+  Add `stdout=exact` and an immediately following `text` fence to compare its
+  transcript as well as its exit status at both levels.
 - `i test-fails`: `i test` must exit nonzero at both levels, with stdout exactly
   equal to the following `text` fence. A reproduction `sh` fence may precede it.
 - `i check`: complete `src/main.i` that checks without diagnostics.
+- `i types`: complete module checked with `i check --types --offline`; the next
+  `text` fence must match its entire stdout exactly, with no diagnostics. This
+  runs once because type checking has no optimization level.
+- `i format`: unformatted complete module; `i fmt` formats the primary file and
+  the next `text` fence must match the resulting file exactly. Runs once.
 - `i error E0123 E0456`: complete module whose check reports exactly that code set.
 - `i shown file=src/main.i`: a complete file checked with `i check`, without
   running it. Includes earlier `file=` blocks on the same page, including those
@@ -60,6 +83,9 @@ with punctuation changed to underscores (`first-program.mdx` → `first_program`
 prefix `page_` if the name starts with a digit). `package=<name>` overrides that
 default on run, test, test-fails, check, error, and shown fences. The runner never
 infers the package name from imports. Use the declared name for local imports.
+`env.PORT=8080` supplies a deterministic environment input to an example at both
+levels. It affects that example's compiler/program subprocesses only; the source
+still uses the ordinary process environment service.
 The runner sets the manifest name, absolute local `std` paths, and the
 `std/test.tests` collection. Tests use a `std` dev-dependency unless source
 modules need a regular dependency. Commands use `--offline`; output must be
