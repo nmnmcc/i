@@ -1,5 +1,71 @@
 ---
 title: Standard library reference
+description: Browse the modules supplied by i and the std package.
 ---
 
-to be written
+The library reference describes the modules in `std` and `i/…`. Select a module to find its exports and source documentation. The `i/…` modules are supplied with the compiler; `std` is a separate package.
+
+To use `std` in a project, put its checkout path in `i.toml` under `[dependencies]`, as in `std = { path = "../std" }`; the path is relative to the package. For tests only, the starter project uses `[dev-dependencies]`. The generated reference pages take module introductions from `////` comments and export documentation from `///` comments. When a checked type is available, the generator includes it; otherwise it uses the source declaration.
+
+## `std` modules
+
+| Module | Purpose |
+| --- | --- |
+| [std/bit_array](/docs/library/generated/std-bit-array) | Functions for `BitArray`, the type of lists of bits |
+| [std/bool](/docs/library/generated/std-bool) | Functions for the built-in type `Bool { True False }` |
+| [std/calendar](/docs/library/generated/std-calendar) | Proleptic Gregorian dates for all integer years, and explicit fixed offsets |
+| [std/cli](/docs/library/generated/std-cli) | Pure command argument descriptions with typed results |
+| [std/crypto](/docs/library/generated/std-crypto) | SHA-2 digests and key derivation in ordinary immutable i |
+| [std/csv](/docs/library/generated/std-csv) | Strict CSV rows, following RFC 4180 and Go encoding/csv |
+| [std/dict](/docs/library/generated/std-dict) | Dictionaries: maps from keys to values that may not be changed |
+| [std/float](/docs/library/generated/std-float) | Functions for `Float`, the type of finite IEEE 754 binary64 numbers |
+| [std/http](/docs/library/generated/std-http) | HTTP/1.1 messages, incremental framing, clients and scoped servers |
+| [std/int](/docs/library/generated/std-int) | Functions for `Int`, the type of whole numbers of any size |
+| [std/json](/docs/library/generated/std-json) | JSON values and RFC 8259 text encoding. Offsets are UTF-8 byte offsets |
+| [std/list](/docs/library/generated/std-list) | Functions for immutable lists |
+| [std/log](/docs/library/generated/std-log) | Structured entries and call-time sink services. See std-2.md §6/§7 |
+| [std/option](/docs/library/generated/std-option) | Optional values, represented by `Some(value)` or `None` |
+| [std/order](/docs/library/generated/std-order) | The result of comparing two values, and functions to work with it |
+| [std/pair](/docs/library/generated/std-pair) | Functions for tuples of two parts, `(a, b)` |
+| [std/path](/docs/library/generated/std-path) | Lexical POSIX paths using `/` as the separator |
+| [std/property](/docs/library/generated/std-property) | Reproducible pure generators with lazy, ordered shrink trees |
+| [std/regex](/docs/library/generated/std-regex) | Unicode scalar regular expressions: ordered Thompson NFA / PikeVM |
+| [std/result](/docs/library/generated/std-result) | Functions for the built-in type `Result(A, E) { Ok(A) Error(E) }` |
+| [std/schema](/docs/library/generated/std-schema) | Composable two-way JSON codecs |
+| [std/sequence](/docs/library/generated/std-sequence) | Finite persistent indexed deques |
+| [std/set](/docs/library/generated/std-set) | Immutable sets of distinct values |
+| [std/stream](/docs/library/generated/std-stream) | Replayable pull streams |
+| [std/string](/docs/library/generated/std-string) | Functions for strings of Unicode scalar values |
+| [std/time](/docs/library/generated/std-time) | Exact nanosecond durations and Unix epoch instants |
+| [std/uri](/docs/library/generated/std-uri) | Strict ASCII RFC 3986 references, stored with their original encoded spelling |
+
+## `i` modules
+
+| Module | Purpose |
+| --- | --- |
+| [i/assertion](/docs/library/generated/i-assertion) | Taking `Assert` failures (§9.6) |
+| [i/big](/docs/library/generated/i-big) | Arbitrary precision Int arithmetic beyond the small range (§11.2) |
+| [i/bits](/docs/library/generated/i-bits) | Integer segments of bit arrays (§8.3, §8.4) that do not fit 63 bits |
+| [i/clock](/docs/library/generated/i-clock) | Clock observations and scheduler-friendly sleeps |
+| [i/control](/docs/library/generated/i-control) | One operation to pause a computation and go on with it later (§9.4) |
+| [i/core](/docs/library/generated/i-core) | The operations that are not written in i (§13) |
+| [i/fail](/docs/library/generated/i-fail) | Errors (§9.3) |
+| [i/failure](/docs/library/generated/i-failure) | Errors as a service (§9.3) |
+| [i/fetch](/docs/library/generated/i-fetch) | Fetch transport. Response handles belong to the current resource context |
+| [i/float_text](/docs/library/generated/i-float-text) | The text form of a Float (§11.8) |
+| [i/fs](/docs/library/generated/i-fs) | File system operations |
+| [i/io](/docs/library/generated/i-io) | The standard `Io` service (§9.7) |
+| [i/key](/docs/library/generated/i-key) | Typed keys for heterogeneous immutable values (§9.8) |
+| [i/net](/docs/library/generated/i-net) | TCP streams, UDP datagrams and name resolution |
+| [i/process](/docs/library/generated/i-process) | Process capabilities and secure entropy |
+| [i/random](/docs/library/generated/i-random) | Pure, immutable SplitMix generators (§9.10) |
+| [i/request](/docs/library/generated/i-request) | Typed requests, cancellation groups and replaceable waits (§9.11) |
+| [i/resource](/docs/library/generated/i-resource) | Final functions (§9.5) |
+| [i/stdio](/docs/library/generated/i-stdio) | Byte-oriented standard streams |
+| [i/syntax](/docs/library/generated/i-syntax) | Source syntax values for compile-time programs and tests |
+| [i/task](/docs/library/generated/i-task) | Structured tasks, rendezvous channels and events (§9.9) |
+| [i/tls](/docs/library/generated/i-tls) | TLS on connected byte streams |
+
+## See also
+
+[Library modules and packages](/docs/standard/generated/chapter-2#section-2-1) · [The language standard](/docs/standard)
