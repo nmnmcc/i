@@ -77,8 +77,9 @@ pub(crate) fn function_result(r: &ResultPart) -> String {
             let parts = services
                 .iter()
                 .map(|s| {
-                    let head = format!("{}{}: ", if s.rest { ".." } else { "" }, s.name.name);
-                    cat(vec![t(head), p.ty(&s.ty, 0)])
+                    let head = format!("{}{}", if s.rest { ".." } else { "" }, s.name.name);
+                    let right = p.annot(&s.ty);
+                    assigned(t(head), ":", right, false)
                 })
                 .collect();
             out.push(p.delimited("(", ")", Printer::plain(parts)));

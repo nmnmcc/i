@@ -515,6 +515,7 @@ fn resolve3_differential() {
 const EXTRA: &[&str] = &[
     // Written branch result unions and Fail service patterns retain the
     // transition's return and error channels, including missing results.
+    // old-syntax-check: E0101
     "f = (x: Int) -> Int { x } | (x: Float) -> Float { x }\ng = (x: Int) -> Int { x } | (x: Float) -> Float { x } | (x: String) { x }\nh = () <- (failure: Fail(Int)) { 1 }\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } | (x: Float) <- (failure: Fail(Int)) -> Float { x }\n",
     // A finite callback need captured by a local annotation, then handled.
     "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d: Dependency) { Nil }\nuse = <N>() <- (s: S(N)) { S(f) = s  f() }\napply = <N>() { local: () <- N -> Nil = () { use() }  local() }\nmain = () { apply() <- (S(() { read() })) }\ntyped = () { provided: S(Dependency) = S(() { read() })  apply() <- (provided) }\n",
@@ -527,18 +528,25 @@ const EXTRA: &[&str] = &[
     // Sums, data types, aliases, exports of members.
     "(Shape(..), Circle, Pair(..), area, swap)\n\nCircle = (radius = Float)\nSquare = (side = Float)\nShape = Circle | Square\nPair(A, B) = (first = A, second = B)\nToken = Opaque\nId(A) = A\nBoth = (Int, Int)\nRec = (a = Int, b = Int)\n\narea = (s: Shape) -> Float {\n	s |> (Circle(radius = r)) { r } | (Square(side = _)) { 0.0 }\n}\nswap = <A, B>(p: Pair(A, B)) -> Pair(B, A) { Pair(first = p.second, second = p.first) }\n",
     // Keys in constructor patterns.
+    // old-syntax-check: E0101
     "P = (x = Int, y = Int)\nf = (P(x = x, y = other)) { x + other }\ng = (P(x = _, y = y: Int)) { y }\nh = (P(x = a = b, ..)) { a + b }\nk = (P(x = whole: Int, y = _)) { whole }\nm = (p: P) { P(..p, x = 1) }\nn = (P(x = 0, y = y)) { y }\n",
     // Chains: clauses, guards, several positions, alternatives.
+    // old-syntax-check: E0110,E0101
     "f = (0) { 1 } | (n) { n }\ng = (x, y ? x > y) { x } | (x, y) { y }\nh = (1 | 2, a) { a } | (_, a) { a + 1 }\nk = (a = b, c) { (a, b, c) }\nm = (x) { x |> (0) { 1 } | (n ? n > 2) { 2 } | (_) { 3 } }\np = (x) { x |> (y) { y + 1 } }\nq = (x: Int) -> Int { x } | (x) { x }\nr = (x) { 1 } | (x, y) { 2 }\ns = (? True) { 1 }\nt = (x) { x |> (a, b) { a } | (c) { c } }\n",
     // Data, calls, strings, index.
+    // old-syntax-check: E0110,E0101,E0101
     "f = (x) { \"a\\(x)b\\(x)\" }\ng = (x) { \"\\(x)\" }\nh = () { a = (1, 2)  a.0 }\nk = () { (a = 1, b = 2) }\nm = (r) { (..r, a = 1) }\nn = () { (a = 2, 1) }\np = (f) { f(1, ..f) }\nq = () { () }\nr = (x) { x |> Some }\ns = (x) { core.never(x) }\nt = core.never\n",
     // Services and provides.
+    // old-syntax-check: E0101,E0101,E0101,E0101,E0101
     "A = (n = Int)\nB = (m = Int)\nuse = () <- (a: A, b: B) -> Int { a.n + b.m }\none = () { use() <- (A(n = 1), B(m = 2)) }\ntwo = (a: A, b: B) { use() <- (a, b) }\nthree = () { { x = 1  use() + x } <- (A(n = 1)) }\nfour = () { x = use() <- (a = A(n = 1))  x }\nfive = (e) { use() <- e }\nsix = (e) { use() <- (..e) }\nseven = () <- (..env: N) { 1 }\neight = () { { use() <- (A(n = 1)) } <- (B(m = 2), B(m = 3)) }\nnine = () { y = { use() } <- ()  y }\n",
     // Row variables and function types.
+    // old-syntax-check: E0101,E0110,E0101,E0107,E0101
     "run = <A, N>(body: () <- N -> A) -> A { body() }\ncatch = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> A { body() }\nboth: <A, N>(() <- (..N) -> A) -> A = (body) { body() }\nlocal = () { inner = <N>(f: () <- N -> Int) { f() }  inner }\nbad = () { <A>(a: A) { a } }\nt: ((a = Int, Int)) -> Int = (x) { 1 }\nu: { Int | Float } -> Int = (x) { 1 }\nv: (x = Int, ..Int) -> Int = (x) { 1 }\nw: () <- (Fail(Int), Fail(Float), a = Int) -> Int = () { 1 }\n",
     // Patterns that this stage cannot type.
+    // old-syntax-check: E0101,E0101,E0110,E0101,E0101,E0101
     "f = ((a, ..)) { a }\ng = ((a = b, c)) { c }\nP = (x = Int, y = Int)\nh = (P(..rest)) { rest }\nk = (P(x = (a, b))) { a }\nm = ((a, b) = (c, d)) { a }\nn = (key = x) { x }\np = ([a, ..rest] = whole) { whole }\nq = (\"ab\" <> rest) { rest }\n",
     // Attributes, declarations, heads.
+    // old-syntax-check: E0101,E0101
     "@external(\"m\", \"f\")\nf: (Int) -> Int\n@external(\"m\")\ng: (Int) -> Int\n@deprecated(note = \"x\")\nh = 1\n@host(\"ns\")\nSvc = (run = (Int) -> Int)\n@host(\"ns2\")\nBad = (Int)\n@other\nk = 2\nBox(a) = (a)\nWrap(List(A)) = (A)\nAlias(List(A)) = A\nx = 1\nElem(List(A)) = x\nm: <A>(A) -> A\nimport()\n",
 ];
 

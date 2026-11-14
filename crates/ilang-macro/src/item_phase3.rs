@@ -335,7 +335,14 @@ mod tests {
             shapes,
             [Some(true), Some(false), Some(false), None, Some(false)]
         );
-        assert!(builtin(&module("@main\nf = 1").items[0].attributes[0]));
+        assert!(builtin(
+            &module(
+                // old-syntax-check: E0301
+                "@main\nf = 1"
+            )
+            .items[0]
+                .attributes[0]
+        ));
         assert!(!builtin(&m.items[0].attributes[0]));
     }
 

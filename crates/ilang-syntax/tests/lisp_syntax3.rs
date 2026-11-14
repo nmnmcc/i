@@ -231,15 +231,15 @@ fn show_as_accepts_expressions_already_written_in_normal_surface() {
         "x + y",
         "-{ x + y }",
         "(x) { x }",
-        "(x: Int, y = (a, b)) -> Int { x }",
+        "(x : Int, y = (a, b)) -> Int { x }",
         "(0) { 1 } | (_) { 2 }",
         "x |> (0) { 1 } | (_) { 2 }",
         "x |> f |> g(1)",
         "{\n\ty = x\n\ty\n}",
         "<<1, 2:size(8)>>",
         "app() <- (db, ..env)",
-        "(x) <- (log: Log) { log.info(x) }",
-        "<A>(x: A) -> A { x }",
+        "(x) <- (log : Log) { log.info(x) }",
+        "<A>(x : A) -> A { x }",
         "(p, q ? p > q) { p }",
         "pair.0",
         "Some(x)",
@@ -324,7 +324,7 @@ fn show_as_writes_every_row_in_its_position() {
         (Item, "(= (U A) (List A))", "U(A) = List(A)"),
         (Item, "(= U { (, T1 T2) })", "U = { (T1, T2) }"),
         (Item, "(= T (| C1 C2))", "T = C1 | C2"),
-        (Item, "(: f (-> (, Int) Int))", "f: (Int) -> Int"),
+        (Item, "(: f (-> (, Int) Int))", "f : (Int) -> Int"),
         (Item, "(= x 1)", "x = 1"),
         (
             Item,
@@ -336,7 +336,7 @@ fn show_as_writes_every_row_in_its_position() {
         (
             Item,
             "(= connect (-> (, (: host String) (= port (: p Int))) Conn (open host p)))",
-            "connect = (host: String, port = p: Int) -> Conn { open(host, p) }",
+            "connect = (host : String, port = p : Int) -> Conn { open(host, p) }",
         ),
         (
             Item,
@@ -398,14 +398,14 @@ fn show_as_writes_every_row_in_its_position() {
         (
             FunctionResult,
             "(<- User (, (: db Db)))",
-            "<- (db: Db) -> User",
+            "<- (db : Db) -> User",
         ),
-        (FunctionResult, "(<- _ (, (: log Log)))", "<- (log: Log)"),
-        (FunctionResult, "(<- _ (, .. (: env N)))", "<- (..env: N)"),
+        (FunctionResult, "(<- _ (, (: log Log)))", "<- (log : Log)"),
+        (FunctionResult, "(<- _ (, .. (: env N)))", "<- (..env : N)"),
         (
             FunctionResult,
             "(<- _ (, (: db Db) .. (: env N)))",
-            "<- (db: Db, ..env: N)",
+            "<- (db : Db, ..env : N)",
         ),
         (FunctionResult, "(<- _ N)", "<- N -> _"),
         // Expressions and statements.
@@ -421,22 +421,22 @@ fn show_as_writes_every_row_in_its_position() {
         (
             Expression,
             "(-> (, (: id String)) (<- User (, (: db Db))) e)",
-            "(id: String) <- (db: Db) -> User { e }",
+            "(id : String) <- (db : Db) -> User { e }",
         ),
         (
             Expression,
             "(-> (, x) (<- _ (, (: log Log))) e)",
-            "(x) <- (log: Log) { e }",
+            "(x) <- (log : Log) { e }",
         ),
         (
             Expression,
             "(-> (, f) (<- _ (, .. (: env N))) e)",
-            "(f) <- (..env: N) { e }",
+            "(f) <- (..env : N) { e }",
         ),
         (
             Expression,
             "(-> [A N] (, (: x A)) A e)",
-            "<A, N>(x: A) -> A { e }",
+            "<A, N>(x : A) -> A { e }",
         ),
         (Expression, "(<- e (, s1 .. env))", "e <- (s1, ..env)"),
         (Expression, "(<- (app) (live))", "app() <- live()"),
@@ -493,7 +493,7 @@ fn show_as_writes_every_row_in_its_position() {
             "(size = whole = (w, h))",
         ),
         (Pattern, "(, (= (, a b) args))", "((a, b) = args)"),
-        (Pattern, "(: x Int)", "x: Int"),
+        (Pattern, "(: x Int)", "x : Int"),
         (Pattern, "_", "_"),
         (Pattern, "(- 1)", "-1"),
         (Pattern, "\"text\"", "\"text\""),
@@ -516,7 +516,7 @@ fn show_as_writes_every_row_in_its_position() {
         (PatternItem, "..", ".."),
         (PatternItem, "(| p1 p2)", "p1 | p2"),
         (PatternItem, "(= key (| p1 p2))", "key = p1 | p2"),
-        (PatternItem, "(: x T)", "x: T"),
+        (PatternItem, "(: x T)", "x : T"),
         (PatternItem, "(C p)", "C(p)"),
         // Bit arrays.
         (Segment, "x", "x"),
@@ -597,7 +597,7 @@ fn quotes_and_expansion_checks_work_on_the_rows_of_syntax_three() {
     };
     assert_eq!(
         result.show_as_rows3(Position::FunctionResult).unwrap(),
-        "<- (log: Log)"
+        "<- (log : Log)"
     );
     // A pattern of the rows before syntax three takes the `,` as a parameter.
     let old = root("`(-> (~..params) ~result ~body)");

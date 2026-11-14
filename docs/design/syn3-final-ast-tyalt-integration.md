@@ -79,3 +79,26 @@ not a compiler/test invocation; the Lisp layout implementation is unchanged
 by tyalt. Only line wrapping of the added Node calls changes, before the
 fresh Rust/runtime gate. Check-snippets runs directly and owns its one
 internally wrapped parser-driver build; no outer heavy wrapper is used.
+
+10:57: check-snippets PASS, invoked directly (first ordinary build then
+`--reuse-parser` after inventory repair):5033 extracted literals/blocks,
+34 repository Lisp files,94 CLI macro fragments, five unchanged future-track
+entries. Initial failure was21 unregistered fragments: seven non-program
+Rust templates/substring/builder fragments, five valid expression/attribute/
+pattern grammar fragments now supplied their full module context, and nine
+intentional negative fixtures with every exact diagnostic pinned and an
+adjacent code marker. The differential deliberately compares partial trees
+of invalid EXTRA programs. No program string or assertion was removed.
+
+The native-only print/position.rs FunctionResult path now uses the same
+assigned/Annot helpers as the incoming full printer, including service
+annotation spacing and union grouping. Sixteen renderer test strings receive
+only spec §1.7's canonical colon spacing; bit-array format colons are unchanged.
+This closes an additional new-reader path absent from tyalt's old-tree base.
+Strict workspace clippy passes at11:02 on the current source; the fresh
+Rust/runtime matrix follows.
+
+Strict clippy command (exit0,26.03s after queue):
+`$H direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings`.
+The only warning belongs to the excluded private historical printer helper.
+Final diagnostic golden audit against tyalt: zero .out/.expect.json differences.

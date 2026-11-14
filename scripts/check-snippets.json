@@ -3029,5 +3029,118 @@
   },
   "crates/ilang-check/src/resolve/legacy.rs:d46aee08cc49f6d1": {
     "not_source": "A name compared on the diagnostic path, not an i source"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:7372e79824e15040": {
+    "not_source": "Rust TOML manifest format template, not i source"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:7bf4286e23e784b2": {
+    "not_source": "Rust resolver-differential diagnostic format string, not i source"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:17f920b5612f0655": {
+    "diagnostics": [
+      "E0101: a need has one `Fail` entry: write `Fail(A | B)`"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:c7d1290a9ba8bc14": {
+    "diagnostics": [
+      "E0101: a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:bc8ef69fad3d090f": {
+    "diagnostics": [
+      "E0110: an item by position may not come after an item by label",
+      "E0101: a chain of branches with no parameter has nothing to choose by"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:eb5cba8498c94b57": {
+    "diagnostics": [
+      "E0110: an item by position may not come after an item by label",
+      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
+      "E0101: `..` is the first item of a constructor call"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:ff4a2bc9c99582dc": {
+    "diagnostics": [
+      "E0101: provided services have no labels: each is keyed by its own type",
+      "E0101: a provided service has no label: it is keyed by its type (§2.10.2)",
+      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
+      "E0101: providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet",
+      "E0101: `..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:c67eeff3531f0976": {
+    "diagnostics": [
+      "E0101: type parameters on a function literal that is not the value of a binding need stage 7 of syntax three, which this compiler does not have yet",
+      "E0110: an item by position may not come after an item by label",
+      "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)",
+      "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`",
+      "E0101: a need has no label: a service is keyed by its own type"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:5c74a67df3474805": {
+    "diagnostics": [
+      "E0101: a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0101: a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0110: an item by position may not come after an item by label",
+      "E0101: a named rest `..name` in a pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0101: a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name",
+      "E0101: two patterns joined by `=` that are not names need stage 9 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:3520187651d4a622": {
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:30b0fe37fff13e45": {
+    "not_source": "Rust deep-expression format template; the test inserts 20000 bracket pairs before parsing"
+  },
+  "crates/ilang-macro/src/item_phase3.rs:0acb225eff8aa24b": {
+    "diagnostics": [
+      "E0301: removed @main attribute"
+    ],
+    "reason": "Intentionally removed @main attribute used to test built-in-attribute recognition"
+  },
+  "crates/ilang-syntax/src/lisp/to_source.rs:f9622f252bce8e60": {
+    "not_source": "Expected renderer substring ending before the value, not a complete program"
+  },
+  "crates/ilang-syntax/src/lisp/to_source.rs:348b6f495bab6cbe": {
+    "not_source": "Expected renderer substring ending before the value, not a complete program"
+  },
+  "crates/ilang-syntax/tests/lisp_datum.rs:6f00b960a1df6537": {
+    "not_source": "String-builder prefix; the test appends 2000 statements and the closing function brace"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:5c096acf951e25de": {
+    "prefix": "value = ",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:8102c2aebf844591": {
+    "suffix": "\nvalue = 0\n",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:a07c973a0f5ac738": {
+    "suffix": "\nvalue = 0\n",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:a65ba66a7b98e7b0": {
+    "prefix": "value = ",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:7008341f68f64862": {
+    "prefix": "f = (",
+    "suffix": ") { 0 }\n",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:47fd209da841119d": {
+    "not_source": "Rust export-header format template; the test substitutes each concrete export before parsing"
   }
 }
