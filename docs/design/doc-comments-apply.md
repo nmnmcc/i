@@ -15,7 +15,8 @@ The baseline audit found 1,204 Rust comment lines with 1,343 section marks
 and five `spec.md` paths; all are gone. In `std/` and `lib/`, 68 comment lines
 contained 74 section marks; all are gone. The stale-comment detector found
 540 prose lines before and zero after. The two unchanged format-name mentions
-inside the migrator's protected usage example are counted separately. The three checker fixtures also lose six section marks on five comment lines. No
+inside the migrator's protected usage example are counted separately. The three
+checker fixtures also lose six section marks on five comment lines. No
 TODO/FIXME/XXX comments existed or were retained. Five dormant Python recipes
 contained 231 commented code lines; the recipes and their run instructions are
 removed, with their invariant descriptions retained.
@@ -64,8 +65,8 @@ scripts/doc-comments check --proof "$base" --i-bin target/release/i
 ```
 
 The proof lexes every existing tracked Rust file, plus `.i` and `.is` files under
-`std/` and `lib/`, plus the three checker fixtures listed in `EXTRA_I`. Tokens include exact string and character literals; Rust
-whitespace is ignored, while i line breaks are retained. A separate comparison
+`std/` and `lib/`, plus the three checker fixtures listed in `EXTRA_I`. Tokens
+include exact string and character literals; Rust whitespace is ignored, while i line breaks are retained. A separate comparison
 keeps all seven fenced or indented Rustdoc example blocks byte-identical, including
 their fence attributes. The migrator's fenced command-usage example retains two
 mentions of its input format; it is protected example text rather than stale
@@ -102,7 +103,8 @@ CMX2_I="$PWD/target/release/i"
 CMX2_PARSER="$PWD/target/debug/examples/parse-snippets"
 (cd docs && direnv exec /home/agent/Programming/i npm run generate)
 (cd docs && I_SNIPPET_PARSER="$CMX2_PARSER" direnv exec /home/agent/Programming/i python3 scripts/check-examples.py)
-(cd docs && "$H" direnv exec /home/agent/Programming/i env I_BIN="$CMX2_I" python3 scripts/run-examples.py --no-placeholders --jobs 1)
+"$H" direnv exec /home/agent/Programming/i env I_BIN="$CMX2_I" \
+  bash -c 'cd docs && exec python3 scripts/run-examples.py --no-placeholders --jobs 1'
 (cd docs && direnv exec /home/agent/Programming/i npm run build)
 ```
 

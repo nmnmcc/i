@@ -505,7 +505,6 @@ impl Parser<'_> {
             return Err(Diagnostic::new(Code::HeaderGroup, span, msg));
         }
         let kind = if matches!(self.kind(), T::UpName(_)) {
-
             ItemKind::TypeDef(self.type_def()?)
         } else if self.at_macro_item() {
             let module = if *self.nth(1) == T::Dot {
@@ -831,7 +830,6 @@ impl Parser<'_> {
         let mut e = self.primary()?;
         loop {
             let kind = if self.at_joined(&T::LParen) {
-
                 ExprKind::Call {
                     callee: Box::new(e),
                     args: self.data()?,
@@ -1043,7 +1041,6 @@ impl Parser<'_> {
                 break;
             }
             if self.eat(&T::Question) {
-
                 guard = Some(self.expr()?);
                 if !self.at(&T::RParen) {
                     return self

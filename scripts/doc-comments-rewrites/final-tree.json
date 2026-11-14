@@ -7949,7 +7949,7 @@
     "line": 506,
     "hash": "b73f7152e0bb031d314d2faece93363f810670061f7e3145ff29176468a80b09",
     "old": "        }\n        let kind = if matches!(self.kind(), T::UpName(_)) {\n            // P12.\n            ItemKind::TypeDef(self.type_def()?)\n        } else if self.at_macro_item() {\n",
-    "new": "        }\n        let kind = if matches!(self.kind(), T::UpName(_)) {\n\n            ItemKind::TypeDef(self.type_def()?)\n        } else if self.at_macro_item() {\n"
+    "new": "        }\n        let kind = if matches!(self.kind(), T::UpName(_)) {\n            ItemKind::TypeDef(self.type_def()?)\n        } else if self.at_macro_item() {\n"
   },
   {
     "file": "crates/ilang-syntax/src/parse.rs",
@@ -7977,7 +7977,7 @@
     "line": 832,
     "hash": "fc7bc1e77418c4ffeacf9efa490cb88efef9bfce2948d4b9da622202815a2595",
     "old": "        loop {\n            let kind = if self.at_joined(&T::LParen) {\n                // P2.\n                ExprKind::Call {\n                    callee: Box::new(e),\n",
-    "new": "        loop {\n            let kind = if self.at_joined(&T::LParen) {\n\n                ExprKind::Call {\n                    callee: Box::new(e),\n"
+    "new": "        loop {\n            let kind = if self.at_joined(&T::LParen) {\n                ExprKind::Call {\n                    callee: Box::new(e),\n"
   },
   {
     "file": "crates/ilang-syntax/src/parse.rs",
@@ -8005,7 +8005,7 @@
     "line": 1044,
     "hash": "17a47eeb591fd0ef211ce27244d0d8bf6457fc484852762ae25421078dfd774d",
     "old": "            }\n            if self.eat(&T::Question) {\n                // P9.\n                guard = Some(self.expr()?);\n                if !self.at(&T::RParen) {\n",
-    "new": "            }\n            if self.eat(&T::Question) {\n\n                guard = Some(self.expr()?);\n                if !self.at(&T::RParen) {\n"
+    "new": "            }\n            if self.eat(&T::Question) {\n                guard = Some(self.expr()?);\n                if !self.at(&T::RParen) {\n"
   },
   {
     "file": "crates/ilang-syntax/src/parse.rs",
