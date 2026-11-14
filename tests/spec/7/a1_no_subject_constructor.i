@@ -6,7 +6,7 @@
 Circle = (r = Int)
 Square = (side = Int)
 Shape = Circle | Square
-bad = (s: Shape) { s |> (Circle(..)) { s.r } }
+bad = (s : Shape) { s |> (Circle(..)) { s.r } }
 
 main = () {
 	assert(True)

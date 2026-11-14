@@ -3,8 +3,8 @@
 (
 	main
 )
-f = <K>(r: (k = Int), key: K) -> Int {
-	nested = (another: K) { another }
+f = <K>(r : (k = Int), key : K) -> Int {
+	nested = (another : K) { another }
 	1
 }
 

@@ -5,4 +5,4 @@
 	i/task
 )
 
-widen = (x: task.Task(Int, Nil)) -> task.Task(Int | String, Nil) { x }
+widen = (x : task.Task(Int, Nil)) -> task.Task(Int | String, Nil) { x }

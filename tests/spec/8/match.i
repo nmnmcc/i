@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -13,7 +13,7 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-ints = (b: BitArray) {
+ints = (b : BitArray) {
 	b |>
 		(<<>>) { "empty" }
 		| (<<0xFF:i8>>) { "never: i8 cannot be 255" }
@@ -36,7 +36,7 @@ test("integers", () {
 	check(ints(<<1, 2, 3, 4>>), "other")
 })
 
-lengths = (b: BitArray) {
+lengths = (b : BitArray) {
 	b |>
 		(<<n, data:bytes(n), rest:bits>>) { show((n, data, rest)) }
 		| (_) { "no" }
@@ -66,7 +66,7 @@ test("bytes_need_whole", () {
 	check(r, "bits <<2:u4>>")
 })
 
-floats = (b: BitArray) {
+floats = (b : BitArray) {
 	b |>
 		(<<1.5:f64be>>) { "one and a half" }
 		| (<<x:f32le>>) { "f32le " <> show(x) }
@@ -84,7 +84,7 @@ test("float_segments", () {
 	check(floats(<<126, 0>>), "other")
 })
 
-texts = (b: BitArray) {
+texts = (b : BitArray) {
 	b |>
 		(<<"hi":utf8, rest:bits>>) { "hi then " <> show(rest) }
 		| (<<"é":utf16be>>) { "é in utf16be" }

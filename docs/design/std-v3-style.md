@@ -108,7 +108,7 @@ proved by a separate Gleam style specification.
 | `try_` signals traversal or recovery through Result. | `try_map`, `try_fold`, `try_each` in `gleam-stdlib/src/gleam/list.gleam`; `try_recover` in `gleam-stdlib/src/gleam/result.gleam`; `try_map` in `gleam-http/src/gleam/http/response.gleam`. | Do not make every i effectful callback need a second traversal API. |
 | `_map` describes a specific transformation. It does not have one universal failure meaning. | `filter_map`, `flat_map`, `index_map`, `find_map` in `gleam-stdlib/src/gleam/list.gleam`. `filter_map` discards Error results; `flat_map` concatenates lists. | Define the container and discarded cases precisely. i already uses Option for `filter_map`. |
 | `from_` names an input representation; `to_` names an output representation. | `from_list`/`to_list` in `gleam-stdlib/src/gleam/dict.gleam`; `from_string`/`to_string` in `gleam-stdlib/src/gleam/bit_array.gleam`. | Keep directional names and document validation. A `to_` name does not imply totality. |
-| Labels make calls read naturally. | `keeping`, `with`, `from`, `up_to` in `gleam-stdlib/src/gleam/list.gleam`. | Translate meaning, not syntax. In i, `with: T` binds a positional parameter; `with = value` supplies a data label. See `docs/spec.md` §§6.4, 6.11. |
+| Labels make calls read naturally. | `keeping`, `with`, `from`, `up_to` in `gleam-stdlib/src/gleam/list.gleam`. | Translate meaning, not syntax. In i, `with : T` binds a positional parameter; `with = value` supplies a data label. See `docs/spec.md` §§6.4, 6.11. |
 
 There are exceptions to subject-first order. `dict.group(key, list)` in
 `gleam-stdlib/src/gleam/dict.gleam` puts the classifier first. The corresponding
@@ -304,12 +304,15 @@ are inferred, as specified in `docs/spec.md` §6.8.
 | Use shape groups for a default and an explicit configuration of one operation. | Avoid `_with` families when shape alone expresses the difference. | The `split` definition below. |
 
 ```i
-(std/string)
+(
+	std/string
+)
 
-split = (text: String) -> List(String) { split(text, " ") }
-  | (text: String, separator: String) -> List(String) {
-    string.split(text, separator)
-  }
+split =
+	(text : String) -> List(String) { split(text, " ") }
+	| (text : String, separator : String) -> List(String) {
+		string.split(text, separator)
+	}
 
 words = "one two" |> split
 parts = "one,two" |> split(",")
@@ -364,15 +367,19 @@ chosen boundary. This is a deliberate pre-stability API change, not a claim
 that E3 alone changes those functions.
 
 ```i
-(i/fail, std/int, std/list)
+(
+	i/fail
+	std/int
+	std/list
+)
 
 InvalidPort = (text = String)
 PortError = InvalidPort
 
-parse_port: (String) <- (Fail(PortError)) -> Int = (text) {
-  int.parse(text) |>
-    (Ok(n) ? n >= 1 && n <= 65535) { n }
-    | (_) { fail.raise(InvalidPort(text = text)) }
+parse_port : (String) <- (Fail(PortError)) -> Int = (text) {
+	int.parse(text) |>
+		(Ok(n) ? n >= 1 && n <= 65535) { n }
+		| (_) { fail.raise(InvalidPort(text = text)) }
 }
 
 // One ordinary call chain. Parsing stops at the first raised error.
@@ -381,7 +388,7 @@ ports = () { list.map(["80", "443"], parse_port) }
 // Capture the whole traversal, or capture each element, intentionally.
 all_ports = () { fail.catch(ports) }
 each_port = () {
-  list.map(["80", "bad"], (text) { fail.catch(() { parse_port(text) }) })
+	list.map(["80", "bad"], (text) { fail.catch(() { parse_port(text) }) })
 }
 ```
 
@@ -429,19 +436,19 @@ because needs are keyed by constructor (`docs/spec.md` §9.2).
 
 ```i
 (
-  option = (Option, Some, None) = std/option
+	option = (Option, Some, None) = std/option
 )
 
 Unavailable = (detail = String)
 SettingsError = Unavailable
 Settings = (read = (String) <- (Fail(SettingsError)) -> Option(String))
 
-read = (key: String) <- (settings: Settings) { settings.read(key) }
+read = (key : String) <- (settings : Settings) { settings.read(key) }
 
 defaults = () -> Settings {
-  Settings(read = (key) {
-    key |> ("region") { Some("local") } | (_) { None }
-  })
+	Settings(
+		read = (key) { key |> ("region") { Some("local") } | (_) { None } },
+	)
 }
 
 example = () { read("region") <- (defaults()) }
@@ -503,8 +510,8 @@ Each public function should have:
 ///
 /// Stability: experimental. Since: next release.
 /// Example: first([7, 8]) == Some(7).
-first = <A>(items: List(A)) -> Option(A) {
-  items |> ([]) { None } | ([x, .._]) { Some(x) }
+first = <A>(items : List(A)) -> Option(A) {
+	items |> ([]) { None } | ([x, .._]) { Some(x) }
 }
 ```
 
@@ -532,10 +539,10 @@ and the module that defines `parse_port` and `InvalidPort`:
 
 ```i
 test("parse_port rejects invalid input", () {
-  assert(
-    fail.catch(() { parse_port("bad") }) ==
-      Error(InvalidPort(text = "bad"))
-  )
+	assert(
+		fail.catch(() { parse_port("bad") }) ==
+			Error(InvalidPort(text = "bad")),
+	)
 })
 ```
 

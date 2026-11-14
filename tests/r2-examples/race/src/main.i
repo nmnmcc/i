@@ -11,7 +11,7 @@ forever = () -> Never {
 	forever()
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	answer = task.race(
 		() {
 			task.yield()

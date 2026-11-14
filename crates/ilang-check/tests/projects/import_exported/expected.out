@@ -5,6 +5,6 @@ src/main.i:2:72: error[E0203]: `app/lib` has no `Missing`
 src/main.i:5:9: error[E0204]: `secret` is not exported from `app/lib`
 src/main.i:7:9: error[E0204]: `Hidden` is not exported from `app/lib`
 src/main.i:9:9: error[E0203]: `app/lib` has no `nothing`
-src/main.i:11:8: error[E0204]: the type `Private` is not exported from `app/lib`
-src/main.i:13:8: error[E0203]: `app/lib` has no type `Missing`
-src/main.i:17:13: error[E0201]: `Hidden` is not defined
+src/main.i:11:9: error[E0204]: the type `Private` is not exported from `app/lib`
+src/main.i:13:9: error[E0203]: `app/lib` has no type `Missing`
+src/main.i:17:14: error[E0201]: `Hidden` is not defined

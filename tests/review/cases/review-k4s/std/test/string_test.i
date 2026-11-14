@@ -1536,7 +1536,7 @@ test("inspect_432_test", () {
 
 test("inspect_436_test", () {
 	assert(
-		string.inspect((_: Int, _: String) -> Bool { False }) ==
+		string.inspect((_ : Int, _ : String) -> Bool { False }) ==
 			"//fn(a, b) { ... }",
 	)
 	Nil

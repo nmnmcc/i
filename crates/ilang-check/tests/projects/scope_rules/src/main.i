@@ -12,6 +12,6 @@ uses_param = (x, y) { x + y + z }
 
 clause = (v) { v |> ((p, q) ? p > q) { p } | ((p, _)) { q } }
 
-t: Unknown = 1
+t : Unknown = 1
 
-u: m.T = 1
+u : m.T = 1

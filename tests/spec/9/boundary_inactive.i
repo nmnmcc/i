@@ -4,7 +4,7 @@
 	i/assertion
 )
 
-get = () <- (a: Assert) { a }
+get = () <- (a : Assert) { a }
 
 // The `Assert` of `assertion.catch` is used after `catch` has ended.
 main = () {

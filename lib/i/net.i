@@ -59,7 +59,7 @@ Net = (
 	close_listener = (Int) -> Request(Nil),
 )
 
-listen = (address, port) <- (raw: Net) {
+listen = (address, port) <- (raw : Net) {
 	r = raw.listen(address, port)
 	number = resource.ensure(
 		() {
@@ -87,7 +87,7 @@ listen = (address, port) <- (raw: Net) {
 	Listener(number)
 }
 
-connect = (address, port) <- (raw: Net) {
+connect = (address, port) <- (raw : Net) {
 	r = raw.connect(address, port)
 	number = resource.ensure(
 		() {
@@ -115,7 +115,7 @@ connect = (address, port) <- (raw: Net) {
 	Stream(number)
 }
 
-accept = (Listener(number)) <- (raw: Net) {
+accept = (Listener(number)) <- (raw : Net) {
 	r = raw.accept(number)
 	number = resource.ensure(
 		() {
@@ -143,7 +143,7 @@ accept = (Listener(number)) <- (raw: Net) {
 	Stream(number)
 }
 
-local_port = (socket) <- (raw: Net) {
+local_port = (socket) <- (raw : Net) {
 	r = socket |>
 		(Listener(number)) { raw.local_port(number) }
 		| (Datagram(number)) { raw.datagram_port(number) }
@@ -156,7 +156,7 @@ local_port = (socket) <- (raw: Net) {
 		}
 }
 
-read = (Stream(number), max_bytes) <- (raw: Net) {
+read = (Stream(number), max_bytes) <- (raw : Net) {
 	request.await_owned(raw.read(number, max_bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -164,7 +164,7 @@ read = (Stream(number), max_bytes) <- (raw: Net) {
 		}
 }
 
-write = (Stream(number), bytes) <- (raw: Net) {
+write = (Stream(number), bytes) <- (raw : Net) {
 	request.await_owned(raw.write(number, bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -174,7 +174,7 @@ write = (Stream(number), bytes) <- (raw: Net) {
 		}
 }
 
-shutdown_write = (Stream(number)) <- (raw: Net) {
+shutdown_write = (Stream(number)) <- (raw : Net) {
 	request.await_owned(raw.shutdown_write(number)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -188,11 +188,11 @@ shutdown_write = (Stream(number)) <- (raw: Net) {
 		}
 }
 
-close_stream = (Stream(number)) <- (raw: Net) {
+close_stream = (Stream(number)) <- (raw : Net) {
 	request.await_owned(raw.close_stream(number))
 }
 
-close_listener = (Listener(number)) <- (raw: Net) {
+close_listener = (Listener(number)) <- (raw : Net) {
 	request.await_owned(raw.close_listener(number))
 }
 
@@ -202,13 +202,13 @@ slice = (text, start, length) {
 		| (Error(_)) { panic("net: invalid string slice") }
 }
 
-parts = (text: String, start: Int) -> List(String) {
+parts = (text : String, start : Int) -> List(String) {
 	core.index_of(text, "\u{0}", start) |>
 		(Ok(end)) { [slice(text, start, end - start), ..parts(text, end + 1)] }
 		| (Error(_)) { [] }
 }
 
-resolve = (name) <- (raw: Net) {
+resolve = (name) <- (raw : Net) {
 	request.await_owned(raw.resolve(name)) |>
 		(Ok(value)) { parts(value, 0) }
 		| (Error(code)) {
@@ -232,7 +232,7 @@ byte_stream = (stream) {
 }
 
 /// Bind a UDP socket; port zero asks the OS to allocate a port.
-bind = (address, port) <- (raw: Net) {
+bind = (address, port) <- (raw : Net) {
 	r = raw.bind(address, port)
 	number = resource.ensure(
 		() {
@@ -260,7 +260,7 @@ bind = (address, port) <- (raw: Net) {
 	Datagram(number)
 }
 
-send_to = (Datagram(number), address, port, bytes) <- (raw: Net) {
+send_to = (Datagram(number), address, port, bytes) <- (raw : Net) {
 	request.await_owned(raw.send_to(number, address, port, bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -275,7 +275,7 @@ send_to = (Datagram(number), address, port, bytes) <- (raw: Net) {
 }
 
 /// Receive one datagram, discarding bytes beyond max_bytes.
-receive_from = (Datagram(number), max_bytes) <- (raw: Net) {
+receive_from = (Datagram(number), max_bytes) <- (raw : Net) {
 	request.await_owned(raw.receive_from(number, max_bytes)) |>
 		(Ok(value)) { decode_datagram(value) }
 		| (Error(code)) {
@@ -302,7 +302,7 @@ decode_datagram =
 	}
 	| (_) { panic("net: invalid datagram reply") }
 
-local_address = (Datagram(number)) <- (raw: Net) {
+local_address = (Datagram(number)) <- (raw : Net) {
 	request.await_owned(raw.local_address(number)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -316,6 +316,6 @@ local_address = (Datagram(number)) <- (raw: Net) {
 		}
 }
 
-close_datagram = (Datagram(number)) <- (raw: Net) {
+close_datagram = (Datagram(number)) <- (raw : Net) {
 	request.await_owned(raw.close_datagram(number))
 }

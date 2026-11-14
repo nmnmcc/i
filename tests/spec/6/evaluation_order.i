@@ -4,7 +4,7 @@
 
 // The arguments of a call are worked out from left to right as they are
 // written.
-pair = (a: Int, b: Int) { a + b }
+pair = (a : Int, b : Int) { a + b }
 
 main = () {
 	x = 1

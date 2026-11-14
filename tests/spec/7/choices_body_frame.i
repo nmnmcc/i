@@ -1,6 +1,6 @@
 // spec: 4.8, 6.12, 7.3
 // expect: stop "panic: outer choices"
-f = (s: String) {
+f = (s : String) {
 	s |> ("a" | "c") {
 		{
 			"x" = s

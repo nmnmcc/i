@@ -5,7 +5,7 @@
 Leaf = ()
 Node = (Tree, Tree)
 Tree = Leaf | Node
-make = (n: Int) -> Tree {
+make = (n : Int) -> Tree {
 	n |>
 		(0) { Leaf }
 		| (_) {
@@ -14,7 +14,7 @@ make = (n: Int) -> Tree {
 		}
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	x = make(28)
 	task.scope((s) {
 		t = task.go(s, () { x |> (Leaf) { 0 } | (Node(_, _)) { 1 } })

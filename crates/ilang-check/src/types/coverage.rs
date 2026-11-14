@@ -1249,7 +1249,7 @@ impl Checker<'_> {
                 .join(" | "),
             Pat::Except(h, set) => {
                 let t = Ty::lit(scalar_head(*h).unwrap(), set.clone());
-                format!("_: {}", super::display::show_known(&self.s, &t))
+                format!("_ : {}", super::display::show_known(&self.s, &t))
             }
             // A type with one constructor is shown as that constructor:
             // `False`, `Some(..)` (syntax three: sums are unions of them).
@@ -1264,7 +1264,7 @@ impl Checker<'_> {
                     format!("{}(..)", cs[0].name)
                 }
             }
-            Pat::Head(h, n) => format!("_: {}", self.show_head(*h, *n)),
+            Pat::Head(h, n) => format!("_ : {}", self.show_head(*h, *n)),
             Pat::Ctor(Ctor::Shape(shape), args) => {
                 let parts: Vec<String> = args.iter().map(|a| self.show_pat(a)).collect();
                 shape.text(&parts)

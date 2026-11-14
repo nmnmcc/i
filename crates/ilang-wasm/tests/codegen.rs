@@ -199,7 +199,7 @@ fn metadata() {
 /// lists every external function, also one that is not used (B.6).
 #[test]
 fn externals_are_imports() {
-    let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt: (Float) -> Float\n";
+    let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt : (Float) -> Float\n";
     for main in ["main = () { f()  Nil }", "main = () { Nil }"] {
         let bytes = wasm(&format!("{external}f = () {{ sqrt(2.0) }}\n\n{main}\n")).unwrap();
         let mut imports = Vec::new();
@@ -260,12 +260,9 @@ fn calls_that_may_suspend_are_split() {
 
 #[test]
 fn environments() {
-    let text = wat("Clock = (now = () -> Int)\n\
-         f = () <- (c: Clock) { c.now() }\n\
-         g = () { f() <- (Clock(now = () { 1 })) }\n\
-         \n\
-         main = () { g() }\n\
-         ");
+    let text = wat(
+        "Clock = (now = () -> Int)\nf = () <- (c : Clock) { c.now() }\ng = () { f() <- (Clock(now = () { 1 })) }\n\nmain = () { g() }\n",
+    );
     // A service's slot is chosen from all services in the compiled program;
     // its read and the corresponding environment statement must agree.
     let f = function(&text, "app/main.f");
@@ -297,9 +294,9 @@ fn environments() {
 fn bindings_that_may_fail_report_to_assert() {
     // `r` has the wider type `Result`: with an unknown value, `Ok(v) = r`
     // would narrow `r` to `Ok(_)` (syntax three D4) and not report.
-    let text = wat("f = (r: Result(Int, Int)) {\n  Ok(v) = r\n  v\n}\n\
-         g = ((a, b)) { a + b }\n\
-         \nmain = () { (f(Ok(1)), g((1, 2))) }\n");
+    let text = wat(
+        "f = (r : Result(Int, Int)) {\n  Ok(v) = r\n  v\n}\ng = ((a, b)) { a + b }\n\nmain = () { (f(Ok(1)), g((1, 2))) }\n",
+    );
     let f = function(&text, "app/main.f");
     assert!(
         f.contains("(array.get $env (local.get $env) (i32.const 0))"),
@@ -315,7 +312,7 @@ fn bindings_that_may_fail_report_to_assert() {
 /// `case` (§9.4).
 fn many_points(n: usize) -> String {
     let mut s = String::from(
-        " (i/control)\ns = (b: Boundary(Int, Never, Never), v: Int) -> Int {\n  control.suspend(b, (k) { control.resume(k, v) })\n}\nf = (b: Boundary(Int, Never, Never), x: Int) -> Int {\n  a0 = x\n",
+        " (i/control)\ns = (b : Boundary(Int, Never, Never), v : Int) -> Int {\n  control.suspend(b, (k) { control.resume(k, v) })\n}\nf = (b : Boundary(Int, Never, Never), x : Int) -> Int {\n  a0 = x\n",
     );
     for i in 1..=n {
         let p = i - 1;
@@ -378,17 +375,17 @@ A = Opaque
 B = Opaque
 Alias = A
 @external("opaque", "get")
-get_a: () -> A
+get_a : () -> A
 @external("opaque", "get")
-get_alias: () -> Alias
+get_alias : () -> Alias
 @external("opaque", "get")
-get_b: () -> B
+get_b : () -> B
 equal = (a, b) { a == b }
-same = (a: A, b: B) { equal(a, b) && equal(get_a(), get_b()) }
+same = (a : A, b : B) { equal(a, b) && equal(get_a(), get_b()) }
 repeated = () { equal(get_a(), get_alias()) }
 different = () { equal(get_a(), get_b()) }
-same_a = (a: A, b: Alias) { equal(a, b) }
-echo = (a: A) { a }
+same_a = (a : A, b : Alias) { equal(a, b) }
+echo = (a : A) { a }
 
 main = () { Nil }
 "#;

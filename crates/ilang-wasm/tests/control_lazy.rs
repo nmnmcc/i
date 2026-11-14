@@ -53,8 +53,8 @@ const PROGRAM: &str = r#"(
 Name = (text = String)
 Tag = (text = String)
 
-name = () <- (n: Name) { n.text }
-tag = () <- (t: Tag) { t.text }
+name = () <- (n : Name) { n.text }
+tag = () <- (t : Tag) { t.text }
 
 plain = (b) {
 	x = control.suspend(b, (k) { control.resume(k, "v") })
@@ -383,7 +383,7 @@ Handed = (Inner)
 Lost = ()
 HandedSum = Handed | Lost
 
-put = (k2) <- (o: Out) { o.put(k2) }
+put = (k2) <- (o : Out) { o.put(k2) }
 "#;
 
 /// `g` of test 12: its frame waits for the ensure, so its record is pending.
@@ -523,7 +523,7 @@ Paused = (Continuation(Nil, PausedSum, Never, Name))
 Done = ()
 PausedSum = Paused | Done
 
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 
 g = (b) {
 	control.suspend(b, (k) { Paused(k) })
@@ -563,7 +563,7 @@ Paused = (Continuation(Nil, PausedSum, Never, Name))
 Done = ()
 PausedSum = Paused | Done
 
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 
 g = (b) {
 	resource.ensure(
@@ -608,7 +608,7 @@ Paused = (Continuation(Nil, PausedSum, Never, Io))
 Done = ()
 PausedSum = Paused | Done
 
-say = (text) <- (io: Io) { io.print(text) }
+say = (text) <- (io : Io) { io.print(text) }
 
 // During the cancel, the final function suspends to `inner`, which is
 // paused inside `k`; the value of its `f` goes on into the code after it.
@@ -630,7 +630,7 @@ body = (outer) {
 	Done
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	k = { control.boundary((outer) { body(outer) }) } |>
 		(Paused(k)) { k }
 		| (Done) { panic("not paused") }
@@ -688,7 +688,7 @@ with = (hold, k) {
 	control.cancel(k)
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	k = paused()
 	r = fail.catch(() {
 		held = control.boundary((hold) {
@@ -1222,7 +1222,7 @@ Name = (text = String)
 Done = (String)
 More = (String, Continuation(Nil, Step, Never, Name))
 Step = Done | More
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 leaf = (b) {
 	control.suspend(b, (k) { More("start", k) })
 	first = name()

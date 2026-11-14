@@ -5,7 +5,7 @@ mod common;
 fn compiler_export_can_use_syntax_without_granting_an_ordinary_entry() {
     let (graph, _, _) = common::check_files(&[(
         "src/main.i",
-        "(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { syntax.node(x) x }\n",
+        "(syntax = i/syntax)\n(identity)\nidentity = (x : syntax.Syntax) { syntax.node(x) x }\n",
     )]);
     let (parsed, diags) = ilang_check::parse(&graph);
     assert!(diags.is_empty());
@@ -24,7 +24,7 @@ fn compiler_export_can_use_syntax_without_granting_an_ordinary_entry() {
 fn compiler_export_rejects_foreign_external_through_a_helper() {
     let (graph, _, _) = common::check_files(&[(
         "src/main.i",
-        "(syntax = i/syntax)\n@external(\"outside\", \"effect\")\neffect: () -> Nil\nhelper = () { effect() }\nidentity = (x: syntax.Syntax) { helper() x }\n",
+        "(syntax = i/syntax)\n@external(\"outside\", \"effect\")\neffect : () -> Nil\nhelper = () { effect() }\nidentity = (x : syntax.Syntax) { helper() x }\n",
     )]);
     let (parsed, diags) = ilang_check::parse(&graph);
     assert!(diags.is_empty());
@@ -43,7 +43,7 @@ fn compiler_export_rejects_foreign_external_through_a_helper() {
 fn compiler_export_cannot_request_a_host_service() {
     let (graph, _, _) = common::check_files(&[(
         "src/main.i",
-        "(\n\tsyntax = i/syntax\n)\n@host(\"outside\")\nOutside = (read = () -> Nil)\nidentity = (x: syntax.Syntax) <- (s: Outside) {\n\ts.read()\n\tx\n}\n",
+        "(\n\tsyntax = i/syntax\n)\n@host(\"outside\")\nOutside = (read = () -> Nil)\nidentity = (x : syntax.Syntax) <- (s : Outside) {\n\ts.read()\n\tx\n}\n",
     )]);
     let (parsed, diags) = ilang_check::parse(&graph);
     assert!(diags.is_empty());

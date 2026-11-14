@@ -20,7 +20,7 @@ field_rest = (v) { v |> (A(..)) { v.f } | (_) { 0 } }
 use_rest = () { (field_rest("s"), field_rest(B(h = 1))) }
 
 // A record update, with a union for the type of `v`.
-update = (v: T | S) { v |> (A(..)) { A(..v, f = 1) } | (_) { B(h = 0) } }
+update = (v : { T | S }) { v |> (A(..)) { A(..v, f = 1) } | (_) { B(h = 0) } }
 
 update_open = (v) { v |> (A(..)) { A(..v, g = "x") } | (_) { B(h = 0) } }
 

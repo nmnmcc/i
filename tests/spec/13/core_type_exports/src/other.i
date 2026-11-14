@@ -5,4 +5,4 @@
 (
 	identity
 )
-identity = (x: Int) -> Int { x }
+identity = (x : Int) -> Int { x }

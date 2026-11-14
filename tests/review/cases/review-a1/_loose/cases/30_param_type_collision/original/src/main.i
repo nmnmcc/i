@@ -1,1 +1,1 @@
-f = <Int>(x: Int) { x }
+f = <Int>(x : Int) { x }

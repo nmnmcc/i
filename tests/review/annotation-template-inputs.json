@@ -1,0 +1,80 @@
+[
+  {
+    "path": "crates/ilang-check/tests/literal_types.rs",
+    "name": "literal-Int - -1-1",
+    "before": "f = (n: Int - -1) { n }\nv = f(1)\n",
+    "after": "f = (n : { Int - -1 }) { n }\nv = f(1)\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/literal_types.rs",
+    "name": "literal-Int - -1--1",
+    "before": "f = (n: Int - -1) { n }\nv = f(-1)\n",
+    "after": "f = (n : { Int - -1 }) { n }\nv = f(-1)\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/literal_types.rs",
+    "name": "literal-Int - 1--1",
+    "before": "f = (n: Int - 1) { n }\nv = f(-1)\n",
+    "after": "f = (n : { Int - 1 }) { n }\nv = f(-1)\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/literal_types.rs",
+    "name": "literal-Int - 1-1",
+    "before": "f = (n: Int - 1) { n }\nv = f(1)\n",
+    "after": "f = (n : { Int - 1 }) { n }\nv = f(1)\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/literal_types.rs",
+    "name": "literal--1 | 1--1",
+    "before": "f = (n: -1 | 1) { n }\nv = f(-1)\n",
+    "after": "f = (n : { -1 | 1 }) { n }\nv = f(-1)\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/literal_types.rs",
+    "name": "literal--1 | 1-0",
+    "before": "f = (n: -1 | 1) { n }\nv = f(0)\n",
+    "after": "f = (n : { -1 | 1 }) { n }\nv = f(0)\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/literal_types.rs",
+    "name": "literal--{1}--1",
+    "before": "f = (n: -{1}) { n }\nv = f(-1)\n",
+    "after": "f = (n : { -{1} }) { n }\nv = f(-1)\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/literal_types.rs",
+    "name": "literal--{1}-1",
+    "before": "f = (n: -{1}) { n }\nv = f(1)\n",
+    "after": "f = (n : { -{1} }) { n }\nv = f(1)\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/row_schemes.rs",
+    "name": "row-S(Never) | S(Dep)",
+    "before": "Dep = ()\nS(N) = (() <- N -> Nil)\nT(N) = (() <- N -> Nil)\nAlias(N) = T(N)\nvalue = (x: S(Never) | S(Dep)) { x }\n",
+    "after": "Dep = ()\nS(N) = (() <- N -> Nil)\nT(N) = (() <- N -> Nil)\nAlias(N) = T(N)\nvalue = (x : { S(Never) | S(Dep) }) { x }\n"
+  },
+  {
+    "path": "crates/ilang-check/tests/row_schemes.rs",
+    "name": "row-T(S(Never) | Dep)",
+    "before": "Dep = ()\nS(N) = (() <- N -> Nil)\nT(N) = (() <- N -> Nil)\nAlias(N) = T(N)\nvalue = (x: T(S(Never) | Dep)) { x }\n",
+    "after": "Dep = ()\nS(N) = (() <- N -> Nil)\nT(N) = (() <- N -> Nil)\nAlias(N) = T(N)\nvalue = (x : T(S(Never) | Dep)) { x }\n"
+  },
+  {
+    "path": "crates/ilang-check/src/query/actions.rs",
+    "name": "lisp-type-wrapper-atomic",
+    "before": "x: Int = 0\n",
+    "after": "x : Int = 0\n"
+  },
+  {
+    "path": "crates/ilang-check/src/query/actions.rs",
+    "name": "lisp-type-wrapper-union",
+    "before": "x: Int | String = 0\n",
+    "after": "x : { Int | String } = 0\n"
+  },
+  {
+    "path": "crates/ilang-check/src/query/actions.rs",
+    "name": "lisp-type-wrapper-function-union-result",
+    "before": "x: (Int) -> Int | String = 0\n",
+    "after": "x : (Int) -> { Int | String } = 0\n"
+  }
+]

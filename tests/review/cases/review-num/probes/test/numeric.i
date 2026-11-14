@@ -5,11 +5,11 @@
 	i/resource
 )
 
-check = (b: Bool) { b |> (True) { Nil } | (False) { panic("wrong") } }
+check = (b : Bool) { b |> (True) { Nil } | (False) { panic("wrong") } }
 
-id = <A>(a: A) -> A { a }
+id = <A>(a : A) -> A { a }
 
-check_bits = (x: Float, n: Int) { check(core.float_to_bits(x) == n) }
+check_bits = (x : Float, n : Int) { check(core.float_to_bits(x) == n) }
 
 test("zeros", () {
 	check_bits(id(-.0.0), 9223372036854775808)
@@ -48,14 +48,14 @@ End = (Float, Int, Float)
 More = (Continuation(Float, ResultStep, Never, Never))
 ResultStep = End | More
 
-work = (b, x: Float, n: Int) -> ResultStep {
+work = (b, x : Float, n : Int) -> ResultStep {
 	a = control.suspend(b, (k) { More(k) })
 	y = a +. 0.25
 	c = control.suspend(b, (k) { More(k) })
 	End(x, n + 1, y +. c)
 }
 
-advance = (s: ResultStep, x: Float) -> ResultStep {
+advance = (s : ResultStep, x : Float) -> ResultStep {
 	s |> (More(k)) { control.resume(k, x) } | (other) { other }
 }
 
@@ -72,7 +72,7 @@ test("lazy_two_resumes", () {
 		| (_) { panic("not done") }
 })
 
-make = (x: Float) { () { x } }
+make = (x : Float) { () { x } }
 
 Holder = (f = () -> Float, x = Float)
 
@@ -87,7 +87,7 @@ test("identity_and_capture", () {
 	check_bits(p.f(), 9223372036854775808)
 })
 
-relay = (f: (Float) -> Float, n: Int, x: Float) -> Float {
+relay = (f : (Float) -> Float, n : Int, x : Float) -> Float {
 	{ n == 0 } |> (True) { f(x) } | (False) { relay(f, n - 1, x) }
 }
 
@@ -97,7 +97,7 @@ test("tail_million", () {
 
 Bias = (Float)
 
-read = () <- (b: Bias) { b |> (Bias(v)) { v } }
+read = () <- (b : Bias) { b |> (Bias(v)) { v } }
 
 test("retained_environment", () {
 	{

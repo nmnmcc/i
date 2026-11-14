@@ -5,7 +5,7 @@
 // Syntax three: the written full type of the binding closes the needs.
 s = "b"
 
-f: () -> Int = () {
+f : () -> Int = () {
 	"a" = s
 	1
 }

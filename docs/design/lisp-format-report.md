@@ -53,7 +53,7 @@ An unfitting trailing comment moves to the next line in the same gap.
 `std/src/test.is` after this revision: 100 lines, no tab, no line that
 starts with a closing bracket; the only line over 80 columns is a single
 `panic` string with its closers. The macro expansion location in
-`crates/ilang-cli/tests/commands.rs` moved to `std/test:11:17`.
+`crates/ilang-cli/tests/commands.rs` moved to `std/test : 11 : 17`.
 First 30 lines:
 
 ```is
@@ -195,7 +195,7 @@ and LSP formatting/idempotence/syntax-error behavior.
   AST-regeneration expectation was corrected as described above.
 - Initial acceptance: formatter checks passed; `dev-verify rust` failed at
   `an_error_stops_a_test` because formatting changed the macro source location
-  from `std/test:5:73` to `std/test:21:15`. Updated the expected location.
+  from `std/test : 5 : 73` to `std/test : 21 : 15`. Updated the expected location.
 - Heavy-wrapped `cargo check -p ilang-cli --all-targets` and
   `cargo test -p ilang-cli --test commands an_error_stops_a_test`: passed.
 - Acceptance rerun: release build, formatter checks and `dev-verify rust` passed.

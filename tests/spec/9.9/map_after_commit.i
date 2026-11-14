@@ -10,8 +10,8 @@
 
 main = () {
 	task.scope((s) {
-		c: task.Channel(Int) = task.channel()
-		ack: task.Channel(Nil) = task.channel()
+		c : task.Channel(Int) = task.channel()
+		ack : task.Channel(Nil) = task.channel()
 		task.go(s, () {
 			task.send(c, 7)
 			task.send(ack, Nil)

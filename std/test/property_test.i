@@ -11,7 +11,7 @@
 	(Some, None) = std/option
 )
 
-snapshot = <A>(t: property.Tree(A), depth: Int) -> String {
+snapshot = <A>(t : property.Tree(A), depth : Int) -> String {
 	core.inspect(t.value) <>
 		{
 			{ depth == 0 } |>
@@ -24,14 +24,14 @@ snapshot = <A>(t: property.Tree(A), depth: Int) -> String {
 		}
 }
 
-root = <A>(gen: property.Gen(A), size: Int, seed: Int) -> property.Tree(A) {
+root = <A>(gen : property.Gen(A), size : Int, seed : Int) -> property.Tree(A) {
 	Some(t) = property.sample(gen, size, random.from_seed(seed))
 	t
 }
 
 // Find a root with a source-specified shrink sequence, without fixing a seed
 // from this implementation as an independent expected random oracle.
-find_ten = (gen: property.Gen(Int), seed: Int) -> property.Tree(Int) {
+find_ten = (gen : property.Gen(Int), seed : Int) -> property.Tree(Int) {
 	assert(seed < 1000)
 	t = root(gen, 0, seed)
 	{ t.value == 10 } |> (True) { t } | (False) { find_ten(gen, seed + 1) }
@@ -98,7 +98,7 @@ test("integer_rules", () {
 	assert(
 		list.map(negative.children(), (c) { c.value }) == [0, -5, -8, -9],
 	)
-	verify = (node: property.Tree(Int), target: Int, depth: Int) -> Nil {
+	verify = (node : property.Tree(Int), target : Int, depth : Int) -> Nil {
 		assert(node.value >= 0 && node.value <= 10)
 		{ depth == 0 } |>
 			(True) { Nil }
@@ -123,7 +123,7 @@ test("integer_rules", () {
 		}
 })
 
-valid_dependent = (t: property.Tree((Int, Int)), depth: Int) -> Nil {
+valid_dependent = (t : property.Tree((Int, Int)), depth : Int) -> Nil {
 	assert(t.value.1 >= 0 && t.value.1 <= t.value.0)
 	{ depth == 0 } |>
 		(True) { Nil }
@@ -196,7 +196,7 @@ test("greedy_path_budget_and_replay", () {
 	Ok(ints) = property.int(0, 10)
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
-	predicate = (x: Int) -> property.Verdict {
+	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
 			(True) { property.Fail(core.inspect(x)) }
 			| (False) { property.Pass }
@@ -411,7 +411,7 @@ test("attempt_streams_seed_and_prefixes", () {
 		)
 	})
 	Ok(ints) = property.int(-100, 100)
-	predicate = (x: Int) -> property.Verdict { property.Fail(core.inspect(x)) }
+	predicate = (x : Int) -> property.Verdict { property.Fail(core.inspect(x)) }
 	a = property.check(
 		ints,
 		property.Config(
@@ -454,7 +454,7 @@ test("attempt_streams_seed_and_prefixes", () {
 
 test("list_order_and_generated_bounds", () {
 	Ok(gen) = property.list(property.constant(7), 0, 4)
-	find_four = (seed: Int) -> property.Tree(List(Int)) {
+	find_four = (seed : Int) -> property.Tree(List(Int)) {
 		assert(seed < 1000)
 		t = root(gen, 4, seed)
 		{ list.length(t.value) == 4 } |>
@@ -468,7 +468,7 @@ test("list_order_and_generated_bounds", () {
 	)
 	Ok(items) = property.int(-3, 3)
 	Ok(lists) = property.list(items, 2, 5)
-	verify = (t: property.Tree(List(Int)), depth: Int) -> Nil {
+	verify = (t : property.Tree(List(Int)), depth : Int) -> Nil {
 		assert(list.length(t.value) >= 2 && list.length(t.value) <= 5)
 		assert(list.all(t.value, (x) { x >= -3 && x <= 3 }))
 		{ depth == 0 } |>
@@ -581,7 +581,7 @@ test("assertion_adapter_and_clients", () {
 
 test("negative_integer_boolean_element_and_list_element_order", () {
 	Ok(negative) = property.int(-10, 0)
-	find = (seed: Int) -> property.Tree(Int) {
+	find = (seed : Int) -> property.Tree(Int) {
 		assert(seed < 1000)
 		t = root(negative, 0, seed)
 		{ t.value == -10 } |> (True) { t } | (False) { find(seed + 1) }
@@ -632,7 +632,7 @@ test("budget_prefixes_and_discarded_children", () {
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
 	// P7 also counts Discard; it never descends into that child.
-	predicate = (x: Int) -> property.Verdict {
+	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
 			(True) { property.Fail(core.inspect(x)) }
 			| (False) { property.Discard }

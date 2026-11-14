@@ -6,9 +6,9 @@
 	testlib = (test) = std/test
 )
 
-need_int = (n: Int) { n + 1 }
+need_int = (n : Int) { n + 1 }
 
-need_string = (s: String) { s <> "!" }
+need_string = (s : String) { s <> "!" }
 
 equal = (a, b) { a == b }
 

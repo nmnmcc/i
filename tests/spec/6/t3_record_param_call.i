@@ -3,7 +3,7 @@
 (
 	main
 )
-f = <K>(r: (k = Int), key: K) -> Int { 1 }
+f = <K>(r : (k = Int), key : K) -> Int { 1 }
 
 main = () {
 	assert(f((name = 9), "name") == 1)

@@ -15,7 +15,7 @@ main = () {
 	assert(local_scoped() == 2)
 	assert(task.path() == [])
 	value = task.scope((s) {
-		c: task.Channel(Int) = task.channel()
+		c : task.Channel(Int) = task.channel()
 		task.go(s, () { task.send(c, 7) })
 		receiver = task.go(s, () { task.receive(c) + 1 })
 		assert(task.path() == [])

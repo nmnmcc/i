@@ -6,7 +6,7 @@
 	i/fail
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -71,7 +71,7 @@ map_error = () {
 test("map_error", () { map_error() })
 
 // §9.1: retrying is a normal function.
-retry = <A, N>(times: Int, body: () <- N -> A) -> A {
+retry = <A, N>(times : Int, body : () <- N -> A) -> A {
 	fail.catch(body) |>
 		(Ok(value)) { value }
 		| (Error(error)) {
@@ -103,9 +103,9 @@ Http = (get = (String) <- (Fail(HttpError)) -> String)
 
 default_user = User(name = "default")
 
-http_get = (id: String) <- (http: Http) { http.get(id) }
+http_get = (id : String) <- (http : Http) { http.get(id) }
 
-parse_user = (text: String) {
+parse_user = (text : String) {
 	text |>
 		("user " <> name) { User(name = name) }
 		| (_) { fail.raise(ParseError(at = 0)) }
@@ -116,7 +116,7 @@ load = (id) { parse_user(http_get(id)) }
 safe = (id) {
 	fail.catch(() { load(id) }) |>
 		(Ok(user)) { user }
-		| (Error(_: ParseError)) { default_user }
+		| (Error(_ : ParseError)) { default_user }
 		| (Error(other)) { fail.raise(other) }
 }
 

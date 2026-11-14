@@ -81,15 +81,15 @@ native experiment in §6.6; **reported** means earlier i measurements, not rerun
 ### 2.1 What the code does
 
 The representation distinction is explicit in the source:
-`ghc/libraries/ghc-internal/src/GHC/Internal/Types.hs:553`, `Double`, wraps
+`ghc/libraries/ghc-internal/src/GHC/Internal/Types.hs : 553`, `Double`, wraps
 `Double#`; `RuntimeRep` (:798–814) includes a 64-bit floating representation
-and tuple/sum representations. `ghc/compiler/GHC/Types/RepType.hs:402–440`,
+and tuple/sum representations. `ghc/compiler/GHC/Types/RepType.hs : 402–440`,
 “RuntimeRep and PrimRep”, explains that an unboxed product may need several
 machine components. Take internal scalar/product representations, not the
 source spelling or the assumption that an unboxed value is always one word.
 
 GHC analyzes how arguments are used, separately from their source types.
-`ghc/compiler/GHC/Core/Opt/DmdAnal.hs:63–100` (`DmdAnalOpts`,
+`ghc/compiler/GHC/Core/Opt/DmdAnal.hs : 63–100` (`DmdAnalOpts`,
 `dmdAnalProgram`) carries strictness/boxity settings and a maximum worker
 argument count. Its application case (`dmdAnal`, around :472) analyzes the
 function under a call demand and transfers the resulting argument demand to
@@ -98,7 +98,7 @@ what worker/wrapper will actually implement and spends a budget while expanding
 products. This is more than “the argument has a numeric type.”
 
 The consuming transformation is concrete:
-`ghc/compiler/GHC/Core/Opt/WorkWrap/Utils.hs:212–287`, `mkWwBodies`, builds
+`ghc/compiler/GHC/Core/Opt/WorkWrap/Utils.hs : 212–287`, `mkWwBodies`, builds
 argument unpacking, a worker, result unpacking, and a wrapper that rebuilds the
 source result. `isWorkerSmallEnough` immediately below bounds expanded arity.
 The note “Worker/wrapper for CPR” (:1736–1777) explains
@@ -108,7 +108,7 @@ precedent for i's Double pairs; it does not require exposing unboxed tuples to
 i programmers.
 
 Constructed product result analysis is a separate forward fact. In
-`ghc/compiler/GHC/Core/Opt/CprAnal.hs:182–207`, `cprAnalProgram` processes
+`ghc/compiler/GHC/Core/Opt/CprAnal.hs : 182–207`, `cprAnalProgram` processes
 bindings and uses `cprFix` for recursive groups. `cprTransform` (:338–365)
 consults function signatures and constructor information.
 `cprTransformDataConWork` (:380–399) rejects existential or definitely recursive
@@ -129,7 +129,7 @@ out of the first i pass. Different captured Float values must not create new
 workers.
 
 Inlining is guided by the use site. In
-`ghc/compiler/GHC/Core/Opt/Simplify/Inline.hs:302–442`, `tryUnfolding` checks
+`ghc/compiler/GHC/Core/Opt/Simplify/Inline.hs : 302–442`, `tryUnfolding` checks
 saturation, argument discounts, result context, work-free status and adjusted
 size; deep case nesting adds a penalty. A known constructor argument or a
 caller immediately inspecting a result gives information that plain callee
@@ -137,7 +137,7 @@ size misses. Take these signals; do not transplant GHC's tuning constants or
 its source pragmas into i.
 
 Unboxing does not abolish representation constraints at polymorphic calls.
-`ghc/compiler/GHC/Core/Lint.hs:764–780`, “Checking for representation
+`ghc/compiler/GHC/Core/Lint.hs : 764–780`, “Checking for representation
 polymorphism”, explains why compulsory internal unfoldings are checked after
 expansion; binder lint at :1838–1842 requires a fixed runtime representation
 apart from stated exceptions. A raw Double representation cannot simply be
@@ -182,7 +182,7 @@ from a direct import of GHC's demand transformation (spec §§6.2, 11.6–11.7).
 
 ### 3.1 What the code does
 
-`ocaml/asmcomp/cmmgen.ml:1263–1320`, `transl_let`, selects an unboxed local
+`ocaml/asmcomp/cmmgen.ml : 1263–1320`, `transl_let`, selects an unboxed local
 when the bound expression contains removable numeric allocation; it avoids
 unboxing a mere constant reference when that saves nothing. Generic values
 require stricter checking that returning branches agree. The supporting
@@ -193,55 +193,55 @@ generic branches. `add_unboxed_id` (:79) records the alternate local.
 handler joins. Take representation joins and profitability; do not interpret
 “strict” in that helper as a new i source strictness annotation.
 
-Heap storage is a separate decision. `ocaml/lambda/translcore.ml:1022–1050`,
+Heap storage is a separate decision. `ocaml/lambda/translcore.ml : 1022–1050`,
 `transl_record`, maps `Record_float` to a float-array constant or construction.
-`ocaml/asmcomp/cmmgen.ml:795–805`, `transl_make_array`, emits unboxed elements
+`ocaml/asmcomp/cmmgen.ml : 795–805`, `transl_make_array`, emits unboxed elements
 for `Pfloatarray`, but ordinary pointer/int arrays use the general allocation
 path. `transl_unop`'s `Pfloatfield` case (:858–860) loads the raw field and boxes
 it at a generic value boundary. Local unboxing and flat persistent storage are
 therefore distinct opportunities. Take the distinction, not a special rule for
 an i library named float or an assumption that all polymorphic lists become flat.
 
-Flambda's `ocaml/middle_end/flambda/unbox_specialised_args.ml:30–108`,
+Flambda's `ocaml/middle_end/flambda/unbox_specialised_args.ml : 30–108`,
 `Transform.what_to_specialise`, extracts projections from specialized arguments
 and propagates them through invariant parameter relationships in recursive
-functions. `inlining_cost.ml:229–240,311–320`, `Benefit` and `evaluate`, account
+functions. `inlining_cost.ml : 229–240,311–320`, `Benefit` and `evaluate`, account
 for removed calls, allocations, primitives, branches, and indirect calls made
 direct. Take those concrete benefit categories; ordinary user functions should
 qualify exactly as numeric helpers do.
 
 Flambda2 adds a particularly useful join discipline.
-`flambda-backend/middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml:21–149`,
+`flambda-backend/middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml : 21–149`,
 `refine_decision_based_on_arg_types_at_uses` and `make_decisions`, first proposes
 unboxing, then checks arguments at each continuation use and tracks invalid
-rewrites. `is_unboxing_beneficial.ml:22–103`,
+rewrites. `is_unboxing_beneficial.ml : 22–103`,
 `is_unboxing_beneficial_for_epa` and `filter_non_beneficial_decisions`, favor
 already available components instead of newly inserted loads; recursive loops
-receive different treatment in `make_decisions`. `unboxers.ml:21–94` represents
+receive different treatment in `make_decisions`. `unboxers.ml : 21–94` represents
 numeric unboxing with explicit kinds and proof queries.
-`optimistic_unboxing_decision.ml:72–105` caps recursive depth and rejects
+`optimistic_unboxing_decision.ml : 72–105` caps recursive depth and rejects
 unhelpful symbol aliases. Take explicit edge conversions, proof facts and
 bounded depth. These are compiler IR continuations, **not** captured user effect
 continuations.
 
 Flambda2 also tries simplification before judging an inline:
-`flambda-backend/middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml:45–98,288–308`,
+`flambda-backend/middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml : 45–98,288–308`,
 `speculative_inlining` and `might_inline`, analyze a trial body and compare its
 cost with a threshold. Useful as a later model; a full speculative simplifier
 is not a prerequisite for i N1/N2.
 
 Native effects do not inherently prohibit raw numeric locals. The save path is
-visible across compiler and runtime: `ocaml/asmcomp/cmmgen.ml:917–923,1214–1218`
-lowers `Pperform`/`Presume` to calls; `asmcomp/amd64/proc.ml:307–313`,
+visible across compiler and runtime: `ocaml/asmcomp/cmmgen.ml : 917–923,1214–1218`
+lowers `Pperform`/`Presume` to calls; `asmcomp/amd64/proc.ml : 307–313`,
 `destroyed_at_oper`, marks all physical registers clobbered by OCaml calls;
-`asmcomp/spill.ml:161–176`, `reload`, requires all live-across-call registers
+`asmcomp/spill.ml : 161–176`, `reload`, requires all live-across-call registers
 to be spilled. `ocaml/runtime/amd64.S:272–285`, `SWITCH_OCAML_STACKS`, saves the
 old stack pointer and restores the new one. `caml_perform` (:1127–1207) attaches
 that stack to the continuation; `caml_resume` (:1227–1277) switches back. Thus
 raw numeric spill slots can stay in the saved stack without becoming GC roots.
-`ocaml/asmcomp/amd64/emit.mlp:239–254`, `record_frame_label`, includes `Val`
+`ocaml/asmcomp/amd64/emit.mlp : 239–254`, `record_frame_label`, includes `Val`
 registers/stack slots in GC root metadata, not Float slots.
-`ocaml/runtime/fiber.c:262–337`, `scan_stack_frames` and `caml_scan_stack`,
+`ocaml/runtime/fiber.c : 262–337`, `scan_stack_frames` and `caml_scan_stack`,
 scan listed roots and stack-chain handlers. `caml_continuation_use_noexc` and
 `caml_continuation_use` (:688–724) take the saved stack and enforce one use.
 Take precise live-value representation and one-use ownership. Leave native
@@ -283,17 +283,17 @@ values, environments, identity and stop positions is forced by §§9.4 and 11.
 
 ### 4.1 What the code does
 
-`go/src/cmd/compile/internal/escape/escape.go:18–85`, package algorithm, builds
+`go/src/cmd/compile/internal/escape/escape.go : 18–85`, package algorithm, builds
 weighted location edges, checks that stack pointers neither escape to heap nor
 outlive their frame, and exports parameter-to-result/heap summaries for known
 calls. It deliberately does not distinguish every field or array element.
-`escape/solve.go:61–140`, `walkAll` and `walk`, use a work queue, grouped root
+`escape/solve.go : 61–140`, `walkAll` and `walk`, use a work queue, grouped root
 states and bounded dereference propagation to a fixed point. Take the idea of
 small summaries and monotone worklists. Leave pointer-address analysis and
 stack allocation of escaping GC objects out of i's initial numeric pass.
 Removing a box entirely is the useful operation here.
 
-`go/src/cmd/compile/internal/inline/inl.go:50–85,201–240`, `inlineBudget`, has
+`go/src/cmd/compile/internal/inline/inl.go : 50–85,201–240`, `inlineBudget`, has
 a base budget of 80, extra call cost 57, a larger hot-function budget and a
 once-called closure allowance. `hairyVisitor.doNode` (:490 onward) charges
 operations and applies legality exclusions; `inlineCostOK` (:985 onward)
@@ -304,11 +304,11 @@ no library privileged optimization rules. The numbers 80 and 57 are not
 portable performance laws.
 
 The current Go snapshot moved its pass list:
-`go/src/cmd/compile/internal/ssacompile/compile.go:414–460`, `passes`, performs
+`go/src/cmd/compile/internal/ssacompile/compile.go : 414–460`, `passes`, performs
 copy/dead-code cleanup, decomposition, generic optimization/CSE, proof,
 call expansion, more decomposition, mem2reg, and later target lowering. It
 places dead-code cleanup before transformations whose escape reasoning would
-otherwise see dead address uses. `ssacompile/prove.go:913–940,1231–1268`,
+otherwise see dead address uses. `ssacompile/prove.go : 913–940,1231–1268`,
 `factsTable.checkpoint`, `restore` and `prove`, maintains branch-scoped facts
 and induction facts. Take explicit pass prerequisites and branch-local range
 proofs. Do not copy integer rules into floating arithmetic: i still rounds each
@@ -316,11 +316,11 @@ Float operation and stops immediately on nonfinite results.
 
 Go's Wasm implementation is not WasmGC. Its backend source describes a linear
 memory Go stack, resumable block IDs, a cached SP, and a uniform `(i32)->i32`
-control convention (`go/src/cmd/compile/internal/wasm/ssa.go:30–124`, backend
+control convention (`go/src/cmd/compile/internal/wasm/ssa.go : 30–124`, backend
 calling-convention comment; `ssaGenValue` :220 onward emits the calls).
 Arithmetic still lowers to raw target operations:
-`go/src/cmd/compile/internal/ssa/_gen/Wasm.rules:7–48`, arithmetic rules, and
-`wasm/ssa.go:426–468`, `ssaGenValueOnStack`, emit Float arithmetic/conversions.
+`go/src/cmd/compile/internal/ssa/_gen/Wasm.rules : 7–48`, arithmetic rules, and
+`wasm/ssa.go : 426–468`, `ssaGenValueOnStack`, emit Float arithmetic/conversions.
 Take raw scalar arithmetic and inspect resume overhead separately. Leave the
 linear stack and uniform control ABI: i already has a WasmGC continuation
 protocol. Go/Wasm timing would not isolate the cost of i Float boxes.
@@ -353,23 +353,23 @@ exclusion and logical trace requirements remain binding (R3/R9, spec §11.7).
 
 ### 5.1 wasm_of_ocaml
 
-`js_of_ocaml/compiler/lib-wasm/gc_target.ml:58–73`, `Type.float_type` and
+`js_of_ocaml/compiler/lib-wasm/gc_target.ml : 58–73`, `Type.float_type` and
 `float_array_type`, use a one-f64 GC struct for a boxed Float and an f64 GC
 array for flat storage. `Value.val_int`/`int_val` (:532–534) use i31 references;
 `Memory.box_float`/`unbox_float` (:712–719) emit struct construction and field
-read. `generate.ml:450–477`, `convert`, explicitly bridges inferred scalar and
+read. `generate.ml : 450–477`, `convert`, explicitly bridges inferred scalar and
 reference representations. That is a close WasmGC precedent for R1/R2.
 
 The compiler performs its own cross-call work, rather than asking Binaryen to
-discover every scalar signature. `compiler/lib-wasm/typing.ml:27–41`,
+discover every scalar signature. `compiler/lib-wasm/typing.ml : 27–41`,
 `can_unbox_parameters` and `can_unbox_return_value`, require direct-only known
-calls. `generate.ml:2709,2985–3009`, `translate_function` signature construction, then selects
+calls. `generate.ml : 2709,2985–3009`, `translate_function` signature construction, then selects
 raw parameter/result types. The return helper explicitly discusses a limited
 loss of tail calls. Take known-call analysis, but retain i's stricter R3 result
 constraints: i cannot adopt that explanation as a blanket tail-space proof.
 
 Its Binaryen configuration is also informative:
-`compiler/lib-wasm/binaryen.ml:65–94`, `optimizes`, `optimization_options` and
+`compiler/lib-wasm/binaryen.ml : 65–94`, `optimizes`, `optimization_options` and
 `optimize`, use O2/O3, skip `inlining-optimizing`, and pass
 `--traps-never-happen`. The checked function does not add an explicit GUFA pass.
 This is evidence for doing language-aware optimization before Binaryen, not a
@@ -378,7 +378,7 @@ assuming every trap away (spec §11.7; accepted R9).
 
 ### 5.2 Binaryen itself
 
-`B:src/passes/Heap2Local.cpp:18–110`, pass contract, identifies the exact useful
+`B : src/passes/Heap2Local.cpp : 18–110`, pass contract, identifies the exact useful
 shape: allocation and all accesses inside one function, with exclusive uses.
 `getParentChildInteraction` (:317 onward) treats returns as escapes and defaults
 to escaping unless a use is recognized. Its `visitArrayGet`/`visitArraySet`
@@ -387,20 +387,20 @@ and read by `struct.get`, is a good input. A box returned across a surviving
 reference call or mixed with another object at a join is not the same case.
 
 GUFA is flow-based refinement, not a replacement calling convention.
-`B:src/passes/GUFA.cpp:18–43,117–167,413–426`, pass description,
+`B : src/passes/GUFA.cpp : 18–43,117–167,413–426`, pass description,
 `GUFAOptimizer::visitExpression` and `GUFAPass::run`, use a content oracle to
 replace known contents/unreachable expressions; the cast-all variant inserts
 more precise casts. It can expose work for later cleanup. It does not make an
-f64 a subtype of eqref. `SignatureRefining.cpp:18–27,45–65`,
+f64 a subtype of eqref. `SignatureRefining.cpp : 18–27,45–65`,
 `SignatureRefining::run`, refines shared signature types and declines modules
-with tables in this revision. `TypeRefining.cpp:18–26,63–78`,
+with tables in this revision. `TypeRefining.cpp : 18–26,63–78`,
 `FieldInfoScanner::noteExpression`, refines field subtypes from writes. Take
 reference narrowing/devirtualization opportunities; do not claim these passes
 unbox an arbitrary surviving eqref parameter into f64.
 
 The pinned default pipeline already includes `heap2local`, cast optimization
 and local subtyping at O2, with closed-world type/signature refinement
-(`B:src/passes/pass.cpp:682–724,776–803`, `PassRunner` default pass lists).
+(`B : src/passes/pass.cpp : 682–724,776–803`, `PassRunner` default pass lists).
 Local CSE's later gate is O3 or shrink >=1 (:725–728); GUFA is registered but
 not added in this default sequence. i already selects closed world, observable
 traps, speed level from its option and an always-inline limit of 20
@@ -438,7 +438,7 @@ required differences from the reference's permissive optimizer flags.
 
 Do not describe every function as the same double-double algorithm. In this
 snapshot sine has two fast reductions and two accurate paths:
-`core-math/src/binary64/sin/sin.c:883–951`, `cr_sin_moderate` and
+`core-math/src/binary64/sin/sin.c : 883–951`, `cr_sin_moderate` and
 `cr_sin_large`, reduce to a very small remainder, reconstruct from two tables,
 evaluate short sine/cosine corrections, and test rounded endpoints
 `fh + (fl - eps)` and `fh + (fl + eps)`. Agreement returns immediately;
@@ -447,7 +447,7 @@ Take the small reduced domain, mixed precision, table reconstruction and an
 explicit error radius. Leave its numeric radius unchanged only if the entire
 operation model and its proof really are unchanged.
 
-`sin.c:229–262`, `reduce_large`, selects a short window of reciprocal-pi words
+`sin.c : 229–262`, `reduce_large`, selects a short window of reciprocal-pi words
 using the input exponent and multiplies it by the significand. It avoids
 computing all the irrelevant integer bits of a huge quotient.
 `reduce_large_acc` (:572–617) computes a finer remainder with an explicit
@@ -458,15 +458,15 @@ There is no general “keep doubling an arbitrary precision Taylor series” loo
 in these functions. Take the bounded reduction and function-specific accurate
 path; do not assume that 128 bits alone prove rounding for every function.
 
-Cosine is not quite identical: `core-math/src/binary64/cos/cos.c:725–830`,
+Cosine is not quite identical: `core-math/src/binary64/cos/cos.c : 725–830`,
 `u128_tod`, `exceptions` and `cos_large_accurate`, include explicit difficult
 inputs. Its `cr_cos_moderate` and `cr_cos_large` (:831–939) have endpoint tests.
-Tangent's `reduce_fast` (`tan/tan.c:1747` onward) documents the reduction error
+Tangent's `reduce_fast` (`tan/tan.c : 1747` onward) documents the reduction error
 term by term; `cr_tan` (:2246–2296) tests a fast enclosure then calls
 `tan_accurate`. In the latter's final stage (:2200–2242), an integer error bound
 is checked around the high bits, with two explicit exception inputs. Atan uses
 an index approximation, an angle table and a short polynomial in `cr_atan`
-(`atan/atan.c:231–285`), then `as_atan_refine2` (:160–229) with compensated
+(`atan/atan.c : 231–285`), then `as_atan_refine2` (:160–229) with compensated
 operations and exceptional-input corrections. Take per-function proof and hard
 case data. Leave the notion that one generic “accurate enough” pair format
 settles every hard case.
@@ -487,7 +487,7 @@ those files were not present in the checked-out tree. The available
 `cr_sin_moderate`. I did not reconstruct the missing proof package or rerun
 Sage, Sollya or an exhaustive hard-case search. The tan/atan exception tables
 and `.wc` files were read as evidence, not independently certified complete.
-`core-math/src/binary64/sin/check_special.c:89–110`, `check`, compares result
+`core-math/src/binary64/sin/check_special.c : 89–110`, `check`, compares result
 bits with a reference under the selected rounding mode. Take that independent
 bit comparison as a test pattern, not as a substitute for the bounds.
 A production port needs a source revision with matching proof artifacts, plus
@@ -496,19 +496,19 @@ coefficient bits, domain partitions, proof outputs and tests together.
 
 ### 6.3 The non-correctly-rounded baselines
 
-Go's `go/src/math/trig_reduce.go:22–104`, `trigReduce` and `mPi4`, implement
+Go's `go/src/math/trig_reduce.go : 22–104`, `trigReduce` and `mPi4`, implement
 Payne–Hanek reduction from a 1217-bit 4/pi table. The exponent selects a small
 window; `bits.Mul64` and `bits.Add64` produce the fractional part and octant.
-`go/src/math/sin.go:189` onward, `Sin`/`sin`, dispatches to architecture code
+`go/src/math/sin.go : 189` onward, `Sin`/`sin`, dispatches to architecture code
 when available; the pure-Go path uses split pi/4 reduction below its threshold
 and fixed polynomial evaluation. No correct-rounding endpoint certificate or
 accurate fallback is in that pure-Go path. Take the portable table-window
 method, not its result as a rounding oracle. A comparison must force the
 pure-Go path if that is the baseline intended.
 
-musl's `musl/src/math/sin.c:40–78`, `sin`, explicitly describes “nearly rounded”
+musl's `musl/src/math/sin.c : 40–78`, `sin`, explicitly describes “nearly rounded”
 results and dispatches reduced arguments to `__sin`/`__cos`.
-`src/math/__rem_pio2_large.c:13–66`, `__rem_pio2_large` algorithm, skips quotient
+`src/math/__rem_pio2_large.c : 13–66`, `__rem_pio2_large` algorithm, skips quotient
 bits irrelevant modulo eight and uses 24-bit chunks held in doubles. This is
 especially useful for a no-FMA i implementation: bounded chunk products can
 be exact binary64 operations. It is a reduction technique, not a correct
@@ -542,7 +542,7 @@ Three differences *are* required by today's contract:
   separately. This study recommends the no-FMA route first (R2, Std-3 F1).
 - C unsigned arithmetic wraps, while i Int is unbounded. A 128-bit product
   truncation must be an explicit mask/remainder; high-half products and shifts
-  must retain their stated bit meaning. `sin.c:179–190`, `mhUU`, and
+  must retain their stated bit meaning. `sin.c : 179–190`, `mhUU`, and
   `reduce_large` are algorithms to rewrite, not expressions to transliterate.
   Exact Int works initially; machine-limb optimization needs proven ranges.
 - NaN/infinity/errno and directed rounding are not i's result model. Preserve
@@ -628,7 +628,7 @@ all raw samples. There was no GC in this native probe.
 | same | accurate path, forced | 29, 29, 29, 29, 30 | 29 | 32–50 |
 | same | system sin | 80, 80, 80, 80, 80 | 80 | 90–110 |
 
-The last input is the regression input mentioned in `sin.c:947`, not a claim
+The last input is the regression input mentioned in `sin.c : 947`, not a claim
 that the normal dispatcher takes its accurate path. Forced accurate calls
 measure `sin_large_accurate` on inputs satisfying its domain; they do not measure
 fallback probability. All three variants returned identical bits for each of
@@ -720,7 +720,7 @@ constraints. FMA/table-dependent proofs must be adapted to those constraints.
 ### 7.1 What the code does
 
 GHC's numeric implementation moved in this snapshot. The `ghc-bignum` package
-reexports `ghc-internal` (`ghc/libraries/ghc-bignum/ghc-bignum.cabal:27–47`,
+reexports `ghc-internal` (`ghc/libraries/ghc-bignum/ghc-bignum.cabal : 27–47`,
 `library`). Read `ghc/libraries/ghc-internal/src/GHC/Internal/Bignum/Integer.hs`:
 `Integer` (:172–187) is a small signed `Int#` payload or positive/negative
 `BigNat#`; the invariant requires the big constructors only when the value
@@ -729,28 +729,28 @@ does not fit small. `integerAdd` (:554–580) checks `addIntC#` overflow;
 Take exact promotion and normalization. The `IS` constructor is not evidence
 that every escaping Haskell Integer is an immediate pointer-free value.
 
-Zarith is a closer representation precedent. `zarith/caml_z.c:120–131`,
+Zarith is a closer representation precedent. `zarith/caml_z.c : 120–131`,
 representation contract, requires an OCaml immediate int when the number fits;
-otherwise a signed limb block. `zarith/z.ml:28–72`, `add`, `sub`, `mul`, use the
-small path and overflow checks before C fallback. `caml_z.c:405–423`,
+otherwise a signed limb block. `zarith/z.ml : 28–72`, `add`, `sub`, `mul`, use the
+small path and overflow checks before C fallback. `caml_z.c : 405–423`,
 `ml_z_reduce`, trims zero limbs and returns an immediate when possible. Take
 canonical small/big transitions. Leave the OCaml external primitives and GMP
 interface as implementation-specific details, not i library privileges.
 
 CPython's compact path is **not** immediate tagging.
-`cpython/Objects/longobject.c:61–77,312–322`, `get_small_int`,
+`cpython/Objects/longobject.c : 61–77,312–322`, `get_small_int`,
 `maybe_small_long`, `_PyLong_FromSTwoDigits`, select cached objects, a compact
 object, or a larger object. `long_add` (:3832–3863) and `long_mul`
 (:4338–4352) perform native arithmetic on two compact inputs, then normalize
-through those constructors. `Include/cpython/longintrepr.h:11–44` describes
+through those constructors. `Include/cpython/longintrepr.h : 11–44` describes
 30- or 15-bit limbs and a double-width product type. Take a cheap arithmetic
 branch and clear limb invariants; do not call Python's small cache an i31-like
 representation or assume compact arithmetic always avoids allocation.
 
-Go's `math/big` uses a third approach: `go/src/math/big/int.go:20–37`, `Int`,
+Go's `math/big` uses a third approach: `go/src/math/big/int.go : 20–37`, `Int`,
 is a sign plus a magnitude slice, with pointer receiver/result conventions.
 `Add` (:142–159) updates the receiver; `Mul`/`mul` (:184–205) use magnitude
-multiplication or squaring. `nat.go:56–73`, `make`/`setWord`, reuse capacity and
+multiplication or squaring. `nat.go : 56–73`, `make`/`setWord`, reuse capacity and
 avoid over-allocation for one limb; `nat.add` (:97–124) handles zero operands,
 adds limbs and normalizes. The `mul` comment specifically avoids returning a
 pointer so temporary Ints do not escape. Take scratch-storage reuse only when
@@ -845,9 +845,9 @@ the cited language/design rule; no machine timing is a correctness oracle.
 
 ```i
 probe = () {
-  a = 1.0000000074505806
-  b = 0.9999999925494194
-  { a *. b } -. 1.0
+	a = 1.0000000074505806
+	b = 0.9999999925494194
+	{ a *. b } -. 1.0
 }
 ```
 
@@ -859,10 +859,10 @@ reuse of FMA residual error bounds for a split-product rewrite (§6.4; R2).
 **An unused component can still stop.**
 
 ```i
-pair = (x: Float) { (0.0, x *. x) }
+pair = (x : Float) { (0.0, x *. x) }
 probe = () {
-  (first, _) = pair(1.0e308)
-  first
+	(first, _) = pair(1.0e308)
+	first
 }
 ```
 
@@ -874,13 +874,16 @@ fields is not i's rule.
 **“Unbox continuation parameters” can refer to two different things.**
 
 ```i
-(i/core, i/control)
+(
+	i/core
+	i/control
+)
 probe = () {
-  control.boundary((b) {
-    x = -.0.0
-    y = control.suspend(b, (k) { control.resume(k, 2.0) })
-    (core.float_to_bits(x), y)
-  })
+	control.boundary((b) {
+		x = -.0.0
+		y = control.suspend(b, (k) { control.resume(k, 2.0) })
+		(core.float_to_bits(x), y)
+	})
 }
 ```
 
@@ -892,7 +895,7 @@ retain conservative N1 and typed save/restore gates (§3.2).
 **A machine integer is not the whole Int type.**
 
 ```i
-probe = (x: Int) { x + 1 }
+probe = (x : Int) { x + 1 }
 ```
 
 At 1073741823, expect 1073741824; at 9223372036854775807, expect
@@ -916,7 +919,7 @@ Attack generic encoding and recursive result adaptation:
 ```i
 id = (x) { x }
 probe = () { (id(2.5), id("a")) }
-relay = (f: (Float) -> Float, n: Int, x: Float) -> Float {
+relay = (f : (Float) -> Float, n : Int, x : Float) -> Float {
 	{ n == 0 } |> (True) { f(x) } | (False) { relay(f, n - 1, x) }
 }
 ```
@@ -949,7 +952,7 @@ sin(-0.0) and the least negative subnormal by bits, not only `==` (F1–F5).
 Attack quotient-zero and stop motion:
 
 ```i
-probe = (x: Float) { { x *. 2.0 } /. 0.0 }
+probe = (x : Float) { { x *. 2.0 } /. 0.0 }
 ```
 
 At x=1.0e308 the multiplication stops; replacing the whole expression by zero
@@ -990,7 +993,7 @@ No full repository test run is appropriate for this note-only change. The
 native experiment is in §6.6. Source claims were checked against the pinned
 files. All six i code fences parsed without diagnostics using the existing
 `/home/agent/Programming/i/.rd/integ/target/debug/examples/parse-snippets`
-(length-prefixed UTF-8 input, as in `scripts/old-syntax-check:130–136`);
+(length-prefixed UTF-8 input, as in `scripts/old-syntax-check : 130–136`);
 this checks syntax, not inference or execution. Final staged diff checks also
 passed. The counterexample results above are reasoned from
 the specification, not reported as executions of future lowering.

@@ -1,4 +1,4 @@
-n: Int = 1
+n : Int = 1
 N = n
 @external("env", "f")
-f: (N) -> Int
+f : (N) -> Int

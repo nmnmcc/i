@@ -3,8 +3,8 @@
 (
 	main
 )
-f = (value: Record | Int) -> Int {
-	value |> (_: (name = Int)) { 1 } | (_: Int) { 2 }
+f = (value : { Record | Int }) -> Int {
+	value |> (_ : (name = Int)) { 1 } | (_ : Int) { 2 }
 }
 
 main = () { Nil }

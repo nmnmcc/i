@@ -7,7 +7,7 @@
 (
 	main
 )
-f = (r: (a = Int), key: String) {
+f = (r : (a = Int), key : String) {
 	key |> ("a") { record.get(r, key) } | (_) { 0 }
 }
 

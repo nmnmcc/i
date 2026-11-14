@@ -9,9 +9,9 @@
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.scope((s) {
-		gate: task.Channel(Nil) = task.channel()
+		gate : task.Channel(Nil) = task.channel()
 		task.go(s, () {
 			task.receive(gate)
 			io.print("child")

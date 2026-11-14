@@ -1,3 +1,3 @@
 S(A) = ()
-use = <A>() <- (s: S(A)) { Nil }
-wrap = <A>(x: A) { use() }
+use = <A>() <- (s : S(A)) { Nil }
+wrap = <A>(x : A) { use() }

@@ -8,9 +8,9 @@
 	rng = i/random
 	(Io) = i/io
 )
-spin = (n: Int) -> Never { spin(n + 1) }
+spin = (n : Int) -> Never { spin(n + 1) }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.test(rng.from_seed(1), [], () {
 		task.scope((s) {
 			task.go(s, () { io.print("child") })

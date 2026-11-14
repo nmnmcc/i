@@ -2,4 +2,4 @@
 	f
 )
 
-f = (x: Never) -> Int { x + 1 }
+f = (x : Never) -> Int { x + 1 }

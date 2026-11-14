@@ -7,6 +7,6 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later: Later) {
+main = () <- (later : Later) {
 	request.await(later.echo("pending")) <- (request.Await(wait = (_) { Nil }))
 }

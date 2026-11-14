@@ -9,9 +9,9 @@
 	channel_pair
 )
 
-spin = (n: Int) -> Nil { n |> (0) { Nil } | (_) { spin(n - 1) } }
+spin = (n : Int) -> Nil { n |> (0) { Nil } | (_) { spin(n - 1) } }
 
-spawns = (s: Scope(Never), n: Int) -> Nil {
+spawns = (s : Scope(Never), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
 		| (_) {
@@ -20,7 +20,7 @@ spawns = (s: Scope(Never), n: Int) -> Nil {
 		}
 }
 
-yields = (n: Int) -> Nil {
+yields = (n : Int) -> Nil {
 	n |>
 		(0) { Nil }
 		| (_) {
@@ -29,7 +29,7 @@ yields = (n: Int) -> Nil {
 		}
 }
 
-sends = (c: Channel(Nil), n: Int) -> Nil {
+sends = (c : Channel(Nil), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
 		| (_) {
@@ -38,7 +38,7 @@ sends = (c: Channel(Nil), n: Int) -> Nil {
 		}
 }
 
-receives = (c: Channel(Nil), n: Int) -> Nil {
+receives = (c : Channel(Nil), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
 		| (_) {
@@ -47,17 +47,17 @@ receives = (c: Channel(Nil), n: Int) -> Nil {
 		}
 }
 
-empty = (n: Int) -> Int {
-	task.scope((_: Scope(Never)) { spin(n) })
+empty = (n : Int) -> Int {
+	task.scope((_ : Scope(Never)) { spin(n) })
 	n
 }
 
-spawn_join = (n: Int) -> Int {
+spawn_join = (n : Int) -> Int {
 	task.scope((s) { spawns(s, n) })
 	n
 }
 
-switch_pair = (n: Int) -> Int {
+switch_pair = (n : Int) -> Int {
 	task.scope((s) {
 		child = task.go(s, () { yields(n) })
 		yields(n)
@@ -66,9 +66,9 @@ switch_pair = (n: Int) -> Int {
 	n
 }
 
-channel_pair = (n: Int) -> Int {
+channel_pair = (n : Int) -> Int {
 	task.scope((s) {
-		c: Channel(Nil) = task.channel()
+		c : Channel(Nil) = task.channel()
 		child = task.go(s, () { sends(c, n) })
 		receives(c, n)
 		task.join(child)

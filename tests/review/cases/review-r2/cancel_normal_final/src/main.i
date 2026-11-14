@@ -6,10 +6,10 @@
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	r = fail.catch(() {
 		task.scope((s) {
-			gate: task.Channel(Nil) = task.channel()
+			gate : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() { 7 },

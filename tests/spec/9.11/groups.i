@@ -7,12 +7,12 @@
 )
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
-make_group = (root: request.Root) { request.open_owner() <- (root) }
-start = (owner: request.Owner, text: String) <- (later: Later) {
+make_group = (root : request.Root) { request.open_owner() <- (root) }
+start = (owner : request.Owner, text : String) <- (later : Later) {
 	later.echo(text) <- (owner)
 }
 
-main = () <- (root: request.Root, owner: request.Owner) {
+main = () <- (root : request.Root, owner : request.Owner) {
 	separate = request.open_root()
 	other = make_group(separate)
 	a = start(owner, "a")

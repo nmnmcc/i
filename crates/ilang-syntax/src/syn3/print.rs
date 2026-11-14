@@ -82,6 +82,16 @@ pub fn print_type(t: &Type) -> String {
     render(&doc).trim_end().to_string()
 }
 
+/// Prints a type immediately after a type colon, using `Annot`.
+pub fn print_annotation(ty: &Type) -> String {
+    let mut p = Printer {
+        src: None,
+        comments: &[],
+        next: 0,
+    };
+    render(&p.annot(ty)).trim_end().to_string()
+}
+
 /// Prints one pattern.
 pub fn print_pattern(pattern: &Pattern) -> String {
     let mut p = Printer {
@@ -125,6 +135,21 @@ fn nest(d: Doc) -> Doc {
 
 fn group(d: Doc) -> Doc {
     Doc::Group(Box::new(d))
+}
+
+/// The shared layout of `=` and a type `:`. A right side with several
+/// branches uses a hanging continuation; other right sides lay out their
+/// own brackets and operators, under the same enclosing indentation.
+fn assigned(left: Doc, op: &str, right: Doc, hanging: bool) -> Doc {
+    if hanging {
+        group(cat(vec![
+            left,
+            t(format!(" {op}")),
+            nest(cat(vec![Doc::Line, right])),
+        ]))
+    } else {
+        cat(vec![left, t(format!(" {op} ")), right])
+    }
 }
 
 fn text_width(s: &str) -> usize {
@@ -592,8 +617,8 @@ impl Printer<'_> {
             }
             ItemKind::Decl { name, ty } => {
                 out.extend(self.leading(name.span.0.start));
-                out.push(t(format!("{}: ", name.name)));
-                out.push(self.ty(ty, 0));
+                let right = self.annot(ty);
+                out.push(assigned(t(name.name.clone()), ":", right, false));
             }
             ItemKind::Macro { module, name, args } => {
                 let at = module.as_ref().unwrap_or(name).span.0.start;
@@ -643,13 +668,12 @@ impl Printer<'_> {
         match &b.value.kind {
             ExprKind::Chain(fs) if fs.len() > 1 => {
                 let branches = self.branches(fs);
-                group(cat(vec![
-                    pattern,
-                    t(" ="),
-                    nest(cat(vec![Doc::Line, branches])),
-                ]))
+                assigned(pattern, "=", branches, true)
             }
-            _ => cat(vec![pattern, t(" = "), self.expr(&b.value, LOWEST)]),
+            _ => {
+                let right = self.expr(&b.value, LOWEST);
+                assigned(pattern, "=", right, false)
+            }
         }
     }
 
@@ -853,8 +877,9 @@ impl Printer<'_> {
             let parts = services
                 .iter()
                 .map(|s| {
-                    let head = format!("{}{}: ", if s.rest { ".." } else { "" }, s.name.name);
-                    cat(vec![t(head), self.ty(&s.ty, 0)])
+                    let head = format!("{}{}", if s.rest { ".." } else { "" }, s.name.name);
+                    let right = self.annot(&s.ty);
+                    assigned(t(head), ":", right, false)
                 })
                 .collect();
             out.push(self.delimited("(", ")", Self::plain(parts)));
@@ -1093,7 +1118,8 @@ impl Printer<'_> {
             PatternKind::Quote(d) => t(crate::lisp::show(&d.0)),
             PatternKind::Var(s) | PatternKind::Discard(s) => t(s.clone()),
             PatternKind::Typed { binder, ty } => {
-                cat(vec![t(format!("{}: ", binder.name)), self.ty(ty, 0)])
+                let right = self.annot(ty);
+                assigned(t(binder.name.clone()), ":", right, false)
             }
             PatternKind::Int { negative, value } => {
                 let text = if *negative {
@@ -1217,6 +1243,43 @@ impl Printer<'_> {
         group(cat(out))
     }
 
+    /// `Annot`: only an outer union needs a group; a top-level function
+    /// keeps its parameter grammar and groups its result as needed.
+    fn annot(&mut self, ty: &Type) -> Doc {
+        match &ty.kind {
+            TypeKind::Fn(f) => self.fn_type(f, true),
+            TypeKind::Union(_) => self.ty(ty, 1),
+            _ => self.ty(ty, 0),
+        }
+    }
+
+    fn fn_type(&mut self, f: &FnType, annotation: bool) -> Doc {
+        let mut out = Vec::new();
+        if !f.generics.is_empty() {
+            let names: Vec<&str> = f.generics.iter().map(|g| g.name.as_str()).collect();
+            out.push(t(format!("<{}>", names.join(", "))));
+        }
+        match &f.param.kind {
+            TypeKind::Data(items) => out.push(self.data_type(items)),
+            _ => {
+                out.push(t("{ "));
+                out.push(self.ty(&f.param, 0));
+                out.push(t(" }"));
+            }
+        }
+        if let Some(s) = &f.services {
+            out.push(t(" <- "));
+            out.push(self.ty_raw(s));
+        }
+        out.push(t(" -> "));
+        out.push(if annotation {
+            self.annot(&f.ret)
+        } else {
+            self.ty(&f.ret, 0)
+        });
+        cat(out)
+    }
+
     fn ty_raw(&mut self, ty: &Type) -> Doc {
         match &ty.kind {
             TypeKind::Lit(LitValue::Int(n)) => t(n.to_string()),
@@ -1239,28 +1302,7 @@ impl Printer<'_> {
             }
             TypeKind::Hole => t("_"),
             TypeKind::Data(items) => self.data_type(items),
-            TypeKind::Fn(f) => {
-                let mut out = Vec::new();
-                if !f.generics.is_empty() {
-                    let names: Vec<&str> = f.generics.iter().map(|g| g.name.as_str()).collect();
-                    out.push(t(format!("<{}>", names.join(", "))));
-                }
-                match &f.param.kind {
-                    TypeKind::Data(items) => out.push(self.data_type(items)),
-                    _ => {
-                        out.push(t("{ "));
-                        out.push(self.ty(&f.param, 0));
-                        out.push(t(" }"));
-                    }
-                }
-                if let Some(s) = &f.services {
-                    out.push(t(" <- "));
-                    out.push(self.ty_raw(s));
-                }
-                out.push(t(" -> "));
-                out.push(self.ty(&f.ret, 0));
-                cat(out)
-            }
+            TypeKind::Fn(f) => self.fn_type(f, false),
             TypeKind::Union(parts) => self.type_list(parts, "|", 1, true),
             TypeKind::Inter(parts) => self.type_list(parts, "&", 2, false),
             TypeKind::Diff(parts) => self.type_list(parts, "-", 3, false),

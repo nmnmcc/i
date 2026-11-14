@@ -2,7 +2,7 @@
 // data keeps explicit labels (syntax three §2.3, §2.4).
 User = (name = String, age = Int)
 
-make = (name: String, age: Int) { User(name = name, age = age) }
+make = (name : String, age : Int) { User(name = name, age = age) }
 
 by_label = make("bob", 3)
 
@@ -10,15 +10,15 @@ mixed = make("bob", 3)
 
 ctor = User(age = 3, name = "bob")
 
-annotated: (Int) -> Int = (y) { y }
+annotated : (Int) -> Int = (y) { y }
 
 call_annotated = annotated(1)
 
 // The written positional function type is preserved by subtyping.
-relabel: (Int) -> Int = annotated
+relabel : (Int) -> Int = annotated
 
 local = () {
-	f = (a: Int, b: String) { b }
+	f = (a : Int, b : String) { b }
 	f(1, "x")
 }
 
@@ -57,39 +57,39 @@ through = () {
 }
 
 // A `_` part leaves the positional parameter type to inference.
-holes = (f: (_) -> Int) { f(1) }
+holes = (f : (_) -> Int) { f(1) }
 
 // Positional arguments first, also with `|>`.
-minus = (a: Int, b: Int) { a - b }
+minus = (a : Int, b : Int) { a - b }
 
 piped = 5 |> minus(1)
 
 // A function that uses its own result by label needs a written `->`.
 Node = (value = Int, rest = Int)
 
-walk = (n: Int) -> Node {
+walk = (n : Int) -> Node {
 	n |>
 		(0) { Node(value = 0, rest = 0) }
 		| (_) { Node(value = walk(n - 1).value + 1, rest = 0) }
 }
 
-walk_unwritten = (n: Int) {
+walk_unwritten = (n : Int) {
 	n |>
 		(0) { Node(value = 0, rest = 0) }
 		| (_) { Node(value = walk_unwritten(n - 1).value + 1, rest = 0) }
 }
 
 // In a group, the names are known from what is written.
-ping = (n: Int) { pong(n) }
+ping = (n : Int) { pong(n) }
 
-pong = (m: Int) { m |> (0) { 0 } | (_) { ping(m - 1) } }
+pong = (m : Int) { m |> (0) { 0 } | (_) { ping(m - 1) } }
 
 // A written positional signature determines the call interface (§6.6).
-wins: (Int) -> Int = (y) { y }
+wins : (Int) -> Int = (y) { y }
 
 wins_ok = wins(1)
 
 wins_value = wins(1)
 
 // A function expression in a group, called directly.
-direct = { (a: Int, b: String) { b } }(1, "x")
+direct = { (a : Int, b : String) { b } }(1, "x")

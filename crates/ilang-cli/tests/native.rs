@@ -486,7 +486,7 @@ fn imports_the_runner_cannot_supply_are_rejected() {
     let dir = tempfile::tempdir().unwrap();
     let project = package(
         dir.path(),
-        "@external(\"plugin:raw/v1\", \"number\")\nnumber: (Float) -> Float\n\nmain = () {\n  number(1.0)\n  Nil\n}\n",
+        "@external(\"plugin:raw/v1\", \"number\")\nnumber : (Float) -> Float\n\nmain = () {\n  number(1.0)\n  Nil\n}\n",
     );
     let out = i(&["build"], &project);
     assert!(!out.status.success());
@@ -505,7 +505,7 @@ fn imports_the_runner_cannot_supply_are_rejected() {
 	(Io) = i/io
 )
 
-greet = () <- (io: Io) { io.print("quiet") }
+greet = () <- (io : Io) { io.print("quiet") }
 
 main = () { greet() <- (Io(print = (text) { Nil })) }
 "#,
@@ -525,7 +525,7 @@ fn packages_need_the_program_entry() {
     let dir = tempfile::tempdir().unwrap();
     let project = package(
         dir.path(),
-        " (i/core)\n\n (double)\n\ndouble = (n: Int) { core.inspect(n * 2) }\n",
+        " (i/core)\n\n (double)\n\ndouble = (n : Int) { core.inspect(n * 2) }\n",
     );
     std::fs::write(
         project.join("i.toml"),

@@ -12,7 +12,7 @@ EmptyTree = ()
 Single = (Node(a))
 Deep = (Int, Digit(a), Tree(a), Digit(a))
 Tree(a) = EmptyTree | Single | Deep
-map_node = (node: Node(a), with: (a) <- (Fail(e)) -> b) -> Node(b) {
+map_node = (node : Node(a), with : (a) <- (Fail(e)) -> b) -> Node(b) {
 	case
 	node
 	(Leaf(x)) { Leaf(with(x)) }
@@ -23,7 +23,7 @@ map_node = (node: Node(a), with: (a) <- (Fail(e)) -> b) -> Node(b) {
 			Branch3(m, map_node(x, with), map_node(y, with), map_node(z, with))
 		}
 }
-map_digit = (digit: Digit(a), with: (a) <- (Fail(e)) -> b) -> Digit(b) {
+map_digit = (digit : Digit(a), with : (a) <- (Fail(e)) -> b) -> Digit(b) {
 	case
 	digit
 	(One(x)) { One(map_node(x, with)) }
@@ -40,7 +40,7 @@ map_digit = (digit: Digit(a), with: (a) <- (Fail(e)) -> b) -> Digit(b) {
 			)
 		}
 }
-map_tree = (tree: Tree(a), with: (a) <- (Fail(e)) -> b) -> Tree(b) {
+map_tree = (tree : Tree(a), with : (a) <- (Fail(e)) -> b) -> Tree(b) {
 	case
 	tree
 	(EmptyTree) { EmptyTree }

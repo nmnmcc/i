@@ -56,7 +56,7 @@ one row per subcommand in `SUBCOMMANDS`.
 - `i/syntax.Node` as in §2.8, with its users (`std/src/test.is`, Rust tests).
 - `i/task` `Scheduler` and `Runner`: a service type is one named type (E0225),
   so each became a one-constructor service whose field is the union of its
-  detached and attached states (`SchedulerService(state: SchedulerState)`).
+  detached and attached states (`SchedulerService(state : SchedulerState)`).
 - `std/http` `ResponseStream` and `ClientFunctions` became one-constructor
   types because of the solver bug below.
 
@@ -97,7 +97,7 @@ main = () { Nil }
 ```
 
 Today: `error[E0501]: \`Q\` is not a subtype of \`P | Q | { D | { C | { A | B } } }\``.
-With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
+With five members, or with `R { R(read : (Int) -> Int ^ E) }`, it checks.
 
 ## Host ABI
 
@@ -108,15 +108,15 @@ With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
 ## Behaviour changes seen in the tests
 
 - A refutable binding of an unknown value narrows it: `first = (r) { Ok(v) = r  v }`
-  is `(r: Ok(A)) -> A` with no `Assert`, not `(r: Result(A, B)) -> A ! Assert`
+  is `(r : Ok(A)) -> A` with no `Assert`, not `(r : Result(A, B)) -> A ! Assert`
   (lane js's D4 rule widens to `Q | r - Q` only when another constructor's
   value is known). Fixtures that pass an `Error` give the parameter the type
   `Result(…)` now (`tests/spec/9/assert.i`, `crates/ilang-check/tests/codegen.rs`);
   a recursive top-level value needs a written type on the part
   (`tests/spec/7/may_fail_group_ctor.i`).
-- Types are more precise: `named : (r: Result(A, B)) -> Ok(A | 0)`,
-  `not_known : (s: Shape) -> Circle`; a constructor's type is its own
-  (`Some: (A) -> Some(A)`).
+- Types are more precise: `named : (r : Result(A, B)) -> Ok(A | 0)`,
+  `not_known : (s : Shape) -> Circle`; a constructor's type is its own
+  (`Some : (A) -> Some(A)`).
 - A match that does not cover a member of the subject's sum gives E0516
   alone, as before (a former constructor that no pattern takes is held for
   the coverage error when a pattern takes another member of a declared union
@@ -124,7 +124,7 @@ With five members, or with `R { R(read: (Int) -> Int ^ E) }`, it checks.
   gave E0501 (`Point` is not a subtype of `Circle | Square`, corpus fuzz-5:
   `True` is not a subtype of `False`); that was a bug against §5.2.8 rule 11
   ("the coverage error in a match is unchanged").
-- `Circle(..v, …)` with `v: Shape` gives E0501, not E0517's message.
+- `Circle(..v, …)` with `v : Shape` gives E0501, not E0517's message.
 - `field_shared` no longer joins the constructors of a former family.
 - Coverage witnesses show a one-constructor type as its constructor
   (`("a", False)`).
@@ -168,7 +168,7 @@ sum to the alias of the union of its members.
   labelled types that contains `C` (§2.12, D4, "as today with the
   multi-constructor `Result`"): `first = (r) { Ok(v) = r  v }` is
   `(Result(A, B)) <- (Assert) -> A` again (types/effects.i, with the closed
-  case `closed: (Result(Int, String)) -> Int = (Ok(v)) { v }`, E0501).
+  case `closed : (Result(Int, String)) -> Int = (Ok(v)) { v }`, E0501).
 - A match reports a member of the subject's sum that no pattern takes with
   E0516 alone (§5.2.8 rule 11), also for a pipe into a clause-block
   literal, which is now a match (the Lisp surface's match).
@@ -204,7 +204,7 @@ The three questioned expectation changes have been traced to their source:
   introduced by `80bc9296cd`, before the stage-3 merge; the numeric runtime
   modules had stale goldens after conversion. §2.4 says, "Function types
   drop the names and the body. The parameter part is a data type" and
-  "Labels are part of the type". Thus `(x: Float)` becomes `(Float)`;
+  "Labels are part of the type". Thus `(x : Float)` becomes `(Float)`;
   real data labels remain `label = T`. The library golden test now documents
   the cause. Runtime module definitions and expectations are unchanged.
 

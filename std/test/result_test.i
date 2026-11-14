@@ -314,7 +314,7 @@ test("map_effects_test", () {
 
 test("error_union_test", () {
 	// `then` keeps the error type of the first result; a union is fine.
-	r: Result(Int, String | Int) = result.then(Ok(1), (x) {
+	r : Result(Int, String | Int) = result.then(Ok(1), (x) {
 		{ x > 0 } |> (True) { Error(0) } | (False) { Error("negative") }
 	})
 	assert(r == Error(0))

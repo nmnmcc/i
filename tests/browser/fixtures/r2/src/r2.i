@@ -38,7 +38,7 @@ Gates = (wait = (Int) -> Request(Int))
 Control = (release = (Int) -> Nil, check = (Int) -> Nil)
 
 // §6.4: both starts precede release; polls cannot starve the runnable releaser.
-overlap = () <- (gates: Gates, control: Control) {
+overlap = () <- (gates : Gates, control : Control) {
 	task.scope((s) {
 		a = task.go(s, () { request.await_owned(gates.wait(1)) })
 		b = task.go(s, () { request.await_owned(gates.wait(2)) })
@@ -48,7 +48,7 @@ overlap = () <- (gates: Gates, control: Control) {
 }
 
 // §5.1: an unlisted completion is stored while the original wait continues.
-unlisted_answer = () <- (gates: Gates, control: Control) {
+unlisted_answer = () <- (gates : Gates, control : Control) {
 	a = gates.wait(1)
 	b = gates.wait(2)
 	control.release(2)
@@ -65,7 +65,7 @@ unlisted_answer = () <- (gates: Gates, control: Control) {
 }
 
 // §6.4: go keeps the parent turn but polls an existing IO interest.
-go_progress = () <- (gates: Gates, control: Control) {
+go_progress = () <- (gates : Gates, control : Control) {
 	task.scope((s) {
 		waiter = task.go(s, () { request.await_owned(gates.wait(10)) })
 		task.yield()
@@ -76,11 +76,11 @@ go_progress = () <- (gates: Gates, control: Control) {
 	})
 }
 
-cancel_probe = (owned: Bool) <- (gates: Gates, control: Control) {
+cancel_probe = (owned : Bool) <- (gates : Gates, control : Control) {
 	r = gates.wait(1)
 	answer = fail.catch(() {
 		task.scope((s) {
-			armed: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.send(armed, Nil)
 				{ owned } |>
@@ -112,12 +112,12 @@ cancel_owned = () { cancel_probe(True) }
 
 cancel_borrowed = () { cancel_probe(False) }
 
-ready_wait = <A>(r: Request(A)) <- (await: request.Await) {
+ready_wait = <A>(r : Request(A)) <- (await : request.Await) {
 	await.wait(request.ticket(r))
 }
 
 // §5.4 race-then-read: the losing waiter never owns the producer.
-race_read = () <- (gates: Gates, control: Control) {
+race_read = () <- (gates : Gates, control : Control) {
 	a = gates.wait(1)
 	b = gates.wait(2)
 	task.scope((s) {
@@ -147,7 +147,7 @@ forever = () -> Never {
 }
 
 // §12.8: nested waiter interests reach the root despite a CPU-yielding sibling.
-nested_interest = () <- (gates: Gates) {
+nested_interest = () <- (gates : Gates) {
 	task.race(
 		() {
 			task.run(() {
@@ -163,7 +163,7 @@ nested_interest = () <- (gates: Gates) {
 
 // A missing nested progress-interest route fails after turns, without a timer
 // or an indefinitely hanging test process. A delivered answer gets a FIFO turn.
-bounded_cpu = (turns: Int) -> Never {
+bounded_cpu = (turns : Int) -> Never {
 	turns |>
 		(0) { panic("nested IO progress was not forwarded") }
 		| (_) {
@@ -173,7 +173,7 @@ bounded_cpu = (turns: Int) -> Never {
 }
 
 // §6.4: every Owner affiliated with this run's Root counts as work.
-owned_idle = () <- (gates: Gates) {
+owned_idle = () <- (gates : Gates) {
 	{
 		gates.wait(9)
 		task.sync(task.never())
@@ -182,7 +182,7 @@ owned_idle = () <- (gates: Gates) {
 }
 
 // §6.4: a producer in a different Root cannot keep this run alive.
-unrelated_idle = () <- (gates: Gates) {
+unrelated_idle = () <- (gates : Gates) {
 	unrelated = request.open_root()
 	{
 		gates.wait(9)
@@ -192,7 +192,7 @@ unrelated_idle = () <- (gates: Gates) {
 }
 
 // §12.8: raw work alone does not authorize runnable progress polls.
-raw_only = () <- (gates: Gates, control: Control) {
+raw_only = () <- (gates : Gates, control : Control) {
 	gates.wait(9)
 	task.yield()
 	task.yield()
@@ -213,9 +213,9 @@ pure_tasks = () {
 	) |> ((a, b)) { a + b }
 }
 
-cmp = (a: Float, b: Float) { a -. b }
+cmp = (a : Float, b : Float) { a -. b }
 
-cmp2 = (a: Float, b: Float) { cmp(a, b) }
+cmp2 = (a : Float, b : Float) { cmp(a, b) }
 
 fake = () { request.await_owned(request.ready(7)) }
 
@@ -227,7 +227,7 @@ one = () {
 	)
 }
 
-trace = (seed: Int) {
+trace = (seed : Int) {
 	result = fail.catch(() {
 		task.test(random.from_seed(seed), [[1], [1, 2], [1, 1]], () {
 			task.scope((s) {
@@ -248,13 +248,13 @@ trace = (seed: Int) {
 		| (Error(_)) { panic("invalid replay script") }
 }
 
-expected_one = (seed: Int, p: List(Int)) {
+expected_one = (seed : Int, p : List(Int)) {
 	generator = fail.catch(() { random.at_path(random.from_seed(seed), p) }) |>
 		(Ok(g)) { g }
 		| (Error(_)) { panic("invalid expected path") }
 	core.inspect((p, random.word(generator)))
 }
 
-expected_trace = (seed: Int) {
+expected_trace = (seed : Int) {
 	expected_one(seed, [1, 1]) <> "/" <> expected_one(seed, [1, 2])
 }

@@ -21,7 +21,7 @@ Clock = (
 	sleep_ns = (Int) -> Request(Result(Nil, String)),
 )
 
-monotonic_ns = () <- (clock: Clock) {
+monotonic_ns = () <- (clock : Clock) {
 	request.await_owned(clock.monotonic_ns()) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -29,7 +29,7 @@ monotonic_ns = () <- (clock: Clock) {
 		}
 }
 
-unix_ns = () <- (clock: Clock) {
+unix_ns = () <- (clock : Clock) {
 	request.await_owned(clock.unix_ns()) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -37,7 +37,7 @@ unix_ns = () <- (clock: Clock) {
 		}
 }
 
-sleep_ns = (duration: Int) <- (clock: Clock) {
+sleep_ns = (duration : Int) <- (clock : Clock) {
 	request.await_owned(clock.sleep_ns(duration)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {

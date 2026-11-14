@@ -13,26 +13,26 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text : String) <- (out : Out) { out.print(text) }
 
 main = () {
-	callback = control.keep_env((work: (() -> Nil, () -> Nil) -> Nil) {
+	callback = control.keep_env((work : (() -> Nil, () -> Nil) -> Nil) {
 		task.scope((s) {
-			gate: task.Channel(Nil) = task.channel()
-			parked: task.Channel(Nil) = task.channel()
+			gate : task.Channel(Nil) = task.channel()
+			parked : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.receive(gate)
 				task.yield()
 				fail.raise("callback")
 			})
-			arm = control.keep_env((_: Nil) { task.send(gate, Nil) })
-			park = control.keep_env((_: Nil) { task.send(parked, Nil) })
+			arm = control.keep_env((_ : Nil) { task.send(gate, Nil) })
+			park = control.keep_env((_ : Nil) { task.send(parked, Nil) })
 			work(() { arm(Nil) }, () { park(Nil) })
 		})
 	})
 	assert(
 		task.run(() {
-			work = control.keep_env((callbacks: (() -> Nil, () -> Nil)) {
+			work = control.keep_env((callbacks : (() -> Nil, () -> Nil)) {
 				(arm, park) = callbacks
 				task.scope((inner) {
 					child = task.go(inner, () {

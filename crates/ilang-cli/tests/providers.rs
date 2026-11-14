@@ -39,6 +39,11 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
     // std/test and must expand their macros before comparing diagnostics.
     // These counts come from landed tip cc26b8d9, not a stage-three recording.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
+    // Formatting changes source coordinates. Pin those exact corrections separately
+    // until the coordinator records the corpus on the gate tree; retain the full
+    // diagnostic comparison, including every resulting coordinate.
+    let locations: serde_json::Value =
+        serde_json::from_str(include_str!("providers_format_locations.json")).unwrap();
     for (case, count, provider_count) in [
         ("review-k4d/_loose/fuzz/e0505/21_4", 3, 2),
         ("review-k4d/_loose/p/b1", 5, 5),
@@ -66,6 +71,7 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
             .unwrap()
             .lines()
             .filter(|line| line.contains("error["))
+            .map(str::to_owned)
             .collect();
         assert_eq!(expected.len(), count, "landed diagnostic count: {case}");
         assert_eq!(
@@ -86,7 +92,20 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
         let mut actual: Vec<_> = stderr
             .lines()
             .filter(|line| line.contains("error["))
+            .map(str::to_owned)
             .collect();
+        for correction in locations[case].as_array().unwrap() {
+            let before = correction["before"].as_str().unwrap();
+            let after = correction["after"].as_str().unwrap();
+            if let Some(line) = expected.iter_mut().find(|line| line.as_str() == before) {
+                *line = after.to_owned();
+            } else {
+                assert!(
+                    expected.iter().any(|line| line == after),
+                    "stale coordinate correction: {case}: {before}"
+                );
+            }
+        }
         expected.sort_unstable();
         actual.sort_unstable();
         assert_eq!(actual, expected, "{case}");
@@ -96,14 +115,14 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
 #[test]
 fn private_user_factory_and_transitive_dependency_execute() {
     passes(
-        "Config = (value = Int)\nService = (read = () -> Int)\nconfig = () { Config(value = 40) }\nmake = () <- (c: Config) { Service(read = () { c.value + 2 }) }\nmain = () <- (s: Service) { assert(s.read() == 42) }",
+        "Config = (value = Int)\nService = (read = () -> Int)\nconfig = () { Config(value = 40) }\nmake = () <- (c : Config) { Service(read = () { c.value + 2 }) }\nmain = () <- (s : Service) { assert(s.read() == 42) }",
         &[row("Config", "config"), row("Service", "make")].concat(),
     );
 }
 #[test]
 fn parameter_instances_have_separate_factory_environments() {
     passes(
-        "(\n\ti/key\n)\nData(A) = (read = () -> A, key = Key(Nil))\nCell(A) = (read = () -> A, key = Key(Nil))\nLeft = (key = Key(Nil))\nRight = (key = Key(Nil))\ndata = <A>() -> Data(A) {\n\tData(read = () { panic(\"unused value\") }, key = key.new())\n}\ncell = <A>() <- (d: Data(A)) -> Cell(A) { Cell(read = d.read, key = d.key) }\nleft = () <- (c: Cell(Int)) { Left(key = c.key) }\nright = () <- (c: Cell(String)) { Right(key = c.key) }\nmain = () <- (l: Left, r: Right) { assert(l.key != r.key) }",
+        "(\n\ti/key\n)\nData(A) = (read = () -> A, key = Key(Nil))\nCell(A) = (read = () -> A, key = Key(Nil))\nLeft = (key = Key(Nil))\nRight = (key = Key(Nil))\ndata = <A>() -> Data(A) {\n\tData(read = () { panic(\"unused value\") }, key = key.new())\n}\ncell = <A>() <- (d : Data(A)) -> Cell(A) { Cell(read = d.read, key = d.key) }\nleft = () <- (c : Cell(Int)) { Left(key = c.key) }\nright = () <- (c : Cell(String)) { Right(key = c.key) }\nmain = () <- (l : Left, r : Right) { assert(l.key != r.key) }",
         &[
             row("Data", "data"),
             row("Cell", "cell"),
@@ -116,14 +135,14 @@ fn parameter_instances_have_separate_factory_environments() {
 #[test]
 fn seed_aware_factory_runs_inside_user_adapter() {
     passes(
-        "(\n\ti/core\n)\nS = (value = Int)\nretain = (x) { x }\nadapt = <A, N>(body: () <- N -> A) -> A {\n\tcore.portable(body) |>\n\t\t(True) { panic(\"entry body escaped portability\") }\n\t\t| (False) { Nil }\n\tretain(body()) <- (S(value = 40))\n}\nmake = (seeds: List(S)) -> S {\n\tseeds |> ([s]) { S(value = s.value + 2) } | (_) { panic(\"missing seed\") }\n}\nmain = () <- (s: S) { assert(s.value == 42) }",
+        "(\n\ti/core\n)\nS = (value = Int)\nretain = (x) { x }\nadapt = <A, N>(body : () <- N -> A) -> A {\n\tcore.portable(body) |>\n\t\t(True) { panic(\"entry body escaped portability\") }\n\t\t| (False) { Nil }\n\tretain(body()) <- (S(value = 40))\n}\nmake = (seeds : List(S)) -> S {\n\tseeds |> ([s]) { S(value = s.value + 2) } | (_) { panic(\"missing seed\") }\n}\nmain = () <- (s : S) { assert(s.value == 42) }",
         "[providers.\"app/main.S\"]\nrole = \"runner\"\nadapter = \"app/main.adapt\"\nnative = {factory=\"app/main.make\", arguments=[\"seed\"], seed_required=true}\n[provider_adapters.\"app/main.adapt\"]\nsupplies = [\"app/main.S\"]\nrequires = []\n",
     );
 }
 #[test]
 fn adapter_cannot_call_body_twice() {
     let outcome = run(
-        "S = ()\nadapt = <A, N>(body: () <- N -> A) -> A {\n\t{\n\t\tx = body()\n\t\tbody()\n\t} <- (S)\n}\nmake = () { S }\nmain = () <- (s: S) { Nil }",
+        "S = ()\nadapt = <A, N>(body : () <- N -> A) -> A {\n\t{\n\t\tx = body()\n\t\tbody()\n\t} <- (S)\n}\nmake = () { S }\nmain = () <- (s : S) { Nil }",
         "[providers.\"app/main.S\"]\nrole = \"scheduler\"\nadapter = \"app/main.adapt\"\nnative = \"app/main.make\"\n[provider_adapters.\"app/main.adapt\"]\nsupplies = [\"app/main.S\"]\nrequires = []\n",
     );
     assert!(
@@ -134,7 +153,7 @@ fn adapter_cannot_call_body_twice() {
 #[test]
 fn columns_and_cli_ilang_alias_select_their_factories() {
     let dir = project(
-        "(\n\tS\n\tprobe\n)\nS = (value = Int)\na = () { S(value = 1) }\nb = () { S(value = 2) }\nc = () { S(value = 3) }\nd = () { S(value = 4) }\ne = () { S(value = 5) }\nprobe = () <- (s: S) { s.value }\nmain = () { Nil }\n",
+        "(\n\tS\n\tprobe\n)\nS = (value = Int)\na = () { S(value = 1) }\nb = () { S(value = 2) }\nc = () { S(value = 3) }\nd = () { S(value = 4) }\ne = () { S(value = 5) }\nprobe = () <- (s : S) { s.value }\nmain = () { Nil }\n",
         "[wasm]\nexports = [\"app/main.probe\"]\n[providers.\"app/main.S\"]\njs = \"app/main.a\"\nnodejs = \"app/main.b\"\nnative = \"app/main.c\"\nwasi = \"app/main.d\"\nhost = \"app/main.e\"\n",
     );
     for (target, expected) in [
@@ -178,7 +197,7 @@ fn columns_and_cli_ilang_alias_select_their_factories() {
 }
 #[test]
 fn missing_provider_is_a_build_error_but_source_check_passes() {
-    let dir = project("Missing = ()\nmain = () <- (s: Missing) { Nil }", "");
+    let dir = project("Missing = ()\nmain = () <- (s : Missing) { Nil }", "");
     let error = build(dir.path(), options(Target::Native))
         .err()
         .unwrap()
@@ -202,7 +221,7 @@ fn missing_provider_is_a_build_error_but_source_check_passes() {
 #[test]
 fn missing_host_registration_names_the_service_before_execution() {
     let dir = project(
-        "@host(\"custom\")\nService = (read = () -> Int)\nmain = () <- (s: Service) { Nil }",
+        "@host(\"custom\")\nService = (read = () -> Int)\nmain = () <- (s : Service) { Nil }",
         "",
     );
     let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
@@ -217,7 +236,7 @@ fn missing_host_registration_names_the_service_before_execution() {
 #[test]
 fn synchronous_export_rejects_transitive_request_provider() {
     let dir = project(
-        "(\n\tS\n\tprobe\n)\nS = ()\n@host(\"custom\", \"request\")\nWork = (start = () -> Request(Int))\nmake = () <- (w: Work) { S }\nprobe = () <- (s: S) { Nil }",
+        "(\n\tS\n\tprobe\n)\nS = ()\n@host(\"custom\", \"request\")\nWork = (start = () -> Request(Int))\nmake = () <- (w : Work) { S }\nprobe = () <- (s : S) { Nil }",
         "[wasm]\nexports = [\"app/main.probe\"]\nsynchronous = [\"app/main.probe\"]\n[providers.\"app/main.S\"]\nnative = \"app/main.make\"\n",
     );
     let error = build(dir.path(), options(Target::Native))
@@ -232,14 +251,14 @@ fn synchronous_export_rejects_transitive_request_provider() {
 #[test]
 fn diamond_shares_a_factory_value_once_per_invocation() {
     passes(
-        "(\n\ti/key\n)\nD = (key = Key(Nil))\nB = (key = Key(Nil))\nC = (key = Key(Nil))\nd = () { D(key = key.new()) }\nb = () <- (d: D) { B(key = d.key) }\nc = () <- (d: D) { C(key = d.key) }\nmain = () <- (b: B, c: C) { assert(b.key == c.key) }",
+        "(\n\ti/key\n)\nD = (key = Key(Nil))\nB = (key = Key(Nil))\nC = (key = Key(Nil))\nd = () { D(key = key.new()) }\nb = () <- (d : D) { B(key = d.key) }\nc = () <- (d : D) { C(key = d.key) }\nmain = () <- (b : B, c : C) { assert(b.key == c.key) }",
         &[row("D", "d"), row("B", "b"), row("C", "c")].concat(),
     );
 }
 #[test]
 fn generated_root_key_is_shared_without_a_request_service() {
     passes(
-        "A = (key = Key(Nil))\nB = (key = Key(Nil))\na = (key: Key(Nil)) { A(key = key) }\nb = (key: Key(Nil)) { B(key = key) }\nmain = () <- (a: A, b: B) { assert(a.key == b.key) }",
+        "A = (key = Key(Nil))\nB = (key = Key(Nil))\na = (key : Key(Nil)) { A(key = key) }\nb = (key : Key(Nil)) { B(key = key) }\nmain = () <- (a : A, b : B) { assert(a.key == b.key) }",
         "[providers.\"app/main.A\"]\nnative = {factory=\"app/main.a\", arguments=[\"entry-root-key\"]}\n[providers.\"app/main.B\"]\nnative = {factory=\"app/main.b\", arguments=[\"entry-root-key\"]}\n",
     );
 }
@@ -247,7 +266,7 @@ fn generated_root_key_is_shared_without_a_request_service() {
 #[test]
 fn nullary_override_replaces_the_adapters_service_value() {
     passes(
-        "S = (value = Int)\nretain = (x) { x }\nadapt = <A, N>(body: () <- N -> A) -> A { retain(body()) <- (S(value = 40)) }\nmake = () { S(value = 42) }\nmain = () <- (s: S) { assert(s.value == 42) }",
+        "S = (value = Int)\nretain = (x) { x }\nadapt = <A, N>(body : () <- N -> A) -> A { retain(body()) <- (S(value = 40)) }\nmake = () { S(value = 42) }\nmain = () <- (s : S) { assert(s.value == 42) }",
         "[providers.\"app/main.S\"]\nrole = \"runner\"\nadapter = \"app/main.adapt\"\nnative = \"app/main.make\"\n[provider_adapters.\"app/main.adapt\"]\nsupplies = [\"app/main.S\"]\nrequires = []\n",
     );
 }
@@ -265,7 +284,7 @@ fn target_schema_is_checked_without_an_entry() {
 #[test]
 fn generated_discriminant_provisions_constructor_fields() {
     passes(
-        "Part = (value = Int)\nOn = (Part)\nOff = ()\nBundleKind = On | Off\nBundle = (value = BundleKind)\npart = () { Part(value = 42) }\nmain = () <- (b: Bundle) {\n\tb.value |> (On(p)) { assert(p.value == 42) } | (Off) { panic(\"wrong target\") }\n}",
+        "Part = (value = Int)\nOn = (Part)\nOff = ()\nBundleKind = On | Off\nBundle = (value = BundleKind)\npart = () { Part(value = 42) }\nmain = () <- (b : Bundle) {\n\tb.value |> (On(p)) { assert(p.value == 42) } | (Off) { panic(\"wrong target\") }\n}",
         &(row("Part", "part")
             + "[providers.\"app/main.Bundle\"]\ndiscriminant = {js=\"app/main.Off\", nodejs=\"app/main.On\", native=\"app/main.On\", wasi=\"app/main.Off\", host=\"app/main.Off\"}\n"),
     );
@@ -274,7 +293,7 @@ fn generated_discriminant_provisions_constructor_fields() {
 #[test]
 fn factory_request_dependencies_classify_and_suspend_the_entry() {
     let dir = project(
-        "(\n\ti/clock\n\ti/fail\n)\nS = (value = Int)\nmake = () {\n\tfail.catch(() { clock.sleep_ns(1000) }) |>\n\t\t(Ok(_)) { S(value = 42) }\n\t\t| (Error(_)) { panic(\"clock failed\") }\n}\nmain = () <- (s: S) { assert(s.value == 42) }",
+        "(\n\ti/clock\n\ti/fail\n)\nS = (value = Int)\nmake = () {\n\tfail.catch(() { clock.sleep_ns(1000) }) |>\n\t\t(Ok(_)) { S(value = 42) }\n\t\t| (Error(_)) { panic(\"clock failed\") }\n}\nmain = () <- (s : S) { assert(s.value == 42) }",
         &row("S", "make"),
     );
     let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
@@ -293,7 +312,7 @@ fn external_function_factory_uses_its_checked_calling_convention() {
         atomic::{AtomicUsize, Ordering},
     };
     let dir = project(
-        "Token = Opaque\n@external(\"custom\", \"make\")\nmake: () -> Token\nmain = () <- (token: Token) { Nil }",
+        "Token = Opaque\n@external(\"custom\", \"make\")\nmake : () -> Token\nmain = () <- (token : Token) { Nil }",
         &row("Token", "make"),
     );
     let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
@@ -342,7 +361,7 @@ make = () {
 		| (Error(_)) { panic("clock failed") }
 }
 main = () { panic("unselected main") }
-worker = () <- (s: S) { assert(s.value == 42) }
+worker = () <- (s : S) { assert(s.value == 42) }
 test.test("configured", () { worker() })
 "#,
         &(row("S", "make")
@@ -381,7 +400,7 @@ test.test("configured", () { worker() })
 #[test]
 fn dependency_defaults_own_services_and_root_override_keeps_authority() {
     let dir = project(
-        "(\n\tdep = dep/main\n)\nmain = () <- (s: dep.Service) { assert(s.read() == 42) }",
+        "(\n\tdep = dep/main\n)\nmain = () <- (s : dep.Service) { assert(s.read() == 42) }",
         "[dependencies]\ndep = {path=\"dep\"}\n",
     );
     std::fs::create_dir_all(dir.path().join("dep/src")).unwrap();
@@ -403,7 +422,7 @@ fn dependency_defaults_own_services_and_root_override_keeps_authority() {
             .unwrap(),
         Outcome::Ok(_)
     ));
-    std::fs::write(dir.path().join("src/main.i"), "(\n\tdep = dep/main\n)\nfake = () { dep.Service(read = () { 7 }) }\nmain = () <- (s: dep.Service) { assert(s.read() == 7) }").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(\n\tdep = dep/main\n)\nfake = () { dep.Service(read = () { 7 }) }\nmain = () <- (s : dep.Service) { assert(s.read() == 7) }").unwrap();
     std::fs::write(dir.path().join("i.toml"), "name=\"app\"\n[dependencies]\ndep={path=\"dep\"}\n[providers.\"dep/main.Service\"]\nnative=\"app/main.fake\"\n").unwrap();
     let b = build(dir.path(), options(Target::Native)).unwrap_or_else(|e| panic!("{e}"));
     assert!(matches!(

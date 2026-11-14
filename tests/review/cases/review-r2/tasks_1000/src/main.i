@@ -8,7 +8,7 @@
 	rng = i/random
 	(Io) = i/io
 )
-many = (s, n: Int) {
+many = (s, n : Int) {
 	{ n == 0 } |>
 		(True) { Nil }
 		| (False) {
@@ -17,7 +17,7 @@ many = (s, n: Int) {
 		}
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.scope((s) { many(s, 1000) })
 	io.print("tasks-ok")
 }

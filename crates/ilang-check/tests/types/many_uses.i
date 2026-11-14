@@ -22,9 +22,9 @@ main = () { control.boundary((b) { f(b, 0) }) }
 
 // Two upper bounds with one type constructor whose arguments cannot be
 // equal: the problem is found once, where the second is given.
-take_int = (b: Boundary(Int, Never, Never)) { Nil }
+take_int = (b : Boundary(Int, Never, Never)) { Nil }
 
-take_string = (b: Boundary(String, Never, Never)) { Nil }
+take_string = (b : Boundary(String, Never, Never)) { Nil }
 
 g = (b) {
 	take_int(b)

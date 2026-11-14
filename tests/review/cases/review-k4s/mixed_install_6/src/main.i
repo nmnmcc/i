@@ -4,12 +4,12 @@
 
 S(A) = (value = A)
 
-one = () <- (s: S(Int)) { s.value + 1 }
+one = () <- (s : S(Int)) { s.value + 1 }
 
-run = <N>(f: () <- N -> Int, x: N) { f() }
+run = <N>(f : () <- N -> Int, x : N) { f() }
 
 bad = () {
-	_syn3_0: S(String) = S(value = "bad")
+	_syn3_0 : S(String) = S(value = "bad")
 	run(() { one() }, S(value = "hi")) <- (_syn3_0)
 }
 

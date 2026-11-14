@@ -1,5 +1,5 @@
 State(A) = (get = () -> A)
-cur = <A>(seed: A) <- (st: State(A)) { st.get() }
+cur = <A>(seed : A) <- (st : State(A)) { st.get() }
 
 main = () {
 	{

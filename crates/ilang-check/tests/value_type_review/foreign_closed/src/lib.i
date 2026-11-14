@@ -3,4 +3,4 @@
 	v
 )
 Box(A) = (A)
-v: Box(Int) = Box(1)
+v : Box(Int) = Box(1)

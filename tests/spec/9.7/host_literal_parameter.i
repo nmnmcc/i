@@ -4,4 +4,4 @@
 @host("test:io/v1")
 Io = (print = ("a" | "b") -> Nil)
 
-main = () <- (io: Io) { io.print("b") }
+main = () <- (io : Io) { io.print("b") }

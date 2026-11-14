@@ -16,16 +16,16 @@
 )
 
 @external("abi:bench", "tick")
-tick: (Int) -> Int
+tick : (Int) -> Int
 
 @external("abi:bench", "read")
-read: (Int) -> BitArray
+read : (Int) -> BitArray
 
-counter = (n: Int, value: Int) -> Int {
+counter = (n : Int, value : Int) -> Int {
 	{ n == 0 } |> (True) { value } | (False) { counter(n - 1, tick(value)) }
 }
 
-read_lengths = (n: Int, length: Int) -> Int {
+read_lengths = (n : Int, length : Int) -> Int {
 	{ n == 0 } |>
 		(True) { length }
 		| (False) {
@@ -36,22 +36,22 @@ read_lengths = (n: Int, length: Int) -> Int {
 		}
 }
 
-add = (n: Int, a: Int, b: Int, last: Int) -> Int {
+add = (n : Int, a : Int, b : Int, last : Int) -> Int {
 	{ n == 0 } |> (True) { last } | (False) { add(n - 1, a, b, last + b) }
 }
 
-compare = (n: Int, a: Int, b: Int, last: Bool) -> Bool {
+compare = (n : Int, a : Int, b : Int, last : Bool) -> Bool {
 	{ n == 0 } |> (True) { last } | (False) { compare(n - 1, a, b, n < b) }
 }
 
-empty = (n: Int, a: Int, b: Int, last: Int) -> Int {
+empty = (n : Int, a : Int, b : Int, last : Int) -> Int {
 	{ n == 0 } |> (True) { last } | (False) { empty(n - 1, a, b, a) }
 }
 
-echo = (value: Int) -> Int { tick(value) }
+echo = (value : Int) -> Int { tick(value) }
 
 // Real filesystem adapter; /dev/zero keeps every read at eight bytes.
-fs_reads = (n: Int, path: String) {
+fs_reads = (n : Int, path : String) {
 	fail.catch(() {
 		resource.acquire(
 			() { fs.open(path, fs.ReadOnly) },
@@ -63,7 +63,7 @@ fs_reads = (n: Int, path: String) {
 		| (Error(_)) { panic("fs read benchmark") }
 }
 
-fs_loop = (n: Int, file: fs.File) {
+fs_loop = (n : Int, file : fs.File) {
 	{ n == 0 } |>
 		(True) { 0 }
 		| (False) {

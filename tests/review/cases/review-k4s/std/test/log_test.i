@@ -14,31 +14,31 @@ Message = ()
 Event = Sent | Message
 Capture = (record = (Event) -> Nil)
 
-record = (event: Event) <- (capture: Capture) -> Nil { capture.record(event) }
+record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }
 
 // std-2 §7: finite, closed instantiations retain service and error types.
-deliver: (log.Entry) <- (
+deliver : (log.Entry) <- (
 	Fail(String),
 	Capture,
 	log.Sink(String, Capture),
 ) -> Nil = log.write
 
-query: (log.Level) <- (log.Sink(String, Capture)) -> Bool = log.enabled
+query : (log.Level) <- (log.Sink(String, Capture)) -> Bool = log.enabled
 
-defer_message: (log.Level, () <- (Fail(String), Capture) -> String) <- (
+defer_message : (log.Level, () <- (Fail(String), Capture) -> String) <- (
 	Fail(String),
 	Capture,
 	log.Sink(String, Capture),
 ) -> Nil = log.lazy
 
 capture_sink = () -> log.Sink(String, Capture) {
-	log.make((_: log.Level) { True }, (entry) { record(Sent(entry)) })
+	log.make((_ : log.Level) { True }, (entry) { record(Sent(entry)) })
 }
 
 // A pure divergent predicate detects an unwanted call without adding effects.
-unreachable = (level: log.Level) -> Bool { unreachable(level) }
+unreachable = (level : log.Level) -> Bool { unreachable(level) }
 
-entry = (level: log.Level) -> log.Entry {
+entry = (level : log.Level) -> log.Entry {
 	log.Entry(level = level, message = "hello", fields = [], at = None)
 }
 
@@ -53,11 +53,11 @@ test("log_delivery", () {
 	producer = () { deliver(original) }
 	trace = control.boundary((b) {
 		{
-			_syn3_0: log.Sink(String, Capture) = log.silent()
+			_syn3_0 : log.Sink(String, Capture) = log.silent()
 			{
 				producer()
 				{
-					_syn3_1: log.Sink(String, Capture) = capture_sink()
+					_syn3_1 : log.Sink(String, Capture) = capture_sink()
 					{
 						assert(query(log.Info))
 						producer()
@@ -85,7 +85,7 @@ test("log_delivery", () {
 test("log_lazy", () {
 	trace = control.boundary((b) {
 		{
-			_syn3_2: log.Sink(String, Capture) = log.silent()
+			_syn3_2 : log.Sink(String, Capture) = log.silent()
 			{
 				assert(query(log.Info) == False)
 				defer_message(log.Info, () { fail.raise("must not run") })
@@ -94,7 +94,7 @@ test("log_lazy", () {
 					entry(log.Info)
 				})
 				{
-					_syn3_3: log.Sink(String, Capture) = capture_sink()
+					_syn3_3 : log.Sink(String, Capture) = capture_sink()
 					{
 						defer_message(log.Info, () {
 							record(Message)
@@ -155,7 +155,7 @@ test("log_filters", () {
 		(threshold, expected) = case
 		trace = control.boundary((b) {
 			{
-				_syn3_4: log.Sink(String, Capture) = log.minimum(
+				_syn3_4 : log.Sink(String, Capture) = log.minimum(
 					capture_sink(),
 					threshold,
 				)
@@ -178,7 +178,7 @@ test("log_filters", () {
 			(inner, inner_levels) = inner_case
 			trace = control.boundary((b) {
 				{
-					_syn3_5: log.Sink(String, Capture) = log.minimum(
+					_syn3_5 : log.Sink(String, Capture) = log.minimum(
 						log.minimum(capture_sink(), inner),
 						threshold,
 					)
@@ -207,8 +207,8 @@ test("log_filters", () {
 	})
 	trace = control.boundary((b) {
 		{
-			_syn3_6: log.Sink(String, Capture) = log.filter(capture_sink(), (
-				_: log.Level
+			_syn3_6 : log.Sink(String, Capture) = log.filter(capture_sink(), (
+				_ : log.Level
 			) { True })
 			{
 				list.each(levels, (level) { deliver(entry(level)) })
@@ -225,10 +225,10 @@ test("log_filters", () {
 		)
 	})
 	assert(trace == list.map(levels, (level) { Sent(entry(level)) }))
-	_syn3_7: log.Sink(String, Capture) = log.filter(
+	_syn3_7 : log.Sink(String, Capture) = log.filter(
 		// L4 requires new_accept before old_accept and short-circuiting.
-		log.make(unreachable, (_: log.Entry) -> Nil { Nil }),
-		(_: log.Level) { False },
+		log.make(unreachable, (_ : log.Entry) -> Nil { Nil }),
+		(_ : log.Level) { False },
 	)
 	{
 		assert(query(log.Info) == False)
@@ -238,7 +238,7 @@ test("log_filters", () {
 
 DeliveryError = (String)
 
-broken_deliver: (log.Entry) <- (
+broken_deliver : (log.Entry) <- (
 	Fail(DeliveryError),
 	Capture,
 	log.Sink(DeliveryError, Capture),
@@ -248,8 +248,8 @@ broken_deliver: (log.Entry) <- (
 test("log_errors", () {
 	trace = control.boundary((b) {
 		{
-			_syn3_8: log.Sink(DeliveryError, Capture) = log.make(
-				(_: log.Level) { True },
+			_syn3_8 : log.Sink(DeliveryError, Capture) = log.make(
+				(_ : log.Level) { True },
 				(event) {
 					record(Sent(event))
 					fail.raise(DeliveryError(event.message))

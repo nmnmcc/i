@@ -19,7 +19,7 @@ Two children and a result:
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	answer = task.scope((s) {
 		a = task.go(s, () { 20 })
 		b = task.go(s, () { 22 })
@@ -50,7 +50,7 @@ forever = () -> Never {
 	forever()
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	answer = task.race(
 		() {
 			task.yield()
@@ -77,9 +77,9 @@ A channel between two children:
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.scope((s) {
-		c: task.Channel(String) = task.channel()
+		c : task.Channel(String) = task.channel()
 		task.go(s, () { task.send(c, "hello") })
 		receiver = task.go(s, () { io.print(task.receive(c)) })
 		task.join(receiver)

@@ -4,6 +4,6 @@
 	testlib = (test) = std/test
 )
 
-name = (b: Bool) { b |> (True) { "yes" } | (_) { "no" } | (False) { "never" } }
+name = (b : Bool) { b |> (True) { "yes" } | (_) { "no" } | (False) { "never" } }
 
 test("names", () { name(False) |> ("no") { Nil } | (_) { panic("no") } })

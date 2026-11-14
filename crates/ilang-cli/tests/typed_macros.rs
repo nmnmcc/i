@@ -203,7 +203,7 @@ fn typed_macro_rejects_implementation_arity() {
 }
 #[test]
 fn typed_macro_forwarding_record_differential() {
-    let (_,c)=checked(ID,"(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { m.identity(x).a }\nmain = () { assert(f((a = 42, b = \"b\")) == 42) }").unwrap();
+    let (_,c)=checked(ID,"(\n\tm = app/macros\n)\nf = (x : (a = Int, b = String)) { m.identity(x).a }\nmain = () { assert(f((a = 42, b = \"b\")) == 42) }").unwrap();
     assert_eq!(c.types.unwrap().typed_expansions.len(), 1);
 }
 #[test]
@@ -323,10 +323,10 @@ fn typed_macro_identity_principal_graph_differential() {
 }
 #[test]
 fn typed_macro_forwarding_principal_record_graph_differential() {
-    let (_,typed)=checked(ID,"(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { m.identity(x) }\nmain = () { f((a = 42, b = \"x\")) }").unwrap();
+    let (_,typed)=checked(ID,"(\n\tm = app/macros\n)\nf = (x : (a = Int, b = String)) { m.identity(x) }\nmain = () { f((a = 42, b = \"x\")) }").unwrap();
     let (_, plain) = checked(
         ID,
-        "(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { x }\nmain = () { f((a = 42, b = \"x\")) }",
+        "(\n\tm = app/macros\n)\nf = (x : (a = Int, b = String)) { x }\nmain = () { f((a = 42, b = \"x\")) }",
     )
     .unwrap();
     same_principal(&typed, &plain, "f");
@@ -437,7 +437,7 @@ fn typed_macro_members_give_each_closed_data_member_once() {
     );
     checked(
         &m,
-        "(\n\tm = app/macros\n)\nf = (x: (a = Int) | (b = String)) { m.m(x) }\nmain = () { f((a = 42)) }",
+        "(\n\tm = app/macros\n)\nf = (x : { (a = Int) | (b = String) }) { m.m(x) }\nmain = () { f((a = 42)) }",
     )
     .unwrap();
 }
@@ -469,7 +469,7 @@ fn typed_macro_members_accept_symbolic_difference_without_new_bounds() {
 
 #[test]
 fn typed_macro_forwarding_keeps_original_value_type_reads() {
-    checked(ID,"(m = app/macros)\nf = (x: Int) { m.identity(() -> x { x })() }\nmain = () { assert(f(42) == 42) }").unwrap();
+    checked(ID,"(m = app/macros)\nf = (x : Int) { m.identity(() -> x { x })() }\nmain = () { assert(f(42) == 42) }").unwrap();
 }
 #[test]
 fn typed_macro_argument_binder_cannot_escape() {

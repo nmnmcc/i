@@ -523,17 +523,18 @@ hangs; do not use sleep timing as the semantic oracle.
 **Stop beside a spin.** On two workers force the two children to start remotely:
 
 ```i
-(i/task)
+(
+	i/task
+)
 
 spin = () { spin() }
 
-
 main = () {
-  task.scope((s) {
-    task.go(s, spin)
-    task.go(s, () { panic("first") })
-    Nil
-  })
+	task.scope((s) {
+		task.go(s, spin)
+		task.go(s, () { panic("first") })
+		Nil
+	})
 }
 ```
 
@@ -570,7 +571,7 @@ cleanup; an already-removed alias gives Nil.
 @host("i:net/v1", "request")
 Pretend = (read = (Int, Int) -> Request(Result(BitArray, String)))
 
-main = () <- (raw: Pretend) { request.await(raw.read(1, 1)) }
+main = () <- (raw : Pretend) { request.await(raw.read(1, 1)) }
 ```
 
 Private exports alone do not block it. §3.1 denies automatic binding before any service
@@ -683,7 +684,7 @@ timeouts and plugin cleanup, not only tasks.
 @host("review:gate/v1", "request")
 Gate = (wait = () -> Request(Nil))
 
-main = () <- (gate: Gate, root: request.Root) {
+main = () <- (gate : Gate, root : request.Root) {
 	pending = gate.wait()
 	task.scope((s) {
 		child = task.go(s, () { request.count_root(root) })
@@ -719,10 +720,13 @@ request.await remains borrowed. Test with a live Stream and a host fixture
 that keeps the first read pending until the second branch wins:
 
 ```i
-(i/net, i/task)
-twice = (stream: net.Stream) {
-  task.race(() { net.read(stream, 1) }, () { <<>> })
-  net.read(stream, 1)
+(
+	i/net
+	i/task
+)
+twice = (stream : net.Stream) {
+	task.race(() { net.read(stream, 1) }, () { <<>> })
+	net.read(stream, 1)
 }
 ```
 
@@ -755,16 +759,22 @@ for H4/status 1, independently of this program-progress predicate.
 11–12 now distinguish stateful handles from pure event descriptions:
 
 ```i
-(i/task, i/control, i/core)
+(
+	i/task
+	i/control
+	i/core
+)
 event = task.always(1)
 
 main = () {
-  task.run(() { assert(task.sync(event) == 1) })
-  task.run(() { assert(task.sync(event) == 1) })
-  control.boundary((b) {
-    e = task.map(task.always(Nil), (_) { b })
-    assert(core.not(core.portable(e)))
-  })
+	task.run(() { assert(task.sync(event) == 1) })
+	task.run(() { assert(task.sync(event) == 1) })
+	control.boundary((b) {
+		e = task.map(task.always(Nil), (_) { b })
+		assert(
+			core.not(core.portable(e)),
+		)
+	})
 }
 ```
 
@@ -786,7 +796,7 @@ by a nested run on the same worker:
 @host("review:gate/v1", "request")
 Gate = (wait = () -> Request(Nil))
 
-main = () <- (gate: Gate) {
+main = () <- (gate : Gate) {
 	pending = gate.wait()
 	task.run(() { request.await(pending) })
 }
@@ -802,15 +812,17 @@ A captured Request pins a child normally; no cross-worker borrow is introduced.
 **N-R6 combined counter.** The review's go/run/go case is:
 
 ```i
-(i/task)
+(
+	i/task
+)
 
 main = () {
-  task.scope((s) {
-    a = task.go(s, task.path)
-    nested = task.run(task.path)
-    b = task.go(s, task.path)
-    assert((task.join(a), nested, task.join(b)) == ([1], [2], [3]))
-  })
+	task.scope((s) {
+		a = task.go(s, task.path)
+		nested = task.run(task.path)
+		b = task.go(s, task.path)
+		assert((task.join(a), nested, task.join(b)) == ([1], [2], [3]))
+	})
 }
 ```
 
@@ -1019,11 +1031,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Module/service/namespace | Public opaque types and errors |
 > |---|---|
-> | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation: String, code: String) }` |
-> | fs / Fs / `i:fs/v1` | `File {}`; `FsError { FsError(operation: String, path: String, code: String) }` |
-> | net / Net / `i:net/v1` | `Listener {}`; `Stream {}`; `NetError { NetError(operation: String, endpoint: String, code: String) }` |
-> | process / Process / `i:process/v1` | `Child {}`; `ProcessError { ProcessError(operation: String, code: String) }` |
-> | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation: String, code: String) }` |
+> | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation : String, code : String) }` |
+> | fs / Fs / `i:fs/v1` | `File {}`; `FsError { FsError(operation : String, path : String, code : String) }` |
+> | net / Net / `i:net/v1` | `Listener {}`; `Stream {}`; `NetError { NetError(operation : String, endpoint : String, code : String) }` |
+> | process / Process / `i:process/v1` | `Child {}`; `ProcessError { ProcessError(operation : String, code : String) }` |
+> | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation : String, code : String) }` |
 
 - New sentence(s):
 
@@ -1078,11 +1090,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Module/service/namespace | Public resource types and errors |
 > |---|---|
-> | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation: String, code: String) }` |
-> | fs / Fs (type only) / `i:fs/v1` | File, constructor private; `FsError { FsError(operation: String, path: String, code: String) }` |
-> | net / Net (type only) / `i:net/v1` | Listener and Stream, constructors private; `NetError { NetError(operation: String, endpoint: String, code: String) }` |
-> | process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation: String, code: String) }` |
-> | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation: String, code: String) }` |
+> | clock / Clock / `i:clock/v1` | `ClockError { ClockError(operation : String, code : String) }` |
+> | fs / Fs (type only) / `i:fs/v1` | File, constructor private; `FsError { FsError(operation : String, path : String, code : String) }` |
+> | net / Net (type only) / `i:net/v1` | Listener and Stream, constructors private; `NetError { NetError(operation : String, endpoint : String, code : String) }` |
+> | process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation : String, code : String) }` |
+> | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation : String, code : String) }` |
 
 - Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
 
@@ -1092,15 +1104,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > | Raw Fs field | Type |
 > |---|---|
-> | `open` | `(path: String, mode: String) -> Request(Result(File,String))` |
-> | `read` | `(file: File, max_bytes: Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(file: File, bytes: BitArray) -> Request(Result(Nil,String))` |
-> | `flush` | `(file: File) -> Request(Result(Nil,String))` |
-> | `close` | `(file: File) -> Request(Nil)` |
-> | `remove` | `(path: String) -> Request(Result(Nil,String))` |
-> | `rename` | `(from: String, to: String) -> Request(Result(Nil,String))` |
-> | `read_file` | `(path: String) -> Request(Result(BitArray,String))` |
-> | `write_file` | `(path: String, bytes: BitArray) -> Request(Result(Nil,String))` |
+> | `open` | `(path : String, mode : String) -> Request(Result(File,String))` |
+> | `read` | `(file : File, max_bytes : Int) -> Request(Result(BitArray,String))` |
+> | `write` | `(file : File, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `flush` | `(file : File) -> Request(Result(Nil,String))` |
+> | `close` | `(file : File) -> Request(Nil)` |
+> | `remove` | `(path : String) -> Request(Result(Nil,String))` |
+> | `rename` | `(from : String, to : String) -> Request(Result(Nil,String))` |
+> | `read_file` | `(path : String) -> Request(Result(BitArray,String))` |
+> | `write_file` | `(path : String, bytes : BitArray) -> Request(Result(Nil,String))` |
 >
 > Public open takes OpenMode and encodes `read`, `truncate`, `append`, or
 > `read_write`; write modes create the file if absent, read_write does not
@@ -1120,15 +1132,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > | Raw Fs field | Type |
 > |---|---|
-> | `open` | `(path: String, mode: String) -> Request(Result(Int,String))` |
-> | `read` | `(file: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(file: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
-> | `flush` | `(file: Int) -> Request(Result(Nil,String))` |
-> | `close` | `(file: Int) -> Request(Nil)` |
-> | `remove` | `(path: String) -> Request(Result(Nil,String))` |
-> | `rename` | `(from: String, to: String) -> Request(Result(Nil,String))` |
-> | `read_file` | `(path: String) -> Request(Result(BitArray,String))` |
-> | `write_file` | `(path: String, bytes: BitArray) -> Request(Result(Nil,String))` |
+> | `open` | `(path : String, mode : String) -> Request(Result(Int,String))` |
+> | `read` | `(file : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
+> | `write` | `(file : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `flush` | `(file : Int) -> Request(Result(Nil,String))` |
+> | `close` | `(file : Int) -> Request(Nil)` |
+> | `remove` | `(path : String) -> Request(Result(Nil,String))` |
+> | `rename` | `(from : String, to : String) -> Request(Result(Nil,String))` |
+> | `read_file` | `(path : String) -> Request(Result(BitArray,String))` |
+> | `write_file` | `(path : String, bytes : BitArray) -> Request(Result(Nil,String))` |
 >
 > Public open returns File by wrapping the successful Int, takes OpenMode and encodes `read`, `truncate`, `append`, or
 > `read_write`; write modes create the file if absent, read_write does not
@@ -1185,15 +1197,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > | Raw Net field | Type |
 > |---|---|
-> | `listen` | `(address: String, port: Int) -> Request(Result(Listener,String))` |
-> | `local_port` | `(listener: Listener) -> Request(Result(Int,String))` |
-> | `accept` | `(listener: Listener) -> Request(Result(Stream,String))` |
-> | `connect` | `(address: String, port: Int) -> Request(Result(Stream,String))` |
-> | `read` | `(stream: Stream, max_bytes: Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(stream: Stream, bytes: BitArray) -> Request(Result(Nil,String))` |
-> | `shutdown_write` | `(stream: Stream) -> Request(Result(Nil,String))` |
-> | `close_stream` | `(stream: Stream) -> Request(Nil)` |
-> | `close_listener` | `(listener: Listener) -> Request(Nil)` |
+> | `listen` | `(address : String, port : Int) -> Request(Result(Listener,String))` |
+> | `local_port` | `(listener : Listener) -> Request(Result(Int,String))` |
+> | `accept` | `(listener : Listener) -> Request(Result(Stream,String))` |
+> | `connect` | `(address : String, port : Int) -> Request(Result(Stream,String))` |
+> | `read` | `(stream : Stream, max_bytes : Int) -> Request(Result(BitArray,String))` |
+> | `write` | `(stream : Stream, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `shutdown_write` | `(stream : Stream) -> Request(Result(Nil,String))` |
+> | `close_stream` | `(stream : Stream) -> Request(Nil)` |
+> | `close_listener` | `(listener : Listener) -> Request(Nil)` |
 >
 > The same names are public wrappers with the same parameters and success types,
 > `^ NetError`, and no errors for the two close functions. Address is a numeric
@@ -1214,15 +1226,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > | Raw Net field | Type |
 > |---|---|
-> | `listen` | `(address: String, port: Int) -> Request(Result(Int,String))` |
-> | `local_port` | `(listener: Int) -> Request(Result(Int,String))` |
-> | `accept` | `(listener: Int) -> Request(Result(Int,String))` |
-> | `connect` | `(address: String, port: Int) -> Request(Result(Int,String))` |
-> | `read` | `(stream: Int, max_bytes: Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(stream: Int, bytes: BitArray) -> Request(Result(Nil,String))` |
-> | `shutdown_write` | `(stream: Int) -> Request(Result(Nil,String))` |
-> | `close_stream` | `(stream: Int) -> Request(Nil)` |
-> | `close_listener` | `(listener: Int) -> Request(Nil)` |
+> | `listen` | `(address : String, port : Int) -> Request(Result(Int,String))` |
+> | `local_port` | `(listener : Int) -> Request(Result(Int,String))` |
+> | `accept` | `(listener : Int) -> Request(Result(Int,String))` |
+> | `connect` | `(address : String, port : Int) -> Request(Result(Int,String))` |
+> | `read` | `(stream : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
+> | `write` | `(stream : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `shutdown_write` | `(stream : Int) -> Request(Result(Nil,String))` |
+> | `close_stream` | `(stream : Int) -> Request(Nil)` |
+> | `close_listener` | `(listener : Int) -> Request(Nil)` |
 >
 > Public listen returns Listener; accept/connect return Stream. Public resource
 > parameters use Listener or Stream as appropriate. Other result types stay the
@@ -1278,15 +1290,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Raw Process field | Type |
 > |---|---|
 > | `args` | `() -> Request(Result(BitArray,String))` |
-> | `env` | `(name: String) -> Request(Result(String,String))` |
+> | `env` | `(name : String) -> Request(Result(String,String))` |
 > | `cwd` | `() -> Request(Result(String,String))` |
-> | `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
-> | `spawn` | `(program: String, args: BitArray) -> Request(Result(Child,String))` |
-> | `wait` | `(child: Child) -> Request(Result(Int,String))` |
-> | `terminate` | `(child: Child) -> Request(Result(Nil,String))` |
-> | `close` | `(child: Child) -> Request(Nil)` |
+> | `entropy` | `(bytes : Int) -> Request(Result(BitArray,String))` |
+> | `spawn` | `(program : String, args : BitArray) -> Request(Result(Child,String))` |
+> | `wait` | `(child : Child) -> Request(Result(Int,String))` |
+> | `terminate` | `(child : Child) -> Request(Result(Nil,String))` |
+> | `close` | `(child : Child) -> Request(Nil)` |
 >
-> Public args gives List(String); spawn takes `(program: String, args: List(String))`;
+> Public args gives List(String); spawn takes `(program : String, args : List(String))`;
 > other wrappers keep raw parameters/success values, with `^ ProcessError` except
 > close, which has no errors. Program args exclude the interpreter/program name;
 > spawn's args exclude argv[0]. Each child inherits cwd, environment, and standard
@@ -1301,15 +1313,15 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Raw Process field | Type |
 > |---|---|
 > | `args` | `() -> Request(Result(BitArray,String))` |
-> | `env` | `(name: String) -> Request(Result(String,String))` |
+> | `env` | `(name : String) -> Request(Result(String,String))` |
 > | `cwd` | `() -> Request(Result(String,String))` |
-> | `entropy` | `(bytes: Int) -> Request(Result(BitArray,String))` |
-> | `spawn` | `(program: String, args: BitArray) -> Request(Result(Int,String))` |
-> | `wait` | `(child: Int) -> Request(Result(Int,String))` |
-> | `terminate` | `(child: Int) -> Request(Result(Nil,String))` |
-> | `close` | `(child: Int) -> Request(Nil)` |
+> | `entropy` | `(bytes : Int) -> Request(Result(BitArray,String))` |
+> | `spawn` | `(program : String, args : BitArray) -> Request(Result(Int,String))` |
+> | `wait` | `(child : Int) -> Request(Result(Int,String))` |
+> | `terminate` | `(child : Int) -> Request(Result(Nil,String))` |
+> | `close` | `(child : Int) -> Request(Nil)` |
 >
-> Public args gives List(String); spawn takes `(program: String, args: List(String))`
+> Public args gives List(String); spawn takes `(program : String, args : List(String))`
 > and returns Child; wait/terminate/close take Child. Match Child(number)
 > to unwrap arguments and wrap the successful spawn Int with Child. Other wrappers
 > keep raw parameters/success values, with `^ ProcessError` except
@@ -1992,7 +2004,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
 > | R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. No edits to `ilang-host/src/requests.rs` are needed for many outstanding requests |
 > | R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-> | IO service phases | Replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml:15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser service factories and their tests under `bindings/javascript/` and `tests/browser/` |
+> | IO service phases | Replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser service factories and their tests under `bindings/javascript/` and `tests/browser/` |
 > | Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 > | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
@@ -2008,7 +2020,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
 > | R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
 > | R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-> | IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs:1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml:15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
+> | IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs:1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
 > | Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 > | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
@@ -2885,7 +2897,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 - Old sentence(s):
 
-> - **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `( k: b )` is False.
+> - **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `( k : b )` is False.
 > - **T2** `tests/spec/9.7`, with a host fixture as in `tests/spec/11/equality_externals.i`: `portable` of a host reference is False, and of a tuple that holds one too.
 > - **T3** `tests/spec/11/equality.i` stays unchanged; it guards that §11.4 did not change.
 > - **T4** Captures are exact: the example of part 3.1 is True; a closure whose only use of `b` is in a clause that never runs is False. Both run at O0 and O2 and give the same answers.
@@ -2906,7 +2918,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 - New sentence(s):
 
-> - **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `( k: b )` is False.
+> - **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `( k : b )` is False.
 > - **T2** `tests/spec/9.7`, with a host fixture as in `tests/spec/11/equality_externals.i`: `portable` of a host reference is False, and of a tuple that holds one too.
 > - **T3** `tests/spec/11/equality.i` stays unchanged; it guards that §11.4 did not change.
 > - **T4** Captures are exact: the example of part 3.1 is True; a closure whose only use of `b` is in a clause that never runs is False. Both run at O0 and O2 and give the same answers.
@@ -2998,7 +3010,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - Old sentence(s):
 
 > 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 > 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 > 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 > 5. How long may a victim wait before it answers a steal request? Poll points only, or a heartbeat in function prologues later?
@@ -3009,7 +3021,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - New sentence(s):
 
 > 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 > 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 > 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 > 5. Which general typed byte-state transaction interface implements part 7 without running i code under a lock? Recommended: ordinary request-mode services; require the MC-D prototype before MC-I.
@@ -3908,20 +3920,20 @@ Old sentence(s)/block:
 > | Function | Type | Rule |
 > |---|---|---|
 > | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
-> | `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+> | `close_root` | `(root : Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
 > | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
-> | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
-> | `outstanding` | `(owner: Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
-> | `outstanding_root` | `(root: Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
-> | `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
-> | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
-> | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
-> | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
-> | `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
-> | `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-> | `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
-> | `await(A)` | `(r: Request(A)) -> A ! Await` | Wait, then take the Ready value |
-> | `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+> | `close_owner` | `(owner : Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+> | `outstanding` | `(owner : Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
+> | `outstanding_root` | `(root : Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
+> | `within(A,E,N)` | `(body : () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+> | `ready(A)` | `(value : A) -> Request(A)` | A fresh completed request; available in pure fakes |
+> | `ticket(A)` | `(r : Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+> | `state(A)` | `(r : Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+> | `take(A)` | `(r : Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+> | `settled` | `(r : Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+> | `cancel` | `(r : Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+> | `await(A)` | `(r : Request(A)) -> A ! Await` | Wait, then take the Ready value |
+> | `wait_any` | `(rs : List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
 > | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
 
 New sentence(s)/block:
@@ -3929,27 +3941,27 @@ New sentence(s)/block:
 > | Function | Type | Rule |
 > |---|---|---|
 > | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
-> | `close_root` | `(root: Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+> | `close_root` | `(root : Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
 > | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
-> | `close_owner` | `(owner: Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
-> | `count` | `(owner: Owner) -> Int` | Number of outstanding requests in this group |
-> | `count_root` | `(root: Root) -> Int` | Number of outstanding requests in all groups of this root |
-> | `settled_owner` | `(owner: Owner) -> Bool` | True exactly when count(owner) is zero |
-> | `settled_root` | `(root: Root) -> Bool` | True exactly when count_root(root) is zero |
-> | `cancel_all` | `(owner: Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
-> | `cancel_all_root` | `(root: Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
-> | `wait_none` | `(owner: Owner) -> Nil ! Await` | Await until this group's count is zero |
-> | `wait_none_root` | `(root: Root) -> Nil ! Await` | Await until this root's count is zero |
-> | `within(A,E,N)` | `(body: () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
-> | `ready(A)` | `(value: A) -> Request(A)` | A fresh completed request; available in pure fakes |
-> | `ticket(A)` | `(r: Request(A)) -> Ticket` | The same underlying request identity; no answer access |
-> | `state(A)` | `(r: Request(A)) -> RequestState(A)` | Reads do not consume the answer |
-> | `take(A)` | `(r: Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
-> | `settled` | `(r: Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-> | `cancel` | `(r: Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
-> | `await(A)` | `(r: Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
-> | `await_owned(A)` | `(r: Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
-> | `wait_any` | `(rs: List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
+> | `close_owner` | `(owner : Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+> | `count` | `(owner : Owner) -> Int` | Number of outstanding requests in this group |
+> | `count_root` | `(root : Root) -> Int` | Number of outstanding requests in all groups of this root |
+> | `settled_owner` | `(owner : Owner) -> Bool` | True exactly when count(owner) is zero |
+> | `settled_root` | `(root : Root) -> Bool` | True exactly when count_root(root) is zero |
+> | `cancel_all` | `(owner : Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
+> | `cancel_all_root` | `(root : Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
+> | `wait_none` | `(owner : Owner) -> Nil ! Await` | Await until this group's count is zero |
+> | `wait_none_root` | `(root : Root) -> Nil ! Await` | Await until this root's count is zero |
+> | `within(A,E,N)` | `(body : () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
+> | `ready(A)` | `(value : A) -> Request(A)` | A fresh completed request; available in pure fakes |
+> | `ticket(A)` | `(r : Request(A)) -> Ticket` | The same underlying request identity; no answer access |
+> | `state(A)` | `(r : Request(A)) -> RequestState(A)` | Reads do not consume the answer |
+> | `take(A)` | `(r : Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
+> | `settled` | `(r : Ticket) -> Bool` | True for Ready, Cancelled or Taken |
+> | `cancel` | `(r : Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+> | `await(A)` | `(r : Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
+> | `await_owned(A)` | `(r : Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
+> | `wait_any` | `(rs : List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
 > | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
 
 Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
@@ -4412,8 +4424,8 @@ Old sentence(s)/block:
 > read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 > and stderr are distinct directions; one write per direction may be pending,
 > with busy for a competing write. A cancelled write may have written a prefix.
-> Flush functions are explicit. Also export `print(text: String)` and
-> `print_error(text: String)`, which UTF-8 encode text plus one LF, write all bytes,
+> Flush functions are explicit. Also export `print(text : String)` and
+> `print_error(text : String)`, which UTF-8 encode text plus one LF, write all bytes,
 > and flush their stream; both can raise StdioError. No implicit text decoding,
 > line buffering or newline translation is added. Legacy i/io still prints a
 > String plus LF with the old no-error contract under `i:io/v1`.
@@ -4425,8 +4437,8 @@ New sentence(s)/block:
 > read's bound/EOF and write's whole-byte/all-bytes rules are those above. stdout
 > and stderr are distinct directions; one write per direction may be pending,
 > with busy for a competing write. A cancelled write may have written a prefix.
-> Flush functions are explicit. Also export `print(text: String)` and
-> `print_error(text: String)`, which UTF-8 encode text plus one LF, write all bytes,
+> Flush functions are explicit. Also export `print(text : String)` and
+> `print_error(text : String)`, which UTF-8 encode text plus one LF, write all bytes,
 > and flush their stream; both can raise StdioError. No implicit text decoding,
 > line buffering or newline translation is added. Legacy i/io still prints a
 > String plus LF with the old no-error contract under `i:io/v1`.

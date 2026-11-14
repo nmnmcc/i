@@ -8,7 +8,7 @@
 
 // When the stop is in the library function itself, the tail call is the
 // first position.
-root = (x: Float) { core.sqrt(x) }
+root = (x : Float) { core.sqrt(x) }
 
 main = () {
 	root(-.1.0)

@@ -186,9 +186,7 @@ fn programs() -> Vec<(u8, Program)> {
     .unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(i/core)\n(show, nested)\n\
-         show = (x: Float) -> String { core.inspect(x) }\n\
-         nested = (x: Float) -> String { core.inspect([Ok(x), Error((x, \"x\"))]) }\n",
+        "(i/core)\n(show, nested)\nshow = (x : Float) -> String { core.inspect(x) }\nnested = (x : Float) -> String { core.inspect([Ok(x), Error((x, \"x\"))]) }\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_package::load(dir.path());

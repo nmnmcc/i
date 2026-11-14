@@ -1,19 +1,19 @@
 Dep = (v = Int)
-get = () <- (d: Dep) { d.v }
+get = () <- (d : Dep) { d.v }
 S(N) = (() <- N -> Int)
 T(N) = (() <- N -> Int)
-use = <N>() <- (s: S(N)) {
+use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
 }
-uset = <N>() <- (s: T(N)) {
+uset = <N>() <- (s : T(N)) {
 	T(f) = s
 	f()
 }
 
 main = () {
-	_syn3_0: S(Dep) = S(() { get() })
-	_syn3_1: T(Never) = T(() { use() })
+	_syn3_0 : S(Dep) = S(() { get() })
+	_syn3_1 : T(Never) = T(() { use() })
 	{
 		uset()
 		Nil
