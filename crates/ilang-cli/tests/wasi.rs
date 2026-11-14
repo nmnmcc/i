@@ -569,10 +569,10 @@ main = () {
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"Third = (Continuation(Nil, Third, Never, Out))
+const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Never, Out))
 Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
-Third = Third | Over
+ThirdSum = Third | Over
 
 keep = (t) { t |> (Over) { Over } | (t) { t } }
 
@@ -622,9 +622,9 @@ const ENV_TAIL_RESUME: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Never, Name))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
 name = () <- (n: Name) { n.text }
 
@@ -662,9 +662,9 @@ const ENV_TAIL_CANCEL: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Never, Name))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
 name = () <- (n: Name) { n.text }
 
@@ -707,9 +707,9 @@ const CANCEL_INNER: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Never, Io))
+Paused = (Continuation(Nil, PausedSum, Never, Io))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
 say = (text) <- (io: Io) { io.print(text) }
 
@@ -755,12 +755,12 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Int, Never))
+Paused = (Continuation(Nil, PausedSum, Int, Never))
 Done = ()
-Paused = Paused | Done
-Held = (Continuation(Nil, Held, Never, Never))
+PausedSum = Paused | Done
+Held = (Continuation(Nil, HeldSum, Never, Never))
 Over = ()
-Held = Held | Over
+HeldSum = Held | Over
 
 // Cancelling this continuation can return to the code after `inner`,
 // because the final function suspends to `inner` during the cancel (D15).

@@ -1,6 +1,54 @@
 //! Row schemes preserve obligations, identity, and declaration independence.
 mod common;
 
+#[test]
+fn stage_three_provider_diagnostics_match_landed_conversion() {
+    // §9.2: a supplied value must satisfy the needed form by subtyping;
+    // incompatible same-key requirements have an empty intersection.
+    // Keep every diagnostic from landed tip cc26b8d9, including its source
+    // binding. Pin total errors and E0515 counts independently of the saved
+    // messages. The full fourteen-project guard is in CLI providers tests:
+    // two projects need their std dependency and test-macro expansion.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
+    for (case, count, provider_count) in [
+        ("review-k4/cases/provision_closure_False", 1, 1),
+        ("review-k4d/_loose/p/x8", 2, 2),
+        ("review-k4d/_loose/p/b1", 5, 5),
+    ] {
+        let dir = root.join(case);
+        let source = std::fs::read_to_string(dir.join("src/main.i")).unwrap();
+        let observation: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.join("expected.json")).unwrap())
+                .unwrap();
+        let mut expected: Vec<_> = observation["outcome"]["check"]["stderr"]
+            .as_str()
+            .unwrap()
+            .lines()
+            .filter(|line| line.contains("error["))
+            .collect();
+        assert_eq!(expected.len(), count, "landed diagnostic count: {case}");
+        assert_eq!(
+            expected
+                .iter()
+                .filter(|line| line.contains("error[E0515]"))
+                .count(),
+            provider_count,
+            "landed provider diagnostic count: {case}"
+        );
+        let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
+        let checked = ilang_check::check(&graph);
+        let mut actual: Vec<_> = checked
+            .diags
+            .iter()
+            .filter(|d| d.is_error())
+            .map(|d| graph.sources.render(d))
+            .collect();
+        expected.sort_unstable();
+        actual.sort_unstable();
+        assert_eq!(actual, expected, "{case}");
+    }
+}
+
 fn types(source: &str) -> std::collections::BTreeMap<String, String> {
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
@@ -708,6 +756,73 @@ fn a_closed_provider_retains_callback_and_generalization_diagnostics() {
     assert_eq!(
         actual,
         [(14, 19), (14, 5), (16, 29), (16, 5)],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
+
+#[test]
+fn aliased_open_provider_contracts_are_not_generalized_away() {
+    let base = "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\n";
+    for alias in [
+        "Alias = S(_)\n",
+        "Hidden = S(_)\nAlias = Hidden\n",
+        "Hidden(A) = S(A | _)\nAlias = Hidden(Never)\n",
+    ] {
+        let source = [
+            base,
+            alias,
+            "wrap = (body) { provided: Alias = S(f = () -> Int { 1 }) body() <- (provided) }",
+        ]
+        .concat();
+        let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
+        assert_eq!(
+            diags
+                .iter()
+                .filter(|d| d.is_error())
+                .map(|d| d.code)
+                .collect::<Vec<_>>(),
+            ["E0515"],
+            "{:?}",
+            graph.sources.render_all(&diags)
+        );
+    }
+    let (graph, _, diags) = common::check_files(&[
+        (
+            "src/svc.i",
+            "(S(..), Alias)\nS(N) = (f = () <- N -> Int)\nAlias = S(_)\ntouch = <N>(s: S(N)) { s }",
+        ),
+        (
+            "src/main.i",
+            "(svc = app/svc)\nwrap = (body) { provided: svc.Alias = svc.S(f = () -> Int { 1 }) body() <- (provided) }",
+        ),
+    ]);
+    assert_eq!(
+        diags
+            .iter()
+            .filter(|d| d.is_error())
+            .map(|d| d.code)
+            .collect::<Vec<_>>(),
+        ["E0515"],
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
+
+#[test]
+fn a_closed_provider_alias_retains_all_reader_diagnostics() {
+    let source = include_str!("types/soundness.i")
+        .replacen("\nwith_int", "\nIntReader = Reader(Int)\nwith_int", 1)
+        .replace("_syn3_0: Reader(Int)", "_syn3_0: IntReader");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
+    let actual = diags
+        .iter()
+        .filter(|d| d.code == "E0515" && d.message.contains("`Reader(String)` and `Reader(Int)`"))
+        .map(|d| ilang_syntax::span::LineIndex::new(&source).line_col(d.span.start))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        [(15, 19), (15, 5), (17, 29), (17, 5)],
         "{:?}",
         graph.sources.render_all(&diags)
     );

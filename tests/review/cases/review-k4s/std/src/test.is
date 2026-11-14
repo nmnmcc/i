@@ -4,7 +4,7 @@
 (= text
   (-> (, x) _
     (|> ((. syntax node) x)
-        (| (-> (, ((. syntax Text) s)) _ s)
+        (| (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)
           (-> (, _) _ (panic "test name must be a string literal"))))))
 (= _entry
   (-> (, name body mode) (<- _ (, (: items (. syntax Items))))
@@ -52,7 +52,7 @@
             (-> (, `(~callee ~name ~cases ~body)) _
               {(= full
                  ((. syntax make)
-                  ((. syntax Text) (<> prefix (text name)))
+                  ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
                   name))
                (= wrapped `(-> (, case_value) _ {~..env (~body case_value)}))
                [`(~callee ~full ~cases ~wrapped)
@@ -61,7 +61,7 @@
             (-> (, `(~callee ~name ~body)) _
               {(= full
                  ((. syntax make)
-                  ((. syntax Text) (<> prefix (text name)))
+                  ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
                   name))
                (= wrapped `(-> (,) _ {~..env (~body)}))
                [`(~callee ~full ~wrapped) .. (suite_items prefix rest env)]})
@@ -85,12 +85,13 @@
                 (| (-> (, `(, ~name ~value)) _
                      {(= full
                         ((. syntax make)
-                         ((. syntax Text) (<> (<> prefix " / ") (text name)))
+                         ((. syntax Node) ((. syntax Text) (<> (<> prefix " / ") (text name))))
                          name))
                       (= target
                         ((. syntax make)
-                         ((. syntax Name)
-                          (<> "generated_test_" ((. int to_string) index)))
+                         ((. syntax Node)
+                          ((. syntax Name)
+                           (<> "generated_test_" ((. int to_string) index))))
                          `generated_test))
                       ((. items add)
                        `tests

@@ -172,6 +172,10 @@ fn types() {
 
 /// The library modules type check with no problems, and their types are
 /// those of the spec tables (§9, §12, §13).
+/// Syntax three §2.4 drops positional binder names from function types.
+/// `display::tree_with` uses the parameter data's shape keys, not `FnTy.labels`
+/// (which also holds binder names). Thus the runtime modules' `(x: Float)`
+/// is shown as `(Float)`; actual data labels are still shown as `label = T`.
 #[test]
 fn library() {
     let dir = tempfile::tempdir().unwrap();

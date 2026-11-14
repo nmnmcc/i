@@ -17,7 +17,7 @@
 	spawn_piped
 	spawn_config
 	EnvironmentMode(..)
-	Directory(..)
+	DirectoryMode(..)
 	read_stdout
 	read_stderr
 	write_stdin
@@ -46,7 +46,10 @@ EnvironmentMode = InheritEnvironment | ReplaceEnvironment
 
 InheritDirectory = ()
 Directory = (String)
-Directory = InheritDirectory | Directory
+/// Before stage 3 this sum was `Directory` with a constructor of the same
+/// name; a member is now a type of its own (syntax-3.md §2.8), so the sum
+/// has the name `DirectoryMode`, as `EnvironmentMode`.
+DirectoryMode = InheritDirectory | Directory
 
 Child = (Int)
 

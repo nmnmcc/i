@@ -175,10 +175,39 @@ impl Checker<'_> {
     fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
         if catch_all(q) {
             self.bind_catch_all(q, b, in_case);
+        } else if let PatternKind::Tuple(ps) = &q.kind
+            && !in_case
+        {
+            // The parts of a fitted tuple are fitted one by one, so that a
+            // constructor part may fail as at the top: `(Ok(a), Ok(b)) = …`.
+            let parts: Vec<Ty> = ps.iter().map(|_| self.s.fresh()).collect();
+            self.sub(b, &Ty::tuple(parts.clone()), q.span);
+            for (p, t) in ps.iter().zip(&parts) {
+                self.fit_in(p, t, in_case);
+            }
         } else {
             let t = self.pat(q, in_case);
+            // A constructor part whose known values are also made by other
+            // constructors may fail (syntax three D4, as in `fit`).
+            let t = match top_ctor(q) {
+                Some(c) if !in_case => {
+                    let (others, _) = self.made_by_others(b, Head::Named(TypeRef::Custom(c.ty)));
+                    if others { self.with_rest(t) } else { t }
+                }
+                _ => t,
+            };
             self.sub(b, &t, q.span);
         }
+    }
+
+    /// `T | r - T`, with a new type variable `r`.
+    fn with_rest(&mut self, t: Ty) -> Ty {
+        let mut members = Vec::new();
+        super::solve::flatten_union(std::slice::from_ref(&t), &mut members);
+        let r = self.s.fresh();
+        let rest = self.s.diff(r, members.clone());
+        members.push(rest);
+        Ty::Union(members)
     }
 
     /// The type of a parameter (rule 4): a new variable for a catch-all,
@@ -223,7 +252,12 @@ impl Checker<'_> {
                     let ft = fields[i].1.clone();
                     self.fit_in(arg, &ft, in_case);
                 }
-                Ty::named(TypeRef::Custom(ctor.ty), targs)
+                let t = Ty::named(TypeRef::Custom(ctor.ty), targs);
+                if in_case {
+                    t
+                } else {
+                    self.family(t, ctor.ty, q.span)
+                }
             }
             PatternKind::Tuple(ps) => {
                 Ty::tuple(ps.iter().map(|x| self.param_in(x, in_case)).collect())
@@ -241,6 +275,75 @@ impl Checker<'_> {
             }
             _ => self.leaf(q, in_case, false),
         }
+    }
+
+    /// The pattern type of a fitted constructor pattern `C(…)` (a binding, a
+    /// parameter, or a part of one): the declared union that `C` is a member
+    /// of, when there is one smallest such union of labelled types
+    /// (`Ok(v)` gives `Ok(A) | Error(B)`, that is `Result(A, B)`), and else
+    /// `C`'s own type. Before stage 3 the pattern type of `Ok(v)` was
+    /// `Result(A, B)`; syntax-3.md §2.12 keeps that: "So with `r : Ok(Int) |
+    /// Error(String)`, `Ok(v) = r` is correct and needs `Assert`, as today
+    /// with the multi-constructor `Result`". So an unknown value fitted to
+    /// `Ok(v)` is a `Result` and the pattern may fail (§7.3), as before.
+    fn family(&mut self, t: Ty, id: TypeId, span: Span) -> Ty {
+        let h = Head::Named(TypeRef::Custom(id));
+        let mut best: Option<&super::display::AliasFold> = None;
+        let mut tie = false;
+        for f in self.s.alias_folds.iter() {
+            if !f.has_head(h) || !f.all_defined() {
+                continue;
+            }
+            match best {
+                Some(b) if b.len() < f.len() => {}
+                Some(b) if b.len() == f.len() => tie = true,
+                _ => {
+                    best = Some(f);
+                    tie = false;
+                }
+            }
+        }
+        let Some(f) = best.filter(|_| !tie).cloned() else {
+            return t;
+        };
+        let args: Vec<Ty> = (0..f.params()).map(|_| self.s.fresh()).collect();
+        let members = f.members_with(&args);
+        let Some(m) = members.iter().find(|m| m.head() == Some(h)).cloned() else {
+            return t;
+        };
+        self.sub(&t, &m, span);
+        self.sub(&m, &t, span);
+        Ty::Union(members)
+    }
+
+    /// `p` with, for each member that is a labelled type of a declared
+    /// union (see `family`), the members of that union that `p` lacks.
+    fn with_families(&mut self, p: Ty, span: Span) -> Ty {
+        let mut members = Vec::new();
+        super::solve::flatten_union(std::slice::from_ref(&p), &mut members);
+        let mut heads: Vec<Head> = members.iter().filter_map(Ty::head).collect();
+        let mut extra = Vec::new();
+        for m in &members {
+            let Some(Head::Named(TypeRef::Custom(id))) = m.head() else {
+                continue;
+            };
+            let mut family = Vec::new();
+            let whole = self.family(m.clone(), id, span);
+            super::solve::flatten_union(std::slice::from_ref(&whole), &mut family);
+            for f in family {
+                if let Some(h) = f.head()
+                    && !heads.contains(&h)
+                {
+                    heads.push(h);
+                    extra.push(f);
+                }
+            }
+        }
+        if extra.is_empty() {
+            return p;
+        }
+        members.extend(extra);
+        Ty::Union(members)
     }
 
     /// The pattern types of literals, prefixes, and bit arrays, with their
@@ -531,6 +634,16 @@ impl Checker<'_> {
             slack[i] = places[i].catch_here || places[i].parent.is_some_and(|p| slack[p]);
             let pats = std::mem::take(&mut places[i].pats);
             let p = self.union(pats, span);
+            // A member of a declared union of labelled types (a former
+            // constructor) stands for that union, as the type of the whole
+            // family did before stage 3 (§5.2.8 rule 11, "the coverage
+            // error in a match is unchanged"): the members no pattern takes
+            // are added, so they are reported by §7.4, not as a type error.
+            let p = if slack[i] {
+                p
+            } else {
+                self.with_families(p, span)
+            };
             let want = if slack[i] {
                 let mut members = Vec::new();
                 super::solve::flatten_union(std::slice::from_ref(&p), &mut members);
@@ -544,7 +657,10 @@ impl Checker<'_> {
             let b = places[i].ty.clone();
             let at = if i == 0 { subject.span } else { span };
             if fitted {
-                self.sub(&b, &want, at);
+                // A one-clause match reports what its pattern does not take
+                // as the error of §7.4 (`defer_failure` below), as it did
+                // when the members of a sum were constructors of one type.
+                self.sub_fitted_match(&b, &want, at);
             } else {
                 held.extend(self.sub_case(&b, &want, at));
             }
@@ -1358,22 +1474,19 @@ Solo(A) = (A, Int)
             },
             1
         ));
-        // The lowering of this stage reads `Event(A) = Start(A) | Stop(A)`
-        // as one type with the constructors `Start` and `Stop`, so `A` is
-        // written twice in the family. When syntax three's final tree lands
-        // (§2.8, "Sums are unions": two labelled types), each `A` is written
-        // once and these two become `!field_shared` of `Start` and `Stop`.
-        assert!(c.field_shared(
+        // One constructor per type (syntax three): `Start` and `Stop` are
+        // no longer one family, so their fields are not shared.
+        assert!(!c.field_shared(
             CtorRef {
-                ty: id("Event"),
+                ty: id("Start"),
                 index: 0
             },
             0
         ));
-        assert!(c.field_shared(
+        assert!(!c.field_shared(
             CtorRef {
-                ty: id("Event"),
-                index: 1
+                ty: id("Stop"),
+                index: 0
             },
             0
         ));
