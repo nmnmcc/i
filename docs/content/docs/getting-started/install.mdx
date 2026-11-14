@@ -1,5 +1,29 @@
 ---
 title: Install
+description: Build the i compiler from the source checkout.
 ---
 
-to be written
+i is in development and has no published release or package. Build the compiler from a source checkout with Nix and devenv 2.4.0; the development shell supplies the pinned Rust toolchain and the tools used to build Binaryen. Git is needed to fetch its submodule.
+
+From the repository root, run:
+
+```sh
+git submodule update --init crates/ilang-binaryen/binaryen
+devenv shell
+cargo build --release
+```
+
+The build produces `target/release/i`. Add that directory to your `PATH`, or invoke the executable by its path. The compiler, library modules, formatter, and language server are in that file. To check the executable, run:
+
+```sh
+i --version
+```
+```text
+i 0.1.0
+```
+
+The version shown is from this tree. The first build compiles Binaryen from source. The repository also has scripts to make release archives locally; they do not imply a published download.
+
+## See also
+
+[The host boundary](/docs/standard/generated/chapter-10) · [First program](/docs/getting-started/first-program)
