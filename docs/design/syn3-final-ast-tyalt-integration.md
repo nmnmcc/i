@@ -71,3 +71,11 @@ spacing/layout as equals. The compiler migration adds no further language rule.
 Second attempt failed only because the private Transition adapter still needs
 HashMap after upstream removed it from the simpler lowerer; import restored.
 No diagnostic expectation was edited to fix either compile failure.
+
+10:45: format the two conflicted Lisp suite files with
+`./target/release/i fmt std/src/test.is tests/review/cases/review-k4s/std/src/test.is`:
+PASS (read/print structural check retained). This is the light formatter,
+not a compiler/test invocation; the Lisp layout implementation is unchanged
+by tyalt. Only line wrapping of the added Node calls changes, before the
+fresh Rust/runtime gate. Check-snippets runs directly and owns its one
+internally wrapped parser-driver build; no outer heavy wrapper is used.

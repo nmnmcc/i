@@ -63,12 +63,16 @@
                       env))
        (-> (, `(~callee ~name ~cases ~body)) _
          {(= full
-            ((. syntax make) ((. syntax Node) ((. syntax Text) (<> prefix (text name)))) name))
+            ((. syntax make)
+             ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
+             name))
           (= wrapped `(-> (, case_value) _ ~(provide `(~body case_value) env)))
           [`(~callee ~full ~cases ~wrapped)]})
        (-> (, `(~callee ~name ~body)) _
          {(= full
-            ((. syntax make) ((. syntax Node) ((. syntax Text) (<> prefix (text name)))) name))
+            ((. syntax make)
+             ((. syntax Node) ((. syntax Text) (<> prefix (text name))))
+             name))
           (= wrapped `(-> (,) _ ~(provide `(~body) env)))
           [`(~callee ~full ~wrapped)]})
        (-> (, _) _
