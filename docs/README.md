@@ -106,3 +106,17 @@ directories are excluded from execution and placeholder checks.
 The repository snippet inventory excludes `scripts/run-examples-fixtures/`
 under `docs`: its deliberately valid and invalid inputs are checked by
 `scripts/run-examples-test`, rather than treated as documentation.
+
+`npm run check:links` also runs `check:spec-links` and its negative-fixture
+self-test. The latter scans every built HTML page. It counts visible `§`
+characters plus anchor links targeting `/docs/standard` (including subpaths) or
+a file named `spec.md`, including relative and external URLs. Home, tour and
+getting-started pages have a combined limit of one; guides have two. Library
+pages allow no specification links; literal section marks from source comments
+remain plain text. Contributing and the standard’s own pages are exempt from
+the limits. Other navigation pages are measured without a limit. For section
+marks, comments, attribute values and
+head/script/style/template contents are ignored; code and hidden body text are
+counted. Anchor href values are inspected as link targets. Both workflows run
+`check:links` after building, so either a broken link or an excessive citation
+fails the job. Reviewer claim-to-rule tables belong in reports, not page text.

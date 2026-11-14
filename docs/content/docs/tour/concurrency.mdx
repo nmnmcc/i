@@ -61,11 +61,11 @@ main = () <- (io : Io) {
 
 The input order is `3, 1, 2`, so the output is `30, 10, 20`, regardless of completion order. The pair also preserves argument order. This is a useful way to keep concurrent computation separate from ordered output.
 
-Scheduling order is not fixed. Prints inside separate children can appear in either order. These examples collect the results before printing them. The full [task specification (§9.9)](/docs/standard/generated/chapter-9#section-9-9) also defines races and event selection.
+Scheduling order is not fixed. Prints inside separate children can appear in either order. These examples collect the results before printing them.
 
 ## Failure cancels the scope
 
-When a scope body or child raises an error, the scope cancels its body and children, waits for their finals, and raises the chosen error. Cancellation itself is not a failure; [§9.9](/docs/standard/generated/chapter-9#section-9-9) defines which error is chosen if several tasks fail.
+When a scope body or child raises an error, the scope cancels its body and children, waits for their finals, and raises the chosen error. Cancellation itself is not a failure. If several tasks fail, the scope chooses one error to raise.
 
 ```i run package=tour title="src/main.i"
 (
@@ -132,7 +132,7 @@ Error("child failed")
 
 Only after the readiness message does the parent start the failing child. Failure cancels the waiting child and runs its final. The final prints before the scope raises its error, proving that the scope waits for cleanup before returning.
 
-Cancellation reaches a running task at its next scheduler suspension. An unstarted child is dropped without calling its body. Already-running finals are shielded from another cancellation. A [stop (§9.9)](/docs/standard/generated/chapter-9#section-9-9) is not caught and runs no final functions.
+Cancellation reaches a running task at its next scheduler suspension. An unstarted child is dropped without calling its body. Already-running finals are shielded from another cancellation. A stop is not caught and runs no final functions.
 
 ## Workers
 
@@ -142,4 +142,6 @@ A **portable** value can be copied to another worker. Ordinary scopes check chil
 
 ## See also
 
-Read [tasks (§9.9)](/docs/standard/generated/chapter-9#section-9-9) and [workers and portability (§11.9)](/docs/standard/generated/chapter-11#section-11-9). Continue with [macros](/docs/tour/macros).
+Continue with [macros](/docs/tour/macros).
+
+The exact rules are in the [specification](/docs/standard/generated/chapter-9#section-9-9).

@@ -91,8 +91,8 @@ The error skips the rest of the use callback. Unwinding releases the handle, the
 
 A final may use services, as the printing callbacks do, but may not raise an error. [Structured task cancellation](/docs/tour/concurrency) also unwinds installed finals and waits for cleanup to finish.
 
-On a [stop (§9.5)](/docs/standard/generated/chapter-9#section-9-5), releases and other final functions do not run.
+On a stop, releases and other final functions do not run.
 
 ## See also
 
-Read [unwinding and final functions (§9.5)](/docs/standard/generated/chapter-9#section-9-5), allowing for the resource API difference above. Continue with [concurrency](/docs/tour/concurrency).
+Continue with [concurrency](/docs/tour/concurrency).

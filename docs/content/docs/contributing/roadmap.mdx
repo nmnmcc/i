@@ -25,16 +25,18 @@ main = () {
 
 These groups describe available features, not full conformance to every rule in their chapters. The [gap register](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) records the exceptions.
 
+The [standard](/docs/standard) defines these areas.
+
 | Standard chapters | Available features |
 | --- | --- |
-| [1: words and symbols](/docs/standard/generated/chapter-1) | Names without keywords, literals, strings with interpolation, and the line rule. |
-| [2: modules](/docs/standard/generated/chapter-2) | Imports and exports, package manifests, dependencies, lock files, and configured entries. |
-| [3–4: types](/docs/standard/generated/chapter-4) | Inference, labelled types, aliases, literal types, unions, intersections, differences, and closed data shapes. |
-| [5–7: names, expressions, patterns](/docs/standard/generated/chapter-6) | Immutable bindings, functions, branches, guards, matching, field access, and data spreads. |
-| [8: bit arrays](/docs/standard/generated/chapter-8) | Construction and matching with integer, float, byte, and UTF encodings. |
-| [9: effects](/docs/standard/generated/chapter-9) | Explicit service needs and provision, typed failure, continuations, structured tasks, and host IO. |
-| [10–11: execution](/docs/standard/generated/chapter-10) | Program entries, tests, host calls, tail calls, stops, and value inspection. |
-| [12–14: built-ins and macros](/docs/standard/generated/chapter-14) | Core operations, syntax and typed macros, and the Lisp surface. |
+| 1: words and symbols | Names without keywords, literals, strings with interpolation, and the line rule. |
+| 2: modules | Imports and exports, package manifests, dependencies, lock files, and configured entries. |
+| 3–4: types | Inference, labelled types, aliases, literal types, unions, intersections, differences, and closed data shapes. |
+| 5–7: names, expressions, patterns | Immutable bindings, functions, branches, guards, matching, field access, and data spreads. |
+| 8: bit arrays | Construction and matching with integer, float, byte, and UTF encodings. |
+| 9: effects | Explicit service needs and provision, typed failure, continuations, structured tasks, and host IO. |
+| 10–11: execution | Program entries, tests, host calls, tail calls, stops, and value inspection. |
+| 12–14: built-ins and macros | Core operations, syntax and typed macros, and the Lisp surface. |
 
 The following command list comes from `i --help` on this tree. Each command has its own help:
 
@@ -87,5 +89,4 @@ Historical reports and plans whose present status is uncertain are omitted from 
 
 ## See also
 
-- [The standard: data](/docs/standard/generated/chapter-6#section-6-4)
 - [How to send changes](/docs/contributing/how-to-send-changes)

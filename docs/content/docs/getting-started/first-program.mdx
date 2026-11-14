@@ -15,11 +15,11 @@ run it with `i run --project hello`
 
 The command creates `hello/i.toml`, `.gitignore`, `src/main.i`, and `test/main_test.i`. The generated manifest uses a local path for the test dependency `std`. If it does not point to the `std` directory in your i checkout, edit the `std` path under `[dev-dependencies]` in `i.toml` to that directory. Paths can be absolute or relative to the package directory.
 
-The generated `src/main.i` is:
+The generated `src/main.i` has this structure, with documentation comments shortened:
 
 ```i run package=hello title="src/main.i"
 //// The package `hello`. It imports the standard service `Io` from `i/io`
-//// (§9.7), and `i run` gives it, so the program can print.
+//// and `i run` gives it, so the program can print.
 (
 	(Io) = i/io
 )
@@ -53,7 +53,7 @@ Change the argument in `main` to `"world"`, leaving the rest of the file as foll
 
 ```i run package=hello title="src/main.i"
 //// The package `hello`. It imports the standard service `Io` from `i/io`
-//// (§9.7), and `i run` gives it, so the program can print.
+//// and `i run` gives it, so the program can print.
 (
 	(Io) = i/io
 )
@@ -82,7 +82,7 @@ The generated test already checks `greeting`. Add a second test so `test/main_te
 
 ```i file=src/main.i title="src/main.i"
 //// The package `hello`. It imports the standard service `Io` from `i/io`
-//// (§9.7), and `i run` gives it, so the program can print.
+//// and `i run` gives it, so the program can print.
 (
 	(Io) = i/io
 )
@@ -133,4 +133,4 @@ Both commands completed with no output in this run. `i fmt` writes formatted sou
 
 ## See also
 
-[Modules](/docs/standard/generated/chapter-2) · [Editor set-up](/docs/getting-started/editor-set-up)
+[Editor set-up](/docs/getting-started/editor-set-up)

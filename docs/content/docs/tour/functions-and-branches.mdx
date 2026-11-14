@@ -170,7 +170,7 @@ A conjunction matches the same value with every part: `(left, right) = whole = p
 
 `Item(value = n)` is a constructor pattern: it matches the constructor and takes its labelled field. `Empty` matches the constructor with no fields. Constructor patterns must use labels for labelled fields. The ordinary data pattern `(a, b)` matches a tuple of that shape.
 
-List patterns distinguish `[]`, an exact list such as `[x]`, and a prefix with a rest such as `[x, ..rest]`. The rest is another list. `list_parts` returns the first item and the remaining list, with separate branches for empty and one-item lists. Data-rest patterns are specified in §7.1 but are not yet accepted by this compiler; list-rest patterns work as shown.
+List patterns distinguish `[]`, an exact list such as `[x]`, and a prefix with a rest such as `[x, ..rest]`. The rest is another list. `list_parts` returns the first item and the remaining list, with separate branches for empty and one-item lists. Data-rest patterns are not yet accepted by this compiler; list-rest patterns work as shown.
 
 ## Text, literals, and bits
 
@@ -217,7 +217,7 @@ A literal pattern matches an equal value. The examples include integer, float, a
 
 String patterns have one binder: `"pre:" <> rest` keeps the suffix, `rest <> ".i"` keeps the prefix, and `"[" <> rest <> "]"` keeps the middle. The fixed prefix and suffix must not overlap. Pattern strings do not interpolate expressions.
 
-A bit-array pattern reads segments in order and must use all the bits. Here `tag` reads the first eight bits, and `body:bits` takes the rest. The catch-all handles inputs too short for the first byte. The [bit-array standard](/docs/standard/generated/chapter-8#section-8-4) defines the other formats and matching rules.
+A bit-array pattern reads segments in order and must use all the bits. Here `tag` reads the first eight bits, and `body:bits` takes the rest. The catch-all handles inputs too short for the first byte.
 
 ## Covering the subject
 
@@ -228,7 +228,7 @@ describe = (n : Int) { n |> (0) { "zero" } | (1) { "one" } }
 main = () { describe(2) }
 ```
 
-Run `i check`. The real diagnostic is **E0516**: “the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `2`”. The annotation admits all integers, while the branches handle only `0` and `1`. Add an unguarded catch-all or narrow the accepted type.
+Run `i check`. The checker reports **E0516** because no unguarded branch matches `2`. The annotation admits all integers, while the branches handle only `0` and `1`. Add an unguarded catch-all or narrow the accepted type.
 
 A single branch without a guard has a different rule: a pattern that may fail reports failure through `Assert`, rather than being checked for exhaustive coverage. For recoverable choices, write the complete branch chain; see [services and errors](/docs/tour/services-and-errors) for the service behavior.
 
@@ -314,14 +314,12 @@ main = () {
 20
 ```
 
-Multiplication binds more tightly than addition, giving `14`; braces change the grouping to give `20`. Operators at the same precedence associate left to right. Calls and field access bind more tightly than arithmetic, and the pipeline binds less tightly. Use the [operator table](/docs/standard/generated/chapter-6#section-6-9) for the complete order.
+Multiplication binds more tightly than addition, giving `14`; braces change the grouping to give `20`. Operators at the same precedence associate left to right. Calls and field access bind more tightly than arithmetic, and the pipeline binds less tightly.
 
 ## Current limits
 
-The standard also allows a pattern to name the labelled parts of data, as in `(name = name, age = _)` ([§7.1](/docs/standard/generated/chapter-7#section-7-1)). The compiler on this tree refuses such a pattern with E0101; until that is fixed, read a labelled part with `.name`. Rest patterns for data (`..rest` inside `( )`) are refused in the same way; list rests work as shown above. Both differences are recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (DOC1, P13).
+The standard also allows a pattern to name the labelled parts of data, as in `(name = name, age = _)`. The compiler on this tree refuses such a pattern with E0101; until that is fixed, read a labelled part with `.name`. Rest patterns for data (`..rest` inside `( )`) are refused in the same way; list rests work as shown above. Both differences are recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (DOC1, P13).
 
 ## See also
 
-- [Functions, blocks, and branches, standard §6](/docs/standard/generated/chapter-6#section-6-8).
-- [Patterns and coverage, standard §7](/docs/standard/generated/chapter-7).
-- Next: [Types and inference](/docs/tour/types-and-inference).
+Next: [Types and inference](/docs/tour/types-and-inference).

@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Positive and negative regressions for reader-facing citation limits."""
+from pathlib import Path
+import subprocess
+import sys
+import unittest
+from spec_links import References, is_spec_target, measure, unlink_spec_references
+
+SCRIPTS = Path(__file__).resolve().parent
+FIXTURES = SCRIPTS / 'spec-link-fixtures'
+
+
+class ReferenceTests(unittest.TestCase):
+    def test_positive_fixture(self):
+        dist = FIXTURES / 'passing'
+        results = [measure(page, dist) for page in dist.rglob('*.html')]
+        self.assertEqual(len(results), 7)
+        self.assertFalse(any(item['failed'] for item in results))
+
+    def test_negative_fixture_and_cli(self):
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'check-spec-links.py'),
+                                 '--dist', str(FIXTURES / 'failing')], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('5 over limit.', result.stdout)
+        for area in ('index.html', 'tour', 'getting-started', 'guides', 'library'):
+            self.assertIn(area, result.stderr)
+
+    def test_visible_text_and_combined_budget(self):
+        parser = References()
+        parser.feed('<head><title>§</title></head><!-- § --><script>"§"</script>'
+                    '<style>§</style><template>§</template><p title="§">&#167;</p>'
+                    '<a href="/docs/standard">rules</a><code>§</code>')
+        self.assertEqual(parser.sections, 2)
+        self.assertEqual(len(parser.links), 1)
+
+    def test_relative_encoded_and_external_targets(self):
+        for target in ('/docs/standard', '/docs/standard/chapter-9#errors',
+                       'https://github.com/nmnmcc/i/blob/main/docs/spec.md#services',
+                       'spec.md?raw=1', '/docs/%73tandard/chapter-1', '../../standard/'):
+            self.assertTrue(is_spec_target(target, '/docs/tour/page/index.html'), target)
+        for target in ('/docs/library', '/docs/contributing', '/docs/standard-library',
+                       'https://example.org/spec-known-gaps.md', '#spec.md'):
+            self.assertFalse(is_spec_target(target), target)
+
+    def test_generator_keeps_section_marks_plain(self):
+        text = '§9.2: [services](/docs/standard/generated/chapter-9), [source](https://example.org/code).'
+        self.assertEqual(unlink_spec_references(text), '§9.2: services, [source](https://example.org/code).')
+        self.assertEqual(unlink_spec_references('<a href="/docs/spec.md">the rule</a>'), 'the rule')
+        self.assertEqual(unlink_spec_references('See https://example.org/docs/spec.md'),
+                         'See `https://example.org/docs/spec.md`')
+        self.assertEqual(unlink_spec_references('`https://example.org/docs/spec.md`'),
+                         '`https://example.org/docs/spec.md`')
+
+
+if __name__ == '__main__':
+    unittest.main()

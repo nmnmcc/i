@@ -70,7 +70,6 @@ port 8080
 <article className="home-program">
 <h3>An unhandled failure stays in the type.</h3>
 <p>A caller cannot promise to need nothing while leaving <code>Fail</code> unhandled. This explicit <code>() -&gt; Int</code> promise is rejected. Handle the failure, or let the need remain in the caller’s inferred type.</p>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-4#section-4-6">§4.6</a> · <a href="/docs/standard/generated/chapter-9#section-9-3">§9.3</a></p>
 <details className="shared-source">
 <summary>The same src/main.i from the first example</summary>
 
@@ -121,7 +120,6 @@ src/probe.i:8:1: error[E0501]: `app.BadPort` is not a subtype of `Never`
 <article className="home-program">
 <h3>A multi-branch match must cover its subject.</h3>
 <p>Values are immutable. Matching selects a result; it does not change the subject. The reader returns an integer, and these branches leave <code>2</code> uncovered.</p>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-11#section-11-1">§11.1</a> · <a href="/docs/standard/generated/chapter-7#section-7-4">§7.4</a></p>
 <details className="shared-source">
 <summary>The same src/main.i from the first example</summary>
 
@@ -163,16 +161,12 @@ main = () {
 describe = () { app.read_port() |> (0) { "off" } | (1) { "one" } }
 ```
 
-```text
-src/probe.i:8:17: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `2`
-1 error
-```
+<p>The checker reports <code>E0516</code>: no clause without a guard matches <code>2</code>.</p>
 
 </article>
 <article className="home-program" id="invalid-edit">
 <h3>Inference still checks every use.</h3>
 <p>The reader has no result annotation. Adding text to its integer result is still rejected: the same check applies in the <a href="#branches">formatter</a> and the <a href="#macros">typed macro</a>.</p>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-4#section-4-8">§4.8</a></p>
 <details className="shared-source">
 <summary>The same src/main.i from the first example</summary>
 
@@ -223,10 +217,8 @@ src/probe.i:8:30: error[E0501]: `"one"` is not a subtype of `Int`
 <article className="home-program">
 <h3>A service use appears in the need.</h3>
 <p>Reading the environment adds <code>Environment</code>; printing adds <code>Stdio</code>. The <a href="#inferred-needs">checked type listing</a> below shows both. The test double supplies the same service directly, through <code>&lt;-</code>.</p>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-2">§9.2</a> · <a href="/docs/standard/generated/chapter-9#section-9-7">§9.7</a></p>
 <h3>One format, checked too.</h3>
 <p>The same <code>i</code> tool checks, formats, tests, runs and builds a project. Compare the first program before and after <code>i fmt</code>:</p>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-1#section-1-7">§1.7</a> · <a href="/docs/standard/generated/chapter-2#section-2-6">§2.6</a></p>
 <details className="shared-source">
 <summary>Unformatted input and the checked formatter output</summary>
 
@@ -283,7 +275,7 @@ main = () {
 </details>
 </article>
 </div>
-<p className="home-footnote">One <a href="/docs/standard">standard</a> defines the language; <a href="/docs/standard/generated/chapter-2#section-2-6">§2.6</a> defines the project tool. Read the site’s text index at <a href="/llms.txt">llms.txt</a> or the complete documentation at <a href="/llms-full.txt">llms-full.txt</a>.</p>
+<p className="home-footnote">One standard defines the language, and one tool works with the project. Read the site’s text index at <a href="/llms.txt">llms.txt</a> or the complete documentation at <a href="/llms-full.txt">llms-full.txt</a>.</p>
 </section>
 
 <section className="home-topic" aria-labelledby="branches">
@@ -293,7 +285,6 @@ main = () {
 <p>The formatter has a branch for zero, another for a port, and one for a host and port together. A pipeline calls the same function. i has no keywords: <code>if</code> here is an ordinary binding.</p>
 <p>Values and bindings are immutable. Parameter and result types can be inferred, while calls remain checked. This same call checking accepts the service supplied in <a href="#needs">Needs and tests</a> and checks the arguments passed to <a href="#macros">Macros</a>.</p>
 <a className="home-text-link" href="/docs/tour/functions-and-branches">Learn functions and branches →</a>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-1#section-1-4">§1.4</a> · <a href="/docs/standard/generated/chapter-4#section-4-7">§4.7</a> · <a href="/docs/standard/generated/chapter-6#section-6-12">§6.12</a></p>
 </div>
 <div className="home-program">
 <details className="shared-source">
@@ -363,7 +354,6 @@ pass hello/format_test.matching and overloading
 <p>The checker accepts a supplied service by the same subtype rule it uses for an argument. Dependency injection and test doubles use that one rule. Raising <code>BadPort</code> adds a typed <code>Fail</code> need; catching supplies its handler.</p>
 <p>That connects <a href="#branches">Functions and inference</a> to error handling. The test checks the returned result for both bad text and an out-of-range number. <a href="#tasks">Tasks</a> carry those service and error requirements too.</p>
 <a className="home-text-link" href="/docs/tour/services-and-errors">Learn services and errors →</a>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-2">§9.2</a> · <a href="/docs/standard/generated/chapter-9#section-9-3">§9.3</a> · <a href="/docs/standard/generated/chapter-9#section-9-6">§9.6</a></p>
 </div>
 <div className="home-program">
 <h3 id="inferred-needs">The needs were inferred.</h3>
@@ -501,7 +491,6 @@ invalid PORT
 <p>A task cannot outlive its scope. Here <code>task.both</code> joins two child calls to the port reader before returning their results. Output happens after both calls have finished.</p>
 <p>The children are <a href="#branches">ordinary functions</a>. Their service needs and error types follow the same <a href="#needs">needs and error rules</a> as the first call. Concurrency keeps those requirements when the computation is composed.</p>
 <a className="home-text-link" href="/docs/tour/concurrency">Learn structured tasks →</a>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-9">§9.9</a></p>
 </div>
 <div className="home-program">
 <details className="shared-source">
@@ -564,7 +553,6 @@ pass hello/tasks_test.joined reads
 <p>The macro operates on the checked port value from the same program. That connects <a href="#branches">function types and inference</a> to code generation. Its implementation is a checked i function with compile-time <a href="#needs">service needs</a>, imported by the ordinary module rules.</p>
 <p>The <code>.is</code> file uses i’s Lisp surface. The test calls its macro from the normal <code>.i</code> surface.</p>
 <a className="home-text-link" href="/docs/tour/macros">Learn macros and the two surfaces →</a>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-14#section-14-1">§14.1</a> · <a href="/docs/standard/generated/chapter-14#section-14-8">§14.8</a></p>
 </div>
 <div className="home-program">
 <details className="shared-source">
@@ -674,7 +662,6 @@ collection = "std/test.tests"
 <p>i compiles to WasmGC. The same source can run natively or as a WASI command. A JavaScript host uses the repository’s Host SDK today; follow the interop guide for its build and loading steps.</p>
 <p>The targets connect <a href="#needs">service needs</a> to the host that provides them. The types checked in <a href="#branches">ordinary calls</a> still apply.</p>
 <a className="home-text-link" href="/docs/guides/js-and-wasi-interop">JS and WASI interop →</a>
-<p className="spec-link"><a href="/docs/standard/generated/chapter-9#section-9-7">§9.7</a> · <a href="/docs/standard/generated/chapter-appendix-b">Appendix B</a></p>
 <details className="host-steps">
 <summary>Build the same program for WASI and a JavaScript host</summary>
 
