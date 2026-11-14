@@ -16,13 +16,13 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-Paused = (Continuation(Nil, Paused, Never, Never))
+Paused = (Continuation(Nil, PausedSum, Never, Never))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
-Held = (Continuation(Nil, Held, Never, Never))
+Held = (Continuation(Nil, HeldSum, Never, Never))
 Over = ()
-Held = Held | Over
+HeldSum = Held | Over
 
 // Puts `text` in front of the value of the boundary `log`.
 note = (log, text) {

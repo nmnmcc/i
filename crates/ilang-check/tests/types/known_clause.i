@@ -26,10 +26,10 @@ update_open = (v) { v |> (A(..)) { A(..v, g = "x") } | (_) { B(h = 0) } }
 
 use_update = () { update_open(1) }
 
-Full(A) = (item = A)
+Full(V) = (item = V)
 Empty = ()
 // With a type parameter: the field has the argument of the pattern type.
-Box(A) = Full(A) | Empty
+Box(V) = Full(V) | Empty
 
 item = (b) { b |> (Full(..)) { b.item } | (Empty) { 0 } }
 

@@ -85,9 +85,13 @@ struct CtorInfo {
 /// How a custom type is tested at run time (§7.1).
 #[derive(Clone, Copy, Debug)]
 enum TypeRepr {
-    Bool,
+    /// The prelude's `True` or `False`: the two values of `Bool = True | False`.
+    Bool(bool),
     Nil,
     Record(u32),
+    /// The prelude's `Ok` or `Error`: one constructor of the run-time type
+    /// of `Result = Ok | Error`, which the host also makes.
+    Ctor(u32, u32),
     /// A type with no constructors: its values are host references.
     Host,
 }
@@ -1087,9 +1091,11 @@ impl<'a> Lowerer<'a> {
             };
             let special = if Some(t.module) == prelude {
                 match t.name.as_str() {
-                    "Bool" => Some(TypeRepr::Bool),
+                    "True" => Some(TypeRepr::Bool(true)),
+                    "False" => Some(TypeRepr::Bool(false)),
                     "Nil" => Some(TypeRepr::Nil),
-                    "Result" => Some(TypeRepr::Record(0)),
+                    "Ok" => Some(TypeRepr::Ctor(0, 0)),
+                    "Error" => Some(TypeRepr::Ctor(0, 1)),
                     "AssertionFailure" => Some(TypeRepr::Record(1)),
                     "Assert" => Some(TypeRepr::Record(2)),
                     _ => None,
@@ -1109,13 +1115,11 @@ impl<'a> Lowerer<'a> {
                     index: j as u32,
                 };
                 let repr = match (special, c.name.as_str()) {
-                    (Some(TypeRepr::Bool), "True") => CtorRepr::Bool(true),
-                    (Some(TypeRepr::Bool), _) => CtorRepr::Bool(false),
+                    (Some(TypeRepr::Bool(b)), _) => CtorRepr::Bool(b),
+                    (Some(TypeRepr::Ctor(ty, ctor)), _) => CtorRepr::Record { ctor, ty },
                     (Some(TypeRepr::Nil), _) => CtorRepr::Nil,
                     (Some(TypeRepr::Record(ty)), name) => CtorRepr::Record {
                         ctor: match name {
-                            "Ok" => 0,
-                            "Error" => 1,
                             "AssertionFailure" => 2,
                             _ => 3,
                         },
@@ -1987,10 +1991,22 @@ impl<'a> Lowerer<'a> {
                         .iter()
                         .map(|&i| values[i].clone().expect("constructor dependency"))
                         .collect();
-                    match self.ctors[&c].repr {
+                    let made = match self.ctors[&c].repr {
                         CtorRepr::Record { ctor, ty } => Value::Record { ctor, ty, fields },
                         CtorRepr::Bool(b) => Value::Atom(Atom::Bool(b)),
                         CtorRepr::Nil => Value::Atom(Atom::Nil),
+                    };
+                    // A discriminant service wraps the member it selects.
+                    match step.wrap.map(|w| &self.ctors[&w].repr) {
+                        Some(&CtorRepr::Record { ctor, ty }) => {
+                            let inner = let_value(fx, out, made, None);
+                            Value::Record {
+                                ctor,
+                                ty,
+                                fields: vec![inner],
+                            }
+                        }
+                        _ => made,
                     }
                 }
             };
@@ -4265,9 +4281,16 @@ impl<'a> Lowerer<'a> {
                 },
             ),
             Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {
-                Some(TypeRepr::Bool) => Cond::Tag(v, 1),
+                Some(TypeRepr::Bool(b)) => Cond::And(
+                    Box::new(Cond::Tag(v.clone(), 1)),
+                    Box::new(Cond::Bool(v, *b)),
+                ),
                 Some(TypeRepr::Nil) => Cond::Tag(v, 0),
                 Some(TypeRepr::Record(id)) => Cond::Type(v, *id),
+                Some(TypeRepr::Ctor(id, ctor)) => Cond::And(
+                    Box::new(Cond::Type(v.clone(), *id)),
+                    Box::new(Cond::Ctor(v, *ctor)),
+                ),
                 Some(TypeRepr::Host) => Cond::Tag(v, 10),
                 None => match &self.program.ty(t).body {
                     TypeBody::Alias(Type {
@@ -4722,7 +4745,7 @@ fn abi_json(
         }
     }
     let mut abi = serde_json::json!({
-        "version": 4,
+        "version": 5,
         "entry": entry,
         "tests": tests,
         "exports": map,

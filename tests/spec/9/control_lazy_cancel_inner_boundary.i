@@ -15,9 +15,9 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-Paused(B) = (Continuation(Nil, Paused(B), Never, Never), B)
+Paused(B) = (Continuation(Nil, PausedSum(B), Never, Never), B)
 Done = ()
-Paused(B) = Paused(B) | Done
+PausedSum(B) = Paused(B) | Done
 
 main = () {
 	// A cancel goes through `inner`, which is paused inside `k`. The final

@@ -1,7 +1,7 @@
 # i JavaScript host
 
 `ilang.mjs` is a self-contained ECMAScript module that runs i programs through
-the binary interface version 3 of `docs/spec.md` (Appendix B). It runs in modern
+the binary interface version 5 (also reads versions 3 and 4) of `docs/spec.md` (Appendix B). It runs in modern
 browsers and Node.js without npm runtime dependencies. `ilang.d.ts` describes the
 same API for TypeScript.
 
@@ -60,7 +60,7 @@ of the metadata in a new instance (spec §10.2), giving `{ name, passed, error? 
 | --- | --- | --- |
 | `Nil` | `undefined` or `null` | none |
 | `Bool` | `boolean` | `i32` 0 or 1 |
-| `Int` | `bigint` | sign, address, count |
+| `Int` | `bigint` | sign, address or inline signed i32, count |
 | `Float` | finite `number` | `f64` |
 | `String` | well-formed `string` | address, UTF-8 length |
 | `BitArray` | `{ bytes: Uint8Array, bitLength: number }` | address, number of bits |

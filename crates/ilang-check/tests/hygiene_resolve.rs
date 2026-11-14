@@ -731,7 +731,8 @@ fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
     let expr = scoped.expression(&root, &syntax("f", caller, &[])).unwrap();
-    let ItemKind::Binding(binding) = &mut module.ast.items[1].kind else {
+    // `Ok`, `Option` and `f`: `Ok = ()` is a type of its own (stage 3, §2.8).
+    let ItemKind::Binding(binding) = &mut module.ast.items[2].kind else {
         panic!("binding")
     };
     let ExprKind::Fn(function) = &mut binding.value.kind else {

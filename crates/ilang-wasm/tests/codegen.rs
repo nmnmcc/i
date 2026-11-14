@@ -167,7 +167,7 @@ fn metadata() {
     assert_eq!(
         json,
         serde_json::json!({
-            "version": 4,
+            "version": 5,
             "entry": { "name": "app/main.main", "async": false },
             "tests": [],
             "exports": {},
@@ -295,7 +295,9 @@ fn environments() {
 
 #[test]
 fn bindings_that_may_fail_report_to_assert() {
-    let text = wat("f = (r) {\n  Ok(v) = r\n  v\n}\n\
+    // `r` has the wider type `Result`: with an unknown value, `Ok(v) = r`
+    // would narrow `r` to `Ok(_)` (syntax three D4) and not report.
+    let text = wat("f = (r: Result(Int, Int)) {\n  Ok(v) = r\n  v\n}\n\
          g = ((a, b)) { a + b }\n\
          \nmain = () { (f(Ok(1)), g((1, 2))) }\n");
     let f = function(&text, "app/main.f");

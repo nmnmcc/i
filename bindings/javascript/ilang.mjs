@@ -4,7 +4,7 @@ import { ResourceHost, ResourceError } from "./resources.mjs";
 export { ResourceHost, ResourceContext, ResourceError } from "./resources.mjs";
 const defaultResourceHost = new ResourceHost();
 /**
- * The host side of the binary interface of i, version 4. Language
+ * The host side of the binary interface of i, version 5. Language
  * values live in the guest; this module loads modules and copies values
  * across the host boundary.
  * SPDX-License-Identifier: Apache-2.0
@@ -17,7 +17,7 @@ const kinds = new Set(["nil", "bool", "int", "float", "string", "bit_array", "ex
 /** The canonical order of the members of an error type. */
 const canonical = ["nil", "bool", "int", "float", "string", "bit_array"];
 const namespace = "ilang:host/v1";
-const version = 4;
+const version = 5;
 // Version 4 only adds the runtime imports of multicore workers.
 const oldestVersion = 3;
 export const HOST_VALUE_REASON = "host: value is not correct";
@@ -285,7 +285,7 @@ export function readAbi(module, supplied) {
   if (typeof value.version === "number" && value.version > version) {
     throw new AbiError(`the module uses i ABI version ${value.version}, but this host reads version ${version}; update the host`);
   }
-  if (value.version !== version && value.version !== oldestVersion) throw new AbiError(`Unsupported i ABI version ${value.version}`);
+  if (!Number.isInteger(value.version) || value.version < oldestVersion || value.version > version) throw new AbiError(`Unsupported i ABI version ${value.version}`);
   const exports = Object.create(null);
   for (const [name, signature] of Object.entries(plainObject(value.exports === undefined ? {} : value.exports, "ABI exports"))) {
     expect(!reserved(name), `Export ${name} uses a name of the binary interface`);
@@ -302,7 +302,7 @@ export function readAbi(module, supplied) {
   for (const [module, entries] of Object.entries(externals)) {
     for (const name of Object.keys(entries)) expect(!services[module]?.[name], `${module} ${name} is both a service function and an external`);
   }
-  const abi = Object.freeze({ version, entry, tests: Object.freeze(tests), exports: Object.freeze(exports), services, externals });
+  const abi = Object.freeze({ version: value.version, entry, tests: Object.freeze(tests), exports: Object.freeze(exports), services, externals });
   if (supplied === undefined) embeddedAbis.set(module, abi);
   return abi;
 }
@@ -412,6 +412,7 @@ class GuestFault extends ModuleFault {
 }
 
 class Bridge {
+  abiVersion = version;
   resources;
   ending = false;
   instance;
@@ -612,6 +613,9 @@ class Bridge {
       case "bool": return [value ? 1 : 0];
       case "float": return [value];
       case "int": {
+        if (this.abiVersion >= 5 && typeof value === "bigint" && value >= -2147483648n && value <= 2147483647n) {
+          return [value < 0n ? -1 : value > 0n ? 1 : 0, Number(value), 0];
+        }
         const { sign, bytes } = integerToLimbs(value);
         return [sign, this.allocate(bytes, owned), bytes.length / 4];
       }
@@ -644,6 +648,10 @@ class Bridge {
       }
       case "int": {
         const [sign, pointer, count] = values;
+        if (this.abiVersion >= 5 && count === 0 && sign !== 0) {
+          if ((sign !== -1 && sign !== 1) || Math.sign(pointer) !== sign) throw new GuestFault("an inline Int whose sign does not match its value");
+          return BigInt(pointer);
+        }
         const bytes = this.copy(pointer, unsigned(count, "Count") * 4);
         if (owned && pointer) owned.push([unsigned(pointer, "Address"), bytes.length]);
         try { return integerFromLimbs(sign, bytes); } catch (error) { throw new GuestFault(error.message); }
@@ -884,6 +892,7 @@ export async function instantiate(source, options = {}) {
   const standard = options.standardServices ? standardServices(options.standardServices === true ? {} : options.standardServices) : {};
   checkBindings(module, abi, options);
   const bridge = new Bridge();
+  bridge.abiVersion = abi.version;
   const resourceHost = options.resourceHost ?? defaultResourceHost;
   expect(resourceHost instanceof ResourceHost, "resourceHost must be a ResourceHost");
   bridge.resources = resourceHost.context();

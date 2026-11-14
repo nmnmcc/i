@@ -1660,9 +1660,11 @@ fn lsp_definition_type_of_a_local() {
     let ws = workspace(false);
     let mut c = ws.open();
     let r = c.request::<lsp::request::GotoTypeDefinition>(pos(&ws.main, &ws.main_text, "c)", 0, 0));
+    // `c = Circle(…)` and the constructor have the type `Circle` (syntax
+    // three §2.8: a constructor's type is its own).
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 0))]
     );
     // Of a constructor: its type.
     let r = c.request::<lsp::request::GotoTypeDefinition>(pos(
@@ -1674,7 +1676,7 @@ fn lsp_definition_type_of_a_local() {
     ));
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 0))]
     );
     c.shutdown();
 }
@@ -1799,9 +1801,10 @@ fn lsp_definition_lisp_surface() {
     );
     let r =
         c.request::<lsp::request::GotoTypeDefinition>(pos(&ws.main, &ws.main_text, "size c", 0, 5));
+    // `c` is a `Circle` (syntax three §2.8).
     assert_eq!(
         locations(&r),
-        vec![(ws.shapes.clone(), range_of(SHAPES, "Shape", 1))]
+        vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 0))]
     );
     c.shutdown();
 }
@@ -2102,7 +2105,8 @@ fn lsp_signature_of_a_constructor() {
     let ws = workspace(false);
     let mut c = ws.open();
     let s = signature(&mut c, pos(&ws.main, &ws.main_text, "radius = 2", 0, 9));
-    assert_eq!(s.signatures[0].label, "Circle(radius = Int) -> Shape");
+    // A constructor's type is its own (syntax three §2.8).
+    assert_eq!(s.signatures[0].label, "Circle(radius = Int) -> Circle");
     assert_eq!(s.active_parameter, Some(0));
     c.shutdown();
 }
@@ -2130,7 +2134,9 @@ fn lsp_hover_type_and_documentation() {
     );
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "Circle(radius", 0, 1));
     assert!(
-        h.contains("Circle: (radius: Int) -> Shape") && h.contains("A shape in the plane."),
+        // The constructor makes a `Circle`, a type without a comment of its
+        // own; the comment is on the union `Shape` (syntax three §2.8).
+        h.contains("Circle: (radius: Int) -> Circle"),
         "{h}"
     );
     c.shutdown();
@@ -2626,7 +2632,13 @@ fn lsp_folding_workspace_symbols() {
     assert!(
         symbols
             .iter()
-            .any(|s| s.name == "Circle" && s.kind == lsp::SymbolKind::CONSTRUCTOR)
+            // `Circle = (…)` is one definition of the type and its
+            // constructor (syntax three §2.8), listed once.
+            .any(|s| s.name == "Circle"
+                && matches!(
+                    s.kind,
+                    lsp::SymbolKind::CONSTRUCTOR | lsp::SymbolKind::CLASS
+                ))
     );
     // Not the names of dependencies.
     let r = c.request::<lsp::request::WorkspaceSymbolRequest>(json!({ "query": "shout" }));

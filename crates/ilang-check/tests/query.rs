@@ -201,8 +201,9 @@ fn type_of_local_names() {
 #[test]
 fn type_of_other_things() {
     let f = fixture();
-    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Option(A)");
-    assert_eq!(f.hover("app/main", "None)", 0), "None: Option(A)");
+    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Some(A)");
+    // A constructor's type is its own (syntax three §2.8).
+    assert_eq!(f.hover("app/main", "None)", 0), "None: None");
     assert_eq!(f.hover("app/main", "name", 0), "name: String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
@@ -374,12 +375,18 @@ fn symbols_of_a_module() {
             ("id", SymbolKind::Function),
             ("describe", SymbolKind::Function),
             ("first", SymbolKind::Function),
+            ("Some", SymbolKind::Type),
+            ("None", SymbolKind::Type),
             ("Option", SymbolKind::Type),
             ("total", SymbolKind::Value),
         ]
     );
-    let option = &syms[4];
-    let ctors: Vec<&str> = option.children.iter().map(|c| c.name.as_str()).collect();
+    // `Option` is a union (syntax three §2.8): its members are types with
+    // one constructor each.
+    let ctors: Vec<&str> = syms[4..6]
+        .iter()
+        .flat_map(|s| s.children.iter().map(|c| c.name.as_str()))
+        .collect();
     assert_eq!(ctors, vec!["Some", "None"]);
     assert_eq!(syms[0].detail.as_deref(), Some("(Int, Int) -> Int"));
     // The span is the whole item; the name span is the name.
@@ -783,7 +790,9 @@ fn query_type_definition_signature_and_hints() {
         f.graph.sources.get(types[0].source).text
             [types[0].span.start as usize..types[0].span.end as usize]
             .to_string(),
-        "Shape"
+        // `c = Circle(…)` has the type `Circle`: a constructor's type is its
+        // own (syntax three §2.8).
+        "Circle"
     );
     let s = q
         .signature_help(m, f.at("app/main", "area(c)", 0, 5))
@@ -792,7 +801,7 @@ fn query_type_definition_signature_and_hints() {
     assert_eq!(s.active, Some(0));
     let hints = q.inlay_hints(m, ilang_syntax::span::Span::new(0, MAIN_Q.len() as u32));
     assert_eq!(hints.len(), 1, "{hints:?}");
-    assert_eq!(hints[0].label, ": Shape");
+    assert_eq!(hints[0].label, ": Circle");
 }
 
 #[test]
@@ -806,7 +815,8 @@ fn query_completion_context() {
         CompletionContext::Type
     );
     match q.completion_context(shapes, f.at("app/shapes", "Dot) { 0 }", 0, 0)) {
-        CompletionContext::Pattern { types } => assert_eq!(types.len(), 1),
+        // The members of `Shape = Circle | Dot` (syntax three §2.8).
+        CompletionContext::Pattern { types } => assert_eq!(types.len(), 2),
         other => panic!("{other:?}"),
     }
     let main = f.module("app/main");

@@ -34,17 +34,24 @@ fn bad(new: &str, needle: &str) {
 
 #[test]
 fn type_definitions() {
+    // Stage 3 (§2.8): each data definition is a type with one constructor,
+    // and a sum is the alias of the union of those types. `Option(..)`
+    // stays as written; the checker exports each member with it (§5.2.1).
     same(
         "(\n\tOption(..)\n\tShape\n\tCircle\n\tSquare\n)\n\nSome(A) = (A)\nNone = ()\nOption(A) = Some(A) | None\n\nCircle = (radius = Float)\nSquare = (Float)\nShape = Circle | Square\n\nUser = (name = String, age = Int)\n\nHandle = Opaque\n\nPair(A) = { (A, A) }\n\nName = String\n",
-        "(\n\tOption(..)\n\tShape\n)\n\nOption(A) {\n\tSome(A)\n\tNone\n}\n\nShape {\n\tCircle(radius: Float)\n\tSquare(Float)\n}\n\nUser {\n\tUser(name: String, age: Int)\n}\n\nHandle {}\n\nPair(A) = (A, A)\n\nName = String\n",
+        "(\n\tOption(..)\n\tShape\n\tCircle\n\tSquare\n)\n\nSome(A) {\n\tSome(A)\n}\n\nNone {\n\tNone\n}\n\nOption(A) = Some(A) | None\n\nCircle {\n\tCircle(radius: Float)\n}\n\nSquare {\n\tSquare(Float)\n}\n\nShape = Circle | Square\n\nUser {\n\tUser(name: String, age: Int)\n}\n\nHandle {}\n\nPair(A) = (A, A)\n\nName = String\n",
     );
 }
 
 #[test]
 fn constructor_named_like_its_sum() {
+    // Before stage 3 a sum could have a constructor of its own name. Now
+    // the member is a type of its own and two definitions of one name are
+    // an error (§2.8), so the member has another name; the lowering keeps
+    // each definition as it is.
     same(
-        "Inherit = ()\nDirectory = (String)\nDirectory = Inherit | Directory\n",
-        "Directory {\n\tInherit\n\tDirectory(String)\n}\n",
+        "Inherit = ()\nDirectoryCase = (String)\nDirectory = Inherit | DirectoryCase\n",
+        "Inherit {\n\tInherit\n}\n\nDirectoryCase {\n\tDirectoryCase(String)\n}\n\nDirectory = Inherit | DirectoryCase\n",
     );
 }
 
@@ -215,8 +222,7 @@ fn repeated_type_parameter_kept() {
 
 #[test]
 fn one_member_alias_keeps_a_type_written_as_a_type() {
-    // `Alias(N) = T(N)` is an alias (§2.8, kind 4) when `T` is written as
-    // a type; it does not take `T` in as its one constructor.
+    // `Alias(N) = T(N)` is an alias (§2.8, kind 4); `T` keeps its type.
     same(
         "Dep = ()\nT(N) = (N)\nAlias(N) = T(N)\nf = (x: T(Dep)) { x }\n",
         "Dep { Dep }\nT(N) { T(N) }\nAlias(N) = T(N)\nf = (x: T(Dep)) { x }\n",
@@ -225,12 +231,16 @@ fn one_member_alias_keeps_a_type_written_as_a_type() {
         "T(N) = (N)\nAlias(N) = T(N)\ng = (x: Alias(Int)) { x }\ny: T(Int) = T(1)\n",
         "T(N) { T(N) }\nAlias(N) = T(N)\ng = (x: Alias(Int)) { x }\ny: T(Int) = T(1)\n",
     );
-    // Not written as a type, the member is still the one constructor.
+    // Not written as a type elsewhere, the member is still a type of its
+    // own (stage 3): the alias names it.
     same(
         "DivisionByZero = ()\nTimeError = DivisionByZero\n",
-        "TimeError { DivisionByZero }\n",
+        "DivisionByZero { DivisionByZero }\nTimeError = DivisionByZero\n",
     );
-    same("A = (Int)\nB = ()\nAB = A | B\n", "AB { A(Int) B }\n");
+    same(
+        "A = (Int)\nB = ()\nAB = A | B\n",
+        "A { A(Int) }\nB { B }\nAB = A | B\n",
+    );
 }
 
 #[test]
@@ -341,7 +351,7 @@ main = () {
 }
 
 #[test]
-fn a_single_use_provider_keeps_its_contract_before_generalization() {
+fn a_single_use_provider_keeps_its_contract_for_resolution() {
     let source = "S(N) = (f = () <- N -> Int)\nwrap = (body) { provided: S(_) = S(f = () { 1 }) body() <- (provided) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
@@ -351,17 +361,29 @@ fn a_single_use_provider_keeps_its_contract_before_generalization() {
     let ilang_syntax::ast::ExprKind::Fn(function) = &binding.value.kind else {
         panic!()
     };
-    assert_eq!(function.body.stmts.len(), 2);
-    let ilang_syntax::ast::Stmt::Env { ty, value, .. } = &function.body.stmts[0] else {
+    // Aliases are resolved before deciding whether this temporary can be
+    // fused. Lowering must retain its full written contract and original value.
+    assert_eq!(function.body.stmts.len(), 3);
+    let ilang_syntax::ast::Stmt::Bind(provider) = &function.body.stmts[0] else {
+        panic!()
+    };
+    let ilang_syntax::ast::PatternKind::Typed { ty, .. } = &provider.pattern.kind else {
         panic!()
     };
     assert!(
         matches!(&ty.kind, ilang_syntax::ast::TypeKind::Named { name, .. } if name.name == "S")
     );
     assert!(matches!(
-        &value.kind,
+        &provider.value.kind,
         ilang_syntax::ast::ExprKind::Call { .. }
     ));
+    let ilang_syntax::ast::Stmt::Env { ty, value, .. } = &function.body.stmts[1] else {
+        panic!()
+    };
+    assert!(matches!(ty.kind, ilang_syntax::ast::TypeKind::Hole));
+    assert!(
+        matches!(&value.kind, ilang_syntax::ast::ExprKind::Name { name, .. } if name.name == "provided")
+    );
 
     let used = source.replace("body() <-", "body(provided) <-");
     let (module, errors) = ilang_syntax::parse_module(&used);
@@ -384,7 +406,7 @@ fn a_closed_function_provider_keeps_its_generalization_boundary() {
 
     // §4.7/§4.8: preserve the closed function value's scheme and the
     // actual-provider checks deferred through it. Open contracts are
-    // independently pinned by a_single_use_provider_keeps_its_contract_before_generalization.
+    // independently pinned by a_single_use_provider_keeps_its_contract_for_resolution.
     let source = "Reader(A) = (get = () -> A)\nwith_int = (body) { provided: Reader(Int) = Reader(get = () -> Int { 1 }) body() <- (provided) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");

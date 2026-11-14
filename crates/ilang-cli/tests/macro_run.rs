@@ -2666,7 +2666,7 @@ fn macro_output_over_frame_budget_reports_the_limit() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, deep)
-(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (| (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Square) [x]) x)))))))
+(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (| (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Node) ((. syntax Square) [x])) x)))))))
 (@ macro (= deep (-> (, x) _ (nest 10000 x))))
 "#,
     )

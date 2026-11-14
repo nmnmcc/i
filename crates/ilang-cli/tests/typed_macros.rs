@@ -660,7 +660,10 @@ fn typed_macro_shape_contracts_resolve_aliases_before_comparing_them() {
     let macros = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/macros.is");
     let aliased = macros
         .replace("(, id)", "(, id)\n(= Parameters (| (, Int) (, Int Int)))")
-        .replace("(-> (| (, Int) (, Int Int)) Int)", "(-> Parameters Int)");
+        .replace(
+            "id (-> (| (, Int) (, Int Int)) Int)",
+            "id (-> Parameters Int)",
+        );
     let source = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/main.i")
         .replace("probe/macros", "app/macros");
     checked(&aliased, &source).unwrap();

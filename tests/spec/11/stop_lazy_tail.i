@@ -9,10 +9,10 @@
 	i/control
 )
 
-Paused = (Continuation(Nil, Paused, Never, Never))
+Paused = (Continuation(Nil, PausedSum, Never, Never))
 
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 w1 = (b) {
 	x = w2(b)
 	x

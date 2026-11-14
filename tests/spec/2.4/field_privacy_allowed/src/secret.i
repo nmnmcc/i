@@ -5,7 +5,9 @@
 	Left
 	Right
 	Raw
-	Open(..)
+	Open
+	OpenCase(..)
+	Other(..)
 	make
 	read
 	local_update
@@ -25,9 +27,9 @@ Choice = Left | Right
 
 Raw = (read = () -> Int)
 
-Open = (value = Int)
+OpenCase = (value = Int)
 Other = (value = Int)
-Open = Open | Other
+Open = OpenCase | Other
 
 make = (value) { Pack(value = value, parts = (value, 7), read = () { value }) }
 
@@ -43,4 +45,4 @@ callback = <A>(value: Secret(A)) { value.read }
 
 raw = Raw(read = () { 42 })
 
-open = Open(value = 11)
+open: Open = OpenCase(value = 11)
