@@ -1,5 +1,32 @@
 ---
 title: Home
+description: Learn i and find its language and library references.
 ---
 
-to be written
+i is a small, statically typed functional language that compiles to WebAssembly GC. It runs natively, in JavaScript hosts, and on WASI. It has no keywords: words are names, and forms use brackets and symbols. Values and bindings are immutable. Functions can need services, which callers provide with `<-`. Concurrency is structured, so a task does not outlive its scope.
+
+This complete program prints a greeting:
+
+```i run
+(
+	(Io) = i/io
+)
+
+main = () <- (io : Io) { io.print("Hello, i!") }
+```
+```text
+Hello, i!
+```
+
+`Io` is the standard service for input and output; the entry point receives it from the environment and calls `print`. See [services and errors](/docs/tour/services-and-errors) for how needs work.
+
+- [Getting started](/docs/getting-started) covers installation, a first project, and editors.
+- [The tour](/docs/tour) introduces the language to programmers.
+- [Guides](/docs/guides) cover practical tasks.
+- [Contributing](/docs/contributing) explains how to take part in development.
+
+The [library reference](/docs/library) describes modules, and [the standard](/docs/standard) defines the language. i is in development; the compiler does not yet implement everything in the standard.
+
+## See also
+
+[Words and symbols](/docs/standard/generated/chapter-1) · [Install](/docs/getting-started/install)

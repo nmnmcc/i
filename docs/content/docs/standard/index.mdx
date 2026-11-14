@@ -1,5 +1,43 @@
 ---
 title: The language standard
+description: Read the definition of the i language by chapter or from the command line.
 ---
 
-to be written
+The language standard is the definition of i. Read its introduction for scope and qualifications, then use the numbered chapters for the rules of a topic. The compiler is still being developed and does not yet implement every rule in the standard.
+
+The command line can show the standard's version:
+
+```sh
+i spec --version
+```
+```text
+Version: 1.0; Date: 2026-11-14
+```
+
+Use `i spec --toc` for the table of contents, `i spec 2.1` for a numbered section and its subsections, or `i spec --search words` to find sections. `i spec --help` lists the options. The generated pages split the source standard at chapter headings; subsection anchors use the section number.
+
+| Chapter | Subject |
+| --- | --- |
+| [Introduction](/docs/standard/generated/introduction) | Scope and status of the definition |
+| [0](/docs/standard/generated/chapter-0) | How to read this document |
+| [1](/docs/standard/generated/chapter-1) | Words and symbols |
+| [2](/docs/standard/generated/chapter-2) | Modules |
+| [3](/docs/standard/generated/chapter-3) | Type syntax |
+| [4](/docs/standard/generated/chapter-4) | Types |
+| [5](/docs/standard/generated/chapter-5) | Names and scope |
+| [6](/docs/standard/generated/chapter-6) | Expressions |
+| [7](/docs/standard/generated/chapter-7) | Patterns |
+| [8](/docs/standard/generated/chapter-8) | Bit arrays |
+| [9](/docs/standard/generated/chapter-9) | Effects |
+| [10](/docs/standard/generated/chapter-10) | The host boundary |
+| [11](/docs/standard/generated/chapter-11) | Run-time behavior |
+| [12](/docs/standard/generated/chapter-12) | Built-in names |
+| [13](/docs/standard/generated/chapter-13) | The module i/core |
+| [14](/docs/standard/generated/chapter-14) | Macros and the Lisp surface |
+| [Appendix A](/docs/standard/generated/chapter-appendix-a) | Choices |
+| [Appendix B](/docs/standard/generated/chapter-appendix-b) | The binary interface |
+| [Appendix C](/docs/standard/generated/chapter-appendix-c) | String grammar |
+
+## See also
+
+[How to read the standard](/docs/standard/generated/chapter-0) · [Library reference](/docs/library)

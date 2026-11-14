@@ -1,5 +1,24 @@
 ---
 title: Editor set-up
+description: Set up the repository editor integrations and language server.
 ---
 
-to be written
+The repository contains integrations for VS Code and Zed and a tree-sitter grammar. This page explains how to install the development integrations and what they provide. Build the compiler first; the language server runs as `i lsp` over standard input and output.
+
+For both editors, open the repository root in the development shell and run:
+
+```sh
+scripts/dev-editors
+```
+
+The script builds `target/release/i`, installs the VS Code client dependencies, links its extension, and prepares the Zed development extension. It refuses to overwrite an existing VS Code extension. Reload the VS Code window after linking. In Zed, choose **extensions: install dev extension** and select the printed `target/editor-dev/zed` directory.
+
+For Zed, install a Rust toolchain with the `wasm32-wasip2` target; Zed downloads wasi-sdk for the parser or uses `WASI_SDK_PATH`. Grammar changes must be committed before preparing the extension, because Zed checks out the recorded revision. After changes, rerun `scripts/dev-editors zed` and rebuild the dev extension in Zed.
+
+VS Code highlights `.i` syntax and supplies bracket matching, indentation and comment toggling. It starts `i lsp` using `ilang.path`, which defaults to `i` on `PATH`; the setting can instead name an absolute path or a path relative to the first workspace folder. Zed highlights `.i` with the tree-sitter grammar and starts the same server; its repository settings use `target/release/i`. For another project, omit Zed's `lsp.ilang.binary.path` to use `PATH`, or set an absolute path. Zed does not currently register `.is` files as an i language.
+
+The server offers diagnostics, hover, completion, navigation, references, rename and formatting among other features. Repository settings enable formatting on save. The tree-sitter grammar and highlight queries are also available under `editors/tree-sitter-i`; semantic checks belong to the language server.
+
+## See also
+
+[Source files](/docs/standard/generated/chapter-1#section-1-1) · [The tour](/docs/tour)
