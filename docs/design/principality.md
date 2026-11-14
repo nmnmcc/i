@@ -1053,10 +1053,25 @@ selects this worktree's musl development environment.
 | `python3 scripts/qa/corpus.py run --filter review-k4 --jobs 2` | Pending: 1,225 selected observations |
 | `scripts/test-generation --mode short --binary ./target/release/i` | Pending |
 
-The latest focused/clippy retry after the fixture entry changes, final fmt,
-filtered corpus and short generation checks are in progress. The full
-workspace, unfiltered spec suite, unfiltered corpus and `scripts/dev-verify`
-are reserved for the coordinator and were not run here.
+The focused/clippy retry after the fixture entry changes also passed.
+Filtered corpus, short generation and final fmt are still in progress.
+The first corpus attempt was interrupted to isolate post-test wall-time
+timeouts: one process had printed its complete passing result but remained
+alive for over 35 wall seconds with about one CPU second used. The CLI runs
+global cache maintenance after commands. Its partial observations are
+preserved; the rerun uses a worktree-local compile cache with the same saved
+bounds, two jobs, binary and assertions. No expected observation was changed.
+
+The first 50 completed checks retained their saved 37 accepted / 13 rejected
+split. Initial output differences include the inherited E3 removal of
+synthetic `Fail(E)` from opaque needs, already explained in the
+[E6 integration audit](e6-main-corpus-audit.md). Three `new_unsound_*` cases
+retain E0515 at the same locations and with the same error counts, showing
+the known `S(String, _)` instead of `S(_, _)`. These are recorded differences,
+not a claim that the full corpus comparison passed.
+
+The full workspace, unfiltered spec suite, unfiltered corpus and
+`scripts/dev-verify` are reserved for the coordinator and were not run here.
 
 ## Unproven parts
 
