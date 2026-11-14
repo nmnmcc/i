@@ -8,7 +8,7 @@
 	(Some, None) = std/option
 )
 
-compile = (pattern: String) -> regex.Regex {
+compile = (pattern : String) -> regex.Regex {
 	fail.catch(() { regex.compile(pattern) }) |>
 		(Ok(re)) { re }
 		| (Error(_)) { panic("test pattern") }

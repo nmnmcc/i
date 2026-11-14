@@ -473,7 +473,7 @@ to_codepoint_strings = (string : String) -> List(String) {
 	list.map(core.codepoints(string), (c) { core.from_codepoints([c]) })
 }
 
-_utf_codepoint_result = (value: Int) -> Result(UtfCodepoint, Nil) {
+_utf_codepoint_result = (value : Int) -> Result(UtfCodepoint, Nil) {
 	core.int_to_codepoint(value)
 }
 
@@ -709,7 +709,7 @@ replace_n = (in : String, each : String, with : String, up_to : Int) -> String {
 
 /// Calls on once per scalar, left to right. True separates pieces; separator
 /// runs collapse and empty pieces are omitted. Errors stop traversal at once.
-split_when = <N>(string: String, on: (UtfCodepoint) <- N -> Bool) -> List(
+split_when = <N>(string : String, on : (UtfCodepoint) <- N -> Bool) -> List(
 	String,
 ) {
 	go = (
@@ -759,14 +759,16 @@ filter = <N>(string : String, keeping : (UtfCodepoint) <- N -> Bool) -> String {
 }
 
 /// Folds left to right with (accumulator,scalar); empty input gives from.
-fold = <A, N>(string: String, from: A, with: (A, UtfCodepoint) <- N -> A) -> A {
-	list.fold(core.codepoints(string), from, with)
-}
+fold = <A, N>(
+	string : String,
+	from : A,
+	with : (A, UtfCodepoint) <- N -> A
+) -> A { list.fold(core.codepoints(string), from, with) }
 
 /// The codepoint with this number, raising `Nil` when it is not a Unicode
 /// scalar value (0 to 0x10FFFF, but not 0xD800 to 0xDFFF).
 ///
 /// Reports failure through `Fail(Nil)`.
-utf_codepoint = (value: Int) -> UtfCodepoint {
+utf_codepoint = (value : Int) -> UtfCodepoint {
 	fail.from_result(_utf_codepoint_result(value))
 }

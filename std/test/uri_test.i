@@ -27,7 +27,7 @@ round_trip = (u : uri.Uri) -> Nil {
 	Nil
 }
 
-parse_good = (s: String) -> uri.Uri {
+parse_good = (s : String) -> uri.Uri {
 	Ok(u) = fail.catch(() { uri.parse(s) })
 	assert(uri.to_string(u) == s)
 	round_trip(u)

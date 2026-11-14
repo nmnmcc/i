@@ -545,7 +545,7 @@ fn task_run_discharges_scheduler_in_the_printed_entry_need() {
     assert!(
         shown
             .lines()
-            .any(|line| line == "app/main.main : () <- (Assert, task.Runner) -> Nil"),
+            .any(|line| line == "app/main.main : () <- (Assert, Fail(Never), task.Runner) -> Nil"),
         "{shown}"
     );
 }

@@ -38,7 +38,7 @@ test("fail_caught", () { check(caught(rounds, 0) == total, "fail_caught") })
 test("fail_passed", () { check(passed(rounds, 0) == total, "fail_passed") })
 
 // The former built-in cases now exercise the library implementation too.
-builtin_caught = (i: Int, acc: Int) -> Int {
+builtin_caught = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
 		| (_) {

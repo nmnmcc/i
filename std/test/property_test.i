@@ -433,7 +433,7 @@ test("attempt_streams_seed_and_prefixes", () {
 		)
 	})
 	Ok(ints) = fail.catch(() { property.int(-100, 100) })
-	predicate = (x: Int) -> property.Verdict { property.Fail(core.inspect(x)) }
+	predicate = (x : Int) -> property.Verdict { property.Fail(core.inspect(x)) }
 	a = property.check(
 		ints,
 		property.Config(
@@ -483,7 +483,7 @@ test("list_order_and_generated_bounds", () {
 			property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
 		})
 	}
-	find_four = (seed: Int) -> property.Tree(List(Int)) {
+	find_four = (seed : Int) -> property.Tree(List(Int)) {
 		assert(seed < 1000)
 		t = root(gen, 4, seed)
 		{ list.length(t.value) == 4 } |>
@@ -497,7 +497,7 @@ test("list_order_and_generated_bounds", () {
 	)
 	Ok(items) = fail.catch(() { property.int(-3, 3) })
 	Ok(lists) = fail.catch(() { property.list(items, 2, 5) })
-	verify = (t: property.Tree(List(Int)), depth: Int) -> Nil {
+	verify = (t : property.Tree(List(Int)), depth : Int) -> Nil {
 		assert(list.length(t.value) >= 2 && list.length(t.value) <= 5)
 		assert(list.all(t.value, (x) { x >= -3 && x <= 3 }))
 		{ depth == 0 } |>
@@ -617,7 +617,7 @@ test("assertion_adapter_and_clients", () {
 
 test("negative_integer_boolean_element_and_list_element_order", () {
 	Ok(negative) = fail.catch(() { property.int(-10, 0) })
-	find = (seed: Int) -> property.Tree(Int) {
+	find = (seed : Int) -> property.Tree(Int) {
 		assert(seed < 1000)
 		t = root(negative, 0, seed)
 		{ t.value == -10 } |> (True) { t } | (False) { find(seed + 1) }

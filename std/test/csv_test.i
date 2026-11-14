@@ -12,7 +12,7 @@
 	(Some, None) = std/option
 )
 
-config = (delimiter: String, fields: Int, crlf: Bool) -> csv.Options {
+config = (delimiter : String, fields : Int, crlf : Bool) -> csv.Options {
 	fail.catch(() { csv.options(delimiter, fields, crlf) }) |>
 		(Ok(c)) { c }
 		| (Error(_)) { panic("test options") }

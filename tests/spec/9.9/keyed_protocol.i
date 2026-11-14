@@ -45,6 +45,11 @@ receive = (c) <- (scheduler : Scheduler) {
 	read(k, value)
 }
 
+// Decision 2: install the real key required by a kept pure callback.
+without_fail = <A, N>(body : () <- (Fail(Never), ..N) -> A) -> A {
+	body() <- (Fail(raise = (_ : Never) { panic("fixture: impossible error") }))
+}
+
 start = (body, result_key) {
 	{
 		kept = control.keep((own : Scheduler) {
@@ -52,7 +57,7 @@ start = (body, result_key) {
 				Done(key.wrap(result_key, fail.catch(body))),
 			) <- (own)
 		})
-		Start(run = kept)
+		Start(run = (own) { without_fail(() { kept(own) }) })
 	} <- (Scheduler(step = (_) { panic("prototype: detached") }))
 }
 

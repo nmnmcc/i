@@ -223,7 +223,7 @@ ScopeError = (Keyed)
 ScopeWinner = (Keyed)
 
 @external("ilang:control", "finalizing")
-finalizing: <A, R, N, B, M>(Continuation(A, R, N), Boundary(B, M)) -> Bool
+finalizing : <A, R, N, B, M>(Continuation(A, R, N), Boundary(B, M)) -> Bool
 
 Frame = (
 	scope = Maybe(Address),
@@ -269,10 +269,7 @@ WaitingTicket = (Continuation(StepAnswer, Turn, Never), List(Ticket))
 
 WaitingScope = (Continuation(StepAnswer, Turn, Never), Address)
 
-WaitingEvent = (
-	Continuation(StepAnswer, Turn, Never),
-	Request(Registration),
-)
+WaitingEvent = (Continuation(StepAnswer, Turn, Never), Request(Registration))
 
 WaitingDrain = (Continuation(StepAnswer, Turn, Never))
 
@@ -544,8 +541,8 @@ retain = (value) { value }
 // §9.4 keeps a real Fail key even for a callback that cannot raise.
 // Supply that key at internal, closed scheduling callbacks; never capture
 // a caller's failure handler or export it through a scheduler field.
-without_error = <A>(body: () <- (Fail(Never)) -> A) -> A {
-	body() <- (Fail(raise = (_: Never) { panic("task: impossible error") }))
+without_error = <A>(body : () <- (Fail(Never)) -> A) -> A {
+	body() <- (Fail(raise = (_ : Never) { panic("task: impossible error") }))
 }
 
 unit_value = key.wrap(unit_key, Nil)
@@ -1207,7 +1204,7 @@ complete = <A, E, N>(
 		}
 }
 
-make_start: <A, E, N>(
+make_start : <A, E, N>(
 	() <- (Fail(E), Scheduler, Runner, request.Await, ..N) -> A,
 	Key(Result(A, E)),
 	Key(E),
@@ -1222,7 +1219,11 @@ make_start: <A, E, N>(
 						local = control.keep((_ : Nil) {
 							complete(body, result, errors, check)
 						})
-						retain(guarded(own, Absent, () { without_error(() { local(Nil) }) }))
+						retain(
+							guarded(own, Absent, () {
+								without_error(() { local(Nil) })
+							}),
+						)
 					} <- (attached.waiter) <- (attached.runner) <- (own)
 				}
 		})
@@ -1366,9 +1367,11 @@ remote_begin = (job : Job) -> (
 	)
 }
 
-remote_resume = (
-	input : (Continuation(StepAnswer, Turn, Never), Resume)
-) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket)) {
+remote_resume = (input : (Continuation(StepAnswer, Turn, Never), Resume)) -> (
+	Remote,
+	Continuation(StepAnswer, Turn, Never),
+	List(Ticket),
+) {
 	(k, next) = input
 	remote_turn(control.resume(k, next.answer), next.finals, next.run)
 }
@@ -3605,7 +3608,7 @@ loop = (state : State) -> RunReply {
 		}
 }
 
-scope_call_body: <A, E, N>(
+scope_call_body : <A, E, N>(
 	(Group(E)) <- (Fail(E), ..N) -> A,
 	Witness,
 	Mode,
@@ -3680,7 +3683,7 @@ go_key = <A, E, N>(
 	Task(info = TaskInfo(scope = s.info, id = id), result = result, owner = s)
 }
 
-go: <A, E, N>(Group(E), () <- (Fail(E), ..N) -> A) <- (Scheduler, ..N) -> Task(
+go : <A, E, N>(Group(E), () <- (Fail(E), ..N) -> A) <- (Scheduler, ..N) -> Task(
 	A,
 	E,
 ) = (s, body) {
@@ -3841,8 +3844,8 @@ get = <A>(s : Shared(A)) <- (own : Scheduler) -> A {
 }
 
 keep = <S, A, E, N>(
-	f: (S) <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A
-) <- (_own: Scheduler, .._env: N) -> (S) <- (Fail(E), Scheduler) -> A {
+	f : (S) <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A
+) <- (_own : Scheduler, .._env : N) -> (S) <- (Fail(E), Scheduler) -> A {
 	{
 		kept = control.keep((input : (S, Scheduler)) {
 			(value, own) = input
@@ -3918,7 +3921,7 @@ race = <A, E, N>(
 		| (BodyValue(_)) { panic("task: missing race winner") }
 }
 
-spawn_values: <A, B, E, N>(Group(E), List(A), (A) <- (Fail(E), ..N) -> B) <- (
+spawn_values : <A, B, E, N>(Group(E), List(A), (A) <- (Fail(E), ..N) -> B) <- (
 	Scheduler,
 	..N,
 ) -> List(Task(B, E)) = (s, xs, f) {
@@ -3943,8 +3946,16 @@ map_concurrently = <A, B, N>(xs : List(A), f : (A) <- N -> B) -> List(B) {
 	scope((s) { join_values(spawn_values(s, xs, f)) })
 }
 
-execute_body: <A, E, N>(
-	() <- (Fail(E), Scheduler, Runner, request.Await, request.Owner, request.Root, ..N) -> A,
+execute_body : <A, E, N>(
+	() <- (
+		Fail(E),
+		Scheduler,
+		Runner,
+		request.Await,
+		request.Owner,
+		request.Root,
+		..N,
+	) -> A,
 	Runner,
 	rng.Generator,
 	Policy,
@@ -4061,21 +4072,45 @@ execute_body: <A, E, N>(
 		}
 }
 
-run = <A, N>(body : () <- (Scheduler, Runner, request.Await, request.Owner, request.Root, ..N) -> A) <- (runner : Runner) -> A {
+run = <A, N>(
+	body : () <- (
+		Scheduler,
+		Runner,
+		request.Await,
+		request.Owner,
+		request.Root,
+		..N,
+	) -> A
+) <- (runner : Runner, ..env : N) -> A {
 	runner.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
 		| (AttachedRunner(..) = attached) {
-			execute(body, runner, attached.seed, attached.policy) |>
-				(Ok(result)) { fail.from_result(result) }
+			// The residual need, including any actual Fail, comes from run's
+			// caller. Internal completion bookkeeping cannot raise an error.
+			scheduled : () <- (
+				Scheduler,
+				Runner,
+				request.Await,
+				request.Owner,
+				request.Root,
+			) -> A = () { body() <- env }
+			result : Result(Result(A, Never), ScheduleError) = execute(
+				scheduled,
+				runner,
+				attached.seed,
+				attached.policy,
+			)
+			result |>
+				(Ok(Ok(value))) { value }
 				| (Error(_)) { panic("task: invalid inherited schedule") }
 		}
 }
 
 test = <A, E, N>(
-	seed: rng.Generator,
-	choices: List(List(Int)),
-	body: () <- (Fail(E), ..N) -> A
-) <- (runner: Runner) -> A {
+	seed : rng.Generator,
+	choices : List(List(Int)),
+	body : () <- (Fail(E), ..N) -> A
+) <- (runner : Runner) -> A {
 	execute(body, runner, seed, Script(choices)) |>
 		(Ok(result)) { fail.from_result(result) }
 		| (Error(error)) { fail.raise(error) }
@@ -4085,7 +4120,7 @@ _entry = <A, N>(body : () <- N -> A) <- (root : request.Root) -> A {
 	retain(run(body)) <- (initial(root))
 }
 
-scope_call: <A, E, N>(
+scope_call : <A, E, N>(
 	(Group(E)) <- (Fail(E), ..N) -> A,
 	Witness,
 	Mode,
@@ -4109,16 +4144,22 @@ scope_call: <A, E, N>(
 		}
 }
 
-execute: <A, E, N>(
-	() <- (Fail(E), Scheduler, Runner, request.Await, request.Owner, request.Root, ..N) -> A,
+execute : <A, E, N>(
+	() <- (
+		Fail(E),
+		Scheduler,
+		Runner,
+		request.Await,
+		request.Owner,
+		request.Root,
+		..N,
+	) -> A,
 	Runner,
 	rng.Generator,
 	Policy,
 ) <- N -> Result(Result(A, E), ScheduleError) = (body, runner, seed, policy) {
-	kept = control.keep((_ : Nil) {
-		execute_body(body, runner, seed, policy)
-	})
-	retain(kept(Nil))
+	kept = control.keep((_ : Nil) { execute_body(body, runner, seed, policy) })
+	without_error(() { kept(Nil) })
 }
 
 sync = <A, E, N>(e : Event(A, E, N)) <- (own : Scheduler) -> A {

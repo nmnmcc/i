@@ -5,7 +5,7 @@
 First = (value = Int)
 Second = (value = Int)
 
-values = () <- (first: First, second: Second) { (first.value, second.value) }
+values = () <- (first : First, second : Second) { (first.value, second.value) }
 
 suite("provided groups", () {
 	{

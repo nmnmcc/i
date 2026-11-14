@@ -33,7 +33,7 @@
 /// The UTF-8 bytes of a string.
 from_string = (string : String) -> BitArray { <<string:utf8>> }
 
-_to_string_result = (bits: BitArray) -> Result(String, Nil) {
+_to_string_result = (bits : BitArray) -> Result(String, Nil) {
 	core.bit_array_to_string(bits)
 }
 
@@ -74,7 +74,10 @@ reverse = <A>(list : List(A)) -> List(A) {
 	go(list, [])
 }
 
-_slice_result = (from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil) {
+_slice_result = (from : BitArray, at : Int, take : Int) -> Result(
+	BitArray,
+	Nil,
+) {
 	(start, length) = { take < 0 } |>
 		(True) { (at + take, -take) }
 		| (False) { (at, take) }
@@ -182,7 +185,7 @@ hex_value = (byte : Int) -> Int {
 		}
 }
 
-_base16_decode_result = (input: String) -> Result(BitArray, Nil) {
+_base16_decode_result = (input : String) -> Result(BitArray, Nil) {
 	go = (rest, acc) {
 		rest |>
 			(<<>>) { Ok(concat(reverse(acc))) }
@@ -295,11 +298,11 @@ decode64 = (input : String, c62 : Int, c63 : Int) -> Result(BitArray, Nil) {
 	go(<<input:utf8>>, [])
 }
 
-_base64_decode_result = (encoded: String) -> Result(BitArray, Nil) {
+_base64_decode_result = (encoded : String) -> Result(BitArray, Nil) {
 	decode64(encoded, 43, 47)
 }
 
-_base64_url_decode_result = (encoded: String) -> Result(BitArray, Nil) {
+_base64_url_decode_result = (encoded : String) -> Result(BitArray, Nil) {
 	decode64(encoded, 45, 95)
 }
 
@@ -311,7 +314,7 @@ _base64_url_decode_result = (encoded: String) -> Result(BitArray, Nil) {
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-to_string = (bits: BitArray) -> String {
+to_string = (bits : BitArray) -> String {
 	fail.from_result(_to_string_result(bits))
 }
 
@@ -325,7 +328,7 @@ to_string = (bits: BitArray) -> String {
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-slice = (from: BitArray, at: Int, take: Int) -> BitArray {
+slice = (from : BitArray, at : Int, take : Int) -> BitArray {
 	fail.from_result(_slice_result(from, at, take))
 }
 
@@ -337,7 +340,7 @@ slice = (from: BitArray, at: Int, take: Int) -> BitArray {
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-base16_decode = (input: String) -> BitArray {
+base16_decode = (input : String) -> BitArray {
 	fail.from_result(_base16_decode_result(input))
 }
 
@@ -350,13 +353,13 @@ base16_decode = (input: String) -> BitArray {
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-base64_decode = (encoded: String) -> BitArray {
+base64_decode = (encoded : String) -> BitArray {
 	fail.from_result(_base64_decode_result(encoded))
 }
 
 /// Like `base64_decode`, with `-` and `_` in the place of `+` and `/`.
 ///
 /// Reports failure through `Fail(Nil)`.
-base64_url_decode = (encoded: String) -> BitArray {
+base64_url_decode = (encoded : String) -> BitArray {
 	fail.from_result(_base64_url_decode_result(encoded))
 }

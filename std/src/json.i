@@ -37,7 +37,7 @@ Object = (List((String, Json)))
 Json = Null | Boolean | Integer | Number | Text | Array | Object
 JsonError = (offset = Int, reason = String)
 
-_parse_result = (text: String) -> Result(Json, JsonError) {
+_parse_result = (text : String) -> Result(Json, JsonError) {
 	fail.catch(() {
 		xs = octets(<<text:utf8>>)
 		(value, rest, at) = value(xs, 0)
@@ -409,7 +409,7 @@ octets = (bits : BitArray) -> List(Int) {
 	go(bits, [])
 }
 
-text_bytes = (xs: List(Int)) -> String {
+text_bytes = (xs : List(Int)) -> String {
 	{
 		e4_call_arg_0 = bit_array.concat(list.map(xs, (x) { <<x>> }))
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
@@ -562,4 +562,4 @@ hex_char = (n : Int) -> Int {
 }
 
 /// Reports failure through `Fail(JsonError)`.
-parse = (text: String) -> Json { fail.from_result(_parse_result(text)) }
+parse = (text : String) -> Json { fail.from_result(_parse_result(text)) }

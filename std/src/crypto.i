@@ -476,22 +476,22 @@ hmac = (
 		| (True) { Ok(authenticate(prepare(key, block, hash), input)) }
 }
 
-_hmac_sha256_result = (key: BitArray, input: BitArray) -> Result(
+_hmac_sha256_result = (key : BitArray, input : BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { hmac(key, input, 64, sha256) }
 
-_hmac_sha512_result = (key: BitArray, input: BitArray) -> Result(
+_hmac_sha512_result = (key : BitArray, input : BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { hmac(key, input, 128, sha512) }
 
-_hkdf_extract_sha256_result = (salt: BitArray, input: BitArray) -> Result(
+_hkdf_extract_sha256_result = (salt : BitArray, input : BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { _hmac_sha256_result(salt, input) }
 
-_hkdf_extract_sha512_result = (salt: BitArray, input: BitArray) -> Result(
+_hkdf_extract_sha512_result = (salt : BitArray, input : BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { _hmac_sha512_result(salt, input) }
@@ -536,24 +536,24 @@ expand = (
 }
 
 _hkdf_expand_sha256_result = (
-	prk: BitArray,
-	info: BitArray,
-	length: Int
+	prk : BitArray,
+	info : BitArray,
+	length : Int
 ) -> Result(BitArray, CryptoError) { expand(prk, info, length, 32, 64, sha256) }
 
 _hkdf_expand_sha512_result = (
-	prk: BitArray,
-	info: BitArray,
-	length: Int
+	prk : BitArray,
+	info : BitArray,
+	length : Int
 ) -> Result(BitArray, CryptoError) {
 	expand(prk, info, length, 64, 128, sha512)
 }
 
 _hkdf_sha256_result = (
-	input: BitArray,
-	salt: BitArray,
-	info: BitArray,
-	length: Int
+	input : BitArray,
+	salt : BitArray,
+	info : BitArray,
+	length : Int
 ) -> Result(BitArray, CryptoError) {
 	_hkdf_extract_sha256_result(salt, input) |>
 		(Error(e)) { Error(e) }
@@ -561,10 +561,10 @@ _hkdf_sha256_result = (
 }
 
 _hkdf_sha512_result = (
-	input: BitArray,
-	salt: BitArray,
-	info: BitArray,
-	length: Int
+	input : BitArray,
+	salt : BitArray,
+	info : BitArray,
+	length : Int
 ) -> Result(BitArray, CryptoError) {
 	_hkdf_extract_sha512_result(salt, input) |>
 		(Error(e)) { Error(e) }
@@ -579,10 +579,10 @@ xor_bits = (a : BitArray, b : BitArray) -> BitArray {
 }
 
 _pbkdf2_sha256_result = (
-	password: BitArray,
-	salt: BitArray,
-	iterations: Int,
-	length: Int
+	password : BitArray,
+	salt : BitArray,
+	iterations : Int,
+	length : Int
 ) -> Result(BitArray, CryptoError) {
 	{ iterations <= 0 } |>
 		(True) { Error(InvalidIterations) }
@@ -666,7 +666,7 @@ constant_time_equal = (a : BitArray, b : BitArray) -> Bool {
 		}
 }
 
-_random_bytes_result = (length: Int) -> Result(BitArray, CryptoError) {
+_random_bytes_result = (length : Int) -> Result(BitArray, CryptoError) {
 	{ length < 0 } |>
 		(True) { Error(InvalidLength) }
 		| (False) { Ok(process.entropy(length)) }
@@ -675,42 +675,50 @@ _random_bytes_result = (length: Int) -> Result(BitArray, CryptoError) {
 /// RFC 4231 HMAC-SHA-256: `hmac_sha256(<<1>>, <<2>>)`.
 ///
 /// Reports failure through `Fail(CryptoError)`.
-hmac_sha256 = (key: BitArray, input: BitArray) -> BitArray {
+hmac_sha256 = (key : BitArray, input : BitArray) -> BitArray {
 	fail.from_result(_hmac_sha256_result(key, input))
 }
 
 /// RFC 4231 HMAC-SHA-512, with arbitrary-length byte keys.
 ///
 /// Reports failure through `Fail(CryptoError)`.
-hmac_sha512 = (key: BitArray, input: BitArray) -> BitArray {
+hmac_sha512 = (key : BitArray, input : BitArray) -> BitArray {
 	fail.from_result(_hmac_sha512_result(key, input))
 }
 
 /// RFC 5869 extract. Empty salt is equivalent to a hash-length zero salt.
 ///
 /// Reports failure through `Fail(CryptoError)`.
-hkdf_extract_sha256 = (salt: BitArray, input: BitArray) -> BitArray {
+hkdf_extract_sha256 = (salt : BitArray, input : BitArray) -> BitArray {
 	fail.from_result(_hkdf_extract_sha256_result(salt, input))
 }
 
 /// RFC 5869 extract using SHA-512.
 ///
 /// Reports failure through `Fail(CryptoError)`.
-hkdf_extract_sha512 = (salt: BitArray, input: BitArray) -> BitArray {
+hkdf_extract_sha512 = (salt : BitArray, input : BitArray) -> BitArray {
 	fail.from_result(_hkdf_extract_sha512_result(salt, input))
 }
 
 /// Expands a SHA-256 PRK into 0..8160 bytes. A short PRK is an error.
 ///
 /// Reports failure through `Fail(CryptoError)`.
-hkdf_expand_sha256 = (prk: BitArray, info: BitArray, length: Int) -> BitArray {
+hkdf_expand_sha256 = (
+	prk : BitArray,
+	info : BitArray,
+	length : Int
+) -> BitArray {
 	fail.from_result(_hkdf_expand_sha256_result(prk, info, length))
 }
 
 /// Expands a SHA-512 PRK into 0..16320 bytes.
 ///
 /// Reports failure through `Fail(CryptoError)`.
-hkdf_expand_sha512 = (prk: BitArray, info: BitArray, length: Int) -> BitArray {
+hkdf_expand_sha512 = (
+	prk : BitArray,
+	info : BitArray,
+	length : Int
+) -> BitArray {
 	fail.from_result(_hkdf_expand_sha512_result(prk, info, length))
 }
 
@@ -718,10 +726,10 @@ hkdf_expand_sha512 = (prk: BitArray, info: BitArray, length: Int) -> BitArray {
 ///
 /// Reports failure through `Fail(CryptoError)`.
 hkdf_sha256 = (
-	input: BitArray,
-	salt: BitArray,
-	info: BitArray,
-	length: Int
+	input : BitArray,
+	salt : BitArray,
+	info : BitArray,
+	length : Int
 ) -> BitArray {
 	fail.from_result(_hkdf_sha256_result(input, salt, info, length))
 }
@@ -730,10 +738,10 @@ hkdf_sha256 = (
 ///
 /// Reports failure through `Fail(CryptoError)`.
 hkdf_sha512 = (
-	input: BitArray,
-	salt: BitArray,
-	info: BitArray,
-	length: Int
+	input : BitArray,
+	salt : BitArray,
+	info : BitArray,
+	length : Int
 ) -> BitArray {
 	fail.from_result(_hkdf_sha512_result(input, salt, info, length))
 }
@@ -743,10 +751,10 @@ hkdf_sha512 = (
 ///
 /// Reports failure through `Fail(CryptoError)`.
 pbkdf2_sha256 = (
-	password: BitArray,
-	salt: BitArray,
-	iterations: Int,
-	length: Int
+	password : BitArray,
+	salt : BitArray,
+	iterations : Int,
+	length : Int
 ) -> BitArray {
 	fail.from_result(_pbkdf2_sha256_result(password, salt, iterations, length))
 }
@@ -754,6 +762,6 @@ pbkdf2_sha256 = (
 /// Secure bytes from the existing Entropy service. No pseudo-random substitute.
 ///
 /// Reports failure through `Fail(CryptoError)`.
-random_bytes = (length: Int) -> BitArray {
+random_bytes = (length : Int) -> BitArray {
 	fail.from_result(_random_bytes_result(length))
 }

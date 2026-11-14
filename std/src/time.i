@@ -102,7 +102,10 @@ scale = (duration : Duration, by : Int) -> Duration {
 	Duration(to_nanoseconds(duration) * by)
 }
 
-_divide_result = (duration: Duration, by: Int) -> Result(Duration, TimeError) {
+_divide_result = (duration : Duration, by : Int) -> Result(
+	Duration,
+	TimeError,
+) {
 	{ by == 0 } |>
 		(True) { Error(DivisionByZero) }
 		| (False) { Ok(Duration(to_nanoseconds(duration) / by)) }
@@ -150,6 +153,6 @@ measure = (body) {
 /// Divides toward zero, or returns DivisionByZero for a zero divisor.
 ///
 /// Reports failure through `Fail(TimeError)`.
-divide = (duration: Duration, by: Int) -> Duration {
+divide = (duration : Duration, by : Int) -> Duration {
 	fail.from_result(_divide_result(duration, by))
 }

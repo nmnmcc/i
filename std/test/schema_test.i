@@ -7,7 +7,7 @@
 	(Some, None) = std/option
 )
 
-round = <A>(s: schema.Schema(A, schema.SchemaError), value: A) -> Bool {
+round = <A>(s : schema.Schema(A, schema.SchemaError), value : A) -> Bool {
 	{
 		e4_call_arg_0 = s
 		e4_call_arg_1 = schema.encode(s, value)
@@ -513,8 +513,8 @@ test("optional_field_path", () {
 })
 
 test("literal_types", () {
-	s: Schema("yes", schema.SchemaError) = schema.literal_string("yes")
-	n: Schema(7, schema.SchemaError) = schema.literal_int(7)
+	s : Schema("yes", schema.SchemaError) = schema.literal_string("yes")
+	n : Schema(7, schema.SchemaError) = schema.literal_int(7)
 	assert(
 		{
 			e4_call_arg_0 = s

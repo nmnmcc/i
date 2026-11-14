@@ -51,7 +51,7 @@ Syntax = (json.JsonError)
 Decode = (SchemaError)
 ParseError = Syntax | Decode
 
-_decode_result = <A, E>(schema: Schema(A, E), value: json.Json) -> Result(
+_decode_result = <A, E>(schema : Schema(A, E), value : json.Json) -> Result(
 	A,
 	E,
 ) { schema.read(value) }
@@ -60,7 +60,7 @@ encode = <A, E>(schema : Schema(A, E), value : A) -> json.Json {
 	schema.write(value)
 }
 
-_parse_result = <A>(schema: Schema(A, SchemaError), text: String) -> Result(
+_parse_result = <A>(schema : Schema(A, SchemaError), text : String) -> Result(
 	A,
 	ParseError,
 ) {
@@ -367,7 +367,7 @@ refine = <A>(
 	)
 }
 
-lazy = <A>(get: () -> Schema(A, SchemaError)) -> Schema(A, SchemaError) {
+lazy = <A>(get : () -> Schema(A, SchemaError)) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) { _decode_result(get(), x) },
 		write = (x) { encode(get(), x) },
@@ -445,11 +445,11 @@ tagged_union = <A>(
 }
 
 /// Reports failure through `Fail(E)`.
-decode = <A, E>(schema: Schema(A, E), value: json.Json) -> A {
+decode = <A, E>(schema : Schema(A, E), value : json.Json) -> A {
 	fail.from_result(_decode_result(schema, value))
 }
 
 /// Reports failure through `Fail(ParseError)`.
-parse = <A>(schema: Schema(A, SchemaError), text: String) -> A {
+parse = <A>(schema : Schema(A, SchemaError), text : String) -> A {
 	fail.from_result(_parse_result(schema, text))
 }

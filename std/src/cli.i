@@ -332,7 +332,7 @@ map2 = <A, B, C>(
 
 text = (text : String) -> Result(String, String) { Ok(text) }
 
-integer = (text: String) -> Result(Int, String) {
+integer = (text : String) -> Result(Int, String) {
 	fail.catch(() { int.parse(text) }) |>
 		(Ok(value)) { Ok(value) }
 		| (Error(_)) { Error("expected integer") }
@@ -751,7 +751,7 @@ allocate = (
 	go(fields, buckets, positions, [])
 }
 
-_parse_result = <A>(parser: Parser(A), args: List(String)) -> Result(
+_parse_result = <A>(parser : Parser(A), args : List(String)) -> Result(
 	A,
 	CliError,
 ) {
@@ -789,7 +789,7 @@ show_field = (field : Field) -> String {
 		| (Remaining) { "[<\(field.name)>...]" }
 }
 
-_help_result = <A>(parser: Parser(A), program: String) -> Result(
+_help_result = <A>(parser : Parser(A), program : String) -> Result(
 	String,
 	DefinitionError,
 ) {
@@ -820,10 +820,10 @@ _help_result = <A>(parser: Parser(A), program: String) -> Result(
 		}
 }
 
-_read_result = <A>(parser: Parser(A)) { _parse_result(parser, process.args()) }
+_read_result = <A>(parser : Parser(A)) { _parse_result(parser, process.args()) }
 
 /// Runs a command after parsing its arguments, reporting failures on stderr.
-run = <A, N>(parser: Parser(A), program: String, body: (A) <- N -> Nil) {
+run = <A, N>(parser : Parser(A), program : String, body : (A) <- N -> Nil) {
 	_read_result(parser) |>
 		(Ok(value)) { body(value) }
 		| (Error(error)) {
@@ -838,16 +838,16 @@ run = <A, N>(parser: Parser(A), program: String, body: (A) <- N -> Nil) {
 }
 
 /// Reports failure through `Fail(CliError)`.
-parse = <A>(parser: Parser(A), args: List(String)) -> A {
+parse = <A>(parser : Parser(A), args : List(String)) -> A {
 	fail.from_result(_parse_result(parser, args))
 }
 
 /// Reports failure through `Fail(DefinitionError)`.
-help = <A>(parser: Parser(A), program: String) -> String {
+help = <A>(parser : Parser(A), program : String) -> String {
 	fail.from_result(_help_result(parser, program))
 }
 
 /// Parses the arguments supplied by the process service.
 ///
 /// Reports failure through `Fail(CliError)`.
-read = <A>(parser: Parser(A)) -> A { fail.from_result(_read_result(parser)) }
+read = <A>(parser : Parser(A)) -> A { fail.from_result(_read_result(parser)) }

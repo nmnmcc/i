@@ -120,7 +120,10 @@ is_absolute = (path : String) -> Bool {
 	path |> ("/" <> _) { True } | (_) { False }
 }
 
-_relative_result = (from: String, to: String) -> Result(String, RelativeError) {
+_relative_result = (from : String, to : String) -> Result(
+	String,
+	RelativeError,
+) {
 	a = clean(from)
 	b = clean(to)
 	{ is_absolute(a) != is_absolute(b) } |>
@@ -189,6 +192,6 @@ clean_segments = (path : String) -> List(String) {
 /// parents in the base are errors. Neither location is implicitly a file.
 ///
 /// Reports failure through `Fail(RelativeError)`.
-relative = (from: String, to: String) -> String {
+relative = (from : String, to : String) -> String {
 	fail.from_result(_relative_result(from, to))
 }

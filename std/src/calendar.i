@@ -128,7 +128,10 @@ is_leap_year = (year : Int) -> Bool {
 	year % 4 == 0 && { year % 100 != 0 || year % 400 == 0 }
 }
 
-_days_in_month_result = (year: Int, month: Int) -> Result(Int, CalendarError) {
+_days_in_month_result = (year : Int, month : Int) -> Result(
+	Int,
+	CalendarError,
+) {
 	month |>
 		(1 | 3 | 5 | 7 | 8 | 10 | 12) { Ok(31) }
 		| (4 | 6 | 9 | 11) { Ok(30) }
@@ -136,7 +139,7 @@ _days_in_month_result = (year: Int, month: Int) -> Result(Int, CalendarError) {
 		| (_) { Error(BadMonth) }
 }
 
-_date_result = (year: Int, month: Int, day: Int) -> Result(
+_date_result = (year : Int, month : Int, day : Int) -> Result(
 	Date,
 	CalendarError,
 ) {
@@ -150,10 +153,10 @@ _date_result = (year: Int, month: Int, day: Int) -> Result(
 }
 
 _time_of_day_result = (
-	hour: Int,
-	minute: Int,
-	second: Int,
-	nanosecond: Int
+	hour : Int,
+	minute : Int,
+	second : Int,
+	nanosecond : Int
 ) -> Result(TimeOfDay, CalendarError) {
 	{ hour < 0 || hour > 23 } |>
 		(True) { Error(BadHour) }
@@ -181,7 +184,7 @@ _time_of_day_result = (
 		}
 }
 
-_offset_result = (minutes: Int) -> Result(Offset, CalendarError) {
+_offset_result = (minutes : Int) -> Result(Offset, CalendarError) {
 	{ minutes >= -1439 && minutes <= 1439 } |>
 		(True) { Ok(Offset(minutes)) }
 		| (False) { Error(BadOffset) }
@@ -385,7 +388,7 @@ read_offset = (chars : List(Int)) -> Offset {
 		| ([]) { fail.raise(BadText) }
 }
 
-_parse_result = (text: String) -> Result((Civil, Offset), CalendarError) {
+_parse_result = (text : String) -> Result((Civil, Offset), CalendarError) {
 	fail.catch(() {
 		chars = list.map(core.codepoints(text), core.codepoint_to_int)
 		(y, r1) = read_year(chars)
@@ -477,29 +480,29 @@ now = () { at(time.now(), utc()) }
 format_now = () { format(now(), utc()) }
 
 /// Reports failure through `Fail(CalendarError)`.
-days_in_month = (year: Int, month: Int) -> Int {
+days_in_month = (year : Int, month : Int) -> Int {
 	fail.from_result(_days_in_month_result(year, month))
 }
 
 /// Reports failure through `Fail(CalendarError)`.
-date = (year: Int, month: Int, day: Int) -> Date {
+date = (year : Int, month : Int, day : Int) -> Date {
 	fail.from_result(_date_result(year, month, day))
 }
 
 /// Reports failure through `Fail(CalendarError)`.
 time_of_day = (
-	hour: Int,
-	minute: Int,
-	second: Int,
-	nanosecond: Int
+	hour : Int,
+	minute : Int,
+	second : Int,
+	nanosecond : Int
 ) -> TimeOfDay {
 	fail.from_result(_time_of_day_result(hour, minute, second, nanosecond))
 }
 
 /// Reports failure through `Fail(CalendarError)`.
-offset = (minutes: Int) -> Offset { fail.from_result(_offset_result(minutes)) }
+offset = (minutes : Int) -> Offset { fail.from_result(_offset_result(minutes)) }
 
 /// Reports failure through `Fail(CalendarError)`.
-parse = (text: String) -> (Civil, Offset) {
+parse = (text : String) -> (Civil, Offset) {
 	fail.from_result(_parse_result(text))
 }

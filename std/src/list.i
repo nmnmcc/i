@@ -531,7 +531,7 @@ zip = <A, B>(list : List(A), with : List(B)) -> List((A, B)) {
 	go(list, with, [])
 }
 
-_strict_zip_result = <A, B>(list: List(A), with: List(B)) -> Result(
+_strict_zip_result = <A, B>(list : List(A), with : List(B)) -> Result(
 	List((A, B)),
 	Nil,
 ) {
@@ -1154,6 +1154,6 @@ min = <A, N>(over : List(A), with : (A, A) <- N -> Order) -> Option(A) {
 /// Like `zip`, but Raises `Nil` when the lists have different lengths.
 ///
 /// Reports failure through `Fail(Nil)`.
-strict_zip = <A, B>(list: List(A), with: List(B)) -> List((A, B)) {
+strict_zip = <A, B>(list : List(A), with : List(B)) -> List((A, B)) {
 	fail.from_result(_strict_zip_result(list, with))
 }

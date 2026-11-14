@@ -63,7 +63,7 @@ main = () {
 					})
 					control.cancel(k4)
 					control.boundary((boundary) {
-						extra : Extra(Nil, Never, Assert) = Extra(boundary)
+						extra : Extra(Nil, Assert) = Extra(boundary)
 						{
 							f = control.keep(pure)
 							assert(

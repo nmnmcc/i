@@ -16,6 +16,11 @@ Out = (print = (String) -> Nil)
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
+// Decision 2: install the real key required by a kept pure callback.
+without_fail = <A, N>(body : () <- (Fail(Never), ..N) -> A) -> A {
+	body() <- (Fail(raise = (_ : Never) { panic("fixture: impossible error") }))
+}
+
 main = () {
 	callback = control.keep((work : (() -> Nil) -> Nil) {
 		task.scope((s) {
@@ -25,7 +30,7 @@ main = () {
 				fail.raise("callback")
 			})
 			signal = control.keep((_ : Nil) { task.send(gate, Nil) })
-			work(() { signal(Nil) })
+			work(() { without_fail(() { signal(Nil) }) })
 		})
 	})
 	assert(
@@ -49,7 +54,9 @@ main = () {
 					})
 				})
 				assert(
-					fail.catch(() { callback((notify) { work(notify) }) }) ==
+					fail.catch(() {
+						callback((notify) { without_fail(() { work(notify) }) })
+					}) ==
 						Error("callback"),
 				)
 				42

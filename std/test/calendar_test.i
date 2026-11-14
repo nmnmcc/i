@@ -7,7 +7,7 @@
 	std/int
 )
 
-valid_date = (year: Int, month: Int, day: Int) -> calendar.Date {
+valid_date = (year : Int, month : Int, day : Int) -> calendar.Date {
 	fail.catch(() { calendar.date(year, month, day) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("invalid test date") }
@@ -24,7 +24,7 @@ valid_time = (
 		| (Error(_)) { panic("invalid test time") }
 }
 
-valid_offset = (minutes: Int) -> calendar.Offset {
+valid_offset = (minutes : Int) -> calendar.Offset {
 	fail.catch(() { calendar.offset(minutes) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("invalid test offset") }

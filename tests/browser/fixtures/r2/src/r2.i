@@ -37,13 +37,14 @@ Gates = (wait = (Int) -> Request(Int))
 @host("r2:control/v1")
 Control = (release = (Int) -> Nil, check = (Int) -> Nil)
 
-// These exports have no ordinary failure; retain all other service needs.
-NoFail(N) = N - Fail(Never)
-
-without_fail = <A, N>(body: () <- (NoFail(N)) -> A) -> A { body() }
+// These exports cannot raise. Decision 2 requires an actual Fail(Never)
+// provider, rather than the old universal-entry-removal filter.
+without_fail = <A, N>(body : () <- (Fail(Never), ..N) -> A) -> A {
+	body() <- (Fail(raise = (_ : Never) { panic("r2: impossible error") }))
+}
 
 // §6.4: both starts precede release; polls cannot starve the runnable releaser.
-overlap = () <- (gates: Gates, control: Control) {
+overlap = () <- (gates : Gates, control : Control) {
 	without_fail(() {
 		task.scope((s) {
 			a = task.go(s, () { request.await_owned(gates.wait(1)) })
@@ -55,7 +56,7 @@ overlap = () <- (gates: Gates, control: Control) {
 }
 
 // §5.1: an unlisted completion is stored while the original wait continues.
-unlisted_answer = () <- (gates: Gates, control: Control) {
+unlisted_answer = () <- (gates : Gates, control : Control) {
 	without_fail(() {
 		a = gates.wait(1)
 		b = gates.wait(2)
@@ -74,7 +75,7 @@ unlisted_answer = () <- (gates: Gates, control: Control) {
 }
 
 // §6.4: go keeps the parent turn but polls an existing IO interest.
-go_progress = () <- (gates: Gates, control: Control) {
+go_progress = () <- (gates : Gates, control : Control) {
 	without_fail(() {
 		task.scope((s) {
 			waiter = task.go(s, () { request.await_owned(gates.wait(10)) })
@@ -128,7 +129,7 @@ ready_wait = <A>(r : Request(A)) <- (await : request.Await) {
 }
 
 // §5.4 race-then-read: the losing waiter never owns the producer.
-race_read = () <- (gates: Gates, control: Control) {
+race_read = () <- (gates : Gates, control : Control) {
 	without_fail(() {
 		a = gates.wait(1)
 		b = gates.wait(2)
@@ -160,7 +161,7 @@ forever = () -> Never {
 }
 
 // §12.8: nested waiter interests reach the root despite a CPU-yielding sibling.
-nested_interest = () <- (gates: Gates) {
+nested_interest = () <- (gates : Gates) {
 	without_fail(() {
 		task.race(
 			() {
@@ -188,7 +189,7 @@ bounded_cpu = (turns : Int) -> Never {
 }
 
 // §6.4: every Owner affiliated with this run's Root counts as work.
-owned_idle = () <- (gates: Gates) {
+owned_idle = () <- (gates : Gates) {
 	without_fail(() {
 		{
 			gates.wait(9)
@@ -199,7 +200,7 @@ owned_idle = () <- (gates: Gates) {
 }
 
 // §6.4: a producer in a different Root cannot keep this run alive.
-unrelated_idle = () <- (gates: Gates) {
+unrelated_idle = () <- (gates : Gates) {
 	without_fail(() {
 		unrelated = request.open_root()
 		{

@@ -116,6 +116,37 @@ need-coercion rejection. The display-error fixture similarly uses a required
 State value field; the bottom-returning-method positive remains independently
 covered. These changes preserve each negative test's incompatibility intent.
 
+The first gate-equivalent workspace run completed 118 binaries: 101 passed
+and 17 failed. Every failure is retained in `target/e4-ptest-logs` for the
+subsequent fixes/reruns; this checkpoint is not a green landing claim. A
+revised `run` captures its caller's residual N explicitly and passes it to
+the scheduled body. Thus actual Fail entries come from the caller, while
+internal completion is `Result(Result(A, Never), ScheduleError)` and does not
+manufacture an outward Fail need. `execute` supplies the genuine Fail(Never)
+needed by its pure kept bookkeeping callback. This implements the exact
+§9.9 run contract under Decision 2 instead of relying on erasure.
+
+Fresh checks confirm `only_runner` has exactly Runner and the test wrapper
+has exactly Fail(ScheduleError) and Runner. Native R2 passes all nine tests,
+including accounting, ancestor cancellation/finals and 200 seeded replays at
+each optimization level. The original events program prints
+`app/main.main : () <- (Assert, Fail(Never), task.Runner) -> Nil`: Scheduler is
+removed, while its genuine pure-event Fail key remains under Decision 2. The
+CLI test pins that exact type. Callback fixtures supply real Fail(Never) keys
+where a closed function is required, or state the key on a boundary/callback
+annotation; every prior cancellation, ordering, error and portability
+assertion is unchanged. The R2 export helper likewise installs that real key
+instead of its old NoFail filter. The generator/catch fixture drops only its
+proven conversion ghost key. The remaining old three-argument Boundary use
+becomes the same two-argument Boundary under E3.
+
+Owner decision 9, “Finals may raise”, changes the old final-error rejection
+fixture into an execution test asserting the identical Error("final") through
+fail.catch. Decision 15 still forbids running finals on a stop; no stop
+handler or stop-final path is added. The first full spec run passed its stop
+fixtures. Full reruns of the changed fixtures remain pending. Required i
+formatting is applied to the 30 reported files without changing assertions.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**

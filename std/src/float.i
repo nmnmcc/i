@@ -97,7 +97,7 @@ significand_limit = 9007199254740992
 /// ```
 to_string = (x : Float) -> String { core.inspect(x) }
 
-_parse_result = (text: String) -> Result(Float, Nil) {
+_parse_result = (text : String) -> Result(Float, Nil) {
 	<<text:utf8>> |>
 		(<<45, rest:bytes>>) { whole(rest, True, 0, 0, 0) }
 		| (<<43, rest:bytes>>) { whole(rest, False, 0, 0, 0) }
@@ -447,7 +447,7 @@ to_precision = (x : Float, precision : Int) -> Float {
 		}
 }
 
-_power_result = (base: Float, of: Int) -> Result(Float, Nil) {
+_power_result = (base : Float, of : Int) -> Result(Float, Nil) {
 	{ base == 0.0 && of < 0 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -468,7 +468,7 @@ _power_result = (base: Float, of: Int) -> Result(Float, Nil) {
 		}
 }
 
-_square_root_result = (x: Float) -> Result(Float, Nil) {
+_square_root_result = (x : Float) -> Result(Float, Nil) {
 	{ x <. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(core.sqrt(x)) }
 }
 
@@ -486,11 +486,11 @@ product = (numbers : List(Float)) -> Float {
 	go(numbers, 1.0)
 }
 
-_divide_result = (a: Float, by: Float) -> Result(Float, Nil) {
+_divide_result = (a : Float, by : Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |> (True) { Error(Nil) } | (False) { Ok(a /. by) }
 }
 
-_modulo_result = (a: Float, by: Float) -> Result(Float, Nil) {
+_modulo_result = (a : Float, by : Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |>
 		(True) { Error(Nil) }
 		| (False) { Ok(a -. core.floor(a /. by) *. by) }
@@ -505,7 +505,7 @@ subtract = (a : Float, b : Float) -> Float { a -. b }
 /// `a *. b`, as a function.
 multiply = (a : Float, b : Float) -> Float { a *. b }
 
-_exponential_result = (x: Float) -> Result(Float, Nil) {
+_exponential_result = (x : Float) -> Result(Float, Nil) {
 	{ x >. 7.09782712893383973096e2 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -519,11 +519,11 @@ _exponential_result = (x: Float) -> Result(Float, Nil) {
 		}
 }
 
-_logarithm_result = (x: Float) -> Result(Float, Nil) {
+_logarithm_result = (x : Float) -> Result(Float, Nil) {
 	{ x <=. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(log_positive(x)) }
 }
 
-_real_power_result = (base: Float, of: Float) -> Result(Float, Nil) {
+_real_power_result = (base : Float, of : Float) -> Result(Float, Nil) {
 	fractional = core.ceiling(of) -. of >. 0.0
 	{ { base <. 0.0 && fractional } || { base == 0.0 && of <. 0.0 } } |>
 		(True) { Error(Nil) }
@@ -954,7 +954,7 @@ asin_ratio = (z : Float) -> Float {
 	p /. q
 }
 
-_asin_result = (x: Float) -> Result(Float, Nil) {
+_asin_result = (x : Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a >. 1.0 } |>
 		(True) { Error(Nil) }
@@ -1006,7 +1006,7 @@ _asin_result = (x: Float) -> Result(Float, Nil) {
 		}
 }
 
-_acos_result = (x: Float) -> Result(Float, Nil) {
+_acos_result = (x : Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a >. 1.0 } |>
 		(True) { Error(Nil) }
@@ -1216,7 +1216,7 @@ atan2 = (y : Float, x : Float) -> Float {
 /// Convert degrees to radians.
 radians = (degrees : Float) -> Float { degrees *. 0.017453292519943295 }
 
-_degrees_result = (radians: Float) -> Result(Float, Nil) {
+_degrees_result = (radians : Float) -> Result(Float, Nil) {
 	{ abs(radians) >. 3.1375664143845866e306 } |>
 		(True) { Error(Nil) }
 		| (False) { Ok(radians *. 57.29577951308232) }
@@ -1232,7 +1232,7 @@ hypot_square = (x : Float) -> (Float, Float) {
 	(hi, lo)
 }
 
-_hypot_result = (x: Float, y: Float) -> Result(Float, Nil) {
+_hypot_result = (x : Float, y : Float) -> Result(Float, Nil) {
 	a = max(abs(x), abs(y))
 	b = min(abs(x), abs(y))
 	ex = core.float_to_bits(a) / mantissa_unit
@@ -1478,7 +1478,7 @@ trig_tan = (input : Float, tail : Float, odd : Bool) -> Float {
 		}
 }
 
-_tan_result = (x: Float) -> Result(Float, Nil) {
+_tan_result = (x : Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a <. 0.7853981633974483 } |>
 		(True) {
@@ -1512,7 +1512,7 @@ _tan_result = (x: Float) -> Result(Float, Nil) {
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-parse = (text: String) -> Float { fail.from_result(_parse_result(text)) }
+parse = (text : String) -> Float { fail.from_result(_parse_result(text)) }
 
 /// `base` to the power of a whole number. A negative exponent gives the
 /// inverse: `power(2.0, -1)` is `0.5`. `0.0` with a negative exponent, and a
@@ -1526,7 +1526,7 @@ parse = (text: String) -> Float { fail.from_result(_parse_result(text)) }
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-power = (base: Float, of: Int) -> Float {
+power = (base : Float, of : Int) -> Float {
 	fail.from_result(_power_result(base, of))
 }
 
@@ -1538,12 +1538,12 @@ power = (base: Float, of: Int) -> Float {
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-square_root = (x: Float) -> Float { fail.from_result(_square_root_result(x)) }
+square_root = (x : Float) -> Float { fail.from_result(_square_root_result(x)) }
 
 /// `a /. by`, raising `Nil` when `by` is `0.0`.
 ///
 /// Reports failure through `Fail(Nil)`.
-divide = (a: Float, by: Float) -> Float {
+divide = (a : Float, by : Float) -> Float {
 	fail.from_result(_divide_result(a, by))
 }
 
@@ -1555,7 +1555,7 @@ divide = (a: Float, by: Float) -> Float {
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-modulo = (a: Float, by: Float) -> Float {
+modulo = (a : Float, by : Float) -> Float {
 	fail.from_result(_modulo_result(a, by))
 }
 
@@ -1567,7 +1567,7 @@ modulo = (a: Float, by: Float) -> Float {
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-exponential = (x: Float) -> Float { fail.from_result(_exponential_result(x)) }
+exponential = (x : Float) -> Float { fail.from_result(_exponential_result(x)) }
 
 /// The natural logarithm (base `e`). `0.0` and negative numbers raise
 /// `Nil`.
@@ -1578,7 +1578,7 @@ exponential = (x: Float) -> Float { fail.from_result(_exponential_result(x)) }
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-logarithm = (x: Float) -> Float { fail.from_result(_logarithm_result(x)) }
+logarithm = (x : Float) -> Float { fail.from_result(_logarithm_result(x)) }
 
 /// `base` to the power `of`, for any Float exponent. A negative base with
 /// an exponent that is not a whole number, `0.0` with a negative exponent,
@@ -1591,33 +1591,35 @@ logarithm = (x: Float) -> Float { fail.from_result(_logarithm_result(x)) }
 /// ```
 ///
 /// Reports failure through `Fail(Nil)`.
-real_power = (base: Float, of: Float) -> Float {
+real_power = (base : Float, of : Float) -> Float {
 	fail.from_result(_real_power_result(base, of))
 }
 
 /// The arcsine in radians; inputs outside [-1, 1] raise Nil.
 ///
 /// Reports failure through `Fail(Nil)`.
-asin = (x: Float) -> Float { fail.from_result(_asin_result(x)) }
+asin = (x : Float) -> Float { fail.from_result(_asin_result(x)) }
 
 /// The arccosine in radians; inputs outside [-1, 1] raise Nil.
 ///
 /// Reports failure through `Fail(Nil)`.
-acos = (x: Float) -> Float { fail.from_result(_acos_result(x)) }
+acos = (x : Float) -> Float { fail.from_result(_acos_result(x)) }
 
 /// Convert radians to degrees, returning an error if the result overflows.
 ///
 /// Reports failure through `Fail(Nil)`.
-degrees = (radians: Float) -> Float {
+degrees = (radians : Float) -> Float {
 	fail.from_result(_degrees_result(radians))
 }
 
 /// The Euclidean length of (x, y), returning an error on overflow.
 ///
 /// Reports failure through `Fail(Nil)`.
-hypot = (x: Float, y: Float) -> Float { fail.from_result(_hypot_result(x, y)) }
+hypot = (x : Float, y : Float) -> Float {
+	fail.from_result(_hypot_result(x, y))
+}
 
 /// Tangent of an angle in radians.
 ///
 /// Reports failure through `Fail(Nil)`.
-tan = (x: Float) -> Float { fail.from_result(_tan_result(x)) }
+tan = (x : Float) -> Float { fail.from_result(_tan_result(x)) }

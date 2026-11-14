@@ -26,7 +26,7 @@ the_fail = <E>() <- (f : Syn3ServiceFail(E)) { f }
 
 Yield(A) = (emit = (A) -> Nil)
 
-collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
@@ -185,9 +185,7 @@ test("a catch inside the final function of an ensure", () {
 		resource.ensure(
 			() { fail.raise(1) },
 			() {
-				inner : Result(Nil, Int) = fail.catch(() {
-					fail.raise(2)
-				})
+				inner : Result(Nil, Int) = fail.catch(() { fail.raise(2) })
 				check(show(inner), "Error(2)")
 			},
 		)

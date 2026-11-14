@@ -95,7 +95,7 @@ InvalidUtf8 = ()
 UnalignedBits = ()
 CodecError = BadEscape | NonAscii | InvalidUtf8 | UnalignedBits
 
-_parse_result = (text: String) -> Result(Uri, UriError) {
+_parse_result = (text : String) -> Result(Uri, UriError) {
 	fail.catch(() {
 		raw = bytes(text)
 		lexical(raw, WholePart)
@@ -154,7 +154,7 @@ _parse_result = (text: String) -> Result(Uri, UriError) {
 	})
 }
 
-_build_result = (parts: Parts) -> Result(Uri, UriError) {
+_build_result = (parts : Parts) -> Result(Uri, UriError) {
 	validated(parts, False)
 }
 
@@ -195,7 +195,7 @@ to_string = (uri : Uri) -> String {
 
 has_scheme = (uri : Uri) -> Bool { parts(uri).scheme != None }
 
-_resolve_result = (base: Uri, reference: Uri) -> Result(Uri, UriError) {
+_resolve_result = (base : Uri, reference : Uri) -> Result(Uri, UriError) {
 	b = parts(base)
 	r = parts(reference)
 	b.scheme |>
@@ -251,21 +251,21 @@ encode_component = (text : String) -> String {
 	encode_octets(bytes(text), False)
 }
 
-_encode_bytes_result = (bytes: BitArray) -> Result(String, CodecError) {
+_encode_bytes_result = (bytes : BitArray) -> Result(String, CodecError) {
 	{ bit_array.bit_size(bytes) % 8 == 0 } |>
 		(True) { Ok(encode_octets(octets(bytes), False)) }
 		| (False) { Error(UnalignedBits) }
 }
 
-_decode_component_result = (text: String) -> Result(String, CodecError) {
+_decode_component_result = (text : String) -> Result(String, CodecError) {
 	fail.catch(() { decode_text(text, False) })
 }
 
-_decode_bytes_result = (text: String) -> Result(BitArray, CodecError) {
+_decode_bytes_result = (text : String) -> Result(BitArray, CodecError) {
 	fail.catch(() { decode_raw(bytes(text), False) })
 }
 
-_parse_query_result = (query: String) -> Result(
+_parse_query_result = (query : String) -> Result(
 	List((String, String)),
 	CodecError,
 ) {
@@ -823,7 +823,7 @@ decode_raw = (xs : List(Int), form : Bool) -> BitArray {
 	go(xs, 0, [])
 }
 
-decode_text = (text: String, form: Bool) -> String {
+decode_text = (text : String, form : Bool) -> String {
 	{
 		e4_call_arg_0 = decode_raw(bytes(text), form)
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
@@ -835,42 +835,42 @@ decode_text = (text: String, form: Bool) -> String {
 /// Parses without repairing, decoding or normalizing any component.
 ///
 /// Reports failure through `Fail(UriError)`.
-parse = (text: String) -> Uri { fail.from_result(_parse_result(text)) }
+parse = (text : String) -> Uri { fail.from_result(_parse_result(text)) }
 
 /// Validates raw candidate fields and their cross-field grammar constraints.
 ///
 /// Reports failure through `Fail(UriError)`.
-build = (parts: Parts) -> Uri { fail.from_result(_build_result(parts)) }
+build = (parts : Parts) -> Uri { fail.from_result(_build_result(parts)) }
 
 /// Strict RFC 5.2 resolution over encoded paths, followed by build validation.
 ///
 /// Reports failure through `Fail(UriError)`.
-resolve = (base: Uri, reference: Uri) -> Uri {
+resolve = (base : Uri, reference : Uri) -> Uri {
 	fail.from_result(_resolve_result(base, reference))
 }
 
 /// Reports failure through `Fail(CodecError)`.
-encode_bytes = (bytes: BitArray) -> String {
+encode_bytes = (bytes : BitArray) -> String {
 	fail.from_result(_encode_bytes_result(bytes))
 }
 
 /// Decodes once, leaves plus unchanged, then validates UTF-8.
 ///
 /// Reports failure through `Fail(CodecError)`.
-decode_component = (text: String) -> String {
+decode_component = (text : String) -> String {
 	fail.from_result(_decode_component_result(text))
 }
 
 /// Decodes arbitrary octets; literal ASCII has no component grammar restriction.
 ///
 /// Reports failure through `Fail(CodecError)`.
-decode_bytes = (text: String) -> BitArray {
+decode_bytes = (text : String) -> BitArray {
 	fail.from_result(_decode_bytes_result(text))
 }
 
 /// Ordered query form pairs. Empty pieces are skipped; semicolons are data.
 ///
 /// Reports failure through `Fail(CodecError)`.
-parse_query = (query: String) -> List((String, String)) {
+parse_query = (query : String) -> List((String, String)) {
 	fail.from_result(_parse_query_result(query))
 }

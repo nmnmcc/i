@@ -12,11 +12,11 @@
 )
 
 /// Ends the computation with `error`, through the current `Fail`.
-raise = <E>(error: E) <- (handler: Fail(E)) -> Never { handler.raise(error) }
+raise = <E>(error : E) <- (handler : Fail(E)) -> Never { handler.raise(error) }
 
 /// Gives `Ok(value)` when `body` ends with `value`, or `Error(error)` for the
 /// first `error` it raises through `Fail(E)`.
-catch = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> Result(A, E) {
+catch = <A, E, N>(body : () <- (Fail(E), ..N) -> A) -> Result(A, E) {
 	control.boundary((b) {
 		Ok(body()) <- (
 			Fail(raise = (error) { control.escape(b, Error(error)) }),
@@ -30,7 +30,7 @@ from_result = <A, E>(result : Result(A, E)) -> A {
 }
 
 /// Changes the errors.
-map_error: <A, E, N, E2>(() <- (Fail(E), ..N) -> A, (E) <- N -> E2) <- (
+map_error : <A, E, N, E2>(() <- (Fail(E), ..N) -> A, (E) <- N -> E2) <- (
 	Fail(E2),
 	..N,
 ) -> A = (body, with) {
