@@ -1,0 +1,3 @@
+(, id)
+(@ macro (: id (-> (| (, Int) (, Int Int)) Int)))
+(@ macro (= id (-> (, x) _ x)))

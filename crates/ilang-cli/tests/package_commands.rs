@@ -1383,3 +1383,270 @@ fn publish_keeps_literal_alias_values_beyond_hover_limits() {
     assert!(out.contains("a new major version"), "{out}");
     assert!(!out.contains("…"), "{out}");
 }
+
+#[cfg(unix)]
+#[test]
+fn publish_rejects_committed_source_links_before_reading_their_targets() {
+    let w = World::new();
+    let outside = w.project(
+        "outside",
+        &[(
+            "lib.i",
+            include_str!("../../../tests/spec/2.8/mp01_external.i"),
+        )],
+    );
+    let package = w.project(
+        "pub",
+        &[("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n")],
+    );
+    fs::create_dir(package.join("src")).unwrap();
+    std::os::unix::fs::symlink(outside.join("lib.i"), package.join("src/lib.i")).unwrap();
+    git(&package, &["init", "-q"]);
+    commit(&package, "source link");
+    let err = w.fails(&[
+        "publish",
+        "1.0.0",
+        "--dry-run",
+        "--project",
+        package.to_str().unwrap(),
+    ]);
+    assert!(err.contains("symbolic link"), "{err}");
+    assert!(git(&package, &["tag", "--list"]).is_empty());
+}
+
+/// MP01: package commands reject the same source-link attack as compilation.
+#[cfg(unix)]
+#[test]
+fn add_rejects_dependency_with_source_link() {
+    let w = World::new();
+    w.repo("dep", &[]);
+    let outside = w.project(
+        "outside",
+        &[(
+            "lib.i",
+            include_str!("../../../tests/spec/2.8/mp01_external.i"),
+        )],
+    );
+    let work = w.path().join("work/dep");
+    write(&work, &[("i.toml", "name = \"dep\"\n")]);
+    fs::create_dir_all(work.join("src")).unwrap();
+    std::os::unix::fs::symlink(outside.join("lib.i"), work.join("src/lib.i")).unwrap();
+    commit(&work, "source link");
+    git(&work, &["tag", "v1.0.0"]);
+    git(
+        &work,
+        &[
+            "push",
+            "-q",
+            w.path().join("remotes/dep").to_str().unwrap(),
+            "--tags",
+        ],
+    );
+    let manifest = "name = \"app\"\n";
+    let app = w.project(
+        "app",
+        &[("i.toml", manifest), ("src/main.i", "main = () { Nil }\n")],
+    );
+    let err = w.fails(&[
+        "add",
+        "dep",
+        "example.com/dep@1.0.0",
+        "--project",
+        app.to_str().unwrap(),
+    ]);
+    assert!(err.contains("symbolic link"), "{err}");
+    assert_eq!(read(&app.join("i.toml")), manifest);
+    assert!(!app.join("i.lock").exists());
+}
+
+#[test]
+fn package_commands_reject_tampered_cache_with_original_sidecar() {
+    let w = World::new();
+    w.repo(
+        "dep",
+        &[(
+            "1.0.0",
+            &[
+                ("i.toml", "name = \"dep\"\n"),
+                ("src/lib.i", "(value)\nvalue = 1\n"),
+            ],
+        )],
+    );
+    let app = w.project(
+        "app",
+        &[
+            (
+                "i.toml",
+                "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
+            ),
+            ("src/main.i", "main = () { Nil }\n"),
+        ],
+    );
+    let project = app.to_str().unwrap();
+    w.ok(&["check", "--project", project]);
+    let locked = read(&app.join("i.lock"));
+    let commit = locked.split_whitespace().nth(2).unwrap();
+    let cache = w.path().join("cache/pkg/example.com%2fdep").join(commit);
+    let sidecar = read(&cache.with_extension("hash"));
+    fs::remove_file(cache.join("src/lib.i")).unwrap();
+    fs::write(
+        cache.join("src/lib.i"),
+        include_str!("../../../tests/spec/2.8/mp02_cached.i"),
+    )
+    .unwrap();
+    for command in ["check", "deps", "update"] {
+        let err = w.fails(&[command, "--project", project]);
+        assert!(
+            err.contains("cached files") && err.contains("do not match"),
+            "{err}"
+        );
+        assert_eq!(read(&app.join("i.lock")), locked);
+        assert_eq!(read(&cache.with_extension("hash")), sidecar);
+    }
+}
+
+#[test]
+fn package_commands_reject_moved_superseded_resolution_input() {
+    let w = World::new();
+    w.repo(
+        "c",
+        &[
+            ("1.0.0", &[("i.toml", "name = \"c\"\n")]),
+            ("1.1.0", &[("i.toml", "name = \"c\"\n")]),
+        ],
+    );
+    w.repo(
+        "a",
+        &[
+            (
+                "1.0.0",
+                &[(
+                    "i.toml",
+                    "name = \"a\"\n[dependencies]\nc = \"example.com/c@1.0.0\"\n",
+                )],
+            ),
+            ("1.1.0", &[("i.toml", "name = \"a\"\n")]),
+        ],
+    );
+    w.repo(
+        "b",
+        &[(
+            "1.0.0",
+            &[(
+                "i.toml",
+                "name = \"b\"\n[dependencies]\na = \"example.com/a@1.1.0\"\n",
+            )],
+        )],
+    );
+    let app = w.project("app", &[
+        ("i.toml", "name = \"app\"\n[dependencies]\na = \"example.com/a@1.0.0\"\nb = \"example.com/b@1.0.0\"\n"),
+        ("src/main.i", include_str!("../../../tests/spec/2.8/mp03_main.i")),
+    ]);
+    let project = app.to_str().unwrap();
+    w.ok(&["check", "--project", project]);
+    let locked = read(&app.join("i.lock"));
+    assert!(
+        locked
+            .lines()
+            .any(|l| l.starts_with("example.com/a 1.0.0 "))
+    );
+    let work = w.path().join("work/a");
+    git(&work, &["tag", "-d", "v1.0.0"]);
+    w.tag(
+        "a",
+        "1.0.0",
+        &[(
+            "i.toml",
+            "name = \"a\"\n[dependencies]\nc = \"example.com/c@1.1.0\"\n",
+        )],
+    );
+    // Each command sees a fresh copy, as on a second computer.
+    for command in ["check", "deps", "update"] {
+        fs::remove_dir_all(w.path().join("cache")).unwrap();
+        let err = w.fails(&[command, "--project", project]);
+        assert!(
+            err.contains("i.lock") && err.contains("example.com/a@1.0.0"),
+            "{err}"
+        );
+        assert_eq!(read(&app.join("i.lock")), locked);
+    }
+}
+
+#[test]
+fn publish_pins_macro_kind_call_contract_and_compile_time_source() {
+    let w = World::new();
+    let macros = include_str!("../../../tests/spec/14.5/mp07_macro_contract/src/macros.is");
+    let dir = w.project(
+        "pub",
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/macros.is", macros),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "original macro");
+    let project = dir.to_str().unwrap();
+    w.ok(&["publish", "1.0.0", "--project", project]);
+    // Identical source is a valid patch.
+    let (ok, out) = try_publish(&w, &dir, &[], "1.0.1");
+    assert!(ok, "{out}");
+    // Renaming a parameter and changing the transformer both escape a plain
+    // (Syntax) -> Syntax comparison, but change the conservative contract.
+    for changed in [
+        macros.replace("value", "renamed"),
+        macros.replace("((. syntax make) ((. syntax node) value) value)", "`False"),
+    ] {
+        let (ok, out) = try_publish(&w, &dir, &[("src/macros.is", &changed)], "1.0.1");
+        assert!(!ok, "{out}");
+        assert!(
+            out.contains("changed macro macros.id") && out.contains("a new major version"),
+            "{out}"
+        );
+    }
+}
+
+#[test]
+fn publish_macro_contract_includes_imported_compile_time_initializers() {
+    let w = World::new();
+    let dir = w.project("pub", &[
+        ("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n"),
+        ("src/helper.i", "(answer)\nanswer = 42\n"),
+        ("src/macros.is", "(, (= helper (/ pub helper)))\n(, m)\n(@ macro (= m (-> (, value) _ {(. helper answer) value})))\n"),
+    ]);
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "original helper");
+    w.ok(&["publish", "1.0.0", "--project", dir.to_str().unwrap()]);
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[("src/helper.i", "(answer)\nanswer = 43\n")],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed macro macros.m"), "{out}");
+}
+
+#[test]
+fn publish_compares_interfaces_after_macro_generated_exports() {
+    let w = World::new();
+    let dir = w.project("pub", &[
+        ("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n"),
+        ("src/macros.is", "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, name value) (<- _ (, (: items (. syntax Items)))) {((. items expose) name) `(= ~name ~value)})))\n"),
+        ("src/api.i", "(m = pub/macros)\nm.emit(answer, 42)\n"),
+    ]);
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "generated API");
+    w.ok(&["publish", "1.0.0", "--project", dir.to_str().unwrap()]);
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "src/api.i",
+            "(m = pub/macros)\nm.emit(answer, \"changed\")\n",
+        )],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed value api.answer"), "{out}");
+}

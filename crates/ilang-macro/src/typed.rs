@@ -174,7 +174,22 @@ impl Expander for Driver {
             .chain(written.args.iter().map(|a| &a.value))
             .map(|e| syntax_for(p, &self.graph, e))
             .collect();
+        let written_labels: Vec<_> = written
+            .prefix
+            .into_iter()
+            .map(|_| None)
+            .chain(
+                written
+                    .args
+                    .iter()
+                    .map(|a| a.label.as_ref().map(|l| l.name.clone())),
+            )
+            .collect();
         let order = query.argument_order();
+        let labels: Vec<_> = order
+            .iter()
+            .map(|i| written_labels[*i as usize].clone())
+            .collect();
         arguments = order
             .iter()
             .map(|i| arguments[*i as usize].clone())
@@ -320,10 +335,8 @@ impl Expander for Driver {
         let args = arguments
             .iter()
             .cloned()
-            .map(|syntax| MacroArgument {
-                label: None,
-                syntax,
-            })
+            .zip(labels)
+            .map(|(syntax, label)| MacroArgument { label, syntax })
             .collect();
         let (result, budget, transactions) = engine
             .execute(&mac, args, &call, span, None, MacroPosition::Expression)
