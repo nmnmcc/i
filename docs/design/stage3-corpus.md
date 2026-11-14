@@ -20,6 +20,13 @@ transparent alias, as today.” And: “A labelled type with data `D` has the
 constructor function `(D) -> T(…)`.” Thus the former sum alias is not one
 nominal service, while the new data wrapper is.
 
+Syntax-three §5.2.3 makes the choice explicit: “A sum is a name for a
+union, or a labelled type whose data is one item of a union type. Its
+members may be any types, labelled or not, also built-in types; values are
+told apart by type tests and constructor patterns, so every two members
+must have different type constructors (§4.4, §7.1).” Both migrations use
+the second form for the service and retain the first form as its payload.
+
 Spec §9.2: “A **service** is an ordinary value of a labelled type (§4.3),
 normally one whose data holds functions. Two services of one form are made
 by defining two types. A service is a normal value: it may be stored and
@@ -82,3 +89,31 @@ code multisets and runtime output. The guard text omits their names. A saved
 case list/diff has been requested because the coordinator worktrees now
 contain restored observations; these cases must be enumerated and explained
 before updating their records.
+
+## Verification of the eight named cases
+
+A fresh `cargo build -p ilang-cli --release --locked` passed through the
+heavy wrapper. Its own-worktree binary has SHA-256
+`3e167eabd7243533c6312e934c8114713fef5fc482b88a980b51084c1b58891c`.
+All eight tabled cases passed their individual corpus filters with
+`UPDATE=1`, `--jobs 2`, `--binary ./target/release/i`, and `--keep-bounds`,
+serially under one heavy reservation: 34 phases total. Both original run
+phases of rebinding passed, including the `(1, 2)` assertion. The capability
+case retains its original check/test0/test2 phase set; it had no run phase.
+
+The recorder independently checked identical phase sets, commands, exits,
+runtime stdout, and bounds. Diagnostic-code multisets differ only by the
+documented W0501/W0503 additions. Exactly five observations change: the four
+wrappers and `review-t1/original-equality`. The two migrated cases and the
+already-recorded `review-k4d` equality case have identical outcomes, so their
+fingerprint-only edits were restored. The release formatter check passed for
+both migrated sources, and `git diff --check` passed.
+
+An earlier debug-binary attempt accepted capability and printed the original
+passing test output, but both test phases exceeded their unchanged 10-second
+bounds. Those observations were restored, not recorded. The fresh release
+run above passed those same bounds. An earlier filter-selection mistake
+selected no cases and changed no observations. These failed attempts are
+preserved in the lane's verification logs. The 39 display-only records and
+their group explanations remain unverified because their case list/diff is
+missing; this audit is not yet the complete landing gate.
