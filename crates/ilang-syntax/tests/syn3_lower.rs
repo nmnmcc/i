@@ -339,7 +339,7 @@ fn migrated_captured_row_provider_keeps_its_written_contract() {
 
 #[test]
 fn a_single_use_provider_keeps_its_contract_for_resolution() {
-    let source = "S(N) = (f = () <- N -> Int)\nwrap = (body) { provided: S(_) = S(f = () { 1 }) body() <- (provided) }";
+    let source = "S(N) = (f = () <- N -> Int)\nwrap = (body) { provided : S(_) = S(f = () { 1 }) body() <- (provided) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let ilang_syntax::ast::ItemKind::Binding(binding) = &module.items[1].kind else {
@@ -394,7 +394,7 @@ fn a_closed_function_provider_keeps_its_generalization_boundary() {
     // §4.7/§4.8: preserve the closed function value's scheme and the
     // actual-provider checks deferred through it. Open contracts are
     // independently pinned by a_single_use_provider_keeps_its_contract_for_resolution.
-    let source = "Reader(A) = (get = () -> A)\nwith_int = (body) { provided: Reader(Int) = Reader(get = () -> Int { 1 }) body() <- (provided) }";
+    let source = "Reader(A) = (get = () -> A)\nwith_int = (body) { provided : Reader(Int) = Reader(get = () -> Int { 1 }) body() <- (provided) }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let ItemKind::Binding(binding) = &module.items[1].kind else {

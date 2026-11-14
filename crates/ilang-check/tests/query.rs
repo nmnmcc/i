@@ -201,10 +201,10 @@ fn type_of_local_names() {
 #[test]
 fn type_of_other_things() {
     let f = fixture();
-    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some: (A) -> Some(A)");
+    assert_eq!(f.hover("app/main", "Some(v)", 0), "Some : (A) -> Some(A)");
     // A constructor's type is its own (syntax three §2.8).
-    assert_eq!(f.hover("app/main", "None)", 0), "None: None");
-    assert_eq!(f.hover("app/main", "name", 0), "name: String");
+    assert_eq!(f.hover("app/main", "None)", 0), "None : None");
+    assert_eq!(f.hover("app/main", "name", 0), "name : String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
         "User = (name = String, age = Int)"
@@ -788,7 +788,7 @@ fn query_type_definition_signature_and_hints() {
     assert_eq!(s.active, Some(0));
     let hints = q.inlay_hints(m, ilang_syntax::span::Span::new(0, MAIN_Q.len() as u32));
     assert_eq!(hints.len(), 1, "{hints:?}");
-    assert_eq!(hints[0].label, ": Circle");
+    assert_eq!(hints[0].label, " : Circle");
 }
 
 #[test]

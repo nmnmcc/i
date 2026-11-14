@@ -2130,7 +2130,7 @@ fn lsp_hover_type_and_documentation() {
     assert!(
         // The constructor makes a `Circle`, a type without a comment of its
         // own; the comment is on the union `Shape` (syntax three §2.8).
-        h.contains("Circle: (radius: Int) -> Circle"),
+        h.contains("Circle : (radius : Int) -> Circle"),
         "{h}"
     );
     c.shutdown();

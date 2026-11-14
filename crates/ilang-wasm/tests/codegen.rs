@@ -294,9 +294,7 @@ fn environments() {
 fn bindings_that_may_fail_report_to_assert() {
     // `r` has the wider type `Result`: with an unknown value, `Ok(v) = r`
     // would narrow `r` to `Ok(_)` (syntax three D4) and not report.
-    let text = wat("f = (r: Result(Int, Int)) {\n  Ok(v) = r\n  v\n}\n\
-         g = ((a, b)) { a + b }\n\
-         \nmain = () { (f(Ok(1)), g((1, 2))) }\n");
+    let text = wat("f = (r : Result(Int, Int)) {\n  Ok(v) = r\n  v\n}\ng = ((a, b)) { a + b }\n\nmain = () { (f(Ok(1)), g((1, 2))) }\n");
     let f = function(&text, "app/main.f");
     assert!(
         f.contains("(array.get $env (local.get $env) (i32.const 0))"),

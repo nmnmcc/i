@@ -80,7 +80,7 @@ lane runs; the lists it names are the authority.
    stage 3, lane/s3). The lowering no longer absorbs the data definitions
    before `Event(A) = Start(A) | Stop(A)` into one multi-constructor type:
    each member is its own labelled type and the sum is the alias of their
-   union, so `f = (x: Start(Int))` is defined, and
+   union, so `f = (x : Start(Int))` is defined, and
    `types::pattern::shared_place_tests` asserts that `Start` and `Stop` no
    longer share their fields. See `docs/design/syn3-stage3-report.md`.
 3. **`()` as a value is the empty data** of type `()` (§7.1 row 7): `f = (()) { 1 }`

@@ -634,7 +634,7 @@ fn a_closed_provider_retains_callback_and_generalization_diagnostics() {
 
 #[test]
 fn aliased_open_provider_contracts_are_not_generalized_away() {
-    let base = "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\n";
+    let base = "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s : S(N)) { s.f() }\n";
     for alias in [
         "Alias = S(_)\n",
         "Hidden = S(_)\nAlias = Hidden\n",
@@ -643,7 +643,7 @@ fn aliased_open_provider_contracts_are_not_generalized_away() {
         let source = [
             base,
             alias,
-            "wrap = (body) { provided: Alias = S(f = () -> Int { 1 }) body() <- (provided) }",
+            "wrap = (body) { provided : Alias = S(f = () -> Int { 1 }) body() <- (provided) }",
         ]
         .concat();
         let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
@@ -661,11 +661,11 @@ fn aliased_open_provider_contracts_are_not_generalized_away() {
     let (graph, _, diags) = common::check_files(&[
         (
             "src/svc.i",
-            "(S(..), Alias)\nS(N) = (f = () <- N -> Int)\nAlias = S(_)\ntouch = <N>(s: S(N)) { s }",
+            "(S(..), Alias)\nS(N) = (f = () <- N -> Int)\nAlias = S(_)\ntouch = <N>(s : S(N)) { s }",
         ),
         (
             "src/main.i",
-            "(svc = app/svc)\nwrap = (body) { provided: svc.Alias = svc.S(f = () -> Int { 1 }) body() <- (provided) }",
+            "(svc = app/svc)\nwrap = (body) { provided : svc.Alias = svc.S(f = () -> Int { 1 }) body() <- (provided) }",
         ),
     ]);
     assert_eq!(
@@ -684,7 +684,7 @@ fn aliased_open_provider_contracts_are_not_generalized_away() {
 fn a_closed_provider_alias_retains_all_reader_diagnostics() {
     let source = include_str!("types/soundness.i")
         .replacen("\nwith_int", "\nIntReader = Reader(Int)\nwith_int", 1)
-        .replace("_syn3_0: Reader(Int)", "_syn3_0: IntReader");
+        .replace("_syn3_0 : Reader(Int)", "_syn3_0 : IntReader");
     let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
     let actual = diags
         .iter()

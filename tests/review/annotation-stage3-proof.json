@@ -1,0 +1,53 @@
+{
+  "stage3": "915b0aa53988d0b4ac11bbb50e1856ad64b5f340",
+  "merge": "2945508c1",
+  "proofs": {
+    "braces": {
+      "differences": []
+    },
+    "inline": {
+      "inventoried": 37822,
+      "compared": 0,
+      "sites": 0,
+      "new_spec_examples": 11,
+      "differences": []
+    },
+    "files": {
+      "files": 2965,
+      "changed": 15,
+      "invalid": 100,
+      "fmt_exit": 1,
+      "preserved_diagnostic_fixtures": [
+        "tests/spec/1.7/one_binding_warning.i"
+      ],
+      "baseline_sha256": "76e079cd5e7a41dc159b5fc4b45f159a7cc01fa81e6cdd4897cd8a093cff5af7",
+      "differences": []
+    },
+    "snippets": {
+      "snippets": 26,
+      "hosts": {
+        "crates/ilang-check/tests/provider_graph.rs": 2,
+        "crates/ilang-check/tests/query.rs": 4,
+        "crates/ilang-check/tests/row_schemes.rs": 6,
+        "crates/ilang-check/tests/value_types.rs": 1,
+        "crates/ilang-cli/tests/providers.rs": 1,
+        "crates/ilang-lsp/tests/protocol.rs": 1,
+        "crates/ilang-wasm/tests/codegen.rs": 1,
+        "docs/design/syn3-conversion-report.md": 1,
+        "docs/design/syn3-stage3-report.md": 9
+      },
+      "differences": []
+    },
+    "indirect-fragments": {
+      "changed": 2,
+      "differences": [],
+      "path": "crates/ilang-syntax/tests/syn3_lower.rs"
+    }
+  },
+  "extra_display_fragment": {
+    "path": "docs/design/syn3-stage3-report.md",
+    "before": "Some: (A) -> Some(A)",
+    "after": "Some : (A) -> Some(A)",
+    "differences": []
+  }
+}

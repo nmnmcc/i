@@ -772,7 +772,7 @@ fn alias_exports_preserve_constructor_privacy() {
             // Stage 3 (§2.8): a type and its constructor have one name, so
             // the exported type `Secret` is the labelled type itself, with
             // its constructor not exported.
-            "\nSecret = (Int)\nvalue: Secret = Secret(1)\nPublic = value",
+            "\nSecret = (Int)\nvalue : Secret = Secret(1)\nPublic = value",
         ]
         .concat();
         let (_, c) = checked(&[
