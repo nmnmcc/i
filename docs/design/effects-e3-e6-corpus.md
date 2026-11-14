@@ -75,6 +75,20 @@ row run completed in 143 seconds; the attempted process stop found it already
 finished. Rest-service regressions passed 13/13 before the final-AST merge;
 the merged workspace all-targets check is green, with runtime gates pending.
 
+Fresh std checking found three conversion issues and now passes after their
+repair. Main's `redirect_headers` takes and returns `AnyHeaders`, preserving
+raw byte values; restore those types. Std-1 §3.1's written signatures give
+`fold`, `fold_until`, and `each` independent callback error `F`, with result
+errors `E | F`; the restored Stream representation had lost those explicit
+Fail heads, so put them back and keep every callback-error assertion. The two
+map-environment runner tests now state the genuine `Fail(Never)` callback
+need (Decision 2), with all pull/replay assertions unchanged. Finally state
+the concrete stdout/stderr sink result, including Stdio, Await and Owner,
+to prevent an unresolved callback row from recursively swallowing its own
+Sink requirement (std-2 §7: finite, closed instantiations). The vendored copy
+receives the same migration. The release build, workspace check and std
+check are green; full runtime gates are next.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**

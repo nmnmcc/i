@@ -224,7 +224,7 @@ add_header = (hs : AnyHeaders, name : String, value : String) -> AnyHeaders {
 		}
 }
 
-_parse_query_result = (query: String) -> Result(
+_parse_query_result = (query : String) -> Result(
 	List((String, String)),
 	uri.CodecError,
 ) { fail.catch(() { uri.parse_query(query) }) }
@@ -422,7 +422,7 @@ make_headers = (xs : List((String, BitArray))) -> AnyHeaders {
 		| (False) { RawHeaders(xs) }
 }
 
-text_unchecked = (xs: List(Int)) -> String {
+text_unchecked = (xs : List(Int)) -> String {
 	{
 		e4_call_arg_0 = bits(xs)
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
@@ -734,7 +734,7 @@ bits = (xs : List(Int)) -> BitArray {
 	bit_array.concat(list.map(xs, (x) { <<x>> }))
 }
 
-text = (xs: List(Int)) -> String {
+text = (xs : List(Int)) -> String {
 	{
 		e4_call_arg_0 = bits(xs)
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
@@ -1316,11 +1316,11 @@ Client = (
 native_client = () <- (n : net.Net, t : tls.Tls) {
 	Client(
 		make = () {
-			provider: (send = _, close = _) = network_client()
+			provider : (send = _, close = _) = network_client()
 			Transport(
 				stream = (req) {
 					{
-						res: Response = provider.send(req)
+						res : Response = provider.send(req)
 						cursor = task.ref(res.body)
 						(
 							head = res,
@@ -1387,7 +1387,7 @@ fetch_error = (code : String) {
 		| (_) { fail.raise(Connect(code)) }
 }
 
-fetch_reply: <A, N>(() <- (Fail(String), ..N) -> A) <- (
+fetch_reply : <A, N>(() <- (Fail(String), ..N) -> A) <- (
 	Fail(HttpError),
 	..N,
 ) -> A = (body) {
@@ -1453,7 +1453,7 @@ fetch_client = () <- (f : fetch.Fetch) {
 				stream = (req) {
 					{
 						// Keep Fetch across suspension; task services still come from the caller.
-						reader: (
+						reader : (
 							head = Response,
 							read = _,
 							close = _,
@@ -1463,7 +1463,7 @@ fetch_client = () <- (f : fetch.Fetch) {
 				},
 				send = (req) {
 					{
-						reader: (
+						reader : (
 							head = Response,
 							read = _,
 							close = _,
@@ -1563,7 +1563,7 @@ post = (url : String, body : BitArray) -> Response {
 	)
 }
 
-_body_text_result = (res: Response) -> Result(String, Nil) {
+_body_text_result = (res : Response) -> Result(String, Nil) {
 	fail.catch(() { bit_array.to_string(res.body) })
 }
 
@@ -1640,7 +1640,12 @@ follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 		}
 }
 
-redirect_headers = (hs: Headers, base, next, drop_body: Bool) -> Headers {
+redirect_headers = (
+	hs : AnyHeaders,
+	base,
+	next,
+	drop_body : Bool
+) -> AnyHeaders {
 	resolved = fail.catch(() { uri.resolve(base, next) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("http: invalid resolved redirect") }
@@ -1672,7 +1677,7 @@ redirect_headers = (hs: Headers, base, next, drop_body: Bool) -> Headers {
 	)
 }
 
-send_once = (pool: task.Ref(Pool), req: Request) {
+send_once = (pool : task.Ref(Pool), req : Request) {
 	u = fail.catch(() { uri.parse(req.target) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { fail.raise(Protocol("invalid URL")) }
@@ -1810,7 +1815,7 @@ exchange = (
 	lease : Key(Nil) = key.new()
 	resource.ensure(
 		() {
-			transport: (read = _, write = _) = entry.connection |>
+			transport : (read = _, write = _) = entry.connection |>
 				(Plain(stream)) { net_transport(stream) }
 				| (Secure(stream)) { tls_transport(stream) }
 			transport.write(wire)
@@ -1898,7 +1903,7 @@ InvalidJson = (json.JsonError)
 InvalidSchema = (schema.SchemaError)
 BodyError = InvalidText | InvalidJson | InvalidSchema
 
-_body_json_result = (res: Response) -> Result(json.Json, BodyError) {
+_body_json_result = (res : Response) -> Result(json.Json, BodyError) {
 	_body_text_result(res) |>
 		(Error(_)) { Error(InvalidText) }
 		| (Ok(text)) {
@@ -1909,8 +1914,8 @@ _body_json_result = (res: Response) -> Result(json.Json, BodyError) {
 }
 
 _body_decode_result = <A>(
-	res: Response,
-	codec: schema.Schema(A, schema.SchemaError)
+	res : Response,
+	codec : schema.Schema(A, schema.SchemaError)
 ) -> Result(A, BodyError) {
 	_body_json_result(res) |>
 		(Error(error)) { Error(error) }
@@ -2043,22 +2048,22 @@ has_token = (hs : AnyHeaders, name : String, value : String) -> Bool {
 }
 
 /// Reports failure through `Fail(uri.CodecError)`.
-parse_query = (query: String) -> List((String, String)) {
+parse_query = (query : String) -> List((String, String)) {
 	fail.from_result(_parse_query_result(query))
 }
 
 /// Reports failure through `Fail(Nil)`.
-body_text = (res: Response) -> String {
+body_text = (res : Response) -> String {
 	fail.from_result(_body_text_result(res))
 }
 
 /// Reports failure through `Fail(BodyError)`.
-body_json = (res: Response) -> json.Json {
+body_json = (res : Response) -> json.Json {
 	fail.from_result(_body_json_result(res))
 }
 
 /// Reports failure through `Fail(BodyError)`.
 body_decode = <A>(
-	res: Response,
-	codec: schema.Schema(A, schema.SchemaError)
+	res : Response,
+	codec : schema.Schema(A, schema.SchemaError)
 ) -> A { fail.from_result(_body_decode_result(res, codec)) }

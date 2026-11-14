@@ -50,6 +50,7 @@
 (
 	i/core
 	i/stdio
+	i/request
 	i/fs
 	i/resource
 	std/list
@@ -92,8 +93,8 @@ Entry = (
 Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
 
 make = <E, N>(
-	accept: (Level) -> Bool,
-	send: (Entry) <- (Fail(E), ..N) -> Nil
+	accept : (Level) -> Bool,
+	send : (Entry) <- (Fail(E), ..N) -> Nil
 ) -> Sink(E, N) { Sink(accept, send, (_ : N) { Nil }) }
 
 silent = <N>() -> Sink(Never, N) {
@@ -120,8 +121,8 @@ write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	accept(entry.level) |> (True) { send(entry) } | (False) { Nil }
 }
 
-lazy = <E, F, N>(level: Level, message: () <- (Fail(F), ..N) -> String) <- (
-	sink: Sink(E, N),
+lazy = <E, F, N>(level : Level, message : () <- (Fail(F), ..N) -> String) <- (
+	sink : Sink(E, N),
 ) {
 	Sink(accept, send, _) = sink
 	accept(level) |>
@@ -194,14 +195,16 @@ escape = (codepoint : UtfCodepoint) -> String {
 }
 
 /// A sink that writes each formatted entry to standard error.
-stderr = () {
-	make((_ : Level) { True }, (entry) { stdio.print_error(format(entry)) })
-}
+stderr = () -> Sink(
+	stdio.StdioError,
+	stdio.Stdio | request.Await | request.Owner,
+) { make((_ : Level) { True }, (entry) { stdio.print_error(format(entry)) }) }
 
 /// A sink that writes each formatted entry to standard output.
-stdout = () {
-	make((_ : Level) { True }, (entry) { stdio.print(format(entry)) })
-}
+stdout = () -> Sink(
+	stdio.StdioError,
+	stdio.Stdio | request.Await | request.Owner,
+) { make((_ : Level) { True }, (entry) { stdio.print(format(entry)) }) }
 
 /// A sink that appends each formatted entry to a file.
 file = (path : String) {
