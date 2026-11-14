@@ -40,3 +40,42 @@ fn lisp_keys_keep_their_own_tokens() {
         );
     }
 }
+
+#[test]
+fn macro_argument_type_notes_use_written_source() {
+    let stderr = check("14.9/type_note_argument");
+    assert_eq!(
+        stderr.lines().filter(|l| l.contains("error[")).count(),
+        2,
+        "{stderr}"
+    );
+    assert!(stderr.contains("error[E0515]"), "{stderr}");
+    assert!(
+        stderr.contains("src/main.i:16:61: error[E0501]"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("(the type at src/main.i:16:55 needs it)"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("18:88"), "{stderr}");
+}
+
+#[test]
+fn template_type_notes_use_the_macro_call_site() {
+    let stderr = check("14.9/type_note_template");
+    assert_eq!(
+        stderr.lines().filter(|l| l.contains("error[")).count(),
+        1,
+        "{stderr}"
+    );
+    assert!(stderr.contains("src/main.i:2:9: error[E0501]"), "{stderr}");
+    assert!(
+        stderr.contains("(the type at src/main.i:2:9 needs it)"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("src/macros.is:2:72: note: expanded from this template"),
+        "{stderr}"
+    );
+}

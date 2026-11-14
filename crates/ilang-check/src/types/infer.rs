@@ -1425,9 +1425,24 @@ impl<'a> Checker<'a> {
     }
 
     fn position(&self, span: Span) -> String {
-        let text = &self.sources.get(self.p.module(self.module).source).text;
-        let (line, col) = LineIndex::new(text).line_col(span.start);
-        format!("{line}:{col}")
+        self.position_in(self.module, span, false)
+    }
+
+    /// Notes follow the same source-origin rule as primary diagnostics (§14.9).
+    /// A virtual expansion offset is never a bare position in the user's file.
+    fn position_in(&self, module: ModuleId, span: Span, qualified: bool) -> String {
+        let m = self.p.module(module);
+        if let Some(origin) = self.p.origin(module, span) {
+            let file = self.sources.get(origin.source);
+            let (line, col) = LineIndex::new(&file.text).line_col(origin.span.start);
+            return format!("{}:{line}:{col}", file.display);
+        }
+        let (line, col) = LineIndex::new(&self.sources.get(m.source).text).line_col(span.start);
+        if qualified {
+            format!("{}:{line}:{col}", m.path)
+        } else {
+            format!("{line}:{col}")
+        }
     }
 
     /// `l <: r`, with problems reported at `span`.
@@ -1547,12 +1562,9 @@ impl<'a> Checker<'a> {
             message.push_str(&format!(" (the type at {} needs it)", self.position(o)));
         }
         if let Some(fixed) = self.fix_notes.iter().find_map(|v| self.reads.fixed.get(v)) {
-            let module = self.p.module(fixed.module);
-            let text = &self.sources.get(module.source).text;
-            let (line, column) = LineIndex::new(text).line_col(fixed.span.start);
             message.push_str(&format!(
-                " (this type was fixed here: {}:{line}:{column})",
-                module.path
+                " (this type was fixed here: {})",
+                self.position_in(fixed.module, fixed.span, true)
             ));
         }
         self.fix_notes.clear();
