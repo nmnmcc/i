@@ -1,5 +1,5 @@
 // spec: 4.4, 9.2, 11.7
-// expect: stop "bottom"
+// expect: stop "panic: bottom"
 // Decision 1: Read(Never) is inhabited by a stopping function.
 Read(A) = (read = () -> A)
 f = () <- (r : Read(Int)) { r.read() }
