@@ -42,12 +42,12 @@ main = () {
 	raw : Point = (x = 3, y = 4)
 	labelled = ScreenPoint(x = 3, y = 4)
 	position : Position = raw
-	stdio.print(core.inspect((raw, (labelled.x, labelled.y), position, Hidden)))
+	stdio.print(core.inspect((raw, labelled, position, Hidden)))
 }
 ```
 
 ```text
-((x = 3, y = 4), (3, 4), (x = 3, y = 4), Hidden)
+((x = 3, y = 4), ScreenPoint(x = 3, y = 4), (x = 3, y = 4), Hidden)
 ```
 
 A type definition starts with an uppercase name and `=`. An **alias** is another name for an existing type. The written right side determines whether a definition makes an alias or a new labelled type:
@@ -238,10 +238,6 @@ main = () {
 ```
 
 `i check` reports **E0501**: “`"seven"` is not a subtype of `Int`”. The string value does not belong to the annotated type, so the module does not pass checking. Supply an integer or change the annotation to describe the intended value.
-
-## Current limits
-
-The standard says the text form of a value of a labelled type keeps its labels, for example `User(age = 36, name = "ada")` ([§11.8](/docs/standard/generated/chapter-11#section-11-8)). The compiler on this tree prints the parts without their labels, so `core.inspect` of such a value shows `ScreenPoint(3, 4)`. This is a recorded difference from the standard ([known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md), DOC2), not the intended output.
 
 ## See also
 

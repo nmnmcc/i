@@ -254,6 +254,21 @@ pub fn wat() -> String {
       (then (return {{unknown}})))
     (array.get $values (local.get $names) (local.get $index)))
 
+  ;; Each user constructor has an optional inspection descriptor. Its pairs
+  ;; are (physical field index, label or null), in the order required by §11.8.
+  (global $constructor_parts (mut (ref null $values)) (ref.null $values))
+  (func $constructor_parts_install (param $parts (ref $values))
+    (global.set $constructor_parts (local.get $parts)))
+  (func $constructor_parts_for (param $ctor i32) (result (ref null $values))
+    (local $parts (ref null $values)) (local $index i32)
+    (local.set $parts (global.get $constructor_parts))
+    (local.set $index (i32.sub (local.get $ctor) (i32.const 16)))
+    (if (i32.or (ref.is_null (local.get $parts)) (i32.lt_s (local.get $index) (i32.const 0)))
+      (then (return (ref.null $values))))
+    (if (i32.ge_u (local.get $index) (array.len (ref.as_non_null (local.get $parts))))
+      (then (return (ref.null $values))))
+    (ref.cast (ref null $values) (array.get $values (local.get $parts) (local.get $index))))
+
   ;; Aggregate traversal uses an explicit stack of tasks rather than Wasm
   ;; calls, so deep values do not use the Wasm stack. A task is a value and a
   ;; number, `kind | index << 2`, in two growable arrays.
@@ -315,6 +330,7 @@ pub fn wat() -> String {
   (func $inspect (param $value eqref) (result eqref)
     (local $obj (ref $obj)) (local $fields (ref null $values)) (local $out (ref $bytes))
     (local $kind i32) (local $index i32) (local $tag i32) (local $sp i32) (local $meta i32)
+    (local $parts (ref null $values)) (local $field_index i32)
     (global.set $ib (array.new_default $bytes (i32.const 64)))
     (global.set $il (i32.const 0))
     (global.set $it_values (array.new_default $values (i32.const 64)))
@@ -343,12 +359,20 @@ pub fn wat() -> String {
           (if (ref.is_null (local.get $fields)) (then (br $next)))
           (br_if $next (i32.ge_u (local.get $index) (array.len (ref.as_non_null (local.get $fields)))))
           (if (local.get $index) (then (call $ib_comma)))
-          (if (i32.eq (call $value_tag (local.get $value)) (i32.const 4))
-            (then (call $inspect_label (local.get $value) (local.get $index)
-              (array.len (ref.as_non_null (local.get $fields))))))
+          (call $inspect_label (local.get $value) (local.get $index)
+            (array.len (ref.as_non_null (local.get $fields))))
+          (local.set $field_index (local.get $index))
+          (if (i32.eq (call $value_tag (local.get $value)) (i32.const 5))
+            (then
+              (local.set $parts (call $constructor_parts_for
+                (struct.get $obj 1 (ref.cast (ref $obj) (local.get $value)))))
+              (if (i32.eqz (ref.is_null (local.get $parts)))
+                (then (local.set $field_index (i31.get_u (ref.cast (ref i31)
+                  (array.get $values (ref.as_non_null (local.get $parts))
+                    (i32.mul (local.get $index) (i32.const 2))))))))))
           (call $inspect_push (i32.const 2) (local.get $value) (i32.add (local.get $index) (i32.const 1)))
           (call $inspect_push (i32.const 0)
-            (array.get $values (ref.as_non_null (local.get $fields)) (local.get $index)) (i32.const 0))
+            (array.get $values (ref.as_non_null (local.get $fields)) (local.get $field_index)) (i32.const 0))
           (br $next)))
 
       ;; 3: the rest of a list; `index` is 1 after its first part.
@@ -392,16 +416,32 @@ pub fn wat() -> String {
     (global.set $it_meta (ref.null $frames))
     (call $string_from_bytes (local.get $out)))
 
-  ;; `label = ` before the labelled part `index` of data (syntax-3 §2.15).
+  ;; `label = ` before the canonical part `index` of data or a labelled value.
   (func $inspect_label (param $value eqref) (param $index i32) (param $len i32)
-    (local $labels (ref null $values)) (local $at i32)
-    (local.set $labels (call $data_labels (local.get $value)))
-    (if (ref.is_null (local.get $labels)) (then (return)))
-    (local.set $at (i32.sub (local.get $index)
-      (i32.sub (local.get $len) (array.len (ref.as_non_null (local.get $labels))))))
-    (if (i32.lt_s (local.get $at) (i32.const 0)) (then (return)))
-    (call $ib_string (array.get $values (ref.as_non_null (local.get $labels)) (local.get $at)))
-    (call $ib_byte (i32.const 32)) (call $ib_byte (i32.const 61)) (call $ib_byte (i32.const 32)))
+    (local $labels (ref null $values)) (local $at i32) (local $ctor i32) (local $label eqref)
+    (if (i32.eq (call $value_tag (local.get $value)) (i32.const 4))
+      (then
+        (local.set $labels (call $data_labels (local.get $value)))
+        (if (ref.is_null (local.get $labels)) (then (return)))
+        (local.set $at (i32.sub (local.get $index)
+          (i32.sub (local.get $len) (array.len (ref.as_non_null (local.get $labels))))))
+        (if (i32.lt_s (local.get $at) (i32.const 0)) (then (return)))
+        (local.set $label (array.get $values (ref.as_non_null (local.get $labels)) (local.get $at))))
+      (else
+        (local.set $ctor (struct.get $obj 1 (ref.cast (ref $obj) (local.get $value))))
+        ;; The runtime's own labelled types have one field each.
+        (if (i32.eq (local.get $ctor) (i32.const 2))
+          (then (local.set $label {{message_label}}))
+          (else (if (i32.eq (local.get $ctor) (i32.const 3))
+            (then (local.set $label {{fail_label}}))
+            (else
+              (local.set $labels (call $constructor_parts_for (local.get $ctor)))
+              (if (ref.is_null (local.get $labels)) (then (return)))
+              (local.set $label (array.get $values (ref.as_non_null (local.get $labels))
+                (i32.add (i32.mul (local.get $index) (i32.const 2)) (i32.const 1))))))))))
+    (if (ref.is_null (local.get $label)) (then (return)))
+    (call $ib_string (local.get $label))
+    (call $ib_string {{label_eq}}))
 
   (func $value_inspect (param $value eqref) (result eqref)
     (return_call $inspect (local.get $value)))
@@ -428,6 +468,8 @@ pub fn wat() -> String {
             ("error", "Error"),
             ("assertion_failure", "AssertionFailure"),
             ("assert", "Assert"),
+            ("message_label", "message"),
+            ("fail_label", "fail"),
             ("opaque", "//wasm(opaque)"),
             ("boundary", "//boundary"),
             ("continuation", "//continuation"),

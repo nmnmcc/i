@@ -1850,6 +1850,21 @@ impl<'p> Emitter<'p> {
         let shapes = self.metadata_array("shapes", &shapes);
         let modules = self.metadata_array("modules", &modules);
         let names = self.metadata_array("constructors", &names);
+        let mut constructor_parts = Vec::new();
+        for (i, parts) in self.p.constructor_parts.clone().into_iter().enumerate() {
+            if parts.is_empty() {
+                constructor_parts.push("(ref.null eq)".into());
+                continue;
+            }
+            let mut fields = Vec::new();
+            for (index, label) in parts {
+                fields.push(format!("(ref.i31 (i32.const {index}))"));
+                fields.push(label.map_or_else(|| "(ref.null eq)".into(), |l| self.string(&l)));
+            }
+            constructor_parts
+                .push(self.metadata_array(&format!("constructor_fields_{i}"), &fields));
+        }
+        let constructor_parts = self.metadata_array("constructor_parts", &constructor_parts);
         let notes = if self.p.site_notes.iter().any(Option::is_some) {
             assert_eq!(self.p.site_notes.len(), self.p.sites.len());
             let notes: Vec<String> = self
@@ -1870,6 +1885,10 @@ impl<'p> Emitter<'p> {
              {modules})\n\
              (call $constructors_install {names})",
             self.p.sites.len() * 3,
+        );
+        let _ = writeln!(
+            self.out,
+            "(call $constructor_parts_install {constructor_parts})"
         );
         if let Some(notes) = notes {
             let _ = writeln!(self.out, "(call $site_notes_install {notes})");

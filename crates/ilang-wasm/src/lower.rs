@@ -1131,6 +1131,18 @@ impl<'a> Lowerer<'a> {
                             unreachable!("a type with constructors is a record")
                         };
                         self.out.constructors.push(c.name.clone());
+                        let mut parts: Vec<_> = c
+                            .fields
+                            .iter()
+                            .enumerate()
+                            .map(|(i, f)| (i as u32, f.label.as_ref().map(|l| l.name.clone())))
+                            .collect();
+                        if parts.iter().all(|(_, label)| label.is_none()) {
+                            parts.clear();
+                        } else {
+                            parts.sort_by(|a, b| a.1.cmp(&b.1));
+                        }
+                        self.out.constructor_parts.push(parts);
                         next_ctor += 1;
                         CtorRepr::Record {
                             ctor: next_ctor - 1,

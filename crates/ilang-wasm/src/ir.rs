@@ -937,6 +937,10 @@ pub struct Program {
     pub site_modules: Vec<String>,
     /// The constructor names, from `FIRST_CONSTRUCTOR` on.
     pub constructors: Vec<String>,
+    /// Inspection order for each constructor: physical field index and label,
+    /// positions first, then labels in UTF-8 byte order (§11.8). An empty
+    /// entry means positional data, whose physical order is already correct.
+    pub constructor_parts: Vec<Vec<(u32, Option<String>)>>,
     /// The `ilang.abi` metadata (B.6).
     pub abi_json: String,
     /// The functions that the host gives (B.4).
