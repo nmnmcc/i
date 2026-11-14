@@ -330,3 +330,38 @@ and clippy-green e840c135b frontend/backend. Wasm unit result:27/27 pass.
 The first combined CLI/syntax log reports416 passes,3 known failures and2
 existing ignored (includes child harness output); full binary failures are
 exactly the three listed above. No further target fails.
+
+12:40: all27 package tests PASS; all3 cache tests PASS. The exact
+fourteen-project provider diagnostic comparison PASS, including both
+mixed-install projects with the four explained row/virtual-coordinate
+changes. Every diagnostic count, code, full message and written-source
+location remains compared exactly. The final transitive-provider runtime
+case is still active; no retry failure has occurred.
+
+12:41: full three-binary CLI retry PASS: cache3, package27, providers19,
+including the exact fourteen-project comparison and transitive runtime.
+No known failing Rust/CLI test remains. All first-run failures and their
+repairs stay recorded. Fresh release build and runtime/spec/generation gate
+continue; backend follow-up validation uses the fresh compiler.
+
+12:43: fresh release compiler build PASS (1m32s). Macro examples PASS:
+13 passed,0 failed,1 existing skip. Std O0 starts on this fresh binary,
+followed by O2 and the requested spec/generation gate. Latest tyalt c220
+remains an ancestor; no new incoming changes at this checkpoint.
+
+12:48: std O0 PASS2170/2170, including schema_test.null_round. O2 starts.
+Because the first all-CLI invocation compiled before the late backend merge,
+all CLI unit targets and every integration binary except the unfiltered spec
+suite will additionally be rebuilt/rerun on the merged backend after the
+current runtime/spec/generation/private gate. The macro crate is also rerun
+because it executes backend-generated guest code. Frontend checker/LSP/syntax
+production code has not changed since its full passing gate. The fresh
+CLI/macro script waits for parent1923201 to end before entering H, so the
+lane never has two heavy commands running or queued.
+
+12:53: std O2 PASS2170/2170, including schema_test.null_round. Both std
+levels are green on the merged release compiler (O0 completed12:47:53;
+O2 completed12:52:57). Requested chapters6/7/9/15.7 and short generation
+follow, then private migration checks and final formatting. Fresh complete
+CLI/macro replay remains serialized behind the gate; no failing test is
+currently known. This is an interim runtime milestone, not final full green.

@@ -911,3 +911,17 @@ All16 conflicts are resolved and the workspace all-target check passes.
 Every incoming change to deleted/relocated files is inventoried in
 [syn3-final-ast-tyalt-integration.md](syn3-final-ast-tyalt-integration.md).
 This is a compiling milestone, not a green claim on the new main base.
+
+Nov14 12:53: the native-tree integration now contains latest tyalt c220161d5
+(main/ABI5, stage3, colon precedence, continuation environment fix and the
+stop-position proof). Every deleted-file change and every diagnostic move
+is inventoried in [the integration report](syn3-final-ast-tyalt-integration.md).
+Fresh workspace all-target check, strict clippy,27 Wasm units, the full
+syntax/macro/check/LSP gate (764 passes after four test-shape repairs),
+complete initial CLI plus all three repaired binaries, macro examples and
+both std O0/O2 (2170/2170 each, including schema.null_round) pass.
+No known failing test remains. Spec6/7/9/15.7, short generation, private
+migration/final formatting and a complete fresh-backend CLI/macro replay
+remain pending. The full-new-base green hash is not claimed yet.
+Steps2c/2d/3/4 implementation stays complete; this is the final integration
+gate, with no production old tree or lowerer reintroduced.
