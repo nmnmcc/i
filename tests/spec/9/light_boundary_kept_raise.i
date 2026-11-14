@@ -1,6 +1,6 @@
 // spec: 9.2, 9.3, 9.4, 11.7
 // expect: stop "control: boundary is not active"
-// at: spec/main:14:31
+// at: spec/main:14:32
 (
 	i/control
 	i/failure

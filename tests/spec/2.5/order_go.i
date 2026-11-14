@@ -1,6 +1,6 @@
 // spec: 2.5
 // expect: stop "panic: y"
-// at: spec/main:18:19
+// at: spec/main:18:20
 // at: spec/main:14:5
 (
 	i/core

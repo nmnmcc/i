@@ -1,6 +1,6 @@
 // spec: 2.5, 11.7
 // expect: stop "panic: not ready"
-// at: spec/main:11:58
+// at: spec/main:11:59
 // at: spec/main:9:9
 (
 	i/core
