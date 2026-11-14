@@ -1,8 +1,13 @@
 # Syntax three, stage 3: report
 
-Current integration status, 2026-11-14: **verification in progress against
-fetched `origin/main` at `cc26b8d9`**. The READY result below applies to the
-previous `ab8178ab4` base, not yet to this new integration.
+Current integration status, 2026-11-14: **READY against fetched
+`origin/main` at `cc26b8d9`**. Every requested fresh gate passes. The full
+`review-k4d` filter checks 365 projects with zero failures; all fourteen
+named-provider projects match the landed error multisets exactly. One
+additional equality observation records the W0503 warnings required by
+spec §6.9 for stage three's distinct nominal types (§2.8), with unchanged
+acceptance and runtime. The landed-tip integration and audit below
+supersede earlier READY results and interim blockers.
 
 Previous base landing status, 2026-11-14: **READY for the requested gates**.
 Main and the latest READY conversion fix are merged, the three provider
@@ -471,3 +476,43 @@ first-run snapshot is `s3-r4-corpus-first-outcomes.json` in the shared
 coordinator cache; its raw log is `s3-r4-corpus.log`, and the focused retry
 is `s3-r4-equality.log`. A second complete filter run is required before
 READY.
+
+For the strict audit classification this is **one diagnostic outcome
+difference**, since the W0503 count increases, with **zero acceptance or
+runtime outcome changes**. There are zero other message or shown-type
+differences in this filter. The controlling §6.9 paragraph is quoted in
+commit `7a7d7df01`; the machine classification is
+`s3-r4-corpus-classification.json`. The historical shard classifications
+above apply to their earlier baselines.
+
+### Final landed-tip gates
+
+The second **complete** `review-k4d` run passes: 365 selected projects,
+213 accepted checks, 152 rejected checks, zero failures. Its command is
+`python3 scripts/qa/corpus.py run --filter review-k4d --jobs 2`, through the
+shared heavy wrapper; log `s3-r4-corpus-final.log`. The focused equality
+retry also passes. No runtime retry or changed bound is needed in this
+final complete run. All fourteen named-provider source/expected pairs are
+verified byte-identical to fetched `cc26b8d9` again after completion.
+
+The first run's sole difference is classified strictly as one diagnostic
+outcome change (three new W0503 warnings in each check/O0/O2 phase), with
+zero acceptance/runtime changes and zero other message/shown-type changes.
+Spec §6.9 requires the warnings under syntax-three §2.8; its complete
+paragraph is quoted in `7a7d7df01`. The first-run snapshot retains all saved
+expected records and the sole mismatching actual observation; matching
+cases have no `actual.json` by runner design. The initial sparse-snapshot
+audit helper was corrected for that format. The machine classification is
+`s3-r4-corpus-classification.json`.
+
+All other requested gates remain green on this compiler: workspace check;
+checker/syntax/LSP/Wasm/macro and all five CLI binaries; all five requested
+spec filters at O0/O2; std O0/O2 (2,170 each); snippets and helper tests;
+short generation; Rust/i formatting; workspace all-feature clippy. The
+full command/result ledger and initial resolved failures are in shared
+cache `report-s3-r4.md`, with `s3-r4-rust-results.json`,
+`s3-r4-post-results.json`, and `s3-r4-final-results.json`. Only documentation
+and the explained equality observation changed after those compiler gates.
+The requested recovery skip, four existing ignores, existing spec pending
+entries and inherited record-field solver limitation remain as documented.
+No required lane gate remains unfinished; main landing is coordinator-owned.
