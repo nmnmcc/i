@@ -85,7 +85,7 @@ main = () <- (io : Io) {
 [30, 10, 20]
 ```
 
-Scheduling and completion order can change; prints inside children can interleave. The host chooses workers, whose identity stays hidden; task steps behave as some serial order. Ordinary scopes require portable results and errors (copyable across workers); `task.local_scope` keeps nonportable values on one worker.
+Scheduling and completion order can change; prints inside children can interleave. The runtime chooses how to use CPU cores, and task steps behave as some serial order. Ordinary scopes require portable results and errors (safe to copy for parallel execution); `task.local_scope` keeps nonportable values on one thread.
 
 ## A channel
 
@@ -176,7 +176,7 @@ Error("child failed")
 
 The readiness message ensures the final is installed before failure; `task.never()` is an event that never becomes ready. Cancellation reaches running tasks at scheduler suspensions, drops unstarted bodies, and shields finals already running. A stop bypasses catches and finals.
 
-**Current limits:** avoid retaining a scope through user suspension, which can deadlock, and unnecessary services around child callbacks, which can prevent portability ([C03, C04](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+Using a scope outside a suspended computation can deadlock, and unused services captured by a child can still make its callback nonportable.
 
 Continue with [macros](/docs/tour/macros).
 

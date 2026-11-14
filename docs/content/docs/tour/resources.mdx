@@ -1,6 +1,6 @@
 ---
 title: Resources
-description: Acquire a value, release it after use, and understand unwinding on this tree.
+description: Acquire values and release them after normal returns or errors.
 ---
 
 Release acquired values after use, including when a computation raises an error.
@@ -24,7 +24,7 @@ use handle
 release handle
 ```
 
-Strings stand in for handles so these examples need no files. **Current limits:** use callbacks; resource `Scope` and `resource.scoped` are unavailable ([EF11](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+Strings stand in for handles so these examples need no files. `resource.scoped` and the resource `Scope` type are not available yet.
 
 ## A returned value
 

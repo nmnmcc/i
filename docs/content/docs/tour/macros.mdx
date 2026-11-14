@@ -39,7 +39,7 @@ main = () <- (io : Io) { io.print(core.inspect(twice(21))) }
 42
 ```
 
-In `.is`, `(, twice)` exports, `=` binds, and `->` constructs a function; braces hold a block and line breaks are whitespace. The backtick quotes syntax, `~value` inserts argument syntax, and `_` infers the result. `@macro` definitions require `.is` and a separate importing module; `.i` and `.is` share a core tree and can import each other without filename extensions.
+In `.is`, `(, twice)` exports, `=` binds, and `->` constructs a function; braces hold a block and line breaks are whitespace. The backtick quotes syntax, `~value` inserts argument syntax, and `_` infers the result. `@macro` definitions require `.is` and a separate importing module; `.i` and `.is` are two forms of the same code and can import each other without filename extensions.
 
 ## Expanded code
 
@@ -114,7 +114,7 @@ main = () <- (io : Io) {
 22
 ```
 
-This is hygiene: caller syntax keeps its scope, while each expansion gives generated syntax a fresh mark. Expansion output spells both names `saved`, hiding that distinction; labels are compared by text.
+This is hygiene: caller syntax keeps its scope, while generated names belong to the macro expansion. Expansion output spells both names `saved`, hiding that distinction; labels are compared by text.
 
 ## Definition names
 
@@ -138,7 +138,7 @@ main = () <- (io : Io) { io.print(core.inspect(twice(21))) }
 42
 ```
 
-Template references resolve in the defining module. Macros have no host file, network, or clock services; expansion is deterministic and budgeted. **Current limits:** budget metering differs from the specified accounting ([MP08](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+Template references resolve in the defining module. Macros have no host file, network, or clock services; their output is deterministic. Large macro expansions may hit compiler limits sooner than expected.
 
 ## Selected branches
 
