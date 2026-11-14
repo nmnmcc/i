@@ -45,7 +45,7 @@ def i_options(info):
     words, options = [], {}
     for word in shlex.split(info)[1:]:
         key, separator, value = word.partition('=')
-        if separator and (key in ('title', 'package', 'file', 'stdout', 'stderr', 'project') or re.fullmatch(r'env\.[A-Za-z_][A-Za-z0-9_]*', key)):
+        if separator and (key in ('title', 'package', 'file', 'stdout', 'stderr', 'project', 'hosts') or re.fullmatch(r'env\.[A-Za-z_][A-Za-z0-9_]*', key)):
             if key in options or not value:
                 raise ValueError(f'expected one nonempty {key}=')
             options[key] = value
@@ -62,6 +62,8 @@ def i_options(info):
         raise ValueError('stdout=exact is supported on test fences')
     if 'stderr' in options and (options['stderr'] != 'exact' or not words or words[0] != 'error'):
         raise ValueError('stderr=exact is supported on error fences')
+    if 'hosts' in options and (words != ['run'] or options['hosts'] != 'native,wasi,javascript'):
+        raise ValueError('hosts=native,wasi,javascript is supported on run fences')
     if any(key.startswith('env.') for key in options) and not words:
         raise ValueError('env.NAME= needs an example kind')
     return words, options
@@ -103,12 +105,12 @@ def i_info(info):
         return words[0], path or title or 'src/main.i', frozenset()
     if path:
         raise ValueError('file= belongs to a supporting file or a shown block')
-    if words[0] in ('run', 'test', 'test-fails', 'check', 'types', 'format') and len(words) == 1:
+    if words[0] in ('run', 'test', 'test-fails', 'check', 'types', 'format', 'expand') and len(words) == 1:
         return words[0], title, frozenset()
     if words[0] == 'error' and len(words) > 1 and all(
             re.fullmatch(r'[EW]\d{4}', word) for word in words[1:]):
         return 'error', title, frozenset(words[1:])
-    raise ValueError('expected run, test, test-fails, check, types, format, error <codes…>, shown file=<path>, shown-unchecked, or file=<path>; got '
+    raise ValueError('expected run, test, test-fails, check, types, format, expand, error <codes…>, shown file=<path>, shown-unchecked, or file=<path>; got '
                      + repr(' '.join(words)))
 
 
@@ -118,6 +120,14 @@ def safe_file(path):
             or parts.as_posix() != path or path == '.'):
         raise ValueError('expected a project-relative file path without . or ..; got ' + repr(path))
     return path
+
+
+def output_info(info):
+    """A transcript may have a display title, but no execution or file metadata."""
+    if not info.split() or info.split()[0] != 'text':
+        return False
+    words, options = i_options(info)
+    return not words and set(options) <= {'title'}
 
 
 def generated(path):

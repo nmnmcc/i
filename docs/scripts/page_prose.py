@@ -85,7 +85,7 @@ def example_count(path, content):
     if source is None or not source.is_file():
         return 0
     # Count each complete compiler action once, not one per optimization level.
-    kinds = {'run', 'test', 'test-fails', 'check', 'error', 'types', 'format'}
+    kinds = {'run', 'test', 'test-fails', 'check', 'error', 'types', 'format', 'expand'}
     return sum(bool(info and info[0] in kinds) for block in fences(source.read_text())
                if (info := i_info(block.info)) is not None)
 

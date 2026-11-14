@@ -17,10 +17,10 @@ import tempfile
 import time
 import tomllib
 
-from example_fences import fences, generated, i_info, i_options, safe_file
+from example_fences import fences, generated, i_info, i_options, output_info, safe_file
 from paths import ROOT
 
-KINDS = ('run', 'test', 'test-fails', 'check', 'types', 'format', 'error', 'shown', 'shown-unchecked')
+KINDS = ('run', 'test', 'test-fails', 'check', 'types', 'format', 'expand', 'error', 'shown', 'shown-unchecked')
 TIMEOUT = 60
 # Match diagnostic headers, not codes mentioned in their messages or source.
 DIAGNOSTIC = re.compile(r'(?m)^(?:[^\n]+:\d+:\d+: )?(?:error|warning|note)\[([A-Z]\d{4})\]:')
@@ -56,6 +56,7 @@ class Example:
     compare_test_output: bool = False
     shared_files: dict = field(default_factory=dict)
     compare_error_output: bool = False
+    hosts: bool = False
 
 
 def read_page(page):
@@ -93,20 +94,21 @@ def read_page(page):
             options = i_options(block.info)[1]
             compare_test_output = kind == 'test' and options.get('stdout') == 'exact'
             compare_error_output = kind == 'error' and options.get('stderr') == 'exact'
-            if kind in ('run', 'test-fails', 'types', 'format') or compare_test_output or compare_error_output:
+            if kind in ('run', 'test-fails', 'types', 'format', 'expand') or compare_test_output or compare_error_output:
                 following = index + 1
                 # A failure transcript may show the reproduction command first.
                 if kind == 'test-fails':
                     while following < len(blocks) and blocks[following].info.split()[0:1] == ['sh']:
                         following += 1
-                if following >= len(blocks) or blocks[following].info != 'text' or not blocks[following].closed:
+                if following >= len(blocks) or not output_info(blocks[following].info) or not blocks[following].closed:
                     raise ValueError(kind + ' needs a closed text fence after it')
                 output = blocks[following].source
             shared_files = project_sources(page, options['project']) if 'project' in options else {}
             package = options.get('package')
             environment = {key[4:]: value for key, value in options.items() if key.startswith('env.')}
             examples.append(Example(page, block.line, kind, block.source, files, output, codes,
-                                    package, path, environment, compare_test_output, shared_files, compare_error_output))
+                                    package, path, environment, compare_test_output, shared_files, compare_error_output,
+                                    'hosts' in options))
         except ValueError as error:
             failures.append(Failure(page, block.line, 'a valid example fence', str(error)))
     for name, block in pending.items():
@@ -211,6 +213,25 @@ def output_matches(expected, actual):
     return expected.removesuffix('\n') == actual.removesuffix('\n')
 
 
+def host_commands(binary, opt, project, environment):
+    """Compile each host separately; compare the same program output on all three."""
+    node = shutil.which('node')
+    if not node:
+        raise ValueError('hosts= needs Node.js for the WASI runner and JavaScript SDK')
+    host_driver = project / 'host-run.mjs'
+    host_driver.write_text(
+        'import { readFile } from "node:fs/promises";\n'
+        f'import {{ instantiate }} from {json.dumps((ROOT / "bindings/javascript/ilang.mjs").as_uri())};\n'
+        'const app = await instantiate(await readFile(new URL("./build/javascript.wasm", import.meta.url)),\n'
+        '  { standardServices: true });\nawait app.run();\n')
+    for host, target in (('wasi', 'wasi'), ('javascript', 'host')):
+        output = 'build/' + host + '.wasm'
+        build = [str(binary), 'build', '--offline', '--opt', str(opt), '--target', target, '--out', output]
+        run = ([node, '--no-warnings', str(ROOT / 'bindings/javascript/wasi-run.mjs'), output,
+                json.dumps({'env': environment})] if host == 'wasi' else [node, str(host_driver)])
+        yield host, build, run
+
+
 def run_example(example, binary, timeout=TIMEOUT):
     failures = []
     with tempfile.TemporaryDirectory(prefix=f'docs-{page_name(example.page)}-') as scratch:
@@ -227,6 +248,8 @@ def run_example(example, binary, timeout=TIMEOUT):
             command += [main] if example.kind in ('shown-unchecked', 'format') else ['--offline']
             if example.kind == 'types':
                 command += ['--types']
+            if example.kind == 'expand':
+                command += ['--to', 'i', main]
             if opt is not None:
                 command += ['--opt', str(opt)]
             label = example.kind + (f' --opt {opt}' if opt is not None else '')
@@ -236,6 +259,7 @@ def run_example(example, binary, timeout=TIMEOUT):
                         'check': 'exit 0 and no diagnostics',
                         'types': f'exit 0, no diagnostics and inferred types={example.output!r}',
                         'format': f'exit 0 and formatted source={example.output!r}',
+                        'expand': f'exit 0, no diagnostics and expanded source={example.output!r}',
                         'shown': 'exit 0 and no diagnostics',
                         'shown-unchecked': 'syntax that parses (type checking intentionally omitted)',
                         'error': 'nonzero exit and codes=' + repr(sorted(example.codes)) + (f' and stderr={example.output!r}' if example.compare_error_output else '')}[example.kind]
@@ -257,7 +281,7 @@ def run_example(example, binary, timeout=TIMEOUT):
                 passed = status > 0 and stdout == example.output
             elif example.kind in ('check', 'shown'):
                 passed = status == 0 and not stdout and not stderr
-            elif example.kind == 'types':
+            elif example.kind in ('types', 'expand'):
                 passed = status == 0 and not stderr and stdout == example.output
             elif example.kind == 'format':
                 formatted = (project / main).read_text()
@@ -270,6 +294,20 @@ def run_example(example, binary, timeout=TIMEOUT):
             if not passed:
                 failures.append(Failure(example.page, example.line, f'{label}: {expected}',
                                         f'exit {status}, codes={sorted(codes)!r}, stdout={stdout!r}, stderr={stderr!r}{details}'))
+            if example.hosts:
+                try:
+                    for host, build, run in host_commands(binary, opt, project, example.environment):
+                        status, stdout, stderr = invoke(build, project, max(.001, deadline - time.monotonic()), example.environment)
+                        if status != 0:
+                            failures.append(Failure(example.page, example.line, f'{host} build --opt {opt}: exit 0',
+                                                    f'exit {status}, stdout={stdout!r}, stderr={stderr!r}'))
+                            continue
+                        status, stdout, stderr = invoke(run, project, max(.001, deadline - time.monotonic()), example.environment)
+                        if status != 0 or not output_matches(example.output, stdout):
+                            failures.append(Failure(example.page, example.line, f'{host} --opt {opt}: exit 0 and stdout={example.output!r}',
+                                                    f'exit {status}, stdout={stdout!r}, stderr={stderr!r}'))
+                except (OSError, ValueError, TimeoutError) as error:
+                    failures.append(Failure(example.page, example.line, f'host runs --opt {opt} within the example deadline', str(error)))
     return failures
 
 

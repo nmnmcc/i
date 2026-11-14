@@ -1,6 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { enhanceCarousel } from '../src/scripts/home-carousel.ts';
+
+test('home keeps six plain cards in reading order, with one visible example each', () => {
+  const page = readFileSync(new URL('../content/home/index.mdx', import.meta.url), 'utf8');
+  const cards = [...page.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/g)].map((match) => match[1]);
+  assert.deepEqual(cards.map((card) => card.match(/<h2>(.*?)<\/h2>/)[1]), [
+    'Simple enough', 'Safe enough', 'Testable enough', 'Precise enough', 'Extensible enough', 'Fast enough',
+  ]);
+  for (const card of cards) {
+    const visible = card.replace(/<div hidden>[\s\S]*?<\/div>/g, '');
+    assert.equal([...visible.matchAll(/<p>/g)].length, 1);
+    assert.equal([...visible.matchAll(/^```(?:i|scheme)\b/gm)].length, 1);
+    assert.equal([...visible.matchAll(/^```text\b/gm)].length, 1);
+  }
+  assert.doesNotMatch(page, /href=["']#/);
+  assert.match(page, /href="\/docs\/getting-started\/install"/);
+  assert.match(page, /className="hero-position"><strong>Enough\.<\/strong><\/p>/);
+  assert.doesNotMatch(page, /\b(novel|unique|powerful|revolutionary|advanced|first|only|guarantee|set-theoretic|capability|intersection)\b|effect system|principal types/i);
+});
 
 class ElementFixture {
   listeners = new Map();

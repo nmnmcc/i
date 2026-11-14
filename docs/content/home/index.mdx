@@ -1,6 +1,6 @@
 ---
 title: i — the language for the rest of us
-description: "Fast enough, complete enough, easy to read, and light: a small functional language with inferred static types that compiles to WasmGC."
+description: "Enough: functions, data, checked types and services, compiled to WebAssembly."
 ---
 
 <div className="home-page">
@@ -8,11 +8,25 @@ description: "Fast enough, complete enough, easy to read, and light: a small fun
 <div className="hero-copy">
 <p className="home-eyebrow">The i programming language</p>
 <h1 id="home-title">The language for the rest of us</h1>
-<p className="hero-position"><strong>Fast enough:</strong> compiles to WasmGC and runs natively, on WASI, and in JavaScript hosts. <strong>Complete enough:</strong> services, typed errors, structured concurrency, macros. <strong>Easy to read:</strong> no keywords, no types to write. <strong>Light:</strong> one standard, one tool.</p>
+<p className="hero-position"><strong>Enough.</strong></p>
 <p className="hero-explanation">Run with <code>PORT=8080</code>. No parameter, result, or service annotations.</p>
 <div className="home-actions">
 <a className="home-button home-button-primary" href="/docs/tour">Read the tour</a>
 <a className="home-button" href="/docs/getting-started/install">Install</a>
+</div>
+<div className="hero-signature" aria-label="Inferred types">
+<div hidden>
+```i types project=examples/port package=hello title="src/probe.i"
+(
+	hello/main
+)
+```
+</div>
+
+```text title="i check --types"
+hello/main.read_port : (String) <- (Fail(BadPort | process.ProcessError), i/request.Await, i/request.Owner, process.Environment) -> Int
+hello/main.main : () <- (Fail(stdio.StdioError), i/request.Await, i/request.Owner, process.Environment, stdio.Stdio) -> Nil
+```
 </div>
 </div>
 <div className="hero-example">
@@ -29,26 +43,26 @@ description: "Fast enough, complete enough, easy to read, and light: a small fun
 	BadPort(..)
 )
 BadPort = ()
-read_port = () {
-	int.parse(process.env("PORT")) |>
+read_port = (name) {
+	int.parse(process.env(name)) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
 main = () {
-	text = fail.catch(read_port) |>
+	text = fail.catch(() { read_port("PORT") }) |>
 		(Ok(port)) { "port " <> int.to_string(port) }
 		| (Error(_)) { "invalid PORT" }
 	stdio.print(text)
 }
 ```
 
-```text
+```text title="PORT=8080 i run"
 port 8080
 ```
 </div>
 </section>
 
-<section className="home-carousel" data-home-carousel="" role="region" aria-roledescription="carousel" aria-label="Language examples">
+<section className="home-carousel" data-home-carousel="" role="region" aria-roledescription="carousel" aria-label="Enough, in six examples">
 <div className="carousel-controls" data-carousel-controls="" data-page-chrome="" hidden>
 <button type="button" data-carousel-previous="" aria-label="Previous example" aria-controls="home-examples">←</button>
 <output data-carousel-position="" aria-live="polite" aria-atomic="true">1 / 6</output>
@@ -56,123 +70,35 @@ port 8080
 </div>
 <div className="carousel-track" id="home-examples" data-carousel-track="" role="group" aria-label="Example slides" tabIndex={0}>
 <article className="carousel-slide" data-home-slide="1" role="group" aria-roledescription="slide" aria-label="1 of 6" tabIndex={0}>
-<h2>Matching and overloading, one construct</h2>
-<p>One function handles several patterns and argument shapes; the same checked port flows through each call.</p>
+<h2>Simple enough</h2>
+<p>Functions, data and a few symbols make a program.</p>
 <div className="slide-example">
-```i test stdout=exact env.PORT=8080 project=examples/port package=hello title="test/format_test.i"
+```i run package=hello title="src/main.i"
 (
-	testlib = (test) = std/test
 	i/stdio
 	std/int
-	app = hello/main
 )
-format =
-	(0) { "off" }
-	| (port) { "port " <> int.to_string(port) }
-	| (host, port) { host <> ":" <> int.to_string(port) }
-test("matching and overloading", () {
-	if = app.read_port()
-	stdio.print(0 |> format)
-	stdio.print(format(if))
-	stdio.print(format("localhost", if))
-})
+Num = (Int)
+Add = (Expr, Expr)
+Mul = (Expr, Expr)
+Expr = Num | Add | Mul
+eval =
+	(Num(n)) { n }
+	| (Add(a, b)) { eval(a) + eval(b) }
+	| (Mul(a, b)) { eval(a) * eval(b) }
+main = () {
+	Mul(Add(Num(1), Num(5)), Num(7)) |> eval |> int.to_string |> stdio.print
+}
 ```
 
-```text
-off
-port 8080
-localhost:8080
-pass hello/format_test.matching and overloading
-1 passed, 0 failed
+```text title="i run"
+42
 ```
 </div>
 </article>
 <article className="carousel-slide" data-home-slide="2" role="group" aria-roledescription="slide" aria-label="2 of 6" tabIndex={0}>
-<h2>A service is a value</h2>
-<p>Supply an Environment value to the unchanged reader; the same code now reads only the test’s input.</p>
-<div className="slide-example">
-```i test stdout=exact project=examples/port package=hello title="test/main_test.i"
-(
-	testlib = (test) = std/test
-	i/request
-	i/process
-	i/fail
-	app = hello/main
-)
-read = (text) {
-	fail.catch(app.read_port) <- (
-		process.Environment(env = (_) { request.ready(Ok(text)) }),
-	)
-}
-test("reads a port", () { assert(read("8080") == Ok(8080)) })
-test("rejects a bad port", () {
-	assert(read("oops") == Error(app.BadPort))
-	assert(read("65536") == Error(app.BadPort))
-})
-```
-
-```text
-pass hello/main_test.reads a port
-pass hello/main_test.rejects a bad port
-2 passed, 0 failed
-```
-</div>
-</article>
-<article className="carousel-slide" data-home-slide="3" role="group" aria-roledescription="slide" aria-label="3 of 6" tabIndex={0}>
-<h2>Concurrent calls keep their scope</h2>
-<p>Both child calls finish before their results are printed, carrying the reader’s service and failure requirements.</p>
-<div className="slide-example">
-```i test stdout=exact env.PORT=8080 project=examples/port package=hello title="test/tasks_test.i"
-(
-	testlib = (test) = std/test
-	i/task
-	i/core
-	i/stdio
-	app = hello/main
-)
-test("joined reads", () {
-	ports = task.both(app.read_port, app.read_port)
-	stdio.print(core.inspect(ports))
-})
-```
-
-```text
-(8080, 8080)
-pass hello/tasks_test.joined reads
-1 passed, 0 failed
-```
-</div>
-</article>
-<article className="carousel-slide" data-home-slide="4" role="group" aria-roledescription="slide" aria-label="4 of 6" tabIndex={0}>
-<h2>Generated code keeps the checks</h2>
-<p>The typed macro doubles the checked port value; its arguments and expanded result must fit its signature.</p>
-<div className="slide-example">
-```i test stdout=exact env.PORT=8080 project=examples/port package=hello title="test/macros_test.i"
-(
-	testlib = (test) = std/test
-	i/core
-	i/stdio
-	app = hello/main
-	hello/macros
-)
-test("typed expansion", () {
-	port = app.read_port()
-	stdio.print(
-		core.inspect(macros.twice(port)),
-	)
-})
-```
-
-```text
-16160
-pass hello/macros_test.typed expansion
-1 passed, 0 failed
-```
-</div>
-</article>
-<article className="carousel-slide" data-home-slide="5" role="group" aria-roledescription="slide" aria-label="5 of 6" tabIndex={0}>
-<h2>An error stays in the type</h2>
-<p>A caller promising no service needs cannot leave BadPort unhandled; the checker rejects this call.</p>
+<h2>Safe enough</h2>
+<p>The type shows what a function needs and how it can fail.</p>
 <div className="slide-example">
 ```i error E0501 stderr=exact project=examples/port package=hello title="src/probe.i"
 (
@@ -182,33 +108,112 @@ pass hello/macros_test.typed expansion
 (
 	pure
 )
-pure : () -> Int = () { app.read_port() }
+pure : () -> Int = () { app.read_port("PORT") }
 ```
 
-```text
+```text title="i check"
 src/probe.i:8:1: error[E0501]: `app.BadPort` is not a subtype of `Never`
 1 error
 ```
 </div>
 </article>
-<article className="carousel-slide" data-home-slide="6" role="group" aria-roledescription="slide" aria-label="6 of 6" tabIndex={0}>
-<h2>Inferred types still reject wrong uses</h2>
-<p>No result annotation is needed to reject adding text to the reader’s integer result.</p>
+<article className="carousel-slide" data-home-slide="3" role="group" aria-roledescription="slide" aria-label="3 of 6" tabIndex={0}>
+<h2>Testable enough</h2>
+<p>Hand a function a fake clock.</p>
 <div className="slide-example">
-```i error E0501 stderr=exact project=examples/port package=hello title="src/probe.i"
+```i test stdout=exact package=hello title="test/clock_test.i"
 (
-	app = hello/main
+	testlib = (test) = std/test
 )
-
-(
-	bad
-)
-bad = () { app.read_port() + "one" }
+Clock = (now = () -> Int)
+elapsed = (start) <- (clock : Clock) { clock.now() - start }
+test("a fake clock", () {
+	assert(elapsed(40) == 2) <- (Clock(now = () { 42 }))
+})
 ```
 
-```text
-src/probe.i:8:30: error[E0501]: `"one"` is not a subtype of `Int`
-1 error
+```text title="i test"
+pass hello/clock_test.a fake clock
+1 passed, 0 failed
+```
+</div>
+</article>
+<article className="carousel-slide" data-home-slide="4" role="group" aria-roledescription="slide" aria-label="4 of 6" tabIndex={0}>
+<h2>Precise enough</h2>
+<p>Types say what values can be, no more.</p>
+<div className="slide-example">
+```i types package=hello title="src/main.i"
+(
+	word
+)
+word = (number) { number |> (0) { "zero" } | (1) { "one" } }
+```
+
+```text title="i check --types"
+hello/main.word : (0 | 1) -> "one" | "zero"
+```
+</div>
+</article>
+<article className="carousel-slide" data-home-slide="5" role="group" aria-roledescription="slide" aria-label="5 of 6" tabIndex={0}>
+<h2>Extensible enough</h2>
+<p>Write your own <code>if</code> when you need one.</p>
+<div className="slide-example">
+```scheme file=src/sugar.is title="src/sugar.is"
+(, if)
+(= _branches
+  (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
+(@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
+```
+
+<div hidden>
+```i expand project=examples/sugar package=hello title="src/main.i"
+(
+	i/stdio
+	sugar = (if) = hello/sugar
+)
+main = () { stdio.print(if(1 < 2, "yes", "no")) }
+```
+</div>
+
+```text title="i expand --to i src/main.i"
+// hello/main
+(
+	i/stdio
+	sugar = (if) = hello/sugar
+)
+
+main = () { stdio.print(1 < 2 |> (True) { "yes" } | (False) { "no" }) }
+
+```
+
+<div hidden>
+```i run project=examples/sugar package=hello title="src/main.i"
+(
+	i/stdio
+	sugar = (if) = hello/sugar
+)
+main = () { stdio.print(if(1 < 2, "yes", "no")) }
+```
+
+```text title="i run"
+yes
+```
+</div>
+</div>
+</article>
+<article className="carousel-slide" data-home-slide="6" role="group" aria-roledescription="slide" aria-label="6 of 6" tabIndex={0}>
+<h2>Fast enough</h2>
+<p>Compiles to WebAssembly and runs where you need it.</p>
+<div className="slide-example">
+```i run hosts=native,wasi,javascript package=hello title="src/main.i"
+(
+	i/stdio
+)
+main = () { stdio.print("hello from i") }
+```
+
+```text title="native / WASI / JavaScript"
+hello from i
 ```
 </div>
 </article>

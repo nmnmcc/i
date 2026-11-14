@@ -5,11 +5,11 @@
 .home-page :where(h1, h2, p) { margin: 0; }
 .home-page a, .home-page button { -webkit-tap-highlight-color: transparent; }
 .home-page :focus-visible { outline: 2px solid var(--color-fd-primary); outline-offset: 5px; }
-.home-hero { min-height: min(calc(100svh - 4rem), 50rem); padding-block: 3rem; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(2.5rem, 6vw, 5rem); }
+.home-hero { padding-block: 2.5rem; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(2.5rem, 6vw, 5rem); }
 .home-eyebrow { margin-bottom: 1.5rem !important; color: var(--color-fd-muted-foreground); font-size: .875rem; }
-.home-page h1 { max-width: 16ch; font-size: clamp(2.5rem, 4.3vw, 3.75rem); line-height: 1.06; letter-spacing: -.055em; font-weight: 600; }
-.hero-position { margin-top: 1.75rem !important; font-size: 1rem; line-height: 1.75; color: var(--color-fd-muted-foreground); }
-.hero-position strong { color: var(--color-fd-foreground); font-weight: 500; }
+.home-page h1 { max-width: 18ch; font-size: clamp(2.5rem, 4vw, 3.25rem); line-height: 1.06; letter-spacing: -.055em; font-weight: 600; }
+.hero-position { margin-top: 1.5rem !important; font-size: clamp(3.5rem, 5vw, 4.5rem); line-height: 1; letter-spacing: -.05em; }
+.hero-position strong { color: var(--color-fd-foreground); font-weight: 600; }
 .hero-explanation { margin-top: 1.5rem !important; font-size: .875rem; color: var(--color-fd-muted-foreground); }
 .home-actions { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 2rem; }
 .home-button { display: inline-flex; min-height: 2.75rem; align-items: center; padding: .65rem 1.15rem; border-radius: .4rem; color: var(--color-fd-foreground); text-decoration: none; font-size: .875rem; font-weight: 500; }
@@ -20,6 +20,8 @@
 .home-page figure.shiki pre { font-size: .8125rem; line-height: 1.5; }
 .home-page figure.shiki figcaption { font-family: var(--font-mono); font-size: .75rem; }
 .hero-example { display: grid; gap: 1rem; }
+.hero-signature { margin-top: 2rem; }
+.hero-signature figure.shiki pre { width: 100%; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75rem; }
 .hero-example figure.shiki > div[role='region'] { padding-block: .75rem; }
 .home-carousel { padding-block: 3rem 5rem; }
 .carousel-controls { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 2rem; }
@@ -43,7 +45,7 @@
   .carousel-slide > p { font-size: .9375rem; }
   .carousel-controls { margin-bottom: 1.5rem; }
   .home-page figure.shiki pre { font-size: .75rem; }
-  .hero-example figure.shiki pre, .hero-example figure.shiki pre code { font-size: .75rem; tab-size: 2; }
+  .home-page figure.shiki pre, .home-page figure.shiki pre code { font-size: .75rem; tab-size: 2; }
 }
 @media (prefers-reduced-motion: no-preference) { .carousel-track { scroll-behavior: smooth; } }
 @media (prefers-reduced-motion: reduce) { .carousel-track { scroll-behavior: auto; } }

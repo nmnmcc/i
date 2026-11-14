@@ -13,8 +13,8 @@ standard and library reference before building the static site in `dist/`.
 `npm run check:links` checks the built local links; `npm run check:examples`
 checks fenced i examples with the repository's parser and snippet registry,
 then executes complete examples against the tree's compiler.
-`npm run check:rendering` verifies the built i blocks' titles and highlighted
-source, including that execution metadata stays out of the displayed code.
+`npm run check:rendering` verifies example and titled transcript blocks in the
+built site, including that execution metadata stays out of the displayed code.
 After building, `npm run check:placeholders` runs its negative-fixture tests
 and scans every HTML file in `dist`, including generated library pages.
 It rejects `to be written` without regard to case or intervening HTML whitespace,
@@ -38,8 +38,19 @@ to run the parser checks without a Cargo build.
 
 Example fences in authored pages use these info strings:
 
+An expected-output `text` fence may carry a quoted `title="…"` for display;
+it must have no other metadata. Hidden source fences still execute. The home
+page uses a hidden import module to check the full inferred types of its shared
+port reader, and a hidden caller to compare the custom `if` expansion and run it.
+The displayed reader and macro definitions must match their shared files.
+
 - `i run`: complete `src/main.i`; the next fence is `text`, with exact stdout
   (one trailing newline is tolerated). Runs at `--opt 0` and `--opt 2`.
+  Add `hosts=native,wasi,javascript` to compare that same stdout on all three
+  hosts at both levels: `i run`, a WASI build run by Node's WASI runner, and a
+  host build run by the JavaScript SDK with `standardServices: true`. Node must
+  be on PATH. Each example's existing deadline covers all six runs and builds;
+  an unavailable host or a failed build fails the example, rather than skipping it.
 - `i test`: complete `test/<page>_test.i`; every test must pass at both levels.
   Add `stdout=exact` and an immediately following `text` fence to compare its
   transcript as well as its exit status at both levels.
@@ -51,6 +62,9 @@ Example fences in authored pages use these info strings:
   runs once because type checking has no optimization level.
 - `i format`: unformatted complete module; `i fmt` formats the primary file and
   the next `text` fence must match the resulting file exactly. Runs once.
+- `i expand`: complete module expanded with `i expand --offline --to i <file>`;
+  the next `text` fence matches the entire expansion exactly, including its
+  module comment and final blank line, with no diagnostics. Runs once.
 - `i error E0123 E0456`: complete module whose check reports exactly that code set.
   Add `stderr=exact` and a following `text` fence to compare its entire diagnostic
   transcript as well.
@@ -132,7 +146,7 @@ headings and inline code, outside code figures/blocks, navigation and controls.
 Comments, head/script/style/template contents, `hidden`, `aria-hidden` and
 `sr-only` text do not contribute words. Citation counts still include code and
 hidden body text. Examples come from complete `run`, `test`, `test-fails`,
-`check`, `error`, `types` and `format` fences in the matching source page;
+`check`, `error`, `types`, `format` and `expand` fences in the matching source page;
 files, bare fragments, shown files and generated spec fragments are excluded.
 Each example counts once, regardless of its optimization levels.
 

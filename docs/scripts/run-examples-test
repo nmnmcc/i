@@ -63,6 +63,10 @@ class RunnerTests(unittest.TestCase):
             'missing-project': 1,
             'passing-error-output': 0,
             'failing-error-output': 1,
+            'passing-expand': 0,
+            'failing-expand': 1,
+            'passing-hosts': 0,
+            'failing-hosts': 6,
         }
         for name, count in expected.items():
             with self.subTest(fixture=name):
@@ -91,6 +95,10 @@ class RunnerTests(unittest.TestCase):
                     self.assertTrue(all('0 passed, 1 failed' in failure.actual for failure in failures))
                 if name == 'test-fails-with-success':
                     self.assertTrue(all('exit 0,' in failure.actual for failure in failures))
+                if name == 'failing-hosts':
+                    for host in ('run', 'wasi', 'javascript'):
+                        for level in (0, 2):
+                            self.assertTrue(any(f'{host} --opt {level}:' in failure.expected for failure in failures))
                 for failure in failures:
                     self.assertRegex(str(failure), r'\.mdx:\d+: expected .+; actual .+')
 
@@ -111,10 +119,29 @@ class RunnerTests(unittest.TestCase):
         examples, failures, _ = runner.read_page(page)
         self.assertFalse(failures)
         primary = next(example.source for example in examples if example.kind == 'run')
-        shared = [example.shared_files for example in examples if example.kind == 'test']
-        self.assertEqual(len(shared), 4)
+        shared = [example.shared_files for example in examples if example.kind in ('types', 'error') and example.shared_files]
+        self.assertEqual(len(shared), 2)
         self.assertTrue(all(files['src/main.i'] == primary for files in shared))
         self.assertTrue(all(example.compare_test_output for example in examples if example.kind == 'test'))
+        expansion = next(example for example in examples if example.kind == 'expand')
+        execution = next(example for example in examples if example.kind == 'run' and 'src/sugar.is' in example.shared_files)
+        self.assertEqual(expansion.source, execution.source)
+        self.assertEqual(expansion.files['src/sugar.is'], execution.shared_files['src/sugar.is'])
+        self.assertEqual(sum(example.hosts for example in examples), 1)
+
+    def test_output_titles_and_host_metadata(self):
+        for info in ('text', 'text title="native / WASI / JavaScript"'):
+            self.assertTrue(runner.output_info(info))
+        for info in ('text file=answer.txt', 'text run', 'i'):
+            self.assertFalse(runner.output_info(info))
+        for info in ('i test hosts=native,wasi,javascript', 'i run hosts=unknown'):
+            with self.assertRaises(ValueError):
+                runner.i_info(info)
+
+    def test_host_runner_never_skips_an_unavailable_host(self):
+        with tempfile.TemporaryDirectory() as scratch, patch.object(runner.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(ValueError, 'needs Node.js'):
+                list(runner.host_commands(self.binary, 0, Path(scratch), {}))
 
     def test_shared_project_is_local_and_primary_overrides_it(self):
         examples, errors, _ = runner.read_page(FIXTURES / 'passing-project.mdx')
