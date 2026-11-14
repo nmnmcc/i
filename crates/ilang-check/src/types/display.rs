@@ -1095,14 +1095,7 @@ impl Norm<'_> {
                 let ms = if directed { self.meet_forms(ms) } else { ms };
                 self.union_in(ms, true)
             }
-            t => {
-                let t = self.norm(t);
-                if directed && self.s.vacuous(&t) {
-                    Ty::Never
-                } else {
-                    t
-                }
-            }
+            t => self.norm(t),
         }
     }
 
@@ -1111,9 +1104,6 @@ impl Norm<'_> {
     fn meet_forms(&self, ms: Vec<Ty>) -> Vec<Ty> {
         let mut out: Vec<Ty> = Vec::new();
         for m in ms {
-            if self.s.vacuous(&m) {
-                continue;
-            }
             if m.head().is_some()
                 && let Some(i) = out
                     .iter()
@@ -2553,7 +2543,10 @@ mod directed_need_simplification_tests {
     use crate::hir::{BuiltinType, TypeId, TypeRef};
 
     #[test]
-    fn a_single_need_that_becomes_vacuous_is_removed_after_simplification() {
+    fn a_single_need_keeps_its_constructor_after_argument_simplification() {
+        // Decision 2 (EF03): greatest within a constructor still requires
+        // an environment entry of that constructor. Argument simplification
+        // must not erase the key.
         let id = TypeId(0);
         let mut s = Solver::new(Default::default(), vec!["app.Svc".into()]);
         s.variance.insert(id, vec![Variance::Contra]);
@@ -2562,7 +2555,7 @@ mod directed_need_simplification_tests {
         let need = Ty::named(TypeRef::Custom(id), vec![variable]);
         assert_eq!(
             shown(&s, &function(need), Opts::default()).unwrap(),
-            function(Ty::Never)
+            function(Ty::named(TypeRef::Custom(id), vec![Ty::Never]))
         );
     }
 

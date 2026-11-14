@@ -6,6 +6,24 @@ observations as fingerprint-only, 919 as display-only, and 45 otherwise.
 Sixteen of the 45 have resource timeouts; the remaining 29 are listed below.
 The timeout reruns retain each saved `bound_seconds`; no bound is raised.
 
+## Owner rulings, 2026-11-14
+
+The merge base for the new gate is main `9b8061137`, merged at `e357d7449`.
+The historical table below is being re-evaluated against the owner decisions in
+`decisions-2026-11-14.md`; its R3/R4 outcomes are not approved new baselines.
+Decision 1: “A need is a set of environments (EF01/T5/F7).”
+Decision 2: “Drop the Fail(Never) universal-entry removal (EF03/T4).”
+Spec §9.2's safety promise remains: “Getting it never fails at run time.”
+A greatest form within one constructor does not supply that constructor's key.
+The solver and printed types now retain all such entries, including explicitly
+written `Fail(Never)`, contravariant `Sink(Never)` and unconstrained unused `S`.
+The two `review-k4s/min_main_{3,5}_0` entries must again reject a missing `S`;
+the old R4 acceptance justification is withdrawn. The revised unit regression
+keeps both unused cases and the used-head control. Three §9.2 fixtures check
+missing/provided `Sink(Never)` and a pure function missing `Fail(Never)`.
+The wide-row and `review-std2/unsafe` display judgments that erased keys also
+need re-recording only after the new full corpus run. Verification is pending.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**

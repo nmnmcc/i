@@ -953,15 +953,16 @@ fn an_error_alias_uses_an_ordinary_value_parameter_after_e3() {
 }
 
 #[test]
-fn unused_service_heads_remove_only_universal_need_forms() {
-    // §9.2 removes a form satisfied by every value of its constructor.
-    // A one-sided row argument can reach that form only while unused;
-    // invoking the service still retains S and the missing-entry error.
+fn unused_service_heads_keep_the_required_environment_key() {
+    // Decision 2 (EF03/T4) drops §9.2's constructor-relative universal
+    // entry removal: simplifying the argument cannot supply a missing key.
+    // Keep both unused-head cases and the original used-head control.
     for source in [
         include_str!("../../../tests/review/cases/review-k4s/min_main_3_0/src/main.i"),
         include_str!("../../../tests/review/cases/review-k4s/min_main_5_0/src/main.i"),
     ] {
-        assert_eq!(types(source)["app/main.main"], "() -> Nil");
+        let shown = types(source);
+        assert!(shown["app/main.main"].contains("S("), "{shown:?}");
     }
     let used = types(include_str!(
         "../../../tests/review/cases/review-k4s/min_main_6_0/src/main.i"
