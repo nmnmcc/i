@@ -177,6 +177,9 @@ fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
 wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
 	body() <- (svc)
 }";
+    let invariant_hole = source.replace("svc: Svc(Int)", "svc: Svc(_)");
+    assert_ne!(source, invariant_hole);
+    assert_eq!(types(source), types(&invariant_hole));
     for inferred in [false, true] {
         let head = if inferred {
             "wrap = <N>(body : () <- (Fail(Never), Svc(Int), ..N) -> Int, svc : Svc(Int))"

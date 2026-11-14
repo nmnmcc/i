@@ -471,6 +471,9 @@ pub struct Typed {
     /// The type scheme of each top-level name, simplified and shown in the
     /// syntax of §3 (§4.7).
     pub schemes: HashMap<DefId, String>,
+    /// Completed nullary function values, including private aliases and
+    /// computed bindings, for collection-target validation before selection.
+    pub nullary_functions: std::collections::HashSet<DefId>,
     /// Human-facing text; full scheme trees and interfaces stay exact.
     pub scheme_hovers: HashMap<DefId, String>,
     /// The type scheme of each exported top-level name and of each

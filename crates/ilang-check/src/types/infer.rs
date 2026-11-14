@@ -377,6 +377,10 @@ impl<'a> Checker<'a> {
                     .exported_type_needed(d)
                     .then(|| simplified.as_ref().map(|(t, _)| t.clone()).map_err(|_| ()));
                 if let Ok((_, shown)) = simplified {
+                    if matches!(&shown, super::ShownType::Fn(f) if !f.group && f.params.is_empty())
+                    {
+                        typed.nullary_functions.insert(id);
+                    }
                     if let super::ShownType::Fn(f) = &shown
                         && f.params.is_empty()
                         && f.ret == super::ShownType::Named(self.b.nil, Vec::new())
