@@ -92,20 +92,21 @@ The real diagnostic is: `` `Greeting` is not a subtype of `Never` `` (E0501). Th
 
 ## Errors and missing values
 
-A `Result` keeps success or failure as a value, with `Ok(value)` and `Error(error)`. It is built in. On this tree, `std/int.parse` returns `Result(Int, Nil)`: a parsed integer, or an error whose value is `Nil`.
+A `Result` keeps success or failure as a value, with `Ok(value)` and `Error(error)`. It is built in. `std/int.parse` returns an integer and needs `Fail(Nil)` for invalid input. Use `fail.catch` to keep either outcome as `Result(Int, Nil)` data.
 
 ```i run package=tour title="src/main.i"
 (
+	i/fail
 	i/core
 	(Io) = i/io
 	std/int
 )
 main = () <- (io : Io) {
 	io.print(
-		core.inspect(int.parse("42")),
+		core.inspect(fail.catch(() { int.parse("42") })),
 	)
 	io.print(
-		core.inspect(int.parse("oops")),
+		core.inspect(fail.catch(() { int.parse("oops") })),
 	)
 }
 ```
@@ -139,7 +140,7 @@ Some(7)
 None
 ```
 
-Match either form with the branches introduced earlier. A failed parse and an empty list return ordinary values; neither jumps out of the computation.
+Match either form with the branches introduced earlier. The caught parse outcome and the optional list element are ordinary values; matching them does not raise an error.
 
 ## Raising and catching errors
 
@@ -165,7 +166,7 @@ Ok(42)
 Error("bad input")
 ```
 
-The zero-argument function passed to `catch` delays the computation until its handler is ready. An error can be any value, including a string. Standard-library APIs have not all changed to this form: choose explicitly when to turn a returned `Result` into a raised error with `result.to_error`:
+The zero-argument function passed to `catch` delays the computation until its handler is ready. An error can be any value, including a string. Standard-library operations that report failure need `Fail`. APIs that deliberately store outcomes still use `Result` data. Here the first catch stores the parser outcome, and `result.to_error` raises that stored error again:
 
 ```i run package=tour title="src/main.i"
 (
@@ -176,7 +177,8 @@ The zero-argument function passed to `catch` delays the computation until its ha
 	std/result
 )
 main = () <- (io : Io) {
-	answer = fail.catch(() { result.to_error(int.parse("oops")) })
+	parsed = fail.catch(() { int.parse("oops") })
+	answer = fail.catch(() { result.to_error(parsed) })
 	io.print(core.inspect(answer))
 }
 ```
