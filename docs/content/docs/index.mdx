@@ -1,22 +1,29 @@
 ---
 title: Documentation
-description: Choose a route through the tour, practical guides, library reference, and language standard.
+description: Run a program, learn the language, and find a function.
 ---
 
-Start with a complete program, then follow the rules behind it. The [home page](/) connects the examples; these pages let you work through them in detail.
+Run a complete program, then follow the links for your next task.
 
-## Start here
+```i run package=hello title="src/main.i"
+(
+	(Io) = i/io
+)
+main = () <- (io : Io) { io.print("hello") }
+```
 
-- [Install i](/docs/getting-started/install), then [create your first program](/docs/getting-started/first-program).
-- [Take the tour](/docs/tour) if you already know another programming language. Begin with [values and data](/docs/tour/values-and-data), then [functions and branches](/docs/tour/functions-and-branches).
-- Continue to [services and errors](/docs/tour/services-and-errors), [structured tasks](/docs/tour/concurrency), and [macros](/docs/tour/macros) to follow their connections.
+```text
+hello
+```
 
-## Build something
+[Install i](/docs/getting-started/install) and [create a package](/docs/getting-started/first-program) to run it locally.
 
-Use the [guides](/docs/guides) for a concrete task: [a CLI](/docs/guides/cli), [files](/docs/guides/files), [an HTTP service](/docs/guides/http-service), [tests and test doubles](/docs/guides/testing), or [JS and WASI interop](/docs/guides/js-and-wasi-interop).
+## Sections
 
-## Look up a rule or a function
+- [Tour](/docs/tour): values, functions, services, resources, tasks, and macros.
+- [Guides](/docs/guides): command-line tools, files, HTTP services, tests, packaging, and host integration.
+- [Library](/docs/library): modules, exports, and function documentation.
+- [Standard](/docs/standard): the language definition.
+- [Contributing](/docs/contributing): sources, focused checks, and changes.
 
-- [Library reference](/docs/library): find a module and its source declarations.
-- [The standard](/docs/standard): read the language definition.
-- [Contributing](/docs/contributing): work on the compiler, library, tests, or these pages. The [known-gap register](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) records differences between the current compiler and the standard.
+[Some features are not available yet](/docs/contributing/roadmap).

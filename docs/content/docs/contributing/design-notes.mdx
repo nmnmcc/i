@@ -1,19 +1,38 @@
 ---
 title: Design notes
-description: Use the design notes alongside the language standard.
+description: Check a design claim against a working program and current sources.
 ---
 
-The files in `docs/design` explain reasoning, investigations, and plans. Use them to understand a decision or find implementation context, then check the standard for the rule that applies today. A design note can describe historical code or proposed work; it does not replace `docs/spec.md`.
+Check a design claim against a small program and the current sources.
 
-The [generated design note index](/docs/contributing/generated/design-index) lists every note. Its generator labels `syntax-3.md` as in force and files ending in `-report` as historical; other notes need a status review. Check a note's own status and the current tree before relying on its implementation claims.
+```i run package=notes title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	record = (a = 1)
+	io.print(core.inspect(record.a))
+}
+```
 
-- **Syntax and compiler trees:** [syntax-3.md](https://github.com/nmnmcc/i/blob/main/docs/design/syntax-3.md) explains the controlling syntax design. [ast-hir-merge.md](https://github.com/nmnmcc/i/blob/main/docs/design/ast-hir-merge.md) evaluates the syntax and checked trees.
-- **Types:** [principality.md](https://github.com/nmnmcc/i/blob/main/docs/design/principality.md) presents the inference argument and its unproven parts. [known-types-are-facts.md](https://github.com/nmnmcc/i/blob/main/docs/design/known-types-are-facts.md) discusses known types.
-- **Runtime and host:** [runtime.md](https://github.com/nmnmcc/i/blob/main/docs/design/runtime.md) discusses tasks and IO; [native.md](https://github.com/nmnmcc/i/blob/main/docs/design/native.md) covers native execution. These are design documents, so compare their proposals to the current code and standard.
-- **Macros and tests:** [meta.md](https://github.com/nmnmcc/i/blob/main/docs/design/meta.md) explains the metaprogramming design; [testing-macro.md](https://github.com/nmnmcc/i/blob/main/docs/design/testing-macro.md) describes the test macros.
-- **Conformance:** [spec-known-gaps.md](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) tracks specified rules the compiler does not yet implement, including a known unsound case.
+```text
+1
+```
 
-## See also
+[records.md](https://github.com/nmnmcc/i/blob/main/docs/design/records.md) proposes more than the available closed data shapes. A note's opening status can describe an older tree; use the [standard](/docs/standard) for the intended behavior and the compiler for what works today.
 
-- [The standard: introduction](/docs/standard/generated/introduction)
-- [How to send changes](/docs/contributing/how-to-send-changes)
+## Index
+
+The [generated index](/docs/contributing/generated/design-index) includes every note. Its generator marks `syntax-3.md` as in force and names ending in `-report` as historical; other notes need status review.
+
+| Topic | Notes |
+| --- | --- |
+| Syntax | [syntax-3.md](https://github.com/nmnmcc/i/blob/main/docs/design/syntax-3.md): controlling syntax design. |
+| Trees | [ast-hir-merge.md](https://github.com/nmnmcc/i/blob/main/docs/design/ast-hir-merge.md): syntax/checker tree investigation. |
+| Inference | [principality.md](https://github.com/nmnmcc/i/blob/main/docs/design/principality.md): inference argument and unproven parts; [known-types-are-facts.md](https://github.com/nmnmcc/i/blob/main/docs/design/known-types-are-facts.md): known types. |
+| Execution | [runtime.md](https://github.com/nmnmcc/i/blob/main/docs/design/runtime.md): tasks and IO; [native.md](https://github.com/nmnmcc/i/blob/main/docs/design/native.md): native execution. |
+| Macros | [meta.md](https://github.com/nmnmcc/i/blob/main/docs/design/meta.md): metaprogramming; [testing-macro.md](https://github.com/nmnmcc/i/blob/main/docs/design/testing-macro.md): test macros. |
+| Conformance | [spec-known-gaps.md](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md): implementation differences and a known unsound case. |
+
+[Compiler architecture](/docs/contributing/compiler-architecture) links current entry points; [the roadmap](/docs/contributing/roadmap) gives checked boundaries for unfinished designs.

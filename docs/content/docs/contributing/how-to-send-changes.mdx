@@ -1,120 +1,57 @@
 ---
 title: How to send changes
-description: Make a first spec case, run a focused check, and prepare a change for submission.
+description: Add a focused case and prepare a reviewable change.
 ---
 
-This page takes you from the development shell to a checked first change. For a language change, work in the order spec text, test, implementation. The standard defines the intended behavior; tests make the requirement repeatable.
+Make a small regression case and prepare a change someone can review.
 
-## Set up and build
-
-From the repository root, use the setup in [development.md](https://github.com/nmnmcc/i/blob/main/docs/development.md):
-
-```sh
-git submodule update --init crates/ilang-binaryen/binaryen
-devenv shell
-```
-
-Inside the shell, build the CLI. This is the build command from CI's **Build the release i** step:
-
-```sh
-cargo build --release --locked -p ilang-cli
-```
-
-The CLI is the resulting `target/release/i`. For the commands below, set:
-
-```sh
-I=target/release/i
-```
-
-## A first change, step by step
-
-1. **Choose the rule.** Read the spec paragraph for the behavior you want to exercise. For a language change, amend the rule first. For a missing regression test, keep the rule and add a case that demonstrates it.
-2. **Find the smallest neighboring case.** [tests/spec/10/a1_entry_exports.i](https://github.com/nmnmcc/i/blob/main/tests/spec/10/a1_entry_exports.i) is a complete, small case for a program entry. Inspect it from the repository root:
-
-```sh
-ls tests/spec/10/a1_entry_exports.i
-```
-```text
-tests/spec/10/a1_entry_exports.i
-```
-
-```sh
-cat tests/spec/10/a1_entry_exports.i
-```
-```text
+```i run package=entry title="src/main.i"
 // spec: 10.2
 // expect: pass
 main = () { Nil }
 ```
 
-3. **Add a distinct case in the same form.** Create a new `.i` file under the section directory for your rule and give it a descriptive, unused basename. Put the `spec:` and `expect:` lines first, then the complete module. This existing case needs no imports or package manifest: its `main` takes no arguments and returns Nil. `expect: pass` requires successful compilation and execution without a stop, and any collected tests must pass. For a different rule, replace the body with the smallest assertion or rejected expression that tests it, and use that rule's section number. Use a `compile-error` or `warning` expectation only with the actual diagnostic code required by the rule.
-4. **Run the case by its basename.** The spec runner discovers cases recursively; no test-list edit is needed. Here is the command for the existing case above. Substitute the new basename when running your added case:
+```text
 
-```sh
-cargo test -p ilang-cli --test spec --locked -- a1_entry_exports
 ```
 
-The selected-case output from the run used to check this page is:
+This is [tests/spec/10/a1_entry_exports.i](https://github.com/nmnmcc/i/blob/main/tests/spec/10/a1_entry_exports.i). It needs no imports or manifest. `pass` requires successful execution without a stop and passing collected tests.
+
+## A first change
+
+Choose the relevant [standard](/docs/standard) paragraph. For language changes, edit that text first, add a distinct case beside a related one, then implement it. Give the new case an unused, descriptive basename; discovery is recursive and needs no registration list.
+
+Keep `spec:` and `expect:` at the top. Other expectations are `compile-error` or `warning` with the actual diagnostic code, and `stop` with its first message line; `at:` checks further stop lines, and `output:` checks emitted text. Package cases use `#` headers in `i.toml`.
+
+## Focused checks
+
+The filtered command for the existing case is `cargo test -p ilang-cli --test spec --locked -- a1_entry_exports`; substitute your new basename. [The runner](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/tests/spec.rs) checks each header at O0/O2 and compares the levels. [Building and testing](/docs/contributing/building-and-testing) gives setup, the CLI build command, and the shared heavy-queue requirement.
+
+## Library cases
+
+```i test stdout=exact package=changes title="test/bool_test.i"
+(
+	testlib = (test) = std/test
+	std/bool
+)
+test("negation", () {
+	assert(bool.not(False) == True)
+})
+```
 
 ```text
-ok   10/a1_entry_exports.i
-
-spec: 1 of 1 cases passed at --opt 0 and --opt 2
+pass changes/bool_test.negation
+1 passed, 0 failed
 ```
 
-The runner itself checks both `--opt 0` and `--opt 2`. It compares each result to the header and compares the two levels to each other. Its header contract and discovery code are in [crates/ilang-cli/tests/spec.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/tests/spec.rs).
+Use the filter shown on [building and testing](/docs/contributing/building-and-testing#filtered-tests) to run an existing library case; filters select test names, without making package checking module-local. Widen verification to the changed layer, source formatting, compiler lint, snippets, and any affected docs or editor checks.
 
-5. **Implement and widen the check.** Make the implementation satisfy the case and run the related layer. A library change belongs with the module's tests. For example, these commands select the tests in [std/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/std/test/bool_test.i):
+## Corpus effects
 
-```sh
-"$I" test --project std --opt 0 bool_test
-"$I" test --project std --opt 2 bool_test
-```
+A language change includes its spec text, `tests/spec` case, and an account of its effect on `tests/review`. Recorded output is an observation; O0/O2 agreement can preserve a shared defect. Change expectations only with the requiring spec paragraph, review the separate semantic requirement, and promote fixed known failures. [The testing guide](https://github.com/nmnmcc/i/blob/main/docs/testing.md) documents deliberate regeneration.
 
-Both commands passed with the supplied compiler. Each run ended with:
+## Submission
 
-```text
-34 passed, 0 failed
-```
+Use a plain English commit subject describing the change, following recent commits. The [README](https://github.com/nmnmcc/i/blob/main/README.md) and [development guide](https://github.com/nmnmcc/i/blob/main/docs/development.md) describe checks but provide no submission procedure; ask through the [issue tracker](https://github.com/nmnmcc/i/issues) for `nmnmcc/i`.
 
-The name filter selects tests to run; it does not make package checking module-local.
-
-In the shared redesign worktrees, [testing.md](https://github.com/nmnmcc/i/blob/main/docs/testing.md) requires Cargo work to go through the heavy queue. The exact filtered command used for this page was:
-
-```sh
-/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- a1_entry_exports
-```
-
-## Format, lint, and account for corpus effects
-
-CI's **Verify rust-lint** step runs the `rust-lint` part of [scripts/dev-verify](https://github.com/nmnmcc/i/blob/main/scripts/dev-verify). Its Rust formatting and lint checks are:
-
-```sh
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-```
-
-The i part checks source formatting with the built release compiler:
-
-```sh
-"$I" fmt --check lib std bench examples
-```
-
-For the complete Rust lint and snippet checks, use:
-
-```sh
-./scripts/dev-verify rust-lint
-```
-
-The accepted parts are `rust`, `rust-lint`, `rust-test`, `snippets`, `i`, `js`, and `editors`. No argument runs `rust`, `i`, `js`, and `editors` in order. The [building and testing page](/docs/contributing/building-and-testing) gives each layer's commands and the CI steps that run them.
-
-A language change must include its spec text, a case under `tests/spec`, and an account of its effect on `tests/review`. Expected corpus output is an observation, not the rule. Change an expectation only with the spec paragraph that requires it; review the separate semantic requirement and promote fixed known failures. The [testing guide](https://github.com/nmnmcc/i/blob/main/docs/testing.md) describes deliberate regeneration.
-
-## Sending the change
-
-Recent commit subjects use plain English sentences describing the change. The [README](https://github.com/nmnmcc/i/blob/main/README.md) and [development guide](https://github.com/nmnmcc/i/blob/main/docs/development.md) document development and checks, but the repository does not yet document a submission process. Its GitHub remote is `nmnmcc/i`; the [issue tracker](https://github.com/nmnmcc/i/issues) is the place to raise a question about how to submit a change.
-
-## See also
-
-- [The standard: program entries and tests](/docs/standard/generated/chapter-10#section-10-2)
-- [Compiler architecture](/docs/contributing/compiler-architecture)
+[Compiler architecture](/docs/contributing/compiler-architecture) identifies implementation entry points.

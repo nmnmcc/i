@@ -1,41 +1,59 @@
 ---
 title: Repository layout
-description: Find the compiler crates, libraries, tests, and supporting tools.
+description: Locate a source file and its neighboring tests.
 ---
 
-This page maps the repository so you can find the source or test for a change. The workspace includes every crate under `crates/`.
+Find the source and test directory for a behavior you want to change.
 
-| Directory | Contents |
+```i test stdout=exact package=layout title="test/bool_test.i"
+(
+	testlib = (test) = std/test
+	std/bool
+)
+test("negation", () {
+	assert(bool.not(False) == True)
+})
+```
+
+```text
+pass layout/bool_test.negation
+1 passed, 0 failed
+```
+
+Follow [std/src/bool.i](https://github.com/nmnmcc/i/blob/main/std/src/bool.i) to the export and its documentation; [std/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/std/test/bool_test.i) holds the neighboring cases.
+
+## Directories
+
+| Path | Contents |
 | --- | --- |
-| `crates` | Rust workspace crates listed below. |
-| `lib/i` | Language library modules under the `i/` paths. |
-| `std` | Standard library package and its tests. |
-| `tests/spec` | Cases organized by standard section. |
-| `tests/review` | Independent review projects, observations, and requirements. |
-| `tests` | Spec and review cases and other test fixtures. |
-| `examples` | Example packages. |
-| `editors` | VS Code and Zed support and the tree-sitter grammar. |
-| `docs` | Standard, development documents, design notes, and this site. |
-| `scripts` | Verification, corpus, generation, and development tools. |
-| `bench` | Benchmark package and tests. |
-| `bindings` | Host bindings, including the JavaScript SDK. |
-| `licenses` | Licenses of included third-party code. |
-| `.github` | Repository workflows, including CI. |
+| `crates/` | Compiler workspace; every crate is a member. |
+| `lib/i/` | Compiler-supplied `i/` modules. |
+| `std/` | Standard library sources and tests. |
+| `tests/spec/` | Cases grouped by standard section. |
+| `tests/review/` | Review projects, observations, and semantic requirements. |
+| `tests/` | Other test fixtures as well as spec and review cases. |
+| `examples/` | Example packages. |
+| `editors/` | VS Code, Zed, and tree-sitter support. |
+| `docs/` | Standard, site, development documents, and design notes. |
+| `scripts/` | Verification, corpus, generation, and development tools. |
+| `bench/` | Benchmark package and tests. |
+| `bindings/` | Host SDK and bindings. |
+| `licenses/` | Included third-party licenses. |
+| `.github/` | Workflows, including CI. |
+
+## Crates
 
 | Crate | Responsibility |
 | --- | --- |
-| `ilang-syntax` | Tokens, parsing, syntax trees, and formatting. |
-| `ilang-package` | Package files, modules, dependencies, and the package graph. |
-| `ilang-check` | Name resolution, top-level order, and type inference. |
-| `ilang-macro` | Compile-time syntax macro programs and expansion. |
-| `ilang-wasm` | WasmGC code generation and runtime. |
-| `ilang-binaryen` | Binaryen optimization of WasmGC modules. |
-| `ilang-host` | Wasmtime embedding of the i binary interface. |
-| `ilang-cli` | The `i` command and its load, check, build, and run pipeline. |
-| `ilang-lsp` | Language server diagnostics and editor operations. |
-| `ilang-runner` | Native package runner to which `i build` appends a program. |
+| `ilang-syntax` | Tokens, parser, syntax tree, formatter. |
+| `ilang-package` | Manifests, modules, dependencies, package graph. |
+| `ilang-check` | Resolution, top-level ordering, type inference. |
+| `ilang-macro` | Macro execution and expansion. |
+| `ilang-wasm` | WasmGC generation and runtime. |
+| `ilang-binaryen` | WasmGC optimization. |
+| `ilang-host` | Wasmtime embedding and binary interface. |
+| `ilang-cli` | Command dispatch and load/check/build/run pipeline. |
+| `ilang-lsp` | Editor diagnostics and operations. |
+| `ilang-runner` | Native runner with an appended program. |
 
-## See also
-
-- [The standard: packages and modules](/docs/standard/generated/chapter-2#section-2-1)
-- [Building and testing](/docs/contributing/building-and-testing)
+[Compiler architecture](/docs/contributing/compiler-architecture) connects the stages; [building and testing](/docs/contributing/building-and-testing) identifies their checks.
