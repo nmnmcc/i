@@ -2863,6 +2863,16 @@ impl<'a, 't> R3<'a, 't> {
 
     // ---- Patterns ----
 
+    /// Data patterns have their own binders: the enclosing field label is
+    /// metadata, rather than a name in their conjunction (§7.1).
+    fn keyed_data(p: &n::Pattern) -> bool {
+        match &p.kind {
+            n::PatternKind::Data(_) => true,
+            n::PatternKind::And(parts) => parts.iter().any(Self::keyed_data),
+            _ => false,
+        }
+    }
+
     fn keyed<'x>(&self, l: &'x n::Ident, p: &'x n::Pattern) -> AndPlan<'x> {
         let pre = self.pre();
         keyed_plan(l, p, || {
@@ -2893,6 +2903,7 @@ impl<'a, 't> R3<'a, 't> {
                 for item in args.iter().flatten() {
                     match item {
                         n::DPItem::Pos(p) => self.binders(p, out),
+                        n::DPItem::Key(_, p) if Self::keyed_data(p) => self.binders(p, out),
                         n::DPItem::Key(l, p) => self.plan_binders(&self.keyed(l, p), out),
                         n::DPItem::Rest(_) => {}
                     }
@@ -3116,6 +3127,15 @@ impl<'a, 't> R3<'a, 't> {
                             }
                             _ => self.pattern(a, binders, shared),
                         }),
+                        n::DPItem::Key(l, a) if Self::keyed_data(a) => {
+                            parts.push(Pattern {
+                                kind: PatternKind::Keyed {
+                                    label: id(l),
+                                    pattern: Box::new(self.pattern(a, binders, shared)),
+                                },
+                                span: Span::new(l.span.0.start, a.span.0.end),
+                            });
+                        }
                         n::DPItem::Key(l, a) => {
                             let plan = self.keyed(l, a);
                             parts.push(self.ctor_part(&plan, binders, shared));

@@ -1700,6 +1700,7 @@ fn binder_pattern(p: &Pattern, v: VarId) -> Option<&Pattern> {
         PatternKind::Typed {
             binder: Some(b), ..
         } if b.var == v => Some(p),
+        PatternKind::Keyed { pattern, .. } => binder_pattern(pattern, v),
         PatternKind::Named { binder, pattern } => {
             if binder.var == v {
                 Some(p)
@@ -1929,7 +1930,10 @@ impl Walk<'_> {
             if def.fields.get(index).is_none_or(|f| f.label.is_none()) {
                 continue;
             }
-            if let Some(b) = label_binder(a) {
+            if let PatternKind::Keyed { label, .. } = &a.kind {
+                self.occ
+                    .push((label.span, Target::Field(vec![(ctor, index as u32)])));
+            } else if let Some(b) = label_binder(a) {
                 self.labels
                     .push((b.span, Target::Field(vec![(ctor, index as u32)])));
             }
@@ -1994,6 +1998,7 @@ impl Walk<'_> {
             PatternKind::Quote { captures, .. } => {
                 captures.iter().for_each(|(_, p)| self.pattern(p))
             }
+            PatternKind::Keyed { pattern, .. } => self.pattern(pattern),
             PatternKind::Var(b) => self.binder(b),
             PatternKind::Discard
             | PatternKind::String(_)

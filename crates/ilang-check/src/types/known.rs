@@ -155,7 +155,7 @@ pub(super) fn top_written(mut q: &Pattern) -> Option<&Type> {
     loop {
         match &q.kind {
             PatternKind::Typed { ty, .. } => return Some(ty),
-            PatternKind::Named { pattern, .. } => q = pattern,
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => q = pattern,
             _ => return None,
         }
     }
@@ -623,7 +623,9 @@ impl Checker<'_> {
             PatternKind::Quote { syntax, .. } => Head::Named(TypeRef::Custom(*syntax)),
             PatternKind::Var(_) | PatternKind::Discard => return b.clone(),
             PatternKind::Typed { ty, .. } => return self.kconv(ty, &HashMap::new()),
-            PatternKind::Named { pattern, .. } => return self.member_for_ty(pattern, b),
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+                return self.member_for_ty(pattern, b);
+            }
             PatternKind::Int { .. } => prim(BuiltinType::Int),
             PatternKind::Float { .. } => prim(BuiltinType::Float),
             PatternKind::String(_) | PatternKind::Prefix { .. } => prim(BuiltinType::String),
@@ -663,6 +665,7 @@ impl Checker<'_> {
                     self.fit_known(pattern, &Knowledge::certain(ty), in_case);
                 }
             }
+            PatternKind::Keyed { pattern, .. } => self.fit_known(pattern, b, in_case),
             PatternKind::Var(x) => self.kbind(x.var, b.clone(), in_case),
             PatternKind::Typed {
                 binder: Some(x),

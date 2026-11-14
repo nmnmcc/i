@@ -18,7 +18,9 @@ const LITERAL_CANDIDATES: bool = true;
 pub(crate) fn catch_all(p: &Pattern) -> bool {
     match &p.kind {
         PatternKind::Var(_) | PatternKind::Discard => true,
-        PatternKind::Named { pattern, .. } => catch_all(pattern),
+        PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+            catch_all(pattern)
+        }
         _ => false,
     }
 }
@@ -28,10 +30,11 @@ pub(crate) fn binders(p: &Pattern, out: &mut Vec<VarId>) {
     crate::hir::pattern_binders(p, &mut |b| out.push(b.var));
 }
 
-/// The label of a part of a constructor pattern (§7.1): the last name in
-/// the chain of `=` at its top.
+/// The explicit label of a constructor part (§7.1), or the last name in
+/// the legacy representation of its top-level `=` chain.
 pub(crate) fn part_label(p: &Pattern) -> Option<&str> {
     match &p.kind {
+        PatternKind::Keyed { label, .. } => Some(&label.name),
         PatternKind::Var(b) => Some(&b.name),
         PatternKind::Typed {
             binder: Some(b), ..
@@ -126,6 +129,7 @@ impl Checker<'_> {
     /// Gives every name of a catch-all the type `t`.
     fn bind_catch_all(&mut self, p: &Pattern, t: &Ty, in_case: bool) {
         match &p.kind {
+            PatternKind::Keyed { pattern, .. } => self.bind_catch_all(pattern, t, in_case),
             PatternKind::Var(b) => self.bind(b, t.clone(), in_case),
             PatternKind::Named { binder, pattern } => {
                 self.bind(binder, t.clone(), in_case);
@@ -173,7 +177,9 @@ impl Checker<'_> {
     }
 
     fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
-        if catch_all(q) {
+        if let PatternKind::Keyed { pattern, .. } = &q.kind {
+            self.fit_in(pattern, b, in_case);
+        } else if catch_all(q) {
             self.bind_catch_all(q, b, in_case);
         } else if let PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } = &q.kind
             && !in_case
@@ -230,6 +236,7 @@ impl Checker<'_> {
     /// are fitted to the parts of `Q`.
     fn pat(&mut self, q: &Pattern, in_case: bool) -> Ty {
         match &q.kind {
+            PatternKind::Keyed { pattern, .. } => self.param_in(pattern, in_case),
             PatternKind::Var(_) | PatternKind::Discard => self.param_in(q, in_case),
             PatternKind::Named { binder, pattern } => {
                 let t = self.param_in(pattern, in_case);
@@ -1053,6 +1060,9 @@ impl Checker<'_> {
             });
             return (places[at].ty.clone(), Pat::Wild(Some(id)));
         }
+        if let PatternKind::Keyed { pattern, .. } = &q.kind {
+            return self.visit(pattern, at, v, places);
+        }
         if let PatternKind::Named { binder, pattern } = &q.kind {
             let (t, pat) = self.visit(pattern, at, v, places);
             self.bind(binder, t.clone(), true);
@@ -1322,7 +1332,9 @@ impl Checker<'_> {
 fn top_ctor(p: &Pattern) -> Option<CtorRef> {
     match &p.kind {
         PatternKind::Constructor { ctor, .. } => Some(*ctor),
-        PatternKind::Named { pattern, .. } => top_ctor(pattern),
+        PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+            top_ctor(pattern)
+        }
         _ => None,
     }
 }
@@ -1334,6 +1346,7 @@ fn ctor_binders(p: &Pattern, out: &mut Vec<(VarId, Option<CtorRef>)>) {
         PatternKind::Quote { captures, .. } => {
             captures.iter().for_each(|(_, p)| ctor_binders(p, out))
         }
+        PatternKind::Keyed { pattern, .. } => ctor_binders(pattern, out),
         PatternKind::Named { binder, pattern } => {
             out.push((binder.var, top_ctor(pattern)));
             ctor_binders(pattern, out);

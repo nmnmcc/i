@@ -1084,7 +1084,10 @@ impl Cx {
             }
         }
         if let (Some(_), Some(core)) = (label, core_at)
-            && !matches!(core.kind, n::PatternKind::Typed { .. })
+            && !matches!(
+                core.kind,
+                n::PatternKind::Typed { .. } | n::PatternKind::Data(_)
+            )
         {
             self.error(
                 core.span.0,

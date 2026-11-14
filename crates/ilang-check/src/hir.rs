@@ -604,6 +604,11 @@ pub enum PatternKind {
         binder: Binder,
         pattern: Box<Pattern>,
     },
+    /// A written constructor-field label, without a binder (§7.1).
+    Keyed {
+        label: Ident,
+        pattern: Box<Pattern>,
+    },
     Int {
         negative: bool,
         value: BigUint,
@@ -922,7 +927,9 @@ pub fn children<'a>(node: Node<'a>, mut f: impl FnMut(Node<'a>)) {
             PatternKind::Quote { captures, .. } => {
                 captures.iter().for_each(|(_, p)| f(Node::Pattern(p)))
             }
-            PatternKind::Named { pattern, .. } => f(Node::Pattern(pattern)),
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+                f(Node::Pattern(pattern))
+            }
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
             | PatternKind::Data { parts: args, .. }
@@ -988,7 +995,9 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
     fn pattern(p: &Pattern, f: &mut impl FnMut(&Type)) {
         match &p.kind {
             PatternKind::Typed { ty, .. } => f(ty),
-            PatternKind::Named { pattern: p, .. } => pattern(p, f),
+            PatternKind::Named { pattern: p, .. } | PatternKind::Keyed { pattern: p, .. } => {
+                pattern(p, f)
+            }
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
             | PatternKind::Data { parts: args, .. }
@@ -1137,7 +1146,9 @@ pub fn visit_expr_mut(e: &mut Expr, visit: &mut impl FnMut(&mut Expr) -> bool) {
                     pattern(p, f);
                 }
             }
-            PatternKind::Named { pattern: p, .. } => pattern(p, f),
+            PatternKind::Named { pattern: p, .. } | PatternKind::Keyed { pattern: p, .. } => {
+                pattern(p, f)
+            }
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
             | PatternKind::Data { parts: args, .. }

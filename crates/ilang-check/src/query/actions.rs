@@ -668,7 +668,9 @@ pub(crate) fn lisp_pattern(pattern: &str) -> Option<String> {
 fn irrefutable(p: &Pattern) -> bool {
     match &p.kind {
         PatternKind::Var(_) | PatternKind::Discard => true,
-        PatternKind::Named { pattern, .. } => irrefutable(pattern),
+        PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+            irrefutable(pattern)
+        }
         PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => ps.iter().all(irrefutable),
         _ => false,
     }

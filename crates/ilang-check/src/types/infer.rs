@@ -1357,7 +1357,9 @@ impl<'a> Checker<'a> {
     fn check_pattern_places(&mut self, q: &Pattern, pol: Pol) {
         match &q.kind {
             PatternKind::Typed { ty, .. } => self.check_places(ty, pol, 0),
-            PatternKind::Named { pattern, .. } => self.check_pattern_places(pattern, pol),
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+                self.check_pattern_places(pattern, pol)
+            }
             PatternKind::Constructor { args: ps, .. }
             | PatternKind::Tuple(ps)
             | PatternKind::Data { parts: ps, .. }

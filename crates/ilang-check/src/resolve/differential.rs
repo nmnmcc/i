@@ -286,7 +286,9 @@ fn compare_inner(name: &str, dir: &Path, totals: &mut Totals, prepare_quotes: bo
             &["E0510"]
         } else if name.ends_with("keyed_data_duplicate_binder.i") {
             &["E0217"]
-        } else if name.ends_with("keyed_data_label_is_not_binder.i") {
+        } else if name.ends_with("keyed_data_label_is_not_binder.i")
+            || name.ends_with("keyed_data_constructor_label.i")
+        {
             &["E0201"]
         } else if name.contains("keyed_data_order") {
             &["E0101"]

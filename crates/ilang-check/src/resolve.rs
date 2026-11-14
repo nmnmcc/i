@@ -2689,7 +2689,9 @@ fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec
     fn top_type(p: &Pattern) -> Option<&Type> {
         match &p.kind {
             PatternKind::Typed { ty, .. } => Some(ty),
-            PatternKind::Named { pattern, .. } => top_type(pattern),
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+                top_type(pattern)
+            }
             _ => None,
         }
     }
@@ -2703,6 +2705,7 @@ fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec
             binder: Some(b),
             ty,
         } => check(b, Some(ty)),
+        PatternKind::Keyed { pattern, .. } => top_annotations(pattern, exported, out),
         PatternKind::Named { binder, pattern } => {
             check(binder, top_type(pattern));
             top_annotations(pattern, exported, out);

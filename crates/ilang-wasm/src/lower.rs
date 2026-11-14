@@ -305,7 +305,9 @@ fn pattern_values(p: &Pattern) -> usize {
                 .map(|(_, p)| pattern_values(p))
                 .sum::<usize>()
         }
-        PatternKind::Named { pattern, .. } => 1 + pattern_values(pattern),
+        PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+            1 + pattern_values(pattern)
+        }
         PatternKind::Constructor { args, .. }
         | PatternKind::Tuple(args)
         | PatternKind::Data { parts: args, .. }
@@ -564,6 +566,7 @@ impl Walk {
             PatternKind::Quote { captures, .. } => {
                 captures.iter().for_each(|(_, p)| self.pattern(p))
             }
+            PatternKind::Keyed { pattern, .. } => self.pattern(pattern),
             PatternKind::Var(b) => self.binder(b),
             PatternKind::Typed { binder, .. } => binder.iter().for_each(|b| self.binder(b)),
             PatternKind::Named { binder, pattern } => {
@@ -4112,6 +4115,7 @@ impl<'a> Lowerer<'a> {
                     self.pattern(fx, out, pattern, value, fail);
                 }
             }
+            PatternKind::Keyed { pattern, .. } => self.pattern(fx, out, pattern, v, fail),
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
             PatternKind::Typed { binder, .. } => {
@@ -4528,7 +4532,9 @@ impl<'a> Lowerer<'a> {
     fn plain(&self, p: &Pattern) -> bool {
         match &p.kind {
             PatternKind::Var(_) | PatternKind::Discard | PatternKind::Typed { .. } => true,
-            PatternKind::Named { pattern, .. } => self.plain(pattern),
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+                self.plain(pattern)
+            }
             PatternKind::Tuple(parts) | PatternKind::Data { parts, .. } => {
                 parts.iter().all(|x| self.plain(x))
             }
@@ -4633,6 +4639,7 @@ impl<'a> Lowerer<'a> {
     /// Binds a pattern that `plain` takes.
     fn bind(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom) {
         match &p.kind {
+            PatternKind::Keyed { pattern, .. } => self.bind(fx, out, pattern, v),
             PatternKind::Var(b) => Self::bind_var(fx, out, b, v),
             PatternKind::Discard => {}
             PatternKind::Typed { binder, .. } => {

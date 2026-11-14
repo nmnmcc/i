@@ -69,7 +69,9 @@ pub(crate) fn visit_pattern<'h>(p: &'h Pattern, f: &mut dyn FnMut(Node<'h>)) {
             captures.iter().for_each(|(_, c)| visit_pattern(c, f))
         }
         PatternKind::Typed { ty, .. } => visit_type(ty, f),
-        PatternKind::Named { pattern, .. } => visit_pattern(pattern, f),
+        PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+            visit_pattern(pattern, f)
+        }
         PatternKind::Constructor { args, .. }
         | PatternKind::Tuple(args)
         | PatternKind::Data { parts: args, .. }
