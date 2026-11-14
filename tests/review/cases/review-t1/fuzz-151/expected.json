@@ -1,6 +1,6 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "f6d6fe19e4ed64218b7b89518e4d1b17fef9929d",
+  "binary_sha256": "ffc07954f0199bceaf0e5c4d5e1812b338955c7b78c49e72fc4c90c0a3941bdb",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "probe/main.f : ((\"\" | \"a\" | \"ab\" | \"b\" | \"c\", Bool)) -> 0 | 1\n",
-      "stderr": "src/main.i:2:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"\", _)`\n1 error\n"
+      "stderr": "src/main.i:2:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"\", True)`\n1 error\n"
     }
   }
 }
