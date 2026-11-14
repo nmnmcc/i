@@ -186,20 +186,22 @@ requested corpus integration is green.
 Every listed observation has equal phase sets, phase exits, diagnostic code
 multisets (including duplicate counts), and runtime stdout. Only the checker
 types or diagnostic text change. Groups overlap. The original coordinator
-run has 919 display-only cases; this checkpoint records 907 after
+run has 919 display-only cases; this checkpoint records 915 after
 complete bounded reruns. Remaining per-group runs are still in progress.
 CPU-censored observations retain their old baselines and are not counted
 as completed display-only reruns.
 
 | Group | Cases so far | Exact displayed change and controlling paragraph |
 |---|---:|---|
-| D1 | 852 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain. Merging two callbacks combines their whole rows, without a separate `Fail(E | E2)` carrier. R1 (syntax-three §6.1); subsequent variable renumbering follows §4.7. |
-| D2 | 128 | Directed bounds are shown without redundant variables: read-only `S(N & A)` becomes `S(N)`; a consumer of argument `A` needs `S(A)` rather than a separate bound `S(B)`; `cur : (A & B) <- (State(A & B)) -> B` becomes `(A) <- (State(A)) -> A`; a pure stored callback closes its residual N to Never. Inferred E/A labels can change. Spec §4.7 simplification, §4.5 rule 4 needs direction, §9.2 provider subtyping; R1 removes the independent error bounds. |
+| D1 | 856 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain. Merging two callbacks combines their whole rows, without a separate `Fail(E | E2)` carrier. R1 (syntax-three §6.1); subsequent variable renumbering follows §4.7. |
+| D2 | 111 | Directed bounds are shown without redundant variables: read-only `S(N & A)` becomes `S(N)`; a consumer of argument `A` needs `S(A)` rather than a separate bound `S(B)`; `cur : (A & B) <- (State(A & B)) -> B` becomes `(A) <- (State(A)) -> A`; a pure stored callback closes its residual N to Never. Inferred E/A labels can change. Spec §4.7 simplification, §4.5 rule 4 needs direction, §9.2 provider subtyping; R1 removes the independent error bounds. |
 | D3 | 9 | Only canonical type-variable labels change after the independent error carrier disappears; the shown type is equivalent by renaming. R1 and spec §4.7. |
-| D4 | 257 | E5 replaces planner messages such as `missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 multiset, source sites and failing phases. R6 (§2.10.11). |
+| D4 | 258 | E5 replaces planner messages such as `missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 multiset, source sites and failing phases. R6 (§2.10.11). |
 | D5 | 3 | Recovery diagnostics retain a known String argument: `S(_, _)` becomes `S(String, _)` against the same incompatible `S(1, Never)`. Same E0515 site and invariant mismatch; ordinary incoming bounds survive single-row inference. R1, spec §4.7 monomorphic variables show their incoming types, §4.5 rule 4 and §9.2. |
 | D6 | 2 | The obsolete independent error parameter disappears from `Boundary(R, E, N)`, now `Boundary(R, N)` (and likewise Continuation). Syntax-three §2.10.7 explicitly gives these two- and three-parameter forms, and R1 puts any Fail entry in N. |
 | D7 | 5 | The single-row solver reports the incompatible leaf instead of the enclosing recovery summary: g_ann_Never/g_inf_Never show `_` against Never instead of `S(_)`; pl44 shows `_` against the required Int instead of `Cov(_)` against Never. Each E0501 remains at the same callback and annotation sites, with the same count; every separate provider error also remains. R1 changes the constraint graph, while spec §4.5 rule 4 still forbids the needed effect in a pure callback; §4.7 governs displayed incoming bounds. These are recovery projections of the same rejection, not newly accepted annotations. |
+| D8 | 2 | The task scope handle is shown as `task.Group(E)` instead of `task.Scope(E)`. Syntax-three §2.10.9 says the structured-concurrency handle is renamed `task.Group(E)` in stage E5, so Scope in a need always means the resource service; §7.2 row E5 and the spec-change table repeat the rename. Spec §9.9 uses Group(E); task.scope remains the same operation. Runtime output and error counts are unchanged. |
+| D9 | 3 | Universal service forms disappear under R4 (spec §9.2). The two 1,024-service libraries ignore every `s: S_i(A)`; their unconstrained covariant data arguments reach the universal form, so `f_i`, `u_i` and `wide` show pure `() -> Nil`. In std2/unsafe, `Consumer(A) = ((A) -> Nil)` makes Consumer(Never) universal by function-parameter contravariance (§4.5 rule 4); its row entry disappears, so the result `Sink(Never, Consumer(Never))` is shown as `Sink(Never, Never)`. This preserves the same accepted higher-order value. |
 
 One line per reviewed case:
 
@@ -225,6 +227,7 @@ One line per reviewed case:
 | `review-k4-lane/previous-chain-64` | D1, D4 |
 | `review-k4-lane/w1-Dep` | D1 |
 | `review-k4-lane/w1-Never` | D1 |
+| `review-k4-lane/w10-Dep` | D1 |
 | `review-k4-lane/w10-Never` | D1 |
 | `review-k4-lane/w12-Dep` | D1 |
 | `review-k4-lane/w12-Never` | D1 |
@@ -275,6 +278,7 @@ One line per reviewed case:
 | `review-k4/cases/provision_direct_True` | D1 |
 | `review-k4/cases/provision_explicit_contract` | D1 |
 | `review-k4/cases/provision_helper_False` | D1 |
+| `review-k4/cases/provision_helper_True` | D1 |
 | `review-k4/cases/provision_inferred_False` | D1 |
 | `review-k4/cases/provision_inferred_True` | D1 |
 | `review-k4/cases/provision_marker` | D1 |
@@ -338,7 +342,7 @@ One line per reviewed case:
 | `review-k4/perf/plain_chain_256` | D1 |
 | `review-k4/perf/plain_chain_512` | D1 |
 | `review-k4/perf/plain_chain_64` | D1 |
-| `review-k4/perf/wide_generic_1024` | D1, D2 |
+| `review-k4/perf/wide_generic_1024` | D1, D9 |
 | `review-k4/perf/wide_generic_128` | D1, D2 |
 | `review-k4/perf/wide_generic_2048` | D1, D2 |
 | `review-k4/perf/wide_generic_256` | D1, D2 |
@@ -367,51 +371,51 @@ One line per reviewed case:
 | `review-k4c/cases/contra_nested` | D1 |
 | `review-k4c/cases/effects_co_0_0` | D1 |
 | `review-k4c/cases/effects_co_0_1` | D1 |
-| `review-k4c/cases/effects_co_1_0` | D1, D2 |
+| `review-k4c/cases/effects_co_1_0` | D1 |
 | `review-k4c/cases/effects_co_1_1` | D1 |
-| `review-k4c/cases/effects_co_2_0` | D1, D2 |
+| `review-k4c/cases/effects_co_2_0` | D1 |
 | `review-k4c/cases/effects_co_2_1` | D1 |
 | `review-k4c/cases/effects_co_3_0` | D1 |
 | `review-k4c/cases/effects_co_3_1` | D1 |
-| `review-k4c/cases/effects_co_4_0` | D1, D2 |
+| `review-k4c/cases/effects_co_4_0` | D1 |
 | `review-k4c/cases/effects_co_4_1` | D1 |
 | `review-k4c/cases/effects_co_5_0` | D1 |
 | `review-k4c/cases/effects_co_5_1` | D1 |
-| `review-k4c/cases/effects_co_6_0` | D1, D2 |
+| `review-k4c/cases/effects_co_6_0` | D1 |
 | `review-k4c/cases/effects_co_6_1` | D1 |
-| `review-k4c/cases/effects_co_7_0` | D1, D2 |
+| `review-k4c/cases/effects_co_7_0` | D1 |
 | `review-k4c/cases/effects_co_7_1` | D1 |
 | `review-k4c/cases/effects_inv_0_0` | D1 |
 | `review-k4c/cases/effects_inv_0_1` | D1 |
-| `review-k4c/cases/effects_inv_1_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_1_0` | D1 |
 | `review-k4c/cases/effects_inv_1_1` | D1 |
-| `review-k4c/cases/effects_inv_2_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_2_0` | D1 |
 | `review-k4c/cases/effects_inv_2_1` | D1 |
 | `review-k4c/cases/effects_inv_3_0` | D1 |
 | `review-k4c/cases/effects_inv_3_1` | D1 |
-| `review-k4c/cases/effects_inv_4_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_4_0` | D1 |
 | `review-k4c/cases/effects_inv_4_1` | D1 |
 | `review-k4c/cases/effects_inv_5_0` | D1 |
 | `review-k4c/cases/effects_inv_5_1` | D1 |
-| `review-k4c/cases/effects_inv_6_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_6_0` | D1 |
 | `review-k4c/cases/effects_inv_6_1` | D1 |
-| `review-k4c/cases/effects_inv_7_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_7_0` | D1 |
 | `review-k4c/cases/effects_inv_7_1` | D1 |
 | `review-k4c/cases/effects_two_0_0` | D1 |
 | `review-k4c/cases/effects_two_0_1` | D1 |
-| `review-k4c/cases/effects_two_1_0` | D1, D2 |
+| `review-k4c/cases/effects_two_1_0` | D1 |
 | `review-k4c/cases/effects_two_1_1` | D1 |
-| `review-k4c/cases/effects_two_2_0` | D1, D2 |
+| `review-k4c/cases/effects_two_2_0` | D1 |
 | `review-k4c/cases/effects_two_2_1` | D1 |
 | `review-k4c/cases/effects_two_3_0` | D1 |
 | `review-k4c/cases/effects_two_3_1` | D1 |
-| `review-k4c/cases/effects_two_4_0` | D1, D2 |
+| `review-k4c/cases/effects_two_4_0` | D1 |
 | `review-k4c/cases/effects_two_4_1` | D1 |
 | `review-k4c/cases/effects_two_5_0` | D1 |
 | `review-k4c/cases/effects_two_5_1` | D1 |
-| `review-k4c/cases/effects_two_6_0` | D1, D2 |
+| `review-k4c/cases/effects_two_6_0` | D1 |
 | `review-k4c/cases/effects_two_6_1` | D1 |
-| `review-k4c/cases/effects_two_7_0` | D1, D2 |
+| `review-k4c/cases/effects_two_7_0` | D1 |
 | `review-k4c/cases/effects_two_7_1` | D1 |
 | `review-k4c/cases/finite_field_0` | D1 |
 | `review-k4c/cases/finite_field_1` | D1 |
@@ -782,7 +786,7 @@ One line per reviewed case:
 | `review-k4c/cases/stress_row_128` | D1 |
 | `review-k4c/cases/stress_row_32` | D1 |
 | `review-k4c/cases/stress_row_512` | D1 |
-| `review-k4c/cases/stress_wide_1024` | D2 |
+| `review-k4c/cases/stress_wide_1024` | D9 |
 | `review-k4c/cases/stress_wide_128` | D2 |
 | `review-k4c/cases/stress_wide_32` | D2 |
 | `review-k4c/cases/stress_wide_512` | D2 |
@@ -864,7 +868,7 @@ One line per reviewed case:
 | `review-k4d/_loose/p/x8` | D1 |
 | `review-k4d/_loose/p/z2` | D1 |
 | `review-k4d/_loose/spec/tests_spec_11_stop_tail_service` | D1 |
-| `review-k4d/_loose/spec/tests_spec_9_generic_service_rows` | D1, D2 |
+| `review-k4d/_loose/spec/tests_spec_9_generic_service_rows` | D1 |
 | `review-k4d/fuzz/m0` | D1 |
 | `review-k4d/fuzz/m11` | D1 |
 | `review-k4d/fuzz/m13` | D1 |
@@ -968,6 +972,8 @@ One line per reviewed case:
 | `review-k4d/proj/g_ann_Never` | D7 |
 | `review-k4d/proj/g_inf_Never` | D7 |
 | `review-k4d/proj/p1` | D1, D2 |
+| `review-k4d/proj/q1` | D1, D2 |
+| `review-k4d/proj/q10` | D1 |
 | `review-k4d/proj/q11` | D1 |
 | `review-k4d/proj/q12` | D1 |
 | `review-k4d/proj/q13` | D1 |
@@ -1100,6 +1106,9 @@ One line per reviewed case:
 | `review-k4s/wide_plain_64` | D1 |
 | `review-num/probes` | D6 |
 | `review-num/trace` | D3, D6 |
+| `review-r2/missing_service` | D4 |
+| `review-r2/senders_256` | D8 |
+| `review-r2/senders_32` | D8 |
 | `review-std2/client_nil_error` | D3 |
 | `review-std2/client_no_marker` | D3 |
 | `review-std2/error` | D3 |
@@ -1110,5 +1119,6 @@ One line per reviewed case:
 | `review-std2/pure_wrap` | D1 |
 | `review-std2/replacement` | D3 |
 | `review-std2/replacement_scope` | D3 |
-| `review-std2/unsafe` | D2 |
+| `review-std2/unsafe` | D9 |
 | `review-t1/original-stop_tail_service` | D1 |
+| `review-t1/service` | D2 |
