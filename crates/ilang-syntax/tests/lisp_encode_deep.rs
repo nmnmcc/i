@@ -1,3 +1,4 @@
+extern crate ilang_syntax as native;
 #[path = "oracle.rs"]
 mod ilang_syntax;
 use std::collections::BTreeSet;
@@ -320,6 +321,7 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
     let mut dirs = vec![root.join("lib"), root.join("std"), root.join("tests/spec")];
     let scope = scope();
     let mut checked = 0;
+    let mut native_checked = 0;
     while let Some(dir) = dirs.pop() {
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
@@ -331,9 +333,31 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
                 continue;
             }
             let source = std::fs::read_to_string(&path).unwrap();
-            let (module, diagnostics) = ilang_syntax::parse_module(&source);
+            let (tree, diagnostics) = native::parse_module(&source);
             if !diagnostics.is_empty() {
                 // The spec corpus includes deliberately invalid source files.
+                continue;
+            }
+            // The production source encoder covers every native item, including
+            // §7.1 data patterns which the frozen AST cannot represent.
+            let source_tree = native::lisp::source_tree::SourceTree::new(&scope, &source);
+            for item in &tree.items {
+                let encoded = source_tree.item(item.span.0).unwrap();
+                let datum = native::rows::item_datum(item);
+                let expected = native::lisp::syntax::Syntax::from_datum(&datum, &scope);
+                assert!(encoded.same_code(&expected), "{}", path.display());
+                assert_eq!(encoded.scope(), &scope, "{}", path.display());
+                native_checked += 1;
+            }
+            // Keep every legacy encoder/charge assertion on its representable
+            // domain. The only new exclusions are the obsolete §7.1 gates;
+            // their full native trees were checked just above.
+            let (module, diagnostics) = migration_syntax::parse_module(&source);
+            if !diagnostics.is_empty() {
+                assert!(diagnostics.iter().all(|d| d.code == native::Code::Unexpected && (d.message ==
+                    "a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet"
+                    || d.message == "a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name")),
+                    "{}: {diagnostics:?}", path.display());
                 continue;
             }
             let encoder = SourceEncoder::new(&scope, &source);
@@ -372,6 +396,10 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
             }
         }
     }
+    assert!(
+        native_checked >= checked,
+        "{native_checked} native, {checked} legacy"
+    );
     assert!(
         checked > 100,
         "expected substantive valid corpus, saw {checked} items"

@@ -1,5 +1,8 @@
+extern crate ilang_syntax as native;
 #[path = "oracle.rs"]
 mod ilang_syntax;
+#[path = "common/native_shape.rs"]
+mod native_shape;
 use ilang_syntax::lisp::{DatumKind, parse, show};
 
 #[test]
@@ -450,16 +453,17 @@ fn check_corpus(dir: &std::path::Path) {
             {
                 continue;
             }
-            let (module, diagnostics) = ilang_syntax::parse_module(&source);
-            let _ = &module;
+            let (tree, diagnostics) = native::parse_module(&source);
             if !diagnostics.is_empty() {
                 continue;
             }
             // The Lisp surface of syntax three must read back the same module.
-            let tree = ilang_syntax::syn3::parse_module(&source).0;
             let text = ilang_syntax::syn3::lisp::to_lisp(&tree);
             let (read, errors) = ilang_syntax::syn3::lisp::from_lisp(&text);
-            if !errors.is_empty() || ilang_syntax::syn3::lisp::to_lisp(&read) != text {
+            if !errors.is_empty()
+                || !native_shape::equivalent(&tree, &read)
+                || ilang_syntax::syn3::lisp::to_lisp(&read) != text
+            {
                 failures.push(format!(
                     "{}: syntax-three Lisp {errors:?}\n{text}",
                     path.display()

@@ -8,17 +8,24 @@
 //! - indentation is tabs, and no line ends in a space or a tab, but in
 //!   documentation.
 
-mod common;
 #[path = "oracle.rs"]
-mod ilang_syntax;
+mod migration_oracle;
+#[path = "common/native_shape.rs"]
+mod native_shape;
 
 use ilang_syntax::format::format;
-use ilang_syntax::{lex, parse_module};
+use ilang_syntax::lex;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn parse_module(source: &str) -> (ilang_syntax::ast::Module, Vec<ilang_syntax::Diagnostic>) {
+    let (module, errors) = ilang_syntax::parse_module(source);
+    migration_oracle::check_native_validation(source, &module);
+    (module, errors)
 }
 
 fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -111,7 +118,7 @@ fn check(src: &str) -> Result<(), String> {
     if !diags.is_empty() {
         return Err(format!("the output has errors: {diags:?}\n{out}"));
     }
-    if ilang_syntax::shape::canon(&module) != ilang_syntax::shape::canon(&again) {
+    if !native_shape::equivalent(&module, &again) {
         return Err(format!("the output has another tree:\n{out}"));
     }
     if kept_comments(src) != comments(&out) {

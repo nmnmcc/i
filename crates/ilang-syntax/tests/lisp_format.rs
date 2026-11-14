@@ -1,11 +1,11 @@
 //! Layout properties for both source surfaces, using the CLI conversion path's
 //! comment-preserving encoder and the existing canonical core-tree comparison.
-#[path = "oracle.rs"]
-mod ilang_syntax;
+#[path = "common/native_shape.rs"]
+mod native_shape;
 use ilang_syntax::{
     format::{TAB_WIDTH, WIDTH},
     lexer::lex_lisp,
-    lisp, shape,
+    lisp,
 };
 use std::path::{Path, PathBuf};
 
@@ -29,7 +29,7 @@ fn check(source: &str) -> String {
     let out = lisp::format(source).unwrap();
     let (after, errors) = lisp::parse_source(&out);
     assert!(errors.is_empty(), "{errors:?}\n{out}");
-    assert_eq!(shape::canon(&before), shape::canon(&after), "{out}");
+    assert!(native_shape::equivalent(&before, &after), "{out}");
     assert_eq!(lisp::format(&out).unwrap(), out, "not idempotent");
     let comments = |s: &str| {
         lex_lisp(s)
@@ -106,9 +106,19 @@ fn repository_surfaces_have_pretty_lisp_layout() {
         let relative = path.strip_prefix(&root).unwrap();
         let source = std::fs::read_to_string(&path).unwrap();
         if path.extension().unwrap() == "is" {
-            // `.is` modules keep the rows before syntax three until they are
-            // migrated; only well-formed syntax-three Lisp is checked.
-            if ilang_syntax::syn3::lisp::from_lisp(&source).1.is_empty() {
+            // Negative syntax fixtures pin the complete ordered messages;
+            // every unmarked Lisp file must be valid before formatting.
+            let (_, errors) = lisp::parse_source(&source);
+            let expected: Vec<_> = source
+                .lines()
+                .filter_map(|line| line.strip_prefix("// parser-error: "))
+                .collect();
+            let actual: Vec<_> = errors
+                .iter()
+                .map(|d| format!("{}: {}", d.code.as_str(), d.message))
+                .collect();
+            assert_eq!(actual, expected, "{}", relative.display());
+            if errors.is_empty() {
                 eprintln!("Lisp {}", relative.display());
                 check(&source);
                 native += 1;
@@ -125,10 +135,14 @@ fn repository_surfaces_have_pretty_lisp_layout() {
                 ilang_syntax::syn3::lisp::to_lisp(&ilang_syntax::syn3::parse_module(&source).0);
             eprintln!("Converted {}", relative.display());
             let out = check(&lisp);
-            let _ = &module;
             let (read, errors) = ilang_syntax::syn3::lisp::from_lisp(&out);
             assert!(errors.is_empty(), "{errors:?}");
             assert_eq!(ilang_syntax::syn3::lisp::to_lisp(&read), lisp);
+            assert!(
+                native_shape::equivalent(&module, &read),
+                "{}",
+                relative.display()
+            );
             converted += 1;
         }
     }
