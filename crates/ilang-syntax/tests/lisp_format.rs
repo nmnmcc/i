@@ -219,3 +219,40 @@ fn literals_and_long_comments_remain_indivisible() {
     assert!(out.contains(&format!("\"{}\"", "字".repeat(100))));
     assert!(out.contains("0x1234"));
 }
+
+#[test]
+fn header_group_spacing() {
+    let import = "(, (/ i core))";
+    let export = "(, value)";
+    for gap in ["\n", "\n\n", "\n\n\n\n"] {
+        for (headers, spaced) in [
+            (import.to_owned(), import.to_owned()),
+            (export.to_owned(), export.to_owned()),
+            (
+                format!("{import}{gap}{export}"),
+                format!("{import}\n\n{export}"),
+            ),
+        ] {
+            for next in [
+                "(= value 1)\n",
+                "// next\n(= value 1)\n",
+                "(@ inline (= value 1))\n",
+                "/// value\n(= value 1)\n",
+                "// end\n",
+            ] {
+                assert_eq!(
+                    check(&format!("{headers}{gap}{next}")),
+                    format!("{spaced}\n\n{next}")
+                );
+            }
+            assert_eq!(check(&format!("{headers}{gap}")), format!("{spaced}\n"));
+        }
+    }
+    for source in [
+        "(= value 1)\n",
+        "// next\n(= value 1)\n",
+        "(@ inline (= value 1))\n",
+    ] {
+        assert_eq!(check(source), source);
+    }
+}

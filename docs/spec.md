@@ -202,6 +202,14 @@ to the next line), and at most one existing blank line separates top-level
 items. A single indivisible atom, string or comment may exceed the width.
 `i fmt --to is` uses that same layout.
 
+In both surfaces, exactly one blank line follows each import group and each
+export group before the next group or the first item. In the Lisp surface
+these headers are the leading `(, …)` forms (§14.1). If a comment or an
+attribute follows a group, the blank line comes before that comment or
+attribute; an attribute stays with its item. A file containing only groups
+has the blank line between the groups, if both are present, but no blank
+line is added at end of file: the last content ends with a single newline.
+
 Formatting is idempotent: formatting its output again gives identical text.
 It preserves the same code as defined by §14.1, including definition kind.
 A successful conversion between surfaces preserves that same code; conversion

@@ -162,3 +162,29 @@ fn conversion_to_lisp_uses_pretty_layout() {
     assert_eq!(ilang_syntax::lisp::format(&converted).unwrap(), converted);
     assert!(fmt(&["--check"], dir.path()).status.success());
 }
+
+#[test]
+fn check_reports_missing_blank_lines_after_header_groups() {
+    let normal = "(\n\ti/core\n)\n(\n\tvalue\n)\nvalue = 1\n";
+    let lisp = "(, (/ i core))\n(, value)\n(= value 1)\n";
+    let dir = package(&[("src/normal.i", normal), ("src/lisp.is", lisp)]);
+    let out = fmt(&["--check"], dir.path());
+    assert_eq!(out.status.code(), Some(1));
+    let listed = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        listed.contains("normal.i") && listed.contains("lisp.is"),
+        "{listed}"
+    );
+    assert_eq!(read(dir.path(), "src/normal.i"), normal);
+    assert_eq!(read(dir.path(), "src/lisp.is"), lisp);
+    assert!(fmt(&[], dir.path()).status.success());
+    assert_eq!(
+        read(dir.path(), "src/normal.i"),
+        "(\n\ti/core\n)\n\n(\n\tvalue\n)\n\nvalue = 1\n"
+    );
+    assert_eq!(
+        read(dir.path(), "src/lisp.is"),
+        "(, (/ i core))\n\n(, value)\n\n(= value 1)\n"
+    );
+    assert!(fmt(&["--check"], dir.path()).status.success());
+}

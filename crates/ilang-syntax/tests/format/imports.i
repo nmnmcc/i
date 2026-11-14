@@ -10,5 +10,4 @@
 	main
 	User(..)
 )
-
 main = () { core.print(decode.run("1")) }
