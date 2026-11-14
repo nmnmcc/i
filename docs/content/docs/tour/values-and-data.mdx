@@ -115,23 +115,15 @@ The hashes in the raw string keep `\n` literal.
 
 ## Multi-line strings
 
-```i run package=tour title="src/main.i"
-(
-	i/core
-	i/stdio
-)
-
-main = () {
-	lines = """
-		first
-		second
-		"""
-	stdio.print(core.inspect(lines))
-}
+```i format package=tour title="src/main.i"
+lines = """
+	first
+	second
+	"""
 ```
 
 ```text
-"first\nsecond"
+lines = "first\nsecond"
 ```
 
 The closing delimiter’s indentation is removed, along with the opening and closing line breaks; `i fmt` rewrites this value as an escaped single-line string.

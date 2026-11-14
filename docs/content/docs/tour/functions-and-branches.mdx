@@ -102,7 +102,9 @@ size = (n : Int) {
 }
 
 main = () {
-	stdio.print(core.inspect((size(0), size(1), size(-2), size(5))))
+	stdio.print(
+		core.inspect((size(0), size(1), size(-2), size(5))),
+	)
 }
 ```
 
@@ -127,7 +129,9 @@ kind = (value : { Int | String }) {
 }
 
 main = () {
-	stdio.print(core.inspect((kind(7), kind("text"))))
+	stdio.print(
+		core.inspect((kind(7), kind("text"))),
+	)
 }
 ```
 
@@ -192,7 +196,9 @@ unpack = (value : { Item | Empty }) {
 }
 
 main = () {
-	stdio.print(core.inspect((unpack(Item(value = 8)), unpack(Empty))))
+	stdio.print(
+		core.inspect((unpack(Item(value = 8)), unpack(Empty))),
+	)
 }
 ```
 
@@ -215,7 +221,9 @@ list_parts = (xs : List(Int)) {
 }
 
 main = () {
-	stdio.print(core.inspect((list_parts([]), list_parts([2]), list_parts([2, 3]))))
+	stdio.print(
+		core.inspect((list_parts([]), list_parts([2]), list_parts([2, 3]))),
+	)
 }
 ```
 
@@ -238,7 +246,9 @@ suffix = (s : String) { s |> (rest <> ".i") { rest } | (_) { "no suffix" } }
 middle = (s : String) { s |> ("[" <> rest <> "]") { rest } | (_) { "no pair" } }
 
 main = () {
-	stdio.print(core.inspect((prefix("pre:a"), suffix("main.i"), middle("[b]"))))
+	stdio.print(
+		core.inspect((prefix("pre:a"), suffix("main.i"), middle("[b]"))),
+	)
 }
 ```
 
@@ -257,11 +267,17 @@ One binder captures the variable text; fixed parts cannot overlap, and patterns 
 )
 
 literal = (x : { Int | Float | String }) {
-	x |> (-1) { "integer" } | (-.1.5) { "float" } | ("ok") { "string" } | (_) { "other" }
+	x |>
+		(-1) { "integer" }
+		| (-.1.5) { "float" }
+		| ("ok") { "string" }
+		| (_) { "other" }
 }
 
 main = () {
-	stdio.print(core.inspect((literal(-1), literal(-.1.5), literal("ok"), literal(2))))
+	stdio.print(
+		core.inspect((literal(-1), literal(-.1.5), literal("ok"), literal(2))),
+	)
 }
 ```
 
@@ -282,8 +298,12 @@ packet = (bits : BitArray) {
 }
 
 main = () {
-	stdio.print(core.inspect(packet(<<7, 8, 9>>)))
-	stdio.print(core.inspect(packet(<<>>)))
+	stdio.print(
+		core.inspect(packet(<<7, 8, 9>>)),
+	)
+	stdio.print(
+		core.inspect(packet(<<>>)),
+	)
 }
 ```
 
@@ -301,9 +321,7 @@ A bit pattern consumes the whole input; an unmarked segment reads eight bits.
 	i/stdio
 )
 
-describe = (n : Int) {
-	n |> (0) { "zero" } | (1) { "one" } | (_) { "other" }
-}
+describe = (n : Int) { n |> (0) { "zero" } | (1) { "one" } | (_) { "other" } }
 main = () { stdio.print(describe(2)) }
 ```
 
