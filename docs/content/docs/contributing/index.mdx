@@ -1,5 +1,17 @@
 ---
 title: Contributing
+description: Find the sources, checks, and principles for changing i.
 ---
 
-to be written
+These pages are for programmers changing the compiler, the standard library, or the documentation. They explain where to work, how a program reaches the host, and how to check a change against the language definition.
+
+The project aims to be a complete standalone language with a useful standard library. It keeps the language small: there are no keywords, every value and binding is immutable, and no library is special to the compiler. Concurrency is structured: a task belongs to a scope and cannot outlive it. Services and tests use general language features. Simplicity matters; the philosophy of the project comes first, optimisation second.
+
+The goal is that a program never passes the checker and then traps at run time because the checker accepted an invalid program. This is not yet true: [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) record a checked program that traps as well as other differences from the standard. A specified stop is a separate outcome defined by the language.
+
+The [standard](/docs/standard/generated/introduction) is the definition. It says that a compiler or program that does not keep to it is wrong, and that the present compiler does not yet implement everything in it. Read the relevant section before changing behavior.
+
+## See also
+
+- [The standard: introduction](/docs/standard/generated/introduction)
+- [Repository layout](/docs/contributing/repository-layout)
