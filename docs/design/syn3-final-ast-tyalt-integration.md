@@ -1,9 +1,38 @@
 # One-tree integration with main, stage 3 and annotation precedence
 
-Merge target: lane/tyalt 046550bd71040daf219bb078387db7de2f5355cc.
+Latest merged target: lane/tyalt c220161d575019b5b6dead186c7e76993994dc13.
+Initial integration target:046550bd71040daf219bb078387db7de2f5355cc.
 Base: 68b720e9. Previous one-tree green: 5e7ef6e561ae01c7a121811729aa9c3005595cfc.
-This integration compiles; the previous full matrix does not prove this merge.
-The fresh full gate is pending.
+**Full requested integration matrix GREEN at Nov14 13:56:37 HKT.**
+Branch: lane/fa. Production compiler source last changed at e840c135b; later
+commits contain proof/report updates only. The final documentation commit and
+landable hash are recorded in the shared status-fa.txt after committing.
+
+- Workspace all-target check and strict all-target clippy: PASS.
+- Fresh syntax/macro/check/LSP gate:764 passed,0 failed,4 existing ignored;
+  only spec_corpus_reverse_order_and_recovery is explicitly skipped.
+- Fresh CLI:all41 non-spec integration binaries plus library/main units PASS,
+  343 distinct tests,2 existing ignored; raw log344 includes one child result.
+- Wasm library:27/27; private migration:all-target check and23/23 units PASS.
+- Macro examples:13 passed,1 existing skip. Std O0/O2:2170/2170 each PASS,
+  including schema_test.null_round.
+- Requested spec filters6/7/9/15.7:80/114/140/28 cases PASS at both levels;
+  all pre-existing pending markers unchanged.
+- Short generation:32 originals,64 permutations,32 annotation removals,
+  0 failures. All Rust/private/source formatting PASS.
+- Ordinary direct check-snippets with a fresh driver:5035 extracted blocks,
+  34 Lisp files,94 macro fragments PASS;5 unchanged future-track entries.
+- Final ancestor/deletion/golden audit:latest tyalt c220 is included; old
+  production tree/lower/legacy-reader paths remain absent; no .out or
+  .expect.json differences from latest tyalt.
+
+No implementation or required gate is unfinished. The requested recovery
+skip, existing ignored/pending cases and coordinator-owned unfiltered
+workspace/spec/corpus sweeps remain unrun as instructed. Initial failures,
+their explanations and every command are retained below. The12:15 handoff
+window was missed; the full fresh matrix finished before the14:15 last-push
+window. No production or expectation edit was needed during either final
+fresh replay.
 
 ## Changes in deleted or relocated compiler files
 
@@ -417,3 +446,88 @@ have passed cumulatively, but final exact-backend replay results remain
 pending and are not represented as already green. The committed candidate
 contains the complete deleted-file port inventory and explained diagnostic
 changes; latest tyalt c220 is still an ancestor.
+
+13:23 fresh-backend CLI progress: all9 macro budget and all62 macro_run
+tests PASS, including optimization-independent charges, continuation/frame
+accounting, multi-shape argument written-tree preservation in both surfaces,
+and the complete full-engine differentials. No fresh CLI failure. The first
+runtime/spec/generation/private/format phase is already entirely green;
+remaining fresh CLI and complete Rust/direct snippets continue serially.
+
+13:27 fresh replay: collected-test2, multicore11, native14 and numeric
+lowering4 all PASS. Numeric corpus agrees at O0/O2/O3 and pending logical
+frames survive suspension. Cancellation stress child output is expected;
+the parent suite passes. Complete package/provider binaries follow again.
+
+13:32 fresh full-CLI replay: package27 and providers19 PASS again,
+including the exact fourteen-project error comparison. Macro budget9 and
+macro_run62 remain PASS; no fresh target failure. The provider binary takes
+36.08s and package149.11s. Runtime conformance and remaining CLI binaries
+are active; production source stays unchanged.
+
+13:36:43 complete fresh-backend CLI gate PASS: all41 non-spec integration
+binaries and both library/main unit targets; two pre-existing ignored
+performance tests unchanged. Macro crate follow-up PASS13:36:53. The raw
+CLI log includes one nested multicore child-harness result; every top-level
+target passes. The full four-crate Rust replay now runs against the same
+merged backend, followed by ordinary direct check-snippets. No production
+or expectation changes were required by the complete fresh CLI replay.
+
+13:40 fresh four-crate replay: the complete resolve3_differential PASS on
+the current repository, including late-added sources; exact HIR and
+all diagnostics remain equal to the independent private lower/reference
+path. Checker integrations continue with no failure. Complete fresh CLI
+is already green; no implementation changes are needed.
+
+
+
+13:56:01 final fresh four-crate Rust gate PASS:764 passed,0 failed,4 existing
+ignored,1 requested recovery skip. All99 LSP protocol tests and all32 row
+schemes pass, including both conflicting four-error/location regressions;
+all golden comparisons remain intact. Syntax's full46-test lisp_syntax
+binary passes with the intended builtin identity/authority assertions.
+13:56:37 ordinary direct scripts/check-snippets PASS after its fresh internal
+wrapped parser-driver build:5035 blocks,34 Lisp files,94 macro fragments,
+5 unchanged future-track entries, exact expected diagnostics. No heavy jobs
+remain in this lane. Final byte/deletion/ancestor/golden audits PASS. Latest
+tyalt c220 is unchanged and an ancestor. All steps2c/2d/3/4 are complete and
+the merged integration is fully green; no requested verification is pending.
+
+## Complete command ledger
+
+H is `/home/agent/Programming/i/.rd/cache/heavy`. All builds, tests and clippy commands below use it. Source/Rust formatting is nonbuilding; check-snippets is deliberately direct and owns its internal parser-driver wrapper.
+
+| Recorded command | Result |
+|---|---|
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli -p ilang-syntax --lib --bins --test lisp_syntax --test abi_performance --test big_int --test big_int_performance --test check --test cli_log --test collections --test commands --test compile_cache --test compile_time_tests --test determinism --test echo --test entries --test expansion_sites --test float_text --test fmt --test http --test ispec --test lisp --test lsp --test macro_budget --test macro_run --test many_tests --test multicore --test native --test numeric_lowering --test package_commands --test providers --test r2_fixtures --test r2_performance --test r2_runtime --test spec_update --test syn3_fixtures --test syntax_runtime --test tls --test typed_macros --test udp --test unused --test value_type_performance --test value_types --test wasi --test wat_dump --locked --no-fail-fast -- --test-threads=4` | exit 101 at 12:35:43 |
+| `$H direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked --message-format=short` | exit 0 at 12:35:58 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test compile_cache --test package_commands --test providers --locked --no-fail-fast -- --test-threads=4` | exit 0 at 12:41:09 |
+| `$H direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings` | exit 0 at 12:36:05 |
+| `$H ./target/release/i test --project examples/macro-tests --opt 0` | exit 0 at 12:42:51 |
+| `direnv exec /home/agent/Programming/i cargo fmt --all -- --check` | exit 0 at 13:13:47 |
+| `$H scripts/test-generation --mode short --binary ./target/release/i` | exit 0 at 13:13:33 |
+| `$H direnv exec /home/agent/Programming/i cargo check --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --all-targets --target-dir target --locked` | exit 0 at 13:13:37 |
+| `direnv exec /home/agent/Programming/i cargo fmt --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml -- --check` | exit 0 at 13:13:47 |
+| `$H direnv exec /home/agent/Programming/i cargo test --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --lib --target-dir target --locked -- --test-threads=2` | exit 0 at 13:13:44 |
+| `$H direnv exec /home/agent/Programming/i cargo build --release -p ilang-cli --bin i --locked` | exit 0 at 12:42:42 |
+| `./target/release/i fmt --check lib std bench examples` | exit 0 at 13:13:48 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 15.7/` | exit 0 at 13:06:01 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 6/` | exit 0 at 12:54:22 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 7/` | exit 0 at 12:55:59 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 9/` | exit 0 at 13:05:03 |
+| `$H ./target/release/i test --project std --opt 0` | exit 0 at 12:47:53 |
+| `$H ./target/release/i test --project std --opt 2` | exit 0 at 12:52:57 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-wasm --lib --locked -- --test-threads=2` | exit 0 at 12:36:20 |
+| `direnv exec /home/agent/Programming/i cargo fmt --all -- --check` | exit 0 at 12:12:23 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --lib --bins --test abi_performance --test big_int --test big_int_performance --test check --test cli_log --test collections --test commands --test compile_cache --test compile_time_tests --test determinism --test echo --test entries --test expansion_sites --test float_text --test fmt --test http --test ispec --test lisp --test lsp --test macro_budget --test macro_run --test many_tests --test multicore --test native --test numeric_lowering --test package_commands --test providers --test r2_fixtures --test r2_performance --test r2_runtime --test spec_update --test syn3_fixtures --test syntax_runtime --test tls --test typed_macros --test udp --test unused --test value_type_performance --test value_types --test wasi --test wat_dump --locked --no-fail-fast -- --test-threads=4` | exit 0 at 13:36:43 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-macro --locked -- --test-threads=2` | exit 0 at 13:36:53 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-syntax -p ilang-macro -p ilang-check -p ilang-lsp --locked --no-fail-fast -- --skip spec_corpus_reverse_order_and_recovery --test-threads=2` | exit 0 at 13:56:01 |
+| `scripts/check-snippets` | exit 0 at 13:56:37 |
+| `direnv exec /home/agent/Programming/i cargo fmt --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml -- --check` | exit 0 at 12:12:23 |
+| `$H direnv exec /home/agent/Programming/i cargo test -p ilang-syntax -p ilang-macro -p ilang-check -p ilang-lsp --locked --no-fail-fast -- --skip spec_corpus_reverse_order_and_recovery --test-threads=2` | exit 101 at 11:49:24 |
+| `scripts/check-snippets` | exit 1 at 10:50:20 |
+| `./target/debug/i fmt --check lib std bench examples` | exit 0 at 12:12:23 |
+
+Additional verification commands and failed attempts without separate command files are recorded in the narrative: workspace checks1/2/3, initial strict clippy, Rust formatting with its exact94-file argv JSON, the two Lisp suite-format commands, direct reused-parser snippets, all exact provider/stop/byte audits, and diff/ancestor/deletion audits. Initial failures are retained and explained; no expectation was silently recorded.
+
+<!-- End command ledger -->

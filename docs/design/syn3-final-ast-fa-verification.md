@@ -1,9 +1,12 @@
-Current integration: tyalt046550bd (main1bdea694, stage3 and colon precedence)
-compiles, passes strict clippy and check-snippets; its full Rust/runtime gate
-is in progress. Tyaltf61f812c9 test-only follow-up is merged pending its CLI
-compilation checkpoint. See [the integration report](syn3-final-ast-tyalt-integration.md).
-The earlier full-green result below is for base68b720e9 at5e7ef6e56;
-it is not a full-green claim about the new main integration.
+Current integration: **steps2c/2d/3/4 and latest tyalt c220161d5 are fully
+GREEN at Nov14 13:56:37 HKT**. Full command/results, deleted-file ports and
+explained diagnostic changes are in [the integration report](syn3-final-ast-tyalt-integration.md).
+Fresh Rust764/0, CLI343/0, workspace check/clippy, Wasm27, private23/all-targets,
+examples13, std2170 at O0/O2, spec80/114/140/28 at both levels, short generation,
+all formatting and direct fresh-driver snippets5035+34+94 pass. Existing
+ignored/pending cases and the requested recovery skip remain unchanged.
+The final landable hash is recorded after committing in shared status-fa.txt.
+Everything below is historical evidence for the preceding base/checkpoints.
 
 Previous-base result: **steps 2c, 2d, 3 and 4 are green**. The full native
 resolver prefix is 6de9a39b655edc8fad9dd7e14a848e359df22915. Stage 12

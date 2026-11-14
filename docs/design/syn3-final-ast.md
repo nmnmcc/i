@@ -1,7 +1,8 @@
 # One tree: syntax three as the final AST
 
-Status: deletion green on base68b720e9; integration with tyalt046550bd
-(main1bdea694, stage3 and colon precedence) compiles and its full gate is pending.
+Status: steps2c/2d/3/4 and integration with latest tyalt c220161d5 are
+fully GREEN at Nov14 13:56:37 (main/ABI5, stage3, annotation precedence,
+and continuation environment fix). The compiler has one production tree.
 The inventory below records the starting architecture (Nov13); §6 records
 the completed state. Controlling sources:
 `docs/design/syntax-3.md` §6, §6.7, §6.8 and §7.2 row 12.
@@ -933,3 +934,17 @@ migration all-target/23-unit checks and all formatting pass. Both std levels
 remain2170/2170. The complete fresh-backend CLI replay is active; complete
 four-crate Rust and direct snippets follow serially. Final full-green hash
 awaits those results. There has been no production change since e840c135b.
+
+Nov14 13:56:37 FINAL GREEN: latest tyalt c220161d5 is merged and verified.
+Fresh all-target workspace check/strict clippy, Rust764/0 (4 existing ignored,
+requested recovery skip), complete CLI343/0 (2 existing ignored), Wasm27,
+private migration23/all-targets, examples13 (1 skip), std2170 at each of O0/O2,
+spec80/114/140/28 at both levels, generation32+64+32/0, all formatting and
+direct fresh-driver snippets5035+34+94 pass. The current-repository strict
+native/reference HIR and diagnostic differential passes. Old production
+tree/lower/legacy reader deletions are intact. Every incoming deleted-file
+change and every known diagnostic location/row change is explained in
+[the final integration report](syn3-final-ast-tyalt-integration.md), including
+all command results and repaired initial failures. No implementation or
+required gate remains pending. Landable documentation hash follows in
+shared status-fa.txt; production source is unchanged since e840c135b.
