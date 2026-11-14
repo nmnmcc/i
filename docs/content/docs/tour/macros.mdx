@@ -44,7 +44,7 @@ The macro inserts its argument into a binding and adds the bound value to itself
 
 Use it from `src/main.i` in the same package:
 
-```i shown file=src/main.i package=tour title="src/main.i"
+```i run package=tour title="src/main.i"
 (
 	(Io) = i/io
 	i/core
@@ -56,10 +56,6 @@ main = () <- (io : Io) {
 		core.inspect(twice(saved + 1)),
 	)
 }
-```
-
-```sh
-i run --opt 0
 ```
 
 ```text
@@ -104,6 +100,30 @@ main = () <- (io : Io) {
 The expansion prints the same spelling for these names; their distinct scopes are retained in the syntax tree. The specification defines this with a fresh mark for each expansion. Code from macro arguments retains its original scope, while generated code receives the expansion's mark. References made in a template resolve in the defining module under those rules; labels are compared by text.
 
 Macros have no host services for reading files, the network or the time. The standard requires the same result for the same inputs on every machine and places limits on each expansion. Start with a syntax macro like this one; typed macros, type queries, item generation and diagnostics have additional contracts in §14.
+
+## The repository tour's `if` macro
+
+The complete [`examples/tour/src/sugar.is`](https://github.com/nmnmcc/i/blob/main/examples/tour/src/sugar.is) defines `if` as a macro, rather than a language keyword. These two files are copied unchanged from the repository tour.
+
+```i file=src/sugar.is title="src/sugar.is"
+(, if)
+(= _branches
+  (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
+(@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
+```
+
+```i test package=tour title="test/sugar_test.i"
+(
+	testlib = (test) = std/test
+	sugar = (if) = tour/sugar
+)
+
+sign = (n) { if(n < 0, "negative", "not negative") }
+
+test("if is a macro", () { assert(sign(-1) == "negative") })
+```
+
+`_branches` makes a two-branch function that matches `True` or `False`. The `if` template pipes the test expression into those branches. The branch expressions remain code until the selected branch runs. The test imports the macro from `tour/sugar` and uses it inside `sign`, just as it uses `test` from `std/test`.
 
 ## See also
 
