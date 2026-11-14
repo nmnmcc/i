@@ -138,6 +138,32 @@ errors, and preservation of the vendored marker's invariant row.
 All five corpus-runner regression tests pass. Changed i files and Rust test
 formatting pass.
 
+Commands used for this audit (H is `/home/agent/Programming/i/.rd/cache/heavy`):
+
+| Command | Result |
+|---|---|
+| `CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 $H direnv exec /home/agent/Programming/i cargo build --release -p ilang-cli --locked` | pass |
+| `CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 $H direnv exec /home/agent/Programming/i cargo test --release -p ilang-check --test row_schemes --locked -- --test-threads 2` | 42 pass |
+| `python3 -I scripts/qa/corpus-test` | 5 pass |
+| `direnv exec /home/agent/Programming/i rustfmt --check --edition 2024 crates/ilang-check/tests/row_schemes.rs` | pass |
+| `./target/release/i fmt --check tests/review/cases/review-k4-lane/alias_kind_error/src/main.i tests/review/cases/review-k4s/std/src/log.i tests/review/cases/review-k4s/std/test/stream_test.i` | pass |
+| `git diff --check` | pass at each committed checkpoint |
+
+Corpus updates use `UPDATE=1 python3 scripts/qa/corpus.py run --binary
+./target/release/i --case-list GROUP.json --filter PREFIX --jobs JOBS
+--keep-bounds`, with all groups serialized inside one H invocation. Semantic
+groups use the 29 cases above; original timeout groups use their 16 cases,
+one worker at a time. Display groups use four workers, except scheduler
+groups use one. The case inventory below gives the selected identities.
+The prefixes are `review-k4-lane/`, `review-k4/`, `review-k4c/`,
+`review-k4d/`, `review-k4s/`, `review-native3/`, `review-num/`, `review-r2/`,
+`review-std2/`, `review-t1/`, and the four additional runtime-message probes
+include `review-js/`. A second pass of resource-censored cases uses a
+one-element case list, the complete case ID as filter, and one worker.
+No saved CPU bound is raised. Each completed observation is additionally
+checked for phase sets, exits, diagnostic multiplicity, and runtime stdout;
+fingerprint-only updates are restored byte for byte from the base.
+
 All 29 non-timeout cases pass the bounded per-group update runs and an
 additional audit of their exact required error multisets and entry results.
 The first vendored rerun exposed four remaining stale stream annotations;
@@ -160,17 +186,19 @@ requested corpus integration is green.
 Every listed observation has equal phase sets, phase exits, diagnostic code
 multisets (including duplicate counts), and runtime stdout. Only the checker
 types or diagnostic text change. Groups overlap. The original coordinator
-run has 919 display-only cases; this checkpoint records 802 after
+run has 919 display-only cases; this checkpoint records 907 after
 complete bounded reruns. Remaining per-group runs are still in progress.
 CPU-censored observations retain their old baselines and are not counted
 as completed display-only reruns.
 
 | Group | Cases so far | Exact displayed change and controlling paragraph |
 |---|---:|---|
-| D1 | 770 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain. Merging two callbacks combines their whole rows, without a separate `Fail(E | E2)` carrier. R1 (syntax-three §6.1); subsequent variable renumbering follows §4.7. |
-| D2 | 120 | Directed bounds are shown without redundant variables: read-only `S(N & A)` becomes `S(N)`; a consumer of argument `A` needs `S(A)` rather than a separate bound `S(B)`; a pure stored callback closes its residual N to Never. Inferred E/A labels can change. Spec §4.7 simplification, §4.5 rule 4 needs direction, §9.2 provider subtyping; R1 removes the independent error bounds. |
-| D4 | 238 | E5 replaces planner messages such as `missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 multiset, source sites and failing phases. R6 (§2.10.11). |
+| D1 | 852 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain. Merging two callbacks combines their whole rows, without a separate `Fail(E | E2)` carrier. R1 (syntax-three §6.1); subsequent variable renumbering follows §4.7. |
+| D2 | 128 | Directed bounds are shown without redundant variables: read-only `S(N & A)` becomes `S(N)`; a consumer of argument `A` needs `S(A)` rather than a separate bound `S(B)`; `cur : (A & B) <- (State(A & B)) -> B` becomes `(A) <- (State(A)) -> A`; a pure stored callback closes its residual N to Never. Inferred E/A labels can change. Spec §4.7 simplification, §4.5 rule 4 needs direction, §9.2 provider subtyping; R1 removes the independent error bounds. |
+| D3 | 9 | Only canonical type-variable labels change after the independent error carrier disappears; the shown type is equivalent by renaming. R1 and spec §4.7. |
+| D4 | 257 | E5 replaces planner messages such as `missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 multiset, source sites and failing phases. R6 (§2.10.11). |
 | D5 | 3 | Recovery diagnostics retain a known String argument: `S(_, _)` becomes `S(String, _)` against the same incompatible `S(1, Never)`. Same E0515 site and invariant mismatch; ordinary incoming bounds survive single-row inference. R1, spec §4.7 monomorphic variables show their incoming types, §4.5 rule 4 and §9.2. |
+| D6 | 2 | The obsolete independent error parameter disappears from `Boundary(R, E, N)`, now `Boundary(R, N)` (and likewise Continuation). Syntax-three §2.10.7 explicitly gives these two- and three-parameter forms, and R1 puts any Fail entry in N. |
 | D7 | 5 | The single-row solver reports the incompatible leaf instead of the enclosing recovery summary: g_ann_Never/g_inf_Never show `_` against Never instead of `S(_)`; pl44 shows `_` against the required Int instead of `Cov(_)` against Never. Each E0501 remains at the same callback and annotation sites, with the same count; every separate provider error also remains. R1 changes the constraint graph, while spec §4.5 rule 4 still forbids the needed effect in a pure callback; §4.7 governs displayed incoming bounds. These are recovery projections of the same rejection, not newly accepted annotations. |
 
 One line per reviewed case:
@@ -979,3 +1007,108 @@ One line per reviewed case:
 | `review-k4d/proj/x7` | D1 |
 | `review-k4d/proj/x8` | D1 |
 | `review-k4d/proj/z2` | D1 |
+| `review-k4s/ann_arg0` | D1 |
+| `review-k4s/ann_arg1` | D1 |
+| `review-k4s/ann_capture0` | D1 |
+| `review-k4s/ann_capture1` | D1 |
+| `review-k4s/ann_different0` | D1 |
+| `review-k4s/ann_different1` | D1 |
+| `review-k4s/ann_direct0` | D1 |
+| `review-k4s/ann_direct1` | D1 |
+| `review-k4s/ann_install0` | D1 |
+| `review-k4s/ann_install1` | D1 |
+| `review-k4s/ann_local0` | D1 |
+| `review-k4s/ann_local1` | D1 |
+| `review-k4s/ann_local_install0` | D1 |
+| `review-k4s/ann_local_install1` | D1 |
+| `review-k4s/ann_nested0` | D1 |
+| `review-k4s/ann_nested1` | D1 |
+| `review-k4s/ann_poly0` | D1 |
+| `review-k4s/ann_poly1` | D1 |
+| `review-k4s/ann_twice0` | D1 |
+| `review-k4s/ann_twice1` | D1 |
+| `review-k4s/ann_wrap0` | D1 |
+| `review-k4s/ann_wrap1` | D1 |
+| `review-k4s/captured_rows` | D1 |
+| `review-k4s/chain_1024` | D1 |
+| `review-k4s/chain_128` | D1 |
+| `review-k4s/chain_256` | D1 |
+| `review-k4s/chain_512` | D1 |
+| `review-k4s/chain_64` | D1 |
+| `review-k4s/co_0_0` | D1, D2 |
+| `review-k4s/co_0_17` | D1, D2 |
+| `review-k4s/co_12_0` | D1 |
+| `review-k4s/co_12_17` | D1 |
+| `review-k4s/enum_case` | D1 |
+| `review-k4s/extra_closed_dep` | D1 |
+| `review-k4s/extra_generic_never` | D1 |
+| `review-k4s/extra_genuine_mutual_fn` | D1 |
+| `review-k4s/extra_genuine_mutual_value` | D1 |
+| `review-k4s/extra_genuine_two_rows` | D1 |
+| `review-k4s/extra_pure_helper` | D1 |
+| `review-k4s/extra_servicearg` | D1 |
+| `review-k4s/extra_serviceboth` | D1 |
+| `review-k4s/helper_ann_tmp` | D1 |
+| `review-k4s/hidden_conflict_closure` | D1 |
+| `review-k4s/hidden_conflict_install` | D1 |
+| `review-k4s/hidden_conflict_nested` | D1 |
+| `review-k4s/inner_body_ann` | D1 |
+| `review-k4s/min_main_0_0` | D1, D4 |
+| `review-k4s/min_main_0_1` | D1, D4 |
+| `review-k4s/min_main_1_0` | D4 |
+| `review-k4s/min_main_1_1` | D4 |
+| `review-k4s/min_main_2_0` | D2, D4 |
+| `review-k4s/min_main_2_1` | D4 |
+| `review-k4s/min_main_3_1` | D4 |
+| `review-k4s/min_main_4_0` | D4 |
+| `review-k4s/min_main_4_1` | D4 |
+| `review-k4s/min_main_5_1` | D4 |
+| `review-k4s/min_main_6_0` | D1, D2, D4 |
+| `review-k4s/min_main_6_1` | D1, D4 |
+| `review-k4s/min_main_7_0` | D1, D4 |
+| `review-k4s/min_main_7_1` | D1, D4 |
+| `review-k4s/min_main_8_0` | D4 |
+| `review-k4s/min_main_8_1` | D4 |
+| `review-k4s/missing_scheme_main` | D1, D4 |
+| `review-k4s/mixed_install_12` | D1 |
+| `review-k4s/mixed_install_3` | D1 |
+| `review-k4s/mixed_install_6` | D1 |
+| `review-k4s/mixed_order_0` | D1, D2 |
+| `review-k4s/mixed_order_1` | D1, D2 |
+| `review-k4s/outer_body_ann` | D1 |
+| `review-k4s/outer_closure_ann` | D1 |
+| `review-k4s/outer_closure_var` | D1 |
+| `review-k4s/outer_inner_local_ann` | D1 |
+| `review-k4s/outer_no_helper` | D1 |
+| `review-k4s/outer_no_sparam` | D1 |
+| `review-k4s/principal_missing_retann` | D1 |
+| `review-k4s/principal_missing_use` | D1 |
+| `review-k4s/principal_missing_use_retann` | D1 |
+| `review-k4s/runtime` | D1, D2 |
+| `review-k4s/simple` | D1 |
+| `review-k4s/soundness` | D4 |
+| `review-k4s/soundness_unannotated` | D4 |
+| `review-k4s/wide_128` | D1 |
+| `review-k4s/wide_256` | D1 |
+| `review-k4s/wide_32` | D1 |
+| `review-k4s/wide_512` | D1 |
+| `review-k4s/wide_64` | D1 |
+| `review-k4s/wide_plain_1024` | D1 |
+| `review-k4s/wide_plain_128` | D1 |
+| `review-k4s/wide_plain_256` | D1 |
+| `review-k4s/wide_plain_512` | D1 |
+| `review-k4s/wide_plain_64` | D1 |
+| `review-num/probes` | D6 |
+| `review-num/trace` | D3, D6 |
+| `review-std2/client_nil_error` | D3 |
+| `review-std2/client_no_marker` | D3 |
+| `review-std2/error` | D3 |
+| `review-std2/full` | D3 |
+| `review-std2/full_closed` | D3 |
+| `review-std2/minimal_client` | D3 |
+| `review-std2/minimal_client_final` | D1 |
+| `review-std2/pure_wrap` | D1 |
+| `review-std2/replacement` | D3 |
+| `review-std2/replacement_scope` | D3 |
+| `review-std2/unsafe` | D2 |
+| `review-t1/original-stop_tail_service` | D1 |
