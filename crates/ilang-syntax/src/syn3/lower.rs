@@ -27,7 +27,7 @@ use super::ast as n;
 use crate::ast as o;
 use crate::span::Span;
 use crate::{Code, Diagnostic};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Lowers a module of syntax three to the current tree.
 pub fn lower(m: &n::Module) -> (o::Module, Vec<Diagnostic>) {
@@ -636,7 +636,7 @@ impl Cx {
                 _ => stmts.push(self.stmt(s)),
             }
         }
-        o::Block {
+        let mut block = o::Block {
             stmts,
             span: b.span.0,
         };
@@ -753,6 +753,7 @@ impl Cx {
                 }
             }
         }
+        block
     }
 
     fn stmt(&mut self, s: &n::Stmt) -> o::Stmt {
