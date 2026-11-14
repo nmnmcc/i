@@ -6,7 +6,9 @@
 
 Yield(A) = (emit = (A) -> Nil)
 
-Source(A) = (next = () -> A)
+// §4.1: a function-only Source(Never) is inhabited. A required value
+// retains this fixture's negative empty-intersection intent under Decision 1.
+Source(A) = (value = A, next = () -> A)
 
 collect : <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
 	control.boundary((b) {

@@ -203,12 +203,13 @@ Verification checkpoints (2026-11-13):
 
 Fixture decisions:
 
-- Pure R2 task probes constrain their otherwise open error type through
-  `NoFail(N) = N - Fail(Never)`. The helper calls the original body unchanged;
-  it does not catch errors or remove other service needs or assertions.
-  Spec §4.4: "`A - B` takes out of `A` every member whose type constructor is
-  the type constructor of a member of `B`." Spec §9.2: "An entry that every
-  value of its type constructor satisfies, as `Fail(Never)`, is removed."
+- Owner Decision 2 (2026-11-14) drops universal-entry removal. The R2
+  probes now supply a real `Fail(Never)` value for their pure kept callback;
+  its impossible argument stops if invoked. The original body, cancellation
+  and output assertions are unchanged. The previous `NoFail(N)` filter could
+  not supply a required key and is removed. Spec §9.2: "Type checking makes
+  certain that every service is there when a call takes it. Getting it never
+  fails at run time." No error or other service requirement is erased.
 - The compiled fixture writes the existing Float result contract of `distance`
   explicitly. Stop-position assertions now name the actual call tokens in the
   converted source: `clock.later` at 45:2 and `hypot` at 41:44. Spec §13 says:

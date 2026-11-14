@@ -6,7 +6,9 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
     // §9.2 checks every use of a supplied service, including cached handlers.
     // Use each real manifest: mixed_install_12 and mixed_install_6 import
     // std/test and must expand their macros before comparing diagnostics.
-    // These counts come from landed tip cc26b8d9, not a stage-three recording.
+    // The b1 whole-method meet is inhabited (§4.1); retain all four concrete
+    // provider failures. m32 additionally rejects its duplicate key (§9.2).
+    // See effects-e3-e6-corpus.md R2/R8 for each changed diagnostic.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
     // Formatting changes source coordinates. Pin those exact corrections separately
     // until the coordinator records the corpus on the gate tree; retain the full
@@ -15,15 +17,15 @@ fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
         serde_json::from_str(include_str!("providers_format_locations.json")).unwrap();
     for (case, count, provider_count) in [
         ("review-k4d/_loose/fuzz/e0505/21_4", 3, 2),
-        ("review-k4d/_loose/p/b1", 6, 5),
+        ("review-k4d/_loose/p/b1", 5, 4),
         ("review-k4d/_loose/p/r6", 4, 3),
         ("review-k4d/fuzz/m0", 2, 2),
         ("review-k4d/fuzz/m21", 3, 2),
-        ("review-k4d/fuzz/m32", 9, 8),
+        ("review-k4d/fuzz/m32", 10, 8),
         ("review-k4d/fuzz/w2", 3, 2),
         ("review-k4d/fuzz/w3", 2, 2),
         ("review-k4d/fuzz/w4", 11, 4),
-        ("review-k4d/proj/b1", 6, 5),
+        ("review-k4d/proj/b1", 5, 4),
         ("review-k4d/proj/r6", 4, 3),
         ("review-k4s/hidden_conflict_install", 4, 4),
         ("review-k4s/mixed_install_12", 6, 5),

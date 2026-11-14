@@ -5,15 +5,17 @@ mod common;
 fn stage_three_provider_diagnostics_match_landed_conversion() {
     // §9.2: a supplied value must satisfy the needed form by subtyping;
     // incompatible same-key requirements have an empty intersection.
-    // Keep every diagnostic from landed tip cc26b8d9, including its source
-    // binding. Pin total errors and E0515 counts independently of the saved
+    // Keep every concrete provider diagnostic, including its source binding.
+    // R8 in effects-e3-e6-corpus.md quotes why the b1 whole-method meet is
+    // inhabited (§4.1), removing only its old empty-meet summary.
+    // Pin total errors and E0515 counts independently of the saved
     // messages. The full fourteen-project guard is in CLI providers tests:
     // two projects need their std dependency and test-macro expansion.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
     for (case, count, provider_count) in [
         ("review-k4/cases/provision_closure_False", 1, 1),
         ("review-k4d/_loose/p/x8", 2, 2),
-        ("review-k4d/_loose/p/b1", 6, 5),
+        ("review-k4d/_loose/p/b1", 5, 4),
     ] {
         let dir = root.join(case);
         let source = std::fs::read_to_string(dir.join("src/main.i")).unwrap();
@@ -191,11 +193,29 @@ wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
         );
         let with_hole = source.replace("provided : Svc(Int)", "provided : Svc(_)");
         assert_ne!(source, with_hole);
-        assert_eq!(types(&source), types(&with_hole));
+        assert_eq!(types(&source), types(&with_hole), "inferred={inferred}");
     }
     // Never has an implicit lower bound, so v <: Never also fixes v.
     let never = "S(N) = (() <- N -> Nil)\nuse = () <- (s : S(Never)) {\n\tS(f) = s\n\tf()\n}\nwrap : <N>(() <- (S(Never), ..N) -> Nil, S(Never)) <- N -> Nil = (body, svc) {\n\tbody() <- (svc)\n}";
     types(never);
+}
+
+#[test]
+fn a_handler_annotation_hole_cannot_hide_its_incompatible_value() {
+    // §9.2: the actual provider P must satisfy S by ordinary subtyping.
+    // A covariant hole with incoming Int cannot provide Svc(String).
+    for annotation in ["Int", "_"] {
+        let source = format!(
+            "Svc(A) = (f = () -> A)\nwrap = <N>(body: () <- (Svc(String), ..N) -> String, svc: Svc(Int)) -> String {{ provided: Svc({annotation}) = svc\n body() <- (provided) }}"
+        );
+        let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.code == "E0515"),
+            "{annotation}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
 }
 
 #[test]
@@ -1051,6 +1071,26 @@ fn a_bottom_returning_method_can_satisfy_two_covariant_needs() {
     // a required field of type Never cannot be constructed.
     let source = "Box(A) = (value = A)\nf = () <- (b : Box(Int)) { b.value }\ng = () <- (b : Box(String)) { b.value }\nboth = () { f() g() }";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn a_two_parameter_method_meet_depends_on_required_data() {
+    // Decision 1 and §4.1: a function that stops inhabits () -> Never.
+    // This is the exact constructor shape of the b1 corpus summaries.
+    let source = "S(A, N) = (() <- N -> A)\nleft = () <- (s: S(String, Never)) { Nil }\nright = () <- (s: S(Int, S(String, Never))) { Nil }\nboth = () { left() right() }\n";
+    let shown = types(source);
+    assert!(shown["app/main.both"].contains("S(Never,"), "{shown:?}");
+    // Decision 2: being inhabited does not provide the constructor key.
+    let provided = format!("{source}main = () {{ both() <- (S(() {{ panic(\"bottom\") }})) }}");
+    types(&provided);
+    let impossible = source.replace("S(A, N) = (() <- N -> A)", "S(A, N) = (A, () <- N -> A)");
+    let (graph, _, _) = common::check_files(&[("src/main.i", &impossible)]);
     let checked = ilang_check::check(&graph);
     assert!(
         checked.diags.iter().any(|d| d.code == "E0515"),

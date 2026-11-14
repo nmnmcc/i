@@ -708,9 +708,35 @@ impl Coalescer<'_> {
         }
     }
 
-    /// `env`: the type is an environment, whose members have arguments that
-    /// are compared as equal (§4.5 rule 4), so they are both outputs and
-    /// inputs.
+    /// A fixed annotation hole denotes its exact value even when it occurs
+    /// only in a removed provider. Otherwise outer polarity simplification
+    /// could replace v in `v & Int` by Never before hiding mask-only variables.
+    /// L <: v <: U with L = U fixes v (§4.5); one-sided bounds stay open.
+    fn handler_witness(&mut self, t: &Ty, pos: bool, depth: u32) -> Ty {
+        let mut vars = Vec::new();
+        ty_vars(t, &mut vars);
+        let mut fixed = Vec::new();
+        for v in vars {
+            let state = &self.s.vars[v.0 as usize];
+            if state.name.is_some() || rigid(self.s, self.keep, v) {
+                continue;
+            }
+            if let Some(bound) = state.lower.iter().find(|bound| {
+                if !state.upper.contains(bound) {
+                    return false;
+                }
+                let mut free = Vec::new();
+                ty_vars(bound, &mut free);
+                free.is_empty()
+            }) {
+                fixed.push((v, bound.clone()));
+            }
+        }
+        self.go(&replace_all(t, &fixed), pos, depth, false)
+    }
+
+    /// `env`: the type is a need; service arguments follow the reverse of
+    /// their ordinary value variance (§4.5 rule 4, §9.2).
     fn go(&mut self, t: &Ty, pos: bool, depth: u32, env: bool) -> Ty {
         let env = env || self.s.is_row(t);
         match t {
@@ -914,8 +940,17 @@ impl Coalescer<'_> {
                 Box::new(self.go(a, pos, depth, env)),
                 // A need difference records the supplied value form. Its
                 // arguments follow value variance, not required-service
-                // variance (§9.2); keep the actual bounds of annotation holes.
-                h.iter().map(|m| self.go(m, pos, depth, false)).collect(),
+                // variance (§9.2); the subtracted side reverses polarity. Keep
+                // the actual bounds of annotation holes in the provider witness.
+                h.iter()
+                    .map(|m| {
+                        if env {
+                            self.handler_witness(m, !pos, depth)
+                        } else {
+                            self.go(m, pos, depth, false)
+                        }
+                    })
+                    .collect(),
             ),
             Ty::Both(a, b) => Ty::Both(
                 Box::new(self.go(a, true, depth, env)),

@@ -147,6 +147,34 @@ handler or stop-final path is added. The first full spec run passed its stop
 fixtures. Full reruns of the changed fixtures remain pending. Required i
 formatting is applied to the 30 reported files without changing assertions.
 
+The fresh fourteen-project probe retains every concrete provider-subtyping
+failure. In each `b1` copy only the summary at `6:1` disappears. This is a
+Decision 1 / §4.1 correction, not a lost provider check: “A function field
+requires a function value, not a value of its result type; a function that
+stops or diverges can inhabit `() -> Never`.” For `S(A,N) = (() <- N -> A)`,
+the intersection of the two S forms can therefore be inhabited. §9.2 only
+requires E0515 “When the intersection for one service of a need is `Never`
+while neither side is `Never`”. All four concrete E0515 locations (`6:11`,
+`12:12`, `12:21`, `15:8`) and the duplicate-key E0225 remain. A two-parameter
+positive regression uses this exact constructor shape, with a required-value
+field negative control. An inhabited meet still cannot supply a missing key
+(Decision 2). The fresh m32 probe adds the specified duplicate-key E0225 and
+retains all eight E0515 plus E0501; the other eleven projects retain their
+full landed diagnostic sets. Recording and corpus verification are pending.
+
+The exact annotation-hole witness regression also passes after a display
+repair. The trace proved the local hole has both lower and upper bound Int;
+outer polarity simplification had incorrectly substituted Never inside its
+removed-provider mask. §4.5 says “Two types are equal when each is a subtype
+of the other.” Resolve that proven closed equality in the mask before
+simplifying, leaving one-sided covariant bounds open. All eight focused
+handler tests pass, including the original exact equality assertion and a
+new negative control: Svc(Int) cannot provide Svc(String) through Svc(_).
+The ordinary value-difference display is unchanged. The environment golden
+retains its empty-meet error by giving Source a required A value field
+(§4.1, R8); function-only inhabited meets retain independent positive tests.
+Both std levels pass 2,171 tests each. Full Rust and corpus gates follow.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**
@@ -229,6 +257,18 @@ contributes one test for each written case.” The vendored collector must
 retain complete grouped environment nodes, their temporary bindings and
 block scopes, as the current standard-library collector does.
 
+**R8 — Whole-service inhabitance.** Owner Decision 1: “A need is a set
+of environments.” Spec §4.1: “A non-opaque labelled type is inhabited exactly
+when its data is inhabited. Apply these rules after substituting its type
+arguments.” Further: “A function field requires a function value, not a value
+of its result type; a function that stops or diverges can inhabit `() -> Never`.”
+Spec §9.2 reports E0515 only “When the intersection for one service of a need
+is `Never` while neither side is `Never`”. Thus an empty covariant result
+argument alone does not make a service with only methods empty. This makes
+the conjunction valid, but does not make the unrelated invalid providers valid;
+their subtyping errors remain. A required value field of type Never still
+makes the whole meet empty and still reports E0515.
+
 ## Non-timeout cases
 
 Category **a** is required by the quoted landed rules. Category **c** is a
@@ -245,8 +285,8 @@ rule that a test pinning a removed feature keeps its original intent.
 | `review-k4d/_loose/fuzz/e0505/21_145` | E0501 | E0225 + the same E0501; two explicit `S` values | a, R2 |
 | `review-k4d/_loose/fuzz/e0505/21_160` | one aggregate E0523 | two E0523, for `S` and `T`; all entry phases still reject | a, R6 |
 | `review-k4d/_loose/fuzz/e0505/21_243` | one aggregate E0523 | two E0523, for `S` and `T`; all entry phases still reject | a, R6 |
-| `review-k4d/_loose/p/b1` | E0515 ×5 | same five + E0225 for duplicate explicit `S` | a, R2 |
-| `review-k4d/proj/b1` | E0515 ×5 | same five + E0225 for duplicate explicit `S` | a, R2 |
+| `review-k4d/_loose/p/b1` | E0515 ×5 | four concrete E0515 + E0225; the method-only meet is inhabited, so remove only summary `6:1` | a, R2 and R8 |
+| `review-k4d/proj/b1` | E0515 ×5 | four concrete E0515 + E0225; remove only the inhabited-meet summary `6:1` | a, R2 and R8 |
 | `review-k4d/_loose/p/b10` | E0505 ×2 + E0515 | E0505 + E0515; recursive definition and incompatible provider both remain | a, R1/R5 |
 | `review-k4d/proj/b10` | E0505 ×2 + E0515 | E0505 + E0515; recursive definition and incompatible provider both remain | a, R1/R5 |
 | `review-k4d/_loose/p/r6` | E0515 ×3 | same three + E0225 for duplicate explicit `S` | a, R2 |
@@ -310,7 +350,7 @@ only_runner: (() <- (task.Scheduler) -> Nil) <- (task.Runner) -> Nil =
     (body) <- (runner: task.Runner) { task.run(body) }
 ```
 
-This must typecheck under §9.9; it currently rejects with E0501,
+Before the repair this rejected contrary to §9.9 with E0501,
 `task.Scheduler is not a subtype of task.Runner`. The corresponding test
 wrapper also rejects with E0501 against Fail(ScheduleError) | Runner.
 The coordinator authorized the library repair on 2026-11-14. The four-signature
@@ -318,7 +358,8 @@ repair is now applied to `lib/i/task.i`, retaining main's stage-three Runner and
 Scheduler representations. Three §9.9 fixtures check the Runner-only run/test
 contracts, rejection of an unrelated unprovided `Dep`, and the actual events
 program. A CLI regression checks the latter's printed entry type exactly:
-`app/main.main : () <- (Assert, task.Runner) -> Nil`.
+`app/main.main : () <- (Assert, Fail(Never), task.Runner) -> Nil`
+(Decision 2 retains the genuine pure-event Fail key).
 The original [proposal](effects-e3-e6-task-run.patch) is retained as an audit
 artifact. Verification of the merged compiler and these regressions is pending
 the heavy runs after 20:30; the older results below describe the previous hash.
