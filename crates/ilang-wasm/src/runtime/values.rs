@@ -17,6 +17,36 @@ pub fn wat(references: bool) -> String {
     source
 }
 
+/// §14.9 uses a portable value stream. Nominal type and label-set numbers
+/// are allocation identities of this compiler, so they cannot enter it.
+/// Opaque identities, including compiler Syntax handles, share token 7.
+pub(crate) fn portable_macro_hash(text: &str) -> String {
+    let start = text
+        .find("(func $value_hash_u32 ")
+        .expect("runtime hash function");
+    let end = start
+        + text[start..]
+            .find("(func $value_hash ")
+            .expect("runtime hash wrapper");
+    let mut hash = text[start..end].to_owned();
+    hash = hash.replace(
+        "(local.set $kind (call $value_tag (local.get $v)))",
+        "(local.set $kind (call $value_tag (local.get $v)))\n    (if (i32.or (call $value_identity_kind (local.get $kind)) (i32.eq (local.get $kind) (i32.const 10))) (then (local.set $kind (i32.const 7))))",
+    );
+    hash = hash.replace(
+        "(struct.get $obj 1 (local.get $o))",
+        "(if (result i32) (i32.or (i32.eq (local.get $kind) (i32.const 4)) (i32.eq (local.get $kind) (i32.const 5))) (then (i32.const 0)) (else (struct.get $obj 1 (local.get $o))))",
+    );
+    // Nullary constructors may use either no field array or an empty array.
+    hash = hash.replace("(br_if $walk (ref.is_null (local.get $xs)))",
+        "(if (ref.is_null (local.get $xs)) (then (if (i32.eq (local.get $kind) (i32.const 5)) (then (local.set $h (call $hash_mix (local.get $h) (i32.const 0))))) (br $walk)))");
+    // Only the final object metadata word is nominal; Bits keep their length.
+    let metadata = "(local.set $word (struct.get $obj 2 (local.get $o)))";
+    let at = hash.rfind(metadata).expect("nominal hash metadata");
+    hash.replace_range(at..at + metadata.len(), "(local.set $word (i64.const 0))");
+    format!("{}{}{}", &text[..start], hash, &text[end..])
+}
+
 const CORE: &str = r#"
 (global $value_false eqref
   (struct.new $obj (i32.const 1) (i32.const 0) (i64.const 0) (f64.const 0)
@@ -572,3 +602,31 @@ const HOST_ID: &str = r#"(func $host_id (param $v eqref) (result i64)
   (struct.get $hostref 1 (ref.cast (ref $hostref) (local.get $v))))"#;
 const NOMINAL_HOST_ID: &str = r#"(func $host_id (param $v eqref) (result i64)
   (struct.get $hostref 2 (ref.cast (ref $hostref) (local.get $v))))"#;
+
+#[cfg(test)]
+mod portable_hash_tests {
+    use super::*;
+
+    #[test]
+    fn compiler_hash_removes_nominal_numbers_and_keeps_bit_lengths() {
+        let ordinary = wat(true);
+        let portable = portable_macro_hash(&ordinary);
+        assert_ne!(ordinary, portable);
+        let hash = portable
+            .split("(func $value_hash_u32 ")
+            .nth(1)
+            .unwrap()
+            .split("(func $value_hash ")
+            .next()
+            .unwrap();
+        assert_eq!(
+            hash.matches("(local.set $word (struct.get $obj 2 (local.get $o)))")
+                .count(),
+            1
+        );
+        assert!(hash.contains("(local.set $word (i64.const 0))"));
+        assert!(hash.contains("(then (local.set $kind (i32.const 7)))"));
+        // Target programs still use their original runtime hash.
+        assert_eq!(ordinary, wat(true));
+    }
+}

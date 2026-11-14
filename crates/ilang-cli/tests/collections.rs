@@ -283,3 +283,55 @@ fn expand_command_prints_both_surfaces_and_macro_trace() {
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("--to is"));
 }
+
+#[test]
+fn generated_private_collection_target_shares_the_output_transaction_scope() {
+    let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.6/mp12_collection_transaction");
+    let manifest = ilang_cli::collections(&project, false, true).unwrap();
+    assert_eq!(manifest.entries.len(), 1);
+    assert_eq!(manifest.entries[0].module, "probe/main");
+    for level in [Level::O0, Level::O2] {
+        let built = ilang_cli::build_collection(
+            &project,
+            options(level),
+            &manifest.entries[0].handle,
+            CollectionResult::Nil,
+        )
+        .unwrap();
+        assert!(matches!(
+            built.run_with(built.built.host_options()).unwrap(),
+            Outcome::Ok(_)
+        ));
+    }
+}
+
+#[test]
+fn collections_call_aliases_and_computed_function_values() {
+    let macros = include_str!("../../../tests/spec/14.5/mp15_alias_collection/src/macros.is");
+    for value in ["worker", "make(42)"] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"probe\"\n").unwrap();
+        std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
+        std::fs::write(dir.path().join("src/main.i"), format!("(m = probe/macros)\nworker = () {{ panic(\"target invoked\") }}\nmake = (n) {{ () {{ assert(n == 42) }} }}\ntarget = {value}\nm.register(target)\nmain = () {{ Nil }}\n")).unwrap();
+        let manifest = ilang_cli::collections(dir.path(), false, true).unwrap();
+        assert_eq!(manifest.entries.len(), 1);
+        for opt in [Level::O0, Level::O2] {
+            let built = ilang_cli::build_collection(
+                dir.path(),
+                options(opt),
+                &manifest.entries[0].handle,
+                CollectionResult::Nil,
+            )
+            .unwrap();
+            let outcome = built.run_with(built.built.host_options()).unwrap();
+            if value == "worker" {
+                assert!(matches!(outcome, Outcome::Stop(_)), "{outcome:?}");
+                assert!(format!("{outcome:?}").contains("target invoked"));
+            } else {
+                assert!(matches!(outcome, Outcome::Ok(_)), "{outcome:?}");
+            }
+        }
+    }
+}

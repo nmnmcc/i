@@ -42,20 +42,21 @@ pub fn module(
     let mut entries = Vec::new();
     let mut wrappers = Vec::new();
     for definition in &definitions {
-        let binding = prepared
+        for binding in prepared
             .bindings
             .iter()
-            .find(|b| b.module == root.path && b.name == definition.name)
-            .expect("validated macro was prepared");
-        let (path, name) =
-            prepare::add_wrapper(&mut graph, &mut selected, binding, MacroPosition::Item);
-        let wrapper_source = selected.last().expect("wrapper was appended").source;
-        wrappers.push((
-            wrapper_source,
-            definition.name.clone(),
-            root.ast.items[definition.item].span,
-        ));
-        entries.push((path, name));
+            .filter(|b| b.module == root.path && b.name == definition.name)
+        {
+            let (path, name) =
+                prepare::add_wrapper(&mut graph, &mut selected, binding, MacroPosition::Item);
+            let wrapper_source = selected.last().expect("wrapper was appended").source;
+            wrappers.push((
+                wrapper_source,
+                definition.name.clone(),
+                root.ast.items[definition.item].span,
+            ));
+            entries.push((path, name));
+        }
     }
     let refs = entries
         .iter()

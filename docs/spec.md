@@ -686,7 +686,7 @@ A plain `i build` writes no `.wasm` module.
 
 A **version** of a package with a location is a git tag `vmajor.minor.patch` in its repository, for example `v1.4.0`. The package is the files of the repository at that tag, or the files of the directory after `//`, with its `i.toml` at the top.
 
-A **package** in a program is a location and a major version, or a directory for a path dependency. So `github.com/alice/json@1.4.0` and `github.com/alice/json@2.0.1` are two different packages, and their types are different. A program may use both, with two dependency names. Inside one major version, a newer version must be able to take the place of an older one.
+A **package** in a program is a location and a major version, or a directory for a path dependency. So `github.com/alice/json@1.4.0` and `github.com/alice/json@2.0.1` are two different packages, and their types are different. A program may use both, with two dependency names. Inside one major version, a newer version must be able to take the place of an older one. A published macro interface includes whether it is a syntax or typed macro, its argument-data shapes and explicit labels, and its compile-time contract. Without a stronger declared contract, a tool conservatively treats any change to the source bytes of its defining module or its transitive imported modules (including initializers) as a changed macro interface, even when its ordinary function type is unchanged. Removing or changing that contract requires a new major version; adding a macro requires a new minor version.
 
 A program uses one version of each package. It is chosen by **minimal version selection**:
 
@@ -698,17 +698,17 @@ So the versions used change only when an `i.toml` changes. A newer version that 
 
 ### 2.8 The lock file
 
-The file `i.lock` is next to the `i.toml` of the package that is compiled. It has one line for each version of a package with a location that the program uses, when it is compiled with or without its tests, in the order of locations and then versions as UTF-8 bytes:
+The file `i.lock` is next to the `i.toml` of the package that is compiled. It has one line for every version of a package with a location whose manifest minimal version selection reads (§2.7), in either the configuration with tests or the configuration without tests, including versions superseded by a higher reached version, in the order of locations and then versions as UTF-8 bytes:
 
 ```
 github.com/alice/json 1.4.0 9c3e1f0a5b7d2c4e8f6a1b3d5c7e9f0a2b4c6d8e sha256-6d2f…
 ```
 
-The parts are the location, the version, the git commit of the tag, and the **hash** of the package, with one space between them. The hash is `sha256-` and the lowercase hex SHA-256 of these bytes: for each file of the package, in the order of their paths as UTF-8 bytes: the path from the package directory, with `/` between the parts; a zero byte; the size of the file as a decimal number; a zero byte; the bytes of the file. The files of the package are the files in the git tree of the commit under the package directory, with their bytes as git keeps them, before any change that a checkout makes to line ends. A symbolic link is a file whose bytes are its target. Submodules are not part of the package.
+The parts are the location, the version, the git commit of the tag, and the **hash** of the package, with one space between them. The hash is `sha256-` and the lowercase hex SHA-256 of these bytes: for each file of the package, in the order of their paths as UTF-8 bytes: the path from the package directory, with `/` between the parts; a zero byte; the size of the file as a decimal number; a zero byte; the bytes of the file. The files of the package are the files in the git tree of the commit under the package directory, with their bytes as git keeps them, before any change that a checkout makes to line ends. A symbolic link is a file whose bytes are its target. For a package got by location, `i.toml`, `src`, `test`, and every path below `src` or `test` must not be symbolic links. Source loading does not follow such links, even when their targets are inside the package. A tool cannot publish a package whose committed manifest or source paths contain such a link. Submodules are not part of the package.
 
 - When the files that are got for a package do not have the commit and the hash in `i.lock`, it is an error, and nothing is compiled. So a tag that is moved, or files that are changed on the way, are found.
-- When `i.lock` has no line for a version that is used, the line is added. Lines for versions that are no longer used, with or without the tests, are taken out. So when a version is raised, the line for the old version is taken out and a line for the new one is added.
-- A tool may get the files from the repository or from any copy of it, because the hash makes certain they are the same files.
+- When `i.lock` has no line for a reached version, the line is added. Lines for versions whose manifests are no longer read in either configuration are taken out. Raising a selected version does not remove a lower version that is still reached. Compilation still uses only the selected version of each package and major version (§2.7).
+- A tool may get the files from the repository or from any copy of it, because the hash makes certain they are the same files. Each use verifies the actual file set and bytes against the committed package and the lock. A stored hash alone does not verify a copy. Compilation consumes the verified bytes, without reopening mutable paths.
 
 
 ## 3. Type syntax
@@ -2646,7 +2646,7 @@ The generated artifact and loader metadata are specified in §B.6.1. Host export
 
 These functions are **entry points**:
 
-- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. Its parameter group is `()`, and its result is unused. A missing default means no program entry.
+- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. Its parameter group is `()`, and its result is unused. The binding may be an alias or an expression that computes a function value; its inferred function type determines the parameter group. After ordinary module initialization, the entry invokes that initialized value through the ordinary call rules (§6.6). A missing default means no program entry.
 - **Tests**: the entries of the collection named by `[test] collection` in `i.toml` (§14.5). `std/test` provides ordinary imported item macros `test`, `skip`, `only`, `fails`, `suite`, and `each`, which contribute private functions and display metadata to `std/test.tests`. For example, `(testlib = (test) = std/test)` makes `test("addition", () { assert(1 + 1 == 2) })` available. These names have no special language meaning. Each selected function has the parameter group `()` and gives `Nil` or `Never`. A test **passes** when it gives `Nil`. It **fails** on a stop (§11.7) or an error that reaches the platform's `Fail`. `fails` reverses that expectation; `skip` reports an entry without running it, and `only` selects focused entries. `suite` prefixes names and provides the services written in it to its test bodies; `each` contributes one test for each written case. The runner compiles the collection once and runs each selected test in a fresh started instance (§B.1). With no configured collection, no tests run.
 - **Host exports**: the functions named in `[wasm].exports` (§2.6) of the package that is compiled. The `[wasm]` of other packages is not used. They must be in the exports of their module. A host export has one shape, its parameter data has positions only, and its parameters and value must be types that the host can take (§10.3).
 
@@ -3043,7 +3043,7 @@ SyntaxError = (message = String, at = Syntax)
 
 ### 14.5 Syntax macros
 
-A **syntax macro** is a top-level binding in a `.is` file with the attribute `@macro` and no declaration of the same name. Its pattern is one name, its value a function expression whose parameter items are names, and the value must have a subtype of `(Syntax, …) <- (Assert, Definitions, Diagnostics, Fail(SyntaxError), Items) -> Syntax`, with one `Syntax` for each parameter. `@macro` in a `.i` file, and an item with `@macro` in the result of an expansion, are compile errors. A macro is exported and imported as a value is. Its name may only be used in the imports, in the exports, and as the macro of a macro call. A macro may not be used in the module that defines it; a call in a template is data, not a use.
+A **syntax macro** is a top-level binding in a `.is` file with the attribute `@macro` and no declaration of the same name. Its pattern is one name, its value an ordinary function or chain of shape branches whose parameter items are bare names (positional) or `label = name` (labelled), and the value must have a subtype of `(Syntax, …) <- (Assert, Definitions, Diagnostics, Fail(SyntaxError), Items) -> Syntax`, with one `Syntax` for each parameter. `@macro` in a `.i` file, and an item with `@macro` in the result of an expansion, are compile errors. A macro is exported and imported as a value is. Its name may only be used in the imports, in the exports, and as the macro of a macro call. A macro may not be used in the module that defines it; a call in a template is data, not a use.
 
 ```lisp
 (, unless)
@@ -3062,7 +3062,7 @@ A **macro call** is written in these ways in both surfaces, where `m` is a name,
 | Before an item | `@m Item`, `@m(args) Item` | Expressions, then the item as the last argument | See below |
 | Type | `m(args)` | Types, integer literals and strings, with no labels | A type |
 
-- The parser does not know which names are macros, so arguments are read by the grammar of the position. Arguments are not worked out: the macro gets their `Syntax`. A labelled argument goes to the parameter item with that label. The number of arguments must be the number of parameters.
+- The parser does not know which names are macros, so arguments are read by the grammar of the position. Arguments are not worked out: the macro gets their `Syntax`. A labelled argument goes only to an explicitly labelled parameter item with that label. Bare parameter names are positional and do not create labels; renaming a parameter does not change its call shape. The argument data must have exactly the positional count and explicit labels of the macro parameters, under the ordinary rules of §6.11.
 - No macro call gives a statement or a pattern.
 - Before a type definition, the macro adds its result after the definition, which stays as written. Before a binding or a declaration, the result takes the place of the item. The item goes to the last parameter, with the attributes written after the macro. A built-in attribute may not be written before a macro. With several macros before an item, the first is expanded first.
 - A result may not contain imports, a quote, an unquote or a splice, or a `Curly` of items anywhere but at the top. `@external`, `@js` and `@host` may be in a result only when the whole attribute datum, with its arguments and its item, came unchanged from the caller's source through the arguments of each run, and at most once.
@@ -3148,11 +3148,11 @@ Items = (
 Diagnostics = (note = (String) -> Nil)
 ```
 
-`add(collection, target, data, at)` records that the function `target`, a binding of this module whose parameter group is `()`, belongs to the **collection** named by the exported binding `collection`, with string metadata `data` (unique keys) and source position `at`. A pair of collection and target may be added once. `expose` adds a name of the module to its exports. Requests of a run take effect only when the run succeeds. A tool reads a collection after checking and chooses which targets become entries (§10.2); importing a module runs none of them. `Diagnostics.note` adds a compiler note, given once for a successful run.
+`add(collection, target, data, at)` records that the function `target`, a binding of this module whose parameter group is `()`, belongs to the **collection** named by the exported binding `collection`, with string metadata `data` (unique keys) and source position `at`. The target is checked by its inferred function type; aliases and computed function values are allowed. Selecting a target invokes its initialized value by the ordinary call rules (§6.6). A pair of collection and target may be added once. `expose` adds a name of the module to its exports. Requests of a run take effect only when the run succeeds. A tool reads a collection after checking and chooses which targets become entries (§10.2); importing a module runs none of them. `Diagnostics.note` adds a compiler note, given once for a successful run.
 
 ### 14.6 Names in expanded code
 
-Every `Syntax` value has a scope: a module and a set of **marks**. Code read from a file of module `M`, and a template written in `M`, have the scope `M` with no marks. `make(node, like)` gives the scope of `like`. For each run the compiler makes a new mark; it adds the mark to the arguments and to every answer of `Definitions` or `Types`, runs the macro, and then flips the mark on every part of the result. So code from the arguments is as it was, and code the macro made has the mark.
+Every `Syntax` value has a scope: a module and a set of **marks**. Code read from a file of module `M`, and a template written in `M`, have the scope `M` with no marks. `make(node, like)` gives the scope of `like`. For each run the compiler makes a new mark; it adds the mark to the arguments and to every answer of `Definitions` or `Types`, runs the macro, and then flips the mark on every syntax-bearing part of the successful output transaction: the returned syntax and all recorded `Items.add` and `Items.expose` requests, including their collection, target, name and source-position syntax. The transaction is transformed as one shared syntax graph, so a name shared by a returned binding and a request retains the same scope and identity in both. A failed or postponed run commits none of its requests or diagnostics. So code from the arguments is as it was, and code the macro made has the mark.
 
 A name is looked up in this way:
 
@@ -3160,7 +3160,7 @@ A name is looked up in this way:
 2. Else, when it has no marks, it is a top-level, imported or built-in name of the module of its scope by the usual rules. A made name of another module reaches only exported names.
 3. Else, when it has marks, it is a top-level name that an expansion defined with the same text and scope in the module of the call; or else a top-level, imported or module name of the module of its scope, and then a built-in name. A made name reaches only exported names.
 
-Labels are compared by text only. Every rule that compares names (§2.2, §2.3, §4.3, §4.7, §6.11, §7.1) compares text and scope. A name defined by an expansion with marks may be used only by code of the same run; it cannot be exported, and it may not have the text of a top-level, imported or module name of the module of its scope. A name with no marks whose scope is another module may not be defined. An atom that came from an answer of `Definitions` or `Types` may not be a binder. Services and errors are found by type, not by name, so code from a template and code from the caller share services and error handlers as they would through an ordinary function.
+Labels are compared by text only. Every rule that compares names (§2.2, §2.3, §4.3, §4.7, §6.11, §7.1) compares text and scope. A name defined by an expansion with marks may be used only by code of the same run and cannot be exported. A marked top-level binder may not have the text of a top-level, imported or module name of the module of its scope. Marked local binders use the ordinary lexical shadowing rule (§5) and exact scope matching; an unrelated outer name does not reserve their text. A name with no marks whose scope is another module may not be defined. An atom that came from an answer of `Definitions` or `Types` may not be a binder. Services and errors are found by type, not by name, so code from a template and code from the caller share services and error handlers as they would through an ordinary function.
 
 ### 14.7 Asking for definitions
 
@@ -3168,13 +3168,13 @@ Labels are compared by text only. Every rule that compares names (§2.2, §2.3, 
 Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
 ```
 
-`definition(of)` gives the written type definition named by `of`, an `UpName` or `(. a U)`, with its attributes and parameters, as the `Syntax` of the item. A name bound by a type variable, a type of another module that is not exported or whose constructors are not exported, and a built-in type are `SyntaxError`s; `Bool`, `Nil`, `Result`, `Assert` and `AssertionFailure` give the definitions this document gives them. A value-dependent alias gives its written item. A name that is not found is a compile error at `of`. The definition of a binding cannot be asked for.
+`definition(of)` gives the written type definition named by `of`, an `UpName` or `(. a U)`, with its attributes and parameters, as the `Syntax` of the item. A name bound by a type variable, a type of another module that is not exported or whose constructors are not exported, and a built-in type are `SyntaxError`s; `Bool`, `Nil`, `Result`, `Assert` and `AssertionFailure` give the definitions this document gives them. A value-dependent alias gives its written item. An unresolved name in the current module is not ready while other pending item runs could introduce it. Its absence is a compile error at `of` only after those runs settle. Imported modules are already complete, so an absent imported name is an immediate compile error. The definition of a binding cannot be asked for.
 
-In the first step of expansion, a definition of the module being expanded is given only when it is **ready**: written in the module with no macro call left in it. A run that asks for a definition that is not ready is put off and done again later as a new run. When every run left has been put off, they are done one at a time in source order, each answered from the module as it is then; at the end of the step each such answer is asked again of the complete module, and a different answer is a compile error naming the name and the two runs. Runs that wait for one another in a circle are compile errors. So the result does not depend on the order in which runs are done.
+In the first step of expansion, a definition of the module being expanded is given only when it is **ready**: present in the module with no macro call left in it. A name that may still be introduced by another pending item run is not ready even when no binding for it is present yet. A run that asks for a definition that is not ready is put off and done again later as a new run. When every run left has been put off, they are done one at a time in source order, each answered from the module as it is then; at the end of the step each such answer is asked again of the complete module, and a different answer is a compile error naming the name and the two runs. Runs that wait for one another in a circle are compile errors. So the result does not depend on the order in which runs are done.
 
 ### 14.8 Typed macros
 
-A **typed macro** is a declaration and a binding with one name in a `.is` file, both with `@macro`. The declaration is the **signature**: a full function type, with no `_`. The binding is the **implementation**: one `Syntax` parameter for each parameter of the signature, checked against `(Syntax, …) <- (Assert, Definitions, Fail(SyntaxError), Types) -> Syntax`. A typed macro is used only in the position of an expression. Its signature is written `(@ macro (: name T))`, as `(@ macro (: to_text (-> [A] (, A) String)))`.
+A **typed macro** is a declaration and a binding with one name in a `.is` file, both with `@macro`. The declaration is the **signature**: a full function type, with no `_`. The binding is the **implementation**: an ordinary function or chain of shape branches. It supplies an implementation group for every parameter-data shape of the signature, with the same positional count and explicit labels in each advertised shape; every part of each shape is a `Syntax` parameter. Additional implementation groups are allowed, as for an ordinary function accepting a larger input set, but the signature determines which calls are admitted. Correspondence is checked at the definition, including shapes that no caller uses. Each group is checked against that shape of `Syntax` parts with need `(Assert, Definitions, Diagnostics, Fail(SyntaxError), Types)` and result `Syntax`. A call selects its shape group by the ordinary call rules before the macro runs. A typed macro is used only in the position of an expression. Its signature is written `(@ macro (: name T))`, as `(@ macro (: to_text (-> [A] (, A) String)))`.
 
 For type checking, a call of a typed macro is a call of a function with the signature's type: the types of the code around it never depend on what the macro gives, and whether a binding is a direct value and how it is generalized are decided before expansion. The calls of a group of bindings (§4.7) are expanded after the group is inferred, against one unchanged snapshot of its types. The result is checked against the instantiated signature without adding bounds to any type variable of the snapshot, and a result that cannot be proved to fit is a compile error at the call. A generic binding is expanded once, not once per instance.
 
@@ -3199,45 +3199,13 @@ Types = (
 | `type_of(s)` | The type of `s`, an argument of this run or an expression or bound name inside one |
 | `signature()` | The type of the call as a function type |
 | `subtype(a, b)` | `Yes` when `a <: b` is proved, `No` when it is false and neither has a type variable, `NotKnown` otherwise |
-| `members(t)` | The members of `t` (§4.4), in the order of their `show` text; a member of `Int` or `String` with a finite value set gives one literal type per value, and `A & Int` or `A - U` with a fixed `A` is one member |
+| `members(t)` | The members of `t` (§4.4), in the order of their `show` text as UTF-8 bytes, with ties ordered by semantic identity: package identity (§2.7), module path inside the package, type name, literal set and recursively the identities of type arguments. Data uses its ordered keys and parts; functions use parameter data, result and need; unions and intersections compare sorted member identities, and differences compare their base and sorted excluded identities. Built-in types use their built-in names and fixed variables their binder identities. Printed names alone never break a tie; a member of `Int` or `String` with a finite value set gives one literal type per value, and `A & Int` or `A - U` with a fixed `A` is one member |
 
-A type is a set of values that may be written in several ways, so a macro asks `subtype` and `members` instead of matching the `Syntax` of a type. A type that cannot be written in the type syntax is given as a `TypeView`, which `subtype` accepts and `show` prints as a token that is not source text. A fixed type variable is given as an `Up` node with a scope of its own that only names that variable; it may be written in the result without a declaration, but not in a type test. A variable that occurs only in the result of the signature has no evidence, so a typed macro cannot choose by the type that its call is expected to have. A typed macro cannot delay an argument that has a need, and it cannot make items.
+A type is a set of values that may be written in several ways, so a macro asks `subtype` and `members` instead of matching the `Syntax` of a type. A type that cannot be written in the type syntax is given as a `TypeView`, which `subtype` accepts and `show` prints as a token that is not source text. A fixed type variable is given as an `Up` node with a scope of its own that only names that variable; it may be written in the result without a declaration, but not in a type test. Queries uniformly observe the completed frozen snapshot, including bounds contributed by the expected result type. A variable that occurs only in the result is subject to the same query rules: without lower bounds an output-only closed variable gives `Never`; invariant occurrences remain opaque variables whose existing bounds may prove a subtype query. Queries never add evidence or bounds to the snapshot. A typed macro cannot delay an argument that has a need, and it cannot make items.
 
 ### 14.9 Running macros
 
-The macros of a module run in a program made of that module and the modules it imports, compiled for the compiler itself, not for a target. Its entry points get only `Definitions`, `Items` in an item run, `Types` in a typed run, `Diagnostics`, and an `Assert` whose `fail` stops the run. An `@external` function outside the library modules, or an executable `@js` binding, in the needs of a macro is a compile error. `hash` uses the portable macro hash below. Each run starts from a fresh state; a result may be kept and used again only when everything the run was given is the same, and it then gets the mark of the new run.
-
-**Portable macro hash.** In a macro, `core.hash(v)` is the following unsigned
-32-bit number. Start at 2166136261. For each byte `b` of the encoding below,
-replace `h` by `((h xor b) × 16777619) mod 2^32`. Byte order, tags and lengths
-are part of this rule; machine representation and allocation identities are
-not inputs.
-
-`nat(n)` is unsigned base-128 little-endian encoding: emit the low seven bits
-with bit 7 set while more bits remain, then one final byte without bit 7.
-Zero is one zero byte. `text(s)` is `nat(UTF-8 byte length)` then those bytes.
-Concatenation below means bytes in the listed order; recursively encode values
-in that order, also when an implementation shares their storage.
-
-| Value | Encoding |
-|---|---|
-| Int | byte 0; sign byte 1 if negative, otherwise 0; `nat(n)`; the absolute magnitude as `n` minimal little-endian base-256 bytes; zero has `n = 0` |
-| Float | byte 1; its binary64 bits as eight little-endian bytes, with both zero signs encoded as positive zero |
-| String | byte 2; `text(value)` |
-| BitArray | byte 3; `nat(bit length)`; bits packed highest bit first, with zero padding in the low bits of the last byte |
-| List | byte 4; `nat(length)`; the encodings of its parts in order |
-| Data | byte 5; `nat(position count)`; positional encodings; `nat(label count)`; then `text(label)` and the part encoding for each label in UTF-8 byte order |
-| Non-opaque labelled value | byte 6; `text(declared constructor name)`; encoding of its data, including `()` |
-| UtfCodepoint | byte 7; `nat(Unicode scalar value)` |
-| Identity value | byte 255 only |
-
-The identity row takes precedence over structural rows. It includes functions,
-opaque values, boundaries, continuations, keys, keyed values, requests, tickets,
-Syntax and TypeHandle values, and host references. Do not inspect their captures,
-contents, spans, scopes or ids. Unequal values may hash alike: in particular all
-identity values collide, and constructors with the same declared name can
-collide. Equal values (§11.4) always have equal encodings. This rule applies to
-macro execution only; ordinary execution keeps the hash contract of §13.
+The macros of a module run in a program made of that module and the modules it imports, compiled for the compiler itself, not for a target. Its entry points get only `Definitions`, `Items` in an item run, `Types` in a typed run, `Diagnostics`, and an `Assert` whose `fail` stops the run. An `@external` function outside the library modules, or an executable `@js` binding, in the needs of a macro is a compile error. `hash` in a macro gives the unsigned 32-bit integer defined below, on every machine. It does not use addresses, allocation order, compiler type numbers or randomized seeds. Each run starts from a fresh state; a result may be kept and used again only when everything the run was given is the same, and it then gets the mark of the new run.
 
 A **compile-time binding** has `@macro`, or has a quote or a function of `i/syntax` in its full dependencies (§2.5). A program selected by its entries or host exports may not need one. `i test` provides the functions of `i/syntax`, so a test may call the functions a macro is made of, give its own `Definitions`, and compare code with `same_code`.
 
@@ -3246,6 +3214,27 @@ An error in expanded code is reported at the span of the code; code from a templ
 `i fmt` formats a file in its own surface without expanding macros. `i expand` writes a module after expansion, in the surface that is asked for; a module with quotes can only be written in the Lisp surface, and `i expand --trace` also writes each run with its macro, arguments and result. The language server shows the expansion of a macro call, gives types and completion in the arguments of a typed macro call from its signature, and goes from a name in expanded code to its definition by its span.
 
 
+
+
+**Portable macro hash.** Begin with `h = 2166136261`. For each word `w` of the stream below, set `h = ((h xor w) * 16777619) mod 2^32`. Words are unsigned 32-bit integers; negative words use their value modulo 2^32. Concatenation is in the written order, and nested values contribute their complete streams, without restarting `h`.
+
+| Value | Word stream |
+|---|---|
+| `Nil` | `0` |
+| `False`, `True` | `1, b, 0, 0`, with `b = 0` or `1` |
+| `Int` | `8, sign, n`, then the `n` base-2^32 digits of the absolute value, least significant first; `sign` is -1, 0 or 1; zero has no digits |
+| `Float` | `2, low, high` of its IEEE 754 binary64 bits; either zero uses all-zero bits |
+| `String` | `3`, then one word per UTF-8 byte |
+| `Codepoint` | `13, scalar, 0, 0` |
+| `Bits` | `9, low, high` of its bit length, then one word (0 or 1) per bit, first bit first |
+| Data | `4, 0, 0, 0, n`, then its `n` parts in the canonical shape order (§6.4); labels themselves do not contribute |
+| A constructed value | `5, 0, 0, 0, n`, then its `n` fields in declaration order; constructor and type identities do not contribute |
+| `[]` | `6, 0, 0, 0` |
+| `[head .. tail]` | `6, 0, 0, 0, 2`, then `head` and `tail` |
+| A keyed value (§9.8) | `16, 0, 0, 0, 2`, then its key and enclosed value |
+| An opaque identity | `7` |
+
+Opaque identities include functions, keys, boundaries, continuations, lazy values, references and compiler-owned handles (including `Syntax` and type handles). Their contents and creation numbers are not hashed. Collisions between unequal values, including different labels, types or identities, are permitted (§13). Sharing does not change the stream: each occurrence contributes independently.
 
 ## Appendix A. Choices
 

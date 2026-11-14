@@ -1,6 +1,7 @@
 (
 	choose
 	Target(..)
+	TargetKind(..)
 	Fs(..)
 	Js(..)
 	Wasi(..)
@@ -12,12 +13,13 @@ NodeJS = (Js)
 WasiTarget = (Wasi)
 Native = ()
 Host = ()
-Target = JsTarget | NodeJS | WasiTarget | Native | Host
+TargetKind = JsTarget | NodeJS | WasiTarget | Native | Host
+Target = (TargetKind)
 Fs = (read_file = (String) <- (Fail(String)) -> BitArray)
 read_file = (path) <- (fs : Fs) { fs.read_file(path) }
 choose = () <- (t : Target) {
 	t |>
-		(NodeJS(_)) { read_file("settings.txt") }
-		| (Native) { read_file("settings.txt") }
+		(Target(NodeJS(_))) { read_file("settings.txt") }
+		| (Target(Native)) { read_file("settings.txt") }
 		| (_) { <<>> }
 }

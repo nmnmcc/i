@@ -3,7 +3,8 @@
 //! The packages got by path are read first, by the loader. Then their
 //! dependencies by location are the start of minimal version selection,
 //! which is done twice: without and with the tests of the compiled package.
-//! `i.lock` has a line for each version that either one uses. The versions
+//! `i.lock` pins every version reached by either selection, including
+//! superseded manifests. The versions
 //! of the one that is compiled are loaded.
 
 use crate::git::{self, Git, GitError};
@@ -338,25 +339,26 @@ pub(crate) fn resolve(
                 errors = true;
             }
         }
-        let used: BTreeSet<(PackageKey, Version)> = sel_without
-            .versions
-            .iter()
-            .chain(&sel_with.versions)
-            .map(|(k, v)| (k.clone(), *v))
-            .collect();
-        for (key, version) in used {
+        // Every consulted manifest is a resolution input, even if another
+        // version supersedes it. Pin both configurations' complete closure.
+        let reached: BTreeSet<(PackageKey, Version)> = resolver.reached.keys().cloned().collect();
+        for (key, version) in reached {
             let Some(Ok((commit, _))) = resolver.reached.get(&(key.clone(), version)) else {
                 continue;
             };
             let (repository, dir) = split_place(&key.location);
             let what = format!("{}@{version}", key.location);
-            match resolver.git.package(repository, dir, &key.location, commit) {
+            match resolver
+                .git
+                .package_snapshot(repository, dir, &key.location, commit)
+            {
                 Err(e) => {
+                    mismatch |= matches!(e.code, code::LOCK_MISMATCH | code::PACKAGE_FILES);
                     let origin = origin(&sel_with, &sel_without, &key, version);
                     report(loader, &origin, &what, &e);
                     errors = true;
                 }
-                Ok((path, hash)) => {
+                Ok((path, hash, files)) => {
                     if let Some(l) = lock.get(&key.location, version)
                         && (l.commit != *commit || l.hash != hash)
                     {
@@ -390,6 +392,7 @@ pub(crate) fn resolve(
                         Located {
                             location,
                             dir: path,
+                            files: std::sync::Arc::new(files),
                         },
                     );
                 }

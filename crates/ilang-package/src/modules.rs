@@ -15,10 +15,16 @@ pub(crate) fn collect(
     dir: &Path,
     tests: bool,
     shown: Option<&str>,
+    snapshot: Option<&[crate::lock::PackageFile]>,
 ) -> (Vec<ModuleSource>, Vec<Diagnostic>) {
     let mut diags = Vec::new();
     let mut out: Vec<ModuleSource> = Vec::new();
     let mut seen: HashMap<String, usize> = HashMap::new();
+    let snapshot_by_path: HashMap<_, _> = snapshot
+        .into_iter()
+        .flatten()
+        .map(|file| (file.path.as_str(), file))
+        .collect();
     let roots: &[(&str, ModuleKind)] = if tests {
         &[("src", ModuleKind::Src), ("test", ModuleKind::Test)]
     } else {
@@ -27,14 +33,35 @@ pub(crate) fn collect(
     for &(sub, kind) in roots {
         let base = dir.join(sub);
         let mut files = Vec::new();
-        walk(&base, &mut files);
+        if let Some(snapshot) = snapshot {
+            let prefix = format!("{sub}/");
+            files.extend(
+                snapshot
+                    .iter()
+                    .filter(|f| {
+                        f.path.starts_with(&prefix)
+                            && Path::new(&f.path)
+                                .extension()
+                                .is_some_and(|e| e == "i" || e == "is")
+                    })
+                    .map(|f| dir.join(&f.path)),
+            );
+        } else {
+            walk(&base, &mut files);
+        }
         files.sort();
         for file in files {
             let display = match shown {
                 Some(s) => format!("{s}/{}", crate::relative(dir, &file)),
                 None => loader.display(&file),
             };
-            let text = match std::fs::read(&file).map(String::from_utf8) {
+            let bytes = if snapshot.is_some() {
+                let path = crate::relative(dir, &file);
+                Ok(snapshot_by_path[path.as_str()].bytes.clone())
+            } else {
+                std::fs::read(&file)
+            };
+            let text = match bytes.map(String::from_utf8) {
                 Ok(Ok(text)) => text,
                 _ => {
                     diags.push(Diagnostic::error(

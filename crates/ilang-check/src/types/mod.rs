@@ -480,7 +480,7 @@ pub struct Typed {
     /// `scheme_types[d].text(&type_names(program, d.module))`.
     pub scheme_types: HashMap<DefId, ShownType>,
     /// Inferred schemes for all top-level names, including private bindings
-    /// that may be named by their own package's provider plan.
+    /// named by provider plans or macro collections.
     pub provider_scheme_types: HashMap<DefId, ShownType>,
     /// Complete schemes for plan-only private factories and adapters.
     pub provider_scheme_artifacts: HashMap<DefId, SchemeArtifact>,
