@@ -141,6 +141,12 @@ class RunnerTests(unittest.TestCase):
         for info in ('i file=src/a.i', 'i file="src/a.i"', 'i title="src/a.i"',
                      'i file=src/a.i title="src/a.i"'):
             self.assertEqual(runner.i_info(info), ('file', 'src/a.i', frozenset()))
+        for info, path in (('scheme file=src/a.is title="src/a.is"', 'src/a.is'),
+                           ('toml file=i.toml title="i.toml"', 'i.toml'),
+                           ('text file=data.txt title="data.txt"', 'data.txt')):
+            self.assertEqual(runner.i_info(info), ('file', path, frozenset()))
+        for info in ('scheme', 'scheme title="not-a-project-file"', 'toml', 'text'):
+            self.assertIsNone(runner.i_info(info))
         self.assertEqual(runner.i_info('i error E0201 E0301 E0201')[2], {'E0201', 'E0301'})
         for kind in ('run', 'test', 'test-fails', 'check', 'error E0201'):
             info = f'i {kind} package=hello title="src/main.i"'
@@ -149,7 +155,9 @@ class RunnerTests(unittest.TestCase):
         for info in ('i run extra', 'i error', 'i error not_a_code', 'i mystery',
                      'i file=a.i title="b.i"', 'i file=', 'i title="unterminated',
                      'i run package=i', 'i run package=Upper', 'i run package=one package=two',
-                     'i shown', 'i check file=src/main.i'):
+                     'i shown', 'i check file=src/main.i', 'i file=src/a.is',
+                     'i file=i.toml', 'i title="data.txt"', 'scheme file=src/a.i',
+                     'toml file=src/a.i', 'toml file=i.toml package=wrong'):
             with self.subTest(info=info), self.assertRaises(ValueError):
                 runner.i_info(info)
         for path in ('../a.i', '/tmp/a.i', 'src/../a.i', './a.i', 'src\\a.i'):

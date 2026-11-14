@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify authored i fence titles, highlighted code, and hidden metadata in dist."""
+"""Verify example fence titles, highlighted source, and hidden metadata in dist."""
 from html.parser import HTMLParser
 from pathlib import Path
 import sys
@@ -71,13 +71,13 @@ def main():
             matches = [rendered for rendered in parsed.blocks
                        if rendered['title'] == title and title
                        and rendered['code'].rstrip('\n') == block.source.rstrip('\n')
-                       and rendered['highlighted']]
+                       and (rendered['highlighted'] or block.info.split()[0] == 'text')]
             if not matches:
-                failures.append(f'{page.relative_to(ROOT)}:{block.line}: expected highlighted i source with title={title!r} and no metadata in its code')
+                failures.append(f'{page.relative_to(ROOT)}:{block.line}: expected source with title={title!r}, appropriate highlighting, and no metadata in its code')
             count += 1
     for failure in failures:
         print(failure, file=sys.stderr)
-    print(f'{count} authored i fences checked in dist; {len(failures)} rendering failures.')
+    print(f'{count} authored example fences checked in dist; {len(failures)} rendering failures.')
     return bool(failures)
 
 

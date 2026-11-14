@@ -35,7 +35,7 @@ In the complete definition below, `(, twice)` is the exports header, `(= twice â
 
 Create `src/macros.is` in a package named `tour`:
 
-```i file=src/macros.is title="src/macros.is"
+```scheme file=src/macros.is title="src/macros.is"
 (, twice)
 (@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
 ```
@@ -105,7 +105,7 @@ Macros have no host services for reading files, the network or the time. The sta
 
 The complete [`examples/tour/src/sugar.is`](https://github.com/nmnmcc/i/blob/main/examples/tour/src/sugar.is) defines `if` as a macro, rather than a language keyword. These two files are copied unchanged from the repository tour.
 
-```i file=src/sugar.is title="src/sugar.is"
+```scheme file=src/sugar.is title="src/sugar.is"
 (, if)
 (= _branches
   (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))

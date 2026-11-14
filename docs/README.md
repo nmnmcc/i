@@ -36,7 +36,13 @@ Example fences in authored pages use these info strings:
   check alone, such as a client of a second package; list it in the report.
 - `i file=src/name.i`: an extra file for the next complete example on the page.
   Multiple files may precede it; paths are relative to the scratch project.
-  Other files, such as `i.toml`, are allowed and are excluded from the i parser.
+- `scheme file=src/macros.is title="src/macros.is"`: a supporting Lisp-surface
+  module. The site highlights it as Scheme; the snippet checks use the i
+  parser driver's `--lisp` mode. The runner includes it in the compiled project.
+- `toml file=i.toml title="i.toml"`: a supporting manifest. Use
+  `text file=data.txt title="data.txt"` for other data. These files are written
+  into the project and are excluded from source parsing. Non-source files must
+  not use language `i`, which is reserved for `.i` modules.
 - Bare `i`: a fragment, checked only by the parser. Use it to discuss lines of
   a complete example on the same page.
 
@@ -46,7 +52,8 @@ the block as i; the other words are metadata. A title also names an example's
 source file: `i test-fails package=hello title="test/failure_test.i"` keeps the
 test module name in its transcript. Paths must be relative to the project;
 primary sources live under `src/` or `test/`. The runner also accepts the older
-`i file="src/name.i"` and `i title="src/name.i"` supporting-file spellings.
+`i file="src/name.i"` and `i title="src/name.i"` supporting-file spellings for
+`.i` modules; other languages require an explicit `file=` attribute.
 
 Temporary projects use the page's filename as their package name, lowercased
 with punctuation changed to underscores (`first-program.mdx` → `first_program`;
@@ -70,3 +77,6 @@ runner builds it offline through the shared heavy queue when present.
 `--no-placeholders` rejects `to be written` in authored content. It is enabled
 by `npm run check:examples`; direct runner invocations opt in. Generated
 directories are excluded from execution and placeholder checks.
+The repository snippet inventory excludes `scripts/run-examples-fixtures/`
+under `docs`: its deliberately valid and invalid inputs are checked by
+`scripts/run-examples-test`, rather than treated as documentation.

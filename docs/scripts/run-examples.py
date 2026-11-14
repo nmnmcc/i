@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the complete examples in authored documentation, without network access."""
+"""Execute authored examples and their i, Scheme, TOML, and data files offline."""
 import argparse
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor

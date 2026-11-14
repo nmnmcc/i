@@ -7,6 +7,7 @@ import io
 import json
 from pathlib import Path
 import unittest
+import tempfile
 from unittest.mock import patch
 
 loader = importlib.machinery.SourceFileLoader("old_syntax_check", str(Path(__file__).with_name("check-snippets")))
@@ -41,6 +42,32 @@ let a = "x = \"a\"\n"; let b = r##"f = { x -> x }"##;'''
     def test_driver_reads_multiple_sources(self):
         self.assertEqual(check.parse(['x = "@1..2"', 'x = "@3..4"']), [[], []])
         self.assertTrue(check.parse(['x ='])[0][0].startswith('E0101:'))
+
+    def test_lisp_fences_use_the_lisp_parser(self):
+        text = ('```scheme file=src/value.is title="src/value.is"\n(, answer)\n(= answer 42)\n```\n'
+                '```toml file=i.toml\nname = "example"\n```\n'
+                '```scheme\n(display "not i")\n```\n')
+        items = list(check.markdown_snippets('page.mdx', text))
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['surface'], 'lisp')
+        self.assertEqual(check.parse([items[0]['source']], lisp=True), [[]])
+        self.assertTrue(check.parse(['(='], lisp=True)[0])
+
+    def test_runner_fixtures_are_excluded_but_docs_are_scanned(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            fixture = root / 'docs/scripts/run-examples-fixtures/failing-syntax.mdx'
+            page = root / 'docs/content/docs/example.mdx'
+            for file, source in ((fixture, '='), (page, 'main = () { Nil }')):
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text('```i\n' + source + '\n```\n')
+            registry = root / 'registry.json'
+            registry.write_text('{}')
+            paths = '\n'.join(str(file.relative_to(root)) for file in (fixture, page))
+            with patch.object(check, 'ROOT', root), patch.object(check, 'DATA', registry), \
+                    patch.object(check.subprocess, 'check_output', return_value=paths):
+                items = list(check.snippets())
+            self.assertEqual([item['path'] for item in items], ['docs/content/docs/example.mdx'])
 
 
 class Expectations(unittest.TestCase):

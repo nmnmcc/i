@@ -58,16 +58,29 @@ def i_options(info):
 
 
 def i_info(info):
-    """Return (kind, file path, codes), or None for a different language.
+    """Return (kind, file path, codes) for an example or supporting file.
 
     A title names the primary source of an executable block. On a supporting
-    file block it is also a file= alias. file= remains required on shown.
+    i block it is also a file= alias. Other languages require explicit file=:
+    scheme for .is modules, toml for manifests, and text for other data.
     """
-    if not re.match(r'^i(?:\s|$)', info):
+    language = info.split()[0] if info.split() else ''
+    if language not in ('i', 'scheme', 'toml', 'text'):
         return None
     words, options = i_options(info)
     path = options.get('file')
     title = options.get('title')
+    if language != 'i':
+        if path is None:
+            return None
+        if words or 'package' in options:
+            raise ValueError('a non-i supporting fence needs only file= and title=')
+        if language == 'scheme' and not path.endswith('.is'):
+            raise ValueError('scheme file= must name a .is module')
+        if language == 'toml' and not path.endswith('.toml'):
+            raise ValueError('toml file= must name a .toml manifest')
+    elif (path or title) and not (path or title).endswith('.i'):
+        raise ValueError('i fences hold .i source; use scheme for .is, toml for manifests, or text for data')
     if path and title and title != path:
         raise ValueError('file= and title= must name the same file')
     if not words:

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Check fenced i examples with the repository's snippet parser and registry."""
+"""Check normal and Lisp examples with the repository's snippet parser and registry."""
 import importlib.machinery
 import importlib.util
 import json
 from paths import ROOT, SPEC_PATH
 import subprocess
 import sys
-from example_fences import fences, i_info
+from example_fences import fences, generated, i_info
 from pathlib import Path
 
 loader = importlib.machinery.SourceFileLoader('repo_snippets', str(ROOT / 'scripts/check-snippets'))
@@ -24,15 +24,17 @@ for file in sorted((ROOT / 'docs/content').rglob('*')):
     for block in fences(text):
         try:
             info = i_info(block.info)
-        except ValueError:
+        except ValueError as error:
             # Keep parsing legacy metadata in generated standard snippets.
             # The runner validates the info strings of authored pages.
+            if not generated(file.relative_to(ROOT / 'docs/content')):
+                raise SystemExit(f'{file.relative_to(ROOT)}:{block.line}: {error}')
             info = ('fragment', None, frozenset())
         if info is None:
             continue
         kind, filename, codes = info
-        # Supporting project files (for example i.toml or data.json) are not
-        # i modules. Lisp modules use the parser driver's other surface.
+        # toml/text file= fences are project inputs, not source. scheme file=
+        # fences name .is modules and use the parser driver's Lisp surface.
         if filename and Path(filename).suffix not in ('.i', '.is'):
             continue
         source = block.source
@@ -67,13 +69,7 @@ for lisp in (False, True):
     group = [(index, item[3]) for index, item in enumerate(items) if bool(item[5]) == lisp]
     if not group:
         continue
-    if not lisp:
-        actuals = checker.parse([source for _, source in group])
-    else:
-        data = b''.join(str(len(source.encode())).encode() + b'\n' + source.encode() for _, source in group)
-        output = iter(subprocess.check_output([str(checker.parser_driver()), '--lisp'], input=data).decode().splitlines())
-        actuals = [[(lambda code, message: code + ': ' + bytes.fromhex(message).decode())(*next(output).split(' ', 1))
-                    for _ in range(int(next(output)))] for _ in group]
+    actuals = checker.parse([source for _, source in group], lisp=lisp)
     results.update((index, actual) for (index, _), actual in zip(group, actuals))
 failed = False
 for index, (file, line, entry, code, nearby, lisp, codes) in enumerate(items):

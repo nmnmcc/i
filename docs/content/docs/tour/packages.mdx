@@ -89,7 +89,7 @@ app/
 
 Each directory with a manifest is a separate package. Start with `app/words/i.toml`:
 
-```i file=words/i.toml title="words/i.toml"
+```toml file=words/i.toml title="words/i.toml"
 name = "words"
 ```
 
@@ -104,7 +104,7 @@ message = (name : String) -> String { "hello, " <> name }
 
 Declare the dependency in `app/i.toml`:
 
-```i file=i.toml title="i.toml"
+```toml file=i.toml title="i.toml"
 name = "app"
 
 [dependencies]
