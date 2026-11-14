@@ -1,6 +1,6 @@
 Svc(A) = (() -> A)
 
-Row(N) = () <- (Fail(N)) -> Nil
+Row(N) = () <- N -> Nil
 
 bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 	first: N = one
