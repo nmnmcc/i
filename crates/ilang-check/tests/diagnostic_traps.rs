@@ -7,7 +7,8 @@ fn diagnostics(source: &str) -> Vec<ilang_package::Diagnostic> {
 
 #[test]
 fn two_spaced_constructor_parts_are_still_one_binding() {
-    let source = "Pair = (Int, Int)\nf = (g : Pair) { mk = Pair  (b, c) = g\n (mk, b, c) }\n_ = f\n";
+    let source =
+        "Pair = (Int, Int)\nf = (g : Pair) { mk = Pair  (b, c) = g\n (mk, b, c) }\n_ = f\n";
     let ds = diagnostics(source);
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].code, "W0506");

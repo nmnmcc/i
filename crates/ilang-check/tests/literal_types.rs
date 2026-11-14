@@ -351,7 +351,12 @@ fn narrowing_checks_the_entire_row_and_ignores_guards() {
         ("Ok(\"a\")", "Ok(t)", "Result(String, Nil)", true),
         ("(\"a\", True)", "(t, _)", "(String, Bool)", false),
         ("(\"a\", _)", "(t, _)", "(String, Bool)", true),
-        ("(\"a\", x : Int)", "(t, _)", "(String, Int | String)", false),
+        (
+            "(\"a\", x : Int)",
+            "(t, _)",
+            "(String, Int | String)",
+            false,
+        ),
         ("[\"a\"]", "[t, ..]", "List(String)", false),
         ("[\"a\", ..]", "[t, ..]", "List(String)", true),
         ("x : String - \"a\"", "t", "String", true),
