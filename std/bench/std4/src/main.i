@@ -1,5 +1,6 @@
 //// Reproduce with: i run --project std/bench/std4 --opt 2
 (
+	i/fail
 	i/clock
 	i/stdio
 	std/crypto
@@ -70,7 +71,7 @@ main = () {
 		)
 		Nil
 	})
-	re = regex.compile("^a+b$") |>
+	re = fail.catch(() { regex.compile("^a+b$") }) |>
 		(Ok(re)) { re }
 		| (Error(_)) { panic("benchmark regex") }
 	haystack = message <> "b"
@@ -78,7 +79,7 @@ main = () {
 		assert(regex.is_match(re, haystack))
 		Nil
 	})
-	nested = regex.compile("(a*)*b") |>
+	nested = fail.catch(() { regex.compile("(a*)*b") }) |>
 		(Ok(re)) { re }
 		| (Error(_)) { panic("benchmark regex") }
 	adversarial = string.repeat("a", 5000)
@@ -89,7 +90,7 @@ main = () {
 	rows = list.repeat(["hello", "quoted,field", "é🦀"], 10000)
 	text = csv.print(rows)
 	measure("csv_parse", string.byte_size(text), () {
-		assert(csv.parse(text) == Ok(rows))
+		assert(fail.catch(() { csv.parse(text) }) == Ok(rows))
 		Nil
 	})
 	measure("csv_print", string.byte_size(text), () {

@@ -41,8 +41,6 @@ impl std::fmt::Debug for Ty {
                         pending.push(Part::Text(" })"));
                         pending.push(Part::Type(&fun.env));
                         pending.push(Part::Text(", env: "));
-                        pending.push(Part::Type(&fun.err));
-                        pending.push(Part::Text(", err: "));
                         pending.push(Part::Type(&fun.ret));
                         pending.push(Part::Text("], ret: "));
                         for (i, (label, t)) in fun.params.iter().enumerate().rev() {
@@ -95,7 +93,7 @@ pub(super) fn visit<'a>(t: &'a Ty, mut f: impl FnMut(&'a Ty)) {
             Ty::Var(_) | Ty::Never | Ty::Top => {}
             Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => pending.extend(xs.iter().rev()),
             Ty::Fn(fun) => {
-                pending.extend([&fun.env, &fun.err, &fun.ret]);
+                pending.extend([&fun.env, &fun.ret]);
                 pending.extend(fun.params.iter().rev().map(|(_, t)| t));
             }
             Ty::Diff(a, xs) => {
@@ -156,7 +154,6 @@ impl Clone for Ty {
                             f.params.iter().map(|(n, _)| n.clone()).collect(),
                         ));
                         tasks.push(CopyTask::Visit(&f.env));
-                        tasks.push(CopyTask::Visit(&f.err));
                         tasks.push(CopyTask::Visit(&f.ret));
                         tasks.extend(f.params.iter().rev().map(|(_, t)| CopyTask::Visit(t)));
                     }
@@ -205,7 +202,7 @@ impl Clone for Ty {
                 }
                 CopyTask::Fn(labels) => {
                     let n = labels.len();
-                    let mut parts = take_children(&mut results, n + 3).into_iter();
+                    let mut parts = take_children(&mut results, n + 2).into_iter();
                     let params = labels
                         .into_iter()
                         .map(|label| (label, parts.next().unwrap()))
@@ -213,7 +210,6 @@ impl Clone for Ty {
                     results.push(Ty::Fn(Box::new(FnTy {
                         params,
                         ret: parts.next().unwrap(),
-                        err: parts.next().unwrap(),
                         env: parts.next().unwrap(),
                     })));
                 }
@@ -264,7 +260,7 @@ impl PartialEq for Ty {
                         }
                         pending.push((xt, yt));
                     }
-                    pending.extend([(&x.ret, &y.ret), (&x.err, &y.err), (&x.env, &y.env)]);
+                    pending.extend([(&x.ret, &y.ret), (&x.env, &y.env)]);
                 }
                 _ => return false,
             }
@@ -327,7 +323,6 @@ impl Hash for Ty {
                         label.hash(state);
                     }
                     pending.push(&f.env);
-                    pending.push(&f.err);
                     pending.push(&f.ret);
                     pending.extend(f.params.iter().rev().map(|(_, t)| t));
                 }
@@ -349,7 +344,6 @@ impl Drop for Ty {
                 Ty::Fn(f) => {
                     pending.extend(std::mem::take(&mut f.params).into_iter().map(|(_, t)| t));
                     push(std::mem::replace(&mut f.ret, Ty::Never), pending);
-                    push(std::mem::replace(&mut f.err, Ty::Never), pending);
                     push(std::mem::replace(&mut f.env, Ty::Never), pending);
                 }
                 Ty::Diff(base, xs) => {
@@ -389,7 +383,6 @@ mod tests {
                 1 => Ty::Fn(Box::new(FnTy {
                     params: vec![(Some("p".into()), Ty::Var(V(0)))],
                     ret: t,
-                    err: Ty::Never,
                     env: Ty::Never,
                 })),
                 2 => Ty::Union(vec![t, Ty::Never]),
@@ -435,12 +428,11 @@ mod tests {
         let t = Ty::Fn(Box::new(FnTy {
             params: vec![(Some("p".into()), Ty::Var(V(0)))],
             ret: Ty::Never,
-            err: Ty::Never,
             env: Ty::Never,
         }));
         assert_eq!(
             format!("{t:?}"),
-            "Fn(FnTy { params: [(Some(\"p\"), Var(V(0)))], ret: Never, err: Never, env: Never })"
+            "Fn(FnTy { params: [(Some(\"p\"), Var(V(0)))], ret: Never, env: Never })"
         );
     }
 

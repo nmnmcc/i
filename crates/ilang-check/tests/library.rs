@@ -3,7 +3,7 @@
 
 mod common;
 
-use ilang_check::hir::{DefKind, TypeBody, TypeKind};
+use ilang_check::hir::{DefKind, TypeBody};
 
 #[test]
 fn library_resolves_cleanly() {
@@ -17,7 +17,6 @@ fn library_resolves_cleanly() {
         [
             "i/prelude",
             "i/fail",
-            "i/failure",
             "i/control",
             "i/resource",
             "i/assertion",
@@ -70,12 +69,9 @@ fn library_names() {
     let program = program.unwrap();
     let expect: &[(&str, &[&str])] = &[
         ("i/fail", &["raise", "catch", "from_result", "map_error"]),
-        ("i/failure", &["raise", "catch"]),
         (
             "i/control",
-            &[
-                "boundary", "suspend", "escape", "resume", "cancel", "keep_env",
-            ],
+            &["boundary", "suspend", "escape", "resume", "cancel", "keep"],
         ),
         ("i/key", &["new", "wrap", "unwrap"]),
         (
@@ -319,6 +315,7 @@ fn library_names() {
     // The functions that the spec writes in i are bindings.
     for (path, name) in [
         ("i/assertion", "catch"),
+        ("i/control", "keep"),
         ("i/resource", "acquire"),
         ("i/fail", "from_result"),
         ("i/fail", "map_error"),
@@ -340,23 +337,41 @@ fn library_names() {
 /// `control.suspend: (Boundary(…), (Continuation(…)) -> …) -> A`.
 #[test]
 fn library_labels() {
-    let (_, program, _) = common::check_files(&[]);
-    let program = program.unwrap();
+    let (graph, _, _) = common::check_files(&[]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        checked.diags
+    );
+    let program = checked.program.unwrap();
+    let types = checked.types.unwrap();
+    // E3/E6 make catch/keep ordinary bindings. Inspect the public parameter
+    // data shape, not the legacy HIR's diagnostic parameter-name hints.
     let labels = |path: &str, name: &str| -> Vec<String> {
-        let DefKind::External { ty, .. } = &common::def(&program, path, name).kind else {
-            panic!()
-        };
-        let TypeKind::Fn { params, .. } = &ty.kind else {
-            panic!()
-        };
-        params
+        let module = common::module(&program, path);
+        let index = program
+            .module(module)
+            .defs
             .iter()
-            .map(|p| p.label.as_ref().map_or("_".into(), |l| l.name.clone()))
+            .position(|d| d.name == name)
+            .unwrap();
+        let id = ilang_check::hir::DefId {
+            module,
+            index: index as u32,
+        };
+        let ilang_check::types::ShownType::Fn(f) = &types.scheme_types[&id] else {
+            panic!()
+        };
+        f.params
+            .iter()
+            .map(|(label, _)| label.clone().unwrap_or("_".into()))
             .collect()
     };
     assert_eq!(labels("i/control", "suspend"), ["_", "_"]);
     assert_eq!(labels("i/control", "resume"), ["_", "_"]);
     assert_eq!(labels("i/fail", "catch"), ["_"]);
+    assert_eq!(labels("i/control", "keep"), ["_"]);
     assert_eq!(labels("i/resource", "ensure"), ["_", "_"]);
     assert_eq!(labels("i/core", "byte_slice"), ["_", "_", "_"]);
     assert_eq!(labels("i/core", "index_of"), ["_", "_", "_"]);

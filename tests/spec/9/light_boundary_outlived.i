@@ -2,7 +2,7 @@
 // expect: stop "control: boundary is not active"
 // at: spec/main:16:17
 (
-	i/failure
+	i/fail
 )
 
 // A `Fail` that outlives its `catch` stops the program when it is used
@@ -12,6 +12,6 @@ Syn3ServiceFail(E) = Fail(E)
 the_fail = () <- (f : Syn3ServiceFail(Int)) { f }
 
 main = () {
-	r = failure.catch(() { the_fail() })
+	r = fail.catch(() { the_fail() })
 	r |> (Ok(f)) { f.raise(1) } | (Error(_)) { Nil }
 }

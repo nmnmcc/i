@@ -145,6 +145,7 @@ A property test checks a claim over values from a generator. Here the claim is t
 
 ```i test package=guide_tests title="test/reverse_test.i"
 (
+	i/fail
 	testlib = (test) = std/test
 	i/core
 	std/property
@@ -152,8 +153,8 @@ A property test checks a claim over values from a generator. Here the claim is t
 )
 
 test("reverse twice", () {
-	Ok(numbers) = property.int(-10, 10)
-	Ok(lists) = property.list(numbers, 0, 12)
+	Ok(numbers) = fail.catch(() { property.int(-10, 10) })
+	Ok(lists) = fail.catch(() { property.list(numbers, 0, 12) })
 	property.test(
 		lists,
 		property.Config(

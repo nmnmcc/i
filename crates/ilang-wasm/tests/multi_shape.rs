@@ -191,6 +191,11 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     let r = f.let_(Value::Op(Op::IntMul, vec![v, int(2)]));
     let body = add(f.done("body", Some(r)));
 
+    // E3's library catch calls the body inside a boundary.
+    let mut f = F::new(1);
+    let r = f.call(Callee::Value(Atom::Global(GlobalId(4))), vec![]);
+    let catch_body = add(f.done("catch_body", Some(r)));
+
     // The start: make the values of the globals.
     let mut s = F::new(0);
     let c_one = s.let_(Value::Closure {
@@ -324,16 +329,20 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
 
     // `fail.catch` and `resource.ensure` of multi-shape values (`$call0`).
     let mut f = F::new(0);
-    let r = f.let_(Value::OpEnv(Op::Catch, vec![g(4)], Env::Param));
-    let v = f.let_(Value::Field(r, 0));
-    f.check(v, int(7));
+    let r = f.let_(Value::OpEnv(
+        Op::Boundary,
+        vec![Atom::Func(catch_body)],
+        Env::Param,
+    ));
+    f.check(r, int(7));
     let r = f.let_(Value::OpEnv(Op::Ensure, vec![g(4), g(4)], Env::Param));
     f.check(r, int(7));
     checks.push(("catch_ensure", f.done("catch_ensure", None)));
 
-    // A function kept with its environment, around a multi-shape value.
+    // E6 removes the source primitive. Private host-adapter pinning still
+    // retains an environment around a multi-shape value (§9.4).
     let mut f = F::new(0);
-    let k = f.let_(Value::OpEnv(Op::KeepEnv, vec![g(0)], Env::Param));
+    let k = f.let_(Value::OpEnv(Op::PinEnvironment, vec![g(0)], Env::Param));
     let r = f.call(Callee::Value(k), vec![int(5)]);
     f.check(r, int(6));
     checks.push(("keep", f.done("keep", None)));
@@ -440,6 +449,7 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
         suspends_h,
         body,
         body5,
+        catch_body,
     ];
     p.globals = 9;
     p.start = Some(start);

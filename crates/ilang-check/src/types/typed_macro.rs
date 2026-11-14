@@ -66,7 +66,7 @@ pub(super) struct QueryState {
     pub tyvars: HashMap<TyVarId, Ty>,
     pub module: ModuleId,
     fixed: HashSet<V>,
-    effects: HashMap<Span, (Ty, Ty)>,
+    effects: HashMap<Span, Ty>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MacroTruth {
@@ -101,9 +101,7 @@ fn occurrences(s: &Solver, t: &Ty, pol: Pol, out: &mut HashMap<V, Pol>) {
         }
         Ty::Fn(f) => {
             occurrences(s, &f.param, pol.flip(), out);
-            for t in [&f.ret, &f.err] {
-                occurrences(s, t, pol, out);
-            }
+            occurrences(s, &f.ret, pol, out);
             occurrences_env(s, &f.env, pol, out);
         }
         Ty::Union(xs) | Ty::Inter(xs) => {
@@ -166,7 +164,7 @@ pub(super) fn reachable(s: &Solver, roots: impl IntoIterator<Item = V>) -> HashS
 fn observe(s: &Solver, t: &Ty, fixed: &HashSet<V>, parts: Option<&FnTy>) -> HashMap<V, Ty> {
     let mut ps = HashMap::new();
     if let Some(f) = parts {
-        for t in [&f.param, &f.ret, &f.err] {
+        for t in [&f.param, &f.ret] {
             occurrences(s, t, Pol::Pos, &mut ps);
         }
         occurrences_env(s, &f.env, Pol::Pos, &mut ps);
@@ -213,12 +211,7 @@ enum MemberKey {
         Vec<MemberKey>,
     ),
     Data(Vec<Option<String>>, Vec<MemberKey>),
-    Function(
-        Box<MemberKey>,
-        Box<MemberKey>,
-        Box<MemberKey>,
-        Box<MemberKey>,
-    ),
+    Function(Box<MemberKey>, Box<MemberKey>, Box<MemberKey>),
     Union(Vec<MemberKey>),
     Intersection(Vec<MemberKey>),
     Difference(Box<MemberKey>, Vec<MemberKey>),
@@ -272,7 +265,6 @@ fn member_key(program: &Program, t: &Ty) -> MemberKey {
         Ty::Fn(f) => MemberKey::Function(
             Box::new(member_key(program, &f.param)),
             Box::new(member_key(program, &f.ret)),
-            Box::new(member_key(program, &f.err)),
             Box::new(member_key(program, &f.env)),
         ),
         Ty::Union(xs) => MemberKey::Union(set(xs)),
@@ -352,12 +344,11 @@ impl TypedMacroQuery {
     }
     pub fn argument_is_effectful(&self, span: Span) -> bool {
         let s = self.state.lock().expect("query snapshot");
-        let Some((err, env)) = s.effects.get(&span) else {
+        let Some(env) = s.effects.get(&span) else {
             return false;
         };
         let mut trial = s.solver.clone();
         trial.freeze();
-        trial.constrain(err, &Ty::Never);
         trial.constrain_env(env, &Ty::Never);
         !trial.failures.is_empty()
     }
@@ -738,10 +729,6 @@ impl TypedMacroQuery {
                     // variable is a row variable, `.. V`. Needs that are one
                     // row variable and nothing else are written `(<- R V)`.
                     let mut needs = Vec::new();
-                    if f.err != Ty::Never {
-                        let err = self.syntax_rows(s, &f.err, scope, new_rows);
-                        needs.push(round(vec![atom(DatumKind::UpName("Fail".into())), err]));
-                    }
                     let members: &[Ty] = match &f.env {
                         Ty::Never => &[],
                         Ty::Union(members) => members,
@@ -762,10 +749,6 @@ impl TypedMacroQuery {
                     }
                     form("->", vec![form(",", params), ret])
                 } else {
-                    if f.err != Ty::Never {
-                        let err = self.syntax_rows(s, &f.err, scope, new_rows);
-                        ret = form("^", vec![ret, err]);
-                    }
                     if f.env != Ty::Never {
                         let env = self.syntax_rows(s, &f.env, scope, new_rows);
                         ret = form("!", vec![ret, env]);
@@ -876,7 +859,7 @@ fn convert_query(s: &QueryState, t: &Type, local: &HashMap<TyVarId, Ty>) -> Resu
         TypeKind::Fn {
             params,
             ret,
-            err,
+            err: _,
             env,
         } => Ty::Fn(Box::new(FnTy::new(
             params
@@ -884,10 +867,6 @@ fn convert_query(s: &QueryState, t: &Type, local: &HashMap<TyVarId, Ty>) -> Resu
                 .map(|p| Ok((p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)?)))
                 .collect::<Result<_, String>>()?,
             go(ret)?,
-            err.as_ref()
-                .map(|t| go(t))
-                .transpose()?
-                .unwrap_or(Ty::Never),
             env.as_ref()
                 .map(|t| go(t))
                 .transpose()?
@@ -1064,7 +1043,7 @@ mod tests {
         let a = s.fresh();
         s.constrain(&int(), &a);
         let Ty::Var(v) = a else { unreachable!() };
-        let signature = FnTy::new(vec![(None, Ty::Var(v))], Ty::Var(v), Ty::Never, Ty::Never);
+        let signature = FnTy::new(vec![(None, Ty::Var(v))], Ty::Var(v), Ty::Never);
         let t = Ty::Fn(Box::new(signature.clone()));
         let sub = observe(&s, &t, &HashSet::new(), Some(&signature));
         assert_eq!(sub[&v], int());
@@ -1133,6 +1112,36 @@ mod tests {
         assert_eq!(bundle, again);
     }
     fn rows_query(signature: Ty) -> TypedMacroQuery {
+        // Fail is ordinary labelled prelude data after E3, including in
+        // frozen typed-macro observations (syntax-three §2.10.6).
+        let mut program = Program {
+            prelude: Some(ModuleId(0)),
+            ..Program::default()
+        };
+        program.modules.push(Module {
+            path: "i/prelude".into(),
+            package: 0,
+            source: ilang_package::SourceId(0),
+            kind: ilang_package::ModuleKind::Prelude,
+            scoped: None,
+            imports: vec![],
+            import_names: vec![],
+            imported_types: vec![],
+            defs: vec![],
+            types: vec![TypeId(0)],
+            bindings: vec![],
+        });
+        program.types.push(TypeDef {
+            name: "Fail".into(),
+            span: Span::new(0, 0),
+            module: ModuleId(0),
+            params: vec![("E".into(), TyVarId(0))],
+            body: TypeBody::Custom(vec![]),
+            exported: true,
+            constructors_exported: true,
+            host: None,
+            deprecated: None,
+        });
         TypedMacroQuery {
             id: 1,
             parser: OnceLock::new(),
@@ -1146,7 +1155,7 @@ mod tests {
                 observed: HashSet::new(),
                 arena: HandleArena::new(),
                 answers: HashMap::new(),
-                program: Arc::new(Program::default()),
+                program: Arc::new(program),
                 reads: super::super::value_types::Reads::default(),
                 tyvars: HashMap::new(),
                 module: ModuleId(0),
@@ -1168,13 +1177,25 @@ mod tests {
         (old, new)
     }
     fn function(params: Vec<(Option<&str>, Ty)>, ret: Ty, err: Ty, env: Ty) -> Ty {
+        let env = if err == Ty::Never {
+            env
+        } else {
+            let fail = Ty::named(TypeRef::Custom(TypeId(0)), vec![err]);
+            match env {
+                Ty::Never => fail,
+                Ty::Union(mut members) => {
+                    members.insert(0, fail);
+                    Ty::Union(members)
+                }
+                other => Ty::Union(vec![fail, other]),
+            }
+        };
         Ty::Fn(Box::new(FnTy::new(
             params
                 .into_iter()
                 .map(|(label, t)| (label.map(Into::into), t))
                 .collect(),
             ret,
-            err,
             env,
         )))
     }
@@ -1217,7 +1238,7 @@ mod tests {
         assert_eq!(
             rows(&t),
             (
-                "(-> (Int) (^ Int String))".into(),
+                "(-> (Int) (! Int (Fail String)))".into(),
                 "(-> (, Int) (<- Int (, (Fail String))))".into()
             )
         );
@@ -1246,7 +1267,7 @@ mod tests {
         assert_eq!(
             rows(&t),
             (
-                "(-> ((: x Int)) (! (^ Int (| Int String)) (| Float String)))".into(),
+                "(-> ((: x Int)) (! Int (| (Fail (| Int String)) Float String)))".into(),
                 "(-> (, (= x Int)) (<- Int (, (Fail (| Int String)) Float String)))".into()
             )
         );
@@ -1271,25 +1292,30 @@ mod tests {
         // An error variable is the argument of `Fail`, not a row.
         let t = function(vec![(None, int())], int(), error, env);
         let (old, new) = rows(&t);
-        assert_eq!(old, "(-> (Int) (! (^ Int A0) (| A1 Float)))");
+        assert_eq!(old, "(-> (Int) (! Int (| (Fail A0) A1 Float)))");
         assert_eq!(new, "(-> (, Int) (<- Int (, (Fail A0) .. A1 Float)))");
     }
     /// The new rows are types of the Lisp surface, and the needs read back
-    /// as the two rows they were made from: `Cx::needs_row` is the reverse.
+    /// as one environment with ordinary Fail entries: needs_row is the reverse.
     #[test]
     fn typed_macro_function_type_rows_are_read_back_by_the_lowering() {
         use migration_syntax::ast::{TypeBody, TypeKind as Old};
         let float = builtin(BuiltinType::Float);
         let cases = [
             (Ty::Never, Ty::Never, None, None),
-            (string(), Ty::Never, Some("String"), None),
+            (string(), Ty::Never, None, Some("(Fail String)")),
             (Ty::Never, float.clone(), None, Some("Float")),
-            (string(), float.clone(), Some("String"), Some("Float")),
+            (
+                string(),
+                float.clone(),
+                None,
+                Some("(| (Fail String) Float)"),
+            ),
             (
                 Ty::Union(vec![int(), string()]),
                 Ty::Union(vec![float, string()]),
-                Some("(| Int String)"),
-                Some("(| Float String)"),
+                None,
+                Some("(| (Fail (| Int String)) Float String)"),
             ),
         ];
         for (err, env, want_err, want_env) in cases {
@@ -1315,22 +1341,23 @@ mod tests {
             };
             assert_eq!(params.len(), 2, "{source}");
             assert!(matches!(&ret.kind, Old::Named { name, .. } if name.name == "Int"));
-            let show = |t: &Option<Box<migration_syntax::ast::TypeExpr>>| {
-                t.as_ref().map(|t| match &t.kind {
-                    Old::Named { name, .. } => name.name.clone(),
-                    Old::Union(members) => {
-                        let names: Vec<_> = members
-                            .iter()
-                            .map(|m| match &m.kind {
-                                Old::Named { name, .. } => name.name.clone(),
-                                _ => panic!("a named member"),
-                            })
-                            .collect();
-                        format!("(| {})", names.join(" "))
-                    }
-                    _ => panic!("{source}: a named type or a union"),
-                })
-            };
+            fn show_type(t: &migration_syntax::ast::TypeExpr) -> String {
+                match &t.kind {
+                    Old::Named { name, args, .. } if args.is_empty() => name.name.clone(),
+                    Old::Named { name, args, .. } => format!(
+                        "({} {})",
+                        name.name,
+                        args.iter().map(show_type).collect::<Vec<_>>().join(" ")
+                    ),
+                    Old::Union(members) => format!(
+                        "(| {})",
+                        members.iter().map(show_type).collect::<Vec<_>>().join(" ")
+                    ),
+                    _ => panic!("a named type or union"),
+                }
+            }
+            let show =
+                |t: &Option<Box<migration_syntax::ast::TypeExpr>>| t.as_ref().map(|t| show_type(t));
             assert_eq!(show(err).as_deref(), want_err, "{source}");
             assert_eq!(show(env).as_deref(), want_env, "{source}");
         }

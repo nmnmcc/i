@@ -34,7 +34,10 @@ sync_forever = () -> Nil {
 	sync_forever()
 }
 
-probe = (label : String, wait : () <- (task.Scheduler, request.Root) -> Nil) {
+probe = (
+	label : String,
+	wait : () <- (Fail(Never), task.Scheduler, request.Root) -> Nil
+) {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed : task.Channel(Nil) = task.channel()

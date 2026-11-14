@@ -1,7 +1,7 @@
 // spec: 4.4, 4.5, 9.2
 // expect: pass
 (
-	i/failure
+	i/fail
 )
 
 Syn3ServiceFail(E) = Fail(E)
@@ -24,7 +24,7 @@ need_read_int = () <- (r : Read(Int)) { Nil }
 
 need_read_one = () <- (r : Read(1)) { Nil }
 
-both_read = () -> Nil {
+both_read: () <- (Read(1)) -> Nil = () {
 	need_read_int()
 	need_read_one()
 }
@@ -35,10 +35,10 @@ main = () {
 	_syn3_0 : Read(1) = read_value(Read(value = 1))
 	{
 		both_read()
-		failure.catch(() {
+		fail.catch(() {
 			both_fail()
 			Nil
 		})
 		Nil
-	} <- (_syn3_0)
+	} <- (read_value(Read(value = 1)))
 }

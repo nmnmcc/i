@@ -331,8 +331,8 @@ impl Abi {
         for (module, functions) in &self.externals {
             for (name, signature) in functions {
                 ensure!(
-                    signature.errors.is_empty() && !signature.is_async,
-                    "external {module} {name} cannot have errors or be async"
+                    (self.version >= 5 || signature.errors.is_empty()) && !signature.is_async,
+                    "external {module} {name} may report errors at ABI5 and cannot be async"
                 );
                 ensure!(
                     !self
@@ -547,6 +547,7 @@ enum HostFunction {
     Service(ContextServiceFunction),
     AsyncService(ContextAsyncServiceFunction),
     External(ContextExternalFunction),
+    FallibleExternal(ContextServiceFunction),
 }
 
 /// The functions that the host gives, by import module and name.
@@ -726,6 +727,24 @@ impl HostImports {
         }
         self.unrestricted.extend(other.unrestricted);
         self.grants.merge(other.grants);
+        Ok(())
+    }
+
+    /// A synchronous external that may report the declared Fail error (§10.1).
+    /// The outer error is a host failure; the inner error is raised in i.
+    pub fn fallible_external(
+        &mut self,
+        module: impl Into<String>,
+        name: impl Into<String>,
+        function: impl Fn(&[Value]) -> Result<std::result::Result<Value, Value>> + Send + Sync + 'static,
+    ) -> Result<()> {
+        let (module, name) = (module.into(), name.into());
+        self.insert(
+            module.clone(),
+            name.clone(),
+            HostFunction::FallibleExternal(Arc::new(move |_, args| function(args))),
+        )?;
+        self.unrestricted.insert((module, name));
         Ok(())
     }
 
@@ -1295,7 +1314,11 @@ impl Program {
                     match (&function, kind, signature.is_async) {
                         (HostFunction::Service(_), true, false)
                         | (HostFunction::AsyncService(_), true, true)
-                        | (HostFunction::External(_), false, _) => {}
+                        | (
+                            HostFunction::External(_) | HostFunction::FallibleExternal(_),
+                            false,
+                            _,
+                        ) => {}
                         _ => bail!("host function {module} {name} has the wrong kind"),
                     }
                     define_import(
@@ -2481,6 +2504,7 @@ fn define_import(
                 }
                 HostFunction::Service(service) => service(resources, &arguments),
                 HostFunction::External(external) => external(resources, &arguments).map(Ok),
+                HostFunction::FallibleExternal(external) => external(resources, &arguments),
             };
             let reply = match reply {
                 Ok(reply) => reply,

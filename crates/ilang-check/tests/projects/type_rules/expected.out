@@ -10,7 +10,7 @@ src/main.i:23:11: error[E0224]: the type `List` has 1 type parameter, but 0 are 
 src/main.i:25:11: error[E0224]: the type `Int` has 0 type parameters, but 1 is given
 src/main.i:27:11: error[E0224]: the type `Result` has 2 type parameters, but 1 is given
 src/main.i:29:11: error[E0224]: the type `Box` has 1 type parameter, but 0 are given
-src/main.i:31:36: error[E0224]: the type `Continuation` has 4 type parameters, but 1 is given
+src/main.i:31:31: error[E0224]: the type `Continuation` has 3 type parameters, but 1 is given
 src/main.i:33:12: error[E0202]: the type `Nothing` is not defined; to use a type parameter, declare it in the head, as in `Box(A) { … }`
 src/main.i:43:30: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)
 src/main.i:43:37: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)

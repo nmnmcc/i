@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	std/http
 	std/list
@@ -35,7 +36,7 @@ test("http_messages", () {
 		http.serialize_response(res),
 	)
 	assert(res2 == res)
-	assert(http.parse_query("a=b+c") == Ok([("a", "b c")]))
+	assert(fail.catch(() { http.parse_query("a=b+c") }) == Ok([("a", "b c")]))
 	assert(http.build_query([("a", "b c")]) == "a=b+c")
 })
 
@@ -699,7 +700,7 @@ test("http_obs_text_round_trip", () {
 })
 
 test("http_generated_body_round_trip", () {
-	Ok(gen) = property.string(30)
+	Ok(gen) = fail.catch(() { property.string(30) })
 	property.test(
 		gen,
 		property.Config(

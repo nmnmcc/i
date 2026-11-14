@@ -18,6 +18,7 @@ Put this complete program in `src/main.i`:
 
 ```i run package=guide_files title="src/main.i"
 (
+	i/fail
 	i/fs
 	i/stdio
 	std/path
@@ -29,7 +30,7 @@ main = () {
 	fs.write_file(file, <<"hello from a file":utf8>>)
 	bytes = fs.read_file(file)
 	fs.remove(file)
-	Ok(text) = bit_array.to_string(bytes)
+	Ok(text) = fail.catch(() { bit_array.to_string(bytes) })
 	stdio.print(file)
 	stdio.print(text)
 }

@@ -437,10 +437,10 @@ fn a_record_update_is_not_a_macro_call() {
 }
 
 #[test]
-fn a_function_type_is_visited_as_parameters_result_error_environment() {
+fn a_function_type_is_visited_as_parameters_result_then_need_entries() {
     assert_eq!(
         type_calls("x: (a(Int)) <- (S(b(Int)), Fail(c(Int))) -> d(Int)"),
-        ["a", "d", "c", "b"]
+        ["a", "d", "b", "c"]
     );
 }
 

@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	schema = (Schema) = std/schema
 	std/json
@@ -7,7 +8,12 @@
 )
 
 round = <A>(s : schema.Schema(A, schema.SchemaError), value : A) -> Bool {
-	schema.decode(s, schema.encode(s, value)) == Ok(value)
+	{
+		e4_call_arg_0 = s
+		e4_call_arg_1 = schema.encode(s, value)
+		fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+	} ==
+		Ok(value)
 }
 
 User = (name = String, addresses = List(Address), role = Role)
@@ -67,7 +73,11 @@ test("int_negative", () { assert(round(schema.int, -7)) })
 
 test("int_wrong", () {
 	assert(
-		schema.decode(schema.int, json.Text("x")) ==
+		{
+			e4_call_arg_0 = schema.int
+			e4_call_arg_1 = json.Text("x")
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(schema.SchemaError(path = [], expected = "int")),
 	)
 })
@@ -76,7 +86,11 @@ test("float_round", () { assert(round(schema.float, 1.5)) })
 
 test("float_wrong", () {
 	assert(
-		schema.decode(schema.float, json.Integer(1)) ==
+		{
+			e4_call_arg_0 = schema.float
+			e4_call_arg_1 = json.Integer(1)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(schema.SchemaError(path = [], expected = "float")),
 	)
 })
@@ -87,7 +101,7 @@ test("string_empty", () { assert(round(schema.string, "")) })
 
 test("string_wrong", () {
 	assert(
-		schema.decode(schema.string, json.Null) ==
+		fail.catch(() { schema.decode(schema.string, json.Null) }) ==
 			Error(schema.SchemaError(path = [], expected = "string")),
 	)
 })
@@ -98,7 +112,11 @@ test("bool_false", () { assert(round(schema.bool, False)) })
 
 test("bool_wrong", () {
 	assert(
-		schema.decode(schema.bool, json.Integer(1)) ==
+		{
+			e4_call_arg_0 = schema.bool
+			e4_call_arg_1 = json.Integer(1)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(schema.SchemaError(path = [], expected = "bool")),
 	)
 })
@@ -107,7 +125,11 @@ test("null_round", () { assert(round(schema.null, ())) })
 
 test("null_wrong", () {
 	assert(
-		schema.decode(schema.null, json.Boolean(False)) ==
+		{
+			e4_call_arg_0 = schema.null
+			e4_call_arg_1 = json.Boolean(False)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(schema.SchemaError(path = [], expected = "null")),
 	)
 })
@@ -120,7 +142,11 @@ test("literal_string_round", () {
 
 test("literal_string_wrong", () {
 	assert(
-		schema.decode(schema.literal_string("yes"), json.Text("no")) ==
+		{
+			e4_call_arg_0 = schema.literal_string("yes")
+			e4_call_arg_1 = json.Text("no")
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(schema.SchemaError(path = [], expected = "yes")),
 	)
 })
@@ -133,7 +159,11 @@ test("literal_int_round", () {
 
 test("literal_int_wrong", () {
 	assert(
-		schema.decode(schema.literal_int(3), json.Integer(4)) ==
+		{
+			e4_call_arg_0 = schema.literal_int(3)
+			e4_call_arg_1 = json.Integer(4)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(schema.SchemaError(path = [], expected = "literal int")),
 	)
 })
@@ -176,10 +206,11 @@ test("list_empty", () {
 
 test("list_path", () {
 	assert(
-		schema.decode(
-			schema.list(schema.int),
-			json.Array([json.Integer(1), json.Text("x")]),
-		) ==
+		{
+			e4_call_arg_0 = schema.list(schema.int)
+			e4_call_arg_1 = json.Array([json.Integer(1), json.Text("x")])
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				schema.SchemaError(path = [schema.Index(1)], expected = "int"),
 			),
@@ -200,10 +231,11 @@ test("dict_empty", () {
 
 test("dict_path", () {
 	assert(
-		schema.decode(
-			schema.dict(schema.bool),
-			json.Object([("x", json.Null)]),
-		) ==
+		{
+			e4_call_arg_0 = schema.dict(schema.bool)
+			e4_call_arg_1 = json.Object([("x", json.Null)])
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				schema.SchemaError(
 					path = [schema.Field("x")],
@@ -221,10 +253,11 @@ test("tuple_round", () {
 
 test("tuple_path", () {
 	assert(
-		schema.decode(
-			schema.tuple(schema.int, schema.string),
-			json.Array([json.Integer(1), json.Null]),
-		) ==
+		{
+			e4_call_arg_0 = schema.tuple(schema.int, schema.string)
+			e4_call_arg_1 = json.Array([json.Integer(1), json.Null])
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				schema.SchemaError(
 					path = [schema.Index(1)],
@@ -254,10 +287,11 @@ test("refine_round", () {
 
 test("refine_error", () {
 	assert(
-		schema.decode(
-			schema.refine(schema.int, (x) { x > 0 }, "positive"),
-			json.Integer(-1),
-		) ==
+		{
+			e4_call_arg_0 = schema.refine(schema.int, (x) { x > 0 }, "positive")
+			e4_call_arg_1 = json.Integer(-1)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(schema.SchemaError(path = [], expected = "positive")),
 	)
 })
@@ -282,29 +316,36 @@ test("union_round", () {
 
 test("union_order", () {
 	assert(
-		schema.decode(
-			schema.union([
+		{
+			e4_call_arg_0 = schema.union([
 				schema.refine(schema.int, (x) { x > 5 }, "large"),
 				schema.int,
-			], (_) { 0 }),
-			json.Integer(2),
-		) ==
+			], (_) { 0 })
+			e4_call_arg_1 = json.Integer(2)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(2),
 	)
 })
 
 test("union_failure", () {
 	assert(
-		schema.decode(schema.union([schema.int], (_) { 0 }), json.Null) ==
+		{
+			e4_call_arg_0 = schema.union([schema.int], (_) { 0 })
+			e4_call_arg_1 = json.Null
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(schema.SchemaError(path = [], expected = "union")),
 	)
 })
 
-test("parse_ok", () { assert(schema.parse(schema.int, "123") == Ok(123)) })
+test("parse_ok", () {
+	assert(fail.catch(() { schema.parse(schema.int, "123") }) == Ok(123))
+})
 
 test("parse_bad_syntax", () {
 	assert(
-		schema.parse(schema.int, "[") |>
+		fail.catch(() { schema.parse(schema.int, "[") }) |>
 			(Error(schema.Syntax(_))) { True }
 			| (_) { False },
 	)
@@ -312,7 +353,7 @@ test("parse_bad_syntax", () {
 
 test("parse_bad_value", () {
 	assert(
-		schema.parse(schema.int, "true") ==
+		fail.catch(() { schema.parse(schema.int, "true") }) ==
 			Error(
 				schema.Decode(schema.SchemaError(path = [], expected = "int")),
 			),
@@ -346,9 +387,9 @@ test("nested_round", () {
 
 test("nested_path", () {
 	assert(
-		schema.decode(
-			user_schema(),
-			json.Object(
+		{
+			e4_call_arg_0 = user_schema()
+			e4_call_arg_1 = json.Object(
 				[
 					("name", json.Text("Ada")),
 					(
@@ -357,8 +398,9 @@ test("nested_path", () {
 					),
 					("role", json.Object([("kind", json.Text("admin"))])),
 				],
-			),
-		) ==
+			)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				schema.SchemaError(
 					path = [
@@ -374,16 +416,17 @@ test("nested_path", () {
 
 test("tag_error", () {
 	assert(
-		schema.decode(
-			user_schema(),
-			json.Object(
+		{
+			e4_call_arg_0 = user_schema()
+			e4_call_arg_1 = json.Object(
 				[
 					("name", json.Text("Ada")),
 					("addresses", json.Array([])),
 					("role", json.Object([("kind", json.Text("other"))])),
 				],
-			),
-		) ==
+			)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				schema.SchemaError(
 					path = [schema.Field("role"), schema.Field("kind")],
@@ -455,7 +498,11 @@ test("optional_field_none", () {
 
 test("optional_field_path", () {
 	assert(
-		schema.decode(optional_schema(), json.Object([("value", json.Null)])) ==
+		{
+			e4_call_arg_0 = optional_schema()
+			e4_call_arg_1 = json.Object([("value", json.Null)])
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				schema.SchemaError(
 					path = [schema.Field("value")],
@@ -468,8 +515,22 @@ test("optional_field_path", () {
 test("literal_types", () {
 	s : Schema("yes", schema.SchemaError) = schema.literal_string("yes")
 	n : Schema(7, schema.SchemaError) = schema.literal_int(7)
-	assert(schema.decode(s, json.Text("yes")) == Ok("yes"))
-	assert(schema.decode(n, json.Integer(7)) == Ok(7))
+	assert(
+		{
+			e4_call_arg_0 = s
+			e4_call_arg_1 = json.Text("yes")
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok("yes"),
+	)
+	assert(
+		{
+			e4_call_arg_0 = n
+			e4_call_arg_1 = json.Integer(7)
+			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(7),
+	)
 })
 
 test("structural_record_round", () {

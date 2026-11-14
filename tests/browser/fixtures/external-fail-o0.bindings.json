@@ -1,0 +1,24 @@
+{
+  "artifact_digest": "sha256-6d84fa3324ce81b1b49badae7b38890922619a826b3eb01263c15cfba2ebfca9",
+  "declarations": [
+    {
+      "package": "sha256-afed6cb549600c5939968340641713e08f7ef7a307c14570bfe5e9ad856a61a7",
+      "module": "app/main",
+      "module_digest": "sha256-0f737eb7d259bbf1b3974cc0f60b3dead35fcf364a473b164fbe3dcb4c33d8e0",
+      "declaration": "value",
+      "namespace": "app:fallible/v1",
+      "name": "value",
+      "kind": "external",
+      "signature": {
+        "params": [
+          "string"
+        ],
+        "result": "int",
+        "errors": [
+          "string"
+        ],
+        "async": false
+      }
+    }
+  ]
+}

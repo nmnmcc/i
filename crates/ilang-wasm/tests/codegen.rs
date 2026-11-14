@@ -225,7 +225,7 @@ fn externals_are_imports() {
         let json: serde_json::Value = serde_json::from_str(&abi.unwrap()).unwrap();
         assert_eq!(
             json["externals"],
-            serde_json::json!({ "app:math/v1": { "sqrt": { "params": ["float"], "result": "float" } } })
+            serde_json::json!({ "app:math/v1": { "sqrt": { "params": ["float"], "result": "float", "errors": [] } } })
         );
     }
 }
@@ -312,7 +312,7 @@ fn bindings_that_may_fail_report_to_assert() {
 /// `case` (§9.4).
 fn many_points(n: usize) -> String {
     let mut s = String::from(
-        " (i/control)\ns = (b : Boundary(Int, Never, Never), v : Int) -> Int {\n  control.suspend(b, (k) { control.resume(k, v) })\n}\nf = (b : Boundary(Int, Never, Never), x : Int) -> Int {\n  a0 = x\n",
+        " (i/control)\ns = (b: Boundary(Int, Never), v: Int) -> Int {\n  control.suspend(b, (k) { control.resume(k, v) })\n}\nf = (b: Boundary(Int, Never), x: Int) -> Int {\n  a0 = x\n",
     );
     for i in 1..=n {
         let p = i - 1;

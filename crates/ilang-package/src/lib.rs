@@ -14,7 +14,6 @@ pub mod lock;
 pub mod manifest;
 pub mod modules;
 pub mod mvs;
-pub mod providers;
 
 use ilang_syntax::span::{LineIndex, Span};
 use manifest::{DependencySource, Manifest, Version, WasmExport};
@@ -246,7 +245,6 @@ pub struct Package {
     pub modules: Vec<ModuleSource>,
     pub wasm_exports: Vec<WasmExport>,
     pub wasm_synchronous: Vec<WasmExport>,
-    pub provider_plan: providers::ProviderPlan,
     pub entries: Vec<(String, WasmExport)>,
     /// For a package got by location: its location and version.
     pub location: Option<PackageLocation>,
@@ -548,7 +546,6 @@ impl Loader {
             modules: Vec::new(),
             wasm_exports: manifest.wasm_exports.clone(),
             wasm_synchronous: manifest.wasm_synchronous.clone(),
-            provider_plan: manifest.provider_plan.clone(),
             entries: manifest
                 .entries
                 .iter()
@@ -642,7 +639,6 @@ impl Loader {
             modules: Vec::new(),
             wasm_exports: Vec::new(),
             wasm_synchronous: Vec::new(),
-            provider_plan: manifest.provider_plan.clone(),
             entries: Vec::new(),
             location: Some(loc.clone()),
         });

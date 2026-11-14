@@ -291,7 +291,6 @@ fn same_unmarked(a: &Ty, b: &Ty) -> bool {
             f.labels == g.labels
                 && same_unmarked(&f.param, &g.param)
                 && same_unmarked(&f.ret, &g.ret)
-                && same_unmarked(&f.err, &g.err)
                 && same_unmarked(&f.env, &g.env)
         }
         (Ty::Diff(x, h), Ty::Diff(y, g)) => same_unmarked(x, y) && all(h, g),
@@ -485,9 +484,7 @@ pub(super) fn ty_vars(t: &Ty, out: &mut Vec<V>) {
         }
         Ty::Fn(f) => {
             ty_vars(&f.param, out);
-            [&f.ret, &f.err, &f.env]
-                .into_iter()
-                .for_each(|x| ty_vars(x, out));
+            [&f.ret, &f.env].into_iter().for_each(|x| ty_vars(x, out));
         }
         Ty::Diff(a, h) => {
             ty_vars(a, out);
@@ -690,7 +687,6 @@ impl Coalescer<'_> {
                 param: self.bound_key(&f.param),
                 labels: f.labels.clone(),
                 ret: self.bound_key(&f.ret),
-                err: self.bound_key(&f.err),
                 env: self.bound_key(&f.env),
             })),
             Ty::Union(xs) => Ty::Union(xs.iter().map(|x| self.bound_key(x)).collect()),
@@ -712,9 +708,35 @@ impl Coalescer<'_> {
         }
     }
 
-    /// `env`: the type is an environment, whose members have arguments that
-    /// are compared as equal (§4.5 rule 4), so they are both outputs and
-    /// inputs.
+    /// A fixed annotation hole denotes its exact value even when it occurs
+    /// only in a removed provider. Otherwise outer polarity simplification
+    /// could replace v in `v & Int` by Never before hiding mask-only variables.
+    /// L <: v <: U with L = U fixes v (§4.5); one-sided bounds stay open.
+    fn handler_witness(&mut self, t: &Ty, pos: bool, depth: u32) -> Ty {
+        let mut vars = Vec::new();
+        ty_vars(t, &mut vars);
+        let mut fixed = Vec::new();
+        for v in vars {
+            let state = &self.s.vars[v.0 as usize];
+            if state.name.is_some() || rigid(self.s, self.keep, v) {
+                continue;
+            }
+            if let Some(bound) = state.lower.iter().find(|bound| {
+                if !state.upper.contains(bound) {
+                    return false;
+                }
+                let mut free = Vec::new();
+                ty_vars(bound, &mut free);
+                free.is_empty()
+            }) {
+                fixed.push((v, bound.clone()));
+            }
+        }
+        self.go(&replace_all(t, &fixed), pos, depth, false)
+    }
+
+    /// `env`: the type is a need; service arguments follow the reverse of
+    /// their ordinary value variance (§4.5 rule 4, §9.2).
     fn go(&mut self, t: &Ty, pos: bool, depth: u32, env: bool) -> Ty {
         let env = env || self.s.is_row(t);
         match t {
@@ -889,10 +911,11 @@ impl Coalescer<'_> {
                     .zip(vs)
                     .zip(self.s.rows(*h, args.len()))
                     .map(|((a, v), row)| match v {
-                        _ if env => Ty::Both(
-                            Box::new(self.go(a, true, depth + 1, row != Mode::Value)),
-                            Box::new(self.go(a, false, depth + 1, row != Mode::Value)),
-                        ),
+                        // Rule A: in a need, arguments go the other way
+                        // round from values.
+                        Variance::Co if env => self.go(a, !pos, depth + 1, row != Mode::Value),
+                        Variance::Contra if env => self.go(a, pos, depth + 1, row != Mode::Value),
+                        Variance::Bi if env => self.go(a, pos, depth + 1, row != Mode::Value),
                         Variance::Co | Variance::Bi => {
                             self.go(a, pos, depth + 1, row != Mode::Value)
                         }
@@ -909,14 +932,25 @@ impl Coalescer<'_> {
                 param: self.go(&f.param, !pos, depth + 1, false),
                 labels: f.labels.clone(),
                 ret: self.go(&f.ret, pos, depth + 1, false),
-                err: self.go(&f.err, pos, depth + 1, true),
                 env: self.go(&f.env, pos, depth + 1, true),
             })),
             Ty::Union(ms) => Ty::Union(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
             Ty::Inter(ms) => Ty::Inter(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
             Ty::Diff(a, h) => Ty::Diff(
                 Box::new(self.go(a, pos, depth, env)),
-                h.iter().map(|m| self.go(m, pos, depth, env)).collect(),
+                // A need difference records the supplied value form. Its
+                // arguments follow value variance, not required-service
+                // variance (§9.2); the subtracted side reverses polarity. Keep
+                // the actual bounds of annotation holes in the provider witness.
+                h.iter()
+                    .map(|m| {
+                        if env {
+                            self.handler_witness(m, !pos, depth)
+                        } else {
+                            self.go(m, pos, depth, false)
+                        }
+                    })
+                    .collect(),
             ),
             Ty::Both(a, b) => Ty::Both(
                 Box::new(self.go(a, true, depth, env)),
@@ -947,7 +981,6 @@ pub(crate) fn both(t: &Ty) -> Ty {
             param: both(&f.param),
             labels: f.labels.clone(),
             ret: both(&f.ret),
-            err: both(&f.err),
             env: both(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(both(a)), h.iter().map(both).collect()),
@@ -1051,7 +1084,6 @@ impl Norm<'_> {
                     param: self.norm(f.param),
                     labels: f.labels,
                     ret: self.norm(f.ret),
-                    err: self.env(f.err),
                     env: self.services(f.env),
                 }))
             }
@@ -1238,7 +1270,7 @@ impl Norm<'_> {
                     Variance::Inv => false,
                 })
             }
-            Ty::Fn(f) => f.param == Ty::Never && [&f.ret, &f.err, &f.env].iter().all(|x| is_top(x)),
+            Ty::Fn(f) => f.param == Ty::Never && [&f.ret, &f.env].iter().all(|x| is_top(x)),
             _ => false,
         }
     }
@@ -1433,7 +1465,6 @@ impl Norm<'_> {
                     param: pick(f.param, g.param, Variance::Contra),
                     labels,
                     ret: pick(f.ret, g.ret, Variance::Co),
-                    err: pick(f.err, g.err, Variance::Co),
                     env: if union {
                         self.services(Ty::Union(vec![f.env, g.env]))
                     } else {
@@ -1488,8 +1519,9 @@ impl Norm<'_> {
         // Graph keys hash their immutable pool identity and node ID.
         #[allow(clippy::mutable_key_type)]
         let mut dropped: HashSet<Ty> = HashSet::default();
-        // The members dropped from each group, by its address.
-        let mut shrunk: HashMap<usize, usize> = HashMap::default();
+        // The positions dropped from each group, by its address. Invariant
+        // traversal may visit the same position more than once.
+        let mut shrunk: HashMap<usize, HashSet<usize>> = HashMap::default();
         for v in &order {
             let Some((v, by)) = self.decide(*v, &occ[v], &dropped) else {
                 continue;
@@ -1503,7 +1535,11 @@ impl Norm<'_> {
             let drop = with.is_some_and(|w| {
                 !w.alone
                     && w.groups.iter().all(|(g, _)| {
-                        g.len() - shrunk.get(&(g.as_ptr() as usize)).copied().unwrap_or(0) > 2
+                        g.len()
+                            - shrunk
+                                .get(&(g.as_ptr() as usize))
+                                .map_or(0, |removed| removed.len())
+                            > 2
                     })
             });
             if !drop {
@@ -1512,8 +1548,8 @@ impl Norm<'_> {
                 }
                 break;
             }
-            for (g, _) in &with.expect("a dropped variable").groups {
-                *shrunk.entry(g.as_ptr() as usize).or_default() += 1;
+            for (g, i) in &with.expect("a dropped variable").groups {
+                shrunk.entry(g.as_ptr() as usize).or_default().insert(*i);
             }
             dropped.insert(Ty::Var(v));
             out.push((v, by));
@@ -1592,8 +1628,8 @@ impl Norm<'_> {
     }
 
     /// Invariant arguments count on both sides (§4.5 rules 6 and 7), even
-    /// when normalization has collapsed their equal `Both` forms. In an
-    /// environment, every argument is invariant (§4.5 rule 4).
+    /// when normalization has collapsed their equal `Both` forms. Need
+    /// arguments follow rule A's reverse value direction, as coalescing does.
     fn walk<'a>(
         &self,
         t: &'a Ty,
@@ -1627,9 +1663,15 @@ impl Norm<'_> {
                     let vs = self.s.variances(*h, args.len());
                     for ((a, v), row) in args.iter().zip(vs).zip(self.s.rows(*h, args.len())) {
                         match v {
-                            _ if env || v == Variance::Inv => {
+                            Variance::Inv => {
                                 self.walk(a, true, occ, order, row != Mode::Value);
                                 self.walk(a, false, occ, order, row != Mode::Value);
+                            }
+                            Variance::Co if env => {
+                                self.walk(a, !pos, occ, order, row != Mode::Value)
+                            }
+                            Variance::Contra | Variance::Bi if env => {
+                                self.walk(a, pos, occ, order, row != Mode::Value)
                             }
                             Variance::Contra => self.walk(a, !pos, occ, order, row != Mode::Value),
                             _ => self.walk(a, pos, occ, order, row != Mode::Value),
@@ -1639,7 +1681,6 @@ impl Norm<'_> {
                 Ty::Fn(f) => {
                     self.walk(&f.param, !pos, occ, order, false);
                     self.walk(&f.ret, pos, occ, order, false);
-                    self.walk(&f.err, pos, occ, order, true);
                     self.walk(&f.env, pos, occ, order, true);
                 }
                 Ty::Both(a, b) => {
@@ -1701,9 +1742,7 @@ fn visit(t: &Ty, f: &mut dyn FnMut(&Ty)) {
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| visit(x, f)),
         Ty::Fn(g) => {
             visit(&g.param, f);
-            [&g.ret, &g.err, &g.env]
-                .into_iter()
-                .for_each(|x| visit(x, f));
+            [&g.ret, &g.env].into_iter().for_each(|x| visit(x, f));
         }
         Ty::Diff(a, h) => {
             visit(a, f);
@@ -1739,7 +1778,6 @@ fn replace_map(t: &Ty, map: &HashMap<V, &Ty>) -> Ty {
             param: r(&f.param),
             labels: f.labels.clone(),
             ret: r(&f.ret),
-            err: r(&f.err),
             env: r(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(r(a)), h.iter().map(r).collect()),
@@ -1760,7 +1798,6 @@ fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
             param: r(&f.param),
             labels: f.labels.clone(),
             ret: r(&f.ret),
-            err: r(&f.err),
             env: r(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(r(a)), h.iter().map(r).collect()),
@@ -1774,7 +1811,6 @@ fn replace(t: &Ty, v: V, by: &Ty) -> Ty {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Role {
     Value,
-    Err,
     Env,
 }
 
@@ -1829,9 +1865,6 @@ impl Namer {
 
     fn fresh(&mut self, role: Role) -> String {
         let candidates: Box<dyn Iterator<Item = String>> = match role {
-            Role::Err => {
-                Box::new(std::iter::once("E".to_string()).chain((2..).map(|i| format!("E{i}"))))
-            }
             Role::Env => {
                 Box::new(std::iter::once("N".to_string()).chain((2..).map(|i| format!("N{i}"))))
             }
@@ -1987,7 +2020,6 @@ fn fit_pattern(p: &Ty, t: &Ty, args: &mut [Option<Ty>]) -> bool {
             f.labels == g.labels
                 && fit_pattern(&f.param, &g.param, args)
                 && fit_pattern(&f.ret, &g.ret, args)
-                && fit_pattern(&f.err, &g.err, args)
                 && fit_pattern(&f.env, &g.env, args)
         }
         _ => {
@@ -2016,7 +2048,6 @@ fn fold_in(s: &Solver, t: &Ty) -> Ty {
             param: go(&f.param),
             labels: f.labels.clone(),
             ret: go(&f.ret),
-            err: go(&f.err),
             env: go(&f.env),
         })),
         Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
@@ -2084,7 +2115,6 @@ fn tops(t: &Ty, next: &mut u32, origin: &mut HashMap<V, V>) -> Ty {
             param: go(&f.param),
             labels: f.labels.clone(),
             ret: go(&f.ret),
-            err: go(&f.err),
             env: go(&f.env),
         })),
         // A part of `H` with no effect is written `_`.
@@ -2115,7 +2145,6 @@ fn roles(t: &Ty, role: Role, out: &mut Vec<(V, Role)>) {
         Ty::Fn(f) => {
             roles(&f.param, Role::Value, out);
             roles(&f.ret, Role::Value, out);
-            roles(&f.err, Role::Err, out);
             roles(&f.env, Role::Env, out);
         }
         Ty::Both(a, b) => {
@@ -2197,7 +2226,7 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
                 None => (vec![(None, tree_with(&f.param, name))], true),
             };
             let ret = tree_with(&f.ret, name);
-            let err = (f.err != Ty::Never).then(|| tree_with(&f.err, name));
+            let err = None;
             let env = (f.env != Ty::Never).then(|| tree_with(&f.env, name));
             ShownType::Fn(Box::new(ShownFn {
                 params,
@@ -2244,7 +2273,7 @@ fn outer_vars(t: &Ty, out: &mut HashSet<V>) {
         }
         Ty::Fn(f) => {
             outer_vars(&f.param, out);
-            [&f.ret, &f.err, &f.env]
+            [&f.ret, &f.env]
                 .into_iter()
                 .for_each(|x| outer_vars(x, out));
         }
@@ -2275,7 +2304,6 @@ fn hide(t: &Ty, outside: &HashSet<V>, in_h: bool) -> Ty {
             param: go(&f.param),
             labels: f.labels.clone(),
             ret: go(&f.ret),
-            err: go(&f.err),
             env: go(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(
@@ -2333,7 +2361,6 @@ fn not_general(s: &Solver, t: &Ty, level: u32) -> Ty {
             param: go(&f.param),
             labels: f.labels.clone(),
             ret: go(&f.ret),
-            err: go(&f.err),
             env: go(&f.env),
         })),
         Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.iter().map(go).collect()),
@@ -2480,7 +2507,6 @@ mod lazy_display_tests {
             param: Ty::tuple(vec![Ty::Var(vs[0]), int.clone()]),
             labels: vec![None, None],
             ret: Ty::Union(vec![Ty::Var(vs[0]), Ty::Var(vs[1]), int]),
-            err: Ty::Never,
             env: Ty::Var(vs[2]),
         }));
         for opts in [
@@ -2518,10 +2544,83 @@ mod lazy_display_tests {
     }
 
     #[test]
+    fn repeated_invariant_visits_drop_one_union_member_once() {
+        // Coalescing invariant arguments can retain Both forms. Walking
+        // an outer invariant visits that same positive union repeatedly;
+        // those visits still describe just three members (§4.4, §4.7).
+        let mut s = Solver::new(Default::default(), Vec::new());
+        let vs = vars(&mut s, 3);
+        let id = crate::hir::TypeId(0);
+        s.variance.insert(id, vec![Variance::Inv]);
+        let members = Ty::Union(vs.iter().copied().map(Ty::Var).collect());
+        let both = Ty::Both(Box::new(members), Box::new(Ty::Never));
+        let inner = Ty::named(TypeRef::Custom(id), vec![both]);
+        let ty = Ty::named(TypeRef::Custom(id), vec![inner]);
+        let norm = Norm {
+            s: &s,
+            keep: Some(0),
+            written: false,
+        };
+        // Only the first removal may be batched: the group then has two
+        // members, whose remaining decisions need a new pass.
+        assert_eq!(norm.steps(&ty), vec![(vs[0], Ty::Never)]);
+    }
+
+    #[test]
     fn a_variable_taken_out_twice_stops_the_steps() {
         let mut budget = StepBudget::default();
         assert!(budget.allows(&[(V(1), Ty::Top), (V(2), Ty::Never)]));
         assert!(budget.allows(&[(V(3), Ty::Var(V(4)))]));
         assert!(!budget.allows(&[(V(2), Ty::Top)]));
+    }
+}
+
+#[cfg(test)]
+mod directed_need_simplification_tests {
+    use super::*;
+    use crate::hir::{BuiltinType, TypeId, TypeRef};
+
+    #[test]
+    fn a_single_need_keeps_its_constructor_after_argument_simplification() {
+        // Decision 2 (EF03): greatest within a constructor still requires
+        // an environment entry of that constructor. Argument simplification
+        // must not erase the key.
+        let id = TypeId(0);
+        let mut s = Solver::new(Default::default(), vec!["app.Svc".into()]);
+        s.variance.insert(id, vec![Variance::Contra]);
+        let variable = Ty::Var(s.fresh_at(1));
+        let function = |env| Ty::Fn(Box::new(FnTy::new(Vec::new(), Ty::Never, env)));
+        let need = Ty::named(TypeRef::Custom(id), vec![variable]);
+        assert_eq!(
+            shown(&s, &function(need), Opts::default()).unwrap(),
+            function(Ty::named(TypeRef::Custom(id), vec![Ty::Never]))
+        );
+    }
+
+    #[test]
+    fn one_sided_need_arguments_follow_the_directed_service_variance() {
+        for variance in [Variance::Contra, Variance::Co] {
+            let id = TypeId(0);
+            let mut s = Solver::new(Default::default(), vec!["app.Svc".into()]);
+            s.variance.insert(id, vec![variance]);
+            let variable = Ty::Var(s.fresh_at(1));
+            let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+            let argument = if variance == Variance::Contra {
+                Ty::Union(vec![variable, int.clone()])
+            } else {
+                Ty::Inter(vec![variable, int.clone()])
+            };
+            let function = |argument| {
+                Ty::Fn(Box::new(FnTy::new(
+                    Vec::new(),
+                    Ty::Never,
+                    Ty::named(TypeRef::Custom(id), vec![argument]),
+                )))
+            };
+            assert_eq!(
+                shown(&s, &function(argument), Opts::default()).unwrap(),
+                function(int)
+            );
+        }
     }
 }

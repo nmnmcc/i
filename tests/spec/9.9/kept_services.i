@@ -48,4 +48,4 @@ main = () {
 	} <- (Name(value = "saved"))
 }
 
-Marker = (Boundary(Nil, Never, task.Scheduler | Assert | request.Root))
+Marker = (Boundary(Nil, task.Scheduler | Assert | request.Root | Fail(Never)))
