@@ -104,8 +104,8 @@ mod deep_tests {
             "value = 2\n",
             "value = (1, 2)\n",
             "value = (2, 1)\n",
-            "value = (x: Int) { x + 1 }\n",
-            "value = (x: String) { x + 1 }\n",
+            "value = (x : Int) { x + 1 }\n",
+            "value = (x : String) { x + 1 }\n",
         ];
         let modules: Vec<_> = samples
             .iter()

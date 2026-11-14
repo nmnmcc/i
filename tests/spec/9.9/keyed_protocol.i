@@ -33,13 +33,13 @@ read = (k, value) {
 
 identity = (x) { x }
 
-send = (c, value) <- (scheduler: Scheduler) {
+send = (c, value) <- (scheduler : Scheduler) {
 	Channel(k) = c
 	scheduler.step(Send(key.wrap(k, value)))
 	Nil
 }
 
-receive = (c) <- (scheduler: Scheduler) {
+receive = (c) <- (scheduler : Scheduler) {
 	Channel(k) = c
 	Proceed(value) = scheduler.step(Receive)
 	read(k, value)
@@ -47,7 +47,7 @@ receive = (c) <- (scheduler: Scheduler) {
 
 start = (body, result_key) {
 	{
-		kept = control.keep_env((own: Scheduler) {
+		kept = control.keep_env((own : Scheduler) {
 			identity(
 				Done(key.wrap(result_key, fail.catch(body))),
 			) <- (own)
@@ -56,7 +56,7 @@ start = (body, result_key) {
 	} <- (Scheduler(step = (_) { panic("prototype: detached") }))
 }
 
-begin = (start: Start) {
+begin = (start : Start) {
 	control.boundary((b) {
 		start.run(
 			Scheduler(

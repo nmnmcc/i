@@ -7,7 +7,7 @@
 	i/failure
 )
 
-check = (got: String, want: String) { assert(got == want) }
+check = (got : String, want : String) { assert(got == want) }
 
 show = (x) { core.inspect(x) }
 
@@ -18,20 +18,20 @@ need_string = () -> Nil { failure.raise("s") }
 
 Syn3ServiceFail(E) = Fail(E)
 
-both = () <- (f: Syn3ServiceFail(Int | String)) { need_int() }
+both = () <- (f : Syn3ServiceFail(Int | String)) { need_int() }
 
-either = (n: Int) { n |> (0) { need_int() } | (_) { need_string() } }
+either = (n : Int) { n |> (0) { need_int() } | (_) { need_string() } }
 
 Yield(A) = (emit = (A) -> Nil)
 
-collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
 			[]
 		} <- (
 			Yield(
-				emit = (x: A) {
+				emit = (x : A) {
 					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 				},
 			),
@@ -39,22 +39,22 @@ collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	})
 }
 
-emit = <A>(x: A) <- (y: Yield(A)) { y.emit(x) }
+emit = <A>(x : A) <- (y : Yield(A)) { y.emit(x) }
 
 test("a wider Fail meets a narrower need", () {
-	r: Result(Nil, Int | String) = failure.catch(() { both() })
+	r : Result(Nil, Int | String) = failure.catch(() { both() })
 	check(show(r), "Error(1)")
 })
 
 test("two needs of Fail are one entry", () {
-	a: Result(Nil, Int | String) = failure.catch(() { either(0) })
-	b: Result(Nil, Int | String) = failure.catch(() { either(1) })
+	a : Result(Nil, Int | String) = failure.catch(() { either(0) })
+	b : Result(Nil, Int | String) = failure.catch(() { either(1) })
 	check(show(a), "Error(1)")
 	check(show(b), "Error(\"s\")")
 })
 
 test("a generator of two types", () {
-	xs: List(Int | String) = collect(() {
+	xs : List(Int | String) = collect(() {
 		emit(1)
 		emit("two")
 	})

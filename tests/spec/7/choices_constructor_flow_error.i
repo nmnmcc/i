@@ -3,4 +3,4 @@
 Yes = (value = Int)
 No = ()
 T = Yes | No
-f = (r: T) { r |> (Yes(_) | Yes(_)) { r.value } }
+f = (r : T) { r |> (Yes(_) | Yes(_)) { r.value } }

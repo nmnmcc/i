@@ -677,7 +677,7 @@ stderr: () -> Sink(stdio.StdioError, stdio.Stdio | request.Await | request.Owner
   accept is always False. All these factories are pure. Calling enabled then
   write performs two checks; enabled gives a query result, not a reservation.
 - **L5 Services and errors.** E is covariant; N is invariant through the unused
-  `(N)->Nil` marker, made as `(_: N) { Nil }` and never called. Composition uses
+  `(N)->Nil` marker, made as `(_ : N) { Nil }` and never called. Composition uses
   one chosen N, not an invariant union of free row variables. Different Sink
   instances in an environment must have equal arguments, per spec §9.2;
   there is no automatic union of two sinks’ error/environment parameters.
@@ -754,11 +754,11 @@ same failure was reproduced with the complete four-field Entry of §6.
 Entry = (message = String)
 Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
 
-make = <E, N>(send: (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
-	Sink(send, (_: N) { Nil })
+make = <E, N>(send : (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
+	Sink(send, (_ : N) { Nil })
 }
 
-write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
+write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(send, _) = sink
 	send(entry)
 }
@@ -784,7 +784,7 @@ checker, though it is still not a build of this exact baseline.
 An explicit closed instantiation works with the inferred implementation:
 
 ```i
-send: (Entry) <- (Fail(String), Sink(String, Never)) -> Nil = write
+send : (Entry) <- (Fail(String), Sink(String, Never)) -> Nil = write
 
 working = () {
 	fail.catch(() { send(Entry("seen")) }) <- (
@@ -814,7 +814,7 @@ case rejected:
 ```i
 Consumer(A) = { ((A) -> Nil) }
 
-bad = (s: Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }
+bad = (s : Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }
 // Must reject: stored environments preserve exact service arguments.
 ```
 
@@ -868,7 +868,7 @@ for later authorized implementation, not permission to modify other lanes.
 | New `std/test/{time,calendar,cli,log}_test.i`, entire files | All tables above; laws, error ordering and boundary cases. Keep IO-fake cases in the matching second phase. |
 | `crates/ilang-check/src/types/solve.rs:688–714`, `:801–870`, `:950–999`; `infer.rs:2127–2156`; type-checker regression tests | Compiler owner investigates §7. These are starting regions, not a claim that all need edits. Exported generic wrappers and closed client calls need paired regression tests. |
 | `lib/i/{clock,process,stdio}.i:1`, request module and registration `crates/ilang-package/src/library.rs:7–24` | IO/runtime owners replace reservations and add the accepted request APIs. Std-2 edits none of these. |
-| `std/i.toml:1`; `docs/spec.md` | No manifest or language-spec change required. All new imports are std or accepted i library modules. |
+| `std/i.toml : 1`; `docs/spec.md` | No manifest or language-spec change required. All new imports are std or accepted i library modules. |
 
 1. Implement pure time first, then calendar. CLI is independent. Log needs
    time’s Instant type but no real clock. Use explicit annotations on public
@@ -1181,7 +1181,7 @@ The smallest rejection needs no logging library:
 
 ```i
 S(N) = (() <- N -> Nil)
-use = <N>() <- (s: S(N)) -> Nil {
+use = <N>() <- (s : S(N)) -> Nil {
 	S(f) = s
 	f()
 }

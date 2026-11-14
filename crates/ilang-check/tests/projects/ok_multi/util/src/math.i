@@ -2,4 +2,4 @@
 	double
 )
 
-double = (n: Int) -> Int { n * 2 }
+double = (n : Int) -> Int { n * 2 }

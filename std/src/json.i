@@ -37,7 +37,7 @@ Object = (List((String, Json)))
 Json = Null | Boolean | Integer | Number | Text | Array | Object
 JsonError = (offset = Int, reason = String)
 
-parse = (text: String) -> Result(Json, JsonError) {
+parse = (text : String) -> Result(Json, JsonError) {
 	fail.catch(() {
 		xs = octets(<<text:utf8>>)
 		(value, rest, at) = value(xs, 0)
@@ -50,7 +50,7 @@ parse = (text: String) -> Result(Json, JsonError) {
 	})
 }
 
-whitespace = (xs: List(Int), at: Int) -> (List(Int), Int) {
+whitespace = (xs : List(Int), at : Int) -> (List(Int), Int) {
 	xs |>
 		([x, ..tail] ? x == 32 || x == 9 || x == 10 || x == 13) {
 			whitespace(tail, at + 1)
@@ -58,7 +58,7 @@ whitespace = (xs: List(Int), at: Int) -> (List(Int), Int) {
 		| (_) { (xs, at) }
 }
 
-value = (input: List(Int), offset: Int) -> (Json, List(Int), Int) {
+value = (input : List(Int), offset : Int) -> (Json, List(Int), Int) {
 	(xs, at) = whitespace(input, offset)
 	xs |>
 		([110, 117, 108, 108, ..rest]) { (Null, rest, at + 4) }
@@ -74,14 +74,14 @@ value = (input: List(Int), offset: Int) -> (Json, List(Int), Int) {
 		| (_) { fail.raise(JsonError(offset = at, reason = "expected value")) }
 }
 
-array_start = (xs: List(Int), at: Int) -> (Json, List(Int), Int) {
+array_start = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 	(rest, pos) = whitespace(xs, at)
 	rest |>
 		([93, ..tail]) { (Array([]), tail, pos + 1) }
 		| (_) { array_items(rest, pos, []) }
 }
 
-array_items = (xs: List(Int), at: Int, acc: List(Json)) -> (
+array_items = (xs : List(Int), at : Int, acc : List(Json)) -> (
 	Json,
 	List(Int),
 	Int,
@@ -101,14 +101,14 @@ array_items = (xs: List(Int), at: Int, acc: List(Json)) -> (
 		}
 }
 
-object_start = (xs: List(Int), at: Int) -> (Json, List(Int), Int) {
+object_start = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 	(rest, pos) = whitespace(xs, at)
 	rest |>
 		([125, ..tail]) { (Object([]), tail, pos + 1) }
 		| (_) { object_items(rest, pos, []) }
 }
 
-object_items = (xs: List(Int), at: Int, acc: List((String, Json))) -> (
+object_items = (xs : List(Int), at : Int, acc : List((String, Json))) -> (
 	Json,
 	List(Int),
 	Int,
@@ -156,7 +156,7 @@ object_items = (xs: List(Int), at: Int, acc: List((String, Json))) -> (
 		}
 }
 
-read_string = (xs: List(Int), at: Int, acc: List(BitArray)) -> (
+read_string = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 	String,
 	List(Int),
 	Int,
@@ -183,7 +183,7 @@ read_string = (xs: List(Int), at: Int, acc: List(BitArray)) -> (
 		| ([x, ..tail]) { read_string(tail, at + 1, [<<x>>, ..acc]) }
 }
 
-escape = (xs: List(Int), at: Int, acc: List(BitArray)) -> (
+escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 	String,
 	List(Int),
 	Int,
@@ -269,7 +269,7 @@ escape = (xs: List(Int), at: Int, acc: List(BitArray)) -> (
 		}
 }
 
-hex4 = (xs: List(Int), at: Int) -> (Int, List(Int), Int) {
+hex4 = (xs : List(Int), at : Int) -> (Int, List(Int), Int) {
 	xs |>
 		([a, b, c, d, ..tail]) {
 			digits = [hex(a), hex(b), hex(c), hex(d)]
@@ -291,7 +291,7 @@ hex4 = (xs: List(Int), at: Int) -> (Int, List(Int), Int) {
 		}
 }
 
-hex = (x: Int) -> Int {
+hex = (x : Int) -> Int {
 	x |>
 		(n ? n >= 48 && n <= 57) { n - 48 }
 		| (n ? n >= 65 && n <= 70) { n - 55 }
@@ -299,15 +299,15 @@ hex = (x: Int) -> Int {
 		| (_) { -1 }
 }
 
-scalar = (n: Int) -> BitArray {
+scalar = (n : Int) -> BitArray {
 	core.int_to_codepoint(n) |>
 		(Ok(c)) { <<core.from_codepoints([c]):utf8>> }
 		| (Error(_)) { panic("json: invalid scalar") }
 }
 
-digit = (x: Int) -> Bool { x >= 48 && x <= 57 }
+digit = (x : Int) -> Bool { x >= 48 && x <= 57 }
 
-number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) {
+number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 	(negative, start, pos) = xs |>
 		([45, ..tail]) { (True, tail, at + 1) }
 		| (_) { (False, xs, at) }
@@ -389,7 +389,7 @@ number = (xs: List(Int), at: Int) -> (Json, List(Int), Int) {
 	(parsed, remaining, final)
 }
 
-digits = (xs: List(Int), at: Int, acc: List(Int)) -> (
+digits = (xs : List(Int), at : Int, acc : List(Int)) -> (
 	List(Int),
 	List(Int),
 	Int,
@@ -399,7 +399,7 @@ digits = (xs: List(Int), at: Int, acc: List(Int)) -> (
 		| (_) { (list.reverse(acc), xs, at) }
 }
 
-octets = (bits: BitArray) -> List(Int) {
+octets = (bits : BitArray) -> List(Int) {
 	go = (rest, acc) {
 		rest |>
 			(<<x, tail:bytes>>) { go(tail, [x, ..acc]) }
@@ -408,7 +408,7 @@ octets = (bits: BitArray) -> List(Int) {
 	go(bits, [])
 }
 
-text_bytes = (xs: List(Int)) -> String {
+text_bytes = (xs : List(Int)) -> String {
 	bit_array.to_string(
 		bit_array.concat(list.map(xs, (x) { <<x>> })),
 	) |>
@@ -416,7 +416,7 @@ text_bytes = (xs: List(Int)) -> String {
 		| (Error(_)) { panic("json: invalid internal text") }
 }
 
-field = (json: Json, key: String) -> Option(Json) {
+field = (json : Json, key : String) -> Option(Json) {
 	json |>
 		(Object(xs)) {
 			list.find_map(xs, (pair) {
@@ -427,41 +427,46 @@ field = (json: Json, key: String) -> Option(Json) {
 		| (_) { None }
 }
 
-index = (json: Json, at: Int) -> Option(Json) {
+index = (json : Json, at : Int) -> Option(Json) {
 	json |> (Array(xs)) { list.at(xs, at) } | (_) { None }
 }
 
-as_bool = (json: Json) -> Option(Bool) {
+as_bool = (json : Json) -> Option(Bool) {
 	json |> (Boolean(x)) { Some(x) } | (_) { None }
 }
 
-as_int = (json: Json) -> Option(Int) {
+as_int = (json : Json) -> Option(Int) {
 	json |> (Integer(x)) { Some(x) } | (_) { None }
 }
 
-as_float = (json: Json) -> Option(Float) {
+as_float = (json : Json) -> Option(Float) {
 	json |> (Number(x)) { Some(x) } | (_) { None }
 }
 
-as_string = (json: Json) -> Option(String) {
+as_string = (json : Json) -> Option(String) {
 	json |> (Text(x)) { Some(x) } | (_) { None }
 }
 
-as_array = (json: Json) -> Option(List(Json)) {
+as_array = (json : Json) -> Option(List(Json)) {
 	json |> (Array(x)) { Some(x) } | (_) { None }
 }
 
-as_object = (json: Json) -> Option(List((String, Json))) {
+as_object = (json : Json) -> Option(List((String, Json))) {
 	json |> (Object(x)) { Some(x) } | (_) { None }
 }
 
-print = (json: Json) -> String { render(json, "", 0, False) }
+print = (json : Json) -> String { render(json, "", 0, False) }
 
-pretty = (json: Json, indent: Int) -> String {
+pretty = (json : Json, indent : Int) -> String {
 	render(json, string.repeat(" ", indent), 0, True)
 }
 
-render = (json: Json, indent: String, depth: Int, formatted: Bool) -> String {
+render = (
+	json : Json,
+	indent : String,
+	depth : Int,
+	formatted : Bool
+) -> String {
 	json |>
 		(Null) { "null" }
 		| (Boolean(True)) { "true" }
@@ -501,12 +506,12 @@ render = (json: Json, indent: String, depth: Int, formatted: Bool) -> String {
 }
 
 collection = (
-	open: String,
-	close: String,
-	xs: List(String),
-	indent: String,
-	depth: Int,
-	formatted: Bool
+	open : String,
+	close : String,
+	xs : List(String),
+	indent : String,
+	depth : Int,
+	formatted : Bool
 ) -> String {
 	{ xs == [] || formatted == False } |>
 		(True) { string.concat([open, string.join(xs, ","), close]) }
@@ -526,7 +531,7 @@ collection = (
 		}
 }
 
-quote = (s: String) -> String {
+quote = (s : String) -> String {
 	pieces = list.map(core.codepoints(s), (cp) {
 		x = core.codepoint_to_int(cp)
 		x |>
@@ -550,6 +555,6 @@ quote = (s: String) -> String {
 	string.concat(["\"", string.concat(pieces), "\""])
 }
 
-hex_char = (n: Int) -> Int {
+hex_char = (n : Int) -> Int {
 	{ n < 10 } |> (True) { n + 48 } | (False) { n + 87 }
 }

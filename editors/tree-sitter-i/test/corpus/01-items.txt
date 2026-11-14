@@ -17,17 +17,17 @@ Headers, types and bindings
 Greeting = (name = String, times = Int)
 
 /// `text` `times` times, with `sep` between.
-repeat = (text: String, times: Int, sep: String) -> String {
+repeat = (text : String, times : Int, sep : String) -> String {
 	times |>
 		(0) { "" }
 		| (1) { text }
 		| (_) { text <> sep <> repeat(text, times - 1, sep) }
 }
 
-greet = (g: Greeting) { repeat("hello \(g.name)!", g.times, " ") }
+greet = (g : Greeting) { repeat("hello \(g.name)!", g.times, " ") }
 
 // Program entry.
-main = () <- (io: Io) { io.print("Hello from i!") }
+main = () <- (io : Io) { io.print("Hello from i!") }
 
 ---
 

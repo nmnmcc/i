@@ -57,6 +57,7 @@ pub mod code {
     pub const TYPE_PARAM_FORM: &str = "E0232";
     pub const MACRO_RESERVED: &str = "E0234";
     pub const MACRO_BINDER: &str = "E0235";
+    pub const MANY_CONSTRUCTORS: &str = "E0238";
     // E0229, E0233 and E0237 were temporary value-type reservations.
     pub const VALUE_TYPE_CIRCLE: &str = "E0530";
     pub const VALUE_TYPE_PLACE: &str = "E0531";
@@ -129,6 +130,7 @@ pub mod code {
     pub const EQ_DISJOINT: &str = "W0503";
     pub const UNUSED_BINDING: &str = "W0504";
     pub const PATTERN_DISJOINT: &str = "W0505";
+    pub const ONE_LINE_BINDING: &str = "W0506";
 }
 
 /// A parsed module of the graph.

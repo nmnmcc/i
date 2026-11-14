@@ -62,7 +62,7 @@ mode_string =
 	| (Append) { "append" }
 	| (ReadWrite) { "read_write" }
 
-open = (path, mode) <- (raw: Fs) {
+open = (path, mode) <- (raw : Fs) {
 	r = raw.open(path, mode_string(mode))
 	number = resource.ensure(
 		() {
@@ -86,7 +86,7 @@ open = (path, mode) <- (raw: Fs) {
 	File(number)
 }
 
-read = (File(number), max_bytes) <- (raw: Fs) {
+read = (File(number), max_bytes) <- (raw : Fs) {
 	request.await_owned(raw.read(number, max_bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -94,7 +94,7 @@ read = (File(number), max_bytes) <- (raw: Fs) {
 		}
 }
 
-write = (File(number), bytes) <- (raw: Fs) {
+write = (File(number), bytes) <- (raw : Fs) {
 	request.await_owned(raw.write(number, bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -102,7 +102,7 @@ write = (File(number), bytes) <- (raw: Fs) {
 		}
 }
 
-flush = (File(number)) <- (raw: Fs) {
+flush = (File(number)) <- (raw : Fs) {
 	request.await_owned(raw.flush(number)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -110,9 +110,9 @@ flush = (File(number)) <- (raw: Fs) {
 		}
 }
 
-close = (File(number)) <- (raw: Fs) { request.await_owned(raw.close(number)) }
+close = (File(number)) <- (raw : Fs) { request.await_owned(raw.close(number)) }
 
-remove = (path) <- (raw: Fs) {
+remove = (path) <- (raw : Fs) {
 	request.await_owned(raw.remove(path)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -120,7 +120,7 @@ remove = (path) <- (raw: Fs) {
 		}
 }
 
-rename = (from, to) <- (raw: Fs) {
+rename = (from, to) <- (raw : Fs) {
 	request.await_owned(raw.rename(from, to)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -128,7 +128,7 @@ rename = (from, to) <- (raw: Fs) {
 		}
 }
 
-mkdir = (path) <- (raw: Fs) {
+mkdir = (path) <- (raw : Fs) {
 	request.await_owned(raw.mkdir(path)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -142,7 +142,7 @@ slice = (text, start, length) {
 		| (Error(_)) { panic("fs: invalid string slice") }
 }
 
-list_parts = (text: String, start: Int) -> List(String) {
+list_parts = (text : String, start : Int) -> List(String) {
 	core.index_of(text, "\u{0}", start) |>
 		(Ok(end)) {
 			[slice(text, start, end - start), ..list_parts(text, end + 1)]
@@ -150,7 +150,7 @@ list_parts = (text: String, start: Int) -> List(String) {
 		| (Error(_)) { [] }
 }
 
-list = (path) <- (raw: Fs) {
+list = (path) <- (raw : Fs) {
 	request.await_owned(raw.list(path)) |>
 		(Ok(value)) { list_parts(value, 0) }
 		| (Error(code)) {
@@ -158,7 +158,7 @@ list = (path) <- (raw: Fs) {
 		}
 }
 
-metadata = (path) <- (raw: Fs) {
+metadata = (path) <- (raw : Fs) {
 	size = request.await_owned(raw.size(path)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -176,7 +176,7 @@ metadata = (path) <- (raw: Fs) {
 	Metadata(size = size, kind = kind)
 }
 
-temp_dir = () <- (raw: Fs) {
+temp_dir = () <- (raw : Fs) {
 	request.await_owned(raw.temp_dir()) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -207,7 +207,7 @@ write_file = (path, bytes) {
 	)
 }
 
-line_parts = (text: String, start: Int) -> List(String) {
+line_parts = (text : String, start : Int) -> List(String) {
 	core.index_of(text, "\n", start) |>
 		(Ok(end)) {
 			[slice(text, start, end - start), ..line_parts(text, end + 1)]

@@ -1,0 +1,23 @@
+// @ts-check
+import { defineConfig } from 'astro/config';
+import tailwindcss from '@tailwindcss/vite';
+import fumadocs from '@fumadocs/astro';
+import { readFileSync } from 'node:fs';
+
+const grammar = JSON.parse(readFileSync(new URL('../editors/vscode/syntaxes/i.tmLanguage.json', import.meta.url), 'utf8'));
+grammar.name = 'i';
+
+export default defineConfig({
+  site: 'https://i.nmnm.cc',
+  base: '/',
+  integrations: [
+    fumadocs({
+      components: './src/components/mdx.tsx',
+      rehypeCodeOptions: { langs: [grammar], fallbackLanguage: 'text', engine: 'oniguruma' },
+      includeProcessedMarkdown: true,
+    }),
+  ],
+  vite: {
+    plugins: [tailwindcss()],
+  },
+});

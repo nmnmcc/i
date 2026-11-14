@@ -452,7 +452,7 @@ The readback examples below are excerpts of the programs executed by
 
 ```i
 v = "GET"
-x: v = "GET"
+x : v = "GET"
 ```
 
 The annotation reads the exact literal type of v. POST would be rejected.

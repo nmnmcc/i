@@ -9,8 +9,8 @@ guarded_only : (A & 1) -> 1 | A - 1
 describe : (Int | String) -> String
 choice : (Result(A, A)) -> A
 mixed : (Bool) -> 1 | "no"
-named : (Result(A, B)) -> Result(A | 0, B)
+named : (Result(A, B)) -> Ok(A | 0)
 bad : (A) -> A
 first_one : ((A, B) | C - (_, B)) -> B | 0
 22:40: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-37:28: error[E0511]: in a test, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)
+37:30: error[E0511]: in a test, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)

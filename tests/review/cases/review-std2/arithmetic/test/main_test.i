@@ -2,11 +2,11 @@
 	testlib = (test) = std/test
 )
 
-fd = (a: Int, b: Int) -> Int {
+fd = (a : Int, b : Int) -> Int {
 	{ a % b < 0 } |> (True) { a / b - 1 } | (False) { a / b }
 }
 
-day = (y: Int, m: Int, d: Int) -> Int {
+day = (y : Int, m : Int, d : Int) -> Int {
 	y1 = { m <= 2 } |> (True) { y - 1 } | (False) { y }
 	era = fd(y1, 400)
 	yoe = y1 - era * 400
@@ -15,7 +15,7 @@ day = (y: Int, m: Int, d: Int) -> Int {
 	era * 146097 + 365 * yoe + fd(yoe, 4) - fd(yoe, 100) + doy - 719468
 }
 
-civil = (n: Int) -> (Int, Int, Int) {
+civil = (n : Int) -> (Int, Int, Int) {
 	z = n + 719468
 	era = fd(z, 146097)
 	doe = z - era * 146097

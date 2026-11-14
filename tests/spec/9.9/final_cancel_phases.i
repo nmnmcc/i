@@ -35,14 +35,14 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text : String) <- (out : Out) { out.print(text) }
 
-probe = (phase: Int, typed: Bool) {
+probe = (phase : Int, typed : Bool) {
 	result = fail.catch(() {
 		task.scope((s) {
-			gate: task.Channel(Nil) = task.channel()
-			never: task.Channel(Nil) = task.channel()
-			started: task.Channel(Nil) = task.channel()
+			gate : task.Channel(Nil) = task.channel()
+			never : task.Channel(Nil) = task.channel()
+			started : task.Channel(Nil) = task.channel()
 			child = task.go(s, () {
 				fail.catch(() {
 					resource.ensure(

@@ -5,3 +5,4 @@ pub mod expand;
 pub mod fmt;
 pub mod lsp;
 pub mod package;
+pub mod spec;

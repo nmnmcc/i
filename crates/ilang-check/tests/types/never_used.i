@@ -1,5 +1,5 @@
 // §6.12 and §7.4: a clause that can never be used gives a warning.
-after_all = (b: Bool) { b |> (True) { 1 } | (False) { 2 } | (_) { 3 } }
+after_all = (b : Bool) { b |> (True) { 1 } | (False) { 2 } | (_) { 3 } }
 
 duplicate = (n) { n |> (1) { 1 } | (1) { 2 } | (_) { 3 } }
 
@@ -7,9 +7,9 @@ after_catch_all = (x) { x |> (_) { 1 } | (0) { 2 } }
 
 // A clause with a guard may be never used, but it never makes a later one
 // never used.
-guarded_after = (b: Bool) { b |> (_) { 1 } | (True ? True) { 2 } }
+guarded_after = (b : Bool) { b |> (_) { 1 } | (True ? True) { 2 } }
 
-guard_not_counted = (b: Bool) {
+guard_not_counted = (b : Bool) {
 	b |> (True ? True) { 1 } | (True) { 2 } | (False) { 3 }
 }
 
@@ -18,11 +18,11 @@ prefixes = (s) {
 }
 
 // The type of the subject has no `String`.
-no_values = (v: Int) { v |> (_: Int) { 1 } | (_: String) { 2 } }
+no_values = (v : Int) { v |> (_ : Int) { 1 } | (_ : String) { 2 } }
 
 choices = (r) { r |> (Ok(_) | Error(_)) { 1 } | (Ok(1)) { 2 } }
 
-nested = (r: Result(Bool, Nil)) {
+nested = (r : Result(Bool, Nil)) {
 	r |> (Ok(True)) { 1 } | (Ok(False)) { 2 } | (Error(_)) { 3 } | (Ok(_)) { 4 }
 }
 

@@ -270,7 +270,7 @@ Single = { (Int) }
 f = (x) -> Int { x }
 first = (name = "Ada", x_y = 7)
 second = (..first, count = 2)
-choose = <K, R>(key: K, r: (k = Int)) -> (k = Int) { r }
+choose = <K, R>(key : K, r : (k = Int)) -> (k = Int) { r }
 "#;
     let (normal, errors) = ilang_syntax::syn3::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");

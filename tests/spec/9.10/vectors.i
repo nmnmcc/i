@@ -10,7 +10,7 @@
 	i/core
 )
 
-advance = (g: random.Generator, n: Int) -> random.Generator {
+advance = (g : random.Generator, n : Int) -> random.Generator {
 	{ n == 0 } |> (True) { g } | (False) { advance(random.word(g).1, n - 1) }
 }
 

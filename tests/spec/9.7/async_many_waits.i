@@ -5,7 +5,7 @@
 @host("test:async/v1", "async")
 Later = (double = (Int) <- (Fail(String)) -> Int)
 
-sum = (n: Int, total: Int) <- (later: Later) {
+sum = (n : Int, total : Int) <- (later : Later) {
 	n |> (0) { total } | (_) { sum(n - 1, total + later.double(n)) }
 }
 

@@ -9,7 +9,7 @@
 	i/fail
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -17,9 +17,9 @@ check = (got: String, want: String) {
 
 show = (x) { core.inspect(x) }
 
-Paused = (Continuation(Nil, Paused, Never, Never))
+Paused = (Continuation(Nil, PausedSum, Never, Never))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
 // The call of `fail.raise` is not a tail call, so the frame of `inner` is
 // still on the shadow stack when the error goes out of it.

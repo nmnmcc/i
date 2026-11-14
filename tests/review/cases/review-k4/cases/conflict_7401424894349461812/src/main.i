@@ -1,8 +1,8 @@
 S(A) = (value = A)
-read = () <- (s: S(String)) { s.value <> "!" }
-read_int = () <- (s: S(Int)) { s.value + 1 }
+read = () <- (s : S(String)) { s.value <> "!" }
+read_int = () <- (s : S(Int)) { s.value + 1 }
 run = (f) { f() }
-join = <N, M>(f: () <- N -> String, g: () <- M -> Int) {
+join = <N, M>(f : () <- N -> String, g : () <- M -> Int) {
 	run(f)
 	run(g)
 }

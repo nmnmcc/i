@@ -6,7 +6,7 @@ one = () -> Nil { fail.raise(1) }
 
 two = () -> Nil { fail.raise(2) }
 
-pick = (b: Bool) { b |> (True) { one } | (False) { two } }
+pick = (b : Bool) { b |> (True) { one } | (False) { two } }
 
 main = () {
 	fail.catch(() { pick(True)() }) |>

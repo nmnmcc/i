@@ -46,8 +46,8 @@ live = () { middle() }
 dead_value = 2
 dead_leaf = 3
 dead_caller = () { dead_leaf }
-even = (n: Int) { n == 0 || odd(n - 1) }
-odd = (n: Int) { n != 0 && even(n - 1) }
+even = (n : Int) { n == 0 || odd(n - 1) }
+odd = (n : Int) { n != 0 && even(n - 1) }
 "#
         )]),
         ["dead_value", "dead_caller"]
@@ -134,11 +134,11 @@ fn hint_requires_test_module_no_value_parameters_and_exact_nil() {
             r#"forgotten = () { assert(True) }
 explicit = () -> Nil { Nil }
 alias = forgotten
-has_argument = (n: Int) { assert(n > 0) }
+has_argument = (n : Int) { assert(n > 0) }
 returns_int = () { 1 }
 never_returns = () { panic("stop") }
-union_result = (b: Bool) { b |> (True) { Nil } | (False) { 1 } }
-with_environment = () <- (a: Assert) { assert(True) }
+union_result = (b : Bool) { b |> (True) { Nil } | (False) { 1 } }
+with_environment = () <- (a : Assert) { assert(True) }
 "#,
         ),
     ]);
@@ -190,7 +190,7 @@ fn types_services_constructors_and_external_declarations_are_exempt() {
 Alias = String
 Service = (run = () -> Nil)
 @external("env", "f")
-foreign: () -> Int
+foreign : () -> Int
 "#
         )])
         .is_empty()
@@ -208,13 +208,13 @@ fn value_type_reads_are_uses_even_without_runtime_calls() {
 source = ("ok", 1)
 Alias = source
 annotation = 1
-api: (annotation) -> annotation = (x) { x }
+api : (annotation) -> annotation = (x) { x }
 "#
         )])
         .is_empty()
     );
     assert_eq!(
-        names(&[("src/main.i", "source = 1\ndead: source = 1")]),
+        names(&[("src/main.i", "source = 1\ndead : source = 1")]),
         ["dead"]
     );
 }

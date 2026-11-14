@@ -1,1 +1,1 @@
-bad = (x: Never) { bad([x]) }
+bad = (x : Never) { bad([x]) }

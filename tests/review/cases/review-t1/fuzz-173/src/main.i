@@ -1,14 +1,14 @@
-f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
+f = (x : ("a" | "ab" | "b" | "c" | "", Bool)) {
 	x |>
 		(("a" <> _, _)) { 0 }
 		| (("b", _)) { 1 }
-		| ((_: String - "ab" - "b", _)) { 2 }
+		| ((_ : String - "ab" - "b", _)) { 2 }
 		| (("a", False)) { 3 }
-		| ((_: String - "a", False)) { 4 }
+		| ((_ : String - "a", False)) { 4 }
 		| (("a" <> _, _)) { 5 }
 		| (("ab", False)) { 6 }
 		| ((_, False)) { 7 }
-		| ((_: String - "a", False)) { 8 }
+		| ((_ : String - "a", False)) { 8 }
 }
 
 main = () {

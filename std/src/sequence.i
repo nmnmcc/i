@@ -44,24 +44,24 @@ Sequence(A) = (Tree(A))
 new = <A>() -> Sequence(A) { Sequence(EmptyTree) }
 
 /// A sequence of one item.
-wrap = <A>(item: A) -> Sequence(A) { Sequence(Single(Leaf(item))) }
+wrap = <A>(item : A) -> Sequence(A) { Sequence(Single(Leaf(item))) }
 
 /// Builds a sequence in O(n) work, grouping nodes from the bottom up.
-from_list = <A>(items: List(A)) -> Sequence(A) {
+from_list = <A>(items : List(A)) -> Sequence(A) {
 	Sequence(build_tree(list.map(items, (x) { Leaf(x) })))
 }
 
 /// The cached number of elements, in O(1) work.
-length = <A>(sequence: Sequence(A)) -> Int {
+length = <A>(sequence : Sequence(A)) -> Int {
 	Sequence(tree) = sequence
 	tree_size(tree)
 }
 
 /// Whether there are no elements.
-is_empty = <A>(sequence: Sequence(A)) -> Bool { length(sequence) == 0 }
+is_empty = <A>(sequence : Sequence(A)) -> Bool { length(sequence) == 0 }
 
 /// The first item, or `None`.
-first = <A>(sequence: Sequence(A)) -> Option(A) {
+first = <A>(sequence : Sequence(A)) -> Option(A) {
 	Sequence(tree) = sequence
 	tree |>
 		(EmptyTree) { None }
@@ -71,7 +71,7 @@ first = <A>(sequence: Sequence(A)) -> Option(A) {
 }
 
 /// The last item, or `None`.
-last = <A>(sequence: Sequence(A)) -> Option(A) {
+last = <A>(sequence : Sequence(A)) -> Option(A) {
 	Sequence(tree) = sequence
 	tree |>
 		(EmptyTree) { None }
@@ -84,19 +84,19 @@ last = <A>(sequence: Sequence(A)) -> Option(A) {
 }
 
 /// Adds an item at the front, preserving the old sequence.
-push_front = <A>(to: Sequence(A), item: A) -> Sequence(A) {
+push_front = <A>(to : Sequence(A), item : A) -> Sequence(A) {
 	Sequence(tree) = to
 	Sequence(push_left(tree, Leaf(item)))
 }
 
 /// Adds an item at the back, preserving the old sequence.
-push_back = <A>(to: Sequence(A), item: A) -> Sequence(A) {
+push_back = <A>(to : Sequence(A), item : A) -> Sequence(A) {
 	Sequence(tree) = to
 	Sequence(push_right(tree, Leaf(item)))
 }
 
 /// Removes the first item. The item comes before the remaining sequence.
-pop_front = <A>(from: Sequence(A)) -> Option((A, Sequence(A))) {
+pop_front = <A>(from : Sequence(A)) -> Option((A, Sequence(A))) {
 	Sequence(tree) = from
 	view_left(tree) |>
 		(None) { None }
@@ -104,7 +104,7 @@ pop_front = <A>(from: Sequence(A)) -> Option((A, Sequence(A))) {
 }
 
 /// Removes the last item. The item comes before the remaining sequence.
-pop_back = <A>(from: Sequence(A)) -> Option((A, Sequence(A))) {
+pop_back = <A>(from : Sequence(A)) -> Option((A, Sequence(A))) {
 	Sequence(tree) = from
 	view_right(tree) |>
 		(None) { None }
@@ -112,7 +112,7 @@ pop_back = <A>(from: Sequence(A)) -> Option((A, Sequence(A))) {
 }
 
 /// The item at a zero-based index. Negative and out-of-range indices miss.
-at = <A>(sequence: Sequence(A), index: Int) -> Option(A) {
+at = <A>(sequence : Sequence(A), index : Int) -> Option(A) {
 	Sequence(tree) = sequence
 	{ index < 0 || index >= tree_size(tree) } |>
 		(True) { None }
@@ -120,7 +120,7 @@ at = <A>(sequence: Sequence(A), index: Int) -> Option(A) {
 }
 
 /// Replaces one item, preserving length. Invalid indices give `None`.
-set = <A>(in: Sequence(A), index: Int, value: A) -> Option(Sequence(A)) {
+set = <A>(in : Sequence(A), index : Int, value : A) -> Option(Sequence(A)) {
 	Sequence(tree) = in
 	{ index < 0 || index >= tree_size(tree) } |>
 		(True) { None }
@@ -128,14 +128,14 @@ set = <A>(in: Sequence(A), index: Int, value: A) -> Option(Sequence(A)) {
 }
 
 /// Concatenates two sequences by joining their fringes and sharing subtrees.
-append = <A>(first: Sequence(A), second: Sequence(A)) -> Sequence(A) {
+append = <A>(first : Sequence(A), second : Sequence(A)) -> Sequence(A) {
 	Sequence(a) = first
 	Sequence(b) = second
 	Sequence(join_trees(a, [], b))
 }
 
 /// Splits before `at`, clamped to [0, length].
-split = <A>(sequence: Sequence(A), at: Int) -> (Sequence(A), Sequence(A)) {
+split = <A>(sequence : Sequence(A), at : Int) -> (Sequence(A), Sequence(A)) {
 	Sequence(tree) = sequence
 	at |>
 		(i ? i <= 0) { (new(), sequence) }
@@ -147,41 +147,41 @@ split = <A>(sequence: Sequence(A), at: Int) -> (Sequence(A), Sequence(A)) {
 }
 
 /// The first `up_to` items, clamping negative counts to zero.
-take = <A>(from: Sequence(A), up_to: Int) -> Sequence(A) {
+take = <A>(from : Sequence(A), up_to : Int) -> Sequence(A) {
 	(left, _) = split(from, up_to)
 	left
 }
 
 /// Drops the first `up_to` items, clamping negative counts to zero.
-drop = <A>(from: Sequence(A), up_to: Int) -> Sequence(A) {
+drop = <A>(from : Sequence(A), up_to : Int) -> Sequence(A) {
 	(_, right) = split(from, up_to)
 	right
 }
 
 /// Reverses element order by mirroring the tree once.
-reverse = <A>(sequence: Sequence(A)) -> Sequence(A) {
+reverse = <A>(sequence : Sequence(A)) -> Sequence(A) {
 	Sequence(tree) = sequence
 	Sequence(reverse_tree(tree))
 }
 
 /// Eagerly transforms every item, left to right, stopping on the first error.
-map = <A, B, N>(over: Sequence(A), with: (A) <- N -> B) -> Sequence(B) {
+map = <A, B, N>(over : Sequence(A), with : (A) <- N -> B) -> Sequence(B) {
 	Sequence(tree) = over
 	Sequence(map_tree(tree, with))
 }
 
 /// Combines items left to right, passing (accumulator, item) to the callback.
 fold = <A, Acc, N>(
-	over: Sequence(A),
-	from: Acc,
-	with: (Acc, A) <- N -> Acc
+	over : Sequence(A),
+	from : Acc,
+	with : (Acc, A) <- N -> Acc
 ) -> Acc {
 	Sequence(tree) = over
 	fold_tree(tree, from, with)
 }
 
 /// Calls a function on each item left to right and discards its result.
-each = <A, B, N>(over: Sequence(A), with: (A) <- N -> B) -> Nil {
+each = <A, B, N>(over : Sequence(A), with : (A) <- N -> B) -> Nil {
 	fold(over, Nil, (_, x) {
 		with(x)
 		Nil
@@ -189,12 +189,12 @@ each = <A, B, N>(over: Sequence(A), with: (A) <- N -> B) -> Nil {
 }
 
 /// Lists all elements in order with one tree walk.
-to_list = <A>(sequence: Sequence(A)) -> List(A) {
+to_list = <A>(sequence : Sequence(A)) -> List(A) {
 	list.reverse(fold(sequence, [], (acc, x) { [x, ..acc] }))
 }
 
 /// Compares lengths and elements using `==`, independently of tree shape.
-equal = <A>(first: Sequence(A), second: Sequence(A)) -> Bool {
+equal = <A>(first : Sequence(A), second : Sequence(A)) -> Bool {
 	length(first) == length(second) && to_list(first) == to_list(second)
 }
 
@@ -210,32 +210,34 @@ Deep(A) = (Int, List(Node(A)), Tree(A), List(Node(A)))
 // nodes one rank higher. Uniform Node/Tree types avoid polymorphic recursion.
 Tree(A) = EmptyTree | Single(A) | Deep(A)
 
-node_size = <A>(node: Node(A)) -> Int {
+node_size = <A>(node : Node(A)) -> Int {
 	node |> (Leaf(_)) { 1 } | (Branch2(n, ..)) { n } | (Branch3(n, ..)) { n }
 }
 
-tree_size = <A>(tree: Tree(A)) -> Int {
+tree_size = <A>(tree : Tree(A)) -> Int {
 	tree |>
 		(EmptyTree) { 0 }
 		| (Single(x)) { node_size(x) }
 		| (Deep(n, ..)) { n }
 }
 
-digit_size = <A>(nodes: List(Node(A))) -> Int {
+digit_size = <A>(nodes : List(Node(A))) -> Int {
 	list.fold(nodes, 0, (n, x) { n + node_size(x) })
 }
 
-branch2 = <A>(a: Node(A), b: Node(A)) -> Node(A) {
+branch2 = <A>(a : Node(A), b : Node(A)) -> Node(A) {
 	Branch2(node_size(a) + node_size(b), a, b)
 }
 
-branch3 = <A>(a: Node(A), b: Node(A), c: Node(A)) -> Node(A) {
+branch3 = <A>(a : Node(A), b : Node(A), c : Node(A)) -> Node(A) {
 	Branch3(node_size(a) + node_size(b) + node_size(c), a, b, c)
 }
 
-deep = <A>(left: List(Node(A)), middle: Tree(A), right: List(Node(A))) -> Tree(
-	A,
-) {
+deep = <A>(
+	left : List(Node(A)),
+	middle : Tree(A),
+	right : List(Node(A))
+) -> Tree(A) {
 	Deep(
 		digit_size(left) + tree_size(middle) + digit_size(right),
 		left,
@@ -244,19 +246,19 @@ deep = <A>(left: List(Node(A)), middle: Tree(A), right: List(Node(A))) -> Tree(
 	)
 }
 
-children = <A>(node: Node(A)) -> List(Node(A)) {
+children = <A>(node : Node(A)) -> List(Node(A)) {
 	node |>
 		(Branch2(_, a, b)) { [a, b] }
 		| (Branch3(_, a, b, c)) { [a, b, c] }
 		| (Leaf(_)) { panic("sequence: expected a branch") }
 }
 
-leaf_value = <A>(node: Node(A)) -> A {
+leaf_value = <A>(node : Node(A)) -> A {
 	node |> (Leaf(x)) { x } | (_) { panic("sequence: expected a leaf") }
 }
 
 // This helper is only given a bounded digit, never a whole sequence.
-shallow = <A>(nodes: List(Node(A))) -> Tree(A) {
+shallow = <A>(nodes : List(Node(A))) -> Tree(A) {
 	nodes |>
 		([]) { EmptyTree }
 		| ([x]) { Single(x) }
@@ -266,7 +268,7 @@ shallow = <A>(nodes: List(Node(A))) -> Tree(A) {
 		| (_) { panic("sequence: oversized digit") }
 }
 
-push_left = <A>(tree: Tree(A), node: Node(A)) -> Tree(A) {
+push_left = <A>(tree : Tree(A), node : Node(A)) -> Tree(A) {
 	tree |>
 		(EmptyTree) { Single(node) }
 		| (Single(x)) { deep([node], EmptyTree, [x]) }
@@ -280,7 +282,7 @@ push_left = <A>(tree: Tree(A), node: Node(A)) -> Tree(A) {
 		| (Deep(_, left, middle, right)) { deep([node, ..left], middle, right) }
 }
 
-push_right = <A>(tree: Tree(A), node: Node(A)) -> Tree(A) {
+push_right = <A>(tree : Tree(A), node : Node(A)) -> Tree(A) {
 	tree |>
 		(EmptyTree) { Single(node) }
 		| (Single(x)) { deep([x], EmptyTree, [node]) }
@@ -297,9 +299,9 @@ push_right = <A>(tree: Tree(A), node: Node(A)) -> Tree(A) {
 }
 
 left_deep = <A>(
-	left: List(Node(A)),
-	middle: Tree(A),
-	right: List(Node(A))
+	left : List(Node(A)),
+	middle : Tree(A),
+	right : List(Node(A))
 ) -> Tree(A) {
 	left |>
 		([]) {
@@ -311,9 +313,9 @@ left_deep = <A>(
 }
 
 right_deep = <A>(
-	left: List(Node(A)),
-	middle: Tree(A),
-	right: List(Node(A))
+	left : List(Node(A)),
+	middle : Tree(A),
+	right : List(Node(A))
 ) -> Tree(A) {
 	right |>
 		([]) {
@@ -324,7 +326,7 @@ right_deep = <A>(
 		| (_) { deep(left, middle, right) }
 }
 
-view_left = <A>(tree: Tree(A)) -> Option((Node(A), Tree(A))) {
+view_left = <A>(tree : Tree(A)) -> Option((Node(A), Tree(A))) {
 	tree |>
 		(EmptyTree) { None }
 		| (Single(x)) { Some((x, EmptyTree)) }
@@ -334,7 +336,7 @@ view_left = <A>(tree: Tree(A)) -> Option((Node(A), Tree(A))) {
 		| (Deep(_, [], _, _)) { panic("sequence: empty front digit") }
 }
 
-view_right = <A>(tree: Tree(A)) -> Option((Node(A), Tree(A))) {
+view_right = <A>(tree : Tree(A)) -> Option((Node(A), Tree(A))) {
 	tree |>
 		(EmptyTree) { None }
 		| (Single(x)) { Some((x, EmptyTree)) }
@@ -349,7 +351,7 @@ view_right = <A>(tree: Tree(A)) -> Option((Node(A), Tree(A))) {
 
 // Prefer triples, replacing a remainder of one with two pairs. Join bridges
 // have 2..12 nodes, and construction uses the same rule on a whole level.
-group_nodes = <A>(nodes: List(Node(A))) -> List(Node(A)) {
+group_nodes = <A>(nodes : List(Node(A))) -> List(Node(A)) {
 	go = (rest, acc) {
 		rest |>
 			([]) { list.reverse(acc) }
@@ -363,9 +365,11 @@ group_nodes = <A>(nodes: List(Node(A))) -> List(Node(A)) {
 	go(nodes, [])
 }
 
-join_trees = <A>(left: Tree(A), between: List(Node(A)), right: Tree(A)) -> Tree(
-	A,
-) {
+join_trees = <A>(
+	left : Tree(A),
+	between : List(Node(A)),
+	right : Tree(A)
+) -> Tree(A) {
 	(left, right) |>
 		((EmptyTree, _)) {
 			list.fold(list.reverse(between), right, (t, x) { push_left(t, x) })
@@ -393,7 +397,7 @@ join_trees = <A>(left: Tree(A), between: List(Node(A)), right: Tree(A)) -> Tree(
 }
 
 // Build each rank once. List length/split/reversal work sums geometrically.
-build_tree = <A>(nodes: List(Node(A))) -> Tree(A) {
+build_tree = <A>(nodes : List(Node(A))) -> Tree(A) {
 	n = list.length(nodes)
 	n |>
 		(count ? count <= 4) { shallow(nodes) }
@@ -413,7 +417,7 @@ build_tree = <A>(nodes: List(Node(A))) -> Tree(A) {
 }
 
 // Locate a pivot and keep its residual leaf offset, so descent never restarts.
-split_nodes = <A>(nodes: List(Node(A)), index: Int) -> (
+split_nodes = <A>(nodes : List(Node(A)), index : Int) -> (
 	List(Node(A)),
 	Node(A),
 	Int,
@@ -431,7 +435,7 @@ split_nodes = <A>(nodes: List(Node(A)), index: Int) -> (
 	go(nodes, index, [])
 }
 
-split_tree = <A>(tree: Tree(A), index: Int) -> (
+split_tree = <A>(tree : Tree(A), index : Int) -> (
 	Tree(A),
 	Node(A),
 	Int,
@@ -479,7 +483,7 @@ split_tree = <A>(tree: Tree(A), index: Int) -> (
 }
 
 // Lookup follows existing list spines and branches without allocating nodes.
-find_nodes = <A>(nodes: List(Node(A)), index: Int) -> A {
+find_nodes = <A>(nodes : List(Node(A)), index : Int) -> A {
 	nodes |>
 		([]) { panic("sequence: missing lookup node") }
 		| ([x, ..xs]) {
@@ -489,7 +493,7 @@ find_nodes = <A>(nodes: List(Node(A)), index: Int) -> A {
 		}
 }
 
-find_node = <A>(node: Node(A), index: Int) -> A {
+find_node = <A>(node : Node(A), index : Int) -> A {
 	node |>
 		(Leaf(x)) { x }
 		| (Branch2(_, a, b)) {
@@ -507,7 +511,7 @@ find_node = <A>(node: Node(A), index: Int) -> A {
 		}
 }
 
-find_tree = <A>(tree: Tree(A), index: Int) -> A {
+find_tree = <A>(tree : Tree(A), index : Int) -> A {
 	tree |>
 		(EmptyTree) { panic("sequence: lookup of empty tree") }
 		| (Single(x)) { find_node(x, index) }
@@ -521,12 +525,14 @@ find_tree = <A>(tree: Tree(A), index: Int) -> A {
 		}
 }
 
-set_nodes = <A>(nodes: List(Node(A)), index: Int, value: A) -> List(Node(A)) {
+set_nodes = <A>(nodes : List(Node(A)), index : Int, value : A) -> List(
+	Node(A),
+) {
 	(before, x, offset, after) = split_nodes(nodes, index)
 	list.append(before, [set_node(x, offset, value), ..after])
 }
 
-set_node = <A>(node: Node(A), index: Int, value: A) -> Node(A) {
+set_node = <A>(node : Node(A), index : Int, value : A) -> Node(A) {
 	node |>
 		(Leaf(_)) { Leaf(value) }
 		| (Branch2(n, a, b)) {
@@ -555,7 +561,7 @@ set_node = <A>(node: Node(A), index: Int, value: A) -> Node(A) {
 		}
 }
 
-set_tree = <A>(tree: Tree(A), index: Int, value: A) -> Tree(A) {
+set_tree = <A>(tree : Tree(A), index : Int, value : A) -> Tree(A) {
 	tree |>
 		(EmptyTree) { panic("sequence: update of empty tree") }
 		| (Single(x)) { Single(set_node(x, index, value)) }
@@ -575,7 +581,7 @@ set_tree = <A>(tree: Tree(A), index: Int, value: A) -> Tree(A) {
 		}
 }
 
-reverse_node = <A>(node: Node(A)) -> Node(A) {
+reverse_node = <A>(node : Node(A)) -> Node(A) {
 	node |>
 		(Leaf(_)) { node }
 		| (Branch2(n, a, b)) { Branch2(n, reverse_node(b), reverse_node(a)) }
@@ -584,7 +590,7 @@ reverse_node = <A>(node: Node(A)) -> Node(A) {
 		}
 }
 
-reverse_tree = <A>(tree: Tree(A)) -> Tree(A) {
+reverse_tree = <A>(tree : Tree(A)) -> Tree(A) {
 	tree |>
 		(EmptyTree) { EmptyTree }
 		| (Single(x)) { Single(reverse_node(x)) }
@@ -598,7 +604,7 @@ reverse_tree = <A>(tree: Tree(A)) -> Tree(A) {
 		}
 }
 
-map_node = <A, B, N>(node: Node(A), f: (A) <- N -> B) -> Node(B) {
+map_node = <A, B, N>(node : Node(A), f : (A) <- N -> B) -> Node(B) {
 	node |>
 		(Leaf(x)) { Leaf(f(x)) }
 		| (Branch2(n, a, b)) { Branch2(n, map_node(a, f), map_node(b, f)) }
@@ -607,7 +613,7 @@ map_node = <A, B, N>(node: Node(A), f: (A) <- N -> B) -> Node(B) {
 		}
 }
 
-map_tree = <A, B, N>(tree: Tree(A), f: (A) <- N -> B) -> Tree(B) {
+map_tree = <A, B, N>(tree : Tree(A), f : (A) <- N -> B) -> Tree(B) {
 	tree |>
 		(EmptyTree) { EmptyTree }
 		| (Single(x)) { Single(map_node(x, f)) }
@@ -620,9 +626,9 @@ map_tree = <A, B, N>(tree: Tree(A), f: (A) <- N -> B) -> Tree(B) {
 }
 
 fold_node = <A, Acc, N>(
-	node: Node(A),
-	acc: Acc,
-	f: (Acc, A) <- N -> Acc
+	node : Node(A),
+	acc : Acc,
+	f : (Acc, A) <- N -> Acc
 ) -> Acc {
 	node |>
 		(Leaf(x)) { f(acc, x) }
@@ -637,9 +643,9 @@ fold_node = <A, Acc, N>(
 }
 
 fold_tree = <A, Acc, N>(
-	tree: Tree(A),
-	acc: Acc,
-	f: (Acc, A) <- N -> Acc
+	tree : Tree(A),
+	acc : Acc,
+	f : (Acc, A) <- N -> Acc
 ) -> Acc {
 	tree |>
 		(EmptyTree) { acc }

@@ -27,11 +27,11 @@ not_string : String
 31:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 31:2 needs it)
 36:10: error[E0503]: `Int` and `String` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 36:2 needs it)
 53:2: error[E0503]: `_` and `_` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)
-62:11: error[E0501]: `String` is not a subtype of `Int`
-62:44: error[E0501]: `Int` is not a subtype of `String`
-62:41: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-66:11: error[E0501]: `String` is not a subtype of `Int`
-66:41: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
-69:44: error[E0501]: `String` is not a subtype of `Int`
-69:64: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+62:12: error[E0501]: `String` is not a subtype of `Int`
+62:46: error[E0501]: `Int` is not a subtype of `String`
+62:42: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+66:12: error[E0501]: `String` is not a subtype of `Int`
+66:42: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
+69:46: error[E0501]: `String` is not a subtype of `Int`
+69:66: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
 82:1: error[E0501]: `1` is not a subtype of `String`

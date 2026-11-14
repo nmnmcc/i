@@ -137,16 +137,16 @@ fn service_types() {
 #[test]
 fn type_errors() {
     // P10: `:` inside a type.
-    bad("f: (a: Int) -> Int", "`:` is not written in a type");
-    bad("T = (name: String)", "`:` is not written in a type");
+    bad("f : (a : Int) -> Int", "`:` is not written in a type");
+    bad("T = (name : String)", "`:` is not written in a type");
     // P0: `^` and `!` alone are no symbols.
-    bad("f: (Int) -> Int ^ E", "`^` is not a symbol of i");
-    bad("f: (Int) -> Int ! Log", "`!` is not a symbol of i");
+    bad("f : (Int) -> Int ^ E", "`^` is not a symbol of i");
+    bad("f : (Int) -> Int ! Log", "`!` is not a symbol of i");
     ok("x = a != b\n");
-    bad("f: (..N) -> Int", "a data type has no spread");
+    bad("f : (..N) -> Int", "a data type has no spread");
     // §2.3: a positional item may not follow a labelled item.
     bad(
-        "f: (port = Int, String) -> Conn",
+        "f : (port = Int, String) -> Conn",
         "by position may not come after",
     );
 }
@@ -200,7 +200,7 @@ fn node_of_i_syntax() {
 #[test]
 fn header_items_declarations_attributes() {
     let m = ok(
-        "//// A module.\n(\n\ti/fail\n\treq = i/request\n\t(Option, Some, None) = std/option\n)\n\n(\n\tUser(..)\n\tOption\n\tfind\n)\n\n/// Reads.\n@external(\"i:fs/v1\", \"read\")\nread: (String) <- (Fail(String)) -> String\n\n@host(\"app:storage/v1\", \"async\")\nStorage = (read = (String) <- (Fail(String)) -> String)\n\n@macro\nid = (x) { x }\n\ntest.suite(\"name\", () { 1 })\n",
+        "//// A module.\n(\n\ti/fail\n\treq = i/request\n\t(Option, Some, None) = std/option\n)\n\n(\n\tUser(..)\n\tOption\n\tfind\n)\n\n/// Reads.\n@external(\"i:fs/v1\", \"read\")\nread : (String) <- (Fail(String)) -> String\n\n@host(\"app:storage/v1\", \"async\")\nStorage = (read = (String) <- (Fail(String)) -> String)\n\n@macro\nid = (x) { x }\n\ntest.suite(\"name\", () { 1 })\n",
     );
     assert_eq!(m.doc, [" A module."]);
     assert_eq!(m.imports.len(), 3);
@@ -210,7 +210,7 @@ fn header_items_declarations_attributes() {
     assert!(matches!(m.items[0].kind, ItemKind::Decl { .. }));
     assert!(matches!(m.items[3].kind, ItemKind::Macro { .. }));
     // Type parameters are on the function type, not on the name.
-    ok("first: <A>(List(A)) -> Option(A)\n");
+    ok("first : <A>(List(A)) -> Option(A)\n");
     bad("x = 1\n(a, b)\n", "imports or the exports");
 }
 
@@ -249,7 +249,7 @@ fn data_values() {
         "x = (port = 443, \"a.com\")",
         "by position may not come after",
     );
-    bad("x = f(name: 1)", "written `label = value`");
+    bad("x = f(name : 1)", "written `label = value`");
 }
 
 #[test]
@@ -280,7 +280,7 @@ fn operators_and_groups() {
 fn p1_function_or_data() {
     // `)` followed by `->`, or by `{` on the same line: a function.
     assert_eq!(
-        chain(&value("f = (a: Int, b: Int) -> Int { a + b }")).len(),
+        chain(&value("f = (a : Int, b : Int) -> Int { a + b }")).len(),
         1
     );
     assert_eq!(chain(&value("f = (n) { n + 1 }")).len(), 1);
@@ -328,8 +328,9 @@ fn p2_call() {
 
 #[test]
 fn p4_branch_join() {
-    let gcd =
-        value("gcd =\n\t(a: Int, 0) -> Int { a }\n\t| (a: Int, b: Int) -> Int { gcd(b, a % b) }\n");
+    let gcd = value(
+        "gcd =\n\t(a : Int, 0) -> Int { a }\n\t| (a : Int, b : Int) -> Int { gcd(b, a % b) }\n",
+    );
     assert_eq!(chain(&gcd).len(), 2);
     // G1: the body's `{` ends the `->` part; `|` after `}` is a join.
     assert_eq!(chain(&value("f = (p) -> A { e } | (q) { f }")).len(), 2);
@@ -358,7 +359,7 @@ fn p4_branch_join() {
     bad("h = (a) { 1 } | g", "`|` joins only function literals");
     // Overloading by shape (§2.6).
     let show = value(
-        "show =\n\t(n: Int) -> String { int.to_string(n) }\n\t| (s: String) -> Int { string.length(s) }\n\t| (a: Int, b: Int) -> Bool { a == b }\n\t| (host: String, port = p: Int) -> Conn { open(host, p) }\n",
+        "show =\n\t(n : Int) -> String { int.to_string(n) }\n\t| (s : String) -> Int { string.length(s) }\n\t| (a : Int, b : Int) -> Bool { a == b }\n\t| (host : String, port = p : Int) -> Conn { open(host, p) }\n",
     );
     assert_eq!(chain(&show).len(), 4);
 }
@@ -377,7 +378,7 @@ fn p5_arrow_part() {
 #[test]
 fn p6_statements() {
     let m = ok(
-        "f = () {\n\ta = b = c = d\n\tt = (a, b) = pair\n\t(x, y) = whole = e\n\tx: (n = Int) = (n = 1)\n\ta = (n = 1) = b\n\tUser(name = \"ada\")\n\t(w = 3, h = 4, area = w * h)\n\tOk(v) = parse(text)\n\tv\n}\n",
+        "f = () {\n\ta = b = c = d\n\tt = (a, b) = pair\n\t(x, y) = whole = e\n\tx : (n = Int) = (n = 1)\n\ta = (n = 1) = b\n\tUser(name = \"ada\")\n\t(w = 3, h = 4, area = w * h)\n\tOk(v) = parse(text)\n\tv\n}\n",
     );
     let ItemKind::Bind(b) = &m.items[0].kind else {
         unreachable!()
@@ -468,8 +469,8 @@ fn patterns() {
         "x",
         "_",
         "_rest",
-        "x: Int",
-        "_: Int | String",
+        "x : Int",
+        "_ : { Int | String }",
         "1",
         "-1",
         "-.1.5",
@@ -498,8 +499,8 @@ fn patterns() {
         "[..]",
         "<<a:size(8), rest:bytes>>",
         "a = b = (c, d)",
-        "(port = p: Int)",
-        "(label: T = x)",
+        "(port = p : Int)",
+        "(label : T = x)",
     ] {
         assert_eq!(pat(p), p);
     }
@@ -529,7 +530,7 @@ fn patterns() {
 
 #[test]
 fn parameters_alternatives_guards() {
-    let f = value("connect = (host: String, port = p: Int) -> Conn { open(host, p) }");
+    let f = value("connect = (host : String, port = p : Int) -> Conn { open(host, p) }");
     let f = &chain(&f)[0];
     assert!(f.params[0].key.is_none());
     assert_eq!(f.params[1].key.as_ref().unwrap().name, "port");
@@ -537,20 +538,21 @@ fn parameters_alternatives_guards() {
     let f = value("f = (Sat | Sun, x) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);
     assert_eq!(chain(&f)[0].params.len(), 2);
-    // G21, P8: after a `:` type, `|` continues the union.
-    let f = value("f = (x: Int | y) { 1 }");
+    // G21, P8: keep the former union reading explicit; ungrouped choices
+    // are checked separately by one_annotation_boundary_for_declarations_patterns_and_function_results.
+    let f = value("f = (x : { Int | y }) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 1);
-    let f = value("f = (True | _: Int) { 1 }");
+    let f = value("f = (True | _ : Int) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);
     // P9: the guard is after the last item and ends at `)`.
-    let f = value("f = (a: Int, b: Int ? a > b) -> Int { a - b }");
+    let f = value("f = (a : Int, b : Int ? a > b) -> Int { a - b }");
     assert!(chain(&f)[0].guard.is_some());
     assert_eq!(chain(&f)[0].params.len(), 2);
     let f = value("f = (Some(v) ? string.is_empty(v)) { \"empty\" }");
     assert!(chain(&f)[0].guard.is_some());
     // G8: a function inside the guard is inside its own brackets.
     ok("f = (xs ? list.any(xs, (x) { x > 0 })) { 1 }\n");
-    ok("f = (\n\ta: Int\n\tb: Int\n\t? a > b\n) { a }\n");
+    ok("f = (\n\ta : Int\n\tb : Int\n\t? a > b\n) { a }\n");
     // G36: a literal key pattern, not a default.
     let f = value("run = (mode = \"fast\") { quick() } | (mode = \"slow\") { careful() }");
     assert_eq!(chain(&f).len(), 2);
@@ -567,28 +569,29 @@ fn parameters_alternatives_guards() {
 
 #[test]
 fn proposal_examples() {
-    let m = ok(r#"find_user = (id: String) <- (db: Db, log: Log) -> User {
+    let m = ok(
+        r#"find_user = (id : String) <- (db : Db, log : Log) -> User {
 	log.write(id)
 	db.find(id)
 }
 
 Fail(E) = (raise = (E) -> Never)
 
-raise = <E>(error: E) <- (fail: Fail(E)) -> Never { fail.raise(error) }
+raise = <E>(error : E) <- (fail : Fail(E)) -> Never { fail.raise(error) }
 
-catch = <A, E, N>(body: () <- (..N, Fail(E)) -> A) -> Result(A, E) {
+catch = <A, E, N>(body : () <- (..N, Fail(E)) -> A) -> Result(A, E) {
 	control.boundary((b) {
 		Ok(body() <- (Fail(raise = (e) { control.escape(b, Error(e)) })))
 	})
 }
 
-map = <A, B, N>(xs: List(A), f: (A) <- N -> B) -> List(B) {
+map = <A, B, N>(xs : List(A), f : (A) <- N -> B) -> List(B) {
 	xs |>
 		([]) { [] }
 		| ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 
-base = () <- (io: Io) -> (Config, Log) {
+base = () <- (io : Io) -> (Config, Log) {
 	(Config(url = "…"), Log(write = (s) { io.print(s) }))
 }
 
@@ -602,8 +605,9 @@ main = () { app() <- live() }
 
 test = () { app() <- (..live(), fake_db) }
 
-keep = <S, A, N>(f: (S) <- N -> A) <- (..env: N) -> (S) -> A { (x) { f(x) <- env } }
-"#);
+keep = <S, A, N>(f : (S) <- N -> A) <- (..env : N) -> (S) -> A { (x) { f(x) <- env } }
+"#,
+    );
     let function = |i: usize| match &m.items[i].kind {
         ItemKind::Bind(b) => chain(&b.value)[0].clone(),
         other => panic!("{other:?}"),
@@ -640,9 +644,9 @@ keep = <S, A, N>(f: (S) <- N -> A) <- (..env: N) -> (S) -> A { (x) { f(x) <- env
     bad("f = (x) <- N -> Int { x }", "bare row variable");
     bad("f = (x) <- (Db) { x }", "written `name: Type`");
     bad("f = (x) <- () { x }", "leave the `<-` part out");
-    bad("f = (x) <- (..env: N, db: Db) { x }", "is the last item");
-    bad("f: (Int) <- (db = Db) -> Int", "a need has no label");
-    bad("f: (Int) <- (..N, ..M) -> Int", "at most one row variable");
+    bad("f = (x) <- (..env : N, db : Db) { x }", "is the last item");
+    bad("f : (Int) <- (db = Db) -> Int", "a need has no label");
+    bad("f : (Int) <- (..N, ..M) -> Int", "at most one row variable");
     // `d = db_layer() <- s` provides to the call.
     let live = function(6);
     assert!(matches!(
@@ -693,11 +697,13 @@ fn provide() {
         ExprKind::Provide { .. }
     ));
     assert!(matches!(
-        syn3::parse_expr("(a) <- (s: S) { a }").unwrap().kind,
+        syn3::parse_expr("(a) <- (s : S) { a }").unwrap().kind,
         ExprKind::Chain(_)
     ));
     assert!(matches!(
-        syn3::parse_expr("(a) <- (s: S) -> Int { a }").unwrap().kind,
+        syn3::parse_expr("(a) <- (s : S) -> Int { a }")
+            .unwrap()
+            .kind,
         ExprKind::Chain(_)
     ));
     // A line that begins or ends with `<-` continues.
@@ -719,13 +725,13 @@ fn provide() {
 #[test]
 fn generics() {
     // `<` after a line end begins a statement when `UpName … > (` follows.
-    let m = ok("f = () {\n\tlog()\n\t<A>(x: A) { x }\n}\n");
+    let m = ok("f = () {\n\tlog()\n\t<A>(x : A) { x }\n}\n");
     let ItemKind::Bind(b) = &m.items[0].kind else {
         unreachable!()
     };
     assert_eq!(chain(&b.value)[0].body.stmts.len(), 2);
     // Each branch of a chain writes its own `<…>`.
-    let f = value("f = <A>(x: A) { 1 } | <B>(x: B, y: B) { 2 }");
+    let f = value("f = <A>(x : A) { 1 } | <B>(x : B, y : B) { 2 }");
     assert_eq!(chain(&f).len(), 2);
     assert_eq!(chain(&f)[1].generics[0].name, "B");
     // A comparison is still a comparison.
@@ -733,14 +739,14 @@ fn generics() {
     assert_eq!(expr("a < B"), "a < B");
     // The type parameters of a binding head are removed.
     bad(
-        "id(A) = (x: A) { x }",
+        "id(A) = (x : A) { x }",
         "type parameters are written on the function",
     );
     bad(
-        "f = () {\n\tid(A): (A) -> A = g\n\tid\n}\n",
+        "f = () {\n\tid(A) : (A) -> A = g\n\tid\n}\n",
         "type parameters are written on the function",
     );
-    ok("id = <A,>(x: A) { x }\n");
+    ok("id = <A,>(x : A) { x }\n");
 }
 
 #[test]
@@ -779,10 +785,10 @@ fn formatter_layout() {
         syn3::format(long).unwrap(),
         "kind = day |>\n\t(Mon) { \"first day of the week\" }\n\t| (Tue) { \"second day of the week\" }\n\t| (_) { \"another day\" }\n"
     );
-    let gcd = "gcd = (a: Int, 0) -> Int { a } | (a: Int, b: Int) -> Int { gcd(b, a % b) } | (a: Int, b: Int, c: Int) -> Int { gcd(gcd(a, b), c) }\n";
+    let gcd = "gcd = (a : Int, 0) -> Int { a } | (a : Int, b : Int) -> Int { gcd(b, a % b) } | (a : Int, b : Int, c : Int) -> Int { gcd(gcd(a, b), c) }\n";
     assert_eq!(
         syn3::format(gcd).unwrap(),
-        "gcd =\n\t(a: Int, 0) -> Int { a }\n\t| (a: Int, b: Int) -> Int { gcd(b, a % b) }\n\t| (a: Int, b: Int, c: Int) -> Int { gcd(gcd(a, b), c) }\n"
+        "gcd =\n\t(a : Int, 0) -> Int { a }\n\t| (a : Int, b : Int) -> Int { gcd(b, a % b) }\n\t| (a : Int, b : Int, c : Int) -> Int { gcd(gcd(a, b), c) }\n"
     );
     assert_eq!(
         syn3::format("kind = day |> (Sat | Sun) { \"rest\" } | (_) { \"work\" }\n").unwrap(),
@@ -808,9 +814,12 @@ fn lisp_rows() {
         ("U = T", "(= U T)"),
         ("U(A) = List(A)", "(= (U A) (List A))"),
         ("U = { (T1, T2) }", "(= U {(, T1 T2)})"),
-        ("x: (T1, x = T2) -> R", "(: x (-> (, T1 (= x T2)) R))"),
-        ("x: () -> R", "(: x (-> (,) R))"),
-        ("x: { (T) | (T, T) } -> R", "(: x (-> (| (, T) (, T T)) R))"),
+        ("x : (T1, x = T2) -> R", "(: x (-> (, T1 (= x T2)) R))"),
+        ("x : () -> R", "(: x (-> (,) R))"),
+        (
+            "x : { (T) | (T, T) } -> R",
+            "(: x (-> (| (, T) (, T T)) R))",
+        ),
         ("y = f(e1, x = e2)", "(= y (f e1 (= x e2)))"),
         ("y = f()", "(= y (f))"),
         ("y = f(..e)", "(= y (f .. e))"),
@@ -854,25 +863,25 @@ fn lisp_rows() {
         ),
         // The services forms.
         (
-            "x: (T) <- (Db, Log) -> R",
+            "x : (T) <- (Db, Log) -> R",
             "(: x (-> (, T) (<- R (, Db Log))))",
         ),
-        ("x: (T) <- N -> R", "(: x (-> (, T) (<- R N)))"),
+        ("x : (T) <- N -> R", "(: x (-> (, T) (<- R N)))"),
         (
-            "x: (T) <- (..N, Db) -> R",
+            "x : (T) <- (..N, Db) -> R",
             "(: x (-> (, T) (<- R (, .. N Db))))",
         ),
-        ("x: <A>(A) -> A", "(: x (-> [A] (, A) A))"),
+        ("x : <A>(A) -> A", "(: x (-> [A] (, A) A))"),
         (
-            "y = (id: String) <- (db: Db) -> User { e }",
+            "y = (id : String) <- (db : Db) -> User { e }",
             "(= y (-> (, (: id String)) (<- User (, (: db Db))) e))",
         ),
         (
-            "y = (id) <- (db: Db) { e }",
+            "y = (id) <- (db : Db) { e }",
             "(= y (-> (, id) (<- _ (, (: db Db))) e))",
         ),
         (
-            "y = <A, N>(x: A) <- (..env: N) { e }",
+            "y = <A, N>(x : A) <- (..env : N) { e }",
             "(= y (-> [A N] (, (: x A)) (<- _ (, .. (: env N))) e))",
         ),
         ("y = f(x) <- (s)", "(= y (<- (f x) (, s)))"),
@@ -887,7 +896,7 @@ fn lisp_rows() {
 
 #[test]
 fn lisp_examples_of_the_note() {
-    let normal = "connect = (host: String, port = p: Int) -> Conn { open(host, p) }\npick = (0, y) { y } | (x, _) { x }\nlabel = (opt) { opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } | (Some(v)) { v } | (None) { \"none\" } }\n";
+    let normal = "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\npick = (0, y) { y } | (x, _) { x }\nlabel = (opt) { opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } | (Some(v)) { v } | (None) { \"none\" } }\n";
     let lisp_text = "(= connect (-> (, (: host String) (= port (: p Int))) Conn (open host p)))\n(= pick (| (-> (, 0 y) _ y) (-> (, x _) _ x)))\n(= label (-> (, opt) _\n  (|> opt (| (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\")\n             (-> (, (Some v)) _ v)\n             (-> (, None) _ \"none\")))))\n";
     let (read, diags) = lisp::from_lisp(lisp_text);
     assert!(diags.is_empty(), "{diags:#?}");
@@ -895,7 +904,7 @@ fn lisp_examples_of_the_note() {
     // The normal printer writes a body that is not a block in `{ }`.
     assert_eq!(
         syn3::print_module(&read),
-        "connect = (host: String, port = p: Int) -> Conn { open(host, p) }\n\npick = (0, y) { y } | (x, _) { x }\n\nlabel = (opt) {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t| (Some(v)) { v }\n\t\t| (None) { \"none\" }\n}\n"
+        "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\n\npick = (0, y) { y } | (x, _) { x }\n\nlabel = (opt) {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t| (Some(v)) { v }\n\t\t| (None) { \"none\" }\n}\n"
     );
     let test_is = "(= text (-> (, x) _\n  (|> ((. syntax node) x)\n      (| (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)\n         (-> (, _) _ (panic \"test name must be a string literal\"))))))\n(= append (-> (, xs ys) _\n  (|> xs (| (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))\n";
     let (read, diags) = lisp::from_lisp(test_is);
@@ -945,16 +954,16 @@ fn converted(old: &str) -> String {
 #[test]
 fn convert_types() {
     assert_eq!(
-        converted("Tree(A) {\n\tLeaf\n\tNode(left: Tree(A), value: A, right: Tree(A))\n}\n"),
+        converted("Tree(A) {\n\tLeaf\n\tNode(left : Tree(A), value : A, right : Tree(A))\n}\n"),
         "Leaf = ()\nNode(A) = (left = Tree(A), value = A, right = Tree(A))\nTree(A) = Leaf | Node(A)\n"
     );
     assert_eq!(
-        converted("User { User(name: String, age: Int) }\n"),
+        converted("User { User(name : String, age : Int) }\n"),
         "User = (name = String, age = Int)\n"
     );
     assert_eq!(converted("Element {}\n"), "Element = Opaque\n");
     assert_eq!(
-        converted("Point = (x: Int, y: Int)\n"),
+        converted("Point = (x : Int, y : Int)\n"),
         "Point = { (x = Int, y = Int) }\n"
     );
     assert_eq!(
@@ -973,16 +982,16 @@ fn convert_types() {
 fn convert_clauses_and_matches() {
     assert_eq!(
         converted(
-            "describe = (opt: Option(String)) -> String {\n\topt |> {\n\t\tSome(v) ? string.is_empty(v) -> \"empty\"\n\t\tSome(v) -> v\n\t\tNone -> \"none\"\n\t}\n}\n"
+            "describe = (opt : Option(String)) -> String {\n\topt |> {\n\t\tSome(v) ? string.is_empty(v) -> \"empty\"\n\t\tSome(v) -> v\n\t\tNone -> \"none\"\n\t}\n}\n"
         ),
-        "describe = (opt: Option(String)) -> String {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t| (Some(v)) { v }\n\t\t| (None) { \"none\" }\n}\n"
+        "describe = (opt : Option(String)) -> String {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t| (Some(v)) { v }\n\t\t| (None) { \"none\" }\n}\n"
     );
     // A tuple pattern becomes the one item `((a, b))`.
     assert_eq!(
         converted(
-            "pick = (p: (Int, Int)) -> Int {\n\tp |> {\n\t\t(0, y) -> y\n\t\t(x, _) -> x\n\t}\n}\n"
+            "pick = (p : (Int, Int)) -> Int {\n\tp |> {\n\t\t(0, y) -> y\n\t\t(x, _) -> x\n\t}\n}\n"
         ),
-        "pick = (p: (Int, Int)) -> Int { p |> ((0, y)) { y } | ((x, _)) { x } }\n"
+        "pick = (p : (Int, Int)) -> Int { p |> ((0, y)) { y } | ((x, _)) { x } }\n"
     );
     assert_eq!(
         converted("x = list.map(opts, { Some(u) -> u.name  None -> \"\" })\n"),
@@ -993,8 +1002,8 @@ fn convert_clauses_and_matches() {
         "k = d |> (Sat | Sun) { 1 } | (_) { 2 }\n"
     );
     assert_eq!(
-        converted("absurd = (x: Never) { x |> {} }\n"),
-        "absurd = (x: Never) { core.never(x) }\n"
+        converted("absurd = (x : Never) { x |> {} }\n"),
+        "absurd = (x : Never) { core.never(x) }\n"
     );
     // The pipe is the weakest operator in both syntaxes, so the grouping is kept as written.
     assert_eq!(converted("ok = a <> b |> f\n"), "ok = a <> b |> f\n");
@@ -1019,27 +1028,27 @@ fn convert_patterns_and_data() {
         "f = (_ = x = label) { x }\n"
     );
     assert_eq!(
-        converted("f = (x = label: T) { x }\n"),
-        "f = (label: T = x) { x }\n"
+        converted("f = (x = label : T) { x }\n"),
+        "f = (label : T = x) { x }\n"
     );
     assert_eq!(
         converted("f = () {\n\tt = (a, b) = pair\n\tOk(v) = parse(text)\n\tv\n}\n"),
         "f = () {\n\tt = (a, b) = pair\n\tOk(v) = parse(text)\n\tv\n}\n"
     );
     assert_eq!(
-        converted("ada = (name: \"ada\", age: 36)\n"),
+        converted("ada = (name : \"ada\", age : 36)\n"),
         "ada = (name = \"ada\", age = 36)\n"
     );
     assert_eq!(
-        converted("older = (..ada, age: 37)\n"),
+        converted("older = (..ada, age : 37)\n"),
         "older = (..ada, age = 37)\n"
     );
     // Constructors of the file: fields by label, no punning.
     assert_eq!(
         converted(
-            "User { User(name: String, age: Int) }\nu = User(\"ada\", 36)\nv = User(..u, age: 37)\nadult = (u: User) { u |> { User(name, age) -> age > 17 } }\nyoung = (u: User) { u |> { User(n = name, ..) -> n } }\n"
+            "User { User(name : String, age : Int) }\nu = User(\"ada\", 36)\nv = User(..u, age : 37)\nadult = (u : User) { u |> { User(name, age) -> age > 17 } }\nyoung = (u : User) { u |> { User(n = name, ..) -> n } }\n"
         ),
-        "User = (name = String, age = Int)\nu = User(name = \"ada\", age = 36)\nv = User(..u, age = 37)\nadult = (u: User) { u |> (User(name = name, age = age)) { age > 17 } }\nyoung = (u: User) { u |> (User(name = n, ..)) { n } }\n"
+        "User = (name = String, age = Int)\nu = User(name = \"ada\", age = 36)\nv = User(..u, age = 37)\nadult = (u : User) { u |> (User(name = name, age = age)) { age > 17 } }\nyoung = (u : User) { u |> (User(name = n, ..)) { n } }\n"
     );
     assert_eq!(
         converted("s = \"a \\(x + 1) b\"\n"),
@@ -1051,33 +1060,33 @@ fn convert_patterns_and_data() {
 fn convert_services() {
     assert_eq!(
         converted(
-            "find_user = (id: String, db ! Db) -> User ^ NotFound ! Db {\n\tdb.find(id)\n}\n"
+            "find_user = (id : String, db ! Db) -> User ^ NotFound ! Db {\n\tdb.find(id)\n}\n"
         ),
-        "find_user = (id: String) <- (db: Db) -> User { db.find(id) }\n"
+        "find_user = (id : String) <- (db : Db) -> User { db.find(id) }\n"
     );
     assert_eq!(
         converted(
-            "fake = () -> User ^ NotFound {\n\t! Db = Db(find: (id) { fail.raise(NotFound(id)) })\n\tfind_user(\"1\")\n}\n"
+            "fake = () -> User ^ NotFound {\n\t! Db = Db(find : (id) { fail.raise(NotFound(id)) })\n\tfind_user(\"1\")\n}\n"
         ),
         "fake = () -> User {\n\tfind_user(\"1\") <- (Db(find = (id) { fail.raise(NotFound(id)) }))\n}\n"
     );
     assert_eq!(
         converted(
-            "count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N { 0 }\n"
+            "count(A, E, N) = (list : List(A), where : (A) -> Bool ^ E ! N) -> Int ^ E ! N { 0 }\n"
         ),
-        "count = <A, N>(list: List(A), where: (A) <- N -> Bool) -> Int { 0 }\n"
+        "count = <A, N>(list : List(A), where : (A) <- N -> Bool) -> Int { 0 }\n"
     );
     assert_eq!(
-        converted("@external(\"i:fail\", \"raise\")\nraise(E): (error: E) -> Never ^ E\n"),
-        "@external(\"i:fail\", \"raise\")\nraise: <E>(E) <- (Fail(E)) -> Never\n"
+        converted("@external(\"i:fail\", \"raise\")\nraise(E) : (error : E) -> Never ^ E\n"),
+        "@external(\"i:fail\", \"raise\")\nraise : <E>(E) <- (Fail(E)) -> Never\n"
     );
     assert_eq!(
         converted("f = () {\n\t! A = a\n\tx = 1\n\tg(x)\n}\n"),
         "f = () {\n\t{\n\t\tx = 1\n\t\tg(x)\n\t} <- (a)\n}\n"
     );
     assert_eq!(
-        converted("h(N) = (f: () -> Int ! N) -> Int ! N { f() }\n"),
-        "h = <N>(f: () <- N -> Int) -> Int { f() }\n"
+        converted("h(N) = (f : () -> Int ! N) -> Int ! N { f() }\n"),
+        "h = <N>(f : () <- N -> Int) -> Int { f() }\n"
     );
     // Direct values merge into one provide; other values nest.
     assert_eq!(
@@ -1089,12 +1098,12 @@ fn convert_services() {
         "f = () { g() <- (b) <- (make()) }\n"
     );
     assert_eq!(
-        converted("T = (key: String) -> Int ^ E ! Db | Log\n"),
+        converted("T = (key : String) -> Int ^ E ! Db | Log\n"),
         "T = (String) <- (Fail(E), Db, Log) -> Int\n"
     );
     assert_eq!(
-        converted("m(A, B, E) = (f: (A) -> B ^ E) -> B ^ E { f(a) }\n"),
-        "m = <A, B, E>(f: (A) <- (Fail(E)) -> B) -> B { f(a) }\n"
+        converted("m(A, B, E) = (f : (A) -> B ^ E) -> B ^ E { f(a) }\n"),
+        "m = <A, B, E>(f : (A) <- (Fail(E)) -> B) -> B { f(a) }\n"
     );
 }
 
@@ -1104,30 +1113,30 @@ fn convert_labelled_calls() {
     // parameter order.
     assert_eq!(
         converted(
-            "connect = (host: String, port: Int) { open(host, port) }\nc = connect(\"a.com\", port: 80)\nd = connect(port: 80, host: \"a.com\")\n"
+            "connect = (host : String, port : Int) { open(host, port) }\nc = connect(\"a.com\", port : 80)\nd = connect(port : 80, host : \"a.com\")\n"
         ),
-        "connect = (host: String, port: Int) { open(host, port) }\nc = connect(\"a.com\", 80)\nd = connect(\"a.com\", 80)\n"
+        "connect = (host : String, port : Int) { open(host, port) }\nc = connect(\"a.com\", 80)\nd = connect(\"a.com\", 80)\n"
     );
     // The order changes and two arguments are not direct values: locals keep
     // the order of evaluation.
     assert_eq!(
-        converted("f = (a: Int, b: Int) { a - b }\nx = f(b: g(), a: h())\n"),
-        "f = (a: Int, b: Int) { a - b }\nx = {\n\t_syn3_0 = g()\n\t_syn3_1 = h()\n\tf(_syn3_1, _syn3_0)\n}\n"
+        converted("f = (a : Int, b : Int) { a - b }\nx = f(b : g(), a : h())\n"),
+        "f = (a : Int, b : Int) { a - b }\nx = {\n\t_syn3_0 = g()\n\t_syn3_1 = h()\n\tf(_syn3_1, _syn3_0)\n}\n"
     );
     // The piped value is the first argument.
     assert_eq!(
-        converted("f = (a: Int, b: Int, c: Int) { a }\nx = 1 |> f(c: 3, b: 2)\n"),
-        "f = (a: Int, b: Int, c: Int) { a }\nx = 1 |> f(2, 3)\n"
+        converted("f = (a : Int, b : Int, c : Int) { a }\nx = 1 |> f(c : 3, b : 2)\n"),
+        "f = (a : Int, b : Int, c : Int) { a }\nx = 1 |> f(2, 3)\n"
     );
     // A function that the text does not show keeps its labels.
-    assert_eq!(converted("x = m.f(1, to: 2)\n"), "x = m.f(1, to = 2)\n");
+    assert_eq!(converted("x = m.f(1, to : 2)\n"), "x = m.f(1, to = 2)\n");
     // The functions and constructors of an imported module.
     let (lib, _) = legacy::parser::parse_module_legacy(
-        "User { User(name: String, age: Int) }\nrange = (from: Int, to: Int) { [] }\n",
+        "User { User(name : String, age : Int) }\nrange = (from : Int, to : Int) { [] }\n",
     );
     let mut signatures = convert::Signatures::default();
     convert::collect(&lib, "users", &mut signatures);
-    let old = "(\n\tu = app/users\n\t(User) = app/users\n)\n\nx = u.range(to: 9, from: 1)\ny = User(\"ada\", 36)\nz = u.User(\"ada\", 36)\n";
+    let old = "(\n\tu = app/users\n\t(User) = app/users\n)\n\nx = u.range(to : 9, from : 1)\ny = User(\"ada\", 36)\nz = u.User(\"ada\", 36)\n";
     let (module, _) = legacy::parser::parse_module_legacy(old);
     let (new, notes) = convert::convert(&module, Some(&legacy::lexer::lex(old)), &signatures);
     assert!(notes.is_empty(), "{notes:#?}");
@@ -1197,7 +1206,7 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     let collision = converted("T { Syn3ServiceFail }\nUse(E) = () -> Nil ! Fail(E)\n");
     assert!(collision.contains("Syn3ServiceFailX(E)"), "{collision}");
     let row = converted(
-        "wrap(A, E, N) = (body: () -> A ! Fail(E) | N, cap: Fail(E)) -> A ! N { ! Fail(E) = cap body() }\n",
+        "wrap(A, E, N) = (body : () -> A ! Fail(E) | N, cap : Fail(E)) -> A ! N { ! Fail(E) = cap body() }\n",
     );
     let (lowered, diags) = syn3::parse_lowered(&row);
     assert!(diags.is_empty(), "{row}\n{diags:#?}");
@@ -1206,7 +1215,7 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     assert!(!shown.contains(carrier.as_str()), "{shown}");
 
     let row = converted(
-        "wrap(E, N) = (body: () -> Nil ^ E ! Fail(Int) | N, cap: Fail(Int)) -> Nil ^ E ! N { ! Fail(Int) = cap body() }\n",
+        "wrap(E, N) = (body : () -> Nil ^ E ! Fail(Int) | N, cap : Fail(Int)) -> Nil ^ E ! N { ! Fail(Int) = cap body() }\n",
     );
     let (lowered, diags) = syn3::parse_lowered(&row);
     assert!(diags.is_empty(), "{row}\n{diags:#?}");
@@ -1216,7 +1225,7 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
 
 #[test]
 fn converted_bound_fail_remains_a_service_parameter() {
-    let text = converted("use(E) = (error: E, handler ! Fail(E)) { handler.raise(error) }\n");
+    let text = converted("use(E) = (error : E, handler ! Fail(E)) { handler.raise(error) }\n");
     let (module, diags) = syn3::parse_lowered(&text);
     assert!(diags.is_empty(), "{text}\n{diags:#?}");
     let function = module
@@ -1258,4 +1267,88 @@ fn specialized_alias_keeps_the_constructors_type_parameter_scope() {
         definitions[1].body,
         ilang_syntax::ast::TypeBody::Alias(_)
     ));
+}
+
+#[test]
+fn one_annotation_boundary_for_declarations_patterns_and_function_results() {
+    let f = value("f = (x : Int | y) { 1 }");
+    let choices = &chain(&f)[0].params[0].choices;
+    assert_eq!(choices.len(), 2);
+    assert!(matches!(choices[0].kind, PatternKind::Typed { .. }));
+    assert!(matches!(&choices[1].kind, PatternKind::Var(name) if name == "y"));
+    for source in [
+        "v : { Int | String } = 1",
+        "f : (Int) -> { Int | String } = (x) { x }",
+        "inspect : <A>(A) -> { Int | String }",
+        "f = (Box(value = x : { Int | String })) { x }",
+        "f = (x : Int & String - 1) { x }",
+        "f = () <- (clock : Clock(Int | String)) { clock }",
+        "F = (Int) -> Int | String",
+        "F = List((Int) -> Int | String)",
+        "F = (x = Int | String)",
+        "f : ((Int) -> Int | String) -> Int = (x) { 1 }",
+        "f : (Int) -> (Int) -> { Int | String } = (x) { (y) { y } }",
+        "f = (x : { (Int) -> Int | String }) { x }",
+    ] {
+        ok(source);
+    }
+    for source in [
+        "v : Int | String = 1",
+        "f : (Int) -> Int | String = (x) { x }",
+        "f : (Int) -> Int | String",
+        "f = (Box(value = x : Int | String)) { x }",
+        "f = () <- (clock : Clock | Other) { clock }",
+    ] {
+        bad(source, "expected");
+    }
+    // Keep one compact input: both spellings remain accepted.
+    let compact = "x: Int = 1";
+    let spaced = "x : Int = 1";
+    assert_ne!(compact, spaced);
+    assert_eq!(ok(compact), ok(spaced));
+    let (rows, diags) = lisp::from_lisp("(: f (-> (, Int) (| Int String)))");
+    assert!(diags.is_empty(), "{diags:?}");
+    let printed = syn3::print_module(&rows);
+    assert_eq!(printed, "f : (Int) -> { Int | String }\n");
+    assert_eq!(ok(&printed), rows);
+    assert_eq!(
+        syn3::format("x : (LongTypeNameOne, LongTypeNameTwo, LongTypeNameThree, LongTypeNameFour, LongTypeNameFive) = e").unwrap(),
+        syn3::format("x = (LongTypeNameOne, LongTypeNameTwo, LongTypeNameThree, LongTypeNameFour, LongTypeNameFive)").unwrap().replace("x =", "x :").trim_end().to_string() + " = e\n"
+    );
+}
+
+#[test]
+fn one_line_binding_traps_only_explain_the_spec_reading() {
+    use ilang_syntax::span::Span;
+    for source in [
+        "mk = Pair  (b, c) = g",
+        "mk = Pair   (b, c) = g",
+        "mk = m.Pair  (b, c) = g",
+        "mk = Pair  (Other(b), c) = g",
+    ] {
+        let spans = syn3::binding_line_traps(source, Span::new(0, source.len() as u32));
+        assert_eq!(spans.len(), 1, "{source}: {spans:?}");
+        let (_, ds) = syn3::parse_module(source);
+        assert!(ds.is_empty(), "{source}: {ds:?}");
+        let (a, _) = syn3::parse_module(source);
+        let (b, _) = syn3::parse_module(&source.replace("  ", " "));
+        assert_eq!(a, b, "spacing does not change the binding");
+    }
+    for source in [
+        "mk = Pair(b, c) = g",
+        "mk = Pair (b, c) = g",
+        "mk = Pair\n(b, c) = g",
+        "mk = Pair  (b,\nc) = g",
+        "mk = Pair  (b, c)\n= g",
+        "mk = Pair /*  */ (b, c) = g",
+        "mk = Pair\t\t(b, c) = g",
+        "mk = Pair  (b, c)",
+        "Pair  (b, c) = g",
+        "mk = f(\"Pair  (b, c) = g\")",
+    ] {
+        assert!(
+            syn3::binding_line_traps(source, Span::new(0, source.len() as u32)).is_empty(),
+            "{source}"
+        );
+    }
 }

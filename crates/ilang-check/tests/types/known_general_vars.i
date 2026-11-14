@@ -3,7 +3,7 @@
 // has no known type, and `.age` needs one.
 User = (name = String, age = Int)
 
-map = <A, B>(xs: List(A), f: (A) -> B) -> List(B) {
+map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
 	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 
@@ -20,4 +20,4 @@ Box(A) = (item = A)
 boxed = users |> map(Box) |> map((b) { b.item })
 
 // A written type works it out.
-written = users |> map(id) |> map((v: User) { v.age })
+written = users |> map(id) |> map((v : User) { v.age })

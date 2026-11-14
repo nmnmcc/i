@@ -5,9 +5,9 @@
 
 // A length that no bit array can have still only makes the value too
 // short: the stop is not "out of memory".
-id = (n: Int) { n }
+id = (n : Int) { n }
 
-make = (b: BitArray) {
+make = (b : BitArray) {
 	x = <<b:bits(id(34359738369))>>
 	x
 }

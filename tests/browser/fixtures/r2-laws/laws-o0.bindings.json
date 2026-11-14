@@ -1,10 +1,10 @@
 {
-  "artifact_digest": "sha256-06d15c6230363534bac20f8f4fb31d019372ad4fe8d9e1681585e09a8f1f97c9",
+  "artifact_digest": "sha256-952da925dbce19c9f139381f7fef7cd636cc6026098fe151aad92bae1026e4df",
   "declarations": [
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_early_wait",
-      "module_digest": "sha256-01ee4c75cf7399090ca53a70d39f606fbf9beb6e2983a6cae1255f5636766c7c",
+      "module_digest": "sha256-26a0a19cfeff7408474469d2db7468c016b16789c248831a211e4f8a9afdfb29",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.11:early_wait:test:async/v1",
       "name": "echo",
@@ -19,9 +19,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_groups",
-      "module_digest": "sha256-94642938c28b2b9d5563933116fef171e5576e6b6d6808ce61e936438b2f3a5e",
+      "module_digest": "sha256-1a889ffe5340ffed49ccb42b5f1827a49328d9b7fb41cc29b8a14da262510cc9",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.11:groups:test:async/v1",
       "name": "echo",
@@ -36,9 +36,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_literal_parameter",
-      "module_digest": "sha256-ab9252231a61ac803320c76b68131d0a12a238f7609a1c0fc87912b851086594",
+      "module_digest": "sha256-2964792ae46396f340d6c6b1f9b1e248cd78ca4bd89adfb03f32ccce35d2dcce",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.11:literal_parameter:test:async/v1",
       "name": "echo",
@@ -53,9 +53,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_owner_gone",
-      "module_digest": "sha256-c634ac9bef533b935e316153120d93b2edcd72f55a17ed91414cab2a23096c17",
+      "module_digest": "sha256-65c88f102c774620ed086a62b305ab73c70584f1ed492a77ad7282abe57aabb3",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.11:owner_gone:test:async/v1",
       "name": "echo",
@@ -70,9 +70,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_ownership",
-      "module_digest": "sha256-b33b6ef83131476d636d4c40d9bb2a63640a72f0138628c0a52a81da3f840007",
+      "module_digest": "sha256-a46ea32b10437972dedb160644800e8ee0383fe649f9dd1e7460b0b2b214a806",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.11:ownership:test:async/v1",
       "name": "echo",
@@ -87,9 +87,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_raw",
-      "module_digest": "sha256-cf3868d89adfe774e5aa0ef9fc40563c015b34844a9af63133387280c4057116",
+      "module_digest": "sha256-8cf74182844a55175ee5600b1ac50305e773e53f6d6ad3eeef77b3f2f2ce90f8",
       "declaration": "Later.double",
       "namespace": "r2:law:9.11:raw:test:async/v1",
       "name": "double",
@@ -106,9 +106,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_raw",
-      "module_digest": "sha256-cf3868d89adfe774e5aa0ef9fc40563c015b34844a9af63133387280c4057116",
+      "module_digest": "sha256-8cf74182844a55175ee5600b1ac50305e773e53f6d6ad3eeef77b3f2f2ce90f8",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.11:raw:test:async/v1",
       "name": "echo",
@@ -123,9 +123,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_raw_cancel",
-      "module_digest": "sha256-bcb684796f1e18be3836ab25f6e0dce4c88212d6dd45cbcb0a5e606d9aaf514b",
+      "module_digest": "sha256-88f4d7447fab8b4b715435c52ed34a7791c2c3b8eeb8a94803da75a14cb0eacb",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.11:raw_cancel:test:async/v1",
       "name": "echo",
@@ -140,9 +140,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_result_never",
-      "module_digest": "sha256-68f1b57a030d6d3e811a1aab34103ddaff13ed05feb9b1ca006fef6307633426",
+      "module_digest": "sha256-e3166c6d44e5b8b060af61643ae7029de2d2ffa43614ecd985557b557729eb09",
       "declaration": "Later.double",
       "namespace": "r2:law:9.11:result_never:test:async/v1",
       "name": "double",
@@ -157,9 +157,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_11_take_waiting",
-      "module_digest": "sha256-9f33f29e07e3a0c1cb7820ff278e9d9cd9771fb8bb031f3b889d849950b45eea",
+      "module_digest": "sha256-5e097e15cc8187496f070f5f2d7c1bd4bc002446c03555a8c3af5ce4c7c88265",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.11:take_waiting:test:async/v1",
       "name": "echo",
@@ -174,9 +174,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_async_tasks",
-      "module_digest": "sha256-4e0156485bd6d4425b26095573dc1f14d32cd94d633c5249cd86258aee1306b1",
+      "module_digest": "sha256-008973cb8a347d28c81255f92563f20b5337ecb43fb5207ef8a59bc1f28b13bb",
       "declaration": "Later.double",
       "namespace": "r2:law:9.9:async_tasks:test:async/v1",
       "name": "double",
@@ -193,9 +193,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_async_tasks",
-      "module_digest": "sha256-4e0156485bd6d4425b26095573dc1f14d32cd94d633c5249cd86258aee1306b1",
+      "module_digest": "sha256-008973cb8a347d28c81255f92563f20b5337ecb43fb5207ef8a59bc1f28b13bb",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.9:async_tasks:test:async/v1",
       "name": "echo",
@@ -210,9 +210,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_cancel_cleanup",
-      "module_digest": "sha256-3fe330028ec96cc60a1f5433afb2088e3e19dadac9817673ed13f8db32bb8afd",
+      "module_digest": "sha256-70d703bcccaaba51631135d38a832842cf9ecb6853564f5956caeec4bd663f41",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:cancel_cleanup:test:io/v1",
       "name": "print",
@@ -227,9 +227,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_cancel_points",
-      "module_digest": "sha256-105ca773b4b0a2981317e05dad673d2b3ff365b2efafc60bb676d2d70134a363",
+      "module_digest": "sha256-00ebe208f619dee9c24416e1a1b9c5b14ef212d77d5951e4fc7338e2cfb363f5",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:cancel_points:test:io/v1",
       "name": "print",
@@ -244,9 +244,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_error_final_cancel",
-      "module_digest": "sha256-b498968b85aa52dfd007bb0e1a9fc8cc706f18e6f6d01abddcc0cebf0eed412c",
+      "module_digest": "sha256-c1047f5ca0a143514f9446dce154b14c392605959b159186ec6eb46396141ae2",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:error_final_cancel:test:io/v1",
       "name": "print",
@@ -261,9 +261,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_failed_sibling_join",
-      "module_digest": "sha256-49e9cc1c19f824fd85c98c64423bb4681b482338620c8cbd516d6a3df046122c",
+      "module_digest": "sha256-bd0138b9578d8707121bf55fa4445055003d68f30afa79bd65993100c9aabea1",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:failed_sibling_join:test:io/v1",
       "name": "print",
@@ -278,9 +278,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_final_cancel_phases",
-      "module_digest": "sha256-da588a27d57035d675a273978a3fc0678e2b84fe1e0e7203d1ad34b5f2ad5b76",
+      "module_digest": "sha256-9cbb36feaf3961a6172da0e0c5472f5181aac898a9c2fbf84407746eeff539f0",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:final_cancel_phases:test:io/v1",
       "name": "print",
@@ -295,9 +295,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_foreign_blocked_callback",
-      "module_digest": "sha256-228d347a606d4dc84c84c7504f2963ac26726b5bb96de659d67818c39f015533",
+      "module_digest": "sha256-76a46022b33cbc0ea86f838d98c7ca8c4bf66f87f5a31875841b278004d96d0a",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:foreign_blocked_callback:test:io/v1",
       "name": "print",
@@ -312,9 +312,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_foreign_deep_blocked_callback",
-      "module_digest": "sha256-506616d28763ab84cdd0dcb28ba2f4b3d6aa1c88bdabd18b1e4e922a0bfcec82",
+      "module_digest": "sha256-8a0513f1a1b0dda1b33b46e69c380109d5f78dac4e50df1c1241825167e22b54",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:foreign_deep_blocked_callback:test:io/v1",
       "name": "print",
@@ -329,9 +329,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_foreign_scope_deep_cleanup",
-      "module_digest": "sha256-b44dcbb8338c6dc177d49cba6fb3145217d921f3cff061dcb19a8aad02346bbf",
+      "module_digest": "sha256-e5cf9994faf69770ca5b9431b680a533ad3e5aa4a424f04cb26eef29ed980c3c",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:foreign_scope_deep_cleanup:test:io/v1",
       "name": "print",
@@ -346,9 +346,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_foreign_scope_nested_cleanup",
-      "module_digest": "sha256-b3796d35b01ad71a919dbe5314e916fc027f49e0f355f7a1f262043b140f326a",
+      "module_digest": "sha256-72e75449fda94dde422cb15b6eed1b80ab68bb02a11e21ac9978beacc2dfbd75",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:foreign_scope_nested_cleanup:test:io/v1",
       "name": "print",
@@ -363,9 +363,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_fresh_cleanup_failure",
-      "module_digest": "sha256-b96a5ef82bfd5fdd63faf9d7d15e4d666c7685b561866b3de19cf9933e038b62",
+      "module_digest": "sha256-29a24d4fc1db2d409c6e27b5952214ba9cd03c3aa461f19f2101f521dfff06b5",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:fresh_cleanup_failure:test:io/v1",
       "name": "print",
@@ -380,9 +380,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_lifetimes",
-      "module_digest": "sha256-f90d39166a570d78eb14000b67ab273819c04fcd54e0b1d9b12514f36991916f",
+      "module_digest": "sha256-25c404768057428a58a355b009cffd7bfd6ba4d30cac4a2e4dc66bb0e60c1b09",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:lifetimes:test:io/v1",
       "name": "print",
@@ -397,9 +397,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_nested_borrowed",
-      "module_digest": "sha256-e5ad681fce4f6eabcce4977df773ddd7bc54849c31a1678f7dd7a7092812345e",
+      "module_digest": "sha256-f0f4b3150092e85c274c26fa4725759b6776386ec90cc68c331a51f44f688fa4",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.9:nested_borrowed:test:async/v1",
       "name": "echo",
@@ -414,9 +414,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_nested_cancel",
-      "module_digest": "sha256-deafc176863223db3cdd755d6d140d923e52f876756d30ceec7c3f47bc918dee",
+      "module_digest": "sha256-db7088ef7fd3c778c354b23a404d5cd0f6027fcba6e2d4e385f2bf36b82baad3",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:nested_cancel:test:io/v1",
       "name": "print",
@@ -431,9 +431,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_nested_cancel_two",
-      "module_digest": "sha256-33e70efc2474fc136faa7588af70942600b01a391bc02c2260663a660880c979",
+      "module_digest": "sha256-4a3d2c62bb02812c92723ea28195ea2fc1fdfe0fcbea00084076cdae28b949ea",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:nested_cancel_two:test:io/v1",
       "name": "print",
@@ -448,9 +448,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_outer_control_cancel",
-      "module_digest": "sha256-bcf9b3986b7ee011b088e4836217cbb6c538a3b46e14e5cffb8b1c60766b5265",
+      "module_digest": "sha256-b063744a8593fa581686770a8c37c571aa2616dc7cc0d3ca3badce39d1e1f53d",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:outer_control_cancel:test:io/v1",
       "name": "print",
@@ -465,9 +465,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_scripted_cleanup",
-      "module_digest": "sha256-ef53c06ab227cf4da9f53d1f9be80f880561a1c1bc56ace6d02490ff3f457527",
+      "module_digest": "sha256-cf3e416cde1ea82d82e000392566808790a13b29c22a14ddae699f2b40392909",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:scripted_cleanup:test:io/v1",
       "name": "print",
@@ -482,9 +482,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_shielded_final_io",
-      "module_digest": "sha256-fb6d1944d8db9bab49febc4a2fef78332757ffc577b4c2f64d91e8a5ba342c04",
+      "module_digest": "sha256-826b76dfb617bf77541e152f67381251a78123b3f0a9f02c3ac64f66ef9ee54a",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.9:shielded_final_io:test:async/v1",
       "name": "echo",
@@ -499,9 +499,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_test_needs_fake",
-      "module_digest": "sha256-7d6f009d9cce283dfc0813b71f3e56c637e68a186c4d5ba878a8b360ff147245",
+      "module_digest": "sha256-1bdaca9f880aca8777a14c739068ae4bfe2a145f2c176d57d5cac18a364986ef",
       "declaration": "Later.echo",
       "namespace": "r2:law:9.9:test_needs_fake:test:async/v1",
       "name": "echo",
@@ -516,9 +516,9 @@
       }
     },
     {
-      "package": "sha256-bda63c2df473ed6773c05cc00a6e786068a62d4683ac20036ef803ab8fd45fff",
+      "package": "sha256-6c5a8ed7998a4ea90623c59547d89768175a20493c9897d606c194979083243d",
       "module": "app/s9_9_typed_final_fresh_scope",
-      "module_digest": "sha256-3e823087252a513f0dfdcbb64491643d90e0fe4717e2bf7ecc82b6718e18b315",
+      "module_digest": "sha256-50db816b0d217215c2c5693420e78eb7c63bc3800b7b502af70bbb7d256a7177",
       "declaration": "Out.print",
       "namespace": "r2:law:9.9:typed_final_fresh_scope:test:io/v1",
       "name": "print",

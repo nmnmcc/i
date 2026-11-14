@@ -1,9 +1,9 @@
 Svc(A) = (f = () -> A)
 
-use = () <- (s: Svc(Int)) { s.f() }
+use = () <- (s : Svc(Int)) { s.f() }
 
-wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) {
-	_syn3_0: Svc(Int) = svc
+wrap = <N>(body : () <- (Svc(Int), ..N) -> Int, svc : Svc(Int)) {
+	_syn3_0 : Svc(Int) = svc
 	body() <- (_syn3_0)
 }
 

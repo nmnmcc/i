@@ -971,7 +971,7 @@ impl<'a, 't> R3<'a, 't> {
                 span: e.span.0,
             })
             .collect();
-        self.exports(m, &exports);
+        self.exports(m, &exports, &ast.items);
     }
 
     fn collect_pattern_binders(
@@ -1919,6 +1919,19 @@ impl<'a, 't> R3<'a, 't> {
     /// its pattern; in a block, the caller makes them visible from the next
     /// statement (§6.10).
     fn binding(&mut self, b: &n::Binding, top: bool) -> (Binding, Vec<Binder>) {
+        let source = self.p.module(self.cur).source;
+        let file = self.graph.sources.get(source);
+        for span in ilang_syntax::syn3::binding_line_traps(
+            &file.text,
+            Span::new(b.pattern.span.0.start, b.value.span.0.start),
+        ) {
+            self.diags.push(Diagnostic::warning(
+                code::ONE_LINE_BINDING,
+                Some(source),
+                span,
+                ilang_syntax::syn3::ONE_BINDING_HINT,
+            ));
+        }
         let type_params = self
             .pre()
             .type_params

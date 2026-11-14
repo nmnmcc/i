@@ -3,7 +3,7 @@
 (
 	main
 )
-inspect: <A>(A) -> String
+inspect : <A>(A) -> String
 
 main = () {
 	assert(True)

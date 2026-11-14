@@ -3,7 +3,7 @@
 (
 	main
 )
-id = <Int>(x: Int) { x }
+id = <Int>(x : Int) { x }
 
 main = () {
 	assert(True)

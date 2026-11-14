@@ -1,15 +1,15 @@
 (
 	i/control
 )
-g = (b, x: Float) -> Float {
+g = (b, x : Float) -> Float {
 	y = control.suspend(b, (k) { control.resume(k, 1.0) })
 	x *. x +. y
 }
-f = (b, x: Float) -> Float {
+f = (b, x : Float) -> Float {
 	y = g(b, x)
 	y +. 0.25
 }
-h = (b, x: Float) -> Float {
+h = (b, x : Float) -> Float {
 	y = f(b, x)
 	y +. 0.5
 }

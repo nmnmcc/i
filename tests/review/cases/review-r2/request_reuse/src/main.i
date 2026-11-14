@@ -5,7 +5,7 @@
 )
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
-cycle = (n: Int) <- (later: Later) {
+cycle = (n : Int) <- (later : Later) {
 	{ n == 0 } |>
 		(True) { Nil }
 		| (False) {

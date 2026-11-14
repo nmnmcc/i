@@ -65,10 +65,10 @@ test("an answer of the host that is not correct stops the program in the module"
   // By default the module checks the answer, and the stop has the position
   // of the call.
   const value = await guest([], { later: async () => NaN });
-  await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:52:2");
+  await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:45:2");
   assert.ok(value.unusable);
   const sync = await instantiate(compiled, { imports: { ...compiledImports(GuestError), "app:math/v1": { hypot: () => Infinity } } });
-  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:48:35");
+  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:41:35");
   // With `checkReplies`, the host stops the program, with no positions.
   const checked = await instantiate(compiled, { imports: compiledImports(GuestError, [], { later: async () => NaN }), checkReplies: true });
   await assert.rejects(checked.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct");
@@ -117,4 +117,19 @@ test("compiler binding plan authorizes context registrations on the JS host", as
   assert.equal(contexts.size, 2);
   assert.equal(disposed, created);
   assert.ok([...contexts].every((context) => !context.live));
+});
+
+test("ABI 5 Int boundaries cross imports, exports, async replies and errors", async () => {
+  const { checkIntegers } = await import("../../../tests/browser/fixture-abi.mjs");
+  const value = await guest([], { tick: async n => n });
+  assert.equal(value.abi.version, 5);
+  assert.equal(await checkIntegers(value, GuestError), 13);
+  assert.equal(value.unusable, null);
+});
+
+test("the module rejects an inline Int whose sign does not match its value", async () => {
+  for (const [sign, n] of [[1, -1], [-1, 1], [1, 0], [2, 2]]) {
+    const value = await guest();
+    assert.throws(() => value.exports["app/ints.echo"](sign, n, 0), WebAssembly.RuntimeError);
+  }
 });

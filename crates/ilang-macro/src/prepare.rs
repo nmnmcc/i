@@ -269,7 +269,7 @@ _entry = ({parameters}) -> syntax.Syntax {{
 			(Ok(value)) {{ value }}
 			| (Error(syntax.SyntaxError(message, at))) {{ syntax._report_error(message, at) }}
 	}} <- (syntax._diagnostics()){items} <- (syntax._definitions()) <- (
-		Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }}),
+		Assert((failure : AssertionFailure) -> Never {{ panic(failure.message) }}),
 	)
 }}
 "#,

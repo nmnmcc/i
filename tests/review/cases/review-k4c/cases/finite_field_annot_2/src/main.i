@@ -1,7 +1,7 @@
 S(N) = (f = () <- N -> Nil)
-use = <N>() <- (s: S(N)) -> Nil { s.f() }
-run = <N>(body: () <- N -> Nil) { body() }
+use = <N>() <- (s : S(N)) -> Nil { s.f() }
+run = <N>(body : () <- N -> Nil) { body() }
 helper = <N>() {
-	local: () <- (S(N), ..N) -> Nil = () { run(() { use() }) }
+	local : () <- (S(N), ..N) -> Nil = () { run(() { use() }) }
 	run(local)
 }

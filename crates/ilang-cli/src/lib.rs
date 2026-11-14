@@ -771,9 +771,9 @@ mod binding_tests {
             dir.path().join("src/main.i"),
             r#"
 @external("plugin:raw/v1", "number")
-first: (Float) -> Float
+first : (Float) -> Float
 @external("plugin:raw/v1", "number")
-second: (Float) -> Float
+second : (Float) -> Float
 
 main = () {
   first(1.0)

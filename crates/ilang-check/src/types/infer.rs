@@ -65,7 +65,11 @@ struct Effects {
 
 /// The custom types of §4.2 and §9.6 that the rules use.
 pub(super) struct Builtins {
-    pub bool_: TypeRef,
+    /// `True` and `False`, the members of `Bool = True | False`.
+    pub true_: TypeRef,
+    pub false_: TypeRef,
+    /// `Bool` as the checker writes it.
+    pub bool_: Ty,
     pub nil: TypeRef,
     pub assert: TypeRef,
 }
@@ -172,12 +176,18 @@ impl<'a> Checker<'a> {
                 .map(|i| TypeRef::Custom(TypeId(i as u32)))
                 .unwrap_or(TypeRef::Builtin(BuiltinType::Never))
         };
+        let mut solver = Solver::new(variances(p), Vec::new());
+        let (true_, false_) = (find("True"), find("False"));
         let b = Builtins {
-            bool_: find("Bool"),
+            true_,
+            false_,
+            bool_: solver.union(vec![
+                Ty::named(true_, Vec::new()),
+                Ty::named(false_, Vec::new()),
+            ]),
             nil: find("Nil"),
             assert: find("Assert"),
         };
-        let mut solver = Solver::new(variances(p), Vec::new());
         solver.row_params = row_parameters(p);
         Checker {
             p,
@@ -1007,7 +1017,7 @@ impl<'a> Checker<'a> {
         }
         let error_members = known::members(&f.err);
         let errors_ok = error_members.iter().all(|m| {
-            matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.bool_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
+            matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.true_ || *r == self.b.false_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
         // B.2: the signature that the code generator encodes.
         let params: Option<Vec<HostType>> = f
@@ -1051,6 +1061,7 @@ impl<'a> Checker<'a> {
     /// take (§10.3, B.2).
     fn host_part(&self, t: &Ty) -> Option<HostType> {
         Some(match t {
+            Ty::Union(_) if *t == self.b.bool_ => HostType::Bool,
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, _) => match b {
                 BuiltinType::Int => HostType::Int,
                 BuiltinType::Float => HostType::Float,
@@ -1061,7 +1072,7 @@ impl<'a> Checker<'a> {
             Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _, _) => {
                 if *r == self.b.nil {
                     HostType::Nil
-                } else if *r == self.b.bool_ {
+                } else if *r == self.b.true_ || *r == self.b.false_ {
                     HostType::Bool
                 } else if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()) {
                     HostType::Opaque(*id)
@@ -1078,10 +1089,12 @@ impl<'a> Checker<'a> {
     /// (§10.1).
     fn host_type(&self, t: &Ty) -> bool {
         match t {
+            Ty::Union(_) => *t == self.b.bool_,
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, _) => host_builtin(*b),
             Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _, _) => {
                 *r == self.b.nil
-                    || *r == self.b.bool_
+                    || *r == self.b.true_
+                    || *r == self.b.false_
                     || matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty())
             }
             _ => false,
@@ -1347,16 +1360,63 @@ impl<'a> Checker<'a> {
         self.flush(span, None);
     }
 
-    /// Hold only value-set failures belonging to rule 11 until its own coverage check.
+    /// Hold the failures of rule 11 that its own coverage check reports
+    /// instead: value-set failures, and a labelled type of the subject that no
+    /// pattern at the place takes while a pattern takes another member of a
+    /// union it is declared in (see `uncovered_member`).
     pub fn sub_case(&mut self, l: &Ty, r: &Ty, span: Span) -> Vec<(super::solve::Failure, Span)> {
         self.s.constrain(l, r);
         let failures = std::mem::take(&mut self.s.failures);
         let (held, ordinary): (Vec<_>, Vec<_>) = failures
             .into_iter()
-            .partition(|f| f.kind == FailKind::Values);
+            .partition(|f| f.kind == FailKind::Values || self.uncovered_member(f));
         self.s.failures = ordinary;
         self.flush(span, None);
         held.into_iter().map(|f| (f, span)).collect()
+    }
+
+    /// `l <: r` for the one clause of a match: what its pattern does not take
+    /// is reported as the error of §7.4 when the clause may fail
+    /// (`defer_failure`), as it was when the members of a sum were
+    /// constructors of one type (see `uncovered_member`).
+    pub fn sub_fitted_match(&mut self, l: &Ty, r: &Ty, span: Span) {
+        self.fix_notes = self.fixed_reached(l, r);
+        self.s.constrain(l, r);
+        let failures = std::mem::take(&mut self.s.failures);
+        self.s.failures = failures
+            .into_iter()
+            .filter(|f| !self.uncovered_member(f))
+            .collect();
+        self.flush(span, None);
+    }
+
+    /// A failure `C <: P` of a match subject where `C` is a labelled type
+    /// that no pattern at the place takes, and some pattern there takes
+    /// another member of a declared union with `C` (`True` against `False`,
+    /// both in `Bool = True | False`). Before stage 3 these were constructors
+    /// of one type, so `B <: P` held and the only error was the one of §7.4;
+    /// a sum is now a union of such types (syntax-3.md §2.8), and the coverage
+    /// error in a match is unchanged (§5.2.8 rule 11), so that error is
+    /// given alone. A labelled type with no union in common with the
+    /// patterns (`Some` against `Ok`) is still a type error.
+    pub(crate) fn uncovered_member(&self, f: &super::solve::Failure) -> bool {
+        if f.kind != FailKind::Mismatch {
+            return false;
+        }
+        let Some(h @ Head::Named(TypeRef::Custom(_))) = f.lhs.head() else {
+            return false;
+        };
+        let mut ms = Vec::new();
+        super::solve::flatten_union(std::slice::from_ref(&f.rhs), &mut ms);
+        if ms.iter().any(|m| m.head() == Some(h)) {
+            return false;
+        }
+        ms.iter().filter_map(Ty::head).any(|g| {
+            self.s
+                .alias_folds
+                .iter()
+                .any(|a| a.has_head(h) && a.has_head(g))
+        })
     }
 
     /// `l <: r`, where `r` comes from the written type at `other`.
@@ -1724,7 +1784,7 @@ impl<'a> Checker<'a> {
     }
 
     pub fn bool_ty(&self) -> Ty {
-        Ty::named(self.b.bool_, Vec::new())
+        self.b.bool_.clone()
     }
 
     // ---- Expressions ----
@@ -2601,7 +2661,7 @@ impl<'a> Checker<'a> {
                     code::NEEDS_KNOWN_TYPE,
                     name.span,
                     format!(
-                        "`.{}` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`",
+                        "`.{}` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u : User) {{ u.name }}`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) {{ u.name }}`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)",
                         name.name
                     ),
                 );

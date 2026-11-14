@@ -2,12 +2,12 @@
 	i/fail
 )
 S(E) = (() <- (Fail(E)) -> Nil)
-use = <E>() <- (s: S(E)) {
+use = <E>() <- (s : S(E)) {
 	S(f) = s
 	f()
 }
-first: () <- (Fail(String), S(String)) -> Nil = use
-second: () <- (Fail(Int), S(Int)) -> Nil = use
+first : () <- (Fail(String), S(String)) -> Nil = use
+second : () <- (Fail(Int), S(Int)) -> Nil = use
 
 main = () {
 	{

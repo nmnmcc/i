@@ -13,32 +13,32 @@
 	sin_terms
 )
 R = (n = Int, d = Int)
-abs = (a: Int) -> Int { { a < 0 } |> (True) { -a } | (False) { a } }
-gcd = (a: Int, b: Int) -> Int { b |> (0) { a } | (_) { gcd(b, a % b) } }
-make = (n: Int, d: Int) -> R {
+abs = (a : Int) -> Int { { a < 0 } |> (True) { -a } | (False) { a } }
+gcd = (a : Int, b : Int) -> Int { b |> (0) { a } | (_) { gcd(b, a % b) } }
+make = (n : Int, d : Int) -> R {
 	g = gcd(abs(n), d)
 	R(n = n / g, d = d / g)
 }
-add = (a: R, b: R) -> R {
+add = (a : R, b : R) -> R {
 	g = gcd(a.d, b.d)
 	n = a.n * { b.d / g } + b.n * { a.d / g }
 	h = gcd(abs(n), g)
 	R(n = n / h, d = { a.d / g } * { b.d / h })
 }
-sub = (a: R, b: R) -> R { add(a, R(n = -b.n, d = b.d)) }
-mul = (a: R, b: R) -> R {
+sub = (a : R, b : R) -> R { add(a, R(n = -b.n, d = b.d)) }
+mul = (a : R, b : R) -> R {
 	g = gcd(abs(a.n), b.d)
 	h = gcd(abs(b.n), a.d)
 	R(n = { a.n / g } * { b.n / h }, d = { a.d / h } * { b.d / g })
 }
-div = (a: R, b: R) -> R {
+div = (a : R, b : R) -> R {
 	{ b.n < 0 } |>
 		(True) { mul(a, R(n = -b.d, d = -b.n)) }
 		| (False) { mul(a, R(n = b.d, d = b.n)) }
 }
-atan_terms = (z: R, count: Int) -> R {
+atan_terms = (z : R, count : Int) -> R {
 	square = mul(z, z)
-	go = (k: Int, term: R, sum: R) -> R {
+	go = (k : Int, term : R, sum : R) -> R {
 		{ k == count } |>
 			(True) { sum }
 			| (False) {
@@ -51,9 +51,9 @@ atan_terms = (z: R, count: Int) -> R {
 	}
 	go(0, z, R(n = 0, d = 1))
 }
-sin_terms = (z: R, count: Int) -> R {
+sin_terms = (z : R, count : Int) -> R {
 	square = mul(z, z)
-	go = (k: Int, term: R, sum: R) -> R {
+	go = (k : Int, term : R, sum : R) -> R {
 		{ k == count } |>
 			(True) { sum }
 			| (False) {

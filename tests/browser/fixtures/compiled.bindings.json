@@ -1,10 +1,10 @@
 {
-  "artifact_digest": "sha256-07c534956c204c3dd274a02ecb1cdfbc17f05af8930d4fbc100e5556c82273eb",
+  "artifact_digest": "sha256-7f9dbc69d4320ead67c5733636c088cfa03bbad55f35ec0aeec1cdaaba17b5c9",
   "declarations": [
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/app",
-      "module_digest": "sha256-b0fcb081bcfc5b9b45d704f9f340781691789e29b409e867992da5898ddbece0",
+      "module_digest": "sha256-26f516021fbaecea76e09dd6f48b5d27ebedd06d284eeced00a574352f87928c",
       "declaration": "hypot",
       "namespace": "app:math/v1",
       "name": "hypot",
@@ -20,9 +20,26 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
+      "module": "app/ints",
+      "module_digest": "sha256-c1bb78a45d45eeed3fd5623997cb73640442c9804ded7cb3e838d6e6ee51cc0b",
+      "declaration": "foreign_echo",
+      "namespace": "custom",
+      "name": "echo_int",
+      "kind": "external",
+      "signature": {
+        "params": [
+          "int"
+        ],
+        "result": "int",
+        "errors": [],
+        "async": false
+      }
+    },
+    {
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/opaque",
-      "module_digest": "sha256-2dcf0a1cd80a02fe71c582fd5f7b3ac030d60d3064f79b96529ed2dfb6b131ec",
+      "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "get_a",
       "namespace": "app:opaque/v1",
       "name": "get",
@@ -35,9 +52,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/opaque",
-      "module_digest": "sha256-2dcf0a1cd80a02fe71c582fd5f7b3ac030d60d3064f79b96529ed2dfb6b131ec",
+      "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "get_b",
       "namespace": "app:opaque/v1",
       "name": "get",
@@ -50,9 +67,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/opaque",
-      "module_digest": "sha256-2dcf0a1cd80a02fe71c582fd5f7b3ac030d60d3064f79b96529ed2dfb6b131ec",
+      "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "echo_a",
       "namespace": "app:opaque/v1",
       "name": "echo",
@@ -67,9 +84,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/opaque",
-      "module_digest": "sha256-2dcf0a1cd80a02fe71c582fd5f7b3ac030d60d3064f79b96529ed2dfb6b131ec",
+      "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "echo_b",
       "namespace": "app:opaque/v1",
       "name": "echo",
@@ -84,9 +101,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/app",
-      "module_digest": "sha256-b0fcb081bcfc5b9b45d704f9f340781691789e29b409e867992da5898ddbece0",
+      "module_digest": "sha256-26f516021fbaecea76e09dd6f48b5d27ebedd06d284eeced00a574352f87928c",
       "declaration": "Console.print",
       "namespace": "app:console/v1",
       "name": "print",
@@ -101,9 +118,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/app",
-      "module_digest": "sha256-b0fcb081bcfc5b9b45d704f9f340781691789e29b409e867992da5898ddbece0",
+      "module_digest": "sha256-26f516021fbaecea76e09dd6f48b5d27ebedd06d284eeced00a574352f87928c",
       "declaration": "Storage.read",
       "namespace": "app:storage/v1",
       "name": "read",
@@ -120,9 +137,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/app",
-      "module_digest": "sha256-b0fcb081bcfc5b9b45d704f9f340781691789e29b409e867992da5898ddbece0",
+      "module_digest": "sha256-26f516021fbaecea76e09dd6f48b5d27ebedd06d284eeced00a574352f87928c",
       "declaration": "Clock.later",
       "namespace": "app:clock/v1",
       "name": "later",
@@ -139,9 +156,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/app",
-      "module_digest": "sha256-b0fcb081bcfc5b9b45d704f9f340781691789e29b409e867992da5898ddbece0",
+      "module_digest": "sha256-26f516021fbaecea76e09dd6f48b5d27ebedd06d284eeced00a574352f87928c",
       "declaration": "Clock.tick",
       "namespace": "app:clock/v1",
       "name": "tick",
@@ -156,9 +173,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/opaque",
-      "module_digest": "sha256-2dcf0a1cd80a02fe71c582fd5f7b3ac030d60d3064f79b96529ed2dfb6b131ec",
+      "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "SyncA.get_a",
       "namespace": "app:opaque-sync/v1",
       "name": "get_a",
@@ -171,9 +188,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/opaque",
-      "module_digest": "sha256-2dcf0a1cd80a02fe71c582fd5f7b3ac030d60d3064f79b96529ed2dfb6b131ec",
+      "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "SyncB.get_b",
       "namespace": "app:opaque-sync/v1",
       "name": "get_b",
@@ -186,9 +203,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/opaque",
-      "module_digest": "sha256-2dcf0a1cd80a02fe71c582fd5f7b3ac030d60d3064f79b96529ed2dfb6b131ec",
+      "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "AsyncA.get_a",
       "namespace": "app:opaque-async/v1",
       "name": "get_a",
@@ -201,9 +218,9 @@
       }
     },
     {
-      "package": "sha256-a59ab9b16d66280e9df6b648a180d1c0fe6185926fa116032496f109ce50cee8",
+      "package": "sha256-1a9f19cdfea7856127c434de84fbea884307e752fb2cda5af1d96fa83a309498",
       "module": "app/opaque",
-      "module_digest": "sha256-2dcf0a1cd80a02fe71c582fd5f7b3ac030d60d3064f79b96529ed2dfb6b131ec",
+      "module_digest": "sha256-59f32b7e07f721e2f50bc27f97d22cf4593287409a425d87077bb6cae102b29a",
       "declaration": "AsyncB.get_b",
       "namespace": "app:opaque-async/v1",
       "name": "get_b",

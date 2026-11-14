@@ -63,7 +63,7 @@ significand_limit = 9007199254740992
 /// float.to_string(2.5)     // "2.5"
 /// float.to_string(1.0e20)  // "1.0e20"
 /// ```
-to_string = (x: Float) -> String { core.inspect(x) }
+to_string = (x : Float) -> String { core.inspect(x) }
 
 /// Reads a Float: an optional `-` or `+`, one or more digits, `.`, one or
 /// more digits, and then an optional exponent: `e` or `E`, an optional `-`
@@ -77,22 +77,22 @@ to_string = (x: Float) -> String { core.inspect(x) }
 /// float.parse("-2.0e-3")  // Ok(-0.002)
 /// float.parse("1")        // Error(Nil)
 /// ```
-parse = (text: String) -> Result(Float, Nil) {
+parse = (text : String) -> Result(Float, Nil) {
 	<<text:utf8>> |>
 		(<<45, rest:bytes>>) { whole(rest, True, 0, 0, 0) }
 		| (<<43, rest:bytes>>) { whole(rest, False, 0, 0, 0) }
 		| (bytes) { whole(bytes, False, 0, 0, 0) }
 }
 
-is_digit = (byte: Int) -> Bool { byte >= 48 && byte <= 57 }
+is_digit = (byte : Int) -> Bool { byte >= 48 && byte <= 57 }
 
 // The digits before the point.
 whole = (
-	bytes: BitArray,
-	negative: Bool,
-	coefficient: Int,
-	significant: Int,
-	count: Int
+	bytes : BitArray,
+	negative : Bool,
+	coefficient : Int,
+	significant : Int,
+	count : Int
 ) -> Result(Float, Nil) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
@@ -112,11 +112,11 @@ whole = (
 
 // The digits after the point.
 fraction = (
-	bytes: BitArray,
-	negative: Bool,
-	coefficient: Int,
-	significant: Int,
-	digits: Int
+	bytes : BitArray,
+	negative : Bool,
+	coefficient : Int,
+	significant : Int,
+	digits : Int
 ) -> Result(Float, Nil) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
@@ -151,14 +151,14 @@ fraction = (
 }
 
 // The number of significant digits, not counting zeros at the start.
-count_significant = (previous: Int, digit: Int) -> Int {
+count_significant = (previous : Int, digit : Int) -> Int {
 	{ previous == 0 && digit == 0 } |> (True) { 0 } | (False) { previous + 1 }
 }
 
 // When an exponent is greater than any digits could make up for, its exact
 // size has no effect, so it is kept at `limit + 1`. Every byte is still read,
 // so that bad text after it is still found.
-exponent = (bytes: BitArray, value: Int, count: Int, limit: Int) -> Result(
+exponent = (bytes : BitArray, value : Int, count : Int, limit : Int) -> Result(
 	Int,
 	Nil,
 ) {
@@ -175,10 +175,10 @@ exponent = (bytes: BitArray, value: Int, count: Int, limit: Int) -> Result(
 
 // The Float nearest to `coefficient` × 10^`exponent`.
 decimal = (
-	negative: Bool,
-	coefficient: Int,
-	digits: Int,
-	exponent: Int
+	negative : Bool,
+	coefficient : Int,
+	digits : Int,
+	exponent : Int
 ) -> Result(Float, Nil) {
 	sign = negative |> (True) { sign_bit } | (False) { 0 }
 	magnitude = digits + exponent - 1
@@ -210,7 +210,7 @@ decimal = (
 
 // The bits of the Float nearest to `numerator / denominator`, which is more
 // than 0.
-ratio_bits = (numerator: Int, denominator: Int) -> Result(Int, Nil) {
+ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
 	e = radix_order(numerator, denominator, 2)
 	{ e > 1023 } |>
 		(True) { Error(Nil) }
@@ -254,7 +254,7 @@ ratio_bits = (numerator: Int, denominator: Int) -> Result(Int, Nil) {
 // floor(log_radix(numerator / denominator)), with few comparisons: the
 // factors radix^1, radix^2, radix^4, … are found by squaring, and then used
 // from the greatest down.
-radix_order = (numerator: Int, denominator: Int, radix: Int) -> Int {
+radix_order = (numerator : Int, denominator : Int, radix : Int) -> Int {
 	{ numerator >= denominator } |>
 		(True) { order_factors(numerator, denominator, radix, 1, []).0 }
 		| (False) {
@@ -264,11 +264,11 @@ radix_order = (numerator: Int, denominator: Int, radix: Int) -> Int {
 }
 
 order_factors = (
-	numerator: Int,
-	denominator: Int,
-	factor: Int,
-	e: Int,
-	factors: List((Int, Int))
+	numerator : Int,
+	denominator : Int,
+	factor : Int,
+	e : Int,
+	factors : List((Int, Int))
 ) -> (Int, Int) {
 	{ numerator >= denominator * factor } |>
 		(True) {
@@ -284,10 +284,10 @@ order_factors = (
 }
 
 order_search = (
-	numerator: Int,
-	denominator: Int,
-	factors: List((Int, Int)),
-	o: Int
+	numerator : Int,
+	denominator : Int,
+	factors : List((Int, Int)),
+	o : Int
 ) -> (Int, Int) {
 	factors |>
 		([]) { (o, denominator) }
@@ -300,7 +300,7 @@ order_search = (
 }
 
 // numerator / denominator, rounded to the nearest, with ties to even.
-round_ratio = (numerator: Int, denominator: Int) -> Int {
+round_ratio = (numerator : Int, denominator : Int) -> Int {
 	q = numerator / denominator
 	twice = { numerator % denominator } * 2
 	{ twice > denominator || { twice == denominator && q % 2 == 1 } } |>
@@ -308,7 +308,7 @@ round_ratio = (numerator: Int, denominator: Int) -> Int {
 		| (False) { q }
 }
 
-int_power = (base: Int, e: Int) -> Int {
+int_power = (base : Int, e : Int) -> Int {
 	go = (base, e, acc) {
 		e |>
 			(0) { acc }
@@ -322,7 +322,7 @@ int_power = (base: Int, e: Int) -> Int {
 }
 
 /// Compares two Floats. `0.0` and `-0.0` are `Equal`.
-compare = (a: Float, with: Float) -> Order {
+compare = (a : Float, with : Float) -> Order {
 	{ a == with } |>
 		(True) { Equal }
 		| (False) { { a <. with } |> (True) { Less } | (False) { Greater } }
@@ -330,7 +330,7 @@ compare = (a: Float, with: Float) -> Order {
 
 /// Compares two Floats, and gives `Equal` when they are no more than
 /// `tolerating` apart.
-loosely_compare = (a: Float, with: Float, tolerating: Float) -> Order {
+loosely_compare = (a : Float, with : Float, tolerating : Float) -> Order {
 	loosely_equals(a, with, tolerating) |>
 		(True) { Equal }
 		| (False) { compare(a, with) }
@@ -341,7 +341,7 @@ loosely_compare = (a: Float, with: Float, tolerating: Float) -> Order {
 /// ```i
 /// float.loosely_equals(0.1 +. 0.2, 0.3, 1.0e-9)  // True
 /// ```
-loosely_equals = (a: Float, with: Float, tolerating: Float) -> Bool {
+loosely_equals = (a : Float, with : Float, tolerating : Float) -> Bool {
 	// `a -. with` is not finite when they are far apart, so it is not used.
 	{ a >=. with } |>
 		(True) { a -. tolerating <=. with }
@@ -349,18 +349,18 @@ loosely_equals = (a: Float, with: Float, tolerating: Float) -> Bool {
 }
 
 /// The smaller of two Floats.
-min = (a: Float, b: Float) -> Float {
+min = (a : Float, b : Float) -> Float {
 	{ a <. b } |> (True) { a } | (False) { b }
 }
 
 /// The greater of two Floats.
-max = (a: Float, b: Float) -> Float {
+max = (a : Float, b : Float) -> Float {
 	{ a >. b } |> (True) { a } | (False) { b }
 }
 
 /// The Float, but not less than `min` and not greater than `max`. When
 /// `min` is greater than `max`, the two bounds are swapped.
-clamp = (x: Float, min: Float, max: Float) -> Float {
+clamp = (x : Float, min : Float, max : Float) -> Float {
 	(low, high) = { min <=. max } |>
 		(True) { (min, max) }
 		| (False) { (max, min) }
@@ -370,16 +370,16 @@ clamp = (x: Float, min: Float, max: Float) -> Float {
 }
 
 /// The Float without its sign.
-abs = (x: Float) -> Float { { x <. 0.0 } |> (True) { -.x } | (False) { x } }
+abs = (x : Float) -> Float { { x <. 0.0 } |> (True) { -.x } | (False) { x } }
 
 /// The Float with the other sign.
-negate = (x: Float) -> Float { -.x }
+negate = (x : Float) -> Float { -.x }
 
 /// The smallest whole number that is not less than `x`.
-ceiling = (x: Float) -> Float { core.ceiling(x) }
+ceiling = (x : Float) -> Float { core.ceiling(x) }
 
 /// The greatest whole number that is not greater than `x`.
-floor = (x: Float) -> Float { core.floor(x) }
+floor = (x : Float) -> Float { core.floor(x) }
 
 /// The nearest whole number, as an Int. A half goes away from zero.
 ///
@@ -387,13 +387,13 @@ floor = (x: Float) -> Float { core.floor(x) }
 /// float.round(2.5)    // 3
 /// float.round(-2.5)   // -3
 /// ```
-round = (x: Float) -> Int {
+round = (x : Float) -> Int {
 	{ x <. 0.0 } |>
 		(True) { -round_positive(-.x) }
 		| (False) { round_positive(x) }
 }
 
-round_positive = (x: Float) -> Int {
+round_positive = (x : Float) -> Int {
 	f = core.floor(x)
 	// `x -. f` is exact for `x >= 0`.
 	{ x -. f >=. 0.5 } |>
@@ -402,10 +402,10 @@ round_positive = (x: Float) -> Int {
 }
 
 /// The Float without its fraction, as an Int, rounded toward zero.
-truncate = (x: Float) -> Int { core.truncate(x) }
+truncate = (x : Float) -> Int { core.truncate(x) }
 
 /// `True` when the Float is a whole number.
-is_integer = (x: Float) -> Bool { core.floor(x) == x }
+is_integer = (x : Float) -> Bool { core.floor(x) == x }
 
 /// The Float rounded to `precision` digits after the point. A negative
 /// precision rounds to tens, hundreds, and so on. The result is the
@@ -415,7 +415,7 @@ is_integer = (x: Float) -> Bool { core.floor(x) == x }
 /// float.to_precision(2.43434348473, 2)  // 2.43
 /// float.to_precision(547890.453444, -3)  // 548000.0
 /// ```
-to_precision = (x: Float, precision: Int) -> Float {
+to_precision = (x : Float, precision : Int) -> Float {
 	{ precision <= 0 } |>
 		(True) {
 			factor = core.to_float(int_power(10, -precision))
@@ -437,7 +437,7 @@ to_precision = (x: Float, precision: Int) -> Float {
 /// float.power(2.0, 10)  // Ok(1024.0)
 /// float.power(-.2.0, -1)  // Ok(-.0.5)
 /// ```
-power = (base: Float, of: Int) -> Result(Float, Nil) {
+power = (base : Float, of : Int) -> Result(Float, Nil) {
 	{ base == 0.0 && of < 0 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -464,26 +464,26 @@ power = (base: Float, of: Int) -> Result(Float, Nil) {
 /// float.square_root(4.0)   // Ok(2.0)
 /// float.square_root(-1.0)  // Error(Nil)
 /// ```
-square_root = (x: Float) -> Result(Float, Nil) {
+square_root = (x : Float) -> Result(Float, Nil) {
 	{ x <. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(core.sqrt(x)) }
 }
 
 /// The sum of the Floats. The sum of no Floats is `0.0`. A sum that is not
 /// finite stops the program.
-sum = (numbers: List(Float)) -> Float {
+sum = (numbers : List(Float)) -> Float {
 	go = (rest, acc) { rest |> ([]) { acc } | ([x, ..xs]) { go(xs, acc +. x) } }
 	go(numbers, 0.0)
 }
 
 /// The product of the Floats. The product of no Floats is `1.0`. A product
 /// that is not finite stops the program.
-product = (numbers: List(Float)) -> Float {
+product = (numbers : List(Float)) -> Float {
 	go = (rest, acc) { rest |> ([]) { acc } | ([x, ..xs]) { go(xs, acc *. x) } }
 	go(numbers, 1.0)
 }
 
 /// `a /. by`, or `Error(Nil)` when `by` is `0.0`.
-divide = (a: Float, by: Float) -> Result(Float, Nil) {
+divide = (a : Float, by : Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |> (True) { Error(Nil) } | (False) { Ok(a /. by) }
 }
 
@@ -493,20 +493,20 @@ divide = (a: Float, by: Float) -> Result(Float, Nil) {
 /// ```i
 /// float.modulo(13.3, 3.3)  // Ok(0.10000000000000053)
 /// ```
-modulo = (a: Float, by: Float) -> Result(Float, Nil) {
+modulo = (a : Float, by : Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |>
 		(True) { Error(Nil) }
 		| (False) { Ok(a -. core.floor(a /. by) *. by) }
 }
 
 /// `a +. b`, as a function.
-add = (a: Float, b: Float) -> Float { a +. b }
+add = (a : Float, b : Float) -> Float { a +. b }
 
 /// `a -. b`, as a function.
-subtract = (a: Float, b: Float) -> Float { a -. b }
+subtract = (a : Float, b : Float) -> Float { a -. b }
 
 /// `a *. b`, as a function.
-multiply = (a: Float, b: Float) -> Float { a *. b }
+multiply = (a : Float, b : Float) -> Float { a *. b }
 
 /// `e` to the power `x`. A result too big for a Float gives `Error(Nil)`;
 /// that is for `x` greater than about 709.78.
@@ -514,7 +514,7 @@ multiply = (a: Float, b: Float) -> Float { a *. b }
 /// ```i
 /// float.exponential(1.0)  // Ok(2.718281828459045)
 /// ```
-exponential = (x: Float) -> Result(Float, Nil) {
+exponential = (x : Float) -> Result(Float, Nil) {
 	{ x >. 7.09782712893383973096e2 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -535,7 +535,7 @@ exponential = (x: Float) -> Result(Float, Nil) {
 /// float.logarithm(1.0)  // Ok(0.0)
 /// float.logarithm(0.0)  // Error(Nil)
 /// ```
-logarithm = (x: Float) -> Result(Float, Nil) {
+logarithm = (x : Float) -> Result(Float, Nil) {
 	{ x <=. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(log_positive(x)) }
 }
 
@@ -548,7 +548,7 @@ logarithm = (x: Float) -> Result(Float, Nil) {
 /// float.real_power(16.0, 0.5)  // Ok(4.0)
 /// float.real_power(-.8.0, 1.0 /. 3.0)  // Error(Nil)
 /// ```
-real_power = (base: Float, of: Float) -> Result(Float, Nil) {
+real_power = (base : Float, of : Float) -> Result(Float, Nil) {
 	fractional = core.ceiling(of) -. of >. 0.0
 	{ { base <. 0.0 && fractional } || { base == 0.0 && of <. 0.0 } } |>
 		(True) { Error(Nil) }
@@ -573,27 +573,27 @@ ln2_lo = 1.90821492927058770002e-10
 
 inverse_ln2 = 1.442695040888963387
 
-bits_of = (x: Float) -> Int { core.float_to_bits(x) }
+bits_of = (x : Float) -> Int { core.float_to_bits(x) }
 
-from_bits = (x: Int) -> Float { core.float_from_bits(x) }
+from_bits = (x : Int) -> Float { core.float_from_bits(x) }
 
-abs_bits = (x: Float) -> Float { from_bits(bits_of(x) % sign_bit) }
+abs_bits = (x : Float) -> Float { from_bits(bits_of(x) % sign_bit) }
 
-high = (x: Float) -> Int { bits_of(x) / word }
+high = (x : Float) -> Int { bits_of(x) / word }
 
-positive_high = (x: Float) -> Int { high(x) % 0x8000_0000 }
+positive_high = (x : Float) -> Int { high(x) % 0x8000_0000 }
 
-with_high = (x: Float, high_word: Int) -> Float {
+with_high = (x : Float, high_word : Int) -> Float {
 	from_bits(high_word * word + bits_of(x) % word)
 }
 
-without_low = (x: Float) -> Float { from_bits(bits_of(x) / word * word) }
+without_low = (x : Float) -> Float { from_bits(bits_of(x) / word * word) }
 
-two_power = (e: Int) -> Float { from_bits({ e + 1023 } * mantissa_unit) }
+two_power = (e : Int) -> Float { from_bits({ e + 1023 } * mantissa_unit) }
 
 // `value` × 2^`e`, for -1075 <= e <= 1024. The scale for subnormal results
 // is split, so that it is not rounded to zero before the multiplication.
-scale = (value: Float, e: Int) -> Float {
+scale = (value : Float, e : Int) -> Float {
 	{ e > 1023 } |>
 		(True) { value *. 2.0 *. two_power(e - 1) }
 		| (False) {
@@ -605,7 +605,7 @@ scale = (value: Float, e: Int) -> Float {
 		}
 }
 
-exp_polynomial = (x: Float) -> Float {
+exp_polynomial = (x : Float) -> Float {
 	square = x *. x
 	x -.
 		square *.
@@ -628,7 +628,7 @@ exp_polynomial = (x: Float) -> Float {
 			}
 }
 
-exp_finite = (value: Float) -> Float {
+exp_finite = (value : Float) -> Float {
 	hx = positive_high(value)
 	{ hx < 0x3e30_0000 } |>
 		(True) { 1.0 +. value }
@@ -665,7 +665,7 @@ exp_finite = (value: Float) -> Float {
 		}
 }
 
-log_positive = (input: Float) -> Float {
+log_positive = (input : Float) -> Float {
 	(value, correction) = { positive_high(input) < 0x0010_0000 } |>
 		(True) { (input *. 1.8014398509481984e16, -54) }
 		| (False) { (input, 0) }
@@ -750,7 +750,7 @@ log_positive = (input: Float) -> Float {
 
 // The high and low halves of log2(x), which keep their precision when they
 // are multiplied by a large exponent. This matters for bases near one.
-log2_split = (input: Float) -> (Float, Float) {
+log2_split = (input : Float) -> (Float, Float) {
 	(value, correction) = { high(input) < 0x0010_0000 } |>
 		(True) { (input *. 9007199254740992.0, -53) }
 		| (False) { (input, 0) }
@@ -819,7 +819,7 @@ log2_split = (input: Float) -> (Float, Float) {
 	(hi, lo)
 }
 
-log2_close_to_one = (x: Float) -> (Float, Float) {
+log2_close_to_one = (x : Float) -> (Float, Float) {
 	t = x -. 1.0
 	w = t *. t *. { 0.5 -. t *. { 0.3333333333333333333333 -. t *. 0.25 } }
 	u = 1.44269502162933349609 *. t
@@ -829,7 +829,7 @@ log2_close_to_one = (x: Float) -> (Float, Float) {
 }
 
 // `base` to the power `exponent`. A negative base has a whole exponent.
-pow = (base: Float, exponent: Float) -> Result(Float, Nil) {
+pow = (base : Float, exponent : Float) -> Result(Float, Nil) {
 	exponent |>
 		(0.0) { Ok(1.0) }
 		| (1.0) { Ok(base) }
@@ -876,14 +876,14 @@ pow = (base: Float, exponent: Float) -> Result(Float, Nil) {
 }
 
 // `True` when a whole Float is odd. Floats of 2^53 or more are even.
-is_odd_whole = (x: Float) -> Bool {
+is_odd_whole = (x : Float) -> Bool {
 	y = abs(x)
 	{ y >=. 9007199254740992.0 } |>
 		(True) { False }
 		| (False) { core.truncate(y) % 2 != 0 }
 }
 
-pow_extreme = (base: Float, exponent: Float, direction: Float) -> Result(
+pow_extreme = (base : Float, exponent : Float, direction : Float) -> Result(
 	Float,
 	Nil,
 ) {
@@ -895,10 +895,10 @@ pow_extreme = (base: Float, exponent: Float, direction: Float) -> Result(
 }
 
 pow_exp2 = (
-	exponent: Float,
-	log_hi: Float,
-	log_lo: Float,
-	direction: Float
+	exponent : Float,
+	log_hi : Float,
+	log_lo : Float,
+	direction : Float
 ) -> Result(Float, Nil) {
 	y_hi = without_low(exponent)
 	p_lo = { exponent -. y_hi } *. log_hi +. exponent *. log_lo

@@ -3,7 +3,7 @@
 // replaced by the matching part of the known type of the value.
 User = (name = String, age = Int)
 
-map = <A, B>(xs: List(A), f: (A) -> B) -> List(B) {
+map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
 	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 

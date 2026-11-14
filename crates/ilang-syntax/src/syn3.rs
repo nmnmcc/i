@@ -1,8 +1,11 @@
 //! Compatibility namespace for the syntax-three tree now at the crate root.
-pub use crate::parse::{parse_expr, parse_module, parse_pattern, parse_type, pipe_target};
+pub use crate::parse::{
+    ONE_BINDING_HINT, binding_line_traps, parse_expr, parse_module, parse_pattern, parse_type,
+    pipe_target,
+};
 pub use crate::print::{
-    MAX_CALL_DEPTH, WIDTH, call_depth, format, print_expr, print_module, print_pattern, print_type,
-    print_with_comments, record_label, string_literal,
+    MAX_CALL_DEPTH, WIDTH, call_depth, format, print_annotation, print_expr, print_module,
+    print_pattern, print_type, print_with_comments, record_label, string_literal,
 };
 pub use crate::{ast, deep, facts, group, print, rows as lisp, surface, walk};
 /// Temporary integration switch for the remaining non-engine tree readers.

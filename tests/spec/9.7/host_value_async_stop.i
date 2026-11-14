@@ -7,7 +7,7 @@
 @host("test:async/v1", "async")
 Later = (nan = () -> Float)
 
-half = () <- (later: Later) {
+half = () <- (later : Later) {
 	x = later.nan()
 	x /. 2.0
 }

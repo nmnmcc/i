@@ -9,7 +9,7 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later: Later) {
+main = () <- (later : Later) {
 	borrowed = later.echo("borrowed")
 	control.boundary((b) {
 		{

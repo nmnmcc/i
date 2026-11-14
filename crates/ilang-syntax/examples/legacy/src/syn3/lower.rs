@@ -19,10 +19,9 @@
 //!   binding with the type parameter `N` carries the errors in `N`: it
 //!   becomes `^ N%E ! N`, with `N%E` one more type parameter of the binding.
 //!
-//! One-constructor types: the checker of this stage has no unions of data
-//! types that stand for a sum, so `C1 = (…)`, `C2 = (…)`, `T = C1 | C2`
-//! written one after the other are read as today's `T { C1(…) C2(…) }`; an
-//! export of `C1` alone is then part of the export of `T`.
+//! Type definitions (§2.8, stage 3): `C(A) = (…)` is today's one-constructor
+//! type `C(A) { C(…) }`, and a sum `T(A) = C1(A) | C2` is the alias of the
+//! union of such types, which the checker reads as a sum.
 
 use super::ast as n;
 use crate::ast as o;
@@ -301,7 +300,7 @@ pub fn lower_pattern(p: &n::Pattern) -> Result<o::Pattern, Diagnostic> {
 /// Lowers items that stand alone (macro results).
 pub fn lower_items(items: &[n::Item]) -> Result<Vec<o::Item>, Diagnostic> {
     let mut cx = Cx::plain();
-    let (out, _) = cx.items(items);
+    let out = cx.items(items);
     cx.finish(out)
 }
 
@@ -551,19 +550,6 @@ fn head_params(head: &[n::Type]) -> Option<Vec<o::Ident>> {
         .collect()
 }
 
-/// The name of a member `C` or `C(A, …)` of a sum, when its arguments are
-/// bare names.
-fn member_name(t: &n::Type) -> Option<&str> {
-    match &t.kind {
-        n::TypeKind::Named {
-            module: None,
-            name,
-            args,
-        } if head_params(args).is_some() => Some(&name.name),
-        _ => None,
-    }
-}
-
 impl Cx {
     fn boundary(&self, kind: u8, span: Span) -> bool {
         self.fragment != Some((kind, span))
@@ -615,7 +601,7 @@ impl Cx {
     // ---- Module and items ----
 
     fn module(&mut self, m: &n::Module) -> o::Module {
-        let (items, absorbed) = self.items(&m.items);
+        let items = self.items(&m.items);
         let cover = |spans: Vec<Span>| spans.into_iter().reduce(Span::to);
         o::Module {
             doc: m.doc.clone(),
@@ -632,7 +618,6 @@ impl Cx {
             exports: m
                 .exports
                 .iter()
-                .filter(|e| e.constructors || !absorbed.contains(&e.name.name))
                 .flat_map(|e| {
                     // The group bindings of an exported chain go with it.
                     let hidden = self
@@ -660,149 +645,15 @@ impl Cx {
         }
     }
 
-    /// The items, and the names of the one-constructor types that became
-    /// constructors of a sum.
-    ///
-    /// A definition `T = C` or `T(A) = C(A)` with one member is a sum of
-    /// one constructor only while `C` is not written as a type elsewhere
-    /// in the module; otherwise it is the alias it reads as (§2.8, kind 4)
-    /// and `C` keeps its type. (A union `C1 | … | Ck` is still read as one
-    /// type with those constructors, so a member written as a type is not
-    /// defined: the final tree of lane/fa removes this.)
-    fn items(&mut self, items: &[n::Item]) -> (Vec<o::Item>, HashSet<String>) {
-        struct Used(HashSet<String>);
-        impl crate::walk::Visitor for Used {
-            fn ty(&mut self, t: &mut o::TypeExpr) {
-                if let o::TypeKind::Named {
-                    module: None, name, ..
-                } = &t.kind
-                {
-                    self.0.insert(name.name.clone());
-                }
-            }
-        }
-        let (errors, fresh) = (self.errors.len(), self.fresh);
-        let mut plain = HashSet::new();
-        loop {
-            let (mut out, absorbed, single) = self.items_once(items, &plain);
-            let mut used = Used(HashSet::new());
-            crate::walk::Walk::walk(&mut out, &mut used);
-            let aliases: Vec<usize> = single
-                .into_iter()
-                .filter(|(_, member)| used.0.contains(member))
-                .map(|(i, _)| i)
-                .collect();
-            if aliases.is_empty() {
-                return (out, absorbed);
-            }
-            plain.extend(aliases);
-            self.errors.truncate(errors);
-            self.fresh = fresh;
-        }
-    }
-
-    /// The items, with the definitions at `plain` read as aliases; the
-    /// names of the absorbed types; and the one-member sums with the name
-    /// of their member.
-    #[allow(clippy::type_complexity)]
-    fn items_once(
-        &mut self,
-        items: &[n::Item],
-        plain: &HashSet<usize>,
-    ) -> (Vec<o::Item>, HashSet<String>, Vec<(usize, String)>) {
-        // The sums: a definition `T = C1 | … | Ck` whose `k` members are
-        // the data definitions just before it, in order.
-        let mut member_of: HashMap<usize, usize> = HashMap::new();
-        let mut absorbed = HashSet::new();
-        let mut single = Vec::new();
-        if self.transition.is_complete() {
-            for (i, item) in items.iter().enumerate() {
-                if let Some(members) = self.transition.sum_members(item.span.0) {
-                    for member in members {
-                        if let Some(at) = items.iter().position(|item| item.span.0 == *member) {
-                            member_of.insert(at, i);
-                            if let n::ItemKind::TypeDef(def) = &items[at].kind
-                                && let n::ItemKind::TypeDef(parent) = &item.kind
-                                && def.name.name != parent.name.name
-                            {
-                                absorbed.insert(def.name.name.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            for (i, item) in items.iter().enumerate() {
-                let n::ItemKind::TypeDef(def) = &item.kind else {
-                    continue;
-                };
-                if plain.contains(&i) {
-                    continue;
-                }
-                let n::TypeRhs::Type(rhs) = &def.rhs else {
-                    continue;
-                };
-                let members: Vec<&n::Type> = match &rhs.kind {
-                    n::TypeKind::Union(ms) => ms.iter().collect(),
-                    _ => vec![rhs],
-                };
-                let k = members.len();
-                if k > i || head_params(&def.head).is_none() {
-                    continue;
-                }
-                let fits = members.iter().enumerate().all(|(j, m)| {
-                    let at = i - k + j;
-                    !member_of.contains_key(&at)
-                        && match &items[at].kind {
-                            n::ItemKind::TypeDef(n::TypeDef {
-                                name,
-                                head,
-                                rhs: n::TypeRhs::Data(_),
-                                ..
-                            }) => {
-                                member_name(m) == Some(name.name.as_str())
-                                    && matches!(&m.kind, n::TypeKind::Named { args, .. }
-                                        if args.len() == head.len()
-                                            && args.iter().zip(head).all(|(a, b)| member_name(a) == member_name(b)))
-                            },
-                            _ => false,
-                        }
-                });
-                if fits {
-                    for j in 0..k {
-                        member_of.insert(i - k + j, i);
-                        let n::ItemKind::TypeDef(member) = &items[i - k + j].kind else {
-                            unreachable!()
-                        };
-                        if member.name.name != def.name.name {
-                            absorbed.insert(member.name.name.clone());
-                            // Only a one-member right side: a union keeps today's
-                            // reading (its members are constructors), as the
-                            // exports of i/syntax and std rely on it.
-                            if k == 1 && !matches!(rhs.kind, n::TypeKind::Union(_)) {
-                                single.push((i, member.name.name.clone()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        let mut sums: HashMap<usize, Vec<o::Constructor>> = HashMap::new();
+    /// The items. Each definition is lowered alone (§2.8, stage 3): a data
+    /// definition `C(A) = (…)` is a type with one constructor of its name,
+    /// and `T = C1 | … | Ck` is the alias for the union of those types.
+    fn items(&mut self, items: &[n::Item]) -> Vec<o::Item> {
         let mut out = Vec::new();
-        for (i, item) in items.iter().enumerate() {
+        for item in items {
             let attributes = item.attributes.iter().map(|a| self.attribute(a)).collect();
             let kind = match &item.kind {
-                n::ItemKind::TypeDef(def) => {
-                    if let Some(sum) = member_of.get(&i) {
-                        let n::TypeRhs::Data(fields) = &def.rhs else {
-                            unreachable!()
-                        };
-                        let c = self.constructor(&def.name, fields, item.span.0);
-                        sums.entry(*sum).or_default().push(c);
-                        continue;
-                    }
-                    o::ItemKind::TypeDef(self.type_def(def, sums.remove(&i), item.span.0))
-                }
+                n::ItemKind::TypeDef(def) => o::ItemKind::TypeDef(self.type_def(def, item.span.0)),
                 n::ItemKind::Bind(b) => {
                     let mut bindings = self.bindings(b, true);
                     let last = bindings.pop().unwrap();
@@ -844,7 +695,7 @@ impl Cx {
                 span: item.span.0,
             });
         }
-        (out, absorbed, single)
+        out
     }
 
     fn attribute(&mut self, a: &n::Attribute) -> o::Attribute {
@@ -906,12 +757,7 @@ impl Cx {
         }
     }
 
-    fn type_def(
-        &mut self,
-        def: &n::TypeDef,
-        sum: Option<Vec<o::Constructor>>,
-        span: Span,
-    ) -> o::TypeDef {
+    fn type_def(&mut self, def: &n::TypeDef, span: Span) -> o::TypeDef {
         let params = head_params(&def.head);
         let custom = |cx: &mut Cx, ctors: Vec<o::Constructor>| {
             if params.is_none() {
@@ -928,9 +774,6 @@ impl Cx {
                 body: o::TypeBody::Custom(ctors),
             }
         };
-        if let Some(ctors) = sum {
-            return custom(self, ctors);
-        }
         match &def.rhs {
             n::TypeRhs::Opaque => custom(self, Vec::new()),
             n::TypeRhs::Data(fields) => {

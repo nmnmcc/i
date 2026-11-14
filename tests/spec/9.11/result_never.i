@@ -7,7 +7,7 @@
 @host("test:async/v1", "request")
 Later = (double = (Int) -> Request(Result(Int, Never)))
 
-main = () <- (later: Later) {
+main = () <- (later : Later) {
 	assert(
 		request.await_owned(later.double(21)) == Ok(42),
 	)

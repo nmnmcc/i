@@ -21,6 +21,6 @@ B = Int
 q = 1
 
 @external("app:host", "w")
-w: (Int) -> Int
+w : (Int) -> Int
 
 w = 1

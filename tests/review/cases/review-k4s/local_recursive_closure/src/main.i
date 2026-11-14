@@ -1,11 +1,11 @@
 S(N) = (() <- N -> Nil, (N) -> Nil)
-use = <N>() <- (s: S(N)) {
+use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
 }
 make = <N>() {
 	() {
-		_syn3_0: S(N) = S(() { use() }, (_: N) { Nil })
+		_syn3_0 : S(N) = S(() { use() }, (_ : N) { Nil })
 		use() <- (_syn3_0)
 	}
 }

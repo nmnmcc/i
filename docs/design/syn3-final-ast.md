@@ -1,6 +1,7 @@
 # One tree: syntax three as the final AST
 
-Status: completed through deletion on Nov14; the full gate is green.
+Status: deletion green on base68b720e9; integration with tyalt046550bd
+(main1bdea694, stage3 and colon precedence) compiles and its full gate is pending.
 The inventory below records the starting architecture (Nov13); §6 records
 the completed state. Controlling sources:
 `docs/design/syntax-3.md` §6, §6.7, §6.8 and §7.2 row 12.
@@ -903,3 +904,10 @@ initial failure and successful retry is recorded in
 The unchanged schema_test.null_round passes at both levels; the earlier
 fa2 failure is unreproduced, with no speculative patch or changed assertion.
 Unfiltered workspace/spec/corpus verification remains the coordinator's.
+
+
+Nov14 10:43: the new coordinator integration merges lane/tyalt046550bd.
+All16 conflicts are resolved and the workspace all-target check passes.
+Every incoming change to deleted/relocated files is inventoried in
+[syn3-final-ast-tyalt-integration.md](syn3-final-ast-tyalt-integration.md).
+This is a compiling milestone, not a green claim on the new main base.

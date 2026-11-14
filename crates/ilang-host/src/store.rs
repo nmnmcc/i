@@ -629,7 +629,15 @@ mod store_tests {
         let held = s.lock(true).unwrap();
         assert!(s.gc().is_none());
         drop(held);
-        assert!(s.gc().is_some());
+        // Another test thread may be between fork and exec of a child process at this moment: that
+        // child holds a copy of the lock's descriptor until its exec closes it. Wait for it.
+        let collected = (0..200).find_map(|_| {
+            s.gc().or_else(|| {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                None
+            })
+        });
+        assert!(collected.is_some());
     }
 
     #[test]

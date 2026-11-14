@@ -8,7 +8,7 @@
 	i/resource
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -18,13 +18,13 @@ show = (x) { core.inspect(x) }
 
 Name = (text = String)
 
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 
 Bad = (Int)
 
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Never, Name))
 Done = (String)
-Paused = Paused | Done
+PausedSum = Paused | Done
 
 // The final function gives the name it sees to the value of `outer`.
 final = (outer) {

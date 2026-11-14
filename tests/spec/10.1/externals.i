@@ -7,22 +7,22 @@
 
 // External functions that the host gives (`ilang_host::services::testing`).
 @external("test:math/v1", "add")
-add: (Int, Int) -> Int
+add : (Int, Int) -> Int
 
 @external("test:math/v1", "hypot")
-hypot: (Float, Float) -> Float
+hypot : (Float, Float) -> Float
 
 // A top-level value may call an external function: imports may be called
 // while the values are worked out (B.1).
 seven = add(3, 4)
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
 }
 
-apply = (f: (Int, Int) -> Int, a: Int, b: Int) { f(a, b) }
+apply = (f : (Int, Int) -> Int, a : Int, b : Int) { f(a, b) }
 
 test("calls_are_made_as_written", () {
 	check(

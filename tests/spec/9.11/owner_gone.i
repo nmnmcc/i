@@ -7,7 +7,7 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later: Later, owner: request.Owner) {
+main = () <- (later : Later, owner : request.Owner) {
 	request.close_owner(owner)
 	later.echo("unreachable")
 }

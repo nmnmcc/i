@@ -3,7 +3,7 @@
 	i/core
 	numeric/kernels
 )
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	io.print(
 		core.inspect(kernels.horner(0.5)),
 	)

@@ -24,36 +24,36 @@
 )
 
 /// `False` for `True`, and `True` for `False`.
-not = (a: Bool) -> Bool { core.not(a) }
+not = (a : Bool) -> Bool { core.not(a) }
 
 /// `True` when both are `True`.
-and = (a: Bool, b: Bool) -> Bool { a && b }
+and = (a : Bool, b : Bool) -> Bool { a && b }
 
 /// `True` when one or both are `True`.
-or = (a: Bool, b: Bool) -> Bool { a || b }
+or = (a : Bool, b : Bool) -> Bool { a || b }
 
 /// `True` when exactly one is `True`.
-xor = (a: Bool, b: Bool) -> Bool { a != b }
+xor = (a : Bool, b : Bool) -> Bool { a != b }
 
 /// `False` when both are `True`.
-nand = (a: Bool, b: Bool) -> Bool { core.not(a && b) }
+nand = (a : Bool, b : Bool) -> Bool { core.not(a && b) }
 
 /// `True` when both are `False`.
-nor = (a: Bool, b: Bool) -> Bool { core.not(a || b) }
+nor = (a : Bool, b : Bool) -> Bool { core.not(a || b) }
 
 /// `True` when both are the same.
-exclusive_nor = (a: Bool, b: Bool) -> Bool { a == b }
+exclusive_nor = (a : Bool, b : Bool) -> Bool { a == b }
 
 /// `"True"` or `"False"`.
-to_string = (bool: Bool) -> String {
+to_string = (bool : Bool) -> String {
 	bool |> (True) { "True" } | (False) { "False" }
 }
 
 /// `1` for `True` and `0` for `False`.
-to_int = (bool: Bool) -> Int { bool |> (True) { 1 } | (False) { 0 } }
+to_int = (bool : Bool) -> Int { bool |> (True) { 1 } | (False) { 0 } }
 
 /// Compares two bools, with `False < True`.
-compare = (a: Bool, with: Bool) -> Order {
+compare = (a : Bool, with : Bool) -> Order {
 	(a, with) |>
 		((True, False)) { Greater }
 		| ((False, True)) { Less }
@@ -66,13 +66,13 @@ compare = (a: Bool, with: Bool) -> Order {
 /// ```i
 /// bool.guard(n < 0, "negative", () { "positive" })
 /// ```
-guard = <A, N>(when: Bool, return: A, otherwise: () <- N -> A) -> A {
+guard = <A, N>(when : Bool, return : A, otherwise : () <- N -> A) -> A {
 	when |> (True) { return } | (False) { otherwise() }
 }
 
 /// Like `guard`, but the value for `True` is made by a function too.
 lazy_guard = <A, N>(
-	when: Bool,
-	return: () <- N -> A,
-	otherwise: () <- N -> A
+	when : Bool,
+	return : () <- N -> A,
+	otherwise : () <- N -> A
 ) -> A { when |> (True) { return() } | (False) { otherwise() } }

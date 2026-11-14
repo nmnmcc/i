@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -21,7 +21,7 @@ Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
 
-literal = (x: Int | String) {
+literal = (x : { Int | String }) {
 	x |>
 		(0) { "zero" }
 		| (-1) { "minus one" }
@@ -98,7 +98,7 @@ test("constructors", () {
 	u |> (User(age = age, name = name)) { check(name <> show(age), "ann30") }
 	u |> (User(name = n, ..)) { check(n <> name, "annann") }
 	u |> (User(..)) { check("any", "any") }
-	u |> (User(age = age: Int, name = name: String)) { check(name, "ann") }
+	u |> (User(age = age : Int, name = name : String)) { check(name, "ann") }
 	Point(1, 2, label = "p") |> (Point(x, y, label = label)) {
 		check(show((x, y, label)), "(1, 2, \"p\")")
 	}
@@ -107,7 +107,7 @@ test("constructors", () {
 		(Some(None)) { panic("no") }
 		| (Some(Some(n))) { check(show(n), "3") }
 		| (None) { panic("no") }
-	res: Result(List(Int), String) = Ok([1])
+	res : Result(List(Int), String) = Ok([1])
 	res |>
 		(Error(_)) { panic("no") }
 		| (Ok([])) { panic("no") }
@@ -126,15 +126,15 @@ test("named_and_tuples", () {
 	(Nil, (1)) |> ((Nil, (x))) { check(show(x), "1") }
 })
 
-kind = (v: Int | String | List(Int) | (Int, Int) | Nil | Bool | Float) {
+kind = (v : { Int | String | List(Int) | (Int, Int) | Nil | Bool | Float }) {
 	v |>
-		(i: Int) { "int " <> show(i) }
-		| (s: String) { "string " <> s }
-		| (_: List(_)) { "list" }
+		(i : Int) { "int " <> show(i) }
+		| (s : String) { "string " <> s }
+		| (_ : List(_)) { "list" }
 		| ((a, b)) { "pair " <> show(a + b) }
 		| (Nil) { "nil" }
-		| (b: Bool) { "bool " <> show(b) }
-		| (f: Float) { "float " <> show(f) }
+		| (b : Bool) { "bool " <> show(b) }
+		| (f : Float) { "float " <> show(f) }
 }
 
 test("type_tests", () {
@@ -199,7 +199,7 @@ test("choices_and_guards", () {
 	check(r, "between")
 })
 
-guarded = (x: Option(Int)) {
+guarded = (x : Option(Int)) {
 	x |>
 		(Some(n) ? n > 0) { "positive" }
 		| (Some(0)) { "zero" }
@@ -214,10 +214,10 @@ test("guards", () {
 	check(guarded(None), "none")
 })
 
-either = (v: Result(Int, String | Nil)) {
+either = (v : Result(Int, String | Nil)) {
 	v |>
 		(Ok(n)) { show(n) }
-		| (Error(_: Nil)) { "nil" }
+		| (Error(_ : Nil)) { "nil" }
 		| (Error(other)) { "error " <> other }
 }
 

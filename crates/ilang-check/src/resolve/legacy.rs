@@ -640,7 +640,7 @@ impl<'a> Resolver<'a> {
             };
             self.slots[m.0 as usize].push(slot);
         }
-        self.exports(m, &ast.exports);
+        self.exports(m, &ast.exports, &ast.items);
     }
 
     fn collect_pattern_binders(
@@ -728,6 +728,18 @@ impl<'a> Resolver<'a> {
                 span: t.span,
             }),
             ast::TypeBody::Custom(ctors) => {
+                if let [_, second, ..] = &ctors[..] {
+                    let names: Vec<&str> = ctors.iter().map(|c| c.name.name.as_str()).collect();
+                    self.error(
+                        code::MANY_CONSTRUCTORS,
+                        second.name.span,
+                        format!(
+                            "a custom type has one constructor or none; write one type for each constructor and name their union: `{} = {}` (§4.3)",
+                            def.name.name,
+                            names.join(" | ")
+                        ),
+                    );
+                }
                 let mut out = Vec::new();
                 for c in ctors {
                     if !self.value_free(m, &c.name.name, c.name.span) {
@@ -909,7 +921,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// §2.4.
-    fn exports(&mut self, m: ModuleId, items: &[ast::ExportItem]) {
+    fn exports(&mut self, m: ModuleId, items: &[ast::ExportItem], defs: &[ast::Item]) {
         let mi = m.0 as usize;
         for item in items {
             let name = &item.name.name;
@@ -969,10 +981,24 @@ impl<'a> Resolver<'a> {
             };
             let def = &mut self.p.types[t.0 as usize];
             def.exported = true;
-            // `Alias(..)` is the same as `Alias`: an alias has no
-            // constructors of its own, so there is nothing more to export.
             if item.constructors && matches!(def.body, TypeBody::Custom(_)) {
                 def.constructors_exported = true;
+            } else if item.constructors {
+                // `A(..)` of a sum exports the name and each member of its
+                // expansion with `(..)` (syntax-3.md §5.2.1, D8), when every
+                // member is a labelled type of this module.
+                let mut members = Vec::new();
+                if sum_members(defs, name, &mut members, 0) {
+                    for member in members {
+                        if let Some(&t) = self.types_by_name[mi].get(&member) {
+                            let def = &mut self.p.types[t.0 as usize];
+                            if matches!(def.body, TypeBody::Custom(_)) {
+                                def.exported = true;
+                                def.constructors_exported = true;
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -2334,15 +2360,26 @@ impl<'a> Resolver<'a> {
                     } = expanded.kind
                         && args.len() == 1
                     {
-                        let answer = self.expand(&args[0]);
-                        let (value, error) = if let TypeKind::Named {
-                            ty: TypeRef::Custom(id),
-                            args,
-                        } = &answer.kind
-                            && self.p.ty(*id).name == "Result"
-                            && Some(self.p.ty(*id).module) == self.p.prelude
-                            && args.len() == 2
-                        {
+                        // `Result(A, E)` is an alias of `Ok(A) | Error(E)`:
+                        // look for it before expanding it.
+                        let mut answer = args[0].clone();
+                        let result_args = loop {
+                            if let TypeKind::Named {
+                                ty: TypeRef::Custom(id),
+                                args,
+                            } = &answer.kind
+                                && self.p.ty(*id).name == "Result"
+                                && Some(self.p.ty(*id).module) == self.p.prelude
+                                && args.len() == 2
+                            {
+                                break Some(args.clone());
+                            }
+                            match self.expand_alias(&answer) {
+                                Some(next) => answer = next,
+                                None => break None,
+                            }
+                        };
+                        let (value, error) = if let Some(args) = result_args {
                             wrapped = true;
                             (args[0].clone(), Some(Box::new(args[1].clone())))
                         } else {
@@ -2462,12 +2499,25 @@ impl<'a> Resolver<'a> {
             }
         }
         members.sort();
+        members.dedup();
         Some(HostFn {
             params,
             result,
             errors: members,
             request_result: false,
         })
+    }
+
+    /// The name of a prelude type that `t` names with no arguments.
+    fn prelude_ctor_type(&self, t: &Ty) -> Option<&str> {
+        match t {
+            Ty::Con(Head::Named(TypeRef::Custom(id)), _, args)
+                if args.is_empty() && Some(self.p.ty(*id).module) == self.p.prelude =>
+            {
+                Some(self.p.ty(*id).name.as_str())
+            }
+            _ => None,
+        }
     }
 
     fn is_never(&self, t: &Type) -> bool {
@@ -2496,6 +2546,15 @@ impl<'a> Resolver<'a> {
             return None;
         }
         match t {
+            // `Bool = True | False`.
+            Ty::Union(ms)
+                if ms.len() == 2
+                    && ["True", "False"]
+                        .iter()
+                        .all(|n| ms.iter().any(|m| self.prelude_ctor_type(m) == Some(*n))) =>
+            {
+                Some(HostType::Bool)
+            }
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, args) if args.is_empty() => match b {
                 BuiltinType::Int => Some(HostType::Int),
                 BuiltinType::Float => Some(HostType::Float),
@@ -2509,7 +2568,12 @@ impl<'a> Resolver<'a> {
                 match &def.body {
                     TypeBody::Custom(ctors) if ctors.is_empty() => Some(HostType::Opaque(*id)),
                     TypeBody::Custom(_) if prelude && def.name == "Nil" => Some(HostType::Nil),
-                    TypeBody::Custom(_) if prelude && def.name == "Bool" => Some(HostType::Bool),
+                    // One of the two members of `Bool`, as a value or an error.
+                    TypeBody::Custom(_)
+                        if prelude && outgoing && matches!(def.name.as_str(), "True" | "False") =>
+                    {
+                        Some(HostType::Bool)
+                    }
                     _ => None,
                 }
             }
@@ -2762,6 +2826,19 @@ impl<'a> Resolver<'a> {
     /// its pattern; in a block, the caller makes them visible from the next
     /// statement (§6.10).
     fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
+        let source = self.p.module(self.cur).source;
+        let file = self.graph.sources.get(source);
+        for span in ilang_syntax::syn3::binding_line_traps(
+            &file.text,
+            Span::new(b.pattern.span.start, b.value.span.start),
+        ) {
+            self.diags.push(Diagnostic::warning(
+                code::ONE_LINE_BINDING,
+                Some(source),
+                span,
+                ilang_syntax::syn3::ONE_BINDING_HINT,
+            ));
+        }
         let ty_vars = self.push_declared_frame(&b.type_params);
         let direct = self.is_direct(&b.value);
         let mut binders = Vec::new();
@@ -4907,4 +4984,39 @@ pub(super) fn resolve_transition(
             .collect();
         resolve_lowered(graph, &parsed)
     })
+}
+
+/// The labelled types (custom types with constructors) that the type
+/// definition `name` of `defs` expands to, through unions and aliases of the
+/// module; `false` when a member is something else.
+fn sum_members(defs: &[ast::Item], name: &str, out: &mut Vec<String>, depth: usize) -> bool {
+    if depth > 64 {
+        return false;
+    }
+    let Some(def) = defs.iter().find_map(|i| match &i.kind {
+        ast::ItemKind::TypeDef(d) if d.name.name == name => Some(d),
+        _ => None,
+    }) else {
+        return false;
+    };
+    match &def.body {
+        ast::TypeBody::Custom(cs) if !cs.is_empty() => {
+            if !out.iter().any(|o| o == name) {
+                out.push(name.to_string());
+            }
+            true
+        }
+        ast::TypeBody::Custom(_) => false,
+        ast::TypeBody::Alias(t) => members_of(defs, t, out, depth),
+    }
+}
+
+fn members_of(defs: &[ast::Item], t: &ast::TypeExpr, out: &mut Vec<String>, depth: usize) -> bool {
+    match &t.kind {
+        ast::TypeKind::Named {
+            module: None, name, ..
+        } => sum_members(defs, &name.name, out, depth + 1),
+        ast::TypeKind::Union(ms) => ms.iter().all(|m| members_of(defs, m, out, depth)),
+        _ => false,
+    }
 }

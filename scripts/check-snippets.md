@@ -3,6 +3,11 @@ Run `scripts/check-snippets` in the development shell. It builds the small
 redesign lane. It invokes only the new parser. It never scans whole Rust,
 JavaScript or Markdown files for keyword words.
 
+After a successful driver build, `scripts/check-snippets --reuse-parser`
+reruns the complete normal and Lisp validation when only snippets or registry
+data changed. Run the default command again after changing parser or driver
+Rust sources. The reuse option requires the existing driver in its build path.
+
 The extractor reads every tracked `.i` file and every fenced `i` block in
 Markdown. Its Rust lexer decodes ordinary and raw string literals, skipping
 comments and character literals. Its JavaScript lexer decodes strings and

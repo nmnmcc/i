@@ -395,7 +395,7 @@ fn core_forms_convert_between_surfaces() {
 Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
-value: (Int) -> Int
+value : (Int) -> Int
 value = (x) -> Int { x + 1 }
 choose = (x) { x |> (0) { "zero" } | (_) { "other" } }
 "#;

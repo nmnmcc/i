@@ -172,6 +172,10 @@ fn types() {
 
 /// The library modules type check with no problems, and their types are
 /// those of the spec tables (§9, §12, §13).
+/// Syntax three §2.4 drops positional binder names from function types.
+/// `display::tree_with` uses the parameter data's shape keys, not `FnTy.labels`
+/// (which also holds binder names). Thus the runtime modules' `(x: Float)`
+/// is shown as `(Float)`; actual data labels are still shown as `label = T`.
 #[test]
 fn library() {
     let dir = tempfile::tempdir().unwrap();
@@ -243,7 +247,7 @@ fn shown_names_skip_types_and_ignore_written_variable_names() {
     fs::create_dir(dir.path().join("src")).unwrap();
     fs::write(
         dir.path().join("src/main.i"),
-        "A = ()\nE = ()\nN = ()\nkeep = <Z>(v: Z) -> Z { v }\nagain = <K>(v: K) -> K { v }\neffect = <X, Z>(f: () <- Z -> X) { f() }\n",
+        "A = ()\nE = ()\nN = ()\nkeep = <Z>(v : Z) -> Z { v }\nagain = <K>(v : K) -> K { v }\neffect = <X, Z>(f : () <- Z -> X) { f() }\n",
     )
     .unwrap();
     let (graph, diags) = ilang_package::load(dir.path());
@@ -278,7 +282,7 @@ fn scheme_types_know_each_type_by_what_it_is() {
     write("app/src/geo/u.i", "(\n\tT(..)\n)\nT = (Int)\n");
     write(
         "app/src/main.i",
-        "(\n\tapp/geo/u\n\td = dep/u\n)\n\n(\n\tf\n\tg\n\text\n)\n@external(\"env\", \"now\")\nnow: () -> Int\n@external(\"env\", \"ext\")\next: (Int) -> Int\nf = <A>(x: u.T, y: d.T, z: A) -> A { z }\ng = (o: Result(u.T, Int)) { o }\nhidden = (x: u.T) { x }\n",
+        "(\n\tapp/geo/u\n\td = dep/u\n)\n\n(\n\tf\n\tg\n\text\n)\n@external(\"env\", \"now\")\nnow : () -> Int\n@external(\"env\", \"ext\")\next : (Int) -> Int\nf = <A>(x : u.T, y : d.T, z : A) -> A { z }\ng = (o : Result(u.T, Int)) { o }\nhidden = (x : u.T) { x }\n",
     );
     let (graph, diags) = ilang_package::load(&tmp.path().join("app"));
     assert!(diags.is_empty(), "{diags:?}");

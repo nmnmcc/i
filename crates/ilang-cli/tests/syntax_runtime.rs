@@ -69,7 +69,7 @@ fn syntax_library_round_trips_through_the_host() {
 	syntax = i/syntax
 )
 @external("test:syntax", "source")
-source: () -> syntax.Syntax
+source : () -> syntax.Syntax
 
 test("exercise", () -> Nil {
 	value = source()
@@ -78,19 +78,19 @@ test("exercise", () -> Nil {
 		assert(syntax.definition(value) == value)
 		assert(syntax.show(value) == "(f x)")
 		syntax.node(value) |>
-			(syntax.Round([first, second])) {
+			(syntax.Node(syntax.Round([first, second]))) {
 				syntax.node(value) |>
-					(syntax.Round([again, _])) { assert(first == again) }
+					(syntax.Node(syntax.Round([again, _]))) { assert(first == again) }
 					| (_) { panic("unexpected syntax node") }
 				assert(syntax.show(first) == "f")
 				assert(syntax.show(second) == "x")
 			}
 			| (_) { panic("unexpected syntax node") }
-		made = syntax.make(syntax.Name("made"), value)
+		made = syntax.make(syntax.Node(syntax.Name("made")), value)
 		assert(syntax.show(made) == "made")
 		assert(syntax.same_code(made, made))
 		assert(syntax.show_as(made, syntax.Expression) == "made")
-		pair = syntax.make(syntax.Round([made, value]), value)
+		pair = syntax.make(syntax.Node(syntax.Round([made, value])), value)
 		assert(syntax.show(pair) == "(made (f x))")
 		assert(syntax.show_as(pair, syntax.Expression) == "made(f(x))")
 		assert(syntax.show_as(pair, syntax.ValueItem) == "made(f(x))")
@@ -103,15 +103,15 @@ test("exercise", () -> Nil {
 		assert(syntax.show_as(made, syntax.Format) == "made")
 		assert(syntax.show_as(made, syntax.Segment) == "made")
 		assert(syntax.show_as(made, syntax.Attribute) == "@made")
-		fail.catch(() { syntax.make(syntax.Name("Bad Name"), value) }) |>
+		fail.catch(() { syntax.make(syntax.Node(syntax.Name("Bad Name")), value) }) |>
 			(Error(syntax.SyntaxError(message = message, at = at))) {
 				assert(message != "")
 				assert(syntax.same_code(at, value))
 			}
 			| (Ok(_)) { panic("invalid syntax atom was accepted") }
-		comma = syntax.make(syntax.Symbol(","), value)
+		comma = syntax.make(syntax.Node(syntax.Symbol(",")), value)
 		assert(syntax.show(comma) == ",")
-		bad = syntax.make(syntax.Round(BAD), value)
+		bad = syntax.make(syntax.Node(syntax.Round(BAD)), value)
 		fail.catch(() { syntax.show_as(bad, syntax.Expression) }) |>
 			(Error(syntax.SyntaxError(message = message, at = at))) {
 				assert(message != "")
@@ -169,7 +169,7 @@ fn compiler_operations_are_limited_to_compiler_instances() {
 (syntax = i/syntax)
 (show)
 @external("test:syntax", "source")
-source: () -> syntax.Syntax
+source : () -> syntax.Syntax
 show = () { syntax.show(source()) }
 "#,
     )
@@ -228,7 +228,7 @@ show = () { syntax.show(source()) }
 	syntax = i/syntax
 )
 @external("test:syntax", "source")
-source: () -> syntax.Syntax
+source : () -> syntax.Syntax
 main = () -> Nil {
 	{
 		syntax.definition(source())
@@ -248,7 +248,7 @@ main = () -> Nil {
     );
     std::fs::write(
         &main,
-        "@external(\"i:compiler/syntax/v1\", \"show\")\nforged: () -> String\nmain = () { Nil }\n",
+        "@external(\"i:compiler/syntax/v1\", \"show\")\nforged : () -> String\nmain = () { Nil }\n",
     )
     .unwrap();
     let error = match ilang_cli::build(dir.path(), options) {
@@ -272,7 +272,7 @@ fn syntax_values_cross_export_boundary() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { x }\n",
+        "(syntax = i/syntax)\n(identity)\nidentity = (x : syntax.Syntax) { x }\n",
     )
     .unwrap();
     let built = ilang_cli::build(
@@ -324,10 +324,10 @@ fn compiler_templates_rebuild_through_wasm() {
 	testlib = (test) = std/test
 	syntax = i/syntax
 )
-make_many = (value: syntax.Syntax, n: Int, acc: List(syntax.Syntax)) -> List(
+make_many = (value : syntax.Syntax, n : Int, acc : List(syntax.Syntax)) -> List(
 	syntax.Syntax,
 ) { n |> (0) { acc } | (_) { make_many(value, n - 1, [value, ..acc]) } }
-count = (items: List(syntax.Syntax), n: Int) -> Int {
+count = (items : List(syntax.Syntax), n : Int) -> Int {
 	items |> ([]) { n } | ([_, ..rest]) { count(rest, n + 1) }
 }
 
@@ -349,7 +349,7 @@ test("exercise", () {
 	)
 	assert(syntax.show(result) == "(f y)")
 	syntax.node(result) |>
-		(syntax.Round([_, child])) { assert(child == replacement) }
+		(syntax.Node(syntax.Round([_, child]))) { assert(child == replacement) }
 		| (_) { panic("unexpected template") }
 	Nil
 })

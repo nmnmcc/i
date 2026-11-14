@@ -10,7 +10,7 @@ import sys
 n, out = int(sys.argv[1]), sys.argv[2]
 os.makedirs(os.path.join(out, "src"), exist_ok=True)
 with open(os.path.join(out, "i.toml"), "w") as f:
-    f.write("# spec: 4.4, 7.4\n# expect: pass\n\nname = \"spec\"\n")
+    f.write("# spec : 4.4, 7.4\n# expect : pass\n\nname = \"spec\"\n")
 lines = ["C0 { C0 }"]
 lines += [f"C{i}(A) {{ C{i}(A, E(A)) }}" for i in range(1, n)]
 lines.append("E(A) = C0 | " + " | ".join(f"C{i}(A)" for i in range(1, n)))

@@ -19,7 +19,7 @@ fn source(n: usize, value: bool, reverse: bool) -> String {
     }
     let last = format!("A{}", n - 1);
     [
-        "v: Int = 1\n".to_string(),
+        "v : Int = 1\n".to_string(),
         defs.join("\n"),
         "\nx: ".into(),
         last,

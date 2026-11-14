@@ -13,6 +13,7 @@ type PResult<X> = Result<X, Diagnostic>;
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
     let lexed = lex3(source);
     let mut parser = Parser {
+        source,
         toks: &lexed.tokens,
         close: &lexed.close,
         docs: &lexed.docs,
@@ -34,6 +35,7 @@ fn parse_with<X>(
 ) -> Result<X, Vec<Diagnostic>> {
     let lexed = lex3(source);
     let mut parser = Parser {
+        source,
         toks: &lexed.tokens,
         close: &lexed.close,
         docs: &lexed.docs,
@@ -73,6 +75,7 @@ pub fn parse_pattern(source: &str) -> Result<Pattern, Vec<Diagnostic>> {
 }
 
 struct Parser<'a> {
+    source: &'a str,
     toks: &'a [Token],
     close: &'a [Option<u32>],
     docs: &'a [DocComment],
@@ -190,7 +193,18 @@ impl Parser<'_> {
         } else {
             self.kind().to_string()
         };
-        let msg = format!("expected {expected}, found {found}");
+        let mut msg = format!("expected {expected}, found {found}");
+        if self.at(&T::Eq)
+            && let Some(open) = self.pos.checked_sub(1).and_then(|close| {
+                self.close[..self.pos]
+                    .iter()
+                    .rposition(|end| *end == Some(close as u32))
+            })
+            && spaced_binding_call(self.source, self.toks, open, self.pos)
+        {
+            msg.push_str("; ");
+            msg.push_str(ONE_BINDING_HINT);
+        }
         Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg))
     }
 
@@ -519,7 +533,7 @@ impl Parser<'_> {
                 None if matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon => {
                     let name = self.name()?;
                     self.bump();
-                    let ty = self.ty()?;
+                    let ty = self.annot()?;
                     ItemKind::Decl { name, ty }
                 }
                 None => {
@@ -879,6 +893,7 @@ impl Parser<'_> {
                 StringPart::Expr { tokens, .. } => {
                     let close = pair_brackets(&tokens, &mut self.diags);
                     let mut child = Parser {
+                        source: self.source,
                         toks: &tokens,
                         close: &close,
                         docs: &[],
@@ -1223,7 +1238,7 @@ impl Parser<'_> {
                 } else if !segment && self.eat(&T::Colon) {
                     PatternKind::Typed {
                         binder,
-                        ty: self.ty()?,
+                        ty: self.annot()?,
                     }
                 } else if binder.discard {
                     PatternKind::Discard(binder.name)
@@ -1385,15 +1400,21 @@ impl Parser<'_> {
     // ---- Types ----
 
     fn ty(&mut self) -> PResult<Type> {
-        self.type_list(T::Pipe, Self::type_inter, TypeKind::Union)
+        self.type_list(T::Pipe, Self::type_inter::<false>, TypeKind::Union)
     }
 
-    fn type_inter(&mut self) -> PResult<Type> {
-        self.type_list(T::Amp, Self::type_diff, TypeKind::Inter)
+    /// The one precedence rule after every type colon. Bracket contents
+    /// use `ty`; unbracketed function results keep this boundary.
+    fn annot(&mut self) -> PResult<Type> {
+        self.type_inter::<true>()
     }
 
-    fn type_diff(&mut self) -> PResult<Type> {
-        self.type_list(T::Minus, Self::type_prim, TypeKind::Diff)
+    fn type_inter<const ANNOT: bool>(&mut self) -> PResult<Type> {
+        self.type_list(T::Amp, Self::type_diff::<ANNOT>, TypeKind::Inter)
+    }
+
+    fn type_diff<const ANNOT: bool>(&mut self) -> PResult<Type> {
+        self.type_list(T::Minus, Self::type_prim::<ANNOT>, TypeKind::Diff)
     }
 
     fn type_list(
@@ -1488,14 +1509,19 @@ impl Parser<'_> {
     }
 
     /// `[ "<-" Services ] "->" Union`, after the parameter part.
-    fn fn_type(&mut self, generics: Vec<Ident>, param: Type, start: u32) -> PResult<Type> {
+    fn fn_type<const ANNOT: bool>(
+        &mut self,
+        generics: Vec<Ident>,
+        param: Type,
+        start: u32,
+    ) -> PResult<Type> {
         let services = if self.eat(&T::LArrow) {
             Some(self.needs()?)
         } else {
             None
         };
         self.expect(&T::Arrow)?;
-        let ret = self.ty()?;
+        let ret = if ANNOT { self.annot()? } else { self.ty()? };
         Ok(Type::new(
             TypeKind::Fn(Box::new(FnType {
                 generics,
@@ -1568,7 +1594,7 @@ impl Parser<'_> {
         matches!(self.kind(), T::Arrow | T::LArrow)
     }
 
-    fn type_prim(&mut self) -> PResult<Type> {
+    fn type_prim<const ANNOT: bool>(&mut self) -> PResult<Type> {
         let start = self.start();
         let kind = match self.kind().clone() {
             T::Int(n) => {
@@ -1608,13 +1634,13 @@ impl Parser<'_> {
                 if !self.at_fn_tail() {
                     return self.error("`->` or `<-`: type parameters `<A>` begin a function type");
                 }
-                return self.fn_type(generics, param, start);
+                return self.fn_type::<ANNOT>(generics, param, start);
             }
             T::LParen => {
                 let items = self.data_type()?;
                 let data = Type::new(TypeKind::Data(items), self.span_from(start));
                 if self.at_fn_tail() {
-                    return self.fn_type(Vec::new(), data, start);
+                    return self.fn_type::<ANNOT>(Vec::new(), data, start);
                 }
                 return Ok(data);
             }
@@ -1623,7 +1649,7 @@ impl Parser<'_> {
                 let inner = self.ty()?;
                 self.close_type_group()?;
                 if self.at_fn_tail() {
-                    return self.fn_type(Vec::new(), inner, start);
+                    return self.fn_type::<ANNOT>(Vec::new(), inner, start);
                 }
                 return Ok(inner);
             }
@@ -1665,4 +1691,62 @@ impl Parser<'_> {
         };
         Ok(Type::new(kind, self.span_from(start)))
     }
+}
+
+/// The line rule is unchanged; this only explains a likely misplaced statement (§1.7).
+pub const ONE_BINDING_HINT: &str =
+    "this is one binding, not two; to write two, put the second on its own line (§1.7)";
+
+fn spaced_binding_call(source: &str, toks: &[Token], open: usize, eq: usize) -> bool {
+    if open == 0 || toks[open].kind != T::LParen {
+        return false;
+    }
+    let name = &toks[open - 1];
+    if !matches!(name.kind, T::Name(_) | T::UpName(_)) {
+        return false;
+    }
+    let gap = &source[name.span.end as usize..toks[open].span.start as usize];
+    gap.len() >= 2
+        && gap.bytes().all(|b| b == b' ')
+        && !source[name.span.start as usize..toks[eq].span.end as usize].contains(['\n', '\r'])
+}
+
+/// Suspicious spacing inside an already parsed conjunction binding. The caller
+/// supplies the binding's pattern through its final `=`, excluding the value.
+pub fn binding_line_traps(source: &str, span: Span) -> Vec<Span> {
+    let Some(text) = source.get(span.start as usize..span.end as usize) else {
+        return Vec::new();
+    };
+    if !text.contains("  (") {
+        return Vec::new();
+    }
+    let lexed = lex3(text);
+    let mut out = Vec::new();
+    for (open, token) in lexed.tokens.iter().enumerate() {
+        if token.kind != T::LParen || open < 2 {
+            continue;
+        }
+        let name_start = if open >= 4 && lexed.tokens[open - 2].kind == T::Dot {
+            open - 3
+        } else {
+            open - 1
+        };
+        if name_start == 0 || lexed.tokens[name_start - 1].kind != T::Eq {
+            continue;
+        }
+        let Some(close) = lexed.close[open] else {
+            continue;
+        };
+        let eq = close as usize + 1;
+        if lexed.tokens.get(eq).is_some_and(|t| t.kind == T::Eq)
+            && spaced_binding_call(text, &lexed.tokens, open, eq)
+        {
+            let name = lexed.tokens[open - 1].span;
+            out.push(Span::new(
+                span.start + name.start,
+                span.start + token.span.end,
+            ));
+        }
+    }
+    out
 }

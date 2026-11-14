@@ -165,7 +165,7 @@ fn type_macros_are_expanded_outside_in_in_body_annotations() {
             } else {
                 "Int"
             };
-            let (module, errors) = ilang_syntax::parse_module(&format!("x: {source}"));
+            let (module, errors) = ilang_syntax::parse_module(&format!("x : {source}"));
             assert!(errors.is_empty(), "{errors:?}");
             let ItemKind::Declaration { ty, .. } = &module.items[0].kind else {
                 panic!()
@@ -179,7 +179,7 @@ fn type_macros_are_expanded_outside_in_in_body_annotations() {
             false
         }
     }
-    let (mut module, errors) = ilang_syntax::parse_module("x: outer(inner(Int))");
+    let (mut module, errors) = ilang_syntax::parse_module("x : outer(inner(Int))");
     assert!(errors.is_empty(), "{errors:?}");
     let mut hook = Types::default();
     body_walk::expressions(&mut module, &mut hook).unwrap();
@@ -192,7 +192,7 @@ fn deep_mixed_bodies_patterns_and_types_do_not_use_the_host_stack() {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
-            let (mut module, errors) = ilang_syntax::parse_module("f = () { Nil }\nx: Int");
+            let (mut module, errors) = ilang_syntax::parse_module("f = () { Nil }\nx : Int");
             assert!(errors.is_empty(), "{errors:?}");
             let span = Span::default();
             let mut value = expression("m()");
@@ -388,7 +388,7 @@ fn type_macro_result_is_traversed_without_the_host_stack() {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
-            let (mut module, errors) = ilang_syntax::parse_module("x: deep(Int)");
+            let (mut module, errors) = ilang_syntax::parse_module("x : deep(Int)");
             assert!(errors.is_empty(), "{errors:?}");
             let mut hook = GenerateType(0);
             body_walk::expressions(&mut module, &mut hook).unwrap();

@@ -1,4 +1,4 @@
-outer = <N>(xs: List(Int), f: (Int) <- N -> Int) -> List(Int) {
+outer = <N>(xs : List(Int), f : (Int) <- N -> Int) -> List(Int) {
 	helper = (rest, acc) {
 		rest |>
 			([]) { list.reverse(acc) }
@@ -10,12 +10,12 @@ outer = <N>(xs: List(Int), f: (Int) <- N -> Int) -> List(Int) {
 curried = (a) { (b) { (c) { a + b + c } } }
 
 long_signature = (
-	first_parameter: Int,
-	second_parameter: String,
-	third: Bool
+	first_parameter : Int,
+	second_parameter : String,
+	third : Bool
 ) -> Result(Int, String) { Ok(first_parameter) }
 
-with_env = (x) <- (log: Logger) -> Int { x }
+with_env = (x) <- (log : Logger) -> Int { x }
 
 calls = () {
 	each(items, (item) { print(item) })

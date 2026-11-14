@@ -12,16 +12,16 @@ Cell(A) = (get = () -> A, set = (A) -> Nil)
 
 State(A) = (get = () -> A)
 
-cofinite = (s: String - "a") { 1 }
+cofinite = (s : String - "a") { 1 }
 
-read = (c: Cell("a")) { c.get() }
+read = (c : Cell("a")) { c.get() }
 
-stored = () <- (st: State("a")) { st.get() }
+stored = () <- (st : State("a")) { st.get() }
 
 test("noncovariant", () {
-	s = Sink(put = (m: "GET" | "POST") { Nil })
+	s = Sink(put = (m : { "GET" | "POST" }) { Nil })
 	s.put("GET")
-	c = Cell(get = () { "a" }, set = (x: "a") { Nil })
+	c = Cell(get = () { "a" }, set = (x : "a") { Nil })
 	assert(read(c) == "a")
 	assert((cofinite, 0).1 == 0)
 	{

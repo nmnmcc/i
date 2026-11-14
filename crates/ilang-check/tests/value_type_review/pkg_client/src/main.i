@@ -1,4 +1,4 @@
 (
 	(User) = app/model
 )
-x: User = ("yes", 1)
+x : User = ("yes", 1)

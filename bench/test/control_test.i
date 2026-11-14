@@ -15,7 +15,7 @@ More = (Int, Continuation(Nil, Step, Never, Never))
 // number of frames it went back through.
 Step = Done | More
 
-check = (ok: Bool, what: String) -> Nil {
+check = (ok : Bool, what : String) -> Nil {
 	ok |> (True) { Nil } | (False) { panic(what) }
 }
 

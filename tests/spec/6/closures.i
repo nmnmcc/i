@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -78,11 +78,11 @@ test("patterns_in_parameters", () {
 		show(swap((1, 2))),
 		"(2, 1)",
 	)
-	both = ((a, _) = p, _: Int) { (p, a) }
+	both = ((a, _) = p, _ : Int) { (p, a) }
 	check(
 		show(both((1, 2), 3)),
 		"((1, 2), 1)",
 	)
-	typed = (x: Int, y: String) -> String { core.inspect(x) <> y }
+	typed = (x : Int, y : String) -> String { core.inspect(x) <> y }
 	check(typed(1, "!"), "1!")
 })

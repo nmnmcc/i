@@ -11,7 +11,7 @@
 // after the catch has ended: an escape to the catch from it stops.
 Syn3ServiceFail(E) = Fail(E)
 
-the_fail = () <- (f: Syn3ServiceFail(Int)) { f }
+the_fail = () <- (f : Syn3ServiceFail(Int)) { f }
 
 main = () {
 	r = failure.catch(() {

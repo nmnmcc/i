@@ -3,7 +3,7 @@
 (
 	main
 )
-f = <K>(r: (k = Int), key: K) -> Int { 1 }
-g = (key: String) { f((name = 9), key) }
+f = <K>(r : (k = Int), key : K) -> Int { 1 }
+g = (key : String) { f((name = 9), key) }
 
 main = () { Nil }

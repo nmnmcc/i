@@ -6,10 +6,10 @@
 )
 
 loop = (
-	a: task.Channel(Int),
-	b: task.Channel(Int),
-	c: task.Channel(Int),
-	n: Int
+	a : task.Channel(Int),
+	b : task.Channel(Int),
+	c : task.Channel(Int),
+	n : Int
 ) -> Nil {
 	n |>
 		(0) { Nil }
@@ -28,7 +28,7 @@ loop = (
 		}
 }
 
-send = (c: task.Channel(Int), n: Int) -> Nil {
+send = (c : task.Channel(Int), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
 		| (_) {
@@ -39,9 +39,9 @@ send = (c: task.Channel(Int), n: Int) -> Nil {
 
 main = () {
 	task.scope((s) {
-		a: task.Channel(Int) = task.channel()
-		b: task.Channel(Int) = task.channel()
-		c: task.Channel(Int) = task.channel()
+		a : task.Channel(Int) = task.channel()
+		b : task.Channel(Int) = task.channel()
+		c : task.Channel(Int) = task.channel()
 		older = task.go(s, () { assert(task.receive(b) == -1) })
 		producer = task.go(s, () { send(a, 257) })
 		loop(a, b, c, 257)

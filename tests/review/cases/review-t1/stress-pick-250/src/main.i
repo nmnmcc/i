@@ -1,4 +1,4 @@
-pick = (s: String) {
+pick = (s : String) {
 	s |>
 		("k00000") { 0 }
 		| ("k00001") { 1 }

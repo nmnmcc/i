@@ -1,6 +1,6 @@
 // spec: 7.1, 4.8
 // expect: pass
-tail = (s: String) -> String {
+tail = (s : String) -> String {
 	s |>
 		("a" <> r <> ".txt") { "both:\(r)" }
 		| (r <> ".txt") { "txt:\(r)" }

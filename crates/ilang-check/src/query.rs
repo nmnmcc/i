@@ -529,7 +529,7 @@ impl<'a> Query<'a> {
                 let ty = p.ty(c.ty);
                 let ctor = self.ctor_def(*c)?;
                 (
-                    format!("{}: {}", ctor.name, self.ctor_type(*c)),
+                    with_type(&ctor.name, Some(&self.ctor_type(*c))),
                     Some((ty.module, ty.span)),
                 )
             }
@@ -545,7 +545,7 @@ impl<'a> Query<'a> {
                 let label = f.label.as_ref()?;
                 let ty = p.ty(c.ty);
                 (
-                    format!("{}: {}", label.name, self.show_type(&f.ty)),
+                    with_type(&label.name, Some(&self.show_type(&f.ty))),
                     Some((ty.module, ty.span)),
                 )
             }
@@ -634,7 +634,7 @@ impl<'a> Query<'a> {
             .fields
             .iter()
             .map(|f| match &f.label {
-                Some(l) => format!("{}: {}", l.name, self.show_type(&f.ty)),
+                Some(l) => format!("{} : {}", l.name, self.show_type(&f.ty)),
                 None => self.show_type(&f.ty),
             })
             .collect();
@@ -782,7 +782,7 @@ impl<'a> Query<'a> {
             TypeKind::Record { fields } => {
                 let parts: Vec<String> = fields
                     .iter()
-                    .map(|(name, ty)| format!("{}: {}", name.name, self.show_type(ty)))
+                    .map(|(name, ty)| format!("{} : {}", name.name, self.show_type(ty)))
                     .collect();
                 format!("({})", parts.join(", "))
             }
@@ -795,7 +795,7 @@ impl<'a> Query<'a> {
                 let params: Vec<String> = params
                     .iter()
                     .map(|p| match &p.label {
-                        Some(l) => format!("{}: {}", l.name, self.show_type(&p.ty)),
+                        Some(l) => format!("{} : {}", l.name, self.show_type(&p.ty)),
                         None => self.show_type(&p.ty),
                     })
                     .collect();
@@ -1732,9 +1732,17 @@ fn split_first_top<'s>(s: &'s str, sep: &str) -> (&'s str, Option<&'s str>) {
     (s, None)
 }
 
+/// A displayed type becomes an annotation only at a binder. Reuse the
+/// normal printer so unions, including function results, keep their meaning.
+fn annotation_text(ty: &str) -> String {
+    ilang_syntax::syn3::parse_type(ty)
+        .map(|ty| ilang_syntax::syn3::print_annotation(&ty))
+        .unwrap_or_else(|_| ty.to_string())
+}
+
 fn with_type(name: &str, ty: Option<&str>) -> String {
     match ty {
-        Some(t) => format!("{name}: {t}"),
+        Some(t) => format!("{name} : {}", annotation_text(t)),
         None => name.to_string(),
     }
 }

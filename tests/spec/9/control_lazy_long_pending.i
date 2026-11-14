@@ -7,7 +7,7 @@
 	i/fail
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -49,9 +49,9 @@ test("cancel_long_pending", () {
 	)
 })
 
-Step = (Continuation(Nil, Step, Int, Never))
+Step = (Continuation(Nil, StepSum, Int, Never))
 Fin = ()
-Step = Step | Fin
+StepSum = Step | Fin
 
 keep2 = (t) { t |> (Fin) { Fin } | (t) { t } }
 

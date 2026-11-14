@@ -134,7 +134,7 @@ below through wasm.exports. num/math is the float copy above, with fast_sin
 added to its exports and this wrapper appended:
 
 ```i
-fast_sin = (x: Float) -> Float {
+fast_sin = (x : Float) -> Float {
 	fast_sincos(x, False) |> (Some(v)) { v } | (None) { x }
 }
 ```
@@ -157,9 +157,9 @@ the certified branch. Production sin keeps its interval fallback.
 	tuples
 	closures
 )
-identity = (x: Float) -> Float { x }
-fast = (x: Float) -> Float { math.fast_sin(x) }
-horner = (x: Float) -> Float {
+identity = (x : Float) -> Float { x }
+fast = (x : Float) -> Float { math.fast_sin(x) }
+horner = (x : Float) -> Float {
 	a = 0.125 *. x +. 0.25
 	b = a *. x +. 0.375
 	c = b *. x +. 0.5
@@ -202,34 +202,34 @@ xs = [
 	0.875,
 	1.0,
 ]
-dot_go = (as: List(Float), bs: List(Float), sum: Float) -> Float {
+dot_go = (as : List(Float), bs : List(Float), sum : Float) -> Float {
 	as |>
 		([]) { sum }
 		| ([a, ..at]) {
 			bs |> ([]) { sum } | ([b, ..bt]) { dot_go(at, bt, sum +. a *. b) }
 		}
 }
-dot = (x: Float) -> Float { dot_go(xs, xs, x) }
-int_go = (n: Int, acc: Int) -> Int {
+dot = (x : Float) -> Float { dot_go(xs, xs, x) }
+int_go = (n : Int, acc : Int) -> Int {
 	{ n == 0 } |> (True) { acc } | (False) { int_go(n - 1, acc + n) }
 }
-integer = (x: Float) -> Float {
+integer = (x : Float) -> Float {
 	core.to_float(
 		int_go(128, core.truncate(x)),
 	)
 }
-pair = (x: Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }
-tuples = (x: Float) -> Float {
+pair = (x : Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }
+tuples = (x : Float) -> Float {
 	(a, b) = pair(x)
 	(c, d) = pair(a +. b)
 	(e, f) = pair(c +. d)
 	e +. f
 }
-fold = <A, B>(items: List(A), acc: B, f: (B, A) -> B) -> B {
+fold = <A, B>(items : List(A), acc : B, f : (B, A) -> B) -> B {
 	items |> ([]) { acc } | ([a, ..rest]) { fold(rest, f(acc, a), f) }
 }
-closures = (x: Float) -> Float {
-	fold(xs, 0.0, (acc: Float, v: Float) -> Float { acc +. v *. x })
+closures = (x : Float) -> Float {
+	fold(xs, 0.0, (acc : Float, v : Float) -> Float { acc +. v *. x })
 }
 ```
 
@@ -266,9 +266,9 @@ f64.const 0x1.fffffffffffffp+1023
 f64.le
 ```
 
-Full evidence: `target/numeric/horner-o2-hot.wat:2–28`;
-`integer-o2-hot.wat:31–80`; tuple helper `tuples-o2-hot.wat:71`;
-fold handler `closures-o2-hot.wat:132`. O0 executes runtime paths at
+Full evidence: `target/numeric/horner-o2-hot.wat : 2–28`;
+`integer-o2-hot.wat : 31–80`; tuple helper `tuples-o2-hot.wat : 71`;
+fold handler `closures-o2-hot.wat : 132`. O0 executes runtime paths at
 `runtime/core.rs:11–24`, `runtime/values.rs:52–73`,
 `runtime/bigint.rs:220–228,260–268,304–311`. Each kernel has its own retained
 O0/O2 hot WAT file, including sine and dot.
@@ -288,25 +288,25 @@ local-cse requires O3 or shrink level 1 (lines 725–728). GUFA is registered
 “tuple-optimization” (lines 698–702) does not invent multivalue signatures for
 i's heap tuples.
 
-`Heap2Local.cpp:99–110,317–332` requires nonescaping allocations and exclusive
+`Heap2Local.cpp : 99–110,317–332` requires nonescaping allocations and exclusive
 uses; a return or unrecognized use such as a call escapes. Array accesses need
 constant indexes (`:447–460`). It can remove a box when construction and all
 reads become visible inside one function. It cannot generally unbox surviving
 reference parameters/results. Signature refinement narrows reference types,
-not eqref to f64 (`SignatureRefining.cpp:18–24,205–260`). O2 inlining stops at the 20-expression always-inline limit
-for multiply-used, nontrivial helpers (`Inlining.cpp:148–195`); checking,
+not eqref to f64 (`SignatureRefining.cpp : 18–24,205–260`). O2 inlining stops at the 20-expression always-inline limit
+for multiply-used, nontrivial helpers (`Inlining.cpp : 148–195`); checking,
 allocation and shadow operations increase their size. Closure calls can be
 split for capture before Binaryen runs (`control.rs:273–304`); later resolving
 a call does not rerun i's control analysis. These measured survivors motivate
 earlier lowering; Binaryen does have useful GC optimizations.
 
 The independent review linked a scratch driver against the pinned Binaryen
-with the compiler's O2 settings (`/tmp/review-num/opt.cpp:10–16`). Its local
+with the compiler's O2 settings (`/tmp/review-num/opt.cpp : 10–16`). Its local
 visibility probe constructs a Float box, reads it for multiplication, checks
 finiteness, then constructs and reads a second box
-(`/tmp/review-num/box-visible.wat:3–9`). Default optimization removes both boxes
+(`/tmp/review-num/box-visible.wat : 3–9`). Default optimization removes both boxes
 and retains the multiplication and finite check
-(`/tmp/review-num/box-visible-o2.wat:4–17`). This is the review's observation,
+(`/tmp/review-num/box-visible-o2.wat : 4–17`). This is the review's observation,
 confirmed by reading those inputs/outputs; it does not prove a cross-function
 representation rewrite. N0 must first try emission that makes construction and
 consumption visible together, then measure on the real kernels before adding
@@ -890,21 +890,24 @@ task and stress cases as well as these negative cases.
 A compiled/run saved-scalar counterexample:
 
 ```i
-(i/core, i/control)
+(
+	i/core
+	i/control
+)
 probe = () {
-  control.boundary((b) {
-    x = -.0.0
-    n = 1073741823
-    y = control.suspend(b, (k) { control.resume(k, 2.0) })
-    (core.float_to_bits(x), n + 1, y +. x)
-  })
+	control.boundary((b) {
+		x = -.0.0
+		n = 1073741823
+		y = control.suspend(b, (k) { control.resume(k, 2.0) })
+		(core.float_to_bits(x), n + 1, y +. x)
+	})
 }
 ```
 
 A tail-adapter counterexample (scratch passes generic id as f):
 
 ```i
-relay = (f: (Float) -> Float, n: Int, x: Float) -> Float {
+relay = (f : (Float) -> Float, n : Int, x : Float) -> Float {
 	{ n == 0 } |> (True) { f(x) } | (False) { relay(f, n - 1, x) }
 }
 ```
@@ -951,16 +954,16 @@ first-stop order, negative sqrt and cancellation finals. Their O0/O2 status and
 complete output matched. Representative sources:
 
 ```i
-f = (x: Float) -> Float {
-  unused = x *. x
-  0.0
+f = (x : Float) -> Float {
+	unused = x *. x
+	0.0
 }
 
 main = () { f(1.0e308) }
 ```
 
 This stops at the multiplication; removing the unused box must not remove that
-check. `pair = (x: Float) { (0.0, x *. x) }` followed by projection of part zero
+check. `pair = (x : Float) { (0.0, x *. x) }` followed by projection of part zero
 also stops in the second field, retaining the non-tail caller in its trace.
 The cancellation final sees text `-0.0, 9223372036854775808`; its closure values
 cannot be replaced by truncated integers or unsigned zero. Negative sqrt stops
@@ -1035,23 +1038,25 @@ indentation so the expected columns below remain exact. This is the review's
 three-function program (`/tmp/review-num/trace/src/main.i:1–18`):
 
 ```i
-(i/control)
-g = (b, x: Float) -> Float {
- y = control.suspend(b, (k) { control.resume(k, 1.0) })
- x *. x +. y
+(
+	i/control
+)
+g = (b, x : Float) -> Float {
+	y = control.suspend(b, (k) { control.resume(k, 1.0) })
+	x *. x +. y
 }
-f = (b, x: Float) -> Float {
- y = g(b, x)
- y +. 0.25
+f = (b, x : Float) -> Float {
+	y = g(b, x)
+	y +. 0.25
 }
-h = (b, x: Float) -> Float {
- y = f(b, x)
- y +. 0.5
+h = (b, x : Float) -> Float {
+	y = f(b, x)
+	y +. 0.5
 }
 
 main = () {
- control.boundary((b) { h(b, 1.0e308) })
- Nil
+	control.boundary((b) { h(b, 1.0e308) })
+	Nil
 }
 ```
 

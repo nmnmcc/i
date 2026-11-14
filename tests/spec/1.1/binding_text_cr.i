@@ -4,8 +4,7 @@
 // at: spec/main:9:3
 
 // The source text of the pattern has `\n` for each `\r`.
-
 main = () {
-  [a,b] = [1]
-  Nil
+	[a, b] = [1]
+	Nil
 }
