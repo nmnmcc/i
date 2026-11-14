@@ -1,5 +1,88 @@
 ---
 title: Files
+description: Write and read a project file, remove it, and handle missing paths.
 ---
 
-to be written
+This guide writes a file in the project directory, reads it back, and removes it. It then handles a missing file as a value. It assumes the tour's [services and errors](/docs/tour/services-and-errors) and a directory where you can create files.
+
+Create `guide-files/` at the root of a repository checkout, with this `i.toml`. Run commands from that directory.
+
+```toml
+name = "guide_files"
+
+[dependencies]
+std = { path = "../std" }
+```
+
+Put this complete program in `src/main.i`:
+
+```i run
+(
+	i/fs
+	i/stdio
+	std/path
+	std/bit_array
+)
+main = () {
+	file = path.join([".", "guide-note.txt"])
+	fs.write_file(file, <<"hello from a file":utf8>>)
+	bytes = fs.read_file(file)
+	fs.remove(file)
+	Ok(text) = bit_array.to_string(bytes)
+	stdio.print(file)
+	stdio.print(text)
+}
+```
+
+```text
+guide-note.txt
+hello from a file
+```
+
+Run it with `i run`. `fs.write_file` creates the file or truncates an existing one. Use the example's filename only for this exercise. `fs.read_file` returns bytes, and `bit_array.to_string` checks that those bytes are UTF-8. The file is removed before the conversion and printing, so successful runs leave no data file behind and print the same result each time.
+
+The bytes come from the read, rather than from the original string. `write_file` and `read_file` open and close their handles internally. For operations on an open handle, use `fs.open`, `fs.read`, `fs.write`, and `fs.close`; see the tour's [resources](/docs/tour/resources) for arranging a release around a use.
+
+## Handle a missing file and clean a path
+
+Replace `src/main.i` with this program. It creates and removes its own file first, so the missing-file result does not depend on a previous run.
+
+```i run
+(
+	i/fs
+	i/fail
+	i/stdio
+	std/path
+)
+main = () {
+	file = path.join([".", "guide-missing.txt"])
+	// Create and remove it so the missing-file case is repeatable.
+	fs.write_file(file, <<>>)
+	fs.remove(file)
+	fail.catch(() { fs.read_file(file) }) |>
+		(
+			Error(
+				fs.FsError(operation = operation, path = missing, code = code),
+			)
+		) { stdio.print(operation <> ": " <> missing <> ": " <> code) }
+		| (Ok(_)) { panic("expected a missing file") }
+	stdio.print(path.clean("reports/./draft/../result.txt"))
+	stdio.print(path.dir("reports/result.txt"))
+	stdio.print(path.base("reports/result.txt"))
+}
+```
+
+```text
+open: guide-missing.txt: not_found
+reports/result.txt
+reports
+result.txt
+```
+
+`fail.catch` turns the raised `FsError` into an `Error` result. The error records an operation, a path, and a string code. Here the operation is `open`: reading the whole file first tries to open it. Keep those fields when reporting an error instead of treating every failure as a missing file.
+
+`std/path` works on POSIX path strings. Only `/` separates names. `join` combines parts and cleans the result; `clean` removes dot segments and resolves lexical parents. `dir` gets the cleaned directory part, and `base` gets the final name. These functions do not query the filesystem or resolve symbolic links. Relative paths in these runs refer to the working directory; run from the project directory to put the file there.
+
+## See also
+
+The [IO operations, §9.12](/docs/standard/generated/chapter-9#section-9-12) list the filesystem functions. Continue with [HTTP service](/docs/guides/http-service) to handle requests, or [testing](/docs/guides/testing) to check code without depending on real IO.
