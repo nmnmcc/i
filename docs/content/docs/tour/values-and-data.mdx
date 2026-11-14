@@ -3,7 +3,7 @@ title: Values and data
 description: Define names and build immutable numbers, strings, records, tuples, lists, and labelled values.
 ---
 
-Values are the things a program works with: numbers, text, functions, and data built from other values. This page shows how to bind a value to a name, combine values, and inspect the result. You can use these forms to describe the data your functions receive and return.
+Build data from numbers and text, then create updated values without changing the originals.
 
 ```i run package=tour title="src/main.i"
 (
@@ -12,7 +12,10 @@ Values are the things a program works with: numbers, text, functions, and data b
 )
 
 main = () {
+	// A local name starts here.
 	answer = 42
+	line_count2 = answer
+	_unused = line_count2
 	stdio.print(core.inspect(answer))
 }
 ```
@@ -21,13 +24,9 @@ main = () {
 42
 ```
 
-## Names and definitions
+`core.inspect` returns a `String`; use it to print values other than strings.
 
-`answer = 42` is a binding: it gives the name `answer` the value `42`. A local name is available from the next statement to the end of its block. Names use lowercase letters, digits, and underscores, starting with a lowercase letter or one underscore; `answer`, `line_count`, and `_unused` are examples.
-
-There are no keywords. `main` is a name, and `=` is the symbol for a binding. A comment starts with `//` and ends at the line end. The braces around the body of `main` form a block; its final expression gives its value.
-
-`core.inspect` takes any value and returns its text form as a `String`. Here, `stdio.print` prints that string. Inspection is useful when learning a new data form: it shows strings with quotes and lists with brackets.
+A local name is available after its binding until the block ends; names such as `answer`, `line_count`, and `_unused` need no declarations.
 
 ## Integers
 
@@ -40,6 +39,7 @@ There are no keywords. `main` is a name, and `=` is the symbol for a binding. A 
 main = () {
 	whole = 1_000 + 0x10
 	stdio.print(core.inspect(whole))
+	stdio.print(core.inspect((0o10, 0b10, 3 * 4 - 2)))
 	stdio.print(core.inspect(7 / 2))
 	stdio.print(core.inspect(7 % 2))
 	stdio.print(core.inspect(-7 / 2))
@@ -48,12 +48,13 @@ main = () {
 
 ```text
 1016
+(8, 2, 10)
 3
 1
 -3
 ```
 
-An `Int` is a whole number of any size; it does not overflow. Write decimal digits, or use `0x`, `0o`, and `0b` for hexadecimal, octal, and binary. Underscores separate digit groups. Integer arithmetic uses `+`, `-`, `*`, `/`, and `%`; division rounds toward zero, and `%` gives the remainder.
+`Int` has no size limit or overflow; division rounds toward zero.
 
 ## Floats
 
@@ -67,6 +68,7 @@ main = () {
 	stdio.print(core.inspect(7.0 /. 2.0))
 	stdio.print(core.inspect(1.5 +. 2.0))
 	stdio.print(core.inspect(-.1.5))
+	stdio.print(core.inspect(3.0 -. 1.0 *. 2.0))
 	stdio.print(
 		core.inspect(core.to_float(7)),
 	)
@@ -77,12 +79,13 @@ main = () {
 3.5
 3.5
 -1.5
+1.0
 7.0
 ```
 
-A `Float` is a finite binary64 number. Its arithmetic uses separate operators: `+.`, `-.`, `*.`, and `/.`. Negation is `-` for an integer and `-.` for a float. There is no implicit conversion between the two number types; `core.to_float` converts an integer explicitly.
+`Float` holds finite binary64 numbers; integer and float arithmetic use separate operators, with explicit conversion between the types.
 
-## Strings and interpolation
+## Strings
 
 ```i run package=tour title="src/main.i"
 (
@@ -95,6 +98,7 @@ main = () {
 	stdio.print("Hello, \(name)!")
 	stdio.print("count: \(core.inspect(3))")
 	stdio.print("a" <> "b")
+	stdio.print(#"a\nb"#)
 }
 ```
 
@@ -102,9 +106,12 @@ main = () {
 Hello, Ada!
 count: 3
 ab
+a\nb
 ```
 
-A `String` holds Unicode text. Double quotes enclose an ordinary string, and `<>` joins strings. Interpolation writes an expression inside `\(…)`. That expression must already return a string: `name` does, while the integer `3` needs `core.inspect` first.
+Strings hold Unicode text; interpolation requires a string result, so numbers need conversion first.
+
+The hashes in the raw string keep `\n` literal.
 
 ## Multi-line strings
 
@@ -127,11 +134,9 @@ main = () {
 "first\nsecond"
 ```
 
-A multi-line string opens with three quotes followed immediately by a line break. The closing quotes stand on their own line. Their indentation is removed from each content line; the opening and closing line breaks are left out of the value. The inspected output makes the remaining line break visible as `\n`. The formatter rewrites this string as `"first\nsecond"`, using an escape for the line break.
+The closing delimiter’s indentation is removed, along with the opening and closing line breaks; `i fmt` rewrites this value as an escaped single-line string.
 
-Strings also have raw forms and other escapes.
-
-## Records, tuples, and updates
+## Record updates
 
 ```i run package=tour title="src/main.i"
 (
@@ -142,26 +147,46 @@ Strings also have raw forms and other escapes.
 main = () {
 	original = (name = "Ada", score = 4)
 	updated = (..original, score = original.score + 1)
-	pair = (original.name, updated.score)
 	stdio.print(core.inspect(original))
 	stdio.print(core.inspect(updated))
-	stdio.print(core.inspect((pair.0, pair.1)))
-	stdio.print(core.inspect(("one")))
 }
 ```
 
 ```text
 (name = "Ada", score = 4)
 (name = "Ada", score = 5)
-("Ada", 5)
-("one")
 ```
 
-A **record** is data with labelled fields, such as `name` and `score`. Read a field with `.name`. A **tuple** is data with numbered positions; `.0` reads its first position. Both are forms of data written with parentheses, and positions count from zero. The number of positions and the set of labels together are its **shape**. Labels name fields, rather than creating local bindings.
+Values are immutable; the spread creates new data, and a later field replaces the copied field.
 
-Every value is immutable, including every record, list, and string. “Changing” a record means making another record. The spread `..original` copies its fields into new data; the later `score = …` replaces that field in the new value. The original record still has score `4`, as the first output line shows.
+Field labels do not create local bindings.
 
-An empty data value is `()`. One positional item still makes data: `("one")` is a one-position tuple, whose inspected form retains the parentheses. Use braces to group an expression rather than putting it in a tuple.
+## Tuples
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	player = (name = "Ada", score = 5)
+	pair = (player.name, player.score)
+	stdio.print(core.inspect((pair.0, pair.1)))
+	stdio.print(core.inspect(("one")))
+	stdio.print(core.inspect(()))
+}
+```
+
+```text
+("Ada", 5)
+("one")
+()
+```
+
+A single parenthesized item is still data; use braces for expression grouping.
+
+Positions count from zero; positions and labels together give data its shape.
 
 ## Lists
 
@@ -186,7 +211,7 @@ main = () {
 []
 ```
 
-A list is an ordered sequence written `[a, b, c]`. `[]` is empty, and `[x, ..tail]` puts `x` before the items of `tail`, leaving `tail` unchanged.
+The rest of a list is another list, which can be reused unchanged.
 
 ## Booleans
 
@@ -197,10 +222,11 @@ A list is an ordered sequence written `[a, b, c]`. `[]` is empty, and `[x, ..tai
 )
 
 main = () {
+	ready : Bool = True
 	left = 5 + 2
 	right = 1 + 1
 	stdio.print(
-		core.inspect((True && False, True || False, core.not(True))),
+		core.inspect((ready && False, ready || False, core.not(ready))),
 	)
 	stdio.print(core.inspect((left > right, 1.5 <. 2.0)))
 	stdio.print(core.inspect((left == right, left != right)))
@@ -213,7 +239,7 @@ main = () {
 (False, True)
 ```
 
-The boolean values are `True` and `False`, with type `Bool`. `&&` and `||` combine them; `core.not` reverses a boolean. Integer comparisons use `<`, `<=`, `>`, and `>=`; float comparisons add a dot. Equality uses `==`, and inequality uses `!=`.
+Float ordering operators carry a dot, as their arithmetic operators do; `<=`, `>=`, `<=.`, and `>=.` also include equality.
 
 ## Labelled data
 
@@ -239,9 +265,9 @@ Present(7)
 Absent
 ```
 
-A **labelled type** gives data its own identity. `Present = (Int)` defines a labelled type and its **constructor** `Present`, which wraps an integer. `Absent = ()` defines a labelled value with no fields: write `Absent`, without calling it.
+`Present` adds an identity to its payload; the empty constructor `Absent` is already a value.
 
-A **union** contains values from any of its member types. `Maybe` names the closed union `Present | Absent`; its values come from those two alternatives. The annotation `found : Maybe` says that `found` belongs to this union. The [types page](/docs/tour/types-and-inference) explains annotations and the difference between naming a union and defining a labelled type.
+The union adds no wrapper; [annotations](/docs/tour/types-and-inference#annotations) can name that union.
 
 ## Bit arrays
 
@@ -265,8 +291,8 @@ main = () {
 11
 ```
 
-A bit array is a sequence of bits, written between `<<` and `>>`. An unmarked integer segment takes eight bits; `:u3` takes three unsigned bits, so this value has eleven bits. Bit arrays support explicit widths, byte order, and text encodings.
+Segments also support explicit byte order and text encodings.
 
-## See also
+## Further reading
 
-Next: [Functions and branches](/docs/tour/functions-and-branches).
+[Functions and branches](/docs/tour/functions-and-branches).

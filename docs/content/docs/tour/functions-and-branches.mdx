@@ -3,7 +3,7 @@ title: Functions and branches
 description: Call function values, choose with branches, match patterns, and repeat work with recursion.
 ---
 
-Functions turn arguments into results. Branches choose a result by matching patterns against those arguments. This page shows how calls, blocks, patterns, and pipelines fit together, so you can write choices and repeated work without control-flow keywords.
+Pass work to functions, choose results with patterns, and repeat work with recursion.
 
 ```i run package=tour title="src/main.i"
 (
@@ -23,9 +23,9 @@ main = () {
 9
 ```
 
-`(x) { x * x }` is a function value. `square` names it, and `square(3)` calls it. The parameters and body are required; their types can be inferred. A function is a value that you can pass to another function.
+Parameter and result types can be inferred.
 
-## Passing a function
+## Function arguments
 
 ```i run package=tour title="src/main.i"
 (
@@ -34,19 +34,19 @@ main = () {
 )
 
 apply = (f, x) { f(x) }
-add_two = (x) { x + 2 }
+square = (x) { x * x }
 
 main = () {
-	result = apply(add_two, 3)
+	result = apply(square, 3)
 	stdio.print(core.inspect(result))
 }
 ```
 
 ```text
-5
+9
 ```
 
-`apply` receives a function and calls it. The name `add_two` supplies the function value; `add_two(3)` would supply the result of calling it instead.
+A function name supplies the function value; a call supplies its result.
 
 ## Labelled arguments
 
@@ -64,7 +64,7 @@ main = () { stdio.print(greet("Ada", punctuation = "!")) }
 Hello, Ada!
 ```
 
-An argument can have a label: `punctuation = ending` receives the argument under the label `punctuation` and binds it locally as `ending`. Labels use `=`, while an annotation such as `x : Int` states a type. There are no default arguments; every argument key must be supplied.
+`punctuation` is the caller’s label; `ending` is the local name, with no default value.
 
 ## Blocks
 
@@ -87,9 +87,9 @@ main = () {
 10
 ```
 
-A block executes its statements in order and gives the value of its final expression. The block bound to `result` therefore gives `10`. Its last statement must be an expression, rather than a binding. Braces also group a single expression. Parentheses make argument data or tuple data; they are not expression grouping.
+The final statement must be an expression; braces also group expressions, while parentheses make data.
 
-## Choosing with branches
+## Branches
 
 ```i run package=tour title="src/main.i"
 (
@@ -100,34 +100,84 @@ A block executes its statements in order and gives the value of its final expres
 size = (n : Int) {
 	n |> (0 | 1) { "small" } | (x ? x < 0) { "negative" } | (_) { "large" }
 }
-kind = (value : { Int | String }) {
-	value |> (n : Int) { core.inspect(n) } | (s : String) { s }
-}
 
 main = () {
-	stdio.print(
-		core.inspect((size(0), size(1), size(-2), size(5))),
-	)
-	stdio.print(
-		core.inspect((kind(7), kind("text"))),
-	)
-	{ 2 < 3 } |> (True) { stdio.print("yes") } | (False) { stdio.print("no") }
+	stdio.print(core.inspect((size(0), size(1), size(-2), size(5))))
 }
 ```
 
 ```text
 ("small", "small", "negative", "large")
+```
+
+A chain tries branches in order; `?` tests a guard after matching.
+
+Guards do not prove coverage; `_` covers the remaining inputs, and alternative patterns must bind the same names.
+
+## Type tests
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+kind = (value : { Int | String }) {
+	value |> (n : Int) { core.inspect(n) } | (s : String) { s }
+}
+
+main = () {
+	stdio.print(core.inspect((kind(7), kind("text"))))
+}
+```
+
+```text
 ("7", "text")
+```
+
+In a chain, the annotations test union members; a single ordinary parameter annotation instead constrains the accepted argument.
+
+## Conditions
+
+```i run package=tour title="src/main.i"
+(
+	i/stdio
+)
+
+main = () {
+	{ 2 < 3 } |> (True) { stdio.print("yes") } | (False) { stdio.print("no") }
+}
+```
+
+```text
 yes
 ```
 
-`value |> (pattern) { body } | …` matches `value` against a **chain**, one function made from branches joined by `|`. A **guard** is the optional boolean condition after `?`. The match tries branches in order and takes the first matching branch whose guard succeeds. This is the language's form for choosing: there are no `if`, `else`, or `switch` keywords. For a condition, match the boolean values `True` and `False`.
+Choices need no control-flow keywords.
 
-`|>` passes its left value as one positional argument to the chain. Inside a parameter item, `0 | 1` gives alternative patterns; each alternative must bind the same names. A guard is tested after its pattern matches. A guarded branch does not count toward proving that every input has a branch, so `size` ends with the catch-all `_`, which accepts any value.
+## Tuple patterns
 
-In the multi-branch match in `kind`, `n : Int` and `s : String` are type tests. They select the member of the incoming union and bind its value. In an ordinary single-branch parameter group, `x : Int` instead annotates the accepted argument type. Union annotations need braces, as on `value` above.
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
 
-## Taking data apart
+main = () {
+	pair = (4, 5)
+	(a, __unused) = pair
+	(left, right) = whole = pair
+	stdio.print(core.inspect((a, left, right, whole)))
+}
+```
+
+```text
+(4, 4, 5, (4, 5))
+```
+
+`__unused` discards without binding; the conjunction matches one value with both patterns.
+
+## Constructor patterns
 
 ```i run package=tour title="src/main.i"
 (
@@ -140,39 +190,42 @@ Empty = ()
 unpack = (value : { Item | Empty }) {
 	value |> (Item(value = n)) { n } | (Empty) { 0 }
 }
+
+main = () {
+	stdio.print(core.inspect((unpack(Item(value = 8)), unpack(Empty))))
+}
+```
+
+```text
+(8, 0)
+```
+
+Labelled constructor fields need labels in their patterns.
+
+## List patterns
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
 list_parts = (xs : List(Int)) {
 	xs |> ([]) { (0, []) } | ([x]) { (x, []) } | ([x, ..rest]) { (x, rest) }
 }
 
 main = () {
-	pair = (4, 5)
-	(a, __unused) = pair
-	(left, right) = whole = pair
-	stdio.print(core.inspect((a, left, right, whole)))
-	stdio.print(
-		core.inspect((unpack(Item(value = 8)), unpack(Empty))),
-	)
-	stdio.print(
-		core.inspect((list_parts([]), list_parts([2]), list_parts([2, 3]))),
-	)
+	stdio.print(core.inspect((list_parts([]), list_parts([2]), list_parts([2, 3]))))
 }
 ```
 
 ```text
-(4, 4, 5, (4, 5))
-(8, 0)
 ((0, []), (2, []), (2, [3]))
 ```
 
-A name pattern binds the matched value. A discard, either `_` or a name starting with two underscores, matches without binding a name. The tuple pattern `(a, __unused)` takes two positions from `pair` and keeps only the first.
+Current limits: keyed data patterns (DOC1) and data-rest patterns (P13) are rejected; use field access and list rests ([known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
 
-A conjunction matches the same value with every part: `(left, right) = whole = pair` binds the two positions and also names the whole tuple.
-
-`Item(value = n)` is a constructor pattern: it matches the constructor and takes its labelled field. `Empty` matches the constructor with no fields. Constructor patterns must use labels for labelled fields. The ordinary data pattern `(a, b)` matches a tuple of that shape.
-
-List patterns distinguish `[]`, an exact list such as `[x]`, and a prefix with a rest such as `[x, ..rest]`. The rest is another list. `list_parts` returns the first item and the remaining list, with separate branches for empty and one-item lists. Data-rest patterns are not yet accepted by this compiler; list-rest patterns work as shown.
-
-## Text, literals, and bits
+## Text patterns
 
 ```i run package=tour title="src/main.i"
 (
@@ -183,54 +236,78 @@ List patterns distinguish `[]`, an exact list such as `[x]`, and a prefix with a
 prefix = (s : String) { s |> ("pre:" <> rest) { rest } | (_) { "no prefix" } }
 suffix = (s : String) { s |> (rest <> ".i") { rest } | (_) { "no suffix" } }
 middle = (s : String) { s |> ("[" <> rest <> "]") { rest } | (_) { "no pair" } }
-literal = (x : { Int | Float | String }) {
-	x |>
-		(-1) { "integer" }
-		| (-.1.5) { "float" }
-		| ("ok") { "string" }
-		| (_) { "other" }
-}
-packet = (bits : BitArray) {
-	bits |> (<<tag, body:bits>>) { (tag, body) } | (_) { (0, <<>>) }
-}
 
 main = () {
-	stdio.print(
-		core.inspect((prefix("pre:a"), suffix("main.i"), middle("[b]"))),
-	)
-	stdio.print(
-		core.inspect((literal(-1), literal(-.1.5), literal("ok"), literal(2))),
-	)
-	stdio.print(
-		core.inspect(packet(<<7, 8, 9>>)),
-	)
+	stdio.print(core.inspect((prefix("pre:a"), suffix("main.i"), middle("[b]"))))
 }
 ```
 
 ```text
 ("a", "main", "b")
-("integer", "float", "string", "other")
-(7, <<8, 9>>)
 ```
 
-A literal pattern matches an equal value. The examples include integer, float, and string literals, including the separate negative spellings `-1` and `-.1.5`. A final discard handles the remaining values.
+One binder captures the variable text; fixed parts cannot overlap, and patterns cannot interpolate.
 
-String patterns have one binder: `"pre:" <> rest` keeps the suffix, `rest <> ".i"` keeps the prefix, and `"[" <> rest <> "]"` keeps the middle. The fixed prefix and suffix must not overlap. Pattern strings do not interpolate expressions.
+## Literal patterns
 
-A bit-array pattern reads segments in order and must use all the bits. Here `tag` reads the first eight bits, and `body:bits` takes the rest. The catch-all handles inputs too short for the first byte.
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
 
-## Covering the subject
+literal = (x : { Int | Float | String }) {
+	x |> (-1) { "integer" } | (-.1.5) { "float" } | ("ok") { "string" } | (_) { "other" }
+}
 
-A multi-branch group, or a group with a guard, must cover every possible argument value. This module is rejected:
+main = () {
+	stdio.print(core.inspect((literal(-1), literal(-.1.5), literal("ok"), literal(2))))
+}
+```
+
+```text
+("integer", "float", "string", "other")
+```
+
+## Bit patterns
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+packet = (bits : BitArray) {
+	bits |> (<<tag, body:bits>>) { (tag, body) } | (_) { (0, <<>>) }
+}
+
+main = () {
+	stdio.print(core.inspect(packet(<<7, 8, 9>>)))
+	stdio.print(core.inspect(packet(<<>>)))
+}
+```
+
+```text
+(7, <<8, 9>>)
+(0, <<>>)
+```
+
+A bit pattern consumes the whole input; an unmarked segment reads eight bits.
+
+## Coverage
 
 ```i error E0516 package=tour title="src/main.i"
 describe = (n : Int) { n |> (0) { "zero" } | (1) { "one" } }
 main = () { describe(2) }
 ```
 
-Run `i check`. The checker reports **E0516** because no unguarded branch matches `2`. The annotation admits all integers, while the branches handle only `0` and `1`. Add an unguarded catch-all or narrow the accepted type.
+```text
+E0516
+```
 
-A single branch without a guard has a different rule: a pattern that may fail reports failure through `Assert`, rather than being checked for exhaustive coverage. For recoverable choices, write the complete branch chain; see [services and errors](/docs/tour/services-and-errors) for the service behavior.
+Add an unguarded catch-all or narrow the input.
+
+A lone unguarded branch instead reports a failed pattern through `Assert`; see [services](/docs/tour/services-and-errors).
 
 ## Recursion
 
@@ -255,11 +332,9 @@ main = () {
 6
 ```
 
-Repeated work uses recursion: a function calls itself with the next values. `sum` carries its changing total as an argument, with an empty-list branch to finish the loop. Its recursive call is the last work the branch does; this is **tail position**, and the call uses no additional stack.
+The recursive call is in tail position: no work follows it, so it uses no additional stack.
 
 ## Pipelines
-
-This is `examples/tour/src/main.i`, unchanged. Its constructors build an arithmetic expression; `eval` matches each constructor and recursively evaluates its parts.
 
 ```i run package=tour title="src/main.i"
 (
@@ -272,7 +347,6 @@ Num = (Int)
 Add = (Expr, Expr)
 Mul = (Expr, Expr)
 Expr = Num | Add | Mul
-// Inferred: (e: Expr) -> Int
 eval = (e) {
 	e |>
 		(Num(n)) { n }
@@ -291,11 +365,9 @@ main = () {
 42
 ```
 
-A pipeline passes its left value into position zero of the next call. The final line sends `expr` to `eval`, sends the integer result to `int.to_string`, and sends that string to `stdio.print`. These are ordinary function calls written in the order their results flow.
+`|>` passes a result to argument position zero of the next call.
 
-The [types page](/docs/tour/types-and-inference#inferring-the-evaluator) uses this same program to show the type inferred for `eval`.
-
-## Operators and grouping
+## Grouping
 
 ```i run package=tour title="src/main.i"
 (
@@ -314,12 +386,8 @@ main = () {
 20
 ```
 
-Multiplication binds more tightly than addition, giving `14`; braces change the grouping to give `20`. Operators at the same precedence associate left to right. Calls and field access bind more tightly than arithmetic, and the pipeline binds less tightly.
+Equal-precedence operators associate left to right; calls and fields bind above arithmetic, pipelines below it.
 
-## Current limits
+## Further reading
 
-The standard also allows a pattern to name the labelled parts of data, as in `(name = name, age = _)`. The compiler on this tree refuses such a pattern with E0101; until that is fixed, read a labelled part with `.name`. Rest patterns for data (`..rest` inside `( )`) are refused in the same way; list rests work as shown above. Both differences are recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (DOC1, P13).
-
-## See also
-
-Next: [Types and inference](/docs/tour/types-and-inference).
+[Types and inference](/docs/tour/types-and-inference).

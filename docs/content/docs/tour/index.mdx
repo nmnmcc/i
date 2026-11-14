@@ -3,7 +3,7 @@ title: A tour of the language
 description: Learn the language through small programs that you can run in one scratch project.
 ---
 
-This tour introduces i to programmers who already know another language, such as TypeScript, Go, Rust, or OCaml. Each page starts with a complete program, then explains the forms it uses. By the end, you can read an i module, write functions over your own data, and follow the later pages on services, tasks, and libraries.
+Run small programs and change one piece at a time.
 
 ```i run package=tour title="src/main.i"
 (
@@ -17,62 +17,107 @@ main = () { stdio.print("Hello from the tour!") }
 Hello from the tour!
 ```
 
-The opening group imports `i/stdio`; `main` is the program entry, and `stdio.print` writes a line. You do not need to understand the printing service yet. Keep that import and call while you experiment with the values between them. The [services and errors page](/docs/tour/services-and-errors) explains what printing needs from its caller.
+Install [i](/docs/getting-started/install), then run `i new tour` and `cd tour`; replace `src/main.i` with this program and run `i run`.
 
-## Run the examples
+Keep this scratch project; each example replaces the whole file.
 
-The tour assumes that `i` is installed and available in your shell. See [installation](/docs/getting-started/install) if it is not. It assumes familiarity with calling functions, basic types, and source files, but no previous knowledge of i or WebAssembly.
+## A name
 
-Make one scratch project:
+```i run package=tour title="src/main.i"
+(
+	i/stdio
+)
 
-```sh
-i new tour
-cd tour
+main = () {
+	name = "Ada"
+	stdio.print("Hello, \(name)!")
+}
 ```
 
-Replace `src/main.i` with the complete example above, then run it from the project directory:
-
-```sh
-i run
+```text
+Hello, Ada!
 ```
 
-The output is the text shown immediately below the example. Keep this project for the rest of the tour: replace `src/main.i` with each complete program in turn. Most examples on the first four pages use only the language-library modules under `i/…`. The evaluator examples also import `std/int`. For those examples, move the existing `std` entry in `i.toml` from `[dev-dependencies]` to `[dependencies]`, and set its path to the `std` directory in your checkout of the i repository. The [first-program guide](/docs/getting-started/first-program) explains the generated manifest.
+The import makes `stdio.print` available; `main` is the entry point.
 
-A fence marked `i run` is a complete program. A fence marked `i error` is a complete program that the checker rejects on purpose; use `i check` for it and compare the diagnostic with the explanation. Do not combine the programs into one file: each defines its own names and usually its own `main`.
+## Inspection
 
-Format your current program with:
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
 
-```sh
-i fmt
+main = () {
+	name = "Ada"
+	stdio.print(name)
+	stdio.print(core.inspect(name))
+}
 ```
 
-Formatting makes the line breaks and spaces consistent, which helps when comparing your code with the examples. To check it without running it, use `i check`. The [types page](/docs/tour/types-and-inference) also shows how to ask the checker for inferred types.
+```text
+Ada
+"Ada"
+```
 
-## Read in this order
+Use `core.inspect` to turn any value into a string.
 
-1. [Values and data](/docs/tour/values-and-data) introduces names, numbers, strings, records, lists, and labelled data.
-2. [Functions and branches](/docs/tour/functions-and-branches) explains calls, patterns, choices, recursion, and pipelines.
-3. [Types and inference](/docs/tour/types-and-inference) shows type definitions, annotations, generic functions, and the types inferred from code.
-4. [Services and errors](/docs/tour/services-and-errors) explains how functions state their needs and how callers provide them.
-5. [Resources](/docs/tour/resources) covers acquiring and releasing resources.
-6. [Concurrency](/docs/tour/concurrency) introduces structured tasks and communication between them.
-7. [Macros](/docs/tour/macros) shows how i code works with code.
-8. [Packages](/docs/tour/packages) explains modules, dependencies, and the package file.
+## Several lines
 
-The complete tour program is [examples/tour in the repository](https://github.com/nmnmcc/i/blob/main/examples/tour); the functions and types pages reuse its evaluator and pipeline.
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
 
-The pages build on one another, so follow the order on a first reading. The tour teaches a small working program at a time; the standard defines the language in full.
+main = () {
+	name = "Ada"
+	stdio.print("Hello, \(name)!")
+	stdio.print("Your score: \(core.inspect(6 * 7))")
+}
+```
 
-## Ideas behind the language
+```text
+Hello, Ada!
+Your score: 42
+```
 
-- **No keywords:** names, brackets, and symbols express definitions, calls, and branches.
-- **Immutable values:** every value stays the same, so an update constructs a new value.
-- **Explicit needs:** services are passed as needs and provided with `<-`.
-- **Structured concurrency only:** concurrent work belongs to the structure that starts it.
-- **No library is special to the compiler:** library APIs use the general language forms.
+`i check` checks a program without running it; `i error` examples elsewhere expect a diagnostic instead of successful execution.
 
-These ideas appear where the examples first need them. The language and its implementation are also under development; [contributing](/docs/contributing) explains how to report a problem or take part in the work.
+## Formatting
 
-## See also
+```i format package=tour title="src/main.i"
+(i/stdio)
+main=(){stdio.print("Hello!")}
+```
 
-Next: [Values and data](/docs/tour/values-and-data).
+```text
+(
+	i/stdio
+)
+main = () { stdio.print("Hello!") }
+```
+
+Run `i fmt` to format the current source.
+
+## Inferred types
+
+```i types package=tour title="src/main.i"
+greet = (name) { "Hello, \(name)!" }
+main = () { greet("Ada") }
+```
+
+```text
+tour/main.greet : (String) -> String
+tour/main.main : () -> String
+```
+
+Run `i check --types` to see the checker’s complete listing; the prefix identifies the package, module, and name.
+
+## Tour pages
+
+[Values and data](/docs/tour/values-and-data) → [Functions and branches](/docs/tour/functions-and-branches) → [Types and inference](/docs/tour/types-and-inference) → [Services and errors](/docs/tour/services-and-errors) → [Resources](/docs/tour/resources) → [Concurrency](/docs/tour/concurrency) → [Macros](/docs/tour/macros) → [Packages](/docs/tour/packages).
+
+For the evaluator’s `std/int` import, move `std` from `[dev-dependencies]` to `[dependencies]` in `i.toml` and set its path to your checkout’s `std` directory; see [the manifest guide](/docs/getting-started/first-program).
+
+The evaluator also lives in [examples/tour](https://github.com/nmnmcc/i/blob/main/examples/tour); [contributing](/docs/contributing) explains how to report problems.
