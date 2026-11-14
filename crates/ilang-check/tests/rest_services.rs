@@ -151,21 +151,36 @@ fn a_rest_head_declares_its_own_row_parameter() {
 }
 
 #[test]
-fn an_unused_fail_parameter_can_be_empty_but_a_real_error_cannot() {
-    let (types, errors) = checked(
-        "constrain = <E>(f: () <- (Fail(E)) -> Int) -> () -> Int { () { f() } }\npure = () { constrain(() { 42 })() }",
+fn an_unused_fail_parameter_keeps_its_service_key() {
+    // Decision 2: the declared Fail(E) need is real even at E = Never.
+    // Keep both original definitions as rejection cases; retain positive
+    // callback coverage by passing the need on and by supplying its value.
+    let original = "constrain = <E>(f: () <- (Fail(E)) -> Int) -> () -> Int { () { f() } }\npure = () { constrain(() { 42 })() }";
+    for source in [
+        original,
+        "raises = () <- (handler: Fail(String)) { handler.raise(\"error\") }\nconstrain = (f: () <- (Fail(String)) -> Int) -> () -> Int { () { f() } }",
+    ] {
+        let (_, errors) = checked(source);
+        assert!(
+            errors.iter().any(|e| e.contains("not a subtype")),
+            "{errors:#?}"
+        );
+    }
+    let forwarding = original.replace("-> () -> Int", "-> () <- (Fail(E)) -> Int");
+    let source = format!(
+        "{forwarding}\nprovided = () {{ constrain(() {{ 42 }})() <- (Fail(raise = (_: Never) {{ panic(\"unreachable\") }})) }}"
     );
+    let (shown, errors) = checked(&source);
     assert!(errors.is_empty(), "{errors:#?}");
     assert!(
-        types.iter().any(|t| t == "app/main.pure : () -> Int"),
-        "{types:#?}"
-    );
-    let (_, errors) = checked(
-        "raises = () <- (handler: Fail(String)) { handler.raise(\"error\") }\nconstrain = (f: () <- (Fail(String)) -> Int) -> () -> Int { () { f() } }",
+        shown
+            .iter()
+            .any(|t| t.starts_with("app/main.pure :") && t.contains("Fail(")),
+        "{shown:#?}"
     );
     assert!(
-        errors.iter().any(|e| e.contains("not a subtype")),
-        "{errors:#?}"
+        shown.iter().any(|t| t == "app/main.provided : () -> Int"),
+        "{shown:#?}"
     );
 }
 

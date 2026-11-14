@@ -12,7 +12,8 @@
 keep = control.keep
 
 Name = (text = String)
-Paused = (Continuation(Nil, Hop, Never))
+// Decision 2: keep's returned function retains the real Fail(Never) key.
+Paused = (Continuation(Nil, Hop, Fail(Never)))
 Done = (String)
 Hop = Paused | Done
 name = () <- (value: Name) { value.text }
