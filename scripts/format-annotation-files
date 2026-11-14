@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """One i fmt invocation over every repository .i/.is file, with tree equality.
 Invalid syntax fixtures are left unchanged by i fmt and included in the proof.
+The one-binding warning fixture keeps its diagnostic-sensitive double space.
 """
 import argparse
 import gzip
@@ -31,6 +32,10 @@ def main():
             f.write(json.dumps(dict(item, result=tree), ensure_ascii=False) + '\n')
     result = subprocess.run([str(args.binary), 'fmt', *paths], cwd=ROOT, text=True, capture_output=True)
     args.baseline.with_suffix('.fmt.log').write_text(result.stdout + result.stderr)
+    preserved = ['tests/spec/1.7/one_binding_warning.i']
+    for item in before:
+        if item['path'] in preserved:
+            (ROOT / item['path']).write_text(item['source'])
     after = [dict(item, source=(ROOT / item['path']).read_text()) for item in before]
     new = MIGRATE['parse'](after, args.driver)
     entries = []
@@ -44,6 +49,7 @@ def main():
     differences = [i for i in entries if not i['equal'] or not i['diagnostics_equal']]
     report = dict(files=len(entries), changed=sum(i['changed'] for i in entries),
                   invalid=sum(bool(i['diagnostics']) for i in entries), fmt_exit=result.returncode,
+                  preserved_diagnostic_fixtures=preserved,
                   baseline_sha256=hashlib.sha256(args.baseline.read_bytes()).hexdigest(),
                   differences=differences, entries=entries)
     args.report.write_text(json.dumps(report, indent=2) + '\n')

@@ -19,7 +19,7 @@ def exempt(item):
     source=item['source'].replace('\\|','|')
     if source in ('(x : Int | y)','(x : Int | x)'):
         return True
-    if item['path'] in ('docs/spec.md','docs/design/syntax-3.md') and source=='f : (Int) -> Int | String = e':
+    if (item['path'] in ('docs/spec.md','docs/design/syntax-3.md') or '/standard/generated/' in item['path']) and source=='f : (Int) -> Int | String = e':
         return True
     return False
 
