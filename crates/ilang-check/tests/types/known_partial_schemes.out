@@ -5,4 +5,4 @@ part : List(String)
 thunk : List(Int)
 tuple_pattern : List(String)
 unknown : (A) -> Never
-35:4: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u: User) { u.name }`, or give the function where a type is expected, for example `get_name: (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)
+35:4: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)

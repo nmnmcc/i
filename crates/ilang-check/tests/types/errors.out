@@ -28,7 +28,7 @@ bad_bits : BitArray
 25:14: error[E0501]: `(1, 2)` is not a subtype of `(Int)` (the type at 25:14 needs it)
 30:26: error[E0518]: a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here
 32:32: error[E0504]: a value of `1` could go to more than one type variable of `_ | _` (§4.4) (the type at 32:22 needs it)
-35:17: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u: User) { u.name }`, or give the function where a type is expected, for example `get_name: (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)
+35:17: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)
 37:16: error[E0506]: `.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`
 44:26: error[E0512]: not every constructor of `Shape` has a field with the label `radius` (§4.8 rule 13)
 51:1: error[E0509]: a top-level binding may not need an environment (§2.5), but this one has `Clock`

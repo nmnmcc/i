@@ -1,0 +1,43 @@
+{
+  "main": "e44514d4",
+  "merge": "09cfcaacc",
+  "old_reader": "e44514d4",
+  "static_contexts": 29743,
+  "inline_contexts": 36283,
+  "brace_sites": 8,
+  "pending_static": 0,
+  "pending_inline": 0,
+  "proofs": {
+    "braces": {
+      "differences": []
+    },
+    "inline": {
+      "inventoried": 36283,
+      "compared": 6,
+      "sites": 6,
+      "new_spec_examples": 11,
+      "differences": []
+    },
+    "files": {
+      "files": 2963,
+      "changed": 5,
+      "invalid": 100,
+      "fmt_exit": 1,
+      "baseline_sha256": "60f860fc09abb6b03c4cc20f3fc12621294c1322b517e9e5707d650b2de10607",
+      "differences": [],
+      "preserved_diagnostic_fixtures": [
+        "tests/spec/1.7/one_binding_warning.i"
+      ]
+    },
+    "snippets": {
+      "snippets": 39,
+      "hosts": {
+        "crates/ilang-check/tests/diagnostic_traps.rs": 3,
+        "docs/design/principality.md": 23,
+        "docs/design/std-v3-style.md": 6,
+        "docs/design/std-v3.md": 7
+      },
+      "differences": []
+    }
+  }
+}
