@@ -93,14 +93,7 @@ pub fn split(p: &mut Program) {
             if let Env::Local(l) = env {
                 needed.insert(l);
             }
-            let mut todo: Vec<Local> = needed.iter().copied().collect();
-            while let Some(l) = todo.pop() {
-                if let Some(&(Env::Local(from), _)) = defs.get(&l)
-                    && needed.insert(from)
-                {
-                    todo.push(from);
-                }
-            }
+            env_parents(&mut needed, &defs);
             let envs: Vec<EnvLink> = needed
                 .iter()
                 .map(|&l| {
@@ -136,9 +129,14 @@ pub fn split(p: &mut Program) {
         }
         for (k, path) in found.joins.iter().enumerate() {
             let j = found.first_join + k as JoinId;
+            let mut params = live.joins[&j].clone();
+            // A later point saves every link of its environment, including
+            // parents that the source no longer reads. Keep those parents
+            // across joins too, so its frame can capture and rebuild them.
+            env_parents(&mut params, &defs);
             p.joins.push(Join {
                 func: FuncId(i as u32),
-                params: live.joins[&j].iter().copied().collect(),
+                params: params.into_iter().collect(),
                 segment: cutter.segment(path),
                 locals: Vec::new(),
             });
@@ -325,6 +323,19 @@ fn env_defs(stmts: &[Stmt], out: &mut HashMap<Local, (Env, u32)>) {
         } = s
         {
             out.insert(*dst, (*env, *service));
+        }
+    }
+}
+
+/// Frame capture reads the ancestors of a live environment as well as the
+/// environment itself. Those implicit reads must survive every segment join.
+fn env_parents(live: &mut BTreeSet<Local>, defs: &HashMap<Local, (Env, u32)>) {
+    let mut todo: Vec<Local> = live.iter().copied().collect();
+    while let Some(l) = todo.pop() {
+        if let Some(&(Env::Local(from), _)) = defs.get(&l)
+            && live.insert(from)
+        {
+            todo.push(from);
         }
     }
 }
@@ -814,6 +825,80 @@ mod tests {
         );
         let text = crate::emit::wat(&p);
         assert!(text.contains("(struct.new $box (local.get $l1))"), "{text}");
+        let wasm = wat::parse_str(&text).unwrap();
+        crate::validate(&wasm).unwrap();
+    }
+
+    #[test]
+    fn joins_keep_environment_ancestors_for_later_capture() {
+        let mut p = Program {
+            funcs: vec![FuncKind::Code(Func {
+                name: "f".into(),
+                arity: 1,
+                budget_frame: 6,
+                locals: vec![
+                    LocalType::Value,
+                    LocalType::Env,
+                    LocalType::Env,
+                    LocalType::Env,
+                    LocalType::Value,
+                    LocalType::Value,
+                ],
+                body: vec![
+                    Stmt::LetEnv {
+                        dst: 1,
+                        env: Env::Param,
+                        service: 0,
+                        value: Atom::Nil,
+                        in_place: false,
+                    },
+                    Stmt::LetEnv {
+                        dst: 2,
+                        env: Env::Local(1),
+                        service: 1,
+                        value: Atom::Nil,
+                        in_place: false,
+                    },
+                    Stmt::LetEnv {
+                        dst: 3,
+                        env: Env::Local(2),
+                        service: 2,
+                        value: Atom::Nil,
+                        in_place: false,
+                    },
+                    Stmt::Block {
+                        label: 0,
+                        body: vec![Stmt::Let {
+                            dst: 4,
+                            value: Value::Call {
+                                callee: Callee::Value(Atom::Local(0)),
+                                args: vec![],
+                                env: Env::Local(3),
+                            },
+                            site: None,
+                        }],
+                    },
+                    Stmt::Let {
+                        dst: 5,
+                        value: Value::Call {
+                            callee: Callee::Value(Atom::Local(0)),
+                            args: vec![],
+                            env: Env::Local(3),
+                        },
+                        site: None,
+                    },
+                    Stmt::Return(Atom::Local(5)),
+                ],
+                frame: true,
+            })],
+            services: 3,
+            ..Program::default()
+        };
+        split(&mut p);
+        assert_eq!(p.joins.len(), 1);
+        assert_eq!(p.joins[0].params, vec![0, 1, 2, 3]);
+        assert_eq!(p.points[1].envs.len(), 3);
+        let text = crate::emit::wat(&p);
         let wasm = wat::parse_str(&text).unwrap();
         crate::validate(&wasm).unwrap();
     }
