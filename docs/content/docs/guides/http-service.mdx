@@ -1,5 +1,217 @@
 ---
 title: HTTP service
+description: Test a JSON request handler without a socket, then serve it over local HTTP.
 ---
 
-to be written
+This guide builds a local HTTP service with a health route and a JSON user route. You will test its request handler without a socket and then run the same handler in a server. It assumes [services and errors](/docs/tour/services-and-errors) and [concurrency](/docs/tour/concurrency).
+
+Create `guide-http/` at the root of the checkout, with this `i.toml`:
+
+```toml
+name = "guide_http"
+
+[dependencies]
+std = { path = "../std" }
+
+[test]
+collection = "std/test.tests"
+```
+
+## Write the handler
+
+A handler takes an `http.Request` and returns an `http.Response`. Put this complete module in `src/handler.i`:
+
+```i file=src/handler.i
+(
+	std/http
+	std/json
+	std/schema
+	std/bit_array
+)
+
+(
+	handle
+)
+User = (name = String)
+user_schema = () {
+	schema.field(
+		schema.object(User(name = "")),
+		"name",
+		schema.string,
+		(user) { user.name },
+		(_, name) { User(name = name) },
+	)
+}
+reply = (status, value) {
+	base = http.response(http.Status(status))
+	text = json.print(value)
+	http.Response(
+		..base,
+		headers = http.Headers([("Content-Type", "application/json")]),
+		body = <<text:utf8>>,
+	)
+}
+invalid = () { reply(422, json.Object([("error", json.Text("invalid user"))])) }
+handle = (req : http.Request) {
+	(req.method, req.target) |>
+		((http.Method("GET"), "/health")) {
+			reply(200, json.Object([("status", json.Text("ok"))]))
+		}
+		| ((http.Method("POST"), "/users")) {
+			bit_array.to_string(req.body) |>
+				(Ok(text)) {
+					schema.parse(user_schema(), text) |>
+						(Ok(user)) {
+							reply(
+								200,
+								schema.encode(user_schema(), user),
+							)
+						}
+						| (Error(_)) { invalid() }
+				}
+				| (Error(_)) { invalid() }
+		}
+		| (_) { reply(404, json.Object([("error", json.Text("not found"))])) }
+}
+```
+
+Put this complete test in `test/handler_test.i`:
+
+```i test
+(
+	testlib = (test) = std/test
+	std/http
+	guide_http/handler
+)
+test("health and missing route", () {
+	health = handler.handle(http.request(http.Method("GET"), "/health"))
+	assert(health.status == http.Status(200))
+	assert(http.body_text(health) == Ok("{\"status\":\"ok\"}"))
+	missing = handler.handle(http.request(http.Method("GET"), "/missing"))
+	assert(missing.status == http.Status(404))
+})
+test("JSON request", () {
+	http.Complete(req, <<>>) = http.feed_request(
+		<<>>,
+		<<
+			"POST /users HTTP/1.1\r\nContent-Length: 14\r\n\r\n{\"name\":\"Ada\"}":utf8,
+		>>,
+	)
+	response = handler.handle(req)
+	assert(response.status == http.Status(200))
+	assert(http.body_text(response) == Ok("{\"name\":\"Ada\"}"))
+	assert(
+		handler.handle(http.Request(..req, body = <<"{}":utf8>>)).status ==
+			http.Status(422),
+	)
+	assert(
+		handler.handle(http.Request(..req, body = <<"{":utf8>>)).status ==
+			http.Status(422),
+	)
+	assert(
+		handler.handle(http.Request(..req, body = <<255>>)).status ==
+			http.Status(422),
+	)
+})
+```
+
+```sh
+i test --opt 0
+i test --opt 2
+```
+
+Each run prints:
+
+```text
+pass guide_http/handler_test.health and missing route
+pass guide_http/handler_test.JSON request
+2 passed, 0 failed
+```
+
+The first test constructs requests directly with `http.request`. The second feeds a complete HTTP/1.1 request to `http.feed_request`, which returns the parsed request and any unconsumed bytes. Here the body is 14 bytes and no bytes remain. Neither test opens a socket.
+
+## Read and return JSON
+
+`Request` carries the method, target, headers, body bytes, and trailers. The handler matches the method and target together. These routes use exact target strings; `/health?x=1` does not match `/health`. For segment patterns and query-independent path matching, the library also provides `http.route`.
+
+The user route first checks UTF-8, then calls `schema.parse`. The schema maps a JSON object's required `name` field to a `User` value. Invalid UTF-8, malformed JSON, and an object missing that field all produce the tested 422 response. For a valid user, `schema.encode` produces a `json.Json` value; `json.print` supplies the bytes returned to the client. Responses set `Content-Type: application/json`, including errors.
+
+These operations are ordinary library calls. The handler needs no network service. Keeping it in its own module makes its inputs and outputs available to tests and to the server unchanged.
+
+## Start the service
+
+Keep `src/handler.i` exactly as above. Add this complete `src/main.i` to the same project:
+
+```i file=src/main.i
+(
+	i/net
+	i/task
+	i/stdio
+	std/http
+	guide_http/handler
+)
+main = () {
+	listener = net.listen("127.0.0.1", 18080)
+	stdio.print("listening on 127.0.0.1:18080")
+	task.run(() { http.serve(listener, handler.handle) })
+}
+```
+
+Start it by hand from `guide-http/`:
+
+```sh
+i run --opt 2
+```
+
+```text
+listening on 127.0.0.1:18080
+```
+
+This command keeps running. `net.listen` opens the local TCP listener; `http.serve` reads HTTP messages and calls `handler.handle` with the buffered request body. `task.run` supplies the task runner for the service. The library handles connections inside a structured task scope.
+
+In another terminal, run these commands. The `-w` option adds a newline and the HTTP status after each body.
+
+```sh
+curl -sS -w '\n%{http_code}\n' http://127.0.0.1:18080/health
+```
+
+```text
+{"status":"ok"}
+200
+```
+
+```sh
+curl -sS -w '\n%{http_code}\n' -H 'Content-Type: application/json' \
+  -d '{"name":"Ada"}' http://127.0.0.1:18080/users
+```
+
+```text
+{"name":"Ada"}
+200
+```
+
+```sh
+curl -sS -w '\n%{http_code}\n' -H 'Content-Type: application/json' \
+  -d '{}' http://127.0.0.1:18080/users
+```
+
+```text
+{"error":"invalid user"}
+422
+```
+
+```sh
+curl -sS -w '\n%{http_code}\n' http://127.0.0.1:18080/missing
+```
+
+```text
+{"error":"not found"}
+404
+```
+
+
+Stop the server with Ctrl-C when finished. The server and this curl transcript were checked by hand at `--opt 0` and `--opt 2`. The nonterminating server is deliberately a complete file example, not a `run` fence. The tested handler and the served handler are the same `src/handler.i` file.
+
+## See also
+
+Read [IO operations, §9.12](/docs/standard/generated/chapter-9#section-9-12) for `i/net`, and [tasks, §9.9](/docs/standard/generated/chapter-9#section-9-9) for the server's task lifetime. Continue with [testing](/docs/guides/testing) for generated tests and fake services.
