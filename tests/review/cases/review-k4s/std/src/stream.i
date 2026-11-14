@@ -53,10 +53,12 @@ new = <A, N>() -> Stream(A, Never, N) {
 }
 
 /// One item, followed by an empty tail.
-wrap = <A, N>(item: A) -> Stream(A, Never, N) { make(() { Next(item, new()) }) }
+wrap = <A, N>(item : A) -> Stream(A, Never, N) {
+	make(() { Next(item, new()) })
+}
 
 /// Builds one cell per pull, without walking the list at construction.
-from_list = <A, N>(items: List(A)) -> Stream(A, Never, N) {
+from_list = <A, N>(items : List(A)) -> Stream(A, Never, N) {
 	make(() { items |> ([]) { Done } | ([x, ..xs]) { Next(x, from_list(xs)) } })
 }
 
@@ -84,7 +86,7 @@ unfold = <S, A, E, N>(from: S, with: (S) <- N -> Option((A, S))) -> Stream(
 }
 
 /// Calls the stored step once. Repeated pulls do not cache or advance.
-pull = <A, E, N>(stream: Stream(A, E, N)) -> Step(A, E, N) {
+pull = <A, E, N>(stream : Stream(A, E, N)) -> Step(A, E, N) {
 	Stream(step, _) = stream
 	step()
 }
@@ -167,7 +169,7 @@ zip = <A, B, E, N>(first: Stream(A, E, N), second: Stream(B, E, N)) -> Stream(
 }
 
 /// Nonpositive bounds never pull the source, nor is the kth tail prefetched.
-take = <A, E, N>(from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N) {
+take = <A, E, N>(from : Stream(A, E, N), up_to : Int) -> Stream(A, E, N) {
 	make(() {
 		{ up_to <= 0 } |>
 			(True) { Done }
@@ -180,8 +182,8 @@ take = <A, E, N>(from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N) {
 }
 
 /// Skips only on demand; negative counts skip nothing.
-drop = <A, E, N>(from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N) {
-	seek = (source: Stream(A, E, N), n: Int) -> Step(A, E, N) {
+drop = <A, E, N>(from : Stream(A, E, N), up_to : Int) -> Stream(A, E, N) {
+	seek = (source : Stream(A, E, N), n : Int) -> Step(A, E, N) {
 		{ n <= 0 } |>
 			(True) { pull(source) }
 			| (False) {
@@ -211,9 +213,9 @@ take_while = <A, E, N>(
 
 /// Consumes in order, passing (accumulator, element).
 fold = <A, Acc, E, N>(
-	over: Stream(A, E, N),
-	from: Acc,
-	with: (Acc, A) <- N -> Acc
+	over : Stream(A, E, N),
+	from : Acc,
+	with : (Acc, A) <- N -> Acc
 ) -> Acc {
 	pull(over) |>
 		(Done) { from }
@@ -222,9 +224,9 @@ fold = <A, Acc, E, N>(
 
 /// Stop returns immediately without demanding the tail.
 fold_until = <A, Acc, E, N>(
-	over: Stream(A, E, N),
-	from: Acc,
-	with: (Acc, A) <- N -> list.ContinueOrStop(Acc)
+	over : Stream(A, E, N),
+	from : Acc,
+	with : (Acc, A) <- N -> list.ContinueOrStop(Acc)
 ) -> Acc {
 	pull(over) |>
 		(Done) { from }
@@ -236,7 +238,7 @@ fold_until = <A, Acc, E, N>(
 }
 
 /// Discards callback results; an infinite input may never finish.
-each = <A, B, E, N>(over: Stream(A, E, N), with: (A) <- N -> B) -> Nil {
+each = <A, B, E, N>(over : Stream(A, E, N), with : (A) <- N -> B) -> Nil {
 	fold(over, Nil, (_, x) {
 		with(x)
 		Nil
@@ -244,7 +246,7 @@ each = <A, B, E, N>(over: Stream(A, E, N), with: (A) <- N -> B) -> Nil {
 }
 
 /// Collects in order with one reversal, using O(k) space.
-to_list = <A, E, N>(stream: Stream(A, E, N)) -> List(A) {
+to_list = <A, E, N>(stream : Stream(A, E, N)) -> List(A) {
 	list.reverse(fold(stream, [], (acc, x) { [x, ..acc] }))
 }
 

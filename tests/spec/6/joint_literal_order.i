@@ -3,7 +3,7 @@
 // Joint J3: completed value types do not change labelled argument order.
 method = "GET"
 port = 8080
-take = (first: method, last: port) { (first, last) }
+take = (first : method, last : port) { (first, last) }
 
 main = () {
 	_ = {

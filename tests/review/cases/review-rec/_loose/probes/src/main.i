@@ -3,8 +3,8 @@
 	i/record
 )
 // Equivalent record unions preserve scalar and tuple subtyping.
-wrap = (x: Int | String) -> (a = Int | String) { (a = x) }
-wrap_union = (x: Int | String) -> (a = Int) | (a = String) { (a = x) }
+wrap = (x: { Int | String }) -> (a = Int | String) { (a = x) }
+wrap_union = (x: { Int | String }) -> (a = Int) | (a = String) { (a = x) }
 
 // Tuple subtyping applies beneath record fields.
 pair = () -> (data = (Int, Int)) | (error = String) { (data = (1, 2)) }

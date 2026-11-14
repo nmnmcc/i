@@ -7,12 +7,12 @@ User = (name = String)
 Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
-list_map = <A, B>(xs: List(A), f: (A) -> B) -> List(B) {
+list_map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
 	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..list_map(rest, f)] }
 }
 
 main = () {
-	opts: List(Option(User)) = [
+	opts : List(Option(User)) = [
 		Some(User(name = "Ada")),
 		None,
 		Some(User(name = "Bob")),

@@ -8,22 +8,22 @@
 
 Box(A) = (value = A)
 
-f = (s: String) {
+f = (s : String) {
 	x = "a" = s
 	t = (x, 0)
 	t.0
 }
 
-g = (s: String) {
+g = (s : String) {
 	x = "a" = s
 	Box(value = x).value
 }
 
-h = (xs: List(String)) { xs |> ([x = "a", ..]) { (x, 0).0 } | (_) { "" } }
+h = (xs : List(String)) { xs |> ([x = "a", ..]) { (x, 0).0 } | (_) { "" } }
 
 kind = ("a") { 1 } | ("b") { 2 }
 
-apply = <A, B>(x: A, f: (A) -> B) { (f, f(x)) }
+apply = <A, B>(x : A, f : (A) -> B) { (f, f(x)) }
 
 test("fitted", () {
 	assert(f("a") == "a")

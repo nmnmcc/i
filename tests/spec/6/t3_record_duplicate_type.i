@@ -5,6 +5,6 @@
 )
 
 main = () {
-	value: (name = Int, name = String) = (name = 1)
+	value : (name = Int, name = String) = (name = 1)
 	value
 }

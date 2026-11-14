@@ -130,7 +130,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
 
 #[test]
 fn syntax_crosses_the_compiler_export_without_losing_identity() {
-    let built = build("(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { x }\n");
+    let built = build("(syntax = i/syntax)\n(identity)\nidentity = (x : syntax.Syntax) { x }\n");
     let original = input();
     for _ in 0..2 {
         let result =
@@ -144,7 +144,7 @@ fn syntax_crosses_the_compiler_export_without_losing_identity() {
 #[test]
 fn untrusted_external_cannot_be_supplied_to_a_macro_instance() {
     let built = build(
-        "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect: () -> Nil\nidentity = (x: syntax.Syntax) { effect() x }\n",
+        "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect : () -> Nil\nidentity = (x : syntax.Syntax) { effect() x }\n",
     );
     let error = ilang_macro::run::invoke(&built, "app/main.identity", &[input()]).unwrap_err();
     assert!(format!("{error:#}").contains("instantiate macro program"));
@@ -157,7 +157,7 @@ fn compiler_export_is_checked_and_executed_with_syntax_services() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(syntax = i/syntax)\nidentity = (x: syntax.Syntax) { syntax.node(x) x }\n",
+        "(syntax = i/syntax)\nidentity = (x : syntax.Syntax) { syntax.node(x) x }\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -283,7 +283,7 @@ fn compiler_program_selects_only_the_macro_import_closure() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/unrelated.i"),
-        "@external(\"outside\", \"effect\")\neffect: () -> Int\ninitial = effect()\n",
+        "@external(\"outside\", \"effect\")\neffect : () -> Int\ninitial = effect()\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -318,7 +318,7 @@ fn compiler_run_preserves_uncatchable_macro_error_position() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.i"), "(syntax = i/syntax)\nreport = (x: syntax.Syntax) -> syntax.Syntax { syntax._report_error(\"bad macro\", x) }\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(syntax = i/syntax)\nreport = (x : syntax.Syntax) -> syntax.Syntax { syntax._report_error(\"bad macro\", x) }\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let (mut parsed, diagnostics) = ilang_check::parse(&graph);
@@ -639,9 +639,11 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
     );
     let definition = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "keep".into(),
         parameters: vec!["x".into()],
+        labels: vec![None],
     };
     let mut session = Session::default();
     let expanded = session
@@ -715,9 +717,11 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
     let definition = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "wrap".into(),
         parameters: vec!["x".into()],
+        labels: vec![None],
     };
     let argument = input();
     let templates: Arc<[Syntax]> = prepared.templates.into();
@@ -956,7 +960,7 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, use_int)\n(@ macro (= use_int (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `Int)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nx: m.use_int(Undefined)\nx = 1\n",
+        "(m = app/macros)\nx : m.use_int(Undefined)\nx = 1\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -1832,7 +1836,7 @@ fn checked_collection_validates_targets_and_duplicates() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(anchor)\nanchor = Nil\ngood = () { 42 }\nbad = (x: Int) { x }\nalias = good\n",
+        "(anchor)\nanchor = Nil\ngood = () { 42 }\nbad = (x : Int) { x }\nalias = good\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -1885,9 +1889,21 @@ fn checked_collection_validates_targets_and_duplicates() {
     assert_eq!(good.len(), 1);
     assert_eq!(program.def(good[0].target).name, "good");
     assert_eq!(good[0].data[0].1, "example");
+    // §6.6 and §14.5 call the initialized value, so an alias is a valid
+    // target. Keep scalar, nonempty-parameter and duplicate targets invalid.
+    let alias = collections::resolve(
+        &parsed,
+        program,
+        typed,
+        &[transaction(vec![request("alias")])],
+    )
+    .unwrap();
+    assert_eq!(alias.len(), 1);
+    assert_eq!(program.def(alias[0].target).name, "alias");
+    assert_eq!(alias[0].data[0].1, "example");
     for requests in [
         vec![request("bad")],
-        vec![request("alias")],
+        vec![request("anchor")],
         vec![request("good"), request("good")],
     ] {
         assert!(collections::resolve(&parsed, program, typed, &[transaction(requests)]).is_err());
@@ -2109,7 +2125,7 @@ fn shared_macro_code_reads_each_callers_definition_context() {
     for (module, ty, value) in [("a", "Int", "20"), ("b", "String", "\"b\"")] {
         std::fs::write(
             dir.path().join(format!("src/{module}.i")),
-            format!("(m = app/macros)\n(result)\nT = {ty}\nresult: m.read(T) = {value}\n"),
+            format!("(m = app/macros)\n(result)\nT = {ty}\nresult : m.read(T) = {value}\n"),
         )
         .unwrap();
     }
@@ -2650,7 +2666,7 @@ fn macro_output_over_frame_budget_reports_the_limit() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, deep)
-(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (| (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Square) [x]) x)))))))
+(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (| (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Node) ((. syntax Square) [x])) x)))))))
 (@ macro (= deep (-> (, x) _ (nest 10000 x))))
 "#,
     )
@@ -2670,5 +2686,120 @@ fn macro_output_over_frame_budget_reports_the_limit() {
     assert!(
         stderr.contains("macro `deep`") && stderr.contains("frame limit exceeded"),
         "{stderr}"
+    );
+}
+
+#[test]
+fn portable_macro_hash_matches_the_specification_vectors() {
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.9/mp09_portable_hash");
+    let (mut graph, ds) = ilang_cli::load(&project, false, true);
+    assert!(
+        !ds.iter().any(ilang_package::Diagnostic::is_error),
+        "{ds:?}"
+    );
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
+        "{}",
+        graph.sources.render_all(&checked.diags).join("\n")
+    );
+}
+
+#[test]
+fn syntax_macro_call_labels_require_explicit_parameter_labels() {
+    for (case, pass) in [("mp10_positional", false), ("mp10_explicit_label", true)] {
+        let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/spec/14.5")
+            .join(case);
+        let (mut graph, ds) = ilang_cli::load(&project, false, true);
+        assert!(
+            !ds.iter().any(ilang_package::Diagnostic::is_error),
+            "{ds:?}"
+        );
+        let checked = ilang_macro::project::check(&mut graph);
+        let errors = graph.sources.render_all(&checked.diags).join("\n");
+        assert_eq!(
+            !checked
+                .diags
+                .iter()
+                .any(ilang_package::Diagnostic::is_error),
+            pass,
+            "{errors}"
+        );
+        if !pass {
+            assert!(errors.contains("label does not match"), "{errors}");
+        }
+    }
+}
+
+#[test]
+fn unresolved_current_module_definitions_wait_for_item_expansion_to_settle() {
+    let macros = include_str!("../../../tests/spec/14.7/mp13_forward_definition/src/macros.is");
+    for items in [
+        "m.inspect(T)\nm.emit(T)",
+        "m.emit(T)\nm.inspect(T)",
+        "m.inspect(Missing)\nm.emit(T)",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"probe\"\n").unwrap();
+        std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
+        std::fs::write(
+            dir.path().join("src/main.i"),
+            format!("(m = probe/macros)\n{items}\nmain = () {{ Nil }}\n"),
+        )
+        .unwrap();
+        let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);
+        assert!(
+            !ds.iter().any(ilang_package::Diagnostic::is_error),
+            "{ds:?}"
+        );
+        let checked = ilang_macro::project::check(&mut graph);
+        let errors = graph.sources.render_all(&checked.diags).join("\n");
+        if items.contains("Missing") {
+            assert!(
+                checked
+                    .diags
+                    .iter()
+                    .any(ilang_package::Diagnostic::is_error),
+                "{errors}"
+            );
+            assert!(
+                errors.contains("Missing") && errors.contains("no definition"),
+                "{errors}"
+            );
+        } else {
+            assert!(
+                !checked
+                    .diags
+                    .iter()
+                    .any(ilang_package::Diagnostic::is_error),
+                "{errors}"
+            );
+        }
+    }
+}
+
+#[test]
+fn marked_local_parameter_can_shadow_a_macro_module_top_level_name() {
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.6/mp16_local_shadowing");
+    let (mut graph, ds) = ilang_cli::load(&project, false, true);
+    assert!(
+        !ds.iter().any(ilang_package::Diagnostic::is_error),
+        "{ds:?}"
+    );
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
+        "{}",
+        graph.sources.render_all(&checked.diags).join("\n")
     );
 }

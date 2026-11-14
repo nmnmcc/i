@@ -68,7 +68,7 @@ fn build_writes_the_module() {
 fn build_reports_errors() {
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),
-        ("src/main.i", "x: String = 1\n"),
+        ("src/main.i", "x : String = 1\n"),
     ]);
     let out = i(&["build"], dir.path());
     assert!(!out.status.success());
@@ -118,7 +118,7 @@ fn run_prints_the_stop_message() {
 fn test_runs_each_test() {
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),
-        ("src/lib.i", " (twice)\n\ntwice = (n: Int) { n * 2 }\n"),
+        ("src/lib.i", " (twice)\n\ntwice = (n : Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
             "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { Nil } | (_) { panic(\"no\") } })\n\ntest(\"bad\", () { panic(\"bad\") })\n",
@@ -157,12 +157,12 @@ fn host_exports() {
 
  (add, describe, flip, half, bits, unit, alias)
 
-add = (a: Int, b: Int) { a + b }
-describe = (name: String, n: Int) { name <> "=" <> core.inspect(n) }
-flip = (b: Bool) { core.not(b) }
-half = (x: Float) { x /. 2.0 }
-bits = (b: BitArray) -> BitArray { <<b:bits, 1:u1>> }
-unit = (n: Nil) { n }
+add = (a : Int, b : Int) { a + b }
+describe = (name : String, n : Int) { name <> "=" <> core.inspect(n) }
+flip = (b : Bool) { core.not(b) }
+half = (x : Float) { x /. 2.0 }
+bits = (b : BitArray) -> BitArray { <<b:bits, 1:u1>> }
+unit = (n : Nil) { n }
 alias = add
 "#,
         ),
@@ -261,7 +261,7 @@ fn host_exports_give_errors() {
 
 // The errors are `String | Int`, given to the host in the canonical
 // order: `Int` is member 1 and `String` member 2 (B.2).
-divide = (a: Int, b: Int) {
+divide = (a : Int, b : Int) {
 	b |>
 		(0) { fail.raise("division by zero") }
 		| (1) { fail.raise(a) }
@@ -269,18 +269,18 @@ divide = (a: Int, b: Int) {
 }
 
 // `Nil` and `Bool` errors have their own tags.
-check = (n: Int) -> Float {
+check = (n : Int) -> Float {
 	n |> (0) { fail.raise(Nil) } | (1) { fail.raise(True) } | (_) { 1.5 }
 }
 
 // The `Assert` of a host export stops the program (§9.6).
-positive = (n: Int) {
+positive = (n : Int) {
 	assert(n > 0)
 	n
 }
 
 // A `BitArray` error.
-bits = (b: Bool) -> Nil {
+bits = (b : Bool) -> Nil {
 	b |> (True) { fail.raise(<<1, 2>>) } | (False) { Nil }
 }
 "#,
@@ -402,15 +402,15 @@ Kv = (get = (String) <- (Fail(String)) -> String)
 @host("test:async/v1", "async")
 Later = (double = (Int) <- (Fail(String)) -> Int, echo = (String) -> String)
 
-lookup = (key: String) <- (kv: Kv) { kv.get(key) }
+lookup = (key : String) <- (kv : Kv) { kv.get(key) }
 
-quadruple = (n: Int) <- (later: Later) { later.double(later.double(n)) }
+quadruple = (n : Int) <- (later : Later) { later.double(later.double(n)) }
 
-both = (key: String) <- (kv: Kv, later: Later) {
+both = (key : String) <- (kv : Kv, later : Later) {
 	later.echo(kv.get(key) <> "!")
 }
 
-pure = (n: Int) { n + 1 }
+pure = (n : Int) { n + 1 }
 "#,
         ),
     ]);
@@ -574,11 +574,11 @@ fn run_gives_the_standard_services() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            "(\n\t(Io) = i/io\n)\n\nmain = () <- (io: Io) {\n\tio.print(\"one\")\n\tio.print(\"two\")\n}\n",
+            "(\n\t(Io) = i/io\n)\n\nmain = () <- (io : Io) {\n\tio.print(\"one\")\n\tio.print(\"two\")\n}\n",
         ),
         (
             "test/main_test.i",
-            "(\n\ttestlib = (test) = std/test\n\ti/io\n)\n\ntest(\"prints\", () <- (out: io.Io) { out.print(\"in a test\") })\n",
+            "(\n\ttestlib = (test) = std/test\n\ti/io\n)\n\ntest(\"prints\", () <- (out : io.Io) { out.print(\"in a test\") })\n",
         ),
     ]);
     let out = i(&["run"], dir.path());
@@ -744,19 +744,7 @@ fn incorrect_host_answers_stop_in_the_module() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            "@host(\"test:bad/v1\")\n\
-             Bad = (nan = () -> Float)\n\
-             \n\
-             half = () <- (bad: Bad) {\n\
-             \tx = bad.nan()\n\
-             \tx /. 2.0\n\
-             }\n\
-             \n\
-             main = () {\n\
-             \thalf()\n\
-             \tNil\n\
-             }\n\
-             ",
+            "@host(\"test:bad/v1\")\nBad = (nan = () -> Float)\n\nhalf = () <- (bad : Bad) {\n\tx = bad.nan()\n\tx /. 2.0\n}\n\nmain = () {\n\thalf()\n\tNil\n}\n",
         ),
     ]);
     let built = build(

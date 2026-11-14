@@ -15,19 +15,7 @@ fn declared_frames_hide_outer_variables_and_generalize() {
     // §3.10: every declared frame makes fresh variables, while a variable
     // used from an outer frame remains that variable.
     let (_, c) = checked(
-        "outer = <A>(x: A) {
-	inner = <A>(y: A) { y }
-	(inner(1), inner(True), x)
-}
-nested = <A>(x: A) {
-	inner = <B>(y: B, z: A) { (y, z) }
-	inner(1, x)
-}
-id = <A>(x: A) {
-	y: A = x
-	y
-}
-uses = () { (id(1), id(True)) }",
+        "outer = <A>(x : A) {\n\tinner = <A>(y : A) { y }\n\t(inner(1), inner(True), x)\n}\nnested = <A>(x : A) {\n\tinner = <B>(y : B, z : A) { (y, z) }\n\tinner(1, x)\n}\nid = <A>(x : A) {\n\ty : A = x\n\ty\n}\nuses = () { (id(1), id(True)) }",
         &["outer", "nested", "uses"],
     );
     let p = c.program.as_ref().unwrap();
@@ -61,7 +49,7 @@ fn declared_external_variables_are_general_in_library_declarations() {
         .source;
     let text = graph.sources.get(source).text.clone();
     // The library already declares `inspect: <A>(A) -> String` (§2.16).
-    assert!(text.contains("inspect: <A>(A) -> String"));
+    assert!(text.contains("inspect : <A>(A) -> String"));
     graph.sources.set_text(source, text);
     let c = ilang_check::check(&graph);
     common::expect_unused(&c.diags, &["f"]);
@@ -183,12 +171,12 @@ fn kept_form_messages_are_independent_checks() {
     // D7 and §3.11 supply these codes and message fragments; no generated
     // expected output defines them.
     for (src, code, message) in [
-        ("f = <A>(x: A(Int)) { x }", "E0230", "takes no arguments"),
+        ("f = <A>(x : A(Int)) { x }", "E0230", "takes no arguments"),
         ("f = <A, A>() { 1 }", "E0226", "declared more than once"),
         ("f = <Int>() { 1 }", "E0231", "name of a type"),
-        ("f = <A>(x: a) { x }", "E0201", "not defined"),
+        ("f = <A>(x : a) { x }", "E0201", "not defined"),
         (
-            "f = (x: Missing) { x }",
+            "f = (x : Missing) { x }",
             "E0202",
             "declare it after the name",
         ),
@@ -201,8 +189,8 @@ fn kept_form_messages_are_independent_checks() {
             "only type parameters",
         ),
         ("Schema(Int) = Int", "E0231", "name of a type"),
-        ("f = (x: p.name) { x }", "E0201", "not defined"),
-        ("f = (x: m(Int)) { x }", "E0234", "kept for macros"),
+        ("f = (x : p.name) { x }", "E0201", "not defined"),
+        ("f = (x : m(Int)) { x }", "E0234", "kept for macros"),
         (
             /* old-syntax-check: E0301 */ "@main()\nf = () { Nil }",
             "E0301",
@@ -228,7 +216,7 @@ fn labelled_calls_through_function_values_keep_the_data_shape() {
     // Spec §6.6: "Every function is called in this way, whatever expression
     // gives it." Stage 10 lifts stage 9's temporary indirect-call error.
     let (_, c) = checked(
-        "invoke = (f: (x = Int) -> Int) -> Int { f(x = 1) }\nanswer = invoke((x = n: Int) -> Int { n })\n",
+        "invoke = (f : (x = Int) -> Int) -> Int { f(x = 1) }\nanswer = invoke((x = n : Int) -> Int { n })\n",
         &["answer"],
     );
     let program = c.program.as_ref().unwrap();
@@ -250,7 +238,7 @@ fn closed_data_has_no_record_type_even_without_a_spread_error() {
     // which syntax three rejects before resolution.
     let (graph, _, diags) = common::check_files(&[(
         "src/main.i",
-        "left = <R>(r: R & Record) { r }\nright = <R>(r: R & Record) { r }",
+        "left = <R>(r : R & Record) { r }\nright = <R>(r : R & Record) { r }",
     )]);
     assert_eq!(
         diags.iter().map(|d| d.code).collect::<Vec<_>>(),

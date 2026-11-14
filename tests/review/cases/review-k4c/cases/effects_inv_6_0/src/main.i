@@ -1,5 +1,5 @@
 S(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> Nil)
-use = <A, E, N>(x: A) <- (s: S(A, E, N)) {
+use = <A, E, N>(x : A) <- (s : S(A, E, N)) {
 	S(f, _) = s
 	f(x)
 }

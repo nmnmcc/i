@@ -7,7 +7,7 @@ Next(A, E, N) = (A, Stream(A, E, N))
 Step(A, E, N) = Done | Next(A, E, N)
 
 new = <A, N>() -> Stream(A, Never, N) {
-	Stream(() -> Step(A, Never, N) { Done }, (_: N) { Nil })
+	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { Nil })
 }
 
 Bias = (value = Int)
@@ -15,12 +15,12 @@ Bias = (value = Int)
 needs_bias = () -> Stream(Int, Never, Bias) { new() }
 
 // §4.8 rule 5: a stored computation may use Bias when it is called.
-make = <A, E, N>(pull: () <- (Fail(E), ..N) -> Step(A, E, N)) -> Stream(
+make = <A, E, N>(pull : () <- (Fail(E), ..N) -> Step(A, E, N)) -> Stream(
 	A,
 	E,
 	N,
-) { Stream(pull, (_: N) { Nil }) }
+) { Stream(pull, (_ : N) { Nil }) }
 
 biased = () -> Stream(Int, Never, Bias) {
-	make(() <- (b: Bias) { Next(b.value, new()) })
+	make(() <- (b : Bias) { Next(b.value, new()) })
 }

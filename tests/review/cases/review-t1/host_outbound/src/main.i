@@ -1,5 +1,5 @@
 Level = "info" | "warn"
 @external("app", "log")
-log: (Level | "error") -> Nil
+log : (Level | "error") -> Nil
 @external("app", "number")
-number: (Int - 0) -> Nil
+number : (Int - 0) -> Nil

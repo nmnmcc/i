@@ -48,12 +48,12 @@ options = () -> (
 	key = BitArray,
 ) { (alpn = [], roots = <<>>, cert = <<>>, key = <<>>) }
 
-identity = (cert: BitArray, key: BitArray) -> (
+identity = (cert : BitArray, key : BitArray) -> (
 	cert = BitArray,
 	key = BitArray,
 ) { (cert = cert, key = key) }
 
-join = (items: List(String)) -> String {
+join = (items : List(String)) -> String {
 	items |>
 		([]) { "" }
 		| ([one]) { one }
@@ -83,7 +83,7 @@ raise = (message) {
 		| (Error(_)) { panic("tls: invalid error") }
 }
 
-finish = (r: Request(Result(Int, String))) <- (raw: Tls) {
+finish = (r : Request(Result(Int, String))) <- (raw : Tls) {
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -105,13 +105,13 @@ finish = (r: Request(Result(Int, String))) <- (raw: Tls) {
 connect = (
 	stream,
 	name,
-	opts: (
+	opts : (
 		alpn = List(String),
 		roots = BitArray,
 		cert = BitArray,
 		key = BitArray,
 	)
-) <- (raw: Tls) {
+) <- (raw : Tls) {
 	finish(
 		raw.connect(
 			net.stream_number(stream),
@@ -126,14 +126,14 @@ connect = (
 
 accept = (
 	stream,
-	ident: (cert = BitArray, key = BitArray),
-	opts: (
+	ident : (cert = BitArray, key = BitArray),
+	opts : (
 		alpn = List(String),
 		roots = BitArray,
 		cert = BitArray,
 		key = BitArray,
 	)
-) <- (raw: Tls) {
+) <- (raw : Tls) {
 	finish(
 		raw.accept(
 			net.stream_number(stream),
@@ -146,31 +146,31 @@ accept = (
 
 dial = (host, port, opts) { connect(net.connect(host, port), host, opts) }
 
-alpn = (Stream(n)) <- (raw: Tls) {
+alpn = (Stream(n)) <- (raw : Tls) {
 	request.await_owned(raw.alpn(n)) |>
 		(Ok(value)) { value }
 		| (Error(message)) { raise(message) }
 }
 
-read = (Stream(n), max) <- (raw: Tls) {
+read = (Stream(n), max) <- (raw : Tls) {
 	request.await_owned(raw.read(n, max)) |>
 		(Ok(value)) { value }
 		| (Error(message)) { raise(message) }
 }
 
-write = (Stream(n), bytes) <- (raw: Tls) {
+write = (Stream(n), bytes) <- (raw : Tls) {
 	request.await_owned(raw.write(n, bytes)) |>
 		(Ok(value)) { value }
 		| (Error(message)) { raise(message) }
 }
 
-shutdown_write = (Stream(n)) <- (raw: Tls) {
+shutdown_write = (Stream(n)) <- (raw : Tls) {
 	request.await_owned(raw.shutdown_write(n)) |>
 		(Ok(value)) { value }
 		| (Error(message)) { raise(message) }
 }
 
-close = (Stream(n)) <- (raw: Tls) { request.await_owned(raw.close(n)) }
+close = (Stream(n)) <- (raw : Tls) { request.await_owned(raw.close(n)) }
 
 byte_stream = (stream) {
 	(

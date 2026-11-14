@@ -64,31 +64,31 @@ Parser = (
 	names = dict.Dict(String, Int),
 )
 
-bump = (p: Parser) -> Parser {
+bump = (p : Parser) -> Parser {
 	p.rest |>
 		([_, ..tail]) { Parser(..p, rest = tail, position = p.position + 1) }
 		| ([]) { panic("regex: parser advance at end") }
 }
 
-syntax_error = (p: Parser, reason: String) -> Never {
+syntax_error = (p : Parser, reason : String) -> Never {
 	fail.raise(RegexError(position = p.position, reason = reason))
 }
 
-peek = (p: Parser) -> Int { p.rest |> ([]) { -1 } | ([c, .._]) { c } }
+peek = (p : Parser) -> Int { p.rest |> ([]) { -1 } | ([c, .._]) { c } }
 
-digit = (c: Int) -> Bool { c >= 48 && c <= 57 }
+digit = (c : Int) -> Bool { c >= 48 && c <= 57 }
 
-name_char = (c: Int) -> Bool {
+name_char = (c : Int) -> Bool {
 	{ c >= 65 && c <= 90 } || { c >= 97 && c <= 122 } || digit(c) || c == 95
 }
 
-scalar = (n: Int) -> String {
+scalar = (n : Int) -> String {
 	<<n:u(32)>> |>
 		(<<c:utf32be_codepoint>>) { core.from_codepoints([c]) }
 		| (_) { panic("regex: scalar invariant") }
 }
 
-parse_alternation = (p: Parser) -> (Ast, Parser) {
+parse_alternation = (p : Parser) -> (Ast, Parser) {
 	(left, tail) = parse_sequence(p, [])
 	{ peek(tail) == 124 } |>
 		(True) {
@@ -98,7 +98,7 @@ parse_alternation = (p: Parser) -> (Ast, Parser) {
 		| (False) { (left, tail) }
 }
 
-parse_sequence = (p: Parser, acc: List(Ast)) -> (Ast, Parser) {
+parse_sequence = (p : Parser, acc : List(Ast)) -> (Ast, Parser) {
 	peek(p) |>
 		(-1 | 41 | 124) { (Sequence(list.reverse(acc)), p) }
 		| (_) {
@@ -108,7 +108,7 @@ parse_sequence = (p: Parser, acc: List(Ast)) -> (Ast, Parser) {
 		}
 }
 
-parse_atom = (p: Parser) -> (Ast, Parser) {
+parse_atom = (p : Parser) -> (Ast, Parser) {
 	c = peek(p)
 	tail = bump(p)
 	c |>
@@ -131,7 +131,7 @@ parse_atom = (p: Parser) -> (Ast, Parser) {
 		| (_) { (Atom(Literal(c), p.flags.insensitive), tail) }
 }
 
-escape_class = (p: Parser) -> (Class, Parser) {
+escape_class = (p : Parser) -> (Class, Parser) {
 	c = peek(p)
 	{ c == -1 } |>
 		(True) { syntax_error(p, "trailing escape") }
@@ -162,7 +162,7 @@ escape_class = (p: Parser) -> (Class, Parser) {
 		}
 }
 
-hex_value = (c: Int) -> Int {
+hex_value = (c : Int) -> Int {
 	{ c >= 48 && c <= 57 } |>
 		(True) { c - 48 }
 		| (False) {
@@ -176,7 +176,7 @@ hex_value = (c: Int) -> Int {
 		}
 }
 
-hex_digits = (p: Parser, n: Int, value: Int, braced: Bool, seen: Bool) -> (
+hex_digits = (p : Parser, n : Int, value : Int, braced : Bool, seen : Bool) -> (
 	Class,
 	Parser,
 ) {
@@ -202,7 +202,7 @@ hex_digits = (p: Parser, n: Int, value: Int, braced: Bool, seen: Bool) -> (
 		}
 }
 
-hex_escape = (p: Parser, kind: Int) -> (Class, Parser) {
+hex_escape = (p : Parser, kind : Int) -> (Class, Parser) {
 	{ peek(p) == 123 } |>
 		(True) { hex_digits(bump(p), 6, 0, True, False) }
 		| (False) {
@@ -212,7 +212,7 @@ hex_escape = (p: Parser, kind: Int) -> (Class, Parser) {
 		}
 }
 
-escape_atom = (p: Parser) -> (Ast, Parser) {
+escape_atom = (p : Parser) -> (Ast, Parser) {
 	peek(p) |>
 		(98) { (Look(4), bump(p)) }
 		| (66) { (Look(5), bump(p)) }
@@ -224,14 +224,14 @@ escape_atom = (p: Parser) -> (Ast, Parser) {
 		}
 }
 
-class_item = (p: Parser) -> (Class, Parser) {
+class_item = (p : Parser) -> (Class, Parser) {
 	peek(p) |>
 		(-1) { syntax_error(p, "unclosed character class") }
 		| (92) { escape_class(bump(p)) }
 		| (c) { (Literal(c), bump(p)) }
 }
 
-class_items = (p: Parser, acc: List(Class)) -> (Class, Parser) {
+class_items = (p : Parser, acc : List(Class)) -> (Class, Parser) {
 	peek(p) |>
 		(-1) { syntax_error(p, "unclosed character class") }
 		| (93) {
@@ -254,7 +254,7 @@ class_items = (p: Parser, acc: List(Class)) -> (Class, Parser) {
 		}
 }
 
-parse_class = (p: Parser) -> (Class, Parser) {
+parse_class = (p : Parser) -> (Class, Parser) {
 	{ peek(p) == 94 } |>
 		(True) {
 			(c, tail) = class_items(bump(p), [])
@@ -263,7 +263,7 @@ parse_class = (p: Parser) -> (Class, Parser) {
 		| (False) { class_items(p, []) }
 }
 
-read_name = (p: Parser, acc: List(String)) -> (String, Parser) {
+read_name = (p : Parser, acc : List(String)) -> (String, Parser) {
 	peek(p) |>
 		(62) {
 			acc |>
@@ -277,7 +277,7 @@ read_name = (p: Parser, acc: List(String)) -> (String, Parser) {
 		}
 }
 
-finish_group = (p: Parser, outer: Flags, id: Int) -> (Ast, Parser) {
+finish_group = (p : Parser, outer : Flags, id : Int) -> (Ast, Parser) {
 	(body, tail) = parse_alternation(p)
 	{ peek(tail) == 41 } |>
 		(False) { syntax_error(tail, "unclosed group") }
@@ -287,7 +287,7 @@ finish_group = (p: Parser, outer: Flags, id: Int) -> (Ast, Parser) {
 		}
 }
 
-flag_group = (p: Parser, outer: Flags, enabled: Bool, seen: Bool) -> (
+flag_group = (p : Parser, outer : Flags, enabled : Bool, seen : Bool) -> (
 	Ast,
 	Parser,
 ) {
@@ -333,7 +333,7 @@ flag_group = (p: Parser, outer: Flags, enabled: Bool, seen: Bool) -> (
 		}
 }
 
-parse_group = (p: Parser) -> (Ast, Parser) {
+parse_group = (p : Parser) -> (Ast, Parser) {
 	{ peek(p) == 63 } |>
 		(False) {
 			finish_group(Parser(..p, count = p.count + 1), p.flags, p.count + 1)
@@ -378,7 +378,7 @@ parse_group = (p: Parser) -> (Ast, Parser) {
 		}
 }
 
-number = (p: Parser, value: Int, seen: Bool) -> (Int, Parser) {
+number = (p : Parser, value : Int, seen : Bool) -> (Int, Parser) {
 	c = peek(p)
 	digit(c) |>
 		(True) {
@@ -395,7 +395,7 @@ number = (p: Parser, value: Int, seen: Bool) -> (Int, Parser) {
 		}
 }
 
-bounds = (p: Parser) -> (Int, Int, Parser) {
+bounds = (p : Parser) -> (Int, Int, Parser) {
 	(low, tail) = number(p, 0, False)
 	peek(tail) |>
 		(125) { (low, low, bump(tail)) }
@@ -415,7 +415,7 @@ bounds = (p: Parser) -> (Int, Int, Parser) {
 		| (_) { syntax_error(tail, "unclosed repetition") }
 }
 
-parse_repeat = (a: Ast, p: Parser) -> (Ast, Parser) {
+parse_repeat = (a : Ast, p : Parser) -> (Ast, Parser) {
 	peek(p) |>
 		(42 | 43 | 63 | 123) {
 			(low, high, tail) = peek(p) |>
@@ -449,11 +449,11 @@ Regex = (
 	names = dict.Dict(String, Int),
 )
 
-emit = (inst: Inst, b: Build) -> (Int, Build) {
+emit = (inst : Inst, b : Build) -> (Int, Build) {
 	(b.size, Build(code = dict.insert(b.code, b.size, inst), size = b.size + 1))
 }
 
-sequence_code = (xs: List(Ast), next: Int, b: Build) -> (Int, Build) {
+sequence_code = (xs : List(Ast), next : Int, b : Build) -> (Int, Build) {
 	xs |>
 		([]) { (next, b) }
 		| ([a, ..tail]) {
@@ -462,7 +462,7 @@ sequence_code = (xs: List(Ast), next: Int, b: Build) -> (Int, Build) {
 		}
 }
 
-optional_code = (a: Ast, n: Int, lazy: Bool, next: Int, b: Build) -> (
+optional_code = (a : Ast, n : Int, lazy : Bool, next : Int, b : Build) -> (
 	Int,
 	Build,
 ) {
@@ -478,7 +478,7 @@ optional_code = (a: Ast, n: Int, lazy: Bool, next: Int, b: Build) -> (
 		}
 }
 
-required_code = (a: Ast, n: Int, next: Int, b: Build) -> (Int, Build) {
+required_code = (a : Ast, n : Int, next : Int, b : Build) -> (Int, Build) {
 	{ n == 0 } |>
 		(True) { (next, b) }
 		| (False) {
@@ -487,7 +487,7 @@ required_code = (a: Ast, n: Int, next: Int, b: Build) -> (Int, Build) {
 		}
 }
 
-nullable = (a: Ast) -> Bool {
+nullable = (a : Ast) -> Bool {
 	a |>
 		(Empty | Look(_)) { True }
 		| (Atom(_, _)) { False }
@@ -497,7 +497,7 @@ nullable = (a: Ast) -> Bool {
 		| (Repeat(body, low, _, _)) { low == 0 || nullable(body) }
 }
 
-at_least_code = (body: Ast, low: Int, lazy: Bool, next: Int, b: Build) -> (
+at_least_code = (body : Ast, low : Int, lazy : Bool, next : Int, b : Build) -> (
 	Int,
 	Build,
 ) {
@@ -516,7 +516,7 @@ at_least_code = (body: Ast, low: Int, lazy: Bool, next: Int, b: Build) -> (
 		}
 }
 
-lower = (a: Ast, next: Int, b: Build) -> (Int, Build) {
+lower = (a : Ast, next : Int, b : Build) -> (Int, Build) {
 	a |>
 		(Empty) { (next, b) }
 		| (Atom(c, i)) {
@@ -570,7 +570,7 @@ _compile_result = (pattern: String) -> Result(Regex, RegexError) {
 
 // Unicode 16 property tables and simple folds follow regex-syntax's UCD data.
 // Binary search over packed range endpoints is logarithmic in table size.
-in_ranges = (table: BitArray, c: Int) -> Bool {
+in_ranges = (table : BitArray, c : Int) -> Bool {
 	go = (low, high) {
 		{ low >= high } |>
 			(True) { False }
@@ -592,7 +592,7 @@ in_ranges = (table: BitArray, c: Int) -> Bool {
 	go(0, core.bit_size(table) / 48)
 }
 
-class_has = (cls: Class, c: Int) -> Bool {
+class_has = (cls : Class, c : Int) -> Bool {
 	cls |>
 		(Literal(n)) { n == c }
 		| (Range(low, high)) { c >= low && c <= high }
@@ -606,7 +606,7 @@ class_has = (cls: Class, c: Int) -> Bool {
 
 // Fold classes at compile time, before applying their negation. This matters
 // for e.g. (?i)[^a], which must reject both a and A.
-fold_class = (cls: Class) -> Class {
+fold_class = (cls : Class) -> Class {
 	cls |>
 		(Negate(x)) { Negate(fold_class(x)) }
 		| (Union(xs)) { Union(list.map(xs, fold_class)) }
@@ -641,7 +641,7 @@ Captures = (
 	text = String,
 )
 
-input = (text: String) -> Input {
+input = (text : String) -> Input {
 	Input(
 		text = text,
 		rest = list.map(core.codepoints(text), core.codepoint_to_int),
@@ -650,7 +650,7 @@ input = (text: String) -> Input {
 	)
 }
 
-byte_width = (c: Int) -> Int {
+byte_width = (c : Int) -> Int {
 	{ c < 128 } |>
 		(True) { 1 }
 		| (False) {
@@ -660,7 +660,7 @@ byte_width = (c: Int) -> Int {
 		}
 }
 
-advance = (i: Input) -> Input {
+advance = (i : Input) -> Input {
 	i.rest |>
 		([]) { panic("regex: advance after end") }
 		| ([c, ..tail]) {
@@ -676,11 +676,11 @@ advance = (i: Input) -> Input {
 		}
 }
 
-at_end = (i: Input) -> Bool { i.rest == [] }
+at_end = (i : Input) -> Bool { i.rest == [] }
 
-word_at = (c: Int) -> Bool { c >= 0 && in_ranges(unicode_word, c) }
+word_at = (c : Int) -> Bool { c >= 0 && in_ranges(unicode_word, c) }
 
-assertion = (kind: Int, i: Input) -> Bool {
+assertion = (kind : Int, i : Input) -> Bool {
 	following = i.rest |> ([]) { -1 } | ([c, .._]) { c }
 	kind |>
 		(0) { i.at.scalar == 0 }
@@ -692,7 +692,7 @@ assertion = (kind: Int, i: Input) -> Bool {
 		| (_) { panic("regex: assertion opcode") }
 }
 
-instruction = (re: Regex, pc: Int) -> Inst {
+instruction = (re : Regex, pc : Int) -> Inst {
 	dict.get(re.code, pc) |>
 		(Some(i)) { i }
 		| (None) { panic("regex: instruction address") }
@@ -701,11 +701,11 @@ instruction = (re: Regex, pc: Int) -> Inst {
 // Priority-ordered depth-first epsilon closure. Mark before following a Fork
 // to terminate empty cycles and retain the first path's capture slots.
 closure = (
-	re: Regex,
-	pending: List(Thread),
-	i: Input,
-	seen: dict.Dict(Int, Bool),
-	acc: List(Thread)
+	re : Regex,
+	pending : List(Thread),
+	i : Input,
+	seen : dict.Dict(Int, Bool),
+	acc : List(Thread)
 ) -> List(Thread) {
 	pending |>
 		([]) { list.reverse(acc) }
@@ -759,11 +759,11 @@ closure = (
 }
 
 step_threads = (
-	re: Regex,
-	threads: List(Thread),
-	i: Input,
-	acc: List(Thread),
-	best: Option(Captures)
+	re : Regex,
+	threads : List(Thread),
+	i : Input,
+	acc : List(Thread),
+	best : Option(Captures)
 ) -> (List(Thread), Option(Captures)) {
 	threads |>
 		([]) { (list.reverse(acc), best) }
@@ -800,10 +800,10 @@ step_threads = (
 }
 
 search_loop = (
-	re: Regex,
-	i: Input,
-	threads: List(Thread),
-	best: Option(Captures)
+	re : Regex,
+	i : Input,
+	threads : List(Thread),
+	best : Option(Captures)
 ) -> Option(Captures) {
 	active = best |>
 		(None) { list.append(threads, [Thread(re.start, dict.new())]) }
@@ -815,7 +815,7 @@ search_loop = (
 		| (False) { search_loop(re, advance(i), next, found) }
 }
 
-bytes = (text: String, start: Int, end: Int) -> String {
+bytes = (text : String, start : Int, end : Int) -> String {
 	core.byte_slice(text, start, end - start) |>
 		(Ok(s)) { s }
 		| (Error(_)) { panic("regex: capture byte boundaries") }
@@ -823,7 +823,7 @@ bytes = (text: String, start: Int, end: Int) -> String {
 
 /// Capture by index; zero is the full match. An unmatched group is None.
 /// `regex.group(captures, 1)`.
-group = (captures: Captures, index: Int) -> Option(Match) {
+group = (captures : Captures, index : Int) -> Option(Match) {
 	{ index < 0 } |>
 		(True) { None }
 		| (False) {
@@ -845,36 +845,36 @@ group = (captures: Captures, index: Int) -> Option(Match) {
 }
 
 /// Capture by name, or None for an unknown/unmatched name.
-named = (captures: Captures, name: String) -> Option(Match) {
+named = (captures : Captures, name : String) -> Option(Match) {
 	dict.get(captures.names, name) |>
 		(None) { None }
 		| (Some(id)) { group(captures, id) }
 }
 
-whole = (captures: Captures) -> Match {
+whole = (captures : Captures) -> Match {
 	group(captures, 0) |>
 		(Some(m)) { m }
 		| (None) { panic("regex: full match capture") }
 }
 
 /// The leftmost-first capture set, including all participating groups.
-captures = (regex: Regex, input: String) -> Option(Captures) {
+captures = (regex : Regex, input : String) -> Option(Captures) {
 	search_loop(regex, regex_input(input), [], None)
 }
 
 regex_input = input
 
 /// Finds the leftmost-first match: `regex.find(re, "abc")`.
-find = (regex: Regex, input: String) -> Option(Match) {
+find = (regex : Regex, input : String) -> Option(Match) {
 	captures(regex, input) |> (None) { None } | (Some(c)) { Some(whole(c)) }
 }
 
 /// Whether any match exists, including an empty match.
-is_match = (regex: Regex, input: String) -> Bool {
+is_match = (regex : Regex, input : String) -> Bool {
 	captures(regex, input) != None
 }
 
-move_to = (i: Input, scalar: Int) -> Input {
+move_to = (i : Input, scalar : Int) -> Input {
 	{ i.at.scalar == scalar } |>
 		(True) { i }
 		| (False) { move_to(advance(i), scalar) }
@@ -882,9 +882,12 @@ move_to = (i: Input, scalar: Int) -> Input {
 
 // Rust's empty-match iteration rule: suppress an empty match immediately
 // after a nonempty match, and otherwise advance one complete scalar.
-scan_all = (re: Regex, i: Input, last_end: Int, acc: List(Captures)) -> List(
-	Captures,
-) {
+scan_all = (
+	re : Regex,
+	i : Input,
+	last_end : Int,
+	acc : List(Captures)
+) -> List(Captures) {
 	search_loop(re, i, [], None) |>
 		(None) { list.reverse(acc) }
 		| (Some(c)) {
@@ -917,14 +920,14 @@ scan_all = (re: Regex, i: Input, last_end: Int, acc: List(Captures)) -> List(
 }
 
 /// Non-overlapping matches, advancing by scalars after empty matches.
-find_all = (regex: Regex, input: String) -> List(Match) {
+find_all = (regex : Regex, input : String) -> List(Match) {
 	list.map(
 		scan_all(regex, regex_input(input), -1, []),
 		whole,
 	)
 }
 
-slot = (c: Captures, n: Int) -> Offset {
+slot = (c : Captures, n : Int) -> Offset {
 	dict.get(c.slots, n) |>
 		(Some(x)) { x }
 		| (None) { panic("regex: whole capture slot") }
@@ -937,7 +940,7 @@ replacement_value = (c: Captures, name: String) -> String {
 	m |> (Some(v)) { v.text } | (None) { "" }
 }
 
-replacement_name = (xs: List(Int), braced: Bool, acc: List(String)) -> (
+replacement_name = (xs : List(Int), braced : Bool, acc : List(String)) -> (
 	String,
 	List(Int),
 	Bool,
@@ -952,7 +955,11 @@ replacement_name = (xs: List(Int), braced: Bool, acc: List(String)) -> (
 		| (_) { (core.concat(list.reverse(acc)), xs, core.not(braced)) }
 }
 
-expand_replacement = (xs: List(Int), c: Captures, acc: List(String)) -> String {
+expand_replacement = (
+	xs : List(Int),
+	c : Captures,
+	acc : List(String)
+) -> String {
 	xs |>
 		([]) { core.concat(list.reverse(acc)) }
 		| ([36, 36, ..tail]) { expand_replacement(tail, c, ["$", ..acc]) }
@@ -974,11 +981,11 @@ expand_replacement = (xs: List(Int), c: Captures, acc: List(String)) -> String {
 }
 
 replace_captures = (
-	matches: List(Captures),
-	text: String,
-	replacement: List(Int),
-	at: Int,
-	acc: List(String)
+	matches : List(Captures),
+	text : String,
+	replacement : List(Int),
+	at : Int,
+	acc : List(String)
 ) -> String {
 	matches |>
 		([]) {
@@ -1005,7 +1012,7 @@ replace_captures = (
 
 /// Replaces the first match; `$1`, `${name}`, and `$$` expand captures/dollar.
 /// Missing groups expand to empty text. `$1x` names group `1x`; use `${1}x`.
-replace = (regex: Regex, input: String, with: String) -> String {
+replace = (regex : Regex, input : String, with : String) -> String {
 	matches = captures(regex, input) |> (None) { [] } | (Some(c)) { [c] }
 	replace_captures(
 		matches,
@@ -1017,7 +1024,7 @@ replace = (regex: Regex, input: String, with: String) -> String {
 }
 
 /// Replaces all non-overlapping matches with capture expansion.
-replace_all = (regex: Regex, input: String, with: String) -> String {
+replace_all = (regex : Regex, input : String, with : String) -> String {
 	replace_captures(
 		scan_all(regex, regex_input(input), -1, []),
 		input,
@@ -1028,7 +1035,7 @@ replace_all = (regex: Regex, input: String, with: String) -> String {
 }
 
 /// Splits around every non-overlapping match, preserving empty pieces.
-split = (regex: Regex, input: String) -> List(String) {
+split = (regex : Regex, input : String) -> List(String) {
 	go = (matches, at, acc) {
 		matches |>
 			([]) {

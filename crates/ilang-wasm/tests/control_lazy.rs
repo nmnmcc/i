@@ -53,8 +53,8 @@ const PROGRAM: &str = r#"(
 Name = (text = String)
 Tag = (text = String)
 
-name = () <- (n: Name) { n.text }
-tag = () <- (t: Tag) { t.text }
+name = () <- (n : Name) { n.text }
+tag = () <- (t : Tag) { t.text }
 
 plain = (b) {
 	x = control.suspend(b, (k) { control.resume(k, "v") })
@@ -272,6 +272,7 @@ fn record_kinds() {
     assert_ne!(two[0], two[2], "two services: {two:?}");
     // The runtime records: no slot (-1), and their kinds.
     for (reenter, kind) in [
+        ("$catch_reenter", 4),
         ("$ensure_reenter", 2),
         // Bit 5 marks finalizer re-entry for cancellation shielding; Wasm's
         // i32 shift uses the low five bits, so it dispatches like kind 5.
@@ -292,10 +293,7 @@ fn record_kinds() {
     assert!(func(&text, "$boundary_core").contains("(ref.func $boundary_reenter)"));
     assert!(func(&text, "$cancel_core").contains("(ref.func $cancel_reenter)"));
     let tramp = func(&text, "$tramp_run");
-    // E3 deletes catch kind 4: both error and cancel dispatch only kinds 2/3.
-    assert!(tramp.contains("(i32.const 0x0C)"), "{tramp}");
-    assert!(!tramp.contains("(i32.const 0x1C)"), "{tramp}");
-    assert!(!text.contains("$catch_reenter"));
+    assert!(tramp.contains("(i32.const 0x1C)") && tramp.contains("(i32.const 0x0C)"));
 }
 
 #[test]
@@ -383,9 +381,9 @@ Done = ()
 Outer = Paused | Done
 Handed = (Inner)
 Lost = ()
-Handed = Handed | Lost
+HandedSum = Handed | Lost
 
-put = (k2) <- (o: Out) { o.put(k2) }
+put = (k2) <- (o : Out) { o.put(k2) }
 "#;
 
 /// `g` of test 12: its frame waits for the ensure, so its record is pending.
@@ -468,10 +466,10 @@ main = () {
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"Third = (Continuation(Nil, Third, Out))
+const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Out))
 Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
-Third = Third | Over
+ThirdSum = Third | Over
 
 keep = (t) { t |> (Over) { Over } | (t) { t } }
 
@@ -521,11 +519,11 @@ const ENV_TAIL_RESUME: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Paused, Name))
+Paused = (Continuation(Nil, PausedSum, Name))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 
 g = (b) {
 	control.suspend(b, (k) { Paused(k) })
@@ -561,11 +559,11 @@ const ENV_TAIL_CANCEL: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Paused, Name))
+Paused = (Continuation(Nil, PausedSum, Name))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 
 g = (b) {
 	resource.ensure(
@@ -606,11 +604,11 @@ const CANCEL_INNER: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Io))
+Paused = (Continuation(Nil, PausedSum, Io))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
-say = (text) <- (io: Io) { io.print(text) }
+say = (text) <- (io : Io) { io.print(text) }
 
 // During the cancel, the final function suspends to `inner`, which is
 // paused inside `k`; the value of its `f` goes on into the code after it.
@@ -632,7 +630,7 @@ body = (outer) {
 	Done
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	k = { control.boundary((outer) { body(outer) }) } |>
 		(Paused(k)) { k }
 		| (Done) { panic("not paused") }
@@ -654,16 +652,16 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Never))
+Paused = (Continuation(Nil, PausedSum, Fail(Int)))
 Done = ()
-Paused = Paused | Done
-Held = (Continuation(Nil, Held, Never))
+PausedSum = Paused | Done
+Held = (Continuation(Nil, HeldSum, Never))
 Over = ()
-Held = Held | Over
+HeldSum = Held | Over
 
 // Cancelling this continuation can return to the code after `inner`,
 // because the final function suspends to `inner` during the cancel (D15).
-paused = () <- (handler: Fail(Int)) {
+paused = () {
 	{
 		control.boundary((outer) {
 			control.boundary((inner) {
@@ -675,7 +673,7 @@ paused = () <- (handler: Fail(Int)) {
 					() { control.suspend(inner, (k2) { Nil }) },
 				)
 			})
-			handler.raise(7)
+			fail.raise(7)
 			Done
 		})
 	} |>
@@ -683,17 +681,16 @@ paused = () <- (handler: Fail(Int)) {
 		| (Done) { panic("not paused") }
 }
 
-// The continuation captures the active catch's handler, so its need is Never.
-// Cancelling it runs ordinary code after `inner`; that captured handler's
-// error passes through this final function's pending record.
+// `cancel` has no errors in its type. Here it runs the ordinary code
+// after `inner`, whose error passes through this final function's record.
 with = (hold, k) {
 	control.suspend(hold, (k2) { Held(k2) })
 	control.cancel(k)
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
+	k = paused()
 	r = fail.catch(() {
-		k = paused()
 		held = control.boundary((hold) {
 			resource.ensure(() { 99 }, () { with(hold, k) })
 			Over
@@ -1225,7 +1222,7 @@ Name = (text = String)
 Done = (String)
 More = (String, Continuation(Nil, Step, Name))
 Step = Done | More
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 leaf = (b) {
 	control.suspend(b, (k) { More("start", k) })
 	first = name()

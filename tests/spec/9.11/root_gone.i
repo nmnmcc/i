@@ -5,7 +5,7 @@
 	i/request
 )
 
-main = () <- (root: request.Root) {
+main = () <- (root : request.Root) {
 	request.close_root(root)
 	request.open_owner()
 }

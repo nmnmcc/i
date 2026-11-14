@@ -11,8 +11,8 @@ pub use parse::{
     pipe_target,
 };
 pub use print::{
-    MAX_CALL_DEPTH, WIDTH, call_depth, format, print_expr, print_module, print_pattern, print_type,
-    print_with_comments,
+    MAX_CALL_DEPTH, WIDTH, call_depth, format, print_annotation, print_expr, print_module,
+    print_pattern, print_type, print_with_comments,
 };
 pub mod convert;
 pub mod group;

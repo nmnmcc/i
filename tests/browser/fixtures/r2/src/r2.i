@@ -87,11 +87,11 @@ go_progress = () <- (gates: Gates, control: Control) {
 	})
 }
 
-cancel_probe = (owned: Bool) <- (gates: Gates, control: Control) {
+cancel_probe = (owned : Bool) <- (gates : Gates, control : Control) {
 	r = gates.wait(1)
 	answer = fail.catch(() {
 		task.scope((s) {
-			armed: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.send(armed, Nil)
 				{ owned } |>
@@ -123,7 +123,7 @@ cancel_owned = () { cancel_probe(True) }
 
 cancel_borrowed = () { cancel_probe(False) }
 
-ready_wait = <A>(r: Request(A)) <- (await: request.Await) {
+ready_wait = <A>(r : Request(A)) <- (await : request.Await) {
 	await.wait(request.ticket(r))
 }
 
@@ -178,7 +178,7 @@ nested_interest = () <- (gates: Gates) {
 
 // A missing nested progress-interest route fails after turns, without a timer
 // or an indefinitely hanging test process. A delivered answer gets a FIFO turn.
-bounded_cpu = (turns: Int) -> Never {
+bounded_cpu = (turns : Int) -> Never {
 	turns |>
 		(0) { panic("nested IO progress was not forwarded") }
 		| (_) {
@@ -211,7 +211,7 @@ unrelated_idle = () <- (gates: Gates) {
 }
 
 // §12.8: raw work alone does not authorize runnable progress polls.
-raw_only = () <- (gates: Gates, control: Control) {
+raw_only = () <- (gates : Gates, control : Control) {
 	gates.wait(9)
 	task.yield()
 	task.yield()
@@ -234,9 +234,9 @@ pure_tasks = () {
 	})
 }
 
-cmp = (a: Float, b: Float) { a -. b }
+cmp = (a : Float, b : Float) { a -. b }
 
-cmp2 = (a: Float, b: Float) { cmp(a, b) }
+cmp2 = (a : Float, b : Float) { cmp(a, b) }
 
 fake = () { without_fail(() { request.await_owned(request.ready(7)) }) }
 
@@ -248,7 +248,7 @@ one = () {
 	)
 }
 
-trace = (seed: Int) {
+trace = (seed : Int) {
 	result = fail.catch(() {
 		task.test(random.from_seed(seed), [[1], [1, 2], [1, 1]], () {
 			task.scope((s) {
@@ -269,13 +269,13 @@ trace = (seed: Int) {
 		| (Error(_)) { panic("invalid replay script") }
 }
 
-expected_one = (seed: Int, p: List(Int)) {
+expected_one = (seed : Int, p : List(Int)) {
 	generator = fail.catch(() { random.at_path(random.from_seed(seed), p) }) |>
 		(Ok(g)) { g }
 		| (Error(_)) { panic("invalid expected path") }
 	core.inspect((p, random.word(generator)))
 }
 
-expected_trace = (seed: Int) {
+expected_trace = (seed : Int) {
 	expected_one(seed, [1, 1]) <> "/" <> expected_one(seed, [1, 2])
 }

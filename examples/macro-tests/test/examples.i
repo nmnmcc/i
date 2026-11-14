@@ -16,7 +16,7 @@ fails("typed error", () { fail.raise(Problem) })
 
 SuiteService = (value = Int)
 
-read = () <- (service: SuiteService) { service.value }
+read = () <- (service : SuiteService) { service.value }
 
 suite("outer", () {
 	suite("inner", () {

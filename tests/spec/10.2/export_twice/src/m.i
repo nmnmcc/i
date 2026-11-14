@@ -2,4 +2,4 @@
 	f
 )
 
-f = (n: Int) { n }
+f = (n : Int) { n }

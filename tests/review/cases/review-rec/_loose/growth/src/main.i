@@ -1,24 +1,24 @@
 build = (
-	c1: Bool,
-	c2: Bool,
-	c3: Bool,
-	c4: Bool,
-	c5: Bool,
-	c6: Bool,
-	c7: Bool,
-	c8: Bool,
-	c9: Bool,
-	c10: Bool,
-	c11: Bool,
-	c12: Bool,
-	c13: Bool,
-	c14: Bool,
-	c15: Bool,
-	c16: Bool,
-	c17: Bool,
-	c18: Bool,
-	c19: Bool,
-	c20: Bool
+	c1 : Bool,
+	c2 : Bool,
+	c3 : Bool,
+	c4 : Bool,
+	c5 : Bool,
+	c6 : Bool,
+	c7 : Bool,
+	c8 : Bool,
+	c9 : Bool,
+	c10 : Bool,
+	c11 : Bool,
+	c12 : Bool,
+	c13 : Bool,
+	c14 : Bool,
+	c15 : Bool,
+	c16 : Bool,
+	c17 : Bool,
+	c18 : Bool,
+	c19 : Bool,
+	c20 : Bool
 ) {
 	r0 = ()
 	r1 = c1 |> (True) { (..r0, a1 = 1) } | (False) { (..r0, b1 = 1) }
@@ -56,7 +56,7 @@ Fan(A) = { (a1 = A) | (b1 = Int) } & { (a2 = A) | (b2 = Int) } & { (a3 = A)
 		| (b19 = Int) } & { (a20 = A) | (b20 = Int) }
 Closed = Fan(Never)
 
-closed: Closed = (
+closed : Closed = (
 	b1 = 1,
 	b2 = 1,
 	b3 = 1,

@@ -6,7 +6,7 @@
 	i/core
 )
 
-pair = (x: (Int, Int) | (a = Int, b = Int)) { x }
+pair = (x : { (Int, Int) | (a = Int, b = Int) }) { x }
 
 test("labelled data equality", () {
 	assert((a = 1) == (a = 1))
@@ -25,7 +25,7 @@ test("labelled data text", () {
 })
 
 test("spread and access", () {
-	ada: (name = String, age = Int) = (name = "ada", age = 36)
+	ada : (name = String, age = Int) = (name = "ada", age = 36)
 	older = (..ada, age = 37)
 	assert(older.age == 37)
 	assert(older.name == "ada")

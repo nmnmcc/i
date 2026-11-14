@@ -21,21 +21,21 @@ Kv = (
 	check = (Int) <- (Fail(Nil | Int | String)) -> Int,
 )
 
-say = (text: String) <- (io: Io) { io.print(text) }
+say = (text : String) <- (io : Io) { io.print(text) }
 
-checks = () <- (kv: Kv) {
+checks = () <- (kv : Kv) {
 	[0, 200, -1, 21]
 		|> each((n) { core.inspect(fail.catch(() { kv.check(n) })) })
 }
 
-each = (xs: List(Int), f: (Int) -> String) -> String {
+each = (xs : List(Int), f : (Int) -> String) -> String {
 	xs |>
 		([]) { "" }
 		| ([x]) { f(x) }
 		| ([x, ..rest]) { f(x) <> " " <> each(rest, f) }
 }
 
-main = () <- (kv: Kv) {
+main = () <- (kv : Kv) {
 	say("hello")
 	say(kv.get("name"))
 	// An error of the host goes through the program as an error (§9.3).
@@ -46,7 +46,7 @@ main = () <- (kv: Kv) {
 }
 
 // A service is a normal value (§9.2).
-test("services_are_values", () <- (kv: Kv) {
+test("services_are_values", () <- (kv : Kv) {
 	get = kv.get
 	get("lang") |> ("i language") { Nil } | (other) { panic(other) }
 })

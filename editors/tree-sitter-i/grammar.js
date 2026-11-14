@@ -91,7 +91,7 @@ module.exports = grammar({
     type_definition: $ => prec(20, seq(field('name', $.type_identifier), optional($.type_head), '=', $._type)),
     type_head: $ => seq('(', list($._type, $._separator), ')'),
     binding: $ => prec.right(seq(field('pattern', $._atom), repeat(seq('=', $._atom)), '=', field('value', $._expression))),
-    declaration: $ => seq(field('name', $.identifier), ':', $._type),
+    declaration: $ => seq(field('name', $.identifier), ':', $._annot),
 
     // ---- Expressions (§3.3) ----
     _expression: $ => choice($.identifier, $.type_identifier, $.integer, $.float, $.string, $.data, $.list, $.bit_array,
@@ -134,7 +134,7 @@ module.exports = grammar({
     alias_pattern: $ => prec.right(seq($._atom, '=', $._pattern)),
     _atom: $ => choice($.identifier, $.discard, $.typed_pattern, $.integer, $.float, $.string, $.negative_pattern,
       $.constructor_pattern, $.data_pattern, $.list_pattern, $.bit_pattern, $.prefix_pattern),
-    typed_pattern: $ => prec.right(2, seq(field('pattern', choice($.identifier, $.discard)), ':', $._type)),
+    typed_pattern: $ => prec.right(2, seq(field('pattern', choice($.identifier, $.discard)), ':', $._annot)),
     negative_pattern: $ => choice(seq('-', $.integer), seq('-.', $.float)),
     constructor_pattern: $ => prec.right(0, seq(optional(seq($.identifier, '.')), $.type_identifier, optional($.data_pattern))),
     data_pattern: $ => seq('(', list(choice($.data_pattern_item, $.rest_pattern), $._separator), ')'),
@@ -151,6 +151,12 @@ module.exports = grammar({
     // ---- Types (§3.1) ----
     _type: $ => choice($.named_type, $.value_type, $.type_call, $.integer, $.string, $.discard, $.negative_type,
       $.data_type, $.type_group, $.function_type, $.binary_type),
+    // Annot = Inter: only brackets admit a union; an unbracketed function
+    // result keeps that same boundary. Aliases preserve the editor node API.
+    _annot: $ => choice($.named_type, $.value_type, $.type_call, $.integer, $.string, $.discard, $.negative_type,
+      $.data_type, $.type_group, alias($._annot_function, $.function_type), alias($._annot_binary, $.binary_type)),
+    _annot_binary: $ => choice(...[[2, '&'], [3, '-']].map(([p, op]) => prec.left(p, seq($._annot, op, $._annot)))),
+    _annot_function: $ => prec.right(seq(optional($.type_parameters), choice($.data_type, $.type_group), optional(seq('<-', $.needs)), '->', $._annot)),
     named_type: $ => prec(11, seq(optional(seq($.identifier, '.')), $.type_identifier, optional($.type_arguments))),
     value_type: $ => seq(optional(seq($.identifier, '.')), $.identifier),
     type_call: $ => seq(optional(seq($.identifier, '.')), $.identifier, $.type_arguments),

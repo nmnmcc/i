@@ -1,6 +1,6 @@
 {
-  "compiler": "806e2f4abcdb1c5ffcace0f8c82b85851cab12e8",
-  "binary_sha256": "ef499550f00c8cc7ab0317da97d9883b30d9d1d1a85877c19cad132942c8672d",
+  "compiler": "c829216203ac222f43092428007a9c3026b14ac8",
+  "binary_sha256": "ed435649d4ef75158514981103ad983a059a299cca0d40f850c8e4598b401473",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.make : (Bool) -> Schema((a = 1 | \"x\"))\napp/main.schema : Schema((a = 1 | \"x\"))\napp/main.read : ((a = 1 | \"x\")) -> Int | String\napp/main.read_inferred : (A) -> Never\napp/main.read_written : ((a = 1 | \"x\")) -> Int | String\n",
-      "stderr": "src/main.i:12:25: error[E0506]: `.a` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u: User) { u.name }`, or give the function where a type is expected, for example `get_name: (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)\n1 error\n"
+      "stderr": "src/main.i:12:25: error[E0506]: `.a` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)\n1 error\n"
     }
   }
 }

@@ -14,10 +14,10 @@ valid_date = (year: Int, month: Int, day: Int) -> calendar.Date {
 }
 
 valid_time = (
-	hour: Int,
-	minute: Int,
-	second: Int,
-	nanosecond: Int
+	hour : Int,
+	minute : Int,
+	second : Int,
+	nanosecond : Int
 ) -> calendar.TimeOfDay {
 	fail.catch(() { calendar.time_of_day(hour, minute, second, nanosecond) }) |>
 		(Ok(value)) { value }
@@ -169,16 +169,16 @@ test("calendar_known_days", () {
 // Independent January-based oracle from the review. The production algorithm
 // instead decomposes March-based 400-year eras (note §4.3). C3 requires floor
 // division; adjust the remainder to nonnegative here before dividing.
-oracle_floor = (a: Int, b: Int) -> Int { { a - { a % b + b } % b } / b }
+oracle_floor = (a : Int, b : Int) -> Int { { a - { a % b + b } % b } / b }
 
-before_year = (y: Int) -> Int {
+before_year = (y : Int) -> Int {
 	365 * y +
 		oracle_floor(y + 3, 4) -
 		oracle_floor(y + 99, 100) +
 		oracle_floor(y + 399, 400)
 }
 
-oracle_day = (year: Int, month: Int, day: Int) -> Int {
+oracle_day = (year : Int, month : Int, day : Int) -> Int {
 	before_month = month |>
 		(1) { 0 }
 		| (2) { 31 }

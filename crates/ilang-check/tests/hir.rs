@@ -86,7 +86,7 @@ g = (n) { f(n) }
 #[test]
 fn names_resolve() {
     let program = ok(
-        "(\n\ti/core\n\tc = (not) = i/core\n)\n\nC(A) = (A)\nT(A) = C(A)\n\nf = <A>(x: A) -> A {\n\ty = C(x)\n\ty |>\n\t\t(C(z) | C(_ = z) ? True) { core.not(not(True)) }\n\t\t| (_) { panic(\"unreachable\") }\n\tx\n}\n",
+        "(\n\ti/core\n\tc = (not) = i/core\n)\n\nC(A) = (A)\nT(A) = C(A)\n\nf = <A>(x : A) -> A {\n\ty = C(x)\n\ty |>\n\t\t(C(z) | C(_ = z) ? True) { core.not(not(True)) }\n\t\t| (_) { panic(\"unreachable\") }\n\tx\n}\n",
         &["f"],
     );
     let main = program.module(common::module(&program, "app/main"));

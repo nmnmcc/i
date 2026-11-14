@@ -25,7 +25,7 @@ catch = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> Result(A, E) {
 }
 
 /// Gives the error `x` for `Error(x)`.
-from_result = <A, E>(result: Result(A, E)) -> A {
+from_result = <A, E>(result : Result(A, E)) -> A {
 	result |> (Ok(value)) { value } | (Error(error)) { raise(error) }
 }
 

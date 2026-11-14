@@ -14,7 +14,7 @@ compile = (pattern: String) -> regex.Regex {
 		| (Error(_)) { panic("test pattern") }
 }
 
-text = (pattern: String, input: String) -> String {
+text = (pattern : String, input : String) -> String {
 	regex.find(compile(pattern), input) |>
 		(Some(m)) { m.text }
 		| (None) { "<no match>" }

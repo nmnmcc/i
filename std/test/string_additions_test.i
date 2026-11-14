@@ -126,7 +126,7 @@ test("scalar_traversals", () {
 
 Calls = (call = (Int) -> Nil)
 
-observe = (body: () <- (Calls, Assert) -> Nil) -> List(Int) {
+observe = (body : () <- (Calls, Assert) -> Nil) -> List(Int) {
 	control.boundary((b) {
 		{
 			body()
@@ -143,14 +143,14 @@ observe = (body: () <- (Calls, Assert) -> Nil) -> List(Int) {
 
 test("callbacks_run_once_in_order_and_stop_on_error", () {
 	run = (
-		action: ((UtfCodepoint) <- (Fail(String), Calls) -> UtfCodepoint) <- (
+		action : ((UtfCodepoint) <- (Fail(String), Calls) -> UtfCodepoint) <- (
 			Fail(String),
 			Calls,
 		) -> String
 	) -> Nil {
 		seen = observe(() {
 			result = fail.catch(() {
-				action((c) <- (calls: Calls) {
+				action((c) <- (calls : Calls) {
 					n = core.codepoint_to_int(c)
 					calls.call(n)
 					{ n == 233 } |>
@@ -174,7 +174,7 @@ test("callbacks_run_once_in_order_and_stop_on_error", () {
 	})
 	seen = observe(() {
 		assert(
-			string.map("aé😀", (c) <- (calls: Calls) {
+			string.map("aé😀", (c) <- (calls : Calls) {
 				calls.call(core.codepoint_to_int(c))
 				c
 			}) ==

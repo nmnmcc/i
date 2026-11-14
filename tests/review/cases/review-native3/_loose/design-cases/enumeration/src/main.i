@@ -7,7 +7,7 @@
 @host("review:gate/v1", "request")
 Gate = (wait = () -> Request(Nil))
 
-main = () <- (gate: Gate, root: request.Root) {
+main = () <- (gate : Gate, root : request.Root) {
 	pending = gate.wait()
 	task.scope((s) {
 		child = task.go(s, () {

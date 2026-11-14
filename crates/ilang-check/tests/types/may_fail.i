@@ -8,7 +8,7 @@ pair = (t) {
 	a
 }
 
-pair_written = (t: (Int, String)) {
+pair_written = (t : (Int, String)) {
 	(a, b) = t
 	b
 }
@@ -19,7 +19,7 @@ first = (r) {
 }
 
 annotated = () {
-	x: Int = 5
+	x : Int = 5
 	x
 }
 
@@ -28,18 +28,18 @@ literal = (n) {
 	n
 }
 
-single = (u: User) {
+single = (u : User) {
 	User(name = name, ..) = u
 	name
 }
 
 // `Error(Never)` has no values, so `Ok(v)` matches every value.
-only_ok = (r: Result(Int, Never)) {
+only_ok = (r : Result(Int, Never)) {
 	Ok(v) = r
 	v
 }
 
-nested = (p: (Result(Int, Never), Bool)) {
+nested = (p : (Result(Int, Never), Bool)) {
 	(Ok(x), b) = p
 	x
 }
@@ -75,7 +75,7 @@ named = (r) {
 }
 
 typed_part = (p) {
-	(x: Int, y) = p
+	(x : Int, y) = p
 	y
 }
 
@@ -90,7 +90,7 @@ float = (f) {
 }
 
 // Parameters.
-type_var = <A>(x: A) -> A { x }
+type_var = <A>(x : A) -> A { x }
 
 param_tuple = ((a, b)) { a }
 

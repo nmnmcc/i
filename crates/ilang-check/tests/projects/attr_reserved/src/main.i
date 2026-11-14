@@ -1,8 +1,8 @@
 @external("ilang:core", "not")
-not: (Bool) -> Bool
+not : (Bool) -> Bool
 
 @host("ilang:storage")
 S = (get = () -> Int)
 
 @external("app:math/v1", "add")
-add: (Int, Int) -> Int
+add : (Int, Int) -> Int

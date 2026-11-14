@@ -10,7 +10,7 @@ pairs : ((Int | String, Bool)) -> String
 deep : (Result(Result(Int, String) | Nil, Nil)) -> String | Nil
 guarded : (Int | String) -> String | Int
 literal : (Int | String) -> String | Int - 1
-partial : (Result(Int, String) | Nil) -> Nil | Result(Int, String)
+partial : (Result(Int, String) | Nil) -> Nil | Ok(Int)
 by_patterns : ((Bool, Int | String)) -> String | Int
 open : (A) -> 0 | A - Int
 29:1: warning[W0504]: top-level binding `safe` is not used

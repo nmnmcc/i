@@ -2,7 +2,7 @@
 // expect: stop "bit array: length is negative"
 // at: spec/main:10:6
 // at: spec/main:15:2
-make = (n: Int) {
+make = (n : Int) {
 	b = <<1:u1>>
 	c = <<0:u7>>
 	b2 = <<b:bits, c:bits>>

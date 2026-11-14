@@ -131,11 +131,11 @@ Parser(A) = (
 	(List(List(Token))) -> Result((A, List(List(Token))), CliError),
 )
 
-pure = <A>(value: A) -> Parser(A) {
+pure = <A>(value : A) -> Parser(A) {
 	Parser([], (buckets) { Ok((value, buckets)) })
 }
 
-flag = (names: Names, help: String) -> Parser(Bool) {
+flag = (names : Names, help : String) -> Parser(Bool) {
 	Parser([
 		Field(name = names.long, short = names.short, help = help, kind = Flag),
 	], (buckets) {
@@ -146,9 +146,9 @@ flag = (names: Names, help: String) -> Parser(Bool) {
 }
 
 convert = <A>(
-	token: Token,
-	name: String,
-	read: (String) -> Result(A, String)
+	token : Token,
+	name : String,
+	read : (String) -> Result(A, String)
 ) -> Result(A, CliError) {
 	read(token.text) |>
 		(Ok(value)) { Ok(value) }
@@ -165,9 +165,9 @@ convert = <A>(
 }
 
 required = <A>(
-	field: Field,
-	name: String,
-	read: (String) -> Result(A, String)
+	field : Field,
+	name : String,
+	read : (String) -> Result(A, String)
 ) -> Parser(A) {
 	Parser([field], (buckets) {
 		buckets |>
@@ -182,9 +182,9 @@ required = <A>(
 }
 
 option = <A>(
-	names: Names,
-	help: String,
-	read: (String) -> Result(A, String)
+	names : Names,
+	help : String,
+	read : (String) -> Result(A, String)
 ) -> Parser(A) {
 	required(
 		Field(
@@ -199,9 +199,9 @@ option = <A>(
 }
 
 argument = <A>(
-	name: String,
-	help: String,
-	read: (String) -> Result(A, String)
+	name : String,
+	help : String,
+	read : (String) -> Result(A, String)
 ) -> Parser(A) {
 	required(
 		Field(name = name, short = None, help = help, kind = Positional),
@@ -211,9 +211,9 @@ argument = <A>(
 }
 
 optional = <A>(
-	names: Names,
-	help: String,
-	read: (String) -> Result(A, String)
+	names : Names,
+	help : String,
+	read : (String) -> Result(A, String)
 ) -> Parser(Option(A)) {
 	Parser([
 		Field(
@@ -235,11 +235,11 @@ optional = <A>(
 }
 
 convert_all = <A>(
-	tokens: List(Token),
-	name: String,
-	read: (String) -> Result(A, String)
+	tokens : List(Token),
+	name : String,
+	read : (String) -> Result(A, String)
 ) -> Result(List(A), CliError) {
-	go = (remaining: List(Token), acc: List(A)) -> Result(List(A), CliError) {
+	go = (remaining : List(Token), acc : List(A)) -> Result(List(A), CliError) {
 		remaining |>
 			([]) { Ok(list.reverse(acc)) }
 			| ([token, ..tail]) {
@@ -252,9 +252,9 @@ convert_all = <A>(
 }
 
 repeated = <A>(
-	field: Field,
-	name: String,
-	read: (String) -> Result(A, String)
+	field : Field,
+	name : String,
+	read : (String) -> Result(A, String)
 ) -> Parser(List(A)) {
 	Parser([field], (buckets) {
 		buckets |>
@@ -268,9 +268,9 @@ repeated = <A>(
 }
 
 many = <A>(
-	names: Names,
-	help: String,
-	read: (String) -> Result(A, String)
+	names : Names,
+	help : String,
+	read : (String) -> Result(A, String)
 ) -> Parser(List(A)) {
 	repeated(
 		Field(
@@ -285,9 +285,9 @@ many = <A>(
 }
 
 rest = <A>(
-	name: String,
-	help: String,
-	read: (String) -> Result(A, String)
+	name : String,
+	help : String,
+	read : (String) -> Result(A, String)
 ) -> Parser(List(A)) {
 	repeated(
 		Field(name = name, short = None, help = help, kind = Remaining),
@@ -296,7 +296,7 @@ rest = <A>(
 	)
 }
 
-map = <A, B>(parser: Parser(A), with: (A) -> B) -> Parser(B) {
+map = <A, B>(parser : Parser(A), with : (A) -> B) -> Parser(B) {
 	Parser(fields, decode) = parser
 	Parser(fields, (buckets) {
 		decode(buckets) |>
@@ -306,9 +306,9 @@ map = <A, B>(parser: Parser(A), with: (A) -> B) -> Parser(B) {
 }
 
 map2 = <A, B, C>(
-	first: Parser(A),
-	second: Parser(B),
-	with: (A, B) -> C
+	first : Parser(A),
+	second : Parser(B),
+	with : (A, B) -> C
 ) -> Parser(C) {
 	Parser(left_fields, left) = first
 	Parser(right_fields, right) = second
@@ -323,19 +323,19 @@ map2 = <A, B, C>(
 	})
 }
 
-text = (text: String) -> Result(String, String) { Ok(text) }
+text = (text : String) -> Result(String, String) { Ok(text) }
 
-integer = (text: String) -> Result(Int, String) {
+integer = (text : String) -> Result(Int, String) {
 	int.parse(text) |>
 		(Ok(value)) { Ok(value) }
 		| (Error(_)) { Error("expected integer") }
 }
 
-ascii_lower = (c: Int) -> Bool { c >= 97 && c <= 122 }
+ascii_lower = (c : Int) -> Bool { c >= 97 && c <= 122 }
 
-ascii_letter = (c: Int) -> Bool { ascii_lower(c) || { c >= 65 && c <= 90 } }
+ascii_letter = (c : Int) -> Bool { ascii_lower(c) || { c >= 65 && c <= 90 } }
 
-valid_name = (name: String) -> Bool {
+valid_name = (name : String) -> Bool {
 	list.map(string.to_codepoints(name), string.utf_codepoint_to_int) |>
 		([]) { False }
 		| ([first, ..tail]) {
@@ -346,21 +346,21 @@ valid_name = (name: String) -> Bool {
 		}
 }
 
-valid_short = (name: String) -> Bool {
+valid_short = (name : String) -> Bool {
 	list.map(string.to_codepoints(name), string.utf_codepoint_to_int) |>
 		([c]) { ascii_letter(c) }
 		| (_) { False }
 }
 
-positional = (kind: Kind) -> Bool { kind == Positional || kind == Remaining }
+positional = (kind : Kind) -> Bool { kind == Positional || kind == Remaining }
 
-validate = (fields: List(Field)) -> Result(Nil, DefinitionError) {
+validate = (fields : List(Field)) -> Result(Nil, DefinitionError) {
 	go = (
-		remaining: List(Field),
-		longs: List(String),
-		shorts: List(String),
-		positions: List(String),
-		had_rest: Bool
+		remaining : List(Field),
+		longs : List(String),
+		shorts : List(String),
+		positions : List(String),
+		had_rest : Bool
 	) -> Result(Nil, DefinitionError) {
 		remaining |>
 			([]) { Ok(Nil) }
@@ -463,10 +463,10 @@ validate = (fields: List(Field)) -> Result(Nil, DefinitionError) {
 	go(fields, [], [], [], False)
 }
 
-lookup = (fields: List(Field), name: String, short: Bool) -> Option(
+lookup = (fields : List(Field), name : String, short : Bool) -> Option(
 	(Int, Field),
 ) {
-	go = (remaining: List(Field), index: Int) -> Option((Int, Field)) {
+	go = (remaining : List(Field), index : Int) -> Option((Int, Field)) {
 		remaining |>
 			([]) { None }
 			| ([field, ..tail]) {
@@ -481,7 +481,7 @@ lookup = (fields: List(Field), name: String, short: Bool) -> Option(
 	go(fields, 0)
 }
 
-bucket_at = (buckets: List(List(Token)), index: Int) -> List(Token) {
+bucket_at = (buckets : List(List(Token)), index : Int) -> List(Token) {
 	buckets |>
 		([]) { panic("cli: bucket index out of range") }
 		| ([head, ..tail]) {
@@ -491,7 +491,7 @@ bucket_at = (buckets: List(List(Token)), index: Int) -> List(Token) {
 		}
 }
 
-put = (buckets: List(List(Token)), index: Int, token: Token) -> List(
+put = (buckets : List(List(Token)), index : Int, token : Token) -> List(
 	List(Token),
 ) {
 	buckets |>
@@ -504,7 +504,7 @@ put = (buckets: List(List(Token)), index: Int, token: Token) -> List(
 }
 
 // The option name excludes leading dashes; only long options can attach values.
-option_token = (token: String) -> Option((String, Bool, Option(String))) {
+option_token = (token : String) -> Option((String, Bool, Option(String))) {
 	string.to_codepoint_strings(token) |>
 		(["-", "-", ..tail]) {
 			name = string.concat(tail)
@@ -516,16 +516,16 @@ option_token = (token: String) -> Option((String, Bool, Option(String))) {
 		| (_) { None }
 }
 
-scan = (fields: List(Field), args: List(String)) -> Result(
+scan = (fields : List(Field), args : List(String)) -> Result(
 	(List(List(Token)), List(Token)),
 	CliError,
 ) {
 	go = (
-		remaining: List(String),
-		index: Int,
-		options: Bool,
-		buckets: List(List(Token)),
-		positions: List(Token)
+		remaining : List(String),
+		index : Int,
+		options : Bool,
+		buckets : List(List(Token)),
+		positions : List(Token)
 	) -> Result((List(List(Token)), List(Token)), CliError) {
 		remaining |>
 			([]) {
@@ -704,15 +704,15 @@ scan = (fields: List(Field), args: List(String)) -> Result(
 }
 
 allocate = (
-	fields: List(Field),
-	buckets: List(List(Token)),
-	positions: List(Token)
+	fields : List(Field),
+	buckets : List(List(Token)),
+	positions : List(Token)
 ) -> Result(List(List(Token)), CliError) {
 	go = (
-		remaining: List(Field),
-		stored: List(List(Token)),
-		args: List(Token),
-		acc: List(List(Token))
+		remaining : List(Field),
+		stored : List(List(Token)),
+		args : List(Token),
+		acc : List(List(Token))
 	) -> Result(List(List(Token)), CliError) {
 		(remaining, stored) |>
 			(([], [])) {
@@ -744,7 +744,7 @@ allocate = (
 	go(fields, buckets, positions, [])
 }
 
-parse = <A>(parser: Parser(A), args: List(String)) -> Result(A, CliError) {
+parse = <A>(parser : Parser(A), args : List(String)) -> Result(A, CliError) {
 	Parser(fields, decode) = parser
 	validate(fields) |>
 		(Error(error)) { Error(BadDefinition(error)) }
@@ -766,7 +766,7 @@ parse = <A>(parser: Parser(A), args: List(String)) -> Result(A, CliError) {
 		}
 }
 
-show_field = (field: Field) -> String {
+show_field = (field : Field) -> String {
 	base = "--" <>
 		field.name <>
 		{ field.short |> (Some(short)) { ", -" <> short } | (None) { "" } }
@@ -779,7 +779,7 @@ show_field = (field: Field) -> String {
 		| (Remaining) { "[<" <> field.name <> ">...]" }
 }
 
-help = <A>(parser: Parser(A), program: String) -> Result(
+help = <A>(parser : Parser(A), program : String) -> Result(
 	String,
 	DefinitionError,
 ) {
@@ -793,7 +793,7 @@ help = <A>(parser: Parser(A), program: String) -> Result(
 						"Usage: ",
 						program,
 						"\n",
-						..list.map(fields, (field: Field) {
+						..list.map(fields, (field : Field) {
 							string.concat(
 								[
 									"  ",

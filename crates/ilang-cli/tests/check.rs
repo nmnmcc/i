@@ -18,7 +18,7 @@ fn check_types() {
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "id = (x) { x }\nClock = (now = () -> Int)\nelapsed = (start: Int) <- (clock: Clock) { clock.now() - start }\n",
+        "id = (x) { x }\nClock = (now = () -> Int)\nelapsed = (start : Int) <- (clock : Clock) { clock.now() - start }\n",
     )
     .unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -38,7 +38,7 @@ fn check_reports_type_errors() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.i"), "x: String = 1\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "x : String = 1\n").unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["check", "--project"])
         .arg(dir.path())
@@ -91,19 +91,10 @@ fn front_end_project(source: &str) -> tempfile::TempDir {
 fn a_local_annotation_cannot_hide_an_entry_service() {
     // §4.8 retains the service through the local binding; §10.2 requires
     // a provider before entry. Both annotations have the same finite type.
-    let annotated = "S(N) = (() <- N -> Nil)
-use = <N>() <- (s: S(N)) {
-	S(f) = s
-	f()
-}
-
-main = <N>() {
-	local: () <- (S(N), ..N) -> Nil = () { use() }
-	local()
-}";
+    let annotated = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\n\tlocal()\n}";
     for source in [
         annotated.to_string(),
-        annotated.replace("local: () <- (S(N), ..N) -> Nil", "local"),
+        annotated.replace("local : () <- (S(N), ..N) -> Nil", "local"),
     ] {
         let dir = front_end_project(&source);
         let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -146,22 +137,7 @@ fn a_captured_service_row_keeps_callback_dependencies() {
     // §4.8 rule 5b removes S, leaving the callback's Dependency need.
     // Keep the old fixture's explicit provider contract: `! S(Dependency)
     // = S(...)` migrates to a typed local before the provide (syntax-3 §7.3).
-    let source = "S(N) = (() <- N -> Nil)
-Dependency = ()
-read = () <- (d: Dependency) { Nil }
-use = <N>() <- (s: S(N)) {
-	S(f) = s
-	f()
-}
-apply = <N>() {
-	local: () <- N -> Nil = () { use() }
-	local()
-}
-
-main = () {
-	provided: S(Dependency) = S(() { read() })
-	apply() <- (provided)
-}";
+    let source = "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}\n\nmain = () {\n\tprovided : S(Dependency) = S(() { read() })\n\tapply() <- (provided)\n}";
     for supplied in [false, true] {
         let source = if supplied {
             // `Dependency = ()` makes the value `Dependency` (syntax-3.md
@@ -311,7 +287,7 @@ fn old_forms_have_helpful_errors_without_reserving_names() {
             /* old-syntax-check: E0111,E0101 */ "x = 1 |> { n if True -> n }",
             "? condition",
         ),
-        ("id = (x: a) { x }", "error[E0201]: `a` is not defined"),
+        ("id = (x : a) { x }", "error[E0201]: `a` is not defined"),
     ] {
         let dir = front_end_project(source);
         let out = Command::new(env!("CARGO_BIN_EXE_i"))

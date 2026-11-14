@@ -122,11 +122,11 @@ CalendarError = BadMonth
 	| BadOffset
 	| BadText
 
-is_leap_year = (year: Int) -> Bool {
+is_leap_year = (year : Int) -> Bool {
 	year % 4 == 0 && { year % 100 != 0 || year % 400 == 0 }
 }
 
-days_in_month = (year: Int, month: Int) -> Result(Int, CalendarError) {
+days_in_month = (year : Int, month : Int) -> Result(Int, CalendarError) {
 	month |>
 		(1 | 3 | 5 | 7 | 8 | 10 | 12) { Ok(31) }
 		| (4 | 6 | 9 | 11) { Ok(30) }
@@ -134,7 +134,7 @@ days_in_month = (year: Int, month: Int) -> Result(Int, CalendarError) {
 		| (_) { Error(BadMonth) }
 }
 
-date = (year: Int, month: Int, day: Int) -> Result(Date, CalendarError) {
+date = (year : Int, month : Int, day : Int) -> Result(Date, CalendarError) {
 	days_in_month(year, month) |>
 		(Error(e)) { Error(e) }
 		| (Ok(count)) {
@@ -144,10 +144,12 @@ date = (year: Int, month: Int, day: Int) -> Result(Date, CalendarError) {
 		}
 }
 
-time_of_day = (hour: Int, minute: Int, second: Int, nanosecond: Int) -> Result(
-	TimeOfDay,
-	CalendarError,
-) {
+time_of_day = (
+	hour : Int,
+	minute : Int,
+	second : Int,
+	nanosecond : Int
+) -> Result(TimeOfDay, CalendarError) {
 	{ hour < 0 || hour > 23 } |>
 		(True) { Error(BadHour) }
 		| (False) {
@@ -174,7 +176,7 @@ time_of_day = (hour: Int, minute: Int, second: Int, nanosecond: Int) -> Result(
 		}
 }
 
-offset = (minutes: Int) -> Result(Offset, CalendarError) {
+offset = (minutes : Int) -> Result(Offset, CalendarError) {
 	{ minutes >= -1439 && minutes <= 1439 } |>
 		(True) { Ok(Offset(minutes)) }
 		| (False) { Error(BadOffset) }
@@ -182,29 +184,29 @@ offset = (minutes: Int) -> Result(Offset, CalendarError) {
 
 utc = () -> Offset { Offset(0) }
 
-date_parts = (date: Date) -> (Int, Int, Int) {
+date_parts = (date : Date) -> (Int, Int, Int) {
 	Date(y, m, d) = date
 	(y, m, d)
 }
 
-time_parts = (time: TimeOfDay) -> (Int, Int, Int, Int) {
+time_parts = (time : TimeOfDay) -> (Int, Int, Int, Int) {
 	TimeOfDay(h, m, s, n) = time
 	(h, m, s, n)
 }
 
-offset_minutes = (offset: Offset) -> Int {
+offset_minutes = (offset : Offset) -> Int {
 	Offset(minutes) = offset
 	minutes
 }
 
 // Only positive divisors occur in the calendar algorithms (C3).
-floor_divide = (a: Int, b: Int) -> Int {
+floor_divide = (a : Int, b : Int) -> Int {
 	{ a % b < 0 } |> (True) { a / b - 1 } | (False) { a / b }
 }
 
-modulo = (a: Int, b: Int) -> Int { a - b * floor_divide(a, b) }
+modulo = (a : Int, b : Int) -> Int { a - b * floor_divide(a, b) }
 
-day_number = (date: Date) -> Int {
+day_number = (date : Date) -> Int {
 	Date(y, m, d) = date
 	y1 = { m <= 2 } |> (True) { y - 1 } | (False) { y }
 	era = floor_divide(y1, 400)
@@ -215,7 +217,7 @@ day_number = (date: Date) -> Int {
 	era * 146097 + doe - 719468
 }
 
-from_day_number = (day: Int) -> Date {
+from_day_number = (day : Int) -> Date {
 	z = day + 719468
 	era = floor_divide(z, 146097)
 	doe = z - era * 146097
@@ -234,7 +236,7 @@ from_day_number = (day: Int) -> Date {
 	Date({ m <= 2 } |> (True) { y + 1 } | (False) { y }, m, d)
 }
 
-weekday = (date: Date) -> Weekday {
+weekday = (date : Date) -> Weekday {
 	modulo(day_number(date) + 3, 7) |>
 		(0) { Monday }
 		| (1) { Tuesday }
@@ -245,15 +247,15 @@ weekday = (date: Date) -> Weekday {
 		| (_) { Sunday }
 }
 
-add_days = (date: Date, days: Int) -> Date {
+add_days = (date : Date, days : Int) -> Date {
 	from_day_number(day_number(date) + days)
 }
 
-days_between = (start: Date, end: Date) -> Int {
+days_between = (start : Date, end : Date) -> Int {
 	day_number(end) - day_number(start)
 }
 
-at = (instant: time.Instant, offset: Offset) -> Civil {
+at = (instant : time.Instant, offset : Offset) -> Civil {
 	local = time.unix_nanoseconds(instant) +
 		offset_minutes(offset) * 60000000000
 	day = floor_divide(local, 86400000000000)
@@ -269,7 +271,7 @@ at = (instant: time.Instant, offset: Offset) -> Civil {
 	)
 }
 
-to_instant = (civil: Civil, offset: Offset) -> time.Instant {
+to_instant = (civil : Civil, offset : Offset) -> time.Instant {
 	d = civil.date
 	t = civil.time
 	TimeOfDay(h, m, s, n) = t
@@ -285,11 +287,11 @@ to_instant = (civil: Civil, offset: Offset) -> time.Instant {
 
 // Every input check in the text profile maps to BadText, including constructor
 // failures. These helpers raise only within parse's enclosing pure catch.
-require_text = (valid: Bool) -> Nil {
+require_text = (valid : Bool) -> Nil {
 	valid |> (True) { Nil } | (False) { fail.raise(BadText) }
 }
 
-expect = (chars: List(Int), wanted: Int) -> List(Int) {
+expect = (chars : List(Int), wanted : Int) -> List(Int) {
 	chars |>
 		([c, ..tail]) {
 			{ c == wanted } |> (True) { tail } | (False) { fail.raise(BadText) }
@@ -297,7 +299,7 @@ expect = (chars: List(Int), wanted: Int) -> List(Int) {
 		| ([]) { fail.raise(BadText) }
 }
 
-digits = (chars: List(Int), count: Int, value: Int) -> (Int, List(Int)) {
+digits = (chars : List(Int), count : Int, value : Int) -> (Int, List(Int)) {
 	{ count == 0 } |>
 		(True) { (value, chars) }
 		| (False) {
@@ -310,7 +312,7 @@ digits = (chars: List(Int), count: Int, value: Int) -> (Int, List(Int)) {
 		}
 }
 
-scan_digits = (chars: List(Int), value: Int, count: Int) -> (
+scan_digits = (chars : List(Int), value : Int, count : Int) -> (
 	Int,
 	Int,
 	List(Int),
@@ -324,7 +326,7 @@ scan_digits = (chars: List(Int), value: Int, count: Int) -> (
 		| ([]) { (value, count, []) }
 }
 
-read_year = (chars: List(Int)) -> (Int, List(Int)) {
+read_year = (chars : List(Int)) -> (Int, List(Int)) {
 	(sign, rest) = chars |>
 		([43, ..tail]) { (1, tail) }
 		| ([45, ..tail]) { (-1, tail) }
@@ -345,13 +347,13 @@ read_year = (chars: List(Int)) -> (Int, List(Int)) {
 	(year, expect(tail, 45))
 }
 
-power_of_ten = (exponent: Int) -> Int {
+power_of_ten = (exponent : Int) -> Int {
 	{ exponent == 0 } |>
 		(True) { 1 }
 		| (False) { 10 * power_of_ten(exponent - 1) }
 }
 
-read_fraction = (chars: List(Int)) -> (Int, List(Int)) {
+read_fraction = (chars : List(Int)) -> (Int, List(Int)) {
 	chars |>
 		([46, ..tail]) {
 			(n, count, rest) = scan_digits(tail, 0, 0)
@@ -361,7 +363,7 @@ read_fraction = (chars: List(Int)) -> (Int, List(Int)) {
 		| (_) { (0, chars) }
 }
 
-read_offset = (chars: List(Int)) -> Offset {
+read_offset = (chars : List(Int)) -> Offset {
 	chars |>
 		([90]) { utc() }
 		| ([sign, ..tail]) {
@@ -378,7 +380,7 @@ read_offset = (chars: List(Int)) -> Offset {
 		| ([]) { fail.raise(BadText) }
 }
 
-parse = (text: String) -> Result((Civil, Offset), CalendarError) {
+parse = (text : String) -> Result((Civil, Offset), CalendarError) {
 	fail.catch(() {
 		chars = list.map(core.codepoints(text), core.codepoint_to_int)
 		(y, r1) = read_year(chars)
@@ -399,11 +401,11 @@ parse = (text: String) -> Result((Civil, Offset), CalendarError) {
 	})
 }
 
-padded = (value: Int, width: Int) -> String {
+padded = (value : Int, width : Int) -> String {
 	string.pad_left(int.to_string(value), width, "0")
 }
 
-year_text = (year: Int) -> String {
+year_text = (year : Int) -> String {
 	{ year < 0 } |>
 		(True) { "-" <> padded(-year, 4) }
 		| (False) {
@@ -413,8 +415,8 @@ year_text = (year: Int) -> String {
 		}
 }
 
-fraction_text = (n: Int) -> String {
-	trim = (value: Int, width: Int) -> String {
+fraction_text = (n : Int) -> String {
+	trim = (value : Int, width : Int) -> String {
 		{ value % 10 == 0 } |>
 			(True) { trim(value / 10, width - 1) }
 			| (False) { "." <> padded(value, width) }
@@ -422,7 +424,7 @@ fraction_text = (n: Int) -> String {
 	{ n == 0 } |> (True) { "" } | (False) { trim(n, 9) }
 }
 
-offset_text = (offset: Offset) -> String {
+offset_text = (offset : Offset) -> String {
 	minutes = offset_minutes(offset)
 	{ minutes == 0 } |>
 		(True) { "Z" }
@@ -439,7 +441,7 @@ offset_text = (offset: Offset) -> String {
 		}
 }
 
-format = (civil: Civil, offset: Offset) -> String {
+format = (civil : Civil, offset : Offset) -> String {
 	d = civil.date
 	t = civil.time
 	Date(y, m, day) = d

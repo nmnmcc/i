@@ -171,7 +171,7 @@ map_environment(A, E, N, M): (stream: Stream(A, E, N), run: { (body: () -> Step(
 ```
 
 A/E are covariant; N is invariant. The second private Stream field is an unused
-function accepting N and returning Nil. It is made as `(_: N) { Nil }` and never
+function accepting N and returning Nil. It is made as `(_ : N) { Nil }` and never
 called. This is an ordinary negative occurrence, so the existing variance rule
 makes N invariant, including through Step's tail. It prevents a Stream needing
 `Sink(Int)` from being coerced to one needing `Sink(Never)` through the ordinary
@@ -251,18 +251,18 @@ common environment in their constructors; this is a deliberate ergonomic cost.
 Implementation witnesses, using ordinary constructors and calls:
 
 ```i
-make = <A, E, N>(step: () <- (Fail(E), ..N) -> Step(A, E, N)) -> Stream(
+make = <A, E, N>(step : () <- (Fail(E), ..N) -> Step(A, E, N)) -> Stream(
 	A,
 	E,
 	N,
-) { Stream(step, (_: N) { Nil }) }
-pull = <A, E, N>(stream: Stream(A, E, N)) -> Step(A, E, N) {
+) { Stream(step, (_ : N) { Nil }) }
+pull = <A, E, N>(stream : Stream(A, E, N)) -> Step(A, E, N) {
 	Stream(step, _) = stream
 	step()
 }
 map_environment = <A, E, N, M>(
-	stream: Stream(A, E, N),
-	run: (() <- (Fail(E), ..N) -> Step(A, E, N)) <- (Fail(E), ..M) -> Step(
+	stream : Stream(A, E, N),
+	run : (() <- (Fail(E), ..N) -> Step(A, E, N)) <- (Fail(E), ..M) -> Step(
 		A,
 		E,
 		N,
@@ -309,7 +309,7 @@ also need separate demand tests, not just these extensional laws.
 | Collect `from_results([Ok(1), Error("bad"), Ok(3)])` inside fail.catch | `Error("bad")` | S7 |
 | Collect attempt of that stream | `[Ok(1), Error("bad")]` | S7 |
 
-Use a local nominal service `Bias { Bias(value: Int) }` to test S2: construct
+Use a local nominal service `Bias { Bias(value : Int) }` to test S2: construct
 `make((b ! Bias) { Next(b.value, new()) })` before installing Bias; pull it under
 Bias(10), then under Bias(20), expecting heads 10 and 20. A compile-fail client
 pulling it without Bias must be rejected. Repeat the same pure position twice
@@ -345,7 +345,7 @@ written here in the accepted syntax with Stream/Step as defined in §3.1:
 
 ```i
 new = <A, N>() -> Stream(A, Never, N) {
-	Stream(() -> Step(A, Never, N) { Done }, (_: N) { Nil })
+	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { Nil })
 }
 Bias = (value = Int)
 needs_bias = () -> Stream(Int, Never, Bias) { new() }
@@ -699,7 +699,7 @@ build_query: (pairs: List((String, String))) -> String
 ```
 
 `Parts`/`Authority` use existing labelled constructor fields, not structural
-record syntax. For example, modify a query with `Parts(..p, query: Some(q))`,
+record syntax. For example, modify a query with `Parts(..p, query : Some(q))`,
 then call build. The constructor is known from its single-variant nominal type
 (spec §6.7); no T3-only record pattern is involved.
 
@@ -1010,7 +1010,7 @@ BadEmpty = ()
 BadDeep(A) = (List(A), BadTree(BadNode(A)))
 BadTree(A) = BadEmpty | BadDeep(A)
 BadNode(A) = (A, A)
-depth = <A>(tree: BadTree(A)) -> Int {
+depth = <A>(tree : BadTree(A)) -> Int {
 	tree |> (BadEmpty) { 0 } | (BadDeep(_, middle)) { 1 + depth(middle) }
 }
 ```
@@ -1023,10 +1023,13 @@ type and logarithmic middle search do not require polymorphic recursion.
 **Soundness/interface: losing latent effects.** This client must fail to type:
 
 ```i
-(std/stream, i/fail)
+(
+	std/stream
+	i/fail
+)
 bad = () -> List(Int) {
-  s = stream.make(() { fail.raise("lost") })
-  stream.to_list(s)
+	s = stream.make(() { fail.raise("lost") })
+	stream.to_list(s)
 }
 ```
 
@@ -1041,8 +1044,8 @@ cannot be erased by an intermediate combinator.
 ```i
 Sink(A) = (put = (A) -> Nil)
 PlainStream(E, N) = (() <- (Fail(E), ..N) -> Nil)
-need_int = () <- (s: Sink(Int)) { s.put(1) }
-coerce = (source: PlainStream(Never, Sink(Int))) -> PlainStream(
+need_int = () <- (s : Sink(Int)) { s.put(1) }
+coerce = (source : PlainStream(Never, Sink(Int))) -> PlainStream(
 	Never,
 	Sink(Never),
 ) { source }
@@ -1050,7 +1053,7 @@ unsafe = () {
 	{
 		PlainStream(run) = coerce(PlainStream(need_int))
 		run()
-	} <- (Sink(put = (x: Never) -> Nil { core.never(x) }))
+	} <- (Sink(put = (x : Never) -> Nil { core.never(x) }))
 }
 ```
 
@@ -1058,9 +1061,11 @@ This proposed wrapper would route the integer 1 to a function whose parameter ha
 values. In the final design the analogous coercion must be rejected:
 
 ```i
-bad_coerce = (source: stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(Int, Never, Sink(Never)) {
-  source
-}
+bad_coerce = (source : stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(
+	Int,
+	Never,
+	Sink(Never),
+) { source }
 ```
 
 A plain thunk wrapper makes N covariant under the existing variance walk
@@ -1081,10 +1086,18 @@ reading pass did not establish factory buildability.
 **Behavior: overpull through take.**
 
 ```i
-(std/stream, i/fail)
+(
+	std/stream
+	i/fail
+)
 example = () {
-  tail = stream.make(() { fail.raise("too far") })
-  stream.to_list(stream.take(stream.append(stream.wrap(1), tail), 1))
+	tail = stream.make(() { fail.raise("too far") })
+	stream.to_list(
+		stream.take(
+			stream.append(stream.wrap(1), tail),
+			1,
+		),
+	)
 }
 ```
 
@@ -1095,18 +1108,24 @@ another input pull (S4). Expected `[1]`. `take(0)` also cannot call a thunk.
 **Lifetime: a user value can hold a suspended finalizer.**
 
 ```i
-(std/stream, i/control, i/resource)
+(
+	std/stream
+	i/control
+	i/resource
+)
 abandon = () {
-  _ = control.boundary((b) {
-    resource.ensure(
-      () {
-        control.suspend(b, (k) { stream.wrap(() { control.cancel(k) }) })
-        stream.new()
-      },
-      () { panic("finalizer") }
-    )
-  })
-  Nil
+	_ = control.boundary((b) {
+		resource.ensure(
+			() {
+				control.suspend(b, (k) {
+					stream.wrap(() { control.cancel(k) })
+				})
+				stream.new()
+			},
+			() { panic("finalizer") },
+		)
+	})
+	Nil
 }
 ```
 
@@ -1120,9 +1139,12 @@ safety merely from the absence of control calls inside the stream implementation
 **Source/cost conflict: pretending delayed calls memoize.**
 
 ```i
-(std/list, std/sequence)
-branches = (q: sequence.Sequence(Int)) {
-  list.map(list.range(1, 1000), (x) { sequence.push_back(q, x) })
+(
+	std/list
+	std/sequence
+)
+branches = (q : sequence.Sequence(Int)) {
+	list.map(list.range(1, 1000), (x) { sequence.push_back(q, x) })
 }
 ```
 

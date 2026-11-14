@@ -26,9 +26,9 @@ RelativeError = DifferentRoots | UnknownParent
 
 /// Removes empty and dot segments and resolves lexical parents. Empty relative
 /// paths become `.`, and parents cannot climb above an absolute root.
-clean = (path: String) -> String {
+clean = (path : String) -> String {
 	rooted = is_absolute(path)
-	go = (rest: List(String), acc: List(String)) -> String {
+	go = (rest : List(String), acc : List(String)) -> String {
 		rest |>
 			([]) { render(list.reverse(acc), rooted) }
 			| ([part, ..parts]) {
@@ -51,14 +51,14 @@ clean = (path: String) -> String {
 
 /// Joins nonempty pieces with `/`, then cleans. All-empty input gives `""`.
 /// A slash at the start of a later piece does not reset earlier pieces.
-join = (parts: List(String)) -> String {
+join = (parts : List(String)) -> String {
 	list.filter(parts, (p) { p != "" }) |>
 		([]) { "" }
 		| (xs) { clean(string.join(xs, "/")) }
 }
 
 /// Cuts raw input after its last slash, keeping that slash in the first part.
-split = (path: String) -> (String, String) {
+split = (path : String) -> (String, String) {
 	go = (rest, part, directory) {
 		rest |>
 			([]) {
@@ -78,7 +78,7 @@ split = (path: String) -> (String, String) {
 
 /// The final raw name after stripping trailing slashes. Empty input gives `.`,
 /// and an all-slash input gives `/`. Dots are not resolved.
-base = (path: String) -> String {
+base = (path : String) -> String {
 	go = (rest) {
 		rest |>
 			([]) { path |> ("") { "." } | (_) { "/" } }
@@ -91,14 +91,14 @@ base = (path: String) -> String {
 }
 
 /// The cleaned directory part of `split`.
-dir = (path: String) -> String {
+dir = (path : String) -> String {
 	(directory, _) = split(path)
 	clean(directory)
 }
 
 /// The suffix from the last dot in the final raw segment. A dotfile's leading
 /// dot counts, and a trailing slash gives an empty extension.
-extension = (path: String) -> String {
+extension = (path : String) -> String {
 	(_, name) = split(path)
 	go = (rest, suffix) {
 		rest |>
@@ -116,7 +116,7 @@ extension = (path: String) -> String {
 }
 
 /// Tests only for a leading slash.
-is_absolute = (path: String) -> Bool {
+is_absolute = (path : String) -> Bool {
 	path |> ("/" <> _) { True } | (_) { False }
 }
 
@@ -151,7 +151,7 @@ _relative_result = (from: String, to: String) -> Result(String, RelativeError) {
 
 // Convert once, then finish each segment once. Reversed codepoints and segments
 // keep long names and long paths linear in the input size.
-segments = (path: String) -> List(String) {
+segments = (path : String) -> List(String) {
 	go = (rest, part, acc) {
 		rest |>
 			([]) {
@@ -174,14 +174,14 @@ segments = (path: String) -> List(String) {
 	go(string.to_codepoints(path), [], [])
 }
 
-render = (parts: List(String), rooted: Bool) -> String {
+render = (parts : List(String), rooted : Bool) -> String {
 	(rooted, parts) |>
 		((False, [])) { "." }
 		| ((True, _)) { string.concat(["/", string.join(parts, "/")]) }
 		| ((False, _)) { string.join(parts, "/") }
 }
 
-clean_segments = (path: String) -> List(String) {
+clean_segments = (path : String) -> List(String) {
 	path |> (".") { [] } | (_) { list.filter(segments(path), (p) { p != "" }) }
 }
 

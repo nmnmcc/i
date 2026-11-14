@@ -186,12 +186,12 @@ test("filter_test", () {
 	assert(option.filter(None, int_is_even) == None)
 })
 
-int_is_even = (x: Int) { x % 2 == 0 }
+int_is_even = (x : Int) { x % 2 == 0 }
 
 test("map2_test", () {
 	assert(option.map2(Some(1), Some(2), (a, b) { a + b }) == Some(3))
 	assert(option.map2(Some(1), None, (a, b) { a + b }) == None)
-	assert(option.map2(None, Some(2), (a: Int, b: Int) { a + b }) == None)
+	assert(option.map2(None, Some(2), (a : Int, b : Int) { a + b }) == None)
 })
 
 test("labels_test", () {

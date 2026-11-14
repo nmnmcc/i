@@ -6,7 +6,7 @@ one_side : (Int) -> Int
 errors_only : () <- (Fail(1)) -> Int
 empty_list : () -> List(Never)
 inter_unions : (A & Int) -> A & Int
-rest : (A) -> 0 | 1 | 2 | 3 | A - List(_) - Result(_, _)
+rest : (A) -> 0 | 1 | 2 | 3 | A - List(_) - Ok(_) - Error(_)
 id : (A) -> A
 mono : (1 | "a") -> 1 | "a"
 use_int : () -> 1 | "a"

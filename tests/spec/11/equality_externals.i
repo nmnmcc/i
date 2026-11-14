@@ -8,16 +8,16 @@
 )
 
 @external("test:math/v1", "add")
-add: (Int, Int) -> Int
+add : (Int, Int) -> Int
 
 @external("test:math/v1", "add")
-plus: (Int, Int) -> Int
+plus : (Int, Int) -> Int
 
-check = (c: Bool, what: String) {
+check = (c : Bool, what : String) {
 	c |> (True) { Nil } | (False) { panic(what) }
 }
 
-same = (f: (Int, Int) -> Int, g: (Int, Int) -> Int) { f == g }
+same = (f : (Int, Int) -> Int, g : (Int, Int) -> Int) { f == g }
 
 test("declarations_are_values", () {
 	check(add == add, "add is add")

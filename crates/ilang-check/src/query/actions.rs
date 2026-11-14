@@ -341,19 +341,7 @@ impl Query<'_> {
             return None;
         }
         let lisp = self.is_lisp(m);
-        let mut types: Vec<TypeId> = Vec::new();
-        for c in clauses {
-            for pat in &c.patterns {
-                if let PatternKind::Constructor { ctor, .. } = &pat.kind
-                    && !types.contains(&ctor.ty)
-                {
-                    types.push(ctor.ty);
-                }
-            }
-        }
-        if types.is_empty() {
-            types = self.subject_types(m, subject, clauses);
-        }
+        let types = self.subject_types(m, subject, clauses);
         let covered = |ctor: CtorRef| {
             clauses.iter().any(|c| {
                 c.guard.is_none()
@@ -470,7 +458,7 @@ impl Query<'_> {
             vec![Edit {
                 source: self.source_of(m),
                 span: Span::new(span.end, span.end),
-                text: format!(": {ty}"),
+                text: format!(" : {}", annotation_text(&ty)),
             }]
         };
         Some(CodeFix {
@@ -606,11 +594,11 @@ impl Query<'_> {
                 let Some(row) = lisp_type(&ty) else { continue };
                 row
             } else {
-                ty
+                annotation_text(&ty)
             };
             out.push(InlayHint {
                 offset: b.span.end,
-                label: format!(": {ty}"),
+                label: format!(" : {ty}"),
                 parameter,
             });
         }
@@ -623,7 +611,8 @@ impl Query<'_> {
 /// A type shown in the syntax of §3, in the syntax of the Lisp surface: as
 /// the printer of that surface writes it in an annotation.
 fn lisp_type(ty: &str) -> Option<String> {
-    let (module, diags) = ilang_syntax::syn3::parse_module(&format!("x: {ty} = 0\n"));
+    let (module, diags) =
+        ilang_syntax::syn3::parse_module(&format!("x : {} = 0\n", annotation_text(ty)));
     if !diags.is_empty() {
         return None;
     }

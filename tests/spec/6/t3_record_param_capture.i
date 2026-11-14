@@ -7,7 +7,7 @@
 (
 	main
 )
-f = <K>(r: (k = Int), key: K) -> (k = Int) {
+f = <K>(r : (k = Int), key : K) -> (k = Int) {
 	h = () { r }
 	h()
 }

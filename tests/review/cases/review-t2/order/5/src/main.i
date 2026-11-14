@@ -1,5 +1,5 @@
-v: Int = 1
+v : Int = 1
 Pair(A, B) = { (A, B) }
-result: (v, Left, Right) = (2, 3, "ok")
+result : (v, Left, Right) = (2, 3, "ok")
 Pair(Left, Right) = parts
-parts: (Int, String) = (1, "s")
+parts : (Int, String) = (1, "s")

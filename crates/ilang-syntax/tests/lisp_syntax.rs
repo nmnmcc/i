@@ -281,9 +281,11 @@ fn macro_arguments_match_labels_and_attribute_items() {
     use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
     let m = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "m".into(),
         parameters: vec!["first".into(), "second".into(), "item".into()],
+        labels: vec![Some("first".into()), Some("second".into()), None],
     };
     let argument = |label: Option<&str>, text: &str| MacroArgument {
         label: label.map(str::to_string),
@@ -359,13 +361,23 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
     use ilang_syntax::lisp::definitions::builtin_definition;
     use ilang_syntax::lisp::syntax::{Node, Position, ScopeIdentity};
     let like = root("x");
-    for name in ["Bool", "Nil", "Result", "Assert", "AssertionFailure"] {
+    for name in [
+        "Bool",
+        "True",
+        "False",
+        "Nil",
+        "Result",
+        "Ok",
+        "Error",
+        "Assert",
+        "AssertionFailure",
+    ] {
         let result = builtin_definition(name, like.scope(), like.span(), 3).unwrap();
         result.show_as(Position::Item).unwrap();
     }
     assert!(builtin_definition("Int", like.scope(), like.span(), 3).is_none());
-    let first = builtin_definition("Result", like.scope(), like.span(), 3).unwrap();
-    let second = builtin_definition("Result", like.scope(), like.span(), 4).unwrap();
+    let first = builtin_definition("Ok", like.scope(), like.span(), 3).unwrap();
+    let second = builtin_definition("Ok", like.scope(), like.span(), 4).unwrap();
     let Node::Round(parts) = first.node() else {
         panic!("item")
     };
@@ -373,7 +385,7 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
         panic!("head")
     };
     assert!(
-        matches!(head[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Result")
+        matches!(head[0].scope_identity(), Some(ScopeIdentity::Builtin { name }) if name == "Ok")
     );
     assert!(matches!(
         head[1].scope_identity(),
@@ -440,7 +452,7 @@ fn copied_definition_freshens_its_binders_and_uses_together() {
     use ilang_syntax::lisp::definitions::{builtin_definition, freshen_parameters};
     use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
     let like = root("x");
-    let original = builtin_definition("Result", like.scope(), like.span(), 3).unwrap();
+    let original = builtin_definition("Ok", like.scope(), like.span(), 3).unwrap();
     let copy = freshen_parameters(&original, 3, 8);
     let Node::Round(parts) = copy.node() else {
         panic!("item")
@@ -730,8 +742,8 @@ fn definition_table_keeps_scopes_from_expanded_type_items() {
     use ilang_syntax::lisp::definition_table::{Definition, DefinitionTable, Lookup, QueryResult};
     use ilang_syntax::lisp::definitions::builtin_definition;
     use ilang_syntax::lisp::syntax::{Node, ScopeIdentity};
-    let like = root("Result").flip_mark(11);
-    let syntax = builtin_definition("Result", like.scope(), like.span(), 1).unwrap();
+    let like = root("Ok").flip_mark(11);
+    let syntax = builtin_definition("Ok", like.scope(), like.span(), 1).unwrap();
     let mut table = DefinitionTable::default();
     table.insert(
         1,
@@ -1060,7 +1072,7 @@ fn rewriting_a_definition_head_cannot_forge_parameter_binding_authority() {
     use ilang_syntax::lisp::definitions::builtin_definition;
     use ilang_syntax::lisp::syntax::{Node, Syntax};
     let like = root("x");
-    let answer = builtin_definition("Result", like.scope(), like.span(), 30).unwrap();
+    let answer = builtin_definition("Ok", like.scope(), like.span(), 30).unwrap();
     let Node::Round(item) = answer.node() else {
         panic!("item")
     };
@@ -1071,7 +1083,7 @@ fn rewriting_a_definition_head_cannot_forge_parameter_binding_authority() {
     let unchanged = item[0].replace_children(head.clone());
     assert_eq!(unchanged.definition_head(), Some(30));
     let replacement = Syntax::make(Node::Up("A".into()), &head[1]).unwrap();
-    let changed = item[0].replace_children(vec![head[0].clone(), replacement, head[2].clone()]);
+    let changed = item[0].replace_children(vec![head[0].clone(), replacement]);
     assert_eq!(changed.definition_head(), None);
 }
 
@@ -1080,7 +1092,7 @@ fn duplicate_definition_heads_are_freshened_with_all_uses() {
     use ilang_syntax::lisp::definitions::{builtin_definition, freshen_duplicate_heads};
     use ilang_syntax::lisp::syntax::{Node, ScopeIdentity, Syntax};
     let like = root("x");
-    let definition = builtin_definition("Result", like.scope(), like.span(), 50).unwrap();
+    let definition = builtin_definition("Ok", like.scope(), like.span(), 50).unwrap();
     let items = Syntax::make(
         Node::Curly(vec![definition.clone(), definition.clone()]),
         &like,
@@ -1137,7 +1149,7 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
         },
     );
     let expanded =
-        ilang_syntax::lisp::definitions::builtin_definition("Result", of.scope(), of.span(), 9)
+        ilang_syntax::lisp::definitions::builtin_definition("Ok", of.scope(), of.span(), 9)
             .unwrap();
     table.insert(
         2,
@@ -1462,4 +1474,41 @@ fn macro_round_trips_preserve_written_provide_groups() {
             "{source}: {printed}"
         );
     }
+}
+
+#[test]
+fn macro_parameter_labels_are_explicit_and_survive_alpha_renaming() {
+    use ilang_syntax::lisp::{expansion::definitions, parse_source};
+    for local in ["value", "renamed"] {
+        let (module, errors) = parse_source(&format!(
+            "(@ macro (= id (-> (, (= label {local})) _ {local})))"
+        ));
+        assert!(errors.is_empty(), "{errors:?}");
+        let defs = definitions(&module, true).unwrap();
+        assert_eq!(defs[0].parameters, [local]);
+        assert_eq!(defs[0].labels, [Some("label".into())]);
+    }
+    let (module, errors) = parse_source("(@ macro (= id (-> (, value) _ value)))");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(definitions(&module, true).unwrap()[0].labels, [None]);
+}
+
+#[test]
+fn typed_macro_shapes_are_checked_even_when_a_missing_shape_is_never_called() {
+    use ilang_syntax::lisp::{expansion::definitions, parse_source};
+    let source = include_str!("../../../tests/spec/14.8/mp11_missing_shape/src/macros.is");
+    let (module, errors) = parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(
+        definitions(&module, true)
+            .unwrap_err()
+            .iter()
+            .any(|e| e.message.contains("every parameter-data shape"))
+    );
+    let source = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/macros.is");
+    let (module, errors) = parse_source(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let definitions = definitions(&module, true).unwrap();
+    assert_eq!(definitions.len(), 1);
+    assert_eq!(definitions[0].variants.len(), 2);
 }

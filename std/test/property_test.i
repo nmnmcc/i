@@ -11,7 +11,7 @@
 	(Some, None) = std/option
 )
 
-snapshot = <A>(t: property.Tree(A), depth: Int) -> String {
+snapshot = <A>(t : property.Tree(A), depth : Int) -> String {
 	core.inspect(t.value) <>
 		{
 			{ depth == 0 } |>
@@ -24,14 +24,14 @@ snapshot = <A>(t: property.Tree(A), depth: Int) -> String {
 		}
 }
 
-root = <A>(gen: property.Gen(A), size: Int, seed: Int) -> property.Tree(A) {
+root = <A>(gen : property.Gen(A), size : Int, seed : Int) -> property.Tree(A) {
 	Some(t) = property.sample(gen, size, random.from_seed(seed))
 	t
 }
 
 // Find a root with a source-specified shrink sequence, without fixing a seed
 // from this implementation as an independent expected random oracle.
-find_ten = (gen: property.Gen(Int), seed: Int) -> property.Tree(Int) {
+find_ten = (gen : property.Gen(Int), seed : Int) -> property.Tree(Int) {
 	assert(seed < 1000)
 	t = root(gen, 0, seed)
 	{ t.value == 10 } |> (True) { t } | (False) { find_ten(gen, seed + 1) }
@@ -120,7 +120,7 @@ test("integer_rules", () {
 	assert(
 		list.map(negative.children(), (c) { c.value }) == [0, -5, -8, -9],
 	)
-	verify = (node: property.Tree(Int), target: Int, depth: Int) -> Nil {
+	verify = (node : property.Tree(Int), target : Int, depth : Int) -> Nil {
 		assert(node.value >= 0 && node.value <= 10)
 		{ depth == 0 } |>
 			(True) { Nil }
@@ -145,7 +145,7 @@ test("integer_rules", () {
 		}
 })
 
-valid_dependent = (t: property.Tree((Int, Int)), depth: Int) -> Nil {
+valid_dependent = (t : property.Tree((Int, Int)), depth : Int) -> Nil {
 	assert(t.value.1 >= 0 && t.value.1 <= t.value.0)
 	{ depth == 0 } |>
 		(True) { Nil }
@@ -218,7 +218,7 @@ test("greedy_path_budget_and_replay", () {
 	Ok(ints) = fail.catch(() { property.int(0, 10) })
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
-	predicate = (x: Int) -> property.Verdict {
+	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
 			(True) { property.Fail(core.inspect(x)) }
 			| (False) { property.Pass }
@@ -670,7 +670,7 @@ test("budget_prefixes_and_discarded_children", () {
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
 	// P7 also counts Discard; it never descends into that child.
-	predicate = (x: Int) -> property.Verdict {
+	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
 			(True) { property.Fail(core.inspect(x)) }
 			| (False) { property.Discard }

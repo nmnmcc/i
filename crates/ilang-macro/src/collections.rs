@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use ilang_check::{
     Parsed,
-    hir::{DefId, DefKind, ExprKind, ModuleId, Param, Program},
+    hir::{DefId, DefKind, ModuleId, Program},
     hygiene,
     types::Typed,
 };
@@ -116,23 +116,25 @@ pub fn resolve_with_types(
             let DefKind::Binding { binding, .. } = program.def(target_id).kind else {
                 errors.push(report(
                     target,
-                    "collection target must be a direct function",
+                    "collection target must be a function binding",
                 ));
                 continue;
             };
             let top = &program.module(target_id.module).bindings[binding as usize];
-            let function = match &top.binding.value.kind {
-                ExprKind::Fn(f) => Some(f),
-                _ => None,
-            };
-            if target_id.module != caller
-                || !top.binding.direct
-                || top.defs.len() != 1
-                || !function
-                    .is_some_and(|f| f.params.iter().all(|p| matches!(p, Param::Env { .. })))
-            {
-                errors.push(report(target, "collection target must be a same-module direct function with no ordinary parameters"));
+            if target_id.module != caller || top.defs.len() != 1 {
+                errors.push(report(target, "collection target must be a same-module function binding with no ordinary parameters"));
                 continue;
+            }
+            if let Some(typed) = typed {
+                let valid = matches!(typed.provider_scheme_types.get(&target_id),
+                    Some(ilang_check::types::ShownType::Fn(f)) if !f.group && f.params.is_empty());
+                if !valid {
+                    errors.push(report(
+                        target,
+                        "collection target must be a function value with no ordinary parameters",
+                    ));
+                    continue;
+                }
             }
             if !seen.insert((collection_id, target_id)) {
                 errors.push(report(target, "duplicate collection target"));

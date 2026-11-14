@@ -1,1 +1,1 @@
-f = (x: Int) { x }
+f = (x : Int) { x }

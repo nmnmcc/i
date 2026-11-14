@@ -118,7 +118,7 @@ def generate():
            '// The pinned source supplies constants and seed-1337 doctest words.',
            '// Other values are independently computed from spec §9.10; see reference.py.',
            '(testlib = (test) = std/test, i/random, i/core)', '',
-           'advance = (g: random.Generator, n: Int) -> random.Generator {',
+           "advance = (g : random.Generator, n : Int) -> random.Generator {",
            '\t{ n == 0 } |> {', '\t\tTrue -> g',
            '\t\tFalse -> advance(random.word(g).1, n - 1)', '\t}', '}', '']
     def test(name, body):

@@ -20,7 +20,7 @@ config = (delimiter: String, fields: Int, crlf: Bool) -> csv.Options {
 
 PullProbe = (note = () -> Nil)
 
-note_pull = () <- (probe: PullProbe) -> Nil { probe.note() }
+note_pull = () <- (probe : PullProbe) -> Nil { probe.note() }
 
 test("parse_empty", () {
 	assert(fail.catch(() { csv.parse("") }) == Ok([]))

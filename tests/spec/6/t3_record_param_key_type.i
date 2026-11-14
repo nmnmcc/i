@@ -3,8 +3,8 @@
 (
 	main
 )
-f = <K>(r: (k = Int), key: K) {
-	x: key = key
+f = <K>(r : (k = Int), key : K) {
+	x : key = key
 	x
 }
 

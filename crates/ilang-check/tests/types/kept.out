@@ -9,6 +9,6 @@
 18:1: error[E0202]: the type `Schema` is not defined
 18:19: error[E0201]: `user` is not defined
 19:7: error[E0231]: a type parameter may not have the name of a type
-2:13: error[E0207]: `p` is a pending value, not a module
-3:18: error[E0234]: a call in a type is kept for macros
-17:18: error[E0317]: the type of an external function may not have type variables (§10.1)
+2:14: error[E0207]: `p` is a pending value, not a module
+3:19: error[E0234]: a call in a type is kept for macros
+17:19: error[E0317]: the type of an external function may not have type variables (§10.1)

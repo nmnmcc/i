@@ -47,17 +47,28 @@ fn mark_definition_head(definition: Syntax, answer: u64) -> Syntax {
 /// another. Every node is located at the query that caused this answer.
 pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> Option<Syntax> {
     let source = match name {
-        "Bool" => "(Bool { True False })",
+        "Bool" => "(= Bool (| True False))",
+        "True" => "(True { True })",
+        "False" => "(False { False })",
         "Nil" => "(Nil { Nil })",
-        "Result" => "((Result A E) { (Ok A) (Error E) })",
+        "Result" => "(= (Result A E) (| (Ok A) (Error E)))",
+        "Ok" => "((Ok A) { (Ok A) })",
+        "Error" => "((Error E) { (Error E) })",
         "AssertionFailure" => "(AssertionFailure { (AssertionFailure (: message String)) })",
         "Assert" => "(Assert { (Assert (: fail (-> ((: failure AssertionFailure)) Never))) })",
         _ => return None,
     };
-    fn convert(d: &Datum, scope: &Scope, at: Span, answer: u64, result: bool) -> Syntax {
+    // The type parameters of the definition, in order.
+    let params: &[&str] = match name {
+        "Result" => &["A", "E"],
+        "Ok" => &["A"],
+        "Error" => &["E"],
+        _ => &[],
+    };
+    fn convert(d: &Datum, scope: &Scope, at: Span, answer: u64, params: &[&str]) -> Syntax {
         let children = |xs: &[Datum]| {
             xs.iter()
-                .map(|d| convert(d, scope, at, answer, result))
+                .map(|d| convert(d, scope, at, answer, params))
                 .collect()
         };
         let node = match &d.kind {
@@ -70,12 +81,13 @@ pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> O
         };
         let syntax = Syntax::written(node, scope, at);
         match syntax.node() {
-            Node::Up(name) if result && matches!(name.as_str(), "A" | "E") => syntax
-                .with_scope_identity(ScopeIdentity::DefinitionParameter {
+            Node::Up(name) if params.contains(&name.as_str()) => {
+                syntax.with_scope_identity(ScopeIdentity::DefinitionParameter {
                     answer,
-                    parameter: u32::from(name == "E"),
+                    parameter: params.iter().position(|p| p == name).unwrap() as u32,
                     name: name.clone(),
-                }),
+                })
+            }
             Node::Up(name) => {
                 syntax.with_scope_identity(ScopeIdentity::Builtin { name: name.clone() })
             }
@@ -84,7 +96,7 @@ pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> O
     }
     let document = parse(source).expect("compiler builtin definition must parse");
     Some(mark_definition_head(
-        convert(&document[0], scope, at, answer, name == "Result").as_answer(),
+        convert(&document[0], scope, at, answer, params).as_answer(),
         answer,
     ))
 }

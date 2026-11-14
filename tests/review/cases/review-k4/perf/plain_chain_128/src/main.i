@@ -1,4 +1,4 @@
-run = <N>(body: () <- N -> Nil) { body() }
+run = <N>(body : () <- N -> Nil) { body() }
 f_0 = () { Nil }
 f_1 = () { run(() { f_0() }) }
 f_2 = () { run(() { f_1() }) }

@@ -6,7 +6,7 @@
 	testlib = (test) = std/test
 )
 
-probe = (xs: List(Int)) -> Nil {
+probe = (xs : List(Int)) -> Nil {
 	xs |>
 		([]) { Nil }
 		| ([37, a, b, ..tail] ? a >= 0 && b >= 0) { Nil }

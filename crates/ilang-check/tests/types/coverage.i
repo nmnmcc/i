@@ -7,21 +7,21 @@ Point = ()
 Shape = Circle | Square | Point
 Flags = (admin = Bool, active = Bool)
 
-covered = (s: Shape) {
+covered = (s : Shape) {
 	s |> (Circle(..)) { 1 } | (Square(..)) { 2 } | (Point) { 3 }
 }
 
-missing_ctor = (s: Shape) { s |> (Circle(..)) { 1 } | (Square(..)) { 2 } }
+missing_ctor = (s : Shape) { s |> (Circle(..)) { 1 } | (Square(..)) { 2 } }
 
-missing_nested = (r: Result(Bool, Nil)) {
+missing_nested = (r : Result(Bool, Nil)) {
 	r |> (Ok(True)) { 1 } | (Error(_)) { 2 }
 }
 
-missing_member = (v: Int | String) {
-	v |> (_: Int ? True) { 1 } | (_: String) { 2 }
+missing_member = (v : { Int | String }) {
+	v |> (_ : Int ? True) { 1 } | (_ : String) { 2 }
 }
 
-missing_label = (f: Flags) {
+missing_label = (f : Flags) {
 	f |> (Flags(True = admin, ..)) { 1 } | (Flags(True = active, ..)) { 2 }
 }
 
@@ -29,7 +29,7 @@ missing_label = (f: Flags) {
 inferred = (r) { r |> (Ok(1)) { 1 } | (Error(_)) { 2 } }
 
 // A guard is not counted.
-guarded = (b: Bool) { b |> (True) { 1 } | (False ? True) { 2 } }
+guarded = (b : Bool) { b |> (True) { 1 } | (False ? True) { 2 } }
 
 // Literal patterns never cover their type.
 ints = (n) { n |> (0) { 0 } | (1) { 1 } }
@@ -56,18 +56,18 @@ no_long = (xs) { xs |> ([]) { 0 } | ([x]) { x } }
 
 lists = (xs) { xs |> ([]) { 0 } | ([x]) { x } | ([x, y, ..]) { x + y } }
 
-list_items = (xs: List(Bool)) { xs |> ([]) { 0 } | ([True, ..]) { 1 } }
+list_items = (xs : List(Bool)) { xs |> ([]) { 0 } | ([True, ..]) { 1 } }
 
 // Tuples.
-tuples = (p: (Bool, Bool)) { p |> ((True, _)) { 1 } | ((_, True)) { 2 } }
+tuples = (p : (Bool, Bool)) { p |> ((True, _)) { 1 } | ((_, True)) { 2 } }
 
 // Types with no values are covered.
-only_ok = (r: Result(Int, Never)) { r |> (Ok(x)) { x } }
+only_ok = (r : Result(Int, Never)) { r |> (Ok(x)) { x } }
 
 empty = [] |> ([]) { 0 }
 
 // The type test makes `a` an `a & Int`, which it covers.
-any = <A>(x: A) { x |> (_: Int) { 1 } }
+any = <A>(x : A) { x |> (_ : Int) { 1 } }
 
 // A type that comes from a function that is not known.
 unknown = (f) { f() |> (True) { 1 } | (False) { 2 } }

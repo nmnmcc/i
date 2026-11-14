@@ -7,7 +7,7 @@
 	i/core
 )
 
-main = () <- (root: request.Root, owner: request.Owner) {
+main = () <- (root : request.Root, owner : request.Owner) {
 	assert(core.portable(root))
 	assert(core.portable(owner))
 	assert(request.count(owner) == 0)

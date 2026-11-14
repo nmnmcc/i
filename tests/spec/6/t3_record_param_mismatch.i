@@ -3,6 +3,6 @@
 (
 	main
 )
-f = <K>(r: (k = Int), key: K) -> Int { 1 }
+f = <K>(r : (k = Int), key : K) -> Int { 1 }
 
 main = () { f((name = 9), "other") }

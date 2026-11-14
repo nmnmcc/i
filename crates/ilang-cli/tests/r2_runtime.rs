@@ -336,11 +336,11 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     // a source copy; the IO and continuation queries are unused by this pure unit probe.
     let source = include_str!("../../../lib/i/task.i");
     let source = source.replace(
-        "@external(\"ilang:request\", \"observe_change\")\nobserve_change: (Key(Nil)) -> Request(Nil)",
-        "observe_change = (_root: Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
+        "@external(\"ilang:request\", \"observe_change\")\nobserve_change : (Key(Nil)) -> Request(Nil)",
+        "observe_change = (_root : Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
     ).replace(
-        "@external(\"ilang:request\", \"has_work\")\nhas_work: (Ticket) -> Bool",
-        "has_work = (_ticket: Ticket) -> Bool { False }",
+        "@external(\"ilang:request\", \"has_work\")\nhas_work : (Ticket) -> Bool",
+        "has_work = (_ticket : Ticket) -> Bool { False }",
     );
     let begin = source
         .find("@external(\"ilang:control\", \"finalizing\")")
@@ -375,7 +375,7 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         + r#"
 
 main = () {
-  k: Key(String) = key.new()
+  k : Key(String) = key.new()
   extension = key.wrap(k, "extension")
   prefix = key.wrap(k, "prefix")
   later = key.wrap(k, "later")

@@ -91,25 +91,25 @@ make = <E, N>(
 ) -> Sink(E, N) { Sink(accept, send, (_: () <- N -> Nil) { Nil }) }
 
 silent = <N>() -> Sink(Never, N) {
-	make((_: Level) { False }, (_: Entry) { Nil })
+	make((_ : Level) { False }, (_ : Entry) { Nil })
 }
 
-filter = <E, N>(sink: Sink(E, N), accept: (Level) -> Bool) -> Sink(E, N) {
+filter = <E, N>(sink : Sink(E, N), accept : (Level) -> Bool) -> Sink(E, N) {
 	Sink(old_accept, send, marker) = sink
 	Sink((level) { accept(level) && old_accept(level) }, send, marker)
 }
 
-minimum = <E, N>(sink: Sink(E, N), level: Level) -> Sink(E, N) {
+minimum = <E, N>(sink : Sink(E, N), level : Level) -> Sink(E, N) {
 	filter(sink, (candidate) { rank(candidate) >= rank(level) })
 }
 
-enabled = <E, N>(level: Level) <- (sink: Sink(E, N)) -> Bool {
+enabled = <E, N>(level : Level) <- (sink : Sink(E, N)) -> Bool {
 	Sink(accept, _, _) = sink
 	accept(level)
 }
 
 // Inferred returns retain the exact public error and environment rows (§7).
-write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
+write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(accept, send, _) = sink
 	accept(entry.level) |> (True) { send(entry) } | (False) { Nil }
 }
@@ -132,7 +132,7 @@ lazy = <E, F, N>(level: Level, message: () <- (Fail(F), ..N) -> String) <- (
 		| (False) { Nil }
 }
 
-format = (entry: Entry) -> String {
+format = (entry : Entry) -> String {
 	stamp = entry.at |>
 		(None) { [] }
 		| (Some(t)) { [" @", int.to_string(time.unix_nanoseconds(t))] }
@@ -148,11 +148,11 @@ format = (entry: Entry) -> String {
 	)
 }
 
-rank = (level: Level) -> Int {
+rank = (level : Level) -> Int {
 	level |> (Debug) { 0 } | (Info) { 1 } | (Warning) { 2 } | (Failure) { 3 }
 }
 
-level_text = (level: Level) -> String {
+level_text = (level : Level) -> String {
 	level |>
 		(Debug) { "debug" }
 		| (Info) { "info" }
@@ -160,7 +160,7 @@ level_text = (level: Level) -> String {
 		| (Failure) { "failure" }
 }
 
-quote = (text: String) -> String {
+quote = (text : String) -> String {
 	core.concat(
 		[
 			"\"",
@@ -172,7 +172,7 @@ quote = (text: String) -> String {
 	)
 }
 
-escape = (codepoint: UtfCodepoint) -> String {
+escape = (codepoint : UtfCodepoint) -> String {
 	core.codepoint_to_int(codepoint) |>
 		(34) { "\\\"" }
 		| (92) { "\\\\" }

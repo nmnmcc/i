@@ -10,13 +10,13 @@
 
 mine = geo.area
 
-s: String = geo.show(1)
+s : String = geo.show(1)
 
 alias = geo.show
 
-n: Int = alias("x")
+n : Int = alias("x")
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	io.print(
 		core.inspect(geo.area(2.0)),
 	)

@@ -157,7 +157,7 @@ fn read(path: &Path) -> String {
 /// and an external function, v1.2.0 is the same, and v2.0.0 is another major
 /// version.
 fn lib_repo(w: &World) {
-    const PLAIN: &str = " (twice)\n\ntwice = (n: Int) { n * 2 }\n";
+    const PLAIN: &str = " (twice)\n\ntwice = (n : Int) { n * 2 }\n";
     const WITH_HOST: &str = r#"(
 	twice
 	Net
@@ -167,9 +167,9 @@ fn lib_repo(w: &World) {
 Net = (get = (String) -> String)
 
 @external("env", "now")
-now: () -> Int
+now : () -> Int
 
-twice = (n: Int) { n * 2 }
+twice = (n : Int) { n * 2 }
 "#;
     w.repo(
         "lib",
@@ -217,7 +217,7 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     assert_eq!(read(&dir.join("i.toml")), test_project::manifest("demo"));
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
     assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
-    assert!(read(&dir.join("src/main.i")).contains("main = () <- (io: Io)"));
+    assert!(read(&dir.join("src/main.i")).contains("main = () <- (io : Io)"));
     assert!(read(&dir.join("test/main_test.i")).contains("test(\"greets\""));
 
     let project = dir.display().to_string();
@@ -254,7 +254,7 @@ fn two_new_packages_work_together() {
         &app,
         &[(
             "src/main.i",
-            "(\n\t(Io) = i/io\n\tgreet = greet/main\n)\n\n(\n\tgreeting\n)\n\ngreeting = (who: String) { greet.greeting(who) }\n\nmain = () <- (io: Io) { io.print(greeting(\"i\")) }\n",
+            "(\n\t(Io) = i/io\n\tgreet = greet/main\n)\n\n(\n\tgreeting\n)\n\ngreeting = (who : String) { greet.greeting(who) }\n\nmain = () <- (io : Io) { io.print(greeting(\"i\")) }\n",
         )],
     );
     let out = w.ok(&["check", "--project", &project]);
@@ -504,7 +504,7 @@ fn update_raises_within_the_major_version_and_shows_new_permissions() {
         "1.3.0",
         &[
             ("i.toml", "name = \"lib\"\n"),
-            ("src/math.i", " (twice)\n\ntwice = (n: Int) { n + n }\n"),
+            ("src/math.i", " (twice)\n\ntwice = (n : Int) { n + n }\n"),
         ],
     );
     let out = w.ok(&["update", "lib", "--project", &project]);
@@ -588,7 +588,7 @@ fn tags(dir: &Path) -> String {
     git(dir, &["tag", "--list"])
 }
 
-const API_1: &str = "(\n\tone\n\tadd\n\tShape(..)\n\tBox\n)\n\none = 1\n\nadd = (a: Int, b: Int) { a + b }\n\nCircle = (r = Float)\nSquare = (side = Float)\nShape = Circle | Square\n\nBox(A) = (A)\n";
+const API_1: &str = "(\n\tone\n\tadd\n\tShape(..)\n\tBox\n)\n\none = 1\n\nadd = (a : Int, b : Int) { a + b }\n\nCircle = (r = Float)\nSquare = (side = Float)\nShape = Circle | Square\n\nBox(A) = (A)\n";
 
 #[test]
 fn publish_tags_a_first_version() {
@@ -674,11 +674,12 @@ fn publish_compares_the_interface() {
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1");
     w.ok(&["publish", "1.1.0", "--project", &project]);
 
-    // A changed type and a new constructor are incompatible.
+    // §4.3: Shape is a union alias; Dot adds its own type and constructor.
+    // Changing the alias and the function requires a new major (§2.7).
     let changed = added
         .replace(
-            "add = (a: Int, b: Int) { a + b }",
-            "add = (a: Int, b: Int, c: Int) { a + b + c }",
+            "add = (a : Int, b : Int) { a + b }",
+            "add = (a : Int, b : Int, c : Int) { a + b + c }",
         )
         .replace(
             "Shape = Circle | Square\n",
@@ -687,15 +688,25 @@ fn publish_compares_the_interface() {
     write(&dir, &[("src/api.i", &changed)]);
     commit(&dir, "change");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
-    assert!(
-        err.contains("changed value api.add: (Int, Int) -> Int"),
+    let changes = err
+        .split_once("changes to the public interface since v1.1.0:\n")
+        .expect("interface comparison header")
+        .1
+        .lines()
+        .take_while(|line| line.starts_with(' '))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        changes,
+        [
+            "  changed type api.Shape: Shape = Circle | Square",
+            "       to type api.Shape: Shape = Circle | Square | Dot",
+            "  changed value api.add: (Int, Int) -> Int",
+            "       to value api.add: (Int, Int, Int) -> Int",
+            "  added constructors api.Dot: Dot",
+            "  added type api.Dot: Dot",
+        ],
         "{err}"
     );
-    assert!(
-        err.contains("to value api.add: (Int, Int, Int) -> Int"),
-        "{err}"
-    );
-    assert!(err.contains("changed constructors api.Shape"), "{err}");
     assert!(err.contains("a new major version, at least 2.0.0"), "{err}");
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1\nv1.1.0");
     let out = w.ok(&["publish", "2.0.0", "--dry-run", "--project", &project]);
@@ -703,13 +714,24 @@ fn publish_compares_the_interface() {
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1\nv1.1.0");
 
     // Removing a name, or hiding constructors, is incompatible too.
-    let hidden = changed.replace("Shape(..)", "Shape").replace("\ttwo\n", "");
+    // §2.4: the exported alias still needs its member types exported.
+    let hidden = changed
+        .replace("Shape(..)", "Shape, Circle, Square, Dot")
+        .replace("\ttwo\n", "");
     write(&dir, &[("src/api.i", &hidden)]);
     commit(&dir, "hide");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
     assert!(err.contains("removed value api.two: 2"), "{err}");
-    assert!(
-        err.contains("removed constructors api.Shape: Circle(r: Float) | Square(side: Float)"),
+    // v1.1.0 exported Circle and Square through Shape(..); Dot was never
+    // published, so only those two constructors can be removed here (§2.4).
+    assert_eq!(
+        err.lines()
+            .filter(|line| line.starts_with("  removed constructors "))
+            .collect::<Vec<_>>(),
+        [
+            "  removed constructors api.Circle: Circle(r: Float)",
+            "  removed constructors api.Square: Square(side: Float)",
+        ],
         "{err}"
     );
     let out = w.ok(&["publish", "2.0.0", "--project", &project]);
@@ -917,14 +939,14 @@ fn publish_compares_types_by_what_they_are_not_by_their_names() {
     let dir = two_types(
         &w,
         "swap",
-        " (x = pub/a, y = pub/b)\n (f)\n\nf = (v: x.T) { v }\n",
+        " (x = pub/a, y = pub/b)\n (f)\n\nf = (v : x.T) { v }\n",
     );
     let (ok, out) = try_publish(
         &w,
         &dir,
         &[(
             "src/api.i",
-            " (x = pub/b, y = pub/a)\n (f)\n\nf = (v: x.T) { v }\n",
+            " (x = pub/b, y = pub/a)\n (f)\n\nf = (v : x.T) { v }\n",
         )],
         "1.0.1",
     );
@@ -937,14 +959,14 @@ fn publish_compares_types_by_what_they_are_not_by_their_names() {
     let dir = two_types(
         &w,
         "same",
-        "(\n\tpub/a\n)\n\n(\n\tid\n\tf\n\tg\n)\n\nid = <A>(x: A) -> A { x }\n\nf = (v: a.T) { v }\n\ng = (v: a.T) { v }\n",
+        "(\n\tpub/a\n)\n\n(\n\tid\n\tf\n\tg\n)\n\nid = <A>(x : A) -> A { x }\n\nf = (v : a.T) { v }\n\ng = (v : a.T) { v }\n",
     );
     let (ok, out) = try_publish(
         &w,
         &dir,
         &[(
             "src/api.i",
-            "(\n\taa = pub/a\n\t(T) = pub/a\n)\n\n(\n\tid\n\tf\n\tg\n)\n\nid = <B>(x: B) -> B { x }\n\nf = (v: aa.T) { v }\n\ng = (v: T) { v }\n",
+            "(\n\taa = pub/a\n\t(T) = pub/a\n)\n\n(\n\tid\n\tf\n\tg\n)\n\nid = <B>(x : B) -> B { x }\n\nf = (v : aa.T) { v }\n\ng = (v : T) { v }\n",
         )],
         "1.0.1",
     );
@@ -970,7 +992,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
             ("2.0.0", &[("i.toml", "name = \"dep\"\n"), ("src/v.i", &v2)]),
         ],
     );
-    let api = "(\n\tdep/v\n)\n\n(\n\tf\n\tW(..)\n)\n\nf = (x: v.V) { 1 }\n\nW = { (v.V) }\n";
+    let api = "(\n\tdep/v\n)\n\n(\n\tf\n\tW(..)\n)\n\nf = (x : v.V) { 1 }\n\nW = { (v.V) }\n";
     let dir = w.project(
         "pub",
         &[
@@ -1005,7 +1027,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
 #[test]
 fn publish_sees_what_the_host_must_give() {
     let w = World::new();
-    let api = "(\n\tnow\n\tIo\n)\n\n@external(\"env\", \"now\")\nnow: () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n";
+    let api = "(\n\tnow\n\tIo\n)\n\n@external(\"env\", \"now\")\nnow : () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n";
     let dir = w.project(
         "pub",
         &[
@@ -1068,7 +1090,7 @@ fn publish_sees_the_standard_service_of_i_io() {
     let project = dir.display().to_string();
     w.ok(&["publish", "1.0.0", "--project", &project]);
 
-    let printing = "(\n\t(Io) = i/io\n)\n\n(\n\tf\n\tsay\n)\n\nf = () { 1 }\n\nsay = () <- (io: Io) { io.print(\"one\") }\n";
+    let printing = "(\n\t(Io) = i/io\n)\n\n(\n\tf\n\tsay\n)\n\nf = () { 1 }\n\nsay = () <- (io : Io) { io.print(\"one\") }\n";
     let (ok, out) = try_publish(&w, &dir, &[("src/api.i", printing)], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
@@ -1102,7 +1124,7 @@ fn publish_tells_apart_types_that_are_shown_alike() {
             &[("i.toml", "name = \"util\"\n"), ("src/u.i", &u2)],
         )],
     );
-    let get = " (util/u)\n (get)\n\nget = (x: u.T) { x }\n";
+    let get = " (util/u)\n (get)\n\nget = (x : u.T) { x }\n";
     for (name, dep) in [("pa", "u1"), ("pb", "u2")] {
         let toml =
             format!("name = \"{name}\"\n\n[dependencies]\nutil = \"example.com/{dep}@1.0.0\"\n");
@@ -1148,7 +1170,7 @@ fn publish_tells_apart_types_that_are_shown_alike() {
 #[test]
 fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
     let w = World::new();
-    let api = "(\n\tf\n)\n\n@external(\"env\", \"now\")\nnow: () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n\nf = () { now() }\n";
+    let api = "(\n\tf\n)\n\n@external(\"env\", \"now\")\nnow : () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n\nf = () { now() }\n";
     let dir = w.project(
         "pub",
         &[
@@ -1199,7 +1221,7 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
         &dir,
         &[(
             "src/api.i",
-            &api.replace("now: () -> Int", "now: (Int) -> Int")
+            &api.replace("now : () -> Int", "now : (Int) -> Int")
                 .replace("now()", "now(1)"),
         )],
         "1.0.2",
@@ -1360,4 +1382,271 @@ fn publish_keeps_literal_alias_values_beyond_hover_limits() {
     assert!(out.contains("changed type api.Modes"), "{out}");
     assert!(out.contains("a new major version"), "{out}");
     assert!(!out.contains("…"), "{out}");
+}
+
+#[cfg(unix)]
+#[test]
+fn publish_rejects_committed_source_links_before_reading_their_targets() {
+    let w = World::new();
+    let outside = w.project(
+        "outside",
+        &[(
+            "lib.i",
+            include_str!("../../../tests/spec/2.8/mp01_external.i"),
+        )],
+    );
+    let package = w.project(
+        "pub",
+        &[("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n")],
+    );
+    fs::create_dir(package.join("src")).unwrap();
+    std::os::unix::fs::symlink(outside.join("lib.i"), package.join("src/lib.i")).unwrap();
+    git(&package, &["init", "-q"]);
+    commit(&package, "source link");
+    let err = w.fails(&[
+        "publish",
+        "1.0.0",
+        "--dry-run",
+        "--project",
+        package.to_str().unwrap(),
+    ]);
+    assert!(err.contains("symbolic link"), "{err}");
+    assert!(git(&package, &["tag", "--list"]).is_empty());
+}
+
+/// MP01: package commands reject the same source-link attack as compilation.
+#[cfg(unix)]
+#[test]
+fn add_rejects_dependency_with_source_link() {
+    let w = World::new();
+    w.repo("dep", &[]);
+    let outside = w.project(
+        "outside",
+        &[(
+            "lib.i",
+            include_str!("../../../tests/spec/2.8/mp01_external.i"),
+        )],
+    );
+    let work = w.path().join("work/dep");
+    write(&work, &[("i.toml", "name = \"dep\"\n")]);
+    fs::create_dir_all(work.join("src")).unwrap();
+    std::os::unix::fs::symlink(outside.join("lib.i"), work.join("src/lib.i")).unwrap();
+    commit(&work, "source link");
+    git(&work, &["tag", "v1.0.0"]);
+    git(
+        &work,
+        &[
+            "push",
+            "-q",
+            w.path().join("remotes/dep").to_str().unwrap(),
+            "--tags",
+        ],
+    );
+    let manifest = "name = \"app\"\n";
+    let app = w.project(
+        "app",
+        &[("i.toml", manifest), ("src/main.i", "main = () { Nil }\n")],
+    );
+    let err = w.fails(&[
+        "add",
+        "dep",
+        "example.com/dep@1.0.0",
+        "--project",
+        app.to_str().unwrap(),
+    ]);
+    assert!(err.contains("symbolic link"), "{err}");
+    assert_eq!(read(&app.join("i.toml")), manifest);
+    assert!(!app.join("i.lock").exists());
+}
+
+#[test]
+fn package_commands_reject_tampered_cache_with_original_sidecar() {
+    let w = World::new();
+    w.repo(
+        "dep",
+        &[(
+            "1.0.0",
+            &[
+                ("i.toml", "name = \"dep\"\n"),
+                ("src/lib.i", "(value)\nvalue = 1\n"),
+            ],
+        )],
+    );
+    let app = w.project(
+        "app",
+        &[
+            (
+                "i.toml",
+                "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
+            ),
+            ("src/main.i", "main = () { Nil }\n"),
+        ],
+    );
+    let project = app.to_str().unwrap();
+    w.ok(&["check", "--project", project]);
+    let locked = read(&app.join("i.lock"));
+    let commit = locked.split_whitespace().nth(2).unwrap();
+    let cache = w.path().join("cache/pkg/example.com%2fdep").join(commit);
+    let sidecar = read(&cache.with_extension("hash"));
+    fs::remove_file(cache.join("src/lib.i")).unwrap();
+    fs::write(
+        cache.join("src/lib.i"),
+        include_str!("../../../tests/spec/2.8/mp02_cached.i"),
+    )
+    .unwrap();
+    for command in ["check", "deps", "update"] {
+        let err = w.fails(&[command, "--project", project]);
+        assert!(
+            err.contains("cached files") && err.contains("do not match"),
+            "{err}"
+        );
+        assert_eq!(read(&app.join("i.lock")), locked);
+        assert_eq!(read(&cache.with_extension("hash")), sidecar);
+    }
+}
+
+#[test]
+fn package_commands_reject_moved_superseded_resolution_input() {
+    let w = World::new();
+    w.repo(
+        "c",
+        &[
+            ("1.0.0", &[("i.toml", "name = \"c\"\n")]),
+            ("1.1.0", &[("i.toml", "name = \"c\"\n")]),
+        ],
+    );
+    w.repo(
+        "a",
+        &[
+            (
+                "1.0.0",
+                &[(
+                    "i.toml",
+                    "name = \"a\"\n[dependencies]\nc = \"example.com/c@1.0.0\"\n",
+                )],
+            ),
+            ("1.1.0", &[("i.toml", "name = \"a\"\n")]),
+        ],
+    );
+    w.repo(
+        "b",
+        &[(
+            "1.0.0",
+            &[(
+                "i.toml",
+                "name = \"b\"\n[dependencies]\na = \"example.com/a@1.1.0\"\n",
+            )],
+        )],
+    );
+    let app = w.project("app", &[
+        ("i.toml", "name = \"app\"\n[dependencies]\na = \"example.com/a@1.0.0\"\nb = \"example.com/b@1.0.0\"\n"),
+        ("src/main.i", include_str!("../../../tests/spec/2.8/mp03_main.i")),
+    ]);
+    let project = app.to_str().unwrap();
+    w.ok(&["check", "--project", project]);
+    let locked = read(&app.join("i.lock"));
+    assert!(
+        locked
+            .lines()
+            .any(|l| l.starts_with("example.com/a 1.0.0 "))
+    );
+    let work = w.path().join("work/a");
+    git(&work, &["tag", "-d", "v1.0.0"]);
+    w.tag(
+        "a",
+        "1.0.0",
+        &[(
+            "i.toml",
+            "name = \"a\"\n[dependencies]\nc = \"example.com/c@1.1.0\"\n",
+        )],
+    );
+    // Each command sees a fresh copy, as on a second computer.
+    for command in ["check", "deps", "update"] {
+        fs::remove_dir_all(w.path().join("cache")).unwrap();
+        let err = w.fails(&[command, "--project", project]);
+        assert!(
+            err.contains("i.lock") && err.contains("example.com/a@1.0.0"),
+            "{err}"
+        );
+        assert_eq!(read(&app.join("i.lock")), locked);
+    }
+}
+
+#[test]
+fn publish_pins_macro_kind_call_contract_and_compile_time_source() {
+    let w = World::new();
+    let macros = include_str!("../../../tests/spec/14.5/mp07_macro_contract/src/macros.is");
+    let dir = w.project(
+        "pub",
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/macros.is", macros),
+        ],
+    );
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "original macro");
+    let project = dir.to_str().unwrap();
+    w.ok(&["publish", "1.0.0", "--project", project]);
+    // Identical source is a valid patch.
+    let (ok, out) = try_publish(&w, &dir, &[], "1.0.1");
+    assert!(ok, "{out}");
+    // Renaming a parameter and changing the transformer both escape a plain
+    // (Syntax) -> Syntax comparison, but change the conservative contract.
+    for changed in [
+        macros.replace("value", "renamed"),
+        macros.replace("((. syntax make) ((. syntax node) value) value)", "`False"),
+    ] {
+        let (ok, out) = try_publish(&w, &dir, &[("src/macros.is", &changed)], "1.0.1");
+        assert!(!ok, "{out}");
+        assert!(
+            out.contains("changed macro macros.id") && out.contains("a new major version"),
+            "{out}"
+        );
+    }
+}
+
+#[test]
+fn publish_macro_contract_includes_imported_compile_time_initializers() {
+    let w = World::new();
+    let dir = w.project("pub", &[
+        ("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n"),
+        ("src/helper.i", "(answer)\nanswer = 42\n"),
+        ("src/macros.is", "(, (= helper (/ pub helper)))\n(, m)\n(@ macro (= m (-> (, value) _ {(. helper answer) value})))\n"),
+    ]);
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "original helper");
+    w.ok(&["publish", "1.0.0", "--project", dir.to_str().unwrap()]);
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[("src/helper.i", "(answer)\nanswer = 43\n")],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed macro macros.m"), "{out}");
+}
+
+#[test]
+fn publish_compares_interfaces_after_macro_generated_exports() {
+    let w = World::new();
+    let dir = w.project("pub", &[
+        ("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n"),
+        ("src/macros.is", "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, name value) (<- _ (, (: items (. syntax Items)))) {((. items expose) name) `(= ~name ~value)})))\n"),
+        ("src/api.i", "(m = pub/macros)\nm.emit(answer, 42)\n"),
+    ]);
+    git(&dir, &["init", "-q"]);
+    commit(&dir, "generated API");
+    w.ok(&["publish", "1.0.0", "--project", dir.to_str().unwrap()]);
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "src/api.i",
+            "(m = pub/macros)\nm.emit(answer, \"changed\")\n",
+        )],
+        "1.0.1",
+    );
+    assert!(!ok, "{out}");
+    assert!(out.contains("changed value api.answer"), "{out}");
 }

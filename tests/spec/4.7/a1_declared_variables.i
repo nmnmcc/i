@@ -5,15 +5,15 @@
 )
 Box(A) = (A)
 Alias(A) = Box(A)
-id: <A>(A) -> A = (x) { x }
-outer = <A>(x: A) -> A {
-	inherited = (y: A) -> A { y }
-	inner = <A>(y: A) -> A { y }
+id : <A>(A) -> A = (x) { x }
+outer = <A>(x : A) -> A {
+	inherited = (y : A) -> A { y }
+	inner = <A>(y : A) -> A { y }
 	assert(inner(1) == 1)
 	assert(inner("different") == "different")
 	inherited(x)
 }
-unbox = <A>(b: Alias(A)) -> A { b |> (Box(x)) { x } }
+unbox = <A>(b : Alias(A)) -> A { b |> (Box(x)) { x } }
 
 main = () {
 	assert(id(4) == 4)

@@ -1,7 +1,9 @@
 ==================
 Branches, guards and matches
 ==================
-kind = (n: Int) { n |> (0) { "zero" } | (k ? k < 0) { "negative" } | (_) { "positive" } }
+kind = (n : Int) {
+	n |> (0) { "zero" } | (k ? k < 0) { "negative" } | (_) { "positive" }
+}
 
 ---
 
@@ -54,7 +56,7 @@ kind = (n: Int) { n |> (0) { "zero" } | (k ? k < 0) { "negative" } | (_) { "posi
 ==================
 Services and provide
 ==================
-run = () <- (io: Io, ..env: N) { io.print("x") }
+run = () <- (io : Io, ..env : N) { io.print("x") }
 main = () { run() <- (io) }
 
 ---
@@ -99,7 +101,7 @@ main = () { run() <- (io) }
 ==================
 Type parameters and function types
 ==================
-id = <A>(x: A) -> A { x }
+id = <A>(x : A) -> A { x }
 F(A) = <B>(A, B) <- (Fail(String), ..N) -> A
 Pair = (left = Int, right = Int)
 p = Pair(left = 1, right = 2)
@@ -209,3 +211,36 @@ f = ((a, b) = t, Point(x = px, ..)) { (a, b, px, t) }
             (identifier))
           (data_item
             (identifier)))))))
+
+==================
+Annotation pipe ends at alternatives
+==================
+f = (x : Int | y) { x }
+g : (Int) -> { Int | String }
+F = List((Int) -> Int | String)
+
+---
+
+(source_file
+  (binding
+    (identifier)
+    (function
+      (parameters
+        (parameter
+          (typed_pattern (identifier) (named_type (type_identifier)))
+          (identifier)))
+      (block (identifier))))
+  (declaration
+    (identifier)
+    (function_type
+      (data_type (type_item (named_type (type_identifier))))
+      (type_group
+        (binary_type (named_type (type_identifier)) (named_type (type_identifier))))))
+  (type_definition
+    (type_identifier)
+    (named_type
+      (type_identifier)
+      (type_arguments
+        (function_type
+          (data_type (type_item (named_type (type_identifier))))
+          (binary_type (named_type (type_identifier)) (named_type (type_identifier))))))))

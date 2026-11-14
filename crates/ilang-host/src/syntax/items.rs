@@ -329,6 +329,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn result_and_collection_requests_share_one_mark_transformation() {
+        use ilang_syntax::lisp::{
+            parse,
+            syntax::{Node, Scope},
+        };
+        let datum = &parse("generated").unwrap()[0];
+        let target = Syntax::from_datum(
+            datum,
+            &Scope {
+                module: 11,
+                marks: Default::default(),
+            },
+        );
+        let output = Syntax::make(Node::Round(vec![target.clone()]), &target).unwrap();
+        let requests = vec![
+            ItemRequest::Add {
+                collection: target.clone(),
+                target: target.clone(),
+                data: Vec::new(),
+                at: target.clone(),
+            },
+            ItemRequest::Expose { name: target },
+        ];
+        let (output, requests) = flip_output_and_requests(&output, &requests, 17);
+        let Node::Round(parts) = output.node() else {
+            unreachable!()
+        };
+        let ItemRequest::Add {
+            collection,
+            target,
+            at,
+            ..
+        } = &requests[0]
+        else {
+            unreachable!()
+        };
+        let ItemRequest::Expose { name } = &requests[1] else {
+            unreachable!()
+        };
+        for syntax in [collection, target, at, name] {
+            assert!(syntax.identical(&parts[0]));
+            assert!(syntax.scope().marks.contains(&17));
+        }
+    }
+    #[test]
     fn long_metadata_tail_drops_on_a_small_stack() {
         std::thread::Builder::new()
             .stack_size(256 * 1024)

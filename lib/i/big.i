@@ -27,57 +27,57 @@
 
 /// -1, 0 or 1.
 @external("ilang:big", "sign")
-sign: (Int) -> Int
+sign : (Int) -> Int
 
 /// The digits of the magnitude, in base 2^30, least significant first.
 @external("ilang:big", "digits")
-digits: (Int) -> List(Int)
+digits : (Int) -> List(Int)
 
 /// The Int with this sign and these digits; zero digits at the end are
 /// allowed.
 @external("ilang:big", "from_digits")
-from_digits: (Int, List(Int)) -> Int
+from_digits : (Int, List(Int)) -> Int
 
 /// The number of digits of the magnitude, in base 2^30.
 @external("ilang:big", "size")
-size: (Int) -> Int
+size : (Int) -> Int
 
 /// The digit of the magnitude at `index`, in base 2^30; 0 past the end.
 @external("ilang:big", "limb")
-limb: (Int, Int) -> Int
+limb : (Int, Int) -> Int
 
 /// The Int with this sign and these digits in base 2^30, most significant
 /// first; zero digits in front are allowed.
 @external("ilang:big", "from_top")
-from_top: (Int, List(Int)) -> Int
+from_top : (Int, List(Int)) -> Int
 
 // Private construction storage. Each digit is written once, and the storage
 // is never used again after finish; no published Int is changed.
 Digits = Opaque
 
 @external("ilang:big", "builder")
-builder: (Int) -> Digits
+builder : (Int) -> Digits
 
 @external("ilang:big", "put")
-put: (Digits, Int, Int) -> Digits
+put : (Digits, Int, Int) -> Digits
 
 @external("ilang:big", "finish")
-finish: (Int, Digits) -> Int
+finish : (Int, Digits) -> Int
 
 // The two parts of one base-2^30 multiply-add. Separate scalar results
 // keep the inner loop from allocating either a product Int or a tuple.
 @external("ilang:big", "multiply_low")
-multiply_low: (Int, Int, Int) -> Int
+multiply_low : (Int, Int, Int) -> Int
 
 @external("ilang:big", "multiply_high")
-multiply_high: (Int, Int, Int) -> Int
+multiply_high : (Int, Int, Int) -> Int
 
 // Divide high * base + low by d; high < d. Quotient and remainder.
 @external("ilang:big", "divide_digit")
-divide_digit: (Int, Int, Int) -> (Int, Int)
+divide_digit : (Int, Int, Int) -> (Int, Int)
 
 /// -1, 0 or 1, as `a` is less than, equal to or greater than `b`.
-compare = (a: Int, b: Int) -> Int {
+compare = (a : Int, b : Int) -> Int {
 	sa = sign(a)
 	sb = sign(b)
 	{ sa == sb } |>
@@ -88,7 +88,7 @@ compare = (a: Int, b: Int) -> Int {
 }
 
 // -1, 0 or 1 for the magnitudes, digit by digit from the top.
-magnitude_order = (a: Int, b: Int) -> Int {
+magnitude_order = (a : Int, b : Int) -> Int {
 	na = size(a)
 	nb = size(b)
 	{ na == nb } |>
@@ -96,7 +96,7 @@ magnitude_order = (a: Int, b: Int) -> Int {
 		| (False) { { na < nb } |> (True) { -1 } | (False) { 1 } }
 }
 
-order_from = (a: Int, b: Int, i: Int) -> Int {
+order_from = (a : Int, b : Int, i : Int) -> Int {
 	{ i < 0 } |>
 		(True) { 0 }
 		| (False) {
@@ -132,18 +132,18 @@ order_from = (a: Int, b: Int, i: Int) -> Int {
 		}
 }
 
-digit_order = (a: Int, b: Int) -> Int {
+digit_order = (a : Int, b : Int) -> Int {
 	{ a < b } |> (True) { -1 } | (False) { 1 }
 }
 
 /// `a + b`.
-add = (a: Int, b: Int) -> Int { signed_add(a, sign(a), b, sign(b)) }
+add = (a : Int, b : Int) -> Int { signed_add(a, sign(a), b, sign(b)) }
 
 /// `a - b`.
-subtract = (a: Int, b: Int) -> Int { signed_add(a, sign(a), b, -sign(b)) }
+subtract = (a : Int, b : Int) -> Int { signed_add(a, sign(a), b, -sign(b)) }
 
 // `a` with sign `sa` plus the magnitude of `b` with sign `sb`.
-signed_add = (a: Int, sa: Int, b: Int, sb: Int) -> Int {
+signed_add = (a : Int, sa : Int, b : Int, sb : Int) -> Int {
 	{ sb == 0 } |>
 		(True) { a }
 		| (False) {
@@ -193,7 +193,14 @@ signed_add = (a: Int, sa: Int, b: Int, sb: Int) -> Int {
 }
 
 // Write |a| + |b| from digit i up.
-add_up = (a: Int, b: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits {
+add_up = (
+	a : Int,
+	b : Int,
+	i : Int,
+	n : Int,
+	carry : Int,
+	out : Digits
+) -> Digits {
 	{ i == n } |>
 		(True) { put(out, i, carry) }
 		| (False) {
@@ -210,12 +217,12 @@ add_up = (a: Int, b: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits {
 
 // Write |a| - |b|, where |a| is at least |b|.
 subtract_up = (
-	a: Int,
-	b: Int,
-	i: Int,
-	n: Int,
-	borrow: Int,
-	out: Digits
+	a : Int,
+	b : Int,
+	i : Int,
+	n : Int,
+	borrow : Int,
+	out : Digits
 ) -> Digits {
 	{ i == n } |>
 		(True) { out }
@@ -239,7 +246,7 @@ subtract_up = (
 }
 
 /// `a * b`.
-multiply = (a: Int, b: Int) -> Int {
+multiply = (a : Int, b : Int) -> Int {
 	s = sign(a) * sign(b)
 	{ s == 0 } |>
 		(True) { 0 }
@@ -266,7 +273,14 @@ multiply = (a: Int, b: Int) -> Int {
 // Karatsuba on ranges of the original operands. No half is copied into a
 // list or a new number: only the sums and subproducts are materialized.
 // Small or unbalanced ranges use product scanning.
-multiply_range = (a: Int, ao: Int, na: Int, b: Int, bo: Int, nb: Int) -> Int {
+multiply_range = (
+	a : Int,
+	ao : Int,
+	na : Int,
+	b : Int,
+	bo : Int,
+	nb : Int
+) -> Int {
 	{ na == 0 || nb == 0 } |>
 		(True) { 0 }
 		| (False) {
@@ -326,14 +340,14 @@ multiply_range = (a: Int, ao: Int, na: Int, b: Int, bo: Int, nb: Int) -> Int {
 }
 
 sum_halves = (
-	x: Int,
-	offset: Int,
-	k: Int,
-	n: Int,
-	i: Int,
-	end: Int,
-	carry: Int,
-	out: Digits
+	x : Int,
+	offset : Int,
+	k : Int,
+	n : Int,
+	i : Int,
+	end : Int,
+	carry : Int,
+	out : Digits
 ) -> Digits {
 	{ i == end } |>
 		(True) { put(out, i, carry) }
@@ -373,14 +387,14 @@ sum_halves = (
 
 // low + middle * base^k + high * base^(2*k), into one result array.
 combine = (
-	low: Int,
-	middle: Int,
-	high: Int,
-	k: Int,
-	i: Int,
-	n: Int,
-	carry: Int,
-	out: Digits
+	low : Int,
+	middle : Int,
+	high : Int,
+	k : Int,
+	i : Int,
+	n : Int,
+	carry : Int,
+	out : Digits
 ) -> Digits {
 	{ i == n } |>
 		(True) { out }
@@ -404,7 +418,14 @@ combine = (
 }
 
 // |x| × d for one digit d.
-scale_up = (x: Int, d: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits {
+scale_up = (
+	x : Int,
+	d : Int,
+	i : Int,
+	n : Int,
+	carry : Int,
+	out : Digits
+) -> Digits {
 	{ i == n } |>
 		(True) { put(out, i, carry) }
 		| (False) {
@@ -418,15 +439,15 @@ scale_up = (x: Int, d: Int, i: Int, n: Int, carry: Int, out: Digits) -> Digits {
 // Product scanning with three base-2^30 accumulators. Every inner-loop
 // value stays a small Int; only one carry is materialized per column.
 columns = (
-	a: Int,
-	ao: Int,
-	b: Int,
-	bo: Int,
-	na: Int,
-	nb: Int,
-	k: Int,
-	carry: Int,
-	out: Digits
+	a : Int,
+	ao : Int,
+	b : Int,
+	bo : Int,
+	na : Int,
+	nb : Int,
+	k : Int,
+	carry : Int,
+	out : Digits
 ) -> Digits {
 	{ k == na + nb - 1 } |>
 		(True) { put(out, k, carry) }
@@ -459,16 +480,16 @@ columns = (
 }
 
 column = (
-	a: Int,
-	ao: Int,
-	b: Int,
-	bo: Int,
-	i: Int,
-	last: Int,
-	k: Int,
-	low: Int,
-	high: Int,
-	extra: Int
+	a : Int,
+	ao : Int,
+	b : Int,
+	bo : Int,
+	i : Int,
+	last : Int,
+	k : Int,
+	low : Int,
+	high : Int,
+	extra : Int
 ) -> (Int, Int, Int) {
 	{ i > last } |>
 		(True) { (low, high, extra) }
@@ -516,12 +537,12 @@ column = (
 		}
 }
 
-max = (a: Int, b: Int) -> Int { { a > b } |> (True) { a } | (False) { b } }
+max = (a : Int, b : Int) -> Int { { a > b } |> (True) { a } | (False) { b } }
 
-min = (a: Int, b: Int) -> Int { { a < b } |> (True) { a } | (False) { b } }
+min = (a : Int, b : Int) -> Int { { a < b } |> (True) { a } | (False) { b } }
 
 /// `a / b`, rounded toward zero; 0 when `b` is 0 (§11.2).
-divide = (a: Int, b: Int) -> Int {
+divide = (a : Int, b : Int) -> Int {
 	s = sign(a) * sign(b)
 	{ s == 0 } |>
 		(True) { 0 }
@@ -532,7 +553,7 @@ divide = (a: Int, b: Int) -> Int {
 }
 
 /// `a % b`, with the sign of `a`; 0 when `b` is 0 (§11.2).
-remainder = (a: Int, b: Int) -> Int {
+remainder = (a : Int, b : Int) -> Int {
 	sa = sign(a)
 	{ sa * sign(b) == 0 } |>
 		(True) { 0 }
@@ -544,7 +565,7 @@ remainder = (a: Int, b: Int) -> Int {
 
 /// The digits of `value` in `radix` (2 to 36), with `-` when it is
 /// negative; digits above 9 are capital letters.
-to_text = (value: Int, radix: Int) -> String {
+to_text = (value : Int, radix : Int) -> String {
 	s = sign(value)
 	{ s == 0 } |>
 		(True) { "0" }
@@ -561,7 +582,7 @@ to_text = (value: Int, radix: Int) -> String {
 
 // Positive quotient and remainder. Normalize each operand once, then read
 // both numbers directly by offset, with no operand lists.
-magnitude_divide = (a: Int, b: Int) -> (Int, Int) {
+magnitude_divide = (a : Int, b : Int) -> (Int, Int) {
 	{ magnitude_order(a, b) < 0 } |>
 		(True) { (0, { sign(a) < 0 } |> (True) { -a } | (False) { a }) }
 		| (False) {
@@ -619,7 +640,7 @@ magnitude_divide = (a: Int, b: Int) -> (Int, Int) {
 		}
 }
 
-normalized = (x: Int, factor: Int) -> Int {
+normalized = (x : Int, factor : Int) -> Int {
 	{ factor == 1 } |>
 		(True) { x }
 		| (False) {
@@ -639,11 +660,11 @@ normalized = (x: Int, factor: Int) -> Int {
 
 // The top m - 1 dividend digits are below the normalized divisor.
 initial_remainder = (
-	x: Int,
-	offset: Int,
-	i: Int,
-	n: Int,
-	out: Digits
+	x : Int,
+	offset : Int,
+	i : Int,
+	n : Int,
+	out : Digits
 ) -> Digits {
 	{ i == n } |>
 		(True) { out }
@@ -658,7 +679,7 @@ initial_remainder = (
 		}
 }
 
-short_divide_number = (x: Int, d: Int, i: Int, r: Int, out: Digits) -> (
+short_divide_number = (x : Int, d : Int, i : Int, r : Int, out : Digits) -> (
 	Int,
 	Int,
 ) {
@@ -672,10 +693,15 @@ short_divide_number = (x: Int, d: Int, i: Int, r: Int, out: Digits) -> (
 
 // Bring down one dividend digit. Estimate from the top two digits of the
 // shifted remainder, dividing by divisor_top + 1 so it cannot be too big.
-long_divide = (x: Int, y: Int, i: Int, m: Int, top: Int, r: Int, q: Digits) -> (
-	Int,
-	Int,
-) {
+long_divide = (
+	x : Int,
+	y : Int,
+	i : Int,
+	m : Int,
+	top : Int,
+	r : Int,
+	q : Digits
+) -> (Int, Int) {
 	{ i < 0 } |>
 		(True) { (finish(1, q), r) }
 		| (False) {
@@ -693,15 +719,15 @@ long_divide = (x: Int, y: Int, i: Int, m: Int, top: Int, r: Int, q: Digits) -> (
 // r * base + a - y * d. Fuse the one-digit product and subtraction so
 // there is no temporary product or list copy of either operand.
 reduce_digit = (
-	r: Int,
-	a: Int,
-	y: Int,
-	d: Int,
-	i: Int,
-	n: Int,
-	carry: Int,
-	borrow: Int,
-	out: Digits
+	r : Int,
+	a : Int,
+	y : Int,
+	d : Int,
+	i : Int,
+	n : Int,
+	carry : Int,
+	borrow : Int,
+	out : Digits
 ) -> Digits {
 	{ i == n } |>
 		(True) { out }
@@ -741,7 +767,7 @@ reduce_digit = (
 		}
 }
 
-correct = (r: Int, y: Int, digit: Int) -> (Int, Int) {
+correct = (r : Int, y : Int, digit : Int) -> (Int, Int) {
 	{ magnitude_order(r, y) >= 0 } |>
 		(True) {
 			correct(
@@ -763,19 +789,19 @@ correct = (r: Int, y: Int, digit: Int) -> (Int, Int) {
 		| (False) { (digit, r) }
 }
 
-normal_shift = (top: Int, s: Int) -> Int {
+normal_shift = (top : Int, s : Int) -> Int {
 	{ top >= 536870912 } |>
 		(True) { s }
 		| (False) { normal_shift(top * 2, s + 1) }
 }
 
-power_of_two = (s: Int, acc: Int) -> Int {
+power_of_two = (s : Int, acc : Int) -> Int {
 	{ s == 0 } |> (True) { acc } | (False) { power_of_two(s - 1, acc * 2) }
 }
 
 // Division by one digit, from the most significant digit `top`; the
 // quotient least significant first, and the remainder.
-short_divide = (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (
+short_divide = (top : List(Int), d : Int, r : Int, acc : List(Int)) -> (
 	List(Int),
 	Int,
 ) {
@@ -788,25 +814,25 @@ short_divide = (top: List(Int), d: Int, r: Int, acc: List(Int)) -> (
 }
 
 // Text conversion alone uses lists of digits.
-reverse = (x: List(Int), acc: List(Int)) -> List(Int) {
+reverse = (x : List(Int), acc : List(Int)) -> List(Int) {
 	x |> ([]) { acc } | ([d, ..ds]) { reverse(ds, [d, ..acc]) }
 }
 
-trim = (x: List(Int)) -> List(Int) {
+trim = (x : List(Int)) -> List(Int) {
 	reverse(
 		drop_zeros(reverse(x, [])),
 		[],
 	)
 }
 
-drop_zeros = (x: List(Int)) -> List(Int) {
+drop_zeros = (x : List(Int)) -> List(Int) {
 	x |> ([0, ..rest]) { drop_zeros(rest) } | (_) { x }
 }
 
 // ---- Text ----
 
 // The largest power of `radix` that is below 2^30, and its exponent.
-chunk_of = (radix: Int, chunk: Int, width: Int) -> (Int, Int) {
+chunk_of = (radix : Int, chunk : Int, width : Int) -> (Int, Int) {
 	next = chunk * radix
 	{ next >= 1073741824 } |>
 		(True) { (chunk, width) }
@@ -816,11 +842,11 @@ chunk_of = (radix: Int, chunk: Int, width: Int) -> (Int, Int) {
 // Divides by `chunk` until nothing is left; each remainder is `width`
 // digits of the text, and the last one has no zeros in front.
 text_chunks = (
-	x: List(Int),
-	chunk: Int,
-	radix: Int,
-	width: Int,
-	acc: List(String)
+	x : List(Int),
+	chunk : Int,
+	radix : Int,
+	width : Int,
+	acc : List(String)
 ) -> List(String) {
 	(q, r) = short_divide(reverse(x, []), chunk, 0, [])
 	{ q == [] } |>
@@ -839,11 +865,11 @@ text_chunks = (
 // The digits of `v` in `radix` before `acc`, at least `width` of them
 // when `padded`.
 chunk_text = (
-	v: Int,
-	radix: Int,
-	width: Int,
-	padded: Bool,
-	acc: List(String)
+	v : Int,
+	radix : Int,
+	width : Int,
+	padded : Bool,
+	acc : List(String)
 ) -> List(String) {
 	next = [digit_text(v % radix), ..acc]
 	rest = v / radix
@@ -852,7 +878,7 @@ chunk_text = (
 		| (False) { chunk_text(rest, radix, width - 1, padded, next) }
 }
 
-digit_text = (d: Int) -> String {
+digit_text = (d : Int) -> String {
 	d |>
 		(0) { "0" }
 		| (1) { "1" }

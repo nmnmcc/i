@@ -193,11 +193,18 @@ written recursive result types, never polymorphic recursion. An ordinary client:
 )
 
 test("reverse_twice", () {
-  Ok(item) = property.int(-100, 100)
-  Ok(items) = property.list(item, 0, 50)
-  property.test(items, property.defaults(), (xs) {
-    assert(list.reverse(list.reverse(xs)) == xs)
-  }, core.inspect)
+	Ok(item) = property.int(-100, 100)
+	Ok(items) = property.list(item, 0, 50)
+	property.test(
+		items,
+		property.defaults(),
+		(xs) {
+			assert(
+				list.reverse(list.reverse(xs)) == xs,
+			)
+		},
+		core.inspect,
+	)
 })
 ```
 
@@ -372,7 +379,7 @@ reason: <reason>
 
 Multiline show/reason text is included literally, including a final LF supplied
 by the caller. The formatter itself appends none. Passed gives
-`std/property v1: passed; successes: <n>; discards: <d>`; GaveUp substitutes
+`std/property v1 : passed; successes : <n>; discards : <d>`; GaveUp substitutes
 `gave up`; InvalidConfig gives `std/property v1: invalid config; <message>`.
 show runs exactly twice for Falsified, zero times otherwise. It is pure, but
 printing arbitrary closures/host references is not a portable serialization;
@@ -904,10 +911,10 @@ client must fail to check:
 
 ```i
 bad = () {
-  property.flat_map(property.constant(1), (n) {
-    Some(t) = property.sample(property.constant(n), 0, random.from_seed(0))
-    property.constant(t.value)
-  })
+	property.flat_map(property.constant(1), (n) {
+		Some(t) = property.sample(property.constant(n), 0, random.from_seed(0))
+		property.constant(t.value)
+	})
 }
 ```
 
@@ -918,7 +925,7 @@ a dependent bounded builder can use this shape, after outer has been constructed
 with nonnegative bounds:
 
 ```i
-dependent = (outer: property.Gen(Int)) {
+dependent = (outer : property.Gen(Int)) {
 	property.flat_map(outer, (n) {
 		property.int(0, n) |>
 			(Ok(inner)) { property.map(inner, (k) { (n, k) }) }
@@ -938,18 +945,18 @@ functions or polymorphic recursion.
 ```i
 (
 	testlib = (test) = std/test
-	i/core, std/float)
-
+	i/core
+	std/float
+)
 
 test("nonfinite_bits", () {
-  core.float_from_bits(0x7ff0000000000000)
-  Nil
+	core.float_from_bits(0x7ff0000000000000)
+	Nil
 })
 
-
 test("overflow_before_result", () {
-  float.max_finite *. float.max_finite
-  Nil
+	float.max_finite *. float.max_finite
+	Nil
 })
 ```
 
@@ -1047,7 +1054,7 @@ Code citations remain pinned to this note's b9173ce baseline.
 | `python3 .std3-probes/hypot_model.py` | 64 norm comparisons plus eight exact rounding-square cases passed; also reran the 76 trig comparisons. |
 
 The mechanical signature probe extracts each inventory entry and checks the
-ordinary binding `witness_name(A, B) = (f: { signature }) -> { signature } { f }`,
+ordinary binding `witness_name(A, B) = (f : { signature }) -> { signature } { f }`,
 with that entry's actual type parameters, imports and public type definitions.
 This verifies type syntax, labels and effects, **not** an implementation body.
 The separately implemented kernels are stronger evidence for the difficult

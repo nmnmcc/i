@@ -8,7 +8,7 @@ Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
 
-both = (b: Bool) -> Option(Int) { b |> (True) { Some(1) } | (False) { None } }
+both = (b : Bool) -> Option(Int) { b |> (True) { Some(1) } | (False) { None } }
 
 main = () {
 	Some(p) = both(True)

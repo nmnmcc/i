@@ -3,11 +3,11 @@
 	app/facade
 )
 
-id = <A>(value: A) { value }
+id = <A>(value : A) { value }
 
-pass = <A>(value: secret.Secret(A)) { id(value) }
+pass = <A>(value : secret.Secret(A)) { id(value) }
 
-public = (value: facade.OpenAlias) { value.value }
+public = (value : facade.OpenAlias) { value.value }
 
 allowed = () {
 	value = pass(facade.value)
@@ -25,7 +25,9 @@ allowed = () {
 	assert(
 		{
 			facade.open |>
-				(secret.Open(..) = v) { secret.Open(..v, value = 29).value }
+				(secret.OpenCase(..) = v) {
+					secret.OpenCase(..v, value = 29).value
+				}
 				| (_) { 0 }
 		} ==
 			29,
@@ -40,7 +42,7 @@ allowed = () {
 	assert(
 		{
 			facade.open |>
-				(secret.Open(value = value)) { value }
+				(secret.OpenCase(value = value)) { value }
 				| (secret.Other(value = value)) { value }
 		} ==
 			11,

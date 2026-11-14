@@ -12,7 +12,7 @@ Name = (text = String)
 Paused = (Continuation(Nil, Hop, Never))
 Done = (String)
 Hop = Paused | Done
-name = () <- (value: Name) { value.text }
+name = () <- (value : Name) { value.text }
 
 walk = (b, n) {
 	{ n == 3 } |>
@@ -30,7 +30,7 @@ make = () { control.keep((b) { walk(b, 0) }) }
 main = () {
 	{
 		kept = make()
-		pure = (n: Int) { n + 1 }
+		pure = (n : Int) { n + 1 }
 		a = control.keep(pure)
 		b = control.keep(pure)
 		assert(a != b)
@@ -63,7 +63,7 @@ main = () {
 					})
 					control.cancel(k4)
 					control.boundary((boundary) {
-						extra: Extra(Nil, Assert) = Extra(boundary)
+						extra : Extra(Nil, Never, Assert) = Extra(boundary)
 						{
 							f = control.keep(pure)
 							assert(

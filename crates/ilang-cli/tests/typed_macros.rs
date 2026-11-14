@@ -203,7 +203,7 @@ fn typed_macro_rejects_implementation_arity() {
 }
 #[test]
 fn typed_macro_forwarding_record_differential() {
-    let (_,c)=checked(ID,"(\n\tm = app/macros\n)\nf = (x: (a = Int, b = String)) { m.identity(x).a }\nmain = () { assert(f((a = 42, b = \"b\")) == 42) }").unwrap();
+    let (_,c)=checked(ID,"(\n\tm = app/macros\n)\nf = (x : (a = Int, b = String)) { m.identity(x).a }\nmain = () { assert(f((a = 42, b = \"b\")) == 42) }").unwrap();
     assert_eq!(c.types.unwrap().typed_expansions.len(), 1);
 }
 #[test]
@@ -447,7 +447,7 @@ fn typed_macro_members_give_each_closed_data_member_once() {
     );
     checked(
         &m,
-        "(\n\tm = app/macros\n)\nf = (x: (a = Int) | (b = String)) { m.m(x) }\nmain = () { f((a = 42)) }",
+        "(\n\tm = app/macros\n)\nf = (x : { (a = Int) | (b = String) }) { m.m(x) }\nmain = () { f((a = 42)) }",
     )
     .unwrap();
 }
@@ -479,7 +479,7 @@ fn typed_macro_members_accept_symbolic_difference_without_new_bounds() {
 
 #[test]
 fn typed_macro_forwarding_keeps_original_value_type_reads() {
-    checked(ID,"(m = app/macros)\nf = (x: Int) { m.identity(() -> x { x })() }\nmain = () { assert(f(42) == 42) }").unwrap();
+    checked(ID,"(m = app/macros)\nf = (x : Int) { m.identity(() -> x { x })() }\nmain = () { assert(f(42) == 42) }").unwrap();
 }
 #[test]
 fn typed_macro_argument_binder_cannot_escape() {
@@ -592,4 +592,123 @@ fn expansion_and_wasm_are_deterministic() {
     };
     let wasm = build();
     assert!(wasm == build(), "wasm differs between two builds");
+}
+
+#[test]
+fn contextual_invariant_result_bounds_are_visible_in_frozen_snapshot() {
+    let macros = include_str!("../../../tests/spec/14.8/mp04_contextual_invariant/src/macros.is");
+    let main = include_str!("../../../tests/spec/14.8/mp04_contextual_invariant/src/main.i")
+        .replace("probe/macros", "app/macros");
+    checked(macros, &main).unwrap();
+    reject(
+        macros,
+        &main.replace("Key(Int)", "Key(String)"),
+        "expected result is not Key(Int)",
+    );
+}
+
+#[test]
+fn equal_printed_nominal_members_have_the_same_order_in_both_union_spellings() {
+    let macros = include_str!("../../../tests/spec/14.8/mp06_nominal_members/src/macros.is")
+        .replace("/ probe ", "/ app ");
+    let source = include_str!("../../../tests/spec/14.8/mp06_nominal_members/src/main.i")
+        .replace("probe/", "app/");
+    for main in [
+        source.clone(),
+        source.replace("b.Tag | a.Tag", "a.Tag | b.Tag"),
+    ] {
+        let dir = project(&macros, &main);
+        for name in ["a", "b"] {
+            std::fs::write(
+                dir.path().join(format!("src/{name}.i")),
+                "(Tag(..))\nTag = ()\n",
+            )
+            .unwrap();
+        }
+        let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);
+        assert!(!ds.iter().any(Diagnostic::is_error), "{ds:?}");
+        let checked = ilang_macro::project::check(&mut graph);
+        assert!(
+            !checked.diags.iter().any(Diagnostic::is_error),
+            "{}",
+            graph.sources.render_all(&checked.diags).join("\n")
+        );
+    }
+}
+
+#[test]
+fn typed_macro_diagnostics_are_part_of_the_implementation_contract() {
+    let macros = include_str!("../../../tests/spec/14.8/mp14_typed_diagnostics/src/macros.is");
+    let main = include_str!("../../../tests/spec/14.8/mp14_typed_diagnostics/src/main.i")
+        .replace("probe/macros", "app/macros");
+    let (_, checked) = checked(macros, &main).unwrap();
+    assert_eq!(
+        checked
+            .diags
+            .iter()
+            .filter(|d| d.severity == ilang_package::Severity::Note && d.message == "note")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn typed_macro_implementations_dispatch_every_signature_shape() {
+    let macros = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/macros.is");
+    let source = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/main.i")
+        .replace("probe/macros", "app/macros");
+    checked(macros, &source).unwrap();
+    reject(
+        include_str!("../../../tests/spec/14.8/mp11_missing_shape/src/macros.is"),
+        &source,
+        "every parameter-data shape",
+    );
+}
+
+#[test]
+fn typed_macro_shape_contracts_resolve_aliases_before_comparing_them() {
+    let macros = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/macros.is");
+    let aliased = macros
+        .replace("(, id)", "(, id)\n(= Parameters (| (, Int) (, Int Int)))")
+        .replace(
+            "id (-> (| (, Int) (, Int Int)) Int)",
+            "id (-> Parameters Int)",
+        );
+    let source = include_str!("../../../tests/spec/14.8/mp11_shape_branches/src/main.i")
+        .replace("probe/macros", "app/macros");
+    checked(&aliased, &source).unwrap();
+    let missing = aliased.replace(
+        "(| (-> (, x) _ x) (-> (, x y) _ `(+ ~x ~y)))",
+        "(-> (, x) _ x)",
+    );
+    assert_ne!(missing, aliased);
+    reject(&missing, &source, "every parameter-data shape");
+}
+
+#[test]
+fn uncallable_typed_macro_signatures_do_not_need_an_impossible_empty_implementation() {
+    let macros = declared("m (-> Never Int)", "(-> (, value) _ `0)");
+    checked(&macros, "main = () { Nil }\n").unwrap();
+}
+
+#[test]
+fn typed_macro_shape_branches_keep_labels_within_a_single_group() {
+    let macros = include_str!("../../../tests/spec/14.8/mp11_labelled_branches/src/macros.is");
+    let source = include_str!("../../../tests/spec/14.8/mp11_labelled_branches/src/main.i")
+        .replace("probe/macros", "app/macros");
+    let (_, checked) = checked(macros, &source).unwrap();
+    assert_eq!(checked.types.unwrap().typed_expansions.len(), 2);
+}
+
+#[test]
+fn labelled_typed_calls_check_the_expanded_result_against_the_signature() {
+    let macros = declared(
+        "m (-> (, (= value Int)) String)",
+        "(-> (, (= value x)) _ x)",
+    );
+    reject(
+        &macros,
+        "(m = app/macros)\nmain = () { m.m(value = 1) }\n",
+        "cannot depend on its expansion",
+    );
 }

@@ -20,7 +20,8 @@
 //!   left out. The directory is written next to it and then renamed, so it
 //!   is either all there or not there.
 //! - `pkg/<escaped location>/<commit>.hash` is the hash of those files
-//!   (see [`crate::lock::hash`]), worked out from the git objects.
+//!   (see [`crate::lock::hash`]), worked out from the git objects. This is
+//!   advisory: every use rechecks all materialized paths and bytes.
 //!
 //! An escaped name keeps the bytes `a-z`, `0-9`, `.`, `_` and `-`, and writes
 //! every other byte as `%` and two lowercase hex digits, so
@@ -54,6 +55,25 @@ use std::ffi::OsString;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+
+/// Reject committed source links before loading or publishing a located package.
+pub fn check_source_links(files: &[PackageFile]) -> Result<()> {
+    if let Some(file) = files.iter().find(|f| {
+        f.kind == FileKind::Symlink
+            && (matches!(f.path.as_str(), "i.toml" | "src" | "test")
+                || f.path.starts_with("src/")
+                || f.path.starts_with("test/"))
+    }) {
+        return Err(GitError::new(
+            code::PACKAGE_FILES,
+            format!(
+                "symbolic link in a package manifest or source path: `{}`",
+                file.path
+            ),
+        ));
+    }
+    Ok(())
+}
 
 /// A problem while getting a package. `code` is one of [`crate::code`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -518,17 +538,24 @@ impl Git {
         place: &str,
         commit: &str,
     ) -> Result<(PathBuf, String)> {
+        self.package_snapshot(repository, dir, place, commit)
+            .map(|(path, hash, _)| (path, hash))
+    }
+
+    /// Verify the materialization and retain exactly the bytes that were
+    /// verified. The loader consumes this snapshot, without reopening paths.
+    pub(crate) fn package_snapshot(
+        &self,
+        repository: &str,
+        dir: Option<&str>,
+        place: &str,
+        commit: &str,
+    ) -> Result<(PathBuf, String, Vec<PackageFile>)> {
         let base = self.cache.join("pkg").join(escape(place));
         let target = base.join(commit);
         let hash_file = base.join(format!("{commit}.hash"));
-        if target.is_dir()
-            && let Ok(h) = std::fs::read_to_string(&hash_file)
-            && h.trim().len() == 71
-            && h.starts_with("sha256-")
-        {
-            return Ok((target, h.trim().to_string()));
-        }
         let files = self.files(repository, commit, dir)?;
+        check_source_links(&files)?;
         let hash = crate::lock::hash(&files);
         let cache_err = |e: std::io::Error| {
             GitError::new(
@@ -554,11 +581,103 @@ impl Git {
                 }
             }
         }
+        validate_source_paths(&target)?;
+        let snapshot = read_files(&target).map_err(|e| {
+            GitError::new(
+                code::LOCK_MISMATCH,
+                format!("cached package `{place}` could not be verified: {e}"),
+            )
+        })?;
+        // A sidecar authenticates neither bytes nor the set of paths. Verify
+        // against the Git objects even when the sidecar claims the right hash.
+        if crate::lock::hash(&snapshot) != hash {
+            return Err(GitError::new(
+                code::LOCK_MISMATCH,
+                format!(
+                    "cached files of `{place}` do not match the committed package at `{commit}`"
+                ),
+            ));
+        }
         let tmp = temp_name(&hash_file);
         std::fs::write(&tmp, format!("{hash}\n")).map_err(cache_err)?;
         std::fs::rename(&tmp, &hash_file).map_err(cache_err)?;
-        Ok((target, hash))
+        Ok((target, hash, snapshot))
     }
+}
+
+/// Source loading must never follow a symbolic link outside the hashed tree.
+/// Check directories as well as leaves, without traversing any link.
+fn validate_source_paths(dir: &Path) -> Result<()> {
+    fn visit(path: &Path, recurse: bool) -> std::io::Result<()> {
+        let metadata = match std::fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(e),
+        };
+        if metadata.file_type().is_symlink() {
+            return Err(std::io::Error::other(format!(
+                "symbolic link in a package manifest or source path: `{}`",
+                path.display()
+            )));
+        }
+        if recurse && metadata.is_dir() {
+            for entry in std::fs::read_dir(path)? {
+                visit(&entry?.path(), true)?;
+            }
+        }
+        Ok(())
+    }
+    let check = || -> std::io::Result<()> {
+        visit(dir, false)?;
+        visit(&dir.join("i.toml"), false)?;
+        visit(&dir.join("src"), true)?;
+        visit(&dir.join("test"), true)
+    };
+    check().map_err(|e| GitError::new(code::PACKAGE_FILES, e.to_string()))
+}
+
+/// Read each materialized file once, without following symbolic links.
+fn read_files(dir: &Path) -> std::io::Result<Vec<PackageFile>> {
+    fn walk(root: &Path, dir: &Path, files: &mut Vec<PackageFile>) -> std::io::Result<()> {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            let ty = entry.file_type()?;
+            if ty.is_dir() {
+                walk(root, &path, files)?;
+                continue;
+            }
+            let relative = path.strip_prefix(root).expect("walk stays below root");
+            let name = relative
+                .to_str()
+                .ok_or_else(|| std::io::Error::other("non UTF-8 cache path"))?;
+            let (kind, bytes) = if ty.is_symlink() {
+                let target = std::fs::read_link(&path)?;
+                #[cfg(unix)]
+                let bytes = {
+                    use std::os::unix::ffi::OsStrExt;
+                    target.as_os_str().as_bytes().to_vec()
+                };
+                #[cfg(not(unix))]
+                let bytes = target.to_string_lossy().as_bytes().to_vec();
+                (FileKind::Symlink, bytes)
+            } else if ty.is_file() {
+                (FileKind::Regular, std::fs::read(&path)?)
+            } else {
+                return Err(std::io::Error::other("not a regular file or symbolic link"));
+            };
+            files.push(PackageFile {
+                path: name.replace(std::path::MAIN_SEPARATOR, "/"),
+                kind,
+                bytes,
+            });
+        }
+        Ok(())
+    }
+    let mut files = Vec::new();
+    walk(dir, dir, &mut files)?;
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(files)
 }
 
 /// A name next to `path` that no other process uses.

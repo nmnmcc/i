@@ -4,7 +4,7 @@
 	main
 )
 Box(A) = (item = A)
-apply = <K>(b: Box((k = Int)), key: K, f: (Box((k = Int))) -> Int) -> Int {
+apply = <K>(b : Box((k = Int)), key : K, f : (Box((k = Int))) -> Int) -> Int {
 	f(b)
 }
 

@@ -1,0 +1,2 @@
+(, id)
+(@ macro (= id (-> (, (= value renamed)) _ renamed)))

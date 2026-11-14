@@ -25,7 +25,7 @@ for name in ['crates/ilang-cli/tests/macro_run.rs', 'crates/ilang-cli/tests/type
                 '{body}', '(-> (, value) _ `7)')
         elif value.startswith('(->'):
             source = '(@ macro (= m ' + value + '))\n'
-        elif re.match(r'^m \(->', value):
+        elif re.match(r'^[a-z_][A-Za-z0-9_]* \(->', value):
             source = '(@ macro (: ' + value + '))\n'
         elif value.startswith('{}(@ macro'):
             source = value[2:]

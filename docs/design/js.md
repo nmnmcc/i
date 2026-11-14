@@ -124,12 +124,14 @@ a compile error naming the target, service and requiring entry. The user
 accepted this cost verbatim: **“接受这个代价” (J1)**. For example:
 
 ```i
-(i/fs, i/fail)
-
+(
+	i/fs
+	i/fail
+)
 
 main = () {
-  fail.catch(() { fs.read_file("settings.txt") })
-  Nil
+	fail.catch(() { fs.read_file("settings.txt") })
+	Nil
 }
 ```
 
@@ -240,7 +242,7 @@ This complete example covers all five constructors and needs only Target:
 	target = i/target
 )
 
-main = () <- (t: target.Target) {
+main = () <- (t : target.Target) {
 	t |>
 		(target.Js(_)) { Nil }
 		| (target.NodeJS(_)) { Nil }
@@ -265,7 +267,7 @@ The printing example has its required import:
 	(Io) = i/io
 )
 
-main = () <- (io: Io) { io.print("Hello from i!") }
+main = () <- (io : Io) { io.print("Hello from i!") }
 ```
 
 It works where Io is provided, including the standalone runner and WASI.
@@ -343,13 +345,13 @@ Settings = (
 	read = () <- (Fail(fs.FsError), request.Await, request.Owner) -> BitArray,
 )
 
-filesystem = () <- (f: fs.Fs) {
+filesystem = () <- (f : fs.Fs) {
 	Settings(read = () { fs.read_file("settings.txt") <- (f) })
 }
 
 fallback = () { Settings(read = () { <<>> }) }
 
-main = () <- (settings: Settings) { settings.read() }
+main = () <- (settings : Settings) { settings.read() }
 ```
 
 The principal environment of main is Settings | Await | Owner on every
@@ -486,7 +488,7 @@ Remote = (fetch = () -> Request(Int))
 
 Bundle = (fetch = () <- (request.Await, request.Owner) -> Int)
 
-bundle = () <- (remote: Remote) {
+bundle = () <- (remote : Remote) {
 	Bundle(
 		fetch = () {
 			r = remote.fetch()
@@ -498,7 +500,7 @@ bundle = () <- (remote: Remote) {
 	)
 }
 
-main = () <- (b: Bundle) { b.fetch() }
+main = () <- (b : Bundle) { b.fetch() }
 ```
 
 On Host, select Bundle's factory `app/main.bundle` and explicitly register
@@ -524,7 +526,7 @@ host = "app/main.bundle"
 For a synchronous-use export in that module, add this ordinary exported binding:
 
 ```i
-answer = () <- (b: Bundle) { 7 }
+answer = () <- (b : Bundle) { 7 }
 ```
 
 Include answer in the exports and configure
@@ -757,7 +759,7 @@ Remote = (fetch = () -> Request(Int))
 Bundle = (fetch = () <- (request.Await, request.Owner) -> Int)
 
 make_config = () -> Config { Config(label = "configured") }
-make_await = () <- (cfg: Config) -> request.Await {
+make_await = () <- (cfg : Config) -> request.Await {
 	request.Await(
 		wait = (ticket) {
 			_ = cfg
@@ -765,12 +767,12 @@ make_await = () <- (cfg: Config) -> request.Await {
 		},
 	)
 }
-make_root = (k: Key(Nil)) -> request.Root { request.Root(key = k) }
-make_bundle = () <- (remote: Remote) -> Bundle {
+make_root = (k : Key(Nil)) -> request.Root { request.Root(key = k) }
+make_bundle = () <- (remote : Remote) -> Bundle {
 	Bundle(fetch = () { request.await_owned(remote.fetch()) })
 }
 
-main = () <- (b: Bundle) -> Int { b.fetch() }
+main = () <- (b : Bundle) -> Int { b.fetch() }
 ```
 
 Complete explicit host cells (standard-library source names are ordinary
@@ -800,7 +802,7 @@ with every factory requirement explicitly bound; the two parameters are the
 already-typed primitive leaves. It has **no** inferred environment or error:
 
 ```i
-entry_body = (remote: Remote, entry_key: Key(Nil)) -> Int {
+entry_body = (remote : Remote, entry_key : Key(Nil)) -> Int {
 	b = { make_bundle() <- (remote) }
 	cfg = make_config()
 	aw = { make_await() <- (cfg) }
@@ -842,17 +844,17 @@ against the accepted API, not an executed future-R2 fixture.
 Config = (label = String)
 Session = (read = () -> String)
 
-config_from_seed = (values: List(Config)) -> Config {
+config_from_seed = (values : List(Config)) -> Config {
 	values |> ([value]) { value } | (_) { panic("provider: missing seed") }
 }
-make_session = () <- (cfg: Config) -> Session {
+make_session = () <- (cfg : Config) -> Session {
 	Session(read = () { cfg.label })
 }
-with_session = <A, N>(body: () <- N -> A) -> A {
+with_session = <A, N>(body : () <- N -> A) -> A {
 	body() <- (Config(label = "inside"))
 }
 
-main = () <- (s: Session) { s.read() }
+main = () <- (s : Session) { s.read() }
 ```
 
 ```toml
@@ -873,7 +875,7 @@ main. Primitive admission precedes it. The typed ordinary body of its guarded
 continuation is:
 
 ```i
-body = () <- (seed: Config) -> String {
+body = () <- (seed : Config) -> String {
 	cfg = config_from_seed([seed])
 	service = { make_session() <- (cfg) }
 	main() <- (service)
@@ -894,7 +896,7 @@ loops; no compiler rule identifies a library, allocator or scheduler module.
 ## 3. Foreign declarations, linking, and loader lifecycle
 
 **F1 — A declaration holds an opaque JS value. [J3]** The new form is
-`@js("expression") name: T`, where T expands to one closed nominal type with
+`@js("expression") name : T`, where T expands to one closed nominal type with
 no constructors. No holes, type variables, unions, functions or constructed
 resource types. The annotation is required. It creates no i constructor or
 cast between nominal types. `i/js.Value {}` is one ordinary use; packages can
@@ -1030,7 +1032,7 @@ Keep the v3 wire for ordinary service/request calls. Put foreign declaration
 text, stable package/module/name identity, generated import name, nominal type
 identity, source span and availability in a separate versioned target section
 `ilang.js` (initial version 1). A matching generated loader requires that
-section and `target: "js"` or `"nodejs"`; old Appendix B hosts reject the
+section and `target : "js"` or `"nodejs"`; old Appendix B hosts reject the
 non-host target instead of accidentally loading it. The new mandatory target
 metadata is an explicit B.6 extension, not an undocumented v3 runtime export.
 The value getters are target imports listed there, not additions to v3's
@@ -1065,14 +1067,14 @@ an application service above Js; no constructor for Value is added.
 `call(f, args)` gives Value or stops for a thrown exception;
 `try_call(f, args)` gives Value with error `Thrown { Thrown(Value) }`.
 The fixed bridge returns opaque `Outcome {}` for invocation. Its checked
-`is_error: (Outcome) -> Bool` and `value: (Outcome) -> Value` accessors let
+`is_error : (Outcome) -> Bool` and `value : (Outcome) -> Value` accessors let
 ordinary i construct/raise Thrown *after* crossing. Thrown never crosses
 §10.3 as an ABI error. Non-callable f produces a caught JS TypeError by the
 same rule. `call` uses `panic("js: call threw")` with source positions;
 `try_call` preserves the exact thrown value, including null and undefined.
 
-A private argument builder uses `Args {}` with `new_args: () -> Args`,
-`push_arg: (Args, Value) -> Nil`, `invoke: (Value, Args) -> Outcome`.
+A private argument builder uses `Args {}` with `new_args : () -> Args`,
+`push_arg : (Args, Value) -> Nil`, `invoke : (Value, Args) -> Outcome`.
 Build a fresh array per call, copy the completed argument sequence at invoke,
 and never expose the mutable builder through public i/js functions. List
 traversal, result decoding and error construction are ordinary i. An Args
@@ -1113,7 +1115,7 @@ may replace outgoing conversions for application calls.
 | i Int / JS bigint in the matching conversion | convert | Exact arbitrary-precision bigint / Int; never Number |
 | i Float / finite JS number in the matching conversion | convert | binary64; negative zero follows existing SDK/spec equality |
 | i String / well-formed JS string in the matching conversion | convert | Unicode scalar sequence, UTF-8 at the wire |
-| i BitArray to JS, including non-byte lengths | convert | Fresh `{ bytes: Uint8Array, bitLength: number }`, zero padding |
+| i BitArray to JS, including non-byte lengths | convert | Fresh `{ bytes : Uint8Array, bitLength : number }`, zero padding |
 | Correct SDK bit-array object through to_bits | convert | Snapshot copy of exactly ceil(bitLength/8) bytes and exact bit length |
 | Wrong JS primitive kind, including Number through to_int | Mismatch | No coercion |
 | NaN or either infinity through to_float | Mismatch | Not in the set Float |
@@ -1143,8 +1145,8 @@ bridge, for every opaque boundary, not only JS getters. [K4]
 ## 5. Requests, cancellation and IO ownership
 
 **A1 — Await an opaque outcome, then decode in i. [J5]** The raw request
-service has `observe: (Value) -> Request(Outcome)` and
-`start: (Value, Args) -> Request(Outcome)`, with Owner added by runtime §5.2.
+service has `observe : (Value) -> Request(Outcome)` and
+`start : (Value, Args) -> Request(Outcome)`, with Owner added by runtime §5.2.
 There is no `Request(Result(Value, Thrown))` import and no general request map.
 `observe` adopts an already-started promise/thenable; fulfilled and rejected
 values both settle as an Outcome success at the ABI level. Accessor decoding
@@ -1255,12 +1257,12 @@ wraps it. Root APIs expose operations, not the table.
 
 | Field | Type |
 |---|---|
-| alloc | `(size: Int) -> Int ^ String` |
-| free | `(token: Int) -> Nil ^ String` |
-| store | `(token: Int, offset: Int, bytes: BitArray) -> Nil ^ String` |
-| load | `(token: Int, offset: Int, size: Int) -> BitArray ^ String` |
-| fd_write | `(fd: Int, token: Int, offset: Int, size: Int) -> Int ^ String` |
-| proc_exit | `(code: Int) -> Nil ^ String` |
+| alloc | `(size : Int) -> Int ^ String` |
+| free | `(token : Int) -> Nil ^ String` |
+| store | `(token : Int, offset : Int, bytes : BitArray) -> Nil ^ String` |
+| load | `(token : Int, offset : Int, size : Int) -> BitArray ^ String` |
+| fd_write | `(fd : Int, token : Int, offset : Int, size : Int) -> Int ^ String` |
+| proc_exit | `(code : Int) -> Nil ^ String` |
 
 This deliberately replaces the old four raw-address fields and the promise
 of an unchecked field for every preview-1 function. `Wasi` is an ordinary
@@ -1591,7 +1593,7 @@ F2 originally said “allowing parentheses or a one-expression group around the 
 - Baseline paragraph/row 338: The runtime creates the initial Root only for an entry whose inferred needs require request/task support.
 - Baseline paragraph/row 338: The initial bootstrap is part of the narrow entry provision, not a public unscoped root allocator.
 - Baseline paragraph/row 338: Entry request contexts and each task.run open a fresh Root and bind it for their whole lifetime.
-- Baseline paragraph/row 1030: | process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation: String, code: String) }` |
+- Baseline paragraph/row 1030: | process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation : String, code : String) }` |
 - Baseline paragraph/row 1188: | Raw Process field | Type |
 - Baseline paragraph/row 1449: | Module | `i run` and native Rust host | JS SDK standard service factory: Node | JS factory: browser | WASI preview-1 target in this track |
 - Baseline paragraph/row 1451: | random | Pure i | Same pure i | Same pure i | Same pure i |
@@ -1879,13 +1881,13 @@ The shared-constructor package is complete ordinary source plus the new map:
 
 Foreign = Opaque
 @js("(() => { throw Error('must initialize'); })()")
-foreign: Foreign
+foreign : Foreign
 
 Web = ()
 NonWeb = ()
 Family = Web | NonWeb
 
-main = () <- (f: Family) {
+main = () <- (f : Family) {
 	f |> (Web) { foreign == foreign } | (NonWeb) { True }
 }
 ```
@@ -1940,15 +1942,18 @@ are fixtures. They exposed issues beyond merely copying the review fixes.
 **Soundness: address reuse and malicious conversion.**
 
 ```i
-(i/fail, wasi = i/wasi)
+(
+	i/fail
+	wasi = i/wasi
+)
 
-probe = (w: wasi.Wasi) {
-  p = w.alloc(8)
-  w.free(p)
-  again = fail.catch(() { w.free(p) })
-  q = w.alloc(8)
-  stale = fail.catch(() { w.load(p, 0, 1) })
-  (again, stale, p == q)
+probe = (w : wasi.Wasi) {
+	p = w.alloc(8)
+	w.free(p)
+	again = fail.catch(() { w.free(p) })
+	q = w.alloc(8)
+	stale = fail.catch(() { w.load(p, 0, 1) })
+	(again, stale, p == q)
 }
 ```
 
@@ -1984,13 +1989,18 @@ result. Raw ABI fields returning File(Int) also remain rejected under A3.
 A further concrete buildability probe is:
 
 ```i
-(js = i/js)
+(
+	js = i/js
+)
 
 @js("() => Promise.resolve(7n)")
-seven: js.Value
+seven : js.Value
 
-
-main = () { js.to_int(js.await(js.call(seven, []))) }
+main = () {
+	js.to_int(
+		js.await(js.call(seven, [])),
+	)
+}
 ```
 
 The current SDK's unconditional synchronous thenable rejection would reject
@@ -2009,9 +2019,9 @@ an implementation finding from the cited SDK source, not a run of new APIs.
 )
 
 @js("({})")
-object: js.Value
+object : js.Value
 
-uses = (t: target.Target) {
+uses = (t : target.Target) {
 	t |>
 		(target.Js(_)) { object == object }
 		| (target.NodeJS(_)) { object == object }
@@ -2020,7 +2030,7 @@ uses = (t: target.Target) {
 		| (target.Host) { True }
 }
 
-main = () <- (t: target.Target) { uses(t) }
+main = () <- (t : target.Target) { uses(t) }
 ```
 
 This program now rejects on WASI: the ordinary parameter of uses is unknown,
@@ -2044,7 +2054,7 @@ The deterministic-analysis witness from the review is retained in full:
 )
 
 @js("(() => { throw Error('unused'); })()")
-unused: js.Value
+unused : js.Value
 
 choose = (b) { b |> (True) { True } | (False) { False } }
 
@@ -2069,9 +2079,9 @@ The smallest substitution witness for an overly broad Target rule is:
 )
 
 @js("globalThis")
-foreign: js.Value
+foreign : js.Value
 
-inspect = () <- (t: target.Target) {
+inspect = () <- (t : target.Target) {
 	t |> (target.Native) { foreign == foreign } | (_) { True }
 }
 
@@ -2080,7 +2090,7 @@ main = () { inspect() <- (target.Native) }
 
 On WASI this must reject, because inspect really reads foreign. Its environment
 binder is not a certified entry binder; F2 retains it. Capturing inspect with
-`control.keep_env((_: Nil) { inspect() })` inside that substitution and invoking
+`control.keep_env((_ : Nil) { inspect() })` inside that substitution and invoking
 it later has the same answer. Conversely, a closure directly capturing an
 entry's certified t still sees that old value after a substitution: its only
 pruning is justified by lexical capture, not by keep_env. If an entry is also
@@ -2097,7 +2107,7 @@ The Ready-owner test from finding 5, inside an async A1 host fixture, is:
 	i/request
 )
 
-survives = (promise: js.Value) <- (raw: js.JsRequests) {
+survives = (promise : js.Value) <- (raw : js.JsRequests) {
 	r = request.within(() {
 		r = raw.observe(promise)
 		request.wait_any([request.ticket(r)])
@@ -2182,12 +2192,12 @@ A concrete termination attack replaces a package with:
 
 ```i
 Cell(A) = ()
-make_cell = <A>() <- (next: Cell(List(A))) -> Cell(A) {
+make_cell = <A>() <- (next : Cell(List(A))) -> Cell(A) {
 	_ = next
 	Cell
 }
 
-main = () <- (c: Cell(Int)) { Nil }
+main = () <- (c : Cell(Int)) { Nil }
 ```
 
 Selecting make_cell for Cell produces infinitely many distinct instantiated
@@ -2200,7 +2210,7 @@ A concrete lifetime attack replaces T11's with_session body with this
 well-typed ordinary function:
 
 ```i
-with_session = <A, N>(body: () <- N -> A) -> A {
+with_session = <A, N>(body : () <- N -> A) -> A {
 	{
 		_ = body()
 		body()

@@ -8,7 +8,7 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later: Later, owner: request.Owner, root: request.Root) {
+main = () <- (later : Later, owner : request.Owner, root : request.Root) {
 	old = later.echo("old")
 	request.cancel(request.ticket(old))
 	assert(request.state(old) == request.Cancelled)

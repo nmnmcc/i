@@ -9,7 +9,7 @@
 	std/string
 )
 
-hex = (x: BitArray) -> String { string.to_lower(bit_array.base16_encode(x)) }
+hex = (x : BitArray) -> String { string.to_lower(bit_array.base16_encode(x)) }
 
 unhex = (s: String) -> BitArray {
 	fail.catch(() { bit_array.base16_decode(s) }) |>
