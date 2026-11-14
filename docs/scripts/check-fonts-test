@@ -57,6 +57,9 @@ class FontTests(unittest.TestCase):
         parser = fonts.PageFonts('https://i.nmnm.cc')
         parser.feed('<link rel="preload" as="font" href="https://other.test/font.woff2">')
         self.assertTrue(parser.errors)
+        extensionless = fonts.PageFonts('https://i.nmnm.cc')
+        extensionless.feed('<link rel="preload" as="font" href="https://other.test/font?id=1">')
+        self.assertTrue(extensionless.errors)
         self.assertFalse(fonts.remote('https://i.nmnm.cc/local.woff2', 'https://i.nmnm.cc'))
         self.assertFalse(fonts.css_errors('body{background:url(https://images.example.org/photo.png)}', 'https://i.nmnm.cc'))
 

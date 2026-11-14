@@ -67,6 +67,8 @@ class PageFonts(HTMLParser):
             self.style = True
         if tag == 'link' and 'stylesheet' in attrs.get('rel', '').split() and remote(attrs.get('href', ''), self.site):
             self.errors.append('external stylesheet: ' + attrs['href'])
+        if tag == 'link' and attrs.get('as', '').lower() == 'font' and remote(attrs.get('href', ''), self.site):
+            self.errors.append('external font preload: ' + attrs['href'])
         for key in ('href', 'src'):
             value = attrs.get(key, '')
             if font_url(value) and remote(value, self.site):
