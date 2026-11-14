@@ -255,10 +255,11 @@ test("GC, tail calls and exceptions remain available through the adapter", async
 
 test("metadata that is not correct fails before instantiation", async () => {
   const module = await WebAssembly.compile(customFixture);
-  const base = { version: 4, entry: null, tests: [], exports: {}, services: {}, externals: {} };
+  const base = { version: 5, entry: null, tests: [], exports: {}, services: {}, externals: {} };
   assert.equal(readAbi(module, base).entry, null);
-  assert.equal(readAbi(module, base).version, 4);
-  assert.equal(readAbi(module, { ...base, version: 3 }).version, 4);
+  assert.equal(readAbi(module, base).version, 5);
+  assert.equal(readAbi(module, { ...base, version: 4 }).version, 4);
+  assert.equal(readAbi(module, { ...base, version: 3 }).version, 3);
   for (const old of [1, 2]) {
     assert.throws(() => readAbi(module, { ...base, version: old }), { message: `the module uses i ABI version ${old}; build it again with this version of i` });
   }
@@ -624,5 +625,31 @@ test("required exports are checked before delivery or drop", async () => {
         assert.equal(value.unusable, message);
       }
     }
+  }
+});
+
+test("versions 3 and 4 keep the legacy Int buffers in both directions", async () => {
+  for (const version of [3, 4]) {
+    const value = await instantiate(customFixture, { abi: { ...customAbi, version }, imports: customImports(GuestError) });
+    assert.equal(value.abi.version, version);
+    for (const n of [0n, 1n, -1n, -2147483648n, 2147483647n, -2147483649n, 2147483648n, 1n << 4096n]) {
+      assert.equal(value.call("echo_int", [n]), n);
+    }
+    noAllocations(value);
+  }
+});
+
+
+test("ABI 5 inline Ints cross all four directions without allocating or freeing", async () => {
+  const bytes = await readFile(new URL("../../../tests/browser/fixtures/inline-int.wasm", import.meta.url));
+  const make = () => instantiate(bytes, { imports: { custom: { echo_int: n => n } } });
+  const value = await make();
+  for (const n of [0n, 1n, -1n, 1073741823n, 1073741824n, -1073741824n, -1073741825n, -2147483648n, 2147483647n]) {
+    assert.equal(value.call("echo", [n]), n);
+  }
+  for (const name of ["wrong_sign", "wrong_zero", "wrong_marker"]) {
+    const invalid = await make();
+    assert.throws(() => invalid.call(name), /inline Int whose sign does not match/);
+    assert.ok(invalid.unusable);
   }
 });

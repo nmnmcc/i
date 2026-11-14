@@ -2601,7 +2601,7 @@ impl<'a> Checker<'a> {
                     code::NEEDS_KNOWN_TYPE,
                     name.span,
                     format!(
-                        "`.{}` needs a known type for its value (§6.7, §4.8); write its type, such as `x: T`",
+                        "`.{}` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u: User) {{ u.name }}`, or give the function where a type is expected, for example `get_name: (User) -> String = (u) {{ u.name }}`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)",
                         name.name
                     ),
                 );

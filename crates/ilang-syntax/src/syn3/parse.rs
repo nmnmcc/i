@@ -13,6 +13,7 @@ type PResult<X> = Result<X, Diagnostic>;
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
     let lexed = lex3(source);
     let mut parser = Parser {
+        source,
         toks: &lexed.tokens,
         close: &lexed.close,
         docs: &lexed.docs,
@@ -34,6 +35,7 @@ fn parse_with<X>(
 ) -> Result<X, Vec<Diagnostic>> {
     let lexed = lex3(source);
     let mut parser = Parser {
+        source,
         toks: &lexed.tokens,
         close: &lexed.close,
         docs: &lexed.docs,
@@ -73,6 +75,7 @@ pub fn parse_pattern(source: &str) -> Result<Pattern, Vec<Diagnostic>> {
 }
 
 struct Parser<'a> {
+    source: &'a str,
     toks: &'a [Token],
     close: &'a [Option<u32>],
     docs: &'a [DocComment],
@@ -190,7 +193,18 @@ impl Parser<'_> {
         } else {
             self.kind().to_string()
         };
-        let msg = format!("expected {expected}, found {found}");
+        let mut msg = format!("expected {expected}, found {found}");
+        if self.at(&T::Eq)
+            && let Some(open) = self.pos.checked_sub(1).and_then(|close| {
+                self.close[..self.pos]
+                    .iter()
+                    .rposition(|end| *end == Some(close as u32))
+            })
+            && spaced_binding_call(self.source, self.toks, open, self.pos)
+        {
+            msg.push_str("; ");
+            msg.push_str(ONE_BINDING_HINT);
+        }
         Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg))
     }
 
@@ -879,6 +893,7 @@ impl Parser<'_> {
                 StringPart::Expr { tokens, .. } => {
                     let close = pair_brackets(&tokens, &mut self.diags);
                     let mut child = Parser {
+                        source: self.source,
                         toks: &tokens,
                         close: &close,
                         docs: &[],
@@ -1676,4 +1691,62 @@ impl Parser<'_> {
         };
         Ok(Type::new(kind, self.span_from(start)))
     }
+}
+
+/// The line rule is unchanged; this only explains a likely misplaced statement (§1.7).
+pub const ONE_BINDING_HINT: &str =
+    "this is one binding, not two; to write two, put the second on its own line (§1.7)";
+
+fn spaced_binding_call(source: &str, toks: &[Token], open: usize, eq: usize) -> bool {
+    if open == 0 || toks[open].kind != T::LParen {
+        return false;
+    }
+    let name = &toks[open - 1];
+    if !matches!(name.kind, T::Name(_) | T::UpName(_)) {
+        return false;
+    }
+    let gap = &source[name.span.end as usize..toks[open].span.start as usize];
+    gap.len() >= 2
+        && gap.bytes().all(|b| b == b' ')
+        && !source[name.span.start as usize..toks[eq].span.end as usize].contains(['\n', '\r'])
+}
+
+/// Suspicious spacing inside an already parsed conjunction binding. The caller
+/// supplies the binding's pattern through its final `=`, excluding the value.
+pub fn binding_line_traps(source: &str, span: Span) -> Vec<Span> {
+    let Some(text) = source.get(span.start as usize..span.end as usize) else {
+        return Vec::new();
+    };
+    if !text.contains("  (") {
+        return Vec::new();
+    }
+    let lexed = lex3(text);
+    let mut out = Vec::new();
+    for (open, token) in lexed.tokens.iter().enumerate() {
+        if token.kind != T::LParen || open < 2 {
+            continue;
+        }
+        let name_start = if open >= 4 && lexed.tokens[open - 2].kind == T::Dot {
+            open - 3
+        } else {
+            open - 1
+        };
+        if name_start == 0 || lexed.tokens[name_start - 1].kind != T::Eq {
+            continue;
+        }
+        let Some(close) = lexed.close[open] else {
+            continue;
+        };
+        let eq = close as usize + 1;
+        if lexed.tokens.get(eq).is_some_and(|t| t.kind == T::Eq)
+            && spaced_binding_call(text, &lexed.tokens, open, eq)
+        {
+            let name = lexed.tokens[open - 1].span;
+            out.push(Span::new(
+                span.start + name.start,
+                span.start + token.span.end,
+            ));
+        }
+    }
+    out
 }

@@ -464,7 +464,7 @@ try_fold = <A, Acc, F, N>(
 ///
 /// ```i
 /// list.fold_until([1, 2, 3, 4], 0, (acc, x) {
-///   { x < 3 } |> { True -> list.Continue(acc + x)  False -> list.Stop(acc) }
+///   { x < 3 } |> (True) { list.Continue(acc + x) } | (False) { list.Stop(acc) }
 /// })  // 3
 /// ```
 fold_until = <A, Acc, N>(

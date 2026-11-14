@@ -167,7 +167,7 @@ fn metadata() {
     assert_eq!(
         json,
         serde_json::json!({
-            "version": 4,
+            "version": 5,
             "entry": { "name": "app/main.main", "async": false },
             "tests": [],
             "exports": {},

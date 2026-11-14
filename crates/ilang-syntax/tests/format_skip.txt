@@ -10,6 +10,7 @@ parse tests/review/cases/review-std1/variance/src/main.i
 parse tests/spec/1.7/a1_same_line_negative.i
 parse tests/spec/1.7/a1_same_line_tuple.i
 parse tests/spec/1.7/annotation_pipe_declaration_error.i
+parse tests/spec/1.7/one_binding_function_error.i
 parse tests/spec/2.2/a1_empty_header.i
 parse tests/spec/2.2/a1_header_order.i
 parse tests/spec/2.2/a1_macro_attribute_same_line.i

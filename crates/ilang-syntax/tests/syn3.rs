@@ -1307,3 +1307,39 @@ fn one_annotation_boundary_for_declarations_patterns_and_function_results() {
         syn3::format("x = (LongTypeNameOne, LongTypeNameTwo, LongTypeNameThree, LongTypeNameFour, LongTypeNameFive)").unwrap().replace("x =", "x :").trim_end().to_string() + " = e\n"
     );
 }
+
+#[test]
+fn one_line_binding_traps_only_explain_the_spec_reading() {
+    use ilang_syntax::span::Span;
+    for source in [
+        "mk = Pair  (b, c) = g",
+        "mk = Pair   (b, c) = g",
+        "mk = m.Pair  (b, c) = g",
+        "mk = Pair  (Other(b), c) = g",
+    ] {
+        let spans = syn3::binding_line_traps(source, Span::new(0, source.len() as u32));
+        assert_eq!(spans.len(), 1, "{source}: {spans:?}");
+        let (_, ds) = syn3::parse_module(source);
+        assert!(ds.is_empty(), "{source}: {ds:?}");
+        let (a, _) = syn3::parse_module(source);
+        let (b, _) = syn3::parse_module(&source.replace("  ", " "));
+        assert_eq!(a, b, "spacing does not change the binding");
+    }
+    for source in [
+        "mk = Pair(b, c) = g",
+        "mk = Pair (b, c) = g",
+        "mk = Pair\n(b, c) = g",
+        "mk = Pair  (b,\nc) = g",
+        "mk = Pair  (b, c)\n= g",
+        "mk = Pair /*  */ (b, c) = g",
+        "mk = Pair\t\t(b, c) = g",
+        "mk = Pair  (b, c)",
+        "Pair  (b, c) = g",
+        "mk = f(\"Pair  (b, c) = g\")",
+    ] {
+        assert!(
+            syn3::binding_line_traps(source, Span::new(0, source.len() as u32)).is_empty(),
+            "{source}"
+        );
+    }
+}

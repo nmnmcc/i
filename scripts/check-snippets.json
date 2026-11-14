@@ -471,7 +471,7 @@
     "substitutions": [
       [
         "{MAIN}",
-        "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n"
+        "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"h\u00e9llo \ud835\udd4f \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n"
       ],
       [
         "{{",
@@ -1446,7 +1446,7 @@
     "not_source": "Position/search substring inside a complete source fixture"
   },
   "crates/ilang-check/tests/front_end.rs:b6f419e1a1d303f6": {
-    "reason": "Independent negative type-head case: a lowercase head is rejected by syntax-three grammar (§2.8, §3.2), before checker errors.",
+    "reason": "Independent negative type-head case: a lowercase head is rejected by syntax-three grammar (\u00a72.8, \u00a73.2), before checker errors.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
@@ -1468,13 +1468,13 @@
     "not_source": "Rust progress-log format string, not an i type definition."
   },
   "crates/ilang-syntax/tests/string_forms.rs:68d70a8fa472acc8": {
-    "reason": "Interpolation is forbidden in patterns (spec §1.6); the migrated one-branch syntax still rejects the same negative case.",
+    "reason": "Interpolation is forbidden in patterns (spec \u00a71.6); the migrated one-branch syntax still rejects the same negative case.",
     "diagnostics": [
       "E0101: string interpolation is not allowed in patterns"
     ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:f791f2429f546a31": {
-    "reason": "String patterns have exactly one binder (spec §7.1). The syntax-three parameter-item parser rejects the second <> part; the two-binder negative intent is retained.",
+    "reason": "String patterns have exactly one binder (spec \u00a77.1). The syntax-three parameter-item parser rejects the second <> part; the two-binder negative intent is retained.",
     "diagnostics": [
       "E0101: expected `,`, `?` or `)`, found `<>`"
     ]
@@ -1654,7 +1654,7 @@
     "reason": "Function header selected by the witness test; render it with the exact body appended by its format template."
   },
   "crates/ilang-cli/tests/multicore.rs:25af78ab3812c31f": {
-    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(Nil) = task.channel()\n",
+    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec \u00a79.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(Nil) = task.channel()\n",
     "suffix": "fail.raise(\"outer\")\n })\n}\n",
     "reason": "A per-pair stress-generator block inside its actual main/scope header and closing tail."
   },
@@ -1662,7 +1662,7 @@
     "reason": "Robustness test: broken input on purpose",
     "diagnostics": [
       "E0010: `{` is not closed",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0010: `(` is not closed",
       "E0010: `{` is not closed",
       "E0101: expected a closed `{`, found `{`",
@@ -1720,32 +1720,32 @@
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-runtime/echo-types/src/task.i:d34f1075542b01ad": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters",
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
   },
   "tests/review/cases/review-s6/probe/src/main.i:85c0687292ba6d00": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
   },
   "tests/review/cases/review-std1/factory/src/main.i:9083dc65664c46cf": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
   },
   "tests/review/cases/review-std1/tree/src/main.i:066350f997d0a19e": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
   },
   "tests/review/cases/review-std1/variance/src/main.i:9c635f662f81f9ba": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters",
       "E0101: the head of a data type or an opaque type has only type parameters",
@@ -1904,7 +1904,7 @@
       ],
       [
         "{waiter}",
-        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
+        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec \u00a79.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
       ]
     ],
     "suffix": "fail.raise(\"outer\")\n })\n}\n",
@@ -2242,7 +2242,7 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/03_mixed_headers/original/.invalid/src/main.i:a9d9b44168dfeedb": {
@@ -2336,7 +2336,7 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
@@ -2349,7 +2349,7 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:2eeb5a5afc1cebae": {
@@ -2362,7 +2362,7 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
@@ -2375,14 +2375,14 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
@@ -2395,7 +2395,7 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:112761caa62e7257": {
@@ -2469,7 +2469,7 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/cases/04_header_order/.invalid/src/main.i:bc7528f08f9c0a6a": {
@@ -2526,21 +2526,21 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-keep-layout/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-plain/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:b40bf9426d491496": {
@@ -2625,8 +2625,8 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected `,`, `?` or `)`, found `!`"
     ]
@@ -2708,7 +2708,7 @@
     "track": "T3"
   },
   "tests/review/cases/review-rec/_loose/probes/src/main.i:621264ff6bc91a22": {
-    "reason": "Preserve the closed-data negative fixture instead of erasing its illegal type spread. Syntax-three §2.3: a data type has no spread. Main E0541 is diagnosed earlier as parser E0107; removed-module/type errors are independently retained in checker tests.",
+    "reason": "Preserve the closed-data negative fixture instead of erasing its illegal type spread. Syntax-three \u00a72.3: a data type has no spread. Main E0541 is diagnosed earlier as parser E0107; removed-module/type errors are independently retained in checker tests.",
     "diagnostics": [
       "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
     ]
@@ -2716,7 +2716,7 @@
   "tests/review/cases/review-rec/_loose/schema-union/.invalid/src/main.i:5988d6050671f785": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
       "E0101: expected an expression, found `->`",
       "E0101: expected an expression, found `->`",
@@ -2737,9 +2737,9 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
       "E0102: expected the function body, a `{` on the same line, found `?`",
@@ -2768,9 +2768,9 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
       "E0102: expected the function body, a `{` on the same line, found `?`",
@@ -2969,25 +2969,25 @@
     "diagnostics": [
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
     ],
-    "reason": "Intentional new Annot boundary counter-example, spec §3 and §7.1; preserve the unbraced pipe."
+    "reason": "Intentional new Annot boundary counter-example, spec \u00a73 and \u00a77.1; preserve the unbraced pipe."
   },
   "tests/spec/7/annotation_pipe_binding_error.i:0d0649f5406efd7b": {
     "diagnostics": [
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
     ],
-    "reason": "Intentional new Annot boundary counter-example, spec §3 and §7.1; preserve the unbraced pipe."
+    "reason": "Intentional new Annot boundary counter-example, spec \u00a73 and \u00a77.1; preserve the unbraced pipe."
   },
   "tests/spec/7/annotation_pipe_data_error.i:2c6dd3a7a430411f": {
     "diagnostics": [
       "E0101: expected `,` or `)`, found `|`"
     ],
-    "reason": "Intentional new Annot boundary counter-example, spec §3 and §7.1; preserve the unbraced pipe."
+    "reason": "Intentional new Annot boundary counter-example, spec \u00a73 and \u00a77.1; preserve the unbraced pipe."
   },
   "tests/spec/7/annotation_pipe_result_error.i:7629afddbfda0dcd": {
     "diagnostics": [
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
     ],
-    "reason": "Intentional new Annot boundary counter-example, spec §3 and §7.1; preserve the unbraced pipe."
+    "reason": "Intentional new Annot boundary counter-example, spec \u00a73 and \u00a77.1; preserve the unbraced pipe."
   },
   "crates/ilang-check/src/query/actions.rs:f74082bf6dab9ef6": {
     "substitutions": [
@@ -2997,5 +2997,29 @@
       ]
     ],
     "reason": "Rust format! template in lisp_type: annotation_text supplies the rendered type; parse its complete generated source with Int in that slot."
+  },
+  "docs/design/principality.md:de3b81c6d91392fb": {
+    "diagnostics": [
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "A probe of the principality note: a written polymorphic parameter type is not supported yet, and the note records the diagnostic."
+  },
+  "crates/ilang-check/tests/diagnostic_traps.rs:4e85fa57c5a5a045": {
+    "reason": "Intentional \u00a71.7 regression: a spaced lowercase call followed by a stray = remains E0101 and gains the one-binding explanation.",
+    "diagnostics": [
+      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line (\u00a71.7)"
+    ]
+  },
+  "tests/spec/1.7/one_binding_function_error.i:b00b44846a80cdbf": {
+    "reason": "Intentional \u00a71.7 regression: a spaced lowercase call followed by a stray = remains E0101 and gains the one-binding explanation.",
+    "diagnostics": [
+      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line (\u00a71.7)"
+    ]
+  },
+  "crates/ilang-check/tests/diagnostic_traps.rs:24dcfaf171c4adcd": {
+    "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
+  },
+  "crates/ilang-check/tests/diagnostic_traps.rs:8e2eef0119586a1d": {
+    "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
   }
 }
