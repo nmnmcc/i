@@ -195,13 +195,15 @@ The comparison reverses because services are inputs to a call. A function needin
 
 Within a service entry, the provider's value must be a subtype of the required service type. So replacing a function is safe when every provider allowed by the promised need also satisfies the replacement's need. This is why the standard compares needs in the opposite direction from returned values (§4.5 rule 4, §9.2).
 
-## A chain says “or” about arguments and “both” about abilities
+## A chain accepts a union and has both abilities
 
-In the chain below, `|` reads “or”: the argument is an `Int` **or** a `String`, and the call takes this branch **or** that one. Its accepted arguments form the union of the branches' domains. A **domain** is the set of arguments a function accepts (§6.12).
+The argument to the chain below can be an `Int` **or** a `String`: its accepted inputs form the union `Int | String`. A **domain** is the set of arguments a function accepts, so the chain's domain is the union of its branches' domains (§6.12).
 
-Because the argument side says “or,” the function must be able to handle every alternative. It can do the integer job **and** the string job. Parameter contravariance connects these descriptions: with the same result and need, a union of parameter types corresponds to an intersection of function types (§4.4, §4.5 rule 4).
+To accept either kind of argument, the chain must handle integers **and** strings. It belongs to both function types at once: their intersection, written with `&`. Parameter contravariance connects these descriptions: with the same result and need, a union of parameter types corresponds to an intersection of function types (§4.4, §4.5 rule 4).
 
-The chain typing change agreed on 2026-11-14 makes this intersection the chain's type. Compiler support for displaying and accepting that intersection for a chain is still pending. The current standard's §6.12 describes chain typing through combined parameters and results; the intersection description here explains the agreed change, rather than a compiler type display.
+The language is changing the spelling of a chain from `|` to `&` so that its value is written in the same shape as its intersection type; until that lands, the examples on this page use the current `|`.
+
+Compiler support for displaying and accepting a chain's intersection type is also pending. The current standard's §6.12 describes chain typing through combined parameters and results; the intersection description here explains the agreed change, rather than a compiler type display.
 
 This program shows the same chain accepting either kind of argument directly and meeting each single function requirement:
 
