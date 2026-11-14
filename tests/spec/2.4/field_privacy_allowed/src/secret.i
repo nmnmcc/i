@@ -45,4 +45,4 @@ callback = <A>(value : Secret(A)) { value.read }
 
 raw = Raw(read = () { 42 })
 
-open: Open = OpenCase(value = 11)
+open : Open = OpenCase(value = 11)

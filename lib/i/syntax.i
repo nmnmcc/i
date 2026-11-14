@@ -509,8 +509,8 @@ make = (node : Node, like : Syntax) -> Syntax {
 		| (Node(Discard(value))) { raw_make_text(1, value, like) }
 		| (Node(Up(value))) { raw_make_text(2, value, like) }
 		| (Node(Symbol(value))) { raw_make_text(3, value, like) }
-		| (Node(value: Int)) { raw_make_int(value, like) }
-		| (Node(value: Float)) { raw_make_float(value, like) }
+		| (Node(value : Int)) { raw_make_int(value, like) }
+		| (Node(value : Float)) { raw_make_float(value, like) }
 		| (Node(Text(value))) { raw_make_text(6, value, like) }
 		| (Node(Round(items))) {
 			raw_make_list(

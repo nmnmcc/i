@@ -53,4 +53,4 @@ unwrap = (Ok(v)) -> Int { v }
 // Stage 3 keeps D4 (syntax-3.md §2.12, "as today with the multi-constructor
 // `Result`"): `Ok(v)` is fitted to a `Result`, so with a written type that
 // has no needs, the parameter that may fail is an error, as before.
-closed: (Result(Int, String)) -> Int = (Ok(v)) { v }
+closed : (Result(Int, String)) -> Int = (Ok(v)) { v }

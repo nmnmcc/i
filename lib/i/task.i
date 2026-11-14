@@ -557,7 +557,7 @@ answer = (reply : StepAnswer) {
 		}
 }
 
-ask = (own: Scheduler, command: Command) -> Keyed {
+ask = (own : Scheduler, command : Command) -> Keyed {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
 		| (AttachedScheduler(..) = attached) { answer(attached.step(command)) }
@@ -606,7 +606,7 @@ NoTasks = ()
 
 TaskNode(A) = (Int, Int, A, TaskTree(A), TaskTree(A))
 
-tree_height = <A>(tree: TaskTree(A)) -> Int {
+tree_height = <A>(tree : TaskTree(A)) -> Int {
 	tree |> (NoTasks) { 0 } | (TaskNode(h, _, _, _, _)) { h }
 }
 
@@ -1210,7 +1210,7 @@ make_start = <A, E, N>(
 	check : Bool
 ) -> Start {
 	{
-		kept = control.keep_env((own: Scheduler) {
+		kept = control.keep_env((own : Scheduler) {
 			own.state |>
 				(DetachedScheduler) { panic("task: no scheduler") }
 				| (AttachedScheduler(..) = attached) {
@@ -1475,13 +1475,13 @@ pull = (s : State) -> State {
 		}
 }
 
-path = () <- (own: Scheduler) {
+path = () <- (own : Scheduler) {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
 		| (AttachedScheduler(..) = attached) { read(path_key, attached.path) }
 }
 
-random = () <- (own: Scheduler) {
+random = () <- (own : Scheduler) {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
 		| (AttachedScheduler(..) = attached) { attached.seed() }
@@ -1492,7 +1492,7 @@ yield = () <- (own : Scheduler) {
 	Nil
 }
 
-top = (seed: rng.Generator) <- (current: Runner) -> Runner {
+top = (seed : rng.Generator) <- (current : Runner) -> Runner {
 	current.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
 		| (AttachedRunner(..) = attached) {
@@ -1563,7 +1563,7 @@ make_scheduler = (
 	upstream.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
 		| (AttachedRunner(..) = attached) {
-			route = (command: Command) {
+			route = (command : Command) {
 				control.suspend(b, (k) { Switched(id, command, k) })
 			}
 			policy = attached.policy |>
@@ -1580,13 +1580,13 @@ make_scheduler = (
 							answer(route(NextRun)),
 						)
 					},
-					active = (id: Key(Nil), active: Active) {
+					active = (id : Key(Nil), active : Active) {
 						run_control(route(NestedActive(id, active)))
 					},
 					wait = (
-						id: Key(Nil),
-						root: request.Root,
-						tickets: List(Ticket)
+						id : Key(Nil),
+						root : request.Root,
+						tickets : List(Ticket)
 					) {
 						{ request.count_root(root) > 0 } |>
 							(False) {
@@ -1615,11 +1615,11 @@ make_scheduler = (
 							}
 					},
 					poll = (
-						id: Key(Nil),
-						tickets: List(Ticket),
-						_runnable: Bool
+						id : Key(Nil),
+						tickets : List(Ticket),
+						_runnable : Bool
 					) { run_control(route(ForwardWait(id, tickets))) },
-					forget = (id: Key(Nil)) {
+					forget = (id : Key(Nil)) {
 						answer(route(ForgetWait(id)))
 						Nil
 					},
@@ -3772,7 +3772,7 @@ channel = <A>() <- (own : Scheduler) -> Channel(A) {
 	)
 }
 
-local_channel = <A>() <- (own: Scheduler) -> Channel(A) {
+local_channel = <A>() <- (own : Scheduler) -> Channel(A) {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
 		| (AttachedScheduler(..) = attached) {
@@ -3947,9 +3947,9 @@ execute_body = <A, E, N>(
 		(DetachedRunner) { panic("task: no scheduler") }
 		| (AttachedRunner(..) = attached) {
 			prefix = attached.allocate()
-			run_id: Key(Nil) = key.new()
-			results: Key(Result(A, E)) = key.new()
-			errors: Key(E) = key.new()
+			run_id : Key(Nil) = key.new()
+			results : Key(Result(A, E)) = key.new()
+			errors : Key(E) = key.new()
 			{
 				control_root = request.open_root()
 				root = request.open_root()
@@ -4055,7 +4055,7 @@ execute_body = <A, E, N>(
 		}
 }
 
-run = <A, N>(body: () <- N -> A) <- (runner: Runner) -> A {
+run = <A, N>(body : () <- N -> A) <- (runner : Runner) -> A {
 	runner.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
 		| (AttachedRunner(..) = attached) {
@@ -4089,7 +4089,7 @@ scope_call = <A, E, N>(
 		(DetachedScheduler) { panic("task: no scheduler") }
 		| (AttachedScheduler(..) = attached) {
 			owner = { retain(request.open_owner()) <- (attached.root) }
-			kept = control.keep_env((_: Nil) {
+			kept = control.keep_env((_ : Nil) {
 				resource.ensure(
 					() {
 						retain(scope_call_body(body, witness, mode, own)) <- (
@@ -4499,9 +4499,11 @@ BeginForeign = (List(Hop), Key(Nil), () -> Never, Cause)
 
 EndForeign = (List(Hop), Key(Nil))
 
-empty_relay = (_notice: ForeignNotice, _value: Keyed, _discard: Bool) -> Keyed {
-	panic("task: missing foreign relay")
-}
+empty_relay = (
+	_notice : ForeignNotice,
+	_value : Keyed,
+	_discard : Bool
+) -> Keyed { panic("task: missing foreign relay") }
 
 empty_active = Active(hops = [], abort = Absent, relay = empty_relay)
 

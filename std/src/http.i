@@ -150,7 +150,7 @@ response = (status : Status) -> Response {
 	)
 }
 
-header = (hs: AnyHeaders, name: String) -> Option(String) {
+header = (hs : AnyHeaders, name : String) -> Option(String) {
 	hs |>
 		(RawHeaders(_)) {
 			header_bytes(hs, name) |>
@@ -171,7 +171,7 @@ header = (hs: AnyHeaders, name: String) -> Option(String) {
 		}
 }
 
-header_bytes = (hs: AnyHeaders, name: String) -> Option(BitArray) {
+header_bytes = (hs : AnyHeaders, name : String) -> Option(BitArray) {
 	hs |>
 		(Headers(xs)) {
 			list.find_map(xs, (pair) {
@@ -191,7 +191,7 @@ header_bytes = (hs: AnyHeaders, name: String) -> Option(BitArray) {
 		}
 }
 
-headers = (hs: AnyHeaders, name: String) -> List(String) {
+headers = (hs : AnyHeaders, name : String) -> List(String) {
 	hs |>
 		(RawHeaders(xs)) {
 			list.filter_map(xs, (pair) {
@@ -216,7 +216,7 @@ headers = (hs: AnyHeaders, name: String) -> List(String) {
 		}
 }
 
-add_header = (hs: AnyHeaders, name: String, value: String) -> AnyHeaders {
+add_header = (hs : AnyHeaders, name : String, value : String) -> AnyHeaders {
 	hs |>
 		(Headers(xs)) { Headers(list.append(xs, [(name, value)])) }
 		| (RawHeaders(xs)) {
@@ -389,7 +389,7 @@ parse_response_for = (xs : List(Int), method : Method, eof : Bool) -> (
 	)
 }
 
-read_headers = (xs: List(Int), acc: List((String, BitArray))) -> (
+read_headers = (xs : List(Int), acc : List((String, BitArray))) -> (
 	AnyHeaders,
 	List(Int),
 ) {
@@ -410,7 +410,7 @@ read_headers = (xs: List(Int), acc: List((String, BitArray))) -> (
 		}
 }
 
-make_headers = (xs: List((String, BitArray))) -> AnyHeaders {
+make_headers = (xs : List((String, BitArray))) -> AnyHeaders {
 	values = list.map(xs, (pair) {
 		(name, value) = pair
 		bit_array.to_string(value) |>
@@ -428,7 +428,7 @@ text_unchecked = (xs : List(Int)) -> String {
 		| (Error(_)) { panic("http: invalid internal text") }
 }
 
-validate_framing = (hs: AnyHeaders) -> Nil {
+validate_framing = (hs : AnyHeaders) -> Nil {
 	length = header_bytes(hs, "content-length")
 	transfer = header_bytes(hs, "transfer-encoding")
 	require(
@@ -482,7 +482,7 @@ validate_framing = (hs: AnyHeaders) -> Nil {
 	Nil
 }
 
-read_body = (hs: AnyHeaders, xs: List(Int)) -> (
+read_body = (hs : AnyHeaders, xs : List(Int)) -> (
 	BitArray,
 	AnyHeaders,
 	List(Int),
@@ -524,7 +524,7 @@ read_body = (hs: AnyHeaders, xs: List(Int)) -> (
 		}
 }
 
-transfer_codings = (hs: AnyHeaders) -> List(String) {
+transfer_codings = (hs : AnyHeaders) -> List(String) {
 	codings = list.concat(
 		list.map(headers(hs, "transfer-encoding"), (value) {
 			list.map(string.split(value, ","), (part) {
@@ -601,7 +601,7 @@ chunk_size = (size_line : List(Int)) -> Int {
 	size
 }
 
-valid_trailers = (trailers: AnyHeaders) -> Nil {
+valid_trailers = (trailers : AnyHeaders) -> Nil {
 	require(
 		header_bytes(trailers, "content-length") == None &&
 			header_bytes(trailers, "transfer-encoding") == None &&
@@ -760,10 +760,10 @@ serialize_response = (res : Response) -> BitArray {
 }
 
 serialize = (
-	first: String,
-	hs: AnyHeaders,
-	body: BitArray,
-	trailers: AnyHeaders
+	first : String,
+	hs : AnyHeaders,
+	body : BitArray,
+	trailers : AnyHeaders
 ) -> BitArray {
 	xs = raw_pairs(hs)
 	chunked = header(hs, "transfer-encoding") |>
@@ -819,7 +819,7 @@ serialize = (
 	bit_array.concat([<<first:utf8>>, lines, <<"\r\n":utf8>>, data])
 }
 
-raw_pairs = (hs: AnyHeaders) -> List((String, BitArray)) {
+raw_pairs = (hs : AnyHeaders) -> List((String, BitArray)) {
 	hs |>
 		(Headers(xs)) {
 			list.map(xs, (pair) {
@@ -1076,7 +1076,7 @@ BodyFraming = Remaining
 
 BodyCursor = (buffer = BitArray, framing = BodyFraming, trailers = AnyHeaders)
 
-request_framing = (hs: AnyHeaders) -> BodyFraming {
+request_framing = (hs : AnyHeaders) -> BodyFraming {
 	validate_framing(hs)
 	transfer_codings(hs) |>
 		([]) {
@@ -1618,7 +1618,12 @@ follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 		}
 }
 
-redirect_headers = (hs: AnyHeaders, base, next, drop_body: Bool) -> AnyHeaders {
+redirect_headers = (
+	hs : AnyHeaders,
+	base,
+	next,
+	drop_body : Bool
+) -> AnyHeaders {
 	resolved = uri.resolve(base, next) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("http: invalid resolved redirect") }
@@ -2007,7 +2012,7 @@ tls_transport = (stream) {
 	)
 }
 
-has_token = (hs: AnyHeaders, name: String, value: String) -> Bool {
+has_token = (hs : AnyHeaders, name : String, value : String) -> Bool {
 	list.any(headers(hs, name), (line) {
 		list.any(string.split(line, ","), (part) {
 			lowercase(

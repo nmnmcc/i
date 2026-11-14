@@ -52,7 +52,6 @@ choice_field = (s : Shape) {
 		(Circle(..) = c | Square(..) = c ? True) { c.radius }
 		| (_) { panic("unreachable") }
 }
-
 // Syntax three §6.7: Circle(..s, radius = ...) is a constructor call with a
 // spread. Circle has one constructor (§2.8); Shape is a union of distinct
 // labelled types. not_known still fails because its spread has two members

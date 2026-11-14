@@ -25,7 +25,9 @@ allowed = () {
 	assert(
 		{
 			facade.open |>
-				(secret.OpenCase(..) = v) { secret.OpenCase(..v, value = 29).value }
+				(secret.OpenCase(..) = v) {
+					secret.OpenCase(..v, value = 29).value
+				}
 				| (_) { 0 }
 		} ==
 			29,
