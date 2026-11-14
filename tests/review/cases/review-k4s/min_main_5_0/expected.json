@@ -1,6 +1,6 @@
 {
-  "compiler": "63178e1344237ceffee1eaa1251a8e5549b632c6",
-  "binary_sha256": "f781e20e36bacf18802d7e4393cc00921da272335352d671eeebfc065d4bb249",
+  "compiler": "a093577fe83d3b9c3a39da14f8ae73f14c063dc4",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.main : () <- (S(A)) -> Nil\n",
       "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\n"
     },
     "test0": {
@@ -19,9 +19,9 @@
         "--opt",
         "0"
       ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\n"
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -29,9 +29,9 @@
         "--opt",
         "0"
       ],
-      "exit": 0,
+      "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "test2": {
       "command": [
@@ -39,9 +39,9 @@
         "--opt",
         "2"
       ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\n"
+      "exit": 1,
+      "stdout": "",
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -49,9 +49,9 @@
         "--opt",
         "2"
       ],
-      "exit": 0,
+      "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     }
   }
 }

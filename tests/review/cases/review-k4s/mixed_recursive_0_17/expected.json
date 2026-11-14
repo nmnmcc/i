@@ -1,6 +1,6 @@
 {
-  "compiler": "63178e1344237ceffee1eaa1251a8e5549b632c6",
-  "binary_sha256": "f781e20e36bacf18802d7e4393cc00921da272335352d671eeebfc065d4bb249",
+  "compiler": "a093577fe83d3b9c3a39da14f8ae73f14c063dc4",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -9,9 +9,29 @@
         "check",
         "--types"
       ],
-      "exit": 1,
+      "exit": 0,
       "stdout": "app/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (A, () <- A -> Int) <- A -> Int\napp/main.bad : (A) <- (S(A), ..A) -> Int\n",
-      "stderr": "src/main.i:8:43: error[E0225]: an environment row may only be bound, captured or provided after `<-`; it is not ordinary data (§9.4)\n1 error\n"
+      "stderr": "src/main.i:8:1: warning[W0504]: top-level binding `bad` is not used\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:8:1: warning[W0504]: top-level binding `bad` is not used\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:8:1: warning[W0504]: top-level binding `bad` is not used\n"
     }
   }
 }

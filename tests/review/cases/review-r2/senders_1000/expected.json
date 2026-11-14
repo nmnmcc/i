@@ -1,6 +1,6 @@
 {
-  "compiler": "d6ff4abf081814cdc119fe8b3d934f6288d29a1f",
-  "binary_sha256": "f781e20e36bacf18802d7e4393cc00921da272335352d671eeebfc065d4bb249",
+  "compiler": "a093577fe83d3b9c3a39da14f8ae73f14c063dc4",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.spawn : (task.Group(A), task.Channel(B), Int) <- (task.Scheduler) -> Nil\napp/main.receive_all : (task.Channel(A & Int), Int, Int) <- (Assert, task.Scheduler) -> Int\napp/main.main : () <- (Assert, Io, task.Scheduler) -> Nil\n",
+      "stdout": "app/main.spawn : (task.Group(A), task.Channel(B), Int) <- (task.Scheduler) -> Nil\napp/main.receive_all : (task.Channel(A & Int), Int, Int) <- (Assert, Fail(Never), task.Scheduler) -> Int\napp/main.main : () <- (Assert, Fail(Never), Io, task.Scheduler) -> Nil\n",
       "stderr": ""
     },
     "test0": {

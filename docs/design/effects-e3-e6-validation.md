@@ -2,7 +2,7 @@
 
 Worktree `.rd/e4`, branch `lane/e4`. Owner decisions of 2026-11-14 control;
 main `9b8061137`, final-AST main `5e08939f0`, and documentation main
-`05e39a6ae` are merged. This report is in progress; no LANDABLE claim yet.
+`7c0652fad` are merged. This report is in progress; no LANDABLE claim yet.
 Every cargo/check/runtime/corpus command below uses
 `H=/home/agent/Programming/i/.rd/cache/heavy` and the shared environment
 `direnv exec /home/agent/Programming/i` where tools require it. Only one H
@@ -94,3 +94,34 @@ browser 69/69 (Chromium, Firefox, WebKit), with no skips. All R2 laws run at
 O0/O2, including the new Sample/Fail three-resume case, and all original final
 and cancellation output assertions remain. The full 1,973-case corpus is next,
 with jobs=6, BINARYEN_CORES=1 and --keep-bounds; no LANDABLE claim until reviewed.
+
+
+## Completed full corpus and final workspace gate
+
+The pinned record base is 5307a664e. Later main through 7c0652fad changes
+only documentation; compiler/library/corpus inputs are identical. The release
+production source is byte-identical to 62af4eac4; every one of the 1,973 raw
+observations carries the SHA256 of the release binary still used by the gates.
+
+The full corpus completes with 554 rejected checks, 1,416 accepted and three
+checker censors, plus the same two registered known failures. The initial
+failure list consists of withdrawn-rule requirements and resource censors.
+All nineteen revised exact ruling/type requirements pass isolated reruns.
+Nine new resource censors are retried alone without increasing a saved bound;
+five recover completely. Four wide cases remain censored. The coordinator's
+splice.py restores six timed phases. Four runtime phases unstarted after a
+censored checker are retained individually; completed merged phases are never
+discarded. Raw full/isolated observations and phase provenance remain in target.
+
+After the specified phase splices, 977 observations equal main and restore only
+the two fingerprint fields, byte-exactly. There are 972 display changes and 24
+semantic changes, every one explained in the corpus audit. No bound changes.
+The unmodified current requirement-loop AST rechecks all 395 applicable saved
+requirements with zero failures and the same two existing XFAILs. These saved
+checks do not claim fresh completion of the listed censored phases.
+
+Workspace all-targets check passes (8.96s). The final gate-equivalent full Rust
+run is in progress with all value-types properties and the whole spec suite;
+no skip is added. Subsequent serialized gates cover current documentation,
+std O0/O2, examples/macro-tests and bench O0/O2, short generation, workspace
+clippy, both formatters, snippets and the gate self-tests. Final results follow.

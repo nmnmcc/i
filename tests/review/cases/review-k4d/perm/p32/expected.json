@@ -1,6 +1,6 @@
 {
-  "compiler": "f81937365adc81eb55bd1b84a811216d55d38c33",
-  "binary_sha256": "f781e20e36bacf18802d7e4393cc00921da272335352d671eeebfc065d4bb249",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.both : () <- (S(N), T(Int, N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.uset : (A) <- (T(A, N), ..N) -> A\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.main : () -> Nil\napp/main.ping : (Int) <- (S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.closed : () -> Int\napp/main.get : () <- (Dep) -> Int\napp/main.pong : (Int) <- (S(N), T(A & Int, N2), ..N, ..N2) -> Int\n",
+      "stdout": "app/main.both : () <- (Fail(Never), S(N), T(Int, N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.uset : (A) <- (Fail(Never), T(A, N), ..N) -> A\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.main : () <- (Fail(Never)) -> Nil\napp/main.ping : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.closed : () <- (Fail(Never)) -> Int\napp/main.get : () <- (Dep) -> Int\napp/main.pong : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\n",
       "stderr": "src/main.i:26:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:32:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n2 errors\n"
     }
   }

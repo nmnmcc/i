@@ -119,7 +119,7 @@ Ok(42)
 Error(Nil)
 ```
 
-`Result` is built in. The two catches store success or failure as data; neither match leaves the computation early. `std/int.parse` itself raises `Nil` through `Fail(Nil)` for invalid input.
+`Result` is built in. The two catches store success or failure as data; neither caught outcome leaves the computation early. `std/int.parse` itself raises `Nil` through `Fail(Nil)` for invalid input.
 
 ## Missing values
 

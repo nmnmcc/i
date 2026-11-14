@@ -1,6 +1,6 @@
 {
-  "compiler": "96fd9a8c1dc83fdee1006c1bba00da617d8b4d5d",
-  "binary_sha256": "f781e20e36bacf18802d7e4393cc00921da272335352d671eeebfc065d4bb249",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> Nil\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:15:4: error[E0504]: a value of `S(_, _)` could go to more than one type variable of `_ | _` (§4.4)\n1 error\n"
+      "stdout": "app/main.get : () <- (Dep) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> Nil\napp/main.main : () <- (Fail(Never)) -> Nil\n",
+      "stderr": "src/main.i:15:4: error[E0504]: a value of `S(_, _)` could go to more than one type variable of `Fail(Never) | _ | _` (§4.4)\n1 error\n"
     }
   }
 }

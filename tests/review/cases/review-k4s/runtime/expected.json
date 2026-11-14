@@ -1,6 +1,6 @@
 {
-  "compiler": "9cf56650349ac63c40c771b44c9d9a30bbaeb4dc",
-  "binary_sha256": "f781e20e36bacf18802d7e4393cc00921da272335352d671eeebfc065d4bb249",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.marker : Nil\napp/cases.get : () <- (Dep) -> Int\napp/cases.use : (A) <- (Fail(B), S(A, B, N), ..N) -> A\napp/cases.run : (() <- N -> A) <- N -> A\napp/cases.forward : (A & B) <- (Fail(C), S(A & B, C, N), ..N) -> B\napp/cases.left : (Bool) <- (S(Int, Never, N), ..N) -> Int\napp/cases.right : (Bool) <- (S(Int, Never, N), ..N) -> Int\napp/cases.generated_test : () -> Nil\napp/cases.generated_test : () -> Nil\napp/cases.generated_test : () -> Nil\napp/cases.generated_test : () -> Nil\napp/cases.make : (Int) -> () -> Int\napp/cases.generated_test : () -> Nil\n",
+      "stdout": "app/main.marker : Nil\napp/cases.get : () <- (Dep) -> Int\napp/cases.use : (A) <- (Fail(B), S(A, B, N), ..N) -> A\napp/cases.run : (() <- N -> A) <- N -> A\napp/cases.forward : (A & B) <- (Fail(C), S(A & B, C, N), ..N) -> B\napp/cases.left : (Bool) <- (Fail(Never), S(Int, Never, N), ..N) -> Int\napp/cases.right : (Bool) <- (Fail(Never), S(Int, Never, N), ..N) -> Int\napp/cases.generated_test : () <- (Fail(Never)) -> Nil\napp/cases.generated_test : () <- (Fail(Never)) -> Nil\napp/cases.generated_test : () -> Nil\napp/cases.generated_test : () <- (Fail(Never)) -> Nil\napp/cases.make : (Int) -> () <- (Fail(Never)) -> Int\napp/cases.generated_test : () <- (Fail(Never)) -> Nil\n",
       "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
     },
     "test0": {
