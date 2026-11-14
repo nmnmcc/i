@@ -13,6 +13,10 @@ export default defineConfig({
   base: '/',
   integrations: [
     fumadocs({
+      collections: {
+        docs: { dir: 'content/docs' },
+        home: { dir: 'content/home' },
+      },
       components: './src/components/mdx.tsx',
       mdastPlugins: [fenceMetadata],
       rehypeCodeOptions: { langs: [grammar], fallbackLanguage: 'text', engine: 'oniguruma' },

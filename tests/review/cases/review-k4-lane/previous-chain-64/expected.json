@@ -1,6 +1,6 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil\napp/main.forward_0 : () <- (S(N), ..N) -> Nil\napp/main.forward_1 : () <- (S(N), ..N) -> Nil\napp/main.forward_2 : () <- (S(N), ..N) -> Nil\napp/main.forward_3 : () <- (S(N), ..N) -> Nil\napp/main.forward_4 : () <- (S(N), ..N) -> Nil\napp/main.forward_5 : () <- (S(N), ..N) -> Nil\napp/main.forward_6 : () <- (S(N), ..N) -> Nil\napp/main.forward_7 : () <- (S(N), ..N) -> Nil\napp/main.forward_8 : () <- (S(N), ..N) -> Nil\napp/main.forward_9 : () <- (S(N), ..N) -> Nil\napp/main.forward_10 : () <- (S(N), ..N) -> Nil\napp/main.forward_11 : () <- (S(N), ..N) -> Nil\napp/main.forward_12 : () <- (S(N), ..N) -> Nil\napp/main.forward_13 : () <- (S(N), ..N) -> Nil\napp/main.forward_14 : () <- (S(N), ..N) -> Nil\napp/main.forward_15 : () <- (S(N), ..N) -> Nil\napp/main.forward_16 : () <- (S(N), ..N) -> Nil\napp/main.forward_17 : () <- (S(N), ..N) -> Nil\napp/main.forward_18 : () <- (S(N), ..N) -> Nil\napp/main.forward_19 : () <- (S(N), ..N) -> Nil\napp/main.forward_20 : () <- (S(N), ..N) -> Nil\napp/main.forward_21 : () <- (S(N), ..N) -> Nil\napp/main.forward_22 : () <- (S(N), ..N) -> Nil\napp/main.forward_23 : () <- (S(N), ..N) -> Nil\napp/main.forward_24 : () <- (S(N), ..N) -> Nil\napp/main.forward_25 : () <- (S(N), ..N) -> Nil\napp/main.forward_26 : () <- (S(N), ..N) -> Nil\napp/main.forward_27 : () <- (S(N), ..N) -> Nil\napp/main.forward_28 : () <- (S(N), ..N) -> Nil\napp/main.forward_29 : () <- (S(N), ..N) -> Nil\napp/main.forward_30 : () <- (S(N), ..N) -> Nil\napp/main.forward_31 : () <- (S(N), ..N) -> Nil\napp/main.forward_32 : () <- (S(N), ..N) -> Nil\napp/main.forward_33 : () <- (S(N), ..N) -> Nil\napp/main.forward_34 : () <- (S(N), ..N) -> Nil\napp/main.forward_35 : () <- (S(N), ..N) -> Nil\napp/main.forward_36 : () <- (S(N), ..N) -> Nil\napp/main.forward_37 : () <- (S(N), ..N) -> Nil\napp/main.forward_38 : () <- (S(N), ..N) -> Nil\napp/main.forward_39 : () <- (S(N), ..N) -> Nil\napp/main.forward_40 : () <- (S(N), ..N) -> Nil\napp/main.forward_41 : () <- (S(N), ..N) -> Nil\napp/main.forward_42 : () <- (S(N), ..N) -> Nil\napp/main.forward_43 : () <- (S(N), ..N) -> Nil\napp/main.forward_44 : () <- (S(N), ..N) -> Nil\napp/main.forward_45 : () <- (S(N), ..N) -> Nil\napp/main.forward_46 : () <- (S(N), ..N) -> Nil\napp/main.forward_47 : () <- (S(N), ..N) -> Nil\napp/main.forward_48 : () <- (S(N), ..N) -> Nil\napp/main.forward_49 : () <- (S(N), ..N) -> Nil\napp/main.forward_50 : () <- (S(N), ..N) -> Nil\napp/main.forward_51 : () <- (S(N), ..N) -> Nil\napp/main.forward_52 : () <- (S(N), ..N) -> Nil\napp/main.forward_53 : () <- (S(N), ..N) -> Nil\napp/main.forward_54 : () <- (S(N), ..N) -> Nil\napp/main.forward_55 : () <- (S(N), ..N) -> Nil\napp/main.forward_56 : () <- (S(N), ..N) -> Nil\napp/main.forward_57 : () <- (S(N), ..N) -> Nil\napp/main.forward_58 : () <- (S(N), ..N) -> Nil\napp/main.forward_59 : () <- (S(N), ..N) -> Nil\napp/main.forward_60 : () <- (S(N), ..N) -> Nil\napp/main.forward_61 : () <- (S(N), ..N) -> Nil\napp/main.forward_62 : () <- (S(N), ..N) -> Nil\napp/main.forward_63 : () <- (S(N), ..N) -> Nil\napp/main.main : () <- (S(N), ..N) -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.forward_0 : () <- (S(N), ..N) -> Nil\napp/main.forward_1 : () <- (S(N), ..N) -> Nil\napp/main.forward_2 : () <- (S(N), ..N) -> Nil\napp/main.forward_3 : () <- (S(N), ..N) -> Nil\napp/main.forward_4 : () <- (S(N), ..N) -> Nil\napp/main.forward_5 : () <- (S(N), ..N) -> Nil\napp/main.forward_6 : () <- (S(N), ..N) -> Nil\napp/main.forward_7 : () <- (S(N), ..N) -> Nil\napp/main.forward_8 : () <- (S(N), ..N) -> Nil\napp/main.forward_9 : () <- (S(N), ..N) -> Nil\napp/main.forward_10 : () <- (S(N), ..N) -> Nil\napp/main.forward_11 : () <- (S(N), ..N) -> Nil\napp/main.forward_12 : () <- (S(N), ..N) -> Nil\napp/main.forward_13 : () <- (S(N), ..N) -> Nil\napp/main.forward_14 : () <- (S(N), ..N) -> Nil\napp/main.forward_15 : () <- (S(N), ..N) -> Nil\napp/main.forward_16 : () <- (S(N), ..N) -> Nil\napp/main.forward_17 : () <- (S(N), ..N) -> Nil\napp/main.forward_18 : () <- (S(N), ..N) -> Nil\napp/main.forward_19 : () <- (S(N), ..N) -> Nil\napp/main.forward_20 : () <- (S(N), ..N) -> Nil\napp/main.forward_21 : () <- (S(N), ..N) -> Nil\napp/main.forward_22 : () <- (S(N), ..N) -> Nil\napp/main.forward_23 : () <- (S(N), ..N) -> Nil\napp/main.forward_24 : () <- (S(N), ..N) -> Nil\napp/main.forward_25 : () <- (S(N), ..N) -> Nil\napp/main.forward_26 : () <- (S(N), ..N) -> Nil\napp/main.forward_27 : () <- (S(N), ..N) -> Nil\napp/main.forward_28 : () <- (S(N), ..N) -> Nil\napp/main.forward_29 : () <- (S(N), ..N) -> Nil\napp/main.forward_30 : () <- (S(N), ..N) -> Nil\napp/main.forward_31 : () <- (S(N), ..N) -> Nil\napp/main.forward_32 : () <- (S(N), ..N) -> Nil\napp/main.forward_33 : () <- (S(N), ..N) -> Nil\napp/main.forward_34 : () <- (S(N), ..N) -> Nil\napp/main.forward_35 : () <- (S(N), ..N) -> Nil\napp/main.forward_36 : () <- (S(N), ..N) -> Nil\napp/main.forward_37 : () <- (S(N), ..N) -> Nil\napp/main.forward_38 : () <- (S(N), ..N) -> Nil\napp/main.forward_39 : () <- (S(N), ..N) -> Nil\napp/main.forward_40 : () <- (S(N), ..N) -> Nil\napp/main.forward_41 : () <- (S(N), ..N) -> Nil\napp/main.forward_42 : () <- (S(N), ..N) -> Nil\napp/main.forward_43 : () <- (S(N), ..N) -> Nil\napp/main.forward_44 : () <- (S(N), ..N) -> Nil\napp/main.forward_45 : () <- (S(N), ..N) -> Nil\napp/main.forward_46 : () <- (S(N), ..N) -> Nil\napp/main.forward_47 : () <- (S(N), ..N) -> Nil\napp/main.forward_48 : () <- (S(N), ..N) -> Nil\napp/main.forward_49 : () <- (S(N), ..N) -> Nil\napp/main.forward_50 : () <- (S(N), ..N) -> Nil\napp/main.forward_51 : () <- (S(N), ..N) -> Nil\napp/main.forward_52 : () <- (S(N), ..N) -> Nil\napp/main.forward_53 : () <- (S(N), ..N) -> Nil\napp/main.forward_54 : () <- (S(N), ..N) -> Nil\napp/main.forward_55 : () <- (S(N), ..N) -> Nil\napp/main.forward_56 : () <- (S(N), ..N) -> Nil\napp/main.forward_57 : () <- (S(N), ..N) -> Nil\napp/main.forward_58 : () <- (S(N), ..N) -> Nil\napp/main.forward_59 : () <- (S(N), ..N) -> Nil\napp/main.forward_60 : () <- (S(N), ..N) -> Nil\napp/main.forward_61 : () <- (S(N), ..N) -> Nil\napp/main.forward_62 : () <- (S(N), ..N) -> Nil\napp/main.forward_63 : () <- (S(N), ..N) -> Nil\napp/main.main : () <- (S(N), ..N) -> Nil\n",
       "stderr": ""
     },
     "test0": {
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:138:1: error[E0523]: provider target native entry app/main.main: service A must be closed\n1 error\n"
+      "stderr": "src/main.i:138:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:138:1: error[E0523]: provider target native entry app/main.main: service A must be closed\n1 error\n"
+      "stderr": "src/main.i:138:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:138:1: error[E0523]: provider target native entry app/main.main: service A must be closed\n1 error\n"
+      "stderr": "src/main.i:138:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:138:1: error[E0523]: provider target native entry app/main.main: service A must be closed\n1 error\n"
+      "stderr": "src/main.i:138:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     }
   }
 }

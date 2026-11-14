@@ -209,10 +209,10 @@ take_while = <A, E, F, N>(
 }
 
 /// Consumes in order, passing (accumulator, element).
-fold = <A, Acc, E, N>(
+fold = <A, Acc, E, F, N>(
 	over : Stream(A, E, N),
 	from : Acc,
-	with : (Acc, A) <- N -> Acc
+	with : (Acc, A) <- (Fail(F), ..N) -> Acc
 ) -> Acc {
 	pull(over) |>
 		(Done) { from }
@@ -220,10 +220,10 @@ fold = <A, Acc, E, N>(
 }
 
 /// Stop returns immediately without demanding the tail.
-fold_until = <A, Acc, E, N>(
+fold_until = <A, Acc, E, F, N>(
 	over : Stream(A, E, N),
 	from : Acc,
-	with : (Acc, A) <- N -> list.ContinueOrStop(Acc)
+	with : (Acc, A) <- (Fail(F), ..N) -> list.ContinueOrStop(Acc)
 ) -> Acc {
 	pull(over) |>
 		(Done) { from }
@@ -235,7 +235,10 @@ fold_until = <A, Acc, E, N>(
 }
 
 /// Discards callback results; an infinite input may never finish.
-each = <A, B, E, N>(over : Stream(A, E, N), with : (A) <- N -> B) -> Nil {
+each = <A, B, E, F, N>(
+	over : Stream(A, E, N),
+	with : (A) <- (Fail(F), ..N) -> B
+) -> Nil {
 	fold(over, Nil, (_, x) {
 		with(x)
 		Nil

@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	i/core
 	int = std/int
@@ -59,77 +60,77 @@ test("to_string_positive_2_test", () {
 })
 
 test("parse_positive_test", () {
-	assert(int.parse("123") == Ok(123))
+	assert(fail.catch(() { int.parse("123") }) == Ok(123))
 	Nil
 })
 
 test("parse_negative_test", () {
-	assert(int.parse("-123") == Ok(-123))
+	assert(fail.catch(() { int.parse("-123") }) == Ok(-123))
 	Nil
 })
 
 test("parse_leading_zero_test", () {
-	assert(int.parse("0123") == Ok(123))
+	assert(fail.catch(() { int.parse("0123") }) == Ok(123))
 	Nil
 })
 
 test("parse_empty_test", () {
-	assert(int.parse("") == Error(Nil))
+	assert(fail.catch(() { int.parse("") }) == Error(Nil))
 	Nil
 })
 
 test("parse_invalid_test", () {
-	assert(int.parse("what") == Error(Nil))
+	assert(fail.catch(() { int.parse("what") }) == Error(Nil))
 	Nil
 })
 
 test("parse_float_test", () {
-	assert(int.parse("1.23") == Error(Nil))
+	assert(fail.catch(() { int.parse("1.23") }) == Error(Nil))
 	Nil
 })
 
 test("base_parse_hex_test", () {
-	assert(int.parse_base("100", 16) == Ok(256))
+	assert(fail.catch(() { int.parse_base("100", 16) }) == Ok(256))
 	Nil
 })
 
 test("base_parse_hex_negative_test", () {
-	assert(int.parse_base("-100", 16) == Ok(-256))
+	assert(fail.catch(() { int.parse_base("-100", 16) }) == Ok(-256))
 	Nil
 })
 
 test("base_parse_base_1_test", () {
-	assert(int.parse_base("100", 1) == Error(Nil))
+	assert(fail.catch(() { int.parse_base("100", 1) }) == Error(Nil))
 	Nil
 })
 
 test("base_parse_base_37_test", () {
-	assert(int.parse_base("100", 37) == Error(Nil))
+	assert(fail.catch(() { int.parse_base("100", 37) }) == Error(Nil))
 	Nil
 })
 
 test("base_parse_invalid_hex_test", () {
-	assert(int.parse_base("AG", 16) == Error(Nil))
+	assert(fail.catch(() { int.parse_base("AG", 16) }) == Error(Nil))
 	Nil
 })
 
 test("to_base_string_hex_test", () {
-	assert(int.to_base(100, 16) == Ok("64"))
+	assert(fail.catch(() { int.to_base(100, 16) }) == Ok("64"))
 	Nil
 })
 
 test("to_base_string_hex_negative_test", () {
-	assert(int.to_base(-100, 16) == Ok("-64"))
+	assert(fail.catch(() { int.to_base(-100, 16) }) == Ok("-64"))
 	Nil
 })
 
 test("to_base_string_base_1_test", () {
-	assert(int.to_base(100, 1) == Error(Nil))
+	assert(fail.catch(() { int.to_base(100, 1) }) == Error(Nil))
 	Nil
 })
 
 test("to_base_string_base_37_test", () {
-	assert(int.to_base(100, 37) == Error(Nil))
+	assert(fail.catch(() { int.to_base(100, 37) }) == Error(Nil))
 	Nil
 })
 
@@ -378,22 +379,22 @@ test("is_odd_large_test", () {
 })
 
 test("square_root_four_test", () {
-	assert(int.square_root(4) == Ok(2.0))
+	assert(fail.catch(() { int.square_root(4) }) == Ok(2.0))
 	Nil
 })
 
 test("square_root_sixteen_test", () {
-	assert(int.square_root(16) == Ok(4.0))
+	assert(fail.catch(() { int.square_root(16) }) == Ok(4.0))
 	Nil
 })
 
 test("square_root_zero_test", () {
-	assert(int.square_root(0) == Ok(0.0))
+	assert(fail.catch(() { int.square_root(0) }) == Ok(0.0))
 	Nil
 })
 
 test("square_root_negative_error_test", () {
-	assert(int.square_root(-4) == Error(Nil))
+	assert(fail.catch(() { int.square_root(-4) }) == Error(Nil))
 	Nil
 })
 
@@ -438,142 +439,142 @@ test("product_multiple_test", () {
 })
 
 test("divide_by_self_test", () {
-	assert(int.divide(1, 1) == Ok(1))
+	assert(fail.catch(() { int.divide(1, 1) }) == Ok(1))
 	Nil
 })
 
 test("divide_by_zero_test", () {
-	assert(int.divide(1, 0) == Error(Nil))
+	assert(fail.catch(() { int.divide(1, 0) }) == Error(Nil))
 	Nil
 })
 
 test("divide_zero_by_one_test", () {
-	assert(int.divide(0, 1) == Ok(0))
+	assert(fail.catch(() { int.divide(0, 1) }) == Ok(0))
 	Nil
 })
 
 test("divide_one_by_zero_test", () {
-	assert(int.divide(1, 0) == Error(Nil))
+	assert(fail.catch(() { int.divide(1, 0) }) == Error(Nil))
 	Nil
 })
 
 test("divide_truncates_test", () {
-	assert(int.divide(5, 2) == Ok(2))
+	assert(fail.catch(() { int.divide(5, 2) }) == Ok(2))
 	Nil
 })
 
 test("divide_negative_test", () {
-	assert(int.divide(-99, 2) == Ok(-49))
+	assert(fail.catch(() { int.divide(-99, 2) }) == Ok(-49))
 	Nil
 })
 
 test("remainder_basic_test", () {
-	assert(int.remainder(3, 2) == Ok(1))
+	assert(fail.catch(() { int.remainder(3, 2) }) == Ok(1))
 	Nil
 })
 
 test("remainder_by_zero_test", () {
-	assert(int.remainder(1, 0) == Error(Nil))
+	assert(fail.catch(() { int.remainder(1, 0) }) == Error(Nil))
 	Nil
 })
 
 test("remainder_negative_divisor_test", () {
-	assert(int.remainder(10, -1) == Ok(0))
+	assert(fail.catch(() { int.remainder(10, -1) }) == Ok(0))
 	Nil
 })
 
 test("remainder_positive_test", () {
-	assert(int.remainder(13, 3) == Ok(1))
+	assert(fail.catch(() { int.remainder(13, 3) }) == Ok(1))
 	Nil
 })
 
 test("remainder_negative_dividend_test", () {
-	assert(int.remainder(-13, 3) == Ok(-1))
+	assert(fail.catch(() { int.remainder(-13, 3) }) == Ok(-1))
 	Nil
 })
 
 test("remainder_positive_by_negative_test", () {
-	assert(int.remainder(13, -3) == Ok(1))
+	assert(fail.catch(() { int.remainder(13, -3) }) == Ok(1))
 	Nil
 })
 
 test("remainder_both_negative_test", () {
-	assert(int.remainder(-13, -3) == Ok(-1))
+	assert(fail.catch(() { int.remainder(-13, -3) }) == Ok(-1))
 	Nil
 })
 
 test("modulo_basic_test", () {
-	assert(int.modulo(3, 2) == Ok(1))
+	assert(fail.catch(() { int.modulo(3, 2) }) == Ok(1))
 	Nil
 })
 
 test("modulo_by_zero_test", () {
-	assert(int.modulo(1, 0) == Error(Nil))
+	assert(fail.catch(() { int.modulo(1, 0) }) == Error(Nil))
 	Nil
 })
 
 test("modulo_negative_divisor_test", () {
-	assert(int.modulo(10, -1) == Ok(0))
+	assert(fail.catch(() { int.modulo(10, -1) }) == Ok(0))
 	Nil
 })
 
 test("modulo_positive_test", () {
-	assert(int.modulo(13, 3) == Ok(1))
+	assert(fail.catch(() { int.modulo(13, 3) }) == Ok(1))
 	Nil
 })
 
 test("modulo_negative_dividend_test", () {
-	assert(int.modulo(-13, 3) == Ok(2))
+	assert(fail.catch(() { int.modulo(-13, 3) }) == Ok(2))
 	Nil
 })
 
 test("modulo_positive_by_negative_test", () {
-	assert(int.modulo(13, -3) == Ok(-2))
+	assert(fail.catch(() { int.modulo(13, -3) }) == Ok(-2))
 	Nil
 })
 
 test("modulo_both_negative_test", () {
-	assert(int.modulo(-13, -3) == Ok(-1))
+	assert(fail.catch(() { int.modulo(-13, -3) }) == Ok(-1))
 	Nil
 })
 
 test("floor_divide_by_self_test", () {
-	assert(int.floor_divide(1, 1) == Ok(1))
+	assert(fail.catch(() { int.floor_divide(1, 1) }) == Ok(1))
 	Nil
 })
 
 test("floor_divide_by_zero_test", () {
-	assert(int.floor_divide(1, 0) == Error(Nil))
+	assert(fail.catch(() { int.floor_divide(1, 0) }) == Error(Nil))
 	Nil
 })
 
 test("floor_divide_zero_by_one_test", () {
-	assert(int.floor_divide(0, 1) == Ok(0))
+	assert(fail.catch(() { int.floor_divide(0, 1) }) == Ok(0))
 	Nil
 })
 
 test("floor_divide_one_by_zero_test", () {
-	assert(int.floor_divide(1, 0) == Error(Nil))
+	assert(fail.catch(() { int.floor_divide(1, 0) }) == Error(Nil))
 	Nil
 })
 
 test("floor_divide_truncates_test", () {
-	assert(int.floor_divide(5, 2) == Ok(2))
+	assert(fail.catch(() { int.floor_divide(5, 2) }) == Ok(2))
 	Nil
 })
 
 test("floor_divide_negative_divisor_test", () {
-	assert(int.floor_divide(6, -4) == Ok(-2))
+	assert(fail.catch(() { int.floor_divide(6, -4) }) == Ok(-2))
 	Nil
 })
 
 test("floor_divide_negative_dividend_test", () {
-	assert(int.floor_divide(-99, 2) == Ok(-50))
+	assert(fail.catch(() { int.floor_divide(-99, 2) }) == Ok(-50))
 	Nil
 })
 
 test("floor_divide_negative_small_test", () {
-	assert(int.floor_divide(-1, 2) == Ok(-1))
+	assert(fail.catch(() { int.floor_divide(-1, 2) }) == Ok(-1))
 	Nil
 })
 
@@ -868,92 +869,112 @@ test("range_sum_test", () {
 	Nil
 })
 
-test("power_two_squared_test", () { assert(int.power(2, 2) == Ok(4)) })
+test("power_two_squared_test", () {
+	assert(fail.catch(() { int.power(2, 2) }) == Ok(4))
+})
 
-test("power_negative_cubed_test", () { assert(int.power(-5, 3) == Ok(-125)) })
+test("power_negative_cubed_test", () {
+	assert(fail.catch(() { int.power(-5, 3) }) == Ok(-125))
+})
 
 test("power_zero_exponent_test", () {
-	assert(int.power(10, 0) == Ok(1))
-	assert(int.power(0, 0) == Ok(1))
+	assert(fail.catch(() { int.power(10, 0) }) == Ok(1))
+	assert(fail.catch(() { int.power(0, 0) }) == Ok(1))
 })
 
 test("power_big_test", () {
-	assert(int.power(2, 100) == Ok(1267650600228229401496703205376))
-	assert(int.power(10, 30) == Ok(1_000_000_000_000_000_000_000_000_000_000))
+	assert(
+		fail.catch(() { int.power(2, 100) }) ==
+			Ok(1267650600228229401496703205376),
+	)
+	assert(
+		fail.catch(() { int.power(10, 30) }) ==
+			Ok(1_000_000_000_000_000_000_000_000_000_000),
+	)
 })
 
 test("power_negative_exponent_test", () {
-	assert(int.power(2, -1) == Error(Nil))
+	assert(fail.catch(() { int.power(2, -1) }) == Error(Nil))
 })
 
-test("power_pipe_test", () { assert({ 3 |> int.power(4) } == Ok(81)) })
+test("power_pipe_test", () {
+	assert(fail.catch(() { 3 |> int.power(4) }) == Ok(81))
+})
 
 // Tests for functions that are new in std, or that changed from the old
 // library.
 test("parse_more_test", () {
-	assert(int.parse("+7") == Ok(7))
-	assert(int.parse("-0") == Ok(0))
+	assert(fail.catch(() { int.parse("+7") }) == Ok(7))
+	assert(fail.catch(() { int.parse("-0") }) == Ok(0))
 	assert(
-		int.parse("123456789012345678901234567890") ==
+		fail.catch(() { int.parse("123456789012345678901234567890") }) ==
 			Ok(123456789012345678901234567890),
 	)
-	assert(int.parse("") == Error(Nil))
-	assert(int.parse("-") == Error(Nil))
-	assert(int.parse("1_000") == Error(Nil))
-	assert(int.parse(" 1") == Error(Nil))
-	assert(int.parse("1e3") == Error(Nil))
-	assert(int.parse("٣") == Error(Nil))
+	assert(fail.catch(() { int.parse("") }) == Error(Nil))
+	assert(fail.catch(() { int.parse("-") }) == Error(Nil))
+	assert(fail.catch(() { int.parse("1_000") }) == Error(Nil))
+	assert(fail.catch(() { int.parse(" 1") }) == Error(Nil))
+	assert(fail.catch(() { int.parse("1e3") }) == Error(Nil))
+	assert(fail.catch(() { int.parse("٣") }) == Error(Nil))
 })
 
 test("parse_base_more_test", () {
-	assert(int.parse_base("ff", 16) == Ok(255))
-	assert(int.parse_base("FF", 16) == Ok(255))
-	assert(int.parse_base("-101", 2) == Ok(-5))
-	assert(int.parse_base("z", 36) == Ok(35))
-	assert(int.parse_base("2", 2) == Error(Nil))
-	assert(int.parse_base("1", 1) == Error(Nil))
-	assert(int.parse_base("1", 37) == Error(Nil))
+	assert(fail.catch(() { int.parse_base("ff", 16) }) == Ok(255))
+	assert(fail.catch(() { int.parse_base("FF", 16) }) == Ok(255))
+	assert(fail.catch(() { int.parse_base("-101", 2) }) == Ok(-5))
+	assert(fail.catch(() { int.parse_base("z", 36) }) == Ok(35))
+	assert(fail.catch(() { int.parse_base("2", 2) }) == Error(Nil))
+	assert(fail.catch(() { int.parse_base("1", 1) }) == Error(Nil))
+	assert(fail.catch(() { int.parse_base("1", 37) }) == Error(Nil))
 })
 
 test("to_base_more_test", () {
-	assert(int.to_base(255, 16) == Ok("FF"))
-	assert(int.to_base(-5, 2) == Ok("-101"))
-	assert(int.to_base(0, 7) == Ok("0"))
-	assert(int.to_base(35, 36) == Ok("Z"))
-	assert(int.to_base(1, 37) == Error(Nil))
-	assert(int.to_base(1, 1) == Error(Nil))
+	assert(fail.catch(() { int.to_base(255, 16) }) == Ok("FF"))
+	assert(fail.catch(() { int.to_base(-5, 2) }) == Ok("-101"))
+	assert(fail.catch(() { int.to_base(0, 7) }) == Ok("0"))
+	assert(fail.catch(() { int.to_base(35, 36) }) == Ok("Z"))
+	assert(fail.catch(() { int.to_base(1, 37) }) == Error(Nil))
+	assert(fail.catch(() { int.to_base(1, 1) }) == Error(Nil))
 	big = 1267650600228229401496703205376
-	assert(int.to_base(big, 2) == Ok("1" <> string.repeat("0", 100)))
 	assert(
-		int.parse_base(int.to_base16(big), 16) == Ok(big),
+		fail.catch(() { int.to_base(big, 2) }) ==
+			Ok("1" <> string.repeat("0", 100)),
+	)
+	assert(
+		{
+			e4_call_arg_0 = int.to_base16(big)
+			e4_call_arg_1 = 16
+			fail.catch(() { int.parse_base(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(big),
 	)
 })
 
 test("digits_more_test", () {
-	assert(int.digits(234, 10) == Ok([2, 3, 4]))
-	assert(int.digits(-234, 10) == Ok([2, 3, 4]))
-	assert(int.digits(0, 10) == Ok([0]))
-	assert(int.digits(5, 2) == Ok([1, 0, 1]))
-	assert(int.digits(5, 1) == Error(Nil))
-	assert(int.undigits([1, 0, 1], 2) == Ok(5))
-	assert(int.undigits([1, 2], 2) == Error(Nil))
-	assert(int.undigits([], 10) == Ok(0))
+	assert(fail.catch(() { int.digits(234, 10) }) == Ok([2, 3, 4]))
+	assert(fail.catch(() { int.digits(-234, 10) }) == Ok([2, 3, 4]))
+	assert(fail.catch(() { int.digits(0, 10) }) == Ok([0]))
+	assert(fail.catch(() { int.digits(5, 2) }) == Ok([1, 0, 1]))
+	assert(fail.catch(() { int.digits(5, 1) }) == Error(Nil))
+	assert(fail.catch(() { int.undigits([1, 0, 1], 2) }) == Ok(5))
+	assert(fail.catch(() { int.undigits([1, 2], 2) }) == Error(Nil))
+	assert(fail.catch(() { int.undigits([], 10) }) == Ok(0))
 })
 
 test("division_more_test", () {
-	assert(int.divide(7, 2) == Ok(3))
-	assert(int.divide(-7, 2) == Ok(-3))
-	assert(int.divide(7, 0) == Error(Nil))
-	assert(int.remainder(-13, 3) == Ok(-1))
-	assert(int.remainder(13, -3) == Ok(1))
-	assert(int.modulo(-13, 3) == Ok(2))
-	assert(int.modulo(13, -3) == Ok(-2))
-	assert(int.modulo(-13, -3) == Ok(-1))
-	assert(int.modulo(12, 3) == Ok(0))
-	assert(int.floor_divide(-7, 2) == Ok(-4))
-	assert(int.floor_divide(7, -2) == Ok(-4))
-	assert(int.floor_divide(-8, 2) == Ok(-4))
-	assert(int.floor_divide(1, 0) == Error(Nil))
+	assert(fail.catch(() { int.divide(7, 2) }) == Ok(3))
+	assert(fail.catch(() { int.divide(-7, 2) }) == Ok(-3))
+	assert(fail.catch(() { int.divide(7, 0) }) == Error(Nil))
+	assert(fail.catch(() { int.remainder(-13, 3) }) == Ok(-1))
+	assert(fail.catch(() { int.remainder(13, -3) }) == Ok(1))
+	assert(fail.catch(() { int.modulo(-13, 3) }) == Ok(2))
+	assert(fail.catch(() { int.modulo(13, -3) }) == Ok(-2))
+	assert(fail.catch(() { int.modulo(-13, -3) }) == Ok(-1))
+	assert(fail.catch(() { int.modulo(12, 3) }) == Ok(0))
+	assert(fail.catch(() { int.floor_divide(-7, 2) }) == Ok(-4))
+	assert(fail.catch(() { int.floor_divide(7, -2) }) == Ok(-4))
+	assert(fail.catch(() { int.floor_divide(-8, 2) }) == Ok(-4))
+	assert(fail.catch(() { int.floor_divide(1, 0) }) == Error(Nil))
 })
 
 test("big_numbers_test", () {

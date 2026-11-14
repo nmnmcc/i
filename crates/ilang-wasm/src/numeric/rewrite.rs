@@ -33,6 +33,7 @@ pub fn callee(c: &mut Callee, map: &mut impl FnMut(&mut Atom)) {
 pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
     match v {
         Value::Atom(a)
+        | Value::CapturedService(a, _)
         | Value::Field(a, _)
         | Value::ListHead(a)
         | Value::ListTail(a)
@@ -59,7 +60,7 @@ pub fn value(v: &mut Value, map: &mut impl FnMut(&mut Atom)) {
             args.iter_mut().for_each(&mut *map);
             env(e, map);
         }
-        Value::Service(e, _) | Value::ServiceRaw(e, _) => env(e, map),
+        Value::Service(e, _) | Value::ServiceRaw(e, _) | Value::Environment(e, _) => env(e, map),
         Value::Closure { captures, .. } => captures.iter_mut().for_each(map),
         // A multi-shape value is opaque to numeric lowering: its groups are
         // reached only through their reference entries (syntax-3.md §6.4).

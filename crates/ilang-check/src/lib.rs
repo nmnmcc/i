@@ -10,7 +10,7 @@ pub mod hygiene;
 pub mod identity;
 pub mod macro_sandbox;
 pub mod order;
-pub mod providers;
+pub mod platform;
 pub mod query;
 pub mod resolve;
 pub mod syn3_facts;

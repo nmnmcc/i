@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+from spec_links import unlink_spec_references
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'docs/content/docs/library/generated'
@@ -46,6 +47,7 @@ def groups(text):
             return
 
 def safe(text):
+    text = unlink_spec_references(text)
     # MDX text can contain JSX metacharacters in source comments.
     output = []
     fenced = False

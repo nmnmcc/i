@@ -270,9 +270,11 @@ fn record_kinds() {
     };
     assert!(local(&two[1]) < local(&two[3]), "{two:?}");
     assert_ne!(two[0], two[2], "two services: {two:?}");
+    // E3 (§2.10.6): catch is ordinary Fail data and a control boundary,
+    // so it uses provider records, not a special error-channel frame.
+    assert!(all(&text, "(struct.new $frame (ref.func $catch_reenter)").is_empty());
     // The runtime records: no slot (-1), and their kinds.
     for (reenter, kind) in [
-        ("$catch_reenter", 4),
         ("$ensure_reenter", 2),
         // Bit 5 marks finalizer re-entry for cancellation shielding; Wasm's
         // i32 shift uses the low five bits, so it dispatches like kind 5.
@@ -293,7 +295,10 @@ fn record_kinds() {
     assert!(func(&text, "$boundary_core").contains("(ref.func $boundary_reenter)"));
     assert!(func(&text, "$cancel_core").contains("(ref.func $cancel_reenter)"));
     let tramp = func(&text, "$tramp_run");
-    assert!(tramp.contains("(i32.const 0x1C)") && tramp.contains("(i32.const 0x0C)"));
+    // E3 removes the special catch frame (kind 4); only ensure and the
+    // delimiter (kinds 2/3) receive unwind. Fail uses ordinary boundary data.
+    assert!(tramp.contains("(i32.const 0x0C)"));
+    assert!(!tramp.contains("(i32.const 0x1C)"));
 }
 
 #[test]
@@ -375,8 +380,8 @@ const CANCEL_OUT: &str = r#"(
 
 // Hands k2 out of the cancel, to the boundary `b0` around it.
 Out = (put = (Inner) -> Nil)
-Inner = (Continuation(Nil, Int, Never, Out))
-Paused = (Continuation(Nil, Outer, Never, Out))
+Inner = (Continuation(Nil, Int, Out))
+Paused = (Continuation(Nil, Outer, Out))
 Done = ()
 Outer = Paused | Done
 Handed = (Inner)
@@ -466,7 +471,7 @@ main = () {
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Never, Out))
+const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Out))
 Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 ThirdSum = Third | Over
@@ -519,7 +524,7 @@ const ENV_TAIL_RESUME: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, PausedSum, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Name))
 Done = ()
 PausedSum = Paused | Done
 
@@ -559,7 +564,7 @@ const ENV_TAIL_CANCEL: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, PausedSum, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Name))
 Done = ()
 PausedSum = Paused | Done
 
@@ -604,7 +609,7 @@ const CANCEL_INNER: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, PausedSum, Never, Io))
+Paused = (Continuation(Nil, PausedSum, Io))
 Done = ()
 PausedSum = Paused | Done
 
@@ -652,10 +657,10 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, PausedSum, Int, Never))
+Paused = (Continuation(Nil, PausedSum, Fail(Int)))
 Done = ()
 PausedSum = Paused | Done
-Held = (Continuation(Nil, HeldSum, Never, Never))
+Held = (Continuation(Nil, HeldSum, Fail(Int)))
 Over = ()
 HeldSum = Held | Over
 
@@ -681,7 +686,7 @@ paused = () {
 		| (Done) { panic("not paused") }
 }
 
-// `cancel` has no errors in its type. Here it runs the ordinary code
+// `cancel` forwards the continuation need. Here it runs the ordinary code
 // after `inner`, whose error passes through this final function's record.
 with = (hold, k) {
 	control.suspend(hold, (k2) { Held(k2) })
@@ -1086,7 +1091,7 @@ fn nested_source(depth: u32) -> String {
 	i/control
 )
 Done = ()
-More = (Int, Continuation(Nil, Step, Never, Never))
+More = (Int, Continuation(Nil, Step, Never))
 Step = Done | More
 check = (ok) { ok |> (True) { Nil } | (False) { panic("tree walk") } }
 emit = (b, n) { control.suspend(b, (k) { More(n, k) }) }
@@ -1222,7 +1227,7 @@ fn resume_twice_from_new_places() {
 )
 Name = (text = String)
 Done = (String)
-More = (String, Continuation(Nil, Step, Never, Name))
+More = (String, Continuation(Nil, Step, Name))
 Step = Done | More
 name = () <- (n : Name) { n.text }
 leaf = (b) {
@@ -1277,7 +1282,7 @@ fn counted_frames() {
 	i/resource
 )
 Done = ()
-More = (String, Continuation(Nil, Step, Never, Never))
+More = (String, Continuation(Nil, Step, Never))
 Step = Done | More
 check = (ok) { ok |> (True) { Nil } | (False) { panic("counted frame") } }
 layer = (b, n) {

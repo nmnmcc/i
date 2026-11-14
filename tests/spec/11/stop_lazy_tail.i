@@ -9,7 +9,7 @@
 	i/control
 )
 
-Paused = (Continuation(Nil, PausedSum, Never, Never))
+Paused = (Continuation(Nil, PausedSum, Never))
 
 Done = ()
 PausedSum = Paused | Done

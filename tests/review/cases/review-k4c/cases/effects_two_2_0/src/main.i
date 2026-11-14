@@ -4,8 +4,8 @@ use = <A, E, N, M>(x : A) <- (s : S(A, E, N, M)) {
 	g()
 	f(x)
 }
-run = <A, N>(body : () <- N -> A) { body() }
-wrap = <A, E, N, M>(x : A) {
+run = <A, N>(body: () <- N -> A) { body() }
+wrap = <A>(x: A) {
 	local = () { use(x) }
 	local()
 }
