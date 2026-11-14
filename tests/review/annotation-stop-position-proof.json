@@ -1,0 +1,69 @@
+{
+  "baseline_ref": "refs/remotes/origin/main",
+  "baseline_commit": "1bdea69406471b72e6d1df3a5592c075688478b8",
+  "runtime_verified_commit": "1a6453d330ef45f8dd991a3ec4e9cbe6298a31aa",
+  "fixtures": [
+    {
+      "path": "tests/spec/11/stop_tail_assert.i",
+      "old_position": "spec/main:8:23",
+      "new_position": "spec/main:8:24",
+      "same_statement": "assert(n > 0)",
+      "same_stop_reason": "assertion failed: assert",
+      "source_spacing_only": true
+    },
+    {
+      "path": "tests/spec/11/stop_tail_library.i",
+      "old_position": "spec/main:11:21",
+      "new_position": "spec/main:11:22",
+      "same_statement": "core.sqrt(x)",
+      "same_stop_reason": "float: result is not finite",
+      "source_spacing_only": true
+    },
+    {
+      "path": "tests/spec/2.5/order_go.i",
+      "old_position": "spec/main:18:19",
+      "new_position": "spec/main:18:20",
+      "same_statement": "panic(s)",
+      "same_stop_reason": "panic: y",
+      "source_spacing_only": true
+    },
+    {
+      "path": "tests/spec/2.5/stop_in_start.i",
+      "old_position": "spec/main:11:58",
+      "new_position": "spec/main:11:59",
+      "same_statement": "panic(\"not ready\")",
+      "same_stop_reason": "panic: not ready",
+      "source_spacing_only": true
+    },
+    {
+      "path": "tests/spec/9/light_boundary_kept_raise.i",
+      "old_position": "spec/main:14:31",
+      "new_position": "spec/main:14:32",
+      "same_statement": "failure.raise(x)",
+      "same_stop_reason": "control: boundary is not active",
+      "source_spacing_only": true
+    },
+    {
+      "path": "tests/spec/1.1/binding_text_cr.i",
+      "cmp_command": "cmp -s tests/spec/1.1/binding_text_cr.i <(git show refs/remotes/origin/main:tests/spec/1.1/binding_text_cr.i)",
+      "cmp_exit": 0,
+      "sha256": "c5a88776342d5448b1704112e9e58dd0e65d5fedd73a4fe434c3554115273720",
+      "expectation_unchanged": true,
+      "old_position": "spec/main:9:3",
+      "new_position": "spec/main:9:3",
+      "same_stop_reason": "assertion failed: pattern [a,\nb] did not match [1]",
+      "excluded_from_formatter": true
+    },
+    {
+      "path": "tests/spec/1.1/binding_text_crlf.i",
+      "cmp_command": "cmp -s tests/spec/1.1/binding_text_crlf.i <(git show refs/remotes/origin/main:tests/spec/1.1/binding_text_crlf.i)",
+      "cmp_exit": 0,
+      "sha256": "94764ce3755fbe6c75fd6500847281943abde95e940e601019d5f204d9e493cf",
+      "expectation_unchanged": true,
+      "old_position": "spec/main:9:3",
+      "new_position": "spec/main:9:3",
+      "same_stop_reason": "assertion failed: pattern [a,\nb] did not match [1]",
+      "excluded_from_formatter": true
+    }
+  ]
+}
