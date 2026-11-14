@@ -49,5 +49,13 @@
     "before": "Some: (A) -> Some(A)",
     "after": "Some : (A) -> Some(A)",
     "differences": []
-  }
+  },
+  "rebuilt_readers": {
+    "old_contexts": 29864,
+    "formatted_contexts": 29864,
+    "differences": [],
+    "old_parser": "915b0aa5",
+    "new_parser": "2945508c1"
+  },
+  "cached_tools_basis": "Stage3 changes only syn3/lower.rs and Lisp builtin definition-query code; parser, AST, lexer, Lisp reader and formatter source are unchanged. Rebuilt binaries were compared against both saved inventories."
 }
