@@ -45,7 +45,7 @@ def i_options(info):
     words, options = [], {}
     for word in shlex.split(info)[1:]:
         key, separator, value = word.partition('=')
-        if separator and (key in ('title', 'package', 'file', 'stdout', 'stderr', 'project', 'hosts') or re.fullmatch(r'env\.[A-Za-z_][A-Za-z0-9_]*', key)):
+        if separator and (key in ('title', 'package', 'file', 'stdout', 'stderr', 'project', 'hosts', 'transcripts') or re.fullmatch(r'env\.[A-Za-z_][A-Za-z0-9_]*', key)):
             if key in options or not value:
                 raise ValueError(f'expected one nonempty {key}=')
             options[key] = value
@@ -64,6 +64,8 @@ def i_options(info):
         raise ValueError('stderr=exact is supported on error fences')
     if 'hosts' in options and (words != ['run'] or options['hosts'] != 'native,wasi,javascript'):
         raise ValueError('hosts=native,wasi,javascript is supported on run fences')
+    if 'transcripts' in options and (options['transcripts'] != 'hosts' or 'hosts' not in options):
+        raise ValueError('transcripts=hosts needs hosts=native,wasi,javascript')
     if any(key.startswith('env.') for key in options) and not words:
         raise ValueError('env.NAME= needs an example kind')
     return words, options

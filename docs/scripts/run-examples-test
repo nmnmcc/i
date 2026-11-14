@@ -67,6 +67,10 @@ class RunnerTests(unittest.TestCase):
             'failing-expand': 1,
             'passing-hosts': 0,
             'failing-hosts': 6,
+            'passing-host-transcripts': 0,
+            'failing-host-transcripts': 2,
+            'failing-js-transcript': 2,
+            'missing-host-transcript': 1,
         }
         for name, count in expected.items():
             with self.subTest(fixture=name):
@@ -99,6 +103,10 @@ class RunnerTests(unittest.TestCase):
                     for host in ('run', 'wasi', 'javascript'):
                         for level in (0, 2):
                             self.assertTrue(any(f'{host} --opt {level}:' in failure.expected for failure in failures))
+                if name == 'failing-host-transcripts':
+                    self.assertTrue(all('wasi --opt' in failure.expected for failure in failures))
+                if name == 'failing-js-transcript':
+                    self.assertTrue(all('javascript --opt' in failure.expected for failure in failures))
                 for failure in failures:
                     self.assertRegex(str(failure), r'\.mdx:\d+: expected .+; actual .+')
 
@@ -114,20 +122,29 @@ class RunnerTests(unittest.TestCase):
                 '  src/main.i:2:1: note: related error[E9999]: quoted\n')
         self.assertEqual(runner.DIAGNOSTIC.findall(text), ['E0201'])
 
-    def test_home_page_reuses_the_exact_program(self):
+    def test_home_page_reuses_the_deadline_and_macro_sources(self):
         page = SCRIPTS.parent / 'content/home/index.mdx'
         examples, failures, _ = runner.read_page(page)
         self.assertFalse(failures)
-        primary = next(example.source for example in examples if example.kind == 'run')
-        shared = [example.shared_files for example in examples if example.kind in ('types', 'error') and example.shared_files]
-        self.assertEqual(len(shared), 2)
-        self.assertTrue(all(files['src/main.i'] == primary for files in shared))
+        deadline = next(example for example in examples if example.kind == 'types' and 'remaining = ' in example.source)
+        testing = next(example for example in examples if example.kind == 'test')
+        self.assertEqual(testing.shared_files['src/main.i'], deadline.source)
+        self.assertEqual(deadline.output, 'hello/main.remaining : (Int) <- (Clock, Fail(Late)) -> Int\n')
+        self.assertIn('Clock = (now = () -> Int)', testing.shared_files['clock/src/clock.i'])
+        precise = next(example for example in examples if example.kind == 'types' and 'word = ' in example.source)
+        rejection = next(example for example in examples if example.kind == 'error')
+        self.assertEqual(rejection.shared_files['src/main.i'], precise.source)
         self.assertTrue(all(example.compare_test_output for example in examples if example.kind == 'test'))
         expansion = next(example for example in examples if example.kind == 'expand')
         execution = next(example for example in examples if example.kind == 'run' and 'src/sugar.is' in example.shared_files)
         self.assertEqual(expansion.source, execution.source)
-        self.assertEqual(expansion.files['src/sugar.is'], execution.shared_files['src/sugar.is'])
+        definition_check = next(example for example in examples if example.kind == 'check')
+        self.assertEqual(definition_check.files['src/sugar.is'], execution.shared_files['src/sugar.is'])
         self.assertEqual(sum(example.hosts for example in examples), 1)
+        hosts = next(example for example in examples if example.hosts)
+        self.assertEqual(hosts.host_outputs, dict.fromkeys(('native', 'wasi', 'javascript'), '2 min left\n'))
+        self.assertNotIn('Port', page.read_text())
+        self.assertFalse((page.parent / 'examples/port').exists())
 
     def test_output_titles_and_host_metadata(self):
         for info in ('text', 'text title="native / WASI / JavaScript"'):

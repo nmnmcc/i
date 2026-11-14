@@ -2,4 +2,5 @@
 	i/stdio
 	sugar = (if) = hello/sugar
 )
-main = () { stdio.print(if(1 < 2, "yes", "no")) }
+unit = (n) { if(n == 1, "minute", "minutes") }
+main = () { stdio.print(unit(2)) }

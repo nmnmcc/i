@@ -57,6 +57,7 @@ class Example:
     shared_files: dict = field(default_factory=dict)
     compare_error_output: bool = False
     hosts: bool = False
+    host_outputs: dict = field(default_factory=dict)
 
 
 def read_page(page):
@@ -97,18 +98,28 @@ def read_page(page):
             if kind in ('run', 'test-fails', 'types', 'format', 'expand') or compare_test_output or compare_error_output:
                 following = index + 1
                 # A failure transcript may show the reproduction command first.
-                if kind == 'test-fails':
+                if kind == 'test-fails' or (kind == 'run' and 'hosts' in options):
                     while following < len(blocks) and blocks[following].info.split()[0:1] == ['sh']:
                         following += 1
                 if following >= len(blocks) or not output_info(blocks[following].info) or not blocks[following].closed:
                     raise ValueError(kind + ' needs a closed text fence after it')
                 output = blocks[following].source
+            host_outputs = {}
+            if options.get('transcripts') == 'hosts':
+                following = index + 1
+                for host in ('native', 'wasi', 'javascript'):
+                    while following < len(blocks) and blocks[following].info.split()[0:1] == ['sh']:
+                        following += 1
+                    if following >= len(blocks) or not blocks[following].closed or not output_info(blocks[following].info):
+                        raise ValueError('transcripts=hosts needs native, WASI and JavaScript text fences, in that order')
+                    host_outputs[host] = blocks[following].source
+                    following += 1
             shared_files = project_sources(page, options['project']) if 'project' in options else {}
             package = options.get('package')
             environment = {key[4:]: value for key, value in options.items() if key.startswith('env.')}
             examples.append(Example(page, block.line, kind, block.source, files, output, codes,
                                     package, path, environment, compare_test_output, shared_files, compare_error_output,
-                                    'hosts' in options))
+                                    'hosts' in options, host_outputs))
         except ValueError as error:
             failures.append(Failure(page, block.line, 'a valid example fence', str(error)))
     for name, block in pending.items():
@@ -224,11 +235,15 @@ def host_commands(binary, opt, project, environment):
         f'import {{ instantiate }} from {json.dumps((ROOT / "bindings/javascript/ilang.mjs").as_uri())};\n'
         'const app = await instantiate(await readFile(new URL("./build/javascript.wasm", import.meta.url)),\n'
         '  { standardServices: true });\nawait app.run();\n')
+    (project / 'wasi-run.mjs').write_text(
+        f'import {{ runWasi }} from {json.dumps((ROOT / "bindings/javascript/wasi-run.mjs").as_uri())};\n'
+        'process.exitCode = await runWasi(process.argv[2], JSON.parse(process.argv[3] ?? "{}"));\n')
     for host, target in (('wasi', 'wasi'), ('javascript', 'host')):
         output = 'build/' + host + '.wasm'
         build = [str(binary), 'build', '--offline', '--opt', str(opt), '--target', target, '--out', output]
-        run = ([node, '--no-warnings', str(ROOT / 'bindings/javascript/wasi-run.mjs'), output,
-                json.dumps({'env': environment})] if host == 'wasi' else [node, str(host_driver)])
+        run = ([node, '--no-warnings', 'wasi-run.mjs', output]
+               + ([json.dumps({'env': environment})] if environment else [])
+               if host == 'wasi' else [node, 'host-run.mjs'])
         yield host, build, run
 
 
@@ -303,8 +318,9 @@ def run_example(example, binary, timeout=TIMEOUT):
                                                     f'exit {status}, stdout={stdout!r}, stderr={stderr!r}'))
                             continue
                         status, stdout, stderr = invoke(run, project, max(.001, deadline - time.monotonic()), example.environment)
-                        if status != 0 or not output_matches(example.output, stdout):
-                            failures.append(Failure(example.page, example.line, f'{host} --opt {opt}: exit 0 and stdout={example.output!r}',
+                        host_output = example.host_outputs.get(host, example.output)
+                        if status != 0 or not output_matches(host_output, stdout):
+                            failures.append(Failure(example.page, example.line, f'{host} --opt {opt}: exit 0 and stdout={host_output!r}',
                                                     f'exit {status}, stdout={stdout!r}, stderr={stderr!r}'))
                 except (OSError, ValueError, TimeoutError) as error:
                     failures.append(Failure(example.page, example.line, f'host runs --opt {opt} within the example deadline', str(error)))

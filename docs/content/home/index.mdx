@@ -1,169 +1,153 @@
 ---
 title: i — the language for the rest of us
-description: "Enough: functions, data, checked types and services, compiled to WebAssembly."
+description: "Functions, data, checked types and services, compiled to WebAssembly."
 ---
 
 <div className="home-page">
-<section className="home-hero" aria-labelledby="home-title">
-<div className="hero-copy">
+<div className="home-intro">
 <p className="home-eyebrow">The i programming language</p>
-<h1 id="home-title">The language for the rest of us</h1>
-<p className="hero-position"><strong>Enough.</strong></p>
-<p className="hero-explanation">Run with <code>PORT=8080</code>. No parameter, result, or service annotations.</p>
-<div className="home-actions">
-<a className="home-button home-button-primary" href="/docs/tour">Read the tour</a>
-<a className="home-button" href="/docs/getting-started/install">Install</a>
+<h1>The language for the rest of us</h1>
+<fieldset className="home-selector" aria-label="Choose an example">
+<legend hidden>Examples</legend>
+<label className="home-choice" htmlFor="choice-simple">
+<input type="radio" name="home-example" id="choice-simple" value="simple" aria-controls="panel-simple" aria-labelledby="title-simple" aria-describedby="description-simple" defaultChecked={true} />
+<span className="choice-title" id="title-simple">Simple enough</span><br />
+<span className="choice-description" id="description-simple">Functions, data and a few symbols. That's the language.</span>
+</label>
+<label className="home-choice" htmlFor="choice-safe">
+<input type="radio" name="home-example" id="choice-safe" value="safe" aria-controls="panel-safe" aria-labelledby="title-safe" aria-describedby="description-safe" />
+<span className="choice-title" id="title-safe">Safe enough</span><br />
+<span className="choice-description" id="description-safe">The type shows what a function needs and how it can fail.</span>
+</label>
+<label className="home-choice" htmlFor="choice-testable">
+<input type="radio" name="home-example" id="choice-testable" value="testable" aria-controls="panel-testable" aria-labelledby="title-testable" aria-describedby="description-testable" />
+<span className="choice-title" id="title-testable">Testable enough</span><br />
+<span className="choice-description" id="description-testable">Hand a function a fake clock.</span>
+</label>
+<label className="home-choice" htmlFor="choice-precise">
+<input type="radio" name="home-example" id="choice-precise" value="precise" aria-controls="panel-precise" aria-labelledby="title-precise" aria-describedby="description-precise" />
+<span className="choice-title" id="title-precise">Precise enough</span><br />
+<span className="choice-description" id="description-precise">Types say what values can be, no more.</span>
+</label>
+<label className="home-choice" htmlFor="choice-extensible">
+<input type="radio" name="home-example" id="choice-extensible" value="extensible" aria-controls="panel-extensible" aria-labelledby="title-extensible" aria-describedby="description-extensible" />
+<span className="choice-title" id="title-extensible">Extensible enough</span><br />
+<span className="choice-description" id="description-extensible">Write your own if when you need one.</span>
+</label>
+<label className="home-choice" htmlFor="choice-fast">
+<input type="radio" name="home-example" id="choice-fast" value="fast" aria-controls="panel-fast" aria-labelledby="title-fast" aria-describedby="description-fast" />
+<span className="choice-title" id="title-fast">Fast enough</span><br />
+<span className="choice-description" id="description-fast">Compiles to WebAssembly and runs where you need it.</span>
+</label>
+</fieldset>
 </div>
-<div className="hero-signature" aria-label="Inferred types">
-<div hidden>
-```i types project=examples/port package=hello title="src/probe.i"
-(
-	hello/main
-)
-```
-</div>
-
-```text title="i check --types"
-hello/main.read_port : (String) <- (Fail(BadPort | process.ProcessError), i/request.Await, i/request.Owner, process.Environment) -> Int
-hello/main.main : () <- (Fail(stdio.StdioError), i/request.Await, i/request.Owner, process.Environment, stdio.Stdio) -> Nil
-```
-</div>
-</div>
-<div className="hero-example">
-```i run package=hello env.PORT=8080 title="src/main.i"
-(
-	i/process
-	i/fail
-	i/stdio
-	std/int
-)
-
-(
-	read_port
-	BadPort(..)
-)
-BadPort = ()
-read_port = (name) {
-	int.parse(process.env(name)) |>
-		(Ok(port) ? port > 0 && port < 65536) { port }
-		| (_) { fail.raise(BadPort) }
-}
-main = () {
-	text = fail.catch(() { read_port("PORT") }) |>
-		(Ok(port)) { "port " <> int.to_string(port) }
-		| (Error(_)) { "invalid PORT" }
-	stdio.print(text)
-}
-```
-
-```text title="PORT=8080 i run"
-port 8080
-```
-</div>
-</section>
-
-<section className="home-carousel" data-home-carousel="" role="region" aria-roledescription="carousel" aria-label="Enough, in six examples">
-<div className="carousel-controls" data-carousel-controls="" data-page-chrome="" hidden>
-<button type="button" data-carousel-previous="" aria-label="Previous example" aria-controls="home-examples">←</button>
-<output data-carousel-position="" aria-live="polite" aria-atomic="true">1 / 6</output>
-<button type="button" data-carousel-next="" aria-label="Next example" aria-controls="home-examples">→</button>
-</div>
-<div className="carousel-track" id="home-examples" data-carousel-track="" role="group" aria-label="Example slides" tabIndex={0}>
-<article className="carousel-slide" data-home-slide="1" role="group" aria-roledescription="slide" aria-label="1 of 6" tabIndex={0}>
-<h2>Simple enough</h2>
-<p>Functions, data and a few symbols make a program.</p>
-<div className="slide-example">
+<div className="home-display">
+<div className="example-stage">
+<section className="example-panel" id="panel-simple" aria-labelledby="title-simple">
 ```i run package=hello title="src/main.i"
 (
 	i/stdio
 	std/int
 )
-Num = (Int)
-Add = (Expr, Expr)
-Mul = (Expr, Expr)
-Expr = Num | Add | Mul
-eval =
-	(Num(n)) { n }
-	| (Add(a, b)) { eval(a) + eval(b) }
-	| (Mul(a, b)) { eval(a) * eval(b) }
+Ready = ()
+Waiting = (Int)
+message =
+	(Ready) { "ready" }
+	| (Waiting(minutes)) { int.to_string(minutes) <> " min left" }
 main = () {
-	Mul(Add(Num(1), Num(5)), Num(7)) |> eval |> int.to_string |> stdio.print
+	stdio.print(message(Ready))
+	stdio.print(message(Waiting(2)))
 }
 ```
 
 ```text title="i run"
-42
+ready
+2 min left
 ```
-</div>
-</article>
-<article className="carousel-slide" data-home-slide="2" role="group" aria-roledescription="slide" aria-label="2 of 6" tabIndex={0}>
-<h2>Safe enough</h2>
-<p>The type shows what a function needs and how it can fail.</p>
-<div className="slide-example">
-```i error E0501 stderr=exact project=examples/port package=hello title="src/probe.i"
+</section>
+<section className="example-panel" id="panel-safe" aria-labelledby="title-safe">
+```i types project=examples/deadline package=hello title="src/main.i"
 (
-	app = hello/main
+	i/fail
+	clock = (Clock) = clock/clock
 )
 
 (
-	pure
+	remaining
+	Late(..)
 )
-pure : () -> Int = () { app.read_port("PORT") }
+Late = ()
+remaining = (deadline) {
+	left = deadline - clock.now()
+	left |> (n ? n < 0) { fail.raise(Late) } | (n) { n }
+}
 ```
 
-```text title="i check"
-src/probe.i:8:1: error[E0501]: `app.BadPort` is not a subtype of `Never`
-1 error
+```text title="i check --types"
+hello/main.remaining : (Int) <- (Clock, Fail(Late)) -> Int
 ```
-</div>
-</article>
-<article className="carousel-slide" data-home-slide="3" role="group" aria-roledescription="slide" aria-label="3 of 6" tabIndex={0}>
-<h2>Testable enough</h2>
-<p>Hand a function a fake clock.</p>
-<div className="slide-example">
-```i test stdout=exact package=hello title="test/clock_test.i"
+</section>
+<section className="example-panel" id="panel-testable" aria-labelledby="title-testable">
+```i test stdout=exact project=examples/deadline package=hello title="test/deadline_test.i"
 (
 	testlib = (test) = std/test
+	i/fail
+	app = hello/main
+	(Clock) = clock/clock
 )
-Clock = (now = () -> Int)
-elapsed = (start) <- (clock : Clock) { clock.now() - start }
 test("a fake clock", () {
-	assert(elapsed(40) == 2) <- (Clock(now = () { 42 }))
+	{
+		assert(app.remaining(42) == 2)
+		expired = fail.catch(() { app.remaining(30) })
+		assert(expired == Error(app.Late))
+	} <- (Clock(now = () { 40 }))
 })
 ```
 
 ```text title="i test"
-pass hello/clock_test.a fake clock
+pass hello/deadline_test.a fake clock
 1 passed, 0 failed
 ```
-</div>
-</article>
-<article className="carousel-slide" data-home-slide="4" role="group" aria-roledescription="slide" aria-label="4 of 6" tabIndex={0}>
-<h2>Precise enough</h2>
-<p>Types say what values can be, no more.</p>
-<div className="slide-example">
+</section>
+<section className="example-panel" id="panel-precise" aria-labelledby="title-precise">
 ```i types package=hello title="src/main.i"
 (
 	word
 )
-word = (number) { number |> (0) { "zero" } | (1) { "one" } }
+word = (n) { n |> (0) { "zero" } | (1) { "one" } }
 ```
 
 ```text title="i check --types"
 hello/main.word : (0 | 1) -> "one" | "zero"
 ```
-</div>
-</article>
-<article className="carousel-slide" data-home-slide="5" role="group" aria-roledescription="slide" aria-label="5 of 6" tabIndex={0}>
-<h2>Extensible enough</h2>
-<p>Write your own <code>if</code> when you need one.</p>
-<div className="slide-example">
-```scheme file=src/sugar.is title="src/sugar.is"
-(, if)
-(= _branches
-  (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
-(@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
+
+```i error E0501 stderr=exact project=examples/words package=hello title="src/probe.i"
+(
+	app = hello/main
+)
+bad = { app.word }(2)
 ```
+
+```text title="i check"
+src/probe.i:4:20: error[E0501]: `2` is not a subtype of `0 | 1` (the type at 4:7 needs it)
+1 error
+```
+</section>
+<section className="example-panel" id="panel-extensible" aria-labelledby="title-extensible">
+```i run project=examples/sugar package=hello title="src/main.i"
+(
+	i/stdio
+	sugar = (if) = hello/sugar
+)
+unit = (n) { if(n == 1, "minute", "minutes") }
+main = () { stdio.print(unit(2)) }
+```
+
+<div hidden>
+```text
+minutes
+```
+</div>
 
 <div hidden>
 ```i expand project=examples/sugar package=hello title="src/main.i"
@@ -171,7 +155,8 @@ hello/main.word : (0 | 1) -> "one" | "zero"
 	i/stdio
 	sugar = (if) = hello/sugar
 )
-main = () { stdio.print(if(1 < 2, "yes", "no")) }
+unit = (n) { if(n == 1, "minute", "minutes") }
+main = () { stdio.print(unit(2)) }
 ```
 </div>
 
@@ -182,41 +167,67 @@ main = () { stdio.print(if(1 < 2, "yes", "no")) }
 	sugar = (if) = hello/sugar
 )
 
-main = () { stdio.print(1 < 2 |> (True) { "yes" } | (False) { "no" }) }
+unit = (n) { n == 1 |> (True) { "minute" } | (False) { "minutes" } }
+
+main = () { stdio.print(unit(2)) }
 
 ```
 
+<details className="macro-definition">
+<summary>Lisp surface: src/sugar.is</summary>
+```scheme file=src/sugar.is title="src/sugar.is"
+(, if)
+(@ macro
+  (= if
+    (-> (, c a b) _
+      {(= yes `(-> (, True) _ ~a))
+       (= no `(-> (, False) _ ~b))
+       `(|> ~c (| ~yes ~no))})))
+```
+</details>
+
 <div hidden>
-```i run project=examples/sugar package=hello title="src/main.i"
+```i check project=examples/sugar package=hello title="src/main.i"
 (
 	i/stdio
 	sugar = (if) = hello/sugar
 )
-main = () { stdio.print(if(1 < 2, "yes", "no")) }
-```
-
-```text title="i run"
-yes
+unit = (n) { if(n == 1, "minute", "minutes") }
+main = () { stdio.print(unit(2)) }
 ```
 </div>
-</div>
-</article>
-<article className="carousel-slide" data-home-slide="6" role="group" aria-roledescription="slide" aria-label="6 of 6" tabIndex={0}>
-<h2>Fast enough</h2>
-<p>Compiles to WebAssembly and runs where you need it.</p>
-<div className="slide-example">
-```i run hosts=native,wasi,javascript package=hello title="src/main.i"
+</section>
+<section className="example-panel" id="panel-fast" aria-labelledby="title-fast">
+```i run hosts=native,wasi,javascript transcripts=hosts package=hello title="src/main.i"
 (
 	i/stdio
 )
-main = () { stdio.print("hello from i") }
+main = () { stdio.print("2 min left") }
 ```
 
-```text title="native / WASI / JavaScript"
-hello from i
+<div className="host-run">
+<pre className="host-command">{"i run --offline --opt 0"}</pre>
+```text title="Native"
+2 min left
 ```
 </div>
-</article>
+<div className="host-run">
+<pre className="host-command">{"i build --offline --target wasi --opt 0 \\\n  --out build/wasi.wasm 2>/dev/null\nnode --no-warnings wasi-run.mjs build/wasi.wasm"}</pre>
+```text title="WASI"
+2 min left
+```
+</div>
+<div className="host-run">
+<pre className="host-command">{"i build --offline --target host --opt 0 \\\n  --out build/javascript.wasm 2>/dev/null\nnode host-run.mjs"}</pre>
+```text title="JavaScript"
+2 min left
+```
 </div>
 </section>
+</div>
+<div className="home-actions">
+<a className="home-button home-button-primary" href="/docs/tour">Read the tour</a>
+<a className="home-button" href="/docs/getting-started/install">Install</a>
+</div>
+</div>
 </div>

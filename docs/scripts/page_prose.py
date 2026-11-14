@@ -92,7 +92,7 @@ def example_count(path, content):
 
 def budget(path, area):
     if area == 'home':
-        return 220, None, None
+        return 120, None, None
     if area == 'tour':
         return 450, 6, None
     if area == 'getting-started':
