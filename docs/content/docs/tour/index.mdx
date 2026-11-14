@@ -1,5 +1,77 @@
 ---
 title: A tour of the language
+description: Learn the language through small programs that you can run in one scratch project.
 ---
 
-to be written
+This tour introduces i to programmers who already know another language, such as TypeScript, Go, Rust, or OCaml. Each page starts with a complete program, then explains the forms it uses. By the end, you can read an i module, write functions over your own data, and follow the later pages on services, tasks, and libraries.
+
+```i run
+(
+	i/stdio
+)
+
+main = () { stdio.print("Hello from the tour!") }
+```
+
+```text
+Hello from the tour!
+```
+
+The opening group imports `i/stdio`; `main` is the program entry, and `stdio.print` writes a line. You do not need to understand the printing service yet. Keep that import and call while you experiment with the values between them. The [services and errors page](/docs/tour/services-and-errors) explains what printing needs from its caller.
+
+## Run the examples
+
+The tour assumes that `i` is installed and available in your shell. See [installation](/docs/getting-started/install) if it is not. It assumes familiarity with calling functions, basic types, and source files, but no previous knowledge of i or WebAssembly.
+
+Make one scratch project:
+
+```sh
+i new tour
+cd tour
+```
+
+Replace `src/main.i` with the complete example above, then run it from the project directory:
+
+```sh
+i run
+```
+
+The output is the text shown immediately below the example. Keep this project for the rest of the tour: replace `src/main.i` with each complete program in turn. The examples on the first four pages use the built-in `i/…` modules and need no extra dependency. A later page explains any additional files its example needs.
+
+A fence marked `i run` is a complete program. A fence marked `i error` is a complete program that the checker rejects on purpose; use `i check` for it and compare the diagnostic with the explanation. Do not combine the programs into one file: each defines its own names and usually its own `main`.
+
+Format your current program with:
+
+```sh
+i fmt
+```
+
+Formatting makes the line breaks and spaces consistent, which helps when comparing your code with the examples. To check it without running it, use `i check`. The [types page](/docs/tour/types-and-inference) also shows how to ask the checker for inferred types.
+
+## Read in this order
+
+1. [Values and data](/docs/tour/values-and-data) introduces names, numbers, strings, records, lists, and labelled data.
+2. [Functions and branches](/docs/tour/functions-and-branches) explains calls, patterns, choices, recursion, and pipelines.
+3. [Types and inference](/docs/tour/types-and-inference) shows type definitions, annotations, generic functions, and the types inferred from code.
+4. [Services and errors](/docs/tour/services-and-errors) explains how functions state their needs and how callers provide them.
+5. [Resources](/docs/tour/resources) covers acquiring and releasing resources.
+6. [Concurrency](/docs/tour/concurrency) introduces structured tasks and communication between them.
+7. [Macros](/docs/tour/macros) shows how i code works with code.
+8. [Packages](/docs/tour/packages) explains modules, dependencies, and the package file.
+
+The pages build on one another, so follow the order on a first reading. Afterward, use the standard links at the end of each page for exact grammar and rules. The tour teaches a small working program at a time; the standard defines the language in full.
+
+## Ideas behind the language
+
+- **No keywords:** names, brackets, and symbols express definitions, calls, and branches.
+- **Immutable values:** every value stays the same, so an update constructs a new value.
+- **Explicit needs:** services are passed as needs and provided with `<-`.
+- **Structured concurrency only:** concurrent work belongs to the structure that starts it.
+- **No library is special to the compiler:** library APIs use the general language forms.
+
+These ideas appear where the examples first need them. The language and its implementation are also under development; [contributing](/docs/contributing) explains how to report a problem or take part in the work.
+
+## See also
+
+- [Words and symbols, standard §1](/docs/standard/generated/chapter-1).
+- Next: [Values and data](/docs/tour/values-and-data).
