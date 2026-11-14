@@ -109,6 +109,10 @@ The SDK handles value encoding, buffers, and the asynchronous entry protocol. Aw
 
 Keep the host build and WASI build distinct when integrating them into a larger project: the SDK reads the host ABI metadata, while a WASI runtime starts a command. Use separate `--out` paths when both artifacts need to remain available.
 
+## Current limits
+
+The standard specifies a generated loader `name.mjs` with `name.d.ts` for the `js` and `nodejs` targets, and a built-in `@js` declaration ([§B.6.1](/docs/standard/generated/chapter-appendix-b#section-b-6-1)). The compiler on this tree does not generate them and refuses `@js`: a build writes the Wasm module and `name.bindings.json`, and JavaScript loads the module through the Host SDK as shown above. This difference from the standard is recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (DOC3).
+
 ## See also
 
 Read [the host boundary, §10](/docs/standard/generated/chapter-10) for exportable types and [Appendix B](/docs/standard/generated/chapter-appendix-b) for encoding and entry protocols. Return to the [guide index](/docs/guides), or see [building and testing](/docs/contributing/building-and-testing) to work on the hosts and their checks.
