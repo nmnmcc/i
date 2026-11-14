@@ -65,5 +65,23 @@
   "second_static_contexts": 29748,
   "second_inline_contexts": 36421,
   "second_pending_static": 0,
-  "second_pending_inline": 0
+  "second_pending_inline": 0,
+  "final_audits": [
+    {
+      "kind": "static",
+      "contexts": 29748,
+      "pending_sites": 0,
+      "baseline": "tyalt-main2-final-audit.jsonl.gz",
+      "sha256": "c3fd9f4e91510d0dce8a877411c459b9089ed160efb8b4a7b9ad6c83ef4bde02",
+      "intentional_new_rule_examples": 0
+    },
+    {
+      "kind": "inline",
+      "contexts": 36572,
+      "pending_sites": 0,
+      "baseline": "tyalt-main2-inline-final-audit.jsonl.gz",
+      "sha256": "ce2a25f224bb7f83f29c207cffe5a0c8016a298ae17780dc254e024a28f5f6ee",
+      "intentional_new_rule_examples": 11
+    }
+  ]
 }
