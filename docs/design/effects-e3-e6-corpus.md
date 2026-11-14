@@ -140,6 +140,16 @@ Spec §9.9 gives `run` the type
 the callback's Scheduler is supplied inside run, not required from its
 caller. E6's `make_start` annotation now propagates opaque N to its caller,
 and the current `run` implementation leaks Scheduler through it.
+`review-r2/never_yields` exposes the same defect through `task.test`: its
+main gains Scheduler beside the existing Fail(ScheduleError), Io and Runner.
+`review-r2/determinism`, one of the original 919 display cases, has the same
+extra Scheduler need. Its apparent display change is **b**, not an allowed
+simplification: the baseline is restored pending this repair.
+The adjacent §9.9 `test` signature likewise lists Scheduler, Runner, Await,
+Owner and Root among the services provided to the callback, leaving residual
+N, Fail(E | ScheduleError) and Runner at the caller. All three old baselines
+are retained. Events and never_yields belonged to the original 16 timeout
+cases; determinism belonged to the original 919 display-only cases.
 
 An isolated checker probe confirms the contract failure (a proposed positive
 regression, currently failing):
@@ -151,16 +161,17 @@ only_runner: (() <- (task.Scheduler) -> Nil) <- (task.Runner) -> Nil =
 ```
 
 This must typecheck under §9.9; it currently rejects with E0501,
-`task.Scheduler is not a subtype of task.Runner`. The existing native-case
-baseline is retained. The initial lane ownership rule prohibits editing
+`task.Scheduler is not a subtype of task.Runner`. The corresponding test
+wrapper also rejects with E0501 against Fail(ScheduleError) | Runner.
+The initial lane ownership rule prohibits editing
 `lib/i/**`; the coordinator status file requests the E6/library owner's
 repair or a scope change. No failing regression is disguised as a passing
 test and no expectation is rerecorded to bless this contract discrepancy.
 
-The unapplied [four-signature proposal](effects-e3-e6-task-run.patch)
+The unapplied [four-signature proposal and two regression fixtures](effects-e3-e6-task-run.patch)
 separates the internally supplied services from residual N in `make_start`,
 `execute_body`, `execute`, and `run`. An isolated copy of the module
-typechecks the Runner-only case and a positive case also supplying Dep;
+typechecks the Runner-only run/test cases and a positive case also supplying Dep;
 omitting Dep still rejects with E0501. The copy replaces the 17 privileged
 runtime imports with Never-returning stubs of their original types, so this
 is a type-only proposal check, not a rebuilt compiler or a runtime test.
@@ -188,7 +199,11 @@ Commands used for this audit (H is `/home/agent/Programming/i/.rd/cache/heavy`):
 | `python3 -m py_compile scripts/qa/corpus.py` | pass |
 | `direnv exec /home/agent/Programming/i rustfmt --check --edition 2024 crates/ilang-check/tests/row_schemes.rs` | pass |
 | `./target/release/i fmt --check tests/review/cases/review-k4-lane/alias_kind_error/src/main.i tests/review/cases/review-k4s/std/src/log.i tests/review/cases/review-k4s/std/test/stream_test.i` | pass |
-| `git diff --check` | pass at each committed checkpoint |
+| `git diff --check` | pass; patch context whitespace was corrected using a zero-context artifact |
+| `git apply --check --unidiff-zero docs/design/effects-e3-e6-task-run.patch` | pass; unapplied proposal only |
+| `./target/release/i fmt --check target/e4-task-run-candidate.i target/e4-proposed-regressions` | pass |
+| `prlimit --cpu=10:11 ./target/release/i check --offline --project target/e4-task-contract-actual --types` | rejects with two E0501; confirms unfixed run/test contract |
+| `prlimit --cpu=10:11 ./target/release/i check --offline --project target/e4-task-run-contract --types` | copied module: run/test and Dep-present positives pass; Dep-absent control rejects E0501; privileged imports require the documented type-only stubs |
 
 Corpus updates use `UPDATE=1 python3 scripts/qa/corpus.py run --binary
 ./target/release/i --case-list GROUP.json --filter PREFIX --jobs JOBS
@@ -215,25 +230,95 @@ checks successfully; its original O0/O2 resource-censored test outcomes
 remain at the same 10-second bound. The suite collector produces 1,446
 generated test bindings both before and after migration.
 
-The isolated timeout reruns, remaining per-group updates, exact 919-case
-display classifications and fingerprint-only restoration follow. Until they
-finish this section is an audit in progress, not a claim that the full
-requested corpus integration is green.
+All 919 original display-only cases have complete bounded reruns, exact
+diagnostic-multiset/runtime-output audits, and one-line explanations below.
+There are 918 justified display updates and one held library-contract
+defect, determinism. No expectation is recorded for that defect.
+All 1,009 original fingerprint-only files retain their original bytes.
+Across all 1,973 records, every saved bound is unchanged. The original
+16 timeout cases were rerun alone; 25 cases censored during those runs or
+the display runs received a second isolated attempt with Binaryen limited
+to one worker. Sixteen clear completely, six remain CPU-censored, and three
+complete but expose the library-contract defect above. The original
+baselines of those nine cases remain intact. No third diagnostic retry or
+bound increase is made. The initial default-pool scheduler group returned
+failure for CPU-censored accept requirements; its completed results were
+audited individually rather than treating UPDATE mode's exit as proof of
+successful execution. The full requested integration is not green until
+the library owner repairs the contract and the six remaining resource
+cases can be verified at the same bounds.
+
+<!-- resource-audit -->
+
+## Resource reruns
+
+All 16 cases identified as timeouts in the coordinator run were rerun
+alone, at the same saved CPU bounds. Additional censored cases from
+the display runs were retried alone as well. Binaryen defaults to a
+worker for every available core, independently of RAYON_NUM_THREADS
+(`crates/ilang-binaryen/binaryen/src/support/threads.cpp:156-176`).
+The final isolated retry sets BINARYEN_CORES=1; no CPU limit,
+optimization level, source assertion or semantic requirement changes.
+CORPUS_BOUND_SCALE is unset (1). The 10-second CPU limit remains
+`prlimit --cpu=10:11`, with the existing wall-time backstop.
+
+CPU-censored cases after that retry: 6. The three library-contract
+defects are listed separately. A censored phase
+is never recorded as a new passing expectation.
+
+| Case | Final same-bound result |
+|---|---|
+| `review-k4/perf/wide_2048` | all original exits preserved; fingerprint-only file restored |
+| `review-native3/_loose/design-cases/borrowed-request` | test2: exit 1 -> timeout; old baseline retained |
+| `review-native3/_loose/design-cases/events` | §9.9 run/test contract defect; original baseline retained; library-owner repair pending |
+| `review-native3/_loose/design-cases/paths` | run2: exit 0 -> timeout; old baseline retained |
+| `review-r2/cancel_send` | test2: exit 0 -> timeout; old baseline retained |
+| `review-r2/dag_16` | all original exits preserved; fingerprint-only file restored |
+| `review-r2/dag_20` | all original exits preserved; fingerprint-only file restored |
+| `review-r2/deep_50` | all original exits preserved; fingerprint-only file restored |
+| `review-r2/join_failure` | all original exits preserved; fingerprint-only file restored |
+| `review-r2/lifetime` | test2: exit 0 -> timeout; old baseline retained |
+| `review-r2/never_yields` | §9.9 run/test contract defect; original baseline retained; library-owner repair pending |
+| `review-r2/senders_128` | all original exits preserved; task.Scope(E) → task.Group(E), syntax-three §2.10.9 (D8) |
+| `review-r2/senders_16` | all original exits preserved; task.Scope(E) → task.Group(E), syntax-three §2.10.9 (D8) |
+| `review-r2/shield_nested` | test2: exit 0 -> timeout; old baseline retained |
+| `review-r2/tasks_5000` | all original exits preserved; task.Scope(E) → task.Group(E), syntax-three §2.10.9 (D8) |
+| `review-t1/stress-keys-2000` | test2: exit 0 -> timeout; old baseline retained |
+| `review-k4-lane/w10-Dep` | all original exits preserved; shown-type change covered in the display inventory |
+| `review-k4/cases/provision_helper_True` | all original exits preserved; shown-type change covered in the display inventory |
+| `review-k4d/proj/q1` | all original exits preserved; shown-type change covered in the display inventory |
+| `review-k4d/proj/q10` | all original exits preserved; shown-type change covered in the display inventory |
+| `review-k4-lane/unused-True` | all original exits preserved; fingerprint-only file restored |
+| `review-k4-lane/w14-Never` | all original exits preserved; fingerprint-only file restored |
+| `review-k4-lane/w9-Dep` | all original exits preserved; fingerprint-only file restored |
+| `review-r2/deadlock` | all original exits preserved; fingerprint-only file restored |
+| `review-r2/determinism` | §9.9 run/test contract defect; original baseline retained; library-owner repair pending |
+| `review-r2/nonportable_result` | all original exits preserved; fingerprint-only file restored |
+| `review-r2/request_groups` | all original exits preserved; fingerprint-only file restored |
+| `review-r2/senders_1000` | all original exits preserved; task.Scope(E) → task.Group(E), syntax-three §2.10.9 (D8) |
+| `review-r2/senders_64` | all original exits preserved; task.Scope(E) → task.Group(E), syntax-three §2.10.9 (D8) |
+| `review-r2/tasks_1000` | all original exits preserved; task.Scope(E) → task.Group(E), syntax-three §2.10.9 (D8) |
+
+The vendored std case separately retains its pre-existing O0/O2 test
+censors. Its successful checker and unchanged 1,446 generated tests
+do not establish that those runtime tests finish within ten seconds.
 
 <!-- display-inventory -->
 
-## Display-only groups recorded so far
+## Original display inventory: 918 recorded and one held defect
 
 Every listed observation has equal phase sets, phase exits, diagnostic code
 multisets (including duplicate counts), and runtime stdout. Only the checker
 types or diagnostic text change. Groups overlap. The original coordinator
-run has 919 display-only cases; this checkpoint records 915 after
-complete bounded reruns. Remaining per-group runs are still in progress.
+run has 919 display-only cases; 918 justified updates are recorded after
+complete bounded reruns; the remaining case, determinism, completed too but
+is held as the §9.9 library-contract defect B1. All 919 are listed below.
 CPU-censored observations retain their old baselines and are not counted
 as completed display-only reruns.
 
-| Group | Cases so far | Exact displayed change and controlling paragraph |
+| Group | Cases | Exact displayed change and controlling paragraph |
 |---|---:|---|
+| B1 | 1 | determinism gains task.Scheduler through run/test contrary to the explicit spec §9.9 callback-supplied service types. Old baseline retained; requires the library-owner fix and regression above. |
 | D1 | 856 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain. Merging two callbacks combines their whole rows, without a separate `Fail(E | E2)` carrier. R1 (syntax-three §6.1); subsequent variable renumbering follows §4.7. |
 | D2 | 111 | Directed bounds are shown without redundant variables: read-only `S(N & A)` becomes `S(N)`; a consumer of argument `A` needs `S(A)` rather than a separate bound `S(B)`; `cur : (A & B) <- (State(A & B)) -> B` becomes `(A) <- (State(A)) -> A`; a pure stored callback closes its residual N to Never. Inferred E/A labels can change. Spec §4.7 simplification, §4.5 rule 4 needs direction, §9.2 provider subtyping; R1 removes the independent error bounds. |
 | D3 | 9 | Only canonical type-variable labels change after the independent error carrier disappears; the shown type is equivalent by renaming. R1 and spec §4.7. |
@@ -241,7 +326,7 @@ as completed display-only reruns.
 | D5 | 3 | Recovery diagnostics retain a known String argument: `S(_, _)` becomes `S(String, _)` against the same incompatible `S(1, Never)`. Same E0515 site and invariant mismatch; ordinary incoming bounds survive single-row inference. R1, spec §4.7 monomorphic variables show their incoming types, §4.5 rule 4 and §9.2. |
 | D6 | 2 | The obsolete independent error parameter disappears from `Boundary(R, E, N)`, now `Boundary(R, N)` (and likewise Continuation). Syntax-three §2.10.7 explicitly gives these two- and three-parameter forms, and R1 puts any Fail entry in N. |
 | D7 | 5 | The single-row solver reports the incompatible leaf instead of the enclosing recovery summary: g_ann_Never/g_inf_Never show `_` against Never instead of `S(_)`; pl44 shows `_` against the required Int instead of `Cov(_)` against Never. Each E0501 remains at the same callback and annotation sites, with the same count; every separate provider error also remains. R1 changes the constraint graph, while spec §4.5 rule 4 still forbids the needed effect in a pure callback; §4.7 governs displayed incoming bounds. These are recovery projections of the same rejection, not newly accepted annotations. |
-| D8 | 2 | The task scope handle is shown as `task.Group(E)` instead of `task.Scope(E)`. Syntax-three §2.10.9 says the structured-concurrency handle is renamed `task.Group(E)` in stage E5, so Scope in a need always means the resource service; §7.2 row E5 and the spec-change table repeat the rename. Spec §9.9 uses Group(E); task.scope remains the same operation. Runtime output and error counts are unchanged. |
+| D8 | 5 | The task scope handle is shown as `task.Group(E)` instead of `task.Scope(E)`. Syntax-three §2.10.9 says the structured-concurrency handle is renamed `task.Group(E)` in stage E5, so Scope in a need always means the resource service; §7.2 row E5 and the spec-change table repeat the rename. Spec §9.9 uses Group(E); task.scope remains the same operation. Runtime output and error counts are unchanged. |
 | D9 | 3 | Universal service forms disappear under R4 (spec §9.2). The two 1,024-service libraries ignore every `s: S_i(A)`; their unconstrained covariant data arguments reach the universal form, so `f_i`, `u_i` and `wide` show pure `() -> Nil`. In std2/unsafe, `Consumer(A) = ((A) -> Nil)` makes Consumer(Never) universal by function-parameter contravariance (§4.5 rule 4); its row entry disappears, so the result `Sink(Never, Consumer(Never))` is shown as `Sink(Never, Never)`. This preserves the same accepted higher-order value. |
 
 One line per reviewed case:
@@ -1148,8 +1233,11 @@ One line per reviewed case:
 | `review-num/probes` | D6 |
 | `review-num/trace` | D3, D6 |
 | `review-r2/missing_service` | D4 |
+| `review-r2/senders_1000` | D8 |
 | `review-r2/senders_256` | D8 |
 | `review-r2/senders_32` | D8 |
+| `review-r2/senders_64` | D8 |
+| `review-r2/tasks_1000` | D8 |
 | `review-std2/client_nil_error` | D3 |
 | `review-std2/client_no_marker` | D3 |
 | `review-std2/error` | D3 |
@@ -1163,3 +1251,4 @@ One line per reviewed case:
 | `review-std2/unsafe` | D9 |
 | `review-t1/original-stop_tail_service` | D1 |
 | `review-t1/service` | D2 |
+| `review-r2/determinism` | B1 — held; expectation unchanged |
