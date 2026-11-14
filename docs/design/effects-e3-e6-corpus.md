@@ -17,6 +17,13 @@ Spec §9.2's safety promise remains: “Getting it never fails at run time.”
 A greatest form within one constructor does not supply that constructor's key.
 The solver and printed types now retain all such entries, including explicitly
 written `Fail(Never)`, contravariant `Sink(Never)` and unconstrained unused `S`.
+The full-run requirements for `q25`, `q30`, `q35`, and `q40` in each
+of the three K4 prefixes also retain their explicitly written `Fail(Never)`.
+Their exact `use` scheme and runtime stdout assertions stay; only the `fw`
+expectation gains that required key. The other sixteen q21–q40 forms keep
+the original exact scheme requirements. These are R4 display corrections,
+not relaxations of acceptance or provider checks.
+
 The two `review-k4s/min_main_{3,5}_0` entries must again reject a missing `S`;
 the old R4 acceptance justification is withdrawn. The revised unit regression
 keeps both unused cases and the used-head control. Three §9.2 fixtures check
@@ -299,6 +306,8 @@ rule that a test pinning a removed feature keeps its original intent.
 | `review-k4d/proj/b1` | E0515 ×5 | four concrete E0515 + E0225; remove only the inhabited-meet summary `6:1` | a, R2 and R8 |
 | `review-k4d/_loose/p/b10` | E0505 ×2 + E0515 | E0505 + E0515; recursive definition and incompatible provider both remain | a, R1/R5 |
 | `review-k4d/proj/b10` | E0505 ×2 + E0515 | E0505 + E0515; recursive definition and incompatible provider both remain | a, R1/R5 |
+| `review-k4d/_loose/p/m3` | E0515 ×2 | retain concrete provider error `10:48`; retire only method-only empty-meet summary `10:2`; all check/run phases still reject | a, R8; exact site/count regression |
+| `review-k4d/proj/m3` | E0515 ×2 | same retained provider error `10:48`, with check/run rejection unchanged | a, R8; exact site/count regression |
 | `review-k4d/_loose/p/r6` | E0515 ×3 | same three + E0225 for duplicate explicit `S` | a, R2 |
 | `review-k4d/proj/r6` | E0515 ×3 | same three + E0225 for duplicate explicit `S` | a, R2 |
 | `review-k4d/_loose/p/z3` | E0515 ×3 | two concrete E0515; obsolete carrier summary removed | a, R1/R5 |

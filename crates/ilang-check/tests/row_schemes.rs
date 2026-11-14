@@ -16,6 +16,10 @@ fn stage_three_provider_diagnostics_match_landed_conversion() {
         ("review-k4/cases/provision_closure_False", 1, 1),
         ("review-k4d/_loose/p/x8", 2, 2),
         ("review-k4d/_loose/p/b1", 5, 4),
+        // §4.1/R8: the method-only S meet is inhabited; retain the
+        // independent provider mismatch at 10:48 in both corpus copies.
+        ("review-k4d/_loose/p/m3", 1, 1),
+        ("review-k4d/proj/m3", 1, 1),
     ] {
         let dir = root.join(case);
         let source = std::fs::read_to_string(dir.join("src/main.i")).unwrap();

@@ -1859,12 +1859,12 @@
       "outcome": "accept",
       "types_contain": [
         "app/main.use : () <- (S(N), ..N) -> Int",
-        "app/main.fw : () <- (S(N), ..N) -> Int"
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q25$",
       "known_failure": false,
       "finding": "K4 runtime migration: q25",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a Owner decision 2 drops universal-entry removal: retain the explicitly written Fail(Never), as well as the exact principal use/fw schemes and original runtime stdout assertion (effects-e3-e6-corpus.md R4).",
       "origin": "tests/review/k4-migration.json",
       "run_stdout": ""
     },
@@ -1924,12 +1924,12 @@
       "outcome": "accept",
       "types_contain": [
         "app/main.use : () <- (S(N), ..N) -> Int",
-        "app/main.fw : () <- (S(N), ..N) -> Int"
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q30$",
       "known_failure": false,
       "finding": "K4 runtime migration: q30",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a Owner decision 2 drops universal-entry removal: retain the explicitly written Fail(Never), as well as the exact principal use/fw schemes and original runtime stdout assertion (effects-e3-e6-corpus.md R4).",
       "origin": "tests/review/k4-migration.json",
       "run_stdout": ""
     },
@@ -1989,12 +1989,12 @@
       "outcome": "accept",
       "types_contain": [
         "app/main.use : () <- (S(N), ..N) -> Int",
-        "app/main.fw : () <- (S(N), ..N) -> Int"
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q35$",
       "known_failure": false,
       "finding": "K4 runtime migration: q35",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a Owner decision 2 drops universal-entry removal: retain the explicitly written Fail(Never), as well as the exact principal use/fw schemes and original runtime stdout assertion (effects-e3-e6-corpus.md R4).",
       "origin": "tests/review/k4-migration.json",
       "run_stdout": ""
     },
@@ -2054,12 +2054,12 @@
       "outcome": "accept",
       "types_contain": [
         "app/main.use : () <- (S(N), ..N) -> Int",
-        "app/main.fw : () <- (S(N), ..N) -> Int"
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q40$",
       "known_failure": false,
       "finding": "K4 runtime migration: q40",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a Owner decision 2 drops universal-entry removal: retain the explicitly written Fail(Never), as well as the exact principal use/fw schemes and original runtime stdout assertion (effects-e3-e6-corpus.md R4).",
       "origin": "tests/review/k4-migration.json",
       "run_stdout": ""
     },
@@ -2641,7 +2641,7 @@
       "run_stdout": ""
     },
     {
-      "pattern": "^review-k4d/(?:proj|_loose/p)/q(?:2[1-9]|3[0-9]|40)$",
+      "pattern": "^review-k4d/(?:proj|_loose/p)/q(?:2[1-46-9]|3[1-46-9])$",
       "known_failure": false,
       "outcome": "accept",
       "types_contain": [
@@ -3879,6 +3879,28 @@
       ],
       "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
       "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
+    },
+    {
+      "pattern": "^review-std2/replacement_unused$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0225"
+      ],
+      "finding": "Two explicit same-key service values are invalid even when the provided service is unused.",
+      "source": "Spec §9.2: \"An explicit item wins over an item from a spread with the same key; two explicit items, or two spreads, with one key are a compile error.\" See effects-e3-e6-corpus.md R2."
+    },
+    {
+      "pattern": "^review-k4d/(?:proj|_loose/p)/q(?:25|30|35|40)$",
+      "known_failure": false,
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
+      ],
+      "finding": "Principal service/field-access schemes retain the explicitly written Fail(Never) key under Decision 2.",
+      "source": "Owner decision 2: \"Drop the Fail(Never) universal-entry removal.\" Spec §9.2: \"Type checking makes certain that every service is there when a call takes it.\" Retain the exact use and fw scheme assertions, adding only fw's written Fail key. See effects-e3-e6-corpus.md R4.",
+      "origin": "K4 q21–q40 assertions formerly in tests/k4/review.py"
     }
   ],
   "transitions": [
