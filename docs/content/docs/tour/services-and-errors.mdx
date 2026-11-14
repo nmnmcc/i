@@ -156,7 +156,7 @@ Ok(42)
 Error("bad input")
 ```
 
-The callback delays work until `fail.catch` has installed `Fail(E)`; error values can have any type. An unhandled error terminates the program.
+The callback delays work until `fail.catch` has installed `Fail(E)`; error values can have any type. An unhandled error terminates the program. A stop, such as `panic`, also terminates it and escapes `fail.catch`.
 
 ## Result conversion
 
@@ -178,7 +178,7 @@ main = () <- (io : Io) {
 Error(Nil)
 ```
 
-An assertion reports a programming mistake through `Assert`. A stop, such as `panic`, terminates execution and escapes `fail.catch`.
+`result.to_error` raises the `Error` case, so a returned error joins the raised ones.
 
 ## A fixed clock
 
