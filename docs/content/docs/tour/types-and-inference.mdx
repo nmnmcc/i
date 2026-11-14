@@ -73,7 +73,7 @@ main = () {
 ScreenPoint(3, 4)
 ```
 
-Current limits: inspection drops labelled fields’ names (DOC2), a recorded compiler gap ([known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+`core.inspect` currently omits field names from labelled values.
 
 ## Annotations
 
@@ -245,20 +245,19 @@ tour/main.eval : (Expr) -> Int
 
 The same evaluator needs no parameter or result annotation; its patterns and integer operators supply the constraints.
 
-## Type mismatch
+## Type constraints
 
-```i error E0501 package=tour title="src/main.i"
-main = () {
-	count : Int = "seven"
-	count
-}
+```i types package=tour title="src/main.i"
+count : Int = 7
+main = () { count }
 ```
 
 ```text
-E0501
+tour/main.count : Int
+tour/main.main : () -> Int
 ```
 
-An annotation constrains a value; it does not convert it.
+Replacing `7` with a string is a type error; an annotation constrains a value rather than converting it.
 
 ## Field access
 

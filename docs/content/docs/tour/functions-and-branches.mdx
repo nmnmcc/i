@@ -223,7 +223,7 @@ main = () {
 ((0, []), (2, []), (2, [3]))
 ```
 
-Current limits: keyed data patterns (DOC1) and data-rest patterns (P13) are rejected; use field access and list rests ([known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+Record patterns with named fields and `..rest` in record or tuple patterns are not available yet; use field access or list patterns instead.
 
 ## Text patterns
 
@@ -296,16 +296,22 @@ A bit pattern consumes the whole input; an unmarked segment reads eight bits.
 
 ## Coverage
 
-```i error E0516 package=tour title="src/main.i"
-describe = (n : Int) { n |> (0) { "zero" } | (1) { "one" } }
-main = () { describe(2) }
+```i run package=tour title="src/main.i"
+(
+	i/stdio
+)
+
+describe = (n : Int) {
+	n |> (0) { "zero" } | (1) { "one" } | (_) { "other" }
+}
+main = () { stdio.print(describe(2)) }
 ```
 
 ```text
-E0516
+other
 ```
 
-Add an unguarded catch-all or narrow the input.
+The compiler rejects this choice without its final branch; narrow the accepted input if the other cases should be impossible.
 
 A lone unguarded branch instead reports a failed pattern through `Assert`; see [services](/docs/tour/services-and-errors).
 
