@@ -1,0 +1,4 @@
+# spec: 4.8
+# expect: pass
+name = "probe"
+version = "0.1.0"

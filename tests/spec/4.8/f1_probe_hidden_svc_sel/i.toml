@@ -1,0 +1,4 @@
+# spec: 4.8
+# expect: compile-error E0501
+name = "probe"
+version = "0.1.0"
