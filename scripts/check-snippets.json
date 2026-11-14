@@ -2146,7 +2146,7 @@
     "not_source": true,
     "reason": "Reviewed annotation conversion: host diagnostic, URI, metadata, or protocol identity; its colon is not an i annotation."
   },
-  "crates/ilang-cli/tests/commands.rs:7605d4ed451035f1": {
+  "crates/ilang-cli/tests/commands.rs:108375a4abe87ac4": {
     "not_source": true,
     "reason": "Runtime stop output with source locations; colons are message punctuation and line/column separators, not annotations."
   },
