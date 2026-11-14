@@ -1,8 +1,10 @@
 # Applying the final-tree deletion
 
-Preparation only (Nov14). The scripts have passed Python syntax checks and
-the driver dry run; production deletion has not been applied or compiled.
-They adapt lane/fa2 af804b08 to the native resolver, engine and final rows.
+Applied and fully verified (Nov14). The ordered notes below describe the
+original application. The driver performs the structural move; the later
+compilation/test-boundary repairs are recorded in the verification ledger.
+The completed source and ledger are the authoritative resulting state.
+The tools adapt lane/fa2 af804b08 to the native resolver, engine and final rows.
 The complete step-three gate is a prerequisite. The coordinator's latest
 instruction permits compiling milestone commits; a compiling deletion is
 still not a green deletion until its full gate passes.
@@ -59,6 +61,6 @@ regression is also added. Design syntax-3 §6.8: “`(,)` is the empty data
 wherever data is written, and so the empty parameter data. The empty Round
 `()` has no legal position; `(f)` is a call with one part, not an empty Round.”
 
-Do not infer that schema.null_round needs a backend patch: its unchanged
-assertion passes all2170 std tests at both O0 and O2 before deletion. Repeat
-both levels after deletion. The historical fa2 failure's cause is not known.
+The unchanged schema_test.null_round assertion passes with all 2170 std
+tests at both O0 and O2 before and after deletion. No backend patch or
+expectation change was needed. The historical fa2 failure's cause is not known.

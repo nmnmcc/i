@@ -1,3 +1,12 @@
+Current result: **steps 2c, 2d, 3 and 4 are green**. The full native
+resolver prefix is 6de9a39b655edc8fad9dd7e14a848e359df22915. Stage 12
+and the deletion are integrated on lane/fa (via lane/fa-delete).
+The complete deletion matrix and exact commands are recorded at the end
+of this ledger. Everything below the next heading is historical evidence;
+its old pending/deadline statements describe earlier checkpoints.
+
+## Historical checkpoint and verification record
+
 Branch: `lane/fa`. Last committed, landable hash: `baf2e3b11b46e604a42a6eb82f6885540565898a`.
 That checkpoint has the full requested green matrix through conv `31ecae801`.
 The worktree is a pending resolved merge of faD `549e505102ff84f96d81dd8a1a5eef2e0355c7a8`
@@ -543,3 +552,78 @@ std/schema_test.null_round assertion passes. Commands:
 Logs: target/fa-r3/step4-release.log, step4-examples.log, step4-std0.log.
 O2, the four spec chapters, short generation and final formatting remain
 pending; this is a recorded milestone, not a full-green step4 claim.
+
+
+## Complete deletion gate (Nov 14)
+
+The production compiler uses the native tree throughout. The old tree,
+lowerer, converter and readers remain only in the standalone migration
+package and test oracles; all four consumer dependencies are dev-only.
+No diagnostic `.out` or `.expect.json` file changes since the starting
+checkpoint baf2e3b1, including the S12 merge and deletion.
+All five original engine inputs and full output equality checks remain.
+
+All requested gate targets pass after the three explained test-boundary
+repairs above. The scheduler retains the initial failures in its aggregate
+exit status; the passing retries are recorded separately, not hidden.
+Root Rust: 757 passed, four existing ignored and one requested recovery
+skip. Private oracle: 23 passed. All 39 CLI integration binaries and its
+library pass. Examples: 13 pass, one existing skip. Std: 2170/2170 at both
+O0 and O2, including the unchanged schema_test.null_round test. Short generation
+(seed 412, eight batches) has 32 base cases, 64 declaration permutations and
+32 annotation removals, with zero failures. The report-only source-annotation
+difference is the documented widening rule of spec §4.7, not a failed case.
+
+The earlier fa2 null_round failure does not reproduce on this deletion.
+No speculative implementation change or expectation update was needed;
+its historical cause remains unverified. Full unfiltered spec/workspace
+tests and corpus are reserved for the coordinator and were not run.
+
+`H=/home/agent/Programming/i/.rd/cache/heavy`; every command below is serial
+and wrapped. CLI lists every integration binary except the separately
+filtered spec binary. Full logs and exact command argv are retained in
+`target/fa-r3/step4-*`; initial compile repairs and focused retries are
+recorded in the preceding sections.
+
+| Gate | Exact command | Result |
+|---|---|---|
+| `check` | `$H direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked` | 07:21:20, exit 0 |
+| `fmt` | `$H direnv exec /home/agent/Programming/i cargo fmt --all -- --check` | 07:22:13, exit 0 |
+| `clippy` | `$H direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings` | 07:22:23, exit 101; duplicate test-module import fixed, exact retry exit 0 |
+| `private-check` | `$H direnv exec /home/agent/Programming/i cargo check --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --all-targets --target-dir target --locked` | 07:22:23, exit 0 |
+| `private-test` | `$H direnv exec /home/agent/Programming/i cargo test --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml --lib --target-dir target --locked -- --test-threads=2` | 07:34:09, exit 101; moved corpus root corrected, exact retry 23/23 exit 0 |
+| `rust` | `$H direnv exec /home/agent/Programming/i cargo test -p ilang-syntax -p ilang-macro -p ilang-check -p ilang-lsp --locked --no-fail-fast -- --skip spec_corpus_reverse_order_and_recovery --test-threads=2` | 07:55:40, exit 101; production lexer test import corrected, all 35 syn3 tests retry exit 0 (757 pass total) |
+| `cli` | `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --lib --test big_int --test big_int_performance --test check --test cli_log --test collections --test commands --test compile_cache --test compile_time_tests --test determinism --test echo --test entries --test expansion_sites --test float_text --test fmt --test http --test lisp --test lsp --test macro_budget --test macro_run --test many_tests --test multicore --test native --test numeric_lowering --test package_commands --test providers --test r2_fixtures --test r2_performance --test r2_runtime --test spec_update --test syn3_fixtures --test syntax_runtime --test tls --test typed_macros --test udp --test unused --test value_type_performance --test value_types --test wasi --test wat_dump --locked --no-fail-fast -- --test-threads=2` | 08:40:24, exit 0 |
+| `release` | `$H direnv exec /home/agent/Programming/i cargo build --release -p ilang-cli --bin i --locked` | 08:50:09, exit 0 |
+| `examples` | `$H ./target/release/i test --project examples/macro-tests --opt 0` | 08:50:22, exit 0 |
+| `std0` | `$H ./target/release/i test --project std --opt 0` | 09:14:21, exit 0 |
+| `std2` | `$H ./target/release/i test --project std --opt 2` | 09:22:29, exit 0 |
+| `spec6` | `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 6/` | 09:25:46, exit 0 |
+| `spec7` | `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 7/` | 09:30:11, exit 0 |
+| `spec9` | `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 9/` | 09:50:19, exit 0 |
+| `spec15.7` | `$H direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --locked -- 15.7/` | 10:06:36, exit 0 |
+| `generation` | `$H scripts/test-generation --mode short --binary ./target/release/i` | 10:16:18, exit 0 |
+| `private-fmt` | `$H direnv exec /home/agent/Programming/i cargo fmt --manifest-path crates/ilang-syntax/examples/legacy/Cargo.toml -- --check` | 10:23:33, exit 0 |
+| `source-fmt` | `$H ./target/release/i fmt --check lib std bench examples` | 10:29:17, exit 0 |
+
+A final direct rustfmt check of the three test-boundary repairs also passes
+(the command does no compilation):
+
+```sh
+direnv exec /home/agent/Programming/i rustfmt --edition 2024 --config skip_children=true --check crates/ilang-syntax/tests/syn3.rs crates/ilang-syntax/tests/common.rs crates/ilang-syntax/examples/legacy/src/lisp/source_syntax.rs
+```
+
+Light audits also pass: Python AST parsing for all deletion/capture tools;
+TOML audit of migration-syntax as dev-only in syntax/macro/check/CLI;
+assertions that the removed production files are absent; diagnostic
+golden name audit; set equality of all 39 CLI test files against the
+executed --test list (spec checked separately); and git diff --check.
+No acceptance rule or reported diagnostic is intentionally changed. The deletion follows the quoted
+Step 4 paragraph; empty parameter-data test rewrites follow syntax-three
+§6.8, and the unchanged lexer assertions follow spec §1.5.
+
+Final scheduler exit: 3, retaining the three initial clippy/private-test/
+Rust failures above. Their exact retries pass; all other gate commands exit
+0. No heavy command remains active or queued after the final source check.
+The supplied main68b720e9, stage12 58a35636, faD549e5051 and latest
+convdb743d5e7 are all ancestors of this completed source.

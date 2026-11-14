@@ -1,6 +1,8 @@
 # One tree: syntax three as the final AST
 
-Status: plan and inventory (lane/fa, 2026-11-13). Controlling sources:
+Status: completed through deletion on Nov14; the full gate is green.
+The inventory below records the starting architecture (Nov13); §6 records
+the completed state. Controlling sources:
 `docs/design/syntax-3.md` §6, §6.7, §6.8 and §7.2 row 12.
 
 Today there is one surface and two trees. The syntax-three parser builds
@@ -273,8 +275,8 @@ These are not mechanical, and each changes what a macro sees.
 | 2b datum builder; `needs_row` | done |
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
-| 3 resolver | GREEN: expanded Nov14 gate completes on native source `3499484118`; all requested Rust/CLI/std/spec/generation/fmt/clippy checks pass |
-| 4 deletion | Runtime gate in progress on lane/fa-delete: workspace check, strict clippy, Rust 757, private oracle 23, all CLI binaries, examples and std O0 2170 pass; std O2, spec, generation and final formatting pending |
+| 3 resolver | GREEN at `6de9a39b655edc8fad9dd7e14a848e359df22915`: native resolver/query/lits/LSP/expand, full expanded Nov14 matrix passes |
+| 4 deletion | GREEN: S12 merged; compiler uses only the native root AST, old tree/lowerer/readers are private migration/test oracles; the full expanded matrix passes |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
@@ -880,3 +882,24 @@ Workspace/all-target check, strict clippy, private migration checks/tests,
 green after the documented test-import/path repairs. No diagnostic golden
 was edited and no assertion was weakened. Full step4 green waits on the
 remaining O2/spec/generation/final-format gate.
+
+
+Nov14 final deletion gate: all requested targets pass. Production syntax
+is one native AST at the crate root; syn3 is only a compatibility namespace.
+The old tree/lowerer/encoders are absent from compiler source. A standalone
+private migration package under examples preserves the old parser/tree,
+converter and executable test oracles through dev-dependencies only. The
+strict resolver HIR/diagnostic comparisons and all five original full
+engine-output comparisons remain. Stage12 is merged; no diagnostic golden
+is edited after that merge.
+
+The gate includes workspace all-target check, strict clippy, Rust757
+(four existing ignored/one requested recovery skip), private oracle23,
+all39 CLI integration binaries plus library, examples13 (one existing
+skip), std2170 at O0/O2, spec6=80/7=104/9=139/15.7=28 at both levels,
+short generation and root/private/source formatting. Every exact command,
+initial failure and successful retry is recorded in
+[syn3-final-ast-fa-verification.md](syn3-final-ast-fa-verification.md).
+The unchanged schema_test.null_round passes at both levels; the earlier
+fa2 failure is unreproduced, with no speculative patch or changed assertion.
+Unfiltered workspace/spec/corpus verification remains the coordinator's.
