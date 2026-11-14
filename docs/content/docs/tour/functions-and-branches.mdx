@@ -316,6 +316,10 @@ main = () {
 
 Multiplication binds more tightly than addition, giving `14`; braces change the grouping to give `20`. Operators at the same precedence associate left to right. Calls and field access bind more tightly than arithmetic, and the pipeline binds less tightly. Use the [operator table](/docs/standard/generated/chapter-6#section-6-9) for the complete order.
 
+## Current limits
+
+The standard also allows a pattern to name the labelled parts of data, as in `(name = name, age = _)` ([§7.1](/docs/standard/generated/chapter-7#section-7-1)). The compiler on this tree refuses such a pattern with E0101; until that is fixed, read a labelled part with `.name`. Rest patterns for data (`..rest` inside `( )`) are refused in the same way; list rests work as shown above. Both differences are recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (DOC1, P13).
+
 ## See also
 
 - [Functions, blocks, and branches, standard §6](/docs/standard/generated/chapter-6#section-6-8).
