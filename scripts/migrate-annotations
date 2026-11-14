@@ -52,6 +52,16 @@ def new_rule_fixture(path, start, host):
     return begin >= 0 and begin < start and (end < 0 or start < end)
 
 
+def documentation_paths():
+    # Site generation is first-party input; installed packages and build
+    # output are not repository examples and must never be rewritten.
+    excluded = {'node_modules', '.astro', 'dist', 'target'}
+    docs = (p for p in (ROOT / 'docs').rglob('*')
+            if p.suffix in ('.md', '.mdx') and p != ROOT / 'docs/spec.md'
+            and not excluded.intersection(p.relative_to(ROOT).parts))
+    return [ROOT / 'README.md', ROOT / 'docs/spec.md', *sorted(docs)]
+
+
 def inventory(hosts=None, registered=None):
     paths = sorted(set(subprocess.check_output(
         ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--',

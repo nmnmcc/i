@@ -81,7 +81,7 @@ def main():
             items.append(dict(path=str(path.relative_to(ROOT)),source=match[1],start=match.start(1),end=match.end(1),kind='editor-block',lisp=False))
     # Inline code in the current spec/design docs is prose context, not a
     # module. Only whitespace changes here; counter-examples keep their tokens.
-    for path in [ROOT/'README.md', ROOT/'docs/spec.md', *sorted(p for p in (ROOT/'docs').rglob('*') if p.suffix in ('.md', '.mdx') and p != ROOT/'docs/spec.md')]:
+    for path in M['documentation_paths']():
         host = path.read_text()
         fences = [m.span() for m in re.finditer(r'(?m)^```[^\n]*\n.*?^```[ \t]*$', host, re.S)]
         for match in re.finditer(r'(?<!`)`([^`\n]+)`(?!`)', host):

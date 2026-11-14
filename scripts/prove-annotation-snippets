@@ -19,7 +19,7 @@ M=runpy.run_path(str(ROOT/'scripts/migrate-annotations'))
 
 
 def inline(hosts=None):
-    for path in ['README.md', 'docs/spec.md', *sorted(str(p.relative_to(ROOT)) for p in (ROOT/'docs').rglob('*') if p.suffix in ('.md', '.mdx') and p != ROOT/'docs/spec.md')]:
+    for path in [str(p.relative_to(ROOT)) for p in M['documentation_paths']()]:
         if hosts is not None and path not in hosts:
             continue
         host=hosts[path] if hosts is not None else (ROOT/path).read_text()
