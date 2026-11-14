@@ -3750,23 +3750,31 @@
     },
     {
       "pattern": "^review\\-k4s/min_main_3_0$",
-      "outcome": "accept",
+      "outcome": "reject",
       "known_failure": false,
       "types_contain": [
-        "app/main.main : () -> Nil"
+        "app/main.main : () <- (S("
       ],
-      "finding": "E3/E6 corpus audit: an unused one-sided service form is universal and its need is removed.",
-      "source": "docs/spec.md §9.2: An entry that every value of its type constructor satisfies, as Fail(Never), is removed. §4.7 type simplification preserves meaning. See docs/design/effects-e3-e6-corpus.md R4."
+      "finding": "Decision 2: an unused service head still requires its constructor key; reject the missing S before entry execution.",
+      "source": "Owner decision 2 (2026-11-14): \"Drop the Fail(Never) universal-entry removal.\" Spec §9.2: \"Type checking makes certain that every service is there when a call takes it. Getting it never fails at run time.\" Syntax-three §2.10.11: \"Otherwise it is the compile error ‘T is not provided by the target t’.\" See effects-e3-e6-corpus.md R4/R6.",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ]
     },
     {
       "pattern": "^review\\-k4s/min_main_5_0$",
-      "outcome": "accept",
+      "outcome": "reject",
       "known_failure": false,
       "types_contain": [
-        "app/main.main : () -> Nil"
+        "app/main.main : () <- (S("
       ],
-      "finding": "E3/E6 corpus audit: an unused one-sided service form is universal and its need is removed.",
-      "source": "docs/spec.md §9.2: An entry that every value of its type constructor satisfies, as Fail(Never), is removed. §4.7 type simplification preserves meaning. See docs/design/effects-e3-e6-corpus.md R4."
+      "finding": "Decision 2: an unused service head still requires its constructor key; reject the missing S before entry execution.",
+      "source": "Owner decision 2 (2026-11-14): \"Drop the Fail(Never) universal-entry removal.\" Spec §9.2: \"Type checking makes certain that every service is there when a call takes it. Getting it never fails at run time.\" Syntax-three §2.10.11: \"Otherwise it is the compile error ‘T is not provided by the target t’.\" See effects-e3-e6-corpus.md R4/R6.",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ]
     },
     {
       "pattern": "^review\\-k4d/_loose/fuzz/e0505/21_135$",
@@ -3827,6 +3835,50 @@
       ],
       "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
       "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_recursive_0_0$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.bad :",
+        "S("
+      ],
+      "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
+      "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_recursive_0_17$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.bad :",
+        "S("
+      ],
+      "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
+      "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_recursive_1_0$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.bad :",
+        "S("
+      ],
+      "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
+      "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_recursive_1_17$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.bad :",
+        "S("
+      ],
+      "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
+      "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
     }
   ],
   "transitions": [
