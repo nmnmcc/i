@@ -39,5 +39,31 @@
       },
       "differences": []
     }
-  }
+  },
+  "second_main": "1bdea6940",
+  "second_merge": "d316c0235",
+  "second_proofs": {
+    "braces": {
+      "differences": []
+    },
+    "inline": {
+      "inventoried": 36421,
+      "compared": 0,
+      "sites": 0,
+      "new_spec_examples": 11,
+      "differences": []
+    },
+    "snippets": {
+      "snippets": 19,
+      "hosts": {
+        "docs/design/syntax-3.md": 2,
+        "docs/spec.md": 17
+      },
+      "differences": []
+    }
+  },
+  "second_static_contexts": 29748,
+  "second_inline_contexts": 36421,
+  "second_pending_static": 0,
+  "second_pending_inline": 0
 }
