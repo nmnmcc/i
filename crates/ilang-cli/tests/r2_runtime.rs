@@ -348,14 +348,27 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         .unwrap();
     let end = source[begin..].find("\nFrame = (").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "finalizing = <A, R, E, N, B, F, M>(\n\t_k : Continuation(A, R, E, N),\n\t_b : Boundary(B, F, M)\n) -> Bool { False }\n"
+        + "finalizing = <A, R, N, B, M>(\n\t_k: Continuation(A, R, N),\n\t_b: Boundary(B, M)\n) -> Bool { False }\n"
         + &source[end..];
     let begin = source
         .find("@external(\"ilang:worker\", \"enabled\")")
         .unwrap();
     let end = source[begin..].find("\ndrop_shares = ").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "worker_enabled = () -> Bool { False }\nworker_publish = (_job : Job) -> Int { 0 }\nworker_claim = (_ticket : Int) -> Bool { True }\nworker_adopt = (_ticket : Int, _task : Int) -> Nil { Nil }\nworker_placeholder = () -> Continuation(StepAnswer, Turn, Never, Never) { panic(\"no workers\") }\nworker_away = (_k : Continuation(StepAnswer, Turn, Never, Never)) -> Bool { False }\nworker_send = (_task : Int, _resume : Resume) -> Nil { Nil }\nworker_inbox = () -> Int { 0 }\nworker_message = () -> Remote { panic(\"no workers\") }\nworker_pending = () -> Bool { False }\nworker_wait = () -> Nil { Nil }\nworker_share_put = (_run : Key(Nil), _address : Address, _value : Keyed) -> Nil { Nil }\nworker_share_get = (_run : Key(Nil), _address : Address) -> List(Keyed) { [] }\nworker_share_drop = (_run : Key(Nil), _address : Address) -> Nil { Nil }\n"
+        + "worker_enabled = () -> Bool { False }\n\
+           worker_publish = (_job: Job) -> Int { 0 }\n\
+           worker_claim = (_ticket: Int) -> Bool { True }\n\
+           worker_adopt = (_ticket: Int, _task: Int) -> Nil { Nil }\n\
+           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never) { panic(\"no workers\") }\n\
+           worker_away = (_k: Continuation(StepAnswer, Turn, Never)) -> Bool { False }\n\
+           worker_send = (_task: Int, _resume: Resume) -> Nil { Nil }\n\
+           worker_inbox = () -> Int { 0 }\n\
+           worker_message = () -> Remote { panic(\"no workers\") }\n\
+           worker_pending = () -> Bool { False }\n\
+           worker_wait = () -> Nil { Nil }\n\
+           worker_share_put = (_run: Key(Nil), _address: Address, _value: Keyed) -> Nil { Nil }\n\
+           worker_share_get = (_run: Key(Nil), _address: Address) -> List(Keyed) { [] }\n\
+           worker_share_drop = (_run: Key(Nil), _address: Address) -> Nil { Nil }\n"
         + &source[end..];
     assert!(!source.contains("@external(\"ilang:request\""));
     assert!(!source.contains("@external(\"ilang:worker\""));
@@ -508,4 +521,32 @@ fn preserved_review_request_programs_run_with_their_embedder_services() {
             }
         }
     }
+}
+
+#[test]
+fn task_run_discharges_scheduler_in_the_printed_entry_need() {
+    // Run provides Scheduler to its body and retains Runner at
+    // its caller. Keep the exact program that exposed the leaked need.
+    let source = include_str!("../../../tests/spec/9.9/task_run_environment_type.i");
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(directory.path().join("src")).unwrap();
+    std::fs::write(directory.path().join("src/main.i"), source).unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["check", "--types", "--offline", "--project"])
+        .arg(directory.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let shown = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        shown
+            .lines()
+            .any(|line| line == "app/main.main : () <- (Assert, Fail(Never), task.Runner) -> Nil"),
+        "{shown}"
+    );
 }

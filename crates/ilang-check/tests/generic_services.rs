@@ -105,12 +105,22 @@ fn several_parameters_and_nested_services() {
     for annotation in ["{", "-> A {"] {
         let source = "Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> Nil)\nOuter(A, E, N) = (Inner(A, E, N))\nuse = <A, E, N>(x : A) <- (s : Outer(A, E, N)) -> A {\n\tOuter(Inner(f, _)) = s\n\tf(x)\n}\nrun = <A, N>(body : () <- N -> A) { body() }\ninteger = () {\n\trun(() { use(1) }) <- (Outer(Inner((x : Int) { x }, (_ : Never) { Nil })))\n}\nboolean = () {\n\trun(() { use(True) }) <- (Outer(Inner((x : Bool) { x }, (_ : Never) { Nil })))\n}"
         .replace("-> A {", annotation);
-        accepts(&source, "integer", "() -> Int", &["integer", "boolean"]);
-        accepts(&source, "boolean", "() -> Bool", &["integer", "boolean"]);
+        accepts(
+            &source,
+            "integer",
+            "() <- (Fail(Never)) -> Int",
+            &["integer", "boolean"],
+        );
+        accepts(
+            &source,
+            "boolean",
+            "() <- (Fail(Never)) -> Bool",
+            &["integer", "boolean"],
+        );
         accepts(
             &source,
             "use",
-            "(A) <- (Fail(E), Outer(A, E, N), ..N) -> A",
+            "(A) <- (Fail(B), Outer(A, B, N), ..N) -> A",
             &["integer", "boolean"],
         );
     }
@@ -159,8 +169,8 @@ fn recursive_types_still_fail() {
     // rather than the tautology N <: N | S(N).
     for source in [
         "bad = (x) { x(x) }",
-        // Exact whole-row capture is unsupported (known gap EF10); this case
-        // instead exercises the constructor cycle through explicit services.
+        // Constructor cycles must still fail when callback requirements
+        // pass through explicitly supplied services.
         "S(N) = (() <- N -> Nil, (N) -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f, _) = s\n\tf()\n}\nbad = <N>() { use() <- (S(() { use() }, (_ : N) { Nil })) }",
     ] {
         rejects(source, "E0505");
@@ -175,18 +185,35 @@ fn incompatible_service_arguments_still_fail() {
         "Entry = ()\nSink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)\nConsumer(A) = ((A) -> Nil)\nbad = (s : Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }",
         "E0515",
     );
-    // Forms of one service in a row must have equal arguments,
-    // including the error argument, regardless of its ordinary variance.
-    rejects(
+    // Sink's covariant E can meet at Never because its stored
+    // callback is inhabited. Adding a required E value makes that same
+    // intersection empty; retain both direct and helper forms.
+    for source in [
         "Sink(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)\none = () <- (s : Sink(String, Never)) { Nil }\ntwo = () <- (s : Sink(Int, Never)) { Nil }\nbad = () {\n\tone()\n\ttwo()\n}",
-        "E0515",
-    );
-    // The same restriction holds when a service is hidden behind the
-    // helper's inferred environment row.
-    rejects(
         "Sink(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)\none = () <- (s : Sink(String, Never)) { Nil }\ntwo = () <- (s : Sink(Int, Never)) { Nil }\nrun = <N>(body : () <- N -> Nil) { body() }\nbad = () {\n\trun(() { one() })\n\ttwo()\n}",
-        "E0515",
-    );
+    ] {
+        let (graph, checked) = check(source);
+        assert!(
+            !checked.diags.iter().any(|d| d.is_error()),
+            "{:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+        let program = checked.program.unwrap();
+        let shown = checked
+            .types
+            .unwrap()
+            .lines(&program, common::module(&program, "app/main"));
+        assert!(
+            shown
+                .iter()
+                .any(|s| s.starts_with("app/main.bad :") && s.contains("Sink(Never, Never)")),
+            "{shown:?}"
+        );
+        rejects(
+            &source.replace("Sink(E, N) = (()", "Sink(E, N) = (E, ()"),
+            "E0515",
+        );
+    }
 }
 
 #[test]
@@ -208,5 +235,20 @@ fn repeated_helpers_keep_a_finite_principal_row() {
         "forward_63",
         "() <- (S(N), ..N) -> Nil",
         &["forward_63"],
+    );
+}
+
+#[test]
+fn catching_an_unknown_callback_keeps_its_error_cases_reachable() {
+    let (_, checked) = check(
+        "(i/fail)\nprobe = (handler) { fail.catch(() { handler() }) |> (Ok(value)) { value } | (Error(_: String)) { 0 } | (Error(_)) { 1 } }",
+    );
+    common::expect_unused(&checked.diags, &["probe"]);
+    let (_, checked) = check(
+        "(i/fail)\npure = () { fail.catch(() { 1 }) |> (Ok(value)) { value } | (Error(_)) { 0 } }",
+    );
+    assert!(
+        checked.diags.iter().any(|d| d.code == "W0501"),
+        "a pure callback's error branch is still unreachable"
     );
 }

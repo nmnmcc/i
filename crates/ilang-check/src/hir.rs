@@ -329,8 +329,8 @@ impl BuiltinType {
     pub fn arity(self) -> usize {
         match self {
             BuiltinType::List | BuiltinType::Key | BuiltinType::Request => 1,
-            BuiltinType::Boundary => 3,
-            BuiltinType::Continuation => 4,
+            BuiltinType::Boundary => 2,
+            BuiltinType::Continuation => 3,
             _ => 0,
         }
     }
@@ -412,8 +412,12 @@ pub struct Binding {
 #[derive(Clone, Debug)]
 pub enum Stmt {
     Bind(Binding),
-    /// A provided service has one named type for its environment key.
+    /// A provide retains its value and written type for service-key checking.
     Env {
+        /// Supply a whole data value or an opaque environment row.
+        spread: bool,
+        /// The source provide this item belongs to.
+        group: Option<Span>,
         ty: Type,
         value: Expr,
         span: Span,
@@ -554,8 +558,13 @@ pub enum Param {
         /// The label: the last name in the `=` chain at the top.
         label: Option<String>,
     },
-    /// A service parameter has one named type for its environment key.
-    Env { var: VarId, name: Ident, ty: Type },
+    /// `rest` distinguishes an opaque row capture from one named service.
+    Env {
+        rest: bool,
+        var: VarId,
+        name: Ident,
+        ty: Type,
+    },
 }
 
 #[derive(Clone, Debug)]

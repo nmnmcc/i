@@ -96,6 +96,10 @@ pub const RUNTIME_CALLS: &[(&str, &str, &str)] = &[
 /// The service id of `Assert`.
 pub const ASSERT_SERVICE: u32 = 0;
 
+/// The service id of `Fail`. The entry gives the platform's `Fail`,
+/// whose `raise` throws `$error` to the entry.
+pub const FAIL_SERVICE: u32 = 1;
+
 use num_bigint::BigInt;
 
 /// A local of the function. The first `arity` locals are its parameters.
@@ -217,10 +221,6 @@ pub enum Op {
         name: &'static str,
         arity: u32,
     },
-    /// `fail.raise(e)`: throws `$error`. It never gives a value.
-    Raise,
-    /// `fail.catch(body)`: `Ok` of the value, or `Error` of the error.
-    Catch,
     /// `resource.ensure(body, with)`.
     Ensure,
     /// `control.boundary(body)`.
@@ -234,8 +234,9 @@ pub enum Op {
     Resume,
     /// `control.cancel(k)`.
     Cancel,
-    /// Keeps all currently bound services in a fresh one-argument function.
-    KeepEnv,
+    /// Private host-adapter pinning across capture/re-entry. Source `keep`
+    /// is an ordinary library function using captured service rows.
+    PinEnvironment,
     WaitRequests,
     PollRequests,
 }
@@ -252,7 +253,6 @@ impl Op {
                 | Op::FloatDiv
                 | Op::Panic
                 | Op::Runtime { .. }
-                | Op::Catch
                 | Op::Ensure
                 | Op::Boundary
                 | Op::Suspend
@@ -268,12 +268,11 @@ impl Op {
     pub fn needs_env(self) -> bool {
         matches!(
             self,
-            Op::Catch
-                | Op::Ensure
+            Op::Ensure
                 | Op::Boundary
                 | Op::Resume
                 | Op::Cancel
-                | Op::KeepEnv
+                | Op::PinEnvironment
                 | Op::WaitRequests
                 | Op::PollRequests
         )
@@ -284,8 +283,7 @@ impl Op {
     pub fn suspends(self) -> bool {
         matches!(
             self,
-            Op::Catch
-                | Op::Ensure
+            Op::Ensure
                 | Op::Boundary
                 | Op::Suspend
                 | Op::Resume
@@ -380,6 +378,10 @@ pub enum Value {
     },
     /// The service with this id in the environment.
     Service(Env, u32),
+    /// Opaque row captured by a rest service pattern, excluding the listed keys.
+    Environment(Env, Vec<u32>),
+    /// Read a service from an opaque captured environment.
+    CapturedService(Atom, u32),
     /// The slot of the service with this id in the environment, as it is:
     /// a light boundary that stands for a value is not made into it. Only
     /// a name whose every use is the callee of `Callee::Lazy` has it.
@@ -836,8 +838,9 @@ pub enum Target {
 }
 
 impl Target {
-    pub fn provider_target(self) -> ilang_package::providers::Target {
-        use ilang_package::providers::Target as P;
+    /// The target of the platform check.
+    pub fn platform(self) -> ilang_check::platform::Target {
+        use ilang_check::platform::Target as P;
         match self {
             Self::Host => P::Host,
             Self::Js => P::Js,

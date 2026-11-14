@@ -1,12 +1,14 @@
-// §4.5 rule 4 and §9.2: environments are compared head by head, with equal
-// arguments, whatever the variance of the service type.
+// §4.5 rule 4 and §9.2: needs merge by service direction (R4).
+// A provided service must be a subtype of the required service.
 (
 	i/control
 )
 
 Yield(A) = (emit = (A) -> Nil)
 
-Source(A) = (next = () -> A)
+// §4.1: a function-only Source(Never) is inhabited. A required value
+// retains this fixture's negative empty-intersection intent under Decision 1.
+Source(A) = (value = A, next = () -> A)
 
 collect : <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
 	control.boundary((b) {
@@ -43,9 +45,9 @@ run_int = (body : () <- (Yield(Int)) -> Nil) { 1 }
 
 good_int = () { run_int(() <- (y : Yield(Int)) { y.emit(1) }) }
 
-// Merging: two forms of one type constructor in an environment are a
-// compile error, also for a contravariant or a covariant service.
-emit_int = () <- (y : Yield(Int)) { y.emit(1) }
+// R4: contravariant Yield merges Int and String into Int | String.
+// Covariant Source intersects them, so its incompatible need is an error.
+emit_int = () <- (y: Yield(Int)) { y.emit(1) }
 
 emit_string = () <- (y : Yield(String)) { y.emit("a") }
 
@@ -69,9 +71,9 @@ both_fns = [() { emit_int() }, () { emit_string() }]
 // In a written environment.
 written = () <- (y : Yield(Int), z : Source(Int)) -> Nil { y.emit(z.next()) }
 
-// Rule 9: the member that an environment statement takes out must be equal
-// to the service it gives.
-emit_any = () <- (y : Yield(Int | String)) { y.emit(1) }
+// Provide: Yield(Int) cannot implement a need for Yield(Int | String);
+// Yield(Int | String) can implement that need.
+emit_any = () <- (y: Yield(Int | String)) { y.emit(1) }
 
 given_narrow = () {
 	_syn3_1 : Yield(Int) = Yield(emit = (x : Int) { Nil })

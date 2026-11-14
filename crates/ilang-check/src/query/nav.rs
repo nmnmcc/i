@@ -117,7 +117,9 @@ fn visit_block<'h>(b: &'h Block, f: &mut dyn FnMut(Node<'h>)) {
     for s in &b.stmts {
         match s {
             Stmt::Bind(b) => visit_binding(b, f),
-            Stmt::Env { ty, value, span } => {
+            Stmt::Env {
+                ty, value, span, ..
+            } => {
                 f(Node::Stmt(*span));
                 visit_type(ty, f);
                 visit_expr(value, f);
@@ -311,7 +313,10 @@ impl Query<'_> {
             visit_module(p, m, &mut |n| {
                 if let Node::Block(b) = n {
                     for s in &b.stmts {
-                        let Stmt::Env { ty, value, span } = s else {
+                        let Stmt::Env {
+                            ty, value, span, ..
+                        } = s
+                        else {
                             continue;
                         };
                         // A provide `e <- (C(…))` of the source syntax lowers to

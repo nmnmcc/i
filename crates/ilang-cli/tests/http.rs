@@ -99,6 +99,9 @@ fn run_http_program(source: &str) {
         ),
     )
     .unwrap();
+    // Choose the native library Client; the platform supplies Net and Tls.
+    let source = source.replacen("main = ", "_http_test_body = ", 1);
+    let source = format!("{source}\nmain = () {{ _http_test_body() <- (http.native_client()) }}\n");
     std::fs::write(project.path().join("src/main.i"), source).unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["run", "--opt", "0", "--project"])

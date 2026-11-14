@@ -734,6 +734,8 @@ fn quick_changes_are_checked_once() {
 /// the top-level binding that it is in does.
 #[test]
 fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
+    // There is one need row. An unknown callback needs N, without a separate
+    // error-channel variable. Keep the scheme/local naming assertions.
     let text = "k = (f, x) {\n  y = f(x)\n  y\n}\n\
                 \n\
                 compose = (f, g) {\n  (x) { g(f(x)) }\n}\n\
@@ -757,14 +759,11 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
             .trim_end_matches("\n```")
             .to_string()
     };
-    assert_eq!(
-        hover("k ="),
-        "k : ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B"
-    );
+    assert_eq!(hover("k ="), "k : ((A) <- N -> B, A) <- N -> B");
     assert_eq!(hover("y ="), "y : B");
-    assert_eq!(hover("f, x"), "f : (A) <- (Fail(E), ..N) -> B");
-    assert_eq!(hover("g) {"), "g : (B) <- (Fail(E2), ..N2) -> C");
-    assert_eq!(hover("f, g"), "f : (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(hover("f, x"), "f : (A) <- N -> B");
+    assert_eq!(hover("g) {"), "g : (B) <- N2 -> C");
+    assert_eq!(hover("f, g"), "f : (A) <- N -> B");
     assert_eq!(hover("x) { g"), "x : A");
     assert_eq!(hover("b) {"), "b : B");
     assert_eq!(hover("a, b"), "a : A");
@@ -776,6 +775,8 @@ fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
 /// with that name.
 #[test]
 fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
+    // Match the checker's one-row schemes, retaining each local variable's
+    // name and its relationship to the enclosing scheme.
     let text = "one = (x) {\n  y = x\n  1\n}\n\
                 \n\
                 drop2 = (x, g, h) {\n  y = (x, h)\n  g(1)\n}\n\
@@ -802,18 +803,12 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
     assert_eq!(hover("one"), "one : (A) -> 1");
     assert_eq!(hover("x) {\n  y = x"), "x : A");
     assert_eq!(hover("y = x"), "y : A");
-    assert_eq!(
-        hover("drop2"),
-        "drop2 : (A, (1) <- (Fail(E), ..N) -> B, C) <- (Fail(E), ..N) -> B"
-    );
+    assert_eq!(hover("drop2"), "drop2 : (A, (1) <- N -> B, C) <- N -> B");
     assert_eq!(hover("x, g, h"), "x : A");
     assert_eq!(hover("h) {"), "h : C");
     assert_eq!(hover("y = (x, h)"), "y : (A, C)");
-    assert_eq!(
-        hover("effonly"),
-        "effonly : ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> Nil"
-    );
-    assert_eq!(hover("f, x) {\n  r"), "f : (A) <- (Fail(E), ..N) -> B");
+    assert_eq!(hover("effonly"), "effonly : ((A) <- N -> B, A) <- N -> Nil");
+    assert_eq!(hover("f, x) {\n  r"), "f : (A) <- N -> B");
     assert_eq!(hover("r = "), "r : B");
     c.shutdown();
 }

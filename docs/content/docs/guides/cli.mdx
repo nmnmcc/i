@@ -45,25 +45,26 @@ The parser accepts an explicit list of strings. Put this complete file in `test/
 
 ```i test package=guide_cli title="test/options_test.i"
 (
+	i/fail
 	testlib = (test) = std/test
 	std/cli
 	guide_cli/options
 )
 test("parses arguments", () {
 	assert(
-		cli.parse(options.parser(), ["Ada", "--count=2"]) ==
+		fail.catch(() { cli.parse(options.parser(), ["Ada", "--count=2"]) }) ==
 			Ok(options.Options(name = "Ada", count = 2)),
 	)
 	assert(
-		cli.parse(options.parser(), ["-c", "1", "--", "-name"]) ==
+		fail.catch(() { cli.parse(options.parser(), ["-c", "1", "--", "-name"]) }) ==
 			Ok(options.Options(name = "-name", count = 1)),
 	)
 	assert(
-		cli.parse(options.parser(), ["Ada"]) ==
+		fail.catch(() { cli.parse(options.parser(), ["Ada"]) }) ==
 			Error(cli.MissingArgument(name = "--count")),
 	)
 	assert(
-		cli.parse(options.parser(), ["Ada", "--count=bad"]) ==
+		fail.catch(() { cli.parse(options.parser(), ["Ada", "--count=bad"]) }) ==
 			Error(
 				cli.InvalidArgument(
 					index = 1,
@@ -74,7 +75,7 @@ test("parses arguments", () {
 			),
 	)
 	assert(
-		cli.help(options.parser(), "greet") ==
+		fail.catch(() { cli.help(options.parser(), "greet") }) ==
 			Ok(
 				"Usage: greet\n  <name>\tName to greet\n  --count, -c VALUE\tNumber of greetings\n",
 			),
@@ -104,6 +105,7 @@ Add this complete `src/main.i` to the same project. Keep `src/options.i` unchang
 
 ```i shown file=src/main.i package=guide_cli title="src/main.i"
 (
+	i/fail
 	i/process
 	i/stdio
 	std/cli
@@ -122,7 +124,7 @@ greet = (name, count) {
 main = () {
 	{ process.args() == ["--help"] } |>
 		(True) {
-			Ok(usage) = cli.help(options.parser(), "greet")
+			Ok(usage) = fail.catch(() { cli.help(options.parser(), "greet") })
 			stdio.write(<<usage:utf8>>)
 		}
 		| (False) {
@@ -197,4 +199,4 @@ This run exits with status 1. `cli.run` writes the parse error and usage to stan
 
 ## See also
 
-Read [IO operations, §9.12](/docs/standard/generated/chapter-9#section-9-12) for process and stream operations, and [the package file, §2.6](/docs/standard/generated/chapter-2#section-2-6) for entry selection. Continue with [files](/docs/guides/files) to add local storage.
+Continue with [files](/docs/guides/files) to add local storage.

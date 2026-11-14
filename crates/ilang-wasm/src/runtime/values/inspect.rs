@@ -246,6 +246,7 @@ pub fn wat() -> String {
     (if (i32.eq (local.get $ctor) (i32.const 1)) (then (return {{error}})))
     (if (i32.eq (local.get $ctor) (i32.const 2)) (then (return {{assertion_failure}})))
     (if (i32.eq (local.get $ctor) (i32.const 3)) (then (return {{assert}})))
+    (if (i32.eq (local.get $ctor) (i32.const 4)) (then (return {{fail}})))
     (local.set $names (global.get $constructor_names))
     (local.set $index (i32.sub (local.get $ctor) (i32.const 16)))
     (if (i32.or (ref.is_null (local.get $names)) (i32.lt_s (local.get $index) (i32.const 0)))
@@ -428,6 +429,7 @@ pub fn wat() -> String {
             ("error", "Error"),
             ("assertion_failure", "AssertionFailure"),
             ("assert", "Assert"),
+            ("fail", "Fail"),
             ("opaque", "//wasm(opaque)"),
             ("boundary", "//boundary"),
             ("continuation", "//continuation"),

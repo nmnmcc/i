@@ -11,30 +11,40 @@ alongside the remaining comments. The old diagnostic-message map was deliberatel
 excluded: diagnostics are observable output and this cleanup preserves every
 string literal, including embedded i and WAT programs.
 
-The baseline audit found 1,204 Rust comment lines with 1,343 section marks
-and five `spec.md` paths; all are gone. In `std/` and `lib/`, 68 comment lines
-contained 74 section marks; all are gone. The stale-comment detector found
-540 prose lines before and zero after. The two unchanged format-name mentions
-inside the migrator's protected usage example are counted separately. The three
-checker fixtures also lose six section marks on five comment lines. No
-TODO/FIXME/XXX comments existed or were retained. Five dormant Python recipes
-contained 231 commented code lines; the recipes and their run instructions are
-removed, with their invariant descriptions retained.
+The current baseline is `e975c5e93`, merged with all e4 code and deletions
+preserved. The cleanup reused 1,497 exact contextual entries from its previous
+map; 70 stale entries were withheld and reviewed against the new representation.
+The regenerated map below replaces the earlier map, rather than forcing stale
+text onto new code. Conflict decisions are recorded in
+[the merge review](doc-comments-e4-merge.md).
 
-All 136 Rust string literals containing section marks remain exact: 116
+| Scope | Before e4 cleanup | After |
+| --- | ---: | ---: |
+| Rust comment section marks | 1,381 | 0 |
+| Rust comment `spec.md` paths | 5 | 0 |
+| Rust comment lines with either reference | 1,238 | 0 |
+| `std/` and `lib/` comment section marks | 78 | 0 |
+| `std/` and `lib/` comment reference lines | 72 | 0 |
+| Additional checker-fixture section marks / lines | 6 / 5 | 0 / 0 |
+| Stale-comment detector lines | 549 | 0 |
+| Dormant Python recipe code lines / files | 231 / 5 | 0 / 0 |
+| TODO/FIXME/XXX comments | 0 | 0 |
+
+All 154 Rust string literals containing section marks remain exact: 134
 single-line diagnostic message occurrences, nine test/assertion strings, and
-11 multiline embedded programs. They contain 169 section marks in total.
-There are no retained language-rule references in audited comments: the
-constraints are stated directly where needed.
+11 multiline embedded programs. They contain 189 section marks in total.
+There are no retained language-rule references or TODOs in audited comments.
+The migrator usage example still names its input format twice; both occurrences
+are protected example text and remain byte-identical.
 
-The application below reproduces the reviewed result from `5307a664e`. Each map
+The application below reproduces the reviewed result from `e975c5e93`. Each map
 entry contains the exact old text, its SHA-256 hash and two surrounding lines of
 context. All entries are checked before any file is written. Missing files,
 ambiguous matches, bad hashes, changed tokens, changed fixture directives and
 changed Rustdoc examples are errors. Already-applied maps are stale too.
 
 ```sh
-base=5307a664e
+base=e975c5e93
 python3 scripts/test-doc-comments.py
 scripts/doc-comments apply --all
 scripts/doc-comments check --proof "$base" --i-bin target/release/i
@@ -49,7 +59,7 @@ and removes the temporary directory. It never copies the binary.
 For a tree where the cleanup is already applied, verify replay without writing:
 
 ```sh
-scripts/doc-comments apply --all --verify-replay 5307a664e
+scripts/doc-comments apply --all --verify-replay e975c5e93
 ```
 
 On a later tree, retain its pre-application revision. Run `apply --all`; inspect
@@ -75,41 +85,39 @@ remain in the audited sources. Library documentation's obsolete signature copies
 and dormant Python recipes were removed; registered tests and executable test
 bodies are unchanged. The map preserves the exact removed recipe text.
 
-This is the full verification command sequence. The documentation example npm
-script is expanded into its three phases so its runtime checks can hold one heavy
-slot with `--jobs 1`, without nesting the generator’s own heavy std check. Run heavy commands sequentially.
-`check-snippets` and the documentation generator/build scripts acquire the heavy
-wrapper for their own Rust builds and standard-library checks, so run those
-scripts directly in the development environment. `I_SNIPPET_PARSER` avoids another
-build of the parser driver after `check-snippets` has built it.
+These are the verification commands for the e4 merge. Heavy commands run
+sequentially. `check-snippets` acquires the wrapper for its own build and is run
+directly in the development environment. The submodule was initialized before
+the first build; it remains at the revision required by e4.
 
 ```sh
 H=/home/agent/Programming/i/.rd/cache/heavy
-git submodule update --init crates/ilang-binaryen/binaryen
+"$H" direnv exec /home/agent/Programming/i cargo fmt --all
+scripts/doc-comments scan --base e975c5e93
+scripts/doc-comments scan
+scripts/doc-comments record --base e975c5e93 \
+  --output scripts/doc-comments-rewrites/final-tree.json
+scripts/doc-comments apply --all --verify-replay e975c5e93
+python3 -I scripts/test-doc-comments.py
 "$H" direnv exec /home/agent/Programming/i cargo build --locked --release -p ilang-cli --bin i
-"$H" direnv exec /home/agent/Programming/i cargo check --workspace --all-targets --locked
-"$H" direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings
+"$H" direnv exec /home/agent/Programming/i env RUST_TEST_THREADS=2 cargo test --locked -p ilang-binaryen -p ilang-check -p ilang-cli -p ilang-host -p ilang-lsp -p ilang-macro -p ilang-package -p ilang-runner -p ilang-syntax -p ilang-wasm --lib --bins
+"$H" direnv exec /home/agent/Programming/i env RUST_TEST_THREADS=2 cargo test -p ilang-syntax --test format --test lisp_syntax --test lisp_syntax3 --test lisp_definition_rows --test syn3 --test syn3_lower --locked
+"$H" direnv exec /home/agent/Programming/i env RUST_TEST_THREADS=2 cargo test -p ilang-check --test library --test query --test coalescing --test row_schemes --test generic_services --test rest_services --locked
+"$H" direnv exec /home/agent/Programming/i env RUST_TEST_THREADS=2 cargo test -p ilang-cli --test doc_comments --test check --test provider_diagnostics --test rest_services --test wasi --locked
 "$H" direnv exec /home/agent/Programming/i cargo fmt --all --check
-"$H" direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test doc_comments --locked
-"$H" ./target/release/i fmt --check std lib examples
-"$H" ./target/release/i test --project std --opt 0
-"$H" ./target/release/i test --project std --opt 2
+"$H" direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings
+"$H" ./target/release/i fmt --check lib std bench examples
+"$H" ./target/release/i check --project std
+scripts/doc-comments check --proof e975c5e93 --i-bin target/release/i
 direnv exec /home/agent/Programming/i scripts/check-snippets
 python3 -I scripts/check-snippets-test
-"$H" direnv exec /home/agent/Programming/i cargo test -p ilang-syntax --test format --test lisp_syntax --test lisp_syntax3 --test lisp_definition_rows --test syn3 --test syn3_lower --locked
-"$H" direnv exec /home/agent/Programming/i cargo test -p ilang-syntax --test spec --locked -- spec_blocks_parse
-"$H" direnv exec /home/agent/Programming/i cargo test -p ilang-check --test library --test query --locked
-CMX2_I="$PWD/target/release/i"
-CMX2_PARSER="$PWD/target/debug/examples/parse-snippets"
-(cd docs && direnv exec /home/agent/Programming/i npm run generate)
-(cd docs && I_SNIPPET_PARSER="$CMX2_PARSER" direnv exec /home/agent/Programming/i python3 scripts/check-examples.py)
-"$H" direnv exec /home/agent/Programming/i env I_BIN="$CMX2_I" \
-  bash -c 'cd docs && exec python3 scripts/run-examples.py --no-placeholders --jobs 1'
-(cd docs && direnv exec /home/agent/Programming/i npm run build)
 ```
 
-The shared worker rules reserve `cargo test --workspace`, the unfiltered CLI
-conformance suite and the review corpus for the coordinator. This lane runs the
-focused tests above. The coordinator must run the workspace and corpus gates;
-no corpus expectation is intentionally changed. The only two recorded review
-outputs mentioning library paths name `std/src/test.is`, which is unchanged.
+The shared worker rules reserve the full workspace test run, unfiltered CLI
+conformance suite and review corpus for the coordinator. This lane runs unit and
+binary tests for every changed crate and the focused integration binaries above.
+No corpus expectation changes relative to e4: every string literal, embedded
+fixture, executable token and fixture directive is preserved. The coordinator
+runs the combined e4/cmx2/fmtgap gate. The initial cleanup's standard-library O0
+and O2 tests and documentation example/build checks are recorded in the earlier
+lane report; they are not substituted for the new merge checks.

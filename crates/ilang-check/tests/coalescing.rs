@@ -104,9 +104,11 @@ fn two_environment_parameters_retain_the_service() {
 
 #[test]
 fn a_captured_row_annotation_can_contain_the_service() {
-    // Inference may make N the more exact finite row A | S(A).
+    // An explicit Fail(Never) still requires its service key. This case
+    // isolates the inferred row without adding that separate requirement.
+    // Inference allows N to become the more exact finite row A | S(A).
     // Merely making an unused function needs nothing.
-    let source = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- (Fail(Never), ..N) -> Nil = () { use() }\n\tlocal()\n}";
+    let source = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}";
     entry(source);
     let unused = source.replace("\tlocal()\n}", "\tNil\n}");
     assert_ne!(source, unused);
@@ -123,10 +125,10 @@ fn a_captured_row_annotation_can_contain_the_service() {
     }
     // A provided service fits by ordinary value subtyping.
     // Supplying S(Dependency) does not supply its callback's Dependency.
-    let dependency = "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- (Fail(Never), ..N) -> Nil = () { use() }\n\tlocal()\n}\n\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }";
+    let dependency = "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}\n\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }";
     entry(dependency);
-    // An empty `Dependency = ()` is not a keyed service type in the source syntax
-    //, so the supplied variant gives it a field.
+    // The supplied variant carries a field so the service has an explicit
+    // construction value as well as a constructor key.
     let supplied = dependency
         .replace("Dependency = ()", "Dependency = (value = Int)")
         .replace(

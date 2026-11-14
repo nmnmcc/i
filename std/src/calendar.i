@@ -1,6 +1,6 @@
 //// Proleptic Gregorian dates for all integer years, and explicit fixed offsets.
 //// Date, TimeOfDay and Offset have private constructors; Civil, Weekday and
-//// CalendarError expose their constructors. All validation returns Result.
+//// CalendarError expose their constructors. Validation failures use Fail(CalendarError).
 ////
 //// leap years divide by 4, except centuries not divisible by 400. Year 0
 //// is 1 BCE. Months are 1..12; validate month before day, with no 1582 gap.
@@ -19,7 +19,7 @@
 ////
 //// Laws: from_day_number(day_number(d)) = d; day_number(from_day_number(n))
 //// = n; at(to_instant(c,o),o) = c; to_instant(at(t,o),o) = t;
-//// parse(format(c,o)) = Ok((c,o)); add_days(d,days_between(d,e)) = e.
+//// parse(format(c,o)) = (c,o); add_days(d,days_between(d,e)) = e.
 ////
 //// Date, time-of-day and offset constructors stay private so component
 //// validation cannot be bypassed.
@@ -103,7 +103,10 @@ is_leap_year = (year : Int) -> Bool {
 	year % 4 == 0 && { year % 100 != 0 || year % 400 == 0 }
 }
 
-days_in_month = (year : Int, month : Int) -> Result(Int, CalendarError) {
+_days_in_month_result = (year : Int, month : Int) -> Result(
+	Int,
+	CalendarError,
+) {
 	month |>
 		(1 | 3 | 5 | 7 | 8 | 10 | 12) { Ok(31) }
 		| (4 | 6 | 9 | 11) { Ok(30) }
@@ -111,8 +114,11 @@ days_in_month = (year : Int, month : Int) -> Result(Int, CalendarError) {
 		| (_) { Error(BadMonth) }
 }
 
-date = (year : Int, month : Int, day : Int) -> Result(Date, CalendarError) {
-	days_in_month(year, month) |>
+_date_result = (year : Int, month : Int, day : Int) -> Result(
+	Date,
+	CalendarError,
+) {
+	_days_in_month_result(year, month) |>
 		(Error(e)) { Error(e) }
 		| (Ok(count)) {
 			{ day >= 1 && day <= count } |>
@@ -121,7 +127,7 @@ date = (year : Int, month : Int, day : Int) -> Result(Date, CalendarError) {
 		}
 }
 
-time_of_day = (
+_time_of_day_result = (
 	hour : Int,
 	minute : Int,
 	second : Int,
@@ -153,7 +159,7 @@ time_of_day = (
 		}
 }
 
-offset = (minutes : Int) -> Result(Offset, CalendarError) {
+_offset_result = (minutes : Int) -> Result(Offset, CalendarError) {
 	{ minutes >= -1439 && minutes <= 1439 } |>
 		(True) { Ok(Offset(minutes)) }
 		| (False) { Error(BadOffset) }
@@ -357,7 +363,7 @@ read_offset = (chars : List(Int)) -> Offset {
 		| ([]) { fail.raise(BadText) }
 }
 
-parse = (text : String) -> Result((Civil, Offset), CalendarError) {
+_parse_result = (text : String) -> Result((Civil, Offset), CalendarError) {
 	fail.catch(() {
 		chars = list.map(core.codepoints(text), core.codepoint_to_int)
 		(y, r1) = read_year(chars)
@@ -368,10 +374,10 @@ parse = (text : String) -> Result((Civil, Offset), CalendarError) {
 		(s, r6) = digits(expect(r5, 58), 2, 0)
 		(n, r7) = read_fraction(r6)
 		off = read_offset(r7)
-		day = date(y, m, d) |>
+		day = _date_result(y, m, d) |>
 			(Ok(value)) { value }
 			| (Error(_)) { fail.raise(BadText) }
-		tod = time_of_day(h, minute, s, n) |>
+		tod = _time_of_day_result(h, minute, s, n) |>
 			(Ok(value)) { value }
 			| (Error(_)) { fail.raise(BadText) }
 		(Civil(date = day, time = tod), off)
@@ -447,3 +453,31 @@ now = () { at(time.now(), utc()) }
 
 /// Formats the current UTC time.
 format_now = () { format(now(), utc()) }
+
+/// Reports failure through `Fail(CalendarError)`.
+days_in_month = (year : Int, month : Int) -> Int {
+	fail.from_result(_days_in_month_result(year, month))
+}
+
+/// Reports failure through `Fail(CalendarError)`.
+date = (year : Int, month : Int, day : Int) -> Date {
+	fail.from_result(_date_result(year, month, day))
+}
+
+/// Reports failure through `Fail(CalendarError)`.
+time_of_day = (
+	hour : Int,
+	minute : Int,
+	second : Int,
+	nanosecond : Int
+) -> TimeOfDay {
+	fail.from_result(_time_of_day_result(hour, minute, second, nanosecond))
+}
+
+/// Reports failure through `Fail(CalendarError)`.
+offset = (minutes : Int) -> Offset { fail.from_result(_offset_result(minutes)) }
+
+/// Reports failure through `Fail(CalendarError)`.
+parse = (text : String) -> (Civil, Offset) {
+	fail.from_result(_parse_result(text))
+}

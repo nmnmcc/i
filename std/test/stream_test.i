@@ -362,11 +362,9 @@ test("stream_replay_and_services", () {
 		(stream.Done) { panic("missing first step") }
 		| (stream.Next(_, tail)) { assert(stream.to_list(tail) == [2]) }
 	// Runner supplies Bias for each attempted input pull, including Done.
-	run = (body : () <- (Bias) -> stream.Step(Int, Never, Bias)) -> stream.Step(
-		Int,
-		Never,
-		Bias,
-	) { body() <- (Bias(value = 10)) }
+	run = (
+		body : () <- (Fail(Never), Bias) -> stream.Step(Int, Never, Bias)
+	) -> stream.Step(Int, Never, Bias) { body() <- (Bias(value = 10)) }
 	adapted = stream.map_environment(s, run)
 	assert(stream.to_list(adapted) == [10])
 	assert(head(adapted) == Some(10))
@@ -513,7 +511,11 @@ test("stream_runner_demand", () {
 	trace = control.boundary((b) {
 		{
 			run = (
-				body : () <- (Bias) -> stream.Step(Int, Never, Bias)
+				body : () <- (Fail(Never), Bias) -> stream.Step(
+					Int,
+					Never,
+					Bias,
+				)
 			) -> stream.Step(Int, Never, Bias) {
 				visit(99)
 				body() <- (Bias(value = 10))

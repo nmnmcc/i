@@ -164,23 +164,6 @@ pub fn is_match(fs: &[Function]) -> bool {
     })
 }
 
-/// The type `E` of a need `Fail(E)`: the error channel of a function type.
-fn fail_need(ty: &mut Type) -> Option<&mut Type> {
-    match &mut ty.kind {
-        TypeKind::Named {
-            module: None,
-            name,
-            args,
-        } if name.name == "Fail" && args.len() == 1 => args.first_mut(),
-        _ => None,
-    }
-}
-
-fn is_fail_need(ty: &Type) -> bool {
-    matches!(&ty.kind, TypeKind::Named { module: None, name, args }
-        if name.name == "Fail" && args.len() == 1)
-}
-
 struct Walker<'a, H> {
     hook: &'a mut H,
     locals: Vec<Local>,
@@ -343,11 +326,6 @@ impl<H: Hook> Walker<'_, H> {
         let mut seen = HashSet::new();
         for f in fs.iter() {
             for service in f.services.iter().flatten() {
-                // A direct Fail(E) service pattern supplies the error channel;
-                // the transition does not create a local for its written name.
-                if !service.rest && is_fail_need(&service.ty) {
-                    continue;
-                }
                 if seen.insert(service.name.name.as_str()) {
                     self.locals.push(local(&service.name));
                 }
@@ -368,13 +346,7 @@ impl<H: Hook> Walker<'_, H> {
                 binders(pattern, &mut bindings);
             }
         }
-        bindings.extend(
-            f.services
-                .iter()
-                .flatten()
-                .filter(|s| s.rest || !is_fail_need(&s.ty))
-                .map(|s| local(&s.name)),
-        );
+        bindings.extend(f.services.iter().flatten().map(|s| local(&s.name)));
         for param in &mut f.params {
             for pattern in &mut param.choices {
                 self.pattern(pattern, depth)?;
@@ -484,27 +456,9 @@ impl<H: Hook> Walker<'_, H> {
                     _ => self.ty(&mut f.param, depth)?,
                 }
                 self.ty(&mut f.ret, depth)?;
-                // The needs: the error of a `Fail` entry, then the others.
+                // Fail is an ordinary service; visit needs in written order.
                 if let Some(services) = &mut f.services {
-                    if let TypeKind::Data(items) = &mut services.kind {
-                        for item in items.iter_mut() {
-                            if let TItem::Pos(need) = item
-                                && let Some(error) = fail_need(need)
-                            {
-                                self.ty(error, depth)?;
-                            }
-                        }
-                        for item in items.iter_mut() {
-                            match item {
-                                TItem::Pos(need) if is_fail_need(need) => {}
-                                TItem::Pos(need) | TItem::Label(_, need) | TItem::Spread(need) => {
-                                    self.ty(need, depth)?
-                                }
-                            }
-                        }
-                    } else {
-                        self.ty(services, depth)?;
-                    }
+                    self.ty(services, depth)?;
                 }
             }
             TypeKind::Lit(_) | TypeKind::ValueOf { .. } | TypeKind::Hole => {}

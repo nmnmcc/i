@@ -5,15 +5,21 @@ mod common;
 fn stage_three_provider_diagnostics_match_landed_conversion() {
     // A supplied value must satisfy the needed form by subtyping;
     // incompatible same-key requirements have an empty intersection.
-    // Retain each diagnostic and its source
-    // binding. Pin total errors and E0515 counts independently of the saved
+    // Keep every concrete provider diagnostic, including its source binding.
+    // A method returning Never inhabits the whole-method meet, so its
+    // concrete provider failures must be checked independently.
+    // Pin total errors and E0515 counts independently of the saved
     // messages. The full fourteen-project guard is in CLI providers tests:
     // two projects need their std dependency and test-macro expansion.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
     for (case, count, provider_count) in [
         ("review-k4/cases/provision_closure_False", 1, 1),
         ("review-k4d/_loose/p/x8", 2, 2),
-        ("review-k4d/_loose/p/b1", 5, 5),
+        ("review-k4d/_loose/p/b1", 5, 4),
+        // The method-only S meet is inhabited; retain the
+        // independent provider mismatch at 10:48 in both corpus copies.
+        ("review-k4d/_loose/p/m3", 1, 1),
+        ("review-k4d/proj/m3", 1, 1),
     ] {
         let dir = root.join(case);
         let source = std::fs::read_to_string(dir.join("src/main.i")).unwrap();
@@ -146,12 +152,19 @@ fn equivalent_nested_row_orders_do_not_change_handler_acceptance() {
 
 #[test]
 fn row_kind_survives_an_alias_without_algebra() {
-    // Row validation requires N to remain a row even when a function alias is copied
-    // without normalization. Its value positions must compare Svc's
-    // arguments equally before generalization can combine the forms.
-    for need in ["(Fail(Never), ..N)", "(Fail(N))"] {
-        let source = "Svc(A) = (() -> A)\nRow(N) = () <- NEED -> Nil\nbad = <N>(body : Row(N), one : Svc(Int), two : Svc(Nil)) {\n\tfirst : N = one\n\tsecond : N = two\n\tsecond\n}"
-        .replace("NEED", need);
+    // N stays a need row when a function alias is copied without
+    // normalization, whether alone or beside a named service. Errors
+    // use an ordinary Fail argument now, not a second row kind.
+    for need in ["N", "(Dep, ..N)"] {
+        let source = "Dep = ()
+Svc(A) = (() -> A)
+Row(N) = () <- N -> Nil
+bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
+	first: N = one
+	second: N = two
+	second
+}"
+        .replace("() <- N -> Nil", &format!("() <- {need} -> Nil"));
         let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
         let checked = ilang_check::check(&graph);
         assert!(
@@ -164,7 +177,15 @@ fn row_kind_survives_an_alias_without_algebra() {
 
 #[test]
 fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
-    // Both bounds fix the handler hole to the same form.
+    // L <: v <: U proves v = T when L = T = U. A hole in a
+    // invariant handler fixed to Int must prove the same witness as writing Int.
+    let source = "Svc(A) = (f = (A) -> A)
+wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
+	body() <- (svc)
+}";
+    let invariant_hole = source.replace("svc: Svc(Int)", "svc: Svc(_)");
+    assert_ne!(source, invariant_hole);
+    assert_eq!(types(source), types(&invariant_hole));
     for inferred in [false, true] {
         let head = if inferred {
             "wrap = <N>(body : () <- (Fail(Never), Svc(Int), ..N) -> Int, svc : Svc(Int))"
@@ -176,11 +197,29 @@ fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
         );
         let with_hole = source.replace("provided : Svc(Int)", "provided : Svc(_)");
         assert_ne!(source, with_hole);
-        assert_eq!(types(&source), types(&with_hole));
+        assert_eq!(types(&source), types(&with_hole), "inferred={inferred}");
     }
     // Never has an implicit lower bound, so v <: Never also fixes v.
     let never = "S(N) = (() <- N -> Nil)\nuse = () <- (s : S(Never)) {\n\tS(f) = s\n\tf()\n}\nwrap : <N>(() <- (S(Never), ..N) -> Nil, S(Never)) <- N -> Nil = (body, svc) {\n\tbody() <- (svc)\n}";
     types(never);
+}
+
+#[test]
+fn a_handler_annotation_hole_cannot_hide_its_incompatible_value() {
+    // The actual provider P must satisfy S by ordinary subtyping.
+    // A covariant hole with incoming Int cannot provide Svc(String).
+    for annotation in ["Int", "_"] {
+        let source = format!(
+            "Svc(A) = (f = () -> A)\nwrap = <N>(body: () <- (Svc(String), ..N) -> String, svc: Svc(Int)) -> String {{ provided: Svc({annotation}) = svc\n body() <- (provided) }}"
+        );
+        let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.code == "E0515"),
+            "{annotation}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
 }
 
 #[test]
@@ -199,17 +238,25 @@ Alias(N) = T(N)
     );
     for op in ["|", "&", "-"] {
         let row = ["S(Never)", op, "S(Dep)"].join(" ");
-        for (written, error_row) in [
-            (format!("T({row})"), false),
-            (format!("Alias({row})"), false),
-            ("() <- (Fail(Never), ..Written) -> Nil".to_string(), false),
-            (format!("() <- (Fail({row})) -> Nil"), true),
+        for written in [
+            format!("T({row})"),
+            format!("Alias({row})"),
+            // Need lists require named service types, so algebra over error
+            // values belongs inside the ordinary Fail argument.
+            format!("() <- (Fail({row})) -> Nil"),
         ] {
             let source =
                 format!("{invariant_head}Written = {row}\nuse = (x : {written}) {{ x }}\n");
             let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
             let checked = ilang_check::check(&graph);
-            let expected = if op == "-" || error_row {
+            // Fail's argument is an ordinary value type in the need row. Its
+            // invariant union/intersection error is E0503, as elsewhere;
+            // the former separate error-row diagnostic no longer applies.
+            let expected = if op == "-" && written.contains("Fail(") {
+                // A difference in an ordinary error value requires value
+                // subtyping; this is no longer an error-row check.
+                "E0501"
+            } else if op == "-" {
                 "E0515"
             } else {
                 "E0503"
@@ -268,9 +315,17 @@ fn a_directed_row_handler_keeps_the_callback_row_open() {
     // The need is an intersection; function subtyping also determines
     // the direction of N. Handling S(N) must not put S(N) inside N.
     let shown = types(
-        "S(N) = (f = () <- N -> Int)\nuse = <N>() <- (s : S(N)) {\n\tS(f = f, ..) = s\n\tf()\n}\nwrap : <N>(S(N)) <- (Fail(Never), ..N) -> Int = (svc) { use() <- (svc) }",
+        "S(N) = (f = () <- N -> Int)
+use = <N>() <- (s: S(N)) { s.f() }
+wrap = <N>(svc: S(N)) -> Int { use() <- (svc) }",
     );
-    assert_eq!(shown["app/main.wrap"], "(S(A)) <- A -> Int");
+    // The retained key restriction is shown explicitly; A stays open to
+    // every other service. The retained obligation uses the actual provider
+    // form S(A), as required by the directed P <: S check.
+    assert_eq!(shown["app/main.wrap"], "(S(A)) <- (A - S(A)) -> Int");
+    types(
+        "Dep = (value = Int)\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nwrap = <N>(svc: S(N)) -> Int { use() <- (svc) }\nneed = () <- (d: Dep) { d.value }\nexample = () { wrap(S(f = () { need() })) <- (Dep(value = 1)) }\n",
+    );
 }
 
 #[test]
@@ -328,7 +383,11 @@ fn inferred_handlers_keep_future_provider_constraints() {
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
     assert!(
-        checked.diags.iter().any(|d| d.code == "E0515"),
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("S(")
+            && !d.message.contains("hides")
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );
@@ -388,6 +447,131 @@ fn a_value_argument_cannot_erase_a_shared_row_constraint() {
             )
             .replace("\"hi\"", "2"),
     );
+}
+
+#[test]
+fn catch_generalizes_its_stated_fail_entry_and_residual_row() {
+    // Handling: the callback's (..N, Fail(E)) states the restriction on N.
+    // The scheme retains it; it is not an unexpressed provider obligation.
+    let shown = types(
+        "(i/fail)\nforward = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> Result(A, E) { fail.catch(body) }\n",
+    );
+    assert!(shown["app/main.forward"].contains("Fail("), "{shown:?}");
+    assert!(shown["app/main.forward"].contains("Result("), "{shown:?}");
+}
+
+#[test]
+fn catch_cannot_split_a_fail_entry_into_the_residual_row() {
+    // Choosing E = Int and N = Fail(String) would allow
+    // an Error(String) to escape with the claimed Result(Nil, Int) type.
+    let source = "(i/fail)\nsplit: (() <- (Fail(Int | String)) -> Nil) <- (Fail(String)) -> Result(Nil, Int) = (body) { fail.catch(body) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("Result(Nil, Int)", "Result(Nil, Int | String)"));
+}
+
+#[test]
+fn a_directed_handler_restriction_without_a_stated_entry_is_hidden() {
+    let source = "Svc(A) = (value = A)\nhide: <N>(() <- N -> Nil) <- N -> Nil = (body) { body() <- (Svc(value = 1)) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("hides")
+            && d.message.contains("Svc")
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {
+    // Decision 2 (EF03/T4) removes universal-entry erasure. Preserve the
+    // original unused-head source as a negative case beside a real raise;
+    // a provider, not choosing E = Never, makes the pure callback valid.
+    let unused = "unused = <E>() <- (handler: Fail(E)) { Nil }\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { unused() }) }\n";
+    let provided = unused.replace(
+        "unused() })",
+        "unused() <- (Fail(raise = (_: Never) { panic(\"unreachable\") })) })",
+    );
+    types(&provided);
+    for source in [
+        unused,
+        "(i/fail)\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { fail.raise(1) }) }\n",
+    ] {
+        let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.is_error()
+                && d.source
+                    .is_some_and(|id| graph.sources.get(id).text == source)),
+            "{source}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
+}
+
+#[test]
+fn a_sink_with_a_stored_callback_row_has_a_finite_instantiation() {
+    // The callback stores Fail in the callback row. The factory is pure and its
+    // callback raises String; neither row contains the sink itself.
+    let source = r#"(i/fail)
+Entry = (message = String)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, () <- N -> Nil)
+make = <E, N>(send: (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
+    Sink(send, () { Nil })
+}
+write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
+    Sink(send, _) = sink
+    send(entry)
+}
+example = () {
+    fail.catch(() { write(Entry(message = "seen")) }) <- (
+        make((entry) { fail.raise(entry.message) }),
+    )
+}
+"#;
+    types(source);
+    let with_dependency = source
+        .replace(
+            "Entry =",
+            "Dep = (read = () -> Nil)\nread = () <- (d: Dep) { d.read() }\nEntry =",
+        )
+        .replace(
+            "fail.raise(entry.message)",
+            "read()\n        fail.raise(entry.message)",
+        );
+    types(&with_dependency);
+}
+
+#[test]
+fn a_stored_service_row_retains_the_callers_dependency() {
+    let source = r#"Dep = (read = () -> String)
+Other = (read = () -> String)
+S(N) = (run = () <- N -> String)
+need = () <- (s: S(Dep)) { Nil }
+wrong = () <- (o: Other) { "value" }
+main = () { need() <- (S(run = wrong)) }
+"#;
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("(o: Other)", "(o: Dep)"));
 }
 
 #[test]
@@ -498,7 +682,7 @@ fn converted_e1_provider_cases_keep_batch2_check_outcomes() {
 fn syntax_three_library_handler_has_no_unhandled_service() {
     let (graph, _, _) = common::check_files(&[(
         "src/main.i",
-        "(i/failure)\nmain = () { failure.catch(() { failure.raise(1) }) }\n",
+        "(i/fail)\nmain = () { fail.catch(() { fail.raise(1) }) }\n",
     )]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -510,7 +694,7 @@ fn syntax_three_library_handler_has_no_unhandled_service() {
     let mut found = false;
     let typed = checked.types.as_ref().unwrap();
     for (mi, module) in p.modules.iter().enumerate() {
-        if module.path != "i/failure" {
+        if module.path != "i/fail" {
             continue;
         }
         for (di, def) in module.defs.iter().enumerate() {
@@ -537,6 +721,64 @@ fn syntax_three_library_handler_has_no_unhandled_service() {
         }
     }
     assert!(found, "the library handler was checked");
+}
+
+#[test]
+fn a_generator_does_not_export_its_handled_yield_need() {
+    let shown = types(
+        r#"(i/control)
+Yield(A) = (emit = (A) -> Nil)
+collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
+    control.boundary((b) {
+        {
+            body()
+            []
+        } <- (Yield(emit = (x) {
+            control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+        }))
+    })
+}
+main = () { collect(() <- (y: Yield(Int)) { y.emit(1) }) }
+"#,
+    );
+    assert!(!shown["app/main.main"].contains("Yield"), "{shown:?}");
+    assert!(shown["app/main.main"].contains("List(Int)"), "{shown:?}");
+}
+
+#[test]
+fn a_covariant_handler_hole_retains_its_upper_bound() {
+    // P <: S gives A <: Int for a covariant provider, not A = Int.
+    let shown = types(
+        "Svc(A) = (f = () -> A)\nwrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(_)) -> Int { body() <- (svc) }\n",
+    );
+    assert_eq!(
+        shown["app/main.wrap"],
+        "(() <- (Svc(Int), ..N) -> Int, Svc(A & Int)) <- (N - Svc(A & Int)) -> Int"
+    );
+}
+
+#[test]
+fn a_filtered_callback_does_not_vacate_an_unused_fail_need() {
+    // excluding Fail excludes its key even when E = Never.
+    // Keep both old sources: an unused head and a real raise must reject.
+    let source = "(i/fail)\nNoError(N) = N - Fail(Never)\nrun = <N>(f: () <- (NoError(N)) -> Nil) { f() }\npure = <E>() <- (unused: Fail(E)) { Nil }\nmain = () { run(pure) }\n";
+    let plain = source.replace("pure = <E>() <- (unused: Fail(E))", "pure = ()");
+    let shown = types(&plain);
+    assert!(!shown["app/main.main"].contains("Fail"), "{shown:?}");
+    for candidate in [
+        source.to_owned(),
+        source.replace("{ Nil }", "{ fail.raise(1) }"),
+    ] {
+        let (graph, _, _) = common::check_files(&[("src/main.i", &candidate)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.is_error()
+                && d.source
+                    .is_some_and(|id| graph.sources.get(id).text == candidate)),
+            "{candidate}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
 }
 
 #[test]
@@ -702,6 +944,212 @@ fn named_function_provider_keeps_call_and_binding_diagnostics() {
         "{:?}",
         graph.sources.render_all(&diags)
     );
+}
+
+#[test]
+fn an_error_alias_uses_an_ordinary_value_parameter_after_e3() {
+    // Fail(E) is ordinary data; E is not a need row. The
+    // corpus negative retains its row-kind intent with Row(N) <- N.
+    let row =
+        include_str!("../../../tests/review/cases/review-k4-lane/alias_kind_error/src/main.i");
+    let value = row.replace("Row(N) = () <- N -> Nil", "Row(N) = () <- (Fail(N)) -> Nil");
+    let shown = types(&value);
+    assert!(shown["app/main.bad"].contains("Fail("), "{shown:?}");
+    assert!(
+        shown["app/main.bad"].contains("Svc(Int | Nil)"),
+        "{shown:?}"
+    );
+    let (graph, _, diags) = common::check_files(&[("src/main.i", row)]);
+    assert!(
+        diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
+
+#[test]
+fn unused_service_heads_keep_the_required_environment_key() {
+    // Simplifying a service argument cannot supply a missing constructor key.
+    // Keep both unused-head cases and the original used-head control.
+    for source in [
+        include_str!("../../../tests/review/cases/review-k4s/min_main_3_0/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4s/min_main_5_0/src/main.i"),
+    ] {
+        let shown = types(source);
+        assert!(shown["app/main.main"].contains("S("), "{shown:?}");
+    }
+    let used = types(include_str!(
+        "../../../tests/review/cases/review-k4s/min_main_6_0/src/main.i"
+    ));
+    assert!(used["app/main.main"].contains("S("), "{used:?}");
+}
+
+#[test]
+fn corpus_entry_errors_name_each_unprovided_service_once() {
+    // Entry diagnostics identify the target's concrete missing keys. Repeated E0523 codes are distinct
+    // errors for S and T, not duplicate reports of one service.
+    for (source, expected) in [
+        (
+            include_str!(
+                "../../../tests/review/cases/review-k4d/_loose/fuzz/e0505/21_160/src/main.i"
+            ),
+            vec!["S", "T"],
+        ),
+        (
+            include_str!(
+                "../../../tests/review/cases/review-k4d/_loose/fuzz/e0505/21_243/src/main.i"
+            ),
+            vec!["S", "T"],
+        ),
+        (
+            include_str!(
+                "../../../tests/review/cases/review-k4d/_loose/fuzz/e0505/21_135/src/main.i"
+            ),
+            vec!["Dep", "S", "T"],
+        ),
+    ] {
+        let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+        assert!(
+            !diags.iter().any(|d| d.is_error()),
+            "{:?}",
+            graph.sources.render_all(&diags)
+        );
+        let checked = ilang_check::check(&graph);
+        let program = checked.program.unwrap();
+        let typed = checked.types.unwrap();
+        let module = common::module(&program, "app/main");
+        let index = program
+            .module(module)
+            .defs
+            .iter()
+            .position(|d| d.name == "main")
+            .unwrap();
+        let entry = ilang_check::hir::DefId {
+            module,
+            index: index as u32,
+        };
+        let errors = ilang_check::platform::stub(
+            &program,
+            &typed,
+            entry,
+            ilang_check::platform::Target::Native,
+        )
+        .unwrap_err();
+        assert_eq!(errors.len(), expected.len(), "{errors:?}");
+        for (error, name) in errors.iter().zip(expected) {
+            assert_eq!(error.code, "E0523");
+            assert!(
+                error.message.contains(&format!("`app/main.{name}`")),
+                "{errors:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_vendored_sink_marker_keeps_its_row_invariant() {
+    // The old (N) -> Nil marker used a row as an ordinary value. Moving N
+    // into a callback need must retain the marker's opposite variance.
+    let source = "Dep = ()\nOther = ()\nSink(N) = (() <- N -> Nil, (() <- N -> Nil) -> Nil)\nmake = <N>(send: () <- N -> Nil) -> Sink(N) { Sink(send, (_: () <- N -> Nil) { Nil }) }\n";
+    types(source);
+    let bad = format!("{source}widen = (sink: Sink(Dep)) -> Sink(Dep | Other) {{ sink }}\n");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", &bad)]);
+    assert!(
+        diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
+
+#[test]
+fn a_bottom_returning_method_can_satisfy_two_covariant_needs() {
+    // Constructor arguments intersect, while functions may stop or diverge.
+    // A stopping method therefore inhabits Read(Never).
+    let shown = types(
+        "Read(A) = (read = () -> A)\nf = () <- (r : Read(Int)) { r.read() }\ng = () <- (r : Read(String)) { r.read() }\nboth = () { f() g() }\nmain = () { both() <- (Read(read = () { panic(\"bottom\") })) }",
+    );
+    assert!(shown["app/main.both"].contains("Read(Never)"), "{shown:?}");
+    // Keep the negative value-field case: unlike a method returning Never,
+    // a required field of type Never cannot be constructed.
+    let source = "Box(A) = (value = A)\nf = () <- (b : Box(Int)) { b.value }\ng = () <- (b : Box(String)) { b.value }\nboth = () { f() g() }";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn a_two_parameter_method_meet_depends_on_required_data() {
+    // A stopping function inhabits () -> Never.
+    // This is the exact constructor shape of the b1 corpus summaries.
+    let source = "S(A, N) = (() <- N -> A)\nleft = () <- (s: S(String, Never)) { Nil }\nright = () <- (s: S(Int, S(String, Never))) { Nil }\nboth = () { left() right() }\n";
+    let shown = types(source);
+    assert!(shown["app/main.both"].contains("S(Never,"), "{shown:?}");
+    // being inhabited does not provide the constructor key.
+    let provided = format!("{source}main = () {{ both() <- (S(() {{ panic(\"bottom\") }})) }}");
+    types(&provided);
+    let impossible = source.replace("S(A, N) = (() <- N -> A)", "S(A, N) = (A, () <- N -> A)");
+    let (graph, _, _) = common::check_files(&[("src/main.i", &impossible)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn shipped_stored_callback_types_keep_their_need_invariant() {
+    // Stored callback needs remain invariant. Read the shipped
+    // declarations, rather than a second copy that could miss a port bug.
+    let stream = include_str!("../../../std/src/stream.i");
+    let log = include_str!("../../../std/src/log.i");
+    let declarations = stream
+        .lines()
+        .filter(|line| {
+            ["Stream(", "Done =", "Next(", "Step("]
+                .iter()
+                .any(|prefix| line.starts_with(prefix))
+        })
+        .chain(log.lines().filter(|line| line.starts_with("Sink(")))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let head = format!("Level = ()\nEntry = ()\nConsumer(A) = ((A) -> Nil)\n{declarations}\n");
+    types(&format!(
+        "{head}widen_error = (s: Stream(Int, Never, Never)) -> Stream(Int, String, Never) {{ s }}"
+    ));
+    for body in [
+        "bad = (s: Stream(Int, String, Consumer(Int))) -> Stream(Int, String, Consumer(Never)) { s }",
+        "bad = (s: Sink(String, Consumer(Int))) -> Sink(String, Consumer(Never)) { s }",
+        "bad = (s: Stream(Int, String, Never)) -> Stream(Int, Never, Never) { s }",
+    ] {
+        let source = format!("{head}{body}");
+        let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.is_error()),
+            "{body}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
+}
+
+#[test]
+fn mixed_recursive_need_parameters_can_be_forwarded_as_values() {
+    // the same variable may occur in a need and an
+    // ordinary parameter. Keep every original accepted corpus variant.
+    for source in [
+        include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_0_0/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_0_17/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_1_0/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_1_17/src/main.i"),
+    ] {
+        let shown = types(source);
+        assert!(shown["app/main.bad"].contains("S("), "{shown:?}");
+    }
 }
 
 #[test]

@@ -1,10 +1,9 @@
-//! Adapter to the legacy representation retained by migration tools and
-//! differential tests. Unsupported forms must fail before downstream passes
-//! see a partial tree.
+//! The migration adapter preserves source evaluation order while producing
+//! the legacy representation used by differential tests. Unsupported forms
+//! fail before downstream passes can observe a partial tree.
 //!
-//! Data definitions become one-constructor definitions; aliases keep their
-//! name. Calls preserve written evaluation order, and provision becomes
-//! service bindings around the provided expression.
+//! Errors remain ordinary `Fail(E)` members of the one need row. Data
+//! definitions stay separate so aliases and constructor identities survive.
 
 use super::ast as n;
 use crate::ast as o;
@@ -41,7 +40,7 @@ pub fn lower_expanded(
         lisp,
         generated_from,
         errors: Vec::new(),
-        rows: Vec::new(),
+        type_params: Vec::new(),
         fresh: 0,
         group: false,
         hidden: Vec::new(),
@@ -287,86 +286,14 @@ pub fn lower_items(items: &[n::Item]) -> Result<Vec<o::Item>, Diagnostic> {
     cx.finish(out)
 }
 
-struct Row {
-    name: String,
-    /// The signature of the binding writes no `Fail` beside this row
-    /// variable, so the row variable carries the errors.
-    carries: bool,
-    used: bool,
-}
-
-/// The row variables that a type writes beside a `Fail` entry.
-fn fail_rows(t: &n::Type, out: &mut HashSet<String>) {
-    let each =
-        |ts: &[n::Type], out: &mut HashSet<String>| ts.iter().for_each(|t| fail_rows(t, out));
-    match &t.kind {
-        n::TypeKind::Named { args, .. } | n::TypeKind::Call { args, .. } => each(args, out),
-        n::TypeKind::Union(ts) | n::TypeKind::Inter(ts) | n::TypeKind::Diff(ts) => each(ts, out),
-        n::TypeKind::Data(items) => {
-            for i in items {
-                match i {
-                    n::TItem::Pos(t) | n::TItem::Label(_, t) | n::TItem::Spread(t) => {
-                        fail_rows(t, out)
-                    }
-                }
-            }
-        }
-        n::TypeKind::Fn(f) => {
-            fail_rows(&f.param, out);
-            fail_rows(&f.ret, out);
-            if let Some(s) = &f.services {
-                fail_rows(s, out);
-                if let n::TypeKind::Data(items) = &s.kind {
-                    let fail = items.iter().any(|i| {
-                        matches!(i, n::TItem::Pos(t)
-                            if matches!(&t.kind, n::TypeKind::Named { module: None, name, .. } if name.name == "Fail"))
-                    });
-                    if fail {
-                        for i in items {
-                            if let n::TItem::Spread(t) = i
-                                && let n::TypeKind::Named { name, .. } = &t.kind
-                            {
-                                out.insert(name.name.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        n::TypeKind::Lit(_) | n::TypeKind::ValueOf { .. } | n::TypeKind::Hole => {}
-    }
-}
-
-fn pattern_fail_rows(p: &n::Pattern, out: &mut HashSet<String>) {
-    match &p.kind {
-        n::PatternKind::Typed { ty, .. } => fail_rows(ty, out),
-        n::PatternKind::Ctor {
-            args: Some(items), ..
-        }
-        | n::PatternKind::Data(items) => {
-            for i in items {
-                match i {
-                    n::DPItem::Pos(p) | n::DPItem::Key(_, p) => pattern_fail_rows(p, out),
-                    n::DPItem::Rest(_) => {}
-                }
-            }
-        }
-        n::PatternKind::List { items, .. } | n::PatternKind::And(items) => {
-            items.iter().for_each(|p| pattern_fail_rows(p, out))
-        }
-        _ => {}
-    }
-}
-
 struct Cx {
     transition: std::sync::Arc<Transition>,
     fragment: Option<(u8, Span)>,
     lisp: bool,
     generated_from: Option<u32>,
     errors: Vec<Diagnostic>,
-    /// The type parameters of the bindings around, for the error parameter
-    /// that a row variable carries.
-    rows: Vec<Row>,
+    /// Ordinary type parameters in scope; no separate error carrier.
+    type_params: Vec<String>,
     fresh: usize,
     /// The module imports nothing under the name `core`, so `core.never`
     /// is the empty match.
@@ -554,7 +481,7 @@ impl Cx {
             lisp: false,
             generated_from: None,
             errors: Vec::new(),
-            rows: Vec::new(),
+            type_params: Vec::new(),
             fresh: 0,
             core_free: false,
             group: false,
@@ -879,40 +806,13 @@ impl Cx {
                 }
             }
         }
-        let mut with_fail = HashSet::new();
-        pattern_fail_rows(&b.pattern, &mut with_fail);
-        if let n::ExprKind::Chain(fs) = &b.value.kind {
-            for f in fs {
-                for p in &f.params {
-                    p.choices
-                        .iter()
-                        .for_each(|c| pattern_fail_rows(c, &mut with_fail));
-                }
-                for s in f.services.iter().flatten() {
-                    fail_rows(&s.ty, &mut with_fail);
-                }
-                if let Some(r) = &f.ret {
-                    fail_rows(r, &mut with_fail);
-                }
-            }
-        }
         let original = self
             .transition
             .formals(b.span.0, b.pattern.span.0)
             .map(|p| p.to_vec());
-        let mark = self.rows.len();
-        self.rows.extend(generics.iter().map(|g| Row {
-            name: g.name.clone(),
-            carries: original.as_ref().map_or_else(
-                || !with_fail.contains(&g.name),
-                |parameters| {
-                    parameters
-                        .iter()
-                        .any(|(name, _)| *name == format!("{}%E", g.name))
-                },
-            ),
-            used: false,
-        }));
+        let mark = self.type_params.len();
+        self.type_params
+            .extend(generics.iter().map(|g| g.name.clone()));
         let pattern = match (&b.pattern.kind, typed_fn) {
             (n::PatternKind::Typed { binder: bd, ty: t }, Some(f)) => pat(
                 o::PatternKind::Typed {
@@ -930,11 +830,7 @@ impl Cx {
             _ => self.expr(&b.value),
         };
         let mut type_params: Vec<o::Ident> = generics.iter().map(|g| id(g)).collect();
-        for row in self.rows.drain(mark..) {
-            if row.used {
-                type_params.push(ident(format!("{}%E", row.name), b.span.0));
-            }
-        }
+        self.type_params.truncate(mark);
         if let Some(original) = original {
             type_params = original
                 .into_iter()
@@ -1052,54 +948,50 @@ impl Cx {
     fn provide(&mut self, target: &n::Expr, services: &n::Expr) -> Vec<o::Stmt> {
         let mut stmts = Vec::new();
         let mut envs = Vec::new();
-        match &services.kind {
-            n::ExprKind::Data(items) => {
-                let apart = items.len() > 1
-                    && items.iter().any(|i| {
-                        !matches!(i, n::DItem::Pos(n::Expr { kind: n::ExprKind::Name { .. }, .. }))
-                    });
-                for item in items {
-                    match item {
-                        n::DItem::Pos(e) => {
-                            let mut value = self.expr(e);
-                            if apart {
-                                let name = self.fresh("service");
-                                stmts.push(o::Stmt::Bind(o::Binding {
-                                    pattern: pat(o::PatternKind::Var(name.clone()), e.span.0),
-                                    value,
-                                    span: e.span.0,
-                                    type_params: Vec::new(),
-                                }));
-                                value = expr(
-                                    o::ExprKind::Name {
-                                        module: None,
-                                        name: ident(name, e.span.0),
-                                    },
-                                    e.span.0,
-                                );
-                            }
-                            envs.push(o::Stmt::Env {
-                                ty: ty(o::TypeKind::Hole, e.span.0),
-                                value,
-                                span: e.span.0,
-                            });
-                        }
-                        n::DItem::Label(l, _) => self.error(
+        let items: Vec<(&n::Expr, bool)> = match &services.kind {
+            n::ExprKind::Data(items) => items
+                .iter()
+                .filter_map(|item| match item {
+                    n::DItem::Pos(e) => Some((e, false)),
+                    n::DItem::Spread(e) => Some((e, true)),
+                    n::DItem::Label(l, _) => {
+                        self.error(
                             l.span.0,
                             "a provided service has no label: it is keyed by its type (§2.10.2)",
-                        ),
-                        n::DItem::Spread(e) => self.error(
-                            e.span.0,
-                            "providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet",
-                        ),
+                        );
+                        None
                     }
-                }
+                })
+                .collect(),
+            _ => vec![(services, true)],
+        };
+        let apart = items.len() > 1
+            && items
+                .iter()
+                .any(|(e, _)| !matches!(e.kind, n::ExprKind::Name { .. }));
+        for (e, spread) in items {
+            let mut value = self.expr(e);
+            if apart {
+                let name = self.fresh("service");
+                stmts.push(o::Stmt::Bind(o::Binding {
+                    pattern: pat(o::PatternKind::Var(name.clone()), e.span.0),
+                    value,
+                    span: e.span.0,
+                    type_params: Vec::new(),
+                }));
+                value = name_expr(&name, e.span.0);
             }
-            _ => self.error(
-                services.span.0,
-                "providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-            ),
+            envs.push(o::Stmt::Env {
+                spread,
+                group: Some(services.span.0),
+                ty: ty(o::TypeKind::Hole, e.span.0),
+                value,
+                span: e.span.0,
+            });
         }
+        // Work out every value first, in source order, then install the
+        // spreads before explicit keys so an explicit service wins (provided-key precedence).
+        envs.sort_by_key(|s| matches!(s, o::Stmt::Env { spread: false, .. }));
         stmts.extend(envs);
         match &target.kind {
             n::ExprKind::Block(b) => stmts.extend(self.block(b).stmts),
@@ -1115,47 +1007,21 @@ impl Cx {
     // ---- Functions ----
 
     fn params_of(&mut self, f: &n::Function, params: &mut Vec<o::Param>) {
-        let mut fails = 0;
         for s in f.services.iter().flatten() {
-            // `name: Fail(E)` is the legacy error part (`ret`).
-            if fail_of(s).is_some() {
-                fails += 1;
-                if fails == 2 {
-                    self.error(
-                        s.ty.span.0,
-                        "a need has one `Fail` entry: write `Fail(A | B)`",
-                    );
-                }
-                continue;
-            }
-            if s.rest {
-                self.error(
-                    s.name.span.0,
-                    "`..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet",
-                );
-                continue;
-            }
             params.push(o::Param::Env {
+                rest: s.rest,
                 name: id(&s.name),
                 ty: self.ty(&s.ty),
             });
         }
     }
 
-    /// The written `-> R`: the needs are left to inference. A `Fail(E)`
-    /// item of the service pattern gives the error part `E`.
+    /// The written `-> R` leaves needs to inference, including `Fail(E)`.
     fn ret(&mut self, f: &n::Function) -> Option<o::RetType> {
-        let fail = f.services.iter().flatten().find_map(fail_of);
-        let at = match (&f.ret, fail) {
-            (Some(t), _) => t.span.0,
-            (None, Some(e)) => e.span.0,
-            (None, None) => return None,
-        };
-        let hole = || ty(o::TypeKind::Hole, at);
-        Some(o::RetType {
-            value: f.ret.as_ref().map_or_else(hole, |t| self.ty(t)),
-            err: Some(fail.map_or_else(hole, |e| self.ty(e))),
-            env: Some(hole()),
+        f.ret.as_ref().map(|t| o::RetType {
+            value: self.ty(t),
+            err: None,
+            env: Some(ty(o::TypeKind::Hole, t.span.0)),
         })
     }
 
@@ -1267,15 +1133,10 @@ impl Cx {
             }
         }
         let ret = match written.as_slice() {
-            [] => fs
-                .iter()
-                .find(|f| f.services.iter().flatten().any(|s| fail_of(s).is_some()))
-                .and_then(|f| self.ret(f)),
+            [] => None,
             [_] => fs
                 .iter()
-                .find(|f| {
-                    f.ret.is_some() || f.services.iter().flatten().any(|s| fail_of(s).is_some())
-                })
+                .find(|f| f.ret.is_some())
                 .and_then(|f| self.ret(f)),
             _ if fs.iter().any(|f| f.ret.is_none()) => None,
             many => {
@@ -1283,7 +1144,7 @@ impl Cx {
                 let members = many.iter().map(|t| self.ty(t)).collect();
                 Some(o::RetType {
                     value: ty(o::TypeKind::Union(members), at),
-                    err: Some(ty(o::TypeKind::Hole, at)),
+                    err: None,
                     env: Some(ty(o::TypeKind::Hole, at)),
                 })
             }
@@ -1779,79 +1640,34 @@ impl Cx {
 
     // ---- Types ----
 
-    /// The needs written after `<-` as the two rows of the legacy function
-    /// type: the error channel and the environment. This is the only place
-    /// where a need becomes a row: a `Fail(E)` entry is the error `E`, every
-    /// other entry is a member of the environment, and `..N` (or `<- N`) is
-    /// the row variable `N`, which also carries the errors when the
-    /// signature writes no `Fail` beside it.
+    /// every service, including Fail(E), is in the one need.
     fn needs_row(
         &mut self,
         services: Option<&n::Type>,
         span: Span,
     ) -> (Option<o::TypeExpr>, Option<o::TypeExpr>) {
-        let mut err: Option<o::TypeExpr> = None;
-        let mut env: Vec<o::TypeExpr> = Vec::new();
-        let mut row: Option<String> = None;
-        let mut need = |cx: &mut Cx, t: &n::Type, spread: bool| {
-            if let n::TypeKind::Named {
-                module: None,
-                name,
-                args,
-            } = &t.kind
-            {
-                if name.name == "Fail" && args.len() == 1 && !spread {
-                    if err.is_some() {
-                        cx.error(t.span.0, "a need has one `Fail` entry: write `Fail(A | B)`");
-                    }
-                    err = Some(cx.ty(&args[0]));
-                    return;
-                }
-                if spread && args.is_empty() {
-                    row = Some(name.name.clone());
-                }
-            }
-            env.push(cx.ty(t));
-        };
+        let mut env = Vec::new();
         match services.map(|s| (&s.kind, s)) {
             None => {}
             Some((n::TypeKind::Data(items), _)) => {
                 for item in items {
                     match item {
-                        n::TItem::Pos(t) => need(self, t, false),
-                        n::TItem::Spread(t) => need(self, t, true),
-                        n::TItem::Label(l, _) => self.error(
-                            l.span.0,
+                        n::TItem::Pos(ty) | n::TItem::Spread(ty) => env.push(self.ty(ty)),
+                        n::TItem::Label(label, _) => self.error(
+                            label.span.0,
                             "a need has no label: it is keyed by its type (§2.10.2)",
                         ),
                     }
                 }
             }
-            // `<- N`: a row variable.
-            Some((_, t)) => need(self, t, true),
-        }
-        // The errors that a row variable carries.
-        if err.is_none()
-            && let Some(row) = row
-            && let Some(found) = self.rows.iter_mut().rev().find(|r| r.name == row)
-            && found.carries
-        {
-            found.used = true;
-            err = Some(ty(
-                o::TypeKind::Named {
-                    module: None,
-                    name: ident(format!("{row}%E"), span),
-                    args: Vec::new(),
-                },
-                span,
-            ));
+            Some((_, ty)) => env.push(self.ty(ty)),
         }
         let env = match env.len() {
             0 => None,
             1 => env.pop(),
             _ => Some(ty(o::TypeKind::Union(env), span)),
         };
-        (err, env)
+        (None, env)
     }
 
     fn fn_type(&mut self, f: &n::FnType, span: Span, generics_taken: bool) -> o::TypeExpr {
@@ -1887,12 +1703,12 @@ impl Cx {
                 ty: self.ty(&f.param),
             }),
         }
-        let (err, env) = self.needs_row(f.services.as_ref(), span);
+        let (_, env) = self.needs_row(f.services.as_ref(), span);
         ty(
             o::TypeKind::Fn {
                 params,
                 ret: Box::new(self.ty(&f.ret)),
-                err: err.map(Box::new),
+                err: None,
                 env: env.map(Box::new),
             },
             span,
@@ -1971,17 +1787,5 @@ impl Cx {
             }
         };
         ty(kind, span)
-    }
-}
-
-/// The `E` of a service item `name: Fail(E)`.
-fn fail_of(s: &n::SItem) -> Option<&n::Type> {
-    match &s.ty.kind {
-        n::TypeKind::Named {
-            module: None,
-            name,
-            args,
-        } if !s.rest && name.name == "Fail" && args.len() == 1 => Some(&args[0]),
-        _ => None,
     }
 }

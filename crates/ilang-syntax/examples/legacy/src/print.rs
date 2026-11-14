@@ -72,11 +72,6 @@ fn is_simple(e: &Expr) -> bool {
     }
 }
 
-/// A match `e |> { … }`.
-pub(crate) fn is_match(e: &Expr) -> bool {
-    matches!(e.kind, ExprKind::Case { .. })
-}
-
 /// The function that `e` starts with, through operators, calls, `.f`, and
 /// `.k`.
 pub(crate) fn leading_fn(e: &Expr) -> Option<&Function> {
@@ -653,7 +648,10 @@ impl Printer {
         self.w("(");
         self.list(&f.params, |p, param| match param {
             Param::Pattern(pat) => p.pattern(pat, false),
-            Param::Env { name, ty } => {
+            Param::Env { name, ty, rest } => {
+                if *rest {
+                    p.w("..");
+                }
                 p.w(&format!("{} ! ", name.name));
                 p.ty(ty);
             }

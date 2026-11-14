@@ -323,10 +323,10 @@ pub(super) const EFFECTS: &str = r#"
         (else (local.set $given (local.get $cur))))
       (if (local.get $mode)
         (then
-          ;; Kinds 2, 3 and 4 take an error; kinds 2 and 3 take a cancel.
+          ;; Kinds 2 and 3 take an error or a cancel.
           (br_if $step (i32.eqz (i32.and (i32.const 1)
             (i32.shr_u
-              (select (i32.const 0x1C) (i32.const 0x0C) (i32.eq (local.get $mode) (i32.const 1)))
+              (i32.const 0x0C)
               (struct.get $frame 3 (local.get $fr))))))
           (call $shadow_restore (local.get $d))))
       (local.set $v
@@ -352,39 +352,6 @@ pub(super) const EFFECTS: &str = r#"
   (call $capture_splice (local.get $c) (local.get $node) (local.get $nm) (local.get $last) (local.get $mlast))
   (global.set $pend (struct.get $tramp 2 (local.get $t)))
   (throw_ref (local.get $x)))
-
-;; `fail.catch(body)` (§9.3).
-(func $fail_catch (param $body eqref) (param $env (ref null $env)) (result eqref)
-  (return_call $catch_run (local.get $env) (local.get $body)))
-
-;; Calls `body`, and takes `$error`.
-(func $catch_run (param $env (ref null $env)) (param $body eqref) (result eqref)
-  (local $depth i32) (local $e eqref) (local $r eqref)
-  (local.set $depth (call $shadow_depth))
-  (block $captured (result (ref $cap) exnref)
-    (local.set $e
-      (block $caught (result eqref)
-        (local.set $r
-          (try_table (result eqref) (catch $error $caught) (catch_ref $capture $captured)
-            (call $call0 (local.get $body) (local.get $env))))
-        (return (call $result_ok (local.get $r)))))
-    ;; An escape goes on to its boundary.
-    (if (ref.test (ref $escaped) (local.get $e)) (then (throw $error (local.get $e))))
-    (call $shadow_restore (local.get $depth))
-    (return (call $result_error (local.get $e))))
-  (call $capture_rethrow
-    (struct.new $frame (ref.func $catch_reenter) (ref.null $values) (i32.const -1) (i32.const 4)
-      (ref.null $values)))
-  (unreachable))
-
-;; The body ended with the value or the error `v`.
-(func $catch_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env)) (param $v eqref)
-    (param $mode i32) (result eqref)
-  (if (i32.eq (local.get $mode) (i32.const 1))
-    (then
-      (if (ref.test (ref $escaped) (local.get $v)) (then (throw $error (local.get $v))))
-      (return_call $result_error (local.get $v))))
-  (return_call $result_ok (local.get $v)))
 
 ;; `resource.ensure(body, with)` (§9.5): `with` runs after `body`, also when
 ;; an error or an unwinding goes through, which then goes on. A capture
@@ -827,21 +794,35 @@ pub(super) const EFFECTS: &str = r#"
 ;; not part of the environment that source code keeps. Force lazy services
 ;; so the captured tuple holds their values, including portable values
 ;; whose functions do not capture the boundary.
-(func $control_keep_env (param $f eqref) (param $env (ref null $env)) (param $n i32) (result eqref)
+(func $row_snapshot (param $env (ref null $env)) (param $n i32) (result (ref $env))
+  (local $slots (ref $env)) (local $i i32)
+  (local.set $slots (array.new_default $env (local.get $n)))
+  (block $done (loop $copy
+    (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
+    (array.set $env (local.get $slots) (local.get $i)
+      (call $service_force (array.get $env (local.get $env) (local.get $i)) (local.get $env)))
+    (local.set $i (i32.add (local.get $i) (i32.const 1)))
+    (br $copy)))
+  (local.get $slots))
+
+(func $adapter_pin_env (param $f eqref) (param $env (ref null $env)) (param $n i32) (result eqref)
   (local $slots (ref $values)) (local $i i32)
   (local.set $slots (array.new_default $values (local.get $n)))
   (block $done (loop $copy
     (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
-    (array.set $values (local.get $slots) (local.get $i)
-      (call $service_force (array.get $env (local.get $env) (local.get $i)) (local.get $env)))
+    ;; Fail stays at the call, so retaining it here would also make a pure
+    ;; kept function non-portable merely because catch's boundary is local.
+    (if (i32.ne (local.get $i) (i32.const 1))
+      (then (array.set $values (local.get $slots) (local.get $i)
+        (call $service_force (array.get $env (local.get $env) (local.get $i)) (local.get $env)))))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $copy)))
   (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 1)
     (ref.null $bytes)
     (array.new_fixed $values 2 (local.get $f) (call $tuple (local.get $slots)))
-    (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $keep_call)))
+    (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $adapter_pin_call)))
 
-(func $keep_call (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env))
+(func $adapter_pin_call (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env))
     (param $arg eqref) (result eqref)
   (local $caps (ref $values)) (local $slots (ref $values)) (local $kept (ref $env))
   (local $i i32) (local $n i32)
@@ -856,24 +837,34 @@ pub(super) const EFFECTS: &str = r#"
       (array.get $values (local.get $slots) (local.get $i)))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $copy)))
-  (return_call $keep_run (array.get $values (local.get $caps) (i32.const 0))
+  ;; `Fail` comes from the place of the call (§2.10.7: the kept function
+  ;; raises to the caller's `catch`).
+  (if (i32.gt_u (local.get $n) (i32.const 1))
+    (then (array.set $env (local.get $kept) (i32.const 1)
+      (array.get $env (local.get $env) (i32.const 1)))))
+  (return_call $adapter_pin_run (array.get $values (local.get $caps) (i32.const 0))
     (local.get $arg) (local.get $kept)))
 
 ;; A delimiter packs its inner records. Re-entry always uses the kept base,
 ;; before applying any environment statements made inside the kept call.
-(func $keep_run (param $f eqref) (param $arg eqref) (param $env (ref null $env)) (result eqref)
+(func $adapter_pin_run (param $f eqref) (param $arg eqref) (param $env (ref null $env)) (result eqref)
   (block $captured (result (ref $cap) exnref)
     (return (try_table (result eqref) (catch_ref $capture $captured)
       (call $call1 (local.get $f) (local.get $arg) (local.get $env)))))
-  (call $capture_pack (ref.func $keep_reenter) (local.get $env))
+  (call $capture_pack (ref.func $adapter_pin_reenter) (local.get $env))
   unreachable)
 
-(func $keep_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env))
+(func $adapter_pin_reenter (type $refn) (param $frame (ref $frame)) (param $env (ref null $env))
     (param $v eqref) (param $mode i32) (result eqref)
   (local $saved (ref $values)) (local $kept (ref null $env))
   (local $c (ref $cap)) (local $x exnref)
   (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
   (local.set $kept (ref.cast (ref null $env) (array.get $values (local.get $saved) (i32.const 0))))
+  ;; Resume and cancel use their caller's Fail too (§9.4 rule 3).
+  ;; Inner provides are replayed by tramp_run after this base is restored.
+  (if (i32.gt_u (array.len (ref.as_non_null (local.get $kept))) (i32.const 1))
+    (then (local.set $kept (call $env_with (local.get $kept) (i32.const 1)
+      (array.get $env (local.get $env) (i32.const 1))))))
   (block $captured (result (ref $cap) exnref)
     (return (try_table (result eqref) (catch_ref $capture $captured)
       (call $tramp_run
@@ -881,7 +872,7 @@ pub(super) const EFFECTS: &str = r#"
         (local.get $kept) (local.get $v) (local.get $mode)))))
   (local.set $x)
   (local.set $c)
-  (call $capture_pack (local.get $c) (local.get $x) (ref.func $keep_reenter) (local.get $kept))
+  (call $capture_pack (local.get $c) (local.get $x) (ref.func $adapter_pin_reenter) (local.get $kept))
   unreachable)
 
 ;; Request waits use the same one-root capture and re-entry machinery.

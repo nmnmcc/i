@@ -19,7 +19,7 @@ fn has_algebra(t: &Ty) -> bool {
     match t {
         Ty::Union(_) | Ty::Inter(_) | Ty::Diff(_, _) => true,
         Ty::Con(_, _, ts) => ts.iter().any(has_algebra),
-        Ty::Fn(f) => has_algebra(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(has_algebra),
+        Ty::Fn(f) => has_algebra(&f.param) || [&f.ret, &f.env].into_iter().any(has_algebra),
         Ty::Both(a, b) => has_algebra(a) || has_algebra(b),
         Ty::Var(_) | Ty::Never | Ty::Top => false,
     }
@@ -31,7 +31,7 @@ fn has_record(t: &Ty) -> bool {
     match t {
         Ty::Con(super::Head::Shape(shape), _, _) if shape.has_labels() => true,
         Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => parts.iter().any(has_record),
-        Ty::Fn(f) => has_record(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(has_record),
+        Ty::Fn(f) => has_record(&f.param) || [&f.ret, &f.env].into_iter().any(has_record),
         Ty::Diff(base, heads) => has_record(base) || heads.iter().any(has_record),
         Ty::Both(a, b) => has_record(a) || has_record(b),
         Ty::Var(_) | Ty::Never | Ty::Top => false,
@@ -58,7 +58,6 @@ pub(super) fn map_vars(t: &Ty, f: &mut impl FnMut(V) -> Ty) -> Ty {
             param: map_vars(&g.param, f),
             labels: g.labels.clone(),
             ret: map_vars(&g.ret, f),
-            err: map_vars(&g.err, f),
             env: map_vars(&g.env, f),
         })),
         Ty::Union(ts) => Ty::Union(ts.iter().map(|t| map_vars(t, f)).collect()),
@@ -228,14 +227,13 @@ impl Checker<'_> {
             TypeKind::Fn {
                 params: ps,
                 ret,
-                err,
+                err: _,
                 env,
             } => Ty::Fn(Box::new(FnTy::new(
                 ps.iter()
                     .map(|p| Some((p.label.as_ref().map(|l| l.name.clone()), go(&p.ty)?)))
                     .collect::<Option<_>>()?,
                 go(ret)?,
-                err.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
                 env.as_ref().map_or(Some(Ty::Never), |t| go(t))?,
             ))),
         })
@@ -289,7 +287,6 @@ impl Checker<'_> {
                 param: go(f.param),
                 labels: f.labels,
                 ret: go(f.ret),
-                err: go(f.err),
                 env: go(f.env),
             })),
             Ty::Union(ts) => self.kunion(ts.into_iter().map(go).collect()),

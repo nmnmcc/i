@@ -125,21 +125,50 @@ fn work_and_allocation_stop_before_crossing_the_limit() {
 
 #[test]
 fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
-    let tail = compile(
-        "f = (n) { n |> (0) { Nil } | (_) { f(n - 1) } }\n\nmain = () { f(40) }\n",
-        false,
-    );
+    let tail_source = "f = (n) { n |> (0) { Nil } | (_) { f(n - 1) } }\n\nmain = () { f(40) }\n";
+    let baseline = compile(&tail_source.replace("f(40)", "f(0)"), false);
+    let tail = compile(tail_source, false);
     let non_tail = compile(
         "f = (n) { n |> (0) { 0 } | (_) { f(n - 1) + 1 } }\n\nmain = () {\n\tf(40)\n\tNil\n}\n",
         false,
     );
+    // Entries include ordinary library catch/provider frames. Find the
+    // exact zero-recursion peak instead of assuming their old constant cost.
+    // Recursion must fit that same tight budget; it gets no extra frame units.
+    let mut low = 0;
+    let mut high = Limits::default().frames;
+    let (base, _) = run(&baseline, Limits::default());
+    assert!(matches!(base.unwrap(), Outcome::Ok(_)));
+    while low < high {
+        let mid = u64::midpoint(low, high);
+        let (outcome, budget) = run(
+            &baseline,
+            Limits {
+                frames: mid,
+                ..Limits::default()
+            },
+        );
+        match budget.exceeded() {
+            Some(Limit::Frames) => low = mid + 1,
+            None => {
+                assert!(matches!(outcome.unwrap(), Outcome::Ok(_)));
+                high = mid;
+            }
+            other => panic!("unexpected baseline limit: {other:?}"),
+        }
+    }
+    eprintln!("zero-recursion entry frame peak: {low}");
     let limits = Limits {
-        frames: 20,
+        frames: low,
         ..Limits::default()
     };
     let (ok, tail_budget) = run(&tail, limits);
     assert!(matches!(ok.unwrap(), Outcome::Ok(_)));
     assert_eq!(tail_budget.usage().frames, 0);
+    let deeper = compile(&tail_source.replace("f(40)", "f(400)"), false);
+    let (ok, deeper_budget) = run(&deeper, limits);
+    assert!(matches!(ok.unwrap(), Outcome::Ok(_)));
+    assert_eq!(deeper_budget.usage().frames, 0);
     let (_, nested) = run(&non_tail, limits);
     assert_eq!(nested.exceeded(), Some(Limit::Frames));
 }

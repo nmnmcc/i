@@ -258,6 +258,10 @@ test("metadata that is not correct fails before instantiation", async () => {
   const base = { version: 5, entry: null, tests: [], exports: {}, services: {}, externals: {} };
   assert.equal(readAbi(module, base).entry, null);
   assert.equal(readAbi(module, base).version, 5);
+  const fallibleExternal = { ...base, externals: { m: { f: { params: [], result: "int", errors: ["string"] } } } };
+  assert.deepEqual(readAbi(module, fallibleExternal).externals.m.f.errors, ["string"]);
+  assert.throws(() => readAbi(module, { ...fallibleExternal, version: 4 }), AbiError);
+  assert.throws(() => readAbi(module, { ...fallibleExternal, externals: { m: { f: { params: [], result: "int", async: true } } } }), AbiError);
   assert.equal(readAbi(module, { ...base, version: 4 }).version, 4);
   assert.equal(readAbi(module, { ...base, version: 3 }).version, 3);
   for (const old of [1, 2]) {
@@ -275,7 +279,7 @@ test("metadata that is not correct fails before instantiation", async () => {
     { ...base, entry: { name: "ilang_continue", async: true } },
     { ...base, entry: { name: "f" }, exports: { f: { params: [], result: "nil" } } },
     { ...base, services: { "ilang:host/v1": {} } },
-    { ...base, externals: { m: { f: { params: [], result: "nil", errors: ["nil"] } } } },
+    { ...base, version: 3, externals: { m: { f: { params: [], result: "nil", errors: ["nil"] } } } },
   ]) {
     assert.throws(() => readAbi(module, malformed), AbiError, JSON.stringify(malformed));
   }

@@ -18,6 +18,7 @@ Put this complete program in `src/main.i`:
 
 ```i run package=guide_files title="src/main.i"
 (
+	i/fail
 	i/fs
 	i/stdio
 	std/path
@@ -28,7 +29,7 @@ main = () {
 	fs.write_file(file, <<"hello from a file":utf8>>)
 	bytes = fs.read_file(file)
 	fs.remove(file)
-	Ok(text) = bit_array.to_string(bytes)
+	Ok(text) = fail.catch(() { bit_array.to_string(bytes) })
 	stdio.print(file)
 	stdio.print(text)
 }
@@ -85,4 +86,4 @@ result.txt
 
 ## See also
 
-The [IO operations, §9.12](/docs/standard/generated/chapter-9#section-9-12) list the filesystem functions. Continue with [HTTP service](/docs/guides/http-service) to handle requests, or [testing](/docs/guides/testing) to check code without depending on real IO.
+Continue with [HTTP service](/docs/guides/http-service) to handle requests, or [testing](/docs/guides/testing) to check code without depending on real IO.

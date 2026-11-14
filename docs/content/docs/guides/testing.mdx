@@ -140,14 +140,15 @@ A property test checks a claim over values from a generator. Here the claim is t
 
 ```i test package=guide_tests title="test/reverse_test.i"
 (
+	i/fail
 	testlib = (test) = std/test
 	i/core
 	std/property
 	std/list
 )
 test("reverse twice", () {
-	Ok(numbers) = property.int(-10, 10)
-	Ok(lists) = property.list(numbers, 0, 12)
+	Ok(numbers) = fail.catch(() { property.int(-10, 10) })
+	Ok(lists) = fail.catch(() { property.list(numbers, 0, 12) })
 	property.test(
 		lists,
 		property.Config(
@@ -208,4 +209,4 @@ The test supplies an ordinary `Clock` value with `<-`. No wall clock is read, so
 
 ## See also
 
-Read [entry points, §10.2](/docs/standard/generated/chapter-10#section-10-2) for test execution and [assert, §9.6](/docs/standard/generated/chapter-9#section-9-6) for assertion behavior. Continue with [packaging](/docs/guides/packaging) to build the checked project.
+Continue with [packaging](/docs/guides/packaging) to build the checked project.

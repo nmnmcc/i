@@ -154,7 +154,7 @@ header = (hs : AnyHeaders, name : String) -> Option(String) {
 		(RawHeaders(_)) {
 			header_bytes(hs, name) |>
 				(Some(value)) {
-					bit_array.to_string(value) |>
+					fail.catch(() { bit_array.to_string(value) }) |>
 						(Ok(text)) { Some(text) }
 						| (Error(_)) { None }
 				}
@@ -197,7 +197,7 @@ headers = (hs : AnyHeaders, name : String) -> List(String) {
 				(k, v) = pair
 				{ lowercase(k) == lowercase(name) } |>
 					(True) {
-						bit_array.to_string(v) |>
+						fail.catch(() { bit_array.to_string(v) }) |>
 							(Ok(value)) { Some(value) }
 							| (Error(_)) { None }
 					}
@@ -223,10 +223,10 @@ add_header = (hs : AnyHeaders, name : String, value : String) -> AnyHeaders {
 		}
 }
 
-parse_query = (query : String) -> Result(
+_parse_query_result = (query : String) -> Result(
 	List((String, String)),
 	uri.CodecError,
-) { uri.parse_query(query) }
+) { fail.catch(() { uri.parse_query(query) }) }
 
 build_query = (pairs : List((String, String))) -> String {
 	uri.build_query(pairs)
@@ -412,7 +412,7 @@ read_headers = (xs : List(Int), acc : List((String, BitArray))) -> (
 make_headers = (xs : List((String, BitArray))) -> AnyHeaders {
 	values = list.map(xs, (pair) {
 		(name, value) = pair
-		bit_array.to_string(value) |>
+		fail.catch(() { bit_array.to_string(value) }) |>
 			(Ok(text)) { Some((name, text)) }
 			| (Error(_)) { None }
 	})
@@ -422,7 +422,10 @@ make_headers = (xs : List((String, BitArray))) -> AnyHeaders {
 }
 
 text_unchecked = (xs : List(Int)) -> String {
-	bit_array.to_string(bits(xs)) |>
+	{
+		e4_call_arg_0 = bits(xs)
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("http: invalid internal text") }
 }
@@ -450,7 +453,7 @@ validate_framing = (hs : AnyHeaders) -> Nil {
 		} |>
 			(True) {
 				require(
-					bit_array.to_string(value) |>
+					fail.catch(() { bit_array.to_string(value) }) |>
 						(Ok(_)) { True }
 						| (Error(_)) { False },
 					"invalid framing field",
@@ -554,7 +557,7 @@ transfer_codings = (hs : AnyHeaders) -> List(String) {
 parse_length = (value : String) -> Int {
 	raw = octets(<<value:utf8>>)
 	require(raw != [] && list.all(raw, digit), "invalid content-length")
-	int.parse(value) |>
+	fail.catch(() { int.parse(value) }) |>
 		(Ok(size)) { size }
 		| (Error(_)) { fail.raise(BadMessage("invalid content-length")) }
 }
@@ -731,7 +734,10 @@ bits = (xs : List(Int)) -> BitArray {
 }
 
 text = (xs : List(Int)) -> String {
-	bit_array.to_string(bits(xs)) |>
+	{
+		e4_call_arg_0 = bits(xs)
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(s)) { s }
 		| (Error(_)) { fail.raise(BadMessage("invalid UTF-8")) }
 }
@@ -918,7 +924,10 @@ lowercase = (s : String) -> String {
 	raw = list.map(octets(<<s:utf8>>), (x) {
 		{ x >= 65 && x <= 90 } |> (True) { x + 32 } | (False) { x }
 	})
-	bit_array.to_string(bits(raw)) |>
+	{
+		e4_call_arg_0 = bits(raw)
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("http: invalid internal text") }
 }
@@ -1306,11 +1315,11 @@ Client = (
 native_client = () <- (n : net.Net, t : tls.Tls) {
 	Client(
 		make = () {
-			provider = network_client()
+			provider : (send = _, close = _) = network_client()
 			Transport(
 				stream = (req) {
 					{
-						res = provider.send(req)
+						res : Response = provider.send(req)
 						cursor = task.ref(res.body)
 						(
 							head = res,
@@ -1377,7 +1386,10 @@ fetch_error = (code : String) {
 		| (_) { fail.raise(Connect(code)) }
 }
 
-fetch_reply = <A, N>(body : () <- (Fail(String), ..N) -> A) -> A {
+fetch_reply : <A, N>(() <- (Fail(String), ..N) -> A) <- (
+	Fail(HttpError),
+	..N,
+) -> A = (body) {
 	fail.catch(body) |>
 		(Ok(value)) { value }
 		| (Error(code)) { fetch_error(code) }
@@ -1398,7 +1410,7 @@ fetch_open = (req : Request) {
 				(name, value) = pair
 				(
 					name,
-					bit_array.to_string(value) |>
+					fail.catch(() { bit_array.to_string(value) }) |>
 						(Ok(text)) { text }
 						| (Error(_)) {
 							fail.raise(Protocol("invalid header UTF-8"))
@@ -1440,13 +1452,21 @@ fetch_client = () <- (f : fetch.Fetch) {
 				stream = (req) {
 					{
 						// Keep Fetch across suspension; task services still come from the caller.
-						reader = fetch_stream(req)
+						reader : (
+							head = Response,
+							read = _,
+							close = _,
+						) = fetch_stream(req)
 						reader
 					} <- (f)
 				},
 				send = (req) {
 					{
-						reader = fetch_stream(req)
+						reader : (
+							head = Response,
+							read = _,
+							close = _,
+						) = fetch_stream(req)
 						resource.ensure(
 							() {
 								h = reader.head
@@ -1542,7 +1562,9 @@ post = (url : String, body : BitArray) -> Response {
 	)
 }
 
-body_text = (res : Response) { bit_array.to_string(res.body) }
+_body_text_result = (res : Response) -> Result(String, Nil) {
+	fail.catch(() { bit_array.to_string(res.body) })
+}
 
 follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 	{ count > 10 } |>
@@ -1555,15 +1577,15 @@ follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 					(Some(location), c)
 					? c == 301 || c == 302 || c == 303 || c == 307 || c == 308
 				) {
-					base = uri.parse(req.target) |>
+					base = fail.catch(() { uri.parse(req.target) }) |>
 						(Ok(value)) { value }
 						| (Error(_)) { fail.raise(Protocol("invalid URL")) }
-					next = uri.parse(location) |>
+					next = fail.catch(() { uri.parse(location) }) |>
 						(Ok(value)) { value }
 						| (Error(_)) {
 							fail.raise(Protocol("invalid redirect"))
 						}
-					url = uri.resolve(base, next) |>
+					url = fail.catch(() { uri.resolve(base, next) }) |>
 						(Ok(value)) { uri.to_string(value) }
 						| (Error(_)) {
 							fail.raise(Protocol("invalid redirect"))
@@ -1623,7 +1645,7 @@ redirect_headers = (
 	next,
 	drop_body : Bool
 ) -> AnyHeaders {
-	resolved = uri.resolve(base, next) |>
+	resolved = fail.catch(() { uri.resolve(base, next) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("http: invalid resolved redirect") }
 	changed = uri.parts(base).authority != uri.parts(resolved).authority
@@ -1655,7 +1677,7 @@ redirect_headers = (
 }
 
 send_once = (pool : task.Ref(Pool), req : Request) {
-	u = uri.parse(req.target) |>
+	u = fail.catch(() { uri.parse(req.target) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { fail.raise(Protocol("invalid URL")) }
 	parts = uri.parts(u)
@@ -1671,7 +1693,7 @@ send_once = (pool : task.Ref(Pool), req : Request) {
 		| (uri.IpLiteral(value)) { value }
 	port = authority.port |>
 		(Some(value)) {
-			int.parse(value) |>
+			fail.catch(() { int.parse(value) }) |>
 				(Ok(number) ? number > 0 && number < 65536) { number }
 				| (_) { fail.raise(Protocol("invalid port")) }
 		}
@@ -1792,7 +1814,7 @@ exchange = (
 	lease : Key(Nil) = key.new()
 	resource.ensure(
 		() {
-			transport = entry.connection |>
+			transport : (read = _, write = _) = entry.connection |>
 				(Plain(stream)) { net_transport(stream) }
 				| (Secure(stream)) { tls_transport(stream) }
 			transport.write(wire)
@@ -1880,24 +1902,24 @@ InvalidJson = (json.JsonError)
 InvalidSchema = (schema.SchemaError)
 BodyError = InvalidText | InvalidJson | InvalidSchema
 
-body_json = (res : Response) -> Result(json.Json, BodyError) {
-	body_text(res) |>
+_body_json_result = (res : Response) -> Result(json.Json, BodyError) {
+	_body_text_result(res) |>
 		(Error(_)) { Error(InvalidText) }
 		| (Ok(text)) {
-			json.parse(text) |>
+			fail.catch(() { json.parse(text) }) |>
 				(Ok(value)) { Ok(value) }
 				| (Error(error)) { Error(InvalidJson(error)) }
 		}
 }
 
-body_decode = <A>(
+_body_decode_result = <A>(
 	res : Response,
 	codec : schema.Schema(A, schema.SchemaError)
 ) -> Result(A, BodyError) {
-	body_json(res) |>
+	_body_json_result(res) |>
 		(Error(error)) { Error(error) }
 		| (Ok(value)) {
-			schema.decode(codec, value) |>
+			fail.catch(() { schema.decode(codec, value) }) |>
 				(Ok(decoded)) { Ok(decoded) }
 				| (Error(error)) { Error(InvalidSchema(error)) }
 		}
@@ -2023,3 +2045,24 @@ has_token = (hs : AnyHeaders, name : String, value : String) -> Bool {
 		})
 	})
 }
+
+/// Reports failure through `Fail(uri.CodecError)`.
+parse_query = (query : String) -> List((String, String)) {
+	fail.from_result(_parse_query_result(query))
+}
+
+/// Reports failure through `Fail(Nil)`.
+body_text = (res : Response) -> String {
+	fail.from_result(_body_text_result(res))
+}
+
+/// Reports failure through `Fail(BodyError)`.
+body_json = (res : Response) -> json.Json {
+	fail.from_result(_body_json_result(res))
+}
+
+/// Reports failure through `Fail(BodyError)`.
+body_decode = <A>(
+	res : Response,
+	codec : schema.Schema(A, schema.SchemaError)
+) -> A { fail.from_result(_body_decode_result(res, codec)) }

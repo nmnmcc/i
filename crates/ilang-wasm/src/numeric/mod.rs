@@ -894,7 +894,8 @@ fn inline(
                         | Value::OpEnv(_, _, env)
                         | Value::Light { env, .. }
                         | Value::Service(env, _)
-                        | Value::ServiceRaw(env, _),
+                        | Value::ServiceRaw(env, _)
+                        | Value::Environment(env, _),
                     ..
                 }
                 | Stmt::TailCall { env, .. }

@@ -57,8 +57,8 @@ fn constructor_named_like_its_sum() {
 #[test]
 fn matches_and_chains() {
     same(
-        "f = (n : Int) -> String {\n\tn |> (0) { \"zero\" } | (1 | 2) { \"few\" } | (x ? x > 9) { \"many\" } | (_) { \"some\" }\n}\n",
-        "f = (n : Int) -> String ^ _ ! _ {\n\tn |> {\n\t\t0 -> \"zero\"\n\t\t1 | 2 -> \"few\"\n\t\tx ? x > 9 -> \"many\"\n\t\t_ -> \"some\"\n\t}\n}\n",
+        "f = (n: Int) -> String {\n\tn |> (0) { \"zero\" } | (1 | 2) { \"few\" } | (x ? x > 9) { \"many\" } | (_) { \"some\" }\n}\n",
+        "f = (n: Int) -> String ! _ {\n\tn |> {\n\t\t0 -> \"zero\"\n\t\t1 | 2 -> \"few\"\n\t\tx ? x > 9 -> \"many\"\n\t\t_ -> \"some\"\n\t}\n}\n",
     );
     same(
         "name = (Some(u)) { u } | (None) { \"\" }\n",
@@ -90,8 +90,8 @@ fn empty_data_has_the_same_tree_on_both_surfaces() {
 #[test]
 fn services_and_needs() {
     same(
-        "find_user = (id : String) <- (db : Db, log : Log) {\n\tlog.write(id)\n\tdb.find(id)\n}\n\nDb = (find = (String) <- (Fail(NotFound), Log) -> User)\n",
-        "find_user = (id : String, db ! Db, log ! Log) {\n\tlog.write(id)\n\tdb.find(id)\n}\n\nDb {\n\tDb(find : (String) -> User ^ NotFound ! Log)\n}\n",
+        "find_user = (id: String) <- (db: Db, log: Log) {\n\tlog.write(id)\n\tdb.find(id)\n}\n\nDb = (find = (String) <- (Fail(NotFound), Log) -> User)\n",
+        "find_user = (id: String, db ! Db, log ! Log) {\n\tlog.write(id)\n\tdb.find(id)\n}\n\nDb {\n\tDb(find: (String) -> User ! Fail(NotFound) | Log)\n}\n",
     );
 }
 
@@ -112,10 +112,10 @@ fn type_parameters_and_row_variables() {
     let text = shown(
         "map = <A, B, N>(xs : List(A), f : (A) <- N -> B) -> List(B) { [] }\n\ncatch : <A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E)\n",
     );
-    assert!(text.contains("map(A, B, N, N%E) ="), "{text}");
-    assert!(text.contains("f: (A) -> B ^ N%E ! N"), "{text}");
+    assert!(text.contains("map(A, B, N) ="), "{text}");
+    assert!(text.contains("f: (A) -> B ! N"), "{text}");
     assert!(
-        text.contains("catch(A, E, N): (() -> A ^ E ! N) -> Result(A, E) ! N"),
+        text.contains("catch(A, E, N): (() -> A ! N | Fail(E)) -> Result(A, E) ! N"),
         "{text}"
     );
 }
@@ -167,8 +167,7 @@ fn shape_groups() {
 
 #[test]
 fn forms_of_later_stages_are_errors() {
-    bad("keep = (f : Int) <- (..env : N) { f }\n", "stage E6");
-    bad("f = (x) { g(x) <- env }\n", "stage E6");
+    bad("f = () <- () { Nil }\n", "empty service pattern");
 }
 
 /// Round-tripping the library macro must retain its quotes as well as the
@@ -201,7 +200,7 @@ fn lisp_surface_round_trip() {
 #[test]
 fn literal_result_is_open() {
     let out = shown("f = () -> Int { 1 }\n");
-    assert!(out.contains("-> Int ^ _ ! _"), "{out}");
+    assert!(out.contains("-> Int ! _"), "{out}");
 }
 
 /// The written full type of a binding closes needs and failures.
@@ -243,20 +242,10 @@ fn one_member_alias_keeps_a_type_written_as_a_type() {
 }
 
 #[test]
-fn fail_in_a_function_head_is_its_error_part() {
+fn fail_in_a_function_head_is_an_ordinary_service() {
     use ilang_syntax::ast::{ExprKind, ItemKind, Param, TypeKind};
-
-    // `name: Fail(E)` in a head is the error part `^ E`, as in a need of a
-    // function type: no service parameter `Fail`.
-    let text = shown(
-        "load = (id : String) <- (clock : Clock, fail : Fail(String)) -> Int { 1 }\n\nkeep = () <- (fail : Fail(Int)) { 1 }\n\nboth = (0) <- (fail : Fail(Int)) { 1 } | (n : Int) -> Int { n }\n",
-    );
-    assert!(text.contains("clock ! Clock"), "{text}");
-    assert!(!text.contains("Fail"), "{text}");
-    assert!(text.contains("-> Int ^ String"), "{text}");
-    assert!(text.contains("^ Int"), "{text}");
-    // With no written result, keep the value and other needs inferred.
-    // A later branch's Fail entry must also supply the chain's error part.
+    // Fail is a service; errors share the ordinary need row.
+    // Check both a sole head and a service written on a later branch.
     for source in [
         "keep = () <- (fail : Fail(String)) { 1 }\n",
         "late = (0) { 1 } | (n : Int) <- (fail : Fail(String)) { n }\n",
@@ -264,30 +253,21 @@ fn fail_in_a_function_head_is_its_error_part() {
         let (module, diags) = syn3::parse_lowered(source);
         assert!(diags.is_empty(), "{source}\n{diags:#?}");
         let ItemKind::Binding(binding) = &module.items[0].kind else {
-            panic!("expected a binding: {source}");
+            panic!()
         };
         let ExprKind::Fn(function) = &binding.value.kind else {
-            panic!("expected a function: {source}");
+            panic!()
         };
-        assert!(
-            function
-                .params
-                .iter()
-                .all(|p| !matches!(p, Param::Env { .. }))
-        );
-        let ret = function.ret.as_ref().expect("Fail supplies an error part");
-        assert!(matches!(ret.value.kind, TypeKind::Hole));
-        assert!(matches!(ret.env.as_ref().unwrap().kind, TypeKind::Hole));
-        assert!(matches!(
-            &ret.err.as_ref().unwrap().kind,
-            TypeKind::Named { module: None, name, args }
-                if name.name == "String" && args.is_empty()
-        ));
+        assert!(function.params.iter().any(|p| matches!(p,
+            Param::Env { ty, rest: false, .. }
+                if matches!(&ty.kind, TypeKind::Named { name, .. } if name.name == "Fail")
+        )));
+        assert!(function.ret.as_ref().is_none_or(|r| r.err.is_none()));
     }
-    bad(
-        "f = () <- (a : Fail(Int), b : Fail(String)) { 1 }\n",
-        "a need has one `Fail` entry",
-    );
+    let text = shown("load = (id: String) <- (clock: Clock, fail: Fail(String)) -> Int { 1 }\n");
+    assert!(text.contains("clock ! Clock"), "{text}");
+    assert!(text.contains("fail ! Fail(String)"), "{text}");
+    assert!(!text.contains('^'), "{text}");
 }
 
 #[test]
@@ -312,6 +292,38 @@ fn labelled_function_type_parameters_keep_their_data_keys() {
             .map(|(l, _)| l.name.as_str())
             .collect::<Vec<_>>(),
         ["x", "y"]
+    );
+}
+
+#[test]
+fn rest_service_heads_and_whole_provides_lower() {
+    use ilang_syntax::ast::{ExprKind, ItemKind, Param, Stmt};
+    let source =
+        "keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) { (x) { f(x) <- env } }";
+    let (module, diags) = syn3::parse_lowered(source);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let ItemKind::Binding(binding) = &module.items[0].kind else {
+        panic!()
+    };
+    let ExprKind::Fn(f) = &binding.value.kind else {
+        panic!()
+    };
+    assert!(matches!(&f.params[1], Param::Env { rest: true, name, .. } if name.name == "env"));
+    let Stmt::Expr(inner) = &f.body.stmts[0] else {
+        panic!()
+    };
+    let ExprKind::Fn(inner) = &inner.kind else {
+        panic!()
+    };
+    assert!(matches!(
+        &inner.body.stmts[0],
+        Stmt::Env { spread: true, .. }
+    ));
+    assert!(
+        syn3::parse_lowered("f = <N>() <- (..env: N, db: Db) { Nil }")
+            .1
+            .iter()
+            .any(|d| d.message.contains("last item"))
     );
 }
 
@@ -411,4 +423,55 @@ fn a_closed_function_provider_keeps_its_generalization_boundary() {
     assert!(
         matches!(&value.kind, ExprKind::Name { module: None, name } if name.name == "provided")
     );
+}
+
+#[test]
+fn an_enclosing_type_parameter_keeps_a_provider_contract_open() {
+    use ilang_syntax::ast::{ExprKind, ItemKind, Stmt, TypeKind};
+
+    // A nested provider's written contract
+    // remains open over its enclosing parameters, even without a `_` hole.
+    // Fail is an ordinary need entry, with no synthetic error parameter.
+    let source = "S(N) = (run = () <- N -> Int)\nwrap = <N, E>(body) { nested = () { provided: S(N) = S(run = () <- (failure: Fail(E)) { 1 }) body() <- (provided) } nested() }";
+    let (module, errors) = ilang_syntax::parse_module(source);
+    assert!(errors.is_empty(), "{errors:?}");
+    let ItemKind::Binding(binding) = &module.items[1].kind else {
+        panic!()
+    };
+    assert_eq!(
+        binding
+            .type_params
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<Vec<_>>(),
+        ["N", "E"]
+    );
+    let ExprKind::Fn(outer) = &binding.value.kind else {
+        panic!()
+    };
+    let Stmt::Bind(nested) = &outer.body.stmts[0] else {
+        panic!()
+    };
+    let ExprKind::Fn(inner) = &nested.value.kind else {
+        panic!()
+    };
+    // FA keeps the source binding until resolution, so macro name scope
+    // sees it too. Both resolvers then preserve the open provider contract.
+    let Stmt::Bind(provider) = &inner.body.stmts[0] else {
+        panic!()
+    };
+    let ilang_syntax::ast::PatternKind::Typed { ty, .. } = &provider.pattern.kind else {
+        panic!()
+    };
+    assert!(matches!(&ty.kind, TypeKind::Named { name, args, .. }
+        if name.name == "S" && matches!(&args[0].kind,
+            TypeKind::Named { name, .. } if name.name == "N")));
+    let Stmt::Env { ty, value, .. } = &inner.body.stmts[1] else {
+        panic!()
+    };
+    assert!(matches!(ty.kind, TypeKind::Hole));
+    assert!(matches!(&value.kind, ExprKind::Name { name, .. } if name.name == "provided"));
+    let printed = print_module(&module);
+    assert!(printed.contains("failure ! Fail(E)"), "{printed}");
+    assert!(!printed.contains('^'), "{printed}");
 }

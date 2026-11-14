@@ -15,11 +15,11 @@ check = (got : String, want : String) {
 
 show = (x) { core.inspect(x) }
 
-Paused = (Continuation(Nil, PausedSum, Never, Never))
+Paused = (Continuation(Nil, PausedSum, Never))
 Done = ()
 PausedSum = Paused | Done
 
-Held = (Continuation(Nil, HeldSum, Never, Never))
+Held = (Continuation(Nil, HeldSum, Never))
 Over = ()
 HeldSum = Held | Over
 

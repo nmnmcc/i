@@ -115,8 +115,8 @@ identical Wasm
 
 This comparison was also checked at level 0. It demonstrates identical bytes for these local repeated builds. It does not establish identical artifacts across compiler versions, platforms, or optimization levels.
 
-The standard gives macros controlled compile-time services, a fresh state per run, and a portable `hash` definition (§14.9). Reusing a macro result requires identical inputs. These rules and verified package inputs support repeatable compilation; they do not specify that every native executable is byte-identical across build environments. The repository's compiler-release archive scripts have separate timestamp and archive-normalization rules, described in `docs/release.md`.
+The standard gives macros controlled compile-time services, a fresh state per run, and a portable `hash` definition. Reusing a macro result requires identical inputs. These rules and verified package inputs support repeatable compilation; they do not specify that every native executable is byte-identical across build environments. The repository's compiler-release archive scripts have separate timestamp and archive-normalization rules, described in `docs/release.md`.
 
 ## See also
 
-Read [versions and lock files, §§2.7–2.8](/docs/standard/generated/chapter-2#section-2-7), [running macros, §14.9](/docs/standard/generated/chapter-14#section-14-9), and [the binary interface](/docs/standard/generated/chapter-appendix-b). Continue with [JS and WASI interop](/docs/guides/js-and-wasi-interop). To work on packaging itself, see [building and testing the repository](/docs/contributing/building-and-testing).
+Use the [lock-file reference](/docs/standard/generated/chapter-2#section-2-8) for the exact record format and the [macro execution rules](/docs/standard/generated/chapter-14#section-14-9) for reusable expansion inputs. Continue with [JS and WASI interop](/docs/guides/js-and-wasi-interop). To work on packaging itself, see [building and testing the repository](/docs/contributing/building-and-testing).

@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Semantic diagnostic requirements must distinguish expected and stray cycles."""
+import importlib.machinery
+import importlib.util
+from pathlib import Path
+import unittest
+
+loader = importlib.machinery.SourceFileLoader('corpus', str(Path(__file__).with_name('corpus.py')))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+corpus = importlib.util.module_from_spec(spec)
+loader.exec_module(corpus)
+
+
+class DiagnosticRequirements(unittest.TestCase):
+    def test_explicit_cycle_requirement_can_pass(self):
+        self.assertTrue(corpus.diagnostic_codes_match('error[E0505]: recursive type', ['E0505']))
+
+    def test_cycle_cannot_replace_a_provider_error(self):
+        self.assertFalse(corpus.diagnostic_codes_match('error[E0505]: recursive type', ['E0515']))
+
+    def test_stray_cycle_still_invalidates_an_unrelated_rejection(self):
+        self.assertFalse(corpus.diagnostic_codes_match('error[E0505]: cycle\nerror[E0515]: provider', ['E0515']))
+
+    def test_separate_provider_and_cycle_requirements_both_remain_required(self):
+        both = 'error[E0505]: cycle\nerror[E0515]: provider'
+        self.assertTrue(corpus.diagnostic_codes_match(both, ['E0515'], expected_cycle=True))
+        self.assertFalse(corpus.diagnostic_codes_match('error[E0505]: cycle', ['E0515'], expected_cycle=True))
+        self.assertFalse(corpus.diagnostic_codes_match('error[E0515]: provider', ['E0505'], expected_cycle=True))
+
+    def test_missing_error_or_warning_does_not_satisfy_requirement(self):
+        self.assertFalse(corpus.diagnostic_codes_match('warning[W0504]: unused', ['E0505']))
+
+
+if __name__ == '__main__':
+    unittest.main()

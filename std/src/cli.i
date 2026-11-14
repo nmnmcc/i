@@ -4,8 +4,8 @@
 ////
 //// pure stores a value; flag returns Bool; option/argument return a converted
 //// value; optional returns Option; many/rest return List. map and map2 preserve
-//// their result types. parse returns Result(A,CliError); help returns
-//// Result(String,DefinitionError). text and integer are pure Result converters.
+//// their result types. parse raises CliError; help raises DefinitionError.
+//// text and integer are pure Result converters.
 //// Conversion callbacks have type (String)->Result(A,String), without effects.
 ////
 //// validate all metadata first, in leaf order: ASCII long/positional names
@@ -311,7 +311,7 @@ map2 = <A, B, C>(
 text = (text : String) -> Result(String, String) { Ok(text) }
 
 integer = (text : String) -> Result(Int, String) {
-	int.parse(text) |>
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(value)) { Ok(value) }
 		| (Error(_)) { Error("expected integer") }
 }
@@ -729,7 +729,10 @@ allocate = (
 	go(fields, buckets, positions, [])
 }
 
-parse = <A>(parser : Parser(A), args : List(String)) -> Result(A, CliError) {
+_parse_result = <A>(parser : Parser(A), args : List(String)) -> Result(
+	A,
+	CliError,
+) {
 	Parser(fields, decode) = parser
 	validate(fields) |>
 		(Error(error)) { Error(BadDefinition(error)) }
@@ -764,7 +767,7 @@ show_field = (field : Field) -> String {
 		| (Remaining) { "[<\(field.name)>...]" }
 }
 
-help = <A>(parser : Parser(A), program : String) -> Result(
+_help_result = <A>(parser : Parser(A), program : String) -> Result(
 	String,
 	DefinitionError,
 ) {
@@ -795,16 +798,15 @@ help = <A>(parser : Parser(A), program : String) -> Result(
 		}
 }
 
-/// Parses the arguments supplied by the process service.
-read = <A>(parser : Parser(A)) { parse(parser, process.args()) }
+_read_result = <A>(parser : Parser(A)) { _parse_result(parser, process.args()) }
 
 /// Runs a command after parsing its arguments, reporting failures on stderr.
 run = <A, N>(parser : Parser(A), program : String, body : (A) <- N -> Nil) {
-	read(parser) |>
+	_read_result(parser) |>
 		(Ok(value)) { body(value) }
 		| (Error(error)) {
 			stdio.print_error(core.inspect(error))
-			help(parser, program) |>
+			_help_result(parser, program) |>
 				(Ok(usage)) { stdio.print_error(usage) }
 				| (Error(definition)) {
 					stdio.print_error(core.inspect(definition))
@@ -812,3 +814,18 @@ run = <A, N>(parser : Parser(A), program : String, body : (A) <- N -> Nil) {
 			fail.raise(error)
 		}
 }
+
+/// Reports failure through `Fail(CliError)`.
+parse = <A>(parser : Parser(A), args : List(String)) -> A {
+	fail.from_result(_parse_result(parser, args))
+}
+
+/// Reports failure through `Fail(DefinitionError)`.
+help = <A>(parser : Parser(A), program : String) -> String {
+	fail.from_result(_help_result(parser, program))
+}
+
+/// Parses the arguments supplied by the process service.
+///
+/// Reports failure through `Fail(CliError)`.
+read = <A>(parser : Parser(A)) -> A { fail.from_result(_read_result(parser)) }

@@ -2459,6 +2459,7 @@ impl<'a> Resolver<'a> {
                         if let TypeBody::Custom(cs) = &mut self.p.types[t].body
                             && let TypeKind::Fn { env, .. } = &mut cs[0].fields[i].ty.kind
                         {
+                            needs.extend(env.take().map(|e| *e));
                             *env = Some(Box::new(Type {
                                 kind: TypeKind::Union(needs),
                                 span: f.ty.span,
@@ -2506,10 +2507,16 @@ impl<'a> Resolver<'a> {
         else {
             return None;
         };
+        // No need, or exactly `! Fail(E)`; `E` is the errors.
+        let mut err = err.as_deref();
         if let Some(env) = env
             && !self.is_never(env)
         {
-            return None;
+            let e = self.fail_argument(env)?;
+            if err.is_some() {
+                return None;
+            }
+            err = Some(e);
         }
         let params = params
             .iter()
@@ -2543,6 +2550,22 @@ impl<'a> Resolver<'a> {
             errors: members,
             request_result: false,
         })
+    }
+
+    /// `E` for the type `Fail(E)` of the prelude.
+    fn fail_argument<'t>(&self, t: &'t Type) -> Option<&'t Type> {
+        match &t.kind {
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                args,
+            } if args.len() == 1
+                && self.p.ty(*id).name == "Fail"
+                && Some(self.p.ty(*id).module) == self.p.prelude =>
+            {
+                Some(&args[0])
+            }
+            _ => None,
+        }
     }
 
     /// The name of a prelude type that `t` names with no arguments.
@@ -2642,12 +2665,48 @@ impl<'a> Resolver<'a> {
             }
             return;
         };
-        for (part, what) in [(err, "errors"), (env, "an environment")] {
-            if let Some(part) = part {
+        if let Some(part) = err {
+            self.error(
+                code::EXTERNAL_EFFECTS,
+                part.span,
+                "an external function writes errors as a Fail(E) need (§10.1)",
+            );
+        }
+        if let Some(env) = env {
+            let expanded = self.expand(env);
+            if let Some(error) = self.fail_argument(&expanded).cloned() {
+                if let Some(span) = find_in_type(&error, &|k| matches!(k, TypeKind::Hole)) {
+                    self.error(code::EXTERNAL_HOLE, span,
+                        "the full type of an external function must be written, with no `_` (§10.1)");
+                } else if let Some(span) = find_in_type(&error, &|k| matches!(k, TypeKind::Var(_)))
+                {
+                    self.error(
+                        code::EXTERNAL_TYPE_VAR,
+                        span,
+                        "the type of an external function may not have type variables (§10.1)",
+                    );
+                } else {
+                    let valid = self.boundary_type(&error).is_some_and(|t| {
+                        let members = match t {
+                            Ty::Never => vec![],
+                            Ty::Union(ms) => ms,
+                            one => vec![one],
+                        };
+                        members.iter().all(|m| {
+                            self.host_member(m, false)
+                                .is_some_and(|h| !matches!(h, HostType::Opaque(_)))
+                        })
+                    });
+                    if !valid {
+                        self.error(code::EXTERNAL_HOST_TYPE, error.span,
+                            "the error of an external function must be a host-passable error type (§10.3)");
+                    }
+                }
+            } else if !self.is_never(&expanded) {
                 self.error(
                     code::EXTERNAL_EFFECTS,
-                    part.span,
-                    format!("an external function may not have {what} (§10.1)"),
+                    env.span,
+                    "an external function may have no need or exactly Fail(E) (§10.1)",
                 );
             }
         }
@@ -2764,7 +2823,7 @@ impl<'a> Resolver<'a> {
                         let before = self.diags.len();
                         self.external_type(&t);
                         if self.diags.len() == before
-                            && let Some(f) = self.host_fn(&t, false)
+                            && let Some(f) = self.host_fn(&t, true)
                         {
                             self.p.external_fns.insert(
                                 DefId {
@@ -2855,7 +2914,10 @@ impl<'a> Resolver<'a> {
             names.insert(key, var);
             vars.push(var);
         }
-        self.ty_frames.push(TyFrame { names });
+        self.ty_frames.push(TyFrame {
+            names,
+            fn_depth: self.fn_depth,
+        });
         vars
     }
 
@@ -3960,6 +4022,8 @@ impl<'a> Resolver<'a> {
                     ty: key,
                     value,
                     span,
+                    spread: false,
+                    group,
                 }),
             ) = (&b.stmts[i], b.stmts.get(i + 1))
                 && matches!(key.kind, ast::TypeKind::Hole)
@@ -3982,6 +4046,8 @@ impl<'a> Resolver<'a> {
                     self.env_type(&contract);
                     let value = self.expr(&binding.value);
                     stmts.push(Stmt::Env {
+                        spread: false,
+                        group: *group,
                         ty: contract,
                         value,
                         span: *span,
@@ -4003,14 +4069,22 @@ impl<'a> Resolver<'a> {
                     });
                     Stmt::Bind(binding)
                 }
-                ast::Stmt::Env { ty, value, span } => {
+                ast::Stmt::Env {
+                    ty,
+                    value,
+                    span,
+                    spread,
+                    group,
+                } => {
                     let ty = self.ty(ty);
-                    // `_`: the key is read from the value .
+                    // An inferred service type takes its key from the provided value.
                     if !matches!(ty.kind, TypeKind::Hole) {
                         self.env_type(&ty);
                     }
                     let value = self.expr(value);
                     Stmt::Env {
+                        spread: *spread,
+                        group: *group,
                         ty,
                         value,
                         span: *span,
@@ -4068,11 +4142,20 @@ impl<'a> Resolver<'a> {
                     }
                     params.push(Param::Pattern { pattern, label });
                 }
-                ast::Param::Env { name, ty } => {
+                ast::Param::Env { name, ty, rest } => {
                     let ty = self.ty(ty);
                     // Two environment parameters of one function may
                     // not have the same type constructor.
-                    if let Some(head) = self.env_type(&ty) {
+                    let own_row = matches!(ty.kind, TypeKind::Var(v) if self.ty_frames.last().is_some_and(|frame|
+                        frame.fn_depth == self.fn_depth && frame.names.values().any(|id| *id == v)));
+                    if *rest && !own_row {
+                        self.error(
+                            code::ENV_TYPE,
+                            ty.span,
+                            "a rest service pattern needs a type parameter of the function (§6.8)",
+                        );
+                    }
+                    if !rest && let Some(head) = self.env_type(&ty) {
                         if env_heads.contains(&head) {
                             let tname = self.type_name(head);
                             self.error(
@@ -4096,6 +4179,7 @@ impl<'a> Resolver<'a> {
                         span: name.span,
                     });
                     params.push(Param::Env {
+                        rest: *rest,
                         var,
                         name: name.clone(),
                         ty,
@@ -4706,7 +4790,7 @@ impl<'a> Resolver<'a> {
                     ))
                 }
             }
-            // B.5: a function named two times has two exports with one
+            // A function named two times has two exports with one
             // name.
             if problem.is_none() && !names.insert((e.module.as_str(), e.function.as_str())) {
                 problem = Some((

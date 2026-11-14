@@ -266,6 +266,8 @@ fn typed_macro_can_delay_pure_argument() {
     .unwrap();
 }
 
+// Interface graph artifacts are published for exported bindings.
+// Each compared function is exported in both inputs; the full graph check remains.
 fn same_principal(
     left: &ilang_macro::project::ProjectChecked,
     right: &ilang_macro::project::ProjectChecked,
@@ -284,7 +286,7 @@ fn same_principal(
             .find(|(_, m)| m.path == "app/main")
             .unwrap();
         let di = m.defs.iter().position(|d| d.name == name).unwrap();
-        c.types.as_ref().unwrap().provider_scheme_artifacts[&DefId {
+        c.types.as_ref().unwrap().scheme_artifacts[&DefId {
             module: ModuleId(mi as u32),
             index: di as u32,
         }]
@@ -311,22 +313,22 @@ fn same_principal(
 fn typed_macro_identity_principal_graph_differential() {
     let (_, typed) = checked(
         ID,
-        "(m = app/macros)\nf = (x) { m.identity(x) }\nmain = () { assert(f(42) == 42) }",
+        "(m = app/macros)\n(f)\nf = (x) { m.identity(x) }\nmain = () { assert(f(42) == 42) }",
     )
     .unwrap();
     let (_, plain) = checked(
         ID,
-        "(m = app/macros)\nf = (x) { x }\nmain = () { assert(f(42) == 42) }",
+        "(m = app/macros)\n(f)\nf = (x) { x }\nmain = () { assert(f(42) == 42) }",
     )
     .unwrap();
     same_principal(&typed, &plain, "f");
 }
 #[test]
 fn typed_macro_forwarding_principal_record_graph_differential() {
-    let (_,typed)=checked(ID,"(\n\tm = app/macros\n)\nf = (x : (a = Int, b = String)) { m.identity(x) }\nmain = () { f((a = 42, b = \"x\")) }").unwrap();
+    let (_,typed)=checked(ID,"(\n\tm = app/macros\n)\n(f)\nf = (x: (a = Int, b = String)) { m.identity(x) }\nmain = () { f((a = 42, b = \"x\")) }").unwrap();
     let (_, plain) = checked(
         ID,
-        "(\n\tm = app/macros\n)\nf = (x : (a = Int, b = String)) { x }\nmain = () { f((a = 42, b = \"x\")) }",
+        "(\n\tm = app/macros\n)\n(f)\nf = (x: (a = Int, b = String)) { x }\nmain = () { f((a = 42, b = \"x\")) }",
     )
     .unwrap();
     same_principal(&typed, &plain, "f");
@@ -406,23 +408,31 @@ fn typed_macro_library_inside_syntax_generated_test_runs() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(
-        String::from_utf8_lossy(&output.stdout).contains("passed, 0 failed"),
-        "{}",
-        String::from_utf8_lossy(&output.stdout)
-    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("passed, 0 failed"), "{stdout}");
+    for name in [
+        "outer / inner / service",
+        "provided groups / outer before",
+        "provided groups / inner / override",
+        "provided groups / inner / cases / one",
+        "provided groups / inner / cases / two",
+        "provided groups / outer after",
+        "provided groups / sibling",
+    ] {
+        assert!(stdout.contains(name), "missing {name}: {stdout}");
+    }
 }
 
 #[test]
 fn typed_macro_forwarding_effect_rows_graph_differential() {
     let (_, typed) = checked(
         ID,
-        "(m = app/macros)\nf = (g) { m.identity(g()) }\nmain = () { assert(f(() { 42 }) == 42) }",
+        "(m = app/macros)\n(f)\nf = (g) { m.identity(g()) }\nmain = () { assert(f(() { 42 }) == 42) }",
     )
     .unwrap();
     let (_, plain) = checked(
         ID,
-        "(m = app/macros)\nf = (g) { g() }\nmain = () { assert(f(() { 42 }) == 42) }",
+        "(m = app/macros)\n(f)\nf = (g) { g() }\nmain = () { assert(f(() { 42 }) == 42) }",
     )
     .unwrap();
     same_principal(&typed, &plain, "f");
