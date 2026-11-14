@@ -1,5 +1,211 @@
 ---
 title: Testing
+description: Add unit tests, select tests by name, generate cases, and provide fake services.
 ---
 
-to be written
+This guide adds tests to a project, runs selected tests, and checks code that needs a service. It also shows a real failure and a property test. It assumes [functions and branches](/docs/tour/functions-and-branches), [services and errors](/docs/tour/services-and-errors), and a checkout containing `std/`.
+
+Create `guide-tests/` at the root of the checkout. Use this `i.toml`:
+
+```toml
+name = "guide_tests"
+
+[dependencies]
+
+[test]
+collection = "std/test.tests"
+
+[dev-dependencies]
+std = { path = "../std" }
+```
+
+Put the function under test in `src/count.i`:
+
+```i file=src/count.i
+(
+	count
+)
+count = (n : Int) -> Int { n + 1 }
+```
+
+Put its test in `test/count_test.i`:
+
+```i test
+(
+	testlib = (test) = std/test
+	guide_tests/count
+)
+test("adds one", () { assert(count.count(2) == 3) })
+```
+
+```sh
+i test --opt 0
+i test --opt 2
+```
+
+Each run prints:
+
+```text
+pass guide_tests/count_test.adds one
+1 passed, 0 failed
+```
+
+Source modules live under `src/`; test modules live under `test/` and import source modules by package path. The `_test.i` suffix is a useful convention; the loader reads `.i` and `.is` files throughout `test/`. The manifest's test collection selects the contributions to run. Without a configured collection, no tests run.
+
+`test` is an imported macro, with a literal display name and a zero-argument body. `assert` uses the provided `Assert` service. A normal test passes by returning `Nil`; an assertion failure, stop, or unhandled error fails it. The runner starts a fresh instance for each selected test.
+
+## Run one test or one file
+
+The positional filter matches text in a test's full name. In this project, both of these select the one test above:
+
+```sh
+i test --project . --opt 2 'guide_tests/count_test.adds one'
+i test --project . --opt 2 'guide_tests/count_test.'
+```
+
+Each command prints the same one-test result shown above. Use the full module prefix, including the dot, to select a file's tests. There is no file-selection flag or exact-name flag in this CLI; a filter is a substring match. `--project` selects the project directory, and `--opt` selects the optimization level. Both filters were checked at levels 0 and 2.
+
+## Group cases and change expectations
+
+The following examples are independent test files. Use one at a time when comparing the printed counts. This file uses a suite, explicit cases, a skipped test, and an expected failure:
+
+```i test
+(
+	testlib = (test, suite, each, skip, fails) = std/test
+)
+suite("arithmetic", () {
+	test("addition", () { assert(1 + 1 == 2) })
+	each("double", [("zero", 0), ("two", 2)], (n) { assert(n + n == 2 * n) })
+	skip("disabled", () { assert(False) })
+	fails("expected assertion", () { assert(False) })
+})
+```
+
+```text
+pass guide_tests/forms_test.arithmetic / addition
+pass guide_tests/forms_test.arithmetic / double / zero
+pass guide_tests/forms_test.arithmetic / double / two
+skip guide_tests/forms_test.arithmetic / disabled
+pass guide_tests/forms_test.arithmetic / expected assertion
+4 passed, 0 failed, 1 skipped
+```
+
+`suite` prefixes its children's display names. `each` creates a test for each written `(name, value)` case. `skip` reports its test without running it. `fails` expects a runtime stop or raised error; a successful body makes that test fail.
+
+For a temporary focused run, use `only`:
+
+```i test
+(
+	testlib = (test, only) = std/test
+)
+test("other", () { assert(False) })
+only("working", () { assert(True) })
+```
+
+```text
+skip guide_tests/focus_test.other
+pass guide_tests/focus_test.working
+1 passed, 0 failed, 1 skipped
+```
+
+When any `only` contribution exists, ordinary tests are skipped. Remove the focus before expecting a full test run. These are the six forms exported by `std/test`: `test`, `skip`, `only`, `fails`, `suite`, and `each`; they are ordinary library macros, described conceptually in the tour's [macros](/docs/tour/macros).
+
+## Read a failure
+
+To reproduce an ordinary failing test, replace the test file with `test/failure_test.i` below. This is an intentional failure checked by hand at both optimization levels, so it is shown as a file rather than a passing `test` fence.
+
+```i file=test/failure_test.i
+(
+	testlib = (test) = std/test
+)
+test("wrong sum", () { assert(1 + 1 == 3) })
+```
+
+```sh
+i test --opt 2
+```
+
+```text
+FAIL guide_tests/failure_test.wrong sum
+  assertion failed: assert
+guide_tests/failure_test:4:24
+0 passed, 1 failed
+```
+
+The command exits with status 1. The position points to the assertion in the module, followed by the failed count. Remove this file before running the passing examples.
+
+## Generate cases with std/property
+
+A property test checks a claim over values from a generator. Here the claim is that reversing a list twice returns the original list:
+
+```i test
+(
+	testlib = (test) = std/test
+	i/core
+	std/property
+	std/list
+)
+test("reverse twice", () {
+	Ok(numbers) = property.int(-10, 10)
+	Ok(lists) = property.list(numbers, 0, 12)
+	property.test(
+		lists,
+		property.Config(
+			seed = 42,
+			cases = 50,
+			max_size = 12,
+			max_discards = 100,
+			max_shrinks = 100,
+		),
+		(xs) {
+			assert(
+				list.reverse(list.reverse(xs)) == xs,
+			)
+		},
+		core.inspect,
+	)
+})
+```
+
+```text
+pass guide_tests/reverse_test.reverse twice
+1 passed, 0 failed
+```
+
+`property.int` and `property.list` return a result because their bounds must be valid. The configuration fixes the seed, successful case count, size, discard budget, and shrink budget. `property.test` adapts ordinary assertions to the generator runner. On failure it tries ordered smaller cases within the shrink budget and reports replay information. The shrink result is the best value on that path, not a promise of a global minimum. Keep the seed, generator code, library version, and dependencies with a failure report; deterministic callbacks are needed for replay.
+
+## Provide a fake service
+
+Put the service and its client in `src/deadline.i`:
+
+```i file=src/deadline.i
+(
+	Clock(..)
+	remaining
+)
+Clock = (now = () -> Int)
+remaining = (deadline) <- (clock : Clock) { deadline - clock.now() }
+```
+
+This `test/deadline_test.i` provides a clock that always returns 40:
+
+```i test
+(
+	testlib = (test) = std/test
+	guide_tests/deadline
+)
+test("fixed clock", () {
+	{ assert(deadline.remaining(42) == 2) } <- (deadline.Clock(now = () { 40 }))
+})
+```
+
+```text
+pass guide_tests/deadline_test.fixed clock
+1 passed, 0 failed
+```
+
+The test supplies an ordinary `Clock` value with `<-`. No wall clock is read, so the expected remaining time stays 2 on every run. The client takes its clock as a need; the test chooses the implementation. Use the same arrangement for clients of storage or other services.
+
+## See also
+
+Read [entry points, §10.2](/docs/standard/generated/chapter-10#section-10-2) for test execution and [assert, §9.6](/docs/standard/generated/chapter-9#section-9-6) for assertion behavior. Continue with [packaging](/docs/guides/packaging) to build the checked project.
