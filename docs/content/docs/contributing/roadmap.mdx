@@ -1,5 +1,23 @@
 ---
 title: Roadmap
+description: Read the current tree's implemented work and recorded gaps.
 ---
 
-to be written
+This page separates work present in this tree from recorded conformance gaps and designs that have not landed. The standard defines the language; the current compiler does not yet implement every rule in it.
+
+## In this tree
+
+The tree contains the syntax-three parser and lowering, the checker, macro expansion, WasmGC generation, Binaryen optimization, and Wasmtime host. It also has the CLI, language server, standard library, and spec and review suites. Recent history records the stage-three corpus and a regression for the written-type-parameter problem. The [standard](/docs/standard/generated/introduction) describes the intended language and its current qualifications.
+
+## Recorded gaps
+
+[spec-known-gaps.md](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) groups the specific rules and their present behavior. They include task environment and scope handling; pattern parsing and usefulness warnings; effect rows and resource scope; float text; type inference, type applications and polymorphic types; and macro budget accounting. It also records a distinct unsound case where a program passes the checker and traps. Whether a written type parameter is rigid remains open.
+
+## Designed, not landed
+
+[records.md](https://github.com/nmnmcc/i/blob/main/docs/design/records.md) designs structural records whose proposed implementation is not landed. [ast-hir-merge.md](https://github.com/nmnmcc/i/blob/main/docs/design/ast-hir-merge.md) evaluates a change to the compiler trees; the old syntax tree and its lowering remain in this tree. These notes are plans or investigations, not promises of a date or a release.
+
+## See also
+
+- [The standard: types](/docs/standard/generated/chapter-4)
+- [Contributing](/docs/contributing)
