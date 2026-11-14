@@ -30,7 +30,16 @@ def main():
     with gzip.open(args.baseline, 'wt') as f:
         for item, tree in zip(before, old):
             f.write(json.dumps(dict(item, result=tree), ensure_ascii=False) + '\n')
-    result = subprocess.run([str(args.binary), 'fmt', *paths], cwd=ROOT, text=True, capture_output=True)
+    # These fixtures test the exact pattern source text, including raw line
+    # endings. Never pass them to the formatter; equal trees are insufficient.
+    raw_fixtures = {
+        'tests/spec/1.1/binding_text_cr.i',
+        'tests/spec/1.1/binding_text_crlf.i',
+    }
+    format_paths = [path for path in paths if path not in raw_fixtures]
+    command = [str(args.binary), 'fmt', *format_paths]
+    result = (subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
+              if format_paths else subprocess.CompletedProcess(command, 0, '', ''))
     args.baseline.with_suffix('.fmt.log').write_text(result.stdout + result.stderr)
     preserved = [
         'tests/spec/1.7/one_binding_warning.i',
@@ -38,7 +47,7 @@ def main():
         'tests/spec/1.1/binding_text_crlf.i',
     ]
     for item in before:
-        if item['path'] in preserved:
+        if item['path'] in preserved and item['path'] not in raw_fixtures:
             (ROOT / item['path']).write_bytes(item['source'].encode())
     after = [dict(item, source=(ROOT / item['path']).read_bytes().decode()) for item in before]
     new = MIGRATE['parse'](after, args.driver)
@@ -55,11 +64,12 @@ def main():
     differences = [i for i in entries if not i['equal'] or not i['diagnostics_equal']]
     report = dict(files=len(entries), changed=sum(i['changed'] for i in entries),
                   invalid=sum(bool(i['diagnostics']) for i in entries), fmt_exit=result.returncode,
+                  formatter_invocations=int(bool(format_paths)),
                   preserved_diagnostic_fixtures=preserved,
                   baseline_sha256=hashlib.sha256(args.baseline.read_bytes()).hexdigest(),
                   differences=differences, entries=entries)
     args.report.write_text(json.dumps(report, indent=2) + '\n')
-    print(f"one i fmt invocation: {report['files']} files; {report['changed']} changed; "
+    print(f"{report['formatter_invocations']} i fmt invocation(s): {report['files']} files; {report['changed']} changed; "
           f"{report['invalid']} invalid syntax fixtures; {len(differences)} tree/diagnostic differences")
     if differences:
         print(json.dumps(differences, indent=2))
