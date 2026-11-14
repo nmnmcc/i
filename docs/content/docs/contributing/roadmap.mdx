@@ -71,6 +71,40 @@ Error(DivisionByZero)
 
 **Current limits:** [std-v3.md](https://github.com/nmnmcc/i/blob/main/docs/design/std-v3.md) remains a plan: today's `json.parse` and `time.divide` return `Result`, JSON has separate `pretty`, and time lacks the proposed high-level `Clock`; consult [known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) for conformance work.
 
+## Current limitations
+
+### Keyed data patterns
+
+Keyed data patterns are not available yet; use field access (DOC1).
+
+### Data-rest patterns
+
+Data-rest patterns are not available yet; list rest patterns work (P13).
+
+### Labelled value printing
+
+`core.inspect` omits field labels when printing labelled values, including errors (DOC2).
+
+### Resource scopes
+
+`resource.scoped` and `Scope` are not available yet; use `resource.acquire` callbacks (EF11).
+
+### Loader generation
+
+The `js` and `nodejs` targets produce Wasm and a binding plan, without generated loaders or declarations; load them through the host SDK (DOC3). The built-in `@js` declaration is not available yet.
+
+### Captured scopes
+
+A scope retained through user suspension can remain usable outside its body and later deadlock (C03).
+
+### Callback environments
+
+Captured callbacks retain unnecessary services, which can prevent portable use (C04).
+
+### Macro budgets
+
+Macro work and frame limits are measured differently from the standard (MP08).
+
 ## Available features
 
 | Area | Available today |
@@ -84,7 +118,7 @@ Error(DivisionByZero)
 | Execution | Entries, tests, host calls, tail calls, stops, inspection. |
 | Macros | Core operations, syntax/typed macros, alternate surface. |
 
-These features have exceptions in the gap register, including task environments/scopes, pattern syntax/usefulness, service rows/resources, Float text, types, macro budgets, and a checked program that traps. [Open work](/docs/contributing#open-work) lists identifiers; [the standard](/docs/standard) defines intended behavior.
+Other exceptions, including a checked program that traps, are recorded in the [gap register](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md). [Open work](/docs/contributing#open-work) lists tasks; [the standard](/docs/standard) defines intended behavior.
 
 ## Tools
 
@@ -103,7 +137,7 @@ These features have exceptions in the gap register, including task environments/
 
 [CLI commands](/docs/guides/cli) gives usage; each command has help.
 
-`i build` targets are `native` (default; one executable, statically linked on Linux), `host` (alias `ilang`), `js`, `nodejs`, and `wasi` (Wasm modules). **Current limits:** browser/Node targets emit Wasm and a binding plan requiring the host SDK; generated loaders and declarations remain unavailable ([DOC3](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+`i build` targets are `native` (default; one executable, statically linked on Linux), `host` (alias `ilang`), `js`, `nodejs`, and `wasi` (Wasm modules). Browser/Node targets have [loader generation limits](#loader-generation).
 
 [VS Code](https://github.com/nmnmcc/i/blob/main/editors/vscode/README.md), [Zed](https://github.com/nmnmcc/i/blob/main/editors/zed/README.md), and [tree-sitter](https://github.com/nmnmcc/i/blob/main/editors/tree-sitter-i/README.md) sources provide editor support; the server supplies diagnostics, hover, navigation, completion, and formatting.
 
