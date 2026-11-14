@@ -13,11 +13,11 @@ same_size : Bool
 function : ((Int) -> Int) -> Bool
 holes : (A) -> Bool
 6:12: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-8:23: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+8:24: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 22:13: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `!=` is always `True` (§6.9)
-27:45: warning[W0503]: the two sides have the known types `Int | String` and `Float | Nil`, which can never be equal, so `!=` is always `True` (§6.9)
+27:55: warning[W0503]: the two sides have the known types `Int | String` and `Float | Nil`, which can never be equal, so `!=` is always `True` (§6.9)
 30:9: warning[W0503]: the two sides have the known types `(1, 2)` and `(1, 2, 3)`, which can never be equal, so `==` is always `False` (§6.9)
-35:32: warning[W0503]: the two sides have the known types `(Int) -> Int` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+35:33: warning[W0503]: the two sides have the known types `(Int) -> Int` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 38:15: warning[W0503]: the two sides have the known types `(_, 1)` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
 6:1: warning[W0504]: top-level binding `literals` is not used
 8:1: warning[W0504]: top-level binding `typed` is not used

@@ -9,9 +9,9 @@
 	(Io) = i/io
 )
 Missing = (value = Int)
-needs = () <- (m: Missing) { m.value }
+needs = () <- (m : Missing) { m.value }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.scope((s) {
 		task.go(s, () { needs() })
 		Nil

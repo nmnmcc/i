@@ -4,7 +4,7 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later: Later, owner: request.Owner) {
+main = () <- (later : Later, owner : request.Owner) {
 	first = later.echo("first")
 	second = later.echo("second")
 	request.wait_any([request.ticket(second), request.ticket(second)])

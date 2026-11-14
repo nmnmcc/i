@@ -104,31 +104,31 @@ defaults = () -> Config {
 }
 
 /// Stores a pure draw. None discards one attempt; there are no hidden retries.
-make = <A>(draw: (Int, random.Generator) -> Option(Tree(A))) -> Gen(A) {
+make = <A>(draw : (Int, random.Generator) -> Option(Tree(A))) -> Gen(A) {
 	Gen(draw)
 }
 
 /// Calls the draw once, clamping negative size to zero. Random is immutable.
-sample = <A>(gen: Gen(A), size: Int, random: random.Generator) -> Option(
+sample = <A>(gen : Gen(A), size : Int, random : random.Generator) -> Option(
 	Tree(A),
 ) {
 	Gen(draw) = gen
 	draw(nonnegative(size), random)
 }
 
-nonnegative = (n: Int) -> Int { { n < 0 } |> (True) { 0 } | (False) { n } }
+nonnegative = (n : Int) -> Int { { n < 0 } |> (True) { 0 } | (False) { n } }
 
 /// The root is computed now; children are deferred until requested.
-tree = <A>(value: A, children: () -> List(Tree(A))) -> Tree(A) {
+tree = <A>(value : A, children : () -> List(Tree(A))) -> Tree(A) {
 	Tree(value = value, children = children)
 }
 
 /// A leaf, independent of size and random input.
-constant = <A>(value: A) -> Gen(A) {
+constant = <A>(value : A) -> Gen(A) {
 	Gen((_, _) { Some(Tree(value = value, children = () { [] })) })
 }
 
-map_tree = <A, B>(t: Tree(A), with: (A) -> B) -> Tree(B) {
+map_tree = <A, B>(t : Tree(A), with : (A) -> B) -> Tree(B) {
 	Tree(
 		value = with(t.value),
 		children = () { lists.map(t.children(), (c) { map_tree(c, with) }) },
@@ -136,7 +136,7 @@ map_tree = <A, B>(t: Tree(A), with: (A) -> B) -> Tree(B) {
 }
 
 /// Changes values, retaining ordered shape and duplicates, lazily below root.
-map = <A, B>(gen: Gen(A), with: (A) -> B) -> Gen(B) {
+map = <A, B>(gen : Gen(A), with : (A) -> B) -> Gen(B) {
 	Gen((s, g) {
 		sample(gen, s, g) |>
 			(None) { None }
@@ -145,11 +145,11 @@ map = <A, B>(gen: Gen(A), with: (A) -> B) -> Gen(B) {
 }
 
 bind_node = <A, B>(
-	outer: Tree(A),
-	inner: Tree(B),
-	with: (A) -> Gen(B),
-	size: Int,
-	right: random.Generator
+	outer : Tree(A),
+	inner : Tree(B),
+	with : (A) -> Gen(B),
+	size : Int,
+	right : random.Generator
 ) -> Tree(B) {
 	Tree(
 		value = inner.value,
@@ -166,10 +166,10 @@ bind_node = <A, B>(
 }
 
 bind_outer = <A, B>(
-	outer: Tree(A),
-	with: (A) -> Gen(B),
-	size: Int,
-	right: random.Generator
+	outer : Tree(A),
+	with : (A) -> Gen(B),
+	size : Int,
+	right : random.Generator
 ) -> Option(Tree(B)) {
 	sample(with(outer.value), size, right) |>
 		(None) { None }
@@ -179,7 +179,7 @@ bind_outer = <A, B>(
 /// Splits once. Outer shrinks regenerate the dependent tree on the same right
 /// stream and size. Outer alternatives precede inner alternatives; discarded
 /// branches are pruned, including descendants. Seeded associativity is no law.
-flat_map = <A, B>(gen: Gen(A), with: (A) -> Gen(B)) -> Gen(B) {
+flat_map = <A, B>(gen : Gen(A), with : (A) -> Gen(B)) -> Gen(B) {
 	Gen((s, g) {
 		(left, right) = random.split(g)
 		sample(gen, s, left) |>
@@ -189,11 +189,11 @@ flat_map = <A, B>(gen: Gen(A), with: (A) -> Gen(B)) -> Gen(B) {
 }
 
 /// Exactly flat_map followed by map, including random stream allocation.
-pair = <A, B>(first: Gen(A), second: Gen(B)) -> Gen((A, B)) {
+pair = <A, B>(first : Gen(A), second : Gen(B)) -> Gen((A, B)) {
 	flat_map(first, (x) { map(second, (y) { (x, y) }) })
 }
 
-filter_tree = <A>(t: Tree(A), keeping: (A) -> Bool) -> Option(Tree(A)) {
+filter_tree = <A>(t : Tree(A), keeping : (A) -> Bool) -> Option(Tree(A)) {
 	keeping(t.value) |>
 		(False) { None }
 		| (True) {
@@ -211,7 +211,7 @@ filter_tree = <A>(t: Tree(A), keeping: (A) -> Bool) -> Option(Tree(A)) {
 }
 
 /// One root draw. Failing children and their whole subtrees are removed.
-filter = <A>(gen: Gen(A), keeping: (A) -> Bool) -> Gen(A) {
+filter = <A>(gen : Gen(A), keeping : (A) -> Bool) -> Gen(A) {
 	Gen((s, g) {
 		sample(gen, s, g) |>
 			(None) { None }
@@ -220,37 +220,37 @@ filter = <A>(gen: Gen(A), keeping: (A) -> Bool) -> Gen(A) {
 }
 
 /// Selects a generator using the current size, with the same random stream.
-sized = <A>(with: (Int) -> Gen(A)) -> Gen(A) {
+sized = <A>(with : (Int) -> Gen(A)) -> Gen(A) {
 	Gen((s, g) { sample(with(s), s, g) })
 }
 
 /// Replaces size, including the size captured by dependent shrink trees.
-resize = <A>(gen: Gen(A), size: Int) -> Gen(A) {
+resize = <A>(gen : Gen(A), size : Int) -> Gen(A) {
 	Gen((_, g) { sample(gen, nonnegative(size), g) })
 }
 
 // Bounds and path indices below are valid by construction. Exhaustive fallbacks
 // demote RandomError rather than giving stored generator callbacks an effect.
-draw_int = (g: random.Generator, below: Int) -> Option(Int) {
+draw_int = (g : random.Generator, below : Int) -> Option(Int) {
 	fail.catch(() { random.int(g, below) }) |>
 		(Ok((value, _))) { Some(value) }
 		| (Error(_)) { None }
 }
 
-at_path = (g: random.Generator, path: List(Int)) -> Option(random.Generator) {
+at_path = (g : random.Generator, path : List(Int)) -> Option(random.Generator) {
 	fail.catch(() { random.at_path(g, path) }) |>
 		(Ok(next)) { Some(next) }
 		| (Error(_)) { None }
 }
 
-integer_tree = (x: Int, target: Int) -> Tree(Int) {
+integer_tree = (x : Int, target : Int) -> Tree(Int) {
 	Tree(
 		value = x,
 		children = () {
 			{ x == target } |>
 				(True) { [] }
 				| (False) {
-					halves = (q: Int, acc: List(Int)) -> List(Int) {
+					halves = (q : Int, acc : List(Int)) -> List(Int) {
 						q |>
 							(0) { lists.reverse(acc) }
 							| (_) { halves(q / 2, [x - q, ..acc]) }
@@ -266,7 +266,7 @@ integer_tree = (x: Int, target: Int) -> Tree(Int) {
 
 /// Uniform inclusive range under the uniform-word model. Shrinks toward zero
 /// or its nearest endpoint, then by halving distance, with duplicates removed.
-int = (min: Int, max: Int) -> Result(Gen(Int), BuildError) {
+int = (min : Int, max : Int) -> Result(Gen(Int), BuildError) {
 	{ min > max } |>
 		(True) { Error(InvalidRange(min, max)) }
 		| (False) {
@@ -286,7 +286,7 @@ int = (min: Int, max: Int) -> Result(Gen(Int), BuildError) {
 }
 
 // Internal known-valid factories are matched exhaustively, without Assert.
-range = (min: Int, max: Int) -> Gen(Int) {
+range = (min : Int, max : Int) -> Gen(Int) {
 	int(min, max) |> (Ok(gen)) { gen } | (Error(_)) { Gen((_, _) { None }) }
 }
 
@@ -294,7 +294,7 @@ range = (min: Int, max: Int) -> Gen(Int) {
 bool = () -> Gen(Bool) { map(range(0, 1), (n) { n == 1 }) }
 
 /// Draws and shrinks an index toward zero. Duplicates keep their multiplicity.
-element = <A>(choices: List(A)) -> Result(Gen(A), BuildError) {
+element = <A>(choices : List(A)) -> Result(Gen(A), BuildError) {
 	choices |>
 		([]) { Error(EmptyChoice) }
 		| ([first, .._]) {
@@ -311,18 +311,21 @@ element = <A>(choices: List(A)) -> Result(Gen(A), BuildError) {
 		}
 }
 
-list_tree = <A>(items: List(Tree(A)), min: Int) -> Tree(List(A)) {
+list_tree = <A>(items : List(Tree(A)), min : Int) -> Tree(List(A)) {
 	Tree(
 		value = lists.map(items, (t) { t.value }),
 		children = () {
 			n = lists.length(items)
-			chunks = (k: Int, acc: List(Tree(List(A)))) -> List(Tree(List(A))) {
+			chunks = (k : Int, acc : List(Tree(List(A)))) -> List(
+				Tree(List(A)),
+			) {
 				{ k == 0 } |>
 					(True) { lists.reverse(acc) }
 					| (False) {
-						starts = (start: Int, out: List(Tree(List(A)))) -> List(
-							Tree(List(A)),
-						) {
+						starts = (
+							start : Int,
+							out : List(Tree(List(A)))
+						) -> List(Tree(List(A))) {
 							{ start + k > n || n - k < min } |>
 								(True) { out }
 								| (False) {
@@ -347,7 +350,7 @@ list_tree = <A>(items: List(Tree(A)), min: Int) -> Tree(List(A)) {
 						chunks(k / 2, starts(0, acc))
 					}
 			}
-			elements = (rest: List(Tree(A)), before: List(Tree(A))) -> List(
+			elements = (rest : List(Tree(A)), before : List(Tree(A))) -> List(
 				Tree(List(A)),
 			) {
 				rest |>
@@ -373,12 +376,12 @@ list_tree = <A>(items: List(Tree(A)), min: Int) -> Tree(List(A)) {
 }
 
 draw_items = <A>(
-	of: Gen(A),
-	n: Int,
-	size: Int,
-	g: random.Generator,
-	index: Int,
-	acc: List(Tree(A))
+	of : Gen(A),
+	n : Int,
+	size : Int,
+	g : random.Generator,
+	index : Int,
+	acc : List(Tree(A))
 ) -> Option(List(Tree(A))) {
 	{ index == n } |>
 		(True) { Some(lists.reverse(acc)) }
@@ -397,7 +400,10 @@ draw_items = <A>(
 
 /// Length is uniform in min..min(max,max(min,size)). Deletions of full chunks
 /// n,n/2,...,1 precede left-to-right element shrinks. Surviving trees are kept.
-list = <A>(of: Gen(A), min: Int, max: Int) -> Result(Gen(List(A)), BuildError) {
+list = <A>(of : Gen(A), min : Int, max : Int) -> Result(
+	Gen(List(A)),
+	BuildError,
+) {
 	{ min < 0 || max < min } |>
 		(True) { Error(InvalidLength(min, max)) }
 		| (False) {
@@ -439,7 +445,7 @@ utf_codepoint = () -> Gen(UtfCodepoint) {
 		sample(range(0, 0x10f7ff), s, g) |>
 			(None) { None }
 			| (Some(t)) {
-				convert = (rank: Int) -> UtfCodepoint {
+				convert = (rank : Int) -> UtfCodepoint {
 					n = { rank >= 0xd800 } |>
 						(True) { rank + 0x800 }
 						| (False) { rank }
@@ -457,19 +463,19 @@ utf_codepoint = () -> Gen(UtfCodepoint) {
 }
 
 /// Scalar lists of length 0..max_length, preserving valid UTF-8 while shrinking.
-string = (max_length: Int) -> Result(Gen(String), BuildError) {
+string = (max_length : Int) -> Result(Gen(String), BuildError) {
 	list(utf_codepoint(), 0, max_length) |>
 		(Error(e)) { Error(e) }
 		| (Ok(gen)) { Ok(map(gen, core.from_codepoints)) }
 }
 
 shrink = <A>(
-	current: Tree(A),
-	reason: String,
-	left: Int,
-	path: List(Int),
-	checked: Int,
-	property: (A) -> Verdict
+	current : Tree(A),
+	reason : String,
+	left : Int,
+	path : List(Int),
+	checked : Int,
+	property : (A) -> Verdict
 ) -> (Tree(A), String, List(Int), Int, Bool) {
 	{ left == 0 } |>
 		(True) { (current, reason, lists.reverse(path), checked, True) }
@@ -488,14 +494,14 @@ shrink = <A>(
 }
 
 scan = <A>(
-	current: Tree(A),
-	reason: String,
-	children: List(Tree(A)),
-	left: Int,
-	path: List(Int),
-	checked: Int,
-	index: Int,
-	property: (A) -> Verdict
+	current : Tree(A),
+	reason : String,
+	children : List(Tree(A)),
+	left : Int,
+	path : List(Int),
+	checked : Int,
+	index : Int,
+	property : (A) -> Verdict
 ) -> (Tree(A), String, List(Int), Int, Bool) {
 	{ left == 0 } |>
 		(True) { (current, reason, lists.reverse(path), checked, True) }
@@ -531,13 +537,13 @@ scan = <A>(
 }
 
 attempts = <A>(
-	gen: Gen(A),
-	config: Config,
-	property: (A) -> Verdict,
-	seed: Int,
-	attempt: Int,
-	successes: Int,
-	discards: Int
+	gen : Gen(A),
+	config : Config,
+	property : (A) -> Verdict,
+	seed : Int,
+	attempt : Int,
+	successes : Int,
+	discards : Int
 ) -> Report(A) {
 	{ successes == config.cases } |>
 		(True) { Passed(successes = successes, discards = discards) }
@@ -623,7 +629,7 @@ attempts = <A>(
 /// None and Discard each consume one discard. Exhausting the candidate budget
 /// sets limited even when the next child list would be empty; zero never forces
 /// children. The first failing child is adopted and scanning restarts at zero.
-check = <A>(gen: Gen(A), config: Config, property: (A) -> Verdict) -> Report(
+check = <A>(gen : Gen(A), config : Config, property : (A) -> Verdict) -> Report(
 	A,
 ) {
 	{ config.cases <= 0 } |>
@@ -662,7 +668,7 @@ check = <A>(gen: Gen(A), config: Config, property: (A) -> Verdict) -> Report(
 		}
 }
 
-follow = <A>(t: Tree(A), path: List(Int)) -> Option(A) {
+follow = <A>(t : Tree(A), path : List(Int)) -> Option(A) {
 	path |>
 		([]) { Some(t.value) }
 		| ([index, ..rest]) {
@@ -675,11 +681,11 @@ follow = <A>(t: Tree(A), path: List(Int)) -> Option(A) {
 /// Follows retained child positions without invoking a predicate. Invalid
 /// attempt, size or path entries, discarded draws and missing children miss.
 replay = <A>(
-	gen: Gen(A),
-	seed: Int,
-	attempt: Int,
-	size: Int,
-	path: List(Int)
+	gen : Gen(A),
+	seed : Int,
+	attempt : Int,
+	size : Int,
+	path : List(Int)
 ) -> Option(A) {
 	{ attempt < 0 || size < 0 || lists.any(path, (i) { i < 0 }) } |>
 		(True) { None }
@@ -697,7 +703,7 @@ replay = <A>(
 /// Protocol v1, decimal integers and LF separators with no final LF. Calls
 /// show twice only for Falsified; includes multiline text literally. No check
 /// or predicate is rerun, and arbitrary identities are not serialized.
-format = <A>(report: Report(A), show: (A) -> String) -> String {
+format = <A>(report : Report(A), show : (A) -> String) -> String {
 	report |>
 		(Passed(successes = n, discards = d)) {
 			"std/property v1: passed; successes: " <>
@@ -744,11 +750,11 @@ format = <A>(report: Report(A), show: (A) -> String) -> String {
 /// is sent to the caller's Assert outside that catch. Stops remain stops; the
 /// original source stack is not retained, only its message. No runner hook.
 test = <A>(
-	gen: Gen(A),
-	config: Config,
-	property: (A) <- (Assert) -> Nil,
-	show: (A) -> String
-) <- (a: Assert) -> Nil {
+	gen : Gen(A),
+	config : Config,
+	property : (A) <- (Assert) -> Nil,
+	show : (A) -> String
+) <- (a : Assert) -> Nil {
 	report = check(gen, config, (value) {
 		assertion.catch(() { property(value) }) |>
 			(Ok(Nil)) { Pass }

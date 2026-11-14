@@ -3,4 +3,4 @@
 @host("test:kv/v1")
 Kv = (get = (String) <- (Fail(String)) -> "a" | "b")
 
-main = () <- (kv: Kv) { kv.get("name") |> ("a") { Nil } | ("b") { Nil } }
+main = () <- (kv : Kv) { kv.get("name") |> ("a") { Nil } | ("b") { Nil } }

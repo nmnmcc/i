@@ -1,0 +1,377 @@
+{
+  "inventoried": 28997,
+  "compared": 46,
+  "sites": 47,
+  "new_spec_examples": 8,
+  "differences": [],
+  "entries": [
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 144757,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "1c2cd7439337a5c900a072083607bf8f6b570d14a5ef58a36c9e0b5abe877839"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 143280,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "1c2cd7439337a5c900a072083607bf8f6b570d14a5ef58a36c9e0b5abe877839"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 131380,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "7bda55b546f469b315957f869bf2b4f7998d709c5562bb3af4c5ff9e3d1135bb"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 129746,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "94c8c17003fd88aed2a2d60c22d6d0f74f4b3423ac0a14beadd231a85f9cc1fd"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 129555,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "1f70f5656ab931fad9a14b02f8c3c18b47d63570d53108fae317eb041c7886c0"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 128607,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "d2c5e3873feb6892818ccaa63a2f35ec1d529715d6764ce1b895e0086bf66951"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 128499,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "4790b5ef1329627758437526c88e75d2288ceca5a0e0392a0075b6d10857b90c"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 128332,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "2339050c6ed0c6f161f7bb60e3fa8568eb431581ed1e19b08710f27464712cbd"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 125269,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "dc0bf90de188554dc5b2132e2728798225398daf1f6aae2954a2f4cb1238b297"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 124482,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "8164638bc7a31128d5d53087a034cc98d1e12840cb69c1547479ee702532db4c"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 114158,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "77f614dffbfe9ec68aac8f1342b7aa62fdbaa996678bb9669d801dbc1d3f9ce0"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 98344,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "94c8c17003fd88aed2a2d60c22d6d0f74f4b3423ac0a14beadd231a85f9cc1fd"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 96724,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "8164638bc7a31128d5d53087a034cc98d1e12840cb69c1547479ee702532db4c"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 96385,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "54058a68a9d206685f4816cb2c7f916d3ed26071529137199c847ad805e6d2a7"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 93626,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "a45f50da88bf52cafc8626a91b2ff61641bdc8540c0387d6a154f5b0bffea708"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 93578,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "4790b5ef1329627758437526c88e75d2288ceca5a0e0392a0075b6d10857b90c"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 74250,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "2c253d40e17ed55ccf5c326027833cd41673c8fa19386b335ca00d81d0988923"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 22226,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "94c8c17003fd88aed2a2d60c22d6d0f74f4b3423ac0a14beadd231a85f9cc1fd"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 22013,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "2c253d40e17ed55ccf5c326027833cd41673c8fa19386b335ca00d81d0988923"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 20491,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "8164638bc7a31128d5d53087a034cc98d1e12840cb69c1547479ee702532db4c"
+    },
+    {
+      "path": "docs/design/literal-types.md",
+      "start": 14014,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "e37803f59cdd31e03f4eb4f9b43c3b6e81652f044c3cc4997139cf9d38105311"
+    },
+    {
+      "path": "docs/design/meta.md",
+      "start": 20573,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "8decc77a64022cac3a681230fa29dbef564b46ead037b15f2bf96509a4277e74"
+    },
+    {
+      "path": "docs/design/meta.md",
+      "start": 20373,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "fce9a2e4cc98803cef97db1016a782cbfdbadb857e8edae7d42493187794ecaf"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 231346,
+      "sites": 2,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "453982748f5a63366d49b88f0280e13e56419fd38399e44d7e52fba9ee601ffd"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 207813,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "e4edead8199480d2cd19fcc6aec0fa2aefb42a4bf8cbcc6688f89fffe839dcc1"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 194458,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "e4edead8199480d2cd19fcc6aec0fa2aefb42a4bf8cbcc6688f89fffe839dcc1"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 190691,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "e4edead8199480d2cd19fcc6aec0fa2aefb42a4bf8cbcc6688f89fffe839dcc1"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 177605,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "889684946101bfc77b3ecf4a94fe0874322986dff00f973b9d6e35f9076087a6"
+    },
+    {
+      "path": "docs/design/records.md",
+      "start": 112296,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "e4edead8199480d2cd19fcc6aec0fa2aefb42a4bf8cbcc6688f89fffe839dcc1"
+    },
+    {
+      "path": "docs/design/syntax-3.md",
+      "start": 175073,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "072141c86f162f97110a884d9a4779eadf6ce32c7ba16bff2542e8718d80a3b7"
+    },
+    {
+      "path": "docs/design/syntax-3.md",
+      "start": 174924,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "3de2c86cd81abd8fd085900c3675b3e65f26c797c115c65e02a3ee8896b6ed86"
+    },
+    {
+      "path": "docs/design/syntax-3.md",
+      "start": 130366,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "dd2668c05792a62e63cb453a844893a41c5d918185ef1b37f7f458f542d98ff4"
+    },
+    {
+      "path": "docs/design/syntax-3.md",
+      "start": 74944,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "45c472ac4b714ec77015cedc1db17e28d981fb77e2b76e1af82684edd56da144"
+    },
+    {
+      "path": "docs/design/syntax-3.md",
+      "start": 74647,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "4d3a7c90235812aaab231e802d8f4ce45218b2a523be7cf6c3d44724c8309fb8"
+    },
+    {
+      "path": "docs/design/syntax-3.md",
+      "start": 35570,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "072141c86f162f97110a884d9a4779eadf6ce32c7ba16bff2542e8718d80a3b7"
+    },
+    {
+      "path": "docs/design/syntax-3.md",
+      "start": 34800,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "61fc43f6300fab5e62560b4fcbb16422d87e95e2d482ce4bb722763e72720e1c"
+    },
+    {
+      "path": "docs/design/syntax-3.md",
+      "start": 34730,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "b3673707dc228c358ff1c8fe3b41ae011ba973112dae6ff7b17e911fe8f09e26"
+    },
+    {
+      "path": "docs/design/syntax.md",
+      "start": 63066,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "5afc752077372ce617b1de061e1f1f1577b02ac5dae9daeecdbefcc796e1110e"
+    },
+    {
+      "path": "docs/design/syntax.md",
+      "start": 63023,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "5afc752077372ce617b1de061e1f1f1577b02ac5dae9daeecdbefcc796e1110e"
+    },
+    {
+      "path": "docs/design/syntax.md",
+      "start": 40343,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "45c472ac4b714ec77015cedc1db17e28d981fb77e2b76e1af82684edd56da144"
+    },
+    {
+      "path": "docs/design/syntax.md",
+      "start": 40248,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "45c472ac4b714ec77015cedc1db17e28d981fb77e2b76e1af82684edd56da144"
+    },
+    {
+      "path": "docs/design/syntax.md",
+      "start": 4857,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "dd2668c05792a62e63cb453a844893a41c5d918185ef1b37f7f458f542d98ff4"
+    },
+    {
+      "path": "docs/design/syntax.md",
+      "start": 3990,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "1f6745d9405b463282a805d426a21fb5c8b6a62d8c198a5c8fa5b988034aa65c"
+    },
+    {
+      "path": "docs/design/types-joint.md",
+      "start": 26414,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "e4edead8199480d2cd19fcc6aec0fa2aefb42a4bf8cbcc6688f89fffe839dcc1"
+    },
+    {
+      "path": "docs/spec.md",
+      "start": 122151,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "a45f50da88bf52cafc8626a91b2ff61641bdc8540c0387d6a154f5b0bffea708"
+    },
+    {
+      "path": "docs/spec.md",
+      "start": 122103,
+      "sites": 1,
+      "equal": true,
+      "diagnostics_equal": true,
+      "tree_sha256": "4790b5ef1329627758437526c88e75d2288ceca5a0e0392a0075b6d10857b90c"
+    }
+  ]
+}

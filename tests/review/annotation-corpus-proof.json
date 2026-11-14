@@ -1,0 +1,492 @@
+{
+  "selection": {
+    "shard": "1/10",
+    "cases": 198,
+    "identical_case_set": true,
+    "identical_order": false,
+    "case_list": "/home/agent/Programming/i/.rd/tyalt/target/tyalt-corpus-shard-1-of-10.json",
+    "sha256": "c263e27f8200f7de897742cf709798b8cfc1ca5dc82b7231fe8ed0d399e76c24"
+  },
+  "case_ids": [
+    "review-a1/_loose/capture/original",
+    "review-a1/_loose/cases/10_macro_attr_tuple/original",
+    "review-a1/_loose/cases/20_old_alias_returns_fn/original",
+    "review-a1/_loose/cases/30_param_type_collision/original",
+    "review-a1/_loose/cases/40_guarded_choices/original",
+    "review-a1/_loose/cases/50_new_match_empty_call/original",
+    "review-a1/_loose/cases/60_mixed_capture_outer/original",
+    "review-a1/_loose/confirmed/capture-keep-layout/original",
+    "review-a1/_loose/runtime-new/03/original",
+    "review-a1/_loose/runtime-new/40/original",
+    "review-a1/_loose/runtime/02/original",
+    "review-a1/_loose/runtime/20/original",
+    "review-a1/_loose/runtime/46/original",
+    "review-a1/cases/02_old_headers",
+    "review-a1/cases/12_group",
+    "review-a1/cases/22_new_tuple_returns_fn",
+    "review-a1/cases/32_call_constructor_boundary",
+    "review-a1/cases/42_old_plus_match",
+    "review-a1/cases/52_new_tuple_clauses_lines",
+    "review-a1/cases/62_new_record_reserved",
+    "review-a1/confirmed/idempotence-plain",
+    "review-a1/runtime-new/32",
+    "review-a1/runtime-new/64",
+    "review-a1/runtime/16",
+    "review-a1/runtime/43",
+    "review-a1/runtime/61",
+    "review-js3/opaque",
+    "review-k4-lane/error_row_values",
+    "review-k4-lane/previous-2-True",
+    "review-k4-lane/q21",
+    "review-k4-lane/q31",
+    "review-k4-lane/row_alias",
+    "review-k4-lane/w12-Never",
+    "review-k4-lane/w2-Never",
+    "review-k4-lane/w7-Never",
+    "review-k4/cases/closure_closed",
+    "review-k4/cases/conflict_5003292184701381503",
+    "review-k4/cases/local_instances_toprun",
+    "review-k4/cases/matrix_True_False_False_reverse",
+    "review-k4/cases/mutual_False_False_True",
+    "review-k4/cases/provision_closure_False",
+    "review-k4/cases/recursive_env_cov",
+    "review-k4/cases/wrapper_0_True_True",
+    "review-k4/cases/wrapper_1_False_True",
+    "review-k4/cases/wrapper_3_True_True",
+    "review-k4/cases/wrapper_6_False_True",
+    "review-k4/cases/wrapper_8_True_True",
+    "review-k4/perf/generic_chain_64",
+    "review-k4/perf/wide_256",
+    "review-k4c/cases/annotation_1",
+    "review-k4c/cases/closure_statement",
+    "review-k4c/cases/contra_deep",
+    "review-k4c/cases/effects_co_0_0",
+    "review-k4c/cases/effects_co_5_0",
+    "review-k4c/cases/effects_inv_2_0",
+    "review-k4c/cases/effects_inv_7_0",
+    "review-k4c/cases/effects_two_4_0",
+    "review-k4c/cases/finite_field_2",
+    "review-k4c/cases/finite_pattern_2",
+    "review-k4c/cases/invariant",
+    "review-k4c/cases/missing_0_1_1_0",
+    "review-k4c/cases/missing_0_3_0_1",
+    "review-k4c/cases/missing_0_4_1_2",
+    "review-k4c/cases/missing_0_6_1_0",
+    "review-k4c/cases/missing_1_0_0_1",
+    "review-k4c/cases/missing_1_1_1_2",
+    "review-k4c/cases/missing_1_3_1_0",
+    "review-k4c/cases/missing_1_5_0_1",
+    "review-k4c/cases/missing_1_6_1_2",
+    "review-k4c/cases/missing_2_0_1_0",
+    "review-k4c/cases/missing_2_2_0_1",
+    "review-k4c/cases/missing_2_3_1_2",
+    "review-k4c/cases/missing_2_5_1_0",
+    "review-k4c/cases/missing_2_7_0_1",
+    "review-k4c/cases/missing_3_0_1_2",
+    "review-k4c/cases/missing_3_2_1_0",
+    "review-k4c/cases/missing_3_4_0_1",
+    "review-k4c/cases/missing_3_5_1_2",
+    "review-k4c/cases/missing_3_7_1_0",
+    "review-k4c/cases/order_hidden_conflict_11",
+    "review-k4c/cases/order_hidden_conflict_20",
+    "review-k4c/cases/order_hidden_conflict_3",
+    "review-k4c/cases/order_multi_instance_1",
+    "review-k4c/cases/order_multi_instance_19",
+    "review-k4c/cases/order_multi_instance_28",
+    "review-k4c/cases/order_multi_instance_9",
+    "review-k4c/cases/order_mutual_17",
+    "review-k4c/cases/order_mutual_26",
+    "review-k4c/cases/order_mutual_7",
+    "review-k4c/cases/order_mutual_annot_15",
+    "review-k4c/cases/order_mutual_annot_24",
+    "review-k4c/cases/order_mutual_annot_5",
+    "review-k4c/cases/order_recursive_13",
+    "review-k4c/cases/order_recursive_22",
+    "review-k4c/cases/order_recursive_31",
+    "review-k4c/cases/plain_2",
+    "review-k4c/cases/recursive_co_4",
+    "review-k4c/cases/row_callback",
+    "review-k4c/cases/stress_plain_32",
+    "review-k4c/cases/stress_wide_open_1024",
+    "review-k4d/_loose/fuzz/e0505/21_135",
+    "review-k4d/_loose/fuzz/e0505/21_272",
+    "review-k4d/_loose/p/b1",
+    "review-k4d/_loose/p/c1",
+    "review-k4d/_loose/p/g_ann_SDep",
+    "review-k4d/_loose/p/q10",
+    "review-k4d/_loose/p/q2",
+    "review-k4d/_loose/p/q29",
+    "review-k4d/_loose/p/q38",
+    "review-k4d/_loose/p/r2",
+    "review-k4d/_loose/p/w12",
+    "review-k4d/_loose/p/w7",
+    "review-k4d/_loose/p/x8",
+    "review-k4d/_loose/spec/tests_spec_4.3_a1_alias_pattern",
+    "review-k4d/fuzz/m16",
+    "review-k4d/fuzz/pl42",
+    "review-k4d/perf/chain200",
+    "review-k4d/perf/mutplain25",
+    "review-k4d/perf/runchain4000",
+    "review-k4d/perm/p0",
+    "review-k4d/perm/p18",
+    "review-k4d/perm/p27",
+    "review-k4d/perm/p36",
+    "review-k4d/perm/p45",
+    "review-k4d/perm/p54",
+    "review-k4d/proj/a1",
+    "review-k4d/proj/b7",
+    "review-k4d/proj/f3",
+    "review-k4d/proj/m4",
+    "review-k4d/proj/q17",
+    "review-k4d/proj/q26",
+    "review-k4d/proj/q35",
+    "review-k4d/proj/q8",
+    "review-k4d/proj/w1",
+    "review-k4d/proj/w4",
+    "review-k4d/proj/x5",
+    "review-k4d/proj/z5",
+    "review-k4s/ann_install1",
+    "review-k4s/ann_twice1",
+    "review-k4s/co_0_17",
+    "review-k4s/extra_servicearg",
+    "review-k4s/min_main_0_0",
+    "review-k4s/min_main_5_0",
+    "review-k4s/mixed_install_3",
+    "review-k4s/mutual_recursive",
+    "review-k4s/principal_missing_use",
+    "review-k4s/rec_local_0_17_4",
+    "review-k4s/rec_local_1_17_8",
+    "review-k4s/wide_128",
+    "review-native/fake",
+    "review-native3/field",
+    "review-r2/cancel_choose",
+    "review-r2/deadlock",
+    "review-r2/never_yields",
+    "review-r2/senders_256",
+    "review-runtime/echo-types",
+    "review-std2/client_nil_error",
+    "review-std2/minimal",
+    "review-std3/failures",
+    "review-t1/equality",
+    "review-t1/fuzz-102",
+    "review-t1/fuzz-111",
+    "review-t1/fuzz-120",
+    "review-t1/fuzz-13",
+    "review-t1/fuzz-139",
+    "review-t1/fuzz-148",
+    "review-t1/fuzz-157",
+    "review-t1/fuzz-166",
+    "review-t1/fuzz-175",
+    "review-t1/fuzz-22",
+    "review-t1/fuzz-31",
+    "review-t1/fuzz-40",
+    "review-t1/fuzz-5",
+    "review-t1/fuzz-59",
+    "review-t1/fuzz-68",
+    "review-t1/fuzz-77",
+    "review-t1/fuzz-86",
+    "review-t1/fuzz-95",
+    "review-t1/host_export_input",
+    "review-t1/list_annotated",
+    "review-t1/original-stop_tail_service",
+    "review-t1/regress_result",
+    "review-t1/stress-alias-2000",
+    "review-t1/stress-keys-5000",
+    "review-t1/typed_function_acc",
+    "review-t2/order/102",
+    "review-t2/order/111",
+    "review-t2/order/13",
+    "review-t2/order/22",
+    "review-t2/order/31",
+    "review-t2/order/40",
+    "review-t2/order/5",
+    "review-t2/order/59",
+    "review-t2/order/68",
+    "review-t2/order/77",
+    "review-t2/order/86",
+    "review-t2/order/95",
+    "review-t2/valuechain1024"
+  ],
+  "first_run": {
+    "selected": 198,
+    "checks": {
+      "1": 60,
+      "0": 138,
+      "censored-observation": 2,
+      "XFAIL": 1
+    },
+    "failures": [
+      "review-a1/_loose/cases/60_mixed_capture_outer/original: full output changed",
+      "review-k4d/_loose/fuzz/e0505/21_272: full output changed",
+      "review-k4d/fuzz/pl42: full output changed",
+      "review-k4d/_loose/p/c1: full output changed",
+      "review-k4d/perm/p0: full output changed",
+      "review-k4d/perm/p18: full output changed",
+      "review-k4d/perm/p45: full output changed",
+      "review-k4s/mutual_recursive: full output changed",
+      "review-std3/failures: full output changed",
+      "review-t1/equality: full output changed",
+      "review-r2/cancel_choose: full output changed",
+      "review-r2/cancel_choose: required accept",
+      "review-r2/deadlock: full output changed",
+      "review-r2/senders_256: full output changed",
+      "review-r2/senders_256: required accept"
+    ]
+  },
+  "initial_resource_observations": [
+    {
+      "case": "review-r2/cancel_choose",
+      "fields": [
+        "run2.exit"
+      ],
+      "classes": [
+        "needs review"
+      ],
+      "diffs": [],
+      "cold_exit_observations": [
+        {
+          "phase": "run2",
+          "before": 0,
+          "after": "timeout",
+          "stdout_equal": true,
+          "stderr_equal": true
+        }
+      ]
+    },
+    {
+      "case": "review-r2/deadlock",
+      "fields": [
+        "run2.exit"
+      ],
+      "classes": [
+        "needs review"
+      ],
+      "diffs": [],
+      "cold_exit_observations": [
+        {
+          "phase": "run2",
+          "before": 1,
+          "after": "timeout",
+          "stdout_equal": true,
+          "stderr_equal": true
+        }
+      ]
+    },
+    {
+      "case": "review-r2/senders_256",
+      "fields": [
+        "run2.exit",
+        "test2.exit"
+      ],
+      "classes": [
+        "needs review"
+      ],
+      "diffs": [],
+      "cold_exit_observations": [
+        {
+          "phase": "run2",
+          "before": 0,
+          "after": "timeout",
+          "stdout_equal": true,
+          "stderr_equal": true
+        },
+        {
+          "phase": "test2",
+          "before": 0,
+          "after": "timeout",
+          "stdout_equal": true,
+          "stderr_equal": true
+        }
+      ]
+    }
+  ],
+  "same_bound_recheck": {
+    "selected": 3,
+    "checks": {
+      "0": 3
+    },
+    "failures": []
+  },
+  "final_differences": [
+    {
+      "case": "review-a1/_loose/cases/60_mixed_capture_outer/original",
+      "fields": [
+        "check.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -1,3 +1,3 @@\n-src/main.i:1:13: error[E0201]: `b` is not defined\n-src/main.i:2:23: error[E0201]: `b` is not defined\n+src/main.i:1:14: error[E0201]: `b` is not defined\n+src/main.i:2:25: error[E0201]: `b` is not defined\n 2 errors\n"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/_loose/fuzz/e0505/21_272",
+      "fields": [
+        "check.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -1,2 +1,2 @@\n-src/main.i:29:10: error[E0501]: `Dep` is not a subtype of `T(S(Never))` (the type at 27:31 needs it)\n+src/main.i:29:10: error[E0501]: `Dep` is not a subtype of `T(S(Never))` (the type at 27:32 needs it)\n 1 error\n"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/_loose/p/c1",
+      "fields": [
+        "check.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -1,5 +1,5 @@\n src/main.i:11:2: error[E0201]: `Io` is not defined\n src/main.i:11:8: error[E0201]: `i` is not defined\n src/main.i:11:12: error[E0201]: `io` is not defined\n-src/main.i:13:19: error[E0202]: the type `Io` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = \u2026`\n+src/main.i:13:20: error[E0202]: the type `Io` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = \u2026`\n 4 errors\n"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/fuzz/pl42",
+      "fields": [
+        "check.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -1,4 +1,4 @@\n-src/main.i:39:7: error[E0501]: `Dep` is not a subtype of `Never` (the type at 38:22 needs it)\n-src/main.i:43:7: error[E0501]: `Svc(_)` is not a subtype of `Never` (the type at 42:22 needs it)\n-src/main.i:47:30: error[E0501]: `Dep` is not a subtype of `Never` (the type at 47:22 needs it)\n+src/main.i:39:7: error[E0501]: `Dep` is not a subtype of `Never` (the type at 38:23 needs it)\n+src/main.i:43:7: error[E0501]: `Svc(_)` is not a subtype of `Never` (the type at 42:23 needs it)\n+src/main.i:47:31: error[E0501]: `Dep` is not a subtype of `Never` (the type at 47:23 needs it)\n 3 errors\n"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/perm/p0",
+      "fields": [
+        "check.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -1,3 +1,3 @@\n-src/main.i:42:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n-src/main.i:50:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n+src/main.i:45:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n+src/main.i:53:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n 2 errors\n"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/perm/p18",
+      "fields": [
+        "check.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -1,3 +1,3 @@\n src/main.i:13:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n-src/main.i:29:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n+src/main.i:32:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n 2 errors\n"
+        }
+      ]
+    },
+    {
+      "case": "review-k4d/perm/p45",
+      "fields": [
+        "check.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -1,3 +1,3 @@\n-src/main.i:29:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n-src/main.i:37:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n+src/main.i:32:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n+src/main.i:40:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n 2 errors\n"
+        }
+      ]
+    },
+    {
+      "case": "review-k4s/mutual_recursive",
+      "fields": [
+        "check.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -1,3 +1,3 @@\n src/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n-src/main.i:7:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n+src/main.i:9:1: error[E0505]: this type has itself inside it, through a type variable (\u00a74.7)\n 2 errors\n"
+        }
+      ]
+    },
+    {
+      "case": "review-std3/failures",
+      "fields": [
+        "test0.stdout",
+        "test2.stdout"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "test0",
+          "field": "stdout",
+          "diff": "--- expected\n+++ actual\n@@ -2,16 +2,16 @@\n   assertion failed: std/property v1: falsified\n seed: 0\n reason: assert\n-review/cases:12:21\n+review/cases:13:4\n FAIL review/cases.nan_before_library\n   float: result is not finite\n-review/cases:24:2\n+review/cases:25:2\n FAIL review/cases.positive_infinity_before_library\n   float: result is not finite\n-review/cases:29:2\n+review/cases:30:2\n FAIL review/cases.negative_infinity_before_library\n   float: result is not finite\n-review/cases:34:2\n+review/cases:35:2\n pass review/cases.caller_can_catch_final_failure\n pass review/qa_corpus_runtime_test.qa_startup\n 2 passed, 4 failed\n"
+        },
+        {
+          "phase": "test2",
+          "field": "stdout",
+          "diff": "--- expected\n+++ actual\n@@ -2,16 +2,16 @@\n   assertion failed: std/property v1: falsified\n seed: 0\n reason: assert\n-review/cases:12:21\n+review/cases:13:4\n FAIL review/cases.nan_before_library\n   float: result is not finite\n-review/cases:24:2\n+review/cases:25:2\n FAIL review/cases.positive_infinity_before_library\n   float: result is not finite\n-review/cases:29:2\n+review/cases:30:2\n FAIL review/cases.negative_infinity_before_library\n   float: result is not finite\n-review/cases:34:2\n+review/cases:35:2\n pass review/cases.caller_can_catch_final_failure\n pass review/qa_corpus_runtime_test.qa_startup\n 2 passed, 4 failed\n"
+        }
+      ]
+    },
+    {
+      "case": "review-t1/equality",
+      "fields": [
+        "check.stderr",
+        "test0.stderr",
+        "test2.stderr"
+      ],
+      "classes": [
+        "source positions only"
+      ],
+      "diffs": [
+        {
+          "phase": "check",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -3,4 +3,4 @@\n src/main.i:3:1: warning[W0504]: top-level binding `g` is not used\n src/main.i:3:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True` (\u00a76.9)\n src/main.i:4:1: warning[W0504]: top-level binding `h` is not used\n-src/main.i:4:20: warning[W0503]: the two sides have the known types `Int - 1` and `1`, which can never be equal, so `==` is always `False` (\u00a76.9)\n+src/main.i:4:21: warning[W0503]: the two sides have the known types `Int - 1` and `1`, which can never be equal, so `==` is always `False` (\u00a76.9)\n"
+        },
+        {
+          "phase": "test0",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -3,4 +3,4 @@\n src/main.i:3:1: warning[W0504]: top-level binding `g` is not used\n src/main.i:3:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True` (\u00a76.9)\n src/main.i:4:1: warning[W0504]: top-level binding `h` is not used\n-src/main.i:4:20: warning[W0503]: the two sides have the known types `Int - 1` and `1`, which can never be equal, so `==` is always `False` (\u00a76.9)\n+src/main.i:4:21: warning[W0503]: the two sides have the known types `Int - 1` and `1`, which can never be equal, so `==` is always `False` (\u00a76.9)\n"
+        },
+        {
+          "phase": "test2",
+          "field": "stderr",
+          "diff": "--- expected\n+++ actual\n@@ -3,4 +3,4 @@\n src/main.i:3:1: warning[W0504]: top-level binding `g` is not used\n src/main.i:3:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True` (\u00a76.9)\n src/main.i:4:1: warning[W0504]: top-level binding `h` is not used\n-src/main.i:4:20: warning[W0503]: the two sides have the known types `Int - 1` and `1`, which can never be equal, so `==` is always `False` (\u00a76.9)\n+src/main.i:4:21: warning[W0503]: the two sides have the known types `Int - 1` and `1`, which can never be equal, so `==` is always `False` (\u00a76.9)\n"
+        }
+      ]
+    }
+  ],
+  "classification": "Ten remaining differences are source positions only. Three initial timeout cases printed exact expected output and matched all saved observations on the same-bound rerun. Existing censored/XFAIL cases retain their baseline classifications.",
+  "expected_json_updated": false
+}

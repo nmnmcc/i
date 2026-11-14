@@ -6,7 +6,7 @@
 	i/task
 )
 
-spawn = (s: task.Scope(Never), n: Int) -> List(task.Task(Int, Never)) {
+spawn = (s : task.Scope(Never), n : Int) -> List(task.Task(Int, Never)) {
 	n |>
 		(0) { [] }
 		| (_) {
@@ -18,7 +18,7 @@ spawn = (s: task.Scope(Never), n: Int) -> List(task.Task(Int, Never)) {
 		}
 }
 
-join_all = (tasks: List(task.Task(Int, Never)), sum: Int) -> Int {
+join_all = (tasks : List(task.Task(Int, Never)), sum : Int) -> Int {
 	tasks |>
 		([]) { sum }
 		| ([child, ..rest]) {

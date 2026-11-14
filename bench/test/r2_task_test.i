@@ -8,7 +8,7 @@
 
 rounds = 1_000
 
-spawns = (n: Int, total: Int) -> Int {
+spawns = (n : Int, total : Int) -> Int {
 	n |>
 		(0) { total }
 		| (_) {
@@ -17,7 +17,7 @@ spawns = (n: Int, total: Int) -> Int {
 		}
 }
 
-switches = (n: Int, total: Int) -> Int {
+switches = (n : Int, total : Int) -> Int {
 	n |>
 		(0) { total }
 		| (_) {
@@ -26,7 +26,7 @@ switches = (n: Int, total: Int) -> Int {
 		}
 }
 
-sends = (c: task.Channel(Int), n: Int) -> Nil {
+sends = (c : task.Channel(Int), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
 		| (_) {
@@ -35,7 +35,7 @@ sends = (c: task.Channel(Int), n: Int) -> Nil {
 		}
 }
 
-receives = (c: task.Channel(Int), n: Int, total: Int) -> Int {
+receives = (c : task.Channel(Int), n : Int, total : Int) -> Int {
 	n |>
 		(0) { total }
 		| (_) {
@@ -50,7 +50,7 @@ test("r2_switch_1000", () { assert(switches(rounds, 0) == rounds) })
 
 test("r2_channel_1000", () {
 	result = task.scope((s) {
-		c: task.Channel(Int) = task.channel()
+		c : task.Channel(Int) = task.channel()
 		task.go(s, () { sends(c, rounds) })
 		receives(c, rounds, 0)
 	})

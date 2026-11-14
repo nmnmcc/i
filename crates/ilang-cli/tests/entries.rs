@@ -138,11 +138,11 @@ fn cli_selects_entries_and_passes_arguments() {
         &[
             (
                 "src/main.i",
-                "(\n\t(Io) = i/io\n)\nmain = () <- (io: Io) { io.print(\"default ok\") }\n",
+                "(\n\t(Io) = i/io\n)\nmain = () <- (io : Io) { io.print(\"default ok\") }\n",
             ),
             (
                 "src/tools.i",
-                "(\n\t(Io) = i/io\n\ti/process\n)\nwork = () <- (io: Io) {\n\tassert(process.args() == [\"alpha\", \"--beta\"])\n\tio.print(\"tool ok\")\n}\nplain = () <- (io: Io) { io.print(\"plain ok\") }\n",
+                "(\n\t(Io) = i/io\n\ti/process\n)\nwork = () <- (io : Io) {\n\tassert(process.args() == [\"alpha\", \"--beta\"])\n\tio.print(\"tool ok\")\n}\nplain = () <- (io : Io) { io.print(\"plain ok\") }\n",
             ),
         ],
     );

@@ -6,11 +6,11 @@
 
 n = 1_000_000
 
-loop = (k: (Float) -> Float, i: Int, acc: Float) -> Float {
+loop = (k : (Float) -> Float, i : Int, acc : Float) -> Float {
 	i |> (0) { acc } | (_) { loop(k, i - 1, 0.03 *. k(acc)) }
 }
 
-run = (k: (Float) -> Float) {
+run = (k : (Float) -> Float) {
 	stdio.print(
 		core.inspect(loop(k, n, 0.5)),
 	)

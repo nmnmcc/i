@@ -7,7 +7,7 @@
 	option = (Some, None) = std/option
 )
 
-check = (s: sequence.Sequence(Int), xs: List(Int)) -> Nil {
+check = (s : sequence.Sequence(Int), xs : List(Int)) -> Nil {
 	assert(sequence.to_list(s) == xs)
 	assert(sequence.length(s) == list.length(xs))
 	assert(sequence.is_empty(s) == list.is_empty(xs))
@@ -57,7 +57,7 @@ test("sequence_examples", () {
 })
 
 // §4.3 laws compare observable elements, never private representation equality.
-check_laws = (xs: List(Int), ys: List(Int), zs: List(Int)) -> Nil {
+check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
 	a = sequence.from_list(xs)
 	b = sequence.from_list(ys)
 	c = sequence.from_list(zs)
@@ -140,7 +140,7 @@ test("sequence_small_exhaustive", () {
 // A service observes callback order without putting mutable state in sequences.
 Trace = (visit = (Int) -> Nil)
 
-visit = (x: Int) <- (trace: Trace) -> Nil { trace.visit(x) }
+visit = (x : Int) <- (trace : Trace) -> Nil { trace.visit(x) }
 
 test("sequence_walks", () {
 	source = sequence.from_list([1, 2, 3])
@@ -168,7 +168,7 @@ test("sequence_walks", () {
 	Nil
 })
 
-reject_two = (x: Int) -> Int {
+reject_two = (x : Int) -> Int {
 	x |>
 		(2) { fail.raise("two") }
 		| (3) { panic("callback after first error") }
@@ -188,12 +188,12 @@ test("sequence_callback_errors", () {
 })
 
 // A fixed generator branches from retained versions, as required by §4.3.
-prng = (seed: Int) -> Int { { seed * 1664525 + 1013904223 } % 4294967296 }
+prng = (seed : Int) -> Int { { seed * 1664525 + 1013904223 } % 4294967296 }
 
 model = (
-	seed: Int,
-	remaining: Int,
-	versions: List((sequence.Sequence(Int), List(Int)))
+	seed : Int,
+	remaining : Int,
+	versions : List((sequence.Sequence(Int), List(Int)))
 ) -> Nil {
 	remaining |>
 		(0) {
@@ -278,7 +278,7 @@ test("sequence_persistent_model", () {
 })
 
 // Traverse all the way through middle borrowing/collapse, alternating ends.
-drain = (s: sequence.Sequence(Int), low: Int, high: Int) -> Nil {
+drain = (s : sequence.Sequence(Int), low : Int, high : Int) -> Nil {
 	{ low >= high } |>
 		(True) { assert(sequence.is_empty(s)) }
 		| (False) {
@@ -398,13 +398,13 @@ test("sequence_large_boundaries", () {
 	Nil
 })
 
-numbers = (n: Int) -> List(Int) {
+numbers = (n : Int) -> List(Int) {
 	{ n <= 0 } |> (True) { [] } | (False) { list.range(0, n - 1) }
 }
 
 Box = (value = Int)
 
-observe = (body: () <- (Trace, Assert) -> Nil) -> List(Int) {
+observe = (body : () <- (Trace, Assert) -> Nil) -> List(Int) {
 	control.boundary((b) {
 		{
 			body()
@@ -444,14 +444,14 @@ test("sequence_callback_types_and_order", () {
 	)
 	assert(observe(() { sequence.each(s, visit) }) == xs)
 	boxes = sequence.map(s, (x) { Box(value = x) })
-	check(sequence.map(boxes, (b: Box) { b.value }), xs)
+	check(sequence.map(boxes, (b : Box) { b.value }), xs)
 	assert(
 		sequence.to_list(
 			sequence.map(sequence.from_list(["a", "é"]), (x) { x <> "!" }),
 		) ==
 			["a!", "é!"],
 	)
-	union_error = (x: Int) -> Int {
+	union_error = (x : Int) -> Int {
 		{ x == 1 } |>
 			(True) { fail.raise(True) }
 			| (False) { fail.raise("other") }

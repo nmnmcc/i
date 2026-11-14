@@ -41,7 +41,7 @@ test("http_messages", () {
 
 test("http_incremental", () {
 	input = <<"POST / HTTP/1.1\r\nContent-Length: 4\r\n\r\ntest":utf8>>
-	go = (rest: BitArray, buffered: BitArray) -> Nil {
+	go = (rest : BitArray, buffered : BitArray) -> Nil {
 		rest |>
 			(<<x, tail:bytes>>) {
 				http.feed_request(buffered, <<x>>) |>
@@ -138,7 +138,7 @@ test("http_incremental_chunked_response", () {
 	input = <<
 		"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\nX: y\r\n\r\n":utf8,
 	>>
-	go = (rest: BitArray, buffered: BitArray) -> Nil {
+	go = (rest : BitArray, buffered : BitArray) -> Nil {
 		rest |>
 			(<<x, tail:bytes>>) {
 				http.feed_response(buffered, <<x>>) |>
@@ -799,7 +799,7 @@ test("http_reject_chunk_extension_trailing_space", () {
 })
 
 test("provider_and_route", () {
-	provider = (send = (req: http.Request) { http.response(http.Status(201)) })
+	provider = (send = (req : http.Request) { http.response(http.Status(201)) })
 	res = http.send_with(
 		provider.send,
 		http.request(http.Method("GET"), "http://example.com"),

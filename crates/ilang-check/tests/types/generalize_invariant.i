@@ -15,7 +15,7 @@ written_int = () -> Cell(Int) { written() }
 written_string = () -> Cell(String) { written() }
 
 // Invariance also matters in an input place and inside a covariant type.
-ignore = <A>(x: Cell(A)) { Nil }
+ignore = <A>(x : Cell(A)) { Nil }
 
 ignore_inferred = (Cell(run = run)) { Nil }
 
@@ -30,7 +30,7 @@ nested_string = () -> List(Cell(String)) { nested() }
 // §4.7 and §4.8 rule 14: local function bindings are generalized too.
 local = () {
 	new = () { Cell(run = (x) { x }) }
-	int: Cell(Int) = new()
-	string: Cell(String) = new()
+	int : Cell(Int) = new()
+	string : Cell(String) = new()
 	(int, string)
 }

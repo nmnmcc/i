@@ -81,7 +81,7 @@ test("paths", () {
 	Nil
 })
 
-advance = (g: random.Generator, n: Int) -> random.Generator {
+advance = (g : random.Generator, n : Int) -> random.Generator {
 	{ n == 0 } |> (True) { g } | (False) { advance(random.word(g).1, n - 1) }
 }
 
@@ -99,7 +99,7 @@ test("boundaries", () {
 	Nil
 })
 
-check_range = (g: random.Generator, below: Int, count: Int) -> Nil {
+check_range = (g : random.Generator, below : Int, count : Int) -> Nil {
 	{ count == 0 } |>
 		(True) { Nil }
 		| (False) {
@@ -121,7 +121,7 @@ test("ranges", () {
 })
 
 // §9.10: exactly 53 high bits and exactly one draw are used for each Float.
-check_float = (g: random.Generator, count: Int) -> Nil {
+check_float = (g : random.Generator, count : Int) -> Nil {
 	{ count == 0 } |>
 		(True) { Nil }
 		| (False) {
@@ -140,7 +140,7 @@ test("floats", () { check_float(random.from_seed(1337), 1000) })
 
 // A deterministic smoke check of small-bound frequencies. This is not a proof
 // of independence; the exact rejection and uniform-residue proof are separate.
-histogram = (g: random.Generator, count: Int, a: Int, b: Int, c: Int) -> (
+histogram = (g : random.Generator, count : Int, a : Int, b : Int, c : Int) -> (
 	Int,
 	Int,
 	Int,
@@ -164,7 +164,7 @@ test("small_bound_frequencies", () {
 	Nil
 })
 
-walk = (g: random.Generator, count: Int) -> random.Generator {
+walk = (g : random.Generator, count : Int) -> random.Generator {
 	{ count == 0 } |>
 		(True) { g }
 		| (False) { walk(random.split(g).0, count - 1) }

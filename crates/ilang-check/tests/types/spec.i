@@ -6,7 +6,7 @@
 )
 
 // §9.1
-retry = <A, N>(times: Int, body: () <- N -> A) -> A {
+retry = <A, N>(times : Int, body : () <- N -> A) -> A {
 	fail.catch(body) |>
 		(Ok(value)) { value }
 		| (Error(error)) {
@@ -16,14 +16,14 @@ retry = <A, N>(times: Int, body: () <- N -> A) -> A {
 		}
 }
 
-load_user = (id: String) -> String { fail.raise(404) }
+load_user = (id : String) -> String { fail.raise(404) }
 
 user = () { retry(3, () { load_user("1") }) }
 
 // §9.2
 Clock = (now = () -> Int)
 
-elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
+elapsed = (start : Int) <- (clock : Clock) { clock.now() - start }
 
 // type: (start: Int) -> Int ! Clock
 fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
@@ -33,14 +33,14 @@ fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
 // §9.4
 Yield(A) = (emit = (A) -> Nil)
 
-collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
 			[]
 		} <- (
 			Yield(
-				emit = (x: A) {
+				emit = (x : A) {
 					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 				},
 			),
@@ -49,14 +49,14 @@ collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 }
 
 numbers = () {
-	collect(() <- (y: Yield(Int)) {
+	collect(() <- (y : Yield(Int)) {
 		y.emit(1)
 		y.emit(2)
 	})
 }
 
 // §9.6
-my_assert = (c: Bool) <- (a: Assert) {
+my_assert = (c : Bool) <- (a : Assert) {
 	c |>
 		(True) { Nil }
 		| (False) { a.fail(AssertionFailure(message = "assert")) }

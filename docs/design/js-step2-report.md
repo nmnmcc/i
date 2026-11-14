@@ -68,7 +68,7 @@ Verification before the full acceptance run:
 
 Failures found and fixed during implementation:
 
-- `assertion failed: assert io_clock/main:12:2` at WASI O2: Node rounds poll
+- `assertion failed : assert io_clock/main : 12 : 2` at WASI O2: Node rounds poll
   timeouts; the adapter now rechecks the monotonic deadline.
 - `provider target host ... app/main.S: UnknownModule`: macro compilation
   must discard all packages' runtime defaults, not only root/library plans.

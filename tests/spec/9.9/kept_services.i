@@ -11,11 +11,11 @@
 
 Name = (value = String)
 
-read_name = () <- (name: Name) { name.value }
+read_name = () <- (name : Name) { name.value }
 
 main = () {
 	{
-		callback = task.keep((x: Int) {
+		callback = task.keep((x : Int) {
 			task.yield()
 			task.yield()
 			task.yield()
@@ -32,13 +32,13 @@ main = () {
 			assert(task.join(t) == ("saved", [1], 7))
 		})
 		assert(read_name() == "saved")
-		pure = task.keep((_: Nil) { 1 })
+		pure = task.keep((_ : Nil) { 1 })
 		assert(core.portable(pure))
 		control.boundary((b) {
 			task.scope((s) {
 				t = task.go(s, () {
 					task.yield()
-					saved = task.keep((_: Nil) { 1 })
+					saved = task.keep((_ : Nil) { 1 })
 					core.not(core.portable(saved))
 				})
 				assert(core.portable(t))

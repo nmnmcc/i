@@ -66,7 +66,7 @@ fn syntax_library_round_trips_through_the_host() {
 	syntax = i/syntax
 )
 @external("test:syntax", "source")
-source: () -> syntax.Syntax
+source : () -> syntax.Syntax
 
 test("exercise", () -> Nil {
 	value = source()
@@ -146,7 +146,7 @@ fn compiler_operations_are_limited_to_compiler_instances() {
 (syntax = i/syntax)
 (show)
 @external("test:syntax", "source")
-source: () -> syntax.Syntax
+source : () -> syntax.Syntax
 show = () { syntax.show(source()) }
 "#,
     )
@@ -205,7 +205,7 @@ show = () { syntax.show(source()) }
 	syntax = i/syntax
 )
 @external("test:syntax", "source")
-source: () -> syntax.Syntax
+source : () -> syntax.Syntax
 main = () -> Nil {
 	{
 		syntax.definition(source())
@@ -225,7 +225,7 @@ main = () -> Nil {
     );
     std::fs::write(
         &main,
-        "@external(\"i:compiler/syntax/v1\", \"show\")\nforged: () -> String\nmain = () { Nil }\n",
+        "@external(\"i:compiler/syntax/v1\", \"show\")\nforged : () -> String\nmain = () { Nil }\n",
     )
     .unwrap();
     let error = match ilang_cli::build(dir.path(), options) {
@@ -249,7 +249,7 @@ fn syntax_values_cross_export_boundary() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { x }\n",
+        "(syntax = i/syntax)\n(identity)\nidentity = (x : syntax.Syntax) { x }\n",
     )
     .unwrap();
     let built = ilang_cli::build(
@@ -301,10 +301,10 @@ fn compiler_templates_rebuild_through_wasm() {
 	testlib = (test) = std/test
 	syntax = i/syntax
 )
-make_many = (value: syntax.Syntax, n: Int, acc: List(syntax.Syntax)) -> List(
+make_many = (value : syntax.Syntax, n : Int, acc : List(syntax.Syntax)) -> List(
 	syntax.Syntax,
 ) { n |> (0) { acc } | (_) { make_many(value, n - 1, [value, ..acc]) } }
-count = (items: List(syntax.Syntax), n: Int) -> Int {
+count = (items : List(syntax.Syntax), n : Int) -> Int {
 	items |> ([]) { n } | ([_, ..rest]) { count(rest, n + 1) }
 }
 

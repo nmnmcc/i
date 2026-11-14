@@ -10,11 +10,11 @@
 
 User = (name = String, age = Int)
 
-kind = (u: User) {
+kind = (u : User) {
 	u |> (User(age = age, ..) ? age > 10) { 1 } | (User(..)) { 2 }
 }
 
-label = (u: User) {
+label = (u : User) {
 	u |>
 		(User(age = age, name = name) ? age > 10) { name }
 		| (User(name = name, ..)) { "young " <> name }

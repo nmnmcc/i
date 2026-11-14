@@ -182,7 +182,7 @@ fn interpolation_keeps_its_result_through_both_surface_conversions() {
     let mut file = dir.path().join("src/main.i");
     std::fs::write(
         &file,
-        "f = (x: String) { \"a\\(x)b\" }\nmain = () { assert(f(\"c\") == \"acb\") }\n",
+        "f = (x : String) { \"a\\(x)b\" }\nmain = () { assert(f(\"c\") == \"acb\") }\n",
     )
     .unwrap();
     for target in ["is", "i"] {

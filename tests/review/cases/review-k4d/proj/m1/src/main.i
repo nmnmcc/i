@@ -1,13 +1,13 @@
 Dep = (v = Int)
-get = () <- (d: Dep) { d.v }
+get = () <- (d : Dep) { d.v }
 S(N) = (f = () <- N -> Int, m = (N) -> Nil)
 T(N) = (f = () <- N -> Int, m = (N) -> Nil)
-use = <N>() <- (s: S(N)) { s.f() }
-uset = <N>() <- (s: T(N)) { s.f() }
+use = <N>() <- (s : S(N)) { s.f() }
+uset = <N>() <- (s : T(N)) { s.f() }
 
 main = () {
-	_syn3_0: S(Dep) = S(f = () { get() }, m = (_: Dep) { Nil })
-	_syn3_1: T(S(Dep)) = T(f = () { use() }, m = (_: S(Dep)) { Nil })
+	_syn3_0 : S(Dep) = S(f = () { get() }, m = (_ : Dep) { Nil })
+	_syn3_1 : T(S(Dep)) = T(f = () { use() }, m = (_ : S(Dep)) { Nil })
 	{
 		uset()
 		Nil

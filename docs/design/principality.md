@@ -123,15 +123,18 @@ Candidate probes:
 ```i
 // 01-base
 id = (x) { x }
-bounded = (x) { x + 1 x }
-join = (xs: List(Int) | List(String)) { xs }
-except_a = (s: String - "a") { s }
+bounded = (x) {
+	x + 1
+	x
+}
+join = (xs : { List(Int) | List(String) }) { xs }
+except_a = (s : String - "a") { s }
 literals = [200, 404]
 ```
 
 ```i
 // 01-polarity: attempts the excluded choice of variable for an input
-bad = <A, B>(x: A | B) { x }
+bad = <A, B>(x : { A | B }) { x }
 ```
 
 The stronger candidate puts a permitted variable intersection in an input,
@@ -139,7 +142,7 @@ then requires that intersection to be Int while retaining its components:
 
 ```i
 // 01-intersection
-choose = <A, B>(x: A & B, a: A, b: B) { (x + 1, a, b) }
+choose = <A, B>(x : A & B, a : A, b : B) { (x + 1, a, b) }
 ```
 
 `01-intersection-use` additionally has
@@ -252,31 +255,45 @@ Candidate probes:
 ```i
 // 02-needs
 Emit(A) = (emit = (A) -> Nil)
-need_int = () <- (e: Emit(Int)) { e.emit(1) }
-need_string = () <- (e: Emit(String)) { e.emit("s") }
-both = () { need_int() need_string() }
+need_int = () <- (e : Emit(Int)) { e.emit(1) }
+need_string = () <- (e : Emit(String)) { e.emit("s") }
+both = () {
+	need_int()
+	need_string()
+}
 ```
 
 ```i
 // 02-empty
 Read(A) = (read = () -> A)
-need_int = () <- (r: Read(Int)) { r.read() }
-need_string = () <- (r: Read(String)) { r.read() }
-both = () { need_int() need_string() }
+need_int = () <- (r : Read(Int)) { r.read() }
+need_string = () <- (r : Read(String)) { r.read() }
+both = () {
+	need_int()
+	need_string()
+}
 ```
 
 ```i
 // 02-deferred; 02-deferred-use additionally has the last line
 Read(A) = (read = () -> A)
-read = <A>(x: A) <- (r: Read(A)) { r.read() }
-both = <A, B>(x: A, y: B) { read(x) read(y) }
+read = <A>(x : A) <- (r : Read(A)) { r.read() }
+both = <A, B>(x : A, y : B) {
+	read(x)
+	read(y)
+}
 // use = () { both(1, "s") }
 ```
 
 ```i
 // 02-rows; 02-row-split replaces caught with wrong below
-(fail = i/fail)
-body = () { fail.raise(1) fail.raise("s") }
+(
+	fail = i/fail
+)
+body = () {
+	fail.raise(1)
+	fail.raise("s")
+}
 caught = () { fail.catch(body) }
 // wrong: () -> Result(Never, Int) = () { fail.catch(body) }
 ```
@@ -300,14 +317,17 @@ variance to impose the corresponding upper bounds as well.
 ```i
 // 02-deferred-functions
 Read(A) = (read = () -> A)
-both = <A, B>(f: () <- (Read(A)) -> A, g: () <- (Read(B)) -> B) { f() g() }
+both = <A, B>(f : () <- (Read(A)) -> A, g : () <- (Read(B)) -> B) {
+	f()
+	g()
+}
 ```
 
 `02-deferred-functions-use` additionally has:
 
 ```i
-need_int = () <- (r: Read(Int)) { r.read() }
-need_string = () <- (r: Read(String)) { r.read() }
+need_int = () <- (r : Read(Int)) { r.read() }
+need_string = () <- (r : Read(String)) { r.read() }
 use = () { both(need_int, need_string) }
 ```
 
@@ -377,7 +397,7 @@ proof of this property when invariance, upper bounds, and aliases interact.
 
 [§4.8 rule 13 and the value-type paragraph](../spec.md#48-typing-rules)
 explicitly allow a known type to be narrower than an inferred type. With
-`x = "a" = s` and `s: String`, successful matching makes `"a"` a known fact,
+`x = "a" = s` and `s : String`, successful matching makes `"a"` a known fact,
 but the inferred type of `x` is `String`. An annotation naming `x` reads
 that inferred type. A key access uses a whole-scalar bound with fresh
 noncovariant holes for inference; its known result is computed separately.
@@ -406,13 +426,13 @@ Candidate probes:
 ```i
 // 03-reads
 id = (x) { x }
-a: id = (n: Int) { n }
-b: id = (s: String) { s }
-copy = (s: String) {
-    x = "a" = s
-    p = (x, 0).0
-    q: p = "b"
-    q
+a : id = (n : Int) { n }
+b : id = (s : String) { s }
+copy = (s : String) {
+	x = "a" = s
+	p = (x, 0).0
+	q : p = "b"
+	q
 }
 ```
 
@@ -431,9 +451,9 @@ Alias = id
 Ok(A) = (A)
 Error(E) = (E)
 f = () {
-    r = Error("no")
-    Ok(v) = r
-    v
+	r = Error("no")
+	Ok(v) = r
+	v
 }
 ```
 
@@ -473,7 +493,7 @@ generalized variable or an unknown type”. `03-fitted` checks with
 `03-fixation` checks with `source : Inv(1)`. Adding the later use rejects
 with E0501, `2` not a subtype of `1`, and a note at the source's fixation
 read. Omitting that read checks with `source : Inv(1 | 2)` and
-`use : () -> 1 | 2`. These different outcomes implement the specified
+`use : () -> { 1 | 2 }`. These different outcomes implement the specified
 extra completion constraint. Type text printed from the rejected program
 is recovery output, not a successfully changed permanent alias.
 
@@ -526,10 +546,10 @@ type. This probe isolates that distinction:
 
 ```i
 // 04-known-domain
-show = ("a") { "a" } | (other: String) { 1 }
-f = (s: String) {
-    x = "a" = s
-    show(x)
+show = ("a") { "a" } | (other : String) { 1 }
+f = (s : String) {
+	x = "a" = s
+	show(x)
 }
 ```
 
@@ -554,33 +574,33 @@ Candidate probes:
 
 ```i
 // 04-selection
-show = (n: Int) { "int" } | (s: String) { 1 }
+show = (n : Int) { "int" } | (s : String) { 1 }
 direct = show(1)
 alias = show
 by_alias = alias(1)
 h = (x) { show(x) }
 wrapped = (show, 0)
 ordinary = wrapped.0(1)
-shapes = (n: Int) { "one" } | (n: Int, m: Int) { True }
+shapes = (n : Int) { "one" } | (n : Int, m : Int) { True }
 shaped = shapes(1, 2)
 ```
 
 ```i
 // 04-fallback: an unknown parameter must not select only the Int branch
-show = (n: Int) { "int" } | (s: String) { 1 }
+show = (n : Int) { "int" } | (s : String) { 1 }
 h = (x) { show(x) }
-wrong: String = h(1)
+wrong : String = h(1)
 ```
 
 Observed: `04-selection` checks with `direct : "int"`,
-`by_alias : "int"`, and `h : (Int | String) -> "int" | 1`.
-`ordinary : String | Int` is deliberately broader: accessing the stored
+`by_alias : "int"`, and `h : (Int | String) -> { "int" | 1 }`.
+`ordinary : { String | Int }` is deliberately broader: accessing the stored
 function through `.0` uses the whole-scalar inference bound of §4.8 rule
 13. The shape-selected `shaped` is `Bool`. `04-fallback` rejects with E0501
 because the String annotation does not admit the `1` result.
 
 `04-known-domain` checks, showing
-`f : (String) <- (Assert) -> "a" | 1`. It does not even retain the specified
+`f : (String) <- (Assert) -> { "a" | 1 }`. It does not even retain the specified
 literal fact strongly enough to narrow the result here. In `local_binding`,
 a direct source is generalized and `scheme_known` recomputes its known
 type from its String scheme. Thus this first probe does not isolate the
@@ -590,10 +610,10 @@ to preserve the literal fact through that step.
 ```i
 // 04-known-domain-call
 identity = (x) { x }
-show = ("a") { "a" } | (other: String) { 1 }
-f = (s: String) {
-    x = "a" = identity(s)
-    show(x)
+show = ("a") { "a" } | (other : String) { 1 }
+f = (s : String) {
+	x = "a" = identity(s)
+	show(x)
 }
 ```
 
@@ -615,7 +635,7 @@ syntax-three path.**
 [§4.7, “Type parameters”](../spec.md#47-type-inference) makes two distinct
 promises. A parameter on a function expression is an inference variable
 which may become more exact: the spec explicitly permits
-`id = <A>(x: A) -> A { 1 }`. This does not assert an arbitrary, rigid `A`.
+`id = <A>(x : A) -> A { 1 }`. This does not assert an arbitrary, rigid `A`.
 A written polymorphic type in a parameter, data, definition, or annotation
 instead needs fresh rigid parameters that cannot escape, and each use
 instantiates it anew. Inference never guesses a polymorphic parameter type.
@@ -654,8 +674,8 @@ Candidate probes:
 
 ```i
 // 05-flexible
-id = <A>(x: A) -> A { 1 }
-constant: <A>(A) -> A = (x) { 1 }
+id = <A>(x : A) -> A { 1 }
+constant : <A>(A) -> A = (x) { 1 }
 a = id("s")
 b = constant("s")
 ```
@@ -666,7 +686,7 @@ how outer written generics are treated, not a premise of rigid checking.
 <!-- old-syntax-check: E0101 -->
 ```i
 // 05-rank: attempts the specified polymorphic-parameter behavior
-use = (f: <A>(A) -> A) { (f(1), f("s")) }
+use = (f : <A>(A) -> A) { (f(1), f("s")) }
 id = (x) { x }
 result = use(id)
 ```
@@ -674,8 +694,8 @@ result = use(id)
 ```i
 // 05-escape: tries to generalize a captured outer value through a local
 escape = (x) {
-    local: <A>(A) -> A = (y) { x }
-    local
+	local : <A>(A) -> A = (y) { x }
+	local
 }
 result = escape(1)("s")
 ```
@@ -688,7 +708,7 @@ Observed: `05-flexible` checks with both `id` and `constant` shown as
 variables; it does not demonstrate the rigid annotation rule.
 `05-rank` rejects with E0101 and the exact stage-7 diagnostic described
 above, before skolem checking could occur. `05-escape` checks with
-`escape : (A) -> (B) -> B | A` and `result : "s" | 1`: the captured outer
+`escape : (A) -> (B) -> { B | A }` and `result : { "s" | 1 }`: the captured outer
 `A` remains present. Its extra `B` alternative comes from the flexible
 identity-shaped annotation, not a successful higher-rank escape proof.
 
@@ -764,20 +784,26 @@ expansion from a query, rather than merely forwarding an argument:
 
 ```i
 // 06-closed: src/main.i
-(m = princ/macros)
+(
+	m = princ/macros
+)
 value = m.m(42)
 ```
 
 ```i
 // 06-generic: src/main.i
-(m = princ/macros)
+(
+	m = princ/macros
+)
 f = (x) { m.m(x) }
 value = f(42)
 ```
 
 ```i
 // 06-weak: src/main.i
-(m = princ/macros)
+(
+	m = princ/macros
+)
 maker = () { (x) { x } }
 weak = maker()
 f = () { m.m(weak(42)) }

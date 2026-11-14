@@ -24,7 +24,7 @@ fn setup() -> (
     u32,
 ) {
     let (graph, _, _) = common::check_files(&[
-        ("src/main.i", "f = (x: String) { 0 }\n"),
+        ("src/main.i", "f = (x : String) { 0 }\n"),
         ("src/template.i", "helper = 11\n"),
     ]);
     let (parsed, errors) = ilang_check::parse(&graph);
@@ -625,7 +625,7 @@ fn answer_head_owner_survives_marks_and_freshens_but_make_cannot_copy_it() {
 #[test]
 fn an_exported_written_type_cannot_leak_a_foreign_private_type() {
     let (mut graph, _, _) = common::check_files(&[
-        ("src/main.i", "(f)\nf: Int = 1\n"),
+        ("src/main.i", "(f)\nf : Int = 1\n"),
         ("src/template.i", "Secret = ()\n"),
     ]);
     let (mut parsed, errors) = ilang_check::parse(&graph);
@@ -673,7 +673,7 @@ fn an_exported_written_type_cannot_leak_a_foreign_private_type() {
 #[test]
 fn fixed_type_identity_never_falls_back_to_a_same_named_alias() {
     use ilang_syntax::lisp::syntax::ScopeIdentity;
-    let (mut graph, _, _) = common::check_files(&[("src/main.i", "A = Int\nf: A = 1\n")]);
+    let (mut graph, _, _) = common::check_files(&[("src/main.i", "A = Int\nf : A = 1\n")]);
     let (mut parsed, errors) = ilang_check::parse(&graph);
     assert!(errors.is_empty());
     let caller = parsed

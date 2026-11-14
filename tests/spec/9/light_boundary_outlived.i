@@ -9,7 +9,7 @@
 // (syntax-3 §2.10.6): the boundary of the catch is not active.
 Syn3ServiceFail(E) = Fail(E)
 
-the_fail = () <- (f: Syn3ServiceFail(Int)) { f }
+the_fail = () <- (f : Syn3ServiceFail(Int)) { f }
 
 main = () {
 	r = failure.catch(() { the_fail() })

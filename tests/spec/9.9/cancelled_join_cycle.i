@@ -29,9 +29,9 @@ waiter = (inbox, armed) {
 
 main = () {
 	task.scope((s) {
-		a: task.Channel(task.Task(Nil, String)) = task.channel()
-		b: task.Channel(task.Task(Nil, String)) = task.channel()
-		armed: task.Channel(Nil) = task.channel()
+		a : task.Channel(task.Task(Nil, String)) = task.channel()
+		b : task.Channel(task.Task(Nil, String)) = task.channel()
+		armed : task.Channel(Nil) = task.channel()
 		left = task.go(s, waiter(a, armed))
 		right = task.go(s, waiter(b, armed))
 		task.send(a, right)

@@ -1,4 +1,4 @@
 src/main.i:10:5: error[E0205]: `lib` is a module, not a value; use a member, as in `lib.name`
 src/main.i:12:11: error[E0207]: `v` is a value, not a module
 src/main.i:14:5: error[E0201]: `x` is not defined
-src/main.i:16:4: error[E0207]: `g` is not a module
+src/main.i:16:5: error[E0207]: `g` is not a module

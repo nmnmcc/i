@@ -54,11 +54,13 @@ shared monotype, rather than a generalized function at every call:
 
 ```i
 calls = () {
-    f = { g = (x) { Nil }
-        g }
-    f("a")
-    f("b")
-    Nil
+	f = {
+		g = (x) { Nil }
+		g
+	}
+	f("a")
+	f("b")
+	Nil
 }
 ```
 
@@ -90,8 +92,8 @@ identity, a list result, and 250/500/1000 distinct arguments:
 
 ```i
 calls = () {
-    id = (x) { [x] }
-    [id(0), id(1), id(2)]
+	id = (x) { [x] }
+	[id(0), id(1), id(2)]
 }
 ```
 

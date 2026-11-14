@@ -7,7 +7,7 @@
 
 // `core.inspect` and `core.hash` are linear in the size of the value, so
 // long lists take little time.
-build = (n: Int, acc: List(Int)) -> List(Int) {
+build = (n : Int, acc : List(Int)) -> List(Int) {
 	n |> (0) { acc } | (_) { build(n - 1, [n % 10, ..acc]) }
 }
 

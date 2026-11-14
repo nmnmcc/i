@@ -85,7 +85,8 @@
                 (| (-> (, `(, ~name ~value)) _
                      {(= full
                         ((. syntax make)
-                         ((. syntax Node) ((. syntax Text) (<> (<> prefix " / ") (text name))))
+                         ((. syntax Node)
+                          ((. syntax Text) (<> (<> prefix " / ") (text name))))
                          name))
                       (= target
                         ((. syntax make)

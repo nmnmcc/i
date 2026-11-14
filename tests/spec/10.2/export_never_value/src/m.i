@@ -6,4 +6,4 @@
 	f
 )
 
-f = (n: Int) -> Never { fail.raise("no") }
+f = (n : Int) -> Never { fail.raise("no") }

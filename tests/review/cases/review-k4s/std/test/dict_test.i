@@ -804,10 +804,10 @@ test("hash_collision_keys_test", () {
 // Random operations, checked against a list of pairs as a model. The
 // numbers come from a fixed generator, so every run is the same.
 test_random_operations = (
-	initial_seed: Int,
-	num_ops: Int,
-	key_space: Int,
-	initial: dict.Dict(Int, Int)
+	initial_seed : Int,
+	num_ops : Int,
+	key_space : Int,
+	initial : dict.Dict(Int, Int)
 ) -> Nil {
 	test_random_operations_loop(
 		initial_seed,
@@ -820,12 +820,12 @@ test_random_operations = (
 }
 
 test_random_operations_loop = (
-	initial_seed: Int,
-	seed: Int,
-	remaining: Int,
-	key_space: Int,
-	proplist: List((Int, Int)),
-	d: dict.Dict(Int, Int)
+	initial_seed : Int,
+	seed : Int,
+	remaining : Int,
+	key_space : Int,
+	proplist : List((Int, Int)),
+	d : dict.Dict(Int, Int)
 ) -> Nil {
 	{ remaining > 0 } |>
 		(False) { assert_dict_matches_proplist(d, proplist, initial_seed) }
@@ -864,10 +864,10 @@ test_random_operations_loop = (
 }
 
 run_many_random_tests = (
-	count: Int,
-	ops_per_test: Int,
-	key_space: Int,
-	initial: dict.Dict(Int, Int)
+	count : Int,
+	ops_per_test : Int,
+	key_space : Int,
+	initial : dict.Dict(Int, Int)
 ) -> Nil {
 	go = (n, seed) {
 		n |>
@@ -898,12 +898,12 @@ range_dict = (size) {
 		|> dict.from_list
 }
 
-prng = (state: Int) -> Int { { state * 48_271 } % 0x7FFFFFFF }
+prng = (state : Int) -> Int { { state * 48_271 } % 0x7FFFFFFF }
 
 assert_dict_matches_proplist = <K, V>(
-	d: dict.Dict(K, V),
-	proplist: List((K, V)),
-	seed: Int
+	d : dict.Dict(K, V),
+	proplist : List((K, V)),
+	seed : Int
 ) -> Nil {
 	{ dict.size(d) == list.length(proplist) } |>
 		(True) { Nil }

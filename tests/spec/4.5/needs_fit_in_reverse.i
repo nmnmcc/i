@@ -9,4 +9,4 @@ Narrow = () <- (Yield(Int)) -> Nil
 
 Wide = () <- (Yield(Int | String)) -> Nil
 
-bad = (f: Wide) -> Narrow { f }
+bad = (f : Wide) -> Narrow { f }

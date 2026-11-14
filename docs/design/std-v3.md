@@ -91,10 +91,12 @@ This current-library example demonstrates naming, the pipe's position-zero
 rule, and callback-last order. It does not depend on any new API:
 
 ```i
-(std/list)
+(
+	std/list
+)
 
-doubled = (values: List(Int)) -> List(Int) {
-  values |> list.map((n) { n * 2 })
+doubled = (values : List(Int)) -> List(Int) {
+	values |> list.map((n) { n * 2 })
 }
 example = () { assert(doubled([2, 3]) == [4, 6]) }
 ```
@@ -120,24 +122,30 @@ case to a stable closed error family is breaking.
 This complete example already uses syntax three and today's failure API:
 
 ```i
-(i/fail, std/list, std/option)
+(
+	i/fail
+	std/list
+	std/option
+)
 
 BadPort = (text = String)
 PortError = BadPort
-parse_port = (text: String) -> Int {
-  text |> ("80") { 80 } | ("443") { 443 }
-    | (_) { fail.raise(BadPort(text = text)) }
+parse_port = (text : String) -> Int {
+	text |>
+		("80") { 80 }
+		| ("443") { 443 }
+		| (_) { fail.raise(BadPort(text = text)) }
 }
 ports = () { list.map(["80", "443"], parse_port) }
 example = () {
-  assert(fail.catch(ports) == Ok([80, 443]))
-  assert(fail.catch(() { parse_port("bad") }) == Error(BadPort(text = "bad")))
-  assert(list.first([]) == option.None)
+	assert(fail.catch(ports) == Ok([80, 443]))
+	assert(fail.catch(() { parse_port("bad") }) == Error(BadPort(text = "bad")))
+	assert(list.first([]) == option.None)
 }
 ```
 
 To compose errors, call both operations normally. To recover selectively,
-match `Error(e: WantedError)` and re-raise the narrowed remainder. No generic
+match `Error(e : WantedError)` and re-raise the narrowed remainder. No generic
 `Error` hierarchy, universal Cause service or error-code string parser is added.
 
 ### 2.3 Services, defaults and tests
@@ -158,12 +166,12 @@ ordinary provision. Resource-backed factories require Scope around all uses.
 
 ```i
 Settings = (port = () -> Int)
-port = () <- (settings: Settings) { settings.port() }
+port = () <- (settings : Settings) { settings.port() }
 local = () -> Settings { Settings(port = () { 8080 }) }
 example = () {
-  live = local()
-  assert(port() == 8080) <- (live)
-  assert(port() == 9000) <- (Settings(port = () { 9000 }))
+	live = local()
+	assert(port() == 8080) <- (live)
+	assert(port() == 9000) <- (Settings(port = () { 9000 }))
 }
 ```
 
@@ -184,8 +192,10 @@ representation operation. Generic string/byte inspection aliases are deleted.
 `i/stdio` remains fallible byte IO. Their different error promises are explicit.
 
 ```i
-((Io) = i/io)
-main = () <- (io: Io) { io.print("hello") }
+(
+	(Io) = i/io
+)
+main = () <- (io : Io) { io.print("hello") }
 ```
 
 ### 2.5 Doc and test form
@@ -198,13 +208,15 @@ signature catalogue in source comments. The checker owns signatures.
 ```i
 //// Integer list transformations. Ordinary callbacks keep their native needs.
 //// Stability: experimental. Since: next. Tracking: docs/design/std-v3.md.
-(std/list)
+(
+	std/list
+)
 
 /// Doubles each integer, preserving order.
 /// Needs: none. Errors: none.
 /// Example: doubled([2, 3]) == [4, 6].
-doubled = (values: List(Int)) -> List(Int) {
-  values |> list.map((n) { n * 2 })
+doubled = (values : List(Int)) -> List(Int) {
+	values |> list.map((n) { n * 2 })
 }
 ```
 
@@ -223,11 +235,14 @@ limits, early exit and cancellation need visible examples. Assert failures
 stay separate from Fail. No test keyword or special standard-library runner.
 
 ```i
-(testlib = (test) = std/test, std/list)
+(
+	testlib = (test) = std/test
+	std/list
+)
 
 test("mapping preserves order", () {
-  assert(list.map([2, 3], (n) { n * 2 }) == [4, 6])
-  Nil
+	assert(list.map([2, 3], (n) { n * 2 }) == [4, 6])
+	Nil
 })
 ```
 

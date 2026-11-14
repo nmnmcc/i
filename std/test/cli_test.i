@@ -100,10 +100,10 @@ test("cli_options", () {
 
 // A1: validate spelling before duplicate names, then positional placement.
 test("cli_definition_errors", () {
-	stop_int = (_: String) -> Result(Int, String) {
+	stop_int = (_ : String) -> Result(Int, String) {
 		panic("reader called during validation")
 	}
-	stop_text = (_: String) -> Result(String, String) {
+	stop_text = (_ : String) -> Result(String, String) {
 		panic("reader called during validation")
 	}
 	dup = cli.map2(
@@ -376,7 +376,7 @@ test("cli_error_order", () {
 		cli.parse(jobs(), ["extra"]) ==
 			Error(cli.ExtraArgument(index = 0, token = "extra")),
 	)
-	stop = (_: String) -> Result(Int, String) {
+	stop = (_ : String) -> Result(Int, String) {
 		panic("conversion before allocation")
 	}
 	assert(
@@ -387,14 +387,14 @@ test("cli_error_order", () {
 			Error(cli.ExtraArgument(index = 1, token = "extra")),
 	)
 	first = cli.option(cli.Names(long = "first", short = None), "", (
-		_: String
+		_ : String
 	) -> Result(Int, String) { Error("first") })
 	second = cli.option(cli.Names(long = "second", short = None), "", (
-		_: String
+		_ : String
 	) -> Result(Int, String) { panic("later reader called") })
 	p = cli.map2(first, second, (a, b) { a + b })
 	second_error = cli.option(cli.Names(long = "second", short = None), "", (
-		_: String
+		_ : String
 	) -> Result(Int, String) { Error("second") })
 	assert(
 		cli.parse(
@@ -430,7 +430,7 @@ test("cli_error_order", () {
 			Error(cli.UnknownOption(index = 1, token = "--unknown")),
 	)
 	failing_many = cli.many(cli.Names(long = "num", short = None), "", (
-		value: String
+		value : String
 	) -> Result(Int, String) {
 		value |>
 			("1") { Ok(1) }
@@ -512,7 +512,7 @@ test("cli_converters", () {
 		("+12", 12),
 		("001", 1),
 		("9223372036854775808", 9223372036854775808),
-	], (pair: (String, Int)) { assert(cli.integer(pair.0) == Ok(pair.1)) })
+	], (pair : (String, Int)) { assert(cli.integer(pair.0) == Ok(pair.1)) })
 	list.each([
 		"",
 		"+",
@@ -564,7 +564,7 @@ test("cli_composition_laws", () {
 	left = cli.map2(
 		cli.map2(jobs(), name(), Pair),
 		verbose(),
-		(p: Pair, v) {
+		(p : Pair, v) {
 			Pair(n, s) = p
 			Triple(n, s, v)
 		},
@@ -572,7 +572,7 @@ test("cli_composition_laws", () {
 	right = cli.map2(
 		jobs(),
 		cli.map2(name(), verbose(), (s, v) { (s, v) }),
-		(n, pair: (String, Bool)) { Triple(n, pair.0, pair.1) },
+		(n, pair : (String, Bool)) { Triple(n, pair.0, pair.1) },
 	)
 	list.each([
 		["--jobs=4", "--name=x", "-v"],
@@ -585,7 +585,7 @@ test("cli_composition_laws", () {
 	mixed = cli.map2(
 		cli.map2(cli.pure("prefix"), jobs(), (s, n) { (s, n) }),
 		cli.map2(cli.pure(False), verbose(), (_, v) { v }),
-		(pair: (String, Int), v) { Triple(pair.1, pair.0, v) },
+		(pair : (String, Int), v) { Triple(pair.1, pair.0, v) },
 	)
 	assert(
 		cli.parse(mixed, ["--jobs=3", "-v"]) == Ok(Triple(3, "prefix", True)),
@@ -632,7 +632,7 @@ test("cli_help", () {
 		cli.help(cli.rest("files", "Inputs", cli.text), "app") ==
 			Ok("Usage: app\n  [<files>...]\tInputs\n"),
 	)
-	stop = (_: String) -> Result(Int, String) { panic("help called reader") }
+	stop = (_ : String) -> Result(Int, String) { panic("help called reader") }
 	stopping = cli.map(cli.option(
 		cli.Names(long = "jobs", short = None),
 		"Workers\n\tverbatim",

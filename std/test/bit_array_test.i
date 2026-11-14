@@ -837,7 +837,7 @@ test("starts_with_partial_byte_no_match_test", () {
 // Tests for functions that are new in std, or that changed from the old
 // library.
 test("base64_round_trip_test", () {
-	check = (bytes: BitArray) {
+	check = (bytes : BitArray) {
 		assert(
 			bit_array.base64_decode(bit_array.base64_encode(bytes, True)) ==
 				Ok(bytes),

@@ -8,6 +8,6 @@
 
 Counter(A) = (get = () -> A)
 
-read = () <- (c: Counter(Int)) { c.get() }
+read = () <- (c : Counter(Int)) { c.get() }
 
 test("whole", () { assert(read() == 0) <- (Counter(get = () { 0 })) })

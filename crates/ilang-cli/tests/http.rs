@@ -456,9 +456,9 @@ fn http_stream_request_body() {
 	std/option
 )
 read_pieces = (
-	body: (read = _, trailers = _),
-	acc: List(BitArray),
-	count: Int
+	body : (read = _, trailers = _),
+	acc : List(BitArray),
+	count : Int
 ) {
 	piece = body.read(4096)
 	{ bit_array.byte_size(piece) == 0 } |>
@@ -468,12 +468,12 @@ read_pieces = (
 			read_pieces(body, [piece, ..acc], count + 1)
 		}
 }
-handle = (req: http.Request, body: (read = _, trailers = _)) {
+handle = (req : http.Request, body : (read = _, trailers = _)) {
 	{ req.target == "/ignore" || req.target == "/next" } |>
 		(True) { http.response(http.Status(204)) }
 		| (False) { echo_upload(req, body) }
 }
-echo_upload = (req: http.Request, body: (read = _, trailers = _)) {
+echo_upload = (req : http.Request, body : (read = _, trailers = _)) {
 	(bytes, count) = read_pieces(body, [], 0)
 	assert(bit_array.byte_size(bytes) == 1048576)
 	assert(count >= 256)

@@ -3,7 +3,7 @@
 (
 	main
 )
-pure: (Int) -> Int = (0) { 7 }
+pure : (Int) -> Int = (0) { 7 }
 
 main = () {
 	assert(True)

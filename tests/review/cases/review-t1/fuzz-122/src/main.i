@@ -1,12 +1,12 @@
-f = (x: ("a" | "ab" | "b" | "c" | "", Bool)) {
+f = (x : ("a" | "ab" | "b" | "c" | "", Bool)) {
 	x |>
 		((_, True)) { 0 }
-		| ((_: String - "a", _)) { 1 }
-		| ((_: String - "ab" - "b", False)) { 2 }
-		| ((_: String - "a", True)) { 3 }
-		| ((_: "a" | "b", _)) { 4 }
+		| ((_ : String - "a", _)) { 1 }
+		| ((_ : String - "ab" - "b", False)) { 2 }
+		| ((_ : String - "a", True)) { 3 }
+		| ((_ : { "a" | "b" }, _)) { 4 }
 		| ((_, False)) { 5 }
-		| ((_: "a" | "b", False)) { 6 }
+		| ((_ : { "a" | "b" }, False)) { 6 }
 		| (("a", _)) { 7 }
 		| ((_, False)) { 8 }
 }

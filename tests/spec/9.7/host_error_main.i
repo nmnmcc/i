@@ -6,7 +6,7 @@
 @host("test:kv/v1")
 Kv = (get = (String) <- (Fail(String)) -> String)
 
-lookup = (key: String) <- (kv: Kv) { kv.get(key) }
+lookup = (key : String) <- (kv : Kv) { kv.get(key) }
 
 main = () {
 	lookup("missing")

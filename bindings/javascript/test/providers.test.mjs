@@ -22,7 +22,7 @@ async function build(source, plan, use) {
 }
 
 test('user providers and their host leaves run in plan order on Node', async () => {
-  await build('(\n\tS\n\tprobe\n)\n@host("custom")\nHost = (read = () -> Int)\nS = (value = Int)\nmake = () <- (host: Host) { S(value = host.read() + 2) }\nprobe = () <- (s: S) { s.value }', '[wasm]\nexports = ["app/main.probe"]\n[providers."app/main.S"]\nnodejs = "app/main.make"\n', async (bindings) => {
+  await build("(\n\tS\n\tprobe\n)\n@host(\"custom\")\nHost = (read = () -> Int)\nS = (value = Int)\nmake = () <- (host : Host) { S(value = host.read() + 2) }\nprobe = () <- (s : S) { s.value }", '[wasm]\nexports = ["app/main.probe"]\n[providers."app/main.S"]\nnodejs = "app/main.make"\n', async (bindings) => {
     await assert.rejects(instantiate(bindings.module), /Missing host function custom read for service app\/main.Host/);
     let calls = 0;
     const guest = await instantiate(bindings.module, { bindings, contextImports: { custom: { read: () => { calls++; return 40n; } } } });
@@ -34,7 +34,7 @@ test('user providers and their host leaves run in plan order on Node', async () 
 });
 
 test('a fake standard clock uses no host registration and retains request mode', async () => {
-  await build('(\n\ti/clock\n\ti/request\n\ti/fail\n)\n\n(\n\tprobe\n)\nfake = () {\n\tclock.Clock(\n\t\tmonotonic_ns = () { request.ready(Ok(42)) },\n\t\tunix_ns = () { request.ready(Ok(42)) },\n\t\tsleep_ns = (_duration: Int) { request.ready(Ok(Nil)) },\n\t)\n}\nprobe = () {\n\tfail.catch(() { clock.monotonic_ns() }) |>\n\t\t(Ok(value)) { value }\n\t\t| (Error(_)) { panic("fake clock failed") }\n}', '[wasm]\nexports = ["app/main.probe"]\n[providers."i/clock.Clock"]\nnodejs = "app/main.fake"\n', async (bindings) => {
+  await build("(\n\ti/clock\n\ti/request\n\ti/fail\n)\n\n(\n\tprobe\n)\nfake = () {\n\tclock.Clock(\n\t\tmonotonic_ns = () { request.ready(Ok(42)) },\n\t\tunix_ns = () { request.ready(Ok(42)) },\n\t\tsleep_ns = (_duration : Int) { request.ready(Ok(Nil)) },\n\t)\n}\nprobe = () {\n\tfail.catch(() { clock.monotonic_ns() }) |>\n\t\t(Ok(value)) { value }\n\t\t| (Error(_)) { panic(\"fake clock failed\") }\n}", '[wasm]\nexports = ["app/main.probe"]\n[providers."i/clock.Clock"]\nnodejs = "app/main.fake"\n', async (bindings) => {
     const guest = await instantiate(bindings.module, { bindings });
     assert.equal(guest.abi.exports['app/main.probe'].async, true);
     assert.deepEqual(Object.keys(guest.abi.services), []);

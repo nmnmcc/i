@@ -26,9 +26,9 @@ Later = (double = (Int) <- (Fail(String)) -> Int, echo = (String) -> String)
 @host("test:io/v1")
 Io = (print = (String) -> Nil)
 
-twice = (n: Int) <- (later: Later) { later.double(later.double(n)) }
+twice = (n : Int) <- (later : Later) { later.double(later.double(n)) }
 
-main = () <- (later: Later, io: Io) {
+main = () <- (later : Later, io : Io) {
 	a = twice(1)
 	b = later.echo(core.inspect(a))
 	c = fail.catch(() { later.double(-1) })
@@ -48,6 +48,6 @@ main = () <- (later: Later, io: Io) {
 }
 
 // A test that may call an async function is async too.
-test("async_test", () <- (later: Later) {
+test("async_test", () <- (later : Later) {
 	later.double(21) |> (42) { Nil } | (n) { panic(core.inspect(n)) }
 })

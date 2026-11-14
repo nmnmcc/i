@@ -16,31 +16,31 @@ Message = ()
 Event = Sent | Message
 Capture = (record = (Event) -> Nil)
 
-record = (event: Event) <- (capture: Capture) -> Nil { capture.record(event) }
+record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }
 
 // std-2 §7: finite, closed instantiations retain service and error types.
-deliver: (log.Entry) <- (
+deliver : (log.Entry) <- (
 	Fail(String),
 	Capture,
 	log.Sink(String, Capture),
 ) -> Nil = log.write
 
-query: (log.Level) <- (log.Sink(String, Capture)) -> Bool = log.enabled
+query : (log.Level) <- (log.Sink(String, Capture)) -> Bool = log.enabled
 
-defer_message: (log.Level, () <- (Fail(String), Capture) -> String) <- (
+defer_message : (log.Level, () <- (Fail(String), Capture) -> String) <- (
 	Fail(String),
 	Capture,
 	log.Sink(String, Capture),
 ) -> Nil = log.lazy
 
 capture_sink = () -> log.Sink(String, Capture) {
-	log.make((_: log.Level) { True }, (entry) { record(Sent(entry)) })
+	log.make((_ : log.Level) { True }, (entry) { record(Sent(entry)) })
 }
 
 // A pure divergent predicate detects an unwanted call without adding effects.
-unreachable = (level: log.Level) -> Bool { unreachable(level) }
+unreachable = (level : log.Level) -> Bool { unreachable(level) }
 
-entry = (level: log.Level) -> log.Entry {
+entry = (level : log.Level) -> log.Entry {
 	log.Entry(level = level, message = "hello", fields = [], at = None)
 }
 
@@ -196,7 +196,7 @@ test("log_filters", () {
 		{
 			list.each(levels, (level) { deliver(entry(level)) })
 			[]
-		} <- (log.filter(capture_sink(), (_: log.Level) { True })) <- (
+		} <- (log.filter(capture_sink(), (_ : log.Level) { True })) <- (
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {
@@ -212,15 +212,15 @@ test("log_filters", () {
 		assert(query(log.Info) == False)
 		Nil
 	} <- (
-		log.filter(log.make(unreachable, (_: log.Entry) -> Nil { Nil }), (
-			_: log.Level
+		log.filter(log.make(unreachable, (_ : log.Entry) -> Nil { Nil }), (
+			_ : log.Level
 		) { False }),
 	)
 })
 
 DeliveryError = (String)
 
-broken_deliver: (log.Entry) <- (
+broken_deliver : (log.Entry) <- (
 	Fail(DeliveryError),
 	Capture,
 	log.Sink(DeliveryError, Capture),
@@ -237,7 +237,7 @@ test("log_errors", () {
 			[]
 		} <- (
 			log.make(
-				(_: log.Level) { True },
+				(_ : log.Level) { True },
 				(event) {
 					record(Sent(event))
 					fail.raise(DeliveryError(event.message))
@@ -310,19 +310,19 @@ GateSink(E, N) = (
 	(N) -> Nil,
 )
 
-gate_write = <E, N>(event: log.Entry) <- (sink: GateSink(E, N)) -> Nil {
+gate_write = <E, N>(event : log.Entry) <- (sink : GateSink(E, N)) -> Nil {
 	GateSink(accept, send, _) = sink
 	accept(event.level) |> (True) { send(event) } | (False) { Nil }
 }
 
 GateS(N) = (() <- N -> Nil, (N) -> Nil)
 
-gate_use = <N>() <- (s: GateS(N)) {
+gate_use = <N>() <- (s : GateS(N)) {
 	GateS(f, _) = s
 	f()
 }
 
-gate_run = <N>(body: () <- N -> Nil) { body() }
+gate_run = <N>(body : () <- N -> Nil) { body() }
 
 test("gate_annotated_write", () {
 	{
@@ -330,22 +330,22 @@ test("gate_annotated_write", () {
 		Nil
 	} <- (
 		GateSink(
-			(_: log.Level) { True },
+			(_ : log.Level) { True },
 			(e) { fail.raise(e.message) },
-			(_: Never) { Nil },
+			(_ : Never) { Nil },
 		),
 	)
 })
 
 test("gate_annotated_service", () {
-	gate_use() <- (GateS(() { Nil }, (_: Never) { Nil }))
+	gate_use() <- (GateS(() { Nil }, (_ : Never) { Nil }))
 })
 
 test("gate_generic_write", () {
 	{
 		assert(fail.catch(() { log.write(entry(log.Info)) }) == Error("hello"))
 		Nil
-	} <- (log.make((_: log.Level) { True }, (e) { fail.raise(e.message) }))
+	} <- (log.make((_ : log.Level) { True }, (e) { fail.raise(e.message) }))
 })
 
 test("gate_generic_lazy", () {
@@ -361,7 +361,7 @@ test("gate_generic_lazy", () {
 })
 
 test("gate_invariant_client", () {
-	gate_run(() { gate_use() }) <- (GateS(() { Nil }, (_: Never) { Nil }))
+	gate_run(() { gate_use() }) <- (GateS(() { Nil }, (_ : Never) { Nil }))
 })
 
 test("stderr_sink_reports_failures", () {

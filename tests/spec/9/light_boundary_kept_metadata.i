@@ -8,13 +8,13 @@
 
 Reading = (read = () -> Int)
 
-the_reading = () <- (r: Reading) { r }
+the_reading = () <- (r : Reading) { r }
 
-read = () <- (r: Reading) { r.read() }
+read = () <- (r : Reading) { r.read() }
 
 test("keep_env keeps a portable lazy service as its value", () {
 	kept = control.boundary((b) {
-		control.keep_env((x: Nil) { read() }) <- (Reading(read = () { 1 }))
+		control.keep_env((x : Nil) { read() }) <- (Reading(read = () { 1 }))
 	})
 	core.portable(kept) |>
 		(True) { Nil }
@@ -34,7 +34,7 @@ test("keep_env keeps services without light boundary metadata", () {
 			// The old service is still cached in the boundary metadata. It is
 			// no longer bound, so keep_env must keep only its replacement.
 			{
-				kept = control.keep_env((x: Nil) { read() })
+				kept = control.keep_env((x : Nil) { read() })
 				core.portable(kept) |>
 					(True) { Nil }
 					| (False) { panic("kept an unbound service") }

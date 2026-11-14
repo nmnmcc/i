@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""Mechanically space annotation colons in embedded sources and doc examples.
+Normal .i/.is files are handled separately by scripts/format-annotation-files.
+Only Markdown blocks receive full formatting; host literals keep their line
+structure so position-sensitive tests retain their intent.
+"""
+import argparse
+from collections import Counter
+import json
+from pathlib import Path
+import re
+import runpy
+import subprocess
+import ast
+
+ROOT = Path(__file__).resolve().parent.parent
+M = runpy.run_path(str(ROOT / 'scripts/migrate-annotations'))
+CHECK = M['CHECK']
+
+
+def opaque_inline(source):
+    return bool(re.search(r'\.(?:rs|py|md|js|mjs|i|is|ts)\s*:\s*\d', source)
+                or re.match(r'^(?:ilang\w*|node|app|async|frame|errno|error)\s*:', source)
+                or re.search(r'\b(?:Vec|Option)<', source))
+
+
+def spaced(source, colons):
+    data = source.encode()
+    for at in reversed(colons):
+        left, right = at, at+1
+        while left and data[left-1:left] in (b' ', b'\t'):
+            left -= 1
+        prefix = b' '
+        if not left or data[left-1:left] in (b'\n', b'\r'):
+            left, prefix = at, b' ' if at == 0 else b''
+        while right < len(data) and data[right:right+1] in (b' ', b'\t'):
+            right += 1
+        suffix = b'' if right == len(data) or data[right:right+1] in (b'\n', b'\r') else b' '
+        data = data[:left] + prefix + b':' + suffix + data[right:]
+    return data.decode()
+
+
+def selected(item):
+    source = item['source']
+    if item['path']=='crates/ilang-syntax/tests/syn3.rs' and source=='x: Int = 1':
+        return False # deliberate whitespace-insensitivity regression input
+    context = (ROOT/item['path']).read_text()[max(0,item['start']-140):item['start']] if item['kind']=='rust' else ''
+    if item['path'] == 'crates/ilang-syntax/tests/syn3_lower.rs':
+        # shown() takes normal source but returns the historical lowering
+        # printer's diagnostic surface, whose spelling is pinned separately.
+        return bool(re.search(r'\bshown\(\s*$', context))
+    item['source_context'] = bool(re.search(r'parse_(?:module|expr|pattern|type)\(\s*(?:&?\s*format!\(\s*)?$', context))
+    if item.get('entry', {}).get('not_source') or item.get('entry', {}).get('preserve_spelling'):
+        return False
+    if item['kind'] == 'js' and not item['path'].startswith('editors/') and not CHECK['candidate'](source) and not item.get('entry'):
+        return False
+    existing = item.get('source_context',False) or bool(item['kind'] == 'rust' and re.match(r'^[A-Z][A-Za-z0-9]*:\s*(?:\(|[A-Z])', source)) or item['kind'] == 'markdown' or CHECK['candidate'](source) or bool(item.get('entry')) or bool(
+        re.search(r'(?m)^\s*[a-z_]\w*\s*:\s*(?:[A-Z_{(<]|"|[0-9])', source)) or bool(
+        re.fullmatch(r':\s*[A-Z][A-Za-z0-9(), |&{}<>.-]*', source))
+    item['pattern_fragment'] = (not existing and source.lstrip().startswith(('(', '[', '<<'))
+                                and bool(re.search(r'[a-z_]\w*:\s*[A-Za-z_{]', source)))
+    return existing or item['pattern_fragment']
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--driver', type=Path, default=ROOT / 'target/release/examples/pattern-annotations')
+    parser.add_argument('--report', type=Path, required=True)
+    parser.add_argument('--files-baseline', type=Path, action='append', default=[])
+    args = parser.parse_args()
+    items = [i for i in M['inventory']() if i['kind'] != 'file' and selected(i)]
+    # Editor tokenizer samples deliberately contain syntax errors, so i fmt
+    # leaves them alone. Space their annotation tokens without fixing errors.
+    for path in sorted((ROOT/'editors').rglob('*.i')):
+        source=path.read_text()
+        items.append(dict(path=str(path.relative_to(ROOT)), source=source, start=0,
+                          end=len(source), kind='editor', lisp=False))
+    for path in sorted((ROOT/'editors/tree-sitter-i/test/corpus').glob('*.txt')):
+        host=path.read_text()
+        for match in re.finditer(r'(?ms)^={3,}\n[^\n]*\n={3,}\n(.*?)\n---\n',host):
+            items.append(dict(path=str(path.relative_to(ROOT)),source=match[1],start=match.start(1),end=match.end(1),kind='editor-block',lisp=False))
+    # Inline code in the current spec/design docs is prose context, not a
+    # module. Only whitespace changes here; counter-examples keep their tokens.
+    for path in M['documentation_paths']():
+        host = path.read_text()
+        fences = [m.span() for m in re.finditer(r'(?m)^```[^\n]*\n.*?^```[ \t]*$', host, re.S)]
+        for match in re.finditer(r'(?<!`)`([^`\n]+)`(?!`)', host):
+            if any(a <= match.start() < b for a,b in fences):
+                continue
+            source = match[1]
+            if opaque_inline(source):
+                continue
+            annotation = re.search(r'\b[a-z_]\w*\s*:\s*[A-Z_{(<0-9"]', source)
+            value_type = (re.search(r'\b[a-z_]\w*\s*:\s*[a-z_]', source)
+                          and any(c in source for c in '()={}'))
+            if annotation or value_type:
+                items.append(dict(path=str(path.relative_to(ROOT)), source=source, start=match.start(1),
+                                  end=match.end(1), kind='inline', lisp=False,
+                                  valid_inline_only=bool(value_type and not annotation)))
+    requests = [dict(source=item['source'], lisp=item['lisp'], format=True) for item in items]
+    data = ''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in requests)
+    result = subprocess.run([str(args.driver)], input=data, text=True, capture_output=True, check=True)
+    results = [json.loads(line) for line in result.stdout.split('\n') if line]
+    assert len(items) == len(results)
+    registry = json.loads(CHECK['DATA'].read_text())
+    hosts = {}
+    changes = []
+    for item, result in sorted(zip(items, results), key=lambda pair: (pair[0]['path'], -pair[0]['start'])):
+        source = item['source']
+        entry = item.get('entry', {})
+        # A lowercase type name is also common in ABI pseudocode and older
+        # surface examples. Only extend the selection to valid i fragments.
+        if item.get('valid_inline_only') and result['diagnostics']:
+            continue
+        if item.get('pattern_fragment') and (result['diagnostics'] or 'Typed {' not in result['tree']):
+            continue
+        if item['kind'] in ('rust', 'js', 'python') and not CHECK['candidate'](source) and not entry and not source.startswith(': ') and not item.get('source_context'):
+            if result['diagnostics'] and not re.match(r'^[A-Z][A-Za-z0-9]*:\s*(?:\(|[A-Z])', source):
+                continue
+            if re.fullmatch(r'\w+:\s*\{[^}]*\}', source):
+                continue
+        prefix = 0
+        ignored = [(len(source[:m.start()].encode()), len(source[:m.end()].encode())) for old, _ in entry.get('substitutions', []) for m in re.finditer(re.escape(old), source)]
+        colons = [at-prefix for at in result.get('colons', []) if prefix <= at < prefix+len(source.encode()) and not any(a <= at < b for a,b in ignored) and not source.encode()[:at].rstrip().endswith(b'(')]
+        new = spaced(source, colons)
+        if item['kind'] in ('markdown','editor-block') and M['prepared'](item)['source'] == source and result.get('formatted') is not None:
+            new = result['formatted']
+            if not source.endswith('\n'):
+                new = new.removesuffix('\n')
+        if new == source:
+            continue
+        path = item['path']
+        host = hosts.setdefault(path, (ROOT/path).read_text())
+        old = host[item['start']:item['end']]
+        hosts[path] = host[:item['start']] + M['encode'](new, old, item['kind']) + host[item['end']:]
+        key = CHECK['identity'](path, source)
+        if key in registry:
+            registry[CHECK['identity'](path, new)] = registry.pop(key)
+        changes.append(dict(path=path, start=item['start'], before=source, after=new, entry=entry,
+                            kind=item['kind'], lisp=False, old=result))
+    # Program builders use f-strings too. Keep their placeholders and host
+    # escaping intact; add only a space before typed binder colons.
+    generator = ROOT/'scripts/qa/generate.py'
+    host = hosts.get('scripts/qa/generate.py', generator.read_text())
+    lines = host.splitlines(keepends=True)
+    starts = [0]
+    for line in lines:
+        starts.append(starts[-1]+len(line))
+    parsed = ast.parse(host)
+    strings = [node for node in ast.walk(parsed) if isinstance(node, ast.JoinedStr)]
+    nested = {id(child) for node in strings for value in node.values for child in ast.walk(value) if isinstance(child, ast.JoinedStr)}
+    for node in sorted((n for n in strings if id(n) not in nested), key=lambda n: (n.lineno, n.col_offset), reverse=True):
+        a=starts[node.lineno-1]+node.col_offset; b=starts[node.end_lineno-1]+node.end_col_offset
+        literal=host[a:b]
+        new = re.sub(r'([a-z_]\w*):(?=\s*(?:[A-Z_({]|\{))', r'\1 :', literal)
+        if new != literal:
+            host=host[:a]+new+host[b:]
+    if host != generator.read_text():
+        hosts['scripts/qa/generate.py']=host
+    for path, host in hosts.items():
+        (ROOT/path).write_text(host)
+    # Source files have hash-keyed registry entries too. Their source marker
+    # lines are excluded by check-snippets when it computes the key.
+    for baseline in args.files_baseline:
+        for item in M['read'](baseline):
+            if item['kind'] != 'file' or not item['path'].endswith('.i'):
+                continue
+            clean=lambda s: re.sub(r'(?m)^// old-syntax-check:.*\n?', '', s)
+            key=CHECK['identity'](item['path'], clean(item['source']))
+            if key in registry:
+                newkey=CHECK['identity'](item['path'], clean((ROOT/item['path']).read_text()))
+                registry[newkey]=registry.pop(key)
+    CHECK['DATA'].write_text(json.dumps(registry, indent=2, ensure_ascii=False)+'\n')
+    # Each edited decoded snippet is parsed again in the same registry context.
+    before=[dict(i,source=i['before']) for i in changes]
+    after=[dict(i,source=i['after']) for i in changes]
+    old=M['parse'](before,args.driver)
+    new=M['parse'](after,args.driver)
+    differences=[]
+    for item,a,b in zip(changes,old,new):
+        if M['tree'](a['tree']) != M['tree'](b['tree']) or a['diagnostics'] != b['diagnostics']:
+            differences.append(dict(path=item['path'], start=item['start'],before=item['before'],after=item['after'],old=a,new=b))
+    counts=Counter(i['path'] for i in changes)
+    report=dict(snippets=len(changes),hosts=dict(counts),differences=differences)
+    args.report.write_text(json.dumps(report,indent=2)+'\n')
+    print(f'{len(changes)} embedded/inline snippets in {len(counts)} hosts spaced/formatted; {len(differences)} tree/diagnostic differences')
+    if differences:
+        print([(d['path'],d['start'],d['old']['diagnostics'],d['new']['diagnostics']) for d in differences[:10]])
+        raise SystemExit(1)
+
+
+if __name__ == '__main__':
+    main()

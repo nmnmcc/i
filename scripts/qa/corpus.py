@@ -655,7 +655,7 @@ def audit_w520(args):
                 excerpts.append({'path': name, 'line': int(line), 'column': int(col), 'source': text})
             changes.append({'case': case['id'], 'old_exit': old['check']['exit'], 'new_exit': new['check']['exit'], 'old_locations': before, 'new_locations': after, 'shown_types_unchanged': unchanged_types, 'source_excerpts': excerpts})
             if before != after or not unchanged_types:
-                failures.append(case['id'] + ': W520 changed locations or shown types')
+                failures.append(case['id'] + " : W520 changed locations or shown types")
         elif old != new:
             if any(value['exit'] == 'timeout' for value in [*old.values(), *new.values()]):
                 censored.append(case['id'])

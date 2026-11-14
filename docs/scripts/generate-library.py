@@ -100,7 +100,7 @@ for prefix, directory in [('i', ROOT / 'lib/i'), ('std', ROOT / 'std/src')]:
                 output += ['to be written', '']
             signature = types.get((module, name))
             if signature:
-                output += ['```text', name + ': ' + signature, '```', '']
+                output += ['```text', name + ' : ' + signature, '```', '']
             else:
                 # Retain the written source line if inference is unavailable.
                 output += ['```text', match.group(), '```', '']

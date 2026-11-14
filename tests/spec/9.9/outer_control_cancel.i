@@ -12,10 +12,10 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-main = () <- (out: Out) {
+main = () <- (out : Out) {
 	control.boundary((b) {
 		task.scope((s) {
-			armed: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {

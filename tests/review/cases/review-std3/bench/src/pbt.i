@@ -19,21 +19,23 @@
 )
 Gen(A) = ((Int, random.Generator) -> Option(Tree(A)))
 Tree(A) = (value = A, children = () -> List(Tree(A)))
-make = <A>(f: (Int, random.Generator) -> Option(Tree(A))) -> Gen(A) { Gen(f) }
-sample = <A>(gen: Gen(A), size: Int, g: random.Generator) -> Option(Tree(A)) {
+make = <A>(f : (Int, random.Generator) -> Option(Tree(A))) -> Gen(A) { Gen(f) }
+sample = <A>(gen : Gen(A), size : Int, g : random.Generator) -> Option(
+	Tree(A),
+) {
 	Gen(f) = gen
 	f({ size < 0 } |> (True) { 0 } | (False) { size }, g)
 }
-constant = <A>(a: A) -> Gen(A) {
+constant = <A>(a : A) -> Gen(A) {
 	Gen((_, _) { Some(Tree(value = a, children = () { [] })) })
 }
-map_tree = <A, B>(t: Tree(A), f: (A) -> B) -> Tree(B) {
+map_tree = <A, B>(t : Tree(A), f : (A) -> B) -> Tree(B) {
 	Tree(
 		value = f(t.value),
 		children = () { list.map(t.children(), (c) { map_tree(c, f) }) },
 	)
 }
-map = <A, B>(gen: Gen(A), f: (A) -> B) -> Gen(B) {
+map = <A, B>(gen : Gen(A), f : (A) -> B) -> Gen(B) {
 	Gen((s, g) {
 		sample(gen, s, g) |>
 			(None) { None }
@@ -41,11 +43,11 @@ map = <A, B>(gen: Gen(A), f: (A) -> B) -> Gen(B) {
 	})
 }
 bind_node = <A, B>(
-	outer: Tree(A),
-	inner: Tree(B),
-	f: (A) -> Gen(B),
-	s: Int,
-	g: random.Generator
+	outer : Tree(A),
+	inner : Tree(B),
+	f : (A) -> Gen(B),
+	s : Int,
+	g : random.Generator
 ) -> Tree(B) {
 	Tree(
 		value = inner.value,
@@ -59,16 +61,16 @@ bind_node = <A, B>(
 	)
 }
 bind_outer = <A, B>(
-	outer: Tree(A),
-	f: (A) -> Gen(B),
-	s: Int,
-	g: random.Generator
+	outer : Tree(A),
+	f : (A) -> Gen(B),
+	s : Int,
+	g : random.Generator
 ) -> Option(Tree(B)) {
 	sample(f(outer.value), s, g) |>
 		(None) { None }
 		| (Some(inner)) { Some(bind_node(outer, inner, f, s, g)) }
 }
-flat_map = <A, B>(gen: Gen(A), f: (A) -> Gen(B)) -> Gen(B) {
+flat_map = <A, B>(gen : Gen(A), f : (A) -> Gen(B)) -> Gen(B) {
 	Gen((s, g) {
 		(left, right) = random.split(g)
 		sample(gen, s, left) |>
@@ -76,14 +78,14 @@ flat_map = <A, B>(gen: Gen(A), f: (A) -> Gen(B)) -> Gen(B) {
 			| (Some(t)) { bind_outer(t, f, s, right) }
 	})
 }
-int_tree = (x: Int, t: Int) -> Tree(Int) {
+int_tree = (x : Int, t : Int) -> Tree(Int) {
 	Tree(
 		value = x,
 		children = () {
 			{ x == t } |>
 				(True) { [] }
 				| (False) {
-					go = (q: Int, acc: List(Int)) -> List(Int) {
+					go = (q : Int, acc : List(Int)) -> List(Int) {
 						q |>
 							(0) { list.reverse(acc) }
 							| (_) { go(q / 2, [x - q, ..acc]) }
@@ -94,7 +96,7 @@ int_tree = (x: Int, t: Int) -> Tree(Int) {
 		},
 	)
 }
-int = (lo: Int, hi: Int) -> Gen(Int) {
+int = (lo : Int, hi : Int) -> Gen(Int) {
 	Gen((_, g) {
 		fail.catch(() { random.int(g, hi - lo + 1) }) |>
 			(Error(_)) { None }
@@ -106,28 +108,30 @@ int = (lo: Int, hi: Int) -> Gen(Int) {
 			}
 	})
 }
-shrink = <A>(t: Tree(A), budget: Int, f: (A) -> Bool) -> (A, List(Int), Int) {
-	descend(t, budget, [], 0, f)
-}
+shrink = <A>(t : Tree(A), budget : Int, f : (A) -> Bool) -> (
+	A,
+	List(Int),
+	Int,
+) { descend(t, budget, [], 0, f) }
 descend = <A>(
-	current: Tree(A),
-	left: Int,
-	path: List(Int),
-	count: Int,
-	f: (A) -> Bool
+	current : Tree(A),
+	left : Int,
+	path : List(Int),
+	count : Int,
+	f : (A) -> Bool
 ) -> (A, List(Int), Int) {
 	{ left == 0 } |>
 		(True) { (current.value, list.reverse(path), count) }
 		| (False) { scan(current, current.children(), left, path, count, 0, f) }
 }
 scan = <A>(
-	current: Tree(A),
-	children: List(Tree(A)),
-	left: Int,
-	path: List(Int),
-	count: Int,
-	index: Int,
-	f: (A) -> Bool
+	current : Tree(A),
+	children : List(Tree(A)),
+	left : Int,
+	path : List(Int),
+	count : Int,
+	index : Int,
+	f : (A) -> Bool
 ) -> (A, List(Int), Int) {
 	{ left == 0 } |>
 		(True) { (current.value, list.reverse(path), count) }

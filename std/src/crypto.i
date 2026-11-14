@@ -34,20 +34,22 @@ InvalidLength = ()
 InvalidIterations = ()
 UnalignedInput = ()
 CryptoError = InvalidLength | InvalidIterations | UnalignedInput
-xor3 = (a: Int, b: Int, c: Int) -> Int { core.bit_xor(core.bit_xor(a, b), c) }
+xor3 = (a : Int, b : Int, c : Int) -> Int {
+	core.bit_xor(core.bit_xor(a, b), c)
+}
 
-word = (x: Int, width: Int) -> Int {
+word = (x : Int, width : Int) -> Int {
 	core.bit_and(x, core.shift_left(1, width) - 1)
 }
 
-rotate = (x: Int, n: Int, width: Int) -> Int {
+rotate = (x : Int, n : Int, width : Int) -> Int {
 	core.bit_or(
 		core.shift_right(x, n),
 		word(core.shift_left(x, width - n), width),
 	)
 }
 
-nth = (xs: List(Int), n: Int) -> Int {
+nth = (xs : List(Int), n : Int) -> Int {
 	list.at(xs, n) |>
 		(Some(x)) { x }
 		| (None) { panic("crypto: schedule index") }
@@ -55,7 +57,7 @@ nth = (xs: List(Int), n: Int) -> Int {
 
 Words = (Int, Int, Int, Int, Int, Int, Int, Int)
 
-add_words = (x: Words, y: Words, width: Int) -> Words {
+add_words = (x : Words, y : Words, width : Int) -> Words {
 	Words(a, b, c, d, e, f, g, h) = x
 	Words(i, j, k, l, m, n, o, p) = y
 	Words(
@@ -70,7 +72,7 @@ add_words = (x: Words, y: Words, width: Int) -> Words {
 	)
 }
 
-serialize = (x: Words, width: Int) -> BitArray {
+serialize = (x : Words, width : Int) -> BitArray {
 	Words(a, b, c, d, e, f, g, h) = x
 	<<
 		a:u(width),
@@ -152,7 +154,7 @@ constants32 = [
 ]
 
 /// The 256-bit SHA-2 digest. For example `sha256(<<"abc":utf8>>)`.
-sha256 = (input: BitArray) -> BitArray {
+sha256 = (input : BitArray) -> BitArray {
 	n = core.bit_size(input)
 	zeros = { 512 - { n + 1 + 64 } % 512 } % 512
 	padded = <<input:bits, 1:u1, 0:u(zeros), n:u(64)>>
@@ -174,7 +176,7 @@ sha256 = (input: BitArray) -> BitArray {
 	)
 }
 
-blocks32 = (input: BitArray, state: Words) -> Words {
+blocks32 = (input : BitArray, state : Words) -> Words {
 	input |>
 		(<<>>) { state }
 		| (<<block:bits(512), tail:bits>>) {
@@ -187,10 +189,10 @@ blocks32 = (input: BitArray, state: Words) -> Words {
 }
 
 rounds32 = (
-	block: BitArray,
-	constants: List(Int),
-	schedule: List(Int),
-	state: Words
+	block : BitArray,
+	constants : List(Int),
+	schedule : List(Int),
+	state : Words
 ) -> Words {
 	constants |>
 		([]) { state }
@@ -329,7 +331,7 @@ constants64 = [
 ]
 
 /// The 512-bit SHA-2 digest. For example `sha512(<<"abc":utf8>>)`.
-sha512 = (input: BitArray) -> BitArray {
+sha512 = (input : BitArray) -> BitArray {
 	n = core.bit_size(input)
 	zeros = { 1024 - { n + 1 + 128 } % 1024 } % 1024
 	padded = <<input:bits, 1:u1, 0:u(zeros), n:u(128)>>
@@ -351,7 +353,7 @@ sha512 = (input: BitArray) -> BitArray {
 	)
 }
 
-blocks64 = (input: BitArray, state: Words) -> Words {
+blocks64 = (input : BitArray, state : Words) -> Words {
 	input |>
 		(<<>>) { state }
 		| (<<block:bits(1024), tail:bits>>) {
@@ -364,10 +366,10 @@ blocks64 = (input: BitArray, state: Words) -> Words {
 }
 
 rounds64 = (
-	block: BitArray,
-	constants: List(Int),
-	schedule: List(Int),
-	state: Words
+	block : BitArray,
+	constants : List(Int),
+	schedule : List(Int),
+	state : Words
 ) -> Words {
 	constants |>
 		([]) { state }
@@ -422,14 +424,14 @@ rounds64 = (
 		}
 }
 
-aligned = (xs: List(BitArray)) -> Bool {
+aligned = (xs : List(BitArray)) -> Bool {
 	list.all(xs, (x) { core.bit_size(x) % 8 == 0 })
 }
 
 key_pad = (
-	key: BitArray,
-	block: Int,
-	hash: (BitArray) -> BitArray
+	key : BitArray,
+	block : Int,
+	hash : (BitArray) -> BitArray
 ) -> BitArray {
 	k = { bit_array.byte_size(key) > block } |>
 		(True) { hash(key) }
@@ -437,7 +439,7 @@ key_pad = (
 	<<k:bytes, 0:u({ block - bit_array.byte_size(k) } * 8)>>
 }
 
-xor_byte = (bytes: BitArray, mask: Int) -> BitArray {
+xor_byte = (bytes : BitArray, mask : Int) -> BitArray {
 	go = (xs, acc) {
 		xs |>
 			(<<>>) { bit_array.concat(list.reverse(acc)) }
@@ -452,22 +454,22 @@ xor_byte = (bytes: BitArray, mask: Int) -> BitArray {
 // A prepared HMAC stores immutable pads, reusable across KDF iterations.
 Mac = (BitArray, BitArray, (BitArray) -> BitArray)
 
-prepare = (key: BitArray, block: Int, hash: (BitArray) -> BitArray) -> Mac {
+prepare = (key : BitArray, block : Int, hash : (BitArray) -> BitArray) -> Mac {
 	pad = key_pad(key, block, hash)
 	Mac(xor_byte(pad, 54), xor_byte(pad, 92), hash)
 }
 
-authenticate = (mac: Mac, input: BitArray) -> BitArray {
+authenticate = (mac : Mac, input : BitArray) -> BitArray {
 	Mac(inner, outer, hash) = mac
 	digest = hash(<<inner:bytes, input:bytes>>)
 	hash(<<outer:bytes, digest:bytes>>)
 }
 
 hmac = (
-	key: BitArray,
-	input: BitArray,
-	block: Int,
-	hash: (BitArray) -> BitArray
+	key : BitArray,
+	input : BitArray,
+	block : Int,
+	hash : (BitArray) -> BitArray
 ) -> Result(BitArray, CryptoError) {
 	aligned([key, input]) |>
 		(False) { Error(UnalignedInput) }
@@ -475,36 +477,36 @@ hmac = (
 }
 
 /// RFC 4231 HMAC-SHA-256: `hmac_sha256(<<1>>, <<2>>)`.
-hmac_sha256 = (key: BitArray, input: BitArray) -> Result(
+hmac_sha256 = (key : BitArray, input : BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { hmac(key, input, 64, sha256) }
 
 /// RFC 4231 HMAC-SHA-512, with arbitrary-length byte keys.
-hmac_sha512 = (key: BitArray, input: BitArray) -> Result(
+hmac_sha512 = (key : BitArray, input : BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { hmac(key, input, 128, sha512) }
 
 /// RFC 5869 extract. Empty salt is equivalent to a hash-length zero salt.
-hkdf_extract_sha256 = (salt: BitArray, input: BitArray) -> Result(
+hkdf_extract_sha256 = (salt : BitArray, input : BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { hmac_sha256(salt, input) }
 
 /// RFC 5869 extract using SHA-512.
-hkdf_extract_sha512 = (salt: BitArray, input: BitArray) -> Result(
+hkdf_extract_sha512 = (salt : BitArray, input : BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { hmac_sha512(salt, input) }
 
 expand = (
-	prk: BitArray,
-	info: BitArray,
-	length: Int,
-	size: Int,
-	block: Int,
-	hash: (BitArray) -> BitArray
+	prk : BitArray,
+	info : BitArray,
+	length : Int,
+	size : Int,
+	block : Int,
+	hash : (BitArray) -> BitArray
 ) -> Result(BitArray, CryptoError) {
 	{ length < 0 || length > 255 * size || bit_array.byte_size(prk) < size } |>
 		(True) { Error(InvalidLength) }
@@ -538,23 +540,23 @@ expand = (
 }
 
 /// Expands a SHA-256 PRK into 0..8160 bytes. A short PRK is an error.
-hkdf_expand_sha256 = (prk: BitArray, info: BitArray, length: Int) -> Result(
+hkdf_expand_sha256 = (prk : BitArray, info : BitArray, length : Int) -> Result(
 	BitArray,
 	CryptoError,
 ) { expand(prk, info, length, 32, 64, sha256) }
 
 /// Expands a SHA-512 PRK into 0..16320 bytes.
-hkdf_expand_sha512 = (prk: BitArray, info: BitArray, length: Int) -> Result(
+hkdf_expand_sha512 = (prk : BitArray, info : BitArray, length : Int) -> Result(
 	BitArray,
 	CryptoError,
 ) { expand(prk, info, length, 64, 128, sha512) }
 
 /// Extracts then expands: `hkdf_sha256(key, <<>>, <<>>, 32)`.
 hkdf_sha256 = (
-	input: BitArray,
-	salt: BitArray,
-	info: BitArray,
-	length: Int
+	input : BitArray,
+	salt : BitArray,
+	info : BitArray,
+	length : Int
 ) -> Result(BitArray, CryptoError) {
 	hkdf_extract_sha256(salt, input) |>
 		(Error(e)) { Error(e) }
@@ -563,17 +565,17 @@ hkdf_sha256 = (
 
 /// HKDF with SHA-512.
 hkdf_sha512 = (
-	input: BitArray,
-	salt: BitArray,
-	info: BitArray,
-	length: Int
+	input : BitArray,
+	salt : BitArray,
+	info : BitArray,
+	length : Int
 ) -> Result(BitArray, CryptoError) {
 	hkdf_extract_sha512(salt, input) |>
 		(Error(e)) { Error(e) }
 		| (Ok(prk)) { hkdf_expand_sha512(prk, info, length) }
 }
 
-xor_bits = (a: BitArray, b: BitArray) -> BitArray {
+xor_bits = (a : BitArray, b : BitArray) -> BitArray {
 	n = core.bit_size(a)
 	(a, b) |>
 		((<<x:u(n)>>, <<y:u(n)>>)) { <<{ core.bit_xor(x, y) }:u(n)>> }
@@ -583,10 +585,10 @@ xor_bits = (a: BitArray, b: BitArray) -> BitArray {
 /// PBKDF2-HMAC-SHA-256, positive iteration count and 0..(2^32-1)*32 bytes.
 /// `pbkdf2_sha256(<<"password":utf8>>, <<"salt":utf8>>, 1, 32)`.
 pbkdf2_sha256 = (
-	password: BitArray,
-	salt: BitArray,
-	iterations: Int,
-	length: Int
+	password : BitArray,
+	salt : BitArray,
+	iterations : Int,
+	length : Int
 ) -> Result(BitArray, CryptoError) {
 	{ iterations <= 0 } |>
 		(True) { Error(InvalidIterations) }
@@ -643,7 +645,7 @@ pbkdf2_sha256 = (
 
 /// Compares every bit for equal-length inputs, without a content-dependent exit.
 /// Length is public. This source-level timing property is not a host timing guarantee.
-constant_time_equal = (a: BitArray, b: BitArray) -> Bool {
+constant_time_equal = (a : BitArray, b : BitArray) -> Bool {
 	{ core.bit_size(a) != core.bit_size(b) } |>
 		(True) { False }
 		| (False) {
@@ -671,7 +673,7 @@ constant_time_equal = (a: BitArray, b: BitArray) -> Bool {
 }
 
 /// Secure bytes from the existing Entropy service. No pseudo-random substitute.
-random_bytes = (length: Int) -> Result(BitArray, CryptoError) {
+random_bytes = (length : Int) -> Result(BitArray, CryptoError) {
 	{ length < 0 } |>
 		(True) { Error(InvalidLength) }
 		| (False) { Ok(process.entropy(length)) }

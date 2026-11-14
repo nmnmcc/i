@@ -249,7 +249,7 @@ fn deeply_nested_functions_visit_patterns_types_and_blocks_without_recursion() {
 #[test]
 fn reusable_encoder_preserves_source_spans_and_scope_across_items() {
     use ilang_syntax::lisp::{SourceEncoder, item_syntax};
-    let source = "first = (x: Int) -> Int { x + 1 }\nsecond = (y: String) { y }\n";
+    let source = "first = (x : Int) -> Int { x + 1 }\nsecond = (y : String) { y }\n";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let scope = scope();
@@ -621,7 +621,7 @@ fn charge_events_count_unicode_zero_and_large_integer_exactly() {
 #[test]
 fn records_preserve_labels_spreads_and_streamed_cost() {
     use ilang_syntax::lisp::SourceEncoder;
-    let source = "f = <R, K>(r: (k = Int, full_name = String)) { (..r, full_name = \"Ada\", x = 1) }\nempty = ()\n";
+    let source = "f = <R, K>(r : (k = Int, full_name = String)) { (..r, full_name = \"Ada\", x = 1) }\nempty = ()\n";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let scope = scope();
@@ -669,7 +669,7 @@ fn records_preserve_labels_spreads_and_streamed_cost() {
 #[test]
 fn charge_events_for_interpolation_and_two_sided_string_patterns() {
     use ilang_syntax::lisp::SourceEncoder;
-    let source = r##"value = (s: String) {
+    let source = r##"value = (s : String) {
 	s |> ("a" <> r <> "b") { "x\(r)" } | (r <> "b") { r } | (_) { "" }
 }"##;
     let (module, errors) = ilang_syntax::parse_module(source);

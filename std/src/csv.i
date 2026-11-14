@@ -40,7 +40,7 @@ defaults = () -> Options { Options(delimiter = 44, fields = 0, crlf = False) }
 /// A single scalar delimiter, expected width (0 infer, negative variable),
 /// and output line ending. Quotes, NUL, CR, LF, U+FFFD are invalid delimiters.
 /// `csv.options(";", -1, True)`.
-options = (delimiter: String, fields: Int, crlf: Bool) -> Result(
+options = (delimiter : String, fields : Int, crlf : Bool) -> Result(
 	Options,
 	CsvError,
 ) {
@@ -74,7 +74,7 @@ options = (delimiter: String, fields: Int, crlf: Bool) -> Result(
 
 Cursor(E, N) = (List(Int), stream.Stream(String, E, N), Int, Int)
 
-raw = <E, N>(cursor: Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
+raw = <E, N>(cursor : Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
 	Cursor(pending, source, line, column) = cursor
 	pending |>
 		([c, ..rest]) {
@@ -102,7 +102,7 @@ raw = <E, N>(cursor: Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
 		}
 }
 
-next = <E, N>(cursor: Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
+next = <E, N>(cursor : Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
 	(c, tail) = raw(cursor)
 	c |>
 		(Some(13)) {
@@ -121,7 +121,7 @@ next = <E, N>(cursor: Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
 		| (_) { (c, tail) }
 }
 
-text = (reversed: List(Int)) -> String {
+text = (reversed : List(Int)) -> String {
 	core.concat(
 		list.map(list.reverse(reversed), (c) {
 			<<c:u(32)>> |>
@@ -133,20 +133,20 @@ text = (reversed: List(Int)) -> String {
 
 ReadRow = (List(String), Int)
 
-cursor_line = <E, N>(cursor: Cursor(E, N)) -> Int {
+cursor_line = <E, N>(cursor : Cursor(E, N)) -> Int {
 	Cursor(_, _, line, _) = cursor
 	line
 }
 
 // Modes: 0 field start, 1 bare field, 2 quoted field, 3 closing quote.
 read_row = <E, N>(
-	cursor: Cursor(E, N),
-	config: Options,
-	mode: Int,
-	field: List(Int),
-	fields: List(String),
-	started: Bool,
-	startline: Int
+	cursor : Cursor(E, N),
+	config : Options,
+	mode : Int,
+	field : List(Int),
+	fields : List(String),
+	started : Bool,
+	startline : Int
 ) -> Result((Option(ReadRow), Cursor(E, N)), CsvError) {
 	Cursor(_, _, line, column) = cursor
 	(c, tail) = next(cursor)
@@ -319,9 +319,9 @@ read_row = <E, N>(
 }
 
 row_stream = <E, N>(
-	cursor: Cursor(E, N),
-	config: Options,
-	width: Int
+	cursor : Cursor(E, N),
+	config : Options,
+	width : Int
 ) -> stream.Stream(Result(ReadRow, CsvError), E, N) {
 	stream.make(() {
 		parsed = read_row(cursor, config, 0, [], [], False, cursor_line(cursor))
@@ -357,8 +357,8 @@ row_stream = <E, N>(
 /// Parses a stream of arbitrary text chunks, emitting one row per pull.
 /// `csv.rows(stream.from_list(["a,", "b\n"]), csv.defaults())`.
 rows = <E, N>(
-	source: stream.Stream(String, E, N),
-	config: Options
+	source : stream.Stream(String, E, N),
+	config : Options
 ) -> stream.Stream(Result(List(String), CsvError), E, N) {
 	stream.map(row_stream(Cursor([], source, 1, 1), config, config.fields), (
 		result
@@ -367,12 +367,12 @@ rows = <E, N>(
 
 /// Parses comma-separated text, inferring the width from the first row.
 /// `csv.parse("a,b\n1,2\n")` gives `Ok([["a", "b"], ["1", "2"]])`.
-parse = (input: String) -> Result(List(List(String)), CsvError) {
+parse = (input : String) -> Result(List(List(String)), CsvError) {
 	parse_with(input, defaults())
 }
 
 /// Parses with an explicit delimiter and row-width policy.
-parse_with = (input: String, config: Options) -> Result(
+parse_with = (input : String, config : Options) -> Result(
 	List(List(String)),
 	CsvError,
 ) {
@@ -386,7 +386,7 @@ parse_with = (input: String, config: Options) -> Result(
 	})
 }
 
-header = (names: List(String), line: Int) -> Result(List(String), CsvError) {
+header = (names : List(String), line : Int) -> Result(List(String), CsvError) {
 	{ list.length(list.unique(names)) == list.length(names) } |>
 		(True) { Ok(names) }
 		| (False) {
@@ -396,7 +396,7 @@ header = (names: List(String), line: Int) -> Result(List(String), CsvError) {
 		}
 }
 
-named = (names: List(String), row: List(String), line: Int) -> Result(
+named = (names : List(String), row : List(String), line : Int) -> Result(
 	dict.Dict(String, String),
 	CsvError,
 ) {
@@ -414,8 +414,8 @@ named = (names: List(String), row: List(String), line: Int) -> Result(
 }
 
 record_stream = <E, N>(
-	source: stream.Stream(Result(ReadRow, CsvError), E, N),
-	names: List(String)
+	source : stream.Stream(Result(ReadRow, CsvError), E, N),
+	names : List(String)
 ) -> stream.Stream(Result(dict.Dict(String, String), CsvError), E, N) {
 	stream.make(() {
 		stream.pull(source) |>
@@ -433,8 +433,8 @@ record_stream = <E, N>(
 
 /// Uses the first row as unique column names. Empty input yields no records.
 records = <E, N>(
-	source: stream.Stream(String, E, N),
-	config: Options
+	source : stream.Stream(String, E, N),
+	config : Options
 ) -> stream.Stream(Result(dict.Dict(String, String), CsvError), E, N) {
 	stream.make(() {
 		stream.pull(
@@ -451,7 +451,7 @@ records = <E, N>(
 }
 
 /// Header-mode convenience parser: `csv.parse_header("name\ni\n", csv.defaults())`.
-parse_header = (input: String, config: Options) -> Result(
+parse_header = (input : String, config : Options) -> Result(
 	List(dict.Dict(String, String)),
 	CsvError,
 ) {
@@ -468,8 +468,8 @@ parse_header = (input: String, config: Options) -> Result(
 /// Decodes a named row as a JSON object of strings using an ordinary schema.
 /// Compose `schema.string` with `schema.map` for domain conversions.
 decode = <A, E>(
-	codec: schema.Schema(A, E),
-	row: dict.Dict(String, String)
+	codec : schema.Schema(A, E),
+	row : dict.Dict(String, String)
 ) -> Result(A, E) {
 	schema.decode(
 		codec,
@@ -482,7 +482,7 @@ decode = <A, E>(
 	)
 }
 
-quote = (field: String, delimiter: String, single_empty: Bool) -> String {
+quote = (field : String, delimiter : String, single_empty : Bool) -> String {
 	{
 		single_empty ||
 			string.contains(field, delimiter) ||
@@ -496,10 +496,10 @@ quote = (field: String, delimiter: String, single_empty: Bool) -> String {
 
 /// Prints minimal quoting, with one LF after every row.
 /// `csv.print([["a", "b,c"]])` gives `"a,\"b,c\"\n"`.
-print = (rows: List(List(String))) -> String { print_with(rows, defaults()) }
+print = (rows : List(List(String))) -> String { print_with(rows, defaults()) }
 
 /// Prints with the configured delimiter and LF/CRLF. Empty rows print as `""`.
-print_with = (rows: List(List(String)), config: Options) -> String {
+print_with = (rows : List(List(String)), config : Options) -> String {
 	delimiter = text([config.delimiter])
 	ending = config.crlf |> (True) { "\r\n" } | (False) { "\n" }
 	core.concat(

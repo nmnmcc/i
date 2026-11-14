@@ -9,7 +9,7 @@
 @host("test:async/v1", "async")
 Later = (double = (Int) <- (Fail(String)) -> Int)
 
-main = () <- (later: Later) {
+main = () <- (later : Later) {
 	x = later.double(2)
 	later.double(x - 5)
 	Nil

@@ -6,10 +6,10 @@
 
 passes = () { assert(1 == 1) }
 
-host = () <- (s: Storage) { assert(s.read("k") == "v") }
+host = () <- (s : Storage) { assert(s.read("k") == "v") }
 
 gives_int = () { 1 }
 
-needs_clock = () <- (c: Clock) { assert(c.now() == 1) }
+needs_clock = () <- (c : Clock) { assert(c.now() == 1) }
 
 never = () { panic("no") }

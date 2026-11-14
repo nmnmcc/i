@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Parse repository i snippets with the syntax-three parser, so that no text of
-the syntax before it remains; see check-snippets.md."""
+the syntax before it remains; see check-snippets.md. --reuse-parser uses the
+driver built by an earlier run when only snippets or registry data changed.
+"""
 import hashlib
 import json
 import os
@@ -115,7 +117,7 @@ NEXT_SYNTAX = (
 
 def snippets():
     registered = json.loads(DATA.read_text())
-    paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.i", "*.md", "*.rs", "*.js", "*.mjs"], cwd=ROOT, text=True).splitlines()
+    paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.i", "*.md", "*.mdx", "*.rs", "*.js", "*.mjs"], cwd=ROOT, text=True).splitlines()
     for path in sorted(set(paths)):
         file = ROOT / path
         if not file.is_file():
@@ -126,7 +128,7 @@ def snippets():
         text = file.read_bytes().decode()
         if path.endswith(".i"):
             yield dict(path=path, line=1, source=re.sub(r"(?m)^// old-syntax-check:.*\n?", "", text), start=0, end=len(text), host=text, kind="file")
-        elif path.endswith(".md"):
+        elif path.endswith((".md", ".mdx")):
             for m in re.finditer(r"(?m)^```i(?:[ \t][^\n]*)?\n(.*?)^```[ \t]*$", text, re.S):
                 yield dict(path=path, line=text[:m.start()].count("\n") + 1, source=m[1], start=m.start(), end=m.end(), host=text, kind="markdown")
         else:
@@ -136,9 +138,13 @@ def snippets():
                     yield dict(path=path, line=text[:start].count("\n") + 1, source=value, start=start, end=end, host=text, kind="embedded")
 
 
+def parser_driver():
+    return Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/examples/parse-snippets"
+
+
 def parse(sources):
     data = b"".join(str(len(s.encode())).encode() + b"\n" + s.encode() for s in sources)
-    tool = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/examples/parse-snippets"
+    tool = parser_driver()
     out = subprocess.check_output([str(tool)], input=data).decode().splitlines()
     it = iter(out)
     return [[(lambda c, m: c + ": " + bytes.fromhex(m).decode())(*next(it).split(" ", 1))
@@ -197,7 +203,11 @@ def main():
         if heavy.is_file():
             command = [str(heavy), "direnv", "exec", str(shell)] + command
             break
-    subprocess.run(command, check=True)
+    if "--reuse-parser" in sys.argv:
+        if not parser_driver().is_file():
+            raise SystemExit("--reuse-parser requires the driver from an earlier check-snippets run")
+    else:
+        subprocess.run(command, check=True)
     config = json.loads(DATA.read_text())
     config.pop("_syn2_old_forms", None)
     all_snippets = list(snippets())

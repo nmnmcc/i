@@ -5,6 +5,6 @@
 )
 S(A) = (A)
 Bad = { (f = () <- (S(Int), S(String)) -> Nil) }
-use = (x: Bad) { x }
+use = (x : Bad) { x }
 
 main = () { Nil }

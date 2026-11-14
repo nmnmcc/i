@@ -5,7 +5,7 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later: Later) {
+main = () <- (later : Later) {
 	a = later.echo("borrow")
 	b = later.echo("own")
 	control.boundary((exit) {

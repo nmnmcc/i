@@ -13,7 +13,7 @@ from corpus import ROOT, CORPUS, dump, git, invoke, sha
 
 VALUES = ['a', 'ab', 'b', 'c', '']
 # T1 review fuzz.py's finite domain and eight string predicates, represented as data.
-PATTERNS = ['"a"', '"ab"', '"b"', '_: String - "a"', '_: String - "ab" - "b"', '"a" <> _', '_', '_: "a" | "b"']
+PATTERNS = ['"a"', '"ab"', '"b"', "_ : String - \"a\"", "_ : String - \"ab\" - \"b\"", '"a" <> _', '_', "_ : { \"a\" | \"b\" }"]
 BOOLS = ['True', 'False', '_']
 RULES = {
     'coverage': 'docs/spec.md §7.4: A clause with a guard is not counted.',
@@ -56,7 +56,7 @@ def literal_match(domain, rows):
     branches = '\n| '.join(f'(({PATTERNS[p]}, {BOOLS[q]})' +
                            (' ? False' if guard else '') + f') {{ {i} }}'
                            for i, (p, q, guard) in enumerate(rows))
-    return f'f = (x: {domain}) {{ x |>\n{branches}\n}}'
+    return f'f = (x : {domain}) {{ x |>\n{branches}\n}}'
 
 
 def literal_case(seed, *, value_types, rng=None):
@@ -67,9 +67,9 @@ def literal_case(seed, *, value_types, rng=None):
     domain = '("a" | "ab" | "b" | "c" | "", Bool)'
     declarations = []
     if value_types:
-        declarations += [f'domain: {domain} = ("a", True)', 'Input = domain']
+        declarations += [f'domain : {domain} = ("a", True)', 'Input = domain']
         domain = 'Input'
-    declarations.append(f'pass = (x: {domain}) -> {domain} {{ x }}')
+    declarations.append(f'pass = (x : {domain}) -> {domain} {{ x }}')
     declarations.append(literal_match(domain, rows))
     if covered:
         assertions = '\n'.join(f'  assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items())
@@ -77,32 +77,32 @@ def literal_case(seed, *, value_types, rng=None):
     return {'name': ('literal-value-guard-' if value_types else 't1-finite-') + str(seed),
             'declarations': declarations, 'accept': covered, 'rows': rows,
             'model': [{'string': v, 'bool': b, 'result': i} for (v, b), i in expected.items()],
-            'annotation': (f'pass = (x: {domain}) -> {domain} {{ x }}', 'pass = (x) { x }')}
+            'annotation': (f'pass = (x : {domain}) -> {domain} {{ x }}', 'pass = (x) { x }')}
 
 
 def alias_case(seed):
     rng = random.Random(seed)
     n = rng.randint(3, 20)
-    declarations = ['value: Int = 1', 'A0 = value']
+    declarations = ["value : Int = 1", 'A0 = value']
     declarations += [f'A{i} = A{i-1}' for i in range(1, n)]
-    declarations += [f'pass = (x: A{n-1}) -> Int {{ x }}', 'main = () { assert(pass(2) == 2) Nil }']
+    declarations += [f'pass = (x : A{n-1}) -> Int {{ x }}', 'main = () { assert(pass(2) == 2) Nil }']
     return {'name': f't2-alias-{seed}', 'declarations': declarations, 'accept': True,
-            'annotation': (f'pass = (x: A{n-1}) -> Int {{ x }}', 'pass = (x) { x }')}
+            'annotation': (f'pass = (x : A{n-1}) -> Int {{ x }}', 'pass = (x) { x }')}
 
 
 def service_case(seed):
     # The positive service family in K4 reviews, with closed equal arguments.
     n = random.Random(seed).randint(1, 8)
     declarations = ['Svc(A) = (f = () -> A, m = (A) -> Nil)',
-                    'ask = <A>() <- (s: Svc(A)) { s.f() }',
-                    'run = <A, N>(body: () <- N -> A) { body() }',
-                    'pass = (x: Int) -> Int { x }',
+                    "ask = <A>() <- (s : Svc(A)) { s.f() }",
+                    "run = <A, N>(body : () <- N -> A) { body() }",
+                    "pass = (x : Int) -> Int { x }",
                     'h0 = () { ask() }']
     declarations += [f'h{i} = () {{ run(() {{ h{i-1}() }}) }}' for i in range(1, n)]
     # Retain the old provider's explicit closed Svc(Int) contract (§9.2).
-    declarations += [f'main = () {{\n service: Svc(Int) = Svc(f = () {{ 7 }}, m = (_: Int) {{ Nil }})\n assert(pass(h{n-1}()) == 7) <- (service)\n Nil\n}}']
+    declarations += [f'main = () {{\n service : Svc(Int) = Svc(f = () {{ 7 }}, m = (_ : Int) {{ Nil }})\n assert(pass(h{n-1}()) == 7) <- (service)\n Nil\n}}']
     return {'name': f'k4-services-{seed}', 'declarations': declarations, 'accept': True,
-            'annotation': ('pass = (x: Int) -> Int { x }', 'pass = (x) { x }')}
+            'annotation': ("pass = (x : Int) -> Int { x }", 'pass = (x) { x }')}
 
 
 def validate(binary, project, case, bound):
@@ -262,8 +262,8 @@ def main():
                 print(f'{i+1}/{count}: {dict(counts)}, failures {len(failures)}', flush=True)
         # A source annotation can intentionally widen a permanent read (§4.7).
         outcomes = []
-        for declaration in ['value: Int = 1', 'value = 1']:
-            project.joinpath('src/main.i').write_text(declaration + '\nInput = value\nx: Input = 2\n')
+        for declaration in ["value : Int = 1", 'value = 1']:
+            project.joinpath('src/main.i').write_text(declaration + "\nInput = value\nx : Input = 2\n")
             observation, _ = invoke(args.binary, project, ['check', '--types'], args.timeout)
             outcomes.append(observation)
         reports.append({'property': 'remove source annotation before permanent read',

@@ -7,8 +7,8 @@ L = { (a = Int, b = String) }
 M = { (a = String, b = Int) }
 U = { (a = Int | String) }
 W = { (b = Int | String) }
-dup = <A>(x: A, y: A) -> (A, A) { (x, y) }
-use: (L, M) -> (U, W) = dup
+dup = <A>(x : A, y : A) -> (A, A) { (x, y) }
+use : (L, M) -> (U, W) = dup
 
 main = () {
 	(a, b) = use((a = 1, b = "s"), (a = "s", b = 1))
