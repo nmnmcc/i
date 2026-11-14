@@ -1488,5 +1488,14 @@
         "pending_sites": 0
       }
     ]
+  },
+  "library_inline_audit": {
+    "contexts": 37252,
+    "compared": 37241,
+    "intentional_new_rule_exclusions": 11,
+    "pending_sites": 0,
+    "differences": [],
+    "baseline": "tyalt-main-site-inline-final-audit.jsonl.gz",
+    "sha256": "dccf4a27a34b2ce1b70bf2945740aa2950bbe9e1fc6e5f0f10b28648d031da94"
   }
 }
