@@ -388,6 +388,7 @@ def run_corpus(args):
             failures.append(case['id'] + ': unclassified cast failure or compiler panic')
         if result['check']['exit'] == 'timeout' and not any(r.get('known_failure') for r in applicable):
             failures.append(case['id'] + ': unclassified checker timeout')
+        allows_occurs = any('E0505' in r.get('diagnostic_codes', []) for r in applicable)
         for requirement in requirements['requirements']:
             if not re.search(requirement['pattern'], case['id']):
                 continue
@@ -414,7 +415,12 @@ def run_corpus(args):
             if requirement.get('diagnostic_codes'):
                 diagnostic_text = '\n'.join(v['stderr'] for v in result.values()) if requirement.get('phase') == 'entry' else check['stderr']
                 actual_codes = set(re.findall(r'error\[([^]]+)\]', diagnostic_text))
-                met = met and bool(actual_codes.intersection(requirement['diagnostic_codes'])) and 'E0505' not in actual_codes
+                # An incidental recursive-type error must not stand in for
+                # the required diagnostic. Some cases independently require
+                # E0505 as well (b10 also requires its provider's E0515).
+                met = (met
+                       and bool(actual_codes.intersection(requirement['diagnostic_codes']))
+                       and (allows_occurs or 'E0505' not in actual_codes))
             for fragment in requirement.get('types_contain', []):
                 met = met and fragment in check['stdout']
             if 'run_stdout' in requirement:
