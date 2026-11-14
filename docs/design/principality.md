@@ -1032,7 +1032,8 @@ assertions' meaning or compiler logic. The unit/clippy retry and release CLI
 build passed. The positive spec fixtures received executable roots in
 `3e475c4c4`: the bounded intersection fixture asserts both orders' results,
 and the two type-only need controls have empty entries. The checker still
-tests the lower-only probe without that harness entry.
+tests the lower-only probe without that harness entry. The final test-only
+formatter correction is `967d9f2ba`; it changes no assertion or compiler logic.
 
 Every heavy command below ran through `/home/agent/Programming/i/.rd/cache/heavy`.
 Cargo commands also used `direnv exec /home/agent/Programming/i`; the wrapper
@@ -1050,25 +1051,106 @@ selects this worktree's musl development environment.
 | `cargo test -p ilang-cli --release --test spec --locked -- 9/` | 153/153 passed at O0/O2 |
 | `./target/release/i test --project std --opt 0` | 2,171 passed, 0 failed |
 | `./target/release/i test --project std --opt 2` | 2,171 passed, 0 failed |
-| `python3 scripts/qa/corpus.py run --filter review-k4 --jobs 2` | Pending: 1,225 selected observations |
-| `scripts/test-generation --mode short --binary ./target/release/i` | Pending |
+| `python3 scripts/qa/corpus.py run --filter review-k4 --jobs 2` | Interrupted with exit 143 while isolating post-test wall-time waits; partial observations preserved |
+| Same corpus filter with `--compile-cache target/pfix/compile-cache` | All 1,225 completed: 908 checker acceptances, 317 rejections, no resource failures; exit 1 on 865 saved-output differences and three requirement failures |
+| `scripts/test-generation --mode short --binary ./target/release/i` | 32 base cases (20 accepted, 12 model rejections), 64 permutations, 32 annotation removals; no failures |
+| `cargo fmt --all -- --check` | Passed after the test-only layout correction |
+| `python3 -m py_compile scripts/qa/corpus.py` | Passed |
+| Corpus filter `review-k4d/_loose/p/b10` with the same cache and two jobs | 1/1 passed after the assertion-guard correction, with both E0505 and E0515 retained |
+| Checker comparison against starting commit `0c4942e1f` | All 1,225 corpus cases have identical complete diagnostics and shown root types; all match current CLI observations; nine audit controls have the intended outcomes |
 
 The focused/clippy retry after the fixture entry changes also passed.
-Filtered corpus, short generation and final fmt are still in progress.
 The first corpus attempt was interrupted to isolate post-test wall-time
 timeouts: one process had printed its complete passing result but remained
 alive for over 35 wall seconds with about one CPU second used. The CLI runs
 global cache maintenance after commands. Its partial observations are
-preserved; the rerun uses a worktree-local compile cache with the same saved
-bounds, two jobs, binary and assertions. No expected observation was changed.
+preserved. The completed rerun used a worktree-local compile cache with the
+same saved bounds, two jobs, binary and assertions. Every recorded timeout
+disappeared. Generation used that cache too. No expected observation was
+changed.
 
-The first 50 completed checks retained their saved 37 accepted / 13 rejected
-split. Initial output differences include the inherited E3 removal of
-synthetic `Fail(E)` from opaque needs, already explained in the
-[E6 integration audit](e6-main-corpus-audit.md). Three `new_unsound_*` cases
-retain E0515 at the same locations and with the same error counts, showing
-the known `S(String, _)` instead of `S(_, _)`. These are recorded differences,
-not a claim that the full corpus comparison passed.
+The raw saved-output comparison is **not green**. It has 589 cases changing
+only shown types, 267 changing diagnostics or runtime text, and nine changing
+phase sets or exits. Much of the display/wording difference is the inherited
+E3 removal of synthetic `Fail(E)` from opaque needs and E5 removal of provider
+plans, already described in the [E6 integration audit](e6-main-corpus-audit.md).
+Sixty-one changed observations exactly match newer saved observations of
+identical source files and manifests elsewhere in the selected corpus.
+
+The seven changed checker exits against the older observations are:
+
+- `review-k4d/_loose/fuzz/e0505/21_135` and
+  `review-k4-lane/alias_kind_error`: rejected before, accepted now.
+- `review-k4s/mixed_recursive_0_0`, `mixed_recursive_0_17`,
+  `mixed_recursive_1_0`, `mixed_recursive_1_17`: accepted before, now E0225
+  for treating an environment row as ordinary data (§9.4).
+- `review-k4s/std`: the vendored earlier std snapshot now reports five type
+  errors. The current std project passed all 2,171 tests at each level.
+
+Additionally, `review-k4s/min_main_3_0` and `min_main_5_0` now reach their
+entries: their unused local closures no longer leave a need on `main`.
+The starting checker produces the same diagnostics and shown types for all
+these cases. They predate pfix; no corpus checker acceptance changes between
+`0c4942e1f` and this correction. The baseline comparison does not separately
+execute the old runtime. Existing baseline files remain byte-for-byte intact.
+
+Two requirement failures were a runner contradiction, corrected separately
+in `3d9fdec57`. `b10` explicitly requires both a structural-recursion E0505
+and its provider E0515, but the runner unconditionally forbade E0505 while
+checking either requirement. It now permits E0505 only when an applicable
+requirement explicitly requests it; each requirement still needs its own
+code. Only `b10` has such a requirement. Its replay passes without changing
+either diagnostic line or any expectation. This follows §4.7's recursive-type
+paragraph and retains §9.2's independent provider check.
+
+The remaining `alias_kind_error` requirement asks for E0515 on a program
+whose alias is `Row(N) = () <- (Fail(N)) -> Nil` and whose ordinary values
+have types `Svc(Int)` and `Svc(Nil)`, with covariant `Svc(A) = (() -> A)`.
+Here `N` is an error-payload type. §9.3 says “An error may be a value of any
+type”; §4.4 merges these value types as `Svc(Int | Nil)`. It is not an opaque
+service row, and its payload constructors are not service keys under `<-`.
+The old rejection criterion needs review against those paragraphs; it has
+not been weakened or rewritten to claim a green corpus.
+
+The comparison with `0c4942e1f` uses an exact source snapshot of the checker,
+with unchanged package/syntax dependencies and the same package graphs for
+both versions. It compares complete diagnostics and shown root types, and
+checks the current version against the completed CLI observations. Its nine
+extra controls cover local/imported disjoint callbacks, open/lower-only
+needs, both intersection orders with and without a call, and the explicit
+`Int` positive case. A temporary-package lockfile setup failure was resolved
+by generating that package's lockfile offline; the workspace lockfile is
+unchanged.
+
+The initial comparison completed all 1,234 inputs: both checkers agreed on
+all 1,225 corpus inputs, but nine current results did not match the CLI
+because the harness had not expanded their top-level test macros. That
+validation failure was retained, not ignored. A second comparison expanded
+those nine with the unchanged macro implementation, passed the same parsed
+ASTs and hygiene to each checker, and again compared the complete output.
+All nine matched both the starting checker and the current CLI. No typed
+macro driver was shared between checker versions. Thus all 1,225 corpus
+comparisons are validated against the real CLI; none changes checker
+acceptance, diagnostics, or shown root types relative to the starting tip.
+The comparison harness and exact records are under ignored `target/pfix/`.
+
+The nine extra controls establish the intended changes separately:
+
+| Control | Starting checker | Corrected checker | Rule |
+|---|---|---|---|
+| Disjoint callback needs, local | Accepted | E0515 | §9.2 deferred empty meet |
+| Disjoint callback needs, imported | Accepted | E0515 | §9.2 through scheme transfer |
+| Open callback helper | Accepted | Accepted | §9.2 undetermined meet retained |
+| Lower-bound-only ordinary values | Accepted | Accepted | §4.4 value unions remain possible |
+| Original intersection, with call | E0501 at call | E0504 at definition | §4.7 principal type requirement |
+| Original intersection, definition only | Accepted | E0504 | §4.7 principal type requirement |
+| Swapped intersection, with call | Accepted | E0504 | §§4.4, 4.7 same intersection |
+| Swapped intersection, definition only | Accepted | E0504 | §§4.4, 4.7 same intersection |
+| Explicit `Int` intersection member | Accepted | Accepted | §4.5 existing subtype proof |
+
+The raw corpus command remains red against its old saved outputs and the
+unchanged alias criterion. This baseline comparison establishes the scope of
+pfix; it does not re-record those outputs or declare that criterion passed.
 
 The full workspace, unfiltered spec suite, unfiltered corpus and
 `scripts/dev-verify` are reserved for the coordinator and were not run here.
