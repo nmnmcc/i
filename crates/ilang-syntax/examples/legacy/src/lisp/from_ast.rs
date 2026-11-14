@@ -132,13 +132,16 @@ fn render_comments(
                 _ => None,
             };
             if let Some(body) = body {
-                for stmt in &body.stmts {
+                for (index, stmt) in body.stmts.iter().enumerate() {
                     let span = match stmt {
                         Stmt::Bind(b) => b.span,
                         Stmt::Env { span, .. } => *span,
                         Stmt::Expr(e) => e.span,
                     };
-                    self.0.push((span, statement(stmt)));
+                    self.0.push((
+                        span,
+                        statement(stmt, super::starts_provide_group(&body.stmts, index)),
+                    ));
                 }
             }
         }
@@ -381,7 +384,13 @@ fn expr(e: &Expr) -> String {
                     ")",
                     f.params.iter().map(|p| match p {
                         Param::Pattern(p) => pattern(p),
-                        Param::Env { name: n, ty } => form("!", [name(n), typ(ty)]),
+                        Param::Env { name: n, ty, rest } => {
+                            if *rest {
+                                form("!", ["..".into(), name(n), typ(ty)])
+                            } else {
+                                form("!", [name(n), typ(ty)])
+                            }
+                        }
                     }),
                 ),
                 f.ret.as_ref().map_or_else(|| "_".into(), result),
@@ -417,12 +426,35 @@ fn expr(e: &Expr) -> String {
     }
 }
 fn block(b: &Block) -> String {
-    braced("{", "}", b.stmts.iter().map(statement))
+    braced(
+        "{",
+        "}",
+        b.stmts
+            .iter()
+            .enumerate()
+            .map(|(index, s)| statement(s, super::starts_provide_group(&b.stmts, index))),
+    )
 }
-fn statement(s: &Stmt) -> String {
+fn statement(s: &Stmt, first: bool) -> String {
     match s {
         Stmt::Bind(b) => binding(b),
-        Stmt::Env { ty, value, .. } => form("!", [typ(ty), expr(value)]),
+        Stmt::Env {
+            ty,
+            value,
+            spread,
+            group,
+            ..
+        } => {
+            let mut parts = Vec::new();
+            if group.is_some() {
+                parts.push(form("..", [if first { "+".into() } else { "=".into() }]));
+            }
+            if *spread {
+                parts.push("..".into());
+            }
+            parts.extend([typ(ty), expr(value)]);
+            form("!", parts)
+        }
         Stmt::Expr(e) => expr(e),
     }
 }

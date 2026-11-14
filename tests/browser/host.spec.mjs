@@ -164,7 +164,7 @@ test("host functions never throw into the module, and the module checks their an
   }, `(${load})`);
   expect(result).toEqual({
     guarded: { nil: "thrown to the caller", float: "thrown to the caller" },
-    stop: "host: value is not correct\napp/app:41:35",
+    stop: "host: value is not correct\napp/app:41:44",
   });
 });
 
@@ -234,4 +234,18 @@ test("ABI 5 Int boundaries cross compiled imports, exports and async replies", a
     return checkIntegers(guest, GuestError);
   });
   expect(count).toBe(13);
+});
+
+for (const opt of [0, 2]) test(`compiled external Fail at O${opt} keeps the instance usable`, async ({ page }) => {
+  const result = await page.evaluate(async ({ loader, opt }) => {
+    const { instantiate, GuestError } = await eval(loader)();
+    const guest = await instantiate(`/tests/browser/fixtures/external-fail-o${opt}.wasm`, { imports: { "app:fallible/v1": { value: (text) => {
+      if (text === "bad") throw new GuestError("from-host");
+      return 42n;
+    } } } });
+    let error;
+    try { guest.call("app/main.call", ["bad"]); } catch (thrown) { error = thrown.value; }
+    return { error, value: String(guest.call("app/main.call", ["good"])), unusable: guest.unusable };
+  }, { loader: `(${load})`, opt });
+  expect(result).toEqual({ error: "from-host", value: "42", unusable: null });
 });

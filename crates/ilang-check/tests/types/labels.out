@@ -11,7 +11,7 @@ names : (User) -> (String, String, Int)
 unknown : Never
 twice : Never
 missing : User
-param : ((x = 1) <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A
+param : ((x = 1) <- N -> A) <- N -> A
 bad_pattern : (User) -> Never
 id : (A) -> A
 through : () -> User

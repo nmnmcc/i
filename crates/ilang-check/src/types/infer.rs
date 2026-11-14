@@ -1,8 +1,8 @@
 //! The typing rules of §4.8 for expressions, blocks, functions, and
-//! bindings, with the errors `E` and the environment `N` of each expression
+//! bindings, with the need `N` of each expression
 //! (§9.2, §9.3).
 //!
-//! The `E` and `N` of the expression being typed are gathered in a stack of
+//! The needs of the expression being typed are gathered in a stack of
 //! `Effects`: a call adds the `E` and `N` of its callee, and a function or
 //! the rest of a block after an environment statement starts a new entry.
 
@@ -59,7 +59,6 @@ impl Scheme {
 
 #[derive(Default)]
 struct Effects {
-    err: Vec<Ty>,
     env: Vec<Ty>,
 }
 
@@ -72,6 +71,7 @@ pub(super) struct Builtins {
     pub bool_: Ty,
     pub nil: TypeRef,
     pub assert: TypeRef,
+    pub fail: TypeRef,
 }
 
 struct PendingFailure {
@@ -106,6 +106,10 @@ pub(crate) struct Checker<'a> {
     pub(super) recovery: bool,
     /// The solver variable of each type variable written in an annotation.
     pub tyvars: HashMap<TyVarId, Ty>,
+    row_value_allowed: bool,
+    row_lacks: HashMap<super::V, Vec<TypeRef>>,
+    row_supplies: HashMap<(ModuleId, Span), super::V>,
+    row_capture_sites: HashMap<(ModuleId, Span), super::V>,
     /// The expression being typed is the callee of a call.
     in_callee: bool,
     recursive_bindings: HashSet<VarId>,
@@ -158,7 +162,7 @@ pub(crate) struct Checker<'a> {
     pending_typed: Vec<PendingTyped>,
     checked_holes: HashMap<Span, (Ty, Knowledge)>,
     expression_known: HashMap<(ModuleId, Span), Knowledge>,
-    pub(super) expression_effects: HashMap<(ModuleId, Span), (Ty, Ty)>,
+    pub(super) expression_effects: HashMap<(ModuleId, Span), Ty>,
     pub(super) typed_handles: super::typed_macro::HandleArena,
     typed_generalized_roots: HashSet<super::V>,
     typed_depth: u16,
@@ -187,6 +191,7 @@ impl<'a> Checker<'a> {
             ]),
             nil: find("Nil"),
             assert: find("Assert"),
+            fail: find("Fail"),
         };
         solver.row_params = row_parameters(p);
         Checker {
@@ -201,6 +206,10 @@ impl<'a> Checker<'a> {
             reads: super::value_types::Reads::default(),
             recovery: false,
             tyvars: HashMap::new(),
+            row_value_allowed: false,
+            row_lacks: HashMap::new(),
+            row_supplies: HashMap::new(),
+            row_capture_sites: HashMap::new(),
             in_callee: false,
             written: HashMap::new(),
             kvars: HashMap::new(),
@@ -368,6 +377,10 @@ impl<'a> Checker<'a> {
                     .exported_type_needed(d)
                     .then(|| simplified.as_ref().map(|(t, _)| t.clone()).map_err(|_| ()));
                 if let Ok((_, shown)) = simplified {
+                    if matches!(&shown, super::ShownType::Fn(f) if !f.group && f.params.is_empty())
+                    {
+                        typed.nullary_functions.insert(id);
+                    }
                     if let super::ShownType::Fn(f) = &shown
                         && f.params.is_empty()
                         && f.ret == super::ShownType::Named(self.b.nil, Vec::new())
@@ -378,7 +391,6 @@ impl<'a> Checker<'a> {
                         .scheme_hovers
                         .insert(id, shown.text_limited(&self.s.type_names, 12));
                     typed.schemes.insert(id, shown.text(&self.s.type_names));
-                    typed.provider_scheme_types.insert(id, shown.clone());
                     let catalog = artifact_catalog.get_or_insert_with(|| {
                         std::sync::Arc::new(super::scheme_wire::SchemeCatalog {
                             solver: std::sync::Mutex::new(self.s.scheme_snapshot()),
@@ -390,7 +402,6 @@ impl<'a> Checker<'a> {
                         catalog: catalog.clone(),
                         scheme: scheme.clone(),
                     };
-                    typed.provider_scheme_artifacts.insert(id, artifact.clone());
                     if d.exported || opts.written {
                         typed.scheme_artifacts.insert(id, artifact);
                     }
@@ -526,23 +537,21 @@ impl<'a> Checker<'a> {
             if self.binding_may_fail(&binding.pattern, &a) {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
-            let (err, env) = self.pop_effects(binding.span);
-            // §2.5: a top-level binding may not give errors or need an
-            // environment.
-            for (t, what) in [(err, "give errors"), (env, "need an environment")] {
-                self.s.constrain(&t, &Ty::Never);
-                if !self.s.failures.is_empty() {
-                    let f = self.s.failures.remove(0);
-                    self.s.failures.clear();
-                    self.error(
-                        code::TOP_LEVEL_EFFECT,
-                        binding.span,
-                        format!(
-                            "a top-level binding may not {what} (§2.5), but this one has `{}`",
-                            display::show(&self.s, &f.lhs)
-                        ),
-                    );
-                }
+            let env = self.pop_effects(binding.span);
+            // §2.5: a top-level binding may not need services (errors
+            // included as Fail).
+            self.s.constrain(&env, &Ty::Never);
+            if !self.s.failures.is_empty() {
+                let f = self.s.failures.remove(0);
+                self.s.failures.clear();
+                self.error(
+                    code::TOP_LEVEL_EFFECT,
+                    binding.span,
+                    format!(
+                        "a top-level binding may not need an environment (§2.5), but this one has `{}`",
+                        display::show(&self.s, &f.lhs)
+                    ),
+                );
             }
             self.check_occurs(mark, binding.span);
         }
@@ -791,6 +800,9 @@ impl<'a> Checker<'a> {
             trial.kvars = call.known;
             trial.defs = self.defs.clone();
             trial.tyvars = self.tyvars.clone();
+            trial.row_lacks = self.row_lacks.clone();
+            trial.row_supplies = self.row_supplies.clone();
+            trial.row_capture_sites = self.row_capture_sites.clone();
             trial.reads = self.reads.clone();
             trial.known = self.known.clone();
             trial.known_args = self.known_args.clone();
@@ -825,7 +837,7 @@ impl<'a> Checker<'a> {
                 .collect();
             trial.effects.push(Effects::default());
             let ty = trial.infer(&output.expression);
-            let (err, env) = trial.pop_effects(call.span);
+            let env = trial.pop_effects(call.span);
             if let Ty::Fn(f) = &call.signature {
                 let before = trial.diags.len();
                 trial.sub(&ty, &f.ret, call.span);
@@ -852,7 +864,6 @@ impl<'a> Checker<'a> {
                         )
                     };
                 }
-                trial.sub(&err, &f.err, call.span);
                 trial.s.constrain_env(&env, &f.env);
                 if !trial.s.failures.is_empty() {
                     trial.s.failures.clear();
@@ -1003,7 +1014,7 @@ impl<'a> Checker<'a> {
 
     /// §10.2 and §10.3 for one entry point, with its inferred type: a test
     /// gives `Nil`; a host export takes and gives types that the host can
-    /// take. Target provider planning validates its inferred environment later.
+    /// take. The platform check of the target (`platform.rs`) reads its need.
     fn entry_point(&mut self, d: DefId, require_nil: bool, export: bool) {
         self.set_module(d.module);
         let def = self.p.def(d);
@@ -1091,7 +1102,16 @@ impl<'a> Checker<'a> {
                 );
             }
         }
-        let error_members = known::members(&f.err);
+        // §2.10.11: the errors of a host export are the argument of the
+        // `Fail` of its need.
+        let fail = known::members(&f.env).into_iter().find_map(|m| match m {
+            Ty::Con(Head::Named(r), _, xs) if r == self.b.fail && xs.len() == 1 => {
+                Some(xs[0].clone())
+            }
+            _ => None,
+        });
+        let fail = fail.unwrap_or(Ty::Never);
+        let error_members = known::members(&fail);
         let errors_ok = error_members.iter().all(|m| {
             matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.true_ || *r == self.b.false_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
@@ -1122,7 +1142,7 @@ impl<'a> Checker<'a> {
             );
         }
         if !errors_ok {
-            let e = show(self, &f.err);
+            let e = show(self, &fail);
             self.error(
                 code::ENTRY_TYPE,
                 span,
@@ -1291,16 +1311,13 @@ impl<'a> Checker<'a> {
             TypeKind::Fn {
                 params,
                 ret,
-                err,
+                err: _,
                 env,
             } => {
                 for p in params {
                     self.check_places(&p.ty, pol.flip(), depth);
                 }
-                for x in [Some(&**ret), err.as_deref(), env.as_deref()]
-                    .into_iter()
-                    .flatten()
-                {
+                for x in [Some(&**ret), env.as_deref()].into_iter().flatten() {
                     self.check_places(x, pol, depth);
                 }
             }
@@ -1508,8 +1525,31 @@ impl<'a> Checker<'a> {
             self.fix_notes.clear();
             return;
         }
-        let f = self.s.failures.remove(0);
-        self.s.failures.clear();
+        // Decision 1: needs denote sets of environments. A same-key
+        // conjunction is the ordinary intersection of whole service values,
+        // not a demand that every covariant argument be inhabited. In
+        // particular Read(Never), whose field is () -> Never, is inhabited
+        // by a stopping or diverging function (§11.7). The solver does not
+        // have nominal bodies; use the ordinary coverage test here.
+        let failures = std::mem::take(&mut self.s.failures);
+        let f = failures.into_iter().find(|f| {
+            if f.kind != FailKind::NeedMeet {
+                return true;
+            }
+            let left = display::known_shown(&self.s, &f.lhs);
+            let right = display::known_shown(&self.s, &f.rhs);
+            let meet = self.s.inter(vec![left, right]);
+            self.useful(
+                &[],
+                &[super::coverage::Pat::Wild(None)],
+                &[super::coverage::Col::of(meet)],
+            )
+            .is_none()
+        });
+        let Some(f) = f else {
+            self.fix_notes.clear();
+            return;
+        };
         let (l, r) = (
             display::show(&self.s, &f.lhs),
             display::show(&self.s, &f.rhs),
@@ -1581,15 +1621,6 @@ impl<'a> Checker<'a> {
 
     // ---- Effects ----
 
-    fn add_err(&mut self, t: Ty) {
-        self.s.mark_mode(&t, Mode::Row);
-        if t != Ty::Never
-            && let Some(e) = self.effects.last_mut()
-        {
-            e.err.push(t);
-        }
-    }
-
     pub fn add_env(&mut self, t: Ty) {
         self.s.mark_row(&t);
         if t != Ty::Never
@@ -1599,13 +1630,10 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// The errors and the environment of an entry of the effect stack.
-    fn pop_effects(&mut self, span: Span) -> (Ty, Ty) {
+    /// The need of an entry of the effect stack.
+    fn pop_effects(&mut self, span: Span) -> Ty {
         let e = self.effects.pop().unwrap_or_default();
-        let err = self.s.union_mode(e.err, Mode::Row);
-        self.flush(span, None);
-        let env = self.env_union(e.env, span);
-        (err, env)
+        self.env_union(e.env, span)
     }
 
     // ---- Written types ----
@@ -1686,7 +1714,7 @@ impl<'a> Checker<'a> {
             TypeKind::Fn {
                 params,
                 ret,
-                err,
+                err: _,
                 env,
             } => {
                 let params = params
@@ -1699,16 +1727,16 @@ impl<'a> Checker<'a> {
                     })
                     .collect();
                 let ret = self.conv(ret, local);
-                let err = err
-                    .as_ref()
-                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Row));
                 let env = env
                     .as_ref()
                     .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
-                Ty::Fn(Box::new(FnTy::new(params, ret, err, env)))
+                Ty::Fn(Box::new(FnTy::new(params, ret, env)))
             }
             TypeKind::Union(ts) => {
-                let ms = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                let ms: Vec<Ty> = ts.iter().map(|a| self.conv_mode(a, local, mode)).collect();
+                if mode == Mode::Env {
+                    self.note_row_lacks(&ms);
+                }
                 let r = self.s.union_mode(ms, mode);
                 self.flush(t.span, None);
                 r
@@ -1852,7 +1880,7 @@ impl<'a> Checker<'a> {
         if fields.is_empty() {
             return t;
         }
-        Ty::Fn(Box::new(FnTy::new(fields, t, Ty::Never, Ty::Never)))
+        Ty::Fn(Box::new(FnTy::new(fields, t, Ty::Never)))
     }
 
     fn prim(&self, b: BuiltinType) -> Ty {
@@ -1881,7 +1909,12 @@ impl<'a> Checker<'a> {
         if observe {
             self.effects.push(Effects::default());
         }
+        let row_allowed = std::mem::take(&mut self.row_value_allowed);
         let result = self.infer_k_inner(e, expected);
+        if self.s.mode(&result.0) == Mode::Env && !row_allowed {
+            self.error(code::ENV_TYPE, e.span, "an environment row may only be bound, captured or provided after `<-`; it is not ordinary data (§9.4)");
+        }
+        self.row_value_allowed = row_allowed;
         // A name with a selection table, where a function type is expected.
         let result = match self.select_by_expected(e, expected) {
             Some(selected) => selected,
@@ -1889,8 +1922,7 @@ impl<'a> Checker<'a> {
         };
         if observe {
             let effects = self.pop_effects(e.span);
-            self.add_err(effects.0.clone());
-            self.add_env(effects.1.clone());
+            self.add_env(effects.clone());
             self.expression_effects
                 .insert((self.module, e.span), effects);
             self.expression_known
@@ -2350,7 +2382,18 @@ impl<'a> Checker<'a> {
                     },
                     None => Knowledge::unknown(),
                 };
+                // A need variable can also name a function parameter's
+                // type (Decision 1 / EF09). Binding that same row value to
+                // another row-typed parameter is forwarding, not inspecting
+                // or spreading it as ordinary data (§9.4). Use the actual
+                // formal type; a structural hint is not evidence (F1).
+                let saved_row = self.row_value_allowed;
+                self.row_value_allowed = !ctor
+                    && matches!((&f, &to), (Ty::Fn(ft), Some(to))
+                        if ft.parts().and_then(|ps| ps.get(to[i]))
+                            .is_some_and(|p| self.s.mode(p) == Mode::Env));
                 let (t, k) = self.infer_k(a, &expected);
+                self.row_value_allowed = saved_row;
                 if let (Some(ps), false) = (&params, later) {
                     self.match_k(&ps[i], &k.hint, &mut sigma, 0);
                     if let Some(p) = fact_fn
@@ -2408,7 +2451,6 @@ impl<'a> Checker<'a> {
                 for ((t, s), p) in placed.iter().zip(&parts) {
                     self.sub2(t, p, *s, callee.span);
                 }
-                self.add_err(ft.err.clone());
                 self.add_env(ft.env.clone());
                 ft.ret.clone()
             }
@@ -2417,26 +2459,19 @@ impl<'a> Checker<'a> {
                 // mismatch of the parameter.
                 let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
                 self.sub2(&data, &ft.param, span, callee.span);
-                self.add_err(ft.err.clone());
                 self.add_env(ft.env.clone());
                 ft.ret.clone()
             }
             _ => {
                 // The function may be a parameter: what it gives back may
                 // come from outside.
-                let (r, e, n) = (
-                    self.s.fresh_input(),
-                    self.s.fresh_input(),
-                    self.s.fresh_input(),
-                );
+                let (r, n) = (self.s.fresh_input(), self.s.fresh_input());
                 let want = Ty::Fn(Box::new(FnTy::new(
                     placed.into_iter().map(|(t, _)| (None, t)).collect(),
                     r.clone(),
-                    e.clone(),
                     n.clone(),
                 )));
                 self.sub(&f, &want, span);
-                self.add_err(e);
                 self.add_env(n);
                 r
             }
@@ -2504,19 +2539,9 @@ impl<'a> Checker<'a> {
         );
         let mut parts = positions;
         parts.extend(labelled.into_iter().map(|(_, t)| t));
-        let (r, e, n) = (
-            self.s.fresh_input(),
-            self.s.fresh_input(),
-            self.s.fresh_input(),
-        );
-        let want = groups::with_data(
-            groups::group_data(shape, &parts),
-            r.clone(),
-            e.clone(),
-            n.clone(),
-        );
+        let (r, n) = (self.s.fresh_input(), self.s.fresh_input());
+        let want = groups::with_data(groups::group_data(shape, &parts), r.clone(), n.clone());
         self.sub(f, &Ty::Fn(Box::new(want)), span);
-        self.add_err(e);
         self.add_env(n);
         if let Some(definition) = typed_definition {
             let values: Vec<_> = first
@@ -2580,7 +2605,7 @@ impl<'a> Checker<'a> {
                 return self.infer_k(&gs[i].value, expected);
             }
         }
-        let (ret, err, env) = (self.s.fresh(), self.s.fresh(), self.s.fresh());
+        let (ret, env) = (self.s.fresh(), self.s.fresh());
         let mut data = Vec::new();
         for g in gs {
             let (t, _) = self.infer_k(&g.value, &Knowledge::unknown());
@@ -2595,7 +2620,6 @@ impl<'a> Checker<'a> {
             let part = FnTy::new(
                 parts.iter().map(|p| (None, p.clone())).collect(),
                 ret.clone(),
-                err.clone(),
                 env.clone(),
             );
             data.push(groups::group_data(g.shape, &parts));
@@ -2607,7 +2631,7 @@ impl<'a> Checker<'a> {
             Ty::Union(data)
         };
         (
-            Ty::Fn(Box::new(groups::with_data(param, ret, err, env))),
+            Ty::Fn(Box::new(groups::with_data(param, ret, env))),
             Knowledge::unknown(),
         )
     }
@@ -3250,7 +3274,84 @@ impl<'a> Checker<'a> {
                         );
                     }
                 }
-                Stmt::Env { ty, value, span } if matches!(ty.kind, TypeKind::Hole) => {
+                Stmt::Env {
+                    spread: true,
+                    value,
+                    span,
+                    group,
+                    ..
+                } => {
+                    let saved = self.row_value_allowed;
+                    self.row_value_allowed = true;
+                    let (v, k) = self.infer_k(value, &Knowledge::unknown());
+                    self.row_value_allowed = saved;
+                    self.effects.push(Effects::default());
+                    let a = self.block(&stmts[i + 1..], *span, expected);
+                    let env = self.pop_effects(*span);
+                    let rest = if self.s.mode(&v) == Mode::Env {
+                        let outside = match &v {
+                            Ty::Var(row) => self.row_lacks.get(row).cloned().unwrap_or_default(),
+                            _ => Vec::new(),
+                        };
+                        let rest = self.s.env_without_row(&env, &v, &outside).unwrap_or_else(|()| {
+                            self.error(code::ENV_TYPE, value.span, "an opaque callback need must use the captured row parameter when other keys are excluded; write that row and its explicit service keys (§9.4)");
+                            env.clone()
+                        });
+                        let mut keys = self.s.env_keys(&rest);
+                        if let Ty::Var(v) = v {
+                            self.row_supplies.insert((self.module, *span), v);
+                            for key in self.row_lacks.get(&v).into_iter().flatten() {
+                                if !keys.contains(key) {
+                                    keys.push(*key);
+                                }
+                            }
+                        }
+                        self.out
+                            .env_supplies
+                            .insert((self.module, *span), super::EnvSupply::Row(keys));
+                        rest
+                    } else if let Ty::Con(Head::Shape(shape), _, parts) = &k.hint
+                        && !shape.has_labels()
+                    {
+                        let mut keys = Vec::new();
+                        for part in parts {
+                            if let Some(Head::Named(r)) = part.head() {
+                                if keys.contains(&r) {
+                                    self.error(
+                                        code::ENV_TYPE,
+                                        value.span,
+                                        "provided data has two parts with one service key (§9.2)",
+                                    );
+                                }
+                                keys.push(r);
+                            } else {
+                                self.error(
+                                    code::ENV_TYPE,
+                                    value.span,
+                                    "each provided part must have one known service type (§9.2)",
+                                );
+                            }
+                        }
+                        self.out
+                            .env_supplies
+                            .insert((self.module, *span), super::EnvSupply::Data(keys));
+                        self.s.env_diff(env, parts.clone())
+                    } else {
+                        self.error(code::ENV_TYPE, value.span, "a whole provide needs positional data or a captured environment row (§9.2)");
+                        env
+                    };
+                    self.flush(*span, None);
+                    self.add_env(rest);
+                    self.check_provided_duplicates(&stmts[i + 1..], *group, *span);
+                    return a;
+                }
+                Stmt::Env {
+                    ty,
+                    value,
+                    span,
+                    group,
+                    ..
+                } if matches!(ty.kind, TypeKind::Hole) => {
                     // Syntax three, `r <- (e1)` (§2.10.2): the key is the
                     // type constructor of the known type of `e1`.
                     let (v, k) = self.infer_k(value, &Knowledge::unknown());
@@ -3269,19 +3370,19 @@ impl<'a> Checker<'a> {
                     self.out.services.insert((self.module, *span), r);
                     self.effects.push(Effects::default());
                     let a = self.block(&stmts[i + 1..], *span, expected);
-                    let (err, env) = self.pop_effects(*span);
-                    self.add_err(err);
-                    // E1, §9.2: remove this provider's form, retaining its
-                    // directed obligation on the remaining row. Replacing it
-                    // with the needed form loses that obligation and can hide
-                    // a generic handler or report a value error at the call.
+                    let env = self.pop_effects(*span);
+                    // §9.2: subtract the actual provider form, preserving
+                    // its directed obligation for future instantiations.
                     self.sub2(&v, &provided, value.span, value.span);
                     let rest = self.s.env_diff(env, vec![provided]);
                     self.flush(*span, None);
                     self.add_env(rest);
+                    self.check_provided_duplicates(&stmts[i + 1..], *group, *span);
                     return a;
                 }
-                Stmt::Env { ty, value, span } => {
+                Stmt::Env {
+                    ty, value, span, ..
+                } => {
                     // `! T = e1` and the rest `r`: `A ^ E ! N1 | M - T`.
                     self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
@@ -3292,8 +3393,7 @@ impl<'a> Checker<'a> {
                     self.sub2(&v, &t, value.span, ty.span);
                     self.effects.push(Effects::default());
                     let a = self.block(&stmts[i + 1..], *span, expected);
-                    let (err, env) = self.pop_effects(*span);
-                    self.add_err(err);
+                    let env = self.pop_effects(*span);
                     let rest = self.s.env_diff(env, vec![t]);
                     self.flush(*span, None);
                     self.add_env(rest);
@@ -3307,11 +3407,135 @@ impl<'a> Checker<'a> {
         (nil.clone(), Knowledge::certain(nil))
     }
 
+    /// Rule B: a row excludes every key written beside it. Keep this
+    /// information even when a nested provide has already removed a key
+    /// from the current body's need.
+    fn note_row_lacks(&mut self, members: &[Ty]) {
+        let mut flat = Vec::new();
+        super::solve::flatten_union(members, &mut flat);
+        let keys: Vec<TypeRef> = flat
+            .iter()
+            .filter_map(|t| match t.head() {
+                Some(Head::Named(r)) => Some(r),
+                _ => None,
+            })
+            .collect();
+        for member in flat {
+            let Ty::Var(v) = member else {
+                continue;
+            };
+            let excluded = self.row_lacks.entry(v).or_default();
+            for key in &keys {
+                if !excluded.contains(key) {
+                    excluded.push(*key);
+                }
+            }
+            for (site, row) in &self.row_supplies {
+                if *row == v
+                    && let Some(super::EnvSupply::Row(keep)) = self.out.env_supplies.get_mut(site)
+                {
+                    for key in &keys {
+                        if !keep.contains(key) {
+                            keep.push(*key);
+                        }
+                    }
+                }
+            }
+            for (site, row) in &self.row_capture_sites {
+                if *row == v {
+                    let excluded = self.out.env_captures.entry(*site).or_default();
+                    for key in &keys {
+                        if !excluded.contains(key) {
+                            excluded.push(*key);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn note_type_row_lacks(&mut self, ty: &Ty) {
+        match ty {
+            Ty::Fn(f) => {
+                self.note_row_lacks(std::slice::from_ref(&f.env));
+                self.note_type_row_lacks(&f.param);
+                self.note_type_row_lacks(&f.ret);
+            }
+            Ty::Con(_, _, parts) | Ty::Union(parts) | Ty::Inter(parts) => {
+                for part in parts {
+                    self.note_type_row_lacks(part);
+                }
+            }
+            Ty::Diff(base, _) => self.note_type_row_lacks(base),
+            Ty::Both(a, b) => {
+                self.note_type_row_lacks(a);
+                self.note_type_row_lacks(b);
+            }
+            _ => {}
+        }
+    }
+
+    /// Rule C applies to the items of one written provide, never to
+    /// nested provides, whose later value intentionally replaces a key.
+    fn check_provided_duplicates(&mut self, rest: &[Stmt], group: Option<Span>, span: Span) {
+        let Some(group) = group else {
+            return;
+        };
+        let supplied = |this: &Self, site| {
+            if let Some(supply) = this.out.env_supplies.get(&(this.module, site)) {
+                match supply {
+                    super::EnvSupply::Data(keys) => (true, false, keys.clone()),
+                    super::EnvSupply::Row(keep) => (true, true, keep.clone()),
+                }
+            } else {
+                (
+                    false,
+                    false,
+                    this.out
+                        .services
+                        .get(&(this.module, site))
+                        .copied()
+                        .into_iter()
+                        .collect(),
+                )
+            }
+        };
+        let (spread, row, keys) = supplied(self, span);
+        for stmt in rest {
+            let Stmt::Env {
+                group: Some(other),
+                span: other_span,
+                ..
+            } = stmt
+            else {
+                break;
+            };
+            if *other != group {
+                break;
+            }
+            let (other_spread, other_row, other_keys) = supplied(self, *other_span);
+            if spread != other_spread {
+                continue;
+            }
+            let duplicate = match (row, other_row) {
+                (false, false) => keys.iter().any(|k| other_keys.contains(k)),
+                (true, false) => other_keys.iter().any(|k| !keys.contains(k)),
+                (false, true) => keys.iter().any(|k| !other_keys.contains(k)),
+                (true, true) => true,
+            };
+            if duplicate {
+                self.error(code::ENV_TYPE, span, "two explicit services or two spreads in provided data have one service key (§9.2)");
+                break;
+            }
+        }
+    }
+
     /// Rule 4: a function expression, and its known type (§4.8). With an
     /// expected function type with as many parameters, a parameter with no
     /// type written at its top gets the known type of the matching
     /// parameter.
     fn function(&mut self, f: &Function, expected: &Knowledge) -> (Ty, Knowledge) {
+        self.note_type_row_lacks(&expected.hint);
         let count = f
             .params
             .iter()
@@ -3331,6 +3555,11 @@ impl<'a> Checker<'a> {
         };
         let mut params = Vec::new();
         let mut env_tys = Vec::new();
+        let has_rest = f
+            .params
+            .iter()
+            .any(|p| matches!(p, Param::Env { rest: true, .. }));
+        let mut rest_env = false;
         let mut fails = false;
         for p in &f.params {
             match p {
@@ -3350,19 +3579,55 @@ impl<'a> Checker<'a> {
                             .unwrap_or_else(Knowledge::unknown),
                     };
                     self.fit_known(pattern, &k, false);
+                    // A rest head closes its body need now. Link the
+                    // parameter's expected type before checking that body,
+                    // as the enclosing function subtype will do later.
+                    if has_rest
+                        && let Some(expected) = expected.get(params.len())
+                        && expected.hint != Ty::Top
+                    {
+                        self.sub(&expected.hint, &t, pattern.span);
+                    }
                     params.push((label.clone(), t));
                 }
-                Param::Env { var, name, ty } => {
+                Param::Env {
+                    var,
+                    name,
+                    ty,
+                    rest,
+                } => {
+                    rest_env |= rest;
                     self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
                     if let Some(super::Head::Named(r)) = t.head() {
                         self.out.services.insert((self.module, name.span), r);
                     }
-                    let k = Knowledge::certain(self.kconv(ty, &HashMap::new()));
+                    let k = Knowledge::certain(if *rest {
+                        t.clone()
+                    } else {
+                        self.kconv(ty, &HashMap::new())
+                    });
                     self.kvars.insert(*var, k);
                     self.locals.insert(*var, Scheme::mono(t.clone()));
                     env_tys.push(t);
                 }
+            }
+        }
+        self.note_row_lacks(&env_tys);
+        for p in &f.params {
+            if let Param::Env {
+                rest: true,
+                var,
+                name,
+                ..
+            } = p
+                && let Some(Scheme { ty: Ty::Var(v), .. }) = self.locals.get(var)
+            {
+                let site = (self.module, name.span);
+                self.row_capture_sites.insert(site, *v);
+                self.out
+                    .env_captures
+                    .insert(site, self.row_lacks.get(v).cloned().unwrap_or_default());
             }
         }
         for p in &f.params {
@@ -3371,31 +3636,24 @@ impl<'a> Checker<'a> {
             }
         }
         if let Some(r) = &f.ret {
-            for t in [Some(&r.value), r.err.as_ref(), r.env.as_ref()]
-                .into_iter()
-                .flatten()
-            {
+            for t in [Some(&r.value), r.env.as_ref()].into_iter().flatten() {
                 self.check_places(t, Pol::Pos, 0);
             }
         }
-        // Syntax three (transition front): `-> R ^ _ ! _` is a written
+        // Syntax three (transition front): `-> R ! _` is a written
         // result whose needs are left to inference.
         let hole = |t: &Option<Type>| matches!(t, Some(t) if matches!(t.kind, TypeKind::Hole));
-        let inferred_needs = f.ret.as_ref().is_some_and(|r| hole(&r.err) && hole(&r.env));
+        let inferred_needs = f.ret.as_ref().is_some_and(|r| hole(&r.env));
         let ret = f.ret.as_ref().map(|r| {
             let value = self.conv(&r.value, &HashMap::new());
             if inferred_needs {
-                return (value, Ty::Never, Ty::Never);
+                return (value, Ty::Never);
             }
-            let err = r
-                .err
-                .as_ref()
-                .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Row));
             let env = r
                 .env
                 .as_ref()
                 .map_or(Ty::Never, |t| self.conv_mode(t, &HashMap::new(), Mode::Env));
-            (value, err, env)
+            (value, env)
         });
         // §4.8: the body of a function with a written `->` part has that
         // type as its expected type.
@@ -3407,10 +3665,19 @@ impl<'a> Checker<'a> {
         let (a, body_known) = self.block(&f.body.stmts, f.body.span, &body_expected);
         self.function_depth -= 1;
         let known = self.fn_known(f, &expected, body_known);
-        let (err, env) = self.pop_effects(f.span);
+        let mut env = self.pop_effects(f.span);
         let assert = Ty::named(self.b.assert, Vec::new());
+        if rest_env {
+            let declared = self.env_union(env_tys.clone(), f.span);
+            if fails {
+                env = self.env_union(vec![env, assert.clone()], f.span);
+            }
+            self.sub_env(&env, &declared, f.body.span, Some(f.span));
+            env = Ty::Never;
+            fails = false;
+        }
         let t = match (ret, &f.ret) {
-            (Some((value, _, _)), Some(written)) if inferred_needs => {
+            (Some((value, _)), Some(written)) if inferred_needs => {
                 let body_span = match f.body.stmts.last() {
                     Some(Stmt::Expr(e)) => e.span,
                     _ => f.body.span,
@@ -3422,9 +3689,9 @@ impl<'a> Checker<'a> {
                     envs.push(assert);
                 }
                 let env = self.env_union(envs, f.span);
-                Ty::Fn(Box::new(FnTy::new(params, value, err, env)))
+                Ty::Fn(Box::new(FnTy::new(params, value, env)))
             }
-            (Some((value, rerr, renv)), Some(written)) => {
+            (Some((value, renv)), Some(written)) => {
                 // §6.8: the written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
                 // `Assert` when a parameter may fail.
@@ -3433,11 +3700,8 @@ impl<'a> Checker<'a> {
                     _ => f.body.span,
                 };
                 let wspan = written.value.span;
-                let espan = written.err.as_ref().map_or(wspan, |t| t.span);
                 let nspan = written.env.as_ref().map_or(wspan, |t| t.span);
                 self.sub2(&a, &value, body_span, wspan);
-                self.s.constrain_row(&err, &rerr);
-                self.flush(f.body.span, Some(espan));
                 self.sub_env(&env, &renv, f.body.span, Some(nspan));
                 for t in &env_tys {
                     self.sub_env(t, &renv, nspan, None);
@@ -3445,7 +3709,7 @@ impl<'a> Checker<'a> {
                 if fails {
                     self.sub_env(&assert, &renv, nspan, None);
                 }
-                Ty::Fn(Box::new(FnTy::new(params, value, rerr, renv)))
+                Ty::Fn(Box::new(FnTy::new(params, value, renv)))
             }
             _ => {
                 let mut envs = vec![env];
@@ -3454,7 +3718,7 @@ impl<'a> Checker<'a> {
                     envs.push(assert);
                 }
                 let env = self.env_union(envs, f.span);
-                Ty::Fn(Box::new(FnTy::new(params, a, err, env)))
+                Ty::Fn(Box::new(FnTy::new(params, a, env)))
             }
         };
         (t, known)
@@ -3486,7 +3750,13 @@ impl<'a> Checker<'a> {
             self.own_known(b);
         }
         let expected = self.binding_expected(b);
+        let saved = self.row_value_allowed;
+        self.row_value_allowed = matches!(
+            b.pattern.kind,
+            PatternKind::Var(_) | PatternKind::Typed { .. }
+        );
         let (a, k) = self.infer_k(&b.value, &expected);
+        self.row_value_allowed = saved;
         if direct {
             for binder in &binders {
                 self.recursive_bindings.remove(binder);
@@ -3702,7 +3972,6 @@ impl<'a> Checker<'a> {
                 param: go(self, &f.param),
                 labels: f.labels.clone(),
                 ret: go(self, &f.ret),
-                err: go(self, &f.err),
                 env: go(self, &f.env),
             })),
             Ty::Never | Ty::Both(..) => t.clone(),
@@ -3724,7 +3993,7 @@ fn uses_types(t: &Ty, out: &mut Vec<TypeId>) {
         Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| uses_types(x, out)),
         Ty::Fn(f) => {
             uses_types(&f.param, out);
-            [&f.ret, &f.err, &f.env]
+            [&f.ret, &f.env]
                 .into_iter()
                 .for_each(|x| uses_types(x, out));
         }
@@ -3744,7 +4013,7 @@ fn has_both(t: &Ty) -> bool {
     match t {
         Ty::Both(..) => true,
         Ty::Con(_, _, xs) | Ty::Union(xs) | Ty::Inter(xs) => xs.iter().any(has_both),
-        Ty::Fn(f) => has_both(&f.param) || [&f.ret, &f.err, &f.env].into_iter().any(has_both),
+        Ty::Fn(f) => has_both(&f.param) || [&f.ret, &f.env].into_iter().any(has_both),
         Ty::Diff(a, _) => has_both(a),
         _ => false,
     }
@@ -3758,7 +4027,7 @@ fn host_builtin(b: BuiltinType) -> bool {
     )
 }
 
-/// A parameter used as an environment or error row stays a row through
+/// A parameter used as a need stays a row through
 /// other constructors and aliases (§4.5). The finite mode table grows
 /// to a fixed point, independently of declaration order.
 fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
@@ -3779,11 +4048,9 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
                 let modes = match ty {
                     TypeRef::Custom(id) => table[id].clone(),
                     TypeRef::Builtin(BuiltinType::Continuation) => {
-                        vec![Mode::Value, Mode::Value, Mode::Row, Mode::Env]
+                        vec![Mode::Value, Mode::Value, Mode::Env]
                     }
-                    TypeRef::Builtin(BuiltinType::Boundary) => {
-                        vec![Mode::Value, Mode::Row, Mode::Env]
-                    }
+                    TypeRef::Builtin(BuiltinType::Boundary) => vec![Mode::Value, Mode::Env],
                     _ => vec![Mode::Value; args.len()],
                 };
                 for (a, mode) in args.iter().zip(modes) {
@@ -3793,16 +4060,13 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
             TypeKind::Fn {
                 params: ps,
                 ret,
-                err,
+                err: _,
                 env,
             } => {
                 for x in ps {
                     walk(&x.ty, Mode::Value, params, acc, table);
                 }
                 walk(ret, Mode::Value, params, acc, table);
-                if let Some(x) = err {
-                    walk(x, Mode::Row, params, acc, table);
-                }
                 if let Some(x) = env {
                     walk(x, Mode::Env, params, acc, table);
                 }
@@ -3947,14 +4211,43 @@ fn walk_variance(
         TypeKind::Fn {
             params: ps,
             ret,
-            err,
+            err: _,
             env,
         } => {
             ps.iter().for_each(|x| go(&x.ty, v.flip(), acc));
             go(ret, v, acc);
-            err.iter().chain(env).for_each(|x| go(x, v, acc));
+            env.iter()
+                .for_each(|x| walk_env_variance(p, x, v, params, acc, table, depth));
         }
         TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
+    }
+}
+
+/// The variance of the parameters in an environment of a function type at
+/// variance `v`: a row variable goes with `v`, and the arguments of a member
+/// `C(…)` go the other way round from values (rule A: a need is met by a
+/// form that is a subtype of it).
+fn walk_env_variance(
+    p: &Program,
+    t: &Type,
+    v: Variance,
+    params: &[(String, TyVarId)],
+    acc: &mut [Variance],
+    table: &HashMap<TypeId, Vec<Variance>>,
+    depth: u32,
+) {
+    match &t.kind {
+        TypeKind::Union(ts) | TypeKind::Inter(ts) => ts
+            .iter()
+            .for_each(|a| walk_env_variance(p, a, v, params, acc, table, depth)),
+        TypeKind::Diff(ts) => {
+            walk_env_variance(p, &ts[0], v, params, acc, table, depth);
+            ts[1..]
+                .iter()
+                .for_each(|a| walk_variance(p, a, Variance::Inv, params, acc, table, depth));
+        }
+        TypeKind::Named { .. } => walk_variance(p, t, v.flip(), params, acc, table, depth),
+        _ => walk_variance(p, t, v, params, acc, table, depth),
     }
 }
 

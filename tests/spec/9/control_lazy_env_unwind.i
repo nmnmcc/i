@@ -22,7 +22,7 @@ name = () <- (n : Name) { n.text }
 
 Bad = (Int)
 
-Paused = (Continuation(Nil, PausedSum, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Name))
 Done = (String)
 PausedSum = Paused | Done
 

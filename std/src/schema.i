@@ -1,5 +1,6 @@
 //// Composable two-way JSON codecs.
 (
+	i/fail
 	std/json
 	ls = std/list
 	ds = std/dict
@@ -50,22 +51,23 @@ Syntax = (json.JsonError)
 Decode = (SchemaError)
 ParseError = Syntax | Decode
 
-decode = <A, E>(schema : Schema(A, E), value : json.Json) -> Result(A, E) {
-	schema.read(value)
-}
+_decode_result = <A, E>(schema : Schema(A, E), value : json.Json) -> Result(
+	A,
+	E,
+) { schema.read(value) }
 
 encode = <A, E>(schema : Schema(A, E), value : A) -> json.Json {
 	schema.write(value)
 }
 
-parse = <A>(schema : Schema(A, SchemaError), text : String) -> Result(
+_parse_result = <A>(schema : Schema(A, SchemaError), text : String) -> Result(
 	A,
 	ParseError,
 ) {
-	json.parse(text) |>
+	fail.catch(() { json.parse(text) }) |>
 		(Error(e)) { Error(Syntax(e)) }
 		| (Ok(value)) {
-			decode(schema, value) |>
+			_decode_result(schema, value) |>
 				(Ok(x)) { Ok(x) }
 				| (Error(e)) { Error(Decode(e)) }
 		}
@@ -144,7 +146,7 @@ nullable = <A>(s : Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 			x |>
 				(json.Null) { Ok(None) }
 				| (_) {
-					decode(s, x) |>
+					_decode_result(s, x) |>
 						(Ok(v)) { Ok(Some(v)) }
 						| (Error(e)) { Error(e) }
 				}
@@ -174,7 +176,7 @@ read_list = <A>(
 	xs |>
 		([]) { Ok([]) }
 		| ([x, ..rest]) {
-			decode(s, x) |>
+			_decode_result(s, x) |>
 				(Error(e)) { Error(at(Index(index), e)) }
 				| (Ok(v)) {
 					read_list(s, rest, index + 1) |>
@@ -212,7 +214,7 @@ read_dict = <A>(
 	xs |>
 		([]) { Ok(ds.new()) }
 		| ([(k, v), ..rest]) {
-			decode(s, v) |>
+			_decode_result(s, v) |>
 				(Error(e)) { Error(at(Field(k), e)) }
 				| (Ok(value)) {
 					read_dict(s, rest) |>
@@ -230,10 +232,10 @@ tuple = <A, B>(
 		read = (x) {
 			x |>
 				(json.Array([one, two])) {
-					decode(a, one) |>
+					_decode_result(a, one) |>
 						(Error(e)) { Error(at(Index(0), e)) }
 						| (Ok(v)) {
-							decode(b, two) |>
+							_decode_result(b, two) |>
 								(Error(e)) { Error(at(Index(1), e)) }
 								| (Ok(w)) { Ok((v, w)) }
 						}
@@ -265,13 +267,13 @@ field = <A, V>(
 ) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {
-			decode(base, x) |>
+			_decode_result(base, x) |>
 				(Error(e)) { Error(e) }
 				| (Ok(r)) {
 					json.field(x, key) |>
 						(None) { Error(at(Field(key), error("field"))) }
 						| (Some(v)) {
-							decode(value, v) |>
+							_decode_result(value, v) |>
 								(Error(e)) { Error(at(Field(key), e)) }
 								| (Ok(y)) { Ok(put(r, y)) }
 						}
@@ -301,13 +303,13 @@ optional_field = <A, V>(
 ) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {
-			decode(base, x) |>
+			_decode_result(base, x) |>
 				(Error(e)) { Error(e) }
 				| (Ok(r)) {
 					json.field(x, key) |>
 						(None) { Ok(put(r, None)) }
 						| (Some(v)) {
-							decode(value, v) |>
+							_decode_result(value, v) |>
 								(Error(e)) { Error(at(Field(key), e)) }
 								| (Ok(y)) { Ok(put(r, Some(y))) }
 						}
@@ -336,7 +338,9 @@ map = <A, B>(
 ) -> Schema(B, SchemaError) {
 	Schema(
 		read = (x) {
-			decode(s, x) |> (Ok(v)) { Ok(forward(v)) } | (Error(e)) { Error(e) }
+			_decode_result(s, x) |>
+				(Ok(v)) { Ok(forward(v)) }
+				| (Error(e)) { Error(e) }
 		},
 		write = (x) { encode(s, backward(x)) },
 	)
@@ -351,7 +355,7 @@ refine = <A>(
 ) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {
-			decode(s, x) |>
+			_decode_result(s, x) |>
 				(Error(e)) { Error(e) }
 				| (Ok(v)) {
 					predicate(v) |>
@@ -364,7 +368,10 @@ refine = <A>(
 }
 
 lazy = <A>(get : () -> Schema(A, SchemaError)) -> Schema(A, SchemaError) {
-	Schema(read = (x) { decode(get(), x) }, write = (x) { encode(get(), x) })
+	Schema(
+		read = (x) { _decode_result(get(), x) },
+		write = (x) { encode(get(), x) },
+	)
 }
 
 union = <A>(
@@ -388,7 +395,7 @@ read_union = <A>(
 	schemas |>
 		([]) { Error(error("union")) }
 		| ([s, ..rest]) {
-			decode(s, x) |>
+			_decode_result(s, x) |>
 				(Ok(v)) { Ok(v) }
 				| (Error(_)) { read_union(rest, x) }
 		}
@@ -407,7 +414,7 @@ tagged_union = <A>(
 						(k, s) = entry
 						{ k == name } |> (True) { Some(s) } | (False) { None }
 					}) |>
-						(Some(s)) { decode(s, x) }
+						(Some(s)) { _decode_result(s, x) }
 						| (None) { Error(at(Field(key), error("tag"))) }
 				}
 				| (_) { Error(at(Field(key), error("tag"))) }
@@ -435,4 +442,14 @@ tagged_union = <A>(
 				| (None) { panic("schema: unknown tag") }
 		},
 	)
+}
+
+/// Reports failure through `Fail(E)`.
+decode = <A, E>(schema : Schema(A, E), value : json.Json) -> A {
+	fail.from_result(_decode_result(schema, value))
+}
+
+/// Reports failure through `Fail(ParseError)`.
+parse = <A>(schema : Schema(A, SchemaError), text : String) -> A {
+	fail.from_result(_parse_result(schema, text))
 }

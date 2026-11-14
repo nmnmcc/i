@@ -7,8 +7,7 @@
 //! - the fresh names (`%arg1`, `%service2`, `%field3`), numbered in the same
 //!   order, so that the HIR has the same names;
 //! - the type parameters of every binding (the generics of its functions and
-//!   of its signature, and `N%E` for a row variable that carries the errors);
-//! - the function types whose needs get the error parameter `N%E`;
+//!   of its signature); errors are ordinary `Fail(E)` need entries (E3);
 //! - the sums: `C1 = (…)`, `C2 = (…)`, `T = C1 | C2`.
 //!
 //! The walk is the walk of `lower.rs`, form by form, without the output.
@@ -33,24 +32,12 @@ pub struct Return<'a> {
     pub span: Span,
 }
 
-pub fn fail_of(s: &n::SItem) -> Option<&n::Type> {
-    match &s.ty.kind {
-        n::TypeKind::Named {
-            module: None,
-            name,
-            args,
-        } if !s.rest && name.name == "Fail" && args.len() == 1 => Some(&args[0]),
-        _ => None,
-    }
-}
-
 pub fn function_return(f: &n::Function) -> Option<Return<'_>> {
-    let error = f.services.iter().flatten().find_map(fail_of);
-    let span = f.ret.as_ref().or(error)?.span.0;
+    let value = f.ret.as_ref()?;
     Some(Return {
-        values: f.ret.iter().collect(),
-        error,
-        span,
+        values: vec![value],
+        error: None,
+        span: value.span.0,
     })
 }
 
@@ -62,13 +49,10 @@ pub fn chain_return(fs: &[n::Function]) -> Option<Return<'_>> {
         }
     }
     match values.as_slice() {
-        [] => fs
-            .iter()
-            .find(|f| f.services.iter().flatten().any(|s| fail_of(s).is_some()))
-            .and_then(function_return),
+        [] => None,
         [_] => fs
             .iter()
-            .find(|f| f.ret.is_some() || f.services.iter().flatten().any(|s| fail_of(s).is_some()))
+            .find(|f| f.ret.is_some())
             .and_then(function_return),
         _ if fs.iter().any(|f| f.ret.is_none()) => None,
         _ => Some(Return {
@@ -90,9 +74,6 @@ pub struct Pre {
     pub services: HashMap<usize, String>,
     /// By the address of the pattern `_` of `key = _`: its fresh name.
     pub fields: HashMap<usize, String>,
-    /// By the address of a function type: the row variable `N` whose error
-    /// parameter `N%E` is the error of the type.
-    pub row_err: HashMap<usize, String>,
     /// By the address of a binding: its type parameters.
     pub type_params: HashMap<usize, Vec<o::Ident>>,
     /// The index of a member definition of a sum to the index of the sum.
@@ -103,75 +84,6 @@ pub struct Pre {
     pub lisp: bool,
     pub matches: HashSet<usize>,
     pub never: HashSet<usize>,
-}
-
-struct Row {
-    name: String,
-    carries: bool,
-    used: bool,
-}
-
-/// The row variables that a type writes beside a `Fail` entry.
-fn fail_rows(t: &n::Type, out: &mut HashSet<String>) {
-    let each =
-        |ts: &[n::Type], out: &mut HashSet<String>| ts.iter().for_each(|t| fail_rows(t, out));
-    match &t.kind {
-        n::TypeKind::Named { args, .. } | n::TypeKind::Call { args, .. } => each(args, out),
-        n::TypeKind::Union(ts) | n::TypeKind::Inter(ts) | n::TypeKind::Diff(ts) => each(ts, out),
-        n::TypeKind::Data(items) => {
-            for i in items {
-                match i {
-                    n::TItem::Pos(t) | n::TItem::Label(_, t) | n::TItem::Spread(t) => {
-                        fail_rows(t, out)
-                    }
-                }
-            }
-        }
-        n::TypeKind::Fn(f) => {
-            fail_rows(&f.param, out);
-            fail_rows(&f.ret, out);
-            if let Some(s) = &f.services {
-                fail_rows(s, out);
-                if let n::TypeKind::Data(items) = &s.kind {
-                    let fail = items.iter().any(|i| {
-                        matches!(i, n::TItem::Pos(t)
-                            if matches!(&t.kind, n::TypeKind::Named { module: None, name, .. } if name.name == "Fail"))
-                    });
-                    if fail {
-                        for i in items {
-                            if let n::TItem::Spread(t) = i
-                                && let n::TypeKind::Named { name, .. } = &t.kind
-                            {
-                                out.insert(name.name.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        n::TypeKind::Lit(_) | n::TypeKind::ValueOf { .. } | n::TypeKind::Hole => {}
-    }
-}
-
-fn pattern_fail_rows(p: &n::Pattern, out: &mut HashSet<String>) {
-    match &p.kind {
-        n::PatternKind::Typed { ty, .. } => fail_rows(ty, out),
-        n::PatternKind::Ctor {
-            args: Some(items), ..
-        }
-        | n::PatternKind::Data(items) => {
-            for i in items {
-                match i {
-                    n::DPItem::Pos(p) | n::DPItem::Key(_, p) => pattern_fail_rows(p, out),
-                    n::DPItem::Rest(_) => {}
-                }
-            }
-        }
-        n::PatternKind::List { items, .. } | n::PatternKind::And(items) => {
-            items.iter().for_each(|p| pattern_fail_rows(p, out))
-        }
-        _ => {}
-    }
 }
 
 pub fn id(i: &n::Ident) -> o::Ident {
@@ -409,7 +321,6 @@ struct Cx {
     fragment: Option<(u8, Span)>,
     generated_from: Option<u32>,
     out: Pre,
-    rows: Vec<Row>,
     fresh: usize,
 }
 
@@ -431,7 +342,6 @@ pub fn pre_with(
             core_free: core_free(m),
             ..Pre::default()
         },
-        rows: Vec::new(),
         fresh: 0,
     };
     cx.items(&m.items);
@@ -449,7 +359,6 @@ pub fn pre_expr_with(e: &n::Expr, transition: &Transition) -> Pre {
         fragment: None,
         generated_from: None,
         out: Pre { ..Pre::default() },
-        rows: Vec::new(),
         fresh: 0,
     };
     cx.expr(e);
@@ -471,7 +380,6 @@ impl Cx {
             fragment: Some((kind, span)),
             generated_from: None,
             out: Pre::default(),
-            rows: Vec::new(),
             fresh: 0,
         };
         run(&mut cx);
@@ -479,7 +387,6 @@ impl Cx {
         self.out.args.extend(cx.out.args);
         self.out.services.extend(cx.out.services);
         self.out.fields.extend(cx.out.fields);
-        self.out.row_err.extend(cx.out.row_err);
         self.out.type_params.extend(cx.out.type_params);
         self.out.matches.extend(cx.out.matches);
         self.out.never.extend(cx.out.never);
@@ -623,36 +530,10 @@ impl Cx {
             _ => typed_fn(b),
         };
         let generics = binding_generics(b, typed_fn.is_some());
-        let mut with_fail = HashSet::new();
-        pattern_fail_rows(&b.pattern, &mut with_fail);
-        if let n::ExprKind::Chain(fs) = &b.value.kind {
-            for f in fs {
-                for p in &f.params {
-                    p.choices
-                        .iter()
-                        .for_each(|c| pattern_fail_rows(c, &mut with_fail));
-                }
-                for s in f.services.iter().flatten() {
-                    fail_rows(&s.ty, &mut with_fail);
-                }
-                if let Some(r) = &f.ret {
-                    fail_rows(r, &mut with_fail);
-                }
-            }
-        }
         let original = self
             .transition
             .formals(b.span.0, b.pattern.span.0)
             .map(<[_]>::to_vec);
-        let mark = self.rows.len();
-        self.rows.extend(generics.iter().map(|g| Row {
-            name: g.name.clone(),
-            carries: original.as_ref().map_or_else(
-                || !with_fail.contains(&g.name),
-                |ps| ps.iter().any(|(name, _)| *name == format!("{}%E", g.name)),
-            ),
-            used: false,
-        }));
         match (&b.pattern.kind, typed_fn) {
             (n::PatternKind::Typed { ty: t, .. }, Some(f)) => self.fn_type(f, t.span.0, true),
             _ => self.pattern(&b.pattern),
@@ -664,14 +545,6 @@ impl Cx {
             _ => self.expr(&b.value),
         }
         let mut type_params: Vec<o::Ident> = generics.iter().map(|g| id(g)).collect();
-        for row in self.rows.drain(mark..) {
-            if row.used {
-                type_params.push(o::Ident {
-                    name: format!("{}%E", row.name),
-                    span: b.span.0,
-                });
-            }
-        }
         if let Some(original) = original {
             type_params = original
                 .into_iter()
@@ -700,7 +573,7 @@ impl Cx {
                 let apart = provide_apart(items);
                 for item in items {
                     match item {
-                        n::DItem::Pos(e) => {
+                        n::DItem::Pos(e) | n::DItem::Spread(e) => {
                             self.expr(e);
                             if apart {
                                 let name = self.fresh("service");
@@ -711,17 +584,10 @@ impl Cx {
                             l.span.0,
                             "a provided service has no label: it is keyed by its type (§2.10.2)",
                         ),
-                        n::DItem::Spread(e) => self.error(
-                            e.span.0,
-                            "providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet",
-                        ),
                     }
                 }
             }
-            _ => self.error(
-                services.span.0,
-                "providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-            ),
+            _ => self.expr(services),
         }
         match &target.kind {
             n::ExprKind::Block(b) => self.block(b),
@@ -734,26 +600,9 @@ impl Cx {
     }
 
     fn params_of(&mut self, f: &n::Function) {
-        let mut fails = 0;
-        for s in f.services.iter().flatten() {
-            if fail_of(s).is_some() {
-                fails += 1;
-                if fails == 2 {
-                    self.error(
-                        s.ty.span.0,
-                        "a need has one `Fail` entry: write `Fail(A | B)`",
-                    );
-                }
-                continue;
-            }
-            if s.rest {
-                self.error(
-                    s.name.span.0,
-                    "`..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet",
-                );
-                continue;
-            }
-            self.ty(&s.ty);
+        // E3/E6: Fail and a captured rest are ordinary need parameters.
+        for service in f.services.iter().flatten() {
+            self.ty(&service.ty);
         }
     }
 
@@ -1099,52 +948,20 @@ impl Cx {
     }
 
     fn needs_row(&mut self, f: &n::FnType) {
-        let mut fail = false;
-        let mut row: Option<String> = None;
-        let mut need = |cx: &mut Cx, t: &n::Type, spread: bool| {
-            if let n::TypeKind::Named {
-                module: None,
-                name,
-                args,
-            } = &t.kind
-            {
-                if name.name == "Fail" && args.len() == 1 && !spread {
-                    if fail {
-                        cx.error(t.span.0, "a need has one `Fail` entry: write `Fail(A | B)`");
-                    }
-                    fail = true;
-                    cx.ty(&args[0]);
-                    return;
-                }
-                if spread && args.is_empty() {
-                    row = Some(name.name.clone());
-                }
-            }
-            cx.ty(t);
-        };
         match f.services.as_ref().map(|s| (&s.kind, s)) {
             None => {}
             Some((n::TypeKind::Data(items), _)) => {
                 for item in items {
                     match item {
-                        n::TItem::Pos(t) => need(self, t, false),
-                        n::TItem::Spread(t) => need(self, t, true),
-                        n::TItem::Label(l, _) => self.error(
-                            l.span.0,
+                        n::TItem::Pos(t) | n::TItem::Spread(t) => self.ty(t),
+                        n::TItem::Label(label, _) => self.error(
+                            label.span.0,
                             "a need has no label: it is keyed by its type (§2.10.2)",
                         ),
                     }
                 }
             }
-            Some((_, t)) => need(self, t, true),
-        }
-        if !fail
-            && let Some(row) = row
-            && let Some(found) = self.rows.iter_mut().rev().find(|r| r.name == row)
-            && found.carries
-        {
-            found.used = true;
-            self.out.row_err.insert(addr(f), row);
+            Some((_, ty)) => self.ty(ty),
         }
     }
 
@@ -1224,6 +1041,9 @@ pub fn provide_apart(items: &[n::DItem]) -> bool {
                 n::DItem::Pos(n::Expr {
                     kind: n::ExprKind::Name { .. },
                     ..
+                }) | n::DItem::Spread(n::Expr {
+                    kind: n::ExprKind::Name { .. },
+                    ..
                 })
             )
         })
@@ -1235,7 +1055,6 @@ pub fn pre_pattern(pattern: &n::Pattern) -> Pre {
         fragment: None,
         generated_from: None,
         out: Pre { ..Pre::default() },
-        rows: Vec::new(),
         fresh: 0,
     };
     cx.pattern(pattern);
@@ -1247,7 +1066,6 @@ pub fn pre_type(ty: &n::Type) -> Pre {
         fragment: None,
         generated_from: None,
         out: Pre::default(),
-        rows: Vec::new(),
         fresh: 0,
     };
     cx.ty(ty);
@@ -1260,7 +1078,6 @@ pub fn pre_items(items: &[n::Item]) -> Pre {
         fragment: None,
         generated_from: None,
         out: Pre::default(),
-        rows: Vec::new(),
         fresh: 0,
     };
     cx.items(items);

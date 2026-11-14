@@ -329,7 +329,7 @@ fn named_types(t: &Ty, out: &mut Vec<crate::hir::TypeId>) {
         Ty::Union(xs) | Ty::Inter(xs) => xs.iter().for_each(|x| named_types(x, out)),
         Ty::Fn(f) => {
             named_types(&f.param, out);
-            [&f.ret, &f.err, &f.env]
+            [&f.ret, &f.env]
                 .into_iter()
                 .for_each(|x| named_types(x, out));
         }
@@ -686,7 +686,6 @@ fn map_types(ty: &Ty, f: &mut impl FnMut(Ty) -> Ty) -> Ty {
             param: map_types(&fun.param, f),
             labels: fun.labels.clone(),
             ret: map_types(&fun.ret, f),
-            err: map_types(&fun.err, f),
             env: map_types(&fun.env, f),
         })),
         Ty::Union(xs) => Ty::Union(xs.iter().map(|x| map_types(x, f)).collect()),
@@ -858,7 +857,7 @@ fn sites(ty: &Ty, v: V) -> (bool, bool) {
             }
             Ty::Fn(f) => {
                 go(&f.param, v, !pos, out);
-                [&f.ret, &f.err, &f.env]
+                [&f.ret, &f.env]
                     .into_iter()
                     .for_each(|x| go(x, v, pos, out));
             }

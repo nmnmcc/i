@@ -52,6 +52,16 @@ else
 fi
 "$wasm_tools" validate "$fixture_dir/compiled.wasm"
 
+# §10.1: a synchronous external may raise its declared Fail error.
+for level in 0 2; do
+  if [ -n "${I:-}" ]; then
+    "$I" build --target host --project "$fixture_dir/external-fail" --opt "$level" --out "$fixture_dir/external-fail-o$level.wasm"
+  else
+    cargo run --quiet -p ilang-cli -- build --target host --project "$fixture_dir/external-fail" --opt "$level" --out "$fixture_dir/external-fail-o$level.wasm"
+  fi
+  "$wasm_tools" validate "$fixture_dir/external-fail-o$level.wasm"
+done
+
 # Structured concurrency runs on the identical O0/O2 artifacts in both JS hosts.
 for level in 0 2; do
   if [ -n "${I:-}" ]; then

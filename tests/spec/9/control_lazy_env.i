@@ -18,7 +18,7 @@ Name = (text = String)
 
 name = () <- (n : Name) { n.text }
 
-Paused = (Continuation(Nil, PausedSum, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Name))
 Done = (String)
 PausedSum = Paused | Done
 
@@ -32,7 +32,7 @@ twice = (b) {
 	{
 		x = leaf(b)
 		x <> "/" <> name()
-	} <- (Name(text = "a"), Name(text = "twice"))
+	} <- (Name(text = "twice")) <- (Name(text = "a"))
 }
 
 one = (b) {
