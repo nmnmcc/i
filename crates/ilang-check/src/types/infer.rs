@@ -1530,8 +1530,31 @@ impl<'a> Checker<'a> {
             self.fix_notes.clear();
             return;
         }
-        let f = self.s.failures.remove(0);
-        self.s.failures.clear();
+        // Decision 1: needs denote sets of environments. A same-key
+        // conjunction is the ordinary intersection of whole service values,
+        // not a demand that every covariant argument be inhabited. In
+        // particular Read(Never), whose field is () -> Never, is inhabited
+        // by a stopping or diverging function (§11.7). The solver does not
+        // have nominal bodies; use the ordinary coverage test here.
+        let failures = std::mem::take(&mut self.s.failures);
+        let f = failures.into_iter().find(|f| {
+            if f.kind != FailKind::NeedMeet {
+                return true;
+            }
+            let left = display::known_shown(&self.s, &f.lhs);
+            let right = display::known_shown(&self.s, &f.rhs);
+            let meet = self.s.inter(vec![left, right]);
+            self.useful(
+                &[],
+                &[super::coverage::Pat::Wild(None)],
+                &[super::coverage::Col::of(meet)],
+            )
+            .is_none()
+        });
+        let Some(f) = f else {
+            self.fix_notes.clear();
+            return;
+        };
         let (l, r) = (
             display::show(&self.s, &f.lhs),
             display::show(&self.s, &f.rhs),

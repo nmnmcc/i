@@ -1047,3 +1047,23 @@ fn a_vendored_sink_marker_keeps_its_row_invariant() {
         graph.sources.render_all(&diags)
     );
 }
+
+#[test]
+fn a_bottom_returning_method_can_satisfy_two_covariant_needs() {
+    // Decision 1; §4.4 intersects constructor arguments, and §11.7
+    // permits a function to stop or diverge. Read(Never) is inhabited.
+    let shown = types(
+        "Read(A) = (read = () -> A)\nf = () <- (r : Read(Int)) { r.read() }\ng = () <- (r : Read(String)) { r.read() }\nboth = () { f() g() }\nmain = () { both() <- (Read(read = () { panic(\"bottom\") })) }",
+    );
+    assert!(shown["app/main.both"].contains("Read(Never)"), "{shown:?}");
+    // Keep the negative value-field case: unlike a method returning Never,
+    // a required field of type Never cannot be constructed.
+    let source = "Box(A) = (value = A)\nf = () <- (b : Box(Int)) { b.value }\ng = () <- (b : Box(String)) { b.value }\nboth = () { f() g() }";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}

@@ -24,6 +24,16 @@ missing/provided `Sink(Never)` and a pure function missing `Fail(Never)`.
 The wide-row and `review-std2/unsafe` display judgments that erased keys also
 need re-recording only after the new full corpus run. Verification is pending.
 
+Decision 1 also requires judging the intersection of the entire service value,
+not rejecting an empty covariant argument alone. Spec §4.4 intersects the
+arguments of one constructor; §11.7 says “The program stops” when “`panic(m)`
+is called”. Thus `Read(A) = (read = () -> A)` admits a `Read(Never)` whose
+method stops. The checker now applies its ordinary coverage/inhabitance test
+to a provisional empty-argument meet before reporting E0515. A service with a
+required value field of type `Never` still gives E0515. Provider-subtyping
+failures and invariant-argument errors are independently retained. New unit
+and §9.2 runtime regressions pin both sides; merged verification is pending.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**
