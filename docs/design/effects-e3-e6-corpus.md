@@ -56,6 +56,25 @@ every test assertion and algorithm is unchanged. A checker regression reads
 the actual shipped declarations and checks error covariance plus both negative
 need-coercion cases. The E4 Result-data choices remain unchanged.
 
+The final-AST main merge is `5e08939f0` (fa `35f0e0588`). Production
+resolves the native tree; E3's single need and E6's rest/provide metadata now
+live in its prepass and direct resolver. The old AST remains only in main's
+dev-only migration oracle, whose E3/E6 assertions remain exercised. The
+snippet inventory is the union, and main's three changed mixed-install
+records remain the baseline until the full effects corpus is observed.
+
+Decision 2 exposed five library errors in the first row-scheme run, not 41
+independent case defects: all checked programs also check `i/task`. §9.5
+writes `resource.ensure` as `<A, N>(() <- N -> A, () <- N -> Nil) <- N -> A`;
+restore that exact signature instead of manufacturing `Fail(Never)` for a
+pure body. §9.4's written `keep` type still has `Fail(E)` on its result, so
+internal closed scheduler callbacks supply an actual `Fail(Never)` value,
+whose argument is uninhabited. They do not erase a key or retain a caller's
+handler. No final is installed or run on a stop (decision 15). The focused
+row run completed in 143 seconds; the attempted process stop found it already
+finished. Rest-service regressions passed 13/13 before the final-AST merge;
+the merged workspace all-targets check is green, with runtime gates pending.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**

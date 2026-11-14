@@ -541,6 +541,13 @@ read = <A>(k : Key(A), value : Keyed) -> A {
 
 retain = (value) { value }
 
+// §9.4 keeps a real Fail key even for a callback that cannot raise.
+// Supply that key at internal, closed scheduling callbacks; never capture
+// a caller's failure handler or export it through a scheduler field.
+without_error = <A>(body: () <- (Fail(Never)) -> A) -> A {
+	body() <- (Fail(raise = (_: Never) { panic("task: impossible error") }))
+}
+
 unit_value = key.wrap(unit_key, Nil)
 
 unit = () { unit_value }
@@ -1215,11 +1222,11 @@ make_start: <A, E, N>(
 						local = control.keep((_ : Nil) {
 							complete(body, result, errors, check)
 						})
-						retain(guarded(own, Absent, () { local(Nil) }))
+						retain(guarded(own, Absent, () { without_error(() { local(Nil) }) }))
 					} <- (attached.waiter) <- (attached.runner) <- (own)
 				}
 		})
-		Start(body = kept, ticket = 0)
+		Start(body = (own) { without_error(() { kept(own) }) }, ticket = 0)
 	} <- (
 		Scheduler(state = DetachedScheduler),
 		Runner(state = DetachedRunner),
@@ -3620,7 +3627,7 @@ scope_call_body: <A, E, N>(
 	resource.ensure(
 		() {
 			completed = guarded(own, Present(read(address_key, info.id)), () {
-				kept(Nil)
+				without_error(() { kept(Nil) })
 			})
 			mark = completed |>
 				(Succeeded(_)) { Succeeded(unit()) }

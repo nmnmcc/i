@@ -21,20 +21,17 @@
 	Splice(..)
 	TypeHandle
 	Position
+	PatternItem(..)
+	ValueItem(..)
+	TypeItem(..)
 	ImportItem(..)
 	ExportItem(..)
 	Item(..)
 	Attribute(..)
-	Constructor(..)
-	Field(..)
 	Type(..)
 	FunctionResult(..)
-	Parameter(..)
 	Expression(..)
 	Statement(..)
-	CallArgument(..)
-	Clause(..)
-	ClauseHead(..)
 	Pattern(..)
 	Segment(..)
 	Format(..)
@@ -128,17 +125,14 @@ Position = ImportItem
 	| ExportItem
 	| Item
 	| Attribute
-	| Constructor
-	| Field
 	| Type
+	| TypeItem
 	| FunctionResult
-	| Parameter
 	| Expression
+	| ValueItem
 	| Statement
-	| CallArgument
-	| Clause
-	| ClauseHead
 	| Pattern
+	| PatternItem
 	| Segment
 	| Format
 
@@ -150,27 +144,21 @@ Item = ()
 
 Attribute = ()
 
-Constructor = ()
-
-Field = ()
-
 Type = ()
+
+TypeItem = ()
 
 FunctionResult = ()
 
-Parameter = ()
-
 Expression = ()
+
+ValueItem = ()
 
 Statement = ()
 
-CallArgument = ()
-
-Clause = ()
-
-ClauseHead = ()
-
 Pattern = ()
+
+PatternItem = ()
 
 Segment = ()
 
@@ -565,19 +553,16 @@ position_id = (position : Position) -> Int {
 		| (ExportItem) { 1 }
 		| (Item) { 2 }
 		| (Attribute) { 3 }
-		| (Constructor) { 4 }
-		| (Field) { 5 }
-		| (Type) { 6 }
-		| (FunctionResult) { 7 }
-		| (Parameter) { 8 }
-		| (Expression) { 9 }
-		| (Statement) { 10 }
-		| (CallArgument) { 11 }
-		| (Clause) { 12 }
-		| (ClauseHead) { 13 }
-		| (Pattern) { 14 }
-		| (Segment) { 15 }
-		| (Format) { 16 }
+		| (Type) { 4 }
+		| (TypeItem) { 5 }
+		| (FunctionResult) { 6 }
+		| (Expression) { 7 }
+		| (ValueItem) { 8 }
+		| (Statement) { 9 }
+		| (Pattern) { 10 }
+		| (PatternItem) { 11 }
+		| (Segment) { 12 }
+		| (Format) { 13 }
 }
 
 /// Writes syntax in the normal surface at the requested position.

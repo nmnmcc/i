@@ -83,6 +83,7 @@ impl Query<'_> {
         // In the resolved tree.
         let p = self.program;
         let mut in_type = false;
+        let mut in_environment = false;
         let mut case: Option<&Expr> = None;
         let mut pipe_subject: Option<&Expr> = None;
         let mut call: Option<&Expr> = None;
@@ -117,6 +118,12 @@ impl Query<'_> {
                     call = Some(e)
                 }
                 ExprKind::Record { .. } => record = true,
+                ExprKind::Fn(f) => {
+                    in_environment |= f.params.iter().any(|p| {
+                        matches!(p,
+                        Param::Env { ty, .. } if ty.span.start <= start && offset <= ty.span.end)
+                    });
+                }
                 _ => {}
             },
             _ => {}
@@ -126,7 +133,7 @@ impl Query<'_> {
         // type there, or the place after `name:`, is a service. After
         // `e <- (` of a provide the items are values, which are not types
         // of the tree.
-        if (in_type || before == Some(b':')) && after_need_arrow(text, start) {
+        if in_environment || ((in_type || before == Some(b':')) && after_need_arrow(text, start)) {
             return CompletionContext::Environment;
         }
         if in_type {
@@ -734,7 +741,7 @@ impl Query<'_> {
             let Some(path) = self.import_path(m, t) else {
                 continue;
             };
-            for mut c in self.module_members(t) {
+            for mut c in self.module_values_with_prefix(t, prefix) {
                 if !c.label.starts_with(prefix) || visible.contains(&c.label) {
                     continue;
                 }

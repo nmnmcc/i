@@ -1,3 +1,5 @@
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use std::collections::BTreeSet;
 
 use ilang_syntax::ast::{

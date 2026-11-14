@@ -11,8 +11,8 @@
 //! written types.
 
 use ilang_package::{ModuleKind, PackageId, SourceId};
-use ilang_syntax::ast::{BinOp, Ident, UnOp};
 use ilang_syntax::span::Span;
+use ilang_syntax::syn3::ast::{BinOp, UnOp, resolved::Ident};
 use num_bigint::BigUint;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

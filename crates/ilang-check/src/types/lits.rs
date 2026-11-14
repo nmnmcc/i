@@ -9,7 +9,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-pub use ilang_syntax::ast::LitValue;
+pub use ilang_syntax::syn3::ast::LitValue;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TestValues {
@@ -712,16 +712,16 @@ mod tests {
         assert_eq!(int_text(true, &BigUint::from(0u8)), "0");
         assert_eq!(int_text(true, &hex), "-16");
         let (m, diags) =
-            ilang_syntax::parse_module("a = \"\\u{e9}\"\nb = \"é\"\nc = \"e\\u{301}\"\n");
+            ilang_syntax::syn3::parse_module("a = \"\\u{e9}\"\nb = \"é\"\nc = \"e\\u{301}\"\n");
         assert!(diags.is_empty(), "{diags:?}");
         let strings: Vec<_> = m
             .items
             .iter()
             .map(|item| {
-                let ilang_syntax::ast::ItemKind::Binding(b) = &item.kind else {
+                let ilang_syntax::syn3::ast::ItemKind::Bind(b) = &item.kind else {
                     panic!()
                 };
-                let ilang_syntax::ast::ExprKind::String(s) = &b.value.kind else {
+                let ilang_syntax::syn3::ast::ExprKind::String(s) = &b.value.kind else {
                     panic!()
                 };
                 ValueSet::only([Arc::from(s.as_str())]).unwrap()

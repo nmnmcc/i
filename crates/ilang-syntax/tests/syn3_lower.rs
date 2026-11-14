@@ -1,8 +1,9 @@
 //! The transition front of syntax three (docs/design/syntax-3.md §7.2,
 //! stage 8): a syntax-three text lowers to the tree that today's text gives.
 
-#[path = "../examples/support/legacy/mod.rs"]
-mod legacy;
+#[path = "oracle.rs"]
+mod ilang_syntax;
+use migration_syntax::legacy;
 
 use ilang_syntax::print::print_module;
 use ilang_syntax::syn3;

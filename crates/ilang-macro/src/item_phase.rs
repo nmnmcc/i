@@ -2,19 +2,17 @@
 //!
 //! One step leaves all arguments untouched until the selected outermost macro
 //! has run. The scheduler installs a successful result only after parsing it.
+use crate::item_phase3::{
+    builtin, commit_exports, item_names, reject_macro_definitions, type_ready,
+};
 use crate::{
     body_engine::{BodyEngine, Error},
-    body_walk::{self, Hook},
+    body_walk3 as body_walk,
     prepare::MacroPosition,
     session::Transaction,
 };
-use ilang_syntax::ast::{Attribute, Item, ItemKind, Pattern};
-use ilang_syntax::lisp::{
-    Datum, DatumKind,
-    expansion::MacroArgument,
-    source_syntax::source_item_syntax,
-    syntax::{Node, Syntax},
-};
+use ilang_syntax::lisp::syntax::{Node, Syntax};
+use ilang_syntax::syn3::ast::{Item, ItemKind};
 
 /// A step either finishes an ordinary item or replaces it with the returned
 /// items. `retained` is the written type definition: a macro on a type
@@ -28,77 +26,9 @@ pub enum Step {
     },
 }
 
-fn builtin(attribute: &Attribute) -> bool {
-    attribute.module.is_none()
-        && matches!(
-            attribute.name.name.as_str(),
-            "external" | "js" | "host" | "deprecated" | "macro" | "main" | "wasm"
-        )
-}
-
-fn names(pattern: &Pattern, output: &mut Vec<String>) {
-    body_walk::for_each_binder(pattern, |name, _| output.push(name.to_owned()));
-}
-fn item_names(item: &Item) -> Vec<String> {
-    match &item.kind {
-        ItemKind::TypeDef(t) => vec![t.name.name.clone()],
-        ItemKind::Declaration { name, .. } => vec![name.name.clone()],
-        ItemKind::Binding(b) => {
-            let mut out = Vec::new();
-            names(&b.pattern, &mut out);
-            out
-        }
-        ItemKind::MacroItem { .. } => Vec::new(),
-    }
-}
-
 impl BodyEngine<'_> {
-    fn item_root(&self, item: &Item) -> (Syntax, Span) {
-        if let Some(root) = self.item_overrides.get(&item.span) {
-            return root.clone();
-        }
-        if let Some(origin) = self.scoped.origin(item.span) {
-            return (origin.syntax.clone(), item.span);
-        }
-        let file = self.graph.sources.get(self.source);
-        (
-            if file.display.ends_with(".is") {
-                source_item_syntax(item, &self.scope(), &file.text, true)
-            } else {
-                self.source_encoder().item(item)
-            },
-            item.span,
-        )
-    }
     fn item_syntax(&self, item: &Item) -> Syntax {
-        self.item_root(item).0
-    }
-
-    fn attribute_arguments(&self, attribute: &Attribute) -> Vec<MacroArgument> {
-        if let Some((args, _)) = &attribute.call {
-            args.iter()
-                .map(|arg| MacroArgument {
-                    label: arg.label.as_ref().map(|label| label.name.clone()),
-                    syntax: self.expr_syntax(&arg.value),
-                })
-                .collect()
-        } else {
-            attribute
-                .args
-                .iter()
-                .map(|(text, span)| MacroArgument {
-                    label: None,
-                    syntax: Syntax::from_datum(
-                        &Datum {
-                            kind: DatumKind::String(text.clone()),
-                            span: *span,
-                            docs: Vec::new(),
-                        },
-                        &self.scope(),
-                    ),
-                })
-                .collect()
-        }
+        self.item_root3(item).0
     }
 
     /// Expands one outer item call, or one outer attribute call. A written type
@@ -112,7 +42,7 @@ impl BodyEngine<'_> {
             if builtin(attribute) {
                 continue;
             }
-            if let Some(mac) = self.resolve(
+            if let Some(mac) = self.resolve3(
                 attribute.module.as_ref(),
                 &attribute.name,
                 &self.item_locals,
@@ -120,13 +50,13 @@ impl BodyEngine<'_> {
             ) {
                 if let Some(previous) = item.attributes[..index].iter().find(|a| builtin(a)) {
                     return Err(Error::InvalidItem(
-                        previous.span,
+                        previous.span.0,
                         "a built-in attribute cannot precede a macro".into(),
                     ));
                 }
                 if index != 0 {
                     return Err(Error::InvalidItem(
-                        item.attributes[0].span,
+                        item.attributes[0].span.0,
                         "an attribute before a macro must itself name a macro".into(),
                     ));
                 }
@@ -137,15 +67,15 @@ impl BodyEngine<'_> {
                     }
                     _ => panic!("an attributed item must encode as an attribute wrapper"),
                 };
-                let args = self.attribute_arguments(attribute);
-                let call = self.atom(&attribute.name);
+                let args = self.attribute_arguments3(attribute);
+                let call = self.atom3(&attribute.name);
                 let original_names = item_names(&item);
                 let is_type = matches!(item.kind, ItemKind::TypeDef(_));
                 let (result, budget, transactions) = self.execute(
                     &mac,
                     args,
                     &call,
-                    attribute.span,
+                    attribute.span.0,
                     Some(inner.clone()),
                     MacroPosition::Item,
                 )?;
@@ -154,7 +84,7 @@ impl BodyEngine<'_> {
                         error: error.into(),
                         macro_name: mac.definition.name.clone(),
                         call: call.clone(),
-                        invocation_span: attribute.span,
+                        invocation_span: attribute.span.0,
                     }
                 })?;
                 let result =
@@ -165,7 +95,7 @@ impl BodyEngine<'_> {
                     u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let mut items = self
                     .scoped
-                    .items_metered(&result, &call, |work, words| {
+                    .items3_metered(&result, &call, |work, words| {
                         budget.charge(work, words).map_err(|e| Box::new(e) as _)
                     })
                     .map_err(|error| {
@@ -173,13 +103,13 @@ impl BodyEngine<'_> {
                             error,
                             &mac.definition.name,
                             &call,
-                            attribute.span,
+                            attribute.span.0,
                         )
                     })?;
                 let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
                 self.scoped.inherit_call_chain(
                     Span::new(start, end),
-                    attribute.span,
+                    attribute.span.0,
                     &mac.definition.name,
                 );
                 reject_macro_definitions(&items)?;
@@ -195,11 +125,11 @@ impl BodyEngine<'_> {
                     first.doc.clone_from(&item.doc);
                 }
                 let retained = if is_type {
-                    let root_span = self.item_root(&item).1;
+                    let root_span = self.item_root3(&item).1;
                     let inner_span = self.scoped.child_span(root_span, 2).unwrap_or(inner.span());
                     self.scoped
-                        .set_item_override(item.span, inner.clone(), inner_span);
-                    self.item_overrides.insert(item.span, (inner, inner_span));
+                        .set_item_override(item.span.0, inner.clone(), inner_span);
+                    self.item_overrides.insert(item.span.0, (inner, inner_span));
                     item.attributes.remove(index);
                     Some(item)
                 } else {
@@ -212,24 +142,18 @@ impl BodyEngine<'_> {
                 });
             }
         }
-        if let ItemKind::MacroItem { module, name, args } = &item.kind {
-            if let Some(mac) = self.resolve(module.as_ref(), name, &self.item_locals, 0) {
-                let args = args
-                    .iter()
-                    .map(|arg| MacroArgument {
-                        label: arg.label.as_ref().map(|label| label.name.clone()),
-                        syntax: self.expr_syntax(&arg.value),
-                    })
-                    .collect();
+        if let ItemKind::Macro { module, name, args } = &item.kind {
+            if let Some(mac) = self.resolve3(module.as_ref(), name, &self.item_locals, 0) {
+                let args = self.item_call_arguments3(args);
                 let call = self.item_syntax(&item);
                 let (result, budget, transactions) =
-                    self.execute(&mac, args, &call, item.span, None, MacroPosition::Item)?;
+                    self.execute(&mac, args, &call, item.span.0, None, MacroPosition::Item)?;
                 ilang_host::syntax::charge_tree(&budget, &result, true).map_err(|error| {
                     Error::Resource {
                         error: error.into(),
                         macro_name: mac.definition.name.clone(),
                         call: call.clone(),
-                        invocation_span: item.span,
+                        invocation_span: item.span.0,
                     }
                 })?;
                 let result =
@@ -240,7 +164,7 @@ impl BodyEngine<'_> {
                     u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let items = self
                     .scoped
-                    .items_metered(&result, &call, |work, words| {
+                    .items3_metered(&result, &call, |work, words| {
                         budget.charge(work, words).map_err(|e| Box::new(e) as _)
                     })
                     .map_err(|error| {
@@ -248,13 +172,13 @@ impl BodyEngine<'_> {
                             error,
                             &mac.definition.name,
                             &call,
-                            item.span,
+                            item.span.0,
                         )
                     })?;
                 let end = u32::try_from(self.scoped.text().len()).expect("source span overflow");
                 self.scoped.inherit_call_chain(
                     Span::new(start, end),
-                    item.span,
+                    item.span.0,
                     &mac.definition.name,
                 );
                 reject_macro_definitions(&items)?;
@@ -265,12 +189,12 @@ impl BodyEngine<'_> {
                 });
             }
             return Err(Error::InvalidItem(
-                item.span,
+                item.span.0,
                 "an item call must name a macro".into(),
             ));
         }
         if matches!(item.kind, ItemKind::TypeDef(_)) {
-            let (root, root_span) = self.item_root(&item);
+            let (root, root_span) = self.item_root3(&item);
             let start = self.item_replacements.len();
             let ItemKind::TypeDef(definition) = &mut item.kind else {
                 unreachable!()
@@ -284,7 +208,7 @@ impl BodyEngine<'_> {
                             error: error.into(),
                             macro_name: "type macro".into(),
                             call: root.clone(),
-                            invocation_span: item.span,
+                            invocation_span: item.span.0,
                         }
                     })?;
                     let output = &self
@@ -297,7 +221,7 @@ impl BodyEngine<'_> {
                             error: error.into(),
                             macro_name: "type macro".into(),
                             call: root.clone(),
-                            invocation_span: item.span,
+                            invocation_span: item.span.0,
                         }
                     })?;
                 }
@@ -307,9 +231,9 @@ impl BodyEngine<'_> {
                     .collect::<Vec<_>>();
                 let rewritten = self.scoped.rewrite_occurrences(&root, root_span, &spans);
                 self.scoped
-                    .set_item_override(item.span, rewritten.clone(), root_span);
+                    .set_item_override(item.span.0, rewritten.clone(), root_span);
                 self.item_overrides
-                    .insert(item.span, (rewritten, root_span));
+                    .insert(item.span.0, (rewritten, root_span));
                 self.item_replacements.truncate(start);
             }
         }
@@ -317,28 +241,12 @@ impl BodyEngine<'_> {
     }
 }
 
-fn reject_macro_definitions(items: &[Item]) -> Result<(), Error> {
-    for item in items {
-        if let Some(attribute) = item
-            .attributes
-            .iter()
-            .find(|a| a.module.is_none() && a.name.name == "macro")
-        {
-            return Err(Error::InvalidItem(
-                attribute.span,
-                "an expansion cannot define a macro".into(),
-            ));
-        }
-    }
-    Ok(())
-}
-
 use ilang_host::syntax::{DefinitionAbort, DefinitionReply};
-use ilang_syntax::ast::Module;
 use ilang_syntax::lisp::definition_schedule::Mode;
 use ilang_syntax::lisp::scoped::ScopedSource;
 use ilang_syntax::lisp::syntax::Scope;
 use ilang_syntax::span::Span;
+use ilang_syntax::syn3::ast::Module;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
@@ -430,6 +338,14 @@ pub fn expand_items(
     module: &mut Module,
     definitions: Arc<dyn Definitions>,
 ) -> Result<Vec<Transaction>, PhaseError> {
+    ilang_syntax::syn3::deep::deep(|| expand_items_here(engine, module, definitions))
+}
+
+fn expand_items_here(
+    engine: &mut BodyEngine<'_>,
+    module: &mut Module,
+    definitions: Arc<dyn Definitions>,
+) -> Result<Vec<Transaction>, PhaseError> {
     engine.clear_failure_source();
     engine.phase_notes.clear();
     let original_source = engine.scoped.clone();
@@ -466,7 +382,7 @@ fn expand_items_inner(
         .enumerate()
         .map(|(id, item)| Slot {
             id: id as u64,
-            root: item.span,
+            root: item.span.0,
             path: vec![id as u32],
             item: Arc::new(item),
             ready: false,
@@ -505,8 +421,6 @@ fn expand_items_inner(
             imports: module.imports.clone(),
             exports: module.exports.clone(),
             items: Vec::new(),
-            imports_span: module.imports_span,
-            exports_span: module.exports_span,
         };
         let items: Vec<_> = slots.iter().map(|s| s.item.clone()).collect();
         let ready: Vec<_> = slots.iter().map(|s| s.ready).collect();
@@ -592,7 +506,7 @@ fn expand_items_inner(
                             .checked_add(1)
                             .expect("expansion depth overflow");
                         if depth > 256 {
-                            return Err(PhaseError::Step(Error::Depth(slots[index].item.span)));
+                            return Err(PhaseError::Step(Error::Depth(slots[index].item.span.0)));
                         }
                         let mut replacements = Vec::new();
                         let root = slots[index].root;
@@ -715,8 +629,6 @@ fn expand_items_inner(
             .into_iter()
             .map(|s| Arc::unwrap_or_clone(s.item))
             .collect(),
-        imports_span: module.imports_span,
-        exports_span: module.exports_span,
     };
     commit_exports(
         &mut completed,
@@ -760,87 +672,8 @@ fn expand_items_inner(
     Ok(transactions)
 }
 
-/// A written type is visible immediately, and is ready as soon as none of
-/// its type positions names a macro; no macro is executed by this probe.
-fn type_ready(engine: &mut BodyEngine<'_>, item: &Item) -> Result<bool, PhaseError> {
-    let ItemKind::TypeDef(definition) = &item.kind else {
-        return Ok(false);
-    };
-    struct Probe<'a, 'b>(&'a mut BodyEngine<'b>);
-    enum Found {
-        Macro,
-        Error(Error),
-    }
-    impl Hook for Probe<'_, '_> {
-        type Error = Found;
-        fn is_macro(
-            &mut self,
-            _: &ilang_syntax::ast::Expr,
-            _: &[body_walk::Local],
-            _: u32,
-        ) -> Result<bool, Found> {
-            Ok(false)
-        }
-        fn expand(
-            &mut self,
-            _: &ilang_syntax::ast::Expr,
-            _: &[body_walk::Local],
-            _: u32,
-        ) -> Result<ilang_syntax::ast::Expr, Found> {
-            unreachable!("type probe does not expand expressions")
-        }
-        fn is_type_macro(
-            &mut self,
-            ty: &ilang_syntax::ast::TypeExpr,
-            locals: &[body_walk::Local],
-            depth: u32,
-        ) -> Result<bool, Found> {
-            match self.0.is_type_macro(ty, locals, depth) {
-                Ok(true) => Err(Found::Macro),
-                Ok(false) => Ok(false),
-                Err(error) => Err(Found::Error(error)),
-            }
-        }
-        fn expand_type(
-            &mut self,
-            _: &ilang_syntax::ast::TypeExpr,
-            _: &[body_walk::Local],
-            _: u32,
-        ) -> Result<ilang_syntax::ast::TypeExpr, Found> {
-            unreachable!("type probe stops before expansion")
-        }
-        fn depth_error(&mut self, span: Span) -> Found {
-            Found::Error(Error::Depth(span))
-        }
-        fn is_direct(
-            &mut self,
-            _: &ilang_syntax::ast::Expr,
-            _: &[body_walk::Local],
-            _: u32,
-        ) -> bool {
-            false
-        }
-    }
-    match body_walk::type_definition(&mut definition.clone(), &mut Probe(engine)) {
-        Ok(()) => Ok(true),
-        Err(Found::Macro) => Ok(false),
-        Err(Found::Error(error)) => Err(PhaseError::Step(error)),
-    }
-}
-
 fn item_is_finished_without_run(engine: &BodyEngine<'_>, item: &Item, ready: bool) -> bool {
-    if matches!(item.kind, ItemKind::MacroItem { .. }) {
-        return false;
-    }
-    if matches!(item.kind, ItemKind::TypeDef(_)) && !ready {
-        return false;
-    }
-    !item.attributes.iter().any(|a| {
-        !builtin(a)
-            && engine
-                .resolve(a.module.as_ref(), &a.name, &engine.item_locals, 0)
-                .is_some()
-    })
+    engine.item_is_finished_without_run3(item, ready)
 }
 
 impl BodyEngine<'_> {
@@ -880,111 +713,5 @@ impl BodyEngine<'_> {
 }
 
 fn generated_values(engine: &BodyEngine<'_>, slots: &[Slot]) -> Vec<body_walk::Local> {
-    let mut out = Vec::new();
-    for slot in slots {
-        match &slot.item.kind {
-            ItemKind::Binding(binding) => {
-                body_walk::for_each_binder(&binding.pattern, |name, span| {
-                    if engine.scoped.is_generated(span) {
-                        out.push(body_walk::Local {
-                            name: name.to_owned(),
-                            span,
-                            fn_only: None,
-                        });
-                    }
-                })
-            }
-            ItemKind::Declaration { name, .. } if engine.scoped.is_generated(name.span) => out
-                .push(body_walk::Local {
-                    name: name.name.clone(),
-                    span: name.span,
-                    fn_only: None,
-                }),
-            _ => {}
-        }
-    }
-    out
-}
-
-/// Export requests are checked only against the completed item phase. They do
-/// not mutate the import graph and cannot publish a marked or foreign name.
-fn commit_exports(
-    module: &mut Module,
-    transactions: &[Transaction],
-    source: u32,
-    scoped: &ScopedSource,
-) -> Result<(), PhaseError> {
-    for request in transactions
-        .iter()
-        .flat_map(|transaction| &transaction.requests)
-    {
-        let ilang_host::syntax::ItemRequest::Expose { name } = request else {
-            continue;
-        };
-        let Node::Name(text) = name.node() else {
-            return Err(PhaseError::Step(Error::InvalidItem(
-                name.span(),
-                "an export request needs a value name".into(),
-            )));
-        };
-        if name.scope().module != source
-            || !name.scope().marks.is_empty()
-            || name.scope_identity().is_some()
-        {
-            return Err(PhaseError::Step(Error::InvalidItem(
-                name.span(),
-                "an export request needs an unmarked name in this module".into(),
-            )));
-        }
-        let exists = module.items.iter().any(|item| {
-            item_names(item).iter().any(|candidate| candidate == text)
-                && match &item.kind {
-                    ItemKind::Binding(binding) => {
-                        unmarked_binder(&binding.pattern, text, source, scoped)
-                    }
-                    ItemKind::Declaration { name, .. } => {
-                        name.name == *text
-                            && scoped.origin(name.span).is_none_or(|origin| {
-                                origin.syntax.scope().module == source
-                                    && origin.syntax.scope().marks.is_empty()
-                            })
-                    }
-                    _ => false,
-                }
-        });
-        if !exists {
-            return Err(PhaseError::Step(Error::InvalidItem(
-                name.span(),
-                format!("the requested export `{text}` is not defined in this module"),
-            )));
-        }
-        if !module
-            .exports
-            .iter()
-            .any(|export| export.name.name == *text)
-        {
-            module.exports.push(ilang_syntax::ast::ExportItem {
-                name: ilang_syntax::ast::Ident {
-                    name: text.clone(),
-                    span: name.span(),
-                },
-                constructors: false,
-                span: name.span(),
-            });
-        }
-    }
-    Ok(())
-}
-fn unmarked_binder(pattern: &Pattern, wanted: &str, source: u32, scoped: &ScopedSource) -> bool {
-    let mut found = false;
-    body_walk::for_each_binder(pattern, |text, span| {
-        if text == wanted
-            && scoped.origin(span).is_none_or(|origin| {
-                origin.syntax.scope().module == source && origin.syntax.scope().marks.is_empty()
-            })
-        {
-            found = true;
-        }
-    });
-    found
+    engine.generated_values3(slots.iter().map(|slot| slot.item.as_ref()))
 }
