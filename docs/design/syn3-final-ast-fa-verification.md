@@ -526,3 +526,20 @@ with no legacy feature, in target/fa-r3/step4-cli.command. It exits0; its
 scheduler remains paused until the lexer retry completes to avoid overlap.
 Root Rust log: step4-rust.log; syntax retry0: step4-syn3-retry.log. Runtime
 release/examples/std/spec/generation/source-format results remain pending.
+
+
+## Deletion runtime checkpoint (09:14)
+
+The native release build passes, followed by examples/macro-tests (13 pass,
+one existing skip) and std O0 (2170 pass, zero failures). The unchanged
+std/schema_test.null_round assertion passes. Commands:
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo build --release -p ilang-cli --bin i --locked
+/home/agent/Programming/i/.rd/cache/heavy ./target/release/i test --project examples/macro-tests --opt 0
+/home/agent/Programming/i/.rd/cache/heavy ./target/release/i test --project std --opt 0
+```
+
+Logs: target/fa-r3/step4-release.log, step4-examples.log, step4-std0.log.
+O2, the four spec chapters, short generation and final formatting remain
+pending; this is a recorded milestone, not a full-green step4 claim.

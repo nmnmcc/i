@@ -274,7 +274,7 @@ These are not mechanical, and each changes what a macro sees.
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
 | 3 resolver | GREEN: expanded Nov14 gate completes on native source `3499484118`; all requested Rust/CLI/std/spec/generation/fmt/clippy checks pass |
-| 4 deletion | COMPILES on lane/fa-delete: production old tree/lowerer/old row helpers deleted; workspace all-targets check passes; private package and full deletion gate still pending |
+| 4 deletion | Runtime gate in progress on lane/fa-delete: workspace check, strict clippy, Rust 757, private oracle 23, all CLI binaries, examples and std O0 2170 pass; std O2, spec, generation and final formatting pending |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
@@ -870,3 +870,13 @@ syn3 tests pass. All39 CLI integration binaries and the CLI library also
 pass, including the five full engine-boundary answers. Private tests23/23
 and strict clippy are green. Release/examples/std/spec/generation/source
 format checks follow; no full-green deletion claim yet.
+
+
+Nov14 09:14 deletion runtime checkpoint: the release compiler passes all
+2170 std tests at O0, including unchanged schema_test.null_round. The old
+fa2 failure does not reproduce at O0 after deletion; O2 is still pending.
+Workspace/all-target check, strict clippy, private migration checks/tests,
+757 root Rust tests and all39 CLI integration binaries plus library are
+green after the documented test-import/path repairs. No diagnostic golden
+was edited and no assertion was weakened. Full step4 green waits on the
+remaining O2/spec/generation/final-format gate.
