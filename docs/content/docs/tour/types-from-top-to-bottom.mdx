@@ -3,11 +3,11 @@ title: Types from top to bottom
 description: Understand subtyping, unions, intersections, and why function parameters and service needs reverse the direction.
 ---
 
-The checker can reject a string where an integer is required, a call that one possible function cannot handle, or a call missing a service. These checks share a structure: values belong to types, and each use must accept every value that can reach it. Understanding that structure helps you choose annotations and read errors (§4.5, §4.8, §9.2).
+The checker can reject a string where an integer is required, a call that one possible function cannot handle, or a call missing a service. These checks share a structure: values belong to types, and each use must accept every value that can reach it. Understanding that structure helps you choose annotations and read errors.
 
 ## A type is a set of values
 
-A type describes a set of values. `Int` contains integers; the literal type `7` contains just the integer seven. One value can belong to several types, without changing or acquiring a wrapper (§4.1–§4.3):
+A type describes a set of values. `Int` contains integers; the literal type `7` contains just the integer seven. One value can belong to several types, without changing or acquiring a wrapper:
 
 ```i run package=tour title="src/main.i"
 (
@@ -28,23 +28,23 @@ main = () {
 (7, 7, 7)
 ```
 
-Read `A <: B` as “every value in `A` is also in `B`.” This relationship is **subtyping**: inclusion between sets of values. Here `7 <: Int <: Int | String`. Wherever an `Int` is accepted, seven is accepted. Wherever `Int | String` is accepted, any integer is accepted (§4.2, §4.5).
+Read `A <: B` as “every value in `A` is also in `B`.” This relationship is **subtyping**: inclusion between sets of values. Here `7 <: Int <: Int | String`. Wherever an `Int` is accepted, seven is accepted. Wherever `Int | String` is accepted, any integer is accepted.
 
-The direction matters. An arbitrary member of `Int | String` cannot be used as an integer: it might be a string. An annotation states a requirement; it does not convert a value to meet that requirement (§4.7–§4.8).
+The direction matters. An arbitrary member of `Int | String` cannot be used as an integer: it might be a string. An annotation states a requirement; it does not convert a value to meet that requirement.
 
 ## The top and the bottom
 
-Imagine ordering these sets by inclusion, with larger sets above smaller ones. The **top** would contain all values. The standard mentions an “unknown top type” in its inference rules, but i has no written universal top type. In particular, `_` is an inference hole, not a spelling for “all values” (§3, §4.7).
+Imagine ordering these sets by inclusion, with larger sets above smaller ones. The **top** would contain all values. The language has no written universal top type; an “unknown top type” can occur during inference. In particular, `_` is an inference hole, not a spelling for “all values”.
 
-The **bottom** does have a name: `Never`. It contains no values. Every value in `Never` belongs to every other type, because there are no values to contradict that statement. Thus `Never <: Int`, `Never <: String`, and `Never <: A` for any type `A` (§4.1–§4.2, §4.5 rule 1).
+The **bottom** does have a name: `Never`. It contains no values. Every value in `Never` belongs to every other type, because there are no values to contradict that statement. Thus `Never <: Int`, `Never <: String`, and `Never <: A` for any type `A`.
 
-`Never` is a type, not a special value returned for failure. It is different from `Nil` or empty data `()`, each of which has a value. A function returning `Never` cannot return normally with a value. Such a function can stop or run forever; the function itself is still a value (§4.1–§4.2).
+`Never` is a type, not a special value returned for failure. It is different from `Nil` or empty data `()`, each of which has a value. A function returning `Never` cannot return normally with a value. Such a function can stop or run forever; the function itself is still a value.
 
-These ends explain the ordering. Moving upward admits more values. Moving downward imposes more requirements, possibly leaving none (§4.5).
+These ends explain the ordering. Moving upward admits more values. Moving downward imposes more requirements, possibly leaving none.
 
 ## Union means either; intersection means both
 
-`A | B` is a **union**. It includes every value from `A` and every value from `B`. It is the smallest type above both in the subtype ordering, called their **join** (§4.4–§4.5).
+`A | B` is a **union**. It includes every value from `A` and every value from `B`. It is the smallest type above both in the subtype ordering, called their **join**.
 
 ```i run package=tour title="src/main.i"
 (
@@ -67,9 +67,9 @@ main = () {
 "seven"
 ```
 
-For these two different kinds of value, the union means exactly “an integer or a string.” There is a qualification in i: unions merge forms of the same type constructor. For example, `List(Int) | List(String)` becomes `List(Int | String)`, which also admits a mixed list. A join contains either side, but can contain more than their exact set union. Distinct labelled constructors preserve separate alternatives (§4.1, §4.3–§4.4).
+For these two different kinds of value, the union means exactly “an integer or a string.” There is a qualification in i: unions merge forms of the same type constructor. For example, `List(Int) | List(String)` becomes `List(Int | String)`, which also admits a mixed list. A join contains either side, but can contain more than their exact set union. Distinct labelled constructors preserve separate alternatives.
 
-`A & B` is an **intersection**: its values must belong to both types at once. It is the largest type below both, called their **meet** (§4.4–§4.5).
+`A & B` is an **intersection**: its values must belong to both types at once. It is the largest type below both, called their **meet**.
 
 ```i run package=tour title="src/main.i"
 (
@@ -87,11 +87,11 @@ main = () {
 2
 ```
 
-Only `2` is in both sets. By contrast, `Int & String` is `Never`: no value is both an integer and a string. An intersection does not combine two values into a pair. It describes one value meeting both descriptions (§4.1, §4.4).
+Only `2` is in both sets. By contrast, `Int & String` is `Never`: no value is both an integer and a string. An intersection does not combine two values into a pair. It describes one value meeting both descriptions.
 
 ## Function parameters go the other way
 
-A function type is a set of function values. To belong to `(Int) -> String`, a function must accept integers and return strings. A function accepting more kinds of argument can meet that requirement too (§4.5 rule 4, §4.6).
+A function type is a set of function values. To belong to `(Int) -> String`, a function must accept integers and return strings. A function accepting more kinds of argument can meet that requirement too.
 
 ```i run package=tour title="src/main.i"
 (
@@ -119,11 +119,11 @@ main = () {
 "eight"
 ```
 
-`render` can do both jobs, so it belongs to both function types: their intersection. There is one function here, with both abilities. A caller requiring only integer handling can safely receive it; the caller will supply integers (§4.4–§4.6).
+`render` can do both jobs, so it belongs to both function types: their intersection. There is one function here, with both abilities. A caller requiring only integer handling can safely receive it; the caller will supply integers.
 
-This reversal is **contravariance**. Although `Int <: Int | String`, the function accepting `Int | String` is a subtype of the function accepting only `Int`, when results and needs are the same. Broader accepted inputs mean a stronger function. Results go in the usual direction: returning a narrower type still meets a promise to return a broader one (§4.5 rule 4).
+This reversal is **contravariance**. Although `Int <: Int | String`, the function accepting `Int | String` is a subtype of the function accepting only `Int`, when results and needs are the same. Broader accepted inputs mean a stronger function. Results go in the usual direction: returning a narrower type still meets a promise to return a broader one.
 
-Now choose one of two functions. In another language you might write `if c { f } else { g }`. In i, match `True` and `False`. The chosen function belongs to the union of the possible function types; it has to be safe to call whichever function was chosen (§4.4, §6.12):
+Now choose one of two functions. In another language you might write `if c { f } else { g }`. In i, match `True` and `False`. The chosen function belongs to the union of the possible function types; it has to be safe to call whichever function was chosen:
 
 ```i run package=tour title="src/main.i"
 (
@@ -147,7 +147,7 @@ f accepted
 g accepted
 ```
 
-Both accept strings, so either choice accepts `"shared"`. Only `f` accepts integers. Choosing a function does not give the chosen value the abilities of the other one. The safe argument type is the intersection of their accepted inputs, here `String` (§4.4–§4.5):
+Both accept strings, so either choice accepts `"shared"`. Only `f` accepts integers. Choosing a function does not give the chosen value the abilities of the other one. The safe argument type is the intersection of their accepted inputs, here `String`:
 
 ```i error E0501 package=tour title="src/main.i"
 f = (x : { Int | String }) -> String { "f accepted" }
@@ -160,11 +160,11 @@ main = () {
 }
 ```
 
-The checker reports **E0501**: “`7` is not a subtype of `String`.” Seven does not satisfy the shared input requirement. The same rule makes a union of an integer-only function and a string-only function uncallable: their inputs have no common value (§4.4, §4.8 rule 5).
+The checker reports **E0501**: “`7` is not a subtype of `String`.” Seven does not satisfy the shared input requirement. The same rule makes a union of an integer-only function and a string-only function uncallable: their inputs have no common value.
 
 ## A need requires all its services
 
-The part after `<-` describes services taken from the caller. A need such as `(Clock, Offset)` requires both services. It is an intersection of requirements, not a choice between them (§4.6, §9.2).
+The part after `<-` describes services taken from the caller. A need such as `(Clock, Offset)` requires both services. It is an intersection of requirements, not a choice between them.
 
 ```i run package=tour title="src/main.i"
 (
@@ -189,23 +189,21 @@ main = () {
 42
 ```
 
-These are two separate service values, keyed by their labelled type constructors. The need does not ask for one ordinary value belonging to both `Clock` and `Offset`. It asks for an environment satisfying both requirements. Needs merge by intersection; their order does not matter (§9.2).
+These are two separate service values, keyed by their labelled type constructors. The need does not ask for one ordinary value belonging to both `Clock` and `Offset`. It asks for an environment satisfying both requirements. Needs merge by intersection; their order does not matter.
 
-The comparison reverses because services are inputs to a call. A function needing only `Clock` can replace one allowed to need `Clock` and `Offset`: its caller can supply everything it requires. The reverse replacement is unsafe, since a caller supplying only `Clock` has no obligation to supply `Offset` (§4.5 rule 4).
+The comparison reverses because services are inputs to a call. A function needing only `Clock` can replace one allowed to need `Clock` and `Offset`: its caller can supply everything it requires. The reverse replacement is unsafe, since a caller supplying only `Clock` has no obligation to supply `Offset`.
 
-Within a service entry, the provider's value must be a subtype of the required service type. So replacing a function is safe when every provider allowed by the promised need also satisfies the replacement's need. This is why the standard compares needs in the opposite direction from returned values (§4.5 rule 4, §9.2).
+Within a service entry, the provider's value must be a subtype of the required service type. So replacing a function is safe when every provider allowed by the promised need also satisfies the replacement's need. A need describes what callers must supply, so its comparison runs in the opposite direction from returned values.
 
 ## A chain accepts a union and has both abilities
 
-The argument to the chain below can be an `Int` **or** a `String`: its accepted inputs form the union `Int | String`. A **domain** is the set of arguments a function accepts, so the chain's domain is the union of its branches' domains (§6.12).
+The argument to the chain below can be an `Int` **or** a `String`: its accepted inputs form the union `Int | String`. A **domain** is the set of arguments a function accepts, so the chain's domain is the union of its branches' domains.
 
-To accept either kind of argument, the chain must handle integers **and** strings. It belongs to both function types at once: their intersection, written with `&`. Parameter contravariance connects these descriptions: with the same result and need, a union of parameter types corresponds to an intersection of function types (§4.4, §4.5 rule 4).
+To accept either kind of argument, the chain must handle integers **and** strings. It belongs to both function types at once: their intersection, written with `&`. Parameter contravariance connects these descriptions: with the same result and need, a union of parameter types corresponds to an intersection of function types.
 
 The language is changing the spelling of a chain from `|` to `&` so that its value is written in the same shape as its intersection type; until that lands, the examples on this page use the current `|`.
 
-Compiler support for displaying and accepting a chain's intersection type is also pending. The current standard's §6.12 describes chain typing through combined parameters and results; the intersection description here explains the agreed change, rather than a compiler type display.
-
-This program shows the same chain accepting either kind of argument directly and meeting each single function requirement:
+Compiler support for displaying and accepting a chain's intersection type is also pending. You can already pass the same chain to functions requiring either one of its abilities, as the program below shows:
 
 ```i run package=tour title="src/main.i"
 (
@@ -238,6 +236,6 @@ seven
 | Simultaneous abilities | `show` meets both `(Int) -> String` and `(String) -> String`: intersection membership. |
 | Execution | Each call runs one matching branch and prints its result. |
 
-The two consumers accept the same chain today. This demonstrates each ability separately without annotating the chain with an intersection. At run time, a chain tries matching branches in order; groups with several branches must cover their accepted inputs, and guards do not establish coverage (§6.12, §7.4).
+The two consumers accept the same chain today. This demonstrates each ability separately without annotating the chain with an intersection. At run time, a chain tries matching branches in order; groups with several branches must cover their accepted inputs, and guards do not establish coverage.
 
 Continue with [services and errors](/docs/tour/services-and-errors) to use needs in larger programs.
