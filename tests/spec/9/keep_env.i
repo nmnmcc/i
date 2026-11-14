@@ -9,7 +9,8 @@
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Hop, Never))
+// Decision 2: the returned kept callback retains its genuine Fail(Never) key.
+Paused = (Continuation(Nil, Hop, Fail(Never)))
 Done = (String)
 Hop = Paused | Done
 name = () <- (value : Name) { value.text }

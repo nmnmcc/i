@@ -2727,20 +2727,9 @@
   },
   "docs/spec.md:1d31fa1e3d80b6c5": {
     "track": "SYN3",
-    "reason": "Mixed data awaits stage 6; providing a value not written as data and spreading a whole environment await stage E6. These examples now reach the corresponding lowering requirements.",
+    "reason": "Mixed positional/labelled data still awaits stage 6; E6 environment capture and provide forms have landed.",
     "diagnostics": [
-      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
-      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-      "E0101: providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet"
-    ]
-  },
-  "docs/spec.md:57e42e29c5dea7ec": {
-    "track": "SYN3",
-    "reason": "Capturing a whole environment and providing it as one value await stage E6. The syntax-three parser now reaches those lowering requirements.",
-    "diagnostics": [
-      "E0101: `..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet",
-      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet"
+      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)"
     ]
   },
   "editors/vscode/test/sample.i:35e4233e887c3d88": {
@@ -2852,12 +2841,6 @@
   "crates/ilang-check/src/resolve/differential.rs:7bf4286e23e784b2": {
     "not_source": "Rust resolver-differential diagnostic format string, not i source"
   },
-  "crates/ilang-check/src/resolve/differential.rs:17f920b5612f0655": {
-    "diagnostics": [
-      "E0101: a need has one `Fail` entry: write `Fail(A | B)`"
-    ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
-  },
   "crates/ilang-check/src/resolve/differential.rs:c7d1290a9ba8bc14": {
     "diagnostics": [
       "E0101: a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name"
@@ -2882,12 +2865,9 @@
   "crates/ilang-check/src/resolve/differential.rs:ff4a2bc9c99582dc": {
     "diagnostics": [
       "E0101: provided services have no labels: each is keyed by its own type",
-      "E0101: a provided service has no label: it is keyed by its type (\u00a72.10.2)",
-      "E0101: providing a value that is not written as data `(s1, s2)` needs stage E6 of syntax three, which this compiler does not have yet",
-      "E0101: providing a whole environment `..env` needs stage E6 of syntax three, which this compiler does not have yet",
-      "E0101: `..name: N` in a service pattern needs stage E6 of syntax three, which this compiler does not have yet"
+      "E0101: a provided service has no label: it is keyed by its type (\u00a72.10.2)"
     ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+    "reason": "Provided labels remain invalid (\u00a72.10.2); E6 whole-environment capture, spread and provide forms now parse."
   },
   "crates/ilang-check/src/resolve/differential.rs:c67eeff3531f0976": {
     "diagnostics": [
@@ -2964,5 +2944,23 @@
     "diagnostics": [
       "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)"
     ]
+  },
+  "crates/ilang-check/tests/generic_services.rs:f1ca0fc31fd5ee01": {
+    "not_source": "Replacement constructor prefix adding a required error value field; not a complete declaration."
+  },
+  "crates/ilang-check/tests/generic_services.rs:f9227ed0d1f1de21": {
+    "not_source": "Search fragment for replacing a constructor prefix in a complete regression source."
+  },
+  "crates/ilang-check/tests/rest_services.rs:79a56cb7c10b3ff7": {
+    "not_source": "Rust format template; forwarding supplies complete declarations and doubled braces belong to Rust formatting."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:09de51485266a15b": {
+    "not_source": "Search fragment for replacing one function head in a complete regression source."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:6ef77ad854a3321f": {
+    "not_source": "Prefix used to select an actual shipped declaration; no right-hand side is present in this search literal."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:be6a0ac8f8bb9ed4": {
+    "not_source": "Rust format template completed with the actual shipped Stream, Step and Sink declarations before checking."
   }
 }

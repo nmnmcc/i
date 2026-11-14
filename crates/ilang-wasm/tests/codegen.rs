@@ -225,7 +225,7 @@ fn externals_are_imports() {
         let json: serde_json::Value = serde_json::from_str(&abi.unwrap()).unwrap();
         assert_eq!(
             json["externals"],
-            serde_json::json!({ "app:math/v1": { "sqrt": { "params": ["float"], "result": "float" } } })
+            serde_json::json!({ "app:math/v1": { "sqrt": { "params": ["float"], "result": "float", "errors": [] } } })
         );
     }
 }

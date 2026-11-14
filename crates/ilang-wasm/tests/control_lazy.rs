@@ -295,7 +295,10 @@ fn record_kinds() {
     assert!(func(&text, "$boundary_core").contains("(ref.func $boundary_reenter)"));
     assert!(func(&text, "$cancel_core").contains("(ref.func $cancel_reenter)"));
     let tramp = func(&text, "$tramp_run");
-    assert!(tramp.contains("(i32.const 0x1C)") && tramp.contains("(i32.const 0x0C)"));
+    // E3 removes the special catch frame (kind 4); only ensure and the
+    // delimiter (kinds 2/3) receive unwind. Fail uses ordinary boundary data.
+    assert!(tramp.contains("(i32.const 0x0C)"));
+    assert!(!tramp.contains("(i32.const 0x1C)"));
 }
 
 #[test]

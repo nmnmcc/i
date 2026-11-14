@@ -1114,8 +1114,10 @@ mod tests {
     fn rows_query(signature: Ty) -> TypedMacroQuery {
         // Fail is ordinary labelled prelude data after E3, including in
         // frozen typed-macro observations (syntax-three §2.10.6).
-        let mut program = Program::default();
-        program.prelude = Some(ModuleId(0));
+        let mut program = Program {
+            prelude: Some(ModuleId(0)),
+            ..Program::default()
+        };
         program.modules.push(Module {
             path: "i/prelude".into(),
             package: 0,

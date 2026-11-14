@@ -55,3 +55,25 @@ the retained assertion failed as expected before the repair. Temporary trace
 code is removed. `cargo test -p ilang-check --test row_schemes --locked --
 handler_` now passes all 8 selected tests (38.46s), including the original exact
 assertion, open covariant upper bound, and new incompatible-value control.
+
+The final gate includes **all** value_types tests, including the reverse-order
+and recovery property: this lane changes types and the latest brief requests
+the full gate steps. That binary uses CPU affinity for two available CPUs, so
+its own available_parallelism worker pool cannot multiply the six gate workers
+by sixteen. Earlier preparation runs kept the older explicit skip; the final
+run will supersede that limitation without adding an ignore or changing a test.
+
+The complete Rust gate finished **118 binaries: 114 passed, 4 failed**.
+Value-types passes all 31 tests, including the full reverse-order spec and
+standard-library checks (2,081.32s, two CPUs). Whole spec passes 533/535 at both
+levels with 29 existing pending cases: typed_final_fresh_scope reproduces D16,
+and keep_env needs its actual Fail(Never) continuation annotation. The other
+three failed binaries are the removed frame-kind-4 mask, the historical macro
+oracle's deleted synthetic N%E carrier, and raw external metadata's newly
+explicit empty errors list. Their exact assertions are retained and migrated
+with the quoted E3/ABI paragraphs. These prepared fixes still need their reruns.
+All four requested crates' doctests pass. examples/macro-tests and bench pass at
+both levels. Short generation passes; its 8-seed counts and full report are in
+`target/e4-gate-generation.log`. JS is Node122/123; browsers were not reached
+because the Node law failed. Clippy's one fixture-initializer warning and the
+obsolete E3/E6 snippet registrations are patched for rerun.

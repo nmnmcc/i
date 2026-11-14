@@ -1433,7 +1433,7 @@ A structured task cancel resumes its scheduling continuation with a cancel answe
 
 **Keeping services.** In a service pattern, `..env : N` binds the row value defined by §6.8. A value of a row type may be bound, captured and provided after `<-`, alone or as a spread in provided data; it may not be spread into ordinary data, compared, printed or matched. `keep` captures exactly the services in `f`'s inferred residual need, after removing `Fail`. It does not capture other services merely because they are available. Wherever the kept function is called, it calls `f` with those captured services and the caller's `Fail`. This is also the capture rule for `task.keep` and `task.go`, with the scheduler substitutions of §9.9:
 
-```i future-SYN3
+```i
 keep = <S, A, E, N>(f : (S) <- (..N, Fail(E)) -> A) <- (..env : N) -> (S) <- (
 	Fail(E),
 ) -> A { (x) { f(x) <- env } }

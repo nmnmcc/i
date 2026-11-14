@@ -188,3 +188,25 @@ on the same instance at O0/O2. The generation script builds its artifacts;
 no binary or bindings file is edited by hand. Native O0/O2 execution and the
 three checker-project tests pass. Node/browser execution and generated
 artifacts are pending at this source commit; this is not a landable claim.
+
+## 2026-11-14 nested-run re-entry follow-up
+
+The current Node gate passes 122/123 tests: fetch streaming, compiled hypot,
+and synchronous external Fail replies pass. The remaining law is
+`9.9/typed_final_fresh_scope`, which traps in O0's `$s1` (function 2194), the
+segment of run that matches its internal `Result(Result(A, Never), ScheduleError)`.
+The WAT reaches the otherwise-impossible unmatched branch. The run row
+snapshot keeps the Fail slot (1) and excludes only routing slots 2–6, but its
+new scheduled callback tail-calls `body() <- env`; no frame retains that
+provide across suspension.
+
+This is the documented D16 tail-environment gap. Runtime design §6.3 requires:
+“Use a non-tail call after those environment statements, through a surviving
+identity frame when necessary”, explicitly including “nested run wrappers”.
+Spec §9.4 rule 3: “The paused part keeps the services provided inside it”.
+The patch uses `retain(body() <- env)`, retaining the actual caller row while
+leaving the Scheduler-free public contract intact. A new §9.9 fixture reads a
+provided Sample value before and after three yields, then asserts the exact
+raised error through fail.catch. Every existing cleanup/cancellation/output
+assertion remains. This patch is awaiting its native and Node O0/O2 reruns;
+no final is installed or run on a stop.

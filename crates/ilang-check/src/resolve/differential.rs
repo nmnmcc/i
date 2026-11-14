@@ -513,9 +513,8 @@ fn resolve3_differential() {
 /// One module each; a module with a syntax error is still compared, on the
 /// part of the tree that was read.
 const EXTRA: &[&str] = &[
-    // Written branch result unions and Fail service patterns retain the
-    // transition's return and error channels, including missing results.
-    // old-syntax-check: E0101
+    // Written branch result unions and ordinary Fail service patterns use
+    // the single need, including several forms of the same Fail key (E3).
     "f = (x: Int) -> Int { x } | (x: Float) -> Float { x }\ng = (x: Int) -> Int { x } | (x: Float) -> Float { x } | (x: String) { x }\nh = () <- (failure: Fail(Int)) { 1 }\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } | (x: Float) <- (failure: Fail(Int)) -> Float { x }\n",
     // A finite callback need captured by a local annotation, then handled.
     "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d: Dependency) { Nil }\nuse = <N>() <- (s: S(N)) { S(f) = s  f() }\napply = <N>() { local: () <- N -> Nil = () { use() }  local() }\nmain = () { apply() <- (S(() { read() })) }\ntyped = () { provided: S(Dependency) = S(() { read() })  apply() <- (provided) }\n",
@@ -536,8 +535,8 @@ const EXTRA: &[&str] = &[
     // Data, calls, strings, index.
     // old-syntax-check: E0110,E0101,E0101
     "f = (x) { \"a\\(x)b\\(x)\" }\ng = (x) { \"\\(x)\" }\nh = () { a = (1, 2)  a.0 }\nk = () { (a = 1, b = 2) }\nm = (r) { (..r, a = 1) }\nn = () { (a = 2, 1) }\np = (f) { f(1, ..f) }\nq = () { () }\nr = (x) { x |> Some }\ns = (x) { core.never(x) }\nt = core.never\n",
-    // Services and provides.
-    // old-syntax-check: E0101,E0101,E0101,E0101,E0101
+    // Services and provides; E6 forms parse, provided labels remain invalid.
+    // old-syntax-check: E0101,E0101
     "A = (n = Int)\nB = (m = Int)\nuse = () <- (a: A, b: B) -> Int { a.n + b.m }\none = () { use() <- (A(n = 1), B(m = 2)) }\ntwo = (a: A, b: B) { use() <- (a, b) }\nthree = () { { x = 1  use() + x } <- (A(n = 1)) }\nfour = () { x = use() <- (a = A(n = 1))  x }\nfive = (e) { use() <- e }\nsix = (e) { use() <- (..e) }\nseven = () <- (..env: N) { 1 }\neight = () { { use() <- (A(n = 1)) } <- (B(m = 2), B(m = 3)) }\nnine = () { y = { use() } <- ()  y }\n",
     // Row variables and function types.
     // old-syntax-check: E0101,E0110,E0101,E0107,E0101

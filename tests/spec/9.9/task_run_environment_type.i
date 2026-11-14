@@ -1,7 +1,7 @@
 // spec: 9.9
 // expect: pass
-// The caller's need is Assert + Runner, not Scheduler. The CLI regression
-// checks the printed type of this exact program.
+// The caller needs Assert, the genuine Fail(Never) key, and Runner.
+// run supplies Scheduler. The CLI regression pins this program's printed type.
 (
 	i/task
 	i/control

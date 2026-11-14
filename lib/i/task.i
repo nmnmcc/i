@@ -4093,7 +4093,11 @@ run = <A, N>(
 				request.Await,
 				request.Owner,
 				request.Root,
-			) -> A = () { body() <- env }
+			) -> A = () {
+				// §9.4 rule 3: retain this provide across every resume.
+				// runtime.md §6.3 requires the D16 non-tail-call wrapper.
+				retain(body() <- env)
+			}
 			result : Result(Result(A, Never), ScheduleError) = execute(
 				scheduled,
 				runner,
