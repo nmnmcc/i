@@ -1,6 +1,18 @@
 # Syntax three, stage 3: report
 
-Current integration status, 2026-11-14: **READY against fetched
+Package-interface follow-up, 2026-11-14: **expanded CLI verification in
+progress**. The earlier green CLI matrix covered `check`, `providers`,
+`commands`, `typed_macros`, `macro_run`, and the requested spec filters.
+`package_commands` was not in that matrix; its obsolete constructor-family
+assertion is a real coverage gap. The follow-up runs its complete binary,
+all other CLI integration binaries, and both CLI unit-test targets.
+The coordinator main snapshot `e44514d4` is also merged so its newly added
+`ispec` binary can run: 42 integration binaries are now accounted for.
+The five previously tested CLI binaries are rerun after this merge, and
+the requested spec chapter filters are rerun too.
+The unfiltered spec suite remains coordinator-owned.
+
+Earlier requested integration matrix, 2026-11-14: **READY against fetched
 `origin/main` at `cc26b8d9`**. Every requested fresh gate passes. The full
 `review-k4d` filter checks 365 projects with zero failures; all fourteen
 named-provider projects match the landed error multisets exactly. One
@@ -516,3 +528,35 @@ and the explained equality observation changed after those compiler gates.
 The requested recovery skip, four existing ignores, existing spec pending
 entries and inherited record-field solver limitation remain as documented.
 No required lane gate remains unfinished; main landing is coordinator-owned.
+
+## Package interface comparison after independent constructor types
+
+The coordinator's integration gate finds `publish_compares_the_interface`
+expecting a change to constructors of `Shape`. Syntax-three §2.8 and spec
+§4.3 make `Shape = Circle | Square | Dot` a transparent union alias, and
+`Dot = ()` a separate nominal type with its own constructor. Spec §2.4
+makes `Shape(..)` export that alias and each member with its constructor.
+The specified four interface items therefore are changed `type api.Shape`,
+changed `value api.add`, added `constructors api.Dot`, and added
+`type api.Dot`. The assertion now pins all six exact lines, including both
+before/after types. Spec §2.7 requires a newer version in one major to take
+the place of an older one; the function-arity and union-alias changes
+preserve the test's major-version rejection.
+
+Keep every existing major-version and tag assertion. The later hiding step
+compares with published v1.1.0, whose `Shape(..)` exported Circle and Square,
+so pin removal of those two constructors individually. Dot was never
+published, so it cannot be a removed constructor. This preserves the
+constructor-visibility intent under the new type definitions. No comparison
+implementation or language behavior changes. The controlling paragraphs
+are quoted in the commit message. The corrected snippet context and all
+fourteen provider records remain unchanged.
+
+The first whole-package run passes the new exact four-item assertion and
+26 other tests, then rejects the old hiding fixture before interface
+comparison: bare `Shape` leaves its three member types private (E0227).
+Spec §2.4 requires the types used by an exported alias to be exported too.
+The fixture now exports `Shape, Circle, Square, Dot`, each without `(..)`,
+so only the constructors are hidden and the removed-value/interface/tag
+checks remain meaningful. The resolver's E0227 is retained. A complete
+whole-package retry follows; no expectation is changed to accept E0227.

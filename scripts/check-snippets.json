@@ -2945,5 +2945,23 @@
       "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
     ],
     "reason": "A probe of the principality note: a written polymorphic parameter type is not supported yet, and the note records the diagnostic."
+  },
+  "crates/ilang-check/tests/diagnostic_traps.rs:4e85fa57c5a5a045": {
+    "reason": "Intentional §1.7 regression: a spaced lowercase call followed by a stray = remains E0101 and gains the one-binding explanation.",
+    "diagnostics": [
+      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line (§1.7)"
+    ]
+  },
+  "tests/spec/1.7/one_binding_function_error.i:b00b44846a80cdbf": {
+    "reason": "Intentional §1.7 regression: a spaced lowercase call followed by a stray = remains E0101 and gains the one-binding explanation.",
+    "diagnostics": [
+      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line (§1.7)"
+    ]
+  },
+  "crates/ilang-check/tests/diagnostic_traps.rs:24dcfaf171c4adcd": {
+    "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
+  },
+  "crates/ilang-check/tests/diagnostic_traps.rs:8e2eef0119586a1d": {
+    "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
   }
 }

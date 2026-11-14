@@ -130,6 +130,7 @@ pub mod code {
     pub const EQ_DISJOINT: &str = "W0503";
     pub const UNUSED_BINDING: &str = "W0504";
     pub const PATTERN_DISJOINT: &str = "W0505";
+    pub const ONE_LINE_BINDING: &str = "W0506";
 }
 
 /// A parsed module of the graph.
