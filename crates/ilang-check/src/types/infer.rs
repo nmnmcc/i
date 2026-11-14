@@ -2378,7 +2378,18 @@ impl<'a> Checker<'a> {
                     },
                     None => Knowledge::unknown(),
                 };
+                // A need variable can also name a function parameter's
+                // type (Decision 1 / EF09). Binding that same row value to
+                // another row-typed parameter is forwarding, not inspecting
+                // or spreading it as ordinary data (§9.4). Use the actual
+                // formal type; a structural hint is not evidence (F1).
+                let saved_row = self.row_value_allowed;
+                self.row_value_allowed = !ctor
+                    && matches!((&f, &to), (Ty::Fn(ft), Some(to))
+                        if ft.parts().and_then(|ps| ps.get(to[i]))
+                            .is_some_and(|p| self.s.mode(p) == Mode::Env));
                 let (t, k) = self.infer_k(a, &expected);
+                self.row_value_allowed = saved_row;
                 if let (Some(ps), false) = (&params, later) {
                     self.match_k(&ps[i], &k.hint, &mut sigma, 0);
                     if let Some(p) = fact_fn

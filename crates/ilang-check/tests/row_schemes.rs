@@ -1103,3 +1103,18 @@ fn shipped_stored_callback_types_keep_their_need_invariant() {
         );
     }
 }
+
+#[test]
+fn mixed_recursive_need_parameters_can_be_forwarded_as_values() {
+    // Decision 1/EF09: the same variable may occur in a need and an
+    // ordinary parameter. Keep every original accepted corpus variant.
+    for source in [
+        include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_0_0/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_0_17/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_1_0/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_1_17/src/main.i"),
+    ] {
+        let shown = types(source);
+        assert!(shown["app/main.bad"].contains("S("), "{shown:?}");
+    }
+}

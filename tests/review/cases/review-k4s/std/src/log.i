@@ -88,7 +88,7 @@ Sink(E, N) = (
 make = <E, N>(
 	accept: (Level) -> Bool,
 	send: (Entry) <- (Fail(E), ..N) -> Nil
-) -> Sink(E, N) { Sink(accept, send, (_: () <- N -> Nil) { Nil }) }
+) -> Sink(E, N) { Sink(accept, send, (_ : N) { Nil }) }
 
 silent = <N>() -> Sink(Never, N) {
 	make((_ : Level) { False }, (_ : Entry) { Nil })

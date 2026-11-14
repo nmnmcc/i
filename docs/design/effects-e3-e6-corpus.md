@@ -71,26 +71,28 @@ two spreads, with one key are a compile error.” This applies also when the
 key is not used by the body. Three explicit items of one key give two
 duplicate sites; a second duplicated key gives its own site.
 
-**R3 — Row/value separation.** Spec §4.7: “A type parameter used where a
-need is written (`<- N`, `<- (..N, …)`) is a **row variable**: it stands for a
-whole set of services. Any other use makes it an ordinary type variable.
-Using one name both ways is a compile error.” Spec §9.4: “A value of a row
-type may be bound, captured and provided after `<-`, alone or as a spread
-in provided data; it may not be spread into ordinary data, compared,
-printed or matched.” Returning an environment row as ordinary data is
-likewise outside the stated row-value operations.
+**R3 — Mixed variable use; captured-row operations.** Owner decision 1
+(EF01/EF09): “A need is a set of environments.” The exclusive classification
+in the old §4.7 sentence is dropped. One parameter may occur in a need and
+an ordinary type position. Binding a value to another parameter of that same
+row type is forwarding; the checker uses the actual formal type for that
+permission, never an F1 structural hint. The four `mixed_recursive` sources
+are acceptance regressions again, retaining their `S` needs. The written
+§9.4 operation restrictions remain: “A value of a row type may be bound,
+captured and provided after `<-`, alone or as a spread in provided data; it
+may not be spread into ordinary data, compared, printed or matched.” Existing
+negative tests for those operations remain. The full ordinary-environment
+model and Decision 8 migration scope have been queried separately; no new
+public environment type or syntax is invented by this repair.
 
-**R4 — Universal service forms.** Spec §9.2: “An entry that every value of
-its type constructor satisfies, as `Fail(Never)`, is removed.” Spec §4.7:
-“A type is made simpler before it is shown: equal parts are put together,
-and type variables that have no effect on the meaning are taken out. This
-never changes which programs are correct or what they do.” For an unused
-head `s: S(N)` where `S(N) = (() <- N -> Nil)`, the unconstrained one-sided
-row argument reaches the universal form of `S`; the callback is never
-called. Both `min_main` cases therefore simplify to `() -> Nil`. Calling
-the service, as in `min_main_6_0`, retains `S`; the regression checks this
-negative control. This is general universal-entry removal, not a special
-case granting an application service to the platform.
+**R4 — Universal removal withdrawn.** Owner decision 2 (EF03/T4): “Drop
+the Fail(Never) universal-entry removal.” This overrides the former §9.2
+removed-entry sentence. The section's safety promise still says: “Type
+checking makes certain that every service is there when a call takes it.
+Getting it never fails at run time.” Simplifying arguments cannot supply a
+missing constructor key. Both unused `min_main` cases therefore retain `S`
+and reject at an entry again. Explicit `Fail(Never)` and `Consumer(Never)`
+keys remain real needs, and the previous D9 display justification is withdrawn.
 
 **R5 — Removed channel obligations.** R1 removes the extra error-channel
 constraint, not an incompatible service constraint. Spec §9.2 still says:
@@ -101,9 +103,10 @@ provider retains E0515; the secondary cycle through the deleted carrier
 does not exist. The `z3`/`z5` concrete provider errors all remain; the
 additional summary derived from that carrier disappears. The earlier
 [E6 audit](e6-main-corpus-audit.md) describes their exact remaining sites.
-`b10` and `z3` explicitly write `Fail(Never)`: R1 makes it an ordinary
-service entry and R4 requires removal of its universal form, so it cannot
-create a second independent cycle or hidden obligation. `z5` writes only
+`b10` and `z3` explicitly write `Fail(Never)`: the key is now retained
+under the revised R4. Their former R4-dependent diagnostic-count judgment
+is withdrawn pending the fresh probe; an old error cannot disappear merely
+because its key used to be erased. `z5` writes only
 the callback's opaque `N`; its extra carrier was implicit in the old
 representation and is removed by R1. Its three concrete provider errors
 remain independently checked.
@@ -160,13 +163,13 @@ rule that a test pinning a removed feature keeps its original intent.
 | `review-k4d/fuzz/pl41` | E0501 ×3 + E0515 | same errors + E0225 ×3: three explicit `Cov`, two explicit `Svc` | a, R2 |
 | `review-k4d/fuzz/pl42` | E0501 ×3 | same errors + E0225 ×2: three explicit `Svc` | a, R2 |
 | `review-k4d/fuzz/pl43` | E0501 ×2 | same errors + E0225: two explicit `Cov` | a, R2 |
-| `review-k4s/min_main_3_0` | entry E0523 | `main : () -> Nil`, entry runs; unused universal service form removed | a, R4 |
-| `review-k4s/min_main_5_0` | entry E0523, W0504 | `main : () -> Nil`, entry runs; same W0504 remains | a, R4 |
-| `review-k4s/mixed_recursive_0_0` | accepted, W0504 | E0225: `N` is both a callback need and the ordinary parameter type | a, R3 |
-| `review-k4s/mixed_recursive_0_17` | accepted, W0504 | E0225: same mixed row/value parameter | a, R3 |
-| `review-k4s/mixed_recursive_1_0` | accepted, W0504 | E0225: same mixed row/value parameter | a, R3 |
-| `review-k4s/mixed_recursive_1_17` | accepted, W0504 | E0225: same mixed row/value parameter | a, R3 |
-| `review-k4s/std` | checker accepts; entry tests resource-censored | migrate the unused `Sink` marker from `(N) -> Nil` to `(() <- N -> Nil) -> Nil`, retaining its original invariant row parameter; write the message callback's `Fail(F)` explicitly; port grouped suite collection. In the stream tests, the error label `E` is no longer a second channel: add `Fail(E)` to the written `Stream`/`Step` need arguments. Preserve every test body, error assertion and saved bound. | c, R1/R3/R7 |
+| `review-k4s/min_main_3_0` | entry E0523 | retain the required `S` key; entry rejects again (fresh verification pending) | b, universal-erasure defect fixed; R4 / Decision 2 and §9.2 safety |
+| `review-k4s/min_main_5_0` | entry E0523, W0504 | retain `S`, E0523 and the original warning (fresh verification pending) | b, universal-erasure defect fixed; R4 / Decision 2 and §9.2 safety |
+| `review-k4s/mixed_recursive_0_0` | accepted, W0504 | forwarding a value to the same row-typed formal accepts again; retain `S` need (fresh verification pending) | b, overbroad mixed-use rejection repaired; R3 / Decision 1 and §9.4 bound values |
+| `review-k4s/mixed_recursive_0_17` | accepted, W0504 | forwarding a value to the same row-typed formal accepts again; retain `S` need (fresh verification pending) | b, overbroad mixed-use rejection repaired; R3 / Decision 1 and §9.4 bound values |
+| `review-k4s/mixed_recursive_1_0` | accepted, W0504 | forwarding a value to the same row-typed formal accepts again; retain `S` need (fresh verification pending) | b, overbroad mixed-use rejection repaired; R3 / Decision 1 and §9.4 bound values |
+| `review-k4s/mixed_recursive_1_17` | accepted, W0504 | forwarding a value to the same row-typed formal accepts again; retain `S` need (fresh verification pending) | b, overbroad mixed-use rejection repaired; R3 / Decision 1 and §9.4 bound values |
+| `review-k4s/std` | checker accepts; entry tests resource-censored | restore main’s stream signatures, stream test type annotations and ordinary negative `Sink` marker under Decision 1; preserve E covariance and N invariance, explicit message `Fail(F)`, and grouped suite collection. Every test body, error assertion and saved bound remains. | c, R1/R7; std-1 §3.1 and std-2 L5 variance contracts |
 | `review-std2/replacement_unused` | accepted, W0504 | E0225: two explicit `S` items remain invalid even when unused | a, R2 |
 
 ## Corpus runner repair
@@ -370,7 +373,7 @@ as completed display-only reruns.
 | D6 | 2 | The obsolete independent error parameter disappears from `Boundary(R, E, N)`, now `Boundary(R, N)` (and likewise Continuation). Syntax-three §2.10.7 explicitly gives these two- and three-parameter forms, and R1 puts any Fail entry in N. |
 | D7 | 5 | The single-row solver reports the incompatible leaf instead of the enclosing recovery summary: g_ann_Never/g_inf_Never show `_` against Never instead of `S(_)`; pl44 shows `_` against the required Int instead of `Cov(_)` against Never. Each E0501 remains at the same callback and annotation sites, with the same count; every separate provider error also remains. R1 changes the constraint graph, while spec §4.5 rule 4 still forbids the needed effect in a pure callback; §4.7 governs displayed incoming bounds. These are recovery projections of the same rejection, not newly accepted annotations. |
 | D8 | 5 | The task scope handle is shown as `task.Group(E)` instead of `task.Scope(E)`. Syntax-three §2.10.9 says the structured-concurrency handle is renamed `task.Group(E)` in stage E5, so Scope in a need always means the resource service; §7.2 row E5 and the spec-change table repeat the rename. Spec §9.9 uses Group(E); task.scope remains the same operation. Runtime output and error counts are unchanged. |
-| D9 | 3 | Universal service forms disappear under R4 (spec §9.2). The two 1,024-service libraries ignore every `s: S_i(A)`; their unconstrained covariant data arguments reach the universal form, so `f_i`, `u_i` and `wide` show pure `() -> Nil`. In std2/unsafe, `Consumer(A) = ((A) -> Nil)` makes Consumer(Never) universal by function-parameter contravariance (§4.5 rule 4); its row entry disappears, so the result `Sink(Never, Consumer(Never))` is shown as `Sink(Never, Never)`. This preserves the same accepted higher-order value. |
+| D9 (withdrawn) | 3 historical cases | Decision 2 drops universal-entry removal. Retain the 1,024-service keys and `Consumer(Never)` instead; simplifying an argument cannot provide a service (§9.2: “Getting it never fails at run time”). The old explanation is not approval to erase these keys; fresh records remain pending. |
 
 One line per reviewed case:
 
