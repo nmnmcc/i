@@ -1,5 +1,17 @@
 ---
 title: How to send changes
+description: Prepare a change against the standard and the repository checks.
 ---
 
-to be written
+This page explains how to prepare a compiler, library, or documentation change using the sources and checks in this repository. For a language change, start with the rule, make a case that exercises it, and then implement it.
+
+Write or update the relevant text in `docs/spec.md`, add a case under the matching section of `tests/spec`, and implement the behavior. Examine the effect on `tests/review`: its recorded observations are not the standard, and an expectation should change only with the spec paragraph that requires it. Keep requirements and known failures distinct from observed results. The [testing guide](https://github.com/nmnmcc/i/blob/main/docs/testing.md) describes corpus regeneration and review.
+
+For Rust formatting and linting, the CI step **Verify rust-lint** runs `devenv shell -- ./scripts/dev-verify rust-lint`. The script runs `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --locked -- -D warnings`, followed by snippet checks. The i verification part checks formatting with its release binary using `i fmt --check lib std bench examples` and runs the i test layers. Choose the checks affected by the change and use the wider verification described on the [building and testing page](/docs/contributing/building-and-testing).
+
+Recent commit subjects use plain English sentences describing the change. The repository supplies its development and testing documents and CI workflow; they are the process references for this page.
+
+## See also
+
+- [The standard: introduction](/docs/standard/generated/introduction)
+- [Roadmap](/docs/contributing/roadmap)
