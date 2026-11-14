@@ -1,4 +1,10 @@
-# E4 integration with main stage twelve
+# E4 integration with main
+
+Current base: origin/main `e44514d46690ea9e25486c95a34d616fcf86f6a8`.
+Current merge: `636380d50352c574dedcba58c157056a3c624562`.
+All requested affected gates are green on this base.
+The final section records its affected-gate validation. The stage-twelve
+integration below is retained as history.
 
 Base: main `180e00cf70398034e50f253c0b209298758bb4d5`.
 Merge: `72892af423bcac0bcb242ce2d23dd25b8a6f6325`.
@@ -307,11 +313,51 @@ rules above. ABI §B.2 says: “An inline `Int` has no buffer and its second
 `i32` is never checked as an address or freed.” Generated fixtures must be
 ABI 5; the hand-written legacy fixtures remain ABI 3, and hosts read 3–5.
 
-Verification on this new base: workspace all-targets check and release
-build pass. The fixture script regenerates and validates all five ABI-5
-modules and sidecars; legacy hand-written fixtures remain ABI 3. Their five
-binding contracts equal main after digest normalization. The requested
-checker/Wasm/host tests, spec 9/9.7/9.9/11 at both opts, std O0, Node tests,
-formatting, strict clippy, and the directly invoked snippet gate follow. This section
-is updated with results before handover; previous-base O2/browser/generation
-results above are historical and are not claimed as reruns of this merge.
+Verification on this new base: workspace all-targets check, release build,
+and the complete checker/Wasm/host tests pass. The checker run skips only
+`spec_corpus_reverse_order_and_recovery`, as previously directed; four existing
+ignored checker tests remain ignored. The fixture script regenerates and
+validates all five ABI-5 modules and sidecars; legacy hand-written fixtures
+remain ABI 3. Their five binding contracts equal main after digest
+normalization. Spec filters `9/`, `9.7/`, `9.9/`, and `11/` pass respectively
+149, 17, 78, and 48 cases, each at both O0 and O2.
+
+Std O0 passes all 2,171 tests. All 121 Node tests pass, including fetch
+streaming, compiled host calls, and the new ABI-5 Int cases. The i formatter,
+Rust formatter, and strict workspace all-targets clippy pass. The directly
+invoked snippet gate passes 4,734 extracted literals/blocks with exact expected
+diagnostics, 34 repository `.is` files, and 89 CLI macro source fragments;
+four future-track entries remain. Its eight regression tests also pass.
+The parser build waited about 35 minutes in the shared wrapper after the
+preceding batch released its slot; no resource limit was bypassed.
+Previous-base O2/browser/generation results above are historical and are not
+claimed as reruns of this merge. No requested affected gate remains
+unverified; the explicitly skipped reverse-order corpus test and four existing
+ignored checker tests remain outside this validation.
+
+The affected-gate commands are below. Every cargo command and std test runs
+through `/home/agent/Programming/i/.rd/cache/heavy`, with
+`direnv exec /home/agent/Programming/i`, `CARGO_PROFILE_DEV_DEBUG=0`, and
+`CARGO_INCREMENTAL=0`. The script's fixture cargo invocation inherits the
+same held slot. Heavy commands run sequentially; the snippet script runs
+directly after that batch releases its slot because it wraps its own parser
+build.
+
+```sh
+cargo check --workspace --all-targets --locked
+cargo build --release -p ilang-cli --locked
+I="$PWD/target/release/i" bash scripts/build-abi-fixture.sh
+cargo test --release --no-fail-fast -p ilang-check -p ilang-wasm -p ilang-host --locked -- --test-threads 2 --skip spec_corpus_reverse_order_and_recovery
+for chapter in 9 9.7 9.9 11; do
+  taskset -c 0,1 cargo test --release -p ilang-cli --test spec --locked -- "$chapter/"
+done
+./target/release/i test --project std --opt 0
+cargo build -p ilang-cli --locked
+npm test
+./target/release/i fmt --check bench std lib examples
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+scripts/check-snippets
+python3 -I scripts/check-snippets-test
+git diff --check
+```
