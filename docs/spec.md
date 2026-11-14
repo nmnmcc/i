@@ -1284,6 +1284,8 @@ The module `i/resource` puts final functions in place. `Scope` is a service of `
 | `resource.acquire` | `<A, N>(() <- N -> A, (A) -> Nil) <- (..N, Scope) -> A` | Opens a resource and attaches its release to the current `Scope` |
 | `resource.scoped` | `<A, N>(() <- (..N, Scope) -> A) <- N -> A` | Runs the body with a new `Scope`, and runs the attached releases in reverse order when the body ends, also by an error, an escape or a cancel |
 
+A final registration is removed before its final function starts. If that invocation suspends and its continuation is cancelled, cancellation discards the rest of the invocation and runs only other final functions still in place. Structured task cancellation instead shields an already running final function until it finishes (§9.9).
+
 A release that needs services is made with `keep` (§9.4). A final function may not raise errors. When the program stops (§11.7), final functions are not run.
 
 A structured task group waits for cancelled children and their final functions before it returns (§9.9). Those final functions may suspend and resume and use services, but may not raise errors. An unstarted child has no installed final functions. A host failure or a destroyed instance cannot run i final functions; the host instead releases its own work and resources (Appendix B).
