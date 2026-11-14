@@ -73,8 +73,10 @@ Under these conditions the narrower fix is sound for F1: selection cannot
 remove a feasible branch using a hidden-input guess, and a wrong shape
 hint used for an access produces an ordinary type error through its bound.
 Simply changing `groups.rs`, or widening scalar literals, is insufficient.
-Written type parameters must separately become rigid (F2/T8); otherwise
-a written polymorphic result itself lies about the function's behavior.
+A separate F2 hole remains when a relaxable written polymorphic result is
+used as a fact. The owner's reviewer leaves expression type parameters
+relaxable under §4.7 today; this F1-only change does not claim to fix F2.
+A narrower factual treatment of those written results is evaluated separately.
 
 This preserves the useful field inference example:
 
