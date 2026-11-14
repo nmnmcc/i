@@ -77,7 +77,7 @@ build/guide_host.bindings.json
 build/guide_host.wasm
 ```
 
-Keep the binding-plan sidecar for hosts authorizing its declarations. The host ABI and WASI command use different entry protocols; the repository's Node SDK loads host modules in the [interop guide](/docs/guides/js-and-wasi-interop). `--out` preserves both artifacts; otherwise Wasm targets overwrite `build/<package-name>.wasm`.
+Keep the binding-plan sidecar for hosts authorizing its declarations. The host ABI and WASI command use different entry protocols; the Node SDK loads host modules in the [interop guide](/docs/guides/js-and-wasi-interop). `--out` preserves both artifacts; otherwise Wasm targets overwrite `build/<package-name>.wasm`.
 
 ## Local dependencies
 
@@ -131,4 +131,4 @@ identical Wasm
 
 Identical local builds at one optimization level do not establish identical bytes across compiler versions, platforms, or levels. Macros have controlled compile-time services, fresh state per run, and portable `hash`; reuse requires identical inputs. Verified dependencies support repeatability without guaranteeing identical native executables across environments; release timestamps and archive normalization have separate rules in `docs/release.md`.
 
-[Lock records](/docs/standard/generated/chapter-2#section-2-8) · [Macro inputs](/docs/standard/generated/chapter-14#section-14-9) · [Repository builds](/docs/contributing/building-and-testing)
+[Lock records](/docs/standard/generated/chapter-2#section-2-8) · [Macro inputs](/docs/standard/generated/chapter-14#section-14-9) · [Compiler development](/docs/contributing/building-and-testing)

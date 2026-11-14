@@ -3,7 +3,7 @@ title: Host and WASI interop
 description: Run a WASI command and call exports through the host SDK.
 ---
 
-Run a WASI command and call an exported function through the repository's host SDK.
+Run a WASI command and call an exported function through the host SDK.
 
 ```toml file=i.toml title="i.toml"
 name = "guide_interop"
@@ -30,7 +30,7 @@ main = () { stdio.print("hello from Wasm") }
 hello from Wasm
 ```
 
-Create `guide-interop/` in the checkout; run commands there. The Wasm engine needs garbage collection, typed function references, tail calls, and exception handling with `exnref`.
+Create `guide-interop/` in the i source folder; run commands there. The Wasm engine needs garbage collection, typed function references, tail calls, and exception handling with `exnref`.
 
 ## WASI command
 
@@ -58,7 +58,7 @@ node --no-warnings ../bindings/javascript/wasi-run.mjs build/guide_interop.wasm
 hello from Wasm
 ```
 
-The Node runner uses `node:wasi`; `--no-warnings` suppresses its experimental-API notice. `_start` initializes the module and runs the entry; normal return exits with status 0. `scripts/wasi-smoke` checks this path and stop status 1 at both optimization levels in CI.
+The Node runner uses `node:wasi`; `--no-warnings` suppresses its experimental-API notice. `_start` initializes the module and runs the entry; normal return exits with status 0, and a stop exits with status 1.
 
 For files, pass the runner a JSON options argument with `preopens`, `args`, and `env`; this example needs no filesystem grant. WASI supplies streams, clock, entropy, arguments, environment, and filesystem adapters; unmet networking, TLS, process-spawning, or working-directory needs are rejected ([service and path rules](/docs/standard/generated/chapter-appendix-b#section-b-7)).
 
@@ -96,8 +96,8 @@ hello from Wasm
 
 `instantiate` reads ABI metadata, supplies runtime imports, links selected services, and initializes once. `standardServices: true` supplies Node services, including output; `call` selects a configured export by full name. Integers cross this boundary as `bigint`; await `run()` so asynchronous entry work finishes before calling an export.
 
-The SDK handles value encoding, buffers, and the asynchronous entry protocol; `bindings/javascript/test/host.test.mjs` checks host operations and `scripts/bench-abi.mjs` uses it for exports. CI runs host tests in `js` and WASI smoke checks in `i`.
+The SDK handles value encoding, buffers, and the asynchronous entry protocol.
 
-**Current limits:** `js` and `nodejs` builds provide Wasm and a binding plan, without generated `.mjs`/`.d.ts` loaders or an `ilang.js` target section; built-in `@js` is refused, so use the SDK ([DOC3](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+Use the host SDK: `js` and `nodejs` builds produce only Wasm and `.bindings.json`, without generated `.mjs`/`.d.ts` loaders or an `ilang.js` section, and `@js` is not available yet.
 
-[Host ABI](/docs/standard/generated/chapter-appendix-b) · [Repository checks](/docs/contributing/building-and-testing)
+[Host ABI](/docs/standard/generated/chapter-appendix-b) · [Compiler development](/docs/contributing/building-and-testing)

@@ -57,6 +57,7 @@ main = () {
 		(True) {
 			Ok(usage) = cli.help(options.parser(), "greet")
 			stdio.write(<<usage:utf8>>)
+			stdio.flush()
 		}
 		| (False) {
 			cli.run(options.parser(), "greet", (opts) {
@@ -166,7 +167,7 @@ Usage: greet
   --count, -c VALUE	Number of greetings
 ```
 
-The parser reserves no help option: `main` handles exactly `["--help"]`. `cli.help` ends its string with a newline; `stdio.write` adds none. Help and successful actions exit with status 0.
+The parser reserves no help option: `main` handles exactly `["--help"]`. `cli.help` ends its string with a newline; `stdio.write` adds none and needs flushing before exit. Help and successful actions exit with status 0.
 
 ## Parse failure
 
@@ -184,6 +185,6 @@ error: MissingArgument("--count")
 guide_cli/main:17:1
 ```
 
-Exit status is 1. `cli.run` writes the error and usage to standard error, then raises; the entry handler reports the uncaught error. **Current limits:** printed labelled errors omit field labels ([DOC2](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md)).
+Exit status is 1. `cli.run` writes the error and usage to standard error, then raises; the entry handler reports the uncaught error. Printed labelled errors omit their field labels.
 
 [Files](/docs/guides/files)
