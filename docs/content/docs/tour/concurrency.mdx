@@ -3,7 +3,7 @@ title: Concurrency
 description: Start structured tasks, join their results, and handle child failure and cancellation.
 ---
 
-Concurrency in i is structured: a task lives inside the block that starts it. This page shows starting children, joining results, and handling child failure after cleanup. The examples print only after the relevant work finishes, so their output does not depend on which task runs first.
+A **task** is a computation scheduled alongside other computations. Concurrency in i is structured: a **scope** is a block that owns child tasks and waits for them before returning. This page shows starting children, joining results, and handling child failure after cleanup. Results are printed after joining or leaving a scope. The cleanup example uses a readiness message to keep its output order fixed.
 
 ```i run package=tour title="src/main.i"
 (
@@ -31,7 +31,7 @@ main = () <- (io : Io) {
 
 A scope also waits for children that its body did not explicitly join. Joining is useful when you need a child's result before proceeding; automatic waiting establishes the lifetime boundary even when no result is needed. Returning a task handle does not extend that lifetime or make a later join valid.
 
-The program entry already runs inside a task run with a scheduler. `task.run` creates an explicit nested run when needed; this example needs only a scope. Tasks and schedulers are library facilities built using services and control operations. You import `i/task` and call its functions through the same module rules as other libraries.
+A **scheduler** chooses which runnable task takes its next step. The program entry already has a scheduler; this example needs only a scope. Tasks and schedulers are library facilities built using services and control operations. You import `i/task` and call its functions through the same module rules as other libraries.
 
 `Task(A, E)` carries a result type and an error type. Joining returns `A` or raises an error through `Fail(E)`. It does not return a `Result`; wrap a computation in `fail.catch` when you want one, as on the [services and errors](/docs/tour/services-and-errors) page.
 
@@ -61,11 +61,39 @@ main = () <- (io : Io) {
 
 The input order is `3, 1, 2`, so the output is `30, 10, 20`, regardless of completion order. The pair also preserves argument order. This is a useful way to keep concurrent computation separate from ordered output.
 
-Scheduling order is not fixed. Prints inside separate children, competing sends, and the winner of `task.race` can differ across runs. A race cancels its loser and waits for its cleanup; an observed failure before success commits fails the scope. It is not a search for a successful result that ignores earlier failures.
+Scheduling order is not fixed. Prints inside separate children can appear in either order. These examples collect the results before printing them. The full [task specification (§9.9)](/docs/standard/generated/chapter-9#section-9-9) also defines races and event selection.
 
 ## Failure cancels the scope
 
-When a scope body or child raises an error, the scope cancels its body and children, waits for their finals, and raises the chosen error. If several tasks actually fail, the specification chooses the failure with the least task path; cancellation itself is not a failure.
+When a scope body or child raises an error, the scope cancels its body and children, waits for their finals, and raises the chosen error. Cancellation itself is not a failure; [§9.9](/docs/standard/generated/chapter-9#section-9-9) defines which error is chosen if several tasks fail.
+
+```i run package=tour title="src/main.i"
+(
+	i/task
+	i/fail
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = fail.catch(() {
+		task.scope((s) {
+			task.go(s, () { fail.raise("child failed") })
+			Nil
+		})
+	})
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+Error("child failed")
+```
+
+The body returns `Nil` without joining the child. The scope still waits for it, observes its failure, and raises the error to the surrounding `catch`.
+
+## Observing cancellation cleanup
+
+To observe a child's cleanup, first make sure it has started. A **channel** passes a value between tasks; it is unbuffered, so `send` and `receive` wait for each other. Here a readiness message tells the parent that the child's final is installed. An **event** describes an operation to wait for; `task.sync(task.never())` waits on an event that never becomes ready.
 
 ```i run package=tour title="src/main.i"
 (
@@ -76,7 +104,6 @@ When a scope body or child raises an error, the scope cancels its body and child
 	(Io) = i/io
 )
 main = () <- (io : Io) {
-	state = task.ref(0)
 	answer = fail.catch(() {
 		task.scope((s) {
 			ready : task.Channel(Nil) = task.channel()
@@ -86,7 +113,7 @@ main = () <- (io : Io) {
 						task.send(ready, Nil)
 						task.sync(task.never())
 					},
-					() { task.update(state, (n) { (n + 1, Nil) }) },
+					() { io.print("release child") },
 				)
 			})
 			task.receive(ready)
@@ -95,28 +122,23 @@ main = () <- (io : Io) {
 		})
 	})
 	io.print(core.inspect(answer))
-	io.print(
-		core.inspect(task.update(state, (n) { (n, n) })),
-	)
 }
 ```
 
 ```text
+release child
 Error("child failed")
-1
 ```
 
-The first child installs a final and sends a readiness message over a channel. Channels are unbuffered: send and receive rendezvous. Only after that handshake does the parent start the failing child. The first child then waits on an event that never becomes ready. Failure cancels that wait and runs its final.
+Only after the readiness message does the parent start the failing child. Failure cancels the waiting child and runs its final. The final prints before the scope raises its error, proving that the scope waits for cleanup before returning.
 
-The final increments scheduler-owned state through `task.update`. Every value and binding remains immutable: `state` is an immutable handle to that state. The callback returns the new stored value and the result of the update. The parent reads the counter after the scope has unwound, proving the final finished once before the catch returned.
-
-Cancellation is delivered at a task's next scheduler suspension. A child that has not started is dropped without running its body. An already-running final is shielded from a second cancellation, and the scope waits for it; a final that waits forever can keep cancellation waiting forever. A stop is not caught and does not offer this cleanup guarantee.
+Cancellation reaches a running task at its next scheduler suspension. An unstarted child is dropped without calling its body. Already-running finals are shielded from another cancellation. A [stop (§9.9)](/docs/standard/generated/chapter-9#section-9-9) is not caught and runs no final functions.
 
 ## Workers
 
 The standard permits tasks to run on multiple workers, using multiple cores. The host chooses the worker count; task code does not observe which worker executes it. Results correspond to some serial order of task steps, but that order can change between runs and worker counts.
 
-Portable values may cross workers. Ordinary scopes check child results and errors for portability; local scopes support values that must stay on their worker. No public task-starting operation detaches work from its owning scope. The examples use integers, strings and ordinary data and do not depend on worker assignment.
+A **portable** value can be copied to another worker. Ordinary scopes check child results and errors for portability; the specification describes local scopes for values that must stay on their worker. No public task-starting operation detaches work from its owning scope. The examples use integers, strings and ordinary data and do not depend on worker assignment.
 
 ## See also
 

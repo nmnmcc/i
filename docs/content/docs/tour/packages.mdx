@@ -3,7 +3,7 @@ title: Packages
 description: Organize modules, control exports, and connect local or versioned packages.
 ---
 
-A package is a directory containing `i.toml`; its source files are modules. This page shows how to split a program into modules, choose what other modules can use, and depend on another package. The first example uses two files in a package named `tour`.
+A **package** is a directory containing `i.toml`; a **module** is one of its source files. This page shows how to split a program into modules, choose what other modules can use, and depend on another package. The first example uses two files in a package named `tour`.
 
 Put the reusable function in `src/greeting.i`:
 
@@ -68,7 +68,7 @@ These manifest fields are supported on this tree:
 | `[dev-dependencies]` | Packages available only to this package's tests. |
 | `[test] collection` | The collection selected by `i test`, normally `std/test.tests`. |
 | `[entries]` | Named entries, mapped to `"module.path.function"` relative to the package. |
-| `[wasm] exports` | Host exports written as `"package/module.function"`. |
+| `[wasm] exports` | Functions callable by the embedding host, written as `"package/module.function"`. |
 | `[wasm] synchronous` | The subset of host exports declared synchronous. |
 | `providers`, `provider_adapters` | Target provider plans; see §2.6.1 for their schema. |
 
@@ -76,47 +76,49 @@ The default program entry is `main` in `src/main.i`. A named entry supplements i
 
 ## Depending on a local package
 
-Create these files in two sibling project directories:
+Keep the application and its local library in this layout:
 
-`words/i.toml`:
+```text
+app/
+  i.toml
+  src/main.i
+  words/
+    i.toml
+    src/greeting.i
+```
 
-```toml
+Each directory with a manifest is a separate package. Start with `app/words/i.toml`:
+
+```i file=words/i.toml title="words/i.toml"
 name = "words"
 ```
 
-`words/src/greeting.i`:
+Export the library's function from `app/words/src/greeting.i`:
 
-```i shown file=src/greeting.i package=words title="src/greeting.i"
+```i file=words/src/greeting.i title="words/src/greeting.i"
 (
 	message
 )
 message = (name : String) -> String { "hello, " <> name }
 ```
 
-`app/i.toml`:
+Declare the dependency in `app/i.toml`:
 
-```toml
+```i file=i.toml title="i.toml"
 name = "app"
 
 [dependencies]
-util = { path = "../words" }
+util = { path = "words" }
 ```
 
-`app/src/main.i`:
+Use it in `app/src/main.i`. Run `i run` from `app/`:
 
-```i shown-unchecked file=src/main.i package=app title="src/main.i"
+```i run package=app title="src/main.i"
 (
 	(Io) = i/io
 	greeting = util/greeting
 )
 main = () <- (io : Io) { io.print(greeting.message("package")) }
-```
-
-Run these commands from `app/`:
-
-```sh
-i fmt
-i run --opt 0
 ```
 
 ```text
@@ -129,7 +131,7 @@ The path is relative to `app/i.toml`. The dependency name `util` is chosen by `a
 
 The other supported dependency source is a versioned Git location: a string such as `"github.com/alice/json@1.4.0"`. It omits `https://` and states the lowest required version. A `//directory` suffix before `@` selects a package below a repository's root. This is a source format, not a registry lookup; packages are fetched from the Git host. A package fetched by location cannot itself use path dependencies.
 
-Version selection takes the greatest minimum required within each major version. Distinct major versions are distinct packages. The package manager writes `i.lock` next to the root manifest for reached location versions. Each line records the location, version, tag commit and a SHA-256 hash of the package files. Changed commits or bytes fail integrity checking. Path dependencies are local directories rather than locked location versions.
+Version selection takes the greatest of the minimum versions requested for each package and major version. Distinct major versions are distinct packages. The package manager writes `i.lock` next to the root manifest for reached location versions. Each line records the location, version, tag commit and a SHA-256 hash of the package files. Changed commits or bytes fail integrity checking. Path dependencies are local directories rather than locked location versions.
 
 `i add`, `i remove` and `i update` maintain dependencies and the lock file. Read their CLI help before selecting a location or version for a real project.
 

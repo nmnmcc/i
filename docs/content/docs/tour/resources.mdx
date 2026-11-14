@@ -51,7 +51,7 @@ These are ordinary library calls and functions. There is no special resource sta
 
 ## Release on failure
 
-A **final function** is a cleanup callback installed around a computation. `resource.ensure(body, final)` runs the final after a normal return and when an error or control escape unwinds the body. `acquire` uses it to install the release after a successful open.
+A **final function** is a cleanup callback installed around a computation. **Unwinding** runs installed finals from the innermost computation to the outermost when execution leaves early. `resource.ensure(body, final)` runs the final after a normal return and when an error or control escape unwinds the body. `acquire` uses it to install the release after a successful open.
 
 ```i run package=tour title="src/main.i"
 (
@@ -89,9 +89,9 @@ Error("failed")
 
 The error skips the rest of the use callback. Unwinding releases the handle, then runs the enclosing final, and only then returns `Error("failed")` from `fail.catch`. The printed order proves that catching the error does not skip release.
 
-A final may use services, as the printing callbacks do, but may not raise an error. Cancellation of a continuation also unwinds installed finals; [structured task cancellation](/docs/tour/concurrency) waits for cleanup to finish. A continuation that is abandoned without resumption or cancellation does not run its finals.
+A final may use services, as the printing callbacks do, but may not raise an error. [Structured task cancellation](/docs/tour/concurrency) also unwinds installed finals and waits for cleanup to finish.
 
-The current spec says releases do not run on a stop, and whether they should is an open question for the owner.
+On a [stop (§9.5)](/docs/standard/generated/chapter-9#section-9-5), releases and other final functions do not run.
 
 ## See also
 
