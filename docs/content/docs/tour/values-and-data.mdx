@@ -54,7 +54,7 @@ main = () {
 -3
 ```
 
-`Int` has no size limit or overflow; division rounds toward zero.
+`Int` arithmetic does not overflow; division rounds toward zero.
 
 ## Floats
 
@@ -109,7 +109,7 @@ ab
 a\nb
 ```
 
-Strings hold Unicode text; interpolation requires a string result, so numbers need conversion first.
+Strings hold Unicode text; interpolation requires a string result, so numbers need conversion.
 
 The hashes in the raw string keep `\n` literal.
 
@@ -117,13 +117,13 @@ The hashes in the raw string keep `\n` literal.
 
 ```i format package=tour title="src/main.i"
 lines = """
-	first
-	second
+	alpha
+	beta
 	"""
 ```
 
 ```text
-lines = "first\nsecond"
+lines = "alpha\nbeta"
 ```
 
 The closing delimiter’s indentation is removed, along with the opening and closing line breaks; `i fmt` rewrites this value as an escaped single-line string.
@@ -260,6 +260,8 @@ Absent
 `Present` adds an identity to its payload; the empty constructor `Absent` is already a value.
 
 The union adds no wrapper; [annotations](/docs/tour/types-and-inference#annotations) can name that union.
+
+These value types also describe a function’s arguments and result.
 
 ## Bit arrays
 

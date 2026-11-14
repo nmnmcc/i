@@ -76,8 +76,8 @@ Hello, Ada!
 
 main = () {
 	result = {
-		first = 3 + 2
-		first * 2
+		base = 3 + 2
+		base * 2
 	}
 	stdio.print(core.inspect(result))
 }
@@ -390,6 +390,8 @@ main = () {
 ```
 
 `|>` passes a result to argument position zero of the next call.
+
+A caller’s inferred type lists the service needs its calls pass on, including `Fail(E)`.
 
 ## Grouping
 
