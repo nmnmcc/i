@@ -1,0 +1,24 @@
+```i file=src/value.i title="src/value.i"
+(
+	answer
+)
+
+answer = 42
+```
+
+```i test package=shown title="test/value_test.i"
+(
+	testlib = (test) = std/test
+	shown/value
+)
+
+test("answer", () { assert(value.answer == 42) })
+```
+
+```i shown file=src/main.i package=shown title="src/main.i"
+(
+	shown/value
+)
+
+main = () { value.answer }
+```

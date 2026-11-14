@@ -1,0 +1,21 @@
+```i file=src/value.i title="src/value.i"
+(
+	answer
+)
+
+answer = 42
+```
+
+```i run package=different title="src/main.i"
+(
+	i/stdio
+	i/core
+	renamed/value
+)
+
+main = () { stdio.print(core.inspect(value.answer)) }
+```
+
+```text
+42
+```

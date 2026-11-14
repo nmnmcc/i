@@ -14,7 +14,8 @@
     "prebuild": "npm run generate",
     "predev": "npm run generate",
     "check:links": "python3 scripts/check-links.py",
-    "check:examples": "npm run generate && python3 scripts/check-examples.py && python3 scripts/run-examples.py"
+    "check:rendering": "python3 scripts/check-example-rendering.py",
+    "check:examples": "npm run generate && python3 scripts/check-examples.py && python3 scripts/run-examples.py --no-placeholders"
   },
   "dependencies": {
     "@astrojs/react": "7.1.7",

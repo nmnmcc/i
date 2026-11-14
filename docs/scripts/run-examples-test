@@ -41,6 +41,15 @@ class RunnerTests(unittest.TestCase):
             'check-with-warning': 1,
             'test-with-no-tests': 0,
             'run-with-nonzero-exit': 2,
+            'passing-package': 0,
+            'failing-package': 2,
+            'passing-test-fails': 0,
+            'failing-test-fails': 2,
+            'test-fails-with-success': 2,
+            'passing-shown': 0,
+            'failing-shown': 1,
+            'passing-shown-unchecked': 0,
+            'failing-shown-unchecked': 1,
         }
         for name, count in expected.items():
             with self.subTest(fixture=name):
@@ -63,6 +72,12 @@ class RunnerTests(unittest.TestCase):
                 if name == 'failing-error':
                     self.assertIn("codes=['E0301']", str(failures[0]))
                     self.assertIn("codes=['E0201']", str(failures[0]))
+                if name == 'failing-package':
+                    self.assertTrue(all('E0209' in failure.actual for failure in failures))
+                if name == 'failing-test-fails':
+                    self.assertTrue(all('0 passed, 1 failed' in failure.actual for failure in failures))
+                if name == 'test-fails-with-success':
+                    self.assertTrue(all('exit 0,' in failure.actual for failure in failures))
                 for failure in failures:
                     self.assertRegex(str(failure), r'\.mdx:\d+: expected .+; actual .+')
 
@@ -127,8 +142,14 @@ class RunnerTests(unittest.TestCase):
                      'i file=src/a.i title="src/a.i"'):
             self.assertEqual(runner.i_info(info), ('file', 'src/a.i', frozenset()))
         self.assertEqual(runner.i_info('i error E0201 E0301 E0201')[2], {'E0201', 'E0301'})
+        for kind in ('run', 'test', 'test-fails', 'check', 'error E0201'):
+            info = f'i {kind} package=hello title="src/main.i"'
+            self.assertEqual(runner.i_options(info)[1]['package'], 'hello')
+            self.assertEqual(runner.i_info(info)[1], 'src/main.i')
         for info in ('i run extra', 'i error', 'i error not_a_code', 'i mystery',
-                     'i file=a.i title="b.i"', 'i file=', 'i title="unterminated'):
+                     'i file=a.i title="b.i"', 'i file=', 'i title="unterminated',
+                     'i run package=i', 'i run package=Upper', 'i run package=one package=two',
+                     'i shown', 'i check file=src/main.i'):
             with self.subTest(info=info), self.assertRaises(ValueError):
                 runner.i_info(info)
         for path in ('../a.i', '/tmp/a.i', 'src/../a.i', './a.i', 'src\\a.i'):
@@ -191,6 +212,16 @@ class RunnerTests(unittest.TestCase):
                 self.assertTrue(runner.main())
             self.assertIn('missing.mdx:1: expected', errors.getvalue())
             self.assertIn('1 failures', output.getvalue())
+
+    def test_real_cli_wrong_output(self):
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'run-examples.py'),
+                                 '--content', str(FIXTURES), '--page', 'failing-run.mdx'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('1 examples checked; 2 failures.', result.stdout)
+        self.assertIn('expected run --opt 0', result.stderr)
+        self.assertIn('expected run --opt 2', result.stderr)
+        self.assertIn("stdout='actual\\n'", result.stderr)
 
 
 if __name__ == '__main__':

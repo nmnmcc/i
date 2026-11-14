@@ -5,7 +5,7 @@ description: Use a package macro, write a small syntax macro, and inspect its ex
 
 A macro is an i function that runs in the compiler, taking code as data and returning code as data. You can use one through a normal package import, then inspect the code it produces. The test macro is a useful first example: this complete `test/example_test.i` registers a test with `std/test`.
 
-```i test
+```i test package=tour title="test/example_test.i"
 (
 	testlib = (test) = std/test
 )
@@ -35,7 +35,7 @@ In the complete definition below, `(, twice)` is the exports header, `(= twice â
 
 Create `src/macros.is` in a package named `tour`:
 
-```text
+```i file=src/macros.is title="src/macros.is"
 (, twice)
 (@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
 ```
@@ -44,7 +44,7 @@ The macro inserts its argument into a binding and adds the bound value to itself
 
 Use it from `src/main.i` in the same package:
 
-```text
+```i shown file=src/main.i package=tour title="src/main.i"
 (
 	(Io) = i/io
 	i/core

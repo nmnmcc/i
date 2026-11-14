@@ -5,7 +5,7 @@ description: Define names and build immutable numbers, strings, records, tuples,
 
 Values are the things a program works with: numbers, text, functions, and data built from other values. This page shows how to bind a value to a name, combine values, and inspect the result. You can use these forms to describe the data your functions receive and return.
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -31,7 +31,7 @@ There are no keywords. `main` is a name, and `=` is the symbol for a binding. A 
 
 ## Integers and floats
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -60,7 +60,7 @@ A `Float` is a finite binary64 number. Its arithmetic uses separate operators: `
 
 ## Strings and interpolation
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -93,7 +93,7 @@ Raw strings put matching hashes around the quotes. In the one-hash example, the 
 
 ## Records, tuples, and updates
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -125,7 +125,7 @@ An empty data value is `()`. One positional item still makes data: `("one")` is 
 
 ## Lists, booleans, and labelled data
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -161,7 +161,7 @@ A **labelled type** gives data its own identity. `Present(A) = (A)` defines a la
 
 ## Bit arrays
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio

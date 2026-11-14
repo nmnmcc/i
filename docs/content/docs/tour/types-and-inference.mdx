@@ -5,7 +5,7 @@ description: Name types, write annotations, define generic functions, and inspec
 
 Types describe the values a program can accept and return. The checker infers types from definitions and their uses, and checks any annotations you write. This page shows how to name types, distinguish structural data from labelled values, write generic functions, and see the checker's result.
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -27,7 +27,7 @@ No type is written here. The `+` operator requires integers, so `increment` acce
 
 ## Definitions: names and labelled types
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -65,7 +65,7 @@ Data types write labels with `=`, as `x = Int`. Value annotations use `:`, as `r
 
 ## Annotations and unions
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -102,7 +102,7 @@ Annotations constrain inference rather than converting a value. Writing `count :
 
 ## Generic functions and type parameters
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -133,7 +133,7 @@ main = () {
 
 ## Seeing inferred types
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -182,7 +182,7 @@ Some operations need a known type, including reading fields from a function argu
 
 ## A type mismatch
 
-```i error E0501
+```i error E0501 package=tour title="src/main.i"
 main = () {
 	count : Int = "seven"
 	count

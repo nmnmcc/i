@@ -17,7 +17,7 @@ The command creates `hello/i.toml`, `.gitignore`, `src/main.i`, and `test/main_t
 
 The generated `src/main.i` is:
 
-```i run
+```i run package=hello title="src/main.i"
 //// The package `hello`. It imports the standard service `Io` from `i/io`
 //// (§9.7), and `i run` gives it, so the program can print.
 (
@@ -51,7 +51,7 @@ Hello, hello!
 
 Change the argument in `main` to `"world"`, leaving the rest of the file as follows:
 
-```i run
+```i run package=hello title="src/main.i"
 //// The package `hello`. It imports the standard service `Io` from `i/io`
 //// (§9.7), and `i run` gives it, so the program can print.
 (
@@ -80,7 +80,7 @@ Hello, world!
 
 The generated test already checks `greeting`. Add a second test so `test/main_test.i` contains:
 
-```i file=src/main.i
+```i file=src/main.i title="src/main.i"
 //// The package `hello`. It imports the standard service `Io` from `i/io`
 //// (§9.7), and `i run` gives it, so the program can print.
 (
@@ -96,7 +96,7 @@ greeting = (who : String) -> String { "Hello, " <> who <> "!" }
 
 main = () <- (io : Io) { io.print(greeting("world")) }
 ```
-```i test
+```i test package=hello title="test/main_test.i"
 (
 	testlib = (test) = std/test
 	hello/main

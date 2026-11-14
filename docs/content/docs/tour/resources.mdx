@@ -5,7 +5,7 @@ description: Acquire a value, release it after use, and understand unwinding on 
 
 A resource is a value whose use must end with a release, such as an open file or connection. This tree offers callback-based `resource.acquire` and `resource.ensure`. You can put cleanup around a computation and see when it runs, including when the computation raises an [error](/docs/tour/services-and-errors).
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/resource
 	(Io) = i/io
@@ -53,7 +53,7 @@ These are ordinary library calls and functions. There is no special resource sta
 
 A **final function** is a cleanup callback installed around a computation. `resource.ensure(body, final)` runs the final after a normal return and when an error or control escape unwinds the body. `acquire` uses it to install the release after a successful open.
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/resource
 	i/fail

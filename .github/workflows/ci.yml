@@ -317,6 +317,8 @@ jobs:
     needs: release
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      I_BIN: ${{ github.workspace }}/target/release/i
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
@@ -346,4 +348,5 @@ jobs:
           devenv shell -- npm ci
           devenv shell -- npm run build
           devenv shell -- npm run check:links
+          devenv shell -- npm run check:rendering
           devenv shell -- npm run check:examples

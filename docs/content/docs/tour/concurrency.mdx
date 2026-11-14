@@ -5,7 +5,7 @@ description: Start structured tasks, join their results, and handle child failur
 
 Concurrency in i is structured: a task lives inside the block that starts it. This page shows starting children, joining results, and handling child failure after cleanup. The examples print only after the relevant work finishes, so their output does not depend on which task runs first.
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/task
 	i/core
@@ -39,7 +39,7 @@ The program entry already runs inside a task run with a scheduler. `task.run` cr
 
 For independent computations, `task.both` joins two children and returns their results as a pair. `task.map_concurrently` starts a child for each input and returns the results in input order:
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/task
 	i/core
@@ -67,7 +67,7 @@ Scheduling order is not fixed. Prints inside separate children, competing sends,
 
 When a scope body or child raises an error, the scope cancels its body and children, waits for their finals, and raises the chosen error. If several tasks actually fail, the specification chooses the failure with the least task path; cancellation itself is not a failure.
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/task
 	i/resource

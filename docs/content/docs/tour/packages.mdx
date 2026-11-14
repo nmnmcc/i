@@ -7,7 +7,7 @@ A package is a directory containing `i.toml`; its source files are modules. This
 
 Put the reusable function in `src/greeting.i`:
 
-```i file=src/greeting.i
+```i file=src/greeting.i title="src/greeting.i"
 (
 	message
 )
@@ -16,7 +16,7 @@ message = (name : String) -> String { "hello, " <> name }
 
 Use it from `src/main.i`:
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	(Io) = i/io
 	greeting = tour/greeting
@@ -86,7 +86,7 @@ name = "words"
 
 `words/src/greeting.i`:
 
-```text
+```i shown file=src/greeting.i package=words title="src/greeting.i"
 (
 	message
 )
@@ -104,7 +104,7 @@ util = { path = "../words" }
 
 `app/src/main.i`:
 
-```text
+```i shown-unchecked file=src/main.i package=app title="src/main.i"
 (
 	(Io) = i/io
 	greeting = util/greeting

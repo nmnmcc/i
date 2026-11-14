@@ -5,7 +5,7 @@ description: Call function values, choose with branches, match patterns, and rep
 
 Functions turn arguments into results. Branches choose a result by matching patterns against those arguments. This page shows how calls, blocks, patterns, and pipelines fit together, so you can write choices and repeated work without control-flow keywords.
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -27,7 +27,7 @@ main = () {
 
 ## Calls, labels, and blocks
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -59,7 +59,7 @@ A block executes its statements in order and gives the value of its final expres
 
 ## Choosing with branches
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -97,7 +97,7 @@ In the multi-branch match in `kind`, `n : Int` and `s : String` are type tests. 
 
 ## Taking data apart
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -142,7 +142,7 @@ List patterns distinguish `[]`, an exact list such as `[x]`, and a prefix with a
 
 ## Text, literals, and bits
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio
@@ -191,7 +191,7 @@ A bit-array pattern reads segments in order and must use all the bits. Here `tag
 
 A multi-branch group, or a group with a guard, must cover every possible argument value. This module is rejected:
 
-```i error E0516
+```i error E0516 package=tour title="src/main.i"
 describe = (n : Int) { n |> (0) { "zero" } | (1) { "one" } }
 main = () { describe(2) }
 ```
@@ -202,7 +202,7 @@ A single branch without a guard has a different rule: a pattern that may fail re
 
 ## Recursion, pipelines, and precedence
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/core
 	i/stdio

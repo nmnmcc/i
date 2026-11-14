@@ -21,7 +21,7 @@ collection = "std/test.tests"
 
 A handler takes an `http.Request` and returns an `http.Response`. Put this complete module in `src/handler.i`:
 
-```i file=src/handler.i
+```i file=src/handler.i title="src/handler.i"
 (
 	std/http
 	std/json
@@ -77,7 +77,7 @@ handle = (req : http.Request) {
 
 Put this complete test in `test/handler_test.i`:
 
-```i test
+```i test package=guide_http title="test/handler_test.i"
 (
 	testlib = (test) = std/test
 	std/http
@@ -142,7 +142,7 @@ These operations are ordinary library calls. The handler needs no network servic
 
 Keep `src/handler.i` exactly as above. Add this complete `src/main.i` to the same project:
 
-```i file=src/main.i
+```i shown file=src/main.i package=guide_http title="src/main.i"
 (
 	i/net
 	i/task

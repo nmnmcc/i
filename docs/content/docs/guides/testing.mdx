@@ -21,7 +21,7 @@ std = { path = "../std" }
 
 Put the function under test in `src/count.i`:
 
-```i file=src/count.i
+```i file=src/count.i title="src/count.i"
 (
 	count
 )
@@ -30,7 +30,7 @@ count = (n : Int) -> Int { n + 1 }
 
 Put its test in `test/count_test.i`:
 
-```i test
+```i test package=guide_tests title="test/count_test.i"
 (
 	testlib = (test) = std/test
 	guide_tests/count
@@ -69,7 +69,7 @@ Each command prints the same one-test result shown above. Use the full module pr
 
 The following examples are independent test files. Use one at a time when comparing the printed counts. This file uses a suite, explicit cases, a skipped test, and an expected failure:
 
-```i test
+```i test package=guide_tests title="test/forms_test.i"
 (
 	testlib = (test, suite, each, skip, fails) = std/test
 )
@@ -94,7 +94,7 @@ pass guide_tests/forms_test.arithmetic / expected assertion
 
 For a temporary focused run, use `only`:
 
-```i test
+```i test package=guide_tests title="test/focus_test.i"
 (
 	testlib = (test, only) = std/test
 )
@@ -112,9 +112,9 @@ When any `only` contribution exists, ordinary tests are skipped. Remove the focu
 
 ## Read a failure
 
-To reproduce an ordinary failing test, replace the test file with `test/failure_test.i` below. This is an intentional failure checked by hand at both optimization levels, so it is shown as a file rather than a passing `test` fence.
+To reproduce an ordinary failing test, replace the test file with `test/failure_test.i` below. This intentional failure and its standard output are checked at both optimization levels with a `test-fails` fence.
 
-```i file=test/failure_test.i
+```i test-fails package=guide_tests title="test/failure_test.i"
 (
 	testlib = (test) = std/test
 )
@@ -138,7 +138,7 @@ The command exits with status 1. The position points to the assertion in the mod
 
 A property test checks a claim over values from a generator. Here the claim is that reversing a list twice returns the original list:
 
-```i test
+```i test package=guide_tests title="test/reverse_test.i"
 (
 	testlib = (test) = std/test
 	i/core
@@ -178,7 +178,7 @@ pass guide_tests/reverse_test.reverse twice
 
 Put the service and its client in `src/deadline.i`:
 
-```i file=src/deadline.i
+```i file=src/deadline.i title="src/deadline.i"
 (
 	Clock(..)
 	remaining
@@ -189,7 +189,7 @@ remaining = (deadline) <- (clock : Clock) { deadline - clock.now() }
 
 This `test/deadline_test.i` provides a clock that always returns 40:
 
-```i test
+```i test package=guide_tests title="test/deadline_test.i"
 (
 	testlib = (test) = std/test
 	guide_tests/deadline

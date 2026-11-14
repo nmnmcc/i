@@ -5,7 +5,7 @@ description: Take services from a caller, provide test implementations, and hand
 
 A service supplies operations that a function needs from its caller. This page shows how to take and provide services, replace one in a test, and handle expected failures. It builds on [functions and branches](/docs/tour/functions-and-branches) and [types and inference](/docs/tour/types-and-inference).
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	(Io) = i/io
 )
@@ -26,7 +26,7 @@ A need is the intersection of its service requirements. A function that uses two
 
 For the next examples, use a package named `tour`. Define your own service in `src/greeting.i`:
 
-```i file=src/greeting.i
+```i file=src/greeting.i title="src/greeting.i"
 (
 	Greeting(..)
 	message
@@ -37,7 +37,7 @@ message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 
 Then provide an implementation at the call:
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	(Io) = i/io
 	(Greeting, message) = tour/greeting
@@ -59,7 +59,7 @@ A function that calls `message` also needs `Greeting`, unless it provides one. T
 
 Use the same `src/greeting.i` above. Here it is attached again so this test is a complete example:
 
-```i file=src/greeting.i
+```i file=src/greeting.i title="src/greeting.i"
 (
 	Greeting(..)
 	message
@@ -68,7 +68,7 @@ Greeting = (read = () -> String)
 message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 ```
 
-```i test
+```i test package=tour title="test/greeting_test.i"
 (
 	testlib = (test) = std/test
 	(Greeting, message) = tour/greeting
@@ -82,7 +82,7 @@ The fake is another value of `Greeting`. The application function needs no testi
 
 The checker rejects a function promised to need nothing when its body leaves a service unsupplied:
 
-```i error E0501
+```i error E0501 package=tour title="src/main.i"
 Greeting = (read = () -> String)
 message = () <- (g : Greeting) -> String { g.read() }
 main : () -> String = () { message() }
@@ -94,7 +94,7 @@ The real diagnostic is: `` `Greeting` is not a subtype of `Never` `` (E0501). Th
 
 On this tree, `Fail(E)` and `i/fail` support raised errors, but standard-library APIs have not all changed to that form. For example, `std/int.parse` returns `Result(Int, Nil)`. `Result` is a built-in union with `Ok(value)` and `Error(error)`. `Option` comes from `std/option`, with `Some(value)` and `None`; `std/list.first` returns one.
 
-```i run
+```i run package=tour title="src/main.i"
 (
 	i/fail
 	i/core

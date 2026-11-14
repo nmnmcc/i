@@ -21,7 +21,7 @@ collection = "std/test.tests"
 
 Put the description in `src/options.i`. `cli.map2` combines the positional name and the option's integer value into one `Options` value.
 
-```i file=src/options.i
+```i file=src/options.i title="src/options.i"
 (
 	std/cli
 	(Some) = std/option
@@ -43,7 +43,7 @@ parser = () {
 
 The parser accepts an explicit list of strings. Put this complete file in `test/options_test.i`; it checks successful parsing, a missing option, a conversion failure, and the help text.
 
-```i test
+```i test package=guide_cli title="test/options_test.i"
 (
 	testlib = (test) = std/test
 	std/cli
@@ -102,7 +102,7 @@ pass guide_cli/options_test.parses arguments
 
 Add this complete `src/main.i` to the same project. Keep `src/options.i` unchanged.
 
-```i file=src/main.i
+```i shown file=src/main.i package=guide_cli title="src/main.i"
 (
 	i/process
 	i/stdio

@@ -16,7 +16,7 @@ std = { path = "../std" }
 
 Put this complete program in `src/main.i`:
 
-```i run
+```i run package=guide_files title="src/main.i"
 (
 	i/fs
 	i/stdio
@@ -47,7 +47,7 @@ The bytes come from the read, rather than from the original string. `write_file`
 
 Replace `src/main.i` with this program. It creates and removes its own file first, so the missing-file result does not depend on a previous run.
 
-```i run
+```i run package=guide_files title="src/main.i"
 (
 	i/fs
 	i/fail

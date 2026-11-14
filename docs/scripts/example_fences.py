@@ -40,35 +40,52 @@ def fences(text):
         index += 1
 
 
+def i_options(info):
+    """Separate execution words from the filename and package attributes."""
+    words, options = [], {}
+    for word in shlex.split(info)[1:]:
+        key, separator, value = word.partition('=')
+        if separator and key in ('title', 'package', 'file'):
+            if key in options or not value:
+                raise ValueError(f'expected one nonempty {key}=')
+            options[key] = value
+        else:
+            words.append(word)
+    package = options.get('package')
+    if package is not None and (not re.fullmatch(r'_?[a-z][a-z0-9_]*', package) or package == 'i'):
+        raise ValueError('package= must be a package name other than i; got ' + repr(package))
+    return words, options
+
+
 def i_info(info):
     """Return (kind, file path, codes), or None for a different language.
 
-    title= is a file= alias when used alone. A matching title= on a file=
-    block also lets Fumadocs display its filename without a site change.
+    A title names the primary source of an executable block. On a supporting
+    file block it is also a file= alias. file= remains required on shown.
     """
     if not re.match(r'^i(?:\s|$)', info):
         return None
-    words = shlex.split(info)
-    words.pop(0)
-    titles = [word[6:] for word in words if word.startswith('title=')]
-    words = [word for word in words if not word.startswith('title=')]
-    if len(titles) > 1 or (titles and not titles[0]):
-        raise ValueError('expected at most one nonempty title=')
+    words, options = i_options(info)
+    path = options.get('file')
+    title = options.get('title')
+    if path and title and title != path:
+        raise ValueError('file= and title= must name the same file')
     if not words:
-        return ('file', titles[0], frozenset()) if titles else ('fragment', None, frozenset())
-    if words[0].startswith('file=') and len(words) == 1:
-        path = words[0][5:]
-        if titles and titles[0] != path:
-            raise ValueError('file= and title= must name the same file')
-        if not path:
-            raise ValueError('file= needs a relative path')
-        return 'file', path, frozenset()
-    if words[0] in ('run', 'test', 'check') and len(words) == 1:
-        return words[0], None, frozenset()
+        if 'package' in options:
+            raise ValueError('package= needs an example kind')
+        return ('file', path or title, frozenset()) if path or title else ('fragment', None, frozenset())
+    if words[0] in ('shown', 'shown-unchecked') and len(words) == 1:
+        if words[0] == 'shown' and not path:
+            raise ValueError('shown needs file=<path>')
+        return words[0], path or title or 'src/main.i', frozenset()
+    if path:
+        raise ValueError('file= belongs to a supporting file or a shown block')
+    if words[0] in ('run', 'test', 'test-fails', 'check') and len(words) == 1:
+        return words[0], title, frozenset()
     if words[0] == 'error' and len(words) > 1 and all(
             re.fullmatch(r'[EW]\d{4}', word) for word in words[1:]):
-        return 'error', None, frozenset(words[1:])
-    raise ValueError('expected run, test, check, error <codes…>, or file=<path>; got '
+        return 'error', title, frozenset(words[1:])
+    raise ValueError('expected run, test, test-fails, check, error <codes…>, shown file=<path>, shown-unchecked, or file=<path>; got '
                      + repr(' '.join(words)))
 
 
