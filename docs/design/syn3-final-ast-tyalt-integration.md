@@ -161,7 +161,7 @@ the one-parameter head shape. No assertion intent is removed, and no compiler
 implementation or diagnostic expectation changes. Design §2.8/§6.8 requires
 separate one-constructor definitions, not the former sum constructor list.
 
-The syntax retry is selected explicitly alongside all42 sequential CLI test
+The syntax retry is selected explicitly alongside all41 sequential CLI integration test
 binaries plus CLI unit targets in one wrapped Cargo invocation; four harness
 threads per binary, with only one binary active. This obeys the coordinator's
 one-binary-at-a-time option while retaining one heavy command per worker.
@@ -169,7 +169,7 @@ The retry also recompiles the incoming f61 provider assertion update before
 its merge checkpoint. Initial Rust exit101 remains recorded, not hidden.
 
 11:51: all selected CLI targets and the repaired syntax target compile in
-48.18s; CLI library tests pass2/2, main-unit and42 integration binaries follow.
+48.18s; CLI library tests pass2/2, main-unit and41 integration binaries follow.
 This is the compiling checkpoint for the f61 test-only merge and the four
 builtin-test shape repairs. Root Rust remains760 successful tests plus four
 pending repaired assertions; no failed compiler diagnostic golden.
@@ -365,3 +365,55 @@ O2 completed12:52:57). Requested chapters6/7/9/15.7 and short generation
 follow, then private migration checks and final formatting. Fresh complete
 CLI/macro replay remains serialized behind the gate; no failing test is
 currently known. This is an interim runtime milestone, not final full green.
+
+12:55: spec6 PASS80/80 at both O0/O2;28 existing pending cases unchanged.
+To make the final matrix unambiguous on the late backend, the complete four-
+crate Rust gate is also scheduled after the fresh all-CLI parent, followed
+by ordinary direct check-snippets with a fresh internally wrapped driver
+build. It uses the same requested recovery skip and two harness threads.
+Each waiting scheduler waits only on its predecessor PID; no second heavy
+command is queued or active. All results will be recorded separately from
+the initial pre-backend runs, with no normalization or golden rerecording.
+
+12:56: spec7 PASS114/114 at O0/O2,1 existing pending skip. The established
+substring filter also selects matching subsection paths (e.g.9.7), as before;
+no filter semantics are changed. New main fixtures account for the larger
+selection than the old base. Spec9 is active, including the late continuation
+environment regression and the retained boundary stop-position case.
+
+CLI target inventory audit: Cargo.toml declares only the custom spec target;
+all41 other tests/*.rs integration binaries are explicitly selected, plus
+the CLI library/main unit targets. The spec harness is the42nd integration
+binary and is run only with the four authorized chapter filters. Earlier
+status shorthand “CLI42” counted the separately filtered spec harness; the
+non-spec command selects41, not42. The raw reported test totals also include
+one nested multicore child-harness result; final totals distinguish that.
+
+13:05: spec9 PASS140/140 at O0/O2, including
+continuation_environment_join and light_boundary_kept_raise. This locally
+validates the incoming continuation fix and the boundary stop-coordinate
+correction against the native resolver/backend chain. Spec15.7 follows.
+No expectation or fixture is changed during the gate.
+
+13:06: spec15.7 PASS28/28 at both O0/O2,1 existing pending skip. All four
+requested chapter commands now pass:80,114,140,28 cases respectively. The
+chapter9 late environment regression and every selected stop frame remain
+exactly compared. Short generation is now running on the merged release
+compiler. No fixture or expected output was regenerated to obtain these
+results; the ordinary spec header assertions remain unchanged.
+
+13:13 completed runtime/static phase, every command exit0: generation short
+(seed412,count8) has32 original cases (20 accepted,12 rejected by the model),
+64 declaration permutations,32 annotation removals,0 failures. The existing
+source-annotation/permanent-read report-only check is unchanged. Private
+migration all-target check PASS and all23 private library tests PASS. Cargo
+fmt, private cargo fmt and fresh-release `i fmt --check lib std bench examples`
+all PASS. No source/expectation changes were needed during this whole phase.
+
+The complete fresh-backend CLI replay has begun on the same production
+source (compiler changes last at e840; later commits only proof/docs). Full
+Rust and ordinary direct snippets follow it. All required command families
+have passed cumulatively, but final exact-backend replay results remain
+pending and are not represented as already green. The committed candidate
+contains the complete deleted-file port inventory and explained diagnostic
+changes; latest tyalt c220 is still an ancestor.

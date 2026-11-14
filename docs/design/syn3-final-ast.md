@@ -925,3 +925,11 @@ migration/final formatting and a complete fresh-backend CLI/macro replay
 remain pending. The full-new-base green hash is not claimed yet.
 Steps2c/2d/3/4 implementation stays complete; this is the final integration
 gate, with no production old tree or lowerer reintroduced.
+
+Nov14 13:13: runtime/static integration phase entirely green: requested
+spec filters6/7/9/15.7 pass80/114/140/28 cases at both levels; short generation
+passes32 originals,64 permutations and32 annotation removals; private
+migration all-target/23-unit checks and all formatting pass. Both std levels
+remain2170/2170. The complete fresh-backend CLI replay is active; complete
+four-crate Rust and direct snippets follow serially. Final full-green hash
+awaits those results. There has been no production change since e840c135b.
