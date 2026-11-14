@@ -25,12 +25,12 @@ export interface DocsProps extends ProviderProps {
 function ReaderFooter(props: FooterProps) {
   const pathname = usePathname();
   const pages = useFooterItems();
-  if (!pathname.startsWith('/docs/library')) return <PageFooter {...props} />;
+  if (!pathname.startsWith('/docs/library')) return <PageFooter {...props} data-page-chrome="" />;
   const current = pages.findIndex((page) => page.url.replace(/\/$/, '') === pathname.replace(/\/$/, ''));
   const items = props.items ?? (current < 0 ? {} : { previous: pages[current - 1], next: pages[current + 1] });
   const keep = (item: NonNullable<FooterProps['items']>['next']) =>
     item && !/^\/docs\/standard(?:\/|$)/.test(item.url) ? item : undefined;
-  return <PageFooter {...props} items={{ previous: keep(items.previous), next: keep(items.next) }} />;
+  return <PageFooter {...props} data-page-chrome="" items={{ previous: keep(items.previous), next: keep(items.next) }} />;
 }
 
 /**

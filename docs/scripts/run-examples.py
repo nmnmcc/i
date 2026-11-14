@@ -54,6 +54,8 @@ class Example:
     filename: str | None = None
     environment: dict = field(default_factory=dict)
     compare_test_output: bool = False
+    shared_files: dict = field(default_factory=dict)
+    compare_error_output: bool = False
 
 
 def read_page(page):
@@ -90,7 +92,8 @@ def read_page(page):
             output = ''
             options = i_options(block.info)[1]
             compare_test_output = kind == 'test' and options.get('stdout') == 'exact'
-            if kind in ('run', 'test-fails', 'types', 'format') or compare_test_output:
+            compare_error_output = kind == 'error' and options.get('stderr') == 'exact'
+            if kind in ('run', 'test-fails', 'types', 'format') or compare_test_output or compare_error_output:
                 following = index + 1
                 # A failure transcript may show the reproduction command first.
                 if kind == 'test-fails':
@@ -99,15 +102,39 @@ def read_page(page):
                 if following >= len(blocks) or blocks[following].info != 'text' or not blocks[following].closed:
                     raise ValueError(kind + ' needs a closed text fence after it')
                 output = blocks[following].source
+            shared_files = project_sources(page, options['project']) if 'project' in options else {}
             package = options.get('package')
             environment = {key[4:]: value for key, value in options.items() if key.startswith('env.')}
             examples.append(Example(page, block.line, kind, block.source, files, output, codes,
-                                    package, path, environment, compare_test_output))
+                                    package, path, environment, compare_test_output, shared_files, compare_error_output))
         except ValueError as error:
             failures.append(Failure(page, block.line, 'a valid example fence', str(error)))
     for name, block in pending.items():
         failures.append(Failure(page, block.line, 'an example after file=' + name, 'end of page'))
     return examples, failures, counts
+
+
+def project_sources(page, name):
+    """Load a page-relative, local template without exposing it as page prose."""
+    safe_file(name)
+    directory = page.parent / name
+    if directory.is_symlink() or not directory.is_dir() or not directory.resolve().is_relative_to(page.parent.resolve()):
+        raise ValueError('project= must name a local directory below the page')
+    sources = {}
+    try:
+        for file in sorted(directory.rglob('*')):
+            relative = file.relative_to(directory)
+            if relative.parts[0] in ('.git', 'target', 'build', 'generated'):
+                continue
+            if file.is_symlink():
+                raise ValueError('project= files must not be symlinks: ' + str(relative))
+            if file.is_file():
+                sources[safe_file(relative.as_posix())] = file.read_text()
+    except OSError as error:
+        raise ValueError('cannot read project=: ' + str(error)) from error
+    if not sources:
+        raise ValueError('project= directory has no files')
+    return sources
 
 
 def page_name(page):
@@ -136,7 +163,7 @@ def prepare(example, project):
     main = example.filename or (f'test/{page_name(example.page)}_test.i' if testing else 'src/main.i')
     if main in example.files:
         raise ValueError(f'file={main} duplicates the example source')
-    sources = {**example.files, main: example.source}
+    sources = {**example.shared_files, **example.files, main: example.source}
     manifest = tomllib.loads(sources.pop('i.toml', ''))
     manifest['name'] = name
     std = {'path': str(ROOT / 'std')}
@@ -211,7 +238,7 @@ def run_example(example, binary, timeout=TIMEOUT):
                         'format': f'exit 0 and formatted source={example.output!r}',
                         'shown': 'exit 0 and no diagnostics',
                         'shown-unchecked': 'syntax that parses (type checking intentionally omitted)',
-                        'error': 'nonzero exit and codes=' + repr(sorted(example.codes))}[example.kind]
+                        'error': 'nonzero exit and codes=' + repr(sorted(example.codes)) + (f' and stderr={example.output!r}' if example.compare_error_output else '')}[example.kind]
             try:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -239,7 +266,7 @@ def run_example(example, binary, timeout=TIMEOUT):
             elif example.kind == 'shown-unchecked':
                 passed = status == 0
             else:
-                passed = status > 0 and codes == example.codes
+                passed = status > 0 and codes == example.codes and (not example.compare_error_output or stderr == example.output)
             if not passed:
                 failures.append(Failure(example.page, example.line, f'{label}: {expected}',
                                         f'exit {status}, codes={sorted(codes)!r}, stdout={stdout!r}, stderr={stderr!r}{details}'))
