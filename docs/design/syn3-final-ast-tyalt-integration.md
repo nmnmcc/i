@@ -318,3 +318,15 @@ cases totals764 pass,4 existing ignored,1 requested recovery skip. The three
 complete CLI binaries are now being rebuilt/rerun against the late backend
 and the exact explained fixture repairs. This checkpoint is compiling, not
 claimed fully green until the remaining runtime/generation gate finishes.
+
+12:36 latest tyalt c220161d5 merged without conflicts: only the annotation
+formatter script and the new stop-position proof. Python AST parsing of the
+script passes. An independent audit checks that each of the five old/new
+coordinates points to the identical declared statement in origin/main and
+this tree, and both raw fixtures match their baseline bytes and proof SHA256.
+All seven proof entries pass; no compiler, fixture source or diagnostic is
+changed by this proof-only follow-up. The source remains the already compiling
+and clippy-green e840c135b frontend/backend. Wasm unit result:27/27 pass.
+The first combined CLI/syntax log reports416 passes,3 known failures and2
+existing ignored (includes child harness output); full binary failures are
+exactly the three listed above. No further target fails.
