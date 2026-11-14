@@ -45,6 +45,17 @@ on captured-row operations; the broader ordinary-environment model and catch
 migration scope have been queried. R3's old exclusive-kind paragraph is no
 longer a valid justification for any corpus rejection.
 
+The stored-callback audit found and repairs an additional R3-dependent defect:
+the port made `Stream` and `Sink` covariant in their residual need and made the
+stream error label phantom. Restore main's stream signatures and ordinary
+negative markers. Std-1 §3.1: “A/E are covariant; N is invariant.” Std-2 §6.3 L5:
+“E is covariant; N is invariant through the unused `(N)->Nil` marker”. The new
+mixed-variable ruling allows this original representation again. The vendored
+stream source and its four error-label annotations follow the same restoration;
+every test assertion and algorithm is unchanged. A checker regression reads
+the actual shipped declarations and checks error covariance plus both negative
+need-coercion cases. The E4 Result-data choices remain unchanged.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**

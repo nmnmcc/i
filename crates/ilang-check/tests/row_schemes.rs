@@ -1067,3 +1067,39 @@ fn a_bottom_returning_method_can_satisfy_two_covariant_needs() {
         graph.sources.render_all(&checked.diags)
     );
 }
+
+#[test]
+fn shipped_stored_callback_types_keep_their_need_invariant() {
+    // std-1 §3.1 and std-2 L5 require invariant N. Read the shipped
+    // declarations, rather than a second copy that could miss a port bug.
+    let stream = include_str!("../../../std/src/stream.i");
+    let log = include_str!("../../../std/src/log.i");
+    let declarations = stream
+        .lines()
+        .filter(|line| {
+            ["Stream(", "Done =", "Next(", "Step("]
+                .iter()
+                .any(|prefix| line.starts_with(prefix))
+        })
+        .chain(log.lines().filter(|line| line.starts_with("Sink(")))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let head = format!("Level = ()\nEntry = ()\nConsumer(A) = ((A) -> Nil)\n{declarations}\n");
+    types(&format!(
+        "{head}widen_error = (s: Stream(Int, Never, Never)) -> Stream(Int, String, Never) {{ s }}"
+    ));
+    for body in [
+        "bad = (s: Stream(Int, String, Consumer(Int))) -> Stream(Int, String, Consumer(Never)) { s }",
+        "bad = (s: Sink(String, Consumer(Int))) -> Sink(String, Consumer(Never)) { s }",
+        "bad = (s: Stream(Int, String, Never)) -> Stream(Int, Never, Never) { s }",
+    ] {
+        let source = format!("{head}{body}");
+        let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.is_error()),
+            "{body}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
+}
