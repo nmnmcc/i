@@ -1,5 +1,136 @@
 ---
 title: First program
+description: Create a package, run its program, and add a test.
 ---
 
-to be written
+Create a package with `i new`, run its program, then change and test it. This assumes `i` is on your `PATH` and you have a checkout of the i repository for `std`.
+
+```sh
+i new hello
+```
+```text
+made the package `hello` in `hello`
+run it with `i run --project hello`
+```
+
+The command creates `hello/i.toml`, `.gitignore`, `src/main.i`, and `test/main_test.i`. The generated manifest uses a local path for the test dependency `std`. If it does not point to the `std` directory in your i checkout, edit the `std` path under `[dev-dependencies]` in `i.toml` to that directory. Paths can be absolute or relative to the package directory.
+
+The generated `src/main.i` is:
+
+```i run
+//// The package `hello`. It imports the standard service `Io` from `i/io`
+//// (§9.7), and `i run` gives it, so the program can print.
+(
+	(Io) = i/io
+)
+
+(
+	greeting
+)
+
+/// The greeting for `who`.
+greeting = (who : String) -> String { "Hello, " <> who <> "!" }
+
+main = () <- (io : Io) { io.print(greeting("hello")) }
+```
+```text
+Hello, hello!
+```
+
+The `////` lines document the module. The first parenthesized group imports `Io` from `i/io`. The second group exports `greeting` so another module can use it. The `///` line documents that function. `greeting` takes a `String` and joins its argument to two string literals. `main` is the program entry; it needs an `Io` service and calls its `print` function with the greeting. Read about [values](/docs/tour/values-and-data), [functions](/docs/tour/functions-and-branches), [packages](/docs/tour/packages), and [services](/docs/tour/services-and-errors) in the tour.
+
+Enter the project and run it:
+
+```sh
+cd hello
+i run
+```
+```text
+Hello, hello!
+```
+
+Change the argument in `main` to `"world"`, leaving the rest of the file as follows:
+
+```i run
+//// The package `hello`. It imports the standard service `Io` from `i/io`
+//// (§9.7), and `i run` gives it, so the program can print.
+(
+	(Io) = i/io
+)
+
+(
+	greeting
+)
+
+/// The greeting for `who`.
+greeting = (who : String) -> String { "Hello, " <> who <> "!" }
+
+main = () <- (io : Io) { io.print(greeting("world")) }
+```
+```text
+Hello, world!
+```
+
+```sh
+i run
+```
+```text
+Hello, world!
+```
+
+The generated test already checks `greeting`. Add a second test so `test/main_test.i` contains:
+
+```i file=src/main.i
+//// The package `hello`. It imports the standard service `Io` from `i/io`
+//// (§9.7), and `i run` gives it, so the program can print.
+(
+	(Io) = i/io
+)
+
+(
+	greeting
+)
+
+/// The greeting for `who`.
+greeting = (who : String) -> String { "Hello, " <> who <> "!" }
+
+main = () <- (io : Io) { io.print(greeting("world")) }
+```
+```i test
+(
+	testlib = (test) = std/test
+	hello/main
+)
+
+test("greets", () {
+	main.greeting("i") |> ("Hello, i!") { Nil } | (other) { panic(other) }
+})
+
+test("greets the world", () {
+	main.greeting("world") |>
+		("Hello, world!") { Nil }
+		| (other) { panic(other) }
+})
+```
+
+```sh
+i test
+```
+```text
+pass hello/main_test.greets
+pass hello/main_test.greets the world
+2 passed, 0 failed
+```
+
+Format the source and check the package:
+
+```sh
+i fmt
+i check
+```
+
+Both commands completed with no output in this run. `i fmt` writes formatted source; `i check` checks the package without running the program.
+
+## See also
+
+[Modules](/docs/standard/generated/chapter-2) · [Editor set-up](/docs/getting-started/editor-set-up)
