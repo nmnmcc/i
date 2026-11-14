@@ -31,6 +31,8 @@ pub fn parse_module(source: &str) -> (ast::Module, Vec<Diagnostic>) {
 '''
     for path in tests.glob('*.rs'):
         text = path.read_text()
+        if path.name == 'syn3.rs':
+            text = text.replace('use ilang_syntax::lexer::{lex, lex3};', 'use ::ilang_syntax::lexer::{lex, lex3};')
         if path.name == 'common.rs':
             path.write_text(text.replace('ilang_syntax::', 'migration_syntax::'))
             continue

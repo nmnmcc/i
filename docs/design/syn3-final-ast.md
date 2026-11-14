@@ -859,3 +859,14 @@ library tests pass23/23 after correcting only the moved package's repository
 path; the complete corpus/renderer assertions are unchanged. The scheduler
 was paused while these retries ran, so no heavy commands overlapped. Main
 Rust/CLI/std/spec/generation tests resume next. This is not a green4 claim.
+
+
+08:40 deletion Rust/CLI milestone: all757 Rust tests pass (four existing
+ignored, requested recovery skip), counting the strict resolver comparison
+and all unchanged diagnostic goldens. The sole initial syn3 lexer failure
+was a test adapter importing the private historical lexer; explicitly
+selecting the production lexer retains every token assertion and all35
+syn3 tests pass. All39 CLI integration binaries and the CLI library also
+pass, including the five full engine-boundary answers. Private tests23/23
+and strict clippy are green. Release/examples/std/spec/generation/source
+format checks follow; no full-green deletion claim yet.

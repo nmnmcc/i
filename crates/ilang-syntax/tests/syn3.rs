@@ -745,7 +745,7 @@ fn generics() {
 
 #[test]
 fn lexer() {
-    use ilang_syntax::lexer::{lex, lex3};
+    use ::ilang_syntax::lexer::{lex, lex3};
     use ilang_syntax::token::TokenKind as T;
     let kinds = |s: &str| {
         lex3(s)

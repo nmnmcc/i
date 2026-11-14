@@ -501,3 +501,28 @@ Clippy retry0 (step4-clippy-retry.log), private test retry0
 (step4-private-test-retry.log), cleanup formatter0 and diff check0. No
 expectation is re-recorded and no test assertion is removed. The broader
 full-gate results follow.
+
+
+## Rust and CLI deletion results (08:40)
+
+The four-package Rust command below reports756 pass and one failed lexer
+test initially; all other targets pass. The test adapter had selected the
+private historical lexer for a public syntax-three lexer assertion. Its
+import now explicitly selects the production crate; every assertion stays.
+All35 syn3 tests pass on retry, completing757 Rust passes,4 existing ignored
+and the requested reverse-order recovery skip. LSP cold-std latency and the
+strict complete resolver differential both pass unchanged.
+
+All39 CLI integration binaries plus the CLI library pass. This includes
+all62 macro-run cases and the preserved five original engine answers.
+
+```sh
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-syntax -p ilang-macro -p ilang-check -p ilang-lsp --locked --no-fail-fast -- --skip spec_corpus_reverse_order_and_recovery --test-threads=2
+/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test -p ilang-syntax --test syn3 --locked -- --test-threads=2
+```
+
+The CLI command is the same complete39-binary command recorded for step3,
+with no legacy feature, in target/fa-r3/step4-cli.command. It exits0; its
+scheduler remains paused until the lexer retry completes to avoid overlap.
+Root Rust log: step4-rust.log; syntax retry0: step4-syn3-retry.log. Runtime
+release/examples/std/spec/generation/source-format results remain pending.
