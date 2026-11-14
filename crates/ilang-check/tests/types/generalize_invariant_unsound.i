@@ -1,5 +1,5 @@
-// §4.5 rule 4: service arguments must be equal, even for a Sink whose
-// ordinary parameter goes in the other direction under rule 6.
+// §4.5 rule 4: a provided Sink must be a subtype of the needed Sink.
+// Sink(Never) cannot accept the Int that needs_int sends.
 Sink(A) = (put = (A) -> Nil)
 
 needs_int: () <- (Sink(Int)) -> Nil = () <- (s: Sink(Int)) { s.put(1) }

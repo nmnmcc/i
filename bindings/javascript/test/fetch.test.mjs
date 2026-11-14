@@ -10,8 +10,9 @@ import { instantiate, GuestError } from '../ilang.mjs';
 const root = resolve(import.meta.dirname, '../../..');
 const cli = resolve(root, 'target/debug/i');
 
-// Compile once, then exercise ordinary http functions through their JS provider plan.
-test('fetch provider: GET POST headers status timeout cancel refused streamed body', { timeout: 120000 }, async t => {
+// Exercise ordinary http functions through their JS provider plan at both levels.
+for (const opt of [0, 2]) {
+test(`fetch provider at O${opt}: GET POST headers status timeout cancel refused streamed body`, { timeout: 120000 }, async t => {
   let aborted, bodyAborted, streamResponse;
   const wasAborted = new Promise(resolve => { aborted = resolve; });
   const bodyWasAborted = new Promise(resolve => { bodyAborted = resolve; });
@@ -55,13 +56,17 @@ test('fetch provider: GET POST headers status timeout cancel refused streamed bo
 	cancel
 	stream
 )
-checked = <A, N>(body: () <- N -> A) -> A {
-	fail.catch(body) |>
+checked = <A, E, N>(body: () <- (Fail(E), http.Client, ..N) -> A) <- (handler: Fail(String)) -> A {
+	fail.catch(() {
+		// Retain the provision frame across suspension (lazy-reentry.md D16).
+		value = body() <- (http.fetch_client())
+		value
+	}) |>
 		(Ok(value)) { value }
-		| (Error(e)) { fail.raise(core.inspect(e)) }
+		| (Error(e)) { handler.raise(core.inspect(e)) }
 }
 text = (res: http.Response) {
-	http.body_text(res) |> (Ok(s)) { s } | (Error(_)) { panic("bad UTF-8") }
+	fail.catch(() { http.body_text(res) }) |> (Ok(s)) { s } | (Error(_)) { panic("bad UTF-8") }
 }
 get = (url: String) { checked(() { text(http.get(url)) }) }
 post = (url: String) { checked(() { text(http.post(url, <<"posted":utf8>>)) }) }
@@ -126,7 +131,7 @@ stream = (url: String) {
 	})
 }
 `);
-    execFileSync(cli, ['build', '--project', dir, '--target', 'js', '--opt', '0'], { stdio: 'pipe' });
+    execFileSync(cli, ['build', '--project', dir, '--target', 'js', '--opt', String(opt)], { stdio: 'pipe' });
     const wasm = await readFile(join(dir, 'build/app.wasm'));
     const plan = execFileSync(cli, ['deps', '--project', dir, '--target', 'js'], { encoding: 'utf8' });
     assert.match(plan, /fetch/); assert.doesNotMatch(plan, /i:(net|tls)\//);
@@ -147,3 +152,4 @@ stream = (url: String) {
     await t.test('stream reads arrive before response end', async () => assert.equal(await guest.callAsync('app/main.stream', [base + '/stream']), 'stream ok'));
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(dir, { recursive: true, force: true }); }
 });
+}

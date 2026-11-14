@@ -6,4 +6,4 @@ Yield(A) = (emit = (A) -> Nil)
 
 emit = <A>(x: A) <- (y: Yield(A)) { y.emit(x) }
 
-f = () { emit(1) <- (Yield(emit = (x) { x })) }
+f = () { emit(1) <- (Yield(emit = (x: Never) { x })) }

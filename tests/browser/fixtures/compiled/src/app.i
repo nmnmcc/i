@@ -38,7 +38,7 @@ greet = (name: String) <- (console: Console) {
 lookup = (key: String) <- (storage: Storage) { storage.read(key) }
 
 /// A host export that calls an external function.
-distance = (a: Float, b: Float) { hypot(a, b) }
+distance = (a: Float, b: Float) -> Float { hypot(a, b) }
 
 /// An async host export: it waits for the host two times.
 wait_sum = (a: Float, b: Float) <- (clock: Clock) {

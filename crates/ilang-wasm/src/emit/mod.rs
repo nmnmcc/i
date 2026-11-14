@@ -51,8 +51,22 @@ const SUPPORT: &str = r#"
   (call $is_data (local.get $v) (i32.const 0) (local.get $n)))
 "#;
 
-/// The `fail` of the `Assert` of entry points, after the host part.
+/// The `fail` of the `Assert` and the `raise` of the `Fail` of entry points,
+/// after the host part.
 const ENTRY: &str = r#"
+;; The `raise` of the platform's `Fail` (§9.3): the error goes to the
+;; entry point, which stops, or to the host of a host export.
+(func $entry_fail_raise (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env)) (param $error eqref) (result eqref)
+  (throw $error (local.get $error)))
+
+;; The raise of the `Fail` of `env` (slot 1, `FAIL_SERVICE`): the glue for
+;; the errors of host functions.
+(func $fail_env (param $error eqref) (param $env (ref null $env)) (result eqref)
+  (drop (call $call1 (call $field (call $service_force
+    (array.get $env (ref.as_non_null (local.get $env)) (i32.const 1)) (local.get $env))
+    (i32.const 0)) (local.get $error) (local.get $env)))
+  (unreachable))
+
 ;; The `fail` of the `Assert` of an entry point (§9.6, §11.7).
 (func $entry_assert_fail (type $fn1) (param $clo (ref null $obj)) (param $env (ref null $env)) (param $failure eqref) (result eqref)
   (call $stop_assertion (call $field (local.get $failure) (i32.const 0)))
@@ -62,15 +76,15 @@ const ENTRY: &str = r#"
 /// The runtime functions whose references are taken.
 const DECLARED: &[&str] = &[
     "$entry_assert_fail",
-    "$catch_reenter",
+    "$entry_fail_raise",
     "$ensure_reenter",
     "$final_reenter",
     "$boundary_reenter",
     "$light_reenter",
     "$cancel_reenter",
     "$control_unpend",
-    "$keep_call",
-    "$keep_reenter",
+    "$adapter_pin_call",
+    "$adapter_pin_reenter",
     "$request_handoff",
     "$wait_requests_reenter",
 ];
@@ -784,9 +798,6 @@ impl<'p> Emitter<'p> {
                 } else if let Value::Op(Op::Panic, args) = value {
                     let a = self.atom(&args[0]);
                     let _ = writeln!(out, "(call $panic {a}) (unreachable)");
-                } else if let Value::Op(Op::Raise, args) = value {
-                    let a = self.atom(&args[0]);
-                    let _ = writeln!(out, "(throw $error {a})");
                 } else {
                     let v = self.value(value);
                     let _ = writeln!(out, "(local.set $l{dst} {v})");
@@ -1336,8 +1347,6 @@ impl<'p> Emitter<'p> {
             Op::StringAppend => format!("(call $string_append {a} {b})"),
             Op::Panic => format!("(call $panic {a}) (unreachable)"),
             Op::Runtime { name, .. } => format!("(call ${name} {})", args.join(" ")),
-            Op::Raise => format!("(throw $error {a})"),
-            Op::Catch => format!("(call $fail_catch {a} {env})"),
             Op::Ensure => format!("(call $resource_ensure {a} {b} {env})"),
             Op::Boundary => format!("(call $control_boundary {a} {env})"),
             Op::Suspend => format!("(call $control_suspend {a} {b})"),
@@ -1346,8 +1355,8 @@ impl<'p> Emitter<'p> {
             Op::Escape => format!("(throw $error (call $escape_payload {a} {b}))"),
             Op::Resume => format!("(call $control_resume {a} {b} {env})"),
             Op::Cancel => format!("(call $control_cancel {a} {env})"),
-            Op::KeepEnv => format!(
-                "(call $control_keep_env {a} {env} (i32.const {}))",
+            Op::PinEnvironment => format!(
+                "(call $adapter_pin_env {a} {env} (i32.const {}))",
                 self.p.services.max(1)
             ),
             Op::WaitRequests => format!("(call $request_wait_any {a} {env})"),
@@ -1428,6 +1437,27 @@ impl<'p> Emitter<'p> {
             Value::OpEnv(op, args, env) => {
                 let args: Vec<String> = args.iter().map(|a| self.atom(a)).collect();
                 self.op(*op, &args, &env_text(*env))
+            }
+            // An ordinary tuple wraps the dense row pointer, so captures
+            // can use the existing portability and worker-transfer paths.
+            // Clear written keys outside N: they stay with the later caller
+            // and must not make this row capture a Fail boundary.
+            Value::Environment(env, excluded) => {
+                // Snapshot only service slots, forcing lazy values. Light
+                // boundary metadata is not part of the captured row.
+                let mut captured = format!(
+                    "(call $row_snapshot {} (i32.const {}))",
+                    env_text(*env),
+                    self.p.services.max(1)
+                );
+                for id in excluded {
+                    captured =
+                        format!("(call $env_with {captured} (i32.const {id}) (ref.null eq))");
+                }
+                format!("(call $tuple (ref.as_non_null {captured}))")
+            }
+            Value::CapturedService(value, id) => {
+                format!("(call $field {} (i32.const {id}))", self.atom(value))
             }
             Value::Light { func, args, env } => {
                 // The body runs in a handler that takes an escape to this
@@ -1882,8 +1912,12 @@ impl<'p> Emitter<'p> {
              (array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {ASSERT_SERVICE})\n\
              (call $record (i32.const 3) (i64.const 2) (array.new_fixed $values 1\n\
              (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 2) (ref.null $bytes)\n\
-             (ref.null $values) (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $entry_assert_fail)))))",
-            self.p.services.max(1)
+             (ref.null $values) (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $entry_assert_fail)))))
+             (array.set $env (ref.as_non_null (global.get $root_env)) (i32.const {FAIL_SERVICE})
+             (call $record (i32.const 4) (i64.const 3) (array.new_fixed $values 1
+             (struct.new $clo1 (i32.const 7) (i32.const 0) (i64.const 1) (f64.const 2) (ref.null $bytes)
+             (ref.null $values) (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $entry_fail_raise)))))",
+            self.p.services.max(2)
         );
         if self.p.start.is_some() {
             self.out

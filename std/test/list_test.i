@@ -727,29 +727,30 @@ test("zip_tco_test", () {
 })
 
 test("strict_zip_empty_second_error_test", () {
-	assert(list.strict_zip([], [1, 2, 3]) == Error(Nil))
+	assert(fail.catch(() { list.strict_zip([], [1, 2, 3]) }) == Error(Nil))
 	Nil
 })
 
 test("strict_zip_empty_first_error_test", () {
-	assert(list.strict_zip([1, 2], []) == Error(Nil))
+	assert(fail.catch(() { list.strict_zip([1, 2], []) }) == Error(Nil))
 	Nil
 })
 
 test("strict_zip_equal_length_ok_test", () {
 	assert(
-		list.strict_zip([1, 2, 3], [4, 5, 6]) == Ok([(1, 4), (2, 5), (3, 6)]),
+		fail.catch(() { list.strict_zip([1, 2, 3], [4, 5, 6]) }) ==
+			Ok([(1, 4), (2, 5), (3, 6)]),
 	)
 	Nil
 })
 
 test("strict_zip_shorter_second_error_test", () {
-	assert(list.strict_zip([5, 6], [1, 2, 3]) == Error(Nil))
+	assert(fail.catch(() { list.strict_zip([5, 6], [1, 2, 3]) }) == Error(Nil))
 	Nil
 })
 
 test("strict_zip_shorter_first_error_test", () {
-	assert(list.strict_zip([5, 6, 7], [1, 2]) == Error(Nil))
+	assert(fail.catch(() { list.strict_zip([5, 6, 7], [1, 2]) }) == Error(Nil))
 	Nil
 })
 

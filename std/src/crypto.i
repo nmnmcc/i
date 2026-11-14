@@ -1,6 +1,6 @@
 //// SHA-2 digests and key derivation in ordinary immutable i.
 //// Digest inputs are bit strings (SHA padding uses their exact bit length).
-//// HMAC and KDF inputs must be whole bytes; errors are values.
+//// HMAC and KDF inputs must be whole bytes; failures use Fail(CryptoError).
 //// Hex codecs already live in std/bit_array.
 (
 	i/core
@@ -474,29 +474,25 @@ hmac = (
 		| (True) { Ok(authenticate(prepare(key, block, hash), input)) }
 }
 
-/// RFC 4231 HMAC-SHA-256: `hmac_sha256(<<1>>, <<2>>)`.
-hmac_sha256 = (key: BitArray, input: BitArray) -> Result(
+_hmac_sha256_result = (key: BitArray, input: BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { hmac(key, input, 64, sha256) }
 
-/// RFC 4231 HMAC-SHA-512, with arbitrary-length byte keys.
-hmac_sha512 = (key: BitArray, input: BitArray) -> Result(
+_hmac_sha512_result = (key: BitArray, input: BitArray) -> Result(
 	BitArray,
 	CryptoError,
 ) { hmac(key, input, 128, sha512) }
 
-/// RFC 5869 extract. Empty salt is equivalent to a hash-length zero salt.
-hkdf_extract_sha256 = (salt: BitArray, input: BitArray) -> Result(
+_hkdf_extract_sha256_result = (salt: BitArray, input: BitArray) -> Result(
 	BitArray,
 	CryptoError,
-) { hmac_sha256(salt, input) }
+) { _hmac_sha256_result(salt, input) }
 
-/// RFC 5869 extract using SHA-512.
-hkdf_extract_sha512 = (salt: BitArray, input: BitArray) -> Result(
+_hkdf_extract_sha512_result = (salt: BitArray, input: BitArray) -> Result(
 	BitArray,
 	CryptoError,
-) { hmac_sha512(salt, input) }
+) { _hmac_sha512_result(salt, input) }
 
 expand = (
 	prk: BitArray,
@@ -537,40 +533,40 @@ expand = (
 		}
 }
 
-/// Expands a SHA-256 PRK into 0..8160 bytes. A short PRK is an error.
-hkdf_expand_sha256 = (prk: BitArray, info: BitArray, length: Int) -> Result(
-	BitArray,
-	CryptoError,
-) { expand(prk, info, length, 32, 64, sha256) }
+_hkdf_expand_sha256_result = (
+	prk: BitArray,
+	info: BitArray,
+	length: Int
+) -> Result(BitArray, CryptoError) { expand(prk, info, length, 32, 64, sha256) }
 
-/// Expands a SHA-512 PRK into 0..16320 bytes.
-hkdf_expand_sha512 = (prk: BitArray, info: BitArray, length: Int) -> Result(
-	BitArray,
-	CryptoError,
-) { expand(prk, info, length, 64, 128, sha512) }
-
-/// Extracts then expands: `hkdf_sha256(key, <<>>, <<>>, 32)`.
-hkdf_sha256 = (
-	input: BitArray,
-	salt: BitArray,
+_hkdf_expand_sha512_result = (
+	prk: BitArray,
 	info: BitArray,
 	length: Int
 ) -> Result(BitArray, CryptoError) {
-	hkdf_extract_sha256(salt, input) |>
-		(Error(e)) { Error(e) }
-		| (Ok(prk)) { hkdf_expand_sha256(prk, info, length) }
+	expand(prk, info, length, 64, 128, sha512)
 }
 
-/// HKDF with SHA-512.
-hkdf_sha512 = (
+_hkdf_sha256_result = (
 	input: BitArray,
 	salt: BitArray,
 	info: BitArray,
 	length: Int
 ) -> Result(BitArray, CryptoError) {
-	hkdf_extract_sha512(salt, input) |>
+	_hkdf_extract_sha256_result(salt, input) |>
 		(Error(e)) { Error(e) }
-		| (Ok(prk)) { hkdf_expand_sha512(prk, info, length) }
+		| (Ok(prk)) { _hkdf_expand_sha256_result(prk, info, length) }
+}
+
+_hkdf_sha512_result = (
+	input: BitArray,
+	salt: BitArray,
+	info: BitArray,
+	length: Int
+) -> Result(BitArray, CryptoError) {
+	_hkdf_extract_sha512_result(salt, input) |>
+		(Error(e)) { Error(e) }
+		| (Ok(prk)) { _hkdf_expand_sha512_result(prk, info, length) }
 }
 
 xor_bits = (a: BitArray, b: BitArray) -> BitArray {
@@ -580,9 +576,7 @@ xor_bits = (a: BitArray, b: BitArray) -> BitArray {
 		| (_) { panic("crypto: equal digest lengths") }
 }
 
-/// PBKDF2-HMAC-SHA-256, positive iteration count and 0..(2^32-1)*32 bytes.
-/// `pbkdf2_sha256(<<"password":utf8>>, <<"salt":utf8>>, 1, 32)`.
-pbkdf2_sha256 = (
+_pbkdf2_sha256_result = (
 	password: BitArray,
 	salt: BitArray,
 	iterations: Int,
@@ -670,9 +664,94 @@ constant_time_equal = (a: BitArray, b: BitArray) -> Bool {
 		}
 }
 
-/// Secure bytes from the existing Entropy service. No pseudo-random substitute.
-random_bytes = (length: Int) -> Result(BitArray, CryptoError) {
+_random_bytes_result = (length: Int) -> Result(BitArray, CryptoError) {
 	{ length < 0 } |>
 		(True) { Error(InvalidLength) }
 		| (False) { Ok(process.entropy(length)) }
+}
+
+/// RFC 4231 HMAC-SHA-256: `hmac_sha256(<<1>>, <<2>>)`.
+///
+/// Reports failure through `Fail(CryptoError)`.
+hmac_sha256 = (key: BitArray, input: BitArray) -> BitArray {
+	fail.from_result(_hmac_sha256_result(key, input))
+}
+
+/// RFC 4231 HMAC-SHA-512, with arbitrary-length byte keys.
+///
+/// Reports failure through `Fail(CryptoError)`.
+hmac_sha512 = (key: BitArray, input: BitArray) -> BitArray {
+	fail.from_result(_hmac_sha512_result(key, input))
+}
+
+/// RFC 5869 extract. Empty salt is equivalent to a hash-length zero salt.
+///
+/// Reports failure through `Fail(CryptoError)`.
+hkdf_extract_sha256 = (salt: BitArray, input: BitArray) -> BitArray {
+	fail.from_result(_hkdf_extract_sha256_result(salt, input))
+}
+
+/// RFC 5869 extract using SHA-512.
+///
+/// Reports failure through `Fail(CryptoError)`.
+hkdf_extract_sha512 = (salt: BitArray, input: BitArray) -> BitArray {
+	fail.from_result(_hkdf_extract_sha512_result(salt, input))
+}
+
+/// Expands a SHA-256 PRK into 0..8160 bytes. A short PRK is an error.
+///
+/// Reports failure through `Fail(CryptoError)`.
+hkdf_expand_sha256 = (prk: BitArray, info: BitArray, length: Int) -> BitArray {
+	fail.from_result(_hkdf_expand_sha256_result(prk, info, length))
+}
+
+/// Expands a SHA-512 PRK into 0..16320 bytes.
+///
+/// Reports failure through `Fail(CryptoError)`.
+hkdf_expand_sha512 = (prk: BitArray, info: BitArray, length: Int) -> BitArray {
+	fail.from_result(_hkdf_expand_sha512_result(prk, info, length))
+}
+
+/// Extracts then expands: `hkdf_sha256(key, <<>>, <<>>, 32)`.
+///
+/// Reports failure through `Fail(CryptoError)`.
+hkdf_sha256 = (
+	input: BitArray,
+	salt: BitArray,
+	info: BitArray,
+	length: Int
+) -> BitArray {
+	fail.from_result(_hkdf_sha256_result(input, salt, info, length))
+}
+
+/// HKDF with SHA-512.
+///
+/// Reports failure through `Fail(CryptoError)`.
+hkdf_sha512 = (
+	input: BitArray,
+	salt: BitArray,
+	info: BitArray,
+	length: Int
+) -> BitArray {
+	fail.from_result(_hkdf_sha512_result(input, salt, info, length))
+}
+
+/// PBKDF2-HMAC-SHA-256, positive iteration count and 0..(2^32-1)*32 bytes.
+/// `pbkdf2_sha256(<<"password":utf8>>, <<"salt":utf8>>, 1, 32)`.
+///
+/// Reports failure through `Fail(CryptoError)`.
+pbkdf2_sha256 = (
+	password: BitArray,
+	salt: BitArray,
+	iterations: Int,
+	length: Int
+) -> BitArray {
+	fail.from_result(_pbkdf2_sha256_result(password, salt, iterations, length))
+}
+
+/// Secure bytes from the existing Entropy service. No pseudo-random substitute.
+///
+/// Reports failure through `Fail(CryptoError)`.
+random_bytes = (length: Int) -> BitArray {
+	fail.from_result(_random_bytes_result(length))
 }

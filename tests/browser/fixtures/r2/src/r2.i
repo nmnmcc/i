@@ -37,42 +37,53 @@ Gates = (wait = (Int) -> Request(Int))
 @host("r2:control/v1")
 Control = (release = (Int) -> Nil, check = (Int) -> Nil)
 
+// These exports have no ordinary failure; retain all other service needs.
+NoFail(N) = N - Fail(Never)
+
+without_fail = <A, N>(body: () <- (NoFail(N)) -> A) -> A { body() }
+
 // §6.4: both starts precede release; polls cannot starve the runnable releaser.
 overlap = () <- (gates: Gates, control: Control) {
-	task.scope((s) {
-		a = task.go(s, () { request.await_owned(gates.wait(1)) })
-		b = task.go(s, () { request.await_owned(gates.wait(2)) })
-		task.go(s, () { control.release(0) })
-		task.join(a) + task.join(b)
+	without_fail(() {
+		task.scope((s) {
+			a = task.go(s, () { request.await_owned(gates.wait(1)) })
+			b = task.go(s, () { request.await_owned(gates.wait(2)) })
+			task.go(s, () { control.release(0) })
+			task.join(a) + task.join(b)
+		})
 	})
 }
 
 // §5.1: an unlisted completion is stored while the original wait continues.
 unlisted_answer = () <- (gates: Gates, control: Control) {
-	a = gates.wait(1)
-	b = gates.wait(2)
-	control.release(2)
-	task.scope((s) {
-		first = task.go(s, () { request.await_owned(a) })
-		task.go(s, () {
-			ready_wait(b)
-			control.release(1)
+	without_fail(() {
+		a = gates.wait(1)
+		b = gates.wait(2)
+		control.release(2)
+		task.scope((s) {
+			first = task.go(s, () { request.await_owned(a) })
+			task.go(s, () {
+				ready_wait(b)
+				control.release(1)
+			})
+			value = task.join(first)
+			assert(request.state(b) == request.Ready(2))
+			value + request.await_owned(b)
 		})
-		value = task.join(first)
-		assert(request.state(b) == request.Ready(2))
-		value + request.await_owned(b)
 	})
 }
 
 // §6.4: go keeps the parent turn but polls an existing IO interest.
 go_progress = () <- (gates: Gates, control: Control) {
-	task.scope((s) {
-		waiter = task.go(s, () { request.await_owned(gates.wait(10)) })
-		task.yield()
-		control.release(10)
-		task.go(s, () { Nil })
-		control.check(5)
-		task.join(waiter)
+	without_fail(() {
+		task.scope((s) {
+			waiter = task.go(s, () { request.await_owned(gates.wait(10)) })
+			task.yield()
+			control.release(10)
+			task.go(s, () { Nil })
+			control.check(5)
+			task.join(waiter)
+		})
 	})
 }
 
@@ -118,26 +129,28 @@ ready_wait = <A>(r: Request(A)) <- (await: request.Await) {
 
 // §5.4 race-then-read: the losing waiter never owns the producer.
 race_read = () <- (gates: Gates, control: Control) {
-	a = gates.wait(1)
-	b = gates.wait(2)
-	task.scope((s) {
-		task.go(s, () { control.release(2) })
-		winner = task.race(
-			() {
-				ready_wait(a)
-				1
-			},
-			() {
-				ready_wait(b)
-				2
-			},
-		)
-		assert(winner == 2)
-		control.check(3)
-		value = request.await_owned(b)
-		assert(value == 2)
-		assert(request.state(a) == request.Waiting)
-		value
+	without_fail(() {
+		a = gates.wait(1)
+		b = gates.wait(2)
+		task.scope((s) {
+			task.go(s, () { control.release(2) })
+			winner = task.race(
+				() {
+					ready_wait(a)
+					1
+				},
+				() {
+					ready_wait(b)
+					2
+				},
+			)
+			assert(winner == 2)
+			control.check(3)
+			value = request.await_owned(b)
+			assert(value == 2)
+			assert(request.state(a) == request.Waiting)
+			value
+		})
 	})
 }
 
@@ -148,17 +161,19 @@ forever = () -> Never {
 
 // §12.8: nested waiter interests reach the root despite a CPU-yielding sibling.
 nested_interest = () <- (gates: Gates) {
-	task.race(
-		() {
-			task.run(() {
-				task.race(
-					() { request.await_owned(gates.wait(9)) },
-					() { bounded_cpu(32) },
-				)
-			})
-		},
-		forever,
-	)
+	without_fail(() {
+		task.race(
+			() {
+				task.run(() {
+					task.race(
+						() { request.await_owned(gates.wait(9)) },
+						() { bounded_cpu(32) },
+					)
+				})
+			},
+			forever,
+		)
+	})
 }
 
 // A missing nested progress-interest route fails after turns, without a timer
@@ -174,21 +189,25 @@ bounded_cpu = (turns: Int) -> Never {
 
 // §6.4: every Owner affiliated with this run's Root counts as work.
 owned_idle = () <- (gates: Gates) {
-	{
-		gates.wait(9)
-		task.sync(task.never())
-		Nil
-	} <- (request.open_owner())
+	without_fail(() {
+		{
+			gates.wait(9)
+			task.sync(task.never())
+			Nil
+		} <- (request.open_owner())
+	})
 }
 
 // §6.4: a producer in a different Root cannot keep this run alive.
 unrelated_idle = () <- (gates: Gates) {
-	unrelated = request.open_root()
-	{
-		gates.wait(9)
-		task.sync(task.never())
-		Nil
-	} <- (request.open_owner()) <- (unrelated)
+	without_fail(() {
+		unrelated = request.open_root()
+		{
+			gates.wait(9)
+			task.sync(task.never())
+			Nil
+		} <- (request.open_owner()) <- (unrelated)
+	})
 }
 
 // §12.8: raw work alone does not authorize runnable progress polls.
@@ -201,23 +220,25 @@ raw_only = () <- (gates: Gates, control: Control) {
 }
 
 pure_tasks = () {
-	task.both(
-		() {
-			task.yield()
-			2
-		},
-		() {
-			task.yield()
-			5
-		},
-	) |> ((a, b)) { a + b }
+	without_fail(() {
+		task.both(
+			() {
+				task.yield()
+				2
+			},
+			() {
+				task.yield()
+				5
+			},
+		) |> ((a, b)) { a + b }
+	})
 }
 
 cmp = (a: Float, b: Float) { a -. b }
 
 cmp2 = (a: Float, b: Float) { cmp(a, b) }
 
-fake = () { request.await_owned(request.ready(7)) }
+fake = () { without_fail(() { request.await_owned(request.ready(7)) }) }
 
 sync_poll = () { request.poll() }
 

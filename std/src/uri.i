@@ -95,8 +95,7 @@ InvalidUtf8 = ()
 UnalignedBits = ()
 CodecError = BadEscape | NonAscii | InvalidUtf8 | UnalignedBits
 
-/// Parses without repairing, decoding or normalizing any component.
-parse = (text: String) -> Result(Uri, UriError) {
+_parse_result = (text: String) -> Result(Uri, UriError) {
 	fail.catch(() {
 		raw = bytes(text)
 		lexical(raw, WholePart)
@@ -155,8 +154,9 @@ parse = (text: String) -> Result(Uri, UriError) {
 	})
 }
 
-/// Validates raw candidate fields and their cross-field grammar constraints.
-build = (parts: Parts) -> Result(Uri, UriError) { validated(parts, False) }
+_build_result = (parts: Parts) -> Result(Uri, UriError) {
+	validated(parts, False)
+}
 
 /// Projects the original raw fields in constant field work.
 parts = (uri: Uri) -> Parts {
@@ -195,8 +195,7 @@ to_string = (uri: Uri) -> String {
 
 has_scheme = (uri: Uri) -> Bool { parts(uri).scheme != None }
 
-/// Strict RFC 5.2 resolution over encoded paths, followed by build validation.
-resolve = (base: Uri, reference: Uri) -> Result(Uri, UriError) {
+_resolve_result = (base: Uri, reference: Uri) -> Result(Uri, UriError) {
 	b = parts(base)
 	r = parts(reference)
 	b.scheme |>
@@ -243,7 +242,7 @@ resolve = (base: Uri, reference: Uri) -> Result(Uri, UriError) {
 							)
 						}
 				}
-			build(candidate)
+			_build_result(candidate)
 		}
 }
 
@@ -252,24 +251,24 @@ encode_component = (text: String) -> String {
 	encode_octets(bytes(text), False)
 }
 
-encode_bytes = (bytes: BitArray) -> Result(String, CodecError) {
+_encode_bytes_result = (bytes: BitArray) -> Result(String, CodecError) {
 	{ bit_array.bit_size(bytes) % 8 == 0 } |>
 		(True) { Ok(encode_octets(octets(bytes), False)) }
 		| (False) { Error(UnalignedBits) }
 }
 
-/// Decodes once, leaves plus unchanged, then validates UTF-8.
-decode_component = (text: String) -> Result(String, CodecError) {
+_decode_component_result = (text: String) -> Result(String, CodecError) {
 	fail.catch(() { decode_text(text, False) })
 }
 
-/// Decodes arbitrary octets; literal ASCII has no component grammar restriction.
-decode_bytes = (text: String) -> Result(BitArray, CodecError) {
+_decode_bytes_result = (text: String) -> Result(BitArray, CodecError) {
 	fail.catch(() { decode_raw(bytes(text), False) })
 }
 
-/// Ordered query form pairs. Empty pieces are skipped; semicolons are data.
-parse_query = (query: String) -> Result(List((String, String)), CodecError) {
+_parse_query_result = (query: String) -> Result(
+	List((String, String)),
+	CodecError,
+) {
 	fail.catch(() {
 		go = (
 			rest: List(Int),
@@ -685,9 +684,10 @@ octets = (bits: BitArray) -> List(Int) {
 
 text_bytes = (xs: List(Int)) -> String {
 	// Only original UTF-8 slices or ASCII byte lists reach this helper.
-	bit_array.to_string(
-		bit_array.concat(list.map(xs, (x) { <<x>> })),
-	) |>
+	{
+		e4_call_arg_0 = bit_array.concat(list.map(xs, (x) { <<x>> }))
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(s)) { s }
 		| (Error(_)) { panic("uri: invalid internal text") }
 }
@@ -777,7 +777,10 @@ encode_octets = (xs: List(Int), form: Bool) -> String {
 					| (False) { <<37, hex_digit(x / 16), hex_digit(x % 16)>> }
 			}
 	})
-	bit_array.to_string(bit_array.concat(fragments)) |>
+	{
+		e4_call_arg_0 = bit_array.concat(fragments)
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(s)) { s }
 		| (Error(_)) { panic("uri: invalid encoded ASCII") }
 }
@@ -821,9 +824,53 @@ decode_raw = (xs: List(Int), form: Bool) -> BitArray {
 }
 
 decode_text = (text: String, form: Bool) -> String {
-	bit_array.to_string(
-		decode_raw(bytes(text), form),
-	) |>
+	{
+		e4_call_arg_0 = decode_raw(bytes(text), form)
+		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
+	} |>
 		(Ok(s)) { s }
 		| (Error(_)) { fail.raise(InvalidUtf8) }
+}
+
+/// Parses without repairing, decoding or normalizing any component.
+///
+/// Reports failure through `Fail(UriError)`.
+parse = (text: String) -> Uri { fail.from_result(_parse_result(text)) }
+
+/// Validates raw candidate fields and their cross-field grammar constraints.
+///
+/// Reports failure through `Fail(UriError)`.
+build = (parts: Parts) -> Uri { fail.from_result(_build_result(parts)) }
+
+/// Strict RFC 5.2 resolution over encoded paths, followed by build validation.
+///
+/// Reports failure through `Fail(UriError)`.
+resolve = (base: Uri, reference: Uri) -> Uri {
+	fail.from_result(_resolve_result(base, reference))
+}
+
+/// Reports failure through `Fail(CodecError)`.
+encode_bytes = (bytes: BitArray) -> String {
+	fail.from_result(_encode_bytes_result(bytes))
+}
+
+/// Decodes once, leaves plus unchanged, then validates UTF-8.
+///
+/// Reports failure through `Fail(CodecError)`.
+decode_component = (text: String) -> String {
+	fail.from_result(_decode_component_result(text))
+}
+
+/// Decodes arbitrary octets; literal ASCII has no component grammar restriction.
+///
+/// Reports failure through `Fail(CodecError)`.
+decode_bytes = (text: String) -> BitArray {
+	fail.from_result(_decode_bytes_result(text))
+}
+
+/// Ordered query form pairs. Empty pieces are skipped; semicolons are data.
+///
+/// Reports failure through `Fail(CodecError)`.
+parse_query = (query: String) -> List((String, String)) {
+	fail.from_result(_parse_query_result(query))
 }

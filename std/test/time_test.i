@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	std/time
 	std/list
@@ -43,25 +44,60 @@ test("time_units", () {
 // T2 explicitly uses truncating division, for either sign of the divisor.
 test("time_arithmetic", () {
 	assert(
-		time.divide(time.nanoseconds(-5), 2) == Ok(time.nanoseconds(-2)),
+		{
+			e4_call_arg_0 = time.nanoseconds(-5)
+			e4_call_arg_1 = 2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(-2)),
 	)
 	assert(
-		time.divide(time.nanoseconds(5), -2) == Ok(time.nanoseconds(-2)),
+		{
+			e4_call_arg_0 = time.nanoseconds(5)
+			e4_call_arg_1 = -2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(-2)),
 	)
 	assert(
-		time.divide(time.nanoseconds(-5), -2) == Ok(time.nanoseconds(2)),
+		{
+			e4_call_arg_0 = time.nanoseconds(-5)
+			e4_call_arg_1 = -2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(2)),
 	)
 	assert(
-		time.divide(time.nanoseconds(5), 2) == Ok(time.nanoseconds(2)),
+		{
+			e4_call_arg_0 = time.nanoseconds(5)
+			e4_call_arg_1 = 2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(2)),
 	)
 	assert(
-		time.divide(time.seconds(1), 0) == Error(time.DivisionByZero),
+		{
+			e4_call_arg_0 = time.seconds(1)
+			e4_call_arg_1 = 0
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Error(time.DivisionByZero),
 	)
 	assert(
-		time.divide(time.nanoseconds(0), 0) == Error(time.DivisionByZero),
+		{
+			e4_call_arg_0 = time.nanoseconds(0)
+			e4_call_arg_1 = 0
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Error(time.DivisionByZero),
 	)
 	assert(
-		time.divide(time.nanoseconds(0), -2) == Ok(time.nanoseconds(0)),
+		{
+			e4_call_arg_0 = time.nanoseconds(0)
+			e4_call_arg_1 = -2
+			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(time.nanoseconds(0)),
 	)
 	assert(
 		time.scale(time.nanoseconds(-2), 2) != time.nanoseconds(-5),

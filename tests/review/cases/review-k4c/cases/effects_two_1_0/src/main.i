@@ -5,4 +5,4 @@ use = <A, E, N, M>(x: A) <- (s: S(A, E, N, M)) {
 	f(x)
 }
 run = <A, N>(body: () <- N -> A) { body() }
-wrap = <A, E, N, M>(x: A) { run(() { use(x) }) }
+wrap = <A>(x: A) { run(() { use(x) }) }

@@ -5,40 +5,40 @@
 	escape
 	resume
 	cancel
-	keep_env
+	keep
 )
 
 /// Makes a boundary `b` and does `body(b)`.
 @external("ilang:control", "boundary")
-boundary: <R, E, N>((Boundary(R, E, N)) <- (Fail(E), ..N) -> R) <- (
-	Fail(E),
-	..N,
-) -> R
+boundary: <R, N>((Boundary(R, N)) <- N -> R) <- N -> R
 
 /// Pauses the computation back to the boundary `b`, and does `f(k)` in the
 /// place of the boundary.
 @external("ilang:control", "suspend")
-suspend: <R, E, N, A>(
-	Boundary(R, E, N),
-	(Continuation(A, R, E, N)) <- (Fail(E), ..N) -> R,
-) -> A
+suspend: <R, N, A>(Boundary(R, N), (Continuation(A, R, N)) <- N -> R) -> A
 
 /// Ends the boundary `b` at once with `value`, as `suspend(b, (k) { cancel(k)
 /// value })` does, but without keeping the paused computation: no frame
 /// records are made, and `resource.ensure` functions inside `b` run as for an
 /// error.
 @external("ilang:control", "escape")
-escape: <R, E, N>(Boundary(R, E, N), R) -> Never
+escape: <R, N>(Boundary(R, N), R) -> Never
 
 /// Goes on with the paused computation, with `value` as the value of `suspend`.
 @external("ilang:control", "resume")
-resume: <A, R, E, N>(Continuation(A, R, E, N), A) <- (Fail(E), ..N) -> R
+resume: <A, R, N>(Continuation(A, R, N), A) <- N -> R
 
 /// Unwinds the paused computation (§9.5).
 @external("ilang:control", "cancel")
-cancel: <A, R, E, N>(Continuation(A, R, E, N)) <- N -> Nil
+cancel: <A, R, N>(Continuation(A, R, N)) <- N -> Nil
 
-/// Keeps every service bound at this call, including services unused by f.
-/// Resume and cancel inside the returned function keep these services too.
-@external("ilang:control", "keep_env")
-keep_env: <S, A, E, N>((S) <- (Fail(E), ..N) -> A) <- N -> (S) <- (Fail(E)) -> A
+/// Keeps the rest of the current environment; Fail comes from the later caller.
+keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (
+	Fail(E),
+) -> A {
+	(x) {
+		// runtime.md §6.3, D16: retain a frame across suspended provides.
+		value = f(x) <- env
+		value
+	}
+}

@@ -134,6 +134,16 @@ fn service_types() {
 }
 
 #[test]
+fn removed_error_channel_has_its_diagnostic() {
+    let (_, diags) = syn3::parse_module("f: (Int) -> Int ^ String\n");
+    assert!(
+        diags.iter().any(|d| d.code.as_str() == "E0116"),
+        "{diags:?}"
+    );
+    ok("f: (Int) <- (Fail(String)) -> Int\n");
+}
+
+#[test]
 fn type_errors() {
     // P10: `:` inside a type.
     bad("f: (a: Int) -> Int", "`:` is not written in a type");
@@ -1183,10 +1193,10 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     let (lowered, diags) = syn3::parse_lowered(&text);
     assert!(diags.is_empty(), "{text}\n{diags:#?}");
     let shown = ilang_syntax::print::print_module(&lowered);
-    assert!(shown.contains("! Syn3ServiceFail(E)"), "{shown}");
+    assert!(shown.contains("! Fail(E)"), "{shown}");
     assert!(!shown.contains("^ E"), "{shown}");
     let collision = converted("T { Syn3ServiceFail }\nUse(E) = () -> Nil ! Fail(E)\n");
-    assert!(collision.contains("Syn3ServiceFailX(E)"), "{collision}");
+    assert!(collision.contains("Fail(E)"), "{collision}");
     let row = converted(
         "wrap(A, E, N) = (body: () -> A ! Fail(E) | N, cap: Fail(E)) -> A ! N { ! Fail(E) = cap body() }\n",
     );
@@ -1202,7 +1212,28 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     let (lowered, diags) = syn3::parse_lowered(&row);
     assert!(diags.is_empty(), "{row}\n{diags:#?}");
     let shown = ilang_syntax::print::print_module(&lowered);
-    assert!(shown.contains(carrier.as_str()), "{shown}");
+    assert!(!shown.contains(carrier.as_str()), "{shown}");
+}
+
+#[test]
+fn specialized_and_renamed_members_remain_type_aliases() {
+    // §4.3: an RHS naming another type is a transparent alias. Moving
+    // S's fields into Alias would lose N or A's declaration scope.
+    for source in [
+        "S(N) = (() <- N -> Nil)\nAlias = S(Never)\n",
+        "S(A) = (value = A)\nAlias(B) = S(B)\n",
+    ] {
+        let (module, diags) = syn3::parse_lowered(source);
+        assert!(diags.is_empty(), "{source}\n{diags:?}");
+        assert_eq!(module.items.len(), 2, "{module:?}");
+        let ilang_syntax::ast::ItemKind::TypeDef(alias) = &module.items[1].kind else {
+            panic!("expected alias: {module:?}");
+        };
+        assert!(
+            matches!(alias.body, ilang_syntax::ast::TypeBody::Alias(_)),
+            "{alias:?}"
+        );
+    }
 }
 
 #[test]

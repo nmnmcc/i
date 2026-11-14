@@ -1,4 +1,4 @@
-with_int : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Reader(Int)) -> A
+with_int : (() <- N -> A) <- (N - Reader(Int)) -> A
 get_s : () <- (Reader(String)) -> String
 g : () -> String
 k : () -> String
@@ -7,7 +7,7 @@ use_str : (Cell(String)) -> String
 pass : (Cell(String)) -> String
 through_var : (Cell(String)) -> Int
 through_top : (Cell(String)) -> Int
-arity : ({ (1) | (1, 2) } <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A
+arity : ({ (1) | (1, 2) } <- N -> A) <- N -> A
 use_state_int : () <- (State(Int)) -> 1
 use_state_str : () <- (State(String)) -> 1
 nested : List(Cell(A))

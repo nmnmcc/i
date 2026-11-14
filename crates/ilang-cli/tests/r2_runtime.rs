@@ -347,7 +347,7 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         .unwrap();
     let end = source[begin..].find("\nFrame = (").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "finalizing = <A, R, E, N, B, F, M>(\n\t_k: Continuation(A, R, E, N),\n\t_b: Boundary(B, F, M)\n) -> Bool { False }\n"
+        + "finalizing = <A, R, N, B, M>(\n\t_k: Continuation(A, R, N),\n\t_b: Boundary(B, M)\n) -> Bool { False }\n"
         + &source[end..];
     let begin = source
         .find("@external(\"ilang:worker\", \"enabled\")")
@@ -358,8 +358,8 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
            worker_publish = (_job: Job) -> Int { 0 }\n\
            worker_claim = (_ticket: Int) -> Bool { True }\n\
            worker_adopt = (_ticket: Int, _task: Int) -> Nil { Nil }\n\
-           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never, Never) { panic(\"no workers\") }\n\
-           worker_away = (_k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool { False }\n\
+           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never) { panic(\"no workers\") }\n\
+           worker_away = (_k: Continuation(StepAnswer, Turn, Never)) -> Bool { False }\n\
            worker_send = (_task: Int, _resume: Resume) -> Nil { Nil }\n\
            worker_inbox = () -> Int { 0 }\n\
            worker_message = () -> Remote { panic(\"no workers\") }\n\

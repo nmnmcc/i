@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	std/calendar
 	std/time
@@ -7,7 +8,7 @@
 )
 
 valid_date = (year: Int, month: Int, day: Int) -> calendar.Date {
-	calendar.date(year, month, day) |>
+	fail.catch(() { calendar.date(year, month, day) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("invalid test date") }
 }
@@ -18,13 +19,13 @@ valid_time = (
 	second: Int,
 	nanosecond: Int
 ) -> calendar.TimeOfDay {
-	calendar.time_of_day(hour, minute, second, nanosecond) |>
+	fail.catch(() { calendar.time_of_day(hour, minute, second, nanosecond) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("invalid test time") }
 }
 
 valid_offset = (minutes: Int) -> calendar.Offset {
-	calendar.offset(minutes) |>
+	fail.catch(() { calendar.offset(minutes) }) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("invalid test offset") }
 }
@@ -41,21 +42,57 @@ test("calendar_validation", () {
 		(year, expected) = pair
 		assert(calendar.is_leap_year(year) == expected)
 	})
-	assert(calendar.date(1900, 2, 29) == Error(calendar.BadDay))
-	assert(calendar.date(2000, 2, 29) == Ok(valid_date(2000, 2, 29)))
-	assert(calendar.date(2024, 13, 0) == Error(calendar.BadMonth))
-	assert(calendar.date(2024, 0, 1) == Error(calendar.BadMonth))
-	assert(calendar.date(2024, 1, 0) == Error(calendar.BadDay))
-	assert(calendar.date(2024, 4, 31) == Error(calendar.BadDay))
-	assert(calendar.time_of_day(24, 0, 0, 0) == Error(calendar.BadHour))
-	assert(calendar.time_of_day(-1, 60, 60, -1) == Error(calendar.BadHour))
-	assert(calendar.time_of_day(0, -1, 60, -1) == Error(calendar.BadMinute))
-	assert(calendar.time_of_day(0, 60, 60, -1) == Error(calendar.BadMinute))
-	assert(calendar.time_of_day(0, 0, 60, 0) == Error(calendar.BadSecond))
-	assert(calendar.time_of_day(0, 0, -1, -1) == Error(calendar.BadSecond))
-	assert(calendar.time_of_day(0, 0, 0, -1) == Error(calendar.BadNanosecond))
 	assert(
-		calendar.time_of_day(0, 0, 0, 1000000000) ==
+		fail.catch(() { calendar.date(1900, 2, 29) }) == Error(calendar.BadDay),
+	)
+	assert(
+		fail.catch(() { calendar.date(2000, 2, 29) }) ==
+			Ok(valid_date(2000, 2, 29)),
+	)
+	assert(
+		fail.catch(() { calendar.date(2024, 13, 0) }) ==
+			Error(calendar.BadMonth),
+	)
+	assert(
+		fail.catch(() { calendar.date(2024, 0, 1) }) ==
+			Error(calendar.BadMonth),
+	)
+	assert(
+		fail.catch(() { calendar.date(2024, 1, 0) }) == Error(calendar.BadDay),
+	)
+	assert(
+		fail.catch(() { calendar.date(2024, 4, 31) }) == Error(calendar.BadDay),
+	)
+	assert(
+		fail.catch(() { calendar.time_of_day(24, 0, 0, 0) }) ==
+			Error(calendar.BadHour),
+	)
+	assert(
+		fail.catch(() { calendar.time_of_day(-1, 60, 60, -1) }) ==
+			Error(calendar.BadHour),
+	)
+	assert(
+		fail.catch(() { calendar.time_of_day(0, -1, 60, -1) }) ==
+			Error(calendar.BadMinute),
+	)
+	assert(
+		fail.catch(() { calendar.time_of_day(0, 60, 60, -1) }) ==
+			Error(calendar.BadMinute),
+	)
+	assert(
+		fail.catch(() { calendar.time_of_day(0, 0, 60, 0) }) ==
+			Error(calendar.BadSecond),
+	)
+	assert(
+		fail.catch(() { calendar.time_of_day(0, 0, -1, -1) }) ==
+			Error(calendar.BadSecond),
+	)
+	assert(
+		fail.catch(() { calendar.time_of_day(0, 0, 0, -1) }) ==
+			Error(calendar.BadNanosecond),
+	)
+	assert(
+		fail.catch(() { calendar.time_of_day(0, 0, 0, 1000000000) }) ==
 			Error(calendar.BadNanosecond),
 	)
 	assert(
@@ -66,7 +103,9 @@ test("calendar_validation", () {
 		calendar.date_parts(valid_date(-1, 1, 2)) == (-1, 1, 2),
 	)
 	list.each([-1440, 1440], (n) {
-		assert(calendar.offset(n) == Error(calendar.BadOffset))
+		assert(
+			fail.catch(() { calendar.offset(n) }) == Error(calendar.BadOffset),
+		)
 	})
 	list.each([-1439, 0, 1439], (n) {
 		assert(
@@ -76,10 +115,19 @@ test("calendar_validation", () {
 	assert(calendar.utc() == valid_offset(0))
 	list.each(list.range(1, 12), (month) {
 		expected = month |> (2) { 29 } | (4 | 6 | 9 | 11) { 30 } | (_) { 31 }
-		assert(calendar.days_in_month(2000, month) == Ok(expected))
+		assert(
+			fail.catch(() { calendar.days_in_month(2000, month) }) ==
+				Ok(expected),
+		)
 	})
-	assert(calendar.days_in_month(2000, -1) == Error(calendar.BadMonth))
-	assert(calendar.days_in_month(2000, 13) == Error(calendar.BadMonth))
+	assert(
+		fail.catch(() { calendar.days_in_month(2000, -1) }) ==
+			Error(calendar.BadMonth),
+	)
+	assert(
+		fail.catch(() { calendar.days_in_month(2000, 13) }) ==
+			Error(calendar.BadMonth),
+	)
 	Nil
 })
 
@@ -155,7 +203,7 @@ oracle_day = (year: Int, month: Int, day: Int) -> Int {
 test("calendar_day_laws", () {
 	list.each(list.range(-800, 800), (year) {
 		list.each(list.range(1, 12), (month) {
-			length = calendar.days_in_month(year, month) |>
+			length = fail.catch(() { calendar.days_in_month(year, month) }) |>
 				(Ok(n)) { n }
 				| (Error(_)) { panic("test month") }
 			list.each([1, length], (day) {
@@ -176,7 +224,7 @@ test("calendar_day_laws", () {
 			assert(oracle_day(y, m, d) == day)
 		})
 	})
-	huge = int.power(10, 100) |>
+	huge = fail.catch(() { int.power(10, 100) }) |>
 		(Ok(n)) { n }
 		| (Error(_)) { panic("test exponent") }
 	list.each([-huge, huge, -719468, -719469, -719467, -1, 0, 1], (day) {
@@ -186,7 +234,7 @@ test("calendar_day_laws", () {
 			assert(calendar.day_number(value) == n)
 			(y, m, d) = calendar.date_parts(value)
 			assert(oracle_day(y, m, d) == n)
-			assert(calendar.date(y, m, d) == Ok(value))
+			assert(fail.catch(() { calendar.date(y, m, d) }) == Ok(value))
 		})
 	})
 	first = valid_date(-400, 2, 29)
@@ -219,7 +267,7 @@ test("calendar_civil_boundaries", () {
 		) ==
 			(1, 0, 0, 0),
 	)
-	huge = int.power(10, 100) |>
+	huge = fail.catch(() { int.power(10, 100) }) |>
 		(Ok(n)) { n }
 		| (Error(_)) { panic("test exponent") }
 	list.each([-1439, -60, 0, 60, 1439], (minutes) {
@@ -244,7 +292,10 @@ test("calendar_civil_boundaries", () {
 					civil,
 			)
 			assert(
-				calendar.parse(calendar.format(civil, offset)) ==
+				{
+					e4_call_arg_0 = calendar.format(civil, offset)
+					fail.catch(() { calendar.parse(e4_call_arg_0) })
+				} ==
 					Ok((civil, offset)),
 			)
 		})
@@ -272,11 +323,14 @@ test("calendar_text", () {
 	]
 	list.each(cases, (pair) {
 		(input, expected) = pair
-		calendar.parse(input) |>
+		fail.catch(() { calendar.parse(input) }) |>
 			(Error(_)) { panic("valid calendar text rejected") }
 			| (Ok((civil, offset))) {
 				assert(calendar.format(civil, offset) == expected)
-				assert(calendar.parse(expected) == Ok((civil, offset)))
+				assert(
+					fail.catch(() { calendar.parse(expected) }) ==
+						Ok((civil, offset)),
+				)
 			}
 	})
 	// C5 requires every component constructor error to become BadText in parse.
@@ -320,7 +374,9 @@ test("calendar_text", () {
 		"１９７０-01-01T00:00:00Z",
 	]
 	list.each(invalid, (text) {
-		assert(calendar.parse(text) == Error(calendar.BadText))
+		assert(
+			fail.catch(() { calendar.parse(text) }) == Error(calendar.BadText),
+		)
 	})
 	Nil
 })

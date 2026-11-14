@@ -40,7 +40,7 @@ f8: (Wrap, UtfCodepoint, Never) -> Id(List(Int))
 @external("a", "f9")
 f9: (Int | String, (Int, Int)) -> Int
 
-// No errors and no environment.
+// E3: an external has no service need, including Fail.
 @external("a", "f4")
 f4: () <- (Fail(String)) -> Int
 

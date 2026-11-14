@@ -28,6 +28,7 @@ test("sync host services and external functions of a compiled module", async () 
   assert.equal(value.call("app/app.lookup", ["name"]), "i");
   assert.throws(() => value.call("app/app.lookup", ["other"]), (error) => error instanceof GuestError && error.value === "no other");
   assert.equal(value.call("app/app.distance", [3, 4]), 5);
+  assert.equal(value.call("app/app.lookup", ["name"]), "i");
   assert.equal(value.unusable, null);
 });
 
@@ -68,7 +69,7 @@ test("an answer of the host that is not correct stops the program in the module"
   await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:45:2");
   assert.ok(value.unusable);
   const sync = await instantiate(compiled, { imports: { ...compiledImports(GuestError), "app:math/v1": { hypot: () => Infinity } } });
-  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:41:35");
+  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:41:44");
   // With `checkReplies`, the host stops the program, with no positions.
   const checked = await instantiate(compiled, { imports: compiledImports(GuestError, [], { later: async () => NaN }), checkReplies: true });
   await assert.rejects(checked.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct");

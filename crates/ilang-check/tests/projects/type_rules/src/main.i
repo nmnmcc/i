@@ -28,7 +28,7 @@ Arity3 = (Result(Int))
 
 Arity4 = (Box)
 
-Arity5 = (Boundary(Int, Int, Int), Continuation(Int))
+Arity5 = (Boundary(Int, Int), Continuation(Int))
 
 Missing = (Nothing)
 

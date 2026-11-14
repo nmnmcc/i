@@ -1,4 +1,5 @@
 (
+	i/fail
 	testlib = (test) = std/test
 	std/cli
 	std/list
@@ -33,20 +34,37 @@ options = () -> cli.Parser(Options) { cli.map2(jobs(), verbose(), Options) }
 // A2/A3/A6/A7: the note's complete typed description and integer examples.
 test("cli_options", () {
 	assert(
-		cli.parse(options(), ["--verbose", "--jobs=4"]) ==
+		{
+			e4_call_arg_0 = options()
+			e4_call_arg_1 = ["--verbose", "--jobs=4"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(Options(jobs = 4, verbose = True)),
 	)
 	assert(
-		cli.parse(options(), ["-j", "4"]) ==
+		{
+			e4_call_arg_0 = options()
+			e4_call_arg_1 = ["-j", "4"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(Options(jobs = 4, verbose = False)),
 	)
 	list.each([["--jobs=-2"], ["--jobs", "-2"], ["-j", "-2"]], (args) {
 		assert(
-			cli.parse(jobs(), args) == Ok(-2),
+			{
+				e4_call_arg_0 = jobs()
+				e4_call_arg_1 = args
+				fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+			} ==
+				Ok(-2),
 		)
 	})
 	assert(
-		cli.parse(jobs(), ["--jobs="]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--jobs="]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				cli.InvalidArgument(
 					index = 0,
@@ -57,7 +75,11 @@ test("cli_options", () {
 			),
 	)
 	assert(
-		cli.parse(jobs(), ["--jobs", "--verbose"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--jobs", "--verbose"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				cli.InvalidArgument(
 					index = 1,
@@ -68,7 +90,11 @@ test("cli_options", () {
 			),
 	)
 	assert(
-		cli.parse(jobs(), ["-j", "bad"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["-j", "bad"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				cli.InvalidArgument(
 					index = 1,
@@ -79,7 +105,11 @@ test("cli_options", () {
 			),
 	)
 	assert(
-		cli.parse(jobs(), ["--jobs=bad"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--jobs=bad"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				cli.InvalidArgument(
 					index = 0,
@@ -90,10 +120,20 @@ test("cli_options", () {
 			),
 	)
 	assert(
-		cli.parse(jobs(), []) == Error(cli.MissingArgument(name = "--jobs")),
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = []
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Error(cli.MissingArgument(name = "--jobs")),
 	)
 	assert(
-		cli.parse(verbose(), []) == Ok(False),
+		{
+			e4_call_arg_0 = verbose()
+			e4_call_arg_1 = []
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(False),
 	)
 	Nil
 })
@@ -112,106 +152,155 @@ test("cli_definition_errors", () {
 		Pair,
 	)
 	assert(
-		cli.parse(dup, []) ==
+		fail.catch(() { cli.parse(dup, []) }) ==
 			Error(cli.BadDefinition(cli.DuplicateName("--jobs"))),
 	)
 	assert(
-		cli.parse(dup, ["--unknown"]) ==
+		fail.catch(() { cli.parse(dup, ["--unknown"]) }) ==
 			Error(cli.BadDefinition(cli.DuplicateName("--jobs"))),
 	)
-	assert(cli.help(dup, "app") == Error(cli.DuplicateName("--jobs")))
+	assert(
+		fail.catch(() { cli.help(dup, "app") }) ==
+			Error(cli.DuplicateName("--jobs")),
+	)
 	p = jobs()
 	assert(
-		cli.parse(cli.map2(p, p, (a, b) { a + b }), []) ==
+		{
+			e4_call_arg_0 = cli.map2(p, p, (a, b) { a + b })
+			e4_call_arg_1 = []
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.BadDefinition(cli.DuplicateName("--jobs"))),
 	)
 	assert(
-		cli.help(
-			cli.flag(cli.Names(long = "other", short = Some("ab")), ""),
-			"app",
-		) ==
+		{
+			e4_call_arg_0 = cli.flag(
+				cli.Names(long = "other", short = Some("ab")),
+				"",
+			)
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.InvalidName("ab")),
 	)
 	assert(
-		cli.help(
-			cli.map2(jobs(), cli.flag(
+		{
+			e4_call_arg_0 = cli.map2(jobs(), cli.flag(
 				cli.Names(long = "other", short = Some("j")),
 				"",
-			), (a, _) { a }),
-			"app",
-		) ==
+			), (a, _) { a })
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.DuplicateName("-j")),
 	)
 	assert(
-		cli.help(
-			cli.map2(jobs(), cli.flag(
+		{
+			e4_call_arg_0 = cli.map2(jobs(), cli.flag(
 				cli.Names(long = "jobs", short = Some("ab")),
 				"",
-			), (a, _) { a }),
-			"app",
-		) ==
+			), (a, _) { a })
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.InvalidName("ab")),
 	)
 	list.each(["", "Jobs", "1jobs", "-jobs", "jo_bs", "jé", "a\u{0}", "a b"], (
 		bad
 	) {
 		assert(
-			cli.help(
-				cli.flag(cli.Names(long = bad, short = Some("ab")), ""),
-				"app",
-			) ==
+			{
+				e4_call_arg_0 = cli.flag(
+					cli.Names(long = bad, short = Some("ab")),
+					"",
+				)
+				e4_call_arg_1 = "app"
+				fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+			} ==
 				Error(cli.InvalidName(bad)),
 		)
 		assert(
-			cli.help(cli.argument(bad, "", cli.text), "app") ==
+			{
+				e4_call_arg_0 = cli.argument(bad, "", cli.text)
+				e4_call_arg_1 = "app"
+				fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+			} ==
 				Error(cli.InvalidName(bad)),
 		)
 	})
 	list.each(["", "1", "-", "é", "aa"], (bad) {
 		assert(
-			cli.help(
-				cli.flag(cli.Names(long = "valid", short = Some(bad)), ""),
-				"app",
-			) ==
+			{
+				e4_call_arg_0 = cli.flag(
+					cli.Names(long = "valid", short = Some(bad)),
+					"",
+				)
+				e4_call_arg_1 = "app"
+				fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+			} ==
 				Error(cli.InvalidName(bad)),
 		)
 	})
 	list.each(["a", "a0", "a-b", "a-", "a--b"], (good) {
 		assert(
-			cli.parse(
-				cli.flag(cli.Names(long = good, short = Some("Z")), ""),
-				["-Z"],
-			) ==
+			{
+				e4_call_arg_0 = cli.flag(
+					cli.Names(long = good, short = Some("Z")),
+					"",
+				)
+				e4_call_arg_1 = ["-Z"]
+				fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+			} ==
 				Ok(True),
 		)
 	})
 	pos = cli.argument("input", "", cli.text)
 	assert(
-		cli.help(cli.map2(pos, pos, (a, _) { a }), "app") ==
+		{
+			e4_call_arg_0 = cli.map2(pos, pos, (a, _) { a })
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.DuplicateName("input")),
 	)
 	remaining = cli.rest("files", "", cli.text)
 	assert(
-		cli.help(cli.map2(remaining, pos, (a, _) { a }), "app") ==
+		{
+			e4_call_arg_0 = cli.map2(remaining, pos, (a, _) { a })
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.MisplacedRest),
 	)
 	assert(
-		cli.help(
-			cli.map2(remaining, cli.rest("more", "", cli.text), list.append),
-			"app",
-		) ==
+		{
+			e4_call_arg_0 = cli.map2(
+				remaining,
+				cli.rest("more", "", cli.text),
+				list.append,
+			)
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.MisplacedRest),
 	)
 	with_option = cli.map2(remaining, verbose(), (a, _) { a })
-	assert(cli.parse(with_option, ["file", "-v"]) == Ok(["file"]))
 	assert(
-		cli.help(cli.map2(with_option, pos, (a, _) { a }), "app") ==
+		fail.catch(() { cli.parse(with_option, ["file", "-v"]) }) ==
+			Ok(["file"]),
+	)
+	assert(
+		{
+			e4_call_arg_0 = cli.map2(with_option, pos, (a, _) { a })
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.MisplacedRest),
 	)
 	// Option long/short names and positional names have independent namespaces.
 	assert(
-		cli.parse(
-			cli.map2(
+		{
+			e4_call_arg_0 = cli.map2(
 				cli.option(
 					cli.Names(long = "j", short = Some("j")),
 					"",
@@ -219,9 +308,10 @@ test("cli_definition_errors", () {
 				),
 				cli.argument("j", "", cli.text),
 				Pair,
-			),
-			["-j", "3", "x"],
-		) ==
+			)
+			e4_call_arg_1 = ["-j", "3", "x"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(Pair(3, "x")),
 	)
 	Nil
@@ -231,46 +321,93 @@ test("cli_definition_errors", () {
 test("cli_token_ownership", () {
 	list.each([["--jobs"], ["--jobs", "--"], ["-j"], ["-j", "--"]], (args) {
 		assert(
-			cli.parse(jobs(), args) ==
+			{
+				e4_call_arg_0 = jobs()
+				e4_call_arg_1 = args
+				fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+			} ==
 				Error(cli.MissingValue(index = 0, name = "--jobs")),
 		)
 	})
 	assert(
-		cli.parse(jobs(), ["--jobs=1", "-j", "--"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--jobs=1", "-j", "--"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.RepeatedOption(index = 1, name = "--jobs")),
 	)
 	assert(
-		cli.parse(jobs(), ["ignored", "-j", "--"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["ignored", "-j", "--"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.MissingValue(index = 1, name = "--jobs")),
 	)
 	assert(
-		cli.parse(options(), ["é", "--unknown"]) ==
+		{
+			e4_call_arg_0 = options()
+			e4_call_arg_1 = ["é", "--unknown"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.UnknownOption(index = 1, token = "--unknown")),
 	)
 	assert(
-		cli.parse(name(), ["--name", "--verbose"]) == Ok("--verbose"),
+		{
+			e4_call_arg_0 = name()
+			e4_call_arg_1 = ["--name", "--verbose"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok("--verbose"),
 	)
 	assert(
-		cli.parse(name(), ["--name="]) == Ok(""),
+		{
+			e4_call_arg_0 = name()
+			e4_call_arg_1 = ["--name="]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(""),
 	)
 	assert(
-		cli.parse(name(), ["--name=--"]) == Ok("--"),
+		{
+			e4_call_arg_0 = name()
+			e4_call_arg_1 = ["--name=--"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok("--"),
 	)
 	assert(
-		cli.parse(name(), ["--name=a=b"]) == Ok("a=b"),
+		{
+			e4_call_arg_0 = name()
+			e4_call_arg_1 = ["--name=a=b"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok("a=b"),
 	)
 	assert(
-		cli.parse(name(), ["--name", ""]) == Ok(""),
+		{
+			e4_call_arg_0 = name()
+			e4_call_arg_1 = ["--name", ""]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(""),
 	)
 	assert(
-		cli.parse(name(), ["--name", "é \u{0}"]) == Ok("é \u{0}"),
+		{
+			e4_call_arg_0 = name()
+			e4_call_arg_1 = ["--name", "é \u{0}"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok("é \u{0}"),
 	)
 	// A3 does not recognize the following --verbose while it belongs to name.
 	assert(
-		cli.parse(
-			cli.map2(name(), verbose(), (n, v) { (n, v) }),
-			["--name", "--verbose"],
-		) ==
+		{
+			e4_call_arg_0 = cli.map2(name(), verbose(), (n, v) { (n, v) })
+			e4_call_arg_1 = ["--name", "--verbose"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(("--verbose", False)),
 	)
 	list.each([
@@ -285,16 +422,28 @@ test("cli_token_ownership", () {
 		"-é",
 	], (raw) {
 		assert(
-			cli.parse(options(), [raw]) ==
+			{
+				e4_call_arg_0 = options()
+				e4_call_arg_1 = [raw]
+				fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+			} ==
 				Error(cli.UnknownOption(index = 0, token = raw)),
 		)
 	})
 	assert(
-		cli.parse(cli.rest("args", "", cli.text), ["--", "-2", "--", ""]) ==
+		{
+			e4_call_arg_0 = cli.rest("args", "", cli.text)
+			e4_call_arg_1 = ["--", "-2", "--", ""]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(["-2", "--", ""]),
 	)
 	assert(
-		cli.parse(cli.rest("args", "", cli.text), ["-", "a b", "é", "\u{0}"]) ==
+		{
+			e4_call_arg_0 = cli.rest("args", "", cli.text)
+			e4_call_arg_1 = ["-", "a b", "é", "\u{0}"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(["-", "a b", "é", "\u{0}"]),
 	)
 	interspersed = cli.map2(cli.argument("file", "", cli.text), verbose(), (
@@ -302,15 +451,27 @@ test("cli_token_ownership", () {
 		v
 	) { (f, v) })
 	assert(
-		cli.parse(interspersed, ["input", "--verbose"]) == Ok(("input", True)),
+		fail.catch(() { cli.parse(interspersed, ["input", "--verbose"]) }) ==
+			Ok(("input", True)),
 	)
-	assert(cli.parse(interspersed, ["-", "-v"]) == Ok(("-", True)))
 	assert(
-		cli.parse(cli.argument("number", "", cli.integer), ["-2"]) ==
+		fail.catch(() { cli.parse(interspersed, ["-", "-v"]) }) ==
+			Ok(("-", True)),
+	)
+	assert(
+		{
+			e4_call_arg_0 = cli.argument("number", "", cli.integer)
+			e4_call_arg_1 = ["-2"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.UnknownOption(index = 0, token = "-2")),
 	)
 	assert(
-		cli.parse(cli.argument("number", "", cli.integer), ["--", "-2"]) ==
+		{
+			e4_call_arg_0 = cli.argument("number", "", cli.integer)
+			e4_call_arg_1 = ["--", "-2"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(-2),
 	)
 	Nil
@@ -319,37 +480,59 @@ test("cli_token_ownership", () {
 // A4: repetition precedes arity checking and aliases identify the same leaf.
 test("cli_repetition", () {
 	assert(
-		cli.parse(verbose(), ["--verbose=false"]) ==
+		{
+			e4_call_arg_0 = verbose()
+			e4_call_arg_1 = ["--verbose=false"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.UnexpectedValue(index = 0, name = "--verbose")),
 	)
 	assert(
-		cli.parse(verbose(), ["--verbose", "-v"]) ==
+		{
+			e4_call_arg_0 = verbose()
+			e4_call_arg_1 = ["--verbose", "-v"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.RepeatedOption(index = 1, name = "--verbose")),
 	)
 	assert(
-		cli.parse(verbose(), ["-v", "--verbose=false"]) ==
+		{
+			e4_call_arg_0 = verbose()
+			e4_call_arg_1 = ["-v", "--verbose=false"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.RepeatedOption(index = 1, name = "--verbose")),
 	)
 	assert(
-		cli.parse(jobs(), ["--jobs=1", "--jobs"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--jobs=1", "--jobs"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.RepeatedOption(index = 1, name = "--jobs")),
 	)
 	assert(
-		cli.parse(jobs(), ["-j", "1", "--jobs", "--"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["-j", "1", "--jobs", "--"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.RepeatedOption(index = 2, name = "--jobs")),
 	)
 	o = cli.optional(cli.Names(long = "name", short = Some("n")), "", cli.text)
 	assert(
-		cli.parse(o, ["--name=x", "-n", "y"]) ==
+		fail.catch(() { cli.parse(o, ["--name=x", "-n", "y"]) }) ==
 			Error(cli.RepeatedOption(index = 1, name = "--name")),
 	)
 	m = cli.many(cli.Names(long = "name", short = Some("n")), "", cli.text)
-	assert(cli.parse(m, []) == Ok([]))
+	assert(fail.catch(() { cli.parse(m, []) }) == Ok([]))
 	assert(
-		cli.parse(m, ["--name=a", "--name=", "--name=é"]) == Ok(["a", "", "é"]),
+		fail.catch(() { cli.parse(m, ["--name=a", "--name=", "--name=é"]) }) ==
+			Ok(["a", "", "é"]),
 	)
 	assert(
-		cli.parse(m, ["-n", "a", "--name=", "-n", "é"]) == Ok(["a", "", "é"]),
+		fail.catch(() { cli.parse(m, ["-n", "a", "--name=", "-n", "é"]) }) ==
+			Ok(["a", "", "é"]),
 	)
 	Nil
 })
@@ -357,33 +540,58 @@ test("cli_repetition", () {
 // A5/A6: allocation is completed before any missing/conversion callback runs.
 test("cli_error_order", () {
 	assert(
-		cli.parse(jobs(), ["--unknown"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--unknown"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.UnknownOption(index = 0, token = "--unknown")),
 	)
 	assert(
-		cli.parse(cli.argument("file", "", cli.text), []) ==
+		{
+			e4_call_arg_0 = cli.argument("file", "", cli.text)
+			e4_call_arg_1 = []
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.MissingArgument(name = "file")),
 	)
 	assert(
-		cli.parse(cli.pure(2), ["one", "two"]) ==
+		{
+			e4_call_arg_0 = cli.pure(2)
+			e4_call_arg_1 = ["one", "two"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.ExtraArgument(index = 0, token = "one")),
 	)
 	assert(
-		cli.parse(jobs(), ["--jobs=bad", "extra"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--jobs=bad", "extra"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.ExtraArgument(index = 1, token = "extra")),
 	)
 	assert(
-		cli.parse(jobs(), ["extra"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["extra"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.ExtraArgument(index = 0, token = "extra")),
 	)
 	stop = (_: String) -> Result(Int, String) {
 		panic("conversion before allocation")
 	}
 	assert(
-		cli.parse(
-			cli.option(cli.Names(long = "jobs", short = None), "", stop),
-			["--jobs=x", "extra"],
-		) ==
+		{
+			e4_call_arg_0 = cli.option(
+				cli.Names(long = "jobs", short = None),
+				"",
+				stop,
+			)
+			e4_call_arg_1 = ["--jobs=x", "extra"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.ExtraArgument(index = 1, token = "extra")),
 	)
 	first = cli.option(cli.Names(long = "first", short = None), "", (
@@ -397,10 +605,11 @@ test("cli_error_order", () {
 		_: String
 	) -> Result(Int, String) { Error("second") })
 	assert(
-		cli.parse(
-			cli.map2(first, second_error, (a, b) { a + b }),
-			["--second=bad", "--first=bad"],
-		) ==
+		{
+			e4_call_arg_0 = cli.map2(first, second_error, (a, b) { a + b })
+			e4_call_arg_1 = ["--second=bad", "--first=bad"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				cli.InvalidArgument(
 					index = 1,
@@ -411,7 +620,7 @@ test("cli_error_order", () {
 			),
 	)
 	assert(
-		cli.parse(p, ["--second=bad", "--first=bad"]) ==
+		fail.catch(() { cli.parse(p, ["--second=bad", "--first=bad"]) }) ==
 			Error(
 				cli.InvalidArgument(
 					index = 1,
@@ -422,11 +631,11 @@ test("cli_error_order", () {
 			),
 	)
 	assert(
-		cli.parse(p, ["--second=bad"]) ==
+		fail.catch(() { cli.parse(p, ["--second=bad"]) }) ==
 			Error(cli.MissingArgument(name = "--first")),
 	)
 	assert(
-		cli.parse(p, ["--first=bad", "--unknown"]) ==
+		fail.catch(() { cli.parse(p, ["--first=bad", "--unknown"]) }) ==
 			Error(cli.UnknownOption(index = 1, token = "--unknown")),
 	)
 	failing_many = cli.many(cli.Names(long = "num", short = None), "", (
@@ -438,7 +647,9 @@ test("cli_error_order", () {
 			| (_) { panic("later occurrence called") }
 	})
 	assert(
-		cli.parse(failing_many, ["--num=1", "--num=bad", "--num=never"]) ==
+		fail.catch(() {
+			cli.parse(failing_many, ["--num=1", "--num=bad", "--num=never"])
+		}) ==
 			Error(
 				cli.InvalidArgument(
 					index = 1,
@@ -449,10 +660,13 @@ test("cli_error_order", () {
 			),
 	)
 	assert(
-		cli.parse(
-			cli.map(first, (_) -> Int { panic("mapped failed parser") }),
-			["--first=x"],
-		) ==
+		{
+			e4_call_arg_0 = cli.map(first, (_) -> Int {
+				panic("mapped failed parser")
+			})
+			e4_call_arg_1 = ["--first=x"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(
 				cli.InvalidArgument(
 					index = 0,
@@ -472,31 +686,43 @@ test("cli_allocation", () {
 		"",
 		cli.integer,
 	)
-	assert(cli.parse(o, []) == Ok(None))
-	assert(cli.parse(o, ["-j", "2"]) == Ok(Some(2)))
+	assert(fail.catch(() { cli.parse(o, []) }) == Ok(None))
+	assert(fail.catch(() { cli.parse(o, ["-j", "2"]) }) == Ok(Some(2)))
 	defaults = cli.map(o, (value) { value |> (None) { 4 } | (Some(n)) { n } })
-	assert(cli.parse(defaults, []) == Ok(4))
-	assert(cli.parse(defaults, ["--jobs=2"]) == Ok(2))
+	assert(fail.catch(() { cli.parse(defaults, []) }) == Ok(4))
+	assert(fail.catch(() { cli.parse(defaults, ["--jobs=2"]) }) == Ok(2))
 	p = cli.map2(cli.argument("first", "", cli.text), cli.rest(
 		"tail",
 		"",
 		cli.text,
 	), (a, b) { (a, b) })
-	assert(cli.parse(p, ["a", "b", "c"]) == Ok(("a", ["b", "c"])))
-	assert(cli.parse(p, ["a"]) == Ok(("a", [])))
-	assert(cli.parse(p, []) == Error(cli.MissingArgument(name = "first")))
 	assert(
-		cli.parse(cli.rest("tail", "", cli.text), []) == Ok([]),
+		fail.catch(() { cli.parse(p, ["a", "b", "c"]) }) ==
+			Ok(("a", ["b", "c"])),
+	)
+	assert(fail.catch(() { cli.parse(p, ["a"]) }) == Ok(("a", [])))
+	assert(
+		fail.catch(() { cli.parse(p, []) }) ==
+			Error(cli.MissingArgument(name = "first")),
 	)
 	assert(
-		cli.parse(
-			cli.map2(cli.argument("first", "", cli.text), cli.argument(
-				"second",
+		{
+			e4_call_arg_0 = cli.rest("tail", "", cli.text)
+			e4_call_arg_1 = []
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([]),
+	)
+	assert(
+		{
+			e4_call_arg_0 = cli.map2(cli.argument(
+				"first",
 				"",
 				cli.text,
-			), (a, b) { (a, b) }),
-			["a", "b", "c"],
-		) ==
+			), cli.argument("second", "", cli.text), (a, b) { (a, b) })
+			e4_call_arg_1 = ["a", "b", "c"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.ExtraArgument(index = 2, token = "c")),
 	)
 	Nil
@@ -535,17 +761,28 @@ test("cli_converters", () {
 // A6 and the observation laws: heterogeneous types and every bucket consumed.
 test("cli_composition_laws", () {
 	assert(
-		cli.parse(
-			cli.map2(cli.pure(2), cli.pure("x"), Pair),
-			[],
-		) ==
+		{
+			e4_call_arg_0 = cli.map2(cli.pure(2), cli.pure("x"), Pair)
+			e4_call_arg_1 = []
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(Pair(2, "x")),
 	)
 	assert(
-		cli.parse(cli.pure(1), []) == Ok(1),
+		{
+			e4_call_arg_0 = cli.pure(1)
+			e4_call_arg_1 = []
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(1),
 	)
 	assert(
-		cli.parse(cli.pure("x"), []) == Ok("x"),
+		{
+			e4_call_arg_0 = cli.pure("x")
+			e4_call_arg_1 = []
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok("x"),
 	)
 	p = options()
 	identity = cli.map(p, (x) { x })
@@ -556,10 +793,19 @@ test("cli_composition_laws", () {
 		["-v", "--unknown"],
 		["extra"],
 	], (args) {
-		assert(cli.parse(identity, args) == cli.parse(p, args))
-		assert(cli.parse(p, args) == cli.parse(p, args))
+		assert(
+			fail.catch(() { cli.parse(identity, args) }) ==
+				fail.catch(() { cli.parse(p, args) }),
+		)
+		assert(
+			fail.catch(() { cli.parse(p, args) }) ==
+				fail.catch(() { cli.parse(p, args) }),
+		)
 	})
-	assert(cli.help(identity, "app") == cli.help(p, "app"))
+	assert(
+		fail.catch(() { cli.help(identity, "app") }) ==
+			fail.catch(() { cli.help(p, "app") }),
+	)
 	// Reassociation includes map callbacks at the same left-to-right positions.
 	left = cli.map2(
 		cli.map2(jobs(), name(), Pair),
@@ -579,8 +825,16 @@ test("cli_composition_laws", () {
 		["--name=x", "--jobs=bad"],
 		["--jobs=2"],
 		["--unknown"],
-	], (args) { assert(cli.parse(left, args) == cli.parse(right, args)) })
-	assert(cli.help(left, "app") == cli.help(right, "app"))
+	], (args) {
+		assert(
+			fail.catch(() { cli.parse(left, args) }) ==
+				fail.catch(() { cli.parse(right, args) }),
+		)
+	})
+	assert(
+		fail.catch(() { cli.help(left, "app") }) ==
+			fail.catch(() { cli.help(right, "app") }),
+	)
 	// Each leaf consumes one bucket; pure consumes none even within map2 trees.
 	mixed = cli.map2(
 		cli.map2(cli.pure("prefix"), jobs(), (s, n) { (s, n) }),
@@ -588,7 +842,8 @@ test("cli_composition_laws", () {
 		(pair: (String, Int), v) { Triple(pair.1, pair.0, v) },
 	)
 	assert(
-		cli.parse(mixed, ["--jobs=3", "-v"]) == Ok(Triple(3, "prefix", True)),
+		fail.catch(() { cli.parse(mixed, ["--jobs=3", "-v"]) }) ==
+			Ok(Triple(3, "prefix", True)),
 	)
 	Nil
 })
@@ -596,40 +851,67 @@ test("cli_composition_laws", () {
 // A8: byte-exact help, all display forms, verbatim content, no callbacks.
 test("cli_help", () {
 	assert(
-		cli.help(
-			cli.optional(
+		{
+			e4_call_arg_0 = cli.optional(
 				cli.Names(long = "jobs", short = Some("j")),
 				"Workers",
 				cli.integer,
-			),
-			"app",
-		) ==
+			)
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok("Usage: app\n  [--jobs, -j VALUE]\tWorkers\n"),
 	)
 	assert(
-		cli.help(cli.pure(2), "app") == Ok("Usage: app\n"),
+		{
+			e4_call_arg_0 = cli.pure(2)
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok("Usage: app\n"),
 	)
 	assert(
-		cli.help(verbose(), "app") ==
+		{
+			e4_call_arg_0 = verbose()
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok("Usage: app\n  [--verbose, -v]\tShow progress\n"),
 	)
 	assert(
-		cli.help(jobs(), "app") ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok("Usage: app\n  --jobs, -j VALUE\tWorkers\n"),
 	)
 	assert(
-		cli.help(
-			cli.many(cli.Names(long = "name", short = None), "Names", cli.text),
-			"app",
-		) ==
+		{
+			e4_call_arg_0 = cli.many(
+				cli.Names(long = "name", short = None),
+				"Names",
+				cli.text,
+			)
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok("Usage: app\n  [--name VALUE...]\tNames\n"),
 	)
 	assert(
-		cli.help(cli.argument("file", "Input", cli.text), "app") ==
+		{
+			e4_call_arg_0 = cli.argument("file", "Input", cli.text)
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok("Usage: app\n  <file>\tInput\n"),
 	)
 	assert(
-		cli.help(cli.rest("files", "Inputs", cli.text), "app") ==
+		{
+			e4_call_arg_0 = cli.rest("files", "Inputs", cli.text)
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok("Usage: app\n  [<files>...]\tInputs\n"),
 	)
 	stop = (_: String) -> Result(Int, String) { panic("help called reader") }
@@ -639,43 +921,60 @@ test("cli_help", () {
 		stop,
 	), (_) -> String { panic("help called mapper") })
 	assert(
-		cli.help(stopping, "app\n--raw") ==
+		fail.catch(() { cli.help(stopping, "app\n--raw") }) ==
 			Ok("Usage: app\n--raw\n  --jobs VALUE\tWorkers\n\tverbatim\n"),
 	)
 	stopping2 = cli.map2(stopping, cli.pure(False), (_, _) -> Int {
 		panic("help called map2")
 	})
 	assert(
-		cli.help(stopping2, "app") ==
+		fail.catch(() { cli.help(stopping2, "app") }) ==
 			Ok("Usage: app\n  --jobs VALUE\tWorkers\n\tverbatim\n"),
 	)
 	assert(
-		cli.help(options(), "app") ==
+		{
+			e4_call_arg_0 = options()
+			e4_call_arg_1 = "app"
+			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				"Usage: app\n  --jobs, -j VALUE\tWorkers\n  [--verbose, -v]\tShow progress\n",
 			),
 	)
 	// Help and version have no built-in parsing behavior, alone or mixed.
 	assert(
-		cli.parse(jobs(), ["--help"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--help"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.UnknownOption(index = 0, token = "--help")),
 	)
 	assert(
-		cli.parse(jobs(), ["--jobs=1", "--help"]) ==
+		{
+			e4_call_arg_0 = jobs()
+			e4_call_arg_1 = ["--jobs=1", "--help"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Error(cli.UnknownOption(index = 1, token = "--help")),
 	)
 	assert(
-		cli.parse(
-			cli.flag(cli.Names(long = "help", short = None), ""),
-			["--help"],
-		) ==
+		{
+			e4_call_arg_0 = cli.flag(cli.Names(long = "help", short = None), "")
+			e4_call_arg_1 = ["--help"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(True),
 	)
 	assert(
-		cli.parse(
-			cli.flag(cli.Names(long = "version", short = None), ""),
-			["--version"],
-		) ==
+		{
+			e4_call_arg_0 = cli.flag(
+				cli.Names(long = "version", short = None),
+				"",
+			)
+			e4_call_arg_1 = ["--version"]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(True),
 	)
 	Nil
@@ -685,16 +984,26 @@ test("cli_help", () {
 test("cli_long_inputs", () {
 	value = string.repeat("é", 20000)
 	assert(
-		cli.parse(name(), ["--name=" <> value]) == Ok(value),
+		{
+			e4_call_arg_0 = name()
+			e4_call_arg_1 = ["--name=" <> value]
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok(value),
 	)
 	values = list.map(list.range(0, 1000), (n) {
 		"--name=" <> { n % 2 |> (0) { "a" } | (_) { "é" } }
 	})
 	assert(
-		cli.parse(
-			cli.many(cli.Names(long = "name", short = None), "", cli.text),
-			values,
-		) ==
+		{
+			e4_call_arg_0 = cli.many(
+				cli.Names(long = "name", short = None),
+				"",
+				cli.text,
+			)
+			e4_call_arg_1 = values
+			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
+		} ==
 			Ok(
 				list.map(list.range(0, 1000), (n) {
 					n % 2 |> (0) { "a" } | (_) { "é" }

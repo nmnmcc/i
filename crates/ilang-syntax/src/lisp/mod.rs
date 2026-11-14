@@ -34,6 +34,19 @@ pub use to_ast::{
 };
 pub use to_source::{normal_source, normal_with_comments};
 
+// The bridge marks the beginning of each written provide group. This is
+// structural, so copied macro blocks do not depend on original source ids.
+fn starts_provide_group(stmts: &[crate::ast::Stmt], index: usize) -> bool {
+    let crate::ast::Stmt::Env {
+        group: Some(group), ..
+    } = &stmts[index]
+    else {
+        return false;
+    };
+    !matches!(index.checked_sub(1).and_then(|i| stmts.get(i)),
+        Some(crate::ast::Stmt::Env { group: Some(previous), .. }) if previous == group)
+}
+
 #[derive(Debug)]
 pub struct Datum {
     pub kind: DatumKind,

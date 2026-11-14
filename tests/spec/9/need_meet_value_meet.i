@@ -5,15 +5,13 @@
 // §4.4. S's parameter goes in the same direction, so S(Never) and S(Dep)
 // meet in S(Never) on both paths.
 S(N) = (f = () <- N -> Nil)
-
 Dep = (v = Int)
 
 needs_never = () <- (s: S(Never)) { Nil }
-
 needs_dep = () <- (s: S(Dep)) { Nil }
 
 // The need path: the two needs merge to S(Never).
-both = () -> Nil {
+both: () <- (S(Never)) -> Nil = () {
 	needs_never()
 	needs_dep()
 }
@@ -25,11 +23,10 @@ meet = (x: S(Never) & S(Dep)) -> S(Never) { x }
 join = (x: S(Never) | S(Dep)) -> S(Dep) { x }
 
 main = () {
-	_syn3_0: S(Never) = S(f = () { Nil })
 	{
 		both()
 		meet(S(f = () { Nil }))
 		join(S(f = () { Nil }))
 		Nil
-	} <- (_syn3_0)
+	} <- (S(f = () { Nil }))
 }

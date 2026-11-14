@@ -10,7 +10,7 @@
 rounds = 100_000
 
 Done = (Int)
-More = (Int, Continuation(Nil, Step, Never, Never))
+More = (Int, Continuation(Nil, Step, Never))
 // What the paused computation gives: each number, and at the end the
 // number of frames it went back through.
 Step = Done | More

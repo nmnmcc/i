@@ -4,6 +4,7 @@
 //// that count bytes say so. The `base16` and `base64` functions work on
 //// whole bytes: they first fill the last byte with zero bits.
 (
+	i/fail
 	i/core
 	order = (Order, Less, Equal, Greater) = std/order
 )
@@ -32,14 +33,7 @@
 /// The UTF-8 bytes of a string.
 from_string = (string: String) -> BitArray { <<string:utf8>> }
 
-/// The string, when the bits are whole bytes of correct UTF-8, or
-/// `Error(Nil)`.
-///
-/// ```i
-/// bit_array.to_string(<<104, 105>>)  // Ok("hi")
-/// bit_array.to_string(<<255>>)       // Error(Nil)
-/// ```
-to_string = (bits: BitArray) -> Result(String, Nil) {
+_to_string_result = (bits: BitArray) -> Result(String, Nil) {
 	core.bit_array_to_string(bits)
 }
 
@@ -80,15 +74,7 @@ reverse = <A>(list: List(A)) -> List(A) {
 	go(list, [])
 }
 
-/// `take` bytes from byte `position`, counting from 0. A negative `take`
-/// takes the bytes before `position`. `Error(Nil)` when they are not all in
-/// the bit array.
-///
-/// ```i
-/// bit_array.slice(<<1, 2, 3, 4>>, 1, 2)   // Ok(<<2, 3>>)
-/// bit_array.slice(<<1, 2, 3, 4>>, 3, -2)  // Ok(<<2, 3>>)
-/// ```
-slice = (from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil) {
+_slice_result = (from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil) {
 	(start, length) = { take < 0 } |>
 		(True) { (at + take, -take) }
 		| (False) { (at, take) }
@@ -196,13 +182,7 @@ hex_value = (byte: Int) -> Int {
 		}
 }
 
-/// Reads base 16 text: two hex digits, upper or lower case, for each byte.
-/// Any other text gives `Error(Nil)`.
-///
-/// ```i
-/// bit_array.base16_decode("ff01")  // Ok(<<255, 1>>)
-/// ```
-base16_decode = (input: String) -> Result(BitArray, Nil) {
+_base16_decode_result = (input: String) -> Result(BitArray, Nil) {
 	go = (rest, acc) {
 		rest |>
 			(<<>>) { Ok(concat(reverse(acc))) }
@@ -315,18 +295,68 @@ decode64 = (input: String, c62: Int, c63: Int) -> Result(BitArray, Nil) {
 	go(<<input:utf8>>, [])
 }
 
-/// Reads base 64 text (RFC 4648), with `+` and `/`. The `=` padding at the
-/// end may be there or not. Any other text gives `Error(Nil)`.
-///
-/// ```i
-/// bit_array.base64_decode("aGk=")  // Ok(<<104, 105>>)
-/// bit_array.base64_decode("aGk")   // Ok(<<104, 105>>)
-/// ```
-base64_decode = (encoded: String) -> Result(BitArray, Nil) {
+_base64_decode_result = (encoded: String) -> Result(BitArray, Nil) {
 	decode64(encoded, 43, 47)
 }
 
-/// Like `base64_decode`, with `-` and `_` in the place of `+` and `/`.
-base64_url_decode = (encoded: String) -> Result(BitArray, Nil) {
+_base64_url_decode_result = (encoded: String) -> Result(BitArray, Nil) {
 	decode64(encoded, 45, 95)
+}
+
+/// The string, when the bits are whole bytes of correct UTF-8; otherwise raises `Nil`.
+///
+/// ```i
+/// fail.catch(() { bit_array.to_string(<<104, 105>>) })  // Ok("hi")
+/// fail.catch(() { bit_array.to_string(<<255>>) })       // Error(Nil)
+/// ```
+///
+/// Reports failure through `Fail(Nil)`.
+to_string = (bits: BitArray) -> String {
+	fail.from_result(_to_string_result(bits))
+}
+
+/// `take` bytes from byte `position`, counting from 0. A negative `take`
+/// takes the bytes before `position`. Raises `Nil` when they are not all in
+/// the bit array.
+///
+/// ```i
+/// fail.catch(() { bit_array.slice(<<1, 2, 3, 4>>, 1, 2) })   // Ok(<<2, 3>>)
+/// fail.catch(() { bit_array.slice(<<1, 2, 3, 4>>, 3, -2) })  // Ok(<<2, 3>>)
+/// ```
+///
+/// Reports failure through `Fail(Nil)`.
+slice = (from: BitArray, at: Int, take: Int) -> BitArray {
+	fail.from_result(_slice_result(from, at, take))
+}
+
+/// Reads base 16 text: two hex digits, upper or lower case, for each byte.
+/// Any other text raises `Nil`.
+///
+/// ```i
+/// fail.catch(() { bit_array.base16_decode("ff01") })  // Ok(<<255, 1>>)
+/// ```
+///
+/// Reports failure through `Fail(Nil)`.
+base16_decode = (input: String) -> BitArray {
+	fail.from_result(_base16_decode_result(input))
+}
+
+/// Reads base 64 text (RFC 4648), with `+` and `/`. The `=` padding at the
+/// end may be there or not. Any other text raises `Nil`.
+///
+/// ```i
+/// fail.catch(() { bit_array.base64_decode("aGk=") })  // Ok(<<104, 105>>)
+/// fail.catch(() { bit_array.base64_decode("aGk") })   // Ok(<<104, 105>>)
+/// ```
+///
+/// Reports failure through `Fail(Nil)`.
+base64_decode = (encoded: String) -> BitArray {
+	fail.from_result(_base64_decode_result(encoded))
+}
+
+/// Like `base64_decode`, with `-` and `_` in the place of `+` and `/`.
+///
+/// Reports failure through `Fail(Nil)`.
+base64_url_decode = (encoded: String) -> BitArray {
+	fail.from_result(_base64_url_decode_result(encoded))
 }

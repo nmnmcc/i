@@ -1702,12 +1702,12 @@ fn with_type(name: &str, ty: Option<&str>) -> String {
 }
 
 fn builtin_head(b: BuiltinType) -> String {
-    const PARAMS: [&str; 4] = ["A", "R", "E", "N"];
+    const PARAMS: [&str; 3] = ["A", "R", "N"];
     match b {
         BuiltinType::List => "List(A)".into(),
         BuiltinType::Key => "Key(A)".into(),
         BuiltinType::Request => "Request(A)".into(),
-        BuiltinType::Boundary => "Boundary(R, E, N)".into(),
+        BuiltinType::Boundary => "Boundary(R, N)".into(),
         BuiltinType::Continuation => format!("Continuation({})", PARAMS.join(", ")),
         b => b.name().into(),
     }
@@ -2111,7 +2111,7 @@ impl Walk<'_> {
                 for p in &f.params {
                     match p {
                         Param::Pattern { pattern, .. } => self.pattern(pattern),
-                        Param::Env { var, name, ty } => {
+                        Param::Env { var, name, ty, .. } => {
                             self.binders.entry(*var).or_insert(name.span);
                             self.occ.push((name.span, Target::Local(*var)));
                             self.ty(ty);

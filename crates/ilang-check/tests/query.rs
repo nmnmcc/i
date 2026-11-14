@@ -408,6 +408,8 @@ fn types_in_a_program_with_errors() {
 
 #[test]
 fn types_of_parameters_that_share_a_type_variable() {
+    // E3 has one need row: an unknown callback does not introduce a
+    // separate Fail entry. Keep every global/local naming assertion below.
     let f = Fixture::new(&[(
         "src/main.i",
         "h3 = (f, x) { f(x) + 1 }\n\
@@ -419,32 +421,22 @@ fn types_of_parameters_that_share_a_type_variable() {
     // The parameter type of `f` is the type of `x`, which the scheme names.
     assert_eq!(
         f.hover("app/main", "h3", 0),
-        "h3: ((A) <- (Fail(E), ..N) -> Int, A) <- (Fail(E), ..N) -> Int"
+        "h3: ((A) <- N -> Int, A) <- N -> Int"
     );
-    assert_eq!(
-        f.hover("app/main", "f, x", 0),
-        "f: (A) <- (Fail(E), ..N) -> Int"
-    );
-    assert_eq!(
-        f.hover("app/main", "f(x)", 0),
-        "f: (A) <- (Fail(E), ..N) -> Int"
-    );
+    assert_eq!(f.hover("app/main", "f, x", 0), "f: (A) <- N -> Int");
+    assert_eq!(f.hover("app/main", "f(x)", 0), "f: (A) <- N -> Int");
     assert_eq!(f.hover("app/main", "x)", 0), "x: A");
-    assert_eq!(
-        f.hover("app/main", "f, v", 0),
-        "f: (A) <- (Fail(E), ..N) -> B"
-    );
+    assert_eq!(f.hover("app/main", "f, v", 0), "f: (A) <- N -> B");
     assert_eq!(f.hover("app/main", "v)", 0), "v: A");
     // Not shared: as before.
-    assert_eq!(
-        f.hover("app/main", "f) {", 0),
-        "f: (1) <- (Fail(E), ..N) -> A"
-    );
+    assert_eq!(f.hover("app/main", "f) {", 0), "f: (1) <- N -> A");
     assert_eq!(f.hover("app/main", "a) {", 0), "a: A");
 }
 
 #[test]
 fn local_types_use_the_names_of_the_scheme() {
+    // E3 has one need row: an unknown callback does not introduce a
+    // separate Fail entry. Keep every global/local naming assertion below.
     let f = Fixture::new(&[(
         "src/main.i",
         "k = (f, x) {\n  y = f(x)\n  y\n}\n\
@@ -457,33 +449,21 @@ fn local_types_use_the_names_of_the_scheme() {
     // The value of `f` is `y`, and the value of `k`.
     assert_eq!(
         f.hover("app/main", "k = ", 0),
-        "k: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> B"
+        "k: ((A) <- N -> B, A) <- N -> B"
     );
     assert_eq!(f.hover("app/main", "y = ", 0), "y: B");
     assert_eq!(f.hover("app/main", "y\n}", 0), "y: B");
-    assert_eq!(
-        f.hover("app/main", "f, x) {\n  y", 0),
-        "f: (A) <- (Fail(E), ..N) -> B"
-    );
+    assert_eq!(f.hover("app/main", "f, x) {\n  y", 0), "f: (A) <- N -> B");
     // The second parameter of `compose` is named as in its scheme.
     let compose = f.hover("app/main", "compose", 0);
     assert_eq!(
         compose,
-        "compose: ((A) <- (Fail(E), ..N) -> B, (B) <- (Fail(E2), ..N2) -> C) -> (A) <- (Fail(E | E2), ..N, ..N2) -> C"
+        "compose: ((A) <- N -> B, (B) <- N2 -> C) -> (A) <- (..N, ..N2) -> C"
     );
-    assert_eq!(
-        f.hover("app/main", "f, g", 0),
-        "f: (A) <- (Fail(E), ..N) -> B"
-    );
-    assert_eq!(
-        f.hover("app/main", "g) {", 0),
-        "g: (B) <- (Fail(E2), ..N2) -> C"
-    );
+    assert_eq!(f.hover("app/main", "f, g", 0), "f: (A) <- N -> B");
+    assert_eq!(f.hover("app/main", "g) {", 0), "g: (B) <- N2 -> C");
     assert_eq!(f.hover("app/main", "x) { g", 0), "x: A");
-    assert_eq!(
-        f.hover("app/main", "g(f(x))", 0),
-        "g: (B) <- (Fail(E2), ..N2) -> C"
-    );
+    assert_eq!(f.hover("app/main", "g(f(x))", 0), "g: (B) <- N2 -> C");
     // The names of the parameters are not the names of their types.
     assert_eq!(f.hover("app/main", "pairup", 0), "pairup: (A, B) -> (B, A)");
     assert_eq!(f.hover("app/main", "a, b)", 0), "a: A");
@@ -491,18 +471,18 @@ fn local_types_use_the_names_of_the_scheme() {
     assert_eq!(f.hover("app/main", "b, a)", 0), "b: B");
     assert_eq!(
         f.hover("app/main", "twice", 0),
-        "twice: ((A | B) <- (Fail(E), ..N) -> B & C) -> (A) <- (Fail(E), ..N) -> C"
+        "twice: ((A | B) <- N -> B & C) -> (A) <- N -> C"
     );
     assert_eq!(f.hover("app/main", "z) {", 0), "z: A");
     assert_eq!(
         f.hover("app/main", "f(f(z))", 0),
-        "f: (A | B) <- (Fail(E), ..N) -> B & C"
+        "f: (A | B) <- N -> B & C"
     );
     // `w` is generalized in the block: its own variable is not one of the
     // scheme, and has a name that is not used there.
     assert_eq!(
         f.hover("app/main", "both = ", 0),
-        "both: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> (B, (C) -> (C, A))"
+        "both: ((A) <- N -> B, A) <- N -> (B, (C) -> (C, A))"
     );
     assert_eq!(f.hover("app/main", "w = ", 0), "w: (D) -> (D, A)");
     assert_eq!(f.hover("app/main", "q) {", 0), "q: D");
@@ -514,6 +494,8 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
     // A variable on one side only of the scheme has no effect, and is
     // shown as a name of its own there: a local name of that type shows
     // the same name.
+    // E3 has one need row: an unknown callback does not introduce a
+    // separate Fail entry. Keep every global/local naming assertion below.
     let f = Fixture::new(&[(
         "src/main.i",
         "one = (x) {\n  y = x\n  1\n}\n\
@@ -528,17 +510,14 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
     assert_eq!(f.hover("app/main", "x\n  1", 0), "x: A");
     assert_eq!(
         f.hover("app/main", "drop =", 0),
-        "drop: (A, (1) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B"
+        "drop: (A, (1) <- N -> B) <- N -> B"
     );
     assert_eq!(f.hover("app/main", "x, g) {\n  y = x\n  g", 0), "x: A");
     assert_eq!(f.hover("app/main", "y = x\n  g", 0), "y: A");
-    assert_eq!(
-        f.hover("app/main", "g) {\n  y = x", 0),
-        "g: (1) <- (Fail(E), ..N) -> B"
-    );
+    assert_eq!(f.hover("app/main", "g) {\n  y = x", 0), "g: (1) <- N -> B");
     assert_eq!(
         f.hover("app/main", "drop2", 0),
-        "drop2: (A, (1) <- (Fail(E), ..N) -> B, C) <- (Fail(E), ..N) -> B"
+        "drop2: (A, (1) <- N -> B, C) <- N -> B"
     );
     assert_eq!(f.hover("app/main", "x, g, h", 0), "x: A");
     assert_eq!(f.hover("app/main", "h) {", 0), "h: C");
@@ -547,17 +526,11 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
     assert_eq!(f.hover("app/main", "h)\n", 0), "h: C");
     assert_eq!(
         f.hover("app/main", "effonly", 0),
-        "effonly: ((A) <- (Fail(E), ..N) -> B, A) <- (Fail(E), ..N) -> Nil"
+        "effonly: ((A) <- N -> B, A) <- N -> Nil"
     );
-    assert_eq!(
-        f.hover("app/main", "f, x) {\n  r", 0),
-        "f: (A) <- (Fail(E), ..N) -> B"
-    );
+    assert_eq!(f.hover("app/main", "f, x) {\n  r", 0), "f: (A) <- N -> B");
     assert_eq!(f.hover("app/main", "x) {\n  r", 0), "x: A");
-    assert_eq!(
-        f.hover("app/main", "f(x)\n  Nil", 0),
-        "f: (A) <- (Fail(E), ..N) -> B"
-    );
+    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f: (A) <- N -> B");
     assert_eq!(f.hover("app/main", "r = ", 0), "r: B");
 }
 

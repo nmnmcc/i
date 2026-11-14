@@ -241,7 +241,7 @@ test("errors", () {
 })
 
 Done = ()
-More = (Int, Continuation(Nil, Step, Never, Never))
+More = (Int, Continuation(Nil, Step, Never))
 // A generator that is pulled one value at a time: the continuation is a
 // value, and it is resumed later from other places.
 Step = Done | More

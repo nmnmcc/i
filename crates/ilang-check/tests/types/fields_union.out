@@ -13,7 +13,7 @@ make : (Int) -> Cat
 from_call : () -> Int
 from_update : (Cat) -> Int
 local_call : (Cat | Dog) -> String
-apply : ((Cat | Dog) <- (Fail(E), ..N) -> A, Cat | Dog) <- (Fail(E), ..N) -> Never
+apply : ((Cat | Dog) <- N -> A, Cat | Dog) <- N -> Never
 each : (List(A), (A) -> B) -> List(B)
 checked : (List(Rock)) -> List(Int)
 wrong : (List(Rock)) -> List(Int)

@@ -2,6 +2,7 @@
 //// filesystem, a current directory, or a platform's drive conventions.
 //// Unicode, NUL, backslashes, and percent escapes are ordinary characters.
 (
+	i/fail
 	list = std/list
 	string = std/string
 )
@@ -119,9 +120,7 @@ is_absolute = (path: String) -> Bool {
 	path |> ("/" <> _) { True } | (_) { False }
 }
 
-/// A lexical route from one location to another. Different roots and unmatched
-/// parents in the base are errors. Neither location is implicitly a file.
-relative = (from: String, to: String) -> Result(String, RelativeError) {
+_relative_result = (from: String, to: String) -> Result(String, RelativeError) {
 	a = clean(from)
 	b = clean(to)
 	{ is_absolute(a) != is_absolute(b) } |>
@@ -184,4 +183,12 @@ render = (parts: List(String), rooted: Bool) -> String {
 
 clean_segments = (path: String) -> List(String) {
 	path |> (".") { [] } | (_) { list.filter(segments(path), (p) { p != "" }) }
+}
+
+/// A lexical route from one location to another. Different roots and unmatched
+/// parents in the base are errors. Neither location is implicitly a file.
+///
+/// Reports failure through `Fail(RelativeError)`.
+relative = (from: String, to: String) -> String {
+	fail.from_result(_relative_result(from, to))
 }

@@ -46,7 +46,9 @@ fn a_hidden_handler_obligation_is_rejected_at_the_definition() {
     // §4.4: “When the parameter does not change, Ai and Bi must be equal”.
     // An invariant service still retains a hidden same-form obligation.
     let source = "Svc(A) = (A, (A) -> Nil)
-wrap: <N>(() <- (Fail(Never), ..N) -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (body, svc) { body() <- (svc) }";
+wrap: <N>(() <- N -> Int, Svc(String)) <- N -> Int = (body, svc) {
+ body() <- (svc)
+}";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -100,35 +102,31 @@ fn equivalent_nested_row_orders_do_not_change_handler_acceptance() {
     let base = "Dep = ()
 Extra = ()
 Svc(R) = (() <- R -> Nil)
-wrap: <N>(
-	() <- (Svc(Extra | Dep), ..N) -> Nil,
-	Svc(Dep | Extra),
-) <- N -> Nil = (body, svc) {
-    provided: Svc(Extra | Dep) = svc
-    body() <- (provided)
-}";
+wrap = <N>(
+	body: () <- (Svc(Extra | Dep), ..N) -> Nil,
+	svc: Svc(Dep | Extra)
+) -> Nil { body() <- (svc) }";
     let before = types(base);
-    let reordered = base.replace("provided: Svc(Extra | Dep)", "provided: Svc(Dep | Extra)");
-    assert_ne!(base, reordered);
-    let after = types(&reordered);
+    let after = types(&base.replace("Svc(Extra | Dep)", "Svc(Dep | Extra)"));
     assert_eq!(before, after);
     assert!(before["app/main.wrap"].contains("Svc(Dep | Extra)"));
 }
 
 #[test]
 fn row_kind_survives_an_alias_without_algebra() {
-    // F2 requires N to remain a row even when a function alias is copied
-    // without normalization. Its value positions must compare Svc's
-    // arguments equally before generalization can combine the forms.
-    for need in ["(Fail(Never), ..N)", "(Fail(N))"] {
-        let source = "Svc(A) = (() -> A)
-Row(N) = () <- NEED -> Nil
+    // N stays a need row when a function alias is copied without
+    // normalization, whether alone or beside a named service. Errors
+    // use an ordinary Fail argument now (§9.3), not a second row kind.
+    for need in ["N", "(Dep, ..N)"] {
+        let source = "Dep = ()
+Svc(A) = (() -> A)
+Row(N) = () <- N -> Nil
 bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 	first: N = one
 	second: N = two
 	second
 }"
-        .replace("NEED", need);
+        .replace("() <- N -> Nil", &format!("() <- {need} -> Nil"));
         let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
         let checked = ilang_check::check(&graph);
         assert!(
@@ -141,19 +139,22 @@ bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 
 #[test]
 fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
-    // §4.5: both bounds fix the handler hole to the same form.
+    // §4.5: L <: v <: U proves v = T when L = T = U. A hole in a
+    // invariant handler fixed to Int must prove the same witness as writing Int.
+    let source = "Svc(A) = (f = (A) -> A)
+wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
+	body() <- (svc)
+}";
     for inferred in [false, true] {
-        let head = if inferred {
-            "wrap = <N>(body: () <- (Fail(Never), Svc(Int), ..N) -> Int, svc: Svc(Int))"
+        let source = if inferred {
+            source.replace(") -> Int {", ") {")
         } else {
-            "wrap: <N>(() <- (Fail(Never), Svc(Int), ..N) -> Int, Svc(Int)) <- (Fail(Never), ..N) -> Int = (body, svc)"
+            source.to_string()
         };
-        let source = format!(
-            "Svc(A) = (f = () -> A)\n{head} {{\n provided: Svc(Int) = svc\n body() <- (provided)\n}}\n"
+        assert_eq!(
+            types(&source),
+            types(&source.replace("svc: Svc(Int)", "svc: Svc(_)"))
         );
-        let with_hole = source.replace("provided: Svc(Int)", "provided: Svc(_)");
-        assert_ne!(source, with_hole);
-        assert_eq!(types(&source), types(&with_hole));
     }
     // Never has an implicit lower bound, so v <: Never also fixes v.
     let never = "S(N) = (() <- N -> Nil)
@@ -161,7 +162,7 @@ use = () <- (s: S(Never)) {
 	S(f) = s
 	f()
 }
-wrap: <N>(() <- (S(Never), ..N) -> Nil, S(Never)) <- N -> Nil = (body, svc) {
+wrap = <N>(body: () <- (S(Never), ..N) -> Nil, svc: S(Never)) -> Nil {
 	body() <- (svc)
 }";
     types(never);
@@ -183,19 +184,27 @@ Alias(N) = T(N)
     );
     for op in ["|", "&", "-"] {
         let row = ["S(Never)", op, "S(Dep)"].join(" ");
-        for (written, error_row) in [
-            (format!("T({row})"), false),
-            (format!("Alias({row})"), false),
-            ("() <- (Fail(Never), ..Written) -> Nil".to_string(), false),
-            (format!("() <- (Fail({row})) -> Nil"), true),
+        for written in [
+            format!("T({row})"),
+            format!("Alias({row})"),
+            // The old `() -> Nil ! {row}` has no syntax-three form: a need
+            // list holds named service types only (syntax-3 §3.1).
+            format!("() <- (Fail({row})) -> Nil"),
         ] {
             let source = format!(
-                "{invariant_head}Written = {row}\nuse = (x: {written}) {{ x }}
+                "{invariant_head}use = (x: {written}) {{ x }}
 "
             );
             let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
             let checked = ilang_check::check(&graph);
-            let expected = if op == "-" || error_row {
+            // Fail's argument is an ordinary value type after E3. Its
+            // invariant union/intersection error is E0503, as elsewhere;
+            // the former separate error-row diagnostic no longer applies.
+            let expected = if op == "-" && written.contains("Fail(") {
+                // A difference in an ordinary error value requires value
+                // subtyping (§4.4); this is no longer an error-row check.
+                "E0501"
+            } else if op == "-" {
                 "E0515"
             } else {
                 "E0503"
@@ -209,7 +218,7 @@ Alias(N) = T(N)
     }
     let alias = "Dep = ()
 S(N) = (() <- N -> Nil)
-Bad = { S(Never) | S(Dep) }
+Bad = S(Never) | S(Dep)
 use = (body: () <- (Bad) -> Nil) { body() }";
     assert_eq!(
         types(alias),
@@ -279,13 +288,16 @@ fn a_directed_row_handler_keeps_the_callback_row_open() {
     // the direction of N. Handling S(N) must not put S(N) inside N.
     let shown = types(
         "S(N) = (f = () <- N -> Int)
-use = <N>() <- (s: S(N)) {
-	S(f = f, ..) = s
-	f()
-}
-wrap: <N>(S(N)) <- (Fail(Never), ..N) -> Int = (svc) { use() <- (svc) }",
+use = <N>() <- (s: S(N)) { s.f() }
+wrap = <N>(svc: S(N)) -> Int { use() <- (svc) }",
     );
-    assert_eq!(shown["app/main.wrap"], "(S(A)) <- A -> Int");
+    // The retained key restriction is shown explicitly; A stays open to
+    // every other service. The retained obligation uses the actual provider
+    // form S(A), as required by the directed P <: S check (§9.2).
+    assert_eq!(shown["app/main.wrap"], "(S(A)) <- (A - S(A)) -> Int");
+    types(
+        "Dep = (value = Int)\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nwrap = <N>(svc: S(N)) -> Int { use() <- (svc) }\nneed = () <- (d: Dep) { d.value }\nexample = () { wrap(S(f = () { need() })) <- (Dep(value = 1)) }\n",
+    );
 }
 
 #[test]
@@ -311,10 +323,7 @@ fn equal_invariant_arguments_do_not_block_other_argument_meets() {
         "Cell(I, A) = (state = I, put = (I) -> Nil, value = A)
 one = () <- (s: Cell(Int, Int)) { Nil }
 two = () <- (s: Cell(Int, 1)) { Nil }
-both = () {
-	one()
-	two()
-}",
+both = () { one() two() }",
     );
     assert_eq!(shown["app/main.both"], "() <- (Cell(Int, 1)) -> Nil");
 }
@@ -326,20 +335,14 @@ fn an_undetermined_need_argument_keeps_its_intersection() {
     let shown = types(
         "Read(A) = (value = A)
 need_int = () <- (r: Read(Int)) { Nil }
-both = <A>(x: A) <- (r: Read(A)) {
-	need_int()
-	x
-}",
+both = <A>(x: A) <- (r: Read(A)) { need_int() x }",
     );
     assert_eq!(shown["app/main.both"], "(A) <- (Read(Int & A)) -> A");
 }
 
 #[test]
 fn closed_constructor_arguments_still_report_an_empty_need_meet() {
-    let source = "S(A) = (value = A)
-one = () <- (s: S(Int)) { s.value + 1 }
-run = <N>(f: () <- N -> Int, x: N) { f() }
-bad = () { run(() { one() }, S(value = \"hi\")) }";
+    let source = "S(A) = (value = A)\none = () <- (s: S(Int)) { s.value + 1 }\nrun = <N>(f: () <- N -> Int, x: N) { f() }\nbad = () { run(() { one() }, S(value = \"hi\")) }\n";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -356,17 +359,15 @@ bad = () { run(() { one() }, S(value = \"hi\")) }";
 fn inferred_handlers_keep_future_provider_constraints() {
     // §9.2: a provided value must be a subtype of the needed service.
     // Generalizing an inferred row must retain that obligation for callers.
-    let source = "S(A) = (value = A)
-read = () <- (s: S(String)) { s.value <> \"!\" }
-with = <A>(x: A, f) { provided: S(A) = S(value = x) f() <- (provided) }
-main = () {
-	with(1, read)
-	Nil
-}";
+    let source = "S(A) = (value = A)\nread = () <- (s: S(String)) { s.value <> \"!\" }\nwith = <A>(x: A, f) { f() <- (S(value = x)) }\nmain = () {\n\twith(1, read)\n\tNil\n}\n";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
     assert!(
-        checked.diags.iter().any(|d| d.code == "E0515"),
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("S(")
+            && !d.message.contains("hides")
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
         "{:?}",
         graph.sources.render_all(&checked.diags)
     );
@@ -376,13 +377,7 @@ main = () {
 #[test]
 fn higher_order_entry_keeps_unprovided_service() {
     let shown = types(
-        "S(N) = (() <- N -> Nil)
-use = <N>() <- (s: S(N)) {
-	S(f) = s
-	f()
-}
-run = <A, N>(f: () <- N -> A) { f() }
-main = <N>() <- (s: S(N)) { run(() { use() }) }",
+        "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s: S(N)) {\n\tS(f) = s\n\tf()\n}\nrun = <A, N>(f: () <- N -> A) { f() }\nmain = <N>() <- (s: S(N)) { run(() { use() }) }\n",
     );
     assert!(shown["app/main.main"].contains("S("), "{shown:?}");
 }
@@ -391,21 +386,7 @@ main = <N>() <- (s: S(N)) { run(() { use() }) }",
 fn nested_forwarding_keeps_the_provided_services_own_need() {
     // §9.2: providing S(Dep) handles S, not the Dep needed by its method.
     let shown = types(
-        "Dep = (v = Int)
-get = () <- (d: Dep) { d.v }
-S(N) = (f = () <- N -> Int)
-use = <N>() <- (s: S(N)) { s.f() }
-run = <A, N>(f: () <- N -> A) { f() }
-fw = () { use() }
-fr = () { run(() { use() }) }
-main = () {
-	{
-		h = () { run(fr) }
-		k = () { run(h) + fw() }
-		k()
-		Nil
-	} <- (S(f = () { get() }))
-}",
+        "Dep = (v = Int)\nget = () <- (d: Dep) { d.v }\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nrun = <A, N>(f: () <- N -> A) { f() }\nfw = () { use() }\nfr = () { run(() { use() }) }\nmain = () {\n\t{\n\t\th = () { run(fr) }\n\t\tk = () { run(h) + fw() }\n\t\tk()\n\t\tNil\n\t} <- (S(f = () { get() }))\n}\n",
     );
     assert!(shown["app/main.main"].contains("Dep"), "{shown:?}");
 }
@@ -413,19 +394,7 @@ main = () {
 #[test]
 fn direct_forwarding_keeps_the_provided_services_own_need() {
     let shown = types(
-        "Dep = (v = Int)
-get = () <- (d: Dep) { d.v }
-S(N) = (f = () <- N -> Int)
-use = <N>() <- (s: S(N)) { s.f() }
-run = <A, N>(f: () <- N -> A) { f() }
-fw = () { use() }
-fr = () { run(() { use() }) }
-main = () {
-	{
-		fw() + fr()
-		Nil
-	} <- (S(f = () { get() }))
-}",
+        "Dep = (v = Int)\nget = () <- (d: Dep) { d.v }\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nrun = <A, N>(f: () <- N -> A) { f() }\nfw = () { use() }\nfr = () { run(() { use() }) }\nmain = () {\n\t{\n\t\tfw() + fr()\n\t\tNil\n\t} <- (S(f = () { get() }))\n}\n",
     );
     assert!(shown["app/main.main"].contains("Dep"), "{shown:?}");
 }
@@ -433,24 +402,13 @@ main = () {
 #[test]
 fn annotated_mutual_forwarding_keeps_finite_service_rows() {
     types(
-        "S(N) = (() <- N -> Int)
-use = <N>() <- (s: S(N)) {
-	S(f) = s
-	f()
-}
-ping = <N>(n: Int) <- (s: S(N)) -> Int {
-	n |> (0) { use() } | (_) { pong(n - 1) }
-}
-pong = (n: Int) { ping(n) }",
+        "S(N) = (() <- N -> Int)\nuse = <N>() <- (s: S(N)) {\n\tS(f) = s\n\tf()\n}\nping = <N>(n: Int) <- (s: S(N)) -> Int {\n\tn |> (0) { use() } | (_) { pong(n - 1) }\n}\npong = (n: Int) { ping(n) }\n",
     );
 }
 
 #[test]
 fn a_value_argument_cannot_erase_a_shared_row_constraint() {
-    let source = "S(A) = (value = A)
-one = () <- (s: S(Int)) { s.value + 1 }
-run = <N>(f: () <- N -> Int, x: N) { f() }
-bad = () { run(() { one() }, S(value = \"hi\")) <- (S(value = 1)) }";
+    let source = "S(A) = (value = A)\none = () <- (s: S(Int)) { s.value + 1 }\nrun = <N>(f: () <- N -> Int, x: N) { f() }\nbad = () { run(() { one() }, S(value = \"hi\")) <- (S(value = 1)) }\n";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -464,11 +422,129 @@ bad = () { run(() { one() }, S(value = \"hi\")) <- (S(value = 1)) }";
     types(
         &source
             .replace(
-                "one = () <- (s: S(Int)) { s.value + 1 }",
-                "one = () <- (s: S(Int | String)) { 1 }",
+                "one = () <- (s: S(Int)) { s.value + 1 }\n",
+                "one = () <- (s: S(Int | String)) { 1 }\n",
             )
             .replace("\"hi\"", "2"),
     );
+}
+
+#[test]
+fn catch_generalizes_its_stated_fail_entry_and_residual_row() {
+    // Rule B: the callback's (..N, Fail(E)) states the restriction on N.
+    // The scheme retains it; it is not an unexpressed provider obligation.
+    let shown = types(
+        "(i/fail)\nforward = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> Result(A, E) { fail.catch(body) }\n",
+    );
+    assert!(shown["app/main.forward"].contains("Fail("), "{shown:?}");
+    assert!(shown["app/main.forward"].contains("Result("), "{shown:?}");
+}
+
+#[test]
+fn catch_cannot_split_a_fail_entry_into_the_residual_row() {
+    // §2.10.4 Q1-B: choosing E = Int and N = Fail(String) would allow
+    // an Error(String) to escape with the claimed Result(Nil, Int) type.
+    let source = "(i/fail)\nsplit: (() <- (Fail(Int | String)) -> Nil) <- (Fail(String)) -> Result(Nil, Int) = (body) { fail.catch(body) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("Result(Nil, Int)", "Result(Nil, Int | String)"));
+}
+
+#[test]
+fn a_directed_handler_restriction_without_a_stated_entry_is_hidden() {
+    let source = "Svc(A) = (value = A)\nhide: <N>(() <- N -> Nil) <- N -> Nil = (body) { body() <- (Svc(value = 1)) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("hides")
+            && d.message.contains("Svc")
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn a_closed_callback_can_instantiate_an_unused_fail_entry_as_never() {
+    // Written callback types are closed. A fresh E may be Never, but an
+    // actual raised value must not disappear when fitting the callback.
+    types(
+        "unused = <E>() <- (handler: Fail(E)) { Nil }\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { unused() }) }\n",
+    );
+    let source =
+        "(i/fail)\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { fail.raise(1) }) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn a_sink_with_a_stored_callback_row_has_a_finite_instantiation() {
+    // E3 stores Fail in the callback row. The factory is pure and its
+    // callback raises String; neither row contains the sink itself.
+    let source = r#"(i/fail)
+Entry = (message = String)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, () <- N -> Nil)
+make = <E, N>(send: (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
+    Sink(send, () { Nil })
+}
+write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
+    Sink(send, _) = sink
+    send(entry)
+}
+example = () {
+    fail.catch(() { write(Entry(message = "seen")) }) <- (
+        make((entry) { fail.raise(entry.message) }),
+    )
+}
+"#;
+    types(source);
+    let with_dependency = source
+        .replace(
+            "Entry =",
+            "Dep = (read = () -> Nil)\nread = () <- (d: Dep) { d.read() }\nEntry =",
+        )
+        .replace(
+            "fail.raise(entry.message)",
+            "read()\n        fail.raise(entry.message)",
+        );
+    types(&with_dependency);
+}
+
+#[test]
+fn a_stored_service_row_retains_the_callers_dependency() {
+    let source = r#"Dep = (read = () -> String)
+Other = (read = () -> String)
+S(N) = (run = () <- N -> String)
+need = () <- (s: S(Dep)) { Nil }
+wrong = () <- (o: Other) { "value" }
+main = () { need() <- (S(run = wrong)) }
+"#;
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.is_error()
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    types(&source.replace("(o: Other)", "(o: Dep)"));
 }
 
 #[test]
@@ -579,7 +655,7 @@ fn converted_e1_provider_cases_keep_batch2_check_outcomes() {
 fn syntax_three_library_handler_has_no_unhandled_service() {
     let (graph, _, _) = common::check_files(&[(
         "src/main.i",
-        "(i/failure)\nmain = () { failure.catch(() { failure.raise(1) }) }\n",
+        "(i/fail)\nmain = () { fail.catch(() { fail.raise(1) }) }\n",
     )]);
     let checked = ilang_check::check(&graph);
     assert!(
@@ -591,7 +667,7 @@ fn syntax_three_library_handler_has_no_unhandled_service() {
     let mut found = false;
     let typed = checked.types.as_ref().unwrap();
     for (mi, module) in p.modules.iter().enumerate() {
-        if module.path != "i/failure" {
+        if module.path != "i/fail" {
             continue;
         }
         for (di, def) in module.defs.iter().enumerate() {
@@ -618,6 +694,58 @@ fn syntax_three_library_handler_has_no_unhandled_service() {
         }
     }
     assert!(found, "the library handler was checked");
+}
+
+#[test]
+fn a_generator_does_not_export_its_handled_yield_need() {
+    let shown = types(
+        r#"(i/control)
+Yield(A) = (emit = (A) -> Nil)
+collect: <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
+    control.boundary((b) {
+        {
+            body()
+            []
+        } <- (Yield(emit = (x) {
+            control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+        }))
+    })
+}
+main = () { collect(() <- (y: Yield(Int)) { y.emit(1) }) }
+"#,
+    );
+    assert!(!shown["app/main.main"].contains("Yield"), "{shown:?}");
+    assert!(shown["app/main.main"].contains("List(Int)"), "{shown:?}");
+}
+
+#[test]
+fn a_covariant_handler_hole_retains_its_upper_bound() {
+    // P <: S gives A <: Int for a covariant provider, not A = Int.
+    let shown = types(
+        "Svc(A) = (f = () -> A)\nwrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(_)) -> Int { body() <- (svc) }\n",
+    );
+    assert_eq!(
+        shown["app/main.wrap"],
+        "(() <- (Svc(Int), ..N) -> Int, Svc(A & Int)) <- (N - Svc(A & Int)) -> Int"
+    );
+}
+
+#[test]
+fn a_filtered_callback_vacates_only_an_unused_fail_need() {
+    let source = "(i/fail)\nNoError(N) = N - Fail(Never)\nrun = <N>(f: () <- (NoError(N)) -> Nil) { f() }\npure = <E>() <- (unused: Fail(E)) { Nil }\nmain = () { run(pure) }\n";
+    let shown = types(source);
+    assert!(!shown["app/main.main"].contains("Fail"), "{shown:?}");
+    let bad = source.replace("{ Nil }", "{ fail.raise(1) }");
+    let (graph, _, _) = common::check_files(&[("src/main.i", &bad)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked
+            .diags
+            .iter()
+            .any(|d| d.is_error() && d.source.is_some_and(|id| graph.sources.get(id).text == bad)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
 }
 
 #[test]

@@ -8,7 +8,6 @@ use toml::de::{DeTable, DeValue};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Manifest {
-    pub provider_plan: crate::providers::ProviderPlan,
     pub wasm_synchronous: Vec<WasmExport>,
     pub name: String,
     pub name_span: Span,
@@ -116,18 +115,9 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
     let mut dev_deps = Vec::new();
     let mut wasm_exports = Vec::new();
     let mut wasm_synchronous = Vec::new();
-    let mut provider_plan = crate::providers::ProviderPlan::default();
     let mut entries = Vec::new();
     for (key, value) in doc.get_ref().iter() {
         match key.get_ref().as_ref() {
-            "providers" => {
-                provider_plan.span = Some(span(key.span()));
-                crate::providers::rows(value, &mut provider_plan, &mut diags);
-            }
-            "provider_adapters" => {
-                provider_plan.span = Some(span(key.span()));
-                crate::providers::adapters(value, &mut provider_plan, &mut diags);
-            }
             "name" => match value.get_ref() {
                 DeValue::String(s) => name = Some((s.to_string(), span(value.span()))),
                 _ => diags.push(err(
@@ -208,7 +198,6 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
         }
     }
     let manifest = Manifest {
-        provider_plan,
         wasm_synchronous,
         name,
         name_span,

@@ -8,7 +8,6 @@ Read(A) = (value = A)
 value_meet = (x: Read(Int) & Read(String)) -> Read(Never) { x }
 
 one = () <- (r: Read(Int)) { Nil }
-
 two = () <- (r: Read(String)) { Nil }
 
 bad = () {

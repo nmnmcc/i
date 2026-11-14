@@ -766,58 +766,32 @@ fn deps(project: &Path, target: Option<ilang_wasm::Target>) -> Result<ExitCode> 
     }
     let p = checked.program.as_ref().expect("checked program");
     let t = checked.types.as_ref().expect("checked types");
-    if t.entry_provider_needs.keys().all(|&entry| {
-        !ilang_check::providers::entry_is_eligible(p, entry, target.provider_target())
-    }) {
-        let ds =
-            ilang_check::providers::validate_plan_schema(p, t, &graph, target.provider_target());
-        if !ds.is_empty() {
-            return Err(problems(&graph, &ds));
-        }
-    }
-    for (entry, plan) in
-        ilang_check::providers::resolve_plans(&checked, &graph, target.provider_target())
-    {
-        let plan = plan.map_err(|ds| problems(&graph, &ds))?;
+    let mut stubs: Vec<_> = ilang_check::platform::stubs(p, t, target.platform())
+        .into_iter()
+        .collect();
+    stubs.sort_by_key(|(entry, _)| {
+        (
+            p.module(entry.module).path.clone(),
+            p.def(*entry).name.clone(),
+        )
+    });
+    for (entry, stub) in stubs {
+        let stub = stub.map_err(|ds| problems(&graph, &ds))?;
         println!(
-            "entry {}.{} ({:?}, {})",
+            "entry {}.{} ({}, {})",
             p.module(entry.module).path,
             p.def(entry).name,
-            plan.target,
-            if plan.is_async { "async" } else { "sync" }
+            stub.target.name(),
+            if stub.is_async { "async" } else { "sync" }
         );
-        for (i, step) in plan.steps.iter().enumerate() {
-            if let Some(adapter) = &plan.adapter
-                && adapter.enter_at == i
-            {
-                println!(
-                    "  enter {}.{}",
-                    p.module(adapter.binding.module).path,
-                    p.def(adapter.binding).name
-                );
-            }
-            let supply = match step.supply {
-                ilang_check::providers::Supply::Host => "host registration".to_string(),
-                ilang_check::providers::Supply::Factory(d) => {
-                    format!("{}.{}", p.module(d.module).path, p.def(d).name)
-                }
-                ilang_check::providers::Supply::Constructor(c) => {
-                    format!("constructor {}", p.ty(c.ty).name)
-                }
-            };
-            println!(
-                "  {i}: {:?} {} <- {supply} {:?}",
-                step.scope, step.service.name, step.arguments
-            );
+        for &h in &stub.hosts {
+            println!("  host {}.{}", p.module(p.ty(h).module).path, p.ty(h).name);
         }
-        if let Some(adapter) = &plan.adapter
-            && adapter.enter_at == plan.steps.len()
-        {
-            println!(
-                "  enter {}.{}",
-                p.module(adapter.binding.module).path,
-                p.def(adapter.binding).name
-            );
+        if stub.requests() {
+            println!("  request root: Root, Owner, Await");
+        }
+        if stub.tasks {
+            println!("  enter i/task.run");
         }
     }
     Ok(ExitCode::SUCCESS)

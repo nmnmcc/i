@@ -35,7 +35,6 @@ enum WireNode {
         param: usize,
         labels: Vec<Option<String>>,
         ret: usize,
-        err: usize,
         env: usize,
     },
     Union {
@@ -106,7 +105,6 @@ impl<N: FnMut(TypeRef) -> String, W: FnMut(V) -> String> Encoder<'_, N, W> {
                 param: self.node(&f.param),
                 labels: f.labels.clone(),
                 ret: self.node(&f.ret),
-                err: self.node(&f.err),
                 env: self.node(&f.env),
             },
             Ty::Union(ms) => WireNode::Union {
@@ -146,7 +144,7 @@ pub(crate) fn encode(
     };
     let root = e.node(t);
     serde_json::to_string(&Bundle {
-        version: 2,
+        version: 3,
         root,
         nodes: e.nodes,
     })
@@ -161,7 +159,7 @@ pub(crate) fn decode(
     variable: &mut impl FnMut(&str) -> Option<V>,
 ) -> Result<Ty, String> {
     let bundle: Bundle = serde_json::from_str(text).map_err(|e| e.to_string())?;
-    if bundle.version != 2 || bundle.root >= bundle.nodes.len() {
+    if bundle.version != 3 || bundle.root >= bundle.nodes.len() {
         return Err("invalid type version or root".into());
     }
     let mut done: Vec<Ty> = Vec::with_capacity(bundle.nodes.len());
@@ -208,13 +206,11 @@ pub(crate) fn decode(
                 param,
                 labels,
                 ret,
-                err,
                 env,
             } => Ty::Fn(Box::new(FnTy {
                 param: get(&done, param)?,
                 labels,
                 ret: get(&done, ret)?,
-                err: get(&done, err)?,
                 env: get(&done, env)?,
             })),
             WireNode::Union { members } => Ty::Union(all(&done, &members)?),

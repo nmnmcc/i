@@ -181,18 +181,7 @@ pub fn convert(
     if let Some(lexed) = lexed {
         collect_interps(&lexed.tokens, &mut interps);
     }
-    let mut service_fail_name = "Syn3ServiceFail".to_string();
-    while module.items.iter().any(|item| {
-        matches!(&item.kind,
-        o::ItemKind::TypeDef(def) if def.name.name == service_fail_name)
-    }) || imported.contains_key(&service_fail_name)
-        || local.contains_key(&service_fail_name)
-    {
-        service_fail_name.push('X');
-    }
     let mut cx = Cx {
-        service_fail_name,
-        service_fail_used: false,
         local,
         local_fns,
         modules,
@@ -258,8 +247,6 @@ enum Lookup {
 }
 
 struct Cx<'a> {
-    service_fail_name: String,
-    service_fail_used: bool,
     /// The constructors and the top-level functions of this module.
     local: HashMap<String, Vec<Labels>>,
     local_fns: HashMap<String, Vec<Labels>>,
@@ -582,26 +569,6 @@ impl Cx<'_> {
         let mut items = Vec::new();
         for item in &m.items {
             self.item(item, &mut items);
-        }
-        if self.service_fail_used {
-            let span = Span::default();
-            items.insert(
-                0,
-                n::Item {
-                    doc: Vec::new(),
-                    attributes: Vec::new(),
-                    span: n::Sp(span),
-                    kind: n::ItemKind::TypeDef(n::TypeDef {
-                        name: n::Ident::new(&self.service_fail_name, span),
-                        head: vec![named("E", Vec::new(), span)],
-                        rhs: n::TypeRhs::Type(named(
-                            "Fail",
-                            vec![named("E", Vec::new(), span)],
-                            span,
-                        )),
-                    }),
-                },
-            );
         }
         n::Module {
             doc: m.doc.clone(),
@@ -947,23 +914,9 @@ impl Cx<'_> {
         }
     }
 
-    // A bound ordinary Fail service must not become the transition
-    // lowerer's unbound shorthand for the legacy error channel.
+    // E3: Fail is an ordinary prelude service; a bound Fail keeps its name.
     fn service_type(&mut self, ty: &o::TypeExpr) -> n::Type {
-        if let o::TypeKind::Named {
-            module: None,
-            name,
-            args,
-        } = &ty.kind
-            && name.name == "Fail"
-            && args.len() == 1
-        {
-            self.service_fail_used = true;
-            let args = args.iter().map(|a| self.ty(a)).collect();
-            named(&self.service_fail_name, args, ty.span)
-        } else {
-            self.ty(ty)
-        }
+        self.ty(ty)
     }
 
     // Keep the written service form: inference from a constructor alone
@@ -1012,21 +965,34 @@ impl Cx<'_> {
                     ty,
                     value,
                     span: env_span,
+                    spread,
+                    group,
+                    ..
                 } => {
-                    // §7.3: consecutive statements whose values are direct
-                    // values are one provide; others nest, because a later
-                    // value may need an earlier service.
-                    let mut provided = vec![self.provided(ty, value, &mut out)];
+                    // Keep written provide groups distinct (rule C), and
+                    // retain explicit legacy provider types during conversion.
+                    let mut provided = vec![if *spread {
+                        n::DItem::Spread(self.expr(value))
+                    } else {
+                        self.provided(ty, value, &mut out)
+                    }];
                     let mut i = i;
                     while is_direct(value)
                         && let Some(o::Stmt::Env {
                             ty: next_ty,
                             value: next,
+                            spread,
+                            group: next_group,
                             ..
                         }) = stmts.get(i + 1)
+                        && next_group == group
                         && is_direct(next)
                     {
-                        provided.push(self.provided(next_ty, next, &mut out));
+                        provided.push(if *spread {
+                            n::DItem::Spread(self.expr(next))
+                        } else {
+                            self.provided(next_ty, next, &mut out)
+                        });
                         i += 1;
                     }
                     let rest_span = Span::new(env_span.end, span.end.max(env_span.end));
@@ -1119,8 +1085,8 @@ impl Cx<'_> {
                     choices: vec![self.pattern(p, true)],
                 }),
                 // §7.3: the service pattern, in parameter order.
-                o::Param::Env { name, ty } => services.push(n::SItem {
-                    rest: false,
+                o::Param::Env { name, ty, rest } => services.push(n::SItem {
+                    rest: *rest,
                     name: id(name),
                     ty: self.service_type(ty),
                 }),
@@ -1700,7 +1666,6 @@ impl Cx<'_> {
     fn row(&mut self, err: Option<&o::TypeExpr>, env: Option<&o::TypeExpr>) -> Vec<n::TItem> {
         let mut items = Vec::new();
         let mut spreads = Vec::new();
-        let mut ordinary_fail = false;
         if let Some(env) = env {
             let members: Vec<&o::TypeExpr> = match &env.kind {
                 o::TypeKind::Union(ms) => ms.iter().collect(),
@@ -1722,19 +1687,6 @@ impl Cx<'_> {
                     if name.name == "Never" && args.is_empty())
                 {
                     // `! Never` disappears.
-                } else if matches!(&m.kind, o::TypeKind::Named { module: None, name, args }
-                    if name.name == "Fail" && args.len() == 1)
-                {
-                    // Bare Fail(E) in transition needs denotes the old ^ E
-                    // channel. A transparent alias keeps an ordinary ! Fail(E)
-                    // in the service row, without changing its type (§4.3).
-                    self.service_fail_used = true;
-                    ordinary_fail = true;
-                    let o::TypeKind::Named { args, .. } = &m.kind else {
-                        unreachable!()
-                    };
-                    let args = args.iter().map(|a| self.ty(a)).collect();
-                    items.push(n::TItem::Pos(named(&self.service_fail_name, args, m.span)));
                 } else if matches!(m.kind, o::TypeKind::Named { .. }) {
                     items.push(n::TItem::Pos(self.ty(m)));
                 } else {
@@ -1767,23 +1719,6 @@ impl Cx<'_> {
                 let inner = self.ty(err);
                 out.push(n::TItem::Pos(named("Fail", vec![inner], err.span)));
             }
-        }
-        if ordinary_fail
-            && !spreads.is_empty()
-            && err.is_none_or(|e| {
-                matches!(&e.kind, o::TypeKind::Named { module: None, name, args }
-                if name.name == "Never" && args.is_empty())
-            })
-        {
-            // The alias still occupies Fail's key. Suppress the transition
-            // lowerer's synthetic legacy error carrier for the other row.
-            // Fail(Never) is a dropped need entry (§9.2), so this marker
-            // preserves the old empty error channel without another service.
-            out.push(n::TItem::Pos(named(
-                "Fail",
-                vec![named("Never", Vec::new(), Span::default())],
-                Span::default(),
-            )));
         }
         out.extend(items);
         out.extend(spreads);

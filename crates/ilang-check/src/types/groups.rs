@@ -28,12 +28,11 @@ pub(crate) fn is_multi(f: &FnTy) -> bool {
 }
 
 /// The function type whose parameter data type is `param`.
-pub(crate) fn with_data(param: Ty, ret: Ty, err: Ty, env: Ty) -> FnTy {
+pub(crate) fn with_data(param: Ty, ret: Ty, env: Ty) -> FnTy {
     FnTy {
         param,
         labels: Vec::new(),
         ret,
-        err,
         env,
     }
 }
@@ -439,7 +438,7 @@ impl Checker<'_> {
             param: f.param.clone(),
             labels: f.labels.clone(),
             ret,
-            err: f.err.clone(),
+
             env: f.env.clone(),
         })
     }

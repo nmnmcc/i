@@ -89,12 +89,12 @@ Entry = (
 	at = Option(time.Instant),
 )
 
-Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, () <- N -> Nil)
 
 make = <E, N>(
 	accept: (Level) -> Bool,
 	send: (Entry) <- (Fail(E), ..N) -> Nil
-) -> Sink(E, N) { Sink(accept, send, (_: N) { Nil }) }
+) -> Sink(E, N) { Sink(accept, send, () { Nil }) }
 
 silent = <N>() -> Sink(Never, N) {
 	make((_: Level) { False }, (_: Entry) { Nil })
@@ -120,7 +120,9 @@ write = <E, N>(entry: Entry) <- (sink: Sink(E, N)) {
 	accept(entry.level) |> (True) { send(entry) } | (False) { Nil }
 }
 
-lazy = <E, N>(level: Level, message: () <- N -> String) <- (sink: Sink(E, N)) {
+lazy = <E, F, N>(level: Level, message: () <- (Fail(F), ..N) -> String) <- (
+	sink: Sink(E, N),
+) {
 	Sink(accept, send, _) = sink
 	accept(level) |>
 		(True) {
@@ -206,14 +208,14 @@ file = (path: String) {
 	make(
 		(_: Level) { True },
 		(entry) {
-			resource.acquire(
-				() { fs.open(path, fs.Append) },
-				(i) { fs.close(i) },
-				(i) {
+			i = fs.open(path, fs.Append)
+			resource.ensure(
+				() {
 					text = format(entry) <> "\n"
 					fs.write(i, <<text:utf8>>)
 					fs.flush(i)
 				},
+				() { fs.close(i) },
 			)
 		},
 	)

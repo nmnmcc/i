@@ -125,6 +125,7 @@ pub enum Code {
     TypeGroupBreak,
     RecordReserved,
     HeaderGroup,
+    ErrorChannel,
 }
 
 impl Code {
@@ -154,6 +155,7 @@ impl Code {
             Code::TypeGroupBreak => "E0112",
             Code::RecordReserved => "E0114",
             Code::HeaderGroup => "E0115",
+            Code::ErrorChannel => "E0116",
         }
     }
 }

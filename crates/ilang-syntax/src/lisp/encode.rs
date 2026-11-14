@@ -810,10 +810,30 @@ impl Encoder<'_> {
         let parts = b
             .stmts
             .iter()
-            .map(|s| match s {
+            .enumerate()
+            .map(|(index, s)| match s {
                 Stmt::Bind(b) => self.binding(b),
-                Stmt::Env { ty, value, span } => {
-                    self.form("!", [self.ty(ty), self.expr(value)], *span)
+                Stmt::Env {
+                    ty,
+                    value,
+                    span,
+                    spread,
+                    group,
+                } => {
+                    let mut parts = Vec::new();
+                    if let Some(group) = group {
+                        let mark = if super::starts_provide_group(&b.stmts, index) {
+                            "+"
+                        } else {
+                            "="
+                        };
+                        parts.push(self.form("..", [self.symbol(mark, *group)], *group));
+                    }
+                    if *spread {
+                        parts.push(self.symbol("..", *span));
+                    }
+                    parts.extend([self.ty(ty), self.expr(value)]);
+                    self.form("!", parts, *span)
                 }
                 Stmt::Expr(e) => self.expr(e),
             })
@@ -897,11 +917,14 @@ impl Encoder<'_> {
                             .iter()
                             .map(|p| match p {
                                 Param::Pattern(p) => self.pattern(p),
-                                Param::Env { name, ty } => self.form(
-                                    "!",
-                                    [self.name(name), self.ty(ty)],
-                                    name.span.to(ty.span),
-                                ),
+                                Param::Env { name, ty, rest } => {
+                                    let mut parts = Vec::new();
+                                    if *rest {
+                                        parts.push(self.symbol("..", name.span));
+                                    }
+                                    parts.extend([self.name(name), self.ty(ty)]);
+                                    self.form("!", parts, name.span.to(ty.span))
+                                }
                             })
                             .collect(),
                     ),

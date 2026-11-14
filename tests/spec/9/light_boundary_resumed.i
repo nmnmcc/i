@@ -4,7 +4,7 @@
 // at: spec/main:20:34
 (
 	i/control
-	i/failure
+	i/fail
 )
 
 // A continuation made inside a `catch`, but not containing it, is resumed
@@ -14,7 +14,7 @@ Syn3ServiceFail(E) = Fail(E)
 the_fail = () <- (f: Syn3ServiceFail(Int)) { f }
 
 main = () {
-	r = failure.catch(() {
+	r = fail.catch(() {
 		fail = the_fail()
 		control.boundary((g) {
 			control.suspend(g, (k) { () { control.resume(k, Nil)() } })

@@ -264,9 +264,7 @@ integer_tree = (x: Int, target: Int) -> Tree(Int) {
 	)
 }
 
-/// Uniform inclusive range under the uniform-word model. Shrinks toward zero
-/// or its nearest endpoint, then by halving distance, with duplicates removed.
-int = (min: Int, max: Int) -> Result(Gen(Int), BuildError) {
+_int_result = (min: Int, max: Int) -> Result(Gen(Int), BuildError) {
 	{ min > max } |>
 		(True) { Error(InvalidRange(min, max)) }
 		| (False) {
@@ -287,14 +285,15 @@ int = (min: Int, max: Int) -> Result(Gen(Int), BuildError) {
 
 // Internal known-valid factories are matched exhaustively, without Assert.
 range = (min: Int, max: Int) -> Gen(Int) {
-	int(min, max) |> (Ok(gen)) { gen } | (Error(_)) { Gen((_, _) { None }) }
+	_int_result(min, max) |>
+		(Ok(gen)) { gen }
+		| (Error(_)) { Gen((_, _) { None }) }
 }
 
 /// True shrinks to False.
 bool = () -> Gen(Bool) { map(range(0, 1), (n) { n == 1 }) }
 
-/// Draws and shrinks an index toward zero. Duplicates keep their multiplicity.
-element = <A>(choices: List(A)) -> Result(Gen(A), BuildError) {
+_element_result = <A>(choices: List(A)) -> Result(Gen(A), BuildError) {
 	choices |>
 		([]) { Error(EmptyChoice) }
 		| ([first, .._]) {
@@ -395,9 +394,10 @@ draw_items = <A>(
 		}
 }
 
-/// Length is uniform in min..min(max,max(min,size)). Deletions of full chunks
-/// n,n/2,...,1 precede left-to-right element shrinks. Surviving trees are kept.
-list = <A>(of: Gen(A), min: Int, max: Int) -> Result(Gen(List(A)), BuildError) {
+_list_result = <A>(of: Gen(A), min: Int, max: Int) -> Result(
+	Gen(List(A)),
+	BuildError,
+) {
 	{ min < 0 || max < min } |>
 		(True) { Error(InvalidLength(min, max)) }
 		| (False) {
@@ -456,9 +456,8 @@ utf_codepoint = () -> Gen(UtfCodepoint) {
 	})
 }
 
-/// Scalar lists of length 0..max_length, preserving valid UTF-8 while shrinking.
-string = (max_length: Int) -> Result(Gen(String), BuildError) {
-	list(utf_codepoint(), 0, max_length) |>
+_string_result = (max_length: Int) -> Result(Gen(String), BuildError) {
+	_list_result(utf_codepoint(), 0, max_length) |>
 		(Error(e)) { Error(e) }
 		| (Ok(gen)) { Ok(map(gen, core.from_codepoints)) }
 }
@@ -757,4 +756,34 @@ test = <A>(
 	report |>
 		(Passed(..)) { Nil }
 		| (_) { a.fail(AssertionFailure(message = format(report, show))) }
+}
+
+/// Uniform inclusive range under the uniform-word model. Shrinks toward zero
+/// or its nearest endpoint, then by halving distance, with duplicates removed.
+///
+/// Reports failure through `Fail(BuildError)`.
+int = (min: Int, max: Int) -> Gen(Int) {
+	fail.from_result(_int_result(min, max))
+}
+
+/// Draws and shrinks an index toward zero. Duplicates keep their multiplicity.
+///
+/// Reports failure through `Fail(BuildError)`.
+element = <A>(choices: List(A)) -> Gen(A) {
+	fail.from_result(_element_result(choices))
+}
+
+/// Length is uniform in min..min(max,max(min,size)). Deletions of full chunks
+/// n,n/2,...,1 precede left-to-right element shrinks. Surviving trees are kept.
+///
+/// Reports failure through `Fail(BuildError)`.
+list = <A>(of: Gen(A), min: Int, max: Int) -> Gen(List(A)) {
+	fail.from_result(_list_result(of, min, max))
+}
+
+/// Scalar lists of length 0..max_length, preserving valid UTF-8 while shrinking.
+///
+/// Reports failure through `Fail(BuildError)`.
+string = (max_length: Int) -> Gen(String) {
+	fail.from_result(_string_result(max_length))
 }

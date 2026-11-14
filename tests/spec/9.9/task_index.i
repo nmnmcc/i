@@ -6,7 +6,7 @@
 	i/task
 )
 
-spawn = (s: task.Scope(Never), n: Int) -> List(task.Task(Int, Never)) {
+spawn = (s: task.Group(Never), n: Int) -> List(task.Task(Int, Never)) {
 	n |>
 		(0) { [] }
 		| (_) {

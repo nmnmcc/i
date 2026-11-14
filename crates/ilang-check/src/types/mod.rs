@@ -1,8 +1,8 @@
 //! Type inference (§4.7, §4.8) with effects (§9.2–§9.6): algebraic
 //! subtyping in the style of Simple-sub (Parreaux, ICFP 2020; the theory is
 //! MLsub, Dolan and Mycroft, POPL 2017), with the unions, intersections,
-//! and differences of §4.4, the variance of §4.5, and the `^ E ! N` parts of
-//! function types.
+//! and differences of §4.4, the variance of §4.5, and the needs of function
+//! types. Errors are the ordinary need entry `Fail(E)` (§9.3).
 //!
 //! - `solve.rs`: type variables with levels and bounds, `constrain`, and the
 //!   smart constructors that merge unions by type constructor (§4.4).
@@ -28,7 +28,6 @@ mod known;
 mod lits;
 mod pattern;
 mod prove;
-mod provider;
 mod scheme_wire;
 mod shape;
 mod shown;
@@ -103,26 +102,24 @@ pub(crate) struct FnTy {
     /// display only: they have no effect on subtyping (§4.6).
     pub labels: Vec<Option<String>>,
     pub ret: Ty,
-    pub err: Ty,
     pub env: Ty,
 }
 
 impl FnTy {
     /// A function type whose parameter is a tuple of these parts.
-    pub fn new(params: Vec<(Option<String>, Ty)>, ret: Ty, err: Ty, env: Ty) -> FnTy {
+    pub fn new(params: Vec<(Option<String>, Ty)>, ret: Ty, env: Ty) -> FnTy {
         // The transition tree writes a multi-shape function type as one
         // parameter with the reserved label `%data`: its type is the
         // parameter data type itself.
         if matches!(params.as_slice(), [(Some(l), _)] if l == groups::DATA) {
             let param = params.into_iter().next().unwrap().1;
-            return groups::with_data(param, ret, err, env);
+            return groups::with_data(param, ret, env);
         }
         let (labels, parts): (Vec<_>, Vec<_>) = params.into_iter().unzip();
         FnTy {
             param: Ty::tuple(parts),
             labels,
             ret,
-            err,
             env,
         }
     }
@@ -289,7 +286,7 @@ pub(crate) fn boundary_type(
             TypeKind::Fn {
                 params,
                 ret,
-                err,
+                err: _,
                 env,
             } => Ty::Fn(Box::new(FnTy::new(
                 params
@@ -302,10 +299,6 @@ pub(crate) fn boundary_type(
                     })
                     .collect::<Option<_>>()?,
                 convert(s, ret, p, expand)?,
-                match err {
-                    Some(t) => convert(s, t, p, expand)?,
-                    None => Ty::Never,
-                },
                 match env {
                     Some(t) => convert(s, t, p, expand)?,
                     None => Ty::Never,
@@ -435,9 +428,17 @@ pub enum NumericFact {
     SmallInt { min: i32, max: i32 },
 }
 
-/// The result of type checking: the shown types, and what the code
-/// generator needs. Places are keyed by the module and the span of the
-/// node in the HIR, which is unique among the nodes of one kind.
+/// How a whole service value is supplied after `<-`.
+#[derive(Clone, Debug)]
+pub enum EnvSupply {
+    /// An opaque row; these explicit keys keep their caller's services.
+    Row(Vec<TypeRef>),
+    /// Positions of a closed data value, in order.
+    Data(Vec<TypeRef>),
+}
+
+/// The result of type checking: the shown types and code-generation data.
+/// Sites are keyed by module and HIR span.
 #[derive(Clone, Debug, Default)]
 pub struct Typed {
     pub typed_expansions: HashMap<(ModuleId, Span), crate::typed_macro::Output>,
@@ -479,11 +480,6 @@ pub struct Typed {
     /// a module gives them. `schemes[d]` is
     /// `scheme_types[d].text(&type_names(program, d.module))`.
     pub scheme_types: HashMap<DefId, ShownType>,
-    /// Inferred schemes for all top-level names, including private bindings
-    /// that may be named by their own package's provider plan.
-    pub provider_scheme_types: HashMap<DefId, ShownType>,
-    /// Complete schemes for plan-only private factories and adapters.
-    pub provider_scheme_artifacts: HashMap<DefId, SchemeArtifact>,
     /// Full graph schemes, including their retained bounds and obligations.
     pub scheme_artifacts: HashMap<DefId, SchemeArtifact>,
     /// §7.5: each use of a name that is known to be made by a constructor,
@@ -507,6 +503,10 @@ pub struct Typed {
     /// by the span of its name, and of each environment statement, by the
     /// span of the statement (§9.2). Aliases are expanded.
     pub services: HashMap<(ModuleId, Span), TypeRef>,
+    pub env_supplies: HashMap<(ModuleId, Span), EnvSupply>,
+    /// Written keys outside each captured row. They are neither restored
+    /// nor logical captures of that row (notably the caller's Fail).
+    pub env_captures: HashMap<(ModuleId, Span), Vec<TypeRef>>,
     /// Whether each top-level binding was generalized (§4.7): its value is
     /// a direct value, as are the values of its group.
     pub generalized: HashMap<BindingRef, bool>,

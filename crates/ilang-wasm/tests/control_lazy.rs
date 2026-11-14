@@ -272,7 +272,6 @@ fn record_kinds() {
     assert_ne!(two[0], two[2], "two services: {two:?}");
     // The runtime records: no slot (-1), and their kinds.
     for (reenter, kind) in [
-        ("$catch_reenter", 4),
         ("$ensure_reenter", 2),
         // Bit 5 marks finalizer re-entry for cancellation shielding; Wasm's
         // i32 shift uses the low five bits, so it dispatches like kind 5.
@@ -293,7 +292,10 @@ fn record_kinds() {
     assert!(func(&text, "$boundary_core").contains("(ref.func $boundary_reenter)"));
     assert!(func(&text, "$cancel_core").contains("(ref.func $cancel_reenter)"));
     let tramp = func(&text, "$tramp_run");
-    assert!(tramp.contains("(i32.const 0x1C)") && tramp.contains("(i32.const 0x0C)"));
+    // E3 deletes catch kind 4: both error and cancel dispatch only kinds 2/3.
+    assert!(tramp.contains("(i32.const 0x0C)"), "{tramp}");
+    assert!(!tramp.contains("(i32.const 0x1C)"), "{tramp}");
+    assert!(!text.contains("$catch_reenter"));
 }
 
 #[test]
@@ -375,8 +377,8 @@ const CANCEL_OUT: &str = r#"(
 
 // Hands k2 out of the cancel, to the boundary `b0` around it.
 Out = (put = (Inner) -> Nil)
-Inner = (Continuation(Nil, Int, Never, Out))
-Paused = (Continuation(Nil, Outer, Never, Out))
+Inner = (Continuation(Nil, Int, Out))
+Paused = (Continuation(Nil, Outer, Out))
 Done = ()
 Outer = Paused | Done
 Handed = (Inner)
@@ -466,7 +468,7 @@ main = () {
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"Third = (Continuation(Nil, Third, Never, Out))
+const THIRD: &str = r#"Third = (Continuation(Nil, Third, Out))
 Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 Third = Third | Over
@@ -519,7 +521,7 @@ const ENV_TAIL_RESUME: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, Paused, Name))
 Done = ()
 Paused = Paused | Done
 
@@ -559,7 +561,7 @@ const ENV_TAIL_CANCEL: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, Paused, Name))
 Done = ()
 Paused = Paused | Done
 
@@ -604,7 +606,7 @@ const CANCEL_INNER: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Never, Io))
+Paused = (Continuation(Nil, Paused, Io))
 Done = ()
 Paused = Paused | Done
 
@@ -652,16 +654,16 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, Paused, Int, Never))
+Paused = (Continuation(Nil, Paused, Never))
 Done = ()
 Paused = Paused | Done
-Held = (Continuation(Nil, Held, Never, Never))
+Held = (Continuation(Nil, Held, Never))
 Over = ()
 Held = Held | Over
 
 // Cancelling this continuation can return to the code after `inner`,
 // because the final function suspends to `inner` during the cancel (D15).
-paused = () {
+paused = () <- (handler: Fail(Int)) {
 	{
 		control.boundary((outer) {
 			control.boundary((inner) {
@@ -673,7 +675,7 @@ paused = () {
 					() { control.suspend(inner, (k2) { Nil }) },
 				)
 			})
-			fail.raise(7)
+			handler.raise(7)
 			Done
 		})
 	} |>
@@ -681,16 +683,17 @@ paused = () {
 		| (Done) { panic("not paused") }
 }
 
-// `cancel` has no errors in its type. Here it runs the ordinary code
-// after `inner`, whose error passes through this final function's record.
+// The continuation captures the active catch's handler, so its need is Never.
+// Cancelling it runs ordinary code after `inner`; that captured handler's
+// error passes through this final function's pending record.
 with = (hold, k) {
 	control.suspend(hold, (k2) { Held(k2) })
 	control.cancel(k)
 }
 
 main = () <- (io: Io) {
-	k = paused()
 	r = fail.catch(() {
+		k = paused()
 		held = control.boundary((hold) {
 			resource.ensure(() { 99 }, () { with(hold, k) })
 			Over
@@ -1084,7 +1087,7 @@ fn nested_source(depth: u32) -> String {
 	i/control
 )
 Done = ()
-More = (Int, Continuation(Nil, Step, Never, Never))
+More = (Int, Continuation(Nil, Step, Never))
 Step = Done | More
 check = (ok) { ok |> (True) { Nil } | (False) { panic("tree walk") } }
 emit = (b, n) { control.suspend(b, (k) { More(n, k) }) }
@@ -1220,7 +1223,7 @@ fn resume_twice_from_new_places() {
 )
 Name = (text = String)
 Done = (String)
-More = (String, Continuation(Nil, Step, Never, Name))
+More = (String, Continuation(Nil, Step, Name))
 Step = Done | More
 name = () <- (n: Name) { n.text }
 leaf = (b) {
@@ -1275,7 +1278,7 @@ fn counted_frames() {
 	i/resource
 )
 Done = ()
-More = (String, Continuation(Nil, Step, Never, Never))
+More = (String, Continuation(Nil, Step, Never))
 Step = Done | More
 check = (ok) { ok |> (True) { Nil } | (False) { panic("counted frame") } }
 layer = (b, n) {
