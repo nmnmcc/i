@@ -18,9 +18,9 @@ show = (x) { core.inspect(x) }
 
 Bad = (Int)
 
-Paused = (Continuation(Nil, Paused, Never, Never))
+Paused = (Continuation(Nil, PausedSum, Never, Never))
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 
 // Puts `text` in front of the value of the boundary `log`.
 note = (log, text) {

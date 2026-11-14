@@ -18,9 +18,9 @@ Name = (text = String)
 
 name = () <- (n : Name) { n.text }
 
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Never, Name))
 Done = (String)
-Paused = Paused | Done
+PausedSum = Paused | Done
 
 leaf = (b) {
 	control.suspend(b, (k) { Paused(k) })

@@ -29,6 +29,8 @@
 	Method(..)
 	Status(..)
 	Headers(..)
+	RawHeaders(..)
+	AnyHeaders
 	Request(..)
 	Response(..)
 	HttpError(..)
@@ -84,22 +86,25 @@ Status = (Int)
 
 Headers = (List((String, String)))
 RawHeaders = (List((String, BitArray)))
-Headers = Headers | RawHeaders
+/// Before stage 3 this sum was `Headers`, with a constructor of that
+/// name; a member is now a type of its own (syntax-3.md §2.8, §7.3 manual
+/// list), so the sum is `AnyHeaders`.
+AnyHeaders = Headers | RawHeaders
 
 Request = (
 	method = Method,
 	target = String,
-	headers = Headers,
+	headers = AnyHeaders,
 	body = BitArray,
-	trailers = Headers,
+	trailers = AnyHeaders,
 )
 
 Response = (
 	status = Status,
 	reason = String,
-	headers = Headers,
+	headers = AnyHeaders,
 	body = BitArray,
-	trailers = Headers,
+	trailers = AnyHeaders,
 )
 
 NeedMore = ()
@@ -145,7 +150,7 @@ response = (status : Status) -> Response {
 	)
 }
 
-header = (hs : Headers, name : String) -> Option(String) {
+header = (hs: AnyHeaders, name: String) -> Option(String) {
 	hs |>
 		(RawHeaders(_)) {
 			header_bytes(hs, name) |>
@@ -166,7 +171,7 @@ header = (hs : Headers, name : String) -> Option(String) {
 		}
 }
 
-header_bytes = (hs : Headers, name : String) -> Option(BitArray) {
+header_bytes = (hs: AnyHeaders, name: String) -> Option(BitArray) {
 	hs |>
 		(Headers(xs)) {
 			list.find_map(xs, (pair) {
@@ -186,7 +191,7 @@ header_bytes = (hs : Headers, name : String) -> Option(BitArray) {
 		}
 }
 
-headers = (hs : Headers, name : String) -> List(String) {
+headers = (hs: AnyHeaders, name: String) -> List(String) {
 	hs |>
 		(RawHeaders(xs)) {
 			list.filter_map(xs, (pair) {
@@ -211,7 +216,7 @@ headers = (hs : Headers, name : String) -> List(String) {
 		}
 }
 
-add_header = (hs : Headers, name : String, value : String) -> Headers {
+add_header = (hs: AnyHeaders, name: String, value: String) -> AnyHeaders {
 	hs |>
 		(Headers(xs)) { Headers(list.append(xs, [(name, value)])) }
 		| (RawHeaders(xs)) {
@@ -234,7 +239,6 @@ feed_request = (buffer : BitArray, bytes : BitArray) -> Progress(Request) {
 		(Ok((message, rest))) { Complete(message, bits(rest)) }
 		| (Error(NeedMore)) { More(input) }
 		| (Error(BadMessage(why))) { Invalid(why) }
-		| (Error(_)) { panic("http: unexpected parser error") }
 }
 
 feed_response = (buffer : BitArray, bytes : BitArray) -> Progress(Response) {
@@ -243,7 +247,6 @@ feed_response = (buffer : BitArray, bytes : BitArray) -> Progress(Response) {
 		(Ok((message, rest))) { Complete(message, bits(rest)) }
 		| (Error(NeedMore)) { More(input) }
 		| (Error(BadMessage(why))) { Invalid(why) }
-		| (Error(_)) { panic("http: unexpected parser error") }
 }
 
 /// Parse a response with its request method and whether the connection ended.
@@ -262,7 +265,6 @@ feed_response_for = (
 		(Ok((message, rest))) { Complete(message, bits(rest)) }
 		| (Error(NeedMore)) { More(input) }
 		| (Error(BadMessage(why))) { Invalid(why) }
-		| (Error(_)) { panic("http: unexpected parser error") }
 }
 
 feed_request_limit = (
@@ -278,7 +280,6 @@ feed_request_limit = (
 		(Ok((message, rest))) { Complete(message, bits(rest)) }
 		| (Error(NeedMore)) { More(input) }
 		| (Error(BadMessage(why))) { Invalid(why) }
-		| (Error(_)) { panic("http: unexpected parser error") }
 }
 
 check_head = (xs : List(Int), limit : Int) -> Nil {
@@ -388,8 +389,8 @@ parse_response_for = (xs : List(Int), method : Method, eof : Bool) -> (
 	)
 }
 
-read_headers = (xs : List(Int), acc : List((String, BitArray))) -> (
-	Headers,
+read_headers = (xs: List(Int), acc: List((String, BitArray))) -> (
+	AnyHeaders,
 	List(Int),
 ) {
 	(head, rest) = line(xs)
@@ -409,7 +410,7 @@ read_headers = (xs : List(Int), acc : List((String, BitArray))) -> (
 		}
 }
 
-make_headers = (xs : List((String, BitArray))) -> Headers {
+make_headers = (xs: List((String, BitArray))) -> AnyHeaders {
 	values = list.map(xs, (pair) {
 		(name, value) = pair
 		bit_array.to_string(value) |>
@@ -427,7 +428,7 @@ text_unchecked = (xs : List(Int)) -> String {
 		| (Error(_)) { panic("http: invalid internal text") }
 }
 
-validate_framing = (hs : Headers) -> Nil {
+validate_framing = (hs: AnyHeaders) -> Nil {
 	length = header_bytes(hs, "content-length")
 	transfer = header_bytes(hs, "transfer-encoding")
 	require(
@@ -481,7 +482,11 @@ validate_framing = (hs : Headers) -> Nil {
 	Nil
 }
 
-read_body = (hs : Headers, xs : List(Int)) -> (BitArray, Headers, List(Int)) {
+read_body = (hs: AnyHeaders, xs: List(Int)) -> (
+	BitArray,
+	AnyHeaders,
+	List(Int),
+) {
 	validate_framing(hs)
 	lengths = list.concat(
 		list.map(headers(hs, "content-length"), (value) {
@@ -519,7 +524,7 @@ read_body = (hs : Headers, xs : List(Int)) -> (BitArray, Headers, List(Int)) {
 		}
 }
 
-transfer_codings = (hs : Headers) -> List(String) {
+transfer_codings = (hs: AnyHeaders) -> List(String) {
 	codings = list.concat(
 		list.map(headers(hs, "transfer-encoding"), (value) {
 			list.map(string.split(value, ","), (part) {
@@ -557,7 +562,7 @@ parse_length = (value : String) -> Int {
 
 chunks = (xs : List(Int), acc : List(BitArray)) -> (
 	BitArray,
-	Headers,
+	AnyHeaders,
 	List(Int),
 ) {
 	(size_line, rest) = line(xs)
@@ -596,7 +601,7 @@ chunk_size = (size_line : List(Int)) -> Int {
 	size
 }
 
-valid_trailers = (trailers : Headers) -> Nil {
+valid_trailers = (trailers: AnyHeaders) -> Nil {
 	require(
 		header_bytes(trailers, "content-length") == None &&
 			header_bytes(trailers, "transfer-encoding") == None &&
@@ -755,10 +760,10 @@ serialize_response = (res : Response) -> BitArray {
 }
 
 serialize = (
-	first : String,
-	hs : Headers,
-	body : BitArray,
-	trailers : Headers
+	first: String,
+	hs: AnyHeaders,
+	body: BitArray,
+	trailers: AnyHeaders
 ) -> BitArray {
 	xs = raw_pairs(hs)
 	chunked = header(hs, "transfer-encoding") |>
@@ -814,7 +819,7 @@ serialize = (
 	bit_array.concat([<<first:utf8>>, lines, <<"\r\n":utf8>>, data])
 }
 
-raw_pairs = (hs : Headers) -> List((String, BitArray)) {
+raw_pairs = (hs: AnyHeaders) -> List((String, BitArray)) {
 	hs |>
 		(Headers(xs)) {
 			list.map(xs, (pair) {
@@ -954,7 +959,6 @@ connection_loop = (stream, handler, buffer) {
 		(Ok((req, rest))) { Complete(req, bits(rest)) }
 		| (Error(NeedMore)) { More(buffer) }
 		| (Error(BadMessage(why))) { Invalid(why) }
-		| (Error(_)) { panic("http: unexpected head error") }
 	progress |>
 		(Invalid(_)) { write_server_reply(stream, response(Status(400)), True) }
 		| (More(_)) {
@@ -1070,9 +1074,9 @@ BodyFraming = Remaining
 	| ChunkTrailers
 	| BodyDone
 
-BodyCursor = (buffer = BitArray, framing = BodyFraming, trailers = Headers)
+BodyCursor = (buffer = BitArray, framing = BodyFraming, trailers = AnyHeaders)
 
-request_framing = (hs : Headers) -> BodyFraming {
+request_framing = (hs: AnyHeaders) -> BodyFraming {
 	validate_framing(hs)
 	transfer_codings(hs) |>
 		([]) {
@@ -1614,7 +1618,7 @@ follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 		}
 }
 
-redirect_headers = (hs : Headers, base, next, drop_body : Bool) -> Headers {
+redirect_headers = (hs: AnyHeaders, base, next, drop_body: Bool) -> AnyHeaders {
 	resolved = uri.resolve(base, next) |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("http: invalid resolved redirect") }
@@ -2003,7 +2007,7 @@ tls_transport = (stream) {
 	)
 }
 
-has_token = (hs : Headers, name : String, value : String) -> Bool {
+has_token = (hs: AnyHeaders, name: String, value: String) -> Bool {
 	list.any(headers(hs, name), (line) {
 		list.any(string.split(line, ","), (part) {
 			lowercase(

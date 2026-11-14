@@ -22,9 +22,9 @@ name = () <- (n : Name) { n.text }
 
 Bad = (Int)
 
-Paused = (Continuation(Nil, Paused, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Never, Name))
 Done = (String)
-Paused = Paused | Done
+PausedSum = Paused | Done
 
 // The final function gives the name it sees to the value of `outer`.
 final = (outer) {

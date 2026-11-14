@@ -341,19 +341,7 @@ impl Query<'_> {
             return None;
         }
         let lisp = self.is_lisp(m);
-        let mut types: Vec<TypeId> = Vec::new();
-        for c in clauses {
-            for pat in &c.patterns {
-                if let PatternKind::Constructor { ctor, .. } = &pat.kind
-                    && !types.contains(&ctor.ty)
-                {
-                    types.push(ctor.ty);
-                }
-            }
-        }
-        if types.is_empty() {
-            types = self.subject_types(m, subject, clauses);
-        }
+        let types = self.subject_types(m, subject, clauses);
         let covered = |ctor: CtorRef| {
             clauses.iter().any(|c| {
                 c.guard.is_none()

@@ -31,7 +31,10 @@ fn alias(c: &Checked, name: &str) -> String {
         .types
         .iter()
         .enumerate()
-        .find(|(_, t)| t.name == name)
+        // The library has types of these names too (`i/syntax.Item`).
+        .find(|(_, t)| {
+            t.name == name && p.module(t.module).package != p.module(p.prelude.unwrap()).package
+        })
         .unwrap();
     c.types.as_ref().unwrap().alias_types[&TypeId(i as u32)].text(&types::type_names(p, t.module))
 }
@@ -766,7 +769,10 @@ fn alias_exports_preserve_constructor_privacy() {
     for exports in ["(Secret, Public)", "(Secret, Public(..))"] {
         let lib = [
             exports,
-            "\nHidden = (Int)\nSecret = Hidden\nvalue : Secret = Hidden(1)\nPublic = value",
+            // Stage 3 (§2.8): a type and its constructor have one name, so
+            // the exported type `Secret` is the labelled type itself, with
+            // its constructor not exported.
+            "\nSecret = (Int)\nvalue: Secret = Secret(1)\nPublic = value",
         ]
         .concat();
         let (_, c) = checked(&[
@@ -777,7 +783,7 @@ fn alias_exports_preserve_constructor_privacy() {
         assert_eq!(alias(&c, "Public"), "Secret");
         let (_, c) = checked(&[
             ("src/lib.i", &lib),
-            ("src/main.i", "((Public) = app/lib)\nx = lib.Hidden(1)"),
+            ("src/main.i", "((Public) = app/lib)\nx = lib.Secret(1)"),
         ]);
         assert!(
             c.diags.iter().any(|d| d.code == code::NOT_EXPORTED),

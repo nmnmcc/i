@@ -674,7 +674,8 @@ fn publish_compares_the_interface() {
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1");
     w.ok(&["publish", "1.1.0", "--project", &project]);
 
-    // A changed type and a new constructor are incompatible.
+    // §4.3: Shape is a union alias; Dot adds its own type and constructor.
+    // Changing the alias and the function requires a new major (§2.7).
     let changed = added
         .replace(
             "add = (a : Int, b : Int) { a + b }",
@@ -687,15 +688,25 @@ fn publish_compares_the_interface() {
     write(&dir, &[("src/api.i", &changed)]);
     commit(&dir, "change");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
-    assert!(
-        err.contains("changed value api.add: (Int, Int) -> Int"),
+    let changes = err
+        .split_once("changes to the public interface since v1.1.0:\n")
+        .expect("interface comparison header")
+        .1
+        .lines()
+        .take_while(|line| line.starts_with(' '))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        changes,
+        [
+            "  changed type api.Shape: Shape = Circle | Square",
+            "       to type api.Shape: Shape = Circle | Square | Dot",
+            "  changed value api.add: (Int, Int) -> Int",
+            "       to value api.add: (Int, Int, Int) -> Int",
+            "  added constructors api.Dot: Dot",
+            "  added type api.Dot: Dot",
+        ],
         "{err}"
     );
-    assert!(
-        err.contains("to value api.add: (Int, Int, Int) -> Int"),
-        "{err}"
-    );
-    assert!(err.contains("changed constructors api.Shape"), "{err}");
     assert!(err.contains("a new major version, at least 2.0.0"), "{err}");
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1\nv1.1.0");
     let out = w.ok(&["publish", "2.0.0", "--dry-run", "--project", &project]);
@@ -703,13 +714,24 @@ fn publish_compares_the_interface() {
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1\nv1.1.0");
 
     // Removing a name, or hiding constructors, is incompatible too.
-    let hidden = changed.replace("Shape(..)", "Shape").replace("\ttwo\n", "");
+    // §2.4: the exported alias still needs its member types exported.
+    let hidden = changed
+        .replace("Shape(..)", "Shape, Circle, Square, Dot")
+        .replace("\ttwo\n", "");
     write(&dir, &[("src/api.i", &hidden)]);
     commit(&dir, "hide");
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
     assert!(err.contains("removed value api.two: 2"), "{err}");
-    assert!(
-        err.contains("removed constructors api.Shape: Circle(r: Float) | Square(side: Float)"),
+    // v1.1.0 exported Circle and Square through Shape(..); Dot was never
+    // published, so only those two constructors can be removed here (§2.4).
+    assert_eq!(
+        err.lines()
+            .filter(|line| line.starts_with("  removed constructors "))
+            .collect::<Vec<_>>(),
+        [
+            "  removed constructors api.Circle: Circle(r: Float)",
+            "  removed constructors api.Square: Square(side: Float)",
+        ],
         "{err}"
     );
     let out = w.ok(&["publish", "2.0.0", "--project", &project]);

@@ -49,9 +49,9 @@ test("cancel_long_pending", () {
 	)
 })
 
-Step = (Continuation(Nil, Step, Int, Never))
+Step = (Continuation(Nil, StepSum, Int, Never))
 Fin = ()
-Step = Step | Fin
+StepSum = Step | Fin
 
 keep2 = (t) { t |> (Fin) { Fin } | (t) { t } }
 

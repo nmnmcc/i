@@ -3021,5 +3021,10 @@
   },
   "crates/ilang-check/tests/diagnostic_traps.rs:1c54e7195033f60e": {
     "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:1a6175b0d6ec4669": {
+    "prefix": "// Constraints that simplification and generalization must keep.\n\n// §4.5 rule 4 and §9.2: an environment provider must be a subtype of\n// the needed service, also when the function is generalized.\nReader(S) = (get = () -> S)\n",
+    "suffix": " = (body) {\n\t_syn3_0: IntReader = Reader(get = () -> Int { 1 })\n\tbody() <- (_syn3_0)\n}\n",
+    "reason": "The closed-alias regression's replacement text declares IntReader and ends in the with_int binding-name fragment. Complete it with the Reader prefix and the exact declaration tail after the test's following annotation replacement. The checker regression still checks the complete constructed module and pins all four E0515 diagnostics."
   }
 }

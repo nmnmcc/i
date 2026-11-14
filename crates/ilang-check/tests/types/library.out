@@ -258,8 +258,8 @@ i/task.yield : () <- (Scheduler) -> Nil
 i/task.top : (rng.Generator) <- (Runner) -> Runner
 i/task.observe_change : (Key(Nil)) -> Request(Nil)
 i/task.has_work : (Ticket) -> Bool
-i/task.wait_root : (Key(Nil), request.Root, List(Ticket)) -> RunControl
-i/task.root_poll : (Key(Nil), List(Ticket), Bool) -> RunControl
+i/task.wait_root : (Key(Nil), request.Root, List(Ticket)) -> ContinueRun
+i/task.root_poll : (Key(Nil), List(Ticket), Bool) -> ContinueRun
 i/task.root_forget : (Key(Nil)) -> Nil
 i/task.root_allocate : () -> List(Int)
 i/task.initial : (request.Root) -> Runner
@@ -371,14 +371,14 @@ i/task.race : (() <- (Fail(E), ..N) -> A, () <- (Fail(E), ..N) -> A) <- (Fail(E)
 i/task.spawn_values : (Scope(A), List(B), (B) <- (Fail(A), ..N) -> C) <- (N - request.Await - Runner - Scheduler, Scheduler) -> List(Task(C, A))
 i/task.join_values : (List(Task(A, B))) <- (Fail(B), Scheduler) -> List(A)
 i/task.map_concurrently : (List(A), (A) <- (Fail(E), ..N) -> B) <- (Fail(E), N - request.Await - Runner - Scheduler - request.Owner, Scheduler) -> List(B)
-i/task.execute_body : (() <- (Fail(E), ..N) -> A, Runner, rng.Generator, Policy) <- (N - request.Await - Runner - Scheduler - request.Owner - request.Root) -> Result(Result(A, E), ScheduleError)
+i/task.execute_body : (() <- (Fail(E), ..N) -> A, Runner, rng.Generator, Policy) <- (N - request.Await - Runner - Scheduler - request.Owner - request.Root) -> Result(Result(A, E), NotRunnable)
 i/task.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - request.Await - Runner - Scheduler - request.Owner - request.Root, Runner) -> A
-i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(E), ..N) -> A) <- (Fail(E | ScheduleError), N - request.Await - Runner - Scheduler - request.Owner - request.Root, Runner) -> A
+i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(E), ..N) -> A) <- (Fail(E | NotRunnable), N - request.Await - Runner - Scheduler - request.Owner - request.Root, Runner) -> A
 i/task._entry : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - request.Await - Runner - Scheduler - request.Owner - request.Root, request.Root) -> A
 i/task.scope_call : ((Scope(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), N - request.Owner) -> ScopeResult(B)
-i/task.execute : (() <- (Fail(E), ..N) -> A, Runner, rng.Generator, Policy) <- (N - request.Await - Runner - Scheduler - request.Owner - request.Root) -> Result(Result(A, E), ScheduleError)
+i/task.execute : (() <- (Fail(E), ..N) -> A, Runner, rng.Generator, Policy) <- (N - request.Await - Runner - Scheduler - request.Owner - request.Root) -> Result(Result(A, E), NotRunnable)
 i/task.sync : (Event(A, B, C)) <- (Fail(B), Scheduler, ..C) -> A
-i/task.root_active : (Key(Nil), Active) -> RunControl
+i/task.root_active : (Key(Nil), Active) -> ContinueRun
 i/task.cause_allowed : (State, TaskState, Cause) -> Bool
 i/task.frame_abort : (List(Frame)) -> Maybe(() -> Never)
 i/task.effective_active : (State, TaskState) -> Active
@@ -432,7 +432,7 @@ i/random.word : (Generator) -> (Int, Generator)
 i/random.space_for : (Int, Int) -> Int
 i/random.word_group : (Generator, Int, Int, Int) -> (Int, Generator)
 i/random.bounded : (Generator, Int, Int, Int) -> (Int, Generator)
-i/random.int : (Generator, Int) <- (Fail(RandomError)) -> (Int, Generator)
+i/random.int : (Generator, Int) <- (Fail(InvalidBound)) -> (Int, Generator)
 i/random.float : (Generator) -> (Float, Generator)
 i/random.native_split : (State) -> (State, State)
 i/random.edge : (State, Int) -> State
@@ -442,7 +442,7 @@ i/random.binary : (Int, List(Int), Int) -> (List(Int), Int)
 i/random.zeros : (State, Int) -> State
 i/random.follow : (State, List(Int)) -> State
 i/random.derive_path : (Generator, List(Int)) -> Generator
-i/random.at_path : (Generator, List(Int)) <- (Fail(RandomError)) -> Generator
+i/random.at_path : (Generator, List(Int)) <- (Fail(InvalidPath)) -> Generator
 i/syntax.definition : (Syntax) <- (Definitions, Fail(SyntaxError)) -> Syntax
 i/syntax.raw_note : (String) -> Nil
 i/syntax._diagnostics : () -> Diagnostics
@@ -561,7 +561,7 @@ i/process.terminate : (Child) <- (Fail(ProcessError), Process, request.Await, re
 i/process.close : (Child) <- (Process, request.Await, request.Owner) -> Nil
 i/process.stdio_mode : (Stdio) -> "inherit" | "null" | "piped"
 i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
-i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, Directory) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
+i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
 i/process.read_stdout : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
 i/process.read_stderr : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
 i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Nil

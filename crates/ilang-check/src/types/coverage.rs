@@ -1251,6 +1251,19 @@ impl Checker<'_> {
                 let t = Ty::lit(scalar_head(*h).unwrap(), set.clone());
                 format!("_ : {}", super::display::show_known(&self.s, &t))
             }
+            // A type with one constructor is shown as that constructor:
+            // `False`, `Some(..)` (syntax three: sums are unions of them).
+            Pat::Head(Head::Named(TypeRef::Custom(id)), _) if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.len() == 1) =>
+            {
+                let TypeBody::Custom(cs) = &self.p.ty(*id).body else {
+                    unreachable!("checked above")
+                };
+                if cs[0].fields.is_empty() {
+                    cs[0].name.clone()
+                } else {
+                    format!("{}(..)", cs[0].name)
+                }
+            }
             Pat::Head(h, n) => format!("_ : {}", self.show_head(*h, *n)),
             Pat::Ctor(Ctor::Shape(shape), args) => {
                 let parts: Vec<String> = args.iter().map(|a| self.show_pat(a)).collect();

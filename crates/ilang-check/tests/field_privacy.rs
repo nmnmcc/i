@@ -127,7 +127,9 @@ fn generic_value_use_and_public_constructor_fields_keep_their_types() {
         lines,
         [
             "app/main.id : (A) -> A",
-            "app/main.pass : (secret.Secret(A)) -> secret.Secret(A)",
+            // `Secret(A) = Pack(A)` is an alias of the labelled type `Pack`
+            // (stage 3, syntax-3.md §2.8), shown by its expansion.
+            "app/main.pass : (secret.Pack(A)) -> secret.Pack(A)",
             "app/main.public : (secret.Open) -> Int",
             "app/main.allowed : () <- (Assert) -> Nil",
         ]

@@ -715,7 +715,7 @@ impl<'a> Resolver<'a> {
             };
             self.slots[m.0 as usize].push(slot);
         }
-        self.exports(m, &ast.exports);
+        self.exports(m, &ast.exports, &ast.items);
     }
 
     fn collect_pattern_binders(
@@ -803,6 +803,18 @@ impl<'a> Resolver<'a> {
                 span: t.span,
             }),
             ast::TypeBody::Custom(ctors) => {
+                if let [_, second, ..] = &ctors[..] {
+                    let names: Vec<&str> = ctors.iter().map(|c| c.name.name.as_str()).collect();
+                    self.error(
+                        code::MANY_CONSTRUCTORS,
+                        second.name.span,
+                        format!(
+                            "a custom type has one constructor or none; write one type for each constructor and name their union: `{} = {}` (§4.3)",
+                            def.name.name,
+                            names.join(" | ")
+                        ),
+                    );
+                }
                 let mut out = Vec::new();
                 for c in ctors {
                     if !self.value_free(m, &c.name.name, c.name.span) {
@@ -984,7 +996,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// §2.4.
-    fn exports(&mut self, m: ModuleId, items: &[ast::ExportItem]) {
+    fn exports(&mut self, m: ModuleId, items: &[ast::ExportItem], defs: &[ast::Item]) {
         let mi = m.0 as usize;
         for item in items {
             let name = &item.name.name;
@@ -1044,10 +1056,24 @@ impl<'a> Resolver<'a> {
             };
             let def = &mut self.p.types[t.0 as usize];
             def.exported = true;
-            // `Alias(..)` is the same as `Alias`: an alias has no
-            // constructors of its own, so there is nothing more to export.
             if item.constructors && matches!(def.body, TypeBody::Custom(_)) {
                 def.constructors_exported = true;
+            } else if item.constructors {
+                // `A(..)` of a sum exports the name and each member of its
+                // expansion with `(..)` (syntax-3.md §5.2.1, D8), when every
+                // member is a labelled type of this module.
+                let mut members = Vec::new();
+                if sum_members(defs, name, &mut members, 0) {
+                    for member in members {
+                        if let Some(&t) = self.types_by_name[mi].get(&member) {
+                            let def = &mut self.p.types[t.0 as usize];
+                            if matches!(def.body, TypeBody::Custom(_)) {
+                                def.exported = true;
+                                def.constructors_exported = true;
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -2390,15 +2416,26 @@ impl<'a> Resolver<'a> {
                     } = expanded.kind
                         && args.len() == 1
                     {
-                        let answer = self.expand(&args[0]);
-                        let (value, error) = if let TypeKind::Named {
-                            ty: TypeRef::Custom(id),
-                            args,
-                        } = &answer.kind
-                            && self.p.ty(*id).name == "Result"
-                            && Some(self.p.ty(*id).module) == self.p.prelude
-                            && args.len() == 2
-                        {
+                        // `Result(A, E)` is an alias of `Ok(A) | Error(E)`:
+                        // look for it before expanding it.
+                        let mut answer = args[0].clone();
+                        let result_args = loop {
+                            if let TypeKind::Named {
+                                ty: TypeRef::Custom(id),
+                                args,
+                            } = &answer.kind
+                                && self.p.ty(*id).name == "Result"
+                                && Some(self.p.ty(*id).module) == self.p.prelude
+                                && args.len() == 2
+                            {
+                                break Some(args.clone());
+                            }
+                            match self.expand_alias(&answer) {
+                                Some(next) => answer = next,
+                                None => break None,
+                            }
+                        };
+                        let (value, error) = if let Some(args) = result_args {
                             wrapped = true;
                             (args[0].clone(), Some(Box::new(args[1].clone())))
                         } else {
@@ -2518,12 +2555,25 @@ impl<'a> Resolver<'a> {
             }
         }
         members.sort();
+        members.dedup();
         Some(HostFn {
             params,
             result,
             errors: members,
             request_result: false,
         })
+    }
+
+    /// The name of a prelude type that `t` names with no arguments.
+    fn prelude_ctor_type(&self, t: &Ty) -> Option<&str> {
+        match t {
+            Ty::Con(Head::Named(TypeRef::Custom(id)), _, args)
+                if args.is_empty() && Some(self.p.ty(*id).module) == self.p.prelude =>
+            {
+                Some(self.p.ty(*id).name.as_str())
+            }
+            _ => None,
+        }
     }
 
     fn is_never(&self, t: &Type) -> bool {
@@ -2552,6 +2602,15 @@ impl<'a> Resolver<'a> {
             return None;
         }
         match t {
+            // `Bool = True | False`.
+            Ty::Union(ms)
+                if ms.len() == 2
+                    && ["True", "False"]
+                        .iter()
+                        .all(|n| ms.iter().any(|m| self.prelude_ctor_type(m) == Some(*n))) =>
+            {
+                Some(HostType::Bool)
+            }
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, args) if args.is_empty() => match b {
                 BuiltinType::Int => Some(HostType::Int),
                 BuiltinType::Float => Some(HostType::Float),
@@ -2565,7 +2624,12 @@ impl<'a> Resolver<'a> {
                 match &def.body {
                     TypeBody::Custom(ctors) if ctors.is_empty() => Some(HostType::Opaque(*id)),
                     TypeBody::Custom(_) if prelude && def.name == "Nil" => Some(HostType::Nil),
-                    TypeBody::Custom(_) if prelude && def.name == "Bool" => Some(HostType::Bool),
+                    // One of the two members of `Bool`, as a value or an error.
+                    TypeBody::Custom(_)
+                        if prelude && outgoing && matches!(def.name.as_str(), "True" | "False") =>
+                    {
+                        Some(HostType::Bool)
+                    }
                     _ => None,
                 }
             }
@@ -3839,11 +3903,113 @@ impl<'a> Resolver<'a> {
         })
     }
 
+    /// Provider contracts are classified after aliases and imports resolve.
+    /// A syntactically bare alias can still hide an inference hole.
+    fn open_provider_contract(&self, t: &Type) -> bool {
+        let mut pending = vec![t.clone()];
+        while let Some(t) = pending.pop() {
+            if let Some(expanded) = self.expand_alias(&t) {
+                pending.push(expanded);
+                continue;
+            }
+            match t.kind {
+                TypeKind::Hole | TypeKind::Var(_) | TypeKind::Of { .. } | TypeKind::Error => {
+                    return true;
+                }
+                TypeKind::Named {
+                    ty: TypeRef::Custom(id),
+                    ..
+                } if self.circular.contains(&id) => return true,
+                TypeKind::Named { args, .. }
+                | TypeKind::Tuple(args)
+                | TypeKind::Union(args)
+                | TypeKind::Inter(args)
+                | TypeKind::Diff(args) => pending.extend(args),
+                TypeKind::Record { fields } => pending.extend(fields.into_iter().map(|(_, t)| t)),
+                TypeKind::Fn {
+                    params,
+                    ret,
+                    err,
+                    env,
+                } => {
+                    pending.extend(params.into_iter().map(|p| p.ty));
+                    pending.push(*ret);
+                    pending.extend(err.into_iter().map(|t| *t));
+                    pending.extend(env.into_iter().map(|t| *t));
+                }
+                TypeKind::Lit(_) => {}
+            }
+        }
+        false
+    }
+
     fn block(&mut self, b: &ast::Block) -> Block {
         let mark = self.locals.len();
         let mut stmts = Vec::new();
-        for s in &b.stmts {
-            stmts.push(match s {
+        use ilang_syntax::walk::{Visitor, Walk};
+        #[derive(Default)]
+        struct Uses(HashMap<String, usize>);
+        impl Visitor for Uses {
+            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
+                if enter && let ast::ExprKind::Name { module: None, name } = &e.kind {
+                    *self.0.entry(name.name.clone()).or_default() += 1;
+                }
+            }
+        }
+        #[derive(Default)]
+        struct Functions(bool);
+        impl Visitor for Functions {
+            fn expr(&mut self, e: &mut ast::Expr, enter: bool) {
+                if enter {
+                    self.0 |= matches!(e.kind, ast::ExprKind::Fn(_) | ast::ExprKind::Clauses(_));
+                }
+            }
+        }
+        let mut uses = Uses::default();
+        if b.stmts.windows(2).any(|ss| matches!(ss,
+            [ast::Stmt::Bind(ast::Binding { pattern: ast::Pattern { kind: ast::PatternKind::Typed { .. }, .. }, .. }),
+             ast::Stmt::Env { ty, .. }] if matches!(ty.kind, ast::TypeKind::Hole))) {
+            b.clone().walk(&mut uses);
+        }
+        let mut i = 0;
+        while i < b.stmts.len() {
+            if let (
+                ast::Stmt::Bind(binding),
+                Some(ast::Stmt::Env {
+                    ty: key,
+                    value,
+                    span,
+                }),
+            ) = (&b.stmts[i], b.stmts.get(i + 1))
+                && matches!(key.kind, ast::TypeKind::Hole)
+                && binding.type_params.is_empty()
+                && let ast::PatternKind::Typed { binder, ty } = &binding.pattern.kind
+                && !binder.discard
+                && matches!(&value.kind, ast::ExprKind::Name { module: None, name } if name.name == binder.name)
+                && uses.0.get(&binder.name) == Some(&1)
+            {
+                let contract = self.ty(ty);
+                let open = self.open_provider_contract(&contract);
+                let mut functions = Functions::default();
+                if !open {
+                    binding.value.clone().walk(&mut functions);
+                }
+                // An open contract must survive before local generalization.
+                // A closed function value keeps its existing scheme boundary
+                // and the actual-provider checks deferred through that scheme.
+                if open || !functions.0 {
+                    self.env_type(&contract);
+                    let value = self.expr(&binding.value);
+                    stmts.push(Stmt::Env {
+                        ty: contract,
+                        value,
+                        span: *span,
+                    });
+                    i += 2;
+                    continue;
+                }
+            }
+            stmts.push(match &b.stmts[i] {
                 ast::Stmt::Bind(binding) => {
                     let (binding, binders) = self.binding(binding, false);
                     self.local_table(&binding);
@@ -3871,6 +4037,7 @@ impl<'a> Resolver<'a> {
                 }
                 ast::Stmt::Expr(e) => Stmt::Expr(self.expr(e)),
             });
+            i += 1;
         }
         self.locals.truncate(mark);
         Block {
@@ -4925,5 +5092,40 @@ pub fn typed_output(
         Err(r.diags)
     } else {
         Ok((result, r.p))
+    }
+}
+
+/// The labelled types (custom types with constructors) that the type
+/// definition `name` of `defs` expands to, through unions and aliases of the
+/// module; `false` when a member is something else.
+fn sum_members(defs: &[ast::Item], name: &str, out: &mut Vec<String>, depth: usize) -> bool {
+    if depth > 64 {
+        return false;
+    }
+    let Some(def) = defs.iter().find_map(|i| match &i.kind {
+        ast::ItemKind::TypeDef(d) if d.name.name == name => Some(d),
+        _ => None,
+    }) else {
+        return false;
+    };
+    match &def.body {
+        ast::TypeBody::Custom(cs) if !cs.is_empty() => {
+            if !out.iter().any(|o| o == name) {
+                out.push(name.to_string());
+            }
+            true
+        }
+        ast::TypeBody::Custom(_) => false,
+        ast::TypeBody::Alias(t) => members_of(defs, t, out, depth),
+    }
+}
+
+fn members_of(defs: &[ast::Item], t: &ast::TypeExpr, out: &mut Vec<String>, depth: usize) -> bool {
+    match &t.kind {
+        ast::TypeKind::Named {
+            module: None, name, ..
+        } => sum_members(defs, &name.name, out, depth + 1),
+        ast::TypeKind::Union(ms) => ms.iter().all(|m| members_of(defs, m, out, depth)),
+        _ => false,
     }
 }

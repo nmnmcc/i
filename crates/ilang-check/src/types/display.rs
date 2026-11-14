@@ -1913,19 +1913,56 @@ impl AliasFold {
             })
     }
 
-    /// The arguments of the alias when `ms` is exactly its expansion.
-    fn fit(&self, ms: &[Ty]) -> Option<Vec<Ty>> {
-        if ms.len() != self.members.len() {
+    /// The number of members of the expansion.
+    pub(crate) fn len(&self) -> usize {
+        self.members.len()
+    }
+
+    /// Whether every member is a type defined in a program (a labelled
+    /// type, not a built-in one).
+    pub(crate) fn all_defined(&self) -> bool {
+        self.members.iter().all(|m| {
+            matches!(
+                m.head(),
+                Some(super::Head::Named(crate::hir::TypeRef::Custom(_)))
+            )
+        })
+    }
+
+    /// The members with the alias's parameters replaced by `args`.
+    pub(crate) fn members_with(&self, args: &[Ty]) -> Vec<Ty> {
+        self.members
+            .iter()
+            .map(|m| super::alias::map_vars(m, &mut |v| args[v.0 as usize].clone()))
+            .collect()
+    }
+
+    /// The number of parameters of the alias.
+    pub(crate) fn params(&self) -> usize {
+        self.params
+    }
+
+    /// Whether a member of the expansion has the type constructor `h`.
+    pub(crate) fn has_head(&self, h: super::Head) -> bool {
+        self.members.iter().any(|m| m.head() == Some(h))
+    }
+
+    /// The arguments of the alias, and the positions in `ms` of its
+    /// members, when `ms` contains exactly its expansion (and maybe more).
+    fn fit(&self, ms: &[Ty]) -> Option<(Vec<Ty>, Vec<usize>)> {
+        if ms.len() < self.members.len() {
             return None;
         }
         let mut args = vec![None; self.params];
+        let mut at = Vec::new();
         for p in &self.members {
-            let m = ms.iter().find(|m| m.head() == p.head())?;
-            if !fit_pattern(p, m, &mut args) {
+            let i = ms.iter().position(|m| m.head() == p.head())?;
+            if !fit_pattern(p, &ms[i], &mut args) {
                 return None;
             }
+            at.push(i);
         }
-        args.into_iter().collect()
+        Some((args.into_iter().collect::<Option<_>>()?, at))
     }
 }
 
@@ -1986,20 +2023,43 @@ fn fold_in(s: &Solver, t: &Ty) -> Ty {
         Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.clone()),
         Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
         Ty::Union(xs) => {
-            let xs: Vec<Ty> = xs.iter().map(go).collect();
+            let mut xs: Vec<Ty> = xs.iter().map(go).collect();
             let name =
                 |id: crate::hir::TypeId| s.type_names.get(id.0 as usize).map_or("", String::as_str);
-            let best = s
-                .alias_folds
-                .iter()
-                // A name with a module path is not in scope.
-                .filter(|f| !name(f.id).is_empty() && !name(f.id).contains('/'))
-                .filter_map(|f| f.fit(&xs).map(|args| (f.id, args)))
-                .min_by_key(|(id, _)| (name(*id).contains('.'), name(*id).len(), id.0));
-            match best {
-                Some((id, args)) => Ty::named(crate::hir::TypeRef::Custom(id), args),
-                None => Ty::Union(xs),
+            // Each time, the alias with the most members whose expansion is
+            // part of the union takes their place, so the result does not
+            // depend on how the union was put together: `String | True |
+            // False` is `String | Bool`.
+            loop {
+                let best = s
+                    .alias_folds
+                    .iter()
+                    // A name with a module path is not in scope.
+                    .filter(|f| !name(f.id).is_empty() && !name(f.id).contains('/'))
+                    .filter_map(|f| f.fit(&xs).map(|(args, at)| (f.id, args, at)))
+                    .min_by_key(|(id, _, at)| {
+                        (
+                            std::cmp::Reverse(at.len()),
+                            name(*id).contains('.'),
+                            name(*id).len(),
+                            id.0,
+                        )
+                    });
+                let Some((id, args, mut at)) = best else {
+                    break;
+                };
+                let folded = Ty::named(crate::hir::TypeRef::Custom(id), args);
+                if at.len() == xs.len() {
+                    return folded;
+                }
+                at.sort_unstable();
+                let first = at[0];
+                for i in at.into_iter().rev() {
+                    xs.remove(i);
+                }
+                xs.insert(first, folded);
             }
+            Ty::Union(xs)
         }
         Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
     }
@@ -2315,6 +2375,9 @@ pub(crate) fn known_norm(s: &Solver, t: &Ty) -> Ty {
 pub(crate) fn show_known(s: &Solver, t: &Ty) -> String {
     let mut names: HashMap<V, String> = HashMap::default();
     let mut next = 0u8;
+    // A union that is a declared alias's expansion is shown by its name, as
+    // in other shown types (`Bool`, not `True | False`).
+    let t = &fold_aliases(s, t);
     render(
         t,
         &mut |v| {
