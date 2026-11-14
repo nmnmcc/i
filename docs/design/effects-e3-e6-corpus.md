@@ -34,6 +34,17 @@ required value field of type `Never` still gives E0515. Provider-subtyping
 failures and invariant-argument errors are independently retained. New unit
 and §9.2 runtime regressions pin both sides; merged verification is pending.
 
+Decision 1 / EF09 removes the exclusive ordinary/row-variable classifier.
+A variable may occur in a `Boundary` argument, an ordinary parameter type and a
+need. The old mixed-use rejection test now retains its source as an acceptance
+test and separately checks the surviving §9.2 rule: “A provided item is keyed
+by its known type … which must be one named service type: not a union, a type
+variable, or unknown.” The new §9.4 fixture also checks the published control
+signature structure. This does not yet redefine the written §9.4 restrictions
+on captured-row operations; the broader ordinary-environment model and catch
+migration scope have been queried. R3's old exclusive-kind paragraph is no
+longer a valid justification for any corpus rejection.
+
 ## Controlling paragraphs
 
 **R1 — E3, ordinary error values.** Syntax-three §6.1: “**One need row.**

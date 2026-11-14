@@ -110,9 +110,6 @@ pub(crate) struct Checker<'a> {
     row_lacks: HashMap<super::V, Vec<TypeRef>>,
     row_supplies: HashMap<(ModuleId, Span), super::V>,
     row_capture_sites: HashMap<(ModuleId, Span), super::V>,
-    rest_type_vars: HashSet<TyVarId>,
-    value_type_vars: HashSet<TyVarId>,
-    mixed_row_type_vars: HashSet<TyVarId>,
     /// The expression being typed is the callee of a call.
     in_callee: bool,
     recursive_bindings: HashSet<VarId>,
@@ -213,9 +210,6 @@ impl<'a> Checker<'a> {
             row_lacks: HashMap::new(),
             row_supplies: HashMap::new(),
             row_capture_sites: HashMap::new(),
-            rest_type_vars: HashSet::new(),
-            value_type_vars: HashSet::new(),
-            mixed_row_type_vars: HashSet::new(),
             in_callee: false,
             written: HashMap::new(),
             kvars: HashMap::new(),
@@ -805,9 +799,6 @@ impl<'a> Checker<'a> {
             trial.row_lacks = self.row_lacks.clone();
             trial.row_supplies = self.row_supplies.clone();
             trial.row_capture_sites = self.row_capture_sites.clone();
-            trial.rest_type_vars = self.rest_type_vars.clone();
-            trial.value_type_vars = self.value_type_vars.clone();
-            trial.mixed_row_type_vars = self.mixed_row_type_vars.clone();
             trial.reads = self.reads.clone();
             trial.known = self.known.clone();
             trial.known_args = self.known_args.clone();
@@ -1693,12 +1684,6 @@ impl<'a> Checker<'a> {
                 Ty::named(*ty, args)
             }
             TypeKind::Var(tv) => {
-                if mode == Mode::Value {
-                    self.value_type_vars.insert(*tv);
-                    if self.rest_type_vars.contains(tv) && self.mixed_row_type_vars.insert(*tv) {
-                        self.error(code::ENV_TYPE, t.span, "a rest service type parameter cannot also be an ordinary value type (§4.7)");
-                    }
-                }
                 if let Some(t) = local.get(tv).or_else(|| self.tyvars.get(tv)).cloned() {
                     if mode != Mode::Value {
                         self.s.mark_mode(&t, mode);
@@ -3597,13 +3582,6 @@ impl<'a> Checker<'a> {
                     rest,
                 } => {
                     rest_env |= rest;
-                    if *rest && let TypeKind::Var(tv) = ty.kind {
-                        self.rest_type_vars.insert(tv);
-                        if self.value_type_vars.contains(&tv) && self.mixed_row_type_vars.insert(tv)
-                        {
-                            self.error(code::ENV_TYPE, ty.span, "a rest service type parameter cannot also be an ordinary value type (§4.7)");
-                        }
-                    }
                     self.check_places(ty, Pol::Pos, 0);
                     let t = self.conv_mode(ty, &HashMap::new(), Mode::Env);
                     if let Some(super::Head::Named(r)) = t.head() {

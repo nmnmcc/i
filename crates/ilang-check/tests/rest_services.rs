@@ -120,12 +120,17 @@ fn e6_runtime_fixtures_type_check() {
 }
 
 #[test]
-fn a_rest_type_parameter_cannot_also_be_a_value_type() {
+fn a_need_parameter_can_also_appear_in_a_value_type() {
+    // Decision 1 (EF01/EF09) removes §4.7's exclusive classification.
+    // Retain the original mixed-use source as an acceptance regression;
+    // known keys are still required for extracting/providing services.
     let (_, errors) = checked("f = <N>(x: N) <- (..env: N) { Nil }");
+    assert!(errors.is_empty(), "{errors:#?}");
+    let (_, errors) = checked("f = <N>(x: N) { Nil <- (x) }");
     assert!(
         errors
             .iter()
-            .any(|e| e.contains("cannot also be an ordinary value type")),
+            .any(|e| e.contains("not known to be one service type")),
         "{errors:#?}"
     );
 }
