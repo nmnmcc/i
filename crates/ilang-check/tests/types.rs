@@ -227,7 +227,7 @@ fn many_uses_of_a_parameter() {
         let elapsed = start.elapsed();
         eprintln!("{n} uses: {elapsed:?}");
         assert!(
-            out.contains("f : (Boundary(A, B, C), Int) -> Int\n") && !out.contains("error"),
+            out.contains("f : (Boundary(A, B), Int) -> Int\n") && !out.contains("error"),
             "{out}"
         );
         let base = *smallest.get_or_insert(elapsed.max(std::time::Duration::from_millis(50)));
@@ -241,7 +241,8 @@ fn many_uses_of_a_parameter() {
 #[test]
 fn shown_names_skip_types_and_ignore_written_variable_names() {
     // A1 §8: first-use names skip unqualified types and never keep the
-    // spelling of a declared variable. Error/environment roles keep E/N.
+    // spelling of a declared variable. Need rows keep N; E3 has no
+    // independent error channel on an unknown callback.
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     fs::create_dir(dir.path().join("src")).unwrap();
@@ -256,7 +257,7 @@ fn shown_names_skip_types_and_ignore_written_variable_names() {
     assert!(out.contains("keep : (B) -> B\n"), "{out}");
     assert!(out.contains("again : (B) -> B\n"), "{out}");
     assert!(
-        out.contains("effect : (() <- (Fail(E2), ..N2) -> B) <- (Fail(E2), ..N2) -> B\n"),
+        out.contains("effect : (() <- N2 -> B) <- N2 -> B\n"),
         "{out}"
     );
     assert!(!out.contains("error"), "{out}");

@@ -147,8 +147,8 @@ Exit status is 1; the position identifies the assertion. Remove this file before
 	std/list
 )
 test("reverse twice", () {
-	Ok(numbers) = property.int(-10, 10)
-	Ok(lists) = property.list(numbers, 0, 12)
+	numbers = property.int(-10, 10)
+	lists = property.list(numbers, 0, 12)
 	property.test(
 		lists,
 		property.Config(
@@ -173,7 +173,7 @@ pass guide_tests/reverse_test.reverse twice
 1 passed, 0 failed
 ```
 
-Generator bounds must be valid, hence their `Result`. On failure the runner reports replay information and tries ordered smaller cases within `max_shrinks`; its best value on that path need not be a global minimum. Replay needs deterministic callbacks: keep the seed, generator code, library version, and dependencies in a failure report.
+Generator builders raise an error for invalid bounds. On failure the runner reports replay information and tries ordered smaller cases within `max_shrinks`; its best value on that path need not be a global minimum. Replay needs deterministic callbacks: keep the seed, generator code, library version, and dependencies in a failure report.
 
 ## A fake service
 

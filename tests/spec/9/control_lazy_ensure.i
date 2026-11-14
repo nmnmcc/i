@@ -18,7 +18,7 @@ show = (x) { core.inspect(x) }
 
 Bad = (Int)
 
-Paused = (Continuation(Nil, PausedSum, Never, Never))
+Paused = (Continuation(Nil, PausedSum, Never))
 Done = ()
 PausedSum = Paused | Done
 

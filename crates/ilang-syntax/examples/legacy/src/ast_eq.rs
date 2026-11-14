@@ -66,11 +66,15 @@ fn block<'a>(a: &'a Block, b: &'a Block, q: &mut Vec<Pair<'a>>) -> bool {
         }
         (
             Stmt::Env {
+                spread: aspread,
+                group: agroup,
                 ty: a,
                 value: av,
                 span: aspan,
             },
             Stmt::Env {
+                spread: bspread,
+                group: bgroup,
                 ty: b,
                 value: bv,
                 span: bspan,
@@ -78,7 +82,7 @@ fn block<'a>(a: &'a Block, b: &'a Block, q: &mut Vec<Pair<'a>>) -> bool {
         ) => {
             q.push(Pair::Type(a, b));
             q.push(Pair::Expr(av, bv));
-            aspan == bspan
+            aspan == bspan && aspread == bspread && agroup == bgroup
         }
         _ => false,
     })
@@ -107,9 +111,20 @@ fn function<'a>(a: &'a Function, b: &'a Function, q: &mut Vec<Pair<'a>>) -> bool
             q.push(Pair::Pattern(a, b));
             true
         }
-        (Param::Env { name: a, ty: at }, Param::Env { name: b, ty: bt }) => {
+        (
+            Param::Env {
+                name: a,
+                ty: at,
+                rest: ar,
+            },
+            Param::Env {
+                name: b,
+                ty: bt,
+                rest: br,
+            },
+        ) => {
             q.push(Pair::Type(at, bt));
-            a == b
+            a == b && ar == br
         }
         _ => false,
     });

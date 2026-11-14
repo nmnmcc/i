@@ -1,6 +1,6 @@
 {
-  "compiler": "c829216203ac222f43092428007a9c3026b14ac8",
-  "binary_sha256": "ed435649d4ef75158514981103ad983a059a299cca0d40f850c8e4598b401473",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.h0 : () <- (Dep, S(N), ..N) -> Int\napp/main.h1 : () <- (N - Dep, S(N)) -> Int\napp/main.main : () <- (N - Dep - S(Dep), T(N)) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (Dep, S(N), ..N) -> Int\napp/main.h1 : () <- (N - Dep, S(N)) -> Int\napp/main.main : () <- (N - Dep - S(Dep), T(N)) -> Nil\n",
       "stderr": "src/main.i:29:10: error[E0501]: `Dep` is not a subtype of `T(S(Never))` (the type at 27:32 needs it)\n1 error\n"
     }
   }

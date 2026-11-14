@@ -28,6 +28,7 @@ test("sync host services and external functions of a compiled module", async () 
   assert.equal(value.call("app/app.lookup", ["name"]), "i");
   assert.throws(() => value.call("app/app.lookup", ["other"]), (error) => error instanceof GuestError && error.value === "no other");
   assert.equal(value.call("app/app.distance", [3, 4]), 5);
+  assert.equal(value.call("app/app.lookup", ["name"]), "i");
   assert.equal(value.unusable, null);
 });
 
@@ -68,7 +69,7 @@ test("an answer of the host that is not correct stops the program in the module"
   await assert.rejects(value.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:45:2");
   assert.ok(value.unusable);
   const sync = await instantiate(compiled, { imports: { ...compiledImports(GuestError), "app:math/v1": { hypot: () => Infinity } } });
-  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:41:35");
+  assert.throws(() => sync.call("app/app.distance", [3, 4]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct\napp/app:41:44");
   // With `checkReplies`, the host stops the program, with no positions.
   const checked = await instantiate(compiled, { imports: compiledImports(GuestError, [], { later: async () => NaN }), checkReplies: true });
   await assert.rejects(checked.callAsync("app/app.wait_sum", [1, 2]), (error) => error instanceof Stop && error.stopMessage === "host: value is not correct");
@@ -132,4 +133,17 @@ test("the module rejects an inline Int whose sign does not match its value", asy
     const value = await guest();
     assert.throws(() => value.exports["app/ints.echo"](sign, n, 0), WebAssembly.RuntimeError);
   }
+});
+
+for (const opt of [0, 2]) test(`compiled external Fail uses the caller at O${opt}`, async () => {
+  const bytes = await readFile(new URL(`../../../tests/browser/fixtures/external-fail-o${opt}.wasm`, import.meta.url));
+  const value = await instantiate(bytes, { imports: { "app:fallible/v1": { value: (text) => {
+    if (text === "bad") throw new GuestError("from-host");
+    return 42n;
+  } } } });
+  assert.deepEqual(value.abi.externals["app:fallible/v1"].value.errors, ["string"]);
+  assert.equal(value.call("app/main.call", ["good"]), 42n);
+  assert.throws(() => value.call("app/main.call", ["bad"]), (error) => error instanceof GuestError && error.value === "from-host");
+  assert.equal(value.call("app/main.call", ["good"]), 42n);
+  assert.equal(value.unusable, null);
 });

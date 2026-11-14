@@ -394,7 +394,7 @@ A binding may not be among its own dependencies. If it is, it is a compile error
 
 ### 2.6 The package file
 
-The file `i.toml` is in TOML. These keys and the provider keys below have a meaning; other root keys are not used. Unknown keys inside a provider plan are errors (§2.6.1):
+The file `i.toml` is in TOML. These keys have a meaning; other root keys are not used:
 
 ```toml
 name = "app"                                   # required: the first part of the paths of this package's modules
@@ -438,207 +438,11 @@ host exports. The selected function uses the entry checking,
 platform services and calling rules of §10.2. An unused-binding warning must
 exclude both the default entry and every declared entry.
 
+### 2.6.1 Entries and the platform
 
-### 2.6.1 Target provider plans
+At an entry (the program entry, a test, a host export) the target's platform gives its own services: the host services of the target's table (§9.7), `Assert`, a top-level `Fail` (§9.3), and `Root`, `Owner`, `Await`, `Runner` and `Scheduler`. Every other service is given in the entry by i code. The need of an entry may only contain services of the platform of the target; any other service is the compile error "`T` is not provided by the target `t`" (E0523). A program built for targets that need different choices has one entry per target (`[entries]`).
 
-A target provider plan maps resolved service type identities to ordinary i factory functions or host registrations. Infer source types first. For each entry, supply every service left in its inferred environment and all dependencies of the chosen factories. Supply whole services, never selected fields. Missing required services and dependency cycles are compile errors naming the target, service and requiring entry. Catching operation errors, including `unsupported`, does not remove a requirement. A target with no default for a standard capability and no explicit provider is therefore a compile error even when all its operation errors are caught.
-
-Every factory has an ordinary checked type, returns its service and has no uncaught typed errors. Construction may stop, but cannot add an error to the source entry's ABI error row. All source factories are type-checked; only the chosen factories' needs are provisioned. A reference to an unchosen factory in executable source still follows §10.1.2. Construct each graph node once per entry invocation, after top-level initialization. Captured services do not change when another service is later substituted (§9.2).
-
-This is the full version-1 schema; string cells are its nullary shorthand. A service key or factory value is a fully qualified module path, a dot and its type or binding name, resolved through the package graph.
-The package plan is data, not executable macro code. The root package selects target cells over the shipped plan; dependency packages cannot override its selections. A package may declare default cells for its own nominal service constructors; these retain that package's authority, and root cells override them. A dependency row for another package's service is an error. There is no wildcard or implicit service discovery. The shipped capability registry is plan data: a registered row without a cell for this target is unsupplied, including user-registered capabilities. An absent root cell inherits the shipped cell when one exists. A plan is resolved with
-its declaring package's authority: it may name that package's private bindings;
-references into dependencies must be exported. Inherited cells keep their
-original declaring authority. Copying a dependency's private path into a
-root cell is an access error. This gives every package the same plan-only access,
-without making a private factory callable from ordinary outside source. It
-preserves private root-runner construction. The rule does not change source visibility (§2.4).
-Unknown keys, duplicate resolved rows/cells, unknown
-targets, ill-kinded type arguments and unresolved names are errors. The five
-columns are js, nodejs, native, wasi and host; ilang is a CLI alias only.
-
-```text
-providers."<resolved service type constructor>":
-  role = "none" | "scheduler" | "runner"                 # default none
-  adapter = "<accessible ordinary function>"               # iff role != none
-  discriminant = {js=C, nodejs=C, native=C, wasi=C, host=C} # optional
-  <target> = "<factory>"                                 # compact form
-           | {factory="<factory>", arguments=[...], seed_required=false}
-           | {host=true}
-provider_adapters."<accessible ordinary function>":
-  supplies = ["<closed service type>", ...]
-  requires = ["<closed service type>", ...]
-wasm.exports = ["<exported entry>", ...]
-wasm.synchronous = ["<member of wasm.exports>", ...]
-```
-
-Exactly one variant occupies a target cell. `arguments` defaults to []; its
-only elements are `"seed"` and `"entry-root-key"`, each at most once, in the
-factory's argument order. A string is `{factory=..., arguments=[]}`.
-`seed_required` defaults to false and is legal only with a seed argument.
-A host cell is legal only for a declared host service; §9.7's open
-custom-host registration is its implicit cell. A registered ordinary row
-never falls through to host registration. A discriminant row may omit cells;
-its default cell constructs `discriminant[current_target]`, provisioning
-constructor fields as services. Each constructor must belong to that row's
-type, and each field type must be a closed valid service type. Constructor
-aliases resolve before validation; maps must cover all five targets but need
-not be injective. An explicit cell replaces generation and disables §10.1.2's
-certification for that row. Generated payloads are dependency edges too.
-
-A row key is a nominal service constructor identity, not its spelling. A
-parameterized row's factory scheme is instantiated at each required set of
-type arguments, by ordinary type checking; no holes or free variables may
-remain in a chosen instance. Distinct `Cell(Int)`/`Cell(String)` nodes stay
-distinct. Each factory invocation binds only its own checked environment in
-its lexical scope. It does not union incompatible instantiations into one
-environment; §9.2's same-constructor restrictions still apply to each
-actual function environment. This changes no source inference.
-
-A factory for service `S` has type `(generated arguments) <- R -> S`,
-with `R` its ordinary inferred need and no uncaught `Fail` requirement (§9.3).
-`Key(Nil)` is an invariant identity key (§9.8). A request `Root` holds such a
-key and identifies a request run in an entry context; an `Owner` holds its own
-key and its `Root` and identifies a cancellation group. Both are ordinary
-portable service values; `Await` supplies the function that waits for a request
-to settle (§9.11). `Scheduler` and `Runner` are ordinary service values for a
-structured task run and its scheduling and random-generator context (§9.9).
-The primitive entry registry and any required initial root key exist before
-factories run; ordinary factories construct the chosen services from their arguments
-and dependencies. The request and task contracts are defined in §9.9 and
-§9.11. This plan gives none of these services a host-reference representation.
-The selected arguments have these exact types and meanings:
-
-| Argument | Type | Value and dependency |
-|---|---|---|
-| seed | `List(S)` | [] outside the adapter; inside it, [s] when supplies contains S, otherwise []; a nonempty list depends on the adapter entering |
-| entry-root-key | `Key(Nil)` | The initial registered root key of this entry's primitive context, available before factories; no service dependency |
-
-`seed_required=true` requires exactly [s] at this construction site, or the
-plan is rejected; it is not a runtime missing-service fallback. A seed is an
-ordinary value; the factory decides how to use it. It may return it, wrap it,
-or ignore it. Even with a seed, **the selected factory is called** and its
-result is the chosen S. A nullary override receives no seed and still replaces
-the chosen value. This prevents an adapter from silently undoing an Await,
-Root or user-service override. Supplying a seed is not a second provider row.
-
-The root-key argument serializes the narrow initial-root bootstrap:
-open the primitive entry registry, register its initial key when this argument
-is present in the graph, then let an ordinary factory construct the nominal
-Root value. A graph needing no key registers no initial root. It is not a public unscoped root allocator. Any ordinary factory with this argument type can receive the
-key; no rule recognizes Root or its module. All uses in one entry receive the
-same initial key. The registry exists for synchronous fake-only entries too;
-only entries classified async by §10.2 have async admission. The primitive opening is fixed,
-dependency-free and constructs no replaceable service value. On every exit
-it retires the entry's registered roots/groups, even after a stop.
-
-The **role belongs to the row**. A root-package target cell replaces only the
-provider cell; the inherited role, adapter and discriminant are unchanged.
-Redeclaring inherited metadata identically is allowed; changing it is an
-error. New application rows may declare any role with the same rules. A row
-with a role must name a declared adapter, and a row with role none must not.
-An override must still type-check as a provider of S; supplying a pure fake
-does not erase its role. Request mode likewise remains the declared host mode.
-All row/adapter declarations are schema-checked in a target plan; only chosen
-factory dependencies need supplies. Source-only check does no plan validation.
-
-An adapter declaration names an accessible ordinary generalized function with
-this checked type (schema notation, R and S are the declared service unions):
-
-```text
-adapter(A,E,N): (body: () -> A ^ E ! N) -> A ^ E ! R | N - S
-```
-
-It is generalized over arbitrary A, E and N; no extra result/error restriction
-or requirement is permitted. The declared closed supplies and requires lists
-each form a valid ordinary environment. They may overlap **across** lists:
-the required outer Runner and supplied inner Runner, for example, are different
-lexical values. A candidate's inferred scheme must satisfy this entire type,
-not only the current entry instantiation. There is no rank-two field or new
-function kind: the plan names an ordinary top-level generalized function.
-The adapter supplies S by calling body under ordinary environment bindings;
-those bindings are captured as seeds by the generated continuation. It must
-not assume its seeds are the final services used by the source entry.
-
-The continuation has entry lifetime. Generated guards allow exactly one
-invocation, wholly within the adapter invocation's dynamic extent. Re-entry
-or a second invocation stops with `provider: body already called`; invocation
-after adapter exit stops with `provider: body is not active`; returning normally
-without a completed invocation stops with `provider: body was not completed`.
-A stop may abandon the invocation; it runs no i finals and the primitive
-context still retires. Suspension is not exit. Adapters may use ordinary
-structured control and resource.ensure around body; they cannot detach it.
-The guard is required for every adapter, not trusted library code. Ordinary
-service values can escape normally; their later operations obey their own
-lifetime rules. This is not a new linear type system.
-
-Resolve and validate the graph as follows, before linking or optimization:
-
-1. Resolve body providers transitively from the entry's full inferred needs.
-   Each service uses its one target cell. Include all factory requirements,
-   generated-constructor payloads and declared request modes, whether used at
-   runtime or not. Choose roles from these rows, not their factories' names.
-   Expansion must be finite: on any dependency path within one scope,
-   revisiting a service constructor is rejected even at different type
-   arguments (`provider: recursive dependency`). This conservative rule also
-   rejects a finitely decreasing chain such as Box(Box(Config)) -> Box(Config)
-   -> Config. Independent sibling instances remain legal. It prevents an
-   expanding Cell(A) -> Cell(List(A)) plan from hanging the compiler, without
-   adding type-level termination analysis. Completed nodes may be shared;
-   sharing must not hide a repeated constructor on any graph path.
-2. If a role is reached, include its adapter and resolve that adapter's required
-   services in an **outer** scope using the same target cells. Include all roles
-   and requirements reached there too. Repeat until closed. No adapter means
-   no outer scope. More than one resolved adapter identity is an error naming
-   the entry and both originating service rows and their adapter names. Repeated
-   references to the same adapter are shared. Adapter references must resolve
-   to a top-level function binding, allowing only direct lexical binding
-   aliases; arbitrary computed function values cannot be plan adapter names.
-   There is no nested composition.
-3. Make one node per (outer/body scope, fully instantiated service). An edge
-   to each required service stays in that scope. An adapter-enter node depends
-   on all outer requires. Seed nodes depend on adapter-enter; a body factory
-   with a seed argument depends on the appropriate seed if one is supplied.
-   Outer factories always receive []; an unsatisfied required seed is an error.
-   The primitive context/key is a leaf, never a service-provider dependency.
-   Two scopes do not share provider instances, even if their factories match.
-4. Check all supplied/required types, missing cells and cycles over this **one**
-   graph, including adapter and seed edges. A factory cannot obtain an inner
-   seed while constructing an outer prerequisite. Such a requirement is a
-   plan error, not permission for a temporary default service. Source factories
-   and adapters have already undergone ordinary type checking.
-5. Execute a stable topological order. First materialize primitive arguments
-   and host-registration leaves in canonical order; these run no i factory.
-   Then, among ready service nodes, order lexicographically by canonical
-   package/module/type path and normalized type arguments, then outer before
-   body. Expand aliases and sort/deduplicate union members recursively when
-   serializing closed type arguments; never sort by allocated TypeIds. Prefer
-   all ready provider nodes to adapter-enter. Enter the adapter
-   once its prerequisites are ready; finish the same order in its guarded
-   continuation, then invoke the source entry with its chosen body services.
-   No provider may execute before primitive admission is opened when async.
-
-This ordering may construct a body service independent of seeds before adapter
-entry; it is then an ordinary lexical capture in the continuation. It constructs
-seed-dependent providers after entry. This is still one topological order, not
-Root/Owner/Await followed by another sort. No second provider is substituted
-to break a cycle. Classification includes both scopes and the adapter's
-requirements; linkage includes the adapter and all chosen factory bodies.
-A generated wrapper reference is not a *source* reference in §10.1.2's certification.
-
-Shipped task rows use the same schema: scheduler/runner roles select one
-ordinary adapter with the structured run type and supplied
-Scheduler/Runner/Await/Owner/Root, requiring outer Runner. Seed-aware ordinary
-factories return the supplied values inside that adapter; outside it they
-construct the accepted default Runner through its private ordinary constructor
-and the direct context services. The plan names that constructor with its
-own package authority, never via a public root-runner API. The outer
-Runner factory has no required seed and no dependency cycle. Root's direct
-factory takes entry-root-key; Owner's direct factory needs Root. Seed-aware
-factories still declare their full ordinary environments on both paths; those
-requirements are provisioned even when a seed is present. The seeded default
-run remains FIFO, path [], seed 0, with no entropy draw. No special factory
-elision, role erasure or hidden context provider is permitted.
+The entry stub binds the platform's host services that the entry needs; when the entry needs `Root`, `Owner`, `Await`, `Runner` or `Scheduler`, it opens the request root and binds `Root`, `Owner` and `Await`; when it needs `Runner` or `Scheduler`, it binds the initial `Runner` and runs the entry inside `task.run`. There is no `providers` key in the package file.
 
 #### 2.6.2 Synchronous exports and commands
 
@@ -1629,7 +1433,7 @@ A structured task cancel resumes its scheduling continuation with a cancel answe
 
 **Keeping services.** In a service pattern, `..env : N` binds the row value defined by §6.8. A value of a row type may be bound, captured and provided after `<-`, alone or as a spread in provided data; it may not be spread into ordinary data, compared, printed or matched. `keep` captures exactly the services in `f`'s inferred residual need, after removing `Fail`. It does not capture other services merely because they are available. Wherever the kept function is called, it calls `f` with those captured services and the caller's `Fail`. This is also the capture rule for `task.keep` and `task.go`, with the scheduler substitutions of §9.9:
 
-```i future-SYN3
+```i
 keep = <S, A, E, N>(f : (S) <- (..N, Fail(E)) -> A) <- (..env : N) -> (S) <- (
 	Fail(E),
 ) -> A { (x) { f(x) <- env } }
@@ -2658,7 +2462,9 @@ On targets using the asynchronous entry protocol, an entry is **async** exactly 
 
 The entry context is opened before the entry runs, and closed on every exit, after structured cleanup and before the result or error is delivered. A stop runs no i finals. A synchronous context cannot hand off: a low-level wait needing hand-off or poll stops with `request: no active entry`. An async entry may return status 0 on its first call; scheduler switches alone do not yield to the host.
 
+On targets using the v3 asynchronous entry protocol, an entry is **async** exactly when its need has a request-mode host service, `Runner` or `Scheduler` (§2.6.1). Metadata and wrapper shape follow this before linking and optimization; a requested synchronous export that classifies async is a compile error (§2.6.2). The host waits through Appendix B's protocol. WASI instead keeps blocking imports, synchronous metadata and no async hand-off (§B.7).
 
+Open the primitive entry context first, enabling async admission exactly for an async entry. The entry stub of §2.6.1 then binds the platform services and invokes the unchanged source entry. Finish structured cleanup before delivering the result or error; retire the primitive context on every exit. A stop runs no i finals. Synchronous contexts cannot hand off: a low-level wait needing hand-off or poll stops with `request: no active entry`. An async entry may return status 0 on its first call; pure scheduler switches alone do not yield to the host.
 
 ### 10.3 Types the host can take
 
@@ -2748,10 +2554,7 @@ The program stops in these cases:
 | A value from the host is not correct (Appendix B) | `host: value is not correct` |
 | There is no more memory or stack | none |
 
-
-
 A JS bridge call that does not expose exceptions uses `panic("js: call threw")` for a thrown exception. Malformed raw outcomes, argument builders or typed host replies use `host: value is not correct`. These stops are not Mismatch errors; explicit checked conversions may return Mismatch. Memory and stack exhaustion remain stops.
-
 
 Before the program stops, the host gets a **stop message**, in one call of `panic` (Appendix B): the reason, then one line for each source position, with a line feed between lines. The first position is that of the innermost expression in the program source that was being worked out: a call, an operator, a `<<`, or a binding. Then come the positions of the calls in the program source that were running, the innermost first. Calls that were replaced by tail calls are gone, but the first position is always given, also when that expression is a call in tail position: in `f = (n) { assert(n > 0) }`, the stop shows the position of `assert(n > 0)`. A call of a library function, such as `fail.catch` or `resource.ensure`, counts as a tail call when it is in tail position. For an error at an entry point, there is only the position of the entry point's binding.
 

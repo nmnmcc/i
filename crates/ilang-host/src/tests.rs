@@ -156,6 +156,10 @@ fn metadata_that_does_not_follow_b6_is_refused() {
     let empty =
         r#"{"version":3,"entry":null,"tests":[],"exports":{},"services":{},"externals":{}}"#;
     assert!(parse(empty).is_ok());
+    let fallible = r#"{"version":5,"entry":null,"tests":[],"exports":{},"services":{},"externals":{"m":{"f":{"params":[],"result":"int","errors":["string"]}}}}"#;
+    assert!(parse(fallible).is_ok());
+    assert!(parse(&fallible.replace("\"version\":5", "\"version\":4")).is_err());
+    assert!(parse(&fallible.replace("\"errors\":[\"string\"]", "\"async\":true")).is_err());
     for json in [
         r#"{"version":1,"entry":null,"tests":[],"exports":{},"services":{},"externals":{}}"#,
         r#"{"version":3,"entry":null,"tests":[],"exports":{},"services":{}}"#,

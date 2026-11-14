@@ -1,17 +1,15 @@
 // spec: 9.2, 9.3, 9.4, 11.7
 // expect: stop "control: boundary is not active"
-// at: spec/main:14:32
+// at: spec/main:12:15
 (
-	i/control
-	i/failure
+	i/fail
 )
 
-// A function kept inside a `catch` raises through the `Fail` of the catch
-// after the catch has ended: the program stops, because the boundary is
-// not active, at the same place as when the `Fail` value itself is used.
+// A closure that explicitly captures Fail still points at its ended catch.
+// E3 keep-env forwarding leaves Fail at the call (§2.10.8).
 main = () {
-	r : Result((Int) -> Nil, Int) = failure.catch(() {
-		control.keep_env((x : Int) { failure.raise(x) })
+	r : Result((Int) -> Nil, Int) = fail.catch(() <- (active : Fail(Int)) {
+		(x : Int) { active.raise(x) }
 	})
 	r |> (Ok(k)) { k(1) } | (Error(_)) { Nil }
 }

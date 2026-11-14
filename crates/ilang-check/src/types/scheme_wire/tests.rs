@@ -282,7 +282,6 @@ fn scheme_coverage_preserves_handlers_through_union_row_instantiation() {
         let root = Ty::Fn(Box::new(FnTy::new(
             vec![],
             Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
-            Ty::Never,
             row,
         )));
         let scheme = Scheme { level: 0, ty: root };
@@ -325,7 +324,6 @@ fn output_only_environment_can_choose_an_empty_row() {
         let root = Ty::Fn(Box::new(FnTy::new(
             vec![],
             Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
-            Ty::Never,
             Ty::Var(row),
         )));
         let scheme = Scheme { level: 0, ty: root };
@@ -366,16 +364,10 @@ fn scheme_comparison_detects_hidden_service_form_counterexample() {
         ));
         solver.has_handlers = true;
         let result = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
-        let body = Ty::Fn(Box::new(FnTy::new(
-            vec![],
-            result.clone(),
-            Ty::Never,
-            Ty::Var(row),
-        )));
+        let body = Ty::Fn(Box::new(FnTy::new(vec![], result.clone(), Ty::Var(row))));
         let root = Ty::Fn(Box::new(FnTy::new(
             vec![(Some("body".into()), body)],
             result,
-            Ty::Never,
             Ty::Var(row),
         )));
         let scheme = Scheme { level: 0, ty: root };

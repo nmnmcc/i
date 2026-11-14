@@ -72,6 +72,7 @@ fn first_difference(a: &[u8], b: &[u8]) -> String {
 
 fn check_project(name: &str, project: &Path) {
     let dir = tempfile::tempdir().unwrap();
+    // These examples need platform IO/network services, supplied by nodejs (E5).
     for opt in ["0", "2"] {
         let build = |tag: &str| {
             let out = dir.path().join(format!("{name}-{opt}-{tag}.wasm"));
@@ -79,7 +80,7 @@ fn check_project(name: &str, project: &Path) {
                 &[
                     "build",
                     "--target",
-                    "host",
+                    "nodejs",
                     "--opt",
                     opt,
                     "--out",

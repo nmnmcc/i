@@ -65,14 +65,14 @@ For files, pass the runner a JSON options argument with `preopens`, `args`, and 
 ## Host export
 
 ```sh
-i build --target host --opt 2
+i build --target nodejs --opt 2
 ```
 
 ```text
 built ./build/guide_interop.wasm
 ```
 
-This replaces the WASI module and writes `build/guide_interop.bindings.json`; use separate `--out` paths to retain both targets.
+The `nodejs` target supplies standard IO. This replaces the WASI module and writes `build/guide_interop.bindings.json`; use separate `--out` paths to retain both targets.
 
 ```sh
 cat > host.mjs <<'EOF'

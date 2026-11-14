@@ -16,8 +16,8 @@ VALUES = ['a', 'ab', 'b', 'c', '']
 PATTERNS = ['"a"', '"ab"', '"b"', "_ : String - \"a\"", "_ : String - \"ab\" - \"b\"", '"a" <> _', '_', "_ : { \"a\" | \"b\" }"]
 BOOLS = ['True', 'False', '_']
 RULES = {
-    'coverage': 'docs/spec.md §7.4: A clause with a guard is not counted.',
-    'runtime': 'docs/spec.md §6.12: it takes the first clause whose pattern matches the value and whose guard, if there is one, is True',
+    'coverage': 'docs/spec.md §7.4: A branch with a guard is not counted.',
+    'runtime': 'docs/spec.md §6.12: the first branch whose parameter group matches the data and whose guard, if it has one, is True is taken',
     'literal': 'docs/spec.md §4.2: Values are never changed, so a literal type is never made wider',
     'value': 'docs/spec.md §2.5: It only orders type inference',
     'annotation': 'docs/spec.md §4.7: For every binding, the compiler must find the principal type: the most general type, of which every other possible type is an instance.',
