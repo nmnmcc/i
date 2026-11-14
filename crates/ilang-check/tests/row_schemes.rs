@@ -870,3 +870,119 @@ fn named_function_provider_keeps_call_and_binding_diagnostics() {
         graph.sources.render_all(&diags)
     );
 }
+
+#[test]
+fn an_error_alias_uses_an_ordinary_value_parameter_after_e3() {
+    // §9.3 declares Fail(E) as ordinary data; E is not a need row. The
+    // corpus negative retains its row-kind intent with Row(N) <- N.
+    let row =
+        include_str!("../../../tests/review/cases/review-k4-lane/alias_kind_error/src/main.i");
+    let value = row.replace("Row(N) = () <- N -> Nil", "Row(N) = () <- (Fail(N)) -> Nil");
+    let shown = types(&value);
+    assert!(shown["app/main.bad"].contains("Fail("), "{shown:?}");
+    assert!(
+        shown["app/main.bad"].contains("Svc(Int | Nil)"),
+        "{shown:?}"
+    );
+    let (graph, _, diags) = common::check_files(&[("src/main.i", row)]);
+    assert!(
+        diags.iter().any(|d| d.code == "E0515"),
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}
+
+#[test]
+fn unused_service_heads_remove_only_universal_need_forms() {
+    // §9.2 removes a form satisfied by every value of its constructor.
+    // A one-sided row argument can reach that form only while unused;
+    // invoking the service still retains S and the missing-entry error.
+    for source in [
+        include_str!("../../../tests/review/cases/review-k4s/min_main_3_0/src/main.i"),
+        include_str!("../../../tests/review/cases/review-k4s/min_main_5_0/src/main.i"),
+    ] {
+        assert_eq!(types(source)["app/main.main"], "() -> Nil");
+    }
+    let used = types(include_str!(
+        "../../../tests/review/cases/review-k4s/min_main_6_0/src/main.i"
+    ));
+    assert!(used["app/main.main"].contains("S("), "{used:?}");
+}
+
+#[test]
+fn corpus_entry_errors_name_each_unprovided_service_once() {
+    // §2.10.11 replaces the planner's aggregate open-row error by the
+    // target's concrete missing keys. Repeated E0523 codes are distinct
+    // errors for S and T, not duplicate reports of one service.
+    for (source, expected) in [
+        (
+            include_str!(
+                "../../../tests/review/cases/review-k4d/_loose/fuzz/e0505/21_160/src/main.i"
+            ),
+            vec!["S", "T"],
+        ),
+        (
+            include_str!(
+                "../../../tests/review/cases/review-k4d/_loose/fuzz/e0505/21_243/src/main.i"
+            ),
+            vec!["S", "T"],
+        ),
+        (
+            include_str!(
+                "../../../tests/review/cases/review-k4d/_loose/fuzz/e0505/21_135/src/main.i"
+            ),
+            vec!["Dep", "S", "T"],
+        ),
+    ] {
+        let (graph, _, diags) = common::check_files(&[("src/main.i", source)]);
+        assert!(
+            !diags.iter().any(|d| d.is_error()),
+            "{:?}",
+            graph.sources.render_all(&diags)
+        );
+        let checked = ilang_check::check(&graph);
+        let program = checked.program.unwrap();
+        let typed = checked.types.unwrap();
+        let module = common::module(&program, "app/main");
+        let index = program
+            .module(module)
+            .defs
+            .iter()
+            .position(|d| d.name == "main")
+            .unwrap();
+        let entry = ilang_check::hir::DefId {
+            module,
+            index: index as u32,
+        };
+        let errors = ilang_check::platform::stub(
+            &program,
+            &typed,
+            entry,
+            ilang_check::platform::Target::Native,
+        )
+        .unwrap_err();
+        assert_eq!(errors.len(), expected.len(), "{errors:?}");
+        for (error, name) in errors.iter().zip(expected) {
+            assert_eq!(error.code, "E0523");
+            assert!(
+                error.message.contains(&format!("`app/main.{name}`")),
+                "{errors:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_vendored_sink_marker_keeps_its_row_invariant() {
+    // The old (N) -> Nil marker used a row as an ordinary value. Moving N
+    // into a callback need must retain the marker's opposite variance.
+    let source = "Dep = ()\nOther = ()\nSink(N) = (() <- N -> Nil, (() <- N -> Nil) -> Nil)\nmake = <N>(send: () <- N -> Nil) -> Sink(N) { Sink(send, (_: () <- N -> Nil) { Nil }) }\n";
+    types(source);
+    let bad = format!("{source}widen = (sink: Sink(Dep)) -> Sink(Dep | Other) {{ sink }}\n");
+    let (graph, _, diags) = common::check_files(&[("src/main.i", &bad)]);
+    assert!(
+        diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&diags)
+    );
+}

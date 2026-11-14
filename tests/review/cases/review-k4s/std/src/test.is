@@ -39,8 +39,13 @@
        (-> (, [statement .. rest]) _
          (|>
           statement
-          (| (-> (, `(! ~service ~value)) _
+          (| (-> (, `(! ~.._parts)) _
                (suite_items prefix rest (append env [statement])))
+            (-> (, `(= ~head ~value)) _
+              (suite_items prefix rest (append env [statement])))
+            (-> (, `{~..children}) _
+              (append (suite_items prefix children env)
+                      (suite_items prefix rest env)))
             (-> (, `(suite ~name (-> (,) _ {~..children}))) _
               (append
                (suite_items (<> (<> prefix (text name)) " / ") children env)

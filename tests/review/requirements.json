@@ -3747,6 +3747,86 @@
       ],
       "finding": "E6 main integration: The incompatible Svc(String)/Svc(Int) provider obligation must remain rejected.",
       "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review\\-k4s/min_main_3_0$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.main : () -> Nil"
+      ],
+      "finding": "E3/E6 corpus audit: an unused one-sided service form is universal and its need is removed.",
+      "source": "docs/spec.md §9.2: An entry that every value of its type constructor satisfies, as Fail(Never), is removed. §4.7 type simplification preserves meaning. See docs/design/effects-e3-e6-corpus.md R4."
+    },
+    {
+      "pattern": "^review\\-k4s/min_main_5_0$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.main : () -> Nil"
+      ],
+      "finding": "E3/E6 corpus audit: an unused one-sided service form is universal and its need is removed.",
+      "source": "docs/spec.md §9.2: An entry that every value of its type constructor satisfies, as Fail(Never), is removed. §4.7 type simplification preserves meaning. See docs/design/effects-e3-e6-corpus.md R4."
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/fuzz/e0505/21_135$",
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ],
+      "known_failure": false,
+      "types_contain": [
+        "Dep",
+        "S(",
+        "T("
+      ],
+      "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
+      "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
+    },
+    {
+      "pattern": "^review\\-k4s/min_main_6_0$",
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ],
+      "known_failure": false,
+      "types_contain": [
+        "S("
+      ],
+      "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
+      "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/fuzz/e0505/21_160$",
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ],
+      "known_failure": false,
+      "types_contain": [
+        "S(",
+        "T("
+      ],
+      "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
+      "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/fuzz/e0505/21_243$",
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ],
+      "known_failure": false,
+      "types_contain": [
+        "S(",
+        "T("
+      ],
+      "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
+      "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
     }
   ],
   "transitions": [
