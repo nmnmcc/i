@@ -1,6 +1,6 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "96fd9a8c1dc83fdee1006c1bba00da617d8b4d5d",
+  "binary_sha256": "f781e20e36bacf18802d7e4393cc00921da272335352d671eeebfc065d4bb249",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never); needs app/main.S(Never)\n1 error\n"
+      "stderr": "src/main.i:7:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never); needs app/main.S(Never)\n1 error\n"
+      "stderr": "src/main.i:7:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never); needs app/main.S(Never)\n1 error\n"
+      "stderr": "src/main.i:7:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:1: error[E0523]: provider target native entry app/main.main: missing service app/main.S(Never); needs app/main.S(Never)\n1 error\n"
+      "stderr": "src/main.i:7:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
     }
   }
 }

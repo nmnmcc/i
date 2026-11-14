@@ -160,14 +160,17 @@ requested corpus integration is green.
 Every listed observation has equal phase sets, phase exits, diagnostic code
 multisets (including duplicate counts), and runtime stdout. Only the checker
 types or diagnostic text change. Groups overlap. The original coordinator
-run has 919 display-only cases; this checkpoint records the first 33 after
+run has 919 display-only cases; this checkpoint records 586 after
 complete bounded reruns. Remaining per-group runs are still in progress.
+CPU-censored observations retain their old baselines and are not counted
+as completed display-only reruns.
 
 | Group | Cases so far | Exact displayed change and controlling paragraph |
 |---|---:|---|
-| D1 | 27 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain, and the redundant independently generalized error variable disappears. R1 (syntax-three §6.1); any subsequent variable renumbering follows §4.7. |
-| D2 | 2 | Directed residual-need simplification: e.g. `(Sink(A, N), ..N)` becomes `(Sink(A, Never))` for a pure stored callback; error variables are ordinary arguments and may be renamed E → A. The Sink key and entry rejection remain. R1 and spec §4.7 simplification / §9.2 directed satisfaction. |
-| D4 | 14 | E5 replaces `provider target native … missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 count, site and failing phases. R6 (§2.10.11). |
+| D1 | 562 | Opaque callbacks keep one need: `(Fail(E), ..N)` becomes `N`; known service keys remain. Merging two callbacks combines their whole rows, without a separate `Fail(E | E2)` carrier. R1 (syntax-three §6.1); subsequent variable renumbering follows §4.7. |
+| D2 | 99 | Directed bounds are shown without redundant variables: read-only `S(N & A)` becomes `S(N)`; a consumer of argument `A` needs `S(A)` rather than a separate bound `S(B)`; a pure stored callback closes its residual N to Never. Inferred E/A labels can change. Spec §4.7 simplification, §4.5 rule 4 needs direction, §9.2 provider subtyping; R1 removes the independent error bounds. |
+| D4 | 202 | E5 replaces planner messages such as `missing service S(Never)` or `service A must be closed` with the concrete constructor-key message `S is not provided by the target native`. Same E0523 multiset, source sites and failing phases. R6 (§2.10.11). |
+| D5 | 3 | Recovery diagnostics retain a known String argument: `S(_, _)` becomes `S(String, _)` against the same incompatible `S(1, Never)`. Same E0515 site and invariant mismatch; ordinary incoming bounds survive single-row inference. R1, spec §4.7 monomorphic variables show their incoming types, §4.5 rule 4 and §9.2. |
 
 One line per reviewed case:
 
@@ -206,3 +209,556 @@ One line per reviewed case:
 | `review-k4-lane/w4-Never` | D1 |
 | `review-k4-lane/w5-Dep` | D1 |
 | `review-k4-lane/w5-Never` | D1 |
+| `review-k4/cases/conflict_2046229799906290556` | D1 |
+| `review-k4/cases/conflict_3995797194752417745` | D1 |
+| `review-k4/cases/conflict_4688151140569818353` | D1 |
+| `review-k4/cases/conflict_4759503553685934015` | D1 |
+| `review-k4/cases/conflict_5003292184701381503` | D1 |
+| `review-k4/cases/conflict_7401424894349461812` | D1 |
+| `review-k4/cases/finite` | D1 |
+| `review-k4/cases/generic_conflict` | D1, D2 |
+| `review-k4/cases/hidden_conflict` | D1 |
+| `review-k4/cases/invariant_args` | D1 |
+| `review-k4/cases/local_instances_toprun` | D1 |
+| `review-k4/cases/matrix_False_False_False` | D1, D2 |
+| `review-k4/cases/matrix_False_False_False_reverse` | D1, D2 |
+| `review-k4/cases/matrix_False_False_True` | D1, D2 |
+| `review-k4/cases/matrix_False_False_True_reverse` | D1, D2 |
+| `review-k4/cases/matrix_False_True_False` | D1, D2 |
+| `review-k4/cases/matrix_False_True_False_reverse` | D1, D2 |
+| `review-k4/cases/matrix_False_True_True` | D1, D2 |
+| `review-k4/cases/matrix_False_True_True_reverse` | D1, D2 |
+| `review-k4/cases/matrix_True_False_False` | D1 |
+| `review-k4/cases/matrix_True_False_False_reverse` | D1 |
+| `review-k4/cases/matrix_True_False_True` | D1 |
+| `review-k4/cases/matrix_True_False_True_reverse` | D1 |
+| `review-k4/cases/matrix_True_True_False` | D1 |
+| `review-k4/cases/matrix_True_True_False_reverse` | D1 |
+| `review-k4/cases/matrix_True_True_True` | D1 |
+| `review-k4/cases/matrix_True_True_True_reverse` | D1 |
+| `review-k4/cases/multi` | D1 |
+| `review-k4/cases/new_unsound_annotated` | D1, D2, D5 |
+| `review-k4/cases/new_unsound_closure` | D1, D2, D5 |
+| `review-k4/cases/new_unsound_direct` | D1, D2, D5 |
+| `review-k4/cases/provision_closure_False` | D1 |
+| `review-k4/cases/provision_closure_True` | D1 |
+| `review-k4/cases/provision_direct_False` | D1 |
+| `review-k4/cases/provision_direct_True` | D1 |
+| `review-k4/cases/provision_explicit_contract` | D1 |
+| `review-k4/cases/provision_helper_False` | D1 |
+| `review-k4/cases/provision_inferred_False` | D1 |
+| `review-k4/cases/provision_inferred_True` | D1 |
+| `review-k4/cases/provision_marker` | D1 |
+| `review-k4/cases/wrapper_0_False_False` | D1 |
+| `review-k4/cases/wrapper_0_False_True` | D1 |
+| `review-k4/cases/wrapper_0_True_False` | D1 |
+| `review-k4/cases/wrapper_0_True_True` | D1 |
+| `review-k4/cases/wrapper_10_False_False` | D1 |
+| `review-k4/cases/wrapper_10_False_True` | D1 |
+| `review-k4/cases/wrapper_10_True_False` | D1 |
+| `review-k4/cases/wrapper_10_True_True` | D1 |
+| `review-k4/cases/wrapper_11_False_False` | D1 |
+| `review-k4/cases/wrapper_11_False_True` | D1 |
+| `review-k4/cases/wrapper_11_True_False` | D1 |
+| `review-k4/cases/wrapper_11_True_True` | D1 |
+| `review-k4/cases/wrapper_1_False_False` | D1 |
+| `review-k4/cases/wrapper_1_False_True` | D1 |
+| `review-k4/cases/wrapper_1_True_False` | D1 |
+| `review-k4/cases/wrapper_1_True_True` | D1 |
+| `review-k4/cases/wrapper_2_False_False` | D1 |
+| `review-k4/cases/wrapper_2_False_True` | D1 |
+| `review-k4/cases/wrapper_2_True_False` | D1 |
+| `review-k4/cases/wrapper_2_True_True` | D1 |
+| `review-k4/cases/wrapper_3_False_False` | D1 |
+| `review-k4/cases/wrapper_3_False_True` | D1 |
+| `review-k4/cases/wrapper_3_True_False` | D1 |
+| `review-k4/cases/wrapper_3_True_True` | D1 |
+| `review-k4/cases/wrapper_4_False_False` | D1 |
+| `review-k4/cases/wrapper_4_False_True` | D1 |
+| `review-k4/cases/wrapper_4_True_False` | D1 |
+| `review-k4/cases/wrapper_4_True_True` | D1 |
+| `review-k4/cases/wrapper_5_False_False` | D1 |
+| `review-k4/cases/wrapper_5_False_True` | D1 |
+| `review-k4/cases/wrapper_5_True_False` | D1 |
+| `review-k4/cases/wrapper_5_True_True` | D1 |
+| `review-k4/cases/wrapper_6_False_False` | D1 |
+| `review-k4/cases/wrapper_6_False_True` | D1 |
+| `review-k4/cases/wrapper_6_True_False` | D1 |
+| `review-k4/cases/wrapper_6_True_True` | D1 |
+| `review-k4/cases/wrapper_7_False_False` | D1 |
+| `review-k4/cases/wrapper_7_False_True` | D1 |
+| `review-k4/cases/wrapper_7_True_False` | D1 |
+| `review-k4/cases/wrapper_7_True_True` | D1 |
+| `review-k4/cases/wrapper_8_False_False` | D1 |
+| `review-k4/cases/wrapper_8_False_True` | D1 |
+| `review-k4/cases/wrapper_8_True_False` | D1 |
+| `review-k4/cases/wrapper_8_True_True` | D1 |
+| `review-k4/cases/wrapper_9_False_False` | D1 |
+| `review-k4/cases/wrapper_9_False_True` | D1 |
+| `review-k4/cases/wrapper_9_True_False` | D1 |
+| `review-k4/cases/wrapper_9_True_True` | D1 |
+| `review-k4/perf/generic_chain_1024` | D1 |
+| `review-k4/perf/generic_chain_128` | D1 |
+| `review-k4/perf/generic_chain_2048` | D1 |
+| `review-k4/perf/generic_chain_256` | D1 |
+| `review-k4/perf/generic_chain_512` | D1 |
+| `review-k4/perf/generic_chain_64` | D1 |
+| `review-k4/perf/plain_chain_1024` | D1 |
+| `review-k4/perf/plain_chain_128` | D1 |
+| `review-k4/perf/plain_chain_2048` | D1 |
+| `review-k4/perf/plain_chain_256` | D1 |
+| `review-k4/perf/plain_chain_512` | D1 |
+| `review-k4/perf/plain_chain_64` | D1 |
+| `review-k4/perf/wide_generic_1024` | D1, D2 |
+| `review-k4/perf/wide_generic_128` | D1, D2 |
+| `review-k4/perf/wide_generic_2048` | D1, D2 |
+| `review-k4/perf/wide_generic_256` | D1, D2 |
+| `review-k4/perf/wide_generic_512` | D1, D2 |
+| `review-k4/perf/wide_generic_64` | D1, D2 |
+| `review-k4c/cases/annotation_0` | D2 |
+| `review-k4c/cases/annotation_1` | D2 |
+| `review-k4c/cases/annotation_2` | D2 |
+| `review-k4c/cases/annotation_3` | D2 |
+| `review-k4c/cases/closure_statement` | D1, D4 |
+| `review-k4c/cases/closure_statement_ok` | D1 |
+| `review-k4c/cases/co_callback` | D1, D2 |
+| `review-k4c/cases/co_deep` | D2 |
+| `review-k4c/cases/co_direct` | D2 |
+| `review-k4c/cases/co_escape` | D2 |
+| `review-k4c/cases/co_higher` | D1, D2 |
+| `review-k4c/cases/co_local` | D2 |
+| `review-k4c/cases/co_nested` | D1, D2 |
+| `review-k4c/cases/contra_callback` | D1 |
+| `review-k4c/cases/contra_deep` | D2 |
+| `review-k4c/cases/contra_escape` | D2 |
+| `review-k4c/cases/contra_exploit` | D2 |
+| `review-k4c/cases/contra_higher` | D1, D2 |
+| `review-k4c/cases/contra_local` | D2 |
+| `review-k4c/cases/contra_local_good` | D2 |
+| `review-k4c/cases/contra_nested` | D1 |
+| `review-k4c/cases/effects_co_0_0` | D1 |
+| `review-k4c/cases/effects_co_0_1` | D1 |
+| `review-k4c/cases/effects_co_1_0` | D1, D2 |
+| `review-k4c/cases/effects_co_1_1` | D1 |
+| `review-k4c/cases/effects_co_2_0` | D1, D2 |
+| `review-k4c/cases/effects_co_2_1` | D1 |
+| `review-k4c/cases/effects_co_3_0` | D1 |
+| `review-k4c/cases/effects_co_3_1` | D1 |
+| `review-k4c/cases/effects_co_4_0` | D1, D2 |
+| `review-k4c/cases/effects_co_4_1` | D1 |
+| `review-k4c/cases/effects_co_5_0` | D1 |
+| `review-k4c/cases/effects_co_5_1` | D1 |
+| `review-k4c/cases/effects_co_6_0` | D1, D2 |
+| `review-k4c/cases/effects_co_6_1` | D1 |
+| `review-k4c/cases/effects_co_7_0` | D1, D2 |
+| `review-k4c/cases/effects_co_7_1` | D1 |
+| `review-k4c/cases/effects_inv_0_0` | D1 |
+| `review-k4c/cases/effects_inv_0_1` | D1 |
+| `review-k4c/cases/effects_inv_1_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_1_1` | D1 |
+| `review-k4c/cases/effects_inv_2_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_2_1` | D1 |
+| `review-k4c/cases/effects_inv_3_0` | D1 |
+| `review-k4c/cases/effects_inv_3_1` | D1 |
+| `review-k4c/cases/effects_inv_4_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_4_1` | D1 |
+| `review-k4c/cases/effects_inv_5_0` | D1 |
+| `review-k4c/cases/effects_inv_5_1` | D1 |
+| `review-k4c/cases/effects_inv_6_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_6_1` | D1 |
+| `review-k4c/cases/effects_inv_7_0` | D1, D2 |
+| `review-k4c/cases/effects_inv_7_1` | D1 |
+| `review-k4c/cases/effects_two_0_0` | D1 |
+| `review-k4c/cases/effects_two_0_1` | D1 |
+| `review-k4c/cases/effects_two_1_0` | D1, D2 |
+| `review-k4c/cases/effects_two_1_1` | D1 |
+| `review-k4c/cases/effects_two_2_0` | D1, D2 |
+| `review-k4c/cases/effects_two_2_1` | D1 |
+| `review-k4c/cases/effects_two_3_0` | D1 |
+| `review-k4c/cases/effects_two_3_1` | D1 |
+| `review-k4c/cases/effects_two_4_0` | D1, D2 |
+| `review-k4c/cases/effects_two_4_1` | D1 |
+| `review-k4c/cases/effects_two_5_0` | D1 |
+| `review-k4c/cases/effects_two_5_1` | D1 |
+| `review-k4c/cases/effects_two_6_0` | D1, D2 |
+| `review-k4c/cases/effects_two_6_1` | D1 |
+| `review-k4c/cases/effects_two_7_0` | D1, D2 |
+| `review-k4c/cases/effects_two_7_1` | D1 |
+| `review-k4c/cases/finite_field_0` | D1 |
+| `review-k4c/cases/finite_field_1` | D1 |
+| `review-k4c/cases/finite_field_2` | D1 |
+| `review-k4c/cases/finite_field_3` | D1 |
+| `review-k4c/cases/finite_field_4` | D1 |
+| `review-k4c/cases/finite_field_annot_0` | D1 |
+| `review-k4c/cases/finite_field_annot_1` | D1 |
+| `review-k4c/cases/finite_field_annot_2` | D1 |
+| `review-k4c/cases/finite_field_annot_3` | D1 |
+| `review-k4c/cases/finite_field_annot_4` | D1 |
+| `review-k4c/cases/finite_pattern_0` | D1 |
+| `review-k4c/cases/finite_pattern_1` | D1 |
+| `review-k4c/cases/finite_pattern_2` | D1 |
+| `review-k4c/cases/finite_pattern_3` | D1 |
+| `review-k4c/cases/finite_pattern_4` | D1 |
+| `review-k4c/cases/inv_callback` | D1 |
+| `review-k4c/cases/inv_higher` | D1 |
+| `review-k4c/cases/inv_nested` | D1 |
+| `review-k4c/cases/missing_0_0_0_0` | D1, D4 |
+| `review-k4c/cases/missing_0_0_0_1` | D1, D4 |
+| `review-k4c/cases/missing_0_0_0_2` | D1, D4 |
+| `review-k4c/cases/missing_0_0_1_0` | D1, D4 |
+| `review-k4c/cases/missing_0_0_1_1` | D1, D4 |
+| `review-k4c/cases/missing_0_0_1_2` | D1, D4 |
+| `review-k4c/cases/missing_0_1_0_0` | D1, D4 |
+| `review-k4c/cases/missing_0_1_0_1` | D1, D4 |
+| `review-k4c/cases/missing_0_1_0_2` | D1, D4 |
+| `review-k4c/cases/missing_0_1_1_0` | D1, D4 |
+| `review-k4c/cases/missing_0_1_1_1` | D1, D4 |
+| `review-k4c/cases/missing_0_1_1_2` | D1, D4 |
+| `review-k4c/cases/missing_0_2_0_0` | D1, D4 |
+| `review-k4c/cases/missing_0_2_0_1` | D1, D4 |
+| `review-k4c/cases/missing_0_2_0_2` | D1, D4 |
+| `review-k4c/cases/missing_0_2_1_0` | D1, D4 |
+| `review-k4c/cases/missing_0_2_1_1` | D1, D4 |
+| `review-k4c/cases/missing_0_2_1_2` | D1, D4 |
+| `review-k4c/cases/missing_0_3_0_0` | D1, D4 |
+| `review-k4c/cases/missing_0_3_0_1` | D1, D4 |
+| `review-k4c/cases/missing_0_3_0_2` | D1, D4 |
+| `review-k4c/cases/missing_0_3_1_0` | D1, D4 |
+| `review-k4c/cases/missing_0_3_1_1` | D1, D4 |
+| `review-k4c/cases/missing_0_3_1_2` | D1, D4 |
+| `review-k4c/cases/missing_0_4_0_0` | D1, D2, D4 |
+| `review-k4c/cases/missing_0_4_0_1` | D1, D2, D4 |
+| `review-k4c/cases/missing_0_4_0_2` | D1, D2, D4 |
+| `review-k4c/cases/missing_0_4_1_0` | D1, D4 |
+| `review-k4c/cases/missing_0_4_1_1` | D1, D4 |
+| `review-k4c/cases/missing_0_4_1_2` | D1, D4 |
+| `review-k4c/cases/missing_0_5_0_0` | D1, D4 |
+| `review-k4c/cases/missing_0_5_0_1` | D1, D4 |
+| `review-k4c/cases/missing_0_5_0_2` | D1, D4 |
+| `review-k4c/cases/missing_0_5_1_0` | D1, D4 |
+| `review-k4c/cases/missing_0_5_1_1` | D1, D4 |
+| `review-k4c/cases/missing_0_5_1_2` | D1, D4 |
+| `review-k4c/cases/missing_0_6_0_0` | D1, D4 |
+| `review-k4c/cases/missing_0_6_0_1` | D1, D4 |
+| `review-k4c/cases/missing_0_6_0_2` | D1, D4 |
+| `review-k4c/cases/missing_0_6_1_0` | D1, D4 |
+| `review-k4c/cases/missing_0_6_1_1` | D1, D4 |
+| `review-k4c/cases/missing_0_6_1_2` | D1, D4 |
+| `review-k4c/cases/missing_0_7_0_0` | D1, D4 |
+| `review-k4c/cases/missing_0_7_0_1` | D1, D4 |
+| `review-k4c/cases/missing_0_7_0_2` | D1, D4 |
+| `review-k4c/cases/missing_0_7_1_0` | D1, D4 |
+| `review-k4c/cases/missing_0_7_1_1` | D1, D4 |
+| `review-k4c/cases/missing_0_7_1_2` | D1, D4 |
+| `review-k4c/cases/missing_1_0_0_0` | D1, D4 |
+| `review-k4c/cases/missing_1_0_0_1` | D1, D4 |
+| `review-k4c/cases/missing_1_0_0_2` | D1, D4 |
+| `review-k4c/cases/missing_1_0_1_0` | D1, D4 |
+| `review-k4c/cases/missing_1_0_1_1` | D1, D4 |
+| `review-k4c/cases/missing_1_0_1_2` | D1, D4 |
+| `review-k4c/cases/missing_1_1_0_0` | D1, D4 |
+| `review-k4c/cases/missing_1_1_0_1` | D1, D4 |
+| `review-k4c/cases/missing_1_1_0_2` | D1, D4 |
+| `review-k4c/cases/missing_1_1_1_0` | D1, D4 |
+| `review-k4c/cases/missing_1_1_1_1` | D1, D4 |
+| `review-k4c/cases/missing_1_1_1_2` | D1, D4 |
+| `review-k4c/cases/missing_1_2_0_0` | D1, D4 |
+| `review-k4c/cases/missing_1_2_0_1` | D1, D4 |
+| `review-k4c/cases/missing_1_2_0_2` | D1, D4 |
+| `review-k4c/cases/missing_1_2_1_0` | D1, D4 |
+| `review-k4c/cases/missing_1_2_1_1` | D1, D4 |
+| `review-k4c/cases/missing_1_2_1_2` | D1, D4 |
+| `review-k4c/cases/missing_1_3_0_0` | D1, D4 |
+| `review-k4c/cases/missing_1_3_0_1` | D1, D4 |
+| `review-k4c/cases/missing_1_3_0_2` | D1, D4 |
+| `review-k4c/cases/missing_1_3_1_0` | D1, D4 |
+| `review-k4c/cases/missing_1_3_1_1` | D1, D4 |
+| `review-k4c/cases/missing_1_3_1_2` | D1, D4 |
+| `review-k4c/cases/missing_1_4_0_0` | D1, D4 |
+| `review-k4c/cases/missing_1_4_0_1` | D1, D4 |
+| `review-k4c/cases/missing_1_4_0_2` | D1, D4 |
+| `review-k4c/cases/missing_1_4_1_0` | D1, D4 |
+| `review-k4c/cases/missing_1_4_1_1` | D1, D4 |
+| `review-k4c/cases/missing_1_4_1_2` | D1, D4 |
+| `review-k4c/cases/missing_1_5_0_0` | D1, D4 |
+| `review-k4c/cases/missing_1_5_0_1` | D1, D4 |
+| `review-k4c/cases/missing_1_5_0_2` | D1, D4 |
+| `review-k4c/cases/missing_1_5_1_0` | D1, D4 |
+| `review-k4c/cases/missing_1_5_1_1` | D1, D4 |
+| `review-k4c/cases/missing_1_5_1_2` | D1, D4 |
+| `review-k4c/cases/missing_1_6_0_0` | D1, D4 |
+| `review-k4c/cases/missing_1_6_0_1` | D1, D4 |
+| `review-k4c/cases/missing_1_6_0_2` | D1, D4 |
+| `review-k4c/cases/missing_1_6_1_0` | D1, D4 |
+| `review-k4c/cases/missing_1_6_1_1` | D1, D4 |
+| `review-k4c/cases/missing_1_6_1_2` | D1, D4 |
+| `review-k4c/cases/missing_1_7_0_0` | D1, D4 |
+| `review-k4c/cases/missing_1_7_0_1` | D1, D4 |
+| `review-k4c/cases/missing_1_7_0_2` | D1, D4 |
+| `review-k4c/cases/missing_1_7_1_0` | D1, D4 |
+| `review-k4c/cases/missing_1_7_1_1` | D1, D4 |
+| `review-k4c/cases/missing_1_7_1_2` | D1, D4 |
+| `review-k4c/cases/missing_2_0_0_0` | D1, D4 |
+| `review-k4c/cases/missing_2_0_0_1` | D1, D4 |
+| `review-k4c/cases/missing_2_0_0_2` | D1, D4 |
+| `review-k4c/cases/missing_2_0_1_0` | D1, D4 |
+| `review-k4c/cases/missing_2_0_1_1` | D1, D4 |
+| `review-k4c/cases/missing_2_0_1_2` | D1, D4 |
+| `review-k4c/cases/missing_2_1_0_0` | D1, D4 |
+| `review-k4c/cases/missing_2_1_0_1` | D1, D4 |
+| `review-k4c/cases/missing_2_1_0_2` | D1, D4 |
+| `review-k4c/cases/missing_2_1_1_0` | D1, D4 |
+| `review-k4c/cases/missing_2_1_1_1` | D1, D4 |
+| `review-k4c/cases/missing_2_1_1_2` | D1, D4 |
+| `review-k4c/cases/missing_2_2_0_0` | D1, D4 |
+| `review-k4c/cases/missing_2_2_0_1` | D1, D4 |
+| `review-k4c/cases/missing_2_2_0_2` | D1, D4 |
+| `review-k4c/cases/missing_2_2_1_0` | D1, D4 |
+| `review-k4c/cases/missing_2_2_1_1` | D1, D4 |
+| `review-k4c/cases/missing_2_2_1_2` | D1, D4 |
+| `review-k4c/cases/missing_2_3_0_0` | D1, D4 |
+| `review-k4c/cases/missing_2_3_0_1` | D1, D4 |
+| `review-k4c/cases/missing_2_3_0_2` | D1, D4 |
+| `review-k4c/cases/missing_2_3_1_0` | D1, D4 |
+| `review-k4c/cases/missing_2_3_1_1` | D1, D4 |
+| `review-k4c/cases/missing_2_3_1_2` | D1, D4 |
+| `review-k4c/cases/missing_2_4_0_0` | D1, D2, D4 |
+| `review-k4c/cases/missing_2_4_0_1` | D1, D2, D4 |
+| `review-k4c/cases/missing_2_4_0_2` | D1, D2, D4 |
+| `review-k4c/cases/missing_2_4_1_0` | D1, D4 |
+| `review-k4c/cases/missing_2_4_1_1` | D1, D4 |
+| `review-k4c/cases/missing_2_4_1_2` | D1, D4 |
+| `review-k4c/cases/missing_2_5_0_0` | D1, D4 |
+| `review-k4c/cases/missing_2_5_0_1` | D1, D4 |
+| `review-k4c/cases/missing_2_5_0_2` | D1, D4 |
+| `review-k4c/cases/missing_2_5_1_0` | D1, D4 |
+| `review-k4c/cases/missing_2_5_1_1` | D1, D4 |
+| `review-k4c/cases/missing_2_5_1_2` | D1, D4 |
+| `review-k4c/cases/missing_2_6_0_0` | D1, D4 |
+| `review-k4c/cases/missing_2_6_0_1` | D1, D4 |
+| `review-k4c/cases/missing_2_6_0_2` | D1, D4 |
+| `review-k4c/cases/missing_2_6_1_0` | D1, D4 |
+| `review-k4c/cases/missing_2_6_1_1` | D1, D4 |
+| `review-k4c/cases/missing_2_6_1_2` | D1, D4 |
+| `review-k4c/cases/missing_2_7_0_0` | D1, D4 |
+| `review-k4c/cases/missing_2_7_0_1` | D1, D4 |
+| `review-k4c/cases/missing_2_7_0_2` | D1, D4 |
+| `review-k4c/cases/missing_2_7_1_0` | D1, D4 |
+| `review-k4c/cases/missing_2_7_1_1` | D1, D4 |
+| `review-k4c/cases/missing_2_7_1_2` | D1, D4 |
+| `review-k4c/cases/missing_3_0_0_0` | D1, D4 |
+| `review-k4c/cases/missing_3_0_0_1` | D1, D4 |
+| `review-k4c/cases/missing_3_0_0_2` | D1, D4 |
+| `review-k4c/cases/missing_3_0_1_0` | D1, D4 |
+| `review-k4c/cases/missing_3_0_1_1` | D1, D4 |
+| `review-k4c/cases/missing_3_0_1_2` | D1, D4 |
+| `review-k4c/cases/missing_3_1_0_0` | D1, D4 |
+| `review-k4c/cases/missing_3_1_0_1` | D1, D4 |
+| `review-k4c/cases/missing_3_1_0_2` | D1, D4 |
+| `review-k4c/cases/missing_3_1_1_0` | D1, D4 |
+| `review-k4c/cases/missing_3_1_1_1` | D1, D4 |
+| `review-k4c/cases/missing_3_1_1_2` | D1, D4 |
+| `review-k4c/cases/missing_3_2_0_0` | D1, D4 |
+| `review-k4c/cases/missing_3_2_0_1` | D1, D4 |
+| `review-k4c/cases/missing_3_2_0_2` | D1, D4 |
+| `review-k4c/cases/missing_3_2_1_0` | D1, D4 |
+| `review-k4c/cases/missing_3_2_1_1` | D1, D4 |
+| `review-k4c/cases/missing_3_2_1_2` | D1, D4 |
+| `review-k4c/cases/missing_3_3_0_0` | D1, D4 |
+| `review-k4c/cases/missing_3_3_0_1` | D1, D4 |
+| `review-k4c/cases/missing_3_3_0_2` | D1, D4 |
+| `review-k4c/cases/missing_3_3_1_0` | D1, D4 |
+| `review-k4c/cases/missing_3_3_1_1` | D1, D4 |
+| `review-k4c/cases/missing_3_3_1_2` | D1, D4 |
+| `review-k4c/cases/missing_3_4_0_0` | D1 |
+| `review-k4c/cases/missing_3_4_0_1` | D1 |
+| `review-k4c/cases/missing_3_4_0_2` | D1 |
+| `review-k4c/cases/missing_3_4_1_0` | D1 |
+| `review-k4c/cases/missing_3_4_1_1` | D1 |
+| `review-k4c/cases/missing_3_4_1_2` | D1 |
+| `review-k4c/cases/missing_3_5_0_0` | D1, D4 |
+| `review-k4c/cases/missing_3_5_0_1` | D1, D4 |
+| `review-k4c/cases/missing_3_5_0_2` | D1, D4 |
+| `review-k4c/cases/missing_3_5_1_0` | D1, D4 |
+| `review-k4c/cases/missing_3_5_1_1` | D1, D4 |
+| `review-k4c/cases/missing_3_5_1_2` | D1, D4 |
+| `review-k4c/cases/missing_3_6_0_0` | D1, D4 |
+| `review-k4c/cases/missing_3_6_0_1` | D1, D4 |
+| `review-k4c/cases/missing_3_6_0_2` | D1, D4 |
+| `review-k4c/cases/missing_3_6_1_0` | D1, D4 |
+| `review-k4c/cases/missing_3_6_1_1` | D1, D4 |
+| `review-k4c/cases/missing_3_6_1_2` | D1, D4 |
+| `review-k4c/cases/missing_3_7_0_0` | D1, D4 |
+| `review-k4c/cases/missing_3_7_0_1` | D1, D4 |
+| `review-k4c/cases/missing_3_7_0_2` | D1, D4 |
+| `review-k4c/cases/missing_3_7_1_0` | D1, D4 |
+| `review-k4c/cases/missing_3_7_1_1` | D1, D4 |
+| `review-k4c/cases/missing_3_7_1_2` | D1, D4 |
+| `review-k4c/cases/multi_run` | D1 |
+| `review-k4c/cases/nested_env_function` | D1 |
+| `review-k4c/cases/order_hidden_conflict_0` | D1 |
+| `review-k4c/cases/order_hidden_conflict_1` | D1 |
+| `review-k4c/cases/order_hidden_conflict_10` | D1 |
+| `review-k4c/cases/order_hidden_conflict_11` | D1 |
+| `review-k4c/cases/order_hidden_conflict_12` | D1 |
+| `review-k4c/cases/order_hidden_conflict_13` | D1 |
+| `review-k4c/cases/order_hidden_conflict_14` | D1 |
+| `review-k4c/cases/order_hidden_conflict_15` | D1 |
+| `review-k4c/cases/order_hidden_conflict_16` | D1 |
+| `review-k4c/cases/order_hidden_conflict_17` | D1 |
+| `review-k4c/cases/order_hidden_conflict_18` | D1 |
+| `review-k4c/cases/order_hidden_conflict_19` | D1 |
+| `review-k4c/cases/order_hidden_conflict_2` | D1 |
+| `review-k4c/cases/order_hidden_conflict_20` | D1 |
+| `review-k4c/cases/order_hidden_conflict_21` | D1 |
+| `review-k4c/cases/order_hidden_conflict_22` | D1 |
+| `review-k4c/cases/order_hidden_conflict_23` | D1 |
+| `review-k4c/cases/order_hidden_conflict_24` | D1 |
+| `review-k4c/cases/order_hidden_conflict_25` | D1 |
+| `review-k4c/cases/order_hidden_conflict_26` | D1 |
+| `review-k4c/cases/order_hidden_conflict_27` | D1 |
+| `review-k4c/cases/order_hidden_conflict_28` | D1 |
+| `review-k4c/cases/order_hidden_conflict_29` | D1 |
+| `review-k4c/cases/order_hidden_conflict_3` | D1 |
+| `review-k4c/cases/order_hidden_conflict_30` | D1 |
+| `review-k4c/cases/order_hidden_conflict_31` | D1 |
+| `review-k4c/cases/order_hidden_conflict_4` | D1 |
+| `review-k4c/cases/order_hidden_conflict_5` | D1 |
+| `review-k4c/cases/order_hidden_conflict_6` | D1 |
+| `review-k4c/cases/order_hidden_conflict_7` | D1 |
+| `review-k4c/cases/order_hidden_conflict_8` | D1 |
+| `review-k4c/cases/order_hidden_conflict_9` | D1 |
+| `review-k4c/cases/order_multi_instance_0` | D1 |
+| `review-k4c/cases/order_multi_instance_1` | D1 |
+| `review-k4c/cases/order_multi_instance_10` | D1 |
+| `review-k4c/cases/order_multi_instance_11` | D1 |
+| `review-k4c/cases/order_multi_instance_12` | D1 |
+| `review-k4c/cases/order_multi_instance_13` | D1 |
+| `review-k4c/cases/order_multi_instance_14` | D1 |
+| `review-k4c/cases/order_multi_instance_15` | D1 |
+| `review-k4c/cases/order_multi_instance_16` | D1 |
+| `review-k4c/cases/order_multi_instance_17` | D1 |
+| `review-k4c/cases/order_multi_instance_18` | D1 |
+| `review-k4c/cases/order_multi_instance_19` | D1 |
+| `review-k4c/cases/order_multi_instance_2` | D1 |
+| `review-k4c/cases/order_multi_instance_20` | D1 |
+| `review-k4c/cases/order_multi_instance_21` | D1 |
+| `review-k4c/cases/order_multi_instance_22` | D1 |
+| `review-k4c/cases/order_multi_instance_23` | D1 |
+| `review-k4c/cases/order_multi_instance_24` | D1 |
+| `review-k4c/cases/order_multi_instance_25` | D1 |
+| `review-k4c/cases/order_multi_instance_26` | D1 |
+| `review-k4c/cases/order_multi_instance_27` | D1 |
+| `review-k4c/cases/order_multi_instance_28` | D1 |
+| `review-k4c/cases/order_multi_instance_29` | D1 |
+| `review-k4c/cases/order_multi_instance_3` | D1 |
+| `review-k4c/cases/order_multi_instance_30` | D1 |
+| `review-k4c/cases/order_multi_instance_31` | D1 |
+| `review-k4c/cases/order_multi_instance_4` | D1 |
+| `review-k4c/cases/order_multi_instance_5` | D1 |
+| `review-k4c/cases/order_multi_instance_6` | D1 |
+| `review-k4c/cases/order_multi_instance_7` | D1 |
+| `review-k4c/cases/order_multi_instance_8` | D1 |
+| `review-k4c/cases/order_multi_instance_9` | D1 |
+| `review-k4c/cases/order_mutual_0` | D1, D2 |
+| `review-k4c/cases/order_mutual_1` | D1, D2 |
+| `review-k4c/cases/order_mutual_10` | D1, D2 |
+| `review-k4c/cases/order_mutual_11` | D1, D2 |
+| `review-k4c/cases/order_mutual_12` | D1, D2 |
+| `review-k4c/cases/order_mutual_13` | D1, D2 |
+| `review-k4c/cases/order_mutual_14` | D1, D2 |
+| `review-k4c/cases/order_mutual_15` | D1, D2 |
+| `review-k4c/cases/order_mutual_16` | D1, D2 |
+| `review-k4c/cases/order_mutual_17` | D1, D2 |
+| `review-k4c/cases/order_mutual_18` | D1, D2 |
+| `review-k4c/cases/order_mutual_19` | D1, D2 |
+| `review-k4c/cases/order_mutual_2` | D1, D2 |
+| `review-k4c/cases/order_mutual_20` | D1, D2 |
+| `review-k4c/cases/order_mutual_21` | D1, D2 |
+| `review-k4c/cases/order_mutual_22` | D1, D2 |
+| `review-k4c/cases/order_mutual_23` | D1, D2 |
+| `review-k4c/cases/order_mutual_24` | D1, D2 |
+| `review-k4c/cases/order_mutual_25` | D1, D2 |
+| `review-k4c/cases/order_mutual_26` | D1, D2 |
+| `review-k4c/cases/order_mutual_27` | D1, D2 |
+| `review-k4c/cases/order_mutual_28` | D1, D2 |
+| `review-k4c/cases/order_mutual_29` | D1, D2 |
+| `review-k4c/cases/order_mutual_3` | D1, D2 |
+| `review-k4c/cases/order_mutual_30` | D1, D2 |
+| `review-k4c/cases/order_mutual_31` | D1, D2 |
+| `review-k4c/cases/order_mutual_4` | D1, D2 |
+| `review-k4c/cases/order_mutual_5` | D1, D2 |
+| `review-k4c/cases/order_mutual_6` | D1, D2 |
+| `review-k4c/cases/order_mutual_7` | D1, D2 |
+| `review-k4c/cases/order_mutual_8` | D1, D2 |
+| `review-k4c/cases/order_mutual_9` | D1, D2 |
+| `review-k4c/cases/order_mutual_annot_0` | D1 |
+| `review-k4c/cases/order_mutual_annot_1` | D1 |
+| `review-k4c/cases/order_mutual_annot_10` | D1 |
+| `review-k4c/cases/order_mutual_annot_11` | D1 |
+| `review-k4c/cases/order_mutual_annot_12` | D1 |
+| `review-k4c/cases/order_mutual_annot_13` | D1 |
+| `review-k4c/cases/order_mutual_annot_14` | D1 |
+| `review-k4c/cases/order_mutual_annot_15` | D1 |
+| `review-k4c/cases/order_mutual_annot_16` | D1 |
+| `review-k4c/cases/order_mutual_annot_17` | D1 |
+| `review-k4c/cases/order_mutual_annot_18` | D1 |
+| `review-k4c/cases/order_mutual_annot_19` | D1 |
+| `review-k4c/cases/order_mutual_annot_2` | D1 |
+| `review-k4c/cases/order_mutual_annot_20` | D1 |
+| `review-k4c/cases/order_mutual_annot_21` | D1 |
+| `review-k4c/cases/order_mutual_annot_22` | D1 |
+| `review-k4c/cases/order_mutual_annot_23` | D1 |
+| `review-k4c/cases/order_mutual_annot_24` | D1 |
+| `review-k4c/cases/order_mutual_annot_25` | D1 |
+| `review-k4c/cases/order_mutual_annot_26` | D1 |
+| `review-k4c/cases/order_mutual_annot_27` | D1 |
+| `review-k4c/cases/order_mutual_annot_28` | D1 |
+| `review-k4c/cases/order_mutual_annot_29` | D1 |
+| `review-k4c/cases/order_mutual_annot_3` | D1 |
+| `review-k4c/cases/order_mutual_annot_30` | D1 |
+| `review-k4c/cases/order_mutual_annot_31` | D1 |
+| `review-k4c/cases/order_mutual_annot_4` | D1 |
+| `review-k4c/cases/order_mutual_annot_5` | D1 |
+| `review-k4c/cases/order_mutual_annot_6` | D1 |
+| `review-k4c/cases/order_mutual_annot_7` | D1 |
+| `review-k4c/cases/order_mutual_annot_8` | D1 |
+| `review-k4c/cases/order_mutual_annot_9` | D1 |
+| `review-k4c/cases/original` | D4 |
+| `review-k4c/cases/plain_0` | D1 |
+| `review-k4c/cases/plain_2` | D1 |
+| `review-k4c/cases/plain_4` | D1 |
+| `review-k4c/cases/plain_5` | D1 |
+| `review-k4c/cases/plain_6` | D1 |
+| `review-k4c/cases/recursive_co_0` | D1 |
+| `review-k4c/cases/recursive_co_1` | D1 |
+| `review-k4c/cases/recursive_co_2` | D1 |
+| `review-k4c/cases/recursive_co_3` | D1 |
+| `review-k4c/cases/recursive_co_4` | D1 |
+| `review-k4c/cases/recursive_co_5` | D1 |
+| `review-k4c/cases/recursive_inv_0` | D1 |
+| `review-k4c/cases/recursive_inv_1` | D1 |
+| `review-k4c/cases/recursive_inv_2` | D1 |
+| `review-k4c/cases/recursive_inv_3` | D1 |
+| `review-k4c/cases/recursive_inv_4` | D1 |
+| `review-k4c/cases/recursive_inv_5` | D1 |
+| `review-k4c/cases/row_callback` | D1 |
+| `review-k4c/cases/row_higher` | D1, D2 |
+| `review-k4c/cases/row_nested` | D1 |
+| `review-k4c/cases/stress_plain_1024` | D1 |
+| `review-k4c/cases/stress_plain_128` | D1 |
+| `review-k4c/cases/stress_plain_32` | D1 |
+| `review-k4c/cases/stress_plain_512` | D1 |
+| `review-k4c/cases/stress_row_1024` | D1 |
+| `review-k4c/cases/stress_row_128` | D1 |
+| `review-k4c/cases/stress_row_32` | D1 |
+| `review-k4c/cases/stress_row_512` | D1 |
+| `review-k4c/cases/stress_wide_1024` | D2 |
+| `review-k4c/cases/stress_wide_128` | D2 |
+| `review-k4c/cases/stress_wide_32` | D2 |
+| `review-k4c/cases/stress_wide_512` | D2 |
+| `review-k4c/cases/stress_wide_open_1024` | D1, D2 |
+| `review-k4c/cases/stress_wide_open_128` | D1, D2 |
+| `review-k4c/cases/stress_wide_open_32` | D1, D2 |
+| `review-k4c/cases/stress_wide_open_512` | D1, D2 |
+| `review-k4c/cases/two_run` | D1 |

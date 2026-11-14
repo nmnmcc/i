@@ -1,6 +1,6 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "96fd9a8c1dc83fdee1006c1bba00da617d8b4d5d",
+  "binary_sha256": "f781e20e36bacf18802d7e4393cc00921da272335352d671eeebfc065d4bb249",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.u_0 : () <- (S0(A)) -> Nil\napp/main.u_1 : () <- (S1(A)) -> Nil\napp/main.u_2 : () <- (S2(A)) -> Nil\napp/main.u_3 : () <- (S3(A)) -> Nil\napp/main.u_4 : () <- (S4(A)) -> Nil\napp/main.u_5 : () <- (S5(A)) -> Nil\napp/main.u_6 : () <- (S6(A)) -> Nil\napp/main.u_7 : () <- (S7(A)) -> Nil\napp/main.u_8 : () <- (S8(A)) -> Nil\napp/main.u_9 : () <- (S9(A)) -> Nil\napp/main.u_10 : () <- (S10(A)) -> Nil\napp/main.u_11 : () <- (S11(A)) -> Nil\napp/main.u_12 : () <- (S12(A)) -> Nil\napp/main.u_13 : () <- (S13(A)) -> Nil\napp/main.u_14 : () <- (S14(A)) -> Nil\napp/main.u_15 : () <- (S15(A)) -> Nil\napp/main.u_16 : () <- (S16(A)) -> Nil\napp/main.u_17 : () <- (S17(A)) -> Nil\napp/main.u_18 : () <- (S18(A)) -> Nil\napp/main.u_19 : () <- (S19(A)) -> Nil\napp/main.u_20 : () <- (S20(A)) -> Nil\napp/main.u_21 : () <- (S21(A)) -> Nil\napp/main.u_22 : () <- (S22(A)) -> Nil\napp/main.u_23 : () <- (S23(A)) -> Nil\napp/main.u_24 : () <- (S24(A)) -> Nil\napp/main.u_25 : () <- (S25(A)) -> Nil\napp/main.u_26 : () <- (S26(A)) -> Nil\napp/main.u_27 : () <- (S27(A)) -> Nil\napp/main.u_28 : () <- (S28(A)) -> Nil\napp/main.u_29 : () <- (S29(A)) -> Nil\napp/main.u_30 : () <- (S30(A)) -> Nil\napp/main.u_31 : () <- (S31(A)) -> Nil\napp/main.wide : () <- (S0(A), S1(B), S10(C), S11(D), S12(F), S13(G), S14(H), S15(I), S16(J), S17(K), S18(L), S19(M), S2(O), S20(P), S21(Q), S22(R), S23(S), S24(T), S25(U), S26(V), S27(W), S28(X), S29(Y), S3(Z), S30(A2), S31(B2), S4(C2), S5(D2), S6(F2), S7(G2), S8(H2), S9(I2)) -> Nil\n",
+      "stdout": "app/main.u_0 : () -> Nil\napp/main.u_1 : () -> Nil\napp/main.u_2 : () -> Nil\napp/main.u_3 : () -> Nil\napp/main.u_4 : () -> Nil\napp/main.u_5 : () -> Nil\napp/main.u_6 : () -> Nil\napp/main.u_7 : () -> Nil\napp/main.u_8 : () -> Nil\napp/main.u_9 : () -> Nil\napp/main.u_10 : () -> Nil\napp/main.u_11 : () -> Nil\napp/main.u_12 : () -> Nil\napp/main.u_13 : () -> Nil\napp/main.u_14 : () -> Nil\napp/main.u_15 : () -> Nil\napp/main.u_16 : () -> Nil\napp/main.u_17 : () -> Nil\napp/main.u_18 : () -> Nil\napp/main.u_19 : () -> Nil\napp/main.u_20 : () -> Nil\napp/main.u_21 : () -> Nil\napp/main.u_22 : () -> Nil\napp/main.u_23 : () -> Nil\napp/main.u_24 : () -> Nil\napp/main.u_25 : () -> Nil\napp/main.u_26 : () -> Nil\napp/main.u_27 : () -> Nil\napp/main.u_28 : () -> Nil\napp/main.u_29 : () -> Nil\napp/main.u_30 : () -> Nil\napp/main.u_31 : () -> Nil\napp/main.wide : () -> Nil\n",
       "stderr": "src/main.i:65:1: warning[W0504]: top-level binding `wide` is not used\n"
     },
     "test0": {
