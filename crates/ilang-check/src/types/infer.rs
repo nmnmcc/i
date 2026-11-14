@@ -3580,9 +3580,9 @@ impl<'a> Checker<'a> {
                     // as the enclosing function subtype will do later.
                     if has_rest
                         && let Some(expected) = expected.get(params.len())
-                        && *expected != Ty::Top
+                        && expected.hint != Ty::Top
                     {
-                        self.sub(expected, &t, pattern.span);
+                        self.sub(&expected.hint, &t, pattern.span);
                     }
                     params.push((label.clone(), t));
                 }

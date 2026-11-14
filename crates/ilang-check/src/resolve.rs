@@ -4043,6 +4043,8 @@ impl<'a> Resolver<'a> {
                     ty: key,
                     value,
                     span,
+                    spread: false,
+                    group,
                 }),
             ) = (&b.stmts[i], b.stmts.get(i + 1))
                 && matches!(key.kind, ast::TypeKind::Hole)
@@ -4065,6 +4067,8 @@ impl<'a> Resolver<'a> {
                     self.env_type(&contract);
                     let value = self.expr(&binding.value);
                     stmts.push(Stmt::Env {
+                        spread: false,
+                        group: *group,
                         ty: contract,
                         value,
                         span: *span,

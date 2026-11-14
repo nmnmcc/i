@@ -1074,7 +1074,6 @@ mod literal_known_tests {
             vec![(None, a.clone())],
             a.clone(),
             Ty::Never,
-            Ty::Never,
         ))));
         assert_eq!(
             c.call_known(&identity, std::slice::from_ref(&zero)).fact,
@@ -1083,7 +1082,6 @@ mod literal_known_tests {
         let service = Knowledge::certain(Ty::Fn(Box::new(FnTy::new(
             vec![(None, a.clone())],
             Ty::tuple(vec![a.clone()]),
-            Ty::Never,
             a.clone(),
         ))));
         let result = c.call_known(&service, std::slice::from_ref(&zero));
@@ -1091,13 +1089,7 @@ mod literal_known_tests {
         assert_eq!(result.fact, Ty::tuple(vec![Ty::Top]));
         let later = Knowledge::certain(Ty::Fn(Box::new(FnTy::new(
             vec![(None, a.clone())],
-            Ty::Fn(Box::new(FnTy::new(
-                vec![(None, a.clone())],
-                a,
-                Ty::Never,
-                Ty::Never,
-            ))),
-            Ty::Never,
+            Ty::Fn(Box::new(FnTy::new(vec![(None, a.clone())], a, Ty::Never))),
             Ty::Never,
         ))));
         let result = c.call_known(&later, &[zero]);
