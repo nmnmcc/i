@@ -45,7 +45,7 @@ scoped = () {
 
 // A later environment statement for the same type constructor takes the
 // place of an earlier one.
-shadowed = () { name() <- (Name(text = "first"), Name(text = "second")) }
+shadowed = () { name() <- (Name(text = "second")) <- (Name(text = "first")) }
 
 // The value of an environment statement uses the environment from outside
 // the statement (§4.8 rule 9).

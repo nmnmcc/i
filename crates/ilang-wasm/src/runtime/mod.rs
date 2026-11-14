@@ -68,8 +68,8 @@
 //! `reference_id`). Their hash depends only on the tag.
 //!
 //! Constructor ids 0 to 15 belong to the runtime: 0 `Ok` and 1 `Error` (type
-//! id 0, `Result`), 2 `AssertionFailure` (type id 1) and 3 `Assert` (type id
-//! 2). The code generator numbers the other constructors from
+//! id 0, `Result`), 2 `AssertionFailure` (type id 1), 3 `Assert` (type id
+//! 2) and 4 `Fail` (type id 3). The code generator numbers the other constructors from
 //! [`FIRST_CONSTRUCTOR`] and installs their names, in order, with
 //! `$constructors_install (param (ref $values))`, an array of String values.
 //! `Bool` and `Nil` use tags 1 and 0, not constructor ids.

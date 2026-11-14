@@ -17,6 +17,7 @@ collection = "std/test.tests"
 
 ```i file=src/handler.i title="src/handler.i"
 (
+	i/fail
 	std/http
 	std/json
 	std/schema
@@ -52,9 +53,9 @@ handle = (req : http.Request) {
 			reply(200, json.Object([("status", json.Text("ok"))]))
 		}
 		| ((http.Method("POST"), "/users")) {
-			bit_array.to_string(req.body) |>
+			fail.catch(() { bit_array.to_string(req.body) }) |>
 				(Ok(text)) {
-					schema.parse(user_schema(), text) |>
+					fail.catch(() { schema.parse(user_schema(), text) }) |>
 						(Ok(user)) {
 							reply(
 								200,
@@ -86,6 +87,7 @@ main = () {
 
 ```i test stdout=exact package=guide_http title="test/handler_test.i"
 (
+	i/fail
 	testlib = (test) = std/test
 	std/http
 	guide_http/handler
@@ -93,7 +95,7 @@ main = () {
 test("health and missing route", () {
 	health = handler.handle(http.request(http.Method("GET"), "/health"))
 	assert(health.status == http.Status(200))
-	assert(http.body_text(health) == Ok("{\"status\":\"ok\"}"))
+	assert(fail.catch(() { http.body_text(health) }) == Ok("{\"status\":\"ok\"}"))
 	missing = handler.handle(http.request(http.Method("GET"), "/missing"))
 	assert(missing.status == http.Status(404))
 })
@@ -106,7 +108,7 @@ test("JSON request", () {
 	)
 	response = handler.handle(req)
 	assert(response.status == http.Status(200))
-	assert(http.body_text(response) == Ok("{\"name\":\"Ada\"}"))
+	assert(fail.catch(() { http.body_text(response) }) == Ok("{\"name\":\"Ada\"}"))
 	assert(
 		handler.handle(http.Request(..req, body = <<"{}":utf8>>)).status ==
 			http.Status(422),

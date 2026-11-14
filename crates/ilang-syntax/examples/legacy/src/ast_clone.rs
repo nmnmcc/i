@@ -145,7 +145,15 @@ async fn block<'a>(s: &Scheduler<'a>, b: &'a Block) -> Block {
     for x in &b.stmts {
         out.push(match x {
             Stmt::Expr(e) => Stmt::Expr(s.call(|s| ce(s, e)).await),
-            Stmt::Env { ty, value, span } => Stmt::Env {
+            Stmt::Env {
+                ty,
+                value,
+                span,
+                spread,
+                group,
+            } => Stmt::Env {
+                spread: *spread,
+                group: *group,
                 ty: s.call(|s| ct(s, ty)).await,
                 value: s.call(|s| ce(s, value)).await,
                 span: *span,
@@ -183,7 +191,8 @@ async fn function<'a>(s: &Scheduler<'a>, f: &'a Function) -> Function {
     for p in &f.params {
         params.push(match p {
             Param::Pattern(p) => Param::Pattern(s.call(|s| cp(s, p)).await),
-            Param::Env { name, ty } => Param::Env {
+            Param::Env { name, ty, rest } => Param::Env {
+                rest: *rest,
                 name: name.clone(),
                 ty: s.call(|s| ct(s, ty)).await,
             },

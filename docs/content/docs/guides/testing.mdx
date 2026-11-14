@@ -141,14 +141,15 @@ Exit status is 1; the position identifies the assertion. Remove this file before
 
 ```i test stdout=exact package=guide_tests title="test/reverse_test.i"
 (
+	i/fail
 	testlib = (test) = std/test
 	i/core
 	std/property
 	std/list
 )
 test("reverse twice", () {
-	Ok(numbers) = property.int(-10, 10)
-	Ok(lists) = property.list(numbers, 0, 12)
+	Ok(numbers) = fail.catch(() { property.int(-10, 10) })
+	Ok(lists) = fail.catch(() { property.list(numbers, 0, 12) })
 	property.test(
 		lists,
 		property.Config(

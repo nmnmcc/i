@@ -11,7 +11,8 @@
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }

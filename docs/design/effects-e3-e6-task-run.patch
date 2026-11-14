@@ -1,0 +1,82 @@
+diff --git a/lib/i/task.i b/lib/i/task.i
+index 4b6e651f5f534e2ef7a554b2585440e29c044cbc..695064cef06e75ca6275aa7b90b87a250d79fdf1 100644
+--- a/lib/i/task.i
++++ b/lib/i/task.i
+@@ -1112 +1112 @@
+-	() <- (Fail(E), ..N) -> A,
++	() <- (Fail(E), Scheduler, Runner, request.Await, ..N) -> A,
+@@ -3819 +3819,9 @@
+-	() <- (Fail(E), ..N) -> A,
++	() <- (
++		Fail(E),
++		Scheduler,
++		Runner,
++		request.Await,
++		request.Owner,
++		request.Root,
++		..N,
++	) -> A,
+@@ -3930 +3938,10 @@
+-run = <A, N>(body: () <- N -> A) <- (runner: Runner) -> A {
++run = <A, N>(
++	body: () <- (
++		Scheduler,
++		Runner,
++		request.Await,
++		request.Owner,
++		request.Root,
++		..N,
++	) -> A
++) <- (runner: Runner) -> A {
+@@ -3979 +3996,9 @@
+-	() <- (Fail(E), ..N) -> A,
++	() <- (
++		Fail(E),
++		Scheduler,
++		Runner,
++		request.Await,
++		request.Owner,
++		request.Root,
++		..N,
++	) -> A,
+diff --git a/tests/spec/9.9/task_run_supplied_services.i b/tests/spec/9.9/task_run_supplied_services.i
+new file mode 100644
+index 0000000000000000000000000000000000000000..79454ae098b2aa624d29a8d05bdae3efe56df310
+--- /dev/null
++++ b/tests/spec/9.9/task_run_supplied_services.i
+@@ -0,0 +1,18 @@
++// spec: 9.9
++// expect: pass
++// run/test supply their callback's Scheduler; their caller supplies Runner.
++(
++	i/task
++	rng = i/random
++)
++
++only_runner: (() <- (task.Scheduler) -> Nil) <- (task.Runner) -> Nil = (
++	body
++) <- (runner: task.Runner) { task.run(body) }
++
++only_runner_test: (rng.Generator, () <- (task.Scheduler) -> Nil) <- (
++	Fail(task.ScheduleError),
++	task.Runner,
++) -> Nil = (seed, body) <- (runner: task.Runner) { task.test(seed, [], body) }
++
++main = () { Nil }
+diff --git a/tests/spec/9.9/task_run_unprovided_service.i b/tests/spec/9.9/task_run_unprovided_service.i
+new file mode 100644
+index 0000000000000000000000000000000000000000..5feca99d3f129efc998edcd0b58729449f3f1afb
+--- /dev/null
++++ b/tests/spec/9.9/task_run_unprovided_service.i
+@@ -0,0 +1,11 @@
++// spec: 9.9
++// expect: compile-error E0501
++// An unrelated need still belongs to run's caller.
++(
++	i/task
++)
++
++Dep = (value = Int)
++missing_dep: (() <- (task.Scheduler, Dep) -> Nil) <- (task.Runner) -> Nil = (
++	body
++) <- (runner: task.Runner) { task.run(body) }

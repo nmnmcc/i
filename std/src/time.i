@@ -1,13 +1,13 @@
 //// Exact signed nanoseconds. Duration is a length; Instant is a Unix epoch
 //// position. Both hide their constructors and have one Int representation.
-//// TimeError exports DivisionByZero. Arithmetic is pure.
+//// TimeError exports DivisionByZero. Division failures use Fail(TimeError).
 ////
 //// Interface:
 //// nanoseconds/milliseconds/seconds/minutes/hours: (count: Int) -> Duration
 //// to_nanoseconds: (duration: Duration) -> Int
 //// add/subtract: (first: Duration, second: Duration) -> Duration
 //// scale: (duration: Duration, by: Int) -> Duration
-//// divide: (duration: Duration, by: Int) -> Result(Duration, TimeError)
+//// divide: (duration: Duration, by: Int) <- (Fail(TimeError)) -> Duration
 //// compare: (first: Duration, second: Duration) -> Order
 //// from_unix_nanoseconds: (count: Int) -> Instant
 //// unix_nanoseconds: (instant: Instant) -> Int
@@ -18,7 +18,7 @@
 //// T1: Unit constructors multiply by 1, 10^6, 10^9, 60*10^9 and 3600*10^9.
 //// Every Int is accepted, including negative counts; no overflow or clamping.
 //// T2: add, subtract and scale use exact integer arithmetic. divide rejects
-//// zero with Error(DivisionByZero), otherwise rounds toward zero, including
+//// zero by raising DivisionByZero, otherwise rounds toward zero, including
 //// negative divisors. compare uses numeric order.
 //// T3: Instant zero is 1970-01-01T00:00:00Z. between(a,b) is b-a, shift adds
 //// a duration, and unix_nanoseconds reverses from_unix_nanoseconds. Instants
@@ -31,6 +31,7 @@
 //// fixed 86,400 seconds. Operations use O(1) integer operations; bit costs
 //// depend on integer size. Observation functions use i/clock.
 (
+	i/fail
 	i/clock
 	std/int
 	(Order) = std/order
@@ -101,8 +102,10 @@ scale = (duration : Duration, by : Int) -> Duration {
 	Duration(to_nanoseconds(duration) * by)
 }
 
-/// Divides toward zero, or returns DivisionByZero for a zero divisor.
-divide = (duration : Duration, by : Int) -> Result(Duration, TimeError) {
+_divide_result = (duration : Duration, by : Int) -> Result(
+	Duration,
+	TimeError,
+) {
 	{ by == 0 } |>
 		(True) { Error(DivisionByZero) }
 		| (False) { Ok(Duration(to_nanoseconds(duration) / by)) }
@@ -145,4 +148,11 @@ measure = (body) {
 	value = body()
 	end = clock.monotonic_ns()
 	(value, Duration(end - start))
+}
+
+/// Divides toward zero, or returns DivisionByZero for a zero divisor.
+///
+/// Reports failure through `Fail(TimeError)`.
+divide = (duration : Duration, by : Int) -> Duration {
+	fail.from_result(_divide_result(duration, by))
 }
