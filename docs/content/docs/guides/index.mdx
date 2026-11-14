@@ -1,5 +1,19 @@
 ---
 title: Guides
+description: Complete tasks with the command line, files, HTTP, tests, builds, and Wasm hosts.
 ---
 
-to be written
+These guides take a small project from source to a working result. Each assumes that you have installed `i`, can run a project with `i.toml`, and have read the [tour](/docs/tour). Use the tour for language concepts; use a guide when you have a task to finish.
+
+- [CLI](/docs/guides/cli) builds and tests a command with arguments, options, help, and logging; it assumes [functions and branches](/docs/tour/functions-and-branches), [services and errors](/docs/tour/services-and-errors), and a checkout containing `std/`.
+- [Files](/docs/guides/files) writes, reads, and removes a file and handles a missing path; it assumes [values and data](/docs/tour/values-and-data), services and errors, and permission to write in the project directory.
+- [HTTP service](/docs/guides/http-service) serves JSON over a local socket and tests the same handler without networking; it assumes services and errors, [concurrency](/docs/tour/concurrency), `std/`, and `curl`.
+- [Testing](/docs/guides/testing) adds unit tests, generated cases, and a fake service to a project; it assumes functions and branches, services and errors, and `std/`.
+- [Packaging](/docs/guides/packaging) builds a native executable or Wasm module and explains dependency integrity; it assumes [packages](/docs/tour/packages) and a working compiler.
+- [JS and WASI interop](/docs/guides/js-and-wasi-interop) runs a built module in a WASI runtime and loads a host module from JavaScript; it assumes packaging, the repository checkout, Node.js with the required Wasm features, and Wasmtime for the Wasmtime command.
+
+Examples that use `std` show a path dependency on the checkout. Keep the example project beside `std/`, or change the path in its manifest. `i/…` modules come with the compiler.
+
+## See also
+
+Read [the package file, §2.6](/docs/standard/generated/chapter-2#section-2-6) for project configuration. Start with [CLI](/docs/guides/cli), or choose the task you need above.

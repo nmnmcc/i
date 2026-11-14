@@ -1,5 +1,200 @@
 ---
 title: CLI
+description: Build a command with typed arguments, options, help, logging, and parser tests.
 ---
 
-to be written
+This guide builds a greeting command with a positional argument, a required option, help text, and a log entry. You will test its parser without process arguments, then run the command from a shell. It assumes [functions and branches](/docs/tour/functions-and-branches) and [services and errors](/docs/tour/services-and-errors).
+
+Create `guide-cli/` at the root of the checkout. Its `i.toml` is:
+
+```toml
+name = "guide_cli"
+
+[dependencies]
+std = { path = "../std" }
+
+[test]
+collection = "std/test.tests"
+```
+
+## Describe and test the arguments
+
+Put the description in `src/options.i`. `cli.map2` combines the positional name and the option's integer value into one `Options` value.
+
+```i file=src/options.i
+(
+	std/cli
+	(Some) = std/option
+)
+
+(
+	Options(..)
+	parser
+)
+Options = (name = String, count = Int)
+parser = () {
+	cli.map2(cli.argument("name", "Name to greet", cli.text), cli.option(
+		cli.Names(long = "count", short = Some("c")),
+		"Number of greetings",
+		cli.integer,
+	), (name, count) { Options(name = name, count = count) })
+}
+```
+
+The parser accepts an explicit list of strings. Put this complete file in `test/options_test.i`; it checks successful parsing, a missing option, a conversion failure, and the help text.
+
+```i test
+(
+	testlib = (test) = std/test
+	std/cli
+	guide_cli/options
+)
+test("parses arguments", () {
+	assert(
+		cli.parse(options.parser(), ["Ada", "--count=2"]) ==
+			Ok(options.Options(name = "Ada", count = 2)),
+	)
+	assert(
+		cli.parse(options.parser(), ["-c", "1", "--", "-name"]) ==
+			Ok(options.Options(name = "-name", count = 1)),
+	)
+	assert(
+		cli.parse(options.parser(), ["Ada"]) ==
+			Error(cli.MissingArgument(name = "--count")),
+	)
+	assert(
+		cli.parse(options.parser(), ["Ada", "--count=bad"]) ==
+			Error(
+				cli.InvalidArgument(
+					index = 1,
+					name = "--count",
+					text = "bad",
+					reason = "expected integer",
+				),
+			),
+	)
+	assert(
+		cli.help(options.parser(), "greet") ==
+			Ok(
+				"Usage: greet\n  <name>\tName to greet\n  --count, -c VALUE\tNumber of greetings\n",
+			),
+	)
+})
+```
+
+```sh
+i test --opt 0
+i test --opt 2
+```
+
+Each command prints:
+
+```text
+pass guide_cli/options_test.parses arguments
+1 passed, 0 failed
+```
+
+`--count=2`, `--count 2`, and `-c 2` supply the option's value. A bare `--` ends option recognition: the test uses it to pass `-name` as a positional value. Error indexes count from zero. The attached value in `--count=bad` belongs to token 1.
+
+`argument` and `option` require a value. Other builders include `flag` for a Boolean, `optional` for an `Option`, `many` for repeated options, and `rest` for remaining positionals. Their definitions and usage rules are in `std/src/cli.i` and `std/test/cli_test.i` in the checkout. Keep parsing separate from the action so tests can supply an ordinary list.
+
+## Run the command
+
+Add this complete `src/main.i` to the same project. Keep `src/options.i` unchanged.
+
+```i file=src/main.i
+(
+	i/process
+	i/stdio
+	std/cli
+	std/log
+	(None) = std/option
+	guide_cli/options
+)
+greet = (name, count) {
+	{ count > 0 } |>
+		(True) {
+			stdio.print("hello " <> name)
+			greet(name, count - 1)
+		}
+		| (False) { Nil }
+}
+main = () {
+	{ process.args() == ["--help"] } |>
+		(True) {
+			Ok(usage) = cli.help(options.parser(), "greet")
+			stdio.write(<<usage:utf8>>)
+		}
+		| (False) {
+			cli.run(options.parser(), "greet", (opts) {
+				{
+					log.write(
+						log.Entry(
+							level = log.Info,
+							message = "greeting",
+							fields = [("name", opts.name)],
+							at = None,
+						),
+					)
+					greet(opts.name, opts.count)
+				} <- (log.stdout())
+			})
+		}
+}
+```
+
+From `guide-cli/`, run:
+
+```sh
+i run --opt 2 -- Ada --count=2
+```
+
+```text
+info "greeting" "name"="Ada"
+hello Ada
+hello Ada
+```
+
+Arguments reach the program through `i/process.args()`, which returns the tokens after the compiler command's `--`, excluding the executable name. `cli.read(parser)` calls `process.args()` and parses that list. `cli.run` uses `read`, then calls its body with the parsed value.
+
+This process-dependent example was checked by hand at `--opt 0` and `--opt 2`. It is a file example because an automated `i run` fence supplies no arguments. The earlier `i test` example checks the same parsing logic without relying on a process argument list.
+
+The body provides a `std/log` sink with `<- (log.stdout())`. The sink receives a structured `Entry`; its formatter prints the level, quoted message, and fields. `at = None` leaves out a timestamp, making this output repeatable. Use `log.stderr()` when log lines should go to standard error.
+
+## Help and exit status
+
+Help is an explicit action in `main`; the pure parser reserves no help option. This program treats exactly one argument, `--help`, as that action:
+
+```sh
+i run --opt 2 -- --help
+```
+
+```text
+Usage: greet
+  <name>	Name to greet
+  --count, -c VALUE	Number of greetings
+```
+
+`cli.help` returns a string ending in a newline. `stdio.write` writes its UTF-8 bytes without adding another newline. The successful action and the help action both exit with status 0.
+
+Omit the required option to see the failure path:
+
+```sh
+i run --opt 2 -- Ada
+```
+
+```text
+MissingArgument("--count")
+Usage: greet
+  <name>	Name to greet
+  --count, -c VALUE	Number of greetings
+
+error: MissingArgument("--count")
+guide_cli/main:17:1
+```
+
+This run exits with status 1. `cli.run` writes the parse error and usage to standard error, then raises the error. The runner reports the error that reaches the entry. All three shell runs above were checked at both optimization levels.
+
+## See also
+
+Read [IO operations, §9.12](/docs/standard/generated/chapter-9#section-9-12) for process and stream operations, and [the package file, §2.6](/docs/standard/generated/chapter-2#section-2-6) for entry selection. Continue with [files](/docs/guides/files) to add local storage.
