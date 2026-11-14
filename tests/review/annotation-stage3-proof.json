@@ -57,5 +57,23 @@
     "old_parser": "915b0aa5",
     "new_parser": "2945508c1"
   },
-  "cached_tools_basis": "Stage3 changes only syn3/lower.rs and Lisp builtin definition-query code; parser, AST, lexer, Lisp reader and formatter source are unchanged. Rebuilt binaries were compared against both saved inventories."
+  "cached_tools_basis": "Stage3 changes only syn3/lower.rs and Lisp builtin definition-query code; parser, AST, lexer, Lisp reader and formatter source are unchanged. Rebuilt binaries were compared against both saved inventories.",
+  "golden_location_corrections": [
+    {
+      "path": "crates/ilang-check/tests/projects/attr_deprecated/expected.out",
+      "source_locations_only": true
+    },
+    {
+      "path": "crates/ilang-check/tests/types/errors.out",
+      "source_locations_only": true
+    },
+    {
+      "path": "crates/ilang-check/tests/types/known.out",
+      "source_locations_only": true
+    },
+    {
+      "path": "crates/ilang-check/tests/types/known_choices.out",
+      "source_locations_only": true
+    }
+  ]
 }
