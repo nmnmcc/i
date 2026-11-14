@@ -22,7 +22,7 @@ source = (xs: List(Int)) -> stream.Stream(Int, Never, Never) {
 	stream.from_list(xs)
 }
 
-broken = () -> stream.Stream(Int, String, Never) {
+broken = () -> stream.Stream(Int, String, Fail(String)) {
 	stream.make(() { fail.raise("bad") })
 }
 
@@ -414,7 +414,7 @@ test("stream_error_positions", () {
 			Error(CallbackError),
 	)
 	outer = stream.from_results([Ok(1), Error(OuterError)])
-	f = (x: Int) -> stream.Stream(Int, InnerError, Never) {
+	f = (x: Int) -> stream.Stream(Int, InnerError, Fail(InnerError)) {
 		{ x < 0 } |>
 			(True) { fail.raise(CallbackError) }
 			| (False) { stream.from_results([Ok(x), Error(InnerError)]) }
@@ -440,8 +440,8 @@ test("stream_error_positions", () {
 			[Ok(1), Error(OuterError)],
 	)
 	runner = (
-		body: () <- (Fail(String)) -> stream.Step(Int, String, Never)
-	) -> stream.Step(Int, String, Never) {
+		body: () <- (Fail(String)) -> stream.Step(Int, String, Fail(String))
+	) -> stream.Step(Int, String, Fail(String)) {
 		body()
 		fail.raise("runner")
 	}
@@ -594,8 +594,8 @@ test("stream_callback_failures", () {
 			[Error("deferred")],
 	)
 	runner = (
-		body: () <- (Fail(String)) -> stream.Step(Int, String, Never)
-	) -> stream.Step(Int, String, Never) {
+		body: () <- (Fail(String)) -> stream.Step(Int, String, Fail(String))
+	) -> stream.Step(Int, String, Fail(String)) {
 		body()
 		fail.raise("runner")
 	}

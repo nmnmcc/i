@@ -51,6 +51,12 @@ provider retains E0515; the secondary cycle through the deleted carrier
 does not exist. The `z3`/`z5` concrete provider errors all remain; the
 additional summary derived from that carrier disappears. The earlier
 [E6 audit](e6-main-corpus-audit.md) describes their exact remaining sites.
+`b10` and `z3` explicitly write `Fail(Never)`: R1 makes it an ordinary
+service entry and R4 requires removal of its universal form, so it cannot
+create a second independent cycle or hidden obligation. `z5` writes only
+the callback's opaque `N`; its extra carrier was implicit in the old
+representation and is removed by R1. Its three concrete provider errors
+remain independently checked.
 In `21_135`, the local provide of `T` surrounds calls of `S` and `Dep`, not
 `T`; the removed carrier previously made a spurious hidden `T` obligation.
 Its inferred `main` still needs `Dep`, `S` and `T`, and the platform must
@@ -110,7 +116,7 @@ rule that a test pinning a removed feature keeps its original intent.
 | `review-k4s/mixed_recursive_0_17` | accepted, W0504 | E0225: same mixed row/value parameter | a, R3 |
 | `review-k4s/mixed_recursive_1_0` | accepted, W0504 | E0225: same mixed row/value parameter | a, R3 |
 | `review-k4s/mixed_recursive_1_17` | accepted, W0504 | E0225: same mixed row/value parameter | a, R3 |
-| `review-k4s/std` | checker accepts; entry tests resource-censored | migrate the unused `Sink` marker from `(N) -> Nil` to `(() <- N -> Nil) -> Nil`, retaining its original invariant row parameter; write the message callback's `Fail(F)` explicitly; port grouped suite collection. Preserve every test body and saved bound. | c, R1/R3/R7 |
+| `review-k4s/std` | checker accepts; entry tests resource-censored | migrate the unused `Sink` marker from `(N) -> Nil` to `(() <- N -> Nil) -> Nil`, retaining its original invariant row parameter; write the message callback's `Fail(F)` explicitly; port grouped suite collection. In the stream tests, the error label `E` is no longer a second channel: add `Fail(E)` to the written `Stream`/`Step` need arguments. Preserve every test body, error assertion and saved bound. | c, R1/R3/R7 |
 | `review-std2/replacement_unused` | accepted, W0504 | E0225: two explicit `S` items remain invalid even when unused | a, R2 |
 
 ## Corpus runner repair
@@ -125,7 +131,24 @@ cycles, and warning-only output. No semantic requirement is removed.
 
 ## Verification and display groups
 
-The release rebuild, targeted checker regressions, same-bound timeout
-reruns, per-group update runs, exact display classifications and
-fingerprint-only restoration are recorded here when complete. Until then
-this section is an audit in progress, not a claim that the corpus gate is green.
+The release rebuild passes. All 42 checker row-scheme tests pass, including
+four new regressions for the ordinary Fail argument, unused universal need
+forms with a used-service negative control, exact distinct entry-service
+errors, and preservation of the vendored marker's invariant row.
+All five corpus-runner regression tests pass. Changed i files and Rust test
+formatting pass.
+
+All 29 non-timeout cases pass the bounded per-group update runs and an
+additional audit of their exact required error multisets and entry results.
+The first vendored rerun exposed four remaining stale stream annotations;
+only their written Stream/Step need arguments were corrected to include
+Fail(E), as in the current std tests. Every one of that file's 94 assertions
+and every string literal is unchanged. The migrated vendored package now
+checks successfully; its original O0/O2 resource-censored test outcomes
+remain at the same 10-second bound. The suite collector produces 1,446
+generated test bindings both before and after migration.
+
+The isolated timeout reruns, remaining per-group updates, exact 919-case
+display classifications and fingerprint-only restoration follow. Until they
+finish this section is an audit in progress, not a claim that the full
+requested corpus integration is green.
