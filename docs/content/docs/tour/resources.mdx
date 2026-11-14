@@ -1,5 +1,98 @@
 ---
 title: Resources
+description: Acquire a value, release it after use, and understand unwinding on this tree.
 ---
 
-to be written
+A resource is a value whose use must end with a release, such as an open file or connection. This tree offers callback-based `resource.acquire` and `resource.ensure`. You can put cleanup around a computation and see when it runs, including when the computation raises an [error](/docs/tour/services-and-errors).
+
+```i run
+(
+	i/resource
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	resource.acquire(
+		() {
+			io.print("open outer")
+			"outer"
+		},
+		(name) { io.print("close " <> name) },
+		(_) {
+			resource.acquire(
+				() {
+					io.print("open inner")
+					"inner"
+				},
+				(name) { io.print("close " <> name) },
+				(_) { io.print("use both") },
+			)
+		},
+	)
+	io.print("done")
+}
+```
+
+```text
+open outer
+open inner
+use both
+close inner
+close outer
+done
+```
+
+## Acquisition and release
+
+`resource.acquire` takes three functions: `open`, `release`, and `use`. It calls `open`, passes the acquired value to `use`, and releases that value after `use` ends. Its result is the result of `use`. The strings here stand in for handles so that the output shows the order without relying on a machine's files.
+
+The outer acquisition happens first. The inner acquisition happens during its use. The inner release finishes before the outer release, and both finish before `done` is printed. This nesting makes each resource's lifetime visible in the program. If opening raises an error, that acquisition has not yet installed a release.
+
+These are ordinary library calls and functions. There is no special resource statement to learn. `resource.acquire` on this tree takes the `use` callback; it does not attach a release to a resource scope. The resource `Scope` and `resource.scoped` API described in the current standard are not implemented here.
+
+## Release on failure
+
+A **final function** is a cleanup callback installed around a computation. `resource.ensure(body, final)` runs the final after a normal return and when an error or control escape unwinds the body. `acquire` uses it to install the release after a successful open.
+
+```i run
+(
+	i/resource
+	i/fail
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = fail.catch(() {
+		resource.ensure(
+			() {
+				resource.acquire(
+					() {
+						io.print("open")
+						"handle"
+					},
+					(name) { io.print("release " <> name) },
+					(_) { fail.raise("failed") },
+				)
+			},
+			() { io.print("final") },
+		)
+	})
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+open
+release handle
+final
+Error("failed")
+```
+
+The error skips the rest of the use callback. Unwinding releases the handle, then runs the enclosing final, and only then returns `Error("failed")` from `fail.catch`. The printed order proves that catching the error does not skip release.
+
+A final may use services, as the printing callbacks do, but may not raise an error. Cancellation of a continuation also unwinds installed finals; [structured task cancellation](/docs/tour/concurrency) waits for cleanup to finish. A continuation that is abandoned without resumption or cancellation does not run its finals.
+
+The current spec says releases do not run on a stop, and whether they should is an open question for the owner.
+
+## See also
+
+Read [unwinding and final functions (§9.5)](/docs/standard/generated/chapter-9#section-9-5), allowing for the resource API difference above. Continue with [concurrency](/docs/tour/concurrency).
