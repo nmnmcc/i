@@ -1,13 +1,11 @@
 ---
-title: JS and WASI interop
-description: Run a WASI command and load a host module with the repository's JavaScript SDK.
+title: Host and WASI interop
+description: Run a WASI command and call exports through the host SDK.
 ---
 
-This guide runs a built module in a WASI runtime and loads a host module from JavaScript using the repository's host code. These are paths exercised by the repository's CI. It assumes [packaging](/docs/guides/packaging), a repository checkout, and a Wasm engine supporting garbage collection, typed function references, tail calls, and exception handling with `exnref`.
+Run a WASI command and call an exported function through the host SDK.
 
-Create `guide-interop/` at the root of the checkout. Use this `i.toml`:
-
-```toml
+```toml file=i.toml title="i.toml"
 name = "guide_interop"
 
 [dependencies]
@@ -16,9 +14,7 @@ name = "guide_interop"
 exports = ["guide_interop/main.add"]
 ```
 
-Put this complete source in `src/main.i`:
-
-```i shown file=src/main.i package=guide_interop title="src/main.i"
+```i run package=guide_interop title="src/main.i"
 (
 	i/stdio
 )
@@ -30,11 +26,13 @@ add = (a : Int, b : Int) -> Int { a + b }
 main = () { stdio.print("hello from Wasm") }
 ```
 
-The program entry prints a fixed line. The configured host export adds two integers. Commands below run from `guide-interop/`. All builds and host runs on this page were checked by hand at `--opt 0` and `--opt 2`; they are not automated `run` fences.
+```text
+hello from Wasm
+```
 
-## Run under WASI
+Create `guide-interop/` in the i source folder; run commands there. The Wasm engine needs garbage collection, typed function references, tail calls, and exception handling with `exnref`.
 
-Build a WASI preview 1 command:
+## WASI command
 
 ```sh
 i build --target wasi --opt 2
@@ -44,8 +42,6 @@ i build --target wasi --opt 2
 built ./build/guide_interop.wasm
 ```
 
-Run it in Wasmtime:
-
 ```sh
 wasmtime run build/guide_interop.wasm
 ```
@@ -53,8 +49,6 @@ wasmtime run build/guide_interop.wasm
 ```text
 hello from Wasm
 ```
-
-Or use the repository's Node WASI runner:
 
 ```sh
 node --no-warnings ../bindings/javascript/wasi-run.mjs build/guide_interop.wasm
@@ -64,13 +58,11 @@ node --no-warnings ../bindings/javascript/wasi-run.mjs build/guide_interop.wasm
 hello from Wasm
 ```
 
-The Node command uses `node:wasi`; `--no-warnings` suppresses Node's experimental-API notice. This example was checked with Node 26.11.1 and Wasmtime 49.0.2. The module's `_start` initializes it and runs the program entry. A normal return exits with status 0. `scripts/wasi-smoke` exercises this path in CI at both optimization levels, including a stop that exits with status 1.
+The Node runner uses `node:wasi`; `--no-warnings` suppresses its experimental-API notice. `_start` initializes the module and runs the entry; normal return exits with status 0, and a stop exits with status 1.
 
-This example needs no filesystem grant. Programs using WASI files need explicitly preopened directories; the runner accepts a JSON options argument with `preopens`, `args`, and `env`. WASI provides standard streams, clock, entropy, arguments, environment, and filesystem adapters. An unmet need for networking, TLS, process spawning, or the working directory is rejected for this target. See [WASI service and path rules](/docs/standard/generated/chapter-appendix-b#section-b-7) for the supported services and path rules.
+For files, pass the runner a JSON options argument with `preopens`, `args`, and `env`; this example needs no filesystem grant. WASI supplies streams, clock, entropy, arguments, environment, and filesystem adapters; unmet networking, TLS, process-spawning, or working-directory needs are rejected ([service and path rules](/docs/standard/generated/chapter-appendix-b#section-b-7)).
 
-## Load a module from JavaScript
-
-Build the same source for the repository's host SDK:
+## Host export
 
 ```sh
 i build --target host --opt 2
@@ -80,9 +72,10 @@ i build --target host --opt 2
 built ./build/guide_interop.wasm
 ```
 
-This replaces the WASI module at that path. It also writes `build/guide_interop.bindings.json`. Put this JavaScript in `host.mjs`:
+This replaces the WASI module and writes `build/guide_interop.bindings.json`; use separate `--out` paths to retain both targets.
 
-```js
+```sh
+cat > host.mjs <<'EOF'
 import { readFile } from "node:fs/promises";
 import { instantiate } from "../bindings/javascript/ilang.mjs";
 
@@ -92,9 +85,7 @@ const app = await instantiate(
 );
 await app.run();
 console.log(app.call("guide_interop/main.add", [20n, 22n]).toString());
-```
-
-```sh
+EOF
 node host.mjs
 ```
 
@@ -103,16 +94,10 @@ hello from Wasm
 42
 ```
 
-`instantiate` reads ABI metadata, supplies the runtime imports, links the selected services, and initializes the module once. `standardServices: true` provides the SDK's standard Node services, including the output used here. `run` calls the program entry. `call` selects the configured export by its full name. JavaScript `bigint` values represent i integers; the returned integer is converted to text for printing.
+`instantiate` reads ABI metadata, supplies runtime imports, links selected services, and initializes once. `standardServices: true` supplies Node services, including output; `call` selects a configured export by full name. Integers cross this boundary as `bigint`; await `run()` so asynchronous entry work finishes before calling an export.
 
-The SDK handles value encoding, buffers, and the asynchronous entry protocol. Await the entry as above so any asynchronous work finishes before the next call. `bindings/javascript/test/host.test.mjs` checks these host operations; `scripts/bench-abi.mjs` uses the same SDK for compiled host exports. The CI `js` job runs the JavaScript tests; the `i` job runs the WASI smoke script.
+The SDK handles value encoding, buffers, and the asynchronous entry protocol.
 
-Keep the host build and WASI build distinct when integrating them into a larger project: the SDK reads the host ABI metadata, while a WASI runtime starts a command. Use separate `--out` paths when both artifacts need to remain available.
+Use the host SDK: `js` and `nodejs` builds produce only Wasm and `.bindings.json`, without generated `.mjs`/`.d.ts` loaders or an `ilang.js` section, and `@js` is not available yet.
 
-## Current limits
-
-The standard specifies a generated loader `name.mjs` with `name.d.ts` for the `js` and `nodejs` targets, and a built-in `@js` declaration. The compiler on this tree does not generate them and refuses `@js`: a build writes the Wasm module and `name.bindings.json`, and JavaScript loads the module through the Host SDK as shown above. This difference from the standard is recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (DOC3).
-
-## See also
-
-The [host ABI reference](/docs/standard/generated/chapter-appendix-b) defines encoding and entry protocols. Return to the [guide index](/docs/guides), or see [building and testing](/docs/contributing/building-and-testing) to work on the hosts and their checks.
+[Host ABI](/docs/standard/generated/chapter-appendix-b) · [Compiler development](/docs/contributing/building-and-testing)

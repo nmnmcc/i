@@ -1,72 +1,66 @@
 ---
 title: First program
-description: Create a package, run its program, and add a test.
+description: Create a package, run its program, and add tests.
 ---
 
-Create a package with `i new`, run its program, then change and test it. This assumes `i` is on your `PATH` and you have a checkout of the i repository for `std`.
+Create, run, and test a package.
 
 ```sh
 i new hello
 ```
+
 ```text
 made the package `hello` in `hello`
 run it with `i run --project hello`
 ```
 
-The command creates `hello/i.toml`, `.gitignore`, `src/main.i`, and `test/main_test.i`. The generated manifest uses a local path for the test dependency `std`. If it does not point to the `std` directory in your i checkout, edit the `std` path under `[dev-dependencies]` in `i.toml` to that directory. Paths can be absolute or relative to the package directory.
+Put `i` on `PATH` and keep a copy of the i sources containing `std/`. The command creates `i.toml`, `.gitignore`, `src/main.i`, and `test/main_test.i`; correct the manifest's `[dev-dependencies]` `std` path if needed, using an absolute path or one relative to the package directory.
 
-The generated `src/main.i` has this structure, with documentation comments shortened:
+## Program
 
 ```i run package=hello title="src/main.i"
-//// The package `hello`. It imports the standard service `Io` from `i/io`
-//// and `i run` gives it, so the program can print.
+//// Greetings.
 (
 	(Io) = i/io
 )
-
 (
 	greeting
 )
-
-/// The greeting for `who`.
+/// A greeting for a name.
 greeting = (who : String) -> String { "Hello, " <> who <> "!" }
-
 main = () <- (io : Io) { io.print(greeting("hello")) }
 ```
+
 ```text
 Hello, hello!
 ```
 
-The `////` lines document the module. The first parenthesized group imports `Io` from `i/io`. The second group exports `greeting` so another module can use it. The `///` line documents that function. `greeting` takes a `String` and joins its argument to two string literals. `main` is the program entry; it needs an `Io` service and calls its `print` function with the greeting. Read about [values](/docs/tour/values-and-data), [functions](/docs/tour/functions-and-branches), [packages](/docs/tour/packages), and [services](/docs/tour/services-and-errors) in the tour.
-
-Enter the project and run it:
+The generated source is shown with shorter documentation comments. The second parenthesized group exports `greeting` for other modules; `main` is the entry, and `i run` supplies its `Io` service.
 
 ```sh
 cd hello
 i run
 ```
+
 ```text
 Hello, hello!
 ```
 
-Change the argument in `main` to `"world"`, leaving the rest of the file as follows:
+## A new greeting
 
 ```i run package=hello title="src/main.i"
-//// The package `hello`. It imports the standard service `Io` from `i/io`
-//// and `i run` gives it, so the program can print.
+//// Greetings.
 (
 	(Io) = i/io
 )
-
 (
 	greeting
 )
-
-/// The greeting for `who`.
+/// A greeting for a name.
 greeting = (who : String) -> String { "Hello, " <> who <> "!" }
-
 main = () <- (io : Io) { io.print(greeting("world")) }
 ```
+
 ```text
 Hello, world!
 ```
@@ -74,63 +68,63 @@ Hello, world!
 ```sh
 i run
 ```
+
 ```text
 Hello, world!
 ```
 
-The generated test already checks `greeting`. Add a second test so `test/main_test.i` contains:
+## Tests
 
 ```i file=src/main.i title="src/main.i"
-//// The package `hello`. It imports the standard service `Io` from `i/io`
-//// and `i run` gives it, so the program can print.
+//// Greetings.
 (
 	(Io) = i/io
 )
-
 (
 	greeting
 )
-
-/// The greeting for `who`.
+/// A greeting for a name.
 greeting = (who : String) -> String { "Hello, " <> who <> "!" }
-
 main = () <- (io : Io) { io.print(greeting("world")) }
 ```
-```i test package=hello title="test/main_test.i"
+
+```i test stdout=exact package=hello title="test/main_test.i"
 (
 	testlib = (test) = std/test
 	hello/main
 )
-
-test("greets", () {
-	main.greeting("i") |> ("Hello, i!") { Nil } | (other) { panic(other) }
-})
-
-test("greets the world", () {
-	main.greeting("world") |>
-		("Hello, world!") { Nil }
-		| (other) { panic(other) }
-})
+test("greets", () { assert(main.greeting("i") == "Hello, i!") })
+test("greets the world", () { assert(main.greeting("world") == "Hello, world!") })
 ```
 
-```sh
-i test
-```
 ```text
 pass hello/main_test.greets
 pass hello/main_test.greets the world
 2 passed, 0 failed
 ```
 
-Format the source and check the package:
+Replace the generated test file with these two tests.
+
+```sh
+i test
+```
+
+```text
+pass hello/main_test.greets
+pass hello/main_test.greets the world
+2 passed, 0 failed
+```
+
+## Formatting and checking
 
 ```sh
 i fmt
 i check
 ```
 
-Both commands completed with no output in this run. `i fmt` writes formatted source; `i check` checks the package without running the program.
+```text
+```
 
-## See also
+`i fmt` rewrites source; `i check` checks without running it.
 
-[Editor set-up](/docs/getting-started/editor-set-up)
+[Values](/docs/tour/values-and-data) · [Functions](/docs/tour/functions-and-branches) · [Packages](/docs/tour/packages) · [Services](/docs/tour/services-and-errors) · [Editor set-up](/docs/getting-started/editor-set-up)
