@@ -1,0 +1,41 @@
+diff --git a/lib/i/task.i b/lib/i/task.i
+index 4b6e651f5f534e2ef7a554b2585440e29c044cbc..695064cef06e75ca6275aa7b90b87a250d79fdf1 100644
+--- a/lib/i/task.i
++++ b/lib/i/task.i
+@@ -1112 +1112 @@
+-	() <- (Fail(E), ..N) -> A,
++	() <- (Fail(E), Scheduler, Runner, request.Await, ..N) -> A,
+@@ -3819 +3819,9 @@
+-	() <- (Fail(E), ..N) -> A,
++	() <- (
++		Fail(E),
++		Scheduler,
++		Runner,
++		request.Await,
++		request.Owner,
++		request.Root,
++		..N,
++	) -> A,
+@@ -3930 +3938,10 @@
+-run = <A, N>(body: () <- N -> A) <- (runner: Runner) -> A {
++run = <A, N>(
++	body: () <- (
++		Scheduler,
++		Runner,
++		request.Await,
++		request.Owner,
++		request.Root,
++		..N,
++	) -> A
++) <- (runner: Runner) -> A {
+@@ -3979 +3996,9 @@
+-	() <- (Fail(E), ..N) -> A,
++	() <- (
++		Fail(E),
++		Scheduler,
++		Runner,
++		request.Await,
++		request.Owner,
++		request.Root,
++		..N,
++	) -> A,

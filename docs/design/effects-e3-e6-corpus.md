@@ -129,6 +129,46 @@ error, and continue rejecting an unexpected cycle in every other case.
 Five Python regressions cover both errors, either missing error, unexpected
 cycles, and warning-only output. No semantic requirement is removed.
 
+## Library defect found while uncensoring a native case
+
+`review-native3/_loose/design-cases/events` completes with the optimizer
+thread limit, but exposes a separate **b** defect. Its inferred main need
+changes from `(Assert, task.Runner)` to `(Assert, task.Runner,
+task.Scheduler)`. This is not justified by the published library contract.
+Spec §9.9 gives `run` the type
+`<A, N>(() <- (..N, Scheduler, Runner, request.Await, request.Owner, request.Root) -> A) <- (..N, Runner) -> A`:
+the callback's Scheduler is supplied inside run, not required from its
+caller. E6's `make_start` annotation now propagates opaque N to its caller,
+and the current `run` implementation leaks Scheduler through it.
+
+An isolated checker probe confirms the contract failure (a proposed positive
+regression, currently failing):
+
+```text
+(i/task)
+only_runner: (() <- (task.Scheduler) -> Nil) <- (task.Runner) -> Nil =
+    (body) <- (runner: task.Runner) { task.run(body) }
+```
+
+This must typecheck under §9.9; it currently rejects with E0501,
+`task.Scheduler is not a subtype of task.Runner`. The existing native-case
+baseline is retained. The initial lane ownership rule prohibits editing
+`lib/i/**`; the coordinator status file requests the E6/library owner's
+repair or a scope change. No failing regression is disguised as a passing
+test and no expectation is rerecorded to bless this contract discrepancy.
+
+The unapplied [four-signature proposal](effects-e3-e6-task-run.patch)
+separates the internally supplied services from residual N in `make_start`,
+`execute_body`, `execute`, and `run`. An isolated copy of the module
+typechecks the Runner-only case and a positive case also supplying Dep;
+omitting Dep still rejects with E0501. The copy replaces the 17 privileged
+runtime imports with Never-returning stubs of their original types, so this
+is a type-only proposal check, not a rebuilt compiler or a runtime test.
+Apply it with `git apply --unidiff-zero effects-e3-e6-task-run.patch`; the
+application check and proposed-source formatting both pass. The
+library owner still needs to apply it, rebuild the embedded library, and
+run the actual regression and runtime gates.
+
 ## Verification and display groups
 
 The release rebuild passes. All 42 checker row-scheme tests pass, including
@@ -145,6 +185,7 @@ Commands used for this audit (H is `/home/agent/Programming/i/.rd/cache/heavy`):
 | `CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 $H direnv exec /home/agent/Programming/i cargo build --release -p ilang-cli --locked` | pass |
 | `CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 $H direnv exec /home/agent/Programming/i cargo test --release -p ilang-check --test row_schemes --locked -- --test-threads 2` | 42 pass |
 | `python3 -I scripts/qa/corpus-test` | 5 pass |
+| `python3 -m py_compile scripts/qa/corpus.py` | pass |
 | `direnv exec /home/agent/Programming/i rustfmt --check --edition 2024 crates/ilang-check/tests/row_schemes.rs` | pass |
 | `./target/release/i fmt --check tests/review/cases/review-k4-lane/alias_kind_error/src/main.i tests/review/cases/review-k4s/std/src/log.i tests/review/cases/review-k4s/std/test/stream_test.i` | pass |
 | `git diff --check` | pass at each committed checkpoint |
