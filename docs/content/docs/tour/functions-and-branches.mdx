@@ -1,5 +1,239 @@
 ---
 title: Functions and branches
+description: Call function values, choose with branches, match patterns, and repeat work with recursion.
 ---
 
-to be written
+Functions turn arguments into results. Branches choose a result by matching patterns against those arguments. This page shows how calls, blocks, patterns, and pipelines fit together, so you can write choices and repeated work without control-flow keywords.
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+square = (x) { x * x }
+main = () {
+	stdio.print(
+		core.inspect(square(3)),
+	)
+}
+```
+
+```text
+9
+```
+
+`(x) { x * x }` is a function value. `square` names it, and `square(3)` calls it. The parameters and body are required; their types can be inferred. A function is a value that you can pass to another function or store in data.
+
+## Calls, labels, and blocks
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+apply = (f, x) { f(x) }
+greet = (name, punctuation = ending) { "Hello, \(name)\(ending)" }
+
+main = () {
+	offset = 2
+	add_offset = (x) { x + offset }
+	result = {
+		first = apply(add_offset, 3)
+		first * 2
+	}
+	stdio.print(core.inspect(result))
+	stdio.print(greet("Ada", punctuation = "!"))
+}
+```
+
+```text
+10
+Hello, Ada!
+```
+
+`apply` receives a function and calls it. `add_offset` captures the local name `offset`, so its result uses that value when called. An argument can also have a label: `punctuation = ending` receives the argument under the label `punctuation` and binds it locally as `ending`. Labels use `=`, while an annotation such as `x : Int` states a type. There are no default arguments; every argument key must be supplied.
+
+A block executes its statements in order and gives the value of its final expression. The block bound to `result` therefore gives `10`. Its last statement must be an expression, rather than a binding. Braces also group a single expression. Parentheses make argument data or tuple data; they are not expression grouping.
+
+## Choosing with branches
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+size = (n : Int) {
+	n |> (0 | 1) { "small" } | (x ? x < 0) { "negative" } | (_) { "large" }
+}
+kind = (value : { Int | String }) {
+	value |> (n : Int) { core.inspect(n) } | (s : String) { s }
+}
+
+main = () {
+	stdio.print(
+		core.inspect((size(0), size(1), size(-2), size(5))),
+	)
+	stdio.print(
+		core.inspect((kind(7), kind("text"))),
+	)
+	{ 2 < 3 } |> (True) { stdio.print("yes") } | (False) { stdio.print("no") }
+}
+```
+
+```text
+("small", "small", "negative", "large")
+("7", "text")
+yes
+```
+
+`value |> (pattern) { body } | …` matches `value` against a chain of branches. It tries them in order and takes the first matching branch whose guard succeeds. This is the language's form for choosing: there are no `if`, `else`, or `switch` keywords. For a condition, match the boolean values `True` and `False`.
+
+A chain is itself one function value. `|>` passes its left value as one positional argument to that function. Inside a parameter item, `0 | 1` gives alternative patterns; each alternative must bind the same names. The `?` introduces a guard, a boolean expression tested after its pattern matches. A guarded branch does not count toward coverage, so `size` ends with a catch-all.
+
+In the multi-branch match in `kind`, `n : Int` and `s : String` are type tests. They select the member of the incoming union and bind its value. In an ordinary single-branch parameter group, `x : Int` instead annotates the accepted argument type. Union annotations need braces, as on `value` above.
+
+## Taking data apart
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+Item = (value = Int)
+Empty = ()
+unpack = (value : { Item | Empty }) {
+	value |> (Item(value = n)) { n } | (Empty) { 0 }
+}
+list_total = (xs : List(Int)) {
+	xs |> ([]) { 0 } | ([x]) { x } | ([x, ..rest]) { x + list_total(rest) }
+}
+
+main = () {
+	pair = (4, 5)
+	(a, __unused) = pair
+	(left, right) = whole = pair
+	stdio.print(core.inspect((a, left, right, whole)))
+	stdio.print(
+		core.inspect((unpack(Item(value = 8)), unpack(Empty))),
+	)
+	stdio.print(
+		core.inspect((list_total([]), list_total([2]), list_total([2, 3]))),
+	)
+}
+```
+
+```text
+(4, 4, 5, (4, 5))
+(8, 0)
+(0, 2, 5)
+```
+
+A name pattern binds the matched value. A discard, either `_` or a name starting with two underscores, matches without binding a name. The tuple pattern `(a, __unused)` takes two positions from `pair` and keeps only the first.
+
+A conjunction matches the same value with every part: `(left, right) = whole = pair` binds the two positions and also names the whole tuple. In a positional parameter item, write the whole-value name last, as `((left, right) = whole)`, because an item starting with `name =` is labelled.
+
+`Item(value = n)` is a constructor pattern: it matches the constructor and takes its labelled field. `Empty` matches the constructor with no fields. Constructor patterns must use labels for labelled fields. The ordinary data pattern `(a, b)` matches a tuple of that shape; when matching a tuple with `|>`, it is nested inside the branch's parameter group.
+
+List patterns distinguish `[]`, an exact list such as `[x]`, and a prefix with a rest such as `[x, ..rest]`. The rest is another list. Here the recursive function consumes one item at a time. Data-rest patterns are specified in §7.1 but are not yet accepted by this compiler; list-rest patterns work as shown.
+
+## Text, literals, and bits
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+prefix = (s : String) { s |> ("pre:" <> rest) { rest } | (_) { "no prefix" } }
+suffix = (s : String) { s |> (rest <> ".i") { rest } | (_) { "no suffix" } }
+middle = (s : String) { s |> ("[" <> rest <> "]") { rest } | (_) { "no pair" } }
+literal = (x : { Int | Float | String }) {
+	x |>
+		(-1) { "integer" }
+		| (-.1.5) { "float" }
+		| ("ok") { "string" }
+		| (_) { "other" }
+}
+packet = (bits : BitArray) {
+	bits |> (<<tag, body:bits>>) { (tag, body) } | (_) { (0, <<>>) }
+}
+
+main = () {
+	stdio.print(
+		core.inspect((prefix("pre:a"), suffix("main.i"), middle("[b]"))),
+	)
+	stdio.print(
+		core.inspect((literal(-1), literal(-.1.5), literal("ok"), literal(2))),
+	)
+	stdio.print(
+		core.inspect(packet(<<7, 8, 9>>)),
+	)
+}
+```
+
+```text
+("a", "main", "b")
+("integer", "float", "string", "other")
+(7, <<8, 9>>)
+```
+
+A literal pattern matches an equal value. The examples include integer, float, and string literals, including the separate negative spellings `-1` and `-.1.5`. A final discard handles the remaining values.
+
+String patterns have one binder: `"pre:" <> rest` keeps the suffix, `rest <> ".i"` keeps the prefix, and `"[" <> rest <> "]"` keeps the middle. The fixed prefix and suffix must not overlap. Pattern strings do not interpolate expressions.
+
+A bit-array pattern reads segments in order and must use all the bits. Here `tag` reads the first eight bits, and `body:bits` takes the rest. The catch-all handles inputs too short for the first byte. The [bit-array standard](/docs/standard/generated/chapter-8#section-8-4) defines the other formats and matching rules.
+
+## Covering the subject
+
+A multi-branch group, or a group with a guard, must cover every possible argument value. This module is rejected:
+
+```i error E0516
+describe = (n : Int) { n |> (0) { "zero" } | (1) { "one" } }
+main = () { describe(2) }
+```
+
+Run `i check`. The real diagnostic is **E0516**: “the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `2`”. The annotation admits all integers, while the branches handle only `0` and `1`. Add an unguarded catch-all or narrow the accepted type.
+
+A single branch without a guard has a different rule: a pattern that may fail reports failure through `Assert`, rather than being checked for exhaustive coverage. For recoverable choices, write the complete branch chain; see [services and errors](/docs/tour/services-and-errors) for the service behavior.
+
+## Recursion, pipelines, and precedence
+
+```i run
+(
+	i/core
+	i/stdio
+)
+
+sum = (xs : List(Int), total : Int) -> Int {
+	xs |> ([]) { total } | ([x, ..rest]) { sum(rest, total + x) }
+}
+add = (x, y) { x + y }
+
+main = () {
+	[1, 2, 3] |> sum(0) |> add(4) |> core.inspect |> stdio.print
+	stdio.print(core.inspect(2 + 3 * 4))
+	stdio.print(core.inspect({ 2 + 3 } * 4))
+}
+```
+
+```text
+10
+14
+20
+```
+
+Repeated work uses recursion. `sum` carries its changing total as an argument, with an empty-list branch to finish the loop. Its recursive call is the final expression of the branch, so it is in tail position and uses no additional stack.
+
+A pipeline passes its left value into position zero of the next call: `xs |> sum(0)` means `sum(xs, 0)`. Chaining stages sends each result into the next. The final stages inspect and print the result, without an intermediate name for every step.
+
+Multiplication binds more tightly than addition, giving `14`; braces change the grouping to give `20`. Operators at the same precedence associate left to right. Calls and field access bind more tightly than arithmetic, and the pipeline binds less tightly. Use the [operator table](/docs/standard/generated/chapter-6#section-6-9) for the complete order.
+
+## See also
+
+- [Functions, blocks, and branches, standard §6](/docs/standard/generated/chapter-6#section-6-8).
+- [Patterns and coverage, standard §7](/docs/standard/generated/chapter-7).
+- Next: [Types and inference](/docs/tour/types-and-inference).
