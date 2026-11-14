@@ -1,6 +1,6 @@
 {
-  "compiler": "58a356366381d557c52d27afe70e2dc49496fea3",
-  "binary_sha256": "938d9d0476130f259aa42a3a211d6271a3278a36c67d9faf51011a62d3499775",
+  "compiler": "c829216203ac222f43092428007a9c3026b14ac8",
+  "binary_sha256": "ed435649d4ef75158514981103ad983a059a299cca0d40f850c8e4598b401473",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.h0 : () <- (S(N), T(N2), ..N, ..N2) -> Int\napp/main.h1 : () <- (S(N), ..N) -> Int\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:21:8: error[E0515]: `S(Never)` and `S(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:24:7: error[E0501]: `T(_)` is not a subtype of `S(Never)` (the type at 22:25 needs it)\nsrc/main.i:31:8: error[E0515]: `S(_)` and `S(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n3 errors\n"
+      "stderr": "src/main.i:21:8: error[E0515]: `S(Never)` and `S(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:24:7: error[E0501]: `T(_)` is not a subtype of `S(Never)` (the type at 22:26 needs it)\nsrc/main.i:31:8: error[E0515]: `S(_)` and `S(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n3 errors\n"
     }
   }
 }

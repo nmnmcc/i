@@ -1,6 +1,6 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "c829216203ac222f43092428007a9c3026b14ac8",
+  "binary_sha256": "ed435649d4ef75158514981103ad983a059a299cca0d40f850c8e4598b401473",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:3:13: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3); the host gives this value, so it must be all of `String`, not `\"off\" | \"on\"`\n1 error\n"
+      "stderr": "src/main.i:3:14: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3); the host gives this value, so it must be all of `String`, not `\"off\" | \"on\"`\n1 error\n"
     }
   }
 }
