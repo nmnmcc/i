@@ -9,7 +9,7 @@ description: "Fast enough, complete enough, easy to read, and light: a small fun
 <p className="home-eyebrow">The i programming language</p>
 <h1 id="home-title">The language for the rest of us</h1>
 <p className="hero-position"><strong>Fast enough:</strong> compiles to WasmGC and runs natively, on WASI, and in JavaScript hosts. <strong>Complete enough:</strong> services, typed errors, structured concurrency, macros. <strong>Easy to read:</strong> no keywords, no types to write. <strong>Light:</strong> one standard, one tool.</p>
-<p className="hero-explanation"><code>PORT=8080</code>. No parameter, result, or service annotations.</p>
+<p className="hero-explanation">Run with <code>PORT=8080</code>. No parameter, result, or service annotations.</p>
 <div className="home-actions">
 <a className="home-button home-button-primary" href="/docs/tour">Read the tour</a>
 <a className="home-button" href="/docs/getting-started/install">Install</a>
@@ -35,9 +35,10 @@ read_port = () {
 		| (_) { fail.raise(BadPort) }
 }
 main = () {
-	fail.catch(read_port) |>
-		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
-		| (Error(_)) { stdio.print("invalid PORT") }
+	text = fail.catch(read_port) |>
+		(Ok(port)) { "port " <> int.to_string(port) }
+		| (Error(_)) { "invalid PORT" }
+	stdio.print(text)
 }
 ```
 

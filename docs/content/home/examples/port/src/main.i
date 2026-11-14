@@ -16,7 +16,8 @@ read_port = () {
 		| (_) { fail.raise(BadPort) }
 }
 main = () {
-	fail.catch(read_port) |>
-		(Ok(port)) { stdio.print("port " <> int.to_string(port)) }
-		| (Error(_)) { stdio.print("invalid PORT") }
+	text = fail.catch(read_port) |>
+		(Ok(port)) { "port " <> int.to_string(port) }
+		| (Error(_)) { "invalid PORT" }
+	stdio.print(text)
 }

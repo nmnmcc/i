@@ -5,7 +5,7 @@
 .home-page :where(h1, h2, p) { margin: 0; }
 .home-page a, .home-page button { -webkit-tap-highlight-color: transparent; }
 .home-page :focus-visible { outline: 2px solid var(--color-fd-primary); outline-offset: 5px; }
-.home-hero { min-height: calc(100svh - 4rem); padding-block: 3rem; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(2.5rem, 6vw, 5rem); }
+.home-hero { min-height: min(calc(100svh - 4rem), 50rem); padding-block: 3rem; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(2.5rem, 6vw, 5rem); }
 .home-eyebrow { margin-bottom: 1.5rem !important; color: var(--color-fd-muted-foreground); font-size: .875rem; }
 .home-page h1 { max-width: 16ch; font-size: clamp(2.5rem, 4.3vw, 3.75rem); line-height: 1.06; letter-spacing: -.055em; font-weight: 600; }
 .hero-position { margin-top: 1.75rem !important; font-size: 1rem; line-height: 1.75; color: var(--color-fd-muted-foreground); }
@@ -21,7 +21,7 @@
 .home-page figure.shiki figcaption { font-family: var(--font-mono); font-size: .75rem; }
 .hero-example { display: grid; gap: 1rem; }
 .hero-example figure.shiki > div[role='region'] { padding-block: .75rem; }
-.home-carousel { min-height: calc(100svh - 3rem); padding-block: 3rem 4rem; }
+.home-carousel { padding-block: 3rem 5rem; }
 .carousel-controls { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 2rem; }
 .carousel-controls[hidden] { display: none; }
 .carousel-controls button { width: 2.75rem; height: 2.75rem; border-radius: 50%; cursor: pointer; background: var(--color-fd-secondary); color: var(--color-fd-foreground); font-size: 1.25rem; }
@@ -43,6 +43,7 @@
   .carousel-slide > p { font-size: .9375rem; }
   .carousel-controls { margin-bottom: 1.5rem; }
   .home-page figure.shiki pre { font-size: .75rem; }
+  .hero-example figure.shiki pre, .hero-example figure.shiki pre code { font-size: .65rem; tab-size: 2; }
 }
 @media (prefers-reduced-motion: no-preference) { .carousel-track { scroll-behavior: smooth; } }
 @media (prefers-reduced-motion: reduce) { .carousel-track { scroll-behavior: auto; } }
