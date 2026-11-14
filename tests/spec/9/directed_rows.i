@@ -42,13 +42,13 @@ collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 emit = <A>(x : A) <- (y : Yield(A)) { y.emit(x) }
 
 test("a wider Fail meets a narrower need", () {
-	r : Result(Nil, Int | String) = failure.catch(() { both() })
+	r : Result(Nil, Int | String) = fail.catch(() { both() })
 	check(show(r), "Error(1)")
 })
 
 test("two needs of Fail are one entry", () {
-	a : Result(Nil, Int | String) = failure.catch(() { either(0) })
-	b : Result(Nil, Int | String) = failure.catch(() { either(1) })
+	a : Result(Nil, Int | String) = fail.catch(() { either(0) })
+	b : Result(Nil, Int | String) = fail.catch(() { either(1) })
 	check(show(a), "Error(1)")
 	check(show(b), "Error(\"s\")")
 })
