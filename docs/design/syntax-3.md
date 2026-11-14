@@ -367,7 +367,7 @@ rule 11 (§5.2.8) with the keys of its parameter data as its places, and must
 cover its parameter type (spec §7.4). `x : T` in it is a type test.
 
 **The value of a chain.** A chain whose branches all have one shape has the
-function type `(B) <- N -> R`, where `B` is the group's parameter data
+function type `{ B } <- N -> R`, where `B` is the group's parameter data
 type and `R` the union of its branch results. A chain with several groups has
 the multi-shape type of §2.6.5. The need `N` (errors included, as `Fail(E)`)
 is shared by all branches of a chain ([R4] Q15, R6).
@@ -377,8 +377,8 @@ function literals), is a **match**. It works out `e` and calls `C` with the
 one-tuple `(e)`, in place: it adds no call frame, a call in a branch body of
 a match in tail position is in tail position (spec §11.6), the match is not a
 call in a stop message (spec §11.7), and a branch pattern `C(…)` that matches
-a name subject makes that name known to be made by `C` in the branch (spec
-§7.5). So matching uses the group of shape "one position". Branches of other
+a name subject gives that name the branch-local view of spec §7.5. So matching
+uses the group of shape "one position". Branches of other
 shapes in a matched chain literal can never run and give the "never used"
 warning. A match is typed by rule 11 with all branches of that group; there
 is no selection in a match [R4]. A match whose chain has
@@ -540,7 +540,7 @@ and `f(3.0, 4.0)` both have the type `Float`. For `show`,
 `Some(g) = list.first([show])` gives `g(1) : String | Int | Bool | Conn`.
 
 Function types follow the lattice rules of spec §4.4 with one data parameter:
-`(P) -> R | (Q) -> S` is `(P & Q) -> R | S`, and for different shapes `P & Q`
+`{ P } -> R | { Q } -> S` is `{ P & Q } -> R | S`, and for different shapes `P & Q`
 is `Never`, so `[area, show]` is legal and its elements cannot be called. A
 single-shape function is not a subtype of a multi-shape type (its parameter
 type is smaller), and a multi-shape type is a subtype of each of its shapes,
@@ -685,10 +685,10 @@ and every type variable must be a parameter (spec §4.3, unchanged). In a
 labelled type (kinds 2 and 3), a parameter need not be used (a phantom), and a
 parameter that is not used in the data is invariant; an `Opaque` parameter is
 invariant (§1.3). Other parameters of labelled types get their variance from
-the data by spec §4.5 rule 6.
+the data by the simultaneous variance rule of spec §4.5.
 
 - **Constructors.** A labelled type with data `D` has the constructor
-  function `(D) -> T(…)`: `Some : (A) -> Some(A)`,
+  function `{ D } -> T(…)` (spec §4.6): `Some : (A) -> Some(A)`,
   `User : (name = String, age = Int) -> User`. When `D` is `()`, the
   constructor is a value: `None`, `Nil`, `True` (D5); `None()` is a compile
   error, in expressions and in patterns.
@@ -1079,10 +1079,9 @@ catch = <A, E, N>(body: () <- (..N, Fail(E)) -> A) -> Result(A, E) {
 
 #### 2.10.8 `..env` and `keep`
 
-- In a service pattern, `..env : N` binds the whole environment the function
-  receives as one value of the row type `N` (owner: `<- (..env)` replaces
-  `keep_env`). `g() <- env` provides it again; `<- (..env, fake)` overrides one
-  key of it (rule C).
+- `..env: N` binds the projected row value of spec §6.8 (owner:
+  `<- (..env)` replaces `keep_env`). `g() <- env` provides it again;
+  `<- (..env, fake)` overrides one key of it (rule C).
 - A value whose type is a row variable is not data: it may be bound, captured
   and provided after `<-` (alone or as a spread in provided data); it may not
   be spread into ordinary data, compared, printed or matched.
@@ -1098,11 +1097,10 @@ keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail
 - `Fail` stays at the call of the kept function, so an error raised inside it
   goes to the caller's `catch`, as with today's `control.keep_env`. This is
   sound only under rule B.
-- **Implementation.** `N` is erased at run time, so the closure stores the
-  `$env` pointer it received. `f(x) <- env` compiles to that pointer overlaid
-  with the current values of the keys the callee needs outside `N` (here
-  `Fail`); that set is known at compile time. Restoring the whole pointer
-  would also restore the captured `Fail`, which is wrong.
+- **Implementation.** Capture uses spec §9.4: retain only the services in
+  the inferred residual need. A stored environment must not retain unrelated
+  services through its backing pointer. `f(x) <- env` overlays the retained
+  services with the caller's `Fail`. Task substitutions are in spec §9.9.
 - **`keep_env` stays a primitive** with the type of §2.10.7 until stage E6,
   where it is deleted only if `tests/spec/9/keep_env.i` and a
   `task.keep` error-propagation fixture pass on the library `keep`. The seven
@@ -1114,8 +1112,8 @@ keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail
   opens a resource and attaches `release` to the current `Scope`;
   `resource.scoped(body)` runs `body` with a new `Scope` and runs the attached
   releases in reverse order when `body` ends, also by an error, an escape or a
-  cancel. `resource.ensure` is unchanged. The platform gives every entry a
-  `Scope` (§2.10.11).
+  cancel. `resource.ensure` is unchanged. Scope lifecycle and acquisition
+  checks follow spec §9.5. The platform gives every entry a `Scope` (§2.10.11).
 - `resource.acquire : <A, N>(() <- N -> A, (A) -> Nil) <- (..N, Scope) -> A`.
   A release that needs services is made with `keep` (§2.10.8). This is a std
   API break: today `acquire` takes three arguments with a `use` function.
@@ -1263,6 +1261,8 @@ function `core.never : (Never) -> A` (D9; the name [R4]) is the match on
 | Labelled value | The constructor name; when its data is not `()`, then the text form of its data: `Some(1)`, `User(age = 36, name = "ada")`, `None`. The printed text is a legal expression (O20); labels in UTF-8 byte order [R4]. |
 | Function | `//fn(`, one name per key of its shape: positions `a`, `b`, … as today, then each label as `label = ` followed by the next name of the same sequence, `) { ... }`. A multi-shape value writes each group's part joined by ` \| `: `//fn(a) { ... } \| (a, b) { ... }`, in the written order of the groups' first branches. |
 
+Float text uses the source form specified by spec §11.8.
+
 ### 2.16 Type parameters on function values (owner, O23)
 
 Type parameters are written on function values and function types, not on
@@ -1300,11 +1300,10 @@ first = <A>(xs: List(A)) -> Option(A) { … }
 - **Polymorphic types are rigid.** A written function type with
   `TypeParams` in a parameter, a field, a type definition or an annotation is
   a polymorphic type: `Layer = <N>() <- N -> (Config, Log)`,
-  `Show = (write = <A>(A) -> Nil)`. A value checked against it is checked with
-  fresh rigid constants for its parameters and a level-escape check
-  (skolemisation, Peyton Jones et al. 2007); each use instantiates it afresh
-  through the existing `instantiate` (`infer.rs`:1618). Inference never
-  guesses a polymorphic type: a parameter gets one only from a written type,
+  `Show = (write = <A>(A) -> Nil)`. Rigid checking, subtyping, variance and
+  quantified joins and meets follow spec §4.6; each use instantiates afresh.
+  Inference never guesses a polymorphic type: a parameter gets one only from
+  a written type,
   as for polymorphic fields in OCaml and polymorphic function types in
   Scala 3. A rigid row variable is one opaque member of a need.
 - **Chains.** Each branch of a chain writes its own `<…>`, which scopes over
@@ -1442,8 +1441,8 @@ environment statement `"!" NamedType "=" Expr`, the environment read
 - **Function head.** `<-` after `Params` is the **service pattern** (§2.10.3):
   each `SvcItem` binds a name to the service whose key is the written named
   type; the annotation is required and uses `Annot` (§3.1), restricted to
-  `NamedType`. `..name : N` binds the whole environment
-  the function receives, as one value of the row type `N` (§2.10.8); it is
+  `NamedType`. `..name: N` binds the projected row value
+  of spec §6.8 (§2.10.8); it is
   the last item, at most once, and `N` must be a type parameter of the
   function. No other pattern is allowed in a service item, and a service
   pattern has no labels, no guard and no alternatives. `<- ()` is a compile
@@ -2031,7 +2030,7 @@ Grammar as §3.2. Then:
   take apart its values; they come from the host (§10).
 - `T = ( … )`, where the whole right side is one data type not in a group,
   defines a new **labelled type** with that data, and its **constructor** `T`.
-  The constructor is the function `(D) -> T(P1, …)` where `D` is the data
+  The constructor is the function `{ D } -> T(P1, …)` where `D` is the data
   type, or, when `D` is `()`, the value `T`. Two labelled definitions are
   different types even with the same data.
 - Any other right side defines a **name**, a transparent alias. A name may not
@@ -2103,7 +2102,8 @@ in the other direction and `R` and `N` in the same direction.
 
 #### 5.2.5 §4.6 Function types
 
-The function type `(D) <- N -> A` has one parameter, a data type `D`, a need
+The function type `{ D } <- N -> A` uses the complete-data notation of
+spec §4.6: `D` is the whole argument data type. It has a need
 `N` written after `<-` (what it takes from outside, §9.2) and a value `A`
 after `->`. Errors are the need entry `Fail(E)`, so `Effect<A, E, R>` of
 Effect-TS is `() <- (..R, Fail(E)) -> A`. A missing `<-` part means "needs
@@ -2191,12 +2191,9 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
 
 #### 5.2.8 §4.8 Typing rules: changed rules
 
-4. **Functions.** Let the parameter group be the data pattern `q`. `q` is
-   fitted to a data type `P` (below). If `Γ` with the names of `q` gives
-   `body : A <- M` (with the names of the service pattern bound to their
-   annotated types), the function has the type `(P) <- M' -> A`, where `M'` is
-   the merge of `M`, the service pattern's types, and `Assert` when `q` may
-   fail for `P` (§7.3) (§2.10.4). Making the function needs nothing.
+4. **Functions.** Use spec §4.8 rule 4, including its rules for a written
+   result and written type parameters. The whole parameter data uses the
+   notation of spec §4.6.
 5. **Calls.** If `f : {P} <- N -> A` and the argument data `d : D` with
    `D <: P`, then `f(d) : A <- N`.
    **5b. Provide.** `e <- s` as §2.10.4 "Provide".
@@ -2230,10 +2227,9 @@ guard, and the item has no alternatives, and a test when not (§7.1). So with
     with the type arguments of the bound forms, as today for `.f`.
 15. Removed.
 
-Fitting: "Only a clause block with one clause may have choices…" becomes
-"Only a fitted group may have alternatives where a pattern is fitted". The
-pattern type of a conjunction `p1 = … = pk` is the intersection of the
-pattern types of its parts that are not catch-alls; a name part gets that
+Alternatives use spec §4.8 in every shape group; they are not restricted to
+fitted groups. The pattern type of a conjunction `p1 = … = pk` is the
+intersection of the pattern types of its parts that are not catch-alls; a name part gets that
 type. A catch-all is a name, a discard, or a conjunction of catch-alls. A data
 pattern has the data type of its items' pattern types at their keys (with new
 type variables, as today for tuples); a rest gets the data type of the
@@ -2262,8 +2258,7 @@ Grammar as §3.4. Then:
 - A data pattern `( … )` matches data of its shape whose parts match its
   items. A positional item matches the next position; `label = p` matches the
   part under `label`; `..` leaves out the other keys; `..r` binds them as data.
-  `..` needs the shape of the matched value to be known (from a type, or from
-  the constructor).
+  The unique-known-shape requirement for `..` is in spec §7.1.
 - `p1 = … = pk` matches what every part matches. Directly inside a data
   pattern, an item that begins with `name =` is a key item.
 - `x : T` is unchanged: a type annotation where it is fitted and not in an
