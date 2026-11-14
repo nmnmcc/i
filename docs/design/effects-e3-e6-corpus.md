@@ -93,6 +93,12 @@ Getting it never fails at run time.” Simplifying arguments cannot supply a
 missing constructor key. Both unused `min_main` cases therefore retain `S`
 and reject at an entry again. Explicit `Fail(Never)` and `Consumer(Never)`
 keys remain real needs, and the previous D9 display justification is withdrawn.
+The two old unit tests that accepted an unused `Fail(E)` without a provider
+now retain those original sources as rejection cases, alongside the real-raise
+controls. Positive controls supply an actual `Fail(Never)` or use a genuinely
+service-free callback. The filtered-callback spec fixture also checks that
+`N - Fail(Never)` cannot satisfy an unused Fail key. This rewrites tests of the
+dropped removal rule under Decision 2; no negative case or assertion is lost.
 
 **R5 — Removed channel obligations.** R1 removes the extra error-channel
 constraint, not an incompatible service constraint. Spec §9.2 still says:

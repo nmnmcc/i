@@ -467,23 +467,30 @@ fn a_directed_handler_restriction_without_a_stated_entry_is_hidden() {
 }
 
 #[test]
-fn a_closed_callback_can_instantiate_an_unused_fail_entry_as_never() {
-    // Written callback types are closed. A fresh E may be Never, but an
-    // actual raised value must not disappear when fitting the callback.
-    types(
-        "unused = <E>() <- (handler: Fail(E)) { Nil }\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { unused() }) }\n",
+fn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {
+    // Decision 2 (EF03/T4) removes universal-entry erasure. Preserve the
+    // original unused-head source as a negative case beside a real raise;
+    // a provider, not choosing E = Never, makes the pure callback valid.
+    let unused = "unused = <E>() <- (handler: Fail(E)) { Nil }\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { unused() }) }\n";
+    let provided = unused.replace(
+        "unused() })",
+        "unused() <- (Fail(raise = (_: Never) { panic(\"unreachable\") })) })",
     );
-    let source =
-        "(i/fail)\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { fail.raise(1) }) }\n";
-    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
-    let checked = ilang_check::check(&graph);
-    assert!(
-        checked.diags.iter().any(|d| d.is_error()
-            && d.source
-                .is_some_and(|id| graph.sources.get(id).text == source)),
-        "{:?}",
-        graph.sources.render_all(&checked.diags)
-    );
+    types(&provided);
+    for source in [
+        unused,
+        "(i/fail)\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { fail.raise(1) }) }\n",
+    ] {
+        let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.is_error()
+                && d.source
+                    .is_some_and(|id| graph.sources.get(id).text == source)),
+            "{source}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
 }
 
 #[test]
@@ -724,21 +731,27 @@ fn a_covariant_handler_hole_retains_its_upper_bound() {
 }
 
 #[test]
-fn a_filtered_callback_vacates_only_an_unused_fail_need() {
+fn a_filtered_callback_does_not_vacate_an_unused_fail_need() {
+    // Decision 2: excluding Fail excludes its key even when E = Never.
+    // Keep both old sources: an unused head and a real raise must reject.
     let source = "(i/fail)\nNoError(N) = N - Fail(Never)\nrun = <N>(f: () <- (NoError(N)) -> Nil) { f() }\npure = <E>() <- (unused: Fail(E)) { Nil }\nmain = () { run(pure) }\n";
-    let shown = types(source);
+    let plain = source.replace("pure = <E>() <- (unused: Fail(E))", "pure = ()");
+    let shown = types(&plain);
     assert!(!shown["app/main.main"].contains("Fail"), "{shown:?}");
-    let bad = source.replace("{ Nil }", "{ fail.raise(1) }");
-    let (graph, _, _) = common::check_files(&[("src/main.i", &bad)]);
-    let checked = ilang_check::check(&graph);
-    assert!(
-        checked
-            .diags
-            .iter()
-            .any(|d| d.is_error() && d.source.is_some_and(|id| graph.sources.get(id).text == bad)),
-        "{:?}",
-        graph.sources.render_all(&checked.diags)
-    );
+    for candidate in [
+        source.to_owned(),
+        source.replace("{ Nil }", "{ fail.raise(1) }"),
+    ] {
+        let (graph, _, _) = common::check_files(&[("src/main.i", &candidate)]);
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.is_error()
+                && d.source
+                    .is_some_and(|id| graph.sources.get(id).text == candidate)),
+            "{candidate}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
 }
 
 #[test]
