@@ -4,6 +4,15 @@ The `.txt` suffix keeps these intentionally invalid programs out of source
 formatting and snippet discovery. The CLI regression test supplies `src/main.i`
 and a manifest pointing at this worktree’s std; the program text is unchanged.
 
+After merging E4, `t5-a1-r3.stderr` also retains W0505 at 162:7 and W0501 at
+166:8. The original program binds `Ok(source) = bit_array.to_string(bytes)`
+and later matches nested `Ok` values. The E4 table in
+`docs/design/effects-e4.md` changes `bit_array.to_string` to return `String`
+through `Fail(Nil)`, and `json.parse` to return `Json` through `Fail(JsonError)`.
+Its controlling paragraph says: “An operation that may fail reports through
+`Fail`; `Result` is data used after `catch`.” The input and both grouping
+errors are preserved; these extra warnings pin the current API's behavior.
+
 - `t1-a1-r3.txt`: `/home/agent/Programming/i/.rd/cache/ai-eval/round2/runs/subjects/gpt-6-luna/condition-2/T1/i/attempt-1/execution-00/round-3/project/src/main.i`
   SHA-256: `7a1c3daca5fe6657b0e004297b4ff47397a058a3cea8cf6918748bc577242b31`
 - `t1-a2-r3.txt`: `/home/agent/Programming/i/.rd/cache/ai-eval/round2/runs/subjects/gpt-6-luna/condition-2/T1/i/attempt-2/execution-00/round-3/project/src/main.i`

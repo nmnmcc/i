@@ -1,3 +1,5 @@
 src/main.i:92:5: error[E0501]: `(Bool)` is not a subtype of `Bool`. Parentheses construct one-item data. Use braces `{ }` to group an expression: `{ n >= 97 && n <= 122 }`.
 src/main.i:92:30: error[E0501]: `(Bool)` is not a subtype of `Bool`. Parentheses construct one-item data. Use braces `{ }` to group an expression: `{ n >= 48 && n <= 57 }`.
+src/main.i:162:7: warning[W0505]: this pattern never matches: no value of this type is made by `Ok` (§4.8)
+src/main.i:166:8: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)
 2 errors

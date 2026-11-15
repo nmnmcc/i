@@ -45,7 +45,9 @@ fn original_model_programs_get_actionable_repairs() {
         };
     }
     // Every input here is byte-for-byte the model's project/src/main.i.
-    // Exact stderr also pins all original codes, positions and error counts.
+    // Exact stderr pins all original error codes, positions and counts. E4's
+    // Fail-based bit_array.to_string also warns about the archive's unchanged
+    // Ok pattern; its two additional warnings are retained in t5-a1-r3.stderr.
     for (name, source, expected) in [
         // T1/i/attempt-1/execution-00/round-3/project/src/main.i
         archived!("t1-a1-r3"),
