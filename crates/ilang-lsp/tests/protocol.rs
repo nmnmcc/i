@@ -2374,7 +2374,7 @@ fn lsp_code_action_adds_the_missing_clauses() {
     let actions = code_actions(&mut c, &main, d.range);
     let after = applied(action(&actions, "Add the missing clauses"), text, &main);
     assert!(
-        after.contains("| (Circle(1)) { 1 } | (Circle(..)) { panic(\"todo\") } | (Rect(..)) { panic(\"todo\") }"),
+        after.contains("& (Circle(1)) { 1 } & (Circle(..)) { panic(\"todo\") } & (Rect(..)) { panic(\"todo\") }"),
         "{after}"
     );
     // The new text checks.
@@ -2532,7 +2532,7 @@ fn lsp_folding_ranges() {
     let (area, _) = find(SHAPES, "area = ", 0);
     let (case, _) = find(SHAPES, "s |>", 0);
     assert!(ranges.iter().any(|f| f.start_line == area), "{ranges:?}");
-    // A match written over several lines as a chain `s |> (p) { … } | …`
+    // A match written over several lines as a chain `s |> (p) { … } & …`
     // folds from its subject to its last branch.
     assert!(
         ranges

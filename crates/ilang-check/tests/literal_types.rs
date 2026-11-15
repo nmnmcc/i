@@ -367,7 +367,7 @@ fn narrowing_checks_the_entire_row_and_ignores_guards() {
             "String - \"a\""
         };
         let source = format!(
-            "g = (s : {need}) {{ 1 }}\nf = (v : {annotation}, c : Bool) {{ v |> ({pattern}) {{ 0 }} | ({catch}) {{ g(t) }} | (_) {{ 2 }} }}\n"
+            "g = (s : {need}) {{ 1 }}\nf = (v : {annotation}, c : Bool) {{ v |> ({pattern}) {{ 0 }} & ({catch}) {{ g(t) }} & (_) {{ 2 }} }}\n"
         );
         let (ds, _) = check(&source);
         let errors: Vec<_> = ds.iter().filter(|d| d.0.starts_with('E')).collect();
@@ -388,7 +388,7 @@ fn prefix_after_complement_does_not_erase_other_columns() {
     assert!(!ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     // The last wildcard is redundant: the two preceding rows cover String.
     // Without it, neither remaining clause may be called never used.
-    let (covered, _) = check(&source.replace(" | (_) { 2 }", ""));
+    let (covered, _) = check(&source.replace(" & (_) { 2 }", ""));
     assert!(covered.is_empty(), "{covered:?}");
     let (ds, _) = check(&source.replace("(n : Int)", "(n : String)"));
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");

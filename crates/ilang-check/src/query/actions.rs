@@ -395,7 +395,7 @@ impl Query<'_> {
         let line_start = text[..close as usize].rfind('\n').map_or(0, |i| i + 1) as u32;
         let own_line = text[line_start as usize..close as usize].trim().is_empty();
         let body = |pat: &str| {
-            let clause = format!("| ({pat}) {{ panic(\"todo\") }}");
+            let clause = format!("& ({pat}) {{ panic(\"todo\") }}");
             if lisp {
                 lisp_clause(pat, "panic(\"todo\")").unwrap_or(clause)
             } else {
@@ -625,7 +625,7 @@ fn lisp_type(ty: &str) -> Option<String> {
 /// printer writes it.
 pub(crate) fn lisp_clause(pattern: &str, body: &str) -> Option<String> {
     let (module, diags) = ilang_syntax::syn3::parse_module(&format!(
-        "f = (s) {{ s |> ({pattern}) {{ {body} }} | (_) {{ 0 }} }}\n"
+        "f = (s) {{ s |> ({pattern}) {{ {body} }} & (_) {{ 0 }} }}\n"
     ));
     if !diags.is_empty() {
         return None;

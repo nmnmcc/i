@@ -583,7 +583,7 @@ fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
     assert!(!subject.iter().any(|(n, _)| n == "f"), "{subject:?}");
     let body = fixture.completions("app/main", "f(local)", 0);
     assert!(body.iter().any(|(n, _)| n == "f"), "{body:?}");
-    for needle in ["(0) { 1 } | (_) { 2 }\n", ", (0) { 1 }"] {
+    for needle in ["(0) { 1 } & (_) { 2 }\n", ", (0) { 1 }"] {
         let at = fixture.at("app/main", needle, 0, 0);
         let query = fixture.query();
         let module = fixture.module("app/main");
@@ -735,7 +735,7 @@ fn query_missing_clauses_of_a_match() {
     assert_eq!(c.patterns, vec!["Circle(..)", "Line"]);
     assert_eq!(
         c.edit.text,
-        " | (Circle(..)) { panic(\"todo\") } | (Line) { panic(\"todo\") } "
+        " & (Circle(..)) { panic(\"todo\") } & (Line) { panic(\"todo\") } "
     );
 }
 

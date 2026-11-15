@@ -114,7 +114,7 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
     // its first branch and the Case runs from the first branch to the end of
     // the last one.
     let src = "one = (n) { n }\nmany = (0) { 1 } & (_) { 2 }\nstring_argument = () { many(\"s\") }";
-    let chain = "(0) { 1 } | (_) { 2 }";
+    let chain = "(0) { 1 } & (_) { 2 }";
     let chain_start = src.find(chain).unwrap();
     let chain_end = chain_start + chain.len();
     let (_, c) = checked(src, &["one", "string_argument"]);

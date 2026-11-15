@@ -32,7 +32,7 @@ fn nominal_union(n: usize) -> String {
         .collect();
     out.push(format!("E(A) = {}", members.join(" | ")));
     let clauses: Vec<String> = (1..n)
-        .map(|i| format!("\t\t| (C{i}(a, r)) {{ a + f0(r) }}"))
+        .map(|i| format!("\t\t& (C{i}(a, r)) {{ a + f0(r) }}"))
         .collect();
     out.push(format!(
         "f0 = (e) {{\n\te |>\n\t\t(C0) {{ 0 }}\n{}\n}}",

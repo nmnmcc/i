@@ -105,11 +105,11 @@ fn show_as_groups_a_binary_operand_under_negation() {
 
 #[test]
 fn show_as_distinguishes_chains_pipes_and_matches() {
-    let chain = "(| (-> (, 0) _ 1) (-> (, _) _ 2))";
-    assert_eq!(shown(chain, Position::Expression), "(0) { 1 } | (_) { 2 }");
+    let chain = "(& (-> (, 0) _ 1) (-> (, _) _ 2))";
+    assert_eq!(shown(chain, Position::Expression), "(0) { 1 } & (_) { 2 }");
     assert_eq!(
         shown(&format!("(|> s {chain})"), Position::Expression),
-        "s |> (0) { 1 } | (_) { 2 }"
+        "s |> (0) { 1 } & (_) { 2 }"
     );
     assert_eq!(shown("(|> e f)", Position::Expression), "e |> f");
     // The rows in the legacy syntax are not read.
@@ -231,8 +231,8 @@ fn show_as_accepts_expressions_already_written_in_normal_surface() {
         "-{ x + y }",
         "(x) { x }",
         "(x : Int, y = (a, b)) -> Int { x }",
-        "(0) { 1 } | (_) { 2 }",
-        "x |> (0) { 1 } | (_) { 2 }",
+        "(0) { 1 } & (_) { 2 }",
+        "x |> (0) { 1 } & (_) { 2 }",
         "x |> f |> g(1)",
         "{\n\ty = x\n\ty\n}",
         "<<1, 2:size(8)>>",
@@ -447,14 +447,14 @@ fn show_as_writes_every_row_in_its_position() {
         ),
         (
             Expression,
-            "(| (-> (, a) _ a) (-> (, b) _ b))",
-            "(a) { a } | (b) { b }",
+            "(& (-> (, a) _ a) (-> (, b) _ b))",
+            "(a) { a } & (b) { b }",
         ),
         (Expression, "(|> e f)", "e |> f"),
         (
             Expression,
-            "(|> opt (| (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\") (-> (, (Some v)) _ v) (-> (, None) _ \"none\")))",
-            "opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } | (Some(v)) { v } | (None) { \"none\" }",
+            "(|> opt (& (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\") (-> (, (Some v)) _ v) (-> (, None) _ \"none\")))",
+            "opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" }",
         ),
         (Expression, "(. a b)", "a.b"),
         (Expression, "(. m C)", "m.C"),

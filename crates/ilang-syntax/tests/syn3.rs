@@ -379,10 +379,12 @@ fn p4_branch_join() {
 
     bad("h = f & g", "`&` joins only function literals");
     bad("h = (a) { 1 } & g", "`&` joins only function literals");
-    // a value-level `|` is removed syntax, and the hint gives the new join.
-    bad("h = (a) { 1 } & (b) { 2 }", "join the branches with `&`");
-    bad("h = (a) { 1 }\n\t& (b) { 2 }", "join the branches with `&`");
+    // a value-level `|` is removed syntax, and the hint gives the new join;
+    // `&` is the join that replaces it.
+    bad("h = (a) { 1 } | (b) { 2 }", "join the branches with `&`");
+    bad("h = (a) { 1 }\n\t| (b) { 2 }", "join the branches with `&`");
     bad("h = f | g", "join the branches with `&`");
+    assert_eq!(chain(&value("h = (a) { 1 } & (b) { 2 }")).len(), 2);
     // Overloading by shape.
     let show = value(
         "show =\n\t(n : Int) -> String { int.to_string(n) }\n\t& (s : String) -> Int { string.length(s) }\n\t& (a : Int, b : Int) -> Bool { a == b }\n\t& (host : String, port = p : Int) -> Conn { open(host, p) }\n",
@@ -484,9 +486,9 @@ fn p11_pipe() {
         "a |> f(..t)",
         "{ x |> g } == 2",
         "x == 1 |> core.not",
-        "opt |> (Some(v) ? empty(v)) { \"empty\" } | (Some(v)) { v } | (None) { \"none\" }",
-        "day |> (Sat | Sun) { \"rest\" } | (_) { \"work\" }",
-        "p |> ((0, y)) { y } | ((x, _)) { x }",
+        "opt |> (Some(v) ? empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" }",
+        "day |> (Sat | Sun) { \"rest\" } & (_) { \"work\" }",
+        "p |> ((0, y)) { y } & ((x, _)) { x }",
     ] {
         assert_eq!(expr(e), e);
     }
@@ -496,7 +498,7 @@ fn p11_pipe() {
         "the right side of `|>` must be a name, a call",
     );
     // the whole chain is the right operand.
-    match syn3::parse_expr("x |> (p) { e } | (q) { f }")
+    match syn3::parse_expr("x |> (p) { e } & (q) { f }")
         .unwrap()
         .kind
         .clone()
@@ -508,7 +510,7 @@ fn p11_pipe() {
 
 #[test]
 fn p13_lines() {
-    // A line that begins with `|` continues; a line that begins with `(`
+    // A line that begins with `&` continues; a line that begins with `(`
     // begins a new statement; inside `( )` a break is a `,`.
     let m = ok("f = () {\n\tr = x |>\n\t\t(1) { a }\n\t\t& (_) { b }\n\t(r, 1)\n}\n");
     let ItemKind::Bind(b) = &m.items[0].kind else {
