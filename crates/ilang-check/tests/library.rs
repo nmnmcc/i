@@ -1,5 +1,5 @@
 //! The library modules and the prelude parse and resolve with no problems,
-//! and they have the names and labels of the spec tables.
+//! and they have the names and labels that the library documents.
 
 mod common;
 
@@ -62,7 +62,7 @@ fn library_modules_have_sources() {
     assert_eq!(package.modules.len(), count);
 }
 
-/// The exported names of each library module, as in §9, §13 and §14.
+/// The exported names of each library module.
 #[test]
 fn library_names() {
     let (_, program, _) = common::check_files(&[]);
@@ -312,7 +312,7 @@ fn library_names() {
             ("ilang:core", d.name.as_str())
         );
     }
-    // The functions that the spec writes in i are bindings.
+    // The functions that the library writes in i are bindings.
     for (path, name) in [
         ("i/assertion", "catch"),
         ("i/control", "keep"),
@@ -332,8 +332,8 @@ fn library_names() {
     }
 }
 
-/// The parameters of the external functions in the spec tables have no
-/// labels (syntax three, stage 4), for example
+/// The parameters of the external functions of the library have no
+/// labels, for example
 /// `control.suspend: (Boundary(…), (Continuation(…)) -> …) -> A`.
 #[test]
 fn library_labels() {
@@ -346,7 +346,7 @@ fn library_labels() {
     );
     let program = checked.program.unwrap();
     let types = checked.types.unwrap();
-    // E3/E6 make catch/keep ordinary bindings. Inspect the public parameter
+    // Catch and keep are ordinary bindings. Inspect the public parameter
     // data shape, not the legacy HIR's diagnostic parameter-name hints.
     let labels = |path: &str, name: &str| -> Vec<String> {
         let module = common::module(&program, path);
@@ -378,7 +378,7 @@ fn library_labels() {
     assert_eq!(labels("i/prelude", "panic"), ["_"]);
 }
 
-/// The built-in custom types of §4.2 and §9.6 are in the prelude.
+/// The built-in custom types are in the prelude.
 #[test]
 fn prelude_types() {
     let (_, program, _) = common::check_files(&[]);
@@ -389,7 +389,7 @@ fn prelude_types() {
         .iter()
         .filter(|t| t.module == prelude)
         .filter_map(|t| {
-            // `Bool` and `Result` are names of unions (syntax three).
+            // `Bool` and `Result` are names of unions .
             let TypeBody::Custom(cs) = &t.body else {
                 return None;
             };
@@ -443,7 +443,7 @@ const RESERVED: [&str; 7] = [
 
 /// User code imports every reserved module with no problems.
 ///
-/// These standard paths are registered in the library (§0, §2.1).
+/// These standard paths are registered in the library.
 #[test]
 fn reserved_modules_import_cleanly() {
     let imports: String = RESERVED.iter().map(|p| format!("  {p}\n")).collect();
@@ -487,11 +487,11 @@ fn missing_library_names_are_reported() {
 }
 
 /// Only the registered paths are modules of `i`. Any other path in `i` is
-/// still a missing module, as §2.1 says, so the reserved modules do not
+/// still a missing module, so the reserved modules do not
 /// open the whole of `i` to user imports.
 #[test]
 fn unknown_library_path_is_missing() {
-    // Syntax-three §2.3 removes i/record. Keep the corpus probe
+    // The removed `i/record` module must remain unavailable. Keep the corpus probe
     // import rejection independent of its earlier no-type-spread parse error.
     for path in ["i/nope", "i/tasks", "i/std", "i/fs/file", "i/record"] {
         let main = format!("({path})\n\nx = 1\n");

@@ -1,4 +1,5 @@
-//! Tests of the lexer: the token sets of §1.7 and positions.
+//! Tests of the lexer: which tokens can end an expression and begin a
+//! statement, and positions.
 
 #[path = "oracle.rs"]
 mod ilang_syntax;

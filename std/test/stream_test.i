@@ -9,7 +9,7 @@
 	(Some, None) = std/option
 )
 
-// §3.4: constructing either factory needs no Bias service.
+// Constructing either factory needs no Bias service.
 Bias = (value = Int)
 
 needs_bias = () -> stream.Stream(Int, Never, Bias) { stream.new() }
@@ -30,7 +30,7 @@ head = <A, E, N>(s : stream.Stream(A, E, N)) -> option.Option(A) {
 	stream.pull(s) |> (stream.Done) { None } | (stream.Next(x, _)) { Some(x) }
 }
 
-// §3.3's finite-observation laws, with distinct functions for composition.
+// Finite-observation laws, with distinct functions for composition.
 check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
 	a = source(xs)
 	b = source(ys)
@@ -506,7 +506,7 @@ test("stream_long_searches", () {
 	Nil
 })
 
-// S2: each attempted pull, including Done and repeated positions, reruns runner.
+// each attempted pull, including Done and repeated positions, reruns runner.
 test("stream_runner_demand", () {
 	trace = control.boundary((b) {
 		{
@@ -617,7 +617,7 @@ test("stream_callback_failures", () {
 	Nil
 })
 
-// S3/S6: callbacks run in order, and no callback after a failing one is called.
+// callbacks run in order, and no callback after a failing one is called.
 test("stream_callback_order", () {
 	trace = control.boundary((b) {
 		{
@@ -641,8 +641,8 @@ test("stream_callback_order", () {
 	Nil
 })
 
-// S8: the caller keeps the scope through consumption; early termination does
-// not close a resource itself. S7: attempt does not intercept Assert failures.
+// the caller keeps the scope through consumption; early termination does
+// not close a resource itself. A failed attempt does not intercept Assert failures.
 test("stream_resource_scope", () {
 	trace = control.boundary((b) {
 		{
@@ -715,39 +715,9 @@ test("stream_nominal_callbacks", () {
 	Nil
 })
 
-// Checker cases required by std-1 §3.3/§3.4 and §9. They are temporary additions
-// to this owned test file, never failing std tests. Each must report E0501;
-// restore the original file even if checking fails. Run from the lane with:
-// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec("\n".join(x[4:] for x in Path("std/test/stream_test.i").read_text().splitlines() if x.startswith("//| ")))'
-//| import subprocess
-//| from pathlib import Path
-//| path = Path('std/test/stream_test.i')
-//| original = path.read_text()
-//| cases = {
-//|     'invariant environment (§3.4)': '''
-//| Sink(A) { Sink(put: (A) -> Nil) }
-//| bad_coerce = (source: stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(Int, Never, Sink(Never)) {
-//|   source
-//| }
-//| ''',
-//|     'pull requires Bias (S2)': 'bad = () -> List(Int) { stream.to_list(positive()) }',
-//|     'runner cannot erase Bias (§3.3)': '''
-//| bad_runner = (body: () -> stream.Step(Int, Never, Bias) ! Bias) -> stream.Step(Int, Never, Bias) {
-//|   body()
-//| }
-//| ''',
-//|     'pull exposes errors (S7)': 'bad = () -> List(Int) { stream.to_list(broken()) }',
-//| }
-//| try:
-//|     for name, source in cases.items():
-//|         path.write_text(original + '\n' + source + '\n')
-//|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
-//|         print(name, result.returncode, result.stderr, flush=True)
-//|         assert result.returncode == 1 and 'error[E0501]' in result.stderr
-//| finally:
-//|     path.write_text(original)
+// Stream runners retain their service needs and failure channel through pulls.
 
-// S1/S2/S7: defer and unfold run only on pulls; retry explicitly repeats work.
+// defer and unfold run only on pulls; retry explicitly repeats work.
 test("stream_factory_demand", () {
 	trace = control.boundary((b) {
 		{

@@ -1,4 +1,4 @@
-//// Taking `Assert` failures (§9.6).
+//// Taking `Assert` failures.
 (
 	i/control
 )
@@ -8,7 +8,6 @@
 )
 
 /// Gives `Error(failure)` for the first `Assert` failure in `body`.
-/// type: (body: () -> A ! N) -> Result(A, AssertionFailure) ! N - Assert
 catch = (body) {
 	control.boundary((b) {
 		Ok(body()) <- (

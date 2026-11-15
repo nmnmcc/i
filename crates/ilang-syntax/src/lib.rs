@@ -1,6 +1,7 @@
 //! The syntax of i: tokens, the line rule, the parser, the AST, and a printer.
 //!
-//! The only authority is `docs/spec.md`; section numbers in comments refer to it.
+//! The `legacy` feature adds the parser and formatter of the older syntax,
+//! which the migration tools read.
 
 pub mod ast;
 pub mod deep;
@@ -24,7 +25,7 @@ use span::Span;
 
 pub use lexer::{Lexed, lex};
 
-/// Parses a module of syntax three into the tree the compiler reads. The
+/// Parses a module of the source syntax into the tree the compiler reads. The
 /// module is complete as far as the source allows; the diagnostics say what
 /// was wrong, sorted by position.
 pub fn parse_module(source: &str) -> (ast::Module, Vec<Diagnostic>) {
@@ -34,7 +35,7 @@ pub fn parse_module(source: &str) -> (ast::Module, Vec<Diagnostic>) {
     (module, errors)
 }
 
-/// Token marks used to explain errors in packages published before A3.
+/// Token marks let parse errors in older published packages carry migration guidance.
 /// This never changes how a name is parsed or resolved.
 pub fn old_syntax_marks(source: &str) -> bool {
     let lexed = lex(source);

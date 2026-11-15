@@ -1,4 +1,4 @@
-//// Structured tasks, rendezvous channels and events (§9.9).
+//// Structured tasks, rendezvous channels and events.
 (
 	i/control
 	i/key
@@ -109,7 +109,7 @@ Sent = (Int)
 
 Start = (body = (Scheduler) -> Completion, ticket = Int)
 
-/// What a task on another worker tells the scheduler (native N7/N8): its
+/// What a task on another worker tells the scheduler: its
 /// next step with the `finalizing` answers of its frames, or its end.
 Remote = Stepped | Exited | Woken
 
@@ -128,7 +128,7 @@ Resume = (
 	run = Key(Nil),
 )
 
-/// A published task record (multicore D8, native N7). The claiming worker
+/// A published task record. The claiming worker
 /// runs `begin(job)` and later `resume`; the record holds the complete start
 /// function with its kept services, the task's path, run, root and runner.
 Job = (
@@ -538,7 +538,7 @@ read = <A>(k : Key(A), value : Keyed) -> A {
 
 retain = (value) { value }
 
-// §9.4 keeps a real Fail key even for a callback that cannot raise.
+// A callback that cannot raise still requires its declared Fail key.
 // Supply that key at internal, closed scheduling callbacks; never capture
 // a caller's failure handler or export it through a scheduler field.
 without_error = <A>(body : () <- (Fail(Never)) -> A) -> A {
@@ -1377,7 +1377,7 @@ remote_resume = (input : (Continuation(StepAnswer, Turn, Never), Resume)) -> (
 }
 
 /// Publish the record of a new task of the entry run when more than one
-/// worker runs (D8). A nested run keeps its tasks (runtime §6.5).
+/// worker runs. A nested run keeps its tasks.
 publish = (s : State, task_path : List(Int), start : Start) -> Start {
 	{ s.scripted || core.not(s.top) || core.not(worker_enabled()) } |>
 		(True) { start }
@@ -4094,8 +4094,8 @@ run = <A, N>(
 				request.Owner,
 				request.Root,
 			) -> A = () {
-				// §9.4 rule 3: retain this provide across every resume.
-				// runtime.md §6.3 requires the D16 non-tail-call wrapper.
+				// Retain this provide across every resume.
+				// The non-tail wrapper retains the service environment while suspended.
 				retain(body() <- env)
 			}
 			result : Result(Result(A, Never), ScheduleError) = execute(

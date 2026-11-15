@@ -1,6 +1,6 @@
 //! Expanded syntax must resolve through the ordinary checker without capture.
 mod common;
-// Parsed.ast holds the syntax-three tree (final-ast step 2d).
+// Parsed.ast holds the source tree (source nodes retain their identities).
 use common::tree::new as tree;
 use ilang_syntax::lisp::{
     parse,
@@ -711,7 +711,7 @@ fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
 #[test]
 fn same_text_type_parameters_in_distinct_scopes_are_distinct() {
     let (mut graph, mut parsed, caller, template) = setup();
-    // A name whose right side is a data type keeps the `{ }` of the item form (§6.8).
+    // A name whose right side is a data type keeps the `{ }` of the item form.
     let root = syntax("(= (Box A A) { (, A A) })", template, &[7]);
     let Node::Round(parts) = root.node() else {
         panic!("definition")

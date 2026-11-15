@@ -51,7 +51,8 @@ fn check_reports_type_errors() {
 
 #[test]
 fn blind_expected_subject_is_checked_before_audit_codegen() {
-    // S4 ruling 2: even the old-rule audit must report a normal diagnostic
+    // The checker must preserve this error: even the old-rule audit must report
+    // a normal diagnostic
     // when it cannot give this new match subject its expected type.
     let source = include_str!("../../../tests/spec/6/a1_fitting_expected_subject.i");
     let dir = front_end_project(source);
@@ -89,7 +90,7 @@ fn front_end_project(source: &str) -> tempfile::TempDir {
 
 #[test]
 fn a_local_annotation_cannot_hide_an_entry_service() {
-    // §4.8 retains the service through the local binding; §10.2 requires
+    // A local binding retains the service in its type, and the program requires
     // a provider before entry. Both annotations have the same finite type.
     let annotated = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\n\tlocal()\n}";
     for source in [
@@ -108,8 +109,7 @@ fn a_local_annotation_cannot_hide_an_entry_service() {
             String::from_utf8_lossy(&out.stderr)
         );
         assert!(
-            // Syntax three prints a need as `<- (…)` (spec §6.8 table, "Function
-            // type with a need": `(T) <- (Db, Log) -> R`).
+            // A need is printed as `<- (…)`, as in `(T) <- (Db, Log) -> R`.
             String::from_utf8_lossy(&out.stdout)
                 .contains("app/main.main : () <- (S(N), ..N) -> Nil"),
             "{}",
@@ -133,15 +133,14 @@ fn a_local_annotation_cannot_hide_an_entry_service() {
 
 #[test]
 fn a_captured_service_row_keeps_callback_dependencies() {
-    // §9.2 checks the supplied S(Dependency) by directed subtyping;
-    // §4.8 rule 5b removes S, leaving the callback's Dependency need.
+    // Directed subtyping checks the supplied S(Dependency); removing S must
+    // leave the callback's Dependency need unsatisfied.
     // Keep the old fixture's explicit provider contract: `! S(Dependency)
-    // = S(...)` migrates to a typed local before the provide (syntax-3 §7.3).
+    // = S(...)` migrates to a typed local before the provide.
     let source = "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}\n\nmain = () {\n\tprovided : S(Dependency) = S(() { read() })\n\tapply() <- (provided)\n}";
     for supplied in [false, true] {
         let source = if supplied {
-            // `Dependency = ()` makes the value `Dependency` (syntax-3.md
-            // §5.2.3: "when `D` is `()`, the value `T`").
+            // `Dependency = ()` makes the value `Dependency`.
             source.replace("apply() <- (provided)", "apply() <- (Dependency, provided)")
         } else {
             source.to_string()
@@ -155,7 +154,7 @@ fn a_captured_service_row_keeps_callback_dependencies() {
         let main = if supplied {
             "app/main.main : () -> Nil\n"
         } else {
-            // spec §6.8 table, "Function type with a need": `(T) <- (Db, Log) -> R`.
+            // Function type with a need: `(T) <- (Db, Log) -> R`.
             "app/main.main : () <- (Dependency) -> Nil\n"
         };
         assert!(
@@ -188,7 +187,7 @@ fn a_captured_service_row_keeps_callback_dependencies() {
 
 #[test]
 fn lowering_rejects_an_uncoalesced_partial_result() {
-    // §4.7 prohibits recursive types even when a caller of the compiler
+    // Type inference prohibits recursive types even when a caller of the compiler
     // API accidentally ignores the checker diagnostics.
     let dir = front_end_project("bad = (x) { x(x) }\n\nmain = () { Nil }");
     let (graph, _) = ilang_cli::load(dir.path(), false, true);
@@ -218,7 +217,7 @@ fn lowering_rejects_an_uncoalesced_partial_result() {
 
 #[test]
 fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
-    // A1 §3.9 / spec §6.12: a top-level clause block is a known function,
+    // A top-level clause block is a known function,
     // and a failing one-clause match reports at p, adding no match frame.
     let source = "f = (0) { 1 } | (_) { 2 }\nget = (o) { o |> (Ok(x)) { x } }\n\nmain = () {\n\tassert(f(1) == 2)\n\tget(Error(Nil))\n\tNil\n}\n";
     let dir = front_end_project(source);
@@ -272,7 +271,8 @@ fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
 
 #[test]
 fn old_forms_have_helpful_errors_without_reserving_names() {
-    // A3 ruling 1: valid new calls stay calls; hints belong to errors only.
+    // Parse-error guidance must be conditional: valid new calls stay calls;
+    // hints belong to errors only.
     for (source, hint) in [
         ("export(x)", "header groups"),
         ("export()", "old empty header, omit it"),
@@ -338,7 +338,7 @@ fn migration_flags_are_removed() {
 
 #[test]
 fn disjoint_comparisons_are_warnings_in_check_and_test() {
-    // W520/§6.9: warning-only programs succeed; both comparisons have Bool.
+    // warning-only programs succeed; both comparisons have Bool.
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), test_project::manifest("app")).unwrap();
     std::fs::create_dir_all(dir.path().join("test")).unwrap();

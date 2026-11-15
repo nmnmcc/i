@@ -1,9 +1,8 @@
-//! Lazy re-entry of paused frames (docs/design/lazy-reentry.md, 13.2): the
-//! shape of the code that resume, the frame records and the host seam
-//! make, and runs of programs whose output the spec does not state. The
+//! Tests lazy re-entry of paused frames, the generated code, frame records,
+//! host seam, and runs with more than one permitted output. The
 //! rules that the spec states are tested by the spec suite in `tests/spec/`.
 //!
-//! The run tests compile at `--opt 0` for the WASI target (B.7) and run the
+//! The run tests compile at `--opt 0` for the WASI target and run the
 //! module with the `wasmtime` command (`WASMTIME`, by default `wasmtime`),
 //! which reads the stop text from the standard error. The same programs at
 //! `--opt 2` are in `crates/ilang-cli/tests/wasi.rs`.
@@ -270,7 +269,7 @@ fn record_kinds() {
     };
     assert!(local(&two[1]) < local(&two[3]), "{two:?}");
     assert_ne!(two[0], two[2], "two services: {two:?}");
-    // E3 (§2.10.6): catch is ordinary Fail data and a control boundary,
+    // catch is ordinary Fail data and a control boundary,
     // so it uses provider records, not a special error-channel frame.
     assert!(all(&text, "(struct.new $frame (ref.func $catch_reenter)").is_empty());
     // The runtime records: no slot (-1), and their kinds.
@@ -295,7 +294,7 @@ fn record_kinds() {
     assert!(func(&text, "$boundary_core").contains("(ref.func $boundary_reenter)"));
     assert!(func(&text, "$cancel_core").contains("(ref.func $cancel_reenter)"));
     let tramp = func(&text, "$tramp_run");
-    // E3 removes the special catch frame (kind 4); only ensure and the
+    // Library catch needs no dedicated frame kind; only ensure and the
     // delimiter (kinds 2/3) receive unwind. Fail uses ordinary boundary data.
     assert!(tramp.contains("(i32.const 0x0C)"));
     assert!(!tramp.contains("(i32.const 0x1C)"));
@@ -364,9 +363,8 @@ fn modules_validate() {
     ilang_wasm::validate(&wasm).unwrap();
 }
 
-// Run tests 12 to 16 of docs/design/lazy-reentry.md (13.2), and the error
-// through a final record (13.3), with what eager at `1df2fe0` gives for
-// them (D15, D16).
+// These fixtures pin permitted runtime choices, including cancellation
+// through pending final records, so the scheduler remains reproducible.
 
 /// The start of the programs of run tests 12, 13 and 15. A cancel runs a
 /// final function that suspends to `b2`, and `b0` takes the continuation
@@ -457,7 +455,7 @@ paused = () {
 }
 "#;
 
-/// Test 12: the resume of k2 runs the end of the final function, which
+/// Cancellation: the resume of k2 runs the end of the final function, which
 /// throws the `$cancel` of `k`. Nothing takes it, and the entry stops.
 const MAIN_OUT: &str = r#"// The resumed final function ends, and the `$cancel` of `k` goes out of
 // the resume, which nothing takes.
@@ -488,13 +486,13 @@ h = (b3, k2) {
 }
 "#;
 
-/// Test 13: the outer frame of k3 waits.
+/// Nested cancellation: the outer frame of k3 waits.
 const O1_PLAIN: &str = r#"// The outer frame of k3, which waits.
 o1 = (b3, k2) { keep(h(b3, k2)) }
 
 "#;
 
-/// Test 15: the ensure of k3 waits outside `h`.
+/// Re-entry: the ensure of k3 waits outside `h`.
 const O1_ENSURE: &str = r#"// The ensure of k3 waits outside `h`: the cancel runs its final function.
 o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }
 
@@ -517,8 +515,8 @@ main = () {
 "#;
 
 /// Test 14, resume: the tail call of `h_tail` leaves no frame that keeps
-/// `! Name = Name("in")`, so `g` sees "resumer", against §9.4 rule 3
-/// (section 7a).
+/// `! Name = Name("in")`, so `g` sees "resumer", against the rule that a resume
+/// keeps the services provided inside the paused part.
 const ENV_TAIL_RESUME: &str = r#"(
 	i/control
 )
@@ -602,7 +600,7 @@ main = () {
 }
 "#;
 
-/// Test 16: the value of `f` of `inner` goes on into the cancelled code.
+/// Finalization: the value of `f` of `inner` goes on into the cancelled code.
 const CANCEL_INNER: &str = r#"(
 	i/control
 	i/resource
@@ -646,7 +644,7 @@ main = () <- (io : Io) {
 "#;
 
 /// An error goes through a pending final record (kind 5, skipped in mode
-/// 1). A final function cannot raise an error itself (§9.5), but D15's
+/// 1). A final function cannot raise an error itself, but the
 /// cancel through an inner boundary can run ordinary code that raises one.
 /// This is checked against eager, rather than made a conformance rule.
 const ERROR_THROUGH_FINAL: &str = r#"(
@@ -821,7 +819,7 @@ fn same_as_eager(name: &str) {
     );
 }
 
-/// Test 12 (D13, P4): a `$cancel` goes out of a trampoline at the end of its
+/// Cancellation: a `$cancel` goes out of a trampoline at the end of its
 /// list and reaches the entry, which prints the full trace.
 #[test]
 fn cancel_out_trace() {
@@ -829,36 +827,37 @@ fn cancel_out_trace() {
     same_as_eager("cancel_out_trace_catch");
 }
 
-/// Test 13 (D13, P4): two trampolines put their slots back in turn, at
+/// Nested cancellation: two trampolines put their slots back in turn, at
 /// their own depth.
 #[test]
 fn cancel_out_two_trampolines() {
     same_as_eager("cancel_out_two_trampolines");
 }
 
-/// Test 14 (D16): an environment statement before a tail call is lost, as
-/// in eager (section 7a).
+/// Tail calls: an environment statement before a tail call is lost, as in
+/// eager.
 #[test]
 fn env_tail_call_as_eager() {
     same_as_eager("env_tail_call_resume");
     same_as_eager("env_tail_call_cancel");
 }
 
-/// Test 15 (D13, P3): the depth is put back just before a record is called
+/// Re-entry: the depth is put back just before a record is called
 /// in mode 2, so the trace of the final function has no stale lines.
 #[test]
 fn cancel_out_restores_before_mode2() {
     same_as_eager("cancel_out_restores_before_mode2");
 }
 
-/// Test 16 (D15): a final function of a cancel suspends to a boundary that
+/// Finalization: a final function of a cancel suspends to a boundary that
 /// was paused inside the cancelled computation.
 #[test]
 fn cancel_suspends_to_inner_boundary() {
     same_as_eager("cancel_suspends_to_inner_boundary");
 }
 
-/// D2 and 13.3: an error passes a final record without calling it. D15's
+/// Cancellation must preserve this behavior: an error passes a final record
+/// without calling it. the
 /// cancel behaviour supplies the error without giving a final an error type.
 #[test]
 fn error_through_pending_final() {
@@ -979,7 +978,7 @@ impl Runner {
         if out.status.success() {
             return compiled;
         }
-        // Section 13.2 allows .wasm if this CLI cannot precompile fuel.
+        // A compile failure is allowed to give .wasm if this CLI cannot precompile fuel.
         // Do not turn a compile failure without fuel into a fallback.
         assert!(fuel, "wasmtime compile failed: {err}");
         eprintln!("precompiled fuel unavailable; using .wasm: {err}");
@@ -1147,7 +1146,7 @@ main = () {
     .replace("TreeDepth", &depth.to_string())
 }
 
-// Eager 1df2fe0, Wasmtime 49.0.2, x86_64 Linux (14 step 2).
+// The stack threshold is a measured fixture baseline, not a language limit.
 // At S=131072 the last complete tree walk has L=219. Recursion alone
 // needs (5600085, 5601109] bytes; S11=1.5*5601109=8401663. At S11
 // eager recursion with a resume fails with a clean Wasm stack trap.
@@ -1217,8 +1216,8 @@ fn runs_cleanly(source: &str) {
     assert!(Runner::new(8 * 1024 * 1024).finishes(source));
 }
 
-/// Section 13.2 test 8: a kind-1 frame stays pending across two resumes;
-/// rule 3 of spec 9.4 supplies the new base, keeping its own statement.
+/// Test 8: a kind-1 frame stays pending across two resumes;
+/// the place of the resume supplies the new base, keeping its own statement.
 #[test]
 fn resume_twice_from_new_places() {
     runs_cleanly(
@@ -1270,9 +1269,9 @@ main = () {
     );
 }
 
-/// Section 13.2 test 9: three inner frames finish before the next pause;
+/// Test 9: three inner frames finish before the next pause;
 /// further resumes enter the remaining frames once, then cancel runs the
-/// pending final function once (spec 9.4 rules 3/4 and spec 9.5).
+/// pending final function once.
 #[test]
 fn counted_frames() {
     runs_cleanly(

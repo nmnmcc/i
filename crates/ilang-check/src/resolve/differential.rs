@@ -1,11 +1,5 @@
-//! The resolver of the syntax-three tree (`resolve3`) against the resolver
-//! of the lowered tree (`resolve` after `syn3::lower`), for every package
-//! under `std/`, `examples/` and `tests/spec` (with the library `lib/`): the
-//! same HIR and the same diagnostics (docs/design/syn3-final-ast.md, step 3).
-//!
-//! The comparison is by file: the module, its types and its diagnostics.
-//! The first difference of each file is printed, and the count of equal
-//! files.
+//! Differential checks keep direct source resolution and the migration
+//! adapter equal in HIR and diagnostics, including generated names and spans.
 
 use crate as ilang_check;
 use ilang_check::hir::{ModuleId, Program};
@@ -342,7 +336,7 @@ fn resolve3_differential() {
         jobs.push(("std".into(), root.join("std"), None));
     }
     // A focused imported E1 counterexample. Compare resolver input/diagnostics
-    // with current main; its independent inference audit keeps its own oracle.
+    // with the migration adapter; the independent inference audit keeps its own oracle.
     let provider_case = "tests/review/cases/review-k4d/proj/p1";
     if wanted(provider_case) {
         jobs.push((provider_case.into(), root.join(provider_case), None));
@@ -434,7 +428,7 @@ fn resolve3_differential() {
     }
     let next = std::sync::atomic::AtomicUsize::new(0);
     let all = std::sync::Mutex::new(Totals::default());
-    // This suite shares the machine with the other compiler lanes.
+    // Parallel cases would multiply package graphs and exceed the test memory budget.
     let workers = std::thread::available_parallelism().map_or(2, |n| n.get().min(2));
     std::thread::scope(|scope| {
         for _ in 0..workers {
@@ -514,11 +508,11 @@ fn resolve3_differential() {
 /// part of the tree that was read.
 const EXTRA: &[&str] = &[
     // Written branch result unions and ordinary Fail service patterns use
-    // the single need, including several forms of the same Fail key (E3).
+    // the single need, including several forms of the same Fail key.
     "f = (x: Int) -> Int { x } | (x: Float) -> Float { x }\ng = (x: Int) -> Int { x } | (x: Float) -> Float { x } | (x: String) { x }\nh = () <- (failure: Fail(Int)) { 1 }\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } | (x: Float) <- (failure: Fail(Int)) -> Float { x }\n",
     // A finite callback need captured by a local annotation, then handled.
     "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d: Dependency) { Nil }\nuse = <N>() <- (s: S(N)) { S(f) = s  f() }\napply = <N>() { local: () <- N -> Nil = () { use() }  local() }\nmain = () { apply() <- (S(() { read() })) }\ntyped = () { provided: S(Dependency) = S(() { read() })  apply() <- (provided) }\n",
-    // Stages 9/10: named and inline groups, aliases, canonical key order,
+    // Shape dispatch must agree for named and inline groups, aliases, key order,
     // recursion and missing/duplicate shape diagnostics.
     "(f, alias)\nf = (0) { 0 } | (n: Int) { f(n - 1) } | (x: Int, y: Int) { x + y }\nalias = f\na = alias(1, 2)\nb = 1 |> alias(2)\nc = f()\nlocal = () { g = (a = x: Int, z = y: Int) { x + y } | (x: Int) { x }  g(z = 2, a = 1) }\ninline = [(x: Int) { x } | (x: Int, y: Int) { x + y }]\n",
     // General parameter data, closed labelled parameter data, ordinary Fail
@@ -535,13 +529,13 @@ const EXTRA: &[&str] = &[
     // Data, calls, strings, index.
     // old-syntax-check: E0110,E0101,E0101
     "f = (x) { \"a\\(x)b\\(x)\" }\ng = (x) { \"\\(x)\" }\nh = () { a = (1, 2)  a.0 }\nk = () { (a = 1, b = 2) }\nm = (r) { (..r, a = 1) }\nn = () { (a = 2, 1) }\np = (f) { f(1, ..f) }\nq = () { () }\nr = (x) { x |> Some }\ns = (x) { core.never(x) }\nt = core.never\n",
-    // Services and provides; E6 forms parse, provided labels remain invalid.
+    // Services and provides; Captured-row forms parse, provided labels remain invalid.
     // old-syntax-check: E0101,E0101
     "A = (n = Int)\nB = (m = Int)\nuse = () <- (a: A, b: B) -> Int { a.n + b.m }\none = () { use() <- (A(n = 1), B(m = 2)) }\ntwo = (a: A, b: B) { use() <- (a, b) }\nthree = () { { x = 1  use() + x } <- (A(n = 1)) }\nfour = () { x = use() <- (a = A(n = 1))  x }\nfive = (e) { use() <- e }\nsix = (e) { use() <- (..e) }\nseven = () <- (..env: N) { 1 }\neight = () { { use() <- (A(n = 1)) } <- (B(m = 2), B(m = 3)) }\nnine = () { y = { use() } <- ()  y }\n",
     // Row variables and function types.
     // old-syntax-check: E0101,E0110,E0101,E0107,E0101
     "run = <A, N>(body: () <- N -> A) -> A { body() }\ncatch = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> A { body() }\nboth: <A, N>(() <- (..N) -> A) -> A = (body) { body() }\nlocal = () { inner = <N>(f: () <- N -> Int) { f() }  inner }\nbad = () { <A>(a: A) { a } }\nt: ((a = Int, Int)) -> Int = (x) { 1 }\nu: { Int | Float } -> Int = (x) { 1 }\nv: (x = Int, ..Int) -> Int = (x) { 1 }\nw: () <- (Fail(Int), Fail(Float), a = Int) -> Int = () { 1 }\n",
-    // Patterns that this stage cannot type.
+    // Unsupported patterns must preserve diagnostic order.
     // old-syntax-check: E0101,E0101,E0110,E0101,E0101,E0101
     "f = ((a, ..)) { a }\ng = ((a = b, c)) { c }\nP = (x = Int, y = Int)\nh = (P(..rest)) { rest }\nk = (P(x = (a, b))) { a }\nm = ((a, b) = (c, d)) { a }\nn = (key = x) { x }\np = ([a, ..rest] = whole) { whole }\nq = (\"ab\" <> rest) { rest }\n",
     // Attributes, declarations, heads.

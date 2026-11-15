@@ -1,4 +1,4 @@
-//! Name resolution (§2, §5, §6.10, §6.11, §7.2, §10): builds the HIR and
+//! Name resolution: builds the HIR and
 //! reports every name rule as a compile error.
 //!
 //! The work is done in phases, each over all modules:
@@ -6,7 +6,7 @@
 //! 2. resolve the imports, and find import circles;
 //! 3. resolve the type definitions, and find alias circles;
 //! 4. resolve the declarations and bindings;
-//! 5. check that exported definitions use only exported types (§2.4);
+//! 5. check that exported definitions use only exported types;
 //! 6. check the rules about the whole program (entries, host services,
 //!    `[wasm] exports`).
 
@@ -113,7 +113,7 @@ struct Resolver<'a> {
     slots: Vec<Vec<Slot>>,
     scopes: Vec<Scope>,
     by_path: HashMap<(PackageId, String), ModuleId>,
-    /// The built-in names (§12): the prelude and the built-in types.
+    /// The built-in names: the prelude and the built-in types.
     builtin_values: HashMap<String, Entry>,
     builtin_types: HashMap<String, TypeRef>,
     // The state of the module and body being resolved.
@@ -122,13 +122,13 @@ struct Resolver<'a> {
     fn_depth: u32,
     ty_frames: Vec<TyFrame>,
     ty_def: Option<TyDefMode>,
-    /// The aliases in a circle (§4.3); the circle has been reported, and
+    /// The aliases in a circle; the circle has been reported, and
     /// they are not expanded.
     circular: HashSet<TypeId>,
     pending: Vec<HashSet<NameKey>>,
     reserved: Vec<(usize, HashSet<NameKey>)>,
     checked_inputs: Option<&'a CheckedInputs>,
-    /// The selection tables (syntax three §2.6.1) of the top-level names
+    /// The selection tables of the top-level names
     /// and of the local names in scope: for each shape group, its function.
     def_tables: HashMap<DefId, Table>,
     local_tables: HashMap<VarId, Table>,
@@ -175,7 +175,7 @@ fn is_upper(name: &str) -> bool {
     name.starts_with(|c: char| c.is_ascii_uppercase())
 }
 
-/// The names a pattern binds, in order, with repeats (§7.2).
+/// The names a pattern binds, in order, with repeats.
 fn ast_binders(p: &ast::Pattern, out: &mut Vec<(String, Span)>) {
     use ast::PatternKind as P;
     match &p.kind {
@@ -203,7 +203,7 @@ fn ast_binders(p: &ast::Pattern, out: &mut Vec<(String, Span)>) {
     }
 }
 
-/// The label of a parameter (§6.11): the last name in the `=` chain at the
+/// The label of a parameter: the last name in the `=` chain at the
 /// top of its pattern.
 fn label_of(p: &ast::Pattern) -> Option<String> {
     use ast::PatternKind as P;
@@ -217,7 +217,7 @@ fn label_of(p: &ast::Pattern) -> Option<String> {
     }
 }
 
-/// `{ e }` with one expression is a group (§6.10): it is `e`.
+/// `{ e }` with one expression is a group: it is `e`.
 fn ungroup(e: &ast::Expr) -> &ast::Expr {
     match &e.kind {
         ast::ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
@@ -303,7 +303,7 @@ impl<'a> Resolver<'a> {
         self.deprecated(m, note, &name, span);
     }
 
-    // ---- Phase 1: top-level definitions ----
+    // ---- top-level definitions ----
 
     fn create_modules(&mut self) {
         for (i, parsed) in self.parsed.iter().enumerate() {
@@ -338,7 +338,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// A marked top-level name must not shadow an ordinary name in its
-    /// definition module: otherwise the two branches of §5 rule 3 compete.
+    /// definition module: otherwise marked names can resolve to two definitions.
     fn check_generated_collisions(&mut self) {
         let mut conflicts = Vec::new();
         for (m, values) in self.generated_values.iter().enumerate() {
@@ -388,7 +388,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// A value name of this module may be defined only once (§2.2).
+    /// A value name of this module may be defined only once.
     fn value_free(&mut self, m: ModuleId, name: &str, span: Span) -> bool {
         let mi = m.0 as usize;
         let key = self.name_key(name, span);
@@ -806,7 +806,7 @@ impl<'a> Resolver<'a> {
         id
     }
 
-    /// §2.2 and §10: the attributes of an item.
+    /// The attributes of an item.
     fn attributes(&mut self, item: &ast::Item) -> Attrs {
         let mut out = Attrs::default();
         let mut seen = HashSet::new();
@@ -957,7 +957,7 @@ impl<'a> Resolver<'a> {
         true
     }
 
-    /// §2.4.
+    /// Exported names must resolve before their public types can be checked.
     fn exports(&mut self, m: ModuleId, items: &[ast::ExportItem], defs: &[ast::Item]) {
         let mi = m.0 as usize;
         for item in items {
@@ -1022,7 +1022,7 @@ impl<'a> Resolver<'a> {
                 def.constructors_exported = true;
             } else if item.constructors {
                 // `A(..)` of a sum exports the name and each member of its
-                // expansion with `(..)` (syntax-3.md §5.2.1, D8), when every
+                // expansion with `(..)`, when every
                 // member is a labelled type of this module.
                 let mut members = Vec::new();
                 if sum_members(defs, name, &mut members, 0) {
@@ -1066,7 +1066,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    // ---- Phase 2: imports (§2.3) ----
+    // ---- imports ----
 
     fn imports(&mut self, m: ModuleId) {
         self.cur = m;
@@ -1119,7 +1119,7 @@ impl<'a> Resolver<'a> {
         self.scopes[mi] = scope;
     }
 
-    /// The module that an import path names (§2.1).
+    /// The module that an import path names.
     fn import_target(&mut self, item: &ast::ImportItem) -> Option<ModuleId> {
         let me = self.p.module(self.cur);
         let pkg = &self.graph.packages[me.package];
@@ -1223,7 +1223,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// `(A, b) = path` (§2.3). Only exported names may be imported.
+    /// `(A, b) = path`. Only exported names may be imported.
     fn import_name(&mut self, scope: &mut Scope, target: ModuleId, n: &ast::Ident) {
         let ti = target.0 as usize;
         let module = self.module_name(target).to_string();
@@ -1294,7 +1294,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// §2.1: modules may not import one another in a circle.
+    /// Modules may not import one another in a circle.
     fn import_circles(&mut self) {
         let parsed = self.parsed;
         self.import_circles_of(&|m| {
@@ -1371,7 +1371,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    // ---- Phase 3: type definitions (§4.3) ----
+    // ---- type definitions ----
 
     fn type_defs(&mut self, m: ModuleId) {
         self.cur = m;
@@ -1385,7 +1385,7 @@ impl<'a> Resolver<'a> {
             let (ast::ItemKind::TypeDef(def), Slot::Type(id)) = (&item.kind, slot) else {
                 continue;
             };
-            // §4.3: read a reserved head in full, but do not resolve its body.
+            // Read a reserved head in full, but do not resolve its body.
             if !def.head.is_empty() {
                 self.error(
                     code::TYPE_PARAM_FORM,
@@ -1620,7 +1620,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// §9.7: a host service has one constructor, and every field has a
+    /// A host service has one constructor, and every field has a
     /// label and a function type.
     fn host_form(&mut self, def: &ast::TypeDef) {
         let ok = match &def.body {
@@ -1639,7 +1639,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// §4.3: an alias may not use itself, directly or through other aliases.
+    /// An alias may not use itself, directly or through other aliases.
     fn alias_circles(&mut self) {
         let mut g = petgraph::graph::DiGraph::<u32, ()>::new();
         let nodes: Vec<_> = (0..self.p.types.len() as u32)
@@ -1688,7 +1688,7 @@ impl<'a> Resolver<'a> {
     // ---- Types ----
 
     fn lookup_type(&mut self, module: Option<&ast::Ident>, name: &ast::Ident) -> Option<TypeRef> {
-        // §2.3: a local name may cover a module name, in types too.
+        // A local name may cover a module name, in types too.
         if let Some(m) = module
             && let Some(Found::Local(_)) = self.find(&m.name, m.span)
         {
@@ -2176,7 +2176,7 @@ impl<'a> Resolver<'a> {
                 fields,
                 removed,
             } => {
-                // syntax-3 stage 6: records are closed labelled data.
+                // records are closed labelled data.
                 if let Some(base) = base {
                     self.error(
                         code::INVALID_RECORD_KEY,
@@ -2247,7 +2247,7 @@ impl<'a> Resolver<'a> {
         Type { kind, span: t.span }
     }
 
-    /// A label of data is a `name` (syntax-3 §2.3): not a string that is
+    /// A label of data is a `name`: not a string that is
     /// not a name, an `UpName`, or a label parameter.
     fn check_data_label(&mut self, label: &ast::Ident, parameter: bool) {
         let name = label.name.as_str();
@@ -2268,7 +2268,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// The type that the alias `t` stands for, with its arguments put in
-    /// the places of its parameters (§4.3). `None` when `t` is not a use of
+    /// the places of its parameters. `None` when `t` is not a use of
     /// an alias, or of an alias in a circle.
     fn expand_alias(&self, t: &Type) -> Option<Type> {
         let TypeKind::Named {
@@ -2313,7 +2313,7 @@ impl<'a> Resolver<'a> {
         true
     }
 
-    /// §9.2: the type of an environment parameter or statement is one named
+    /// The type of an environment parameter or statement is one named
     /// type: not a type variable alone, a union, or `Never`. An alias is
     /// expanded with its arguments. Gives back the type constructor, or
     /// `None` when there is none or a problem has been reported.
@@ -2345,8 +2345,8 @@ impl<'a> Resolver<'a> {
         head
     }
 
-    /// §9.7: the parameters, values, and errors of the functions of a host
-    /// service are types that the host can take (§10.3), and they have no
+    /// The parameters, values, and errors of the functions of a host
+    /// service are types that the host can take, and they have no
     /// environment. Each such function is put in `host_fns`.
     fn host_fns(&mut self) {
         let request_module = self
@@ -2507,7 +2507,7 @@ impl<'a> Resolver<'a> {
         else {
             return None;
         };
-        // §2.10.12: no need, or exactly `! Fail(E)`; `E` is the errors.
+        // No need, or exactly `! Fail(E)`; `E` is the errors.
         let mut err = err.as_deref();
         if let Some(env) = env
             && !self.is_never(env)
@@ -2584,7 +2584,7 @@ impl<'a> Resolver<'a> {
         self.boundary_type(t) == Some(Ty::Never)
     }
 
-    /// The part of B.2 for a type that the host can take (§10.3).
+    /// The part of B.2 for a type that the host can take.
     fn host_part(&self, t: &Type, outgoing: bool) -> Option<HostType> {
         if let Some(t) = self.boundary_type(t) {
             return self.host_member(&t, outgoing);
@@ -2641,9 +2641,9 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// §10.1: the written type of an external function outside the package
+    /// The written type of an external function outside the package
     /// `i`. It is a function type with no `_` and no type variables, whose
-    /// parameters and value are types that the host can take (§10.3), with
+    /// parameters and value are types that the host can take, with
     /// no errors and no environment.
     fn external_type(&mut self, t: &Type) {
         if self.reject_value_type(t, "an external declaration") {
@@ -2777,7 +2777,7 @@ impl<'a> Resolver<'a> {
         )
     }
 
-    /// §10.3: a type that the host can take. Aliases are expanded.
+    /// A type that the host can take. Aliases are expanded.
     fn host_type(&self, t: &Type, outgoing: bool) -> bool {
         if self.host_part(t, outgoing).is_some() {
             return true;
@@ -2795,7 +2795,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    // ---- Phase 4: values ----
+    // ---- values ----
 
     fn values(&mut self, m: ModuleId) {
         self.cur = m;
@@ -2812,7 +2812,7 @@ impl<'a> Resolver<'a> {
                     let vars = self.push_declared_frame(type_params);
                     let t = self.ty(ty);
                     self.ty_frames.pop();
-                    // Intrinsic library operations are not host imports (§2.1).
+                    // Intrinsic library operations are not host imports.
                     let intrinsic = self.p.typed_macros.contains(&DefId {
                         module: m,
                         index: d,
@@ -2868,7 +2868,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// A quiet lookup, after imports are known (§3.10 and §3.11).
+    /// A quiet lookup, after imports are known.
     fn unqualified_type(&self, name: &str) -> Option<TypeRef> {
         self.scopes[self.cur.0 as usize]
             .types
@@ -2923,7 +2923,7 @@ impl<'a> Resolver<'a> {
 
     /// A binding, at the top level or in a block. Gives back the binders of
     /// its pattern; in a block, the caller makes them visible from the next
-    /// statement (§6.10).
+    /// statement.
     fn binding(&mut self, b: &ast::Binding, top: bool) -> (Binding, Vec<Binder>) {
         let source = self.p.module(self.cur).source;
         let file = self.graph.sources.get(source);
@@ -2951,7 +2951,7 @@ impl<'a> Resolver<'a> {
         let pattern = self.pattern(&b.pattern, &mut binders, None);
         self.pending.pop();
         let value = if direct && !top {
-            // §6.10: the names may be used inside the function bodies of a
+            // The names may be used inside the function bodies of a
             // direct value.
             self.locals.push(Frame {
                 names: binders
@@ -2982,7 +2982,7 @@ impl<'a> Resolver<'a> {
         (binding, binders)
     }
 
-    /// §6.10: a direct value is made without running code.
+    /// A direct value is made without running code.
     fn is_direct(&self, e: &ast::Expr) -> bool {
         use ast::ExprKind as E;
         match &ungroup(e).kind {
@@ -3016,7 +3016,7 @@ impl<'a> Resolver<'a> {
             E::Call { callee, args } => {
                 is_constructor(callee) && args.iter().all(|a| self.is_direct(&a.value))
             }
-            // §6.9: `a |> C` is `C(a)`, and `a |> C(b)` is `C(a, b)`.
+            // A constructor pipe inserts the piped value before written arguments.
             E::Binary {
                 op: ast::BinOp::Pipe,
                 lhs,
@@ -3098,7 +3098,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// Looks up a value name with no module before it (§5).
+    /// Looks up a value name with no module before it.
     fn find(&self, name: &str, span: Span) -> Option<Found> {
         if name.starts_with('\0') {
             return self.scopes[self.cur.0 as usize]
@@ -3466,7 +3466,7 @@ impl<'a> Resolver<'a> {
                     && clauses[0].patterns.len() == 1 =>
             {
                 let clause = &clauses[0];
-                // §3.9: the subject precedes the new scope; no type frame,
+                // The subject precedes the new scope; no type frame,
                 // no generalization, and the binding stops at the pattern.
                 let value = self.expr(subject);
                 let mut binders = Vec::new();
@@ -3528,7 +3528,7 @@ impl<'a> Resolver<'a> {
                 }
             }
             // `x |> f` and `x |> f(…)` with a named chain `f` are direct
-            // calls (syntax three §2.6.2): `x` is position 0.
+            // calls: `x` is position 0.
             E::Binary {
                 op: ast::BinOp::Pipe,
                 lhs,
@@ -3616,7 +3616,7 @@ impl<'a> Resolver<'a> {
         Expr { kind, span: e.span }
     }
 
-    // ---- Shape groups (syntax three §2.6) ----
+    // ---- Shape groups ----
 
     /// The top-level name that a direct alias `g = f` or `g = m.f` names,
     /// read quietly in the module `self.cur`.
@@ -3658,7 +3658,7 @@ impl<'a> Resolver<'a> {
     /// The selection tables of the top-level names, before any body is
     /// resolved: a name bound to a multi chain has the table of its hidden
     /// group bindings, and a direct alias has the table of the name it
-    /// names (§2.6.7).
+    /// names.
     fn selection_tables(&mut self) {
         let parsed = self.parsed;
         let mut aliases: Vec<(DefId, DefId)> = Vec::new();
@@ -3751,7 +3751,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// A direct call of a named chain (§2.6.2, steps 1 and 2): the shape of
+    /// A direct call of a named chain: the shape of
     /// the argument data is read from the call, and the call becomes a call
     /// of that group's function with the arguments in canonical order. The
     /// arguments are worked out in written order.
@@ -4077,7 +4077,7 @@ impl<'a> Resolver<'a> {
                     group,
                 } => {
                     let ty = self.ty(ty);
-                    // `_`: the key is read from the value (syntax three).
+                    // An inferred service type takes its key from the provided value.
                     if !matches!(ty.kind, TypeKind::Hole) {
                         self.env_type(&ty);
                     }
@@ -4101,7 +4101,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// §6.8 and §6.11.
+    /// Parameters bind before the body so body references use their scope.
     fn function(&mut self, f: &ast::Function, span: Span) -> Function {
         let mut params = Vec::new();
         let mut env_heads: Vec<TypeRef> = Vec::new();
@@ -4144,7 +4144,7 @@ impl<'a> Resolver<'a> {
                 }
                 ast::Param::Env { name, ty, rest } => {
                     let ty = self.ty(ty);
-                    // §9.2: two environment parameters of one function may
+                    // Two environment parameters of one function may
                     // not have the same type constructor.
                     let own_row = matches!(ty.kind, TypeKind::Var(v) if self.ty_frames.last().is_some_and(|frame|
                         frame.fn_depth == self.fn_depth && frame.names.values().any(|id| *id == v)));
@@ -4459,7 +4459,7 @@ impl<'a> Resolver<'a> {
                 let args: Vec<Pattern> = args
                     .iter()
                     .map(|a| match same_name_part(a) {
-                        // §7.1: `label = label` writes the label of a part
+                        // `label = label` writes the label of a part
                         // and binds the name once.
                         Some(inner) => Pattern {
                             span: a.span,
@@ -4499,7 +4499,7 @@ impl<'a> Resolver<'a> {
                 let mut out = Vec::new();
                 for s in segs {
                     let value = self.pattern(&s.value, binders, shared);
-                    // §8.4: a length may use names of earlier segments.
+                    // A length may use names of earlier segments.
                     self.locals.push(Frame {
                         names: binders
                             .iter()
@@ -4521,9 +4521,9 @@ impl<'a> Resolver<'a> {
         Pattern { kind, span: p.span }
     }
 
-    // ---- Phase 5: exported types (§2.4) ----
+    // ---- exported types ----
 
-    /// §2.4: if the type of an exported definition uses a type defined in
+    /// If the type of an exported definition uses a type defined in
     /// this module, that type is exported too. This checks the types that
     /// are written: the fields of a type exported with its constructors
     /// (`T(..)`; a type exported alone does not show its fields), the body
@@ -4623,7 +4623,7 @@ impl<'a> Resolver<'a> {
         for_each_child(t, &mut |c| self.hidden_types(m, c, at, seen, out));
     }
 
-    // ---- Phase 6: rules about the whole program ----
+    // ---- rules about the whole program ----
 
     fn program_rules(&mut self) {
         if let Some(root) = self.graph.root {
@@ -4686,7 +4686,7 @@ impl<'a> Resolver<'a> {
             }
         }
         self.host_fns();
-        // §9.7: two host services may not have the same namespace and a
+        // Two host services may not have the same namespace and a
         // field with the same label.
         // The error names the service that has the label first.
         let mut seen: HashMap<(String, String), usize> = HashMap::new();
@@ -4723,7 +4723,7 @@ impl<'a> Resolver<'a> {
         self.wasm_exports();
     }
 
-    /// §10.2: a host export names an exported function of a module.
+    /// A host export names an exported function of a module.
     fn wasm_exports(&mut self) {
         let Some(root) = self.graph.root else {
             return;
@@ -4764,7 +4764,7 @@ impl<'a> Resolver<'a> {
                 Some(d) if self.p.def(d).exported => {
                     let def = self.p.def(d);
                     // Only the entry and tests of the compiled package
-                    // are entry points; the others are not used (§10.2).
+                    // are entry points; the others are not used.
                     if let DefKind::Binding { binding, .. } = def.kind
                         && self.p.module(d.module).package == root
                     {
@@ -4790,7 +4790,7 @@ impl<'a> Resolver<'a> {
                     ))
                 }
             }
-            // B.5: a function named two times has two exports with one
+            // A function named two times has two exports with one
             // name.
             if problem.is_none() && !names.insert((e.module.as_str(), e.function.as_str())) {
                 problem = Some((
@@ -4952,7 +4952,7 @@ pub(crate) fn subst(t: &Type, map: &HashMap<TyVarId, &Type>) -> Type {
     Type { kind, span: t.span }
 }
 
-/// §2.4: the annotations at the top of the pattern of a top-level binding
+/// The annotations at the top of the pattern of a top-level binding
 /// that give the type of an exported name: `x: T`, and `x = y: T`.
 fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec<(String, Type)>) {
     fn top_type(p: &Pattern) -> Option<&Type> {

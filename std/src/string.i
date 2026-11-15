@@ -507,7 +507,7 @@ compare_bytes = (a : BitArray, b : BitArray) -> Order {
 		| (_) { Greater }
 }
 
-/// The text form of any value, as i source (§11.8).
+/// The text form of any value, as i source.
 ///
 /// ```i
 /// string.inspect([1, 2])  // "[1, 2]"

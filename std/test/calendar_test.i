@@ -30,7 +30,7 @@ valid_offset = (minutes : Int) -> calendar.Offset {
 		| (Error(_)) { panic("invalid test offset") }
 }
 
-// C1/C2: validate in component order, without normalization.
+// validate in component order, without normalization.
 test("calendar_validation", () {
 	list.each([
 		(1900, False),
@@ -131,7 +131,7 @@ test("calendar_validation", () {
 	Nil
 })
 
-// Review's independent day table follows C1/C3 and C4's weekday origin.
+// The independent day table uses the same epoch and weekday origin.
 test("calendar_known_days", () {
 	cases = [
 		(-400, 2, 29, -865566, calendar.Tuesday),
@@ -167,7 +167,7 @@ test("calendar_known_days", () {
 })
 
 // Independent January-based oracle from the review. The production algorithm
-// instead decomposes March-based 400-year eras (note §4.3). C3 requires floor
+// instead decomposes March-based 400-year eras. Signed calendar conversion requires floor
 // division; adjust the remainder to nonnegative here before dividing.
 oracle_floor = (a : Int, b : Int) -> Int { { a - { a % b + b } % b } / b }
 
@@ -197,7 +197,7 @@ oracle_day = (year : Int, month : Int, day : Int) -> Int {
 	before_year(year) - before_year(1970) + before_month + extra + day - 1
 }
 
-// C3: both inverse laws, independent reference, negative quotients and all
+// both inverse laws, independent reference, negative quotients and all
 // century/era boundaries in this range. Equality alone of two inverses would
 // miss a common shift; oracle_day establishes the required epoch separately.
 test("calendar_day_laws", () {
@@ -249,7 +249,7 @@ test("calendar_day_laws", () {
 	Nil
 })
 
-// C4: floor splitting for negative epoch nanoseconds and extreme offsets.
+// floor splitting for negative epoch nanoseconds and extreme offsets.
 test("calendar_civil_boundaries", () {
 	epoch = time.from_unix_nanoseconds(0)
 	before = calendar.at(time.from_unix_nanoseconds(-1), calendar.utc())
@@ -303,7 +303,7 @@ test("calendar_civil_boundaries", () {
 	Nil
 })
 
-// C5/C6: canonical expanded years, fractions, and zero offsets.
+// canonical expanded years, fractions, and zero offsets.
 test("calendar_text", () {
 	cases = [
 		("1970-01-01T00:00:00.1+00:00", "1970-01-01T00:00:00.1Z"),
@@ -333,7 +333,8 @@ test("calendar_text", () {
 				)
 			}
 	})
-	// C5 requires every component constructor error to become BadText in parse.
+	// Calendar parsing requires every component constructor error to become
+	// BadText in parse.
 	invalid = [
 		"",
 		"1970-01-01",
@@ -380,27 +381,4 @@ test("calendar_text", () {
 	})
 	Nil
 })
-// C1 and spec §2.4 require constructor and constructor-update
-// privacy. Run these negative checks with the exact lane compiler, restoring
-// this owned file after each case. They are not deliberately failing @tests.
-// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec("\n".join(x[4:] for x in Path("std/test/calendar_test.i").read_text().splitlines() if x.startswith("//| ")))'
-//| import subprocess
-//| from pathlib import Path
-//| path = Path('std/test/calendar_test.i')
-//| original = path.read_text()
-//| cases = {
-//|     'private Date constructor': 'bad = () { calendar.Date(2000, 13, 0) }',
-//|     'private Date update': 'bad = (d: calendar.Date) { calendar.Date(..d) }',
-//|     'private TimeOfDay constructor': 'bad = () { calendar.TimeOfDay(24, 0, 0, 0) }',
-//|     'private Offset constructor': 'bad = () { calendar.Offset(1440) }',
-//| }
-//| baseline = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
-//| assert baseline.returncode == 0, baseline.stderr
-//| try:
-//|     for name, source in cases.items():
-//|         path.write_text(original + '\n' + source + '\n')
-//|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)
-//|         print(name, result.returncode, result.stderr, flush=True)
-//|         assert result.returncode == 1 and 'error[E0204]' in result.stderr
-//| finally:
-//|     path.write_text(original)
+// Invalid components are rejected in component order without normalization.

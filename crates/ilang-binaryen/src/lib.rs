@@ -43,7 +43,7 @@ pub enum Error {
 /// Wasmtime inlines nothing, so each would stay a call with its spills of GC
 /// references. 20 makes list-heavy benchmarks about 25% faster and the
 /// optimization of `std`'s tests about 1 s slower; 40 gains little more and
-/// costs twice that (docs/performance.md).
+/// costs twice that.
 pub const ALWAYS_INLINE: u32 = 20;
 
 /// Run once more after the default pipeline. Heap2Local only removes an
@@ -51,7 +51,7 @@ pub const ALWAYS_INLINE: u32 = 20;
 /// another one escapes until that one is removed. The default pipeline runs
 /// it once after inlining, which removes a closure whose loop was inlined but
 /// leaves its capture array and the boxes in it. Two more rounds remove them
-/// when they too do not escape (numeric-step3-report.md, R7).
+/// when they too do not escape.
 const AFTER_OPTIMIZE: [&std::ffi::CStr; 5] = [
     c"heap2local",
     c"simplify-locals",

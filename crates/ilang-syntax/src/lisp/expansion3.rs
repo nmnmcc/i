@@ -1,4 +1,4 @@
-//! `expansion::definitions` on the tree of syntax three: the written
+//! `expansion::definitions` on the source tree: the written
 //! interface of the syntax macros of a module.
 //!
 //! The answers are those of `expansion::definitions` on the lowered tree
@@ -31,13 +31,13 @@ pub fn has_type_parameters(binding: &Binding) -> bool {
 }
 
 /// A function with no guard and one choice per parameter: with no other
-/// branch it is a plain function (`Fn` of the old tree).
+/// branch it is a plain function.
 pub fn plain(f: &Function) -> bool {
     f.guard.is_none() && f.params.iter().all(|p| p.choices.len() == 1)
 }
 
-/// A chain that is a clause block and not a function (`Clauses` of the old
-/// tree): not one plain function, one position, no written need or result.
+/// Match-shaped chains need one positional argument per branch and no
+/// written needs or results; a lone plain function stays a function.
 pub fn clause_block(fs: &[Function]) -> bool {
     !matches!(fs, [f] if plain(f))
         && fs.first().is_some_and(|f| f.params.len() == 1)
@@ -338,7 +338,7 @@ mod tests {
     use migration_syntax::lisp::expansion3::*;
     use migration_syntax::lisp::syntax::SyntaxError;
 
-    /// The answer on the tree of syntax three and the answer on its
+    /// The answer on the source tree and the answer on its
     /// lowering are the same.
     fn both(source: &str, lisp: bool) -> Result<Vec<MacroDefinition>, Vec<SyntaxError>> {
         let (module, errors) = if lisp {

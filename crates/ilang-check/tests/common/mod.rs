@@ -8,7 +8,7 @@ use ilang_check::hir::{Def, ModuleId, Program};
 use ilang_package::{Diagnostic, PackageGraph};
 use std::fs;
 
-/// Spec §2.4.1: exact warnings for fixtures with no entry or export roots.
+/// Exact warnings for fixtures with no entry or export roots.
 pub fn expect_unused(diags: &[Diagnostic], names: &[&str]) {
     let actual = diags
         .iter()
@@ -52,9 +52,8 @@ pub fn def<'a>(program: &'a Program, path: &str, name: &str) -> &'a Def {
     m.defs.iter().find(|d| d.name == name).unwrap()
 }
 
-/// Whether `tests/syn3-pending.txt` lists the test `name` (`file::test`):
-/// it uses a form that a later stage of syntax three removes, and is skipped
-/// until that stage lands. The skip is printed, so it stays visible.
+/// Listed cases need unsupported forms. Skips are printed so those gaps stay
+/// visible while the remaining cases continue to run.
 #[allow(dead_code)]
 pub fn syn3_pending(name: &str) -> bool {
     let list = std::fs::read_to_string(

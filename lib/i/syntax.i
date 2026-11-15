@@ -76,7 +76,7 @@ TypeHandle = Opaque
 
 /// A node of syntax. `Int` and `Float` are the built-in types; the other
 /// members share a type constructor with another member, so each is its own
-/// type (syntax three §2.8).
+/// type.
 Node = (
 	TypeView
 		| Name

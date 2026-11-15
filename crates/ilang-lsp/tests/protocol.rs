@@ -607,10 +607,14 @@ fn labels(r: &Value) -> Vec<&str> {
         .collect()
 }
 
-/// The requests of a test that must be answered without a check took less than the check that
-/// opened the package. The debounce is 600 seconds, so a request that waited for a check would
-/// not be answered at all before the test's own timeout; this bound catches one that does the
-/// work of a check on every request. It is relative to the first check, with a floor, not a
+/// The requests of a test that must be answered without a check took less than
+/// the check that
+/// opened the package. The debounce is 600 seconds, so a request that waited
+/// for a check would
+/// not be answered at all before the test's own timeout; this bound catches one
+/// that does the
+/// work of a check on every request. It is relative to the first check, with a
+/// floor, not a
 /// wall-clock limit.
 fn assert_answered_without_a_check(took: Duration, first_check: Duration) {
     let limit = first_check.max(Duration::from_millis(500)) * 10;
@@ -649,8 +653,10 @@ fn answers_from_the_last_check() {
     assert_eq!(d["range"]["start"], json!({ "line": dl, "character": dch }));
     // Answered without a check: none has published problems.
     assert!(!c.has_diagnostics(&main));
-    // About: these answers need no check. Relative to the first check of the same package (so
-    // a busy machine does not fail it): the three requests together cost less than the check.
+    // About: these answers need no check. Relative to the first check of the
+    // same package (so
+    // a busy machine does not fail it): the three requests together cost less
+    // than the check.
     assert_answered_without_a_check(started.elapsed(), check_time);
     // New bindings at the end. In the new text, hover waits for a check,
     // which publishes the new problem.
@@ -728,7 +734,7 @@ fn quick_changes_are_checked_once() {
 /// the top-level binding that it is in does.
 #[test]
 fn hover_on_a_local_name_uses_the_names_of_the_scheme() {
-    // E3 has one need row. An unknown callback needs N, without a separate
+    // There is one need row. An unknown callback needs N, without a separate
     // error-channel variable. Keep the scheme/local naming assertions.
     let text = "k = (f, x) {\n  y = f(x)\n  y\n}\n\
                 \n\
@@ -964,7 +970,8 @@ fn typed_macro_hover_and_definition_through_call() {
     let definition =
         client.request::<lsp::request::GotoDefinition>(position_params(&main, line, column + 1));
     assert_eq!(definition["uri"], mac);
-    // The definition is the binding of the macro, as for any name that also has a declaration.
+    // The definition is the binding of the macro, as for any name that also has
+    // a declaration.
     assert_eq!(definition["range"]["start"]["line"], 4);
 }
 
@@ -1169,7 +1176,7 @@ fn lsp_references_constructor() {
         "{refs:?}"
     );
     // `Circle` in `Shape = Circle | Rect` names the labelled type `Circle`,
-    // which is the constructor (syntax three §2.6).
+    // which is the constructor.
     for nth in [1, 2] {
         assert!(
             refs.contains(&(ws.shapes.clone(), range_of(SHAPES, "Circle", nth))),
@@ -1649,7 +1656,7 @@ fn lsp_definition_type_of_a_local() {
     let mut c = ws.open();
     let r = c.request::<lsp::request::GotoTypeDefinition>(pos(&ws.main, &ws.main_text, "c)", 0, 0));
     // `c = Circle(…)` and the constructor have the type `Circle` (syntax
-    // three §2.8: a constructor's type is its own).
+    // each constructor has its own type).
     assert_eq!(
         locations(&r),
         vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 0))]
@@ -1789,7 +1796,7 @@ fn lsp_definition_lisp_surface() {
     );
     let r =
         c.request::<lsp::request::GotoTypeDefinition>(pos(&ws.main, &ws.main_text, "size c", 0, 5));
-    // `c` is a `Circle` (syntax three §2.8).
+    // `c` is a `Circle`.
     assert_eq!(
         locations(&r),
         vec![(ws.shapes.clone(), range_of(SHAPES, "Circle", 0))]
@@ -1952,8 +1959,8 @@ fn lsp_completion_services_in_an_environment() {
         "{:?}",
         items.iter().map(|i| &i.label).collect::<Vec<_>>()
     );
-    // A service type is an ordinary labelled type (syntax three §2.10.3,
-    // R1), so `Point` may be one; the types used as services come first.
+    // A service type is an ordinary labelled type, so `Point` may be one; the
+    // types used as services come first.
     let place = |label: &str| items.iter().position(|i| i.label == label);
     assert!(place("Point").is_some_and(|p| p > 0), "{items:?}");
     // Values are not services.
@@ -2094,7 +2101,7 @@ fn lsp_signature_of_a_constructor() {
     let ws = workspace(false);
     let mut c = ws.open();
     let s = signature(&mut c, pos(&ws.main, &ws.main_text, "radius = 2", 0, 9));
-    // A constructor's type is its own (syntax three §2.8).
+    // A constructor's type is its own.
     assert_eq!(s.signatures[0].label, "Circle(radius = Int) -> Circle");
     assert_eq!(s.active_parameter, Some(0));
     c.shutdown();
@@ -2124,7 +2131,7 @@ fn lsp_hover_type_and_documentation() {
     let h = hover_text(&mut c, pos(&ws.main, &ws.main_text, "Circle(radius", 0, 1));
     assert!(
         // The constructor makes a `Circle`, a type without a comment of its
-        // own; the comment is on the union `Shape` (syntax three §2.8).
+        // own; the comment is on the union `Shape`.
         h.contains("Circle : (radius : Int) -> Circle"),
         "{h}"
     );
@@ -2623,7 +2630,7 @@ fn lsp_folding_workspace_symbols() {
         symbols
             .iter()
             // `Circle = (…)` is one definition of the type and its
-            // constructor (syntax three §2.8), listed once.
+            // constructor, listed once.
             .any(|s| s.name == "Circle"
                 && matches!(
                     s.kind,

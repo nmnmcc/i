@@ -131,14 +131,14 @@ fn tail_calls_are_return_calls() {
     assert!(l.contains("(return_call $f"), "{l}");
     let o = function(&text, "app/main.other");
     assert!(o.contains("(call $f") && !o.contains("return_call"), "{o}");
-    // The right side of `||` in tail position is a tail position (§11.6),
+    // The right side of `||` in tail position is a tail position,
     // but a call inside it is not.
     let e = function(&text, "app/main.either");
     assert!(!e.contains("return_call"), "{e}");
     let r = function(&text, "app/main.right");
     assert!(r.contains("(return_call $f"), "{r}");
     // Every frame is left before a tail call, and the callee gets its
-    // position as a tail site (§11.7).
+    // position as a tail site.
     assert!(l.contains("(call $shadow_leave_tail (i32.const -"), "{l}");
     assert!(l.contains("))\n(return_call"), "{l}");
 }
@@ -175,7 +175,7 @@ fn metadata() {
             "externals": {},
         })
     );
-    // The exports of B.1 and the program entry of B.5.
+    // Runtime exports and the program entry must coexist in one module.
     let mut exports = Vec::new();
     for payload in wasmparser::Parser::new(0).parse_all(&bytes) {
         if let wasmparser::Payload::ExportSection(s) = payload.unwrap() {
@@ -195,8 +195,8 @@ fn metadata() {
     }
 }
 
-/// An external function is a Wasm import (§10.1, B.4), and the metadata
-/// lists every external function, also one that is not used (B.6).
+/// An external function is a Wasm import, and the metadata
+/// lists every external function, also one that is not used.
 #[test]
 fn externals_are_imports() {
     let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt : (Float) -> Float\n";
@@ -236,7 +236,7 @@ fn calls_that_may_suspend_are_split() {
         " (i/control)\ntwice = (f) { f(1) + f(2) }\nlast = (f) { f(1) }\nplain = (n) { n + 1 }\nuses = (n) { plain(n) + twice((x) { x }) }\n\nmain = () {\n  control.boundary((b) { uses(1) + last((x) { x }) })\n  Nil\n}\n",
     );
     // Each call of a closure that is not a tail call is in a handler that
-    // adds its frame record (§9.4), with a segment and a re-entry function.
+    // adds its frame record, with a segment and a re-entry function.
     let twice = function(&text, "app/main.twice");
     assert_eq!(twice.matches("(catch_ref $capture").count(), 2, "{twice}");
     assert!(text.contains(";; app/main.twice after point"), "{text}");
@@ -293,7 +293,7 @@ fn environments() {
 #[test]
 fn bindings_that_may_fail_report_to_assert() {
     // `r` has the wider type `Result`: with an unknown value, `Ok(v) = r`
-    // would narrow `r` to `Ok(_)` (syntax three D4) and not report.
+    // would narrow `r` to `Ok(_)` and hide the missing case.
     let text = wat(
         "f = (r : Result(Int, Int)) {\n  Ok(v) = r\n  v\n}\ng = ((a, b)) { a + b }\n\nmain = () { (f(Ok(1)), g((1, 2))) }\n",
     );
@@ -309,7 +309,7 @@ fn bindings_that_may_fail_report_to_assert() {
 }
 
 /// A function with `n` calls that may suspend, each in a clause of its own
-/// `case` (§9.4).
+/// `case`.
 fn many_points(n: usize) -> String {
     let mut s = String::from(
         " (i/control)\ns = (b: Boundary(Int, Never), v: Int) -> Int {\n  control.suspend(b, (k) { control.resume(k, v) })\n}\nf = (b: Boundary(Int, Never), x: Int) -> Int {\n  a0 = x\n",
@@ -341,7 +341,8 @@ fn segments_grow_linearly() {
     let base = size(0);
     let ratio = (large - base) as f64 / (small - base) as f64;
     assert!(ratio < 5.0, "{base} {small} {large}: {ratio}");
-    // The time to generate the module must not blow up either. It is a growth ratio, not a
+    // The time to generate the module must not blow up either. It is a growth
+    // ratio, not a
     // wall-clock bound, so a busy machine does not fail the test: from 50 to 200 points a
     // polynomial grows by far less than 500 times, an exponential by far more.
     let time = |n| {
@@ -358,8 +359,8 @@ fn segments_grow_linearly() {
     );
 }
 
-/// Spec 4.1/11.4: opaque constructors remain distinct through a shared
-/// wire import. B.2/B.6 still describe each of them as one externref.
+/// Opaque constructors remain distinct through a shared wire import, though
+/// the binary interface describes each of them as one externref.
 #[test]
 fn opaque_decoders_keep_the_declared_type_on_both_targets() {
     let source = r#"(

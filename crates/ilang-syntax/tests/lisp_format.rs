@@ -106,8 +106,8 @@ fn repository_surfaces_have_pretty_lisp_layout() {
         let relative = path.strip_prefix(&root).unwrap();
         let source = std::fs::read_to_string(&path).unwrap();
         if path.extension().unwrap() == "is" {
-            // `.is` modules keep the rows before syntax three until they are
-            // migrated; only well-formed syntax-three Lisp is checked.
+            // `.is` modules keep the legacy rows until they are
+            // migrated; only well-formed current Lisp is checked.
             if ilang_syntax::syn3::lisp::from_lisp(&source).1.is_empty() {
                 eprintln!("Lisp {}", relative.display());
                 check(&source);

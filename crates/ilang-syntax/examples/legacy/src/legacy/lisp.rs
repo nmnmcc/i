@@ -1,4 +1,4 @@
-//! The pre-syntax-three datum reader, private to migration tools.
+//! The legacy datum reader, private to migration tools.
 use crate::lisp::{Datum, DatumKind, Document};
 use crate::token::{Token, TokenKind as T};
 use crate::{Code, Diagnostic};

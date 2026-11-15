@@ -51,7 +51,7 @@ pub struct MacroDefinition {
     pub item: usize,
     pub name: String,
     pub parameters: Vec<String>,
-    /// Explicit argument labels; bare names are positional (§6.11).
+    /// Explicit argument labels; bare names are positional.
     pub labels: Vec<Option<String>>,
     pub variants: Vec<MacroVariant>,
     /// Index of the declared runtime signature, for a typed macro.
@@ -92,7 +92,7 @@ impl MacroDefinition {
         })
     }
 
-    /// Match call arguments to parameters (§6.6). For an attribute call,
+    /// Match call arguments to parameters. For an attribute call,
     /// `item` is placed in the last parameter independently of labels.
     pub fn arguments(
         &self,

@@ -60,7 +60,7 @@ fn show_as_checks_the_requested_syntactic_position() {
         "1 + 2"
     );
     assert!(root("`(f x)").show_as(Position::Expression).is_err());
-    // The empty Round has no position; the empty data is `(,)` (§6.8).
+    // The empty Round has no position; the empty data is `(,)`.
     assert!(root("()").show_as(Position::Type).is_err());
     assert_eq!(root("(,)").show_as(Position::Type).unwrap(), "()");
 }
@@ -136,7 +136,7 @@ fn made_atoms_are_one_valid_token_and_keep_origin() {
     ] {
         assert!(Syntax::make(node, &like).is_err());
     }
-    // Spec §1.5 cuts `<-` as one token on both surfaces (§14.1).
+    // Both surfaces must cut `<-` as a single token.
     assert!(Syntax::make(Node::Symbol("<-".into()), &like).is_ok());
     assert!(Syntax::make(Node::Symbol("^".into()), &like).is_ok());
     let from_answer = like.as_answer();
@@ -373,7 +373,7 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
     use ilang_syntax::lisp::definitions::builtin_definition;
     use ilang_syntax::lisp::syntax::{Node, Position, ScopeIdentity};
     let like = root("x");
-    // In the rows of §6.8 a member of a sum is a type of its own.
+    // In the source rows a member of a sum is a type of its own.
     for name in [
         "Bool",
         "True",
@@ -926,7 +926,7 @@ fn deeply_nested_definition_answer_uses_bounded_host_stack() {
 #[test]
 fn definition_answer_preserves_a_single_field_record_type() {
     // A labelled type of one labelled item, and a name of that data type:
-    // the `{ }` of the item form is kept (§6.8), so the two stay apart.
+    // the `{ }` of the item form is kept, so the two stay apart.
     let definition = root("(= (Box A) (, (= x A)))");
     let answer = ilang_syntax::lisp::definitions::expanded_definition(&definition, 91).unwrap();
     assert_eq!(answer.show(), "(= (Box A) (, (= x A)))");
@@ -1202,7 +1202,7 @@ fn definition_table_charges_before_freshening_written_and_expanded_answers() {
 
 #[test]
 fn records_parse_from_lisp_with_fields_spread_and_removal() {
-    // Data in the rows of §6.8. A record type with a base or a removed key
+    // Data in the source rows. A record type with a base or a removed key
     // has no row any more.
     use ilang_syntax::syn3::ast::{DItem, ExprKind, TItem, TypeKind};
     use ilang_syntax::syn3::lisp::{expr_from_datum, type_from_datum};
@@ -1237,9 +1237,8 @@ fn show_as_groups_a_binary_operand_under_negation() {
 
 #[test]
 fn show_as_distinguishes_postfix_and_standalone_clauses() {
-    // A clause block and a match on it, in the rows before syntax three: the
-    // rows of §6.8 have no clause block, so these stay errors after the rows
-    // flip (the chain and the match of §6.8 are tested in lisp_syntax3.rs).
+    // Legacy clause blocks must stay invalid in both standalone and
+    // postfix positions; valid chain matches are covered in lisp_syntax3.rs.
     assert!(
         root("{ (-> (= a (, x)) (-> (y) Int y)) }")
             .show_as(Position::Expression)
@@ -1274,7 +1273,7 @@ fn show_as_deep_type_and_pattern_use_bounded_host_stack() {
 
 #[test]
 fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
-    // The printer of syntax three writes each statement of a block of
+    // The printer of the source syntax writes each statement of a block of
     // several statements on a line of its own, so `x` and `-1` stay apart;
     // a body of one expression stays on the line.
     let simple = root("(-> (,) _ { x y })");
@@ -1296,7 +1295,7 @@ fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
 #[test]
 fn show_as_attribute_item_uses_only_required_line_breaks() {
     let item = root("(@ custom (= f (-> (,) _ Nil)))");
-    // An attribute is on a line of its own in the layout of syntax three.
+    // An attribute is on a line of its own in the layout of the source syntax.
     assert_eq!(
         item.show_as(Position::Item).unwrap(),
         "@custom\nf = () { Nil }"
@@ -1451,7 +1450,7 @@ fn captured_rest_service_survives_both_macro_encoders_and_scoped_decoding() {
     };
     let syntax = expression_syntax(&binding.value, &root("env").scope().clone(), source);
     // Main's native encoder preserves the written generic head. Decode it
-    // in its binding, where those parameters belong (§4.7), not as a
+    // in its binding, where those parameters belong, not as a
     // detached polymorphic expression.
     assert_eq!(
         syntax.show(),

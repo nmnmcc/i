@@ -1,4 +1,4 @@
-//! Spec §2.4.1: count references in every top-level binding.
+//! Count references in every top-level binding.
 //! This pass changes no HIR.
 
 use crate::code;
@@ -44,7 +44,7 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
     references.pending.extend(&p.chain_uses);
     references.pending.extend(&p.host_exports);
     references.pending.extend(&p.declared_entries);
-    // Exempt definitions still use values through written types (§4.3).
+    // Exempt definitions still use values through written types.
     for t in &p.types {
         match &t.body {
             TypeBody::Alias(t) => references.ty(t),

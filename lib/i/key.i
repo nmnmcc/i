@@ -1,4 +1,4 @@
-//// Typed keys for heterogeneous immutable values (§9.8).
+//// Typed keys for heterogeneous immutable values.
 (
 	new
 	wrap

@@ -1,4 +1,4 @@
-//! The Lisp surface's position-independent datum layer (meta §2.2).
+//! The Lisp surface's position-independent datum layer.
 //!
 //! A datum carries its source span even when nested. The following layer maps
 //! the datum to the core AST in a specific syntactic position.
@@ -219,7 +219,7 @@ pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
     parse3(source)
 }
 
-/// Read all datums of a syntax-three Lisp file, where `<-` is one symbol.
+/// Read all datums of a current Lisp file, where `<-` is one symbol.
 pub fn parse3(source: &str) -> Result<Document, Vec<Diagnostic>> {
     parse_lexed(crate::lexer::lex3_lisp(source))
 }
@@ -261,7 +261,7 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
 
 /// Format a Lisp module without discarding its ordinary comments.
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
-    // The rows are checked by syntax three's reader; the layout is the
+    // The rows are checked by the source reader; the layout is the
     // source-preserving one of the Lisp convention, which keeps comments.
     let (_, diagnostics) = crate::syn3::lisp::from_lisp(source);
     if !diagnostics.is_empty() {

@@ -1,4 +1,4 @@
-//! The WASI target (spec B.7): `i build --target wasi` makes a WASI
+//! The WASI target: `i build --target wasi` makes a WASI
 //! preview 1 command. These tests run it in Wasmtime with a small
 //! `fd_write` and `proc_exit` of their own, which may write only a few bytes
 //! at a time, and link the other imports as a host would.
@@ -8,7 +8,7 @@ use ilang_host::{Abi, Outcome, Program, Stop};
 use std::path::Path;
 use wasmtime::{Caller, Config, Engine, Extern, Linker, Module, Store};
 
-/// The import of the standard service (spec §9.7).
+/// The import of the standard service.
 const IO: &str = " ((Io) = i/io)\n";
 
 fn package(main: &str) -> tempfile::TempDir {
@@ -208,12 +208,12 @@ fn hello_needs_only_wasi() {
 fn stops_write_the_message_and_exit_with_1() {
     let programs = [
         ("", "\nmain = () { assert(1 + 1 == 3) }\n"),
-        // An error at the entry (§9.3).
+        // An error at the entry.
         (
             " (i/fail)\n",
             "Bad = (Int)\n\nmain = () { fail.raise(Bad(7)) }\n",
         ),
-        // A stop while the top-level values are worked out (§2.5).
+        // A stop while the top-level values are worked out.
         ("", "early = panic(\"too early\")\n\nmain = () { early }\n"),
     ];
     for (imports, source) in programs {
@@ -250,7 +250,7 @@ fn long_output_survives_short_writes() {
 }
 
 /// A provider of `app:greet/v1` `greet: (name: String) -> String`, as in
-/// B.2 and B.3: it reads the parameter and gives a buffer of `ilang_alloc`.
+/// The host reply must use a buffer allocated by `ilang_alloc`.
 fn greeter(linker: &mut Linker<State>) {
     linker
         .func_wrap(
@@ -342,7 +342,7 @@ fn needs_an_entry() {
 }
 
 /// The standard service is `Io` of `i/io`. Another declaration of `print`
-/// in `i:io/v1` is two host services with one field (E0311); one with
+/// in `i:io/v1` is two host services with one field; one with
 /// another field is a normal host service, and stays an import.
 #[test]
 fn the_standard_service_is_the_one_of_i_io() {
@@ -375,7 +375,7 @@ fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
     }
 }
 
-/// The runtime imports `fd_write` and `proc_exit` itself (B.7), so a
+/// The runtime imports `fd_write` and `proc_exit` itself, so a
 /// program may not import them, as an external function or as a field of
 /// a host service. Other WASI functions are imports like any other.
 #[test]
@@ -421,9 +421,9 @@ fn only_wasi_modules_name_their_target() {
 }
 
 // Lazy re-entry of paused frames: the programs of run tests 12 to 16 of
-// docs/design/lazy-reentry.md (13.2), and an error through a final record
-// (13.3), at `--opt 2`, with what eager at `1df2fe0` gives for them. The spec
-// does not state these outputs (D15, D16).
+// Cancellation through final records must retain the permitted scheduler
+// behavior at `--opt 2`. The rules
+// does not state these outputs.
 // `crates/ilang-wasm/tests/control_lazy.rs` runs the same programs at
 // `--opt 0`.
 
@@ -516,7 +516,7 @@ paused = () {
 }
 "#;
 
-/// Test 12: the resume of k2 runs the end of the final function, which
+/// Cancellation: the resume of k2 runs the end of the final function, which
 /// throws the `$cancel` of `k`. Nothing takes it, and the entry stops.
 const MAIN_OUT: &str = r#"// The resumed final function ends, and the `$cancel` of `k` goes out of
 // the resume, which nothing takes.
@@ -547,13 +547,13 @@ h = (b3, k2) {
 }
 "#;
 
-/// Test 13: the outer frame of k3 waits.
+/// Nested cancellation: the outer frame of k3 waits.
 const O1_PLAIN: &str = r#"// The outer frame of k3, which waits.
 o1 = (b3, k2) { keep(h(b3, k2)) }
 
 "#;
 
-/// Test 15: the ensure of k3 waits outside `h`.
+/// Re-entry: the ensure of k3 waits outside `h`.
 const O1_ENSURE: &str = r#"// The ensure of k3 waits outside `h`: the cancel runs its final function.
 o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }
 
@@ -576,8 +576,8 @@ main = () {
 "#;
 
 /// Test 14, resume: the tail call of `h_tail` leaves no frame that keeps
-/// `! Name = Name("in")`, so `g` sees "resumer", against §9.4 rule 3
-/// (section 7a).
+/// `! Name = Name("in")`, so `g` sees "resumer", although a resumed part keeps
+/// the services provided inside it.
 const ENV_TAIL_RESUME: &str = r#"(
 	i/control
 )
@@ -661,7 +661,7 @@ main = () {
 }
 "#;
 
-/// Test 16: the value of `f` of `inner` goes on into the cancelled code.
+/// Finalization: the value of `f` of `inner` goes on into the cancelled code.
 const CANCEL_INNER: &str = r#"(
 	i/control
 	i/resource
@@ -705,7 +705,7 @@ main = () <- (io : Io) {
 "#;
 
 /// An error goes through a pending final record (kind 5, skipped in mode
-/// 1). A final function cannot raise an error itself (§9.5), but D15's
+/// 1). A final function cannot raise an error itself, but the
 /// cancel through an inner boundary can run ordinary code that raises one.
 /// This is checked against eager, rather than made a conformance rule.
 const ERROR_THROUGH_FINAL: &str = r#"(

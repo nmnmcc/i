@@ -18,7 +18,7 @@ Capture = (record = (Event) -> Nil)
 
 record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }
 
-// std-2 §7: finite, closed instantiations retain service and error types.
+// Finite, closed instantiations retain service and error types.
 deliver : (log.Entry) <- (
 	Fail(String),
 	Capture,
@@ -44,7 +44,7 @@ entry = (level : log.Level) -> log.Entry {
 	log.Entry(level = level, message = "hello", fields = [], at = None)
 }
 
-// L1/L2 and the sequential service law: entry fields and timestamps are data.
+// Entry fields and timestamps remain data through sequential service calls.
 test("log_delivery", () {
 	original = log.Entry(
 		level = log.Info,
@@ -79,7 +79,7 @@ test("log_delivery", () {
 	Nil
 })
 
-// L3: rejection suppresses both callbacks; eager arguments still evaluate.
+// rejection suppresses both callbacks; eager arguments still evaluate.
 test("log_lazy", () {
 	trace = control.boundary((b) {
 		{
@@ -136,7 +136,7 @@ test("log_lazy", () {
 	Nil
 })
 
-// L4 and both filter laws: thresholds follow L1's four explicitly ordered levels.
+// L4 and both filter laws: thresholds follow the four explicitly ordered levels.
 test("log_filters", () {
 	levels = [log.Debug, log.Info, log.Warning, log.Failure]
 	cases = [
@@ -207,7 +207,7 @@ test("log_filters", () {
 		)
 	})
 	assert(trace == list.map(levels, (level) { Sent(entry(level)) }))
-	// L4 requires new_accept before old_accept and short-circuiting.
+	// Filter composition requires new_accept before old_accept and short-circuiting.
 	{
 		assert(query(log.Info) == False)
 		Nil
@@ -226,7 +226,7 @@ broken_deliver : (log.Entry) <- (
 	log.Sink(DeliveryError, Capture),
 ) -> Nil = log.write
 
-// L2/L5: a custom error is preserved, with no retry or swallowed failure.
+// a custom error is preserved, with no retry or swallowed failure.
 test("log_errors", () {
 	trace = control.boundary((b) {
 		{
@@ -257,7 +257,7 @@ test("log_errors", () {
 	Nil
 })
 
-// L6: fixed expected bytes derive from the format rule, not core.inspect.
+// fixed expected bytes derive from the format rule, not core.inspect.
 test("log_format", () {
 	assert(
 		log.format(

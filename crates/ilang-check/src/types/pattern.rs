@@ -1,6 +1,6 @@
-//! Patterns: pattern types, fitting (§4.8, after rule 14), "may fail"
-//! (§7.3), `case` by places (rule 11), narrowing (rule 12), coverage and
-//! clauses that are never used (§7.4), and known constructors (§7.5).
+//! Patterns: pattern types, fitting, "may fail",
+//! `case` by places, narrowing, coverage and
+//! clauses that are never used, and known constructors.
 
 use super::coverage::{self, Col, Ctor, Pat};
 use super::infer::{Checker, Scheme};
@@ -14,7 +14,7 @@ use std::collections::HashMap;
 
 const LITERAL_CANDIDATES: bool = true;
 
-/// A catch-all is a name, a discard, or `x = q` where `q` is one (§4.8).
+/// A catch-all is a name, a discard, or `x = q` where `q` is one.
 pub(crate) fn catch_all(p: &Pattern) -> bool {
     match &p.kind {
         PatternKind::Var(_) | PatternKind::Discard => true,
@@ -28,7 +28,7 @@ pub(crate) fn binders(p: &Pattern, out: &mut Vec<VarId>) {
     crate::hir::pattern_binders(p, &mut |b| out.push(b.var));
 }
 
-/// The label of a part of a constructor pattern (§7.1): the last name in
+/// The label of a part of a constructor pattern: the last name in
 /// the chain of `=` at its top.
 pub(crate) fn part_label(p: &Pattern) -> Option<&str> {
     match &p.kind {
@@ -41,11 +41,11 @@ pub(crate) fn part_label(p: &Pattern) -> Option<&str> {
     }
 }
 
-/// A place of a `case` (rule 11).
+/// Each match place retains its own pattern domain for coverage.
 struct Place {
     /// `B`: the type of the values at this place.
     ty: Ty,
-    /// The known type of the values at this place (§4.8).
+    /// The known type of the values at this place.
     known: Knowledge,
     /// The pattern types of the patterns here that are not catch-alls.
     pats: Vec<Ty>,
@@ -65,7 +65,7 @@ struct Place {
     shared: bool,
 }
 
-/// A catch-all in a clause pattern, to be narrowed (rule 12).
+/// A catch-all needs the domain left after earlier clauses.
 struct Catch<'p> {
     pattern: &'p Pattern,
     clause: usize,
@@ -73,7 +73,7 @@ struct Catch<'p> {
     place: usize,
 }
 
-/// A `case` whose coverage (§7.4) is checked when the types of its group
+/// A `case` whose coverage is checked when the types of its group
 /// are found.
 pub(crate) struct PendingCase {
     pub module: ModuleId,
@@ -135,14 +135,14 @@ impl Checker<'_> {
         }
     }
 
-    /// Fits `q` to `b` (§4.8): a catch-all gives its names `b`; any other
+    /// Fits `q` to `b`: a catch-all gives its names `b`; any other
     /// pattern needs `b <: Q`, with its parts fitted to the parts of `Q`.
     ///
     /// A constructor pattern `C(…)` (also as `x = C(…)`) with pattern type
     /// `Q` may fail: when some known value of `b` is made by another
     /// constructor, it needs `b <: Q | r - Q` with a new variable `r`, not
     /// `b <: Q`, so that such a value is a failure to match that reports to
-    /// `Assert` (§4.8, syntax three D4). When no value of `b` is made by `C`,
+    /// `Assert`. When no value of `b` is made by `C`,
     /// the pattern never matches: a warning. While the values of `b` are not
     /// known, or are all made by `C`, `b <: Q` keeps the principal type.
     pub fn fit(&mut self, q: &Pattern, b: &Ty) {
@@ -188,7 +188,7 @@ impl Checker<'_> {
         } else {
             let t = self.pat(q, in_case);
             // A constructor part whose known values are also made by other
-            // constructors may fail (syntax three D4, as in `fit`).
+            // constructors may fail (as in `fit`).
             let t = match top_ctor(q) {
                 Some(c) if !in_case => {
                     let (others, _) = self.made_by_others(b, Head::Named(TypeRef::Custom(c.ty)));
@@ -210,7 +210,7 @@ impl Checker<'_> {
         Ty::Union(members)
     }
 
-    /// The type of a parameter (rule 4): a new variable for a catch-all,
+    /// The type of a parameter: a new variable for a catch-all,
     /// and else the pattern type.
     pub fn param(&mut self, q: &Pattern) -> Ty {
         self.param_in(q, false)
@@ -281,11 +281,8 @@ impl Checker<'_> {
     /// parameter, or a part of one): the declared union that `C` is a member
     /// of, when there is one smallest such union of labelled types
     /// (`Ok(v)` gives `Ok(A) | Error(B)`, that is `Result(A, B)`), and else
-    /// `C`'s own type. Before stage 3 the pattern type of `Ok(v)` was
-    /// `Result(A, B)`; syntax-3.md §2.12 keeps that: "So with `r : Ok(Int) |
-    /// Error(String)`, `Ok(v) = r` is correct and needs `Assert`, as today
-    /// with the multi-constructor `Result`". So an unknown value fitted to
-    /// `Ok(v)` is a `Result` and the pattern may fail (§7.3), as before.
+    /// `C`'s own type. An unknown value fitted to `Ok(v)` must allow the
+    /// other members of `Result`, so the pattern may fail and needs `Assert`.
     fn family(&mut self, t: Ty, id: TypeId, span: Span) -> Ty {
         let h = Head::Named(TypeRef::Custom(id));
         let mut best: Option<&super::display::AliasFold> = None;
@@ -411,7 +408,7 @@ impl Checker<'_> {
         }
     }
 
-    /// §8.4: a string format in a pattern needs a string literal, and
+    /// A string format in a pattern needs a string literal, and
     /// `bits` or `bytes` with no length may only be the last segment.
     fn check_bit_pattern(&mut self, segs: &[Segment<Pattern>]) {
         for (i, seg) in segs.iter().enumerate() {
@@ -435,7 +432,7 @@ impl Checker<'_> {
         }
     }
 
-    /// §7.1: the parts of a constructor pattern and the fields they are
+    /// The parts of a constructor pattern and the fields they are
     /// matched to: by position to the fields without labels, then by label.
     pub fn match_fields<'p>(
         &mut self,
@@ -521,7 +518,7 @@ impl Checker<'_> {
         out
     }
 
-    /// §7.3: `q` may fail for the type `t` of the value, when some value of
+    /// `q` may fail for the type `t` of the value, when some value of
     /// `t` does not match it. Only used after `q` is fitted to `t`.
     pub fn may_fail(&mut self, q: &Pattern, t: &Ty) -> bool {
         if catch_all(q) {
@@ -532,21 +529,21 @@ impl Checker<'_> {
             .is_some()
     }
 
-    /// A member that is a custom type with no constructors (§4.3).
+    /// A member that is a custom type with no constructors.
     fn no_constructors(&self, m: &Ty) -> bool {
         matches!(m, Ty::Con(Head::Named(TypeRef::Custom(id)), _, _)
             if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()))
     }
 
     /// `may_fail` for the pattern of a binding or a parameter, kept for the
-    /// code generator (§6.10, §6.11).
+    /// code generator.
     pub fn binding_may_fail(&mut self, q: &Pattern, t: &Ty) -> bool {
         let fails = self.may_fail(q, t);
         self.out.may_fail.insert((self.module, q.span), fails);
         fails
     }
 
-    /// §7.5: `x = C(…)` in a binding or a parameter makes `x` known to be
+    /// `x = C(…)` in a binding or a parameter makes `x` known to be
     /// made by `C`. In a `case`, see `clause_known`.
     fn note_known(&mut self, binder: &Binder, inner: &Pattern) {
         if let Some(c) = top_ctor(inner) {
@@ -554,7 +551,8 @@ impl Checker<'_> {
         }
     }
 
-    /// §7.5 for the choices of a `case` clause: `x` is known to be made by
+    /// Records which constructor `x` is known to be made by in a `case` clause:
+    /// `x` is known to be made by
     /// `C` only when every choice binds `x` through `x = C(…)`. A choice
     /// that binds `x` in another way (`x`, `x: T`, `x = _`) may give it a
     /// value made by another constructor.
@@ -579,9 +577,9 @@ impl Checker<'_> {
         }
     }
 
-    // ---- case (rules 11 and 12) ----
+    // ---- Match constraints and narrowing ----
 
-    /// Rule 11, and the known type of a `case` (§4.8): the union of the
+    /// The known type of a `case` is the union of the
     /// known types of its clause expressions, which have the expected type
     /// of the `case`.
     pub fn case(
@@ -634,11 +632,8 @@ impl Checker<'_> {
             slack[i] = places[i].catch_here || places[i].parent.is_some_and(|p| slack[p]);
             let pats = std::mem::take(&mut places[i].pats);
             let p = self.union(pats, span);
-            // A member of a declared union of labelled types (a former
-            // constructor) stands for that union, as the type of the whole
-            // family did before stage 3 (§5.2.8 rule 11, "the coverage
-            // error in a match is unchanged"): the members no pattern takes
-            // are added, so they are reported by §7.4, not as a type error.
+            // Include every member of the declared union so an omitted
+            // member is reported as a coverage failure.
             let p = if slack[i] {
                 p
             } else {
@@ -657,16 +652,15 @@ impl Checker<'_> {
             let b = places[i].ty.clone();
             let at = if i == 0 { subject.span } else { span };
             if fitted {
-                // A one-clause match reports what its pattern does not take
-                // as the error of §7.4 (`defer_failure` below), as it did
-                // when the members of a sum were constructors of one type.
+                // Defer missing members to the coverage diagnostic below,
+                // avoiding a second subtype error for the same omission.
                 self.sub_fitted_match(&b, &want, at);
             } else {
                 held.extend(self.sub_case(&b, &want, at));
             }
         }
-        // Rule 12: each catch-all gets `B - H`, and its known type less the
-        // members that are taken (§4.8).
+        // Each catch-all gets `B - H`, and its known type less the
+        // members that are taken.
         for k in 0..v.catches.len() {
             let c = &v.catches[k];
             let (pattern, ci, choice, place) = (c.pattern, c.clause, c.choice, c.place);
@@ -680,7 +674,7 @@ impl Checker<'_> {
             };
             self.fit_known(pattern, &known, true);
         }
-        // §7.5: inside a clause `C(…)`, the name of the subject is known to
+        // Inside a clause `C(…)`, the name of the subject is known to
         // be made by `C`.
         let subject_var = match &subject.kind {
             ExprKind::Name(ValueRef::Local(x)) => Some(*x),
@@ -701,7 +695,7 @@ impl Checker<'_> {
                 ctors.all(|o| o == Some(first)).then_some((x, first))
             });
             // Inside the clause, the value of the subject is in the pattern
-            // type `T(b1, …)` at the top place (rule 11), so its fields have
+            // type `T(b1, …)` at the top place, so its fields have
             // the types of these arguments. The type of the name is not
             // changed: outside the clause, it may have other values.
             let before = known.map(|(x, ctor)| {
@@ -743,7 +737,7 @@ impl Checker<'_> {
             self.defer_failure(Pat::Or(rows[0].clone()), a, at);
         } else {
             {
-                // Syntax three §2.6.1: the rows and the branch results, for
+                // The rows and the branch results, for
                 // the selection table of a function with this body.
                 let table = super::groups::CaseTable {
                     rows: rows
@@ -779,7 +773,7 @@ impl Checker<'_> {
         (r, self.kunion_knowledge(knowns))
     }
 
-    /// Rule 12: the type of the catch-all `id` of choice `choice` of clause
+    /// The type of the catch-all `id` of choice `choice` of clause
     /// `ci`, at `place`: `B - H`, with `H` the type constructors that the
     /// earlier clauses without a guard take there. "Every value that the
     /// clause pattern matches" is any value at the other places: the types
@@ -873,7 +867,7 @@ impl Checker<'_> {
         (t, Some(taken))
     }
 
-    /// Checks the coverage (§7.4) of a `case`, and warns about the clauses
+    /// Checks the coverage of a `case`, and warns about the clauses
     /// that are never used, with the types that inference found.
     pub fn check_case(&mut self, c: PendingCase) {
         self.set_module(c.module);
@@ -1018,7 +1012,7 @@ impl Checker<'_> {
     }
 
     /// The arguments shared at a place by the patterns with one head
-    /// (rule 11).
+    /// for match typing.
     fn shared(&mut self, places: &mut [Place], at: usize, h: Head, n: usize) -> Vec<Ty> {
         if let Some((_, args)) = places[at].heads.iter().find(|x| x.0 == h) {
             return args.clone();
@@ -1029,7 +1023,7 @@ impl Checker<'_> {
     }
 
     /// Puts a clause pattern at the place `at`, binds its names (but not
-    /// those of catch-alls, which wait for rule 12), and gives back its
+    /// those of catch-alls, which wait for narrowing), and gives back its
     /// pattern type and its pattern for `coverage`.
     fn visit<'p>(
         &mut self,
@@ -1137,10 +1131,10 @@ impl Checker<'_> {
                             places[at].seen.push((v.clause, v.unguarded, h, n));
                         }
                     }
-                    // Rule 11: the test takes every value of the type
+                    // The test takes every value of the type
                     // constructors of `T`, so those values must be in `T`:
                     // `B <: T | r - T`.
-                    // §7.1: custom types with no constructors cannot be
+                    // Custom types with no constructors cannot be
                     // told apart at run time, so for a type test they all
                     // count as one type constructor: a test of one takes
                     // the values of all of them.
@@ -1177,7 +1171,7 @@ impl Checker<'_> {
                 let kctor = places[at].known.member(h);
                 let mut parts = vec![Pat::Wild(None); fields.len()];
                 let matched = self.match_fields(q.span, &fields, args, *spread);
-                // Rule 11: `..` counts as a catch-all at the places of the
+                // `..` counts as a catch-all at the places of the
                 // fields that it leaves out.
                 if *spread && v.unguarded {
                     for (i, field) in fields.iter().enumerate() {
@@ -1329,7 +1323,7 @@ fn top_ctor(p: &Pattern) -> Option<CtorRef> {
 }
 
 /// Every name that a pattern binds, with the constructor `C` when it is
-/// bound through `x = C(…)` (§7.5).
+/// bound through `x = C(…)`.
 fn ctor_binders(p: &Pattern, out: &mut Vec<(VarId, Option<CtorRef>)>) {
     match &p.kind {
         PatternKind::Quote { captures, .. } => {
@@ -1412,7 +1406,7 @@ mod shared_place_tests {
     use super::*;
     #[test]
     fn written_occurrences_include_other_constructors_and_aliases() {
-        // literal-types §5.3: count every written occurrence after aliases,
+        // Count every written occurrence after aliases,
         // across every constructor of the family, before inference.
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
@@ -1464,7 +1458,7 @@ Solo(A) = (A, Int)
             },
             1
         ));
-        // One constructor per type (syntax three): `Start` and `Stop` are
+        // One constructor per type : `Start` and `Stop` are
         // no longer one family, so their fields are not shared.
         assert!(!c.field_shared(
             CtorRef {

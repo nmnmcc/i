@@ -6,7 +6,8 @@
 	string = std/string
 )
 
-// Expected spellings in these tables are the examples and rules of std-1 §5.
+// Expected spellings in these tables are the documented examples and rules of
+// path handling.
 test("path_clean_examples", () {
 	list.each([
 		("", "."),
@@ -96,7 +97,7 @@ short_paths = (depth : Int) -> List(String) {
 		}
 }
 
-// §5.3: clean idempotence, exact raw split, and the successful relative law.
+// Clean idempotence, exact raw split, and the successful relative law.
 test("path_exhaustive_laws", () {
 	paths = short_paths(4)
 	list.each(paths, (p) {
@@ -123,7 +124,7 @@ test("path_exhaustive_laws", () {
 	Nil
 })
 
-// §5.3 calls for 100,000 segments, multibyte names, and long dot/parent runs.
+// The path functions handle 100,000 segments, multibyte names, and long dot/parent runs.
 test("path_long_inputs", () {
 	names = list.repeat("é猫", 100000)
 	long = string.join(names, "/")

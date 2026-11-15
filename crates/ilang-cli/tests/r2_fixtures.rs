@@ -1,4 +1,5 @@
-//! Additional JavaScript execution of the hand-authored R2 spec bodies.
+//! Runs the hand-authored conformance bodies of the structured scheduler on
+//! JavaScript as well.
 //! R2_FIXTURE_DUMP generates fixtures; ordinary runs check the transformation.
 use ilang_cli::{BuildOptions, Level, build};
 use ilang_syntax::{
@@ -8,7 +9,7 @@ use ilang_syntax::{
 use std::{fs, path::PathBuf};
 
 /// The byte range of a header group `( … )` from the span the tree gives it:
-/// the whole group, or (syntax three's lowering) only its entries.
+/// the whole group, or a lowered representation containing only its entries.
 fn group(text: &str, span: ilang_syntax::span::Span) -> (usize, usize) {
     let (start, end) = (span.start as usize, span.end as usize);
     if text[start..].starts_with('(') && text[..end].ends_with(')') {

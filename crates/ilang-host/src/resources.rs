@@ -289,8 +289,8 @@ impl ResourceContext {
         Ok(id)
     }
 
-    /// Acquiring a named lane checks both the resource kind and Rust type before
-    /// downcasting. Use separate read/write lanes or one shared cursor lane.
+    /// Acquiring by access name checks both the resource kind and Rust type before
+    /// downcasting. Use separate read and write access names or one shared cursor name.
     pub fn acquire<T: Any + Send + Sync>(
         &self,
         id: &BigInt,
@@ -438,8 +438,8 @@ impl ResourceContext {
     }
 }
 
-/// A safe resource reference plus a revocable operation lane. Commit is ordered
-/// with close, so a late success cannot be published. Dropping releases the lane.
+/// A safe resource reference plus a revocable operation access. Commit is ordered
+/// with close, so a late success cannot be published. Dropping releases the access.
 pub struct Lease<T> {
     table: Weak<Mutex<Table>>,
     id: BigInt,

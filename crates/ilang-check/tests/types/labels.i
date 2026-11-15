@@ -1,5 +1,5 @@
-// §6.6: migrated function heads take positional arguments; constructor
-// data keeps explicit labels (syntax three §2.3, §2.4).
+// Positional function parameters differ from constructor fields; constructor
+// data keeps explicit labels so calls retain their complete shape.
 User = (name = String, age = Int)
 
 make = (name : String, age : Int) { User(name = name, age = age) }
@@ -39,7 +39,7 @@ unknown = make(height = 1, name = "x")
 twice = make("a", name = "b")
 
 missing = make("b")
-// Calls through a labelled function value are valid (syntax three stage 10).
+// Calls through a function value retain the labelled argument shape.
 param = (f) { f(x = 1) }
 
 bad_pattern = (u) {
@@ -47,7 +47,7 @@ bad_pattern = (u) {
 	n
 }
 
-// Positional calls use known function types (§4.8).
+// Positional calls use known function types.
 // A name that is not generalized gets its type from its value.
 id = (x) { x }
 
@@ -84,7 +84,7 @@ ping = (n : Int) { pong(n) }
 
 pong = (m : Int) { m |> (0) { 0 } | (_) { ping(m - 1) } }
 
-// A written positional signature determines the call interface (§6.6).
+// A written positional signature determines the call interface.
 wins : (Int) -> Int = (y) { y }
 
 wins_ok = wins(1)

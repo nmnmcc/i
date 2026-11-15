@@ -30,7 +30,7 @@ fn reaches_compiler(program: &Program, initial: impl IntoIterator<Item = DefId>)
 }
 
 pub fn check(program: &Program, graph: &PackageGraph, diags: &mut Vec<Diagnostic>) {
-    // A test instance is supplied with the syntax service (§8); it does not
+    // A test instance is supplied with the syntax service; it does not
     // execute the normal entry or host exports.
     if graph.test_run {
         return;

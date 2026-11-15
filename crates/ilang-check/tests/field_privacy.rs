@@ -1,6 +1,6 @@
-//! §2.4: exporting a nominal type without constructors permits using its
-//! values, but not taking them apart. §6.7 applies this to field selection
-//! and update; §6.4 limits numeric projection to tuples.
+//! Exporting a nominal type without constructors permits using its
+//! values, but not taking them apart. Field selection and update need the
+//! constructors; numeric projection is limited to tuples.
 
 mod common;
 
@@ -10,7 +10,7 @@ const FACADE: &str = include_str!("../../../tests/spec/2.4/field_privacy_allowed
 #[test]
 fn private_fields_cannot_be_selected_through_other_names_or_values() {
     // Each selection takes apart the same nominal value. Aliases and
-    // forwarded values do not change its defining module (§2.4, §6.7).
+    // forwarded values do not change its defining module.
     for source in [
         "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) { v.value }\n",
         "(\n\tapp/secret\n)\nf = <A>(v : secret.Secret(A)) { v.missing }\n",
@@ -37,7 +37,7 @@ fn private_fields_cannot_be_selected_through_other_names_or_values() {
             ("src/main.i", source),
         ]);
         // Retaining the ordinary field type avoids cascading errors on
-        // `.parts.0`. A missing label still fails §4.8 rule 13 too.
+        // `.parts.0`. A missing label still fails the field rule too.
         let expected: &[&str] = if source.contains("v.missing") {
             &["E0204", "E0512"]
         } else {
@@ -120,15 +120,15 @@ fn generic_value_use_and_public_constructor_fields_keep_their_types() {
     let program = checked.program.unwrap();
     let types = checked.types.unwrap();
     let lines = types.lines(&program, common::module(&program, "app/main"));
-    // §4.7 requires principal types; §4.8 rules 3/4 give identity its
-    // general type. §2.4 permits using Secret, and §6.7 gives public
-    // Open.value the field type Int, also through its alias (§4.3).
+    // The types must be principal, so identity has its general type. The use of Secret
+    // is permitted, and public
+    // Open.value the field type Int, also through its alias.
     assert_eq!(
         lines,
         [
             "app/main.id : (A) -> A",
             // `Secret(A) = Pack(A)` is an alias of the labelled type `Pack`
-            // (stage 3, syntax-3.md §2.8), shown by its expansion.
+            // and is shown by its expansion.
             "app/main.pass : (secret.Pack(A)) -> secret.Pack(A)",
             "app/main.public : (secret.Open) -> Int",
             "app/main.allowed : () <- (Assert) -> Nil",

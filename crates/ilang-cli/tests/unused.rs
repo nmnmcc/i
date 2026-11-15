@@ -1,4 +1,4 @@
-//! Scope UNUSED rule 1: a warning must leave `i check` successful.
+//! Unused-binding warnings are nonfatal: a warning must leave `i check` successful.
 #[test]
 fn unused_binding_warning_keeps_check_successful() {
     let dir = tempfile::tempdir().unwrap();

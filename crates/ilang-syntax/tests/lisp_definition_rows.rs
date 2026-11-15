@@ -1,8 +1,5 @@
-//! The definition answers in the item rows of syntax-3.md §6.8 (step 2c of
-//! docs/design/syn3-final-ast.md, question 1): a sum answers
-//! `(= T (| C1 C2))` and each member is its own item `(= C (, …))`. The
-//! `_rows` functions are tested with the rows given, so these tests do not
-//! depend on `NEW_ROWS`.
+//! Each member of a union has its own definition row, so definition queries
+//! must not absorb members into the row of the union name.
 #[path = "oracle.rs"]
 mod ilang_syntax;
 use ilang_syntax::lisp::definitions::{
@@ -96,14 +93,13 @@ fn every_builtin_definition_has_its_row() {
     for rows in [false, true] {
         assert!(builtin_definition_rows("Int", like.scope(), like.span(), 3, rows).is_none());
     }
-    // A member of a sum is a type of its own only in the rows of §6.8.
+    // A member of a sum is a type of its own only in the source rows.
     for member in ["True", "False", "Ok", "Error"] {
         assert!(builtin_definition_rows(member, like.scope(), like.span(), 3, false).is_none());
     }
 }
 
-/// Each row is an item of the Lisp surface of syntax three, of the kind that
-/// §6.8 gives it, and the Lisp writer prints it back the same.
+/// Each definition row must parse as an item and print back unchanged.
 #[test]
 fn every_builtin_row_is_an_item_of_the_lisp_surface() {
     let like = root("x");
@@ -290,7 +286,7 @@ fn expanded_rows_keep_the_three_kinds_of_right_side_apart() {
             .unwrap()
             .show()
     };
-    // Labelled type, opaque type, name (§6.8, "Files and items").
+    // Definition rows must distinguish labelled types, opaque types and names.
     assert_eq!(show("(= U (, T1 (= x T2)))"), "(= U (, T1 (= x T2)))");
     assert_eq!(show("(= (U A) (, A))"), "(= (U A) (, A))");
     assert_eq!(show("(= U (,))"), "(= U (,))");
@@ -452,7 +448,7 @@ fn deeply_nested_rows_use_a_bounded_host_stack() {
         .unwrap();
 }
 
-/// A written definition of the new tree: a sum is `(= T (| C1 C2))` and each
+/// A written definition of the source tree: a sum is `(= T (| C1 C2))` and each
 /// member answers with its own item.
 #[test]
 fn written_definitions_of_the_new_tree_answer_in_the_rows() {

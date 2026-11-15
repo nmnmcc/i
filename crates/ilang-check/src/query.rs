@@ -83,7 +83,7 @@ pub fn check_parsed_for_queries(
 pub struct Hover {
     /// The span of the name or literal, in the file of the module asked.
     pub span: Span,
-    /// The name and its type in the syntax of §3, as `name: Type`, or the
+    /// The name and its type as written in i, as `name: Type`, or the
     /// definition of a type.
     pub code: String,
     /// The documentation comment (`///`) of the definition, if any.
@@ -460,8 +460,8 @@ impl<'a> Query<'a> {
                 notes.push(format!("Declared as `{declared}`"));
             }
         }
-        // The need of a function type (syntax three §2.10, §6.6): its
-        // `Fail(…)` entries are the possible errors, the rest services.
+        // `Fail(E)` entries contribute possible errors; the other need entries
+        // are services. Keeping them separate preserves the hover display.
         let ty = code.split_once(": ").map_or(code, |x| x.1);
         if let Some((_, Some(need), _)) = complete::split_fn_type_need(ty) {
             let inner = need
@@ -621,7 +621,7 @@ impl<'a> Query<'a> {
         }
     }
 
-    /// The type of a constructor as a value (§6.3).
+    /// The type of a constructor as a value.
     fn ctor_type(&self, c: CtorRef) -> String {
         let result = self.type_head(c.ty);
         let Some(def) = self.ctor_def(c) else {
@@ -652,7 +652,7 @@ impl<'a> Query<'a> {
         }
     }
 
-    /// The definition in the syntax-three surface (§4.3).
+    /// The definition in the source surface.
     fn type_definition(&self, t: TypeId) -> String {
         let def = self.program.ty(t);
         let head = self.type_head(t);
@@ -679,8 +679,8 @@ impl<'a> Query<'a> {
         if let TypeBody::Alias(ty) = &def.body {
             return format!("{head} = {}", self.show_type(ty));
         }
-        // A source definition has the syntax-three form chosen before
-        // expansion (§4.3), including a sum's separate member definitions.
+        // Definition queries retain the written form before expansion,
+        // including each separate member of a sum.
         let source_facts = self.ast(def.module);
         if let Some(item) = source_facts.items.iter().find(|item| {
             matches!(&item.kind, tree::ItemKind::TypeDef { name, .. } if name.span == def.span && name.name == def.name)
@@ -699,7 +699,7 @@ impl<'a> Query<'a> {
         }
         match &def.body {
             TypeBody::Alias(ty) => format!("{head} = {}", self.show_type(ty)),
-            // Syntax three (§2.8): `T = Opaque`, a labelled type `T = (…)`,
+            // Source definitions distinguish `T = Opaque`, a labelled type `T = (…)`,
             // or one labelled type per constructor and the sum.
             TypeBody::Custom(cs) if cs.is_empty() => format!("{head} = Opaque"),
             TypeBody::Custom(cs) => {
@@ -745,7 +745,7 @@ impl<'a> Query<'a> {
         }
     }
 
-    /// A written type in the syntax of §3.
+    /// Returns the text of a written type.
     pub fn show_type(&self, t: &Type) -> String {
         self.show_type_prec(t, 0)
     }
@@ -1146,7 +1146,7 @@ impl<'a> Query<'a> {
         }
     }
 
-    /// The members of a sum `T = C1 | C2` (syntax three §2.6): each names
+    /// The members of a sum `T = C1 | C2`: each names
     /// the labelled type `C1`, which is the constructor `C1` of `T` in the
     /// HIR. The HIR keeps only the definitions of the members, so their
     /// names in the sum are found in the written item.
@@ -1243,7 +1243,7 @@ impl<'a> Query<'a> {
 
     /// The names that may be written at `offset`. After `m.`, where `m` is
     /// a module, the exported members of `m`. After `v.`, the fields of the
-    /// known type of `v` (§4.8, §6.7). Else the local names in scope, the
+    /// known type of `v`. Else the local names in scope, the
     /// top-level names and types of the module, the imported names, the
     /// built-in names.
     pub fn completions_at(&self, m: ModuleId, offset: u32) -> Vec<Completion> {
@@ -1277,7 +1277,7 @@ impl<'a> Query<'a> {
 
     /// The fields that may be written after the dot of the field access
     /// whose name starts at `name_start`, from the known type of the value
-    /// before the dot (§6.7).
+    /// before the dot.
     fn field_completions(&self, m: ModuleId, name_start: u32) -> Vec<Completion> {
         let w = self.walk(m);
         let Some(&(_, span)) = w.fields.iter().find(|(n, _)| n.start == name_start) else {
@@ -1314,7 +1314,7 @@ impl<'a> Query<'a> {
         if !local && let Some(t) = self.import_module(m, name) {
             return self.module_members(t);
         }
-        // §7.5: a name known to be made by one constructor.
+        // A name known to be made by one constructor.
         if let Some(c) = self.types.and_then(|t| t.known_ctors.get(&(m, base))) {
             return self.fields_of_ctors(&[*c]);
         }
@@ -1362,7 +1362,7 @@ impl<'a> Query<'a> {
             .unwrap_or_default()
     }
 
-    /// The labels that every one of the constructors has (§6.7).
+    /// The labels that every one of the constructors has.
     fn fields_of_ctors(&self, ctors: &[CtorRef]) -> Vec<Completion> {
         let mut out: Vec<Completion> = Vec::new();
         let Some(first) = ctors.first().and_then(|c| self.ctor_def(*c)) else {
@@ -1570,7 +1570,7 @@ impl<'a> Query<'a> {
                 }
             }
         }
-        // The built-in names (§12).
+        // The built-in names.
         if let Some(prelude) = p.prelude {
             let pm = p.module(prelude);
             for (i, d) in pm.defs.iter().enumerate() {
@@ -1846,7 +1846,7 @@ struct Walk<'q> {
 }
 
 /// The binder that gives a pattern its label: the last name of the chain
-/// of `=` at its top (§6.11, §7.1).
+/// of `=` at its top.
 pub(crate) fn label_binder(p: &Pattern) -> Option<&Binder> {
     match &p.kind {
         PatternKind::Var(b) => Some(b),
@@ -1910,7 +1910,7 @@ impl Walk<'_> {
 
     /// The labels of the parts of a constructor pattern that are matched to
     /// fields with labels: the last name of the chain of `=` at the top of
-    /// the part (§7.1).
+    /// the part.
     fn pattern_labels(&mut self, p: &Pattern, ctor: CtorRef, args: &[Pattern]) {
         let Some(def) = self.q.ctor_def(ctor) else {
             return;
@@ -1935,7 +1935,7 @@ impl Walk<'_> {
         }
     }
 
-    /// Syntax three writes the label and the local of a pattern part both,
+    /// Source patterns write the label and the local of a pattern part both,
     /// `C(label = label)` (`(= label label)` in the Lisp surface), where
     /// the tree has one binder at the label. The label stays a name of the
     /// field; the local is the second word.
@@ -2243,12 +2243,12 @@ impl Walk<'_> {
     }
 }
 
-/// The local names in scope at an offset (§5), outermost first.
+/// The local names in scope at an offset, outermost first.
 struct Scope<'o> {
     offset: u32,
     out: &'o mut Vec<Binder>,
     /// The names of the direct values that the offset is in: they are in
-    /// scope only inside the function bodies of the value (§6.10).
+    /// scope only inside the function bodies of the value.
     direct: Vec<Binder>,
 }
 
@@ -2285,7 +2285,7 @@ impl Scope<'_> {
             if contains(span, self.offset) {
                 match s {
                     Stmt::Bind(b) => {
-                        // §6.10: the names of a direct value may be used in
+                        // The names of a direct value may be used in
                         // the function bodies of the value.
                         if b.direct {
                             pattern_binders(&b.pattern, &mut self.direct);

@@ -1,4 +1,4 @@
-//! `core.index_of` (spec §13): the byte offset of the first place of one
+//! `core.index_of`: the byte offset of the first place of one
 //! string in another, at or after a given offset.
 //!
 //! The search is Knuth–Morris–Pratt, so it takes time linear in the sizes of

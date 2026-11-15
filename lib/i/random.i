@@ -1,4 +1,4 @@
-//// Pure, immutable SplitMix generators (§9.10).
+//// Pure, immutable SplitMix generators.
 //// Pass the returned generator to the next draw. This is not a cryptographic
 //// generator. Split and path streams can have equal outputs or states.
 (

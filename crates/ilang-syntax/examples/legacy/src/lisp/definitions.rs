@@ -3,9 +3,9 @@ use super::syntax::{Node, Scope, ScopeIdentity, Syntax, SyntaxError};
 use super::{Datum, DatumKind, parse};
 use crate::span::Span;
 
-/// The one switch of step 2c for this file and for the typed-macro type
+/// Row selection is shared with the typed-macro type
 /// syntax (`ilang-check`, `types/typed_macro.rs`): `false` answers in the rows
-/// before syntax three, `true` in the rows of syntax-3.md §6.8. Every function
+/// for legacy encoding, `true` for source rows. Every function
 /// here that depends on the rows has a `_rows` form that takes the choice.
 pub const NEW_ROWS: bool = super::syntax::ROWS3;
 
@@ -48,8 +48,8 @@ fn mark_definition_head(definition: Syntax, answer: u64, new_rows: bool) -> Synt
     cursor
 }
 
-/// The names that [`builtin_definition_rows`] answers. In the rows of §6.8 a
-/// member of a sum is a type of its own (question 1 of syn3-final-ast.md §5).
+/// The names that [`builtin_definition_rows`] answers. In the source rows a
+/// member of a sum is a type of its own, so each needs a definition row.
 pub fn builtin_definition_names(new_rows: bool) -> &'static [&'static str] {
     if new_rows {
         &[
@@ -75,7 +75,7 @@ pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> O
     builtin_definition_rows(name, scope, at, answer, NEW_ROWS)
 }
 
-/// [`builtin_definition`] in the chosen rows. In the rows of §6.8 a sum
+/// [`builtin_definition`] in the chosen rows. In the source rows a sum
 /// answers `(= T (| C1 C2))` and each member answers its own item
 /// `(= C (, …))`; a type with one constructor of its own name is one item.
 pub fn builtin_definition_rows(
@@ -346,15 +346,15 @@ pub fn source_definition_from_syntax(
     mark_definition_head(annotate(syntax, &sites, answer).as_answer(), answer, false)
 }
 
-/// A written type definition of the tree of syntax three as a query answer
-/// in the rows of §6.8, with fresh identities for its type parameters. This is
+/// A written type definition of the source tree as a query answer
+/// in the source rows, with fresh identities for its type parameters. This is
 /// [`source_definition`] for the new `Item`; a sum is the item
 /// `(= T (| C1 C2))` and each member is its own item.
 pub fn tree_definition(item: &crate::syn3::ast::Item, scope: &Scope, answer: u64) -> Syntax {
     tree_definition_from_datum(&crate::syn3::lisp::item_datum(item), scope, answer)
 }
 
-/// [`tree_definition`] for an item that is already a datum of the §6.8 rows:
+/// [`tree_definition`] for an item that is already a datum of the source rows:
 /// the written datum of a Lisp file, or the builder's output.
 pub fn tree_definition_from_datum(datum: &Datum, scope: &Scope, answer: u64) -> Syntax {
     expanded_definition_rows(&Syntax::from_datum(datum, scope), answer, true)
@@ -439,7 +439,7 @@ pub struct TypeQuery {
     pub name: Syntax,
 }
 
-/// Read the accepted shapes of a `definition` argument (§6).
+/// Read the accepted shapes of a `definition` argument.
 pub fn type_query(of: &Syntax) -> Result<TypeQuery, super::syntax::SyntaxError> {
     let query = match of.node() {
         Node::Up(_) => Some(TypeQuery {
@@ -665,7 +665,7 @@ fn is_symbol(s: &Syntax, text: &str) -> bool {
     matches!(s.node(), Node::Symbol(x) if x == text)
 }
 
-/// Whether `root` is a type of the rows of §6.8, without recursion: the
+/// Whether `root` is a type of the source rows, without recursion: the
 /// accepted shapes are those of the type reader of `syn3::lisp`. The error is
 /// at the first part that is not a type.
 fn check_type_new(root: &Syntax) -> Result<(), SyntaxError> {
@@ -810,13 +810,13 @@ fn check_type_new(root: &Syntax) -> Result<(), SyntaxError> {
     Ok(())
 }
 
-/// [`expanded_definition`] in the rows of §6.8. A type definition is
+/// [`expanded_definition`] in the source rows. A type definition is
 /// `(= Head Right)` under any number of `(@ attribute Item)`: `Head` is an
 /// upper name, or `(Name P…)`; the parts `P` are the type parameters when all
 /// are upper names, and an alias pattern (kept as written) when not. `Right`
 /// is `Opaque`, a data type `(, …)`, or a type. Type groups `{ T }` are
 /// removed, except the one group of the item form that marks a name whose
-/// right side is a data type or `Opaque` (§6.8).
+/// right side is a data type or `Opaque`.
 fn expanded_definition_new(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxError> {
     let not_a_definition = || SyntaxError {
         message: "definition expects a type definition".into(),
@@ -856,7 +856,7 @@ fn expanded_definition_new(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
     type Binder = (String, Scope, Option<ScopeIdentity>, u32);
     let mut binders: Vec<Binder> = Vec::new();
     // A value-dependent alias binds its head names; those names are not
-    // formal type parameters (spec §4.7).
+    // formal type parameters.
     let mut rhs = right;
     while let Node::Curly(parts) = rhs.node() {
         let [inner] = parts.as_slice() else {
@@ -1030,7 +1030,7 @@ pub fn freshen_duplicate_heads(result: &Syntax, fresh: impl FnMut() -> u64) -> S
     freshen_duplicate_heads_rows(result, NEW_ROWS, fresh)
 }
 
-/// [`freshen_duplicate_heads`] in the chosen rows: in the rows of §6.8 the
+/// [`freshen_duplicate_heads`] in the chosen rows: in the source rows the
 /// head of a type definition is always the second part of `(= head right)`.
 pub fn freshen_duplicate_heads_rows(
     result: &Syntax,

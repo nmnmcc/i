@@ -1,4 +1,4 @@
-//! Control (§9.4) in the generated module: the runtime functions of errors,
+//! Control in the generated module: the runtime functions of errors,
 //! unwinding, the environment and control, and the frame records, segments,
 //! joins, and re-entry functions of the points of `control.rs`.
 //!
@@ -10,10 +10,9 @@ use super::*;
 /// Errors, unwinding, the environment, and control (`ir.rs`). The functions
 /// that call i code save the depth of the shadow stack, and put it back when
 /// they take an exception (`runtime/mod.rs`). No handler takes an exception
-/// of another tag (no `catch_all`), so a stop, which traps, runs no handlers
-/// (§9.5).
+/// of another tag (no `catch_all`), so a stop, which traps, runs no handlers.
 ///
-/// # Control (§9.4)
+/// # Control
 ///
 /// - A boundary is a `$boundary` whose field 8 is 1 while it is active.
 /// - `suspend` throws `$capture` with a `$cap`: the boundary, `f`, and the
@@ -912,7 +911,7 @@ pub(super) const EFFECTS: &str = r#"
 
 "#;
 
-/// The types of control (§9.4), after `$env`.
+/// The types of control, after `$env`.
 pub(super) const TYPES: &str = r#"
 (type $boundary (sub final $obj (struct (field (mut i32)) (field i32) (field i64) (field f64)
   (field (ref null $bytes)) (field (ref null $values)) (field (ref null $limbs))
@@ -946,7 +945,7 @@ pub(super) const TYPES: &str = r#"
 "#;
 
 impl<'p> Emitter<'p> {
-    /// A call that may suspend (§9.4): a handler around it adds the frame
+    /// A call that may suspend: a handler around it adds the frame
     /// record of its point to a capture that goes through.
     pub(super) fn suspendable(
         &mut self,
@@ -960,7 +959,7 @@ impl<'p> Emitter<'p> {
         if let Some(site) = site {
             let _ = writeln!(out, "(call $shadow_site (i32.const {}))", site_code(site));
         }
-        // The slot of the frame, which may be a tail site (§11.7),
+        // The slot of the frame, which may be a tail site,
         // goes in the frame record. The inner frames are still on
         // the shadow stack when the record is made, so it is read
         // before the call.
@@ -980,7 +979,7 @@ impl<'p> Emitter<'p> {
         out.push_str(&self.restore_scalar(dst));
     }
 
-    /// Goes on with the segment of the point `q` (§9.4).
+    /// Goes on with the segment of the point `q`.
     pub(super) fn continue_point(&mut self, out: &mut String, q: PointId) {
         let program: &'p Program = self.p;
         let point = &program.points[q as usize];
@@ -996,7 +995,7 @@ impl<'p> Emitter<'p> {
         );
     }
 
-    /// Goes on with the join `j` (§9.4).
+    /// Goes on with the join `j`.
     pub(super) fn join_call(&mut self, out: &mut String, j: JoinId) {
         let program: &'p Program = self.p;
         let args: String = program.joins[j as usize]
@@ -1016,7 +1015,7 @@ impl<'p> Emitter<'p> {
         }
     }
 
-    /// The frame record of a point (§9.4): its re-entry function, the saved
+    /// The frame record of a point: its re-entry function, the saved
     /// locals then the values of the environment statements it rebuilds
     /// (numbers are boxed), the slot of its frame on the shadow stack, its
     /// kind, and, for kind 1, the pairs `[service, value]` of the
@@ -1154,7 +1153,7 @@ impl<'p> Emitter<'p> {
         self.numeric_enabled = false;
     }
 
-    /// The function `$j…` of a join (§9.4).
+    /// The function `$j…` of a join.
     pub(super) fn join(&mut self, j: JoinId) {
         let program: &'p Program = self.p;
         let join = &program.joins[j as usize];
@@ -1172,7 +1171,7 @@ impl<'p> Emitter<'p> {
         );
     }
 
-    /// The segment `$s…` and the re-entry function `$r…` of a point (§9.4).
+    /// The segment `$s…` and the re-entry function `$r…` of a point.
     pub(super) fn point(&mut self, p: PointId) {
         let program: &'p Program = self.p;
         let point = &program.points[p as usize];
@@ -1219,7 +1218,7 @@ impl<'p> Emitter<'p> {
             };
             let _ = writeln!(self.out, "(local.set $l{l} {v})");
         }
-        // §9.4 rule 3: the environment statements of the frame, on the
+        // The environment statements of the frame, on the
         // environment that the frame is given.
         for (k, link) in point.envs.iter().enumerate() {
             let _ = writeln!(
@@ -1233,8 +1232,7 @@ impl<'p> Emitter<'p> {
             );
         }
         // The slot of the frame as it was at the point: the site of the
-        // call, or the tail site of the tail call that called the function
-        // (§11.7).
+        // call, or the tail site of the tail call that called the function.
         if self.metered {
             let _ = writeln!(
                 self.out,

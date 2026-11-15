@@ -1,6 +1,6 @@
 //! Golden type tests. Each `tests/types/<case>.i` is the module `app/main`
 //! of a package; each `tests/types/<case>/` with an `i.toml` is a package.
-//! The shown type of every top-level name (§4.7), then the problems, are
+//! The shown type of every top-level name, then the problems, are
 //! compared with `<case>.out` or `<case>/expected.out`. `library.out` has
 //! the types of the library modules. `UPDATE=1` writes the files.
 
@@ -171,8 +171,8 @@ fn types() {
 }
 
 /// The library modules type check with no problems, and their types are
-/// those of the spec tables (§9, §12, §13).
-/// Syntax three §2.4 drops positional binder names from function types.
+/// those of the library tables.
+/// Function types carry positional types rather than parameter binder names.
 /// `display::tree_with` uses the parameter data's shape keys, not `FnTy.labels`
 /// (which also holds binder names). Thus the runtime modules' `(x: Float)`
 /// is shown as `(Float)`; actual data labels are still shown as `label = T`.
@@ -197,9 +197,12 @@ fn library() {
 /// were made equal.
 #[test]
 fn many_uses_of_a_parameter() {
-    // About: checking a function whose parameter is used by many `suspend` points must not
-    // blow up. The bound is a growth ratio, not a wall-clock limit, so a busy machine does not
-    // fail it: from 50 to 200 uses the work may grow by far less than 1000 times (polynomial),
+    // About: checking a function whose parameter is used by many `suspend`
+    // points must not
+    // blow up. The bound is a growth ratio, not a wall-clock limit, so a busy
+    // machine does not
+    // fail it: from 50 to 200 uses the work may grow by far less than 1000
+    // times (polynomial),
     // an exponential would grow by far more.
     let source_for = |n: usize| {
         let mut source = String::from(
@@ -240,8 +243,8 @@ fn many_uses_of_a_parameter() {
 
 #[test]
 fn shown_names_skip_types_and_ignore_written_variable_names() {
-    // A1 §8: first-use names skip unqualified types and never keep the
-    // spelling of a declared variable. Need rows keep N; E3 has no
+    // First-use names skip unqualified types and never keep the
+    // spelling of a declared variable. Need rows keep N; There is no
     // independent error channel on an unknown callback.
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();

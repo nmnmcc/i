@@ -1,4 +1,4 @@
-//! The runner of native packages (docs/design/native.md, N2). `i build`
+//! The runner of native packages. `i build`
 //! appends a compiled program to a copy of this executable; it runs that
 //! program with the arguments, environment and standard streams it is given,
 //! and exits as `i run` does. See `ilang_host::native`.

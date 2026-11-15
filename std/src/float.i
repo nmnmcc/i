@@ -1,7 +1,7 @@
 //// Functions for `Float`, the type of finite IEEE 754 binary64 numbers.
 ////
-//// A Float operation whose result is not finite stops the program
-//// (§11.3), so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;
+//// A Float operation whose result is not finite stops the program,
+//// so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;
 //// `divide` raises `Nil` for a zero divisor instead. Functions here
 //// that could give a result that is not finite, such as `power`, raise
 //// `Nil` in its place; handle these errors with `fail.catch`.
@@ -87,7 +87,7 @@ fraction_unit = 4503599627370496
 
 significand_limit = 9007199254740992
 
-/// The text form of the Float (§11.8), the same as `core.inspect`: the
+/// The text form of the Float, the same as `core.inspect`: the
 /// shortest digits that read back as the same number, with `.0` or an
 /// exponent where needed.
 ///

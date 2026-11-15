@@ -1,14 +1,14 @@
-//! A shown type (§4.7) as a tree: the type of [`super::Typed::schemes`]
+//! A shown type as a tree: the type of [`super::Typed::schemes`]
 //! before it is written as text, with each named type known by what it is
 //! (its `TypeRef`), not by the name that a module gives it.
 
 use crate::hir::TypeRef;
 
-/// A type as it is shown (§4.7): simplified, with its type variables named.
-/// [`ShownType::text`] writes it in the syntax of §3.
+/// A type as it is shown: simplified, with its type variables named.
+/// [`ShownType::text`] writes it in i syntax.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ShownType {
-    /// Data with labels (syntax-3 §2.3), its keys in canonical order:
+    /// Data with labels, its keys in canonical order:
     /// `None` for a position. `(a: A, b: B)`.
     Record(Vec<Option<String>>, Vec<ShownType>),
     /// The canonical source text of an Int or String literal.
@@ -23,7 +23,7 @@ pub enum ShownType {
     /// have different names.
     Var(String),
     /// `_`: a part with no effect, as a member of `H` in `A - H` that only
-    /// counts by its type constructor (§4.4).
+    /// counts by its type constructor.
     Hole,
     /// `Never`, the type with no values.
     Never,
@@ -41,7 +41,7 @@ pub enum ShownType {
 pub struct ShownFn {
     pub params: Vec<(Option<String>, ShownType)>,
     /// The parameter is not data of one shape: `params` has the whole
-    /// parameter type, shown as a group `{ T } -> R` (syntax-3 §6.1).
+    /// parameter type, shown as a group `{ T } -> R`.
     pub group: bool,
     pub ret: ShownType,
     pub err: Option<ShownType>,
@@ -49,7 +49,7 @@ pub struct ShownFn {
 }
 
 impl ShownType {
-    /// The text in the syntax of §3, with the custom type `TypeId(i)` named
+    /// The text in i syntax, with the custom type `TypeId(i)` named
     /// `type_names[i]`, as [`super::Typed::schemes`] has it.
     pub fn text(&self, type_names: &[String]) -> String {
         self.text_with(
@@ -91,7 +91,7 @@ impl ShownType {
         out
     }
 
-    /// The text in the syntax of §3, with each named type named by `ty`
+    /// The text in i syntax, with each named type named by `ty`
     /// and each type variable by `var`. Both are called in the order of
     /// the text, so `var` may number the variables by where they first
     /// come.
@@ -206,7 +206,7 @@ impl ShownType {
                     p.write(0, out, n);
                 }
                 out.push_str(if f.group { " }" } else { ")" });
-                // The need (syntax three §2.10): the services, an error as
+                // The need: the services, an error as
                 // the service `Fail(E)`, and row variables as `..N`.
                 let mut items = Vec::new();
                 if let Some(e) = &f.err {
@@ -245,7 +245,7 @@ impl ShownType {
                 close(out, 1);
             }
             ShownType::Diff(a, h) => {
-                // Only the type constructors of `H` matter (§4.4).
+                // Only the type constructors of `H` matter.
                 open(out, 2);
                 a.write(2, out, n);
                 if !h.is_empty() {
@@ -258,8 +258,7 @@ impl ShownType {
     }
 }
 
-/// The `<- …` part of a function type from its items (syntax three
-/// §3.1): empty when nothing is needed, `<- N` for a lone row variable, and
+/// Need text omits an empty row, uses `<- N` for a lone row variable, and
 /// otherwise the bracket form with the services in byte order of their
 /// names and the row variables last.
 pub(crate) fn need_text(mut items: Vec<String>) -> String {

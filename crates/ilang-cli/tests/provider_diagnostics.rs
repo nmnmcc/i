@@ -1,18 +1,16 @@
-//! Ordinary provider diagnostics survive removal of the automatic entry plan.
-//! Syntax-three §2.10.11 deletes that plan, not the §9.2 source checks.
+//! Removing automatic entry plans must preserve concrete diagnostics at
+//! every use of an explicitly supplied service, including cached handlers.
 
 #[test]
 fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
-    // §9.2 checks every use of a supplied service, including cached handlers.
+    // Every use of a supplied service must be checked, including cached handlers.
     // Use each real manifest: mixed_install_12 and mixed_install_6 import
     // std/test and must expand their macros before comparing diagnostics.
-    // The b1 whole-method meet is inhabited (§4.1); retain all four concrete
-    // provider failures. m32 additionally rejects its duplicate key (§9.2).
-    // See effects-e3-e6-corpus.md R2/R8 for each changed diagnostic.
+    // The b1 whole-method meet is inhabited; retain all four concrete
+    // provider failures. m32 additionally rejects its duplicate key.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");
-    // Formatting changes source coordinates. Pin those exact corrections separately
-    // until the coordinator records the corpus on the gate tree; retain the full
-    // diagnostic comparison, including every resulting coordinate.
+    // Formatting shifts source coordinates. A separate coordinate map keeps
+    // the diagnostic comparison complete, including every resulting position.
     let locations: serde_json::Value =
         serde_json::from_str(include_str!("providers_format_locations.json")).unwrap();
     for (case, count, provider_count) in [

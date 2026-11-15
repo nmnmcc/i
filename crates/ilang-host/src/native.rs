@@ -1,4 +1,4 @@
-//! Native packages (docs/design/native.md, N1, N2 and N4).
+//! Native packages: a program compiled ahead of time and packed into one executable file.
 //!
 //! A native package is one executable file: a copy of the runner
 //! (`crates/ilang-runner`), which has the Wasmtime runtime, the standard host
@@ -18,7 +18,7 @@
 //! `Module::deserialize`, which checks the compiler settings once more. The
 //! manifest binds the binding plan to the exact module (its artifact digest)
 //! and the code to its digest. The digest detects a damaged or truncated
-//! file; it is not a signature (signing stays open, native.md §7).
+//! file; it is not a signature (signing is not provided).
 //!
 //! The metadata module is a Wasm module with only the `ilang.*` custom
 //! sections of the program, read exactly as [`Program::from_bytes`] reads
@@ -121,7 +121,7 @@ fn collector_of(name: &str) -> Result<Collector> {
 /// compiler adds only settings of the compiler to it.
 fn config(target: &str, collector: Collector, gc_heap: u64) -> Result<Config> {
     let mut config = runtime_config(collector, gc_heap);
-    // Packages run on several workers, which stop through epochs (N12).
+    // Packages run on several workers, which stop through epochs.
     config.epoch_interruption(true);
     // An explicit target: Wasmtime then infers no CPU features of this
     // machine, so the baseline below is all the code uses.
@@ -162,7 +162,7 @@ pub struct Manifest {
     pub name: String,
     /// The digest of the complete Wasm module the code was compiled from.
     pub artifact_digest: String,
-    /// The compiler's trusted binding plan for that module (native.md §3.1).
+    /// The compiler's trusted binding plan for that module.
     pub binding_plan: BindingPlan,
     /// The content identity of the library package whose declarations the
     /// runner grants the standard host services.
@@ -285,7 +285,7 @@ fn metadata_module(wasm: &[u8]) -> Result<Vec<u8>> {
 
 /// The host options of a native package: the standard host services of
 /// `i run`, with `args`, granted to the declarations of the trusted library
-/// package of the plan. The same for `i build`'s check (N4) and the runner.
+/// package of the plan. The same for `i build`'s check and the runner.
 pub fn host_options(args: Vec<String>, plan: &BindingPlan, trusted_package: &str) -> HostOptions {
     let mut options = HostOptions::new(services::stdout_with_args(args));
     options.imports.grant_package(plan, trusted_package);
@@ -293,8 +293,9 @@ pub fn host_options(args: Vec<String>, plan: &BindingPlan, trusted_package: &str
 }
 
 /// Make a native package: `runner`, built for the triple `target`, followed
-/// by the payload of `wasm`, compiled for that triple ([`contract`]). Fails when the module
-/// has no program entry, or imports a function the runner cannot give (N4).
+/// by the payload of `wasm`, compiled for that triple ([`contract`]). Fails
+/// when the module
+/// has no program entry, or imports a function the runner cannot give.
 #[cfg(feature = "compiler")]
 pub fn package(
     runner: &[u8],

@@ -5,8 +5,7 @@ use crate::{Code, Diagnostic};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
 
-/// A datum of the rows before syntax three as text of the surface before
-/// syntax three.
+/// Legacy rows need the legacy printer so migration input keeps its grouping.
 pub fn show_as(d: &Datum, position: super::syntax::Position) -> Result<String> {
     use super::render::{P, render};
     use super::syntax::Position::*;

@@ -1,4 +1,4 @@
-//! Stop sites in expanded code point to the call and the template (§9).
+//! Stop sites in expanded code point to the call and the template.
 use ilang_syntax::lisp::{
     Datum, DatumKind,
     scoped::ScopedSource,

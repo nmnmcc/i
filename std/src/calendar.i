@@ -2,52 +2,27 @@
 //// Date, TimeOfDay and Offset have private constructors; Civil, Weekday and
 //// CalendarError expose their constructors. Validation failures use Fail(CalendarError).
 ////
-//// C1: leap years divide by 4, except centuries not divisible by 400. Year 0
+//// leap years divide by 4, except centuries not divisible by 400. Year 0
 //// is 1 BCE. Months are 1..12; validate month before day, with no 1582 gap.
-//// C2: validate hour 0..23, minute/second 0..59 and nanosecond 0..999999999
+//// validate hour 0..23, minute/second 0..59 and nanosecond 0..999999999
 //// in that order. Offsets are whole minutes east of UTC in -1439..1439.
-//// C3: day zero is 1970-01-01. Eras and signed days use floor division.
-//// C4: at adds the offset before splitting; to_instant subtracts it. Weekdays
+//// day zero is 1970-01-01. Eras and signed days use floor division.
+//// at adds the offset before splitting; to_instant subtracts it. Weekdays
 //// run Monday through Sunday; day zero is Thursday. No leap seconds or zones.
-//// C5: parse accepts YYYY-MM-DDTHH:mm:ss, optional 1..9 fractional digits,
+//// parse accepts YYYY-MM-DDTHH:mm:ss, optional 1..9 fractional digits,
 //// then Z or a signed HH:mm offset. Years outside 0..9999 use a sign;
 //// negative magnitudes have at least four digits, with no excess zeroes.
 //// Reject negative zero years, -00:00 offsets and non-ASCII syntax. Every
 //// parse failure is BadText; component constructors retain precise errors.
-//// C6: format uses canonical years, two-digit fields, trimmed fractional
+//// format uses canonical years, two-digit fields, trimmed fractional
 //// nanoseconds and Z for zero offset. No locale or host service is consulted.
 ////
 //// Laws: from_day_number(day_number(d)) = d; day_number(from_day_number(n))
 //// = n; at(to_instant(c,o),o) = c; to_instant(at(t,o),o) = t;
 //// parse(format(c,o)) = (c,o); add_days(d,days_between(d,e)) = e.
 ////
-//// Public values:
-//// Date { Date(Int, Int, Int) }, TimeOfDay { TimeOfDay(Int, Int, Int, Int) }
-//// and Offset { Offset(Int) } keep their constructors private.
-//// Civil { Civil(date: Date, time: TimeOfDay) }
-//// Weekday { Monday Tuesday Wednesday Thursday Friday Saturday Sunday }
-//// CalendarError { BadMonth BadDay BadHour BadMinute BadSecond
-////                 BadNanosecond BadOffset BadText }
-////
-//// date: (year: Int, month: Int, day: Int) <- (Fail(CalendarError)) -> Date
-//// time_of_day: (hour: Int, minute: Int, second: Int, nanosecond: Int)
-////              <- (Fail(CalendarError)) -> TimeOfDay
-//// offset: (minutes: Int) <- (Fail(CalendarError)) -> Offset
-//// utc: () -> Offset
-//// date_parts: (date: Date) -> (Int, Int, Int)
-//// time_parts: (time: TimeOfDay) -> (Int, Int, Int, Int)
-//// offset_minutes: (offset: Offset) -> Int
-//// is_leap_year: (year: Int) -> Bool
-//// days_in_month: (year: Int, month: Int) <- (Fail(CalendarError)) -> Int
-//// day_number: (date: Date) -> Int
-//// from_day_number: (day: Int) -> Date
-//// weekday: (date: Date) -> Weekday
-//// add_days: (date: Date, days: Int) -> Date
-//// days_between: (start: Date, end: Date) -> Int
-//// at: (instant: time.Instant, offset: Offset) -> Civil
-//// to_instant: (civil: Civil, offset: Offset) -> time.Instant
-//// parse: (text: String) <- (Fail(CalendarError)) -> (Civil, Offset)
-//// format: (civil: Civil, offset: Offset) -> String
+//// Date, time-of-day and offset constructors stay private so component
+//// validation cannot be bypassed.
 ////
 //// No month/year addition policy is implicit. Conversion uses a fixed number
 //// of exact integer operations. Text scanning and assembly are linear apart
@@ -207,7 +182,7 @@ offset_minutes = (offset : Offset) -> Int {
 	minutes
 }
 
-// Only positive divisors occur in the calendar algorithms (C3).
+// Only positive divisors occur in the calendar algorithms.
 floor_divide = (a : Int, b : Int) -> Int {
 	{ a % b < 0 } |> (True) { a / b - 1 } | (False) { a / b }
 }

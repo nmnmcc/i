@@ -754,7 +754,7 @@ fn equality_is_structural_with_identity_for_functions_and_references() {
 fn core_operations_follow_the_specification() {
     let mut checks = checks();
     let inspect = [
-        // Int division by zero and rounding (spec §11.2).
+        // Int division by zero and rounding.
         (format!("(call $int_div {} {})", int(7), int(0)), "0"),
         (format!("(call $int_rem {} {})", int(7), int(0)), "0"),
         (format!("(call $int_div {} {})", int(-7), int(2)), "-3"),
@@ -764,7 +764,7 @@ fn core_operations_follow_the_specification() {
             format!("(call $int_div {} {})", int(-1073741824), int(-1)),
             "1073741824",
         ),
-        // Floats (spec §11.3).
+        // Floats.
         (
             format!("(call $float_div {} {})", float(1.0), float(0.0)),
             "0.0",
@@ -782,7 +782,7 @@ fn core_operations_follow_the_specification() {
             format!("(call $float_sub {} {})", float(0.1), float(0.3)),
             "-0.19999999999999998",
         ),
-        // i/core (spec §13).
+        // i/core.
         (
             "(call $core_not (call $bool_new (i32.const 1)))".to_owned(),
             "False",
@@ -1330,7 +1330,7 @@ fn host_boundary_values_round_trip_and_reject_incorrect_values() {
             bits(&[0xff, 0xff], 1, 3)
         ),
     );
-    // B.3: the results of an import are freed also when they are empty, as
+    // Import results must be freed even when empty, as
     // a block of `ilang_alloc(0)`; the next one is the same block.
     checks.define(
         "(func $empty_results_are_freed (result i32)
@@ -1405,7 +1405,7 @@ fn host_boundary_values_round_trip_and_reject_incorrect_values() {
             "string outside memory",
             "(drop (call $abi_string_in (i32.const -1) (i32.const 2)))",
         ),
-        // An empty buffer must be inside memory too, for every type (B.2).
+        // An empty buffer must be inside memory too, for every type.
         (
             "empty string outside memory",
             "(drop (call $abi_string_in (i32.const -1) (i32.const 0)))",

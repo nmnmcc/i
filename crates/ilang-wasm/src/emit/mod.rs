@@ -1,6 +1,6 @@
 //! From the intermediate form to a Wasm module: WAT text with the runtime
 //! of `runtime/mod.rs`, assembled to a binary, with the `ilang.abi` custom
-//! section (B.6).
+//! section.
 
 use crate::ir::*;
 use crate::runtime;
@@ -160,7 +160,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         let _ = writeln!(m, ";; numeric: {}", decision.replace('\n', " "));
     }
     // A host reference can come into the program only through an import or
-    // an export whose types have one (B.2).
+    // an export whose types have one.
     let references = p
         .imports
         .iter()
@@ -202,7 +202,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     if p.imports.iter().any(|x| x.kind == ImportKind::AsyncService) {
         m.push_str("(import \"ilang:host/v1\" \"cancel\" (func $host_cancel (param i32)))\n");
     }
-    // The imports of B.4, before every definition.
+    // Imports must precede definitions to keep Wasm function indexes stable.
     for (i, x) in p.imports.iter().enumerate() {
         if matches!(x.kind, ImportKind::WasiStdout | ImportKind::WasiAdapter) {
             continue;
@@ -294,7 +294,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     for g in 0..p.globals {
         let _ = writeln!(m, "(global $g{g} (mut eqref) (ref.null eq))");
     }
-    // The Wasm values of the parameters and results of each import (B.2).
+    // The Wasm values of the parameters and results of each import.
     for (i, x) in p.imports.iter().enumerate() {
         let params = x
             .abi
@@ -369,8 +369,8 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     m
 }
 
-/// A closure of the function `f`: field 2 is the id of its shape
-/// (syntax-3.md §6.4), which is its arity when it has no labels.
+/// A closure of the function `f`: field 2 is the id of its shape,
+/// which is its arity when it has no labels.
 fn closure(arity: u32, shape: ShapeId, f: FuncId, captures: &str, patched: bool) -> String {
     let flags = u32::from(patched);
     format!(
@@ -382,7 +382,7 @@ fn closure(arity: u32, shape: ShapeId, f: FuncId, captures: &str, patched: bool)
 }
 
 /// `$dispatch{n}`: calls the function value `f` with argument data of the
-/// shape `shape` and `n` keys (syntax-3.md §6.4). A `$clo{n}` is called;
+/// shape `shape` and `n` keys. A `$clo{n}` is called;
 /// a `$multi` is scanned for the group of the shape, whose closure is
 /// called. Every call is a `return_call_ref`, so the dispatcher leaves no
 /// frame: a tail call through it stays a tail call, and a capture never
@@ -423,8 +423,8 @@ struct Emitter<'p> {
     self_loop: Option<(FuncId, Vec<(String, String)>)>,
     /// Site stores not written yet, by frame: index 0 is the slot `sp - 1`.
     /// A store waits until something could read the shadow stack; a failed
-    /// Float check writes them in its own cold branch (§11.7 traces stay the
-    /// same because every reader sees every store).
+    /// Float check writes them in its own cold branch. Traces stay the
+    /// same because every reader sees every store.
     pending: Vec<Option<Site>>,
     /// Set while a `Let` is emitted whose site store is decided afterwards.
     deferring: bool,
@@ -464,8 +464,7 @@ impl<'p> Emitter<'p> {
         match f {
             FuncKind::Code(func) => self.code(&name, func, Some(id)),
             // A constructor or a library function used as a value has a
-            // frame too, so that it takes the tail site of a tail call
-            // (§11.7).
+            // frame too, so that it takes the tail site of a tail call.
             FuncKind::Ctor { ctor, ty, arity } => {
                 let locals = vec![LocalType::Value; *arity as usize + 1];
                 self.header(&name, *arity, &locals);
@@ -912,7 +911,7 @@ impl<'p> Emitter<'p> {
     /// A call. A call of a function value has a fast path, when the value is
     /// a closure of the arity of the call: one type test, which keeps the
     /// closure in the local `$cc{n}`, and `call_ref`. Any other value goes to
-    /// the dispatcher with the shape of the call (syntax-3.md §6.4). At a
+    /// the dispatcher with the shape of the call. At a
     /// tail site both paths are tail calls.
     fn call(&mut self, callee: &Callee, args: &[Atom], tail: bool, env: &str) -> String {
         let n = args.len() as u32;
@@ -1300,8 +1299,9 @@ impl<'p> Emitter<'p> {
                 x.to_bits() as i64
             ),
             Atom::String(s) => self.string(s),
-            // A constructor without fields is made once, in a global: its
-            // values are equal however many there are (§11.4).
+            // A constructor without fields is made once, in a global: values of a
+            // labelled type are equal when they have the same constructor and data,
+            // so one value is enough.
             Atom::Ctor { ctor, ty } => {
                 self.ctors.insert((*ctor, *ty));
                 format!("(global.get $k{ctor}_{ty})")
@@ -1849,7 +1849,7 @@ impl<'p> Emitter<'p> {
         format!("(call $metadata_{name})")
     }
 
-    /// `ilang_start` (B.1): the site table, the constructor names, and the
+    /// `ilang_start`: the site table, the constructor names, and the
     /// top-level values.
     fn start(&mut self) {
         let mut sites = String::new();
@@ -1904,7 +1904,7 @@ impl<'p> Emitter<'p> {
         if let Some(notes) = notes {
             let _ = writeln!(self.out, "(call $site_notes_install {notes})");
         }
-        // The root environment: the `Assert` of the runtime (§9.6), and
+        // The root environment: the `Assert` of the runtime, and
         // no other service yet.
         let _ = writeln!(
             self.out,
@@ -1926,10 +1926,10 @@ impl<'p> Emitter<'p> {
         self.out.push_str(")\n");
     }
 
-    /// The entry points (B.5). An error that comes to the program entry or a
-    /// test stops the program with only the position of its binding (§11.7);
-    /// one that comes to a host export is given to the host with its tag
-    /// (B.2). An unwinding that comes to an entry point has lost its
+    /// The entry points. An error that comes to the program entry or a
+    /// test stops the program with only the position of its binding;
+    /// one that comes to a host export is given to the host with its tag.
+    /// An unwinding that comes to an entry point has lost its
     /// boundary.
     fn exports(&mut self) {
         let program: &'p Program = self.p;
@@ -2024,7 +2024,7 @@ impl<'p> Emitter<'p> {
 }
 
 /// The parameters of a host export: their Wasm types, and the values made
-/// from them (B.2).
+/// from them.
 fn export_params(abi: &ExportAbi) -> (String, Vec<String>) {
     let mut sig = String::new();
     let mut converted = Vec::new();
@@ -2049,14 +2049,14 @@ fn export_params(abi: &ExportAbi) -> (String, Vec<String>) {
     (sig, converted)
 }
 
-/// The value and the members of the errors of a function (B.2).
+/// The value and the members of the errors of a function.
 fn parts(abi: &ExportAbi) -> Vec<AbiType> {
     std::iter::once(abi.result)
         .chain(abi.errors.iter().copied())
         .collect()
 }
 
-/// B.2: the value, then each member of the errors, with `value` at `at`;
+/// Wire order is the value then each error member, with `value` at `at`;
 /// the values that are not used are 0 or null.
 fn with_value(parts: &[AbiType], at: usize, value: &str) -> String {
     let mut out = String::new();
@@ -2075,7 +2075,7 @@ fn with_value(parts: &[AbiType], at: usize, value: &str) -> String {
     out
 }
 
-/// The Wasm types of a value (B.2) and the function that makes it from
+/// The Wasm types of a value and the function that makes it from
 /// them.
 fn abi_in(t: AbiType) -> (&'static [&'static str], &'static str) {
     match t {
@@ -2113,7 +2113,7 @@ fn result_list(types: &[&str]) -> String {
     }
 }
 
-/// The results of a function at the host boundary (B.2): the tag when
+/// The results of a function at the host boundary: the tag when
 /// there are errors, the value, then each member of the errors.
 fn import_results(abi: &ExportAbi) -> Vec<&'static str> {
     let mut out = Vec::new();
@@ -2149,7 +2149,7 @@ fn zero(t: &str) -> &'static str {
 }
 
 /// The value tag (`runtime/mod.rs`) of the values of an error member that
-/// the host can take (§10.3).
+/// the host can take.
 fn value_tag(t: AbiType) -> u32 {
     match t {
         AbiType::Nil => 0,
@@ -2328,7 +2328,7 @@ fn int(n: &BigInt) -> String {
     )
 }
 
-/// Appends the `ilang.abi` custom section (B.6).
+/// Appends the `ilang.abi` custom section.
 pub fn add_abi_section(wasm: &mut Vec<u8>, json: &str) {
     add_custom_section(wasm, "ilang.abi", json.as_bytes());
 }

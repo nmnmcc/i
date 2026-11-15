@@ -1,4 +1,5 @@
-//! Interpretation checks for A1 §3.9-§3.12, separate from generated output.
+//! Interpretation checks for the front end (binding spans, labels, declaration
+//! frames, codes), separate from generated output.
 mod common;
 
 use ilang_check::hir::*;
@@ -12,7 +13,7 @@ fn checked(src: &str, unused: &[&str]) -> (ilang_package::PackageGraph, ilang_ch
 
 #[test]
 fn declared_frames_hide_outer_variables_and_generalize() {
-    // §3.10: every declared frame makes fresh variables, while a variable
+    // Every declared frame makes fresh variables, while a variable
     // used from an outer frame remains that variable.
     let (_, c) = checked(
         "outer = <A>(x : A) {\n\tinner = <A>(y : A) { y }\n\t(inner(1), inner(True), x)\n}\nnested = <A>(x : A) {\n\tinner = <B>(y : B, z : A) { (y, z) }\n\tinner(1, x)\n}\nid = <A>(x : A) {\n\ty : A = x\n\ty\n}\nuses = () { (id(1), id(True)) }",
@@ -34,8 +35,8 @@ fn declared_frames_hide_outer_variables_and_generalize() {
 
 #[test]
 fn declared_external_variables_are_general_in_library_declarations() {
-    // §3.10 values(): declaration frames must use their declared UpNames.
-    // §10.3 forbids general host imports, so use the existing library
+    // A `values()` call: declaration frames must use their declared UpNames.
+    // Host imports are limited to the ABI types, so use the existing library
     // operation, whose declarations are not restricted to ABI types.
     let (mut graph, _, _) = common::check_files(&[(
         "src/main.i",
@@ -48,7 +49,7 @@ fn declared_external_variables_are_general_in_library_declarations() {
         .unwrap()
         .source;
     let text = graph.sources.get(source).text.clone();
-    // The library already declares `inspect: <A>(A) -> String` (§2.16).
+    // The library already declares `inspect: <A>(A) -> String`.
     assert!(text.contains("inspect : <A>(A) -> String"));
     graph.sources.set_text(source, text);
     let c = ilang_check::check(&graph);
@@ -62,7 +63,7 @@ fn declared_external_variables_are_general_in_library_declarations() {
 
 #[test]
 fn new_match_is_a_non_generalized_binding_at_the_pattern() {
-    // §3.9(a): resolve subject outside p's scope and keep p.span as the
+    // Resolve the subject outside p's scope and keep p.span as the
     // binding span. The subject function must still call the top-level f.
     let (_, c) = checked(
         "f = (x) { x + 1 }\ng = () { (x) { f(x) * 2 } |> (f) { f(1) } }",
@@ -105,11 +106,11 @@ fn new_match_is_a_non_generalized_binding_at_the_pattern() {
 
 #[test]
 fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
-    // §3.9(c): no label on the artificial parameter, zero-width at the
+    // No label on the artificial parameter, zero-width at the
     // start of the function, and the Case covers the clauses only. One
-    // clause keeps label_of(p). Spec §4.8 rule 11 permits values outside
-    // Int through the catch-all. Syntax three writes the clauses as a chain
-    // (syntax-3 §2.5) with no `{` around them, so the function starts at
+    // clause keeps label_of(p). Values outside
+    // Int through the catch-all. The source syntax writes the clauses as a chain
+    // With no `{` around them, so the function starts at
     // its first branch and the Case runs from the first branch to the end of
     // the last one.
     let src = "one = (n) { n }\nmany = (0) { 1 } | (_) { 2 }\nstring_argument = () { many(\"s\") }";
@@ -168,7 +169,7 @@ fn clause_function_labels_and_synthetic_spans_follow_the_rule() {
 
 #[test]
 fn kept_form_messages_are_independent_checks() {
-    // D7 and §3.11 supply these codes and message fragments; no generated
+    // The codes and message fragments are given here; no generated
     // expected output defines them.
     for (src, code, message) in [
         ("f = <A>(x : A(Int)) { x }", "E0230", "takes no arguments"),
@@ -182,7 +183,7 @@ fn kept_form_messages_are_independent_checks() {
         ),
         ("T = { (Missing) }", "E0202", "declare it in the head"),
         ("Box(Int) = { (Int) }", "E0231", "name of a type"),
-        // Syntax three checks the head by its kind (§3.2): E0101, not E0232.
+        // The parser checks the head kind before resolution, so it reports E0101.
         (
             /* old-syntax-check: E0101 */ "Box(a, B) = ()",
             "E0101",
@@ -197,7 +198,7 @@ fn kept_form_messages_are_independent_checks() {
             "kept for macros",
         ),
         ("@a.main\nf = () { Nil }", "E0301", "kept for macros"),
-        // Syntax three removed the head with type parameters (§3.2).
+        // Type parameters belong on function values, so a binding head cannot carry them.
         ("f(A): (A) -> String", "E0101", "written on the function"),
     ] {
         let (g, _, diags) = common::check_files(&[("src/main.i", src)]);
@@ -213,8 +214,7 @@ fn kept_form_messages_are_independent_checks() {
 
 #[test]
 fn labelled_calls_through_function_values_keep_the_data_shape() {
-    // Spec §6.6: "Every function is called in this way, whatever expression
-    // gives it." Stage 10 lifts stage 9's temporary indirect-call error.
+    // Calls through a value must retain the same argument shape as direct calls.
     let (_, c) = checked(
         "invoke = (f : (x = Int) -> Int) -> Int { f(x = 1) }\nanswer = invoke((x = n : Int) -> Int { n })\n",
         &["answer"],
@@ -232,10 +232,10 @@ fn labelled_calls_through_function_values_keep_the_data_shape() {
 
 #[test]
 fn closed_data_has_no_record_type_even_without_a_spread_error() {
-    // Syntax-three §2.3: "There is no width subtyping, no `Record`, no
+    // "There is no width subtyping, no `Record`, no
     // field addition or removal at run time." Keep both Record lookups of
     // review-rec/probes independent of the restored invalid type spread,
-    // which syntax three rejects before resolution.
+    // which the source parser rejects before resolution.
     let (graph, _, diags) = common::check_files(&[(
         "src/main.i",
         "left = <R>(r : R & Record) { r }\nright = <R>(r : R & Record) { r }",

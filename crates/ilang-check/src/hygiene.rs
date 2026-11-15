@@ -26,7 +26,7 @@ pub enum Lookup<T> {
     Missing,
 }
 
-/// Resolve one identifier using meta §5 rules 1–3. Labels never use this
+/// Marks select the definition scope of an identifier. Labels never use this
 /// function: they compare by written text instead.
 pub fn lookup<T: Clone>(
     name: &Syntax,

@@ -1,4 +1,4 @@
-//! The seventh SYN2 decision: package-scoped conventional and named entries.
+//! Entry lookup is package-scoped for conventional and named entries.
 use ilang_cli::{BuildOptions, Level, Target, build, build_entry};
 use std::path::Path;
 
@@ -32,7 +32,7 @@ fn entry(path: &Path, name: Option<&str>) -> Option<String> {
 }
 #[test]
 fn default_and_private_named_function_keep_the_existing_metadata_shape() {
-    // Rule 2 and ruling [entries]: only src/main.main is the default;
+    // Only src/main.main is the default;
     // named entries may point at an unexported function in another module.
     let dir = project(
         "name = \"app\"\n[entries]\nworker = \"tools.work\"\n",
@@ -60,13 +60,13 @@ fn dotted_entry_path_is_relative_to_the_package() {
 }
 #[test]
 fn missing_default_and_other_module_main_have_no_entry() {
-    // Rules 4/5: main has no special meaning in other modules.
+    // main has no special meaning in other modules.
     let dir = project("name = \"app\"\n", &[("src/tools.i", "main = (x) { x }")]);
     assert_eq!(entry(dir.path(), None), None);
 }
 #[test]
 fn every_declared_target_is_checked_and_selection_must_exist() {
-    // Rule 5: value parameters are an error, even for an unselected target.
+    // Value parameters are an error, even for an unselected target.
     let dir = project(
         "name = \"app\"\n[entries]\nbad = \"tools.work\"\n",
         &[
@@ -92,7 +92,7 @@ fn every_declared_target_is_checked_and_selection_must_exist() {
 }
 #[test]
 fn dependency_conventions_and_entry_tables_have_no_effect() {
-    // Rule 5: dependency package entries and main functions are ignored.
+    // Dependency package entries and main functions are ignored.
     let root = tempfile::tempdir().unwrap();
     let dep = root.path().join("dep");
     std::fs::create_dir_all(dep.join("src")).unwrap();

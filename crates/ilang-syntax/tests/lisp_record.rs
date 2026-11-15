@@ -1,4 +1,4 @@
-//! Data in the Lisp rows of docs/design/syntax-3.md §6.8: `(, e (= x v))`,
+//! Data in the Lisp surface: `(, e (= x v))`,
 //! `(, .. e (= x v))`, `(,)`. These are the forms that the record rows
 //! `(.. r (: x v))`, `((: x v))` and `()` became; a record type with a base
 //! or a removed key, and a key parameter of a record, have no row any more.

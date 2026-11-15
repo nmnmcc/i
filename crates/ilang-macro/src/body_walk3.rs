@@ -1,4 +1,4 @@
-//! `body_walk` on the tree of syntax three: outside-in traversal of
+//! `body_walk` on the source tree: outside-in traversal of
 //! expression and type macro positions.
 //!
 //! The hook decides whether a call resolves to a macro and returns its result.
@@ -152,7 +152,7 @@ pub fn type_definition_on_this_stack<H: Hook>(
     Ok(())
 }
 
-/// A pipe into this chain is a match (§2.11): one position per branch, and
+/// A pipe into this chain is a match: one position per branch, and
 /// nothing that only a function has.
 pub fn is_match(fs: &[Function]) -> bool {
     fs.iter().all(|f| {
@@ -456,7 +456,7 @@ impl<H: Hook> Walker<'_, H> {
                     _ => self.ty(&mut f.param, depth)?,
                 }
                 self.ty(&mut f.ret, depth)?;
-                // E3: Fail is an ordinary service; visit needs in written order.
+                // Fail is an ordinary service; visit needs in written order.
                 if let Some(services) = &mut f.services {
                     self.ty(services, depth)?;
                 }
@@ -518,7 +518,7 @@ impl<H: Hook> Walker<'_, H> {
     }
 }
 
-/// The names that a pattern binds, in the order of the old tree. This is a
+/// Binder visitation must preserve resolution order. This is a
 /// work list and not a recursion: it is called on patterns of any depth
 /// from places that are not on a deep stack.
 pub fn for_each_binder<'a>(pattern: &'a Pattern, mut visit: impl FnMut(&'a str, Span)) {
@@ -531,7 +531,7 @@ pub fn for_each_binder<'a>(pattern: &'a Pattern, mut visit: impl FnMut(&'a str, 
         pending.extend(items.iter().rev().filter_map(|item| match item {
             DPItem::Pos(p) => Some(Task::Pattern(p)),
             DPItem::Key(label, p) => Some(Task::Keyed(label, p)),
-            // `..name` is an error of the lowering today; the name is bound.
+            // Traversal retains rest binders even when later validation rejects them.
             DPItem::Rest(Some(rest)) if !rest.discard => {
                 Some(Task::Binder(&rest.name, rest.span.0))
             }
@@ -546,8 +546,7 @@ pub fn for_each_binder<'a>(pattern: &'a Pattern, mut visit: impl FnMut(&'a str, 
                 visit(name, span);
                 continue;
             }
-            // `key = pattern` in a constructor pattern is the old tree's
-            // chain of names that ends in the label: the label is bound.
+            // A keyed constructor pattern binds the label after its other names.
             Task::Keyed(label, pattern) => {
                 let single = std::slice::from_ref(pattern);
                 let parts = match &pattern.kind {
@@ -570,8 +569,8 @@ pub fn for_each_binder<'a>(pattern: &'a Pattern, mut visit: impl FnMut(&'a str, 
                         names.for_each(|(name, span)| visit(name, span));
                         visit(&label.name, label.span.0);
                     }
-                    // A pattern inside a labelled field is an error of the
-                    // lowering today, which then binds no label.
+                    // Nested field patterns retain their own binders; the label
+                    // itself is not another binder in this form.
                     Some(_) => {
                         names.for_each(|(name, span)| visit(name, span));
                         pending.extend(
@@ -625,8 +624,8 @@ pub fn for_each_binder<'a>(pattern: &'a Pattern, mut visit: impl FnMut(&'a str, 
                     .rev()
                     .map(|segment| Task::Pattern(&segment.value)),
             ),
-            // `p1 = p2 = …`: the names are the old tree's `Named` around
-            // the one other part, so they come first.
+            // Names bind before the structured part of a conjunction, so
+            // visitation must put them first.
             PatternKind::And(parts) => {
                 pending.extend(
                     parts

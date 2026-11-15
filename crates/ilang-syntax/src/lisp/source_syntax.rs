@@ -20,7 +20,7 @@ fn find(datum: &Datum, span: Span) -> Option<&Datum> {
     }
     None
 }
-/// A written Lisp node for a consumer that already has the new tree.
+/// A written Lisp node for a consumer that already has the source tree.
 /// Position normalization remains the caller's choice.
 pub fn written_lisp_syntax(span: Span, scope: &Scope, source: &str) -> Syntax {
     lisp_source(span, scope, source)
@@ -30,7 +30,7 @@ fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
     let document = super::parse(source).expect("parsed Lisp source remains valid");
     let mut datum = document.iter().find_map(|x| find(x, span));
     if datum.is_none() {
-        // Multi-shape values have a synthetic root in the transition AST.
+        // Multi-shape values have a synthetic root in the adapter representation.
         // Recover the source node's span, then use its original datum so
         // Lisp operator tokens and all occurrence identities stay written.
         if let Some(syntax) =
@@ -41,16 +41,16 @@ fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
     }
     let datum = datum.expect("AST node belongs to a Lisp datum");
     // Keep the written rows and occurrence spans when macro syntax uses
-    // syntax three. The inactive legacy path needs its old-row adapter.
+    // the source encoding. The legacy path needs its row adapter.
     Syntax::from_datum(datum, scope)
 }
 fn symbol(s: &Syntax, expected: &str) -> bool {
     matches!(s.node(), Node::Symbol(value) if value == expected)
 }
 
-// ---- The rows of syntax three (docs/design/syntax-3.md §6.8) ----
+// ---- The rows of the source syntax ----
 
-/// What a datum is read as. The table follows the reader of syntax three
+/// What a datum is read as. The table follows the reader of the source syntax
 /// (`syn3::lisp`): a group is a Curly with one part where that reader reads
 /// the part itself (in a type) or a block of one expression (in an
 /// expression). Every other Curly stays: a block, and the `{ }` of a name
@@ -117,27 +117,27 @@ fn rhs_keeps_curly(mut inner: &Syntax) -> bool {
     }
 }
 
-/// A written expression of the rows of syntax three as a macro sees it:
+/// A written expression of the source rows as a macro sees it:
 /// without its groups.
 pub fn normalize_expression(s: &Syntax) -> Syntax {
     normalize3(s, Mode3::Expr)
 }
-/// A written type of the rows of syntax three without its groups.
+/// A written type of the source rows without its groups.
 pub fn normalize_type(s: &Syntax) -> Syntax {
     normalize3(s, Mode3::Type)
 }
-/// A written pattern of the rows of syntax three without the groups of the
+/// A written pattern of the source rows without the groups of the
 /// types and expressions in it.
 pub fn normalize_pattern(s: &Syntax) -> Syntax {
     normalize3(s, Mode3::Pattern)
 }
-/// A written item of the rows of syntax three without its groups. The kind
-/// of the item is read from its form, as the reader of syntax three does.
+/// A written item of the source rows without its groups. The kind
+/// of the item is read from its form, as the reader of the source syntax does.
 pub fn normalize_item(s: &Syntax) -> Syntax {
     normalize3(s, Mode3::Item)
 }
 
-// Normalize source datums of the rows of syntax three without consuming the
+// Normalize source datums of the source rows without consuming the
 // host stack on nested input.
 #[doc(hidden)]
 pub fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn accepted_lisp_item_uses_its_parsed_kind() {
-        // Syntax-three empty data is `(,)`; the legacy item reader rejects
+        // Empty data is `(,)`; the legacy item reader rejects
         // this function head, so the accepted item must not be reparsed there.
         let source = "(test \"quote\" (-> (,) _ { Nil }))";
         let (module, errors) = migration_syntax::lisp::parse_source(source);
@@ -388,7 +388,7 @@ mod tests {
             .unwrap();
     }
 
-    // ---- The rows of syntax three ----
+    // ---- The rows of the source syntax ----
 
     fn scope() -> Scope {
         Scope {
@@ -552,7 +552,7 @@ mod tests {
         assert_eq!(text(&sum[2]), "1");
     }
 
-    /// The table gives what the reader and the datum builder of syntax three
+    /// The table gives what the reader and the datum builder of the source syntax
     /// give for the same text: the tree without groups, written as datums.
     #[test]
     fn the_table_agrees_with_the_reader_of_syntax_three() {

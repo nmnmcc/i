@@ -1,16 +1,16 @@
-//! The commands for packages (§2.6–§2.8): `i new`, `i add`, `i remove`,
+//! The commands for packages: `i new`, `i add`, `i remove`,
 //! `i update`, `i publish`, and `i deps`.
 //!
-//! These are tools, not rules of the language (§0). `i.toml` is changed with
+//! These are tools, not rules of the language. `i.toml` is changed with
 //! `toml_edit`, so its formatting and comments are kept, and then the
-//! package is loaded, which brings `i.lock` up to date (§2.8). When loading
+//! package is loaded, which brings `i.lock` up to date. When loading
 //! fails, `i.toml` and `i.lock` are both put back as they were.
 //!
 //! `i add` and `i update` print the host services and external functions
 //! that the new versions can use and the old ones could not, as
 //! `new permission: …`; `i deps` prints them all. A package can use what
 //! its modules declare, and the host services of the library modules that
-//! they import: a module that imports `i/io` can print (§9.7).
+//! they import: a module that imports `i/io` can print.
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Subcommand;
@@ -30,7 +30,7 @@ use toml_edit::{DocumentMut, InlineTable, Item, TableLike, Value};
 pub enum PackageCommand {
     /// Make a new package, with a program and a test.
     New {
-        /// The name of the package (§2.6).
+        /// The name of the package.
         name: String,
         /// The directory to make; by default `NAME`.
         #[arg(long)]
@@ -38,7 +38,7 @@ pub enum PackageCommand {
     },
     /// Add a dependency to `i.toml`, and bring `i.lock` up to date.
     Add {
-        /// The dependency name (§2.6).
+        /// The dependency name.
         name: String,
         /// `location` or `location@version`. With no version, the newest
         /// tag `vX.Y.Z` of the repository is used.
@@ -61,8 +61,8 @@ pub enum PackageCommand {
         #[arg(long, default_value = ".")]
         project: PathBuf,
     },
-    /// Raise dependencies to the newest version with the same major version
-    /// (§2.7), and bring `i.lock` up to date.
+    /// Raise dependencies to the newest version with the same major version,
+    /// and bring `i.lock` up to date.
     Update {
         /// The dependencies to raise; by default all of them.
         names: Vec<String>,
@@ -453,7 +453,7 @@ fn add(
     dev: bool,
 ) -> Result<ExitCode> {
     let mut file = PackageFile::read(project)?;
-    // §2.6: the dependency names.
+    // The dependency name is a name, not `i`, and not the name of this package.
     if !is_name(name) || name == "i" || name == file.manifest.name {
         bail!(
             "the dependency name `{name}` must be a name (§1.3), not `i`, and not the name of this package (§2.6)"
@@ -581,7 +581,7 @@ fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
         } else {
             git.tags(&loc.repository).map_err(|e| anyhow!(e.message))?
         };
-        // §2.7: a new major version is another package.
+        // A new major version is another package.
         let Some(&newest) = tags
             .iter()
             .filter(|v| v.major == loc.version.major && **v > loc.version)
@@ -622,14 +622,14 @@ struct PackageReport {
 }
 
 /// The packages of a program, by a key that is the same for every version
-/// of one package (§2.7): `location@major`, `path <dir>`, or `` for the
+/// of one package: `location@major`, `path <dir>`, or `` for the
 /// compiled package.
 #[derive(Clone, Debug, Default)]
 struct Report {
     packages: BTreeMap<String, PackageReport>,
 }
 
-/// The host services (§9.7) and the external functions (§10.1) that each
+/// The host services and the external functions that each
 /// package of the graph can use, from the resolved program: those that its
 /// modules declare, and the host services of the library modules that they
 /// import.
@@ -732,7 +732,7 @@ fn report(graph: &PackageGraph) -> Result<Report> {
     Ok(out)
 }
 
-/// The host services (§9.7) of the library `i` that the module `m`
+/// The host services of the library `i` that the module `m`
 /// imports. The standard service is declared in `i/io`, so a package whose
 /// module imports `i/io` can print as if it declared the service itself.
 fn library_hosts<'a>(
@@ -1175,7 +1175,7 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
 /// is named by what it is (`ilang_check::identity`), whatever the module
 /// that uses it calls it: its package (this package; the library `i`;
 /// `location@major` for a package with a location, so that a new major
-/// version of a dependency is another type (§2.7); `path dir` for a path
+/// version of a dependency is another type; `path dir` for a path
 /// dependency), its module in that package, and its name. Type variables
 /// are named by the order they first come in.
 #[derive(Clone, Debug)]
@@ -1194,18 +1194,18 @@ struct Entry {
 }
 
 /// The public interface of the `src/` modules of a package: for each
-/// exported value its type, with the import of an external declaration
-/// (§10.1); for each exported type its parameters and host namespace (or
+/// exported value its type, with the import of an external declaration;
+/// for each exported type its parameters and host namespace (or
 /// its alias); and for each type exported with its constructors, and each
-/// exported host service type (§9.7), the constructors with their fields.
+/// exported host service type, the constructors with their fields.
 /// The keys are `value m.x`, `type m.T`, and `constructors m.T`, where `m`
 /// is the module path without the package name, which only the package
-/// itself uses (§2.6).
+/// itself uses.
 ///
 /// What the host must give is part of it too, exported or not, since an
-/// exported function may use it: each external function (§10.1), as
+/// exported function may use it: each external function, as
 /// `external "module" "function"` with its type, and each host service
-/// (§9.7) that it declares or imports from a library module, such as `Io`
+/// that it declares or imports from a library module, such as `Io`
 /// of `i/io`, as `host "namespace"` with the fields of its constructor.
 type Interface = BTreeMap<String, Entry>;
 
@@ -1355,7 +1355,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             );
         }
         // The host services of the library modules that this module
-        // imports (§9.7) are part of what the host must give, as if the
+        // imports are part of what the host must give, as if the
         // module declared them.
         let types = m
             .types
@@ -1367,7 +1367,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             let shown = TypeShow::new(def, &shown_names, false);
             let canonical = TypeShow::new(def, &canonical_names, true);
             // The host gives the functions of a host service by their
-            // labels (§9.7), so they are part of the interface even when
+            // labels, so they are part of the interface even when
             // the type or its constructor is not exported.
             if let (Some(h), TypeBody::Custom(ctors)) = (&def.host, &def.body) {
                 let fields = |s: &TypeShow| -> String {
@@ -1472,7 +1472,7 @@ fn canonical_names(graph: &PackageGraph, program: &hir::Program) -> Vec<String> 
         .collect()
 }
 
-/// The canonical form of a shown type (§4.7): each custom type is put as
+/// The canonical form of a shown type: each custom type is put as
 /// its canonical name, and each type variable as `'0`, `'1`, … in the
 /// order they first come in. Labels and the names of the built-in types
 /// stay.
@@ -1639,7 +1639,7 @@ impl<'a> TypeShow<'a> {
         format!("({})", fields.join(", "))
     }
 
-    /// A written type in the syntax of §3. `prec` is 1 inside a union, 2
+    /// A written type in the type syntax. `prec` is 1 inside a union, 2
     /// inside an intersection, and 3 inside a difference; a part that
     /// binds less is put in `{ }`.
     fn ty(&self, t: &hir::Type, prec: u8) -> String {
@@ -2230,7 +2230,7 @@ mod value_type_interfaces {
     }
     #[test]
     fn exported_alias_uses_completed_body_not_private_source_spelling() {
-        // X3: private renames are stable, changed closed public types differ.
+        // private renames are stable, changed closed public types differ.
         let a = canonical("(A)\nprivate : Int = 1\nA = private");
         assert_eq!(a, canonical("(A)\nother : Int = 1\nA = other"));
         assert_ne!(a, canonical("(A)\nprivate : String = \"a\"\nA = private"));
@@ -2238,7 +2238,7 @@ mod value_type_interfaces {
     }
     #[test]
     fn completed_alias_keeps_formal_positions() {
-        // X3: alpha-renaming cannot reorder formal parameter identities.
+        // alpha-renaming cannot reorder formal parameter identities.
         let a = canonical("(\n\tPair\n)\nport : Int = 1\nPair(A, B) = { (B, A, port) }");
         assert_eq!(
             a,
@@ -2251,7 +2251,7 @@ mod value_type_interfaces {
     }
     #[test]
     fn completed_literal_aliases_have_full_canonical_identity() {
-        // Joint §4: literal spelling and private source spelling are not identity.
+        // The literal spelling and the private source spelling are not part of identity.
         let a = canonical("(A)\nv=0x10\nA=v");
         assert_eq!(a, canonical("(A)\nrenamed=16\nA=renamed"));
         assert_ne!(a, canonical("(A)\nv=17\nA=v"));
@@ -2330,7 +2330,7 @@ mod value_type_interfaces {
 
     #[test]
     fn open_alias_proofs_report_representation_without_claiming_a_counterexample() {
-        // Stage 6 replaces open-row removal by a difference of closed data.
+        // A difference of closed data represents field removal.
         let old = interface("(T)\nT(A) = A - (x = Int)");
         let new = interface("(T)\nT(A) = A - (y = Int)");
         let same = Diff::new(&old, &old).unwrap();
@@ -2369,7 +2369,7 @@ mod value_type_interfaces {
             "(T)\nT = { (run = (a = Int) -> Int) }",
             "(T)\nT = { (run = (Int) -> Int) }"
         ));
-        // Positions keep their order; labels have no order (syntax-3 §2.3).
+        // Positions keep their order; labels have no order.
         assert!(!compare(
             "(T)\nT = { (run = (Int, String) -> Int) }",
             "(T)\nT = { (run = (String, Int) -> Int) }"
@@ -2394,7 +2394,7 @@ mod value_type_interfaces {
 
     #[test]
     fn exported_record_schemes_compare_labels_and_value_types() {
-        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // Closed-data counterpart: keys are concrete; a
         // changed retained scheme still requires a major version. As in
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.
@@ -2419,7 +2419,7 @@ mod value_type_interfaces {
 
     #[test]
     fn inferred_record_polymorphism_is_not_a_concrete_field_scheme() {
-        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // Closed-data counterpart: keys are concrete; a
         // changed retained scheme still requires a major version. As in
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.
@@ -2441,7 +2441,7 @@ mod value_type_interfaces {
 
     #[test]
     fn key_parameter_and_field_type_parameter_are_compared_together() {
-        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // Closed-data counterpart: keys are concrete; a
         // changed retained scheme still requires a major version. As in
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.
@@ -2485,7 +2485,7 @@ mod value_type_interfaces {
 
     #[test]
     fn key_parameter_can_collide_with_a_written_record_field() {
-        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // Closed-data counterpart: keys are concrete; a
         // changed retained scheme still requires a major version. As in
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.
@@ -2508,7 +2508,7 @@ mod value_type_interfaces {
 
     #[test]
     fn distinct_key_parameters_may_receive_the_same_string() {
-        // Closed-data counterpart (syntax-3 §2.3): keys are concrete; a
+        // Closed-data counterpart: keys are concrete; a
         // changed retained scheme still requires a major version. As in
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.

@@ -8,26 +8,26 @@
 //// text and integer are pure Result converters.
 //// Conversion callbacks have type (String)->Result(A,String), without effects.
 ////
-//// A1: validate all metadata first, in leaf order: ASCII long/positional names
+//// validate all metadata first, in leaf order: ASCII long/positional names
 //// [a-z][a-z0-9-]*, one ASCII letter for short names, spelling before duplicates
 //// before positional order. Long, short and positional namespaces are separate.
 //// Rest is unique and last among positional leaves; later options are allowed.
-//// A2: tokens are unchanged strings with zero-based argument indexes. Recognize
+//// tokens are unchanged strings with zero-based argument indexes. Recognize
 //// exact --long, --long=value and -s until bare --. A lone - is positional;
 //// all other leading-dash tokens are unknown. Options may follow positionals.
-//// A3: flags take no value; other options consume an attached suffix, including
+//// flags take no value; other options consume an attached suffix, including
 //// empty, or the next token unless absent or exactly --. Callback behavior does
 //// not change token ownership. All recognized-option errors use --long names.
-//// A4: singleton repetition wins over arity errors; many keeps occurrence order.
-//// A5: allocate required positionals in order, then rest. Optional absence is
+//// singleton repetition wins over arity errors; many keeps occurrence order.
+//// allocate required positionals in order, then rest. Optional absence is
 //// None; flags default False; many/rest default []; required leaves must occur.
-//// A6: errors precede decoding: definition, scanning, extra positionals, then
+//// errors precede decoding: definition, scanning, extra positionals, then
 //// missing/conversion errors in descriptor order. Conversion indexes identify
 //// the value token, or option token for attached values; scanning indexes always
 //// identify the option token. map/map2 run callbacks once after inner success.
-//// A7: integer accepts an optional sign and ASCII decimal digits, otherwise
+//// integer accepts an optional sign and ASCII decimal digits, otherwise
 //// Error("expected integer"); text preserves all token values, including NUL.
-//// A8: help validates metadata without callbacks. Usage plus program plus LF,
+//// help validates metadata without callbacks. Usage plus program plus LF,
 //// then two spaces, display name, tab, verbatim help and LF for each leaf.
 //// Flags/optional/many are bracketed; value options add VALUE, many adds ...,
 //// positionals use <name>, and rest uses [<name>...]. No automatic help action.
@@ -40,30 +40,8 @@
 //// O(fields^2). Decoder stack depth follows builder depth. Text scans are linear.
 
 ////
-//// Public type inventory:
-//// Names { Names(long: String, short: Option(String)) }
-//// DefinitionError { InvalidName(String) DuplicateName(String) MisplacedRest }
-//// CliError { BadDefinition(DefinitionError) UnknownOption(index:Int,token:String)
-////   MissingValue(index:Int,name:String) UnexpectedValue(index:Int,name:String)
-////   RepeatedOption(index:Int,name:String) MissingArgument(name:String)
-////   InvalidArgument(index:Int,name:String,text:String,reason:String)
-////   ExtraArgument(index:Int,token:String) }
-//// Parser(A) is opaque.
-//// Public signatures:
-//// pure(A): (value: A) -> Parser(A)
-//// flag: (names: Names, help: String) -> Parser(Bool)
-//// option(A): (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(A)
-//// optional(A): (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(Option(A))
-//// many(A): (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))
-//// argument(A): (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(A)
-//// rest(A): (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))
-//// map(A, B): (parser: Parser(A), with: (A) -> B) -> Parser(B)
-//// map2(A, B, C): (first: Parser(A), second: Parser(B), with: (A, B) -> C) -> Parser(C)
-//// parse(A): (parser: Parser(A), args: List(String)) -> A
-//// help(A): (parser: Parser(A), program: String) -> String
-//// text: (text: String) -> Result(String, String)
-//// integer: (text: String) -> Result(Int, String)
-//// read obtains process arguments; run reports errors and runs a body.
+//// Parser constructors stay private so metadata validation and bucket
+//// consumption cannot be bypassed.
 (
 	i/process
 	i/stdio

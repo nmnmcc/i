@@ -1,4 +1,4 @@
-//// One operation to pause a computation and go on with it later (§9.4).
+//// One operation to pause a computation and go on with it later.
 (
 	boundary
 	suspend
@@ -28,7 +28,7 @@ escape : <R, N>(Boundary(R, N), R) -> Never
 @external("ilang:control", "resume")
 resume : <A, R, N>(Continuation(A, R, N), A) <- N -> R
 
-/// Unwinds the paused computation (§9.5).
+/// Unwinds the paused computation.
 @external("ilang:control", "cancel")
 cancel : <A, R, N>(Continuation(A, R, N)) <- N -> Nil
 
@@ -37,7 +37,7 @@ keep = <S, A, E, N>(f : (S) <- (..N, Fail(E)) -> A) <- (..env : N) -> (S) <- (
 	Fail(E),
 ) -> A {
 	(x) {
-		// runtime.md §6.3, D16: retain a frame across suspended provides.
+		// retain a frame across suspended provides.
 		value = f(x) <- env
 		value
 	}

@@ -99,7 +99,7 @@ fn run_http_program(source: &str) {
         ),
     )
     .unwrap();
-    // Choose the native library Client; the platform supplies Net and Tls (§9.7).
+    // Choose the native library Client; the platform supplies Net and Tls.
     let source = source.replacen("main = ", "_http_test_body = ", 1);
     let source = format!("{source}\nmain = () {{ _http_test_body() <- (http.native_client()) }}\n");
     std::fs::write(project.path().join("src/main.i"), source).unwrap();

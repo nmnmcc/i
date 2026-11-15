@@ -1,4 +1,4 @@
-//! `core.bit_array_concat` (spec §13): a list of bit arrays joined in
+//! `core.bit_array_concat`: a list of bit arrays joined in
 //! order, with one copy.
 //!
 //! The first pass adds up the lengths, and the second copies each part into

@@ -1,4 +1,4 @@
-//! Header-only regeneration for A2. Source after the header stays byte-identical.
+//! Header regeneration preserves source after the header byte for byte.
 
 pub fn rewrite(source: &str, comment: &str, first: &str, at: &[String]) -> Result<String, String> {
     for value in std::iter::once(first).chain(at.iter().map(String::as_str)) {

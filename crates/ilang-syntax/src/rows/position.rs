@@ -1,6 +1,6 @@
-//! One datum read for one position of `i/syntax` (docs/design/syntax-3.md
-//! §6.7), in the rows of §6.8. These are the readers of the parent module,
-//! given the names of the positions; `Syntax::show_as` prints their results.
+//! A datum is read for its `i/syntax` position so an identical form can have
+//! different meanings in a type, expression or pattern. The readers here
+//! share the parent module's encoding.
 
 use super::*;
 

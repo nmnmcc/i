@@ -1,4 +1,4 @@
-//! Compatibility namespace for the syntax-three tree now at the crate root.
+//! Compatibility namespace for the source tree now at the crate root.
 pub use crate::parse::{
     ONE_BINDING_HINT, binding_line_traps, parse_expr, parse_module, parse_pattern, parse_type,
     pipe_target,
@@ -33,7 +33,7 @@ pub fn expression_module(value: ast::Expr) -> ast::Module {
     }
 }
 
-/// Prints an expanded syntax-three module in either surface.
+/// Prints an expanded source module in either surface.
 pub fn print_tree(module: &ast::Module, lisp: bool) -> String {
     deep::deep(|| {
         if lisp {

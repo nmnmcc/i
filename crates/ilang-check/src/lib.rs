@@ -2,7 +2,6 @@
 //! the parsed modules of a package graph to the resolved program (HIR) and
 //! its types.
 //!
-//! The only authority is `docs/spec.md`; section numbers refer to it.
 
 mod capabilities;
 pub mod hir;
@@ -39,7 +38,7 @@ pub mod code {
     pub const IMPORT_IS_TOP_LEVEL: &str = "E0213";
     pub const IMPORT_CIRCLE: &str = "E0214";
     pub const EXPORT_UNDEFINED: &str = "E0215";
-    // E0216 is no longer given: `Alias(..)` is the same as `Alias` (§2.4).
+    // E0216 is no longer given: `Alias(..)` is the same as `Alias`.
     pub const PATTERN_BINDS_TWICE: &str = "E0217";
     pub const PARAMS_BIND_TWICE: &str = "E0218";
     pub const PARAMS_SAME_LABEL: &str = "E0219";
@@ -92,7 +91,7 @@ pub mod code {
     pub const DEPRECATED: &str = "W0301";
     // Order.
     pub const NEEDS_ITSELF: &str = "E0401";
-    // Types (§4, §9).
+    // Types.
     pub const TYPE_MISMATCH: &str = "E0501";
     pub const FN_ARITY: &str = "E0502";
     pub const TYPE_INVARIANT: &str = "E0503";
@@ -100,7 +99,7 @@ pub mod code {
     pub const TYPE_OCCURS: &str = "E0505";
     pub const NEEDS_KNOWN_TYPE: &str = "E0506";
     pub const CALL_LABELS: &str = "E0507";
-    // E0508 is no longer given: every value with a known type (§4.8) may
+    // E0508 is no longer given: every value with a known type may
     // use `.f` and `.k`, and E0506 is given for one with no known type.
     pub const TOP_LEVEL_EFFECT: &str = "E0509";
     pub const PATTERN_FIELDS: &str = "E0510";
@@ -120,9 +119,9 @@ pub mod code {
     pub const LABEL_PARAMETER_VALUE: &str = "E0542";
     pub const LABEL_ESCAPES: &str = "E0545";
     pub const BIT_PATTERN: &str = "E0519";
-    // E0520 became warning W0503: disjoint equality is well defined (§6.9).
+    // E0520 became warning W0503: disjoint equality is well defined.
     pub const ENTRY_TYPE: &str = "E0521";
-    // Shape groups (syntax three §2.6).
+    // Shape groups.
     pub const NO_SHAPE_GROUP: &str = "E0550";
     pub const NO_BRANCH_SELECTED: &str = "E0552";
     pub const NEVER_USED: &str = "W0501";
@@ -140,7 +139,7 @@ pub struct Parsed {
     pub source: SourceId,
     pub kind: ModuleKind,
     pub ast: ast::Module,
-    /// Names and spans needed by the temporary transition boundary.
+    /// Names and spans needed to interpret source forms during resolution.
     pub lowering: ilang_syntax::syn3::facts::Transition,
     /// Origins of names introduced by expansion in this module.
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
@@ -426,7 +425,7 @@ pub fn check_selected_many(
 }
 
 /// Map diagnostics from the checker's virtual expansion text to written
-/// source. Warnings from templates are not emitted (§9).
+/// source. Warnings from templates are not emitted.
 pub fn map_expansion_diagnostics(
     program: &hir::Program,
     sources: &ilang_package::Sources,

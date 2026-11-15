@@ -229,7 +229,7 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
 }
 
 /// Two packages made by `i new` both print with `Io` of `i/io`, so one may
-/// depend on the other: neither declares the standard service (§9.7). The
+/// depend on the other: neither declares the standard service. The
 /// dependency is still shown as able to print.
 #[test]
 fn two_new_packages_work_together() {
@@ -674,8 +674,8 @@ fn publish_compares_the_interface() {
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1");
     w.ok(&["publish", "1.1.0", "--project", &project]);
 
-    // §4.3: Shape is a union alias; Dot adds its own type and constructor.
-    // Changing the alias and the function requires a new major (§2.7).
+    // Shape is a union alias; Dot adds its own type and constructor.
+    // Changing the alias and the function requires a new major.
     let changed = added
         .replace(
             "add = (a : Int, b : Int) { a + b }",
@@ -714,7 +714,7 @@ fn publish_compares_the_interface() {
     assert_eq!(tags(&dir), "v1.0.0\nv1.0.1\nv1.1.0");
 
     // Removing a name, or hiding constructors, is incompatible too.
-    // §2.4: the exported alias still needs its member types exported.
+    // The exported alias still needs its member types exported.
     let hidden = changed
         .replace("Shape(..)", "Shape, Circle, Square, Dot")
         .replace("\ttwo\n", "");
@@ -723,7 +723,7 @@ fn publish_compares_the_interface() {
     let err = w.fails(&["publish", "1.2.0", "--project", &project]);
     assert!(err.contains("removed value api.two: 2"), "{err}");
     // v1.1.0 exported Circle and Square through Shape(..); Dot was never
-    // published, so only those two constructors can be removed here (§2.4).
+    // published, so only those two constructors can be removed here.
     assert_eq!(
         err.lines()
             .filter(|line| line.starts_with("  removed constructors "))
@@ -749,7 +749,7 @@ fn new_makes_files_that_are_formatted() {
     w.ok(&["fmt", "--check", "--project", &project]);
 }
 
-/// The package `badmod`, whose module path is not correct (E0623): it is
+/// The package `badmod`, whose module path is not correct: it is
 /// found only after its location is got.
 fn bad_repo(w: &World) {
     w.repo(
@@ -1071,7 +1071,7 @@ fn publish_sees_what_the_host_must_give() {
 }
 
 /// A package that starts to print imports `i/io`: the host must give the
-/// standard service, as if the package declared it (§9.7).
+/// standard service, as if the package declared it.
 #[test]
 fn publish_sees_the_standard_service_of_i_io() {
     let w = World::new();
@@ -1355,7 +1355,7 @@ fn publish_skips_an_old_syntax_interface_and_allows_a_patch() {
 
 #[test]
 fn publish_keeps_literal_alias_values_beyond_hover_limits() {
-    // literal-types decision 11 and types-joint §10: an alias body is full
+    // A published alias body is full
     // interface text; shortening the 14-member hover must not hide a change.
     let w = World::new();
     let literals = (0..14)
@@ -1414,7 +1414,7 @@ fn publish_rejects_committed_source_links_before_reading_their_targets() {
     assert!(git(&package, &["tag", "--list"]).is_empty());
 }
 
-/// MP01: package commands reject the same source-link attack as compilation.
+/// package commands reject the same source-link attack as compilation.
 #[cfg(unix)]
 #[test]
 fn add_rejects_dependency_with_source_link() {

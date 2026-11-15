@@ -1,5 +1,5 @@
-//! The parser of syntax three (docs/design/syntax-3.md §3, rules P1 to P13,
-//! with the services amendment). It reads the tokens of [`crate::lexer::lex3`].
+//! Recursive-descent parsing with Pratt precedence for expressions. Spans
+//! remain attached to source forms so diagnostics and editor queries agree.
 
 use super::ast::*;
 use crate::lexer::{DocComment, generics_end, lex3, pair_brackets};
@@ -9,7 +9,7 @@ use crate::{Code, Diagnostic};
 
 type PResult<X> = Result<X, Diagnostic>;
 
-/// Parses a syntax-three module. The diagnostics are sorted by position.
+/// Parses a source module. The diagnostics are sorted by position.
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
     let lexed = lex3(source);
     let mut parser = Parser {
@@ -112,7 +112,7 @@ fn binop(kind: &T) -> Option<BinOp> {
     })
 }
 
-/// Whether `e` may be the right side of `|>` (P11): a name, a call, or a
+/// Whether `e` may be the right side of `|>`: a name, a call, or a
 /// chain literal.
 pub fn pipe_target(e: &Expr) -> bool {
     match &e.kind {
@@ -130,8 +130,8 @@ fn pipe_target_path(e: &Expr) -> bool {
     }
 }
 
-/// An item with a key, a positional item, or a spread or rest, for the order
-/// rule of §2.3.
+/// Keyed items close the positional prefix, so item order is tracked separately
+/// from the expression or pattern being parsed.
 enum ItemOrder {
     Pos,
     Key,
@@ -252,7 +252,7 @@ impl Parser<'_> {
         Ok(Some(module))
     }
 
-    /// `name =`: the start of a labelled (key) item (P3).
+    /// `name =`: the start of a labelled (key) item.
     fn at_key(&self) -> bool {
         matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Eq
     }
@@ -286,7 +286,7 @@ impl Parser<'_> {
         Ok(parts)
     }
 
-    /// §2.3: an explicit positional item may not follow a labelled item.
+    /// An explicit positional item may not follow a labelled item.
     fn check_order<X>(&mut self, items: &[X], order: impl Fn(&X) -> (ItemOrder, Span)) {
         let mut keyed = false;
         for item in items {
@@ -505,7 +505,6 @@ impl Parser<'_> {
             return Err(Diagnostic::new(Code::HeaderGroup, span, msg));
         }
         let kind = if matches!(self.kind(), T::UpName(_)) {
-            // P12.
             ItemKind::TypeDef(self.type_def()?)
         } else if self.at_macro_item() {
             let module = if *self.nth(1) == T::Dot {
@@ -591,7 +590,7 @@ impl Parser<'_> {
         })
     }
 
-    /// §2.8: `Name [ (head) ] = right side`.
+    /// `Name [ (head) ] = right side`.
     fn type_def(&mut self) -> PResult<TypeDef> {
         let name = self.up_name()?;
         let mut head = Vec::new();
@@ -654,7 +653,7 @@ impl Parser<'_> {
         })
     }
 
-    /// P6: `name ( UpName … )` followed by `=` or `:` is the removed
+    /// `name ( UpName … )` followed by `=` or `:` is the removed
     /// binding head with type parameters.
     fn removed_type_params(&self) -> PResult<()> {
         if !matches!(self.kind(), T::Name(_)) {
@@ -762,7 +761,7 @@ impl Parser<'_> {
         Ok(lhs)
     }
 
-    /// P11: `Pipe = Binary { "|>" Binary }`, left associative.
+    /// `Pipe = Binary { "|>" Binary }`, left associative.
     fn pipe(&mut self) -> PResult<Expr> {
         let start = self.start();
         let mut lhs = self.binary(0)?;
@@ -831,7 +830,6 @@ impl Parser<'_> {
         let mut e = self.primary()?;
         loop {
             let kind = if self.at_joined(&T::LParen) {
-                // P2.
                 ExprKind::Call {
                     callee: Box::new(e),
                     args: self.data()?,
@@ -858,7 +856,7 @@ impl Parser<'_> {
         }
     }
 
-    /// `Data`, from its `(` (P3).
+    /// `Data`, from its `(`.
     fn data(&mut self) -> PResult<Vec<DItem>> {
         self.expect(&T::LParen)?;
         let items = self.seq(T::RParen, true, |p| {
@@ -911,7 +909,7 @@ impl Parser<'_> {
         Ok(ExprKind::Interp(out))
     }
 
-    /// P1: a `(` that begins a primary is a function's parameter group when
+    /// a `(` that begins a primary is a function's parameter group when
     /// its `)` is followed by `->`, by `{` on the same line, or by a service
     /// group `<- ( … )` that is followed on the same line by `->` or `{`.
     fn at_function(&self, open: usize) -> bool {
@@ -1009,7 +1007,7 @@ impl Parser<'_> {
         Ok(Segment { value, format })
     }
 
-    /// P4: `Branches = Function { "|" Function }`.
+    /// `Branches = Function { "|" Function }`.
     fn chain(&mut self) -> PResult<ExprKind> {
         let mut branches = vec![self.function()?];
         while self.at(&T::Pipe) {
@@ -1043,7 +1041,6 @@ impl Parser<'_> {
                 break;
             }
             if self.eat(&T::Question) {
-                // P9.
                 guard = Some(self.expr()?);
                 if !self.at(&T::RParen) {
                     return self
@@ -1062,7 +1059,7 @@ impl Parser<'_> {
             } else {
                 None
             };
-            // P8.
+
             let mut choices = vec![self.pattern()?];
             while self.eat(&T::Pipe) {
                 choices.push(self.pattern()?);
@@ -1325,7 +1322,7 @@ impl Parser<'_> {
         Ok(Pattern::new(kind, self.span_from(start)))
     }
 
-    /// `DataPat`, from its `(` (P3, P7).
+    /// `DataPat`, from its `(`.
     fn data_pattern(&mut self) -> PResult<Vec<DPItem>> {
         self.expect(&T::LParen)?;
         let items = self.seq(T::RParen, true, |p| {
@@ -1479,7 +1476,7 @@ impl Parser<'_> {
         Ok(())
     }
 
-    /// `DataType`, from its `(` (P10).
+    /// `DataType`, from its `(`.
     fn data_type(&mut self) -> PResult<Vec<TItem>> {
         self.expect(&T::LParen)?;
         let items = self.seq(T::RParen, true, |p| {
@@ -1693,7 +1690,7 @@ impl Parser<'_> {
     }
 }
 
-/// The line rule is unchanged; this only explains a likely misplaced statement (§1.7).
+/// The line rule is unchanged; this only explains a likely misplaced statement.
 pub const ONE_BINDING_HINT: &str =
     "this is one binding, not two; to write two, put the second on its own line (§1.7)";
 

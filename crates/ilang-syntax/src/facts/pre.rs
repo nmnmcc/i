@@ -1,18 +1,7 @@
-//! What the lowering of syntax three (`crate::syn3::lower`) knew
-//! about a module beside the tree it built, worked out from the
-//! syntax-three tree alone:
-//!
-//! - the errors of the forms that this compiler cannot type yet ("needs
-//!   stage 9", mixed data, …), with the same code, span, text and order;
-//! - the fresh names (`%arg1`, `%service2`, `%field3`), numbered in the same
-//!   order, so that the HIR has the same names;
-//! - the type parameters of every binding (the generics of its functions and
-//!   of its signature); errors are ordinary `Fail(E)` need entries (E3);
-//! - the sums: `C1 = (…)`, `C2 = (…)`, `T = C1 | C2`.
-//!
-//! The walk is the walk of `lower.rs`, form by form, without the output.
-//! Nodes are named by their address: the tree is not moved while it is
-//! resolved.
+//! Resolution needs stable generated names, binding parameters, union
+//! membership and unsupported-form errors without constructing another tree.
+//! Traversal order preserves diagnostic order and fresh-name numbering.
+//! Nodes are keyed by address, so the tree must not move during resolution.
 
 use super::Transition;
 use crate::span::Span;
@@ -107,7 +96,7 @@ pub fn head_params(head: &[n::Type]) -> Option<Vec<o::Ident>> {
         .collect()
 }
 
-/// Stage 3 keeps every data definition as its own labelled type. There
+/// Each data definition denotes its own labelled type. There
 /// are no adjacent definitions to absorb into an alias of their union.
 pub fn sums(_items: &[n::Item]) -> (HashMap<usize, usize>, HashSet<String>) {
     (HashMap::new(), HashSet::new())
@@ -143,7 +132,7 @@ pub fn chain_kind(fs: &[n::Function]) -> ChainKind {
     }
 }
 
-/// `a |> F1 | F2` is a match (§2.11): one position per branch.
+/// `a |> F1 | F2` is a match: one position per branch.
 pub fn is_match(fs: &[n::Function], lisp: bool) -> bool {
     !lisp
         && fs.iter().all(|f| {
@@ -197,7 +186,7 @@ pub fn attribute_call(a: &n::Attribute) -> bool {
     a.args.is_some() && attribute_strings(a).is_none()
 }
 
-/// The parts of `p1 = p2 = …` as today's chain of names around one
+/// The parts of `p1 = p2 = …` as the legacy chain of names around one
 /// pattern. With a label, the chain ends in the label of a constructor
 /// field.
 pub struct AndPlan<'t> {
@@ -286,7 +275,7 @@ pub(super) fn binding_generics(b: &n::Binding, include_typed: bool) -> Vec<&n::I
     let mut generics: Vec<&n::Ident> = Vec::new();
     if let n::ExprKind::Chain(fs) = &b.value.kind {
         // Branches may share a name; a name written twice in one list is
-        // kept twice, so that the resolver reports it (E0226).
+        // kept twice, so that the resolver reports it.
         for f in fs {
             let before = generics.len();
             for g in &f.generics {
@@ -450,7 +439,7 @@ impl Cx {
                         .iter()
                         .any(|a| a.module.is_none() && a.name.name == "macro") =>
                 {
-                    // MP10/MP11 retain the written macro interface. Validate
+                    // Typed macro calls retain the written macro interface. Validate
                     // its compiler view after ordinary shape grouping instead
                     // of diagnosing the interface's labels as unsupported.
                     let mut compiler_item = item.clone();
@@ -600,7 +589,7 @@ impl Cx {
     }
 
     fn params_of(&mut self, f: &n::Function) {
-        // E3/E6: Fail and a captured rest are ordinary need parameters.
+        // Fail and a captured rest are ordinary need parameters.
         for service in f.services.iter().flatten() {
             self.ty(&service.ty);
         }
@@ -1032,7 +1021,7 @@ impl Cx {
 }
 
 /// Several services of which one is not a name: each is bound to a fresh
-/// local first, so that no service sees another (§2.10.5).
+/// local first, so that no service sees another.
 pub fn provide_apart(items: &[n::DItem]) -> bool {
     items.len() > 1
         && items.iter().any(|i| {

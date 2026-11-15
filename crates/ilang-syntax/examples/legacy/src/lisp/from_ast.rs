@@ -1,4 +1,4 @@
-//! Write the core AST as Lisp datums, following the position tables in meta §2.3.
+//! Position determines a legacy node’s Lisp encoding, so callers must supply its context.
 use crate::ast::*;
 use crate::print::string_literal;
 use crate::span::Span;

@@ -1,4 +1,4 @@
-//// The text form of a Float (§11.8): the shortest digits that read back as
+//// The text form of a Float: the shortest digits that read back as
 //// the same Float, correctly rounded. `core.inspect` and every Float in an
 //// inspected value use this function, so it uses no `core.inspect` itself.
 ////
@@ -251,7 +251,7 @@ length = (list : List(Int), n : Int) -> Int {
 	list |> ([]) { n } | ([_, ..xs]) { length(xs, n + 1) }
 }
 
-// §11.8: the shortest digits, in scientific notation once whole decimal
+// The shortest digits, in scientific notation once whole decimal
 // output would imply precision above 2^53, or would need many zeros.
 layout = (digits : List(Int), n : Int, k : Int, imprecise : Bool) -> List(
 	String,

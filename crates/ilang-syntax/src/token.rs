@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // The token set follows the structure of the Gleam lexer's tokens
 // (https://github.com/gleam-lang/gleam, Apache-2.0, see licenses/gleam-LICENCE),
-// changed for the symbols of i (§1.4, §1.5).
+// changed for the symbols of i.
 
-//! Tokens (§1.3 to §1.6) and the token sets of the line rule (§1.7).
+//! Tokens and the token sets of the line rule.
 
 use crate::span::Span;
 use num_bigint::BigUint;
@@ -18,14 +18,14 @@ pub enum TokenKind {
     Float(f64),
     Str(String),
     Interpolated(Vec<StringPart>),
-    // Symbols (§1.5)
+    // Symbols
     Eq,
     Colon,
     Comma,
     Dot,
     DotDot,
     Arrow,
-    /// `<-`, only in syntax three.
+    /// `<-`, only in the source syntax.
     LArrow,
     Question,
     Caret,
@@ -81,7 +81,7 @@ pub enum StringPart {
 }
 
 /// A token. `nl` is set when a line end or a comment comes before it, and
-/// `brk` when that line end is a break (§1.7).
+/// `brk` when that line end is a break.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
@@ -91,7 +91,7 @@ pub struct Token {
 }
 
 impl TokenKind {
-    /// The last token before a line end that may be a break (§1.7).
+    /// The last token before a line end that may be a break.
     pub fn can_end(&self) -> bool {
         use TokenKind::*;
         matches!(
@@ -100,7 +100,7 @@ impl TokenKind {
         ) || matches!(self, RParen | RBracket | RBrace | GtGt)
     }
 
-    /// The first token after a line end that may be a break (§1.7).
+    /// The first token after a line end that may be a break.
     pub fn can_begin(&self) -> bool {
         use TokenKind::*;
         matches!(

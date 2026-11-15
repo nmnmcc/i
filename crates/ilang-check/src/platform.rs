@@ -1,4 +1,4 @@
-//! Entries and the platform (syntax-3 §2.10.11). At an entry (the program
+//! Entries and the platform. At an entry (the program
 //! entry, a test, a host export) the target platform gives its own
 //! services: the host services of the target's table, `Assert`, `Fail`,
 //! `Root`, `Owner`, `Await`, `Runner` and `Scheduler`. Every other service is
@@ -78,7 +78,7 @@ impl Stub {
 }
 
 /// WASI emits one command; test bodies are checked, but are not entries on
-/// that target (B.7).
+/// that target.
 pub fn entry_is_eligible(p: &Program, entry: DefId, target: Target) -> bool {
     target != Wasi || p.module(entry.module).kind != ModuleKind::Test
 }

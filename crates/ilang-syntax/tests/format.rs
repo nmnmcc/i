@@ -1,5 +1,5 @@
 //! Properties of the formatter over every `.i` file of the repository that
-//! parses without errors, and every ```i block of `docs/spec.md`:
+//! parses without errors, and every language-definition example:
 //!
 //! - the output parses without errors, to the same tree (spans aside);
 //! - formatting the output again changes nothing;
@@ -172,7 +172,7 @@ fn format_properties() {
     skipped.sort();
     let skipped = skipped.join("\n") + "\n";
     // review-rec/_loose/probes deliberately retains an illegal type spread
-    // (syntax-three §2.3: a data type has no spread). Its E0107 is parsed
+    // (a data type has no spread). Its E0107 is parsed
     // before resolution, so it belongs in the recorded invalid-source list.
     let skip_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/format_skip.txt");
     if std::env::var_os("UPDATE").is_some() {

@@ -1,5 +1,5 @@
 //! One part of a tree as text of the normal surface, for the positions of
-//! `i/syntax` (docs/design/syntax-3.md §6.7). The text is on one line but
+//! `i/syntax`. The text is on one line but
 //! for the line ends that the layout always has (the statements of a block,
 //! an attribute before its item, a call of depth greater than
 //! [`MAX_CALL_DEPTH`]). The tree has its groups already (`group.rs`).

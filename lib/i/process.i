@@ -46,9 +46,7 @@ EnvironmentMode = InheritEnvironment | ReplaceEnvironment
 
 InheritDirectory = ()
 Directory = (String)
-/// Before stage 3 this sum was `Directory` with a constructor of the same
-/// name; a member is now a type of its own (syntax-3.md §2.8), so the sum
-/// has the name `DirectoryMode`, as `EnvironmentMode`.
+/// A directory choice keeps inheritance distinct from an explicit path.
 DirectoryMode = InheritDirectory | Directory
 
 Child = (Int)

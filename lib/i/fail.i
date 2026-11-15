@@ -1,4 +1,4 @@
-//// Errors (§9.3): the service `Fail(E)` of the prelude, and ordinary
+//// Errors: the service `Fail(E)` of the prelude, and ordinary
 //// library code over `control.boundary` and `control.escape`.
 (
 	i/control

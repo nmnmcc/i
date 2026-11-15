@@ -1,4 +1,4 @@
-//! `quote_lower` on the tree of syntax three: expression quotes become
+//! `quote_lower` on the source tree: expression quotes become
 //! ordinary calls into the compiler syntax service, and quote patterns get
 //! their template slot. Also the reader of a quote pattern's captures.
 use std::collections::BTreeSet;
@@ -18,7 +18,7 @@ use super::{Datum, DatumKind};
 const ALIAS: &str = "\0quote-syntax";
 
 /// Reads a quote pattern: its unquotes are patterns in the rows of syntax
-/// three (§6.8).
+/// three.
 pub fn read_pattern(d: &Datum) -> Result<QuotePattern, Diagnostic> {
     Ok(QuotePattern {
         datum: Quoted(Box::new(d.clone())),
@@ -28,8 +28,8 @@ pub fn read_pattern(d: &Datum) -> Result<QuotePattern, Diagnostic> {
 }
 
 /// [`read_pattern`], or the quote with no captures when it does not read.
-/// For the time in which the lowering to the old tree still checks every
-/// quote pattern (in the rows before syntax three) and reports the error.
+/// Unread quotes retain their datum so the validation pass can report the
+/// original source rather than an incomplete capture pattern.
 pub fn read_pattern_lenient(d: &Datum) -> QuotePattern {
     read_pattern(d).unwrap_or_else(|_| QuotePattern::unread(d.clone()))
 }

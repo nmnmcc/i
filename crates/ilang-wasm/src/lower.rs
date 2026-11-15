@@ -2,29 +2,29 @@
 //! of `ir.rs`.
 //!
 //! - Every function expression becomes a function of the intermediate form
-//!   with explicit captures (§6.8). A top-level function is one value (§2.5,
-//!   §11.4): a constant closure, and its known calls are direct.
-//! - Constructors (§6.3) and library functions used as values are functions
-//!   with one constant closure each, so they have one identity (§11.4).
-//! - Evaluation order is that of §6.2, and only the tail positions of §11.6
-//!   become tail calls.
-//! - `case` (§6.12) tests the clauses one after the other, each pattern with
-//!   plain tests (§7.2, §8.4).
+//!   with explicit captures. A top-level function is worked out once, so all its
+//!   uses are the same value: a constant closure, and its known calls are direct.
+//! - Constructors and library functions used as values are functions
+//!   with one constant closure each, so they have one identity.
+//! - Evaluation is from left to right, and only the tail positions (the last
+//!   expression of a function body, of a block, and the branches of a chain or a
+//!   match in tail position) become tail calls.
+//! - `case` tests the clauses one after the other, each pattern with
+//!   plain tests.
 //! - Every call, operator, and `<<` of the program source that may stop has a
-//!   site on the shadow stack (§11.7). A call in tail position, also of a
+//!   site on the shadow stack. A call in tail position, also of a
 //!   library function, has a tail site: it is only the first position.
-//! - Top-level values are worked out in `ilang_start`, in `order.init` (§2.5).
-//! - Every call passes the environment of its place (§9.2): environment
+//! - Top-level values are worked out in `ilang_start`, in `order.init`.
+//! - Every call passes the environment of its place: environment
 //!   parameters read a slot of it, and environment statements make a new one
 //!   for the rest of their block.
 //! - `fail.raise`, `fail.catch`, `resource.ensure`, and the four functions
-//!   of `i/control` (§9.4) are operations of the code generator (`emit.rs`);
+//!   of `i/control` are operations of the code generator (`emit.rs`);
 //!   `fail.from_result`, `fail.map_error`, `resource.acquire`,
 //!   `assertion.catch`, and `assert` are i code.
-//! - A binding or a parameter whose pattern may fail (the checker decides,
-//!   §7.3) calls `fail` of the `Assert` service when it does not match
-//!   (§6.10, §6.11).
-//! - The host boundary (§9.7, §10, Appendix B): each external function
+//! - A binding or a parameter whose pattern may fail (the checker decides)
+//!   calls `fail` of the `Assert` service when it does not match.
+//! - The host boundary: each external function
 //!   outside the library, and each field of a host service that an entry
 //!   point needs, is an import with a function that calls it
 //!   ([`Value::HostCall`]). The host services are records of these functions
@@ -60,11 +60,11 @@ const FIRST_ID: u32 = crate::runtime::FIRST_CONSTRUCTOR;
 pub struct Options {
     /// Compile the tests of the compiled package and its dev-dependencies.
     pub tests: bool,
-    /// The host the module is made for (B.7).
+    /// The host the module is made for.
     pub target: ir::Target,
 }
 
-/// The WASI functions that the runtime imports on the WASI target (B.7).
+/// The WASI functions that the runtime imports on the WASI target.
 const WASI: &str = "wasi_snapshot_preview1";
 const WASI_RUNTIME: [&str; 2] = ["fd_write", "proc_exit"];
 
@@ -82,7 +82,7 @@ struct CtorInfo {
     labels: Vec<Option<String>>,
 }
 
-/// How a custom type is tested at run time (§7.1).
+/// How a custom type is tested at run time.
 #[derive(Clone, Copy, Debug)]
 enum TypeRepr {
     /// The prelude's `True` or `False`: the two values of `Bool = True | False`.
@@ -103,7 +103,7 @@ enum Target {
     Callee(Callee),
 }
 
-/// The library functions whose bodies are in the runtime (§13).
+/// The library functions whose bodies are in the runtime.
 const CORE: &[&str] = &[
     "not",
     "to_float",
@@ -173,17 +173,17 @@ const CORE_FUNCS: &[&str] = &[
 /// The state of one function while it is lowered.
 struct Fx {
     module: ModuleId,
-    /// Code of the library: it has no sites (§11.7).
+    /// Code of the library: it has no sites.
     library: bool,
     locals: Vec<LocalType>,
     numeric: HashMap<Local, ilang_check::types::NumericFact>,
     vars: HashMap<VarId, Local>,
     labels: u32,
-    /// The names of the binding whose direct value is being lowered (§6.10).
+    /// The names of the binding whose direct value is being lowered.
     pending: Option<HashSet<VarId>>,
     /// Captures to fill once those names are bound.
     patches: Vec<(Local, u32, VarId)>,
-    /// The environment of the place being lowered (§9.2).
+    /// The environment of the place being lowered.
     env: Env,
     /// In the body of a light boundary: the names of its handle, which is
     /// local 0; `None` once one environment statement is made lazy.
@@ -265,7 +265,7 @@ fn guard(out: &mut Vec<Stmt>, cond: Cond, fail: Label) {
     });
 }
 
-/// `{ e }` with one expression is `e` (§6.10).
+/// `{ e }` with one expression is `e`.
 fn ungroup(e: &Expr) -> &Expr {
     match &e.kind {
         ExprKind::Block(b) if b.stmts.len() == 1 => match &b.stmts[0] {
@@ -486,7 +486,7 @@ impl Walk {
                 lhs,
                 rhs,
             } => {
-                // `a |> f(…)` is `f(a, …)` (§6.9): `a` is the first
+                // `a |> f(…)` is `f(a, …)`: `a` is the first
                 // written argument.
                 let (callee, args) = match &rhs.kind {
                     ExprKind::Call { callee, args } => (callee.as_ref(), &args[..]),
@@ -623,7 +623,7 @@ fn light_names(f: &Function) -> Option<HashSet<VarId>> {
     Some(HashSet::from([binder.var]))
 }
 
-/// A bit array format (§8.2).
+/// A bit array format.
 enum Fmt<'e> {
     Int {
         signed: bool,
@@ -766,7 +766,7 @@ pub(crate) fn lower_tests_numeric(
         }
         match stub {
             Ok(stub) => {
-                // §2.6.2: a synchronous export may not be async.
+                // A synchronous export may not be async.
                 let synchronous = graph.root.is_some_and(|root| {
                     graph.packages[root].wasm_synchronous.iter().any(|e| {
                         e.module == program.module(entry.module).path
@@ -870,7 +870,7 @@ pub(crate) fn lower_selected_numeric(
 
 struct Lowerer<'a> {
     graph: &'a PackageGraph,
-    /// The entry stub of each entry (syntax-3 §2.10.11).
+    /// The entry stub of each entry.
     stubs: std::collections::BTreeMap<DefId, Stub>,
     program: &'a hir::Program,
     typed: &'a Typed,
@@ -894,14 +894,14 @@ struct Lowerer<'a> {
     site_map: HashMap<SitePos, Site>,
     module_index: HashMap<ModuleId, u32>,
     lines: HashMap<ModuleId, LineIndex<'a>>,
-    /// The service id of each service type constructor (§9.2).
+    /// The service id of each service type constructor.
     services: HashMap<TypeRef, u32>,
-    /// The function that calls each import with its declared result decoder (B.4).
+    /// The function that calls each import with its declared result decoder.
     import_funcs: HashMap<(ImportId, AbiType), FuncId>,
     /// Where each import is declared first, by its index in `out.imports`.
     import_sites: Vec<(ModuleId, Span)>,
     bindings: Vec<serde_json::Value>,
-    /// The function of each external function outside the library (§10.1),
+    /// The function of each external function outside the library,
     /// or `None` when it has a problem, which is told one time.
     external_funcs: HashMap<DefId, Option<FuncId>>,
     /// The content hash of each package that declares an import, computed
@@ -982,7 +982,7 @@ impl<'a> Lowerer<'a> {
 
     /// One dense id for each service type constructor of the program:
     /// `Assert` first, then the types of the environment parameters and
-    /// statements (§9.2), with ordinary types before host types.
+    /// statements, with ordinary types before host types.
     fn number_services(&mut self) {
         let prelude = self.program.prelude;
         let assert = self
@@ -1052,7 +1052,7 @@ impl<'a> Lowerer<'a> {
     }
 
     /// The packages that are compiled: the library, the compiled package,
-    /// and what it uses; its dev-dependencies only with the tests (§2.6).
+    /// and what it uses; its dev-dependencies only with the tests.
     fn find_packages(&mut self) {
         let g = self.graph;
         self.packages.insert(g.library);
@@ -1186,7 +1186,7 @@ impl<'a> Lowerer<'a> {
 
     /// Records that the function of the group closure `value` has a shape
     /// with labels, so that its closure shows its labels (field 2 of
-    /// `$clo{n}`, syntax-3.md §6.4). The value is a constant closure or the
+    /// `$clo{n}`). The value is a constant closure or the
     /// closure just made.
     fn label_shape(&mut self, out: &[Stmt], value: &Atom, id: ShapeId) {
         let func = match value {
@@ -1264,7 +1264,8 @@ impl<'a> Lowerer<'a> {
             }
         }
         // Tool builds retain only externals reachable from their selected root
-        // or from required initializers; ordinary builds retain §10.1 imports.
+        // or from required initializers; ordinary builds retain the imports of every
+        // external function.
         let reachable = self.selected.as_ref().map(|(d, _)| self.tool_reachable(*d));
         for (mi, m) in self.program.modules.iter().enumerate() {
             let mid = ModuleId(mi as u32);
@@ -1372,7 +1373,9 @@ impl<'a> Lowerer<'a> {
         seen
     }
 
-    /// `ilang_start`: the top-level values, in the order of §2.5.
+    /// `ilang_start`: the top-level values, each module after the modules it
+    /// imports, and in a module the first binding of the source whose dependencies
+    /// are worked out comes next.
     fn start(&mut self) {
         let mut fx = Fx::new(ModuleId(0), false);
         let mut out = Vec::new();
@@ -1428,8 +1431,8 @@ impl<'a> Lowerer<'a> {
         g
     }
 
-    /// The program entry, the tests, and the host exports (§10.2, B.5),
-    /// and the host services that they need (§9.7).
+    /// The program entry, the tests, and the host exports,
+    /// and the host services that they need.
     fn entries(&mut self) {
         let program = self.program;
         let mut entry = None;
@@ -1546,7 +1549,7 @@ impl<'a> Lowerer<'a> {
         );
     }
 
-    /// The entry stub (syntax-3 §2.10.11): the platform's host services in
+    /// The entry stub: the platform's host services in
     /// the environment, then `Root`, `Owner` and `Await` of the request root
     /// when the entry needs one of them or tasks, and `task.run` around the
     /// entry when it needs `Runner` or `Scheduler`.
@@ -1571,7 +1574,7 @@ impl<'a> Lowerer<'a> {
         );
         // The completion catch supplies Fail before this stub runs. Keep it
         // while installing the platform services so an ordinary error reaches
-        // provider_finish and ends the entry's request context (§9.3, §10.2).
+        // provider_finish and ends the entry's request context.
         let mut env = Env::Param;
         for &t in &stub.hosts {
             let slot = self.services[&TypeRef::Custom(t)];
@@ -1840,12 +1843,12 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Whether a host service is async in the module: on the WASI target
-    /// every host function is a blocking call (B.7).
+    /// every host function is a blocking call.
     fn host_is_async(&self, host: &hir::Host) -> bool {
         host.is_async && self.options.target != ir::Target::Wasi
     }
 
-    /// The body of an async entry point inside its root boundary (B.5): a
+    /// The body of an async entry point inside its root boundary: a
     /// function of the boundary, whose captures are the arguments.
     fn async_body(&mut self, callee: &Callee, n: u32) -> FuncId {
         let mut body = Vec::new();
@@ -1874,7 +1877,7 @@ impl<'a> Lowerer<'a> {
         f
     }
 
-    /// A host service in the environment of an entry point (§9.7): one
+    /// A host service in the environment of an entry point: one
     /// import for each field, and a descriptor for the entry's provider leaf.
     fn host_service(&mut self, t: TypeId) {
         if self
@@ -1958,7 +1961,7 @@ impl<'a> Lowerer<'a> {
         });
     }
 
-    /// The function of an external function outside the library (§10.1),
+    /// The function of an external function outside the library,
     /// which calls its import.
     fn external_func(&mut self, d: DefId) -> Option<FuncId> {
         if let Some(&f) = self.external_funcs.get(&d) {
@@ -1995,7 +1998,7 @@ impl<'a> Lowerer<'a> {
             &def.name,
         ) {
             Ok(import) => {
-                // §11.4: each declaration is one value, so two declarations
+                // Each declaration is one value, so two declarations
                 // of one import have two functions, which call the same
                 // import.
                 Some(self.make_import_func(import, abi_type(hf.result)))
@@ -2007,7 +2010,7 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// The import with this module and name (B.4), declared at `site`.
+    /// The import with this module and name, declared at `site`.
     /// One import may be declared more than once, with one type. A problem
     /// is told at `site`, or, when two declarations do not agree and
     /// `site` is in the library, at the other declaration, which the
@@ -2105,7 +2108,7 @@ impl<'a> Lowerer<'a> {
             .position(|x| x.module == module && x.name == name)
         {
             let x = &self.out.imports[i];
-            // B.4 coalesces wire signatures. The calling declaration keeps
+            // Wire signatures are coalesced. The calling declaration keeps
             // its own nominal result decoder in HostCall or HostStart.
             if names(&x.abi.params) == names(&abi.params)
                 && x.abi.result.name() == abi.result.name()
@@ -2142,8 +2145,8 @@ impl<'a> Lowerer<'a> {
     }
 
     /// The function that calls an import: its parameters go to the host
-    /// encoded as in B.2, and its value or error comes back. An async
-    /// import waits for the host at the root boundary (B.4, B.5).
+    /// encoded in wire order, and its value or error comes back. An async
+    /// import waits for the host at the root boundary.
     fn import_func(&mut self, import: ImportId, result: HostType) -> FuncId {
         let result = abi_type(result);
         if let Some(&f) = self.import_funcs.get(&(import, result)) {
@@ -2407,7 +2410,7 @@ impl<'a> Lowerer<'a> {
                 site: None,
             });
         }
-        // Environment parameters are not parameters of the type (§6.6):
+        // Environment parameters are not parameters of the type:
         // the parameters of the code are the patterns, in order.
         let mut next = 0;
         for p in &f.params {
@@ -2485,7 +2488,7 @@ impl<'a> Lowerer<'a> {
 
     // ---- Sites ----
 
-    /// The site of the expression that starts at `offset` (§11.7). Library
+    /// The site of the expression that starts at `offset`. Library
     /// code is not program source, so it has none.
     fn site(&mut self, fx: &Fx, offset: u32) -> Option<Site> {
         if fx.library {
@@ -2804,7 +2807,7 @@ impl<'a> Lowerer<'a> {
                 // An expected type chose one shape group: the value is that
                 // group's function.
                 Some(i) => self.expr(fx, out, &groups[*i as usize].value),
-                // A multi-shape value (syntax-3.md §6.4): the closure of
+                // A multi-shape value: the closure of
                 // each group with the run-time id of its shape.
                 None => {
                     let parts = groups
@@ -2827,7 +2830,7 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ExprKind::Record { base, fields } => {
-                // syntax-3 §6.4: the items are worked out in written order,
+                // The items are worked out in written order,
                 // the spread base first; the data has its parts in canonical
                 // order.
                 let (shape, base_shape) = self.typed.data_shapes[&(fx.module, e.span)];
@@ -2960,8 +2963,8 @@ impl<'a> Lowerer<'a> {
         finish(out, tail, a)
     }
 
-    /// A block (§6.10). An environment statement changes the environment
-    /// for the rest of its block only (§9.2).
+    /// A block. An environment statement changes the environment
+    /// for the rest of its block only.
     fn block(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Block, tail: bool) -> Option<Atom> {
         let outer = fx.env;
         let a = self.statements(fx, out, b, tail);
@@ -2990,7 +2993,7 @@ impl<'a> Lowerer<'a> {
                         continue;
                     }
                     // The value uses the environment from outside the
-                    // statement (§4.8 rule 9).
+                    // statement.
                     let v = self.expr(fx, out, value);
                     if let Some(supply) = self.typed.env_supplies.get(&(fx.module, *span)) {
                         let mut entries: Vec<(u32, Value)> = match supply {
@@ -3036,11 +3039,11 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
-        // A block always ends with an expression (§6.10).
+        // A block always ends with an expression.
         finish(out, tail, Atom::Nil)
     }
 
-    /// A binding in a block (§6.10). The names of a direct value may be used
+    /// A binding in a block. The names of a direct value may be used
     /// in the function bodies of the value: those closures are made first and
     /// their captures are filled when the names are bound.
     fn binding(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, b: &Binding) {
@@ -3069,8 +3072,8 @@ impl<'a> Lowerer<'a> {
 
     /// `control.boundary(f)` where `f` is a function literal whose parameter
     /// is used only as the first argument of `control.escape`, directly or
-    /// in function literals inside it: a light boundary (syntax-3 §2.10.7,
-    /// O30). The decision is read from the program's shape only. Its handle
+    /// in function literals inside it. The decision uses only the program's
+    /// shape. Its handle
     /// is never suspended on, stored, or given elsewhere, so the boundary
     /// needs no continuation of its own; `f` is lifted to code that takes
     /// its captures as parameters, so no closure is made for it. `None` when
@@ -3365,7 +3368,7 @@ impl<'a> Lowerer<'a> {
         Atom::Local(dst)
     }
 
-    /// `v.f` (§6.7): the constructor of the value picks the field.
+    /// `v.f`: the constructor of the value picks the field.
     fn field(
         &mut self,
         fx: &mut Fx,
@@ -3419,7 +3422,7 @@ impl<'a> Lowerer<'a> {
         tail: bool,
     ) -> Option<Atom> {
         if op == BinOp::Pipe {
-            // `a |> f` is `f(a)`, and `a |> f(b)` is `f(a, b)` (§6.9).
+            // `a |> f` is `f(a)`, and `a |> f(b)` is `f(a, b)`.
             return match &rhs.kind {
                 ExprKind::Call { callee, args } if args.iter().any(|a| a.label.is_some()) => {
                     self.labelled_call(fx, out, e.span, callee, Some(lhs), args, tail)
@@ -3432,7 +3435,7 @@ impl<'a> Lowerer<'a> {
             };
         }
         if matches!(op, BinOp::And | BinOp::Or) && tail {
-            // The right side is in tail position (§11.6).
+            // The right side is in tail position.
             let a = self.expr(fx, out, lhs);
             let mut right = Vec::new();
             self.lower(fx, &mut right, rhs, true);
@@ -3515,7 +3518,7 @@ impl<'a> Lowerer<'a> {
     fn target(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, callee: &Expr) -> Target {
         match &callee.kind {
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
-                // §10.1: a call of an external function is done when it is
+                // A call of an external function is done when it is
                 // reached, like all calls.
                 DefKind::External { ref module, .. }
                     if !self.is_library(d.module) || !module.starts_with("ilang:") =>
@@ -3544,8 +3547,8 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// A call with labelled arguments of a function value (syntax-3.md
-    /// §6.4): the arguments are worked out as written, then passed in the
+    /// A call with labelled arguments of a function value: the arguments are
+    /// worked out as written, then passed in the
     /// canonical order of their shape (positions, then labels in UTF-8
     /// order), and a multi-shape value dispatches on that shape. Any other
     /// callee is called as `call` does.
@@ -3606,8 +3609,8 @@ impl<'a> Lowerer<'a> {
         self.finish_call(fx, out, span, target, all, tail)
     }
 
-    /// A call (§6.6), or `a |> f(…)` with `a` as `first`. The function is
-    /// worked out first, then the arguments as they are written (§6.2); for
+    /// A call, or `a |> f(…)` with `a` as `first`. The function is
+    /// worked out first, then the arguments as they are written; for
     /// `|>`, `a` comes before both.
     #[allow(clippy::too_many_arguments)]
     fn call(
@@ -3692,7 +3695,7 @@ impl<'a> Lowerer<'a> {
                 // Operations of the runtime are not Wasm tail calls: those
                 // that call i code take errors there, or run final
                 // functions. But a call of a library function in tail
-                // position counts as a tail call (§11.7): its position is
+                // position counts as a tail call: its position is
                 // a tail site.
                 let site = self
                     .site(fx, span.start)
@@ -3708,7 +3711,7 @@ impl<'a> Lowerer<'a> {
             Target::Callee(callee) => {
                 let env = fx.env;
                 if tail {
-                    // §11.7: the position of a call in tail position is
+                    // The position of a call in tail position is
                     // given when the stop comes before the callee works out
                     // an expression of the program source.
                     let site = self.site(fx, span.start).map(|s| s | TAIL_SITE);
@@ -3727,7 +3730,7 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    // ---- Bit arrays (§8.3) ----
+    // ---- Bit arrays ----
 
     fn bit_array(
         &mut self,
@@ -3836,7 +3839,7 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    // ---- case (§6.12) ----
+    // ---- case ----
 
     fn case(
         &mut self,
@@ -3919,13 +3922,13 @@ impl<'a> Lowerer<'a> {
                 self.assert_failure(fx, &mut body, span, s, span.start);
             }
         }
-        // The clauses cover every value (§7.4).
+        // The clauses cover every value.
         body.push(Stmt::Unreachable);
         out.push(Stmt::Block { label: end, body });
         dst.map(Atom::Local)
     }
 
-    // ---- Patterns (§7) ----
+    // ---- Patterns ----
 
     fn bind_var(fx: &mut Fx, out: &mut Vec<Stmt>, b: &Binder, v: Atom) {
         let l = fx.var(b.var);
@@ -3937,7 +3940,7 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Matches `v` with the pattern of a `case` clause, and leaves to `fail`
-    /// when it does not match (§7.2).
+    /// when it does not match.
     fn pattern(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, fail: Label) {
         match &p.kind {
             PatternKind::Quote {
@@ -4100,7 +4103,7 @@ impl<'a> Lowerer<'a> {
         let_value(fx, out, value, self.site(fx, span.start))
     }
 
-    /// The test of a type test `x: T` for one member of `T` (§7.1).
+    /// The test of a type test `x: T` for one member of `T`.
     fn test_cond(&self, v: Atom, member: &TestMember) -> Cond {
         let values = match &member.values {
             TestValues::All => return self.head_cond(v, member.head),
@@ -4172,7 +4175,7 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// §8.4: the segments are matched from the start, and all the bits must
+    /// The segments are matched from the start, and all the bits must
     /// be used.
     fn bits_pattern(
         &mut self,
@@ -4364,7 +4367,7 @@ impl<'a> Lowerer<'a> {
     }
 
     /// The parts of a constructor pattern and the fields they are matched
-    /// to (§7.1), as the checker found them.
+    /// to, as the checker found them.
     fn fields_of<'p>(&self, fx: &Fx, p: &Pattern, args: &'p [Pattern]) -> Vec<(&'p Pattern, u32)> {
         let indices = self
             .typed
@@ -4397,9 +4400,9 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// Binds the pattern of a binding or a parameter (§6.10, §6.11). When
+    /// Binds the pattern of a binding or a parameter. When
     /// it may fail, a value that does not match is reported to `Assert`:
-    /// `a.fail(AssertionFailure(m))`, with the message of §6.10 and the
+    /// `a.fail(AssertionFailure(m))`, with the message `m` of the binding and the
     /// position `at` on the shadow stack.
     fn bind_checked(&mut self, fx: &mut Fx, out: &mut Vec<Stmt>, p: &Pattern, v: Atom, at: u32) {
         let fails = self
@@ -4424,7 +4427,7 @@ impl<'a> Lowerer<'a> {
         if fails {
             self.assert_failure(fx, &mut body, p.span, v, at);
         }
-        // `fail` never gives a value (§9.6); a pattern that can not fail
+        // `fail` never gives a value; a pattern that can not fail
         // always matches.
         body.push(Stmt::Unreachable);
         out.push(Stmt::Block { label: ok, body });
@@ -4437,7 +4440,7 @@ impl<'a> Lowerer<'a> {
         let source = text
             .get(span.start as usize..span.end as usize)
             .unwrap_or("");
-        // §1.1: `\r\n` and `\r` are the same as `\n`.
+        // `\r\n` and `\r` are the same as `\n`.
         let source = source.replace("\r\n", "\n").replace('\r', "\n");
         let prefix = Atom::String(format!("pattern {source} did not match "));
         let shown = let_value(
@@ -4519,7 +4522,7 @@ impl<'a> Lowerer<'a> {
     }
 }
 
-/// The ABI type of a type that the host can take (§10.3, B.2). `Never`
+/// The ABI type of a type that the host can take. `Never`
 /// has no values, so it is passed as nothing, like `Nil`.
 fn abi_type(t: HostType) -> AbiType {
     match t {
@@ -4533,16 +4536,16 @@ fn abi_type(t: HostType) -> AbiType {
     }
 }
 
-/// The standard service (§9.7): the type `Io` of the library module
-/// `i/io`. No other package may have a module path that starts with `i/`
-/// (§2.1), so this is that type and no other. A host service declared
+/// The standard service: the type `Io` of the library module
+/// `i/io`. No other package may have a module path that starts with `i/`,
+/// so this is that type and no other. A host service declared
 /// elsewhere with the namespace `i:io/v1` is a normal host service.
 fn is_standard_service(program: &hir::Program, t: TypeId) -> bool {
     let def = program.ty(t);
     def.name == "Io" && program.module(def.module).path == "i/io"
 }
 
-/// The parts of B.2 of a function at the host boundary.
+/// The host signature must preserve wire order and result tags.
 fn host_abi(f: &ilang_check::hir::HostFn) -> ExportAbi {
     ExportAbi {
         params: f.params.iter().map(|t| abi_type(*t)).collect(),
@@ -4555,7 +4558,7 @@ fn names(ts: &[AbiType]) -> Vec<&'static str> {
     ts.iter().map(|t| t.name()).collect()
 }
 
-/// The `ilang.abi` metadata (B.6).
+/// The `ilang.abi` metadata.
 fn abi_json(
     target: ir::Target,
     entry: Option<(String, bool)>,
@@ -4587,7 +4590,7 @@ fn abi_json(
     let mut externals = serde_json::Map::new();
     for x in imports {
         let (table, sig) = match x.kind {
-            // The module gives it itself (B.7).
+            // The module gives it itself.
             ImportKind::WasiStdout | ImportKind::WasiAdapter => continue,
             ImportKind::External => (
                 &mut externals,
@@ -4622,7 +4625,7 @@ fn abi_json(
         "services": services,
         "externals": externals,
     });
-    // Only a module of the WASI target says its target (B.6, B.7).
+    // Only a module of the WASI target says its target.
     if target == ir::Target::Wasi {
         abi["target"] = target.name().into();
     }

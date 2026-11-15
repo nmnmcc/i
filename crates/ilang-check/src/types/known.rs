@@ -1,4 +1,4 @@
-//! Known facts, structural access hints and expected types (§4.8).
+//! Known facts, structural access hints and expected types.
 //!
 //! A known type is found from what is written, by a walk over the
 //! expression that goes with inference, in its order: groups in the order
@@ -62,10 +62,10 @@ impl Knowledge {
     }
 }
 
-/// The types each type variable gets by matching (§4.8).
+/// The types each type variable gets by matching.
 pub(super) type Sigma = HashMap<V, Vec<Ty>>;
 
-/// The members of a known type (§4.4): a difference is replaced by its
+/// The members of a known type: a difference is replaced by its
 /// members, and an intersection `a & T` by `T`.
 pub(super) fn members(k: &Ty) -> Vec<Ty> {
     match k {
@@ -120,7 +120,7 @@ pub(super) fn member(k: &Ty, h: Option<Head>) -> Option<Ty> {
     members(k).into_iter().find(|m| m.head() == Some(h))
 }
 
-/// The one member of `k` with the type constructor `h` (§4.8, names in
+/// The one member of `k` with the type constructor `h` (for names in
 /// patterns): `None` when there is not exactly one.
 pub(super) fn one_member(k: &Ty, h: Head) -> Option<Ty> {
     let mut it = members(k).into_iter().filter(|m| m.head() == Some(h));
@@ -136,7 +136,7 @@ pub(super) fn one_fn(k: &Ty) -> Option<FnTy> {
     }
 }
 
-/// §6.9: two known types are disjoint (§4.5 rule 3) when every member of
+/// Two known types are disjoint when every member of
 /// one has a different type constructor from every member of the other. A
 /// member that is `_` or a type variable is never disjoint.
 pub(super) fn disjoint(x: &Ty, y: &Ty) -> bool {
@@ -163,7 +163,7 @@ pub(super) fn top_written(mut q: &Pattern) -> Option<&Type> {
 
 /// An argument that is a function expression with a parameter that has no
 /// type written at its top: it is left out of the matching that gives the
-/// expected types of the other arguments (§4.8).
+/// expected types of the other arguments.
 pub(super) fn open_fn(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Fn(f) => f.params.iter().any(|p| match p {
@@ -334,7 +334,7 @@ impl Checker<'_> {
         }
     }
 
-    /// A constructor has its function type, with the field labels (§4.8);
+    /// A constructor has its function type, with the field labels;
     /// with no fields, it is a value of its type.
     pub fn ctor_known(&mut self, c: CtorRef) -> Ty {
         let def = self.p.ty(c.ty);
@@ -343,13 +343,13 @@ impl Checker<'_> {
             return Ty::Top;
         };
         let n = ctors[c.index as usize].fields.len();
-        // `∀a. …`: the variables are generalized (§4.8).
+        // `∀a. …`: the variables are generalized.
         for v in &vars {
             self.note_general(v);
         }
         let ret = Ty::named(TypeRef::Custom(c.ty), vars.clone());
         if n == 0 {
-            // `∀a. T(a)`, in its simpler form (§4.7): a parameter that goes
+            // `∀a. T(a)`, in its simpler form: a parameter that goes
             // in the same direction is `Never`.
             let vs = self
                 .s
@@ -374,7 +374,7 @@ impl Checker<'_> {
         Ty::Fn(Box::new(FnTy::new(params, ret, Ty::Never)))
     }
 
-    /// A known type as an upper bound for inference (§4.8 rule 13: the type
+    /// A known type as an upper bound for inference (the type
     /// of `v` is a subtype of its known type). Its parts that are `_` or
     /// type variables are new type variables, because a known type takes
     /// no part in constraints.
@@ -421,7 +421,7 @@ impl Checker<'_> {
 
     /// Notes the type variables of `t` as variables of a type scheme that
     /// are generalized: in a known type, they stand for any type, so they
-    /// match nothing (§4.8).
+    /// match nothing.
     pub fn note_general(&mut self, t: &Ty) {
         match t {
             Ty::Var(v) => {
@@ -449,7 +449,7 @@ impl Checker<'_> {
     }
 
     /// The known type of a name with the type scheme `t`, whose variables
-    /// deeper than `level` are generalized (§4.8): the scheme in its simpler
+    /// deeper than `level` are generalized: the scheme in its simpler
     /// form, where a variable that is not generalized is replaced by the
     /// matching part of `value`, the known type of the value of the
     /// binding, or else by `_`.
@@ -477,7 +477,7 @@ impl Checker<'_> {
         self.ksubst(&simple, &sigma, true).unwrap_or(Ty::Top)
     }
 
-    /// The known type of a name of another module (§4.8): its type scheme,
+    /// The known type of a name of another module: its type scheme,
     /// in its simpler form.
     pub fn other_known(&mut self, t: &Ty) -> Ty {
         let k = display::known_shown(&self.s, t);
@@ -485,7 +485,7 @@ impl Checker<'_> {
         k
     }
 
-    /// Matches a type `p` with a known type `k` (§4.8), adding to `sigma`
+    /// Matches a type `p` with a known type `k`, adding to `sigma`
     /// the types its type variables get. `_` in `k`, and a type variable
     /// that is generalized in `k`, match nothing.
     pub fn match_k(&self, p: &Ty, k: &Ty, sigma: &mut Sigma, depth: u32) {
@@ -569,8 +569,8 @@ impl Checker<'_> {
     }
 
     /// The known type of a call of a function with the known type `f`, with
-    /// arguments of the known types `args`, in the order of the parameters
-    /// (§4.8): every type variable of its result gets a type by matching.
+    /// arguments of the known types `args`, in the order of the parameters:
+    /// every type variable of its result gets a type by matching.
     pub fn call_known(&self, f: &Knowledge, args: &[Knowledge]) -> Knowledge {
         let hints: Vec<_> = args.iter().map(|k| k.hint.clone()).collect();
         let facts: Vec<_> = args.iter().map(|k| k.fact.clone()).collect();
@@ -608,7 +608,7 @@ impl Checker<'_> {
 
     /// The known type that `x` gets in `x = q`, when the value has the
     /// known type `b`: the member of `b` with the type constructor of the
-    /// pattern type of `q`, or what is written in `q` (§4.8).
+    /// pattern type of `q`, or what is written in `q`.
     pub fn member_for(&self, q: &Pattern, b: &Knowledge) -> Knowledge {
         b.map(|t| self.member_for_ty(q, t))
     }
@@ -636,7 +636,7 @@ impl Checker<'_> {
         }
     }
 
-    /// Names in patterns (§4.8): when `q` is fitted to a value with the
+    /// Names in patterns: when `q` is fitted to a value with the
     /// known type `b`, its names get their known types. A catch-all gets
     /// `b`; any other pattern takes the member of `b` with its type
     /// constructor, and its parts get the parts of that member. `x: T` gets
@@ -746,7 +746,7 @@ impl Checker<'_> {
         }
     }
 
-    /// What is written in a value, as a known type (§4.8): the known type
+    /// What is written in a value, as a known type: the known type
     /// of a name inside the value of its own binding, and of a top-level
     /// name of the same group. The body of a function is not looked at.
     pub fn written_known(&self, e: &Expr) -> Ty {
@@ -804,7 +804,7 @@ impl Checker<'_> {
         values.pop().expect("written known type produced no result")
     }
 
-    /// The known type of a function expression (§4.8): its labels; for each
+    /// The known type of a function expression: its labels; for each
     /// parameter, the type written at its top, or else the one from the
     /// expected type in `expected`, or else `_`; and the written `->` part,
     /// or else `body`.
@@ -852,7 +852,7 @@ impl Checker<'_> {
     }
 
     /// The known types of the names of a binding inside its own value, and
-    /// of a top-level binding inside its group (§4.8): from `x: T` at the
+    /// of a top-level binding inside its group: from `x: T` at the
     /// top of the pattern, or else from what is written in the value.
     pub fn own_known(&mut self, b: &Binding) {
         let k = match top_written(&b.pattern) {
@@ -862,7 +862,7 @@ impl Checker<'_> {
         self.fit_known(&b.pattern, &Knowledge::certain(k), false);
     }
 
-    /// The expected type of the value of a binding (§4.8): `T` when the
+    /// The expected type of the value of a binding: `T` when the
     /// pattern has `x: T` at its top.
     pub fn binding_expected(&self, b: &Binding) -> Knowledge {
         Knowledge::certain(
@@ -898,7 +898,7 @@ fn ty_vars(t: &Ty, out: &mut Vec<V>) {
     }
 }
 
-/// §8.2: the type of the value of a segment with the format `name`, when
+/// The type of the value of a segment with the format `name`, when
 /// there is such a format.
 pub(super) fn format_prim(name: &str) -> Option<BuiltinType> {
     let int = |s: &str| {
@@ -934,7 +934,7 @@ pub(super) fn format_prim(name: &str) -> Option<BuiltinType> {
     })
 }
 
-/// Widen known literal facts only in covariant parts (literal-types decision 7).
+/// Only covariant facts may widen without changing callback requirements.
 pub(super) fn whole_lits(s: &super::solve::Solver, t: &Ty) -> Ty {
     match t {
         Ty::Never => Ty::Top,
@@ -1102,7 +1102,7 @@ mod literal_known_tests {
 
     #[test]
     fn hidden_inputs_and_recursive_widening() {
-        // decision 7: callback outputs and environments, not callback inputs.
+        // Hidden callback outputs and needs may widen; input requirements must stay exact.
         let s = super::super::solve::Solver::new(Default::default(), Vec::new());
         let f = FnTy::new(
             vec![(

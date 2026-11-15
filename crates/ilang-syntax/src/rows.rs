@@ -1,18 +1,15 @@
-//! The Lisp surface of syntax three (docs/design/syntax-3.md §6.8, with the
-//! services forms): the tree to Lisp text, and Lisp datums to the tree.
-//!
-//! Rows that §6.8 does not list are those of meta.md §2.3. The services
-//! forms are: a function type `(-> P (<- R S))`, a function head
-//! `(-> (, p…) (<- R (, (: db Db) Log .. N)) body)` with `_` for no result,
-//! type parameters as a leading Square, `(-> [A N] (, x) R e)`, and the
-//! provide `(<- e s)`.
+//! Lisp datums and source nodes share one encoding, so macro input and the
+//! Lisp printer agree. Services use `(-> P (<- R S))` in types and
+//! `(-> (, p…) (<- R (, (: db Db) Log .. N)) body)` in function heads, with
+//! `_` for no written result. Type parameters are a leading Square, as in
+//! `(-> [A N] (, x) R e)`, and provision is `(<- e s)`.
 
 use super::ast::*;
 use crate::lisp::{Datum, DatumKind as K, show};
 use crate::span::Span;
 use crate::{Code, Diagnostic};
 
-/// Readers of one datum by the positions of `i/syntax` (§6.7).
+/// Readers of one datum by the positions of `i/syntax`.
 pub mod position;
 
 // ---- The tree as Lisp datums ----
@@ -230,7 +227,7 @@ pub fn to_lisp(m: &Module) -> String {
     }
 }
 
-/// An item as a datum of the rows of §6.8.
+/// An item as a datum of the source rows.
 pub fn item_datum(item: &Item) -> Datum {
     let span = item.span.0;
     let mut out = match &item.kind {
@@ -322,7 +319,7 @@ fn generics(gs: &[Ident]) -> Option<Datum> {
     ))
 }
 
-/// A type as a datum of the rows of §6.8.
+/// A type as a datum of the source rows.
 pub fn type_datum(t: &Type) -> Datum {
     typ(t)
 }
@@ -493,7 +490,7 @@ fn block(b: &Block) -> Datum {
     )
 }
 
-/// An expression as a datum of the rows of §6.8.
+/// An expression as a datum of the source rows.
 pub fn expr_datum(e: &Expr) -> Datum {
     expr(e)
 }
@@ -558,7 +555,7 @@ fn expr(e: &Expr) -> Datum {
             span,
             [
                 expr(target),
-                // Preserve the transition tree's index span so existing
+                // Preserve the HIR input representation's index span so existing
                 // diagnostics keep their location during the rows flip.
                 at(
                     K::Int(index.clone()),
@@ -614,7 +611,7 @@ fn dpitems(items: &[DPItem], span: Span) -> Vec<Datum> {
         .collect()
 }
 
-/// A pattern as a datum of the rows of §6.8.
+/// A pattern as a datum of the source rows.
 pub fn pattern_datum(p: &Pattern) -> Datum {
     pattern(p)
 }
@@ -710,7 +707,7 @@ fn err<X>(d: &Datum, msg: impl Into<String>) -> R<X> {
     Err(Diagnostic::new(Code::Unexpected, d.span, msg))
 }
 
-/// Reads a syntax-three Lisp file.
+/// Reads a current Lisp file.
 pub fn from_lisp(source: &str) -> (Module, Vec<Diagnostic>) {
     let document = match crate::lisp::parse3(source) {
         Ok(d) => d,
@@ -1294,7 +1291,7 @@ fn pitem_of(d: &Datum) -> R<PItem> {
     if let Some(parts) = round(d, "=")
         && let Some(K::Name(_)) = parts.first().map(|p| &p.kind)
     {
-        // P7: a key item.
+        // a key item.
         let key = lower(&parts[0])?;
         let choices = match &parts[1..] {
             [] => return err(d, "a key item `(= key p)` has a pattern"),
@@ -1542,7 +1539,7 @@ fn dpitems_of(parts: &[Datum]) -> R<Vec<DPItem>> {
         }
         match round(d, "=") {
             Some(ps) if matches!(ps.first().map(|p| &p.kind), Some(K::Name(_))) => {
-                // P7: a key item.
+                // a key item.
                 let key = lower(&ps[0])?;
                 let pattern = match &ps[1..] {
                     [] => return err(d, "a key item `(= key p)` has a pattern"),
@@ -1586,8 +1583,8 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
             name: upper(d)?,
             args: None,
         },
-        // Step 2c: `read_pattern(d)?`, when the lowering no longer checks the
-        // quote in the rows before syntax three.
+        // Keep unread quotes intact so validation can report their original
+        // source rather than an incomplete capture pattern.
         K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),
         K::Square(parts) => {
             let mut items = Vec::new();

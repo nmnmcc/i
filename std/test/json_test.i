@@ -890,8 +890,8 @@ test("json_arbitrary_integer", () {
 	assert(json.print(value) == text)
 })
 
-// E4: successful operations return values, and the same parse error is data
-// only after catch (syntax-3 §2.10.6, Library style).
+// successful operations return values, and the same parse error is data
+// only after catch.
 test("e4_json_parse_fail", () {
 	assert(json.parse("null") == json.Null)
 	assert(

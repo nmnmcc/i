@@ -669,7 +669,7 @@ test("budget_prefixes_and_discarded_children", () {
 	Ok(ints) = fail.catch(() { property.int(0, 10) })
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
-	// P7 also counts Discard; it never descends into that child.
+	// The search also counts Discard; it never descends into that child.
 	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
 			(True) { property.Fail(core.inspect(x)) }

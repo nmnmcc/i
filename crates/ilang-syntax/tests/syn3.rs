@@ -1,6 +1,5 @@
-//! Syntax three (docs/design/syntax-3.md §2, §3, §6.8, with the services
-//! amendment): each production and each rule P1 to P13, the examples of the
-//! note, and the examples of the services proposal.
+//! Grammar round trips must preserve source structure, including service
+//! patterns, branch chains and the equivalent Lisp forms.
 
 #[path = "oracle.rs"]
 mod ilang_syntax;
@@ -75,7 +74,7 @@ fn lisp_of(source: &str) -> String {
     lisp::to_lisp(&ok(source)).trim_end().to_string()
 }
 
-// ---- §3.1 Types ----
+// ---- Types ----
 
 #[test]
 fn types() {
@@ -137,7 +136,7 @@ fn service_types() {
 #[test]
 fn removed_error_channel_has_its_diagnostic() {
     // Keep main's P0 diagnostic for the already-invalid surface spelling;
-    // E3 removes the internal channel without changing this error.
+    // This error is independent of how the need row represents Fail.
     let source = "f: (Int) -> Int ^ String\n";
     let caret = source.find('^').unwrap() as u32;
     let (_, diags) = syn3::parse_module(source);
@@ -159,22 +158,22 @@ fn removed_error_channel_has_its_diagnostic() {
 
 #[test]
 fn type_errors() {
-    // P10: `:` inside a type.
+    // `:` inside a type.
     bad("f : (a : Int) -> Int", "`:` is not written in a type");
     bad("T = (name : String)", "`:` is not written in a type");
-    // P0: `^` and `!` alone are no symbols.
+    // `^` and `!` alone are no symbols.
     bad("f : (Int) -> Int ^ E", "`^` is not a symbol of i");
     bad("f : (Int) -> Int ! Log", "`!` is not a symbol of i");
     ok("x = a != b\n");
     bad("f : (..N) -> Int", "a data type has no spread");
-    // §2.3: a positional item may not follow a labelled item.
+    // A positional item may not follow a labelled item.
     bad(
         "f : (port = Int, String) -> Conn",
         "by position may not come after",
     );
 }
 
-// ---- §3.2 Items and type definitions ----
+// ---- Items and type definitions ----
 
 #[test]
 fn type_definitions() {
@@ -189,15 +188,15 @@ fn type_definitions() {
             _ => unreachable!(),
         })
         .collect();
-    // §2.8: the kind follows the outermost written form.
+    // The kind follows the outermost written form.
     assert!(matches!(kinds[0], TypeRhs::Data(items) if items.len() == 1));
     assert!(matches!(kinds[1], TypeRhs::Data(items) if items.is_empty()));
     assert!(matches!(kinds[2], TypeRhs::Data(items) if items.len() == 2));
     assert!(matches!(kinds[3], TypeRhs::Type(t) if matches!(t.kind, TypeKind::Union(_))));
     assert!(matches!(kinds[4], TypeRhs::Type(t) if matches!(t.kind, TypeKind::Named { .. })));
-    // G16: `{ (Int, Int) }` is a name, not a labelled type.
+    // `{ (Int, Int) }` is a name, not a labelled type.
     assert!(matches!(kinds[5], TypeRhs::Type(t) if matches!(t.kind, TypeKind::Data(_))));
-    // G17.
+
     assert!(matches!(kinds[6], TypeRhs::Type(t) if matches!(t.kind, TypeKind::Union(_))));
     assert!(matches!(kinds[7], TypeRhs::Type(t) if matches!(t.kind, TypeKind::Fn(_))));
     assert!(matches!(kinds[8], TypeRhs::Opaque));
@@ -237,7 +236,7 @@ fn header_items_declarations_attributes() {
     bad("x = 1\n(a, b)\n", "imports or the exports");
 }
 
-// ---- §3.3 Expressions ----
+// ---- Expressions ----
 
 #[test]
 fn data_values() {
@@ -263,7 +262,7 @@ fn data_values() {
     ] {
         assert_eq!(expr(e), e);
     }
-    // P3: `==` is one token, so the item is positional.
+    // `==` is one token, so the item is positional.
     assert!(matches!(
         syn3::parse_expr("(a == b)").unwrap().kind.clone(),
         ExprKind::Data(items) if matches!(items[0], DItem::Pos(_))
@@ -308,14 +307,14 @@ fn p1_function_or_data() {
     );
     assert_eq!(chain(&value("f = (n) { n + 1 }")).len(), 1);
     assert_eq!(chain(&value("f = () { clock.read() }")).len(), 1);
-    // G6, G27.
+
     assert!(matches!(value("f = (x) { y }").kind, ExprKind::Chain(_)));
     assert!(matches!(
         value("f = (x = 1) { 2 }").kind,
         ExprKind::Chain(_)
     ));
     assert!(matches!(value("f = (x = 1)").kind, ExprKind::Data(_)));
-    // G32: the outer `(` is data, the inner item a function.
+    // the outer `(` is data, the inner item a function.
     match value("p = ((a) { a }, 1)").kind.clone() {
         ExprKind::Data(items) => {
             assert!(matches!(&items[0], DItem::Pos(e) if matches!(e.kind, ExprKind::Chain(_))))
@@ -333,7 +332,7 @@ fn p1_function_or_data() {
 
 #[test]
 fn p2_call() {
-    // G7: `f(x) { … }` is a call and then a block statement.
+    // `f(x) { … }` is a call and then a block statement.
     let m = ok("g = () {\n\tf(x)\n\t{ 1 }\n}\n");
     let ItemKind::Bind(b) = &m.items[0].kind else {
         unreachable!()
@@ -355,32 +354,32 @@ fn p4_branch_join() {
         "gcd =\n\t(a : Int, 0) -> Int { a }\n\t| (a : Int, b : Int) -> Int { gcd(b, a % b) }\n",
     );
     assert_eq!(chain(&gcd).len(), 2);
-    // G1: the body's `{` ends the `->` part; `|` after `}` is a join.
+    // the body's `{` ends the `->` part; `|` after `}` is a join.
     assert_eq!(chain(&value("f = (p) -> A { e } | (q) { f }")).len(), 2);
-    // G2: a forgotten body gives one function whose result is a union.
+    // a forgotten body gives one function whose result is a union.
     let g2 = value("f = (a) -> Int | (b) -> Int { 1 }");
     let fs = chain(&g2);
     assert_eq!(fs.len(), 1);
     assert!(matches!(&fs[0].ret, Some(t) if matches!(t.kind, TypeKind::Union(_))));
-    // G33: the labelled item's value is a chain.
+    // the labelled item's value is a chain.
     match value("x = (f = (a) { a } | (b) { b })").kind.clone() {
         ExprKind::Data(items) => {
             assert!(matches!(&items[0], DItem::Label(_, e) if chain(e).len() == 2))
         }
         other => panic!("{other:?}"),
     }
-    // G35: the call applies to the whole chain.
+    // the call applies to the whole chain.
     match value("x = (a) { 1 } | (b) { 2 }(y)").kind.clone() {
         ExprKind::Call { callee, .. } => assert_eq!(chain(&callee).len(), 2),
         other => panic!("{other:?}"),
     }
-    // G9: an inner chain ends at the outer `}`.
+    // an inner chain ends at the outer `}`.
     let nested = value("f = (a) { a |> (1) { 2 } | (_) { 3 } } | (b, c) { 4 }");
     assert_eq!(chain(&nested).len(), 2);
-    // G22, D3.
+
     bad("h = f | g", "`|` joins only function literals");
     bad("h = (a) { 1 } | g", "`|` joins only function literals");
-    // Overloading by shape (§2.6).
+    // Overloading by shape.
     let show = value(
         "show =\n\t(n : Int) -> String { int.to_string(n) }\n\t| (s : String) -> Int { string.length(s) }\n\t| (a : Int, b : Int) -> Bool { a == b }\n\t| (host : String, port = p : Int) -> Conn { open(host, p) }\n",
     );
@@ -414,7 +413,7 @@ fn p6_statements() {
         },
         Stmt::Expr(_) => 0,
     };
-    // G38, G12, G30, G18, G11.
+
     assert_eq!(
         stmts.iter().map(parts).collect::<Vec<_>>(),
         [3, 2, 2, 1, 2, 0, 0, 1, 0]
@@ -451,12 +450,12 @@ fn p11_pipe() {
     ] {
         assert_eq!(expr(e), e);
     }
-    // G5.
+
     bad(
         "y = x |> g == 2",
         "the right side of `|>` must be a name, a call",
     );
-    // G4: the whole chain is the right operand.
+    // the whole chain is the right operand.
     match syn3::parse_expr("x |> (p) { e } | (q) { f }")
         .unwrap()
         .kind
@@ -480,11 +479,11 @@ fn p13_lines() {
         syn3::parse_expr("f(\n\ta\n\tb = 1\n)").unwrap(),
         syn3::parse_expr("f(a, b = 1)").unwrap()
     );
-    // G40.
+
     ok("sign = (-1) { \"neg\" }\n\t| (0) { \"zero\" }\n\t| (_) { \"pos\" }\n");
 }
 
-// ---- §3.4 Patterns ----
+// ---- Patterns ----
 
 #[test]
 fn patterns() {
@@ -527,7 +526,7 @@ fn patterns() {
     ] {
         assert_eq!(pat(p), p);
     }
-    // P7: inside a data pattern a leading `name =` is a key.
+    // inside a data pattern a leading `name =` is a key.
     match syn3::parse_pattern("(size = whole = (w, h))")
         .unwrap()
         .kind
@@ -557,30 +556,31 @@ fn parameters_alternatives_guards() {
     let f = &chain(&f)[0];
     assert!(f.params[0].key.is_none());
     assert_eq!(f.params[1].key.as_ref().unwrap().name, "port");
-    // G20: `|` is tighter than `,`.
+    // `|` is tighter than `,`.
     let f = value("f = (Sat | Sun, x) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);
     assert_eq!(chain(&f)[0].params.len(), 2);
-    // G21, P8: keep the former union reading explicit; ungrouped choices
-    // are checked separately by one_annotation_boundary_for_declarations_patterns_and_function_results.
+    // keep the former union reading explicit; ungrouped choices
+    // are checked separately by
+    // one_annotation_boundary_for_declarations_patterns_and_function_results.
     let f = value("f = (x : { Int | y }) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 1);
     let f = value("f = (True | _ : Int) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);
-    // P9: the guard is after the last item and ends at `)`.
+    // the guard is after the last item and ends at `)`.
     let f = value("f = (a : Int, b : Int ? a > b) -> Int { a - b }");
     assert!(chain(&f)[0].guard.is_some());
     assert_eq!(chain(&f)[0].params.len(), 2);
     let f = value("f = (Some(v) ? string.is_empty(v)) { \"empty\" }");
     assert!(chain(&f)[0].guard.is_some());
-    // G8: a function inside the guard is inside its own brackets.
+    // a function inside the guard is inside its own brackets.
     ok("f = (xs ? list.any(xs, (x) { x > 0 })) { 1 }\n");
     ok("f = (\n\ta : Int\n\tb : Int\n\t? a > b\n) { a }\n");
-    // G36: a literal key pattern, not a default.
+    // a literal key pattern, not a default.
     let f = value("run = (mode = \"fast\") { quick() } | (mode = \"slow\") { careful() }");
     assert_eq!(chain(&f).len(), 2);
     ok("log_all = ((a, b) = args) { log(args) }\n");
-    // G31.
+
     bad("f = (..rest) { 1 }", "no rest `..` at its top");
     bad("f = (a = 1, b) { 1 }", "by position may not come after");
     bad("f = (a ? a > 1, b) { 1 }", "after the guard");
@@ -713,7 +713,7 @@ fn provide() {
         }
         other => panic!("{other:?}"),
     }
-    // P1: `( … ) <- ( … )` is a function head only when the service group
+    // `( … ) <- ( … )` is a function head only when the service group
     // is followed on the same line by `->` or `{`.
     assert!(matches!(
         syn3::parse_expr("(a) <- (s)").unwrap().kind,
@@ -788,7 +788,7 @@ fn lexer() {
     assert!(!kinds("x < -1").contains(&T::LArrow));
     // `<<` is taken first, so bit arrays are unchanged.
     assert!(!kinds("<<-1>>").contains(&T::LArrow));
-    // Spec §1.5: "`x<-1` is `x`, `<-` and `1`". The public lexer now
+    // "`x<-1` is `x`, `<-` and `1`". The public lexer now
     // follows the same rule; only the private migration reader retains `< -`.
     assert!(lex("x<-1").tokens.iter().any(|t| t.kind == T::LArrow));
     assert!(
@@ -799,7 +799,7 @@ fn lexer() {
     );
 }
 
-// ---- §6.5 Printer and formatter ----
+// ---- Printer and formatter ----
 
 #[test]
 fn formatter_layout() {
@@ -824,7 +824,7 @@ fn formatter_layout() {
     assert_eq!(syn3::format(source).unwrap(), source);
 }
 
-// ---- §6.8 Lisp surface ----
+// ---- Lisp surface ----
 
 #[test]
 fn lisp_rows() {
@@ -956,7 +956,7 @@ fn lisp_errors() {
     }
 }
 
-// ---- §7.3 The converter ----
+// ---- The converter ----
 
 fn converted(old: &str) -> String {
     let (module, diags) = legacy::parser::parse_module_legacy(old);
@@ -1028,7 +1028,8 @@ fn convert_clauses_and_matches() {
         converted("absurd = (x : Never) { x |> {} }\n"),
         "absurd = (x : Never) { core.never(x) }\n"
     );
-    // The pipe is the weakest operator in both syntaxes, so the grouping is kept as written.
+    // The pipe is the weakest operator in both syntaxes, so the grouping is
+    // kept as written.
     assert_eq!(converted("ok = a <> b |> f\n"), "ok = a <> b |> f\n");
     assert_eq!(
         converted("ok = a <> { b |> f }\n"),
@@ -1218,7 +1219,7 @@ fn nested_calls_break() {
 
 #[test]
 fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
-    // §4.3 aliases keep nominal identity. The transition syntax reserves
+    // Aliases keep nominal identity. The parser reserves
     // bare Fail(E) for ^ E; an ordinary ! Fail(E) remains a service.
     let text = converted("Use(E) = () -> Nil ! Fail(E)\n");
     let (lowered, diags) = syn3::parse_lowered(&text);
@@ -1248,7 +1249,7 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
 
 #[test]
 fn specialized_and_renamed_members_remain_type_aliases() {
-    // §4.3: an RHS naming another type is a transparent alias. Moving
+    // An RHS naming another type is a transparent alias. Moving
     // S's fields into Alias would lose N or A's declaration scope.
     for source in [
         "S(N) = (() <- N -> Nil)\nAlias = S(Never)\n",

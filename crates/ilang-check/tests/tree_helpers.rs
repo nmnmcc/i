@@ -1,6 +1,5 @@
-//! `common::tree::new` changes the same places as `common::tree::old`: a
-//! change made in the tree of syntax three and then lowered is the change
-//! made in the lowered tree (docs/design/syn3-final-ast.md, step 2d).
+//! Mutations through the source-tree test adapter must survive conversion,
+//! so tree-based assertions exercise the same facts in either representation.
 mod common;
 use migration_syntax as ilang_syntax;
 

@@ -1,4 +1,4 @@
-//! The syntax-three migrator (docs/design/syntax-3.md §7.2 stage 8, §7.3).
+//! Migration preserves legacy source meaning while changing its surface forms.
 //!
 //! ```text
 //! migrate-syntax3 convert [--write] [--ctors DIR]... FILE...
@@ -78,9 +78,9 @@ fn parse_new(path: &Path, source: &str) -> (Module, Vec<Diagnostic>) {
 /// Which syntax a text is in, so that the conversion can run again on a tree
 /// where part of the files are converted.
 enum Reading {
-    /// Only the syntax before syntax three reads it: convert it.
+    /// Only the syntax in the legacy syntax reads it: convert it.
     Old,
-    /// Only syntax three reads it, or both read it to the same tree: it is
+    /// Only the source parser reads it, or both parsers produce the same tree: it is
     /// converted already.
     New,
     /// Both read it, to different trees: the tool cannot tell.
@@ -99,8 +99,8 @@ fn reading(path: &Path, source: &str, ctors: &convert::Signatures) -> Reading {
         (true, true) => {
             let lexed = (!is_lisp(path)).then(|| lex(source));
             let (converted, _) = convert::convert(&old, lexed.as_ref(), ctors);
-            // `x<-1` (`x < -1` before) is in no file of today's syntax
-            // (§7.1 row 9), so a `<-` marks a converted text.
+            // `x<-1` (`x < -1` before) is in no file of the legacy syntax,
+            // so a `<-` marks a converted text.
             let arrow = !is_lisp(path)
                 && ilang_syntax::lexer::lex3(source)
                     .tokens
@@ -373,8 +373,8 @@ fn convert_command(args: &[String]) -> i32 {
                 continue;
             }
             // Both read it to different trees: the tree being converted is
-            // in the syntax before syntax three (the conversion is re-run on
-            // a newer tree of today's syntax), so the old reading wins.
+            // in the syntax in the legacy syntax (the conversion is re-run on
+            // a newer tree of the legacy syntax), so the old reading wins.
             Reading::Ambiguous => {
                 eprintln!(
                     "{}:1: ambiguous: both syntaxes read it, to different trees; read as the old syntax (SYN3_KEEP names files to leave)",

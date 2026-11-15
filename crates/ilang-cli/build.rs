@@ -1,5 +1,5 @@
 //! Build the native runner (crates/ilang-runner) that `i build` copies into
-//! every native package (docs/design/native.md, N2).
+//! every native package, which is a prebuilt runner plus the compiled program.
 //!
 //! The runner is built by a separate Cargo invocation of its own package,
 //! into `target/runner`, so that Cargo's feature unification cannot give it

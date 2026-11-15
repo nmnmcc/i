@@ -1,5 +1,5 @@
 //! Conversion of a file between the two surfaces (`i fmt --to`), on the
-//! tree of syntax three: the file is read, written in the other surface,
+//! tree of the source syntax: the file is read, written in the other surface,
 //! read back and compared, and the comments that stand alone before an item
 //! or a statement are moved to the same item or statement of the output.
 
@@ -13,8 +13,8 @@ use crate::{Code, Diagnostic};
 pub type Converted = Result<(String, Vec<Span>), Vec<Diagnostic>>;
 
 /// The tree without expression groups and with interpolation lowered to
-/// concatenation (§1.6). These are the surface differences before the core
-/// tree is compared (§14.1).
+/// concatenation. These are the surface differences before the core
+/// tree is compared.
 pub fn ungrouped(module: &Module) -> Module {
     struct Ungroup;
     impl Visitor for Ungroup {
@@ -196,7 +196,7 @@ pub fn lisp_to_normal(source: &str) -> Converted {
     if !errors.is_empty() {
         return Err(errors);
     }
-    // Spec §14.1: a macro definition has no normal spelling, even when
+    // A macro definition has no normal spelling, even when
     // its body contains no quote and could otherwise round-trip as text.
     if module.items.iter().any(|item| {
         item.attributes

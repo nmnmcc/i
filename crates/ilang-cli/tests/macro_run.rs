@@ -1891,7 +1891,7 @@ fn checked_collection_validates_targets_and_duplicates() {
     assert_eq!(good.len(), 1);
     assert_eq!(program.def(good[0].target).name, "good");
     assert_eq!(good[0].data[0].1, "example");
-    // §6.6 and §14.5 call the initialized value, so an alias is a valid
+    // The initialized value is called, so an alias is a valid
     // target. Keep scalar, nonempty-parameter and duplicate targets invalid.
     let alias = collections::resolve(
         &parsed,
@@ -2807,7 +2807,7 @@ fn multi_shape_arguments_keep_the_written_tree_in_both_surfaces() {
 
 #[test]
 fn type_macro_does_not_reclassify_a_written_definition_head() {
-    // Spec §4.7 classifies an alias pattern before expanding its right side.
+    // An alias pattern is classified before its right side expands.
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2848,9 +2848,8 @@ fn type_macro_keeps_its_standalone_need_channel() {
     use ilang_macro::{body_engine::BodyEngine, registry::Registry};
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
-    // The old and native engines agreed byte for byte before deletion.
     // Keep the complete five answers as the independent historical oracle.
-    // §4 of syn3-final-ast.md removes the old production engine/tree; its
+    // The production engine reads source nodes directly; its
     // standalone function-need and grouping boundaries remain asserted.
     let oracle: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/type_macro_engine_boundary.json")).unwrap();
@@ -2912,7 +2911,7 @@ fn type_macro_keeps_its_standalone_need_channel() {
                     };
         let actual = migration_syntax::print::print_module(&lowered);
         assert_eq!(cases[case]["source"].as_str().unwrap(), text);
-        // Syntax-three §6.1: err is removed; errors are ordinary Fail
+        // Err is removed; errors are ordinary Fail
         // entries of the one need. Project only that deleted synthetic
         // carrier from the independent historical oracle. Keep every
         // macro/standalone-type/grouping boundary byte for byte.

@@ -232,7 +232,7 @@ fn nested_quote_captures_use_the_parser_work_stack() {
 
 #[test]
 fn invalid_datums_do_not_make_core_items() {
-    // `(1 .. 2)` is the call `1(..2)` in the rows of §6.8, so the spread
+    // `(1 .. 2)` is the call `1(..2)` in the source rows, so the spread
     // with nothing after it stands for the call that is not one.
     for source in ["(= x (1 ..))", "(= x [.. 1])"] {
         let (_, errors) = ilang_syntax::lisp::parse_source(source);
@@ -257,7 +257,7 @@ fn both_surfaces_preserve_attributes_and_grouped_result_holes() {
 }
 
 // Retain the historical decoder's rejection beside the native row test.
-// Syntax-three §6.8 replaces the clause-block rows; neither decoder may
+// Clause-block rows are invalid; neither decoder may
 // silently turn this nonfinal type test into another normal pattern.
 #[test]
 fn a_nonfinal_clause_choice_cannot_end_in_a_type_test() {
@@ -267,7 +267,7 @@ fn a_nonfinal_clause_choice_cannot_end_in_a_type_test() {
 
 #[test]
 fn a_nonfinal_clause_choice_with_a_type_test_has_no_normal_spelling() {
-    // Spec §14.1 permits a Lisp tree without a normal spelling, but
+    // A Lisp tree may lack a normal spelling, but
     // conversion must refuse it rather than change the choice's meaning.
     let source = "(= f (-> (, (| (= a (: b Int)) Unit)) _ 1))";
     let (_, errors) = ilang_syntax::lisp::parse_source(source);
@@ -455,7 +455,7 @@ fn check_corpus(dir: &std::path::Path) {
             if !diagnostics.is_empty() {
                 continue;
             }
-            // The Lisp surface of syntax three must read back the same module.
+            // The Lisp surface of the source syntax must read back the same module.
             let tree = ilang_syntax::syn3::parse_module(&source).0;
             let text = ilang_syntax::syn3::lisp::to_lisp(&tree);
             let (read, errors) = ilang_syntax::syn3::lisp::from_lisp(&text);

@@ -1,4 +1,4 @@
-//! Finite service rows (§4.7, §4.8 rules 3–5 and 9, §9.2).
+//! Finite service rows.
 mod common;
 
 use ilang_check::Checked;
@@ -24,9 +24,9 @@ fn accepts(source: &str, name: &str, expected: &str, unused: &[&str]) {
     );
 
     // Every positive K4 fixture also runs through entry validation. Remove
-    // its supplied services: §4.8 retains the requirements, and §10.2 must
+    // its supplied services: inference retains the requirements, and an entry must
     // reject an entry with no provider. Specialize its value parameter to
-    // Int where the fixture has one (§4.8 rule 3).
+    // Int where the fixture has one.
     let mut missing = source
         .lines()
         .filter(|line| !line.trim_start().starts_with('!'))
@@ -58,8 +58,8 @@ fn accepts(source: &str, name: &str, expected: &str, unused: &[&str]) {
 
 #[test]
 fn annotated_and_inferred_service_rows() {
-    // Rule 4 unions the callback's N with S(N). Writing that same union
-    // must not change the finite principal type (§4.7).
+    // Function inference unions the callback's N with S(N). Writing that same union
+    // must not change the finite principal type.
     for annotation in ["{", "-> Nil {"] {
         accepts(
             &"S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) -> Nil {\n\tS(f) = s\n\tf()\n}"
@@ -73,7 +73,7 @@ fn annotated_and_inferred_service_rows() {
 
 #[test]
 fn generic_service_through_a_helper() {
-    // Rules 3 and 5 instantiate use with N=Never; rule 9 removes S(Never).
+    // Instantiation with N=Never lets provision remove S(Never).
     accepts(
         "S(N) = (() <- N -> Nil, (N) -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f, _) = s\n\tf()\n}\nrun = <N>(body : () <- N -> Nil) { body() }\nexample = () { run(() { use() }) <- (S(() { Nil }, (_ : Never) { Nil })) }",
         "example",
@@ -84,7 +84,7 @@ fn generic_service_through_a_helper() {
 
 #[test]
 fn open_service_row_through_helpers() {
-    // Rule 5 carries both requirements through calls; no closed service
+    // Calls carry both requirements through calls; no closed service
     // annotation is needed to make the row finite.
     for annotation in ["{", "-> Nil {"] {
         accepts(
@@ -99,8 +99,8 @@ fn open_service_row_through_helpers() {
 
 #[test]
 fn several_parameters_and_nested_services() {
-    // Rules 4, 5 and 7 apply equally inside nested constructors and with
-    // independent value/error/environment parameters. Rule 3 permits
+    // Inference constraints apply equally inside nested constructors and with
+    // independent value/error/environment parameters. Instantiation permits
     // independent closed instances of the resulting scheme.
     for annotation in ["{", "-> A {"] {
         let source = "Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> Nil)\nOuter(A, E, N) = (Inner(A, E, N))\nuse = <A, E, N>(x : A) <- (s : Outer(A, E, N)) -> A {\n\tOuter(Inner(f, _)) = s\n\tf(x)\n}\nrun = <A, N>(body : () <- N -> A) { body() }\ninteger = () {\n\trun(() { use(1) }) <- (Outer(Inner((x : Int) { x }, (_ : Never) { Nil })))\n}\nboolean = () {\n\trun(() { use(True) }) <- (Outer(Inner((x : Bool) { x }, (_ : Never) { Nil })))\n}"
@@ -128,7 +128,7 @@ fn several_parameters_and_nested_services() {
 
 #[test]
 fn nonempty_stored_environment() {
-    // §9.2: a callback takes its dependency at the call site; rule 9
+    // A callback takes its dependency at the call site; provision
     // removes each installed service, including a service nested in N.
     accepts(
         "Dependency = (value = Int)\nget = () <- (d : Dependency) { d.value }\nInner(N) = (() <- N -> Int, (N) -> Nil)\nread = <N>() <- (s : Inner(N)) {\n\tInner(f, _) = s\n\tf()\n}\nOuter(N) = (() <- N -> Int, (N) -> Nil)\nuse = <N>() <- (s : Outer(N)) -> Int {\n\tOuter(f, _) = s\n\tf()\n}\nrun = <A, N>(body : () <- N -> A) { body() }\nexample = () {\n\trun(() { use() }) <- (\n\t\tDependency(value = 7),\n\t\tInner(() { get() }, (_ : Dependency) { Nil }),\n\t\tOuter(() { read() }, (_ : { Dependency | Inner(Dependency) }) { Nil }),\n\t)\n}",
@@ -140,8 +140,8 @@ fn nonempty_stored_environment() {
 
 #[test]
 fn logging_example() {
-    // Std-2 §7: E=String, N=Never. fail.catch reifies the error (§9.3),
-    // and rule 9 removes Sink(String, Never).
+    // E=String, N=Never. fail.catch reifies the error,
+    // and provision removes Sink(String, Never).
     for annotation in ["{", "-> Nil {"] {
         accepts(
             &"(\n\ti/fail\n)\nEntry = (message = String)\nSink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)\nmake = <E, N>(send : (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {\n\tSink(send, (_ : N) { Nil })\n}\nwrite = <E, N>(entry : Entry) <- (sink : Sink(E, N)) -> Nil {\n\tSink(send, _) = sink\n\tsend(entry)\n}\nexample = () {\n\tfail.catch(() { write(Entry(message = \"seen\")) }) <- (\n\t\tmake((entry) { fail.raise(entry.message) }),\n\t)\n}"
@@ -164,14 +164,13 @@ fn rejects(source: &str, code: &str) {
 
 #[test]
 fn recursive_types_still_fail() {
-    // §4.7: "A type that has itself inside it, through a type variable,
+    // "A type that has itself inside it, through a type variable,
     // is a compile error." These require an actual constructor cycle,
-    // rather than the tautology N <: N | S(N) (§4.5 rule 2).
+    // rather than the tautology N <: N | S(N).
     for source in [
         "bad = (x) { x(x) }",
-        // The old case `bad(N) = (s ! S(N)) -> Nil ! N { … f() }` (the whole
-        // environment is exactly N) needs `..env: N` in the service pattern,
-        // which waits for stage E6 of syntax three; it is left out until then.
+        // Constructor cycles must still fail when callback requirements
+        // pass through explicitly supplied services.
         "S(N) = (() <- N -> Nil, (N) -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f, _) = s\n\tf()\n}\nbad = <N>() { use() <- (S(() { use() }, (_ : N) { Nil })) }",
     ] {
         rejects(source, "E0505");
@@ -180,15 +179,15 @@ fn recursive_types_still_fail() {
 
 #[test]
 fn incompatible_service_arguments_still_fail() {
-    // Std-2 §7 / §4.5: the input marker keeps N invariant even when
+    // The input marker keeps N invariant even when
     // Consumer's parameter is contravariant.
     rejects(
         "Entry = ()\nSink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)\nConsumer(A) = ((A) -> Nil)\nbad = (s : Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }",
         "E0515",
     );
-    // Decision 1: Sink's covariant E can meet at Never because its stored
+    // Sink's covariant E can meet at Never because its stored
     // callback is inhabited. Adding a required E value makes that same
-    // intersection empty (§4.1); retain both direct and helper forms.
+    // intersection empty; retain both direct and helper forms.
     for source in [
         "Sink(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)\none = () <- (s : Sink(String, Never)) { Nil }\ntwo = () <- (s : Sink(Int, Never)) { Nil }\nbad = () {\n\tone()\n\ttwo()\n}",
         "Sink(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)\none = () <- (s : Sink(String, Never)) { Nil }\ntwo = () <- (s : Sink(Int, Never)) { Nil }\nrun = <N>(body : () <- N -> Nil) { body() }\nbad = () {\n\trun(() { one() })\n\ttwo()\n}",
@@ -220,7 +219,7 @@ fn incompatible_service_arguments_still_fail() {
 #[test]
 fn repeated_helpers_keep_a_finite_principal_row() {
     // Repeated rule-3 instantiation and rule-5 forwarding add no service
-    // and must preserve the same principal scheme (§4.7).
+    // and must preserve the same principal scheme.
     let mut source = String::from(
         "S(N) = (() <- N -> Nil, (N) -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f, _) = s\n\tf()\n}\nrun = <N>(body : () <- N -> Nil) { body() }\nforward_0 = () { run(() { use() }) }\n",
     );

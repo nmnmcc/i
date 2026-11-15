@@ -1,7 +1,5 @@
-//! The parts of `item_phase` that read or write the tree, on the tree of
-//! syntax three. The scheduler of the item phase (`expand_items`,
-//! `item_step`) does not look inside an item; it calls these.
-// Nothing calls these until the item phase is switched to the new tree.
+//! Tree access is kept behind these helpers so the item scheduler (`expand_items`,
+//! `item_step`) can schedule expansion without inspecting item forms.
 #![allow(dead_code)]
 
 use crate::{
@@ -45,7 +43,7 @@ pub fn item_names(item: &Item) -> Vec<String> {
 }
 
 /// The arguments of an attribute that are all plain strings (and at least
-/// one): the old tree keeps these as texts, and they are passed as written,
+/// one): these are passed as literal texts,
 /// with no look at what made them.
 fn plain_strings(args: &[DItem]) -> Option<Vec<(&str, Span)>> {
     if args.is_empty() {

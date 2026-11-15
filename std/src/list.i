@@ -1,7 +1,7 @@
 //// Functions for `List(A)`, the built-in type of lists that may not be
 //// changed.
 ////
-//// Every function that walks a whole list is tail-recursive (§11.6), so it
+//// Every function that walks a whole list is tail-recursive, so it
 //// works on lists of any length without using more stack. Functions that
 //// build a new list build it in reverse and then turn it round, which takes
 //// one more pass.

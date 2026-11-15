@@ -1,5 +1,5 @@
-//! The body walker on the tree of syntax three: the tests of
-//! `tests/body_walk.rs` on new trees, the forms that only the new tree has,
+//! The body walker on the source tree: the tests of
+//! `tests/body_walk.rs` on source trees, the forms that only the source tree has,
 //! and a comparison with the old walker on the lowered tree over every
 //! source file of the repository.
 use ilang_macro::body_walk3::{self, Hook, Local};
@@ -361,7 +361,7 @@ fn type_macro_result_is_traversed_without_the_host_stack() {
     });
 }
 
-// ---- The forms of the tree of syntax three ----
+// ---- The forms of the source tree ----
 
 #[test]
 fn a_service_name_is_a_binder_of_its_function() {
@@ -472,7 +472,7 @@ impl Hook for New {
     type Error = ();
     fn is_macro(&mut self, e: &Expr, locals: &[Local], depth: u32) -> Result<bool, ()> {
         if let Some(call) = call3::expression(e) {
-            // `core.never(x)` is a match with no clause in the old tree.
+            // `core.never(x)` has an empty match domain.
             let never = call.name.name == "never"
                 && call.module.is_some_and(|m| m.name == "core")
                 && call.prefix.is_none();
@@ -519,7 +519,7 @@ impl Hook for New {
     fn is_direct(&mut self, e: &Expr, _: &[Local], _: u32) -> bool {
         let direct = body_engine3::is_direct(e, |name| self.aliases.contains(&name.name));
         // Multi-shape values have a synthetic one-byte root in the
-        // transition AST. Compare their classification at that root.
+        // adapter representation. Compare their classification at that root.
         let span = if matches!(e.kind, ExprKind::Chain(_)) {
             migration_syntax::syn3::lower::lower_expr(e)
                 .map(|e| e.span)
@@ -538,7 +538,7 @@ struct Old {
     direct: std::collections::HashMap<(u32, u32), bool>,
     aliases: Vec<String>,
 }
-/// `BodyEngine::is_direct` of the old tree, with the module aliases given.
+/// Module aliases must not change whether an expression is direct.
 fn old_is_direct(expression: &migration_syntax::ast::Expr, aliases: &[String]) -> bool {
     use migration_syntax::ast::{BinOp, Expr, ExprKind, Stmt};
     fn ungroup(mut expression: &Expr) -> &Expr {
@@ -612,7 +612,7 @@ impl body_walk::Hook for Old {
     ) -> Result<bool, ()> {
         if let Some(call) = call::expression(e) {
             // A shape-group closure is introduced by transition lowering;
-            // it has no call in the source tree (syntax-3 §6.12).
+            // it has no call in the source tree.
             if call.name.name.starts_with('%') {
                 return Ok(false);
             }

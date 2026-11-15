@@ -132,7 +132,7 @@ fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
         "f = (n) { n |> (0) { 0 } | (_) { f(n - 1) + 1 } }\n\nmain = () {\n\tf(40)\n\tNil\n}\n",
         false,
     );
-    // E3/E5 entries include ordinary library catch/provider frames. Find the
+    // Entries include ordinary library catch/provider frames. Find the
     // exact zero-recursion peak instead of assuming their old constant cost.
     // Recursion must fit that same tight budget; it gets no extra frame units.
     let mut low = 0;

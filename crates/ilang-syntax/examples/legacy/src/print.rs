@@ -24,11 +24,11 @@ struct Printer {
     indent: usize,
     explicit: bool,
     /// Set while a clause pattern is printed that `?` or `|` comes after,
-    /// which a function type at its end would take (§7.1).
+    /// which a function type at its end would take.
     fn_next: bool,
 }
 
-/// The binding strength of an expression: binary levels 1 to 8 (§6.9), 9 for
+/// The binding strength of an expression: binary levels 1 to 8, 9 for
 /// unary operators, and 10 for the rest.
 pub(crate) fn level(e: &Expr) -> u8 {
     match &e.kind {
@@ -86,8 +86,8 @@ pub(crate) fn leading_fn(e: &Expr) -> Option<&Function> {
 }
 
 /// Whether the first clause of a clause block is in a place where a clause
-/// expression that starts with a function would be read in another way
-/// (§6.1): a first pattern `n1 = … = ( … )`.
+/// expression that starts with a function would be read in another way:
+/// a first pattern `n1 = … = ( … )`.
 pub(crate) fn first_clause_needs_group(clauses: &[Clause]) -> bool {
     if clauses
         .first()
@@ -113,7 +113,7 @@ pub(crate) fn first_clause_needs_group(clauses: &[Clause]) -> bool {
 /// The span of the first part of `module` that has no text in the normal
 /// surface with the same meaning: a `{` that begins an expression whose
 /// first statement starts with a function with a `->` part and only
-/// patterns as parameters, which §6.1 reads as a clause block; and the first
+/// patterns as parameters, which the legacy parser reads as a clause block; and the first
 /// clause expression of a clause block in a place of
 /// [`first_clause_needs_group`] that starts with such a function; and a
 /// non-final choice ending in a type annotation, whose type takes `|`.
@@ -497,7 +497,7 @@ impl Printer {
     // ---- Expressions ----
 
     /// Prints `e` where an expression of at least level `min` is needed. A
-    /// match is an operation at level 1 (§6.9), so it needs a group where
+    /// match is an operation at level 1, so it needs a group where
     /// more than that is needed.
     fn expr(&mut self, e: &Expr, min: u8) {
         let lvl = level(e);
@@ -526,7 +526,7 @@ impl Printer {
                 self.w(&name.name);
             }
             ExprKind::Tuple(items) => {
-                // `()` is the empty data (syntax three §7.1 row 7), which
+                // `()` is the empty data, which
                 // lowers to the empty tuple.
                 self.w("(");
                 self.list(items, |p, e| p.expr(e, 0));
@@ -693,7 +693,7 @@ impl Printer {
                 self.expr(g, 0);
             }
             self.w(" -> ");
-            // §6.1: a first clause expression that starts with a function
+            // A first clause expression that starts with a function
             // with no `->` part would be read as the `->` part and the body
             // of a function.
             if n == 0 && group_first && leading_fn(&c.body).is_some_and(|f| f.ret.is_none()) {
@@ -724,7 +724,7 @@ impl Printer {
                     self.ty(ty);
                     self.w(" }");
                 } else if clause && self.fn_next {
-                    // §7.1: a function type before `?` or `|` is put in `{ }`.
+                    // A function type before `?` or `|` is put in `{ }`.
                     self.ty_in(ty, 1, false);
                 } else {
                     self.ty(ty);
@@ -817,7 +817,7 @@ impl Printer {
     }
 
     /// Whether the printed type ends with a function type, which would take a
-    /// `|`, `&`, `-`, `?`, or `!` after it (§3).
+    /// `|`, `&`, `-`, `?`, or `!` after it.
     fn ends_with_fn(&self, t: &TypeExpr) -> bool {
         match &t.kind {
             TypeKind::Fn { .. } => true,
@@ -831,7 +831,7 @@ impl Printer {
 
     /// Whether the printed type ends with a tuple or record type: both are
     /// written in `( )`, which becomes the parameters of a function type when
-    /// `->` comes after it (§7.1).
+    /// `->` comes after it.
     fn ends_with_tuple(&self, t: &TypeExpr) -> bool {
         match &t.kind {
             TypeKind::Tuple(_) | TypeKind::Record { .. } => true,

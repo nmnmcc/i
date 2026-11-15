@@ -21,7 +21,7 @@ fn entry(source: &str) {
 
 #[test]
 fn annotated_local_keeps_the_missing_service() {
-    // §4.8 rules 4–5 retain S(N); §10.2 requires it before entry.
+    // The typing rules retain S(N), which must be provided before entry.
     let source = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\n\tlocal()\n}";
     entry(source);
     entry(&source.replace("local : () <- (S(N), ..N) -> Nil", "local"));
@@ -29,7 +29,7 @@ fn annotated_local_keeps_the_missing_service() {
 
 #[test]
 fn local_scheme_is_shown_without_an_entry() {
-    // §4.7: the finite principal scheme may not disappear from --types.
+    // The finite principal scheme may not disappear from --types.
     let source = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\nmain = <N>() {\n\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\n\tlocal()\n}";
     let (graph, _, _) = common::check_files(&[("src/other.i", source)]);
     let checked = ilang_check::query::check_for_queries(&graph);
@@ -52,7 +52,7 @@ fn local_scheme_is_shown_without_an_entry() {
 #[test]
 fn annotation_positions_retain_the_service() {
     let base = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\nrun = <N>(body : () <- N -> Nil) { body() }";
-    // §4.7 and §4.8: annotations, local generalization and calls cannot
+    // Annotations, local generalization and calls cannot
     // remove a requirement. Every case is a finite scheme needing S(N).
     for body in [
         "helper : <N>() <- (S(N), ..N) -> Nil = <N>() { use() }\n\nmain = () { helper() }",
@@ -97,18 +97,17 @@ fn two_parameters_retain_the_service() {
 fn two_environment_parameters_retain_the_service() {
     let source = "S(A, B) = (() <- A -> Nil, () <- B -> Nil)\nuse = <A, B>() <- (s : S(A, B)) {\n\tS(f, g) = s\n\tf()\n\tg()\n}\n\nmain = <A, B>() {\n\tlocal = () { use() }\n\tlocal()\n}";
     // The old annotation `() -> Nil ! A | B | S(A, B)` has two row variables,
-    // which syntax three cannot write (one `..N` per need list); only the
+    // which the source syntax cannot write (one `..N` per need list); only the
     // inferred form is checked.
     entry(source);
 }
 
 #[test]
 fn a_captured_row_annotation_can_contain_the_service() {
-    // E3 removes the old error channel. 73f725713 inserted Fail(Never)
-    // only to suppress its synthetic carrier; Decision 2 makes that a real
-    // key, so restore the pre-conversion annotation rather than erase it.
-    // §4.7 allows N to become the more exact finite row A | S(A).
-    // Merely making an unused function needs nothing (§4.8 rule 4).
+    // An explicit Fail(Never) still requires its service key. This case
+    // isolates the inferred row without adding that separate requirement.
+    // Inference allows N to become the more exact finite row A | S(A).
+    // Merely making an unused function needs nothing.
     let source = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}";
     entry(source);
     let unused = source.replace("\tlocal()\n}", "\tNil\n}");
@@ -124,12 +123,12 @@ fn a_captured_row_annotation_can_contain_the_service() {
             graph.sources.render_all(&checked.diags)
         );
     }
-    // §9.2 fits the provided service by ordinary value subtyping.
+    // A provided service fits by ordinary value subtyping.
     // Supplying S(Dependency) does not supply its callback's Dependency.
     let dependency = "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}\n\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }";
     entry(dependency);
-    // An empty `Dependency = ()` is not a keyed service type in syntax three
-    // (E0225), so the supplied variant gives it a field.
+    // The supplied variant carries a field so the service has an explicit
+    // construction value as well as a constructor key.
     let supplied = dependency
         .replace("Dependency = ()", "Dependency = (value = Int)")
         .replace(
@@ -155,7 +154,7 @@ fn a_captured_row_annotation_can_contain_the_service() {
 
 #[test]
 fn finite_exported_schemes_survive_module_boundaries() {
-    // §2.4 and §4.7: the text and interface tree must both contain the
+    // The text and interface tree must both contain the
     // complete scheme. Reading it in another module must retain S(N).
     let source = "(\n\tS(..)\n\thelper\n)\nS(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\nhelper = <N>() {\n\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\n\tlocal()\n}";
     let (graph, _, _) = common::check_files(&[

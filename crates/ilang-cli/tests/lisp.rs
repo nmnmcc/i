@@ -127,7 +127,7 @@ fn conversion_does_not_write_an_unrepresentable_module() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("sample.is");
     // A macro definition has no normal spelling, including one with no
-    // quote in its body (spec §14.1).
+    // quote in its body.
     let source = "(@ macro (= f (-> (, x) _ x)))\n";
     std::fs::write(&file, source).unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -143,7 +143,7 @@ fn conversion_does_not_write_an_unrepresentable_module() {
 #[test]
 fn conversion_accepts_a_block_containing_a_function_and_value() {
     // The former unrepresentable fixture is now a normal block: every
-    // expression `{ … }` is a computation (syntax three §2.2).
+    // expression `{ … }` is a computation.
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("sample.is");
     let source = "(= f (-> (,) _ { (consume { (-> (, x) Int { x }) 1 }) }))\n";
@@ -175,7 +175,7 @@ fn conversion_accepts_a_block_containing_a_function_and_value() {
 
 #[test]
 fn interpolation_keeps_its_result_through_both_surface_conversions() {
-    // Interpolation becomes concatenation before the core tree (§1.6).
+    // Interpolation becomes concatenation before the core tree.
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();

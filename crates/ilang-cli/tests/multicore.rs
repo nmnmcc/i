@@ -1,4 +1,4 @@
-//! Native multicore workers (multicore.md D1/D8/P1, native.md N5/N7/N8/N12).
+//! Native multicore workers.
 //! The worker count comes from `I_WORKERS`; `I_WORKERS_TRACE` makes the host
 //! print `i: worker W started a task` when a worker other than 0 starts a
 //! task, and at the end of a run that published records
@@ -386,7 +386,7 @@ fn echo_example_serves_three_connections_with_auto_workers() {
     serve_clients(&project, None, 3);
 }
 
-/// Multicore D6: a function copied to another worker and back is `==` to
+/// a function copied to another worker and back is `==` to
 /// its original, and different functions stay different.
 #[test]
 fn copied_functions_keep_their_identity() {
@@ -398,7 +398,7 @@ fn copied_functions_keep_their_identity() {
     assert_eq!(trace.published, 1);
 }
 
-/// R4a: shielded finals joining cancelled tasks must stop, on every worker.
+/// shielded finals joining cancelled tasks must stop, on every worker.
 /// Run in a child process so I_WORKERS does not race other Rust tests.
 #[test]
 fn cancelled_join_cycle_stress() {

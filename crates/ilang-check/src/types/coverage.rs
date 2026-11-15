@@ -1,5 +1,5 @@
-//! What patterns match: "can not fail" (§7.3), "taken" (§4.8 rule 12),
-//! covering every value and "never used" (§7.4), all with the usefulness
+//! What patterns match: "can not fail", "taken",
+//! covering every value and "never used", all with the usefulness
 //! algorithm of Maranget ("Warnings for pattern matching", JFP 2007).
 //!
 //! A pattern vector `q` is **useful** for a matrix of rows when some values
@@ -8,7 +8,7 @@
 //! may have any value, of any type constructor.
 //!
 //! The signatures, by type constructor (`Head`):
-//! - a custom type: its constructors, each with its fields (§7.1);
+//! - a custom type: its constructors, each with its fields;
 //! - a tuple of n parts: one constructor;
 //! - `List`: the empty list, and a cons of an element and the rest;
 //! - every other head (literals, string prefixes, bit arrays, functions,
@@ -31,14 +31,14 @@ pub(crate) enum Lit {
     /// A refutable predicate on an opaque value. Its overlap with another
     /// predicate cannot be inferred by the coverage checker.
     Opaque(TypeId),
-    /// An integer, as its decimal text with its sign; `-0` is `0` (§11.4).
+    /// An integer, as its decimal text with its sign; `-0` is `0`.
     Int(String),
-    /// The bits of a float; `-0.0` is `0.0` (§11.4).
+    /// The bits of a float; `-0.0` is `0.0`.
     Float(u64),
     Str(String),
     /// `"lit" <> r`: the strings that start with `lit`.
     Prefix(String, String),
-    /// A bit array pattern (§8.4). It is never known to match all the
+    /// A bit array pattern. It is never known to match all the
     /// values of another pattern.
     Bits,
 }
@@ -61,7 +61,7 @@ pub(crate) enum Ctor {
 
 #[derive(Clone, Debug)]
 pub(crate) enum Pat {
-    /// A catch-all. The number names it for narrowing (rule 12).
+    /// A catch-all. The number names it for narrowing.
     Wild(Option<u32>),
     /// A constructor, with its parts in the order of its fields.
     Ctor(Ctor, Vec<Pat>),
@@ -353,7 +353,7 @@ impl Walk<'_> {
     /// variable, the result of a function that is not known) also has every
     /// value that its upper bounds allow (`Up` mode): every value that comes to
     /// it is a subtype of them, and with no bound with a head, it may be any
-    /// value (§7.3).
+    /// value.
     ///
     /// A variable met again on the path of the search adds nothing: no values
     /// in `Pos` mode, and no restriction in `Up` mode.
@@ -1238,7 +1238,7 @@ impl Checker<'_> {
 
     // ---- Text ----
 
-    /// The text of a witness, in the syntax of patterns (§7.1).
+    /// The text of a witness, in the syntax of patterns.
     pub(crate) fn show_pat(&self, p: &Pat) -> String {
         match p {
             Pat::Wild(_) => "_".into(),
@@ -1252,7 +1252,7 @@ impl Checker<'_> {
                 format!("_ : {}", super::display::show_known(&self.s, &t))
             }
             // A type with one constructor is shown as that constructor:
-            // `False`, `Some(..)` (syntax three: sums are unions of them).
+            // `False`, `Some(..)`; sums are unions of these member types.
             Pat::Head(Head::Named(TypeRef::Custom(id)), _) if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.len() == 1) =>
             {
                 let TypeBody::Custom(cs) = &self.p.ty(*id).body else {
@@ -1349,8 +1349,8 @@ impl Checker<'_> {
     }
 }
 
-/// The parts of a constructor pattern in the order of the fields of `c`
-/// (§7.1): by position to the fields without labels, then by label. Parts
+/// The parts of a constructor pattern in the order of the fields of `c`:
+/// by position to the fields without labels, then by label. Parts
 /// that match no field were reported when the pattern was typed.
 pub(crate) fn field_order<'p>(
     p: &Program,
@@ -1416,9 +1416,9 @@ pub(crate) fn list(items: Vec<Pat>, rest: bool) -> Pat {
     tail
 }
 
-/// A pattern of a binding or a parameter, for "can not fail" (§7.3). `x: T`
+/// A pattern of a binding or a parameter, for "can not fail". `x: T`
 /// matches every value that comes to it there, because fitting makes the
-/// value a `T` (§4.8), so it is a catch-all here.
+/// value a `T`, so it is a catch-all here.
 pub(crate) fn fit_pat(p: &Program, q: &Pattern) -> Pat {
     if let Some(l) = literal(q) {
         return Pat::Ctor(Ctor::Lit(l), Vec::new());
@@ -1483,7 +1483,7 @@ mod literal_coverage_tests {
     use super::*;
     #[test]
     fn complements_preserve_cross_columns_and_prefixes() {
-        // §5.5: excluded values are specialized separately; prefixes cannot
+        // Excluded values are specialized separately; prefixes cannot
         // be treated as literal strings when testing a cofinite row.
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
@@ -1536,7 +1536,7 @@ mod literal_coverage_tests {
 
     #[test]
     fn scalar_index_agrees_with_the_full_matrix() {
-        // §9: an optimization may avoid the matrix, but must make the
+        // An optimization may avoid the matrix, but must make the
         // same usefulness/coverage decisions as the full-row algorithm.
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
@@ -1643,7 +1643,7 @@ mod literal_coverage_tests {
 
     #[test]
     fn unknown_alternatives_are_whole_even_beside_an_explicit_head() {
-        // literal-types §5.5: a side with other counts as all values of every head.
+        // A side with other counts as all values of every head.
         let head = Head::Named(TypeRef::Builtin(BuiltinType::Int));
         let set = |v: &str| ValueSet::only([std::sync::Arc::from(v)]).unwrap();
         let a = Vals {

@@ -1,5 +1,5 @@
 //! Deep trees. A tree made by a macro can be much deeper than the host
-//! stack, and the passes over the tree of syntax three are plain recursive
+//! stack, and the passes over the source tree are plain recursive
 //! functions. [`deep`] runs such a pass on a stack that is large enough;
 //! dropping a tree needs no care, because `Expr`, `Pattern` and `Type` drop
 //! their children with a work list (`ast.rs`).

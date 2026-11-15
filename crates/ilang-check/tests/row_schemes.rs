@@ -3,11 +3,11 @@ mod common;
 
 #[test]
 fn stage_three_provider_diagnostics_match_landed_conversion() {
-    // §9.2: a supplied value must satisfy the needed form by subtyping;
+    // A supplied value must satisfy the needed form by subtyping;
     // incompatible same-key requirements have an empty intersection.
     // Keep every concrete provider diagnostic, including its source binding.
-    // R8 in effects-e3-e6-corpus.md quotes why the b1 whole-method meet is
-    // inhabited (§4.1), removing only its old empty-meet summary.
+    // A method returning Never inhabits the whole-method meet, so its
+    // concrete provider failures must be checked independently.
     // Pin total errors and E0515 counts independently of the saved
     // messages. The full fourteen-project guard is in CLI providers tests:
     // two projects need their std dependency and test-macro expansion.
@@ -16,7 +16,7 @@ fn stage_three_provider_diagnostics_match_landed_conversion() {
         ("review-k4/cases/provision_closure_False", 1, 1),
         ("review-k4d/_loose/p/x8", 2, 2),
         ("review-k4d/_loose/p/b1", 5, 4),
-        // §4.1/R8: the method-only S meet is inhabited; retain the
+        // The method-only S meet is inhabited; retain the
         // independent provider mismatch at 10:48 in both corpus copies.
         ("review-k4d/_loose/p/m3", 1, 1),
         ("review-k4d/proj/m3", 1, 1),
@@ -78,8 +78,8 @@ fn types(source: &str) -> std::collections::BTreeMap<String, String> {
 
 #[test]
 fn mutual_service_rows_have_canonical_member_and_variable_order() {
-    // §4.7 gives a group's bindings their principal schemes together;
-    // §4.4 makes union commutative. Declaration order changes neither.
+    // A group's bindings get their principal schemes together, and union is
+    // commutative. Declaration order changes neither.
     let defs = [
         "S(N) = (f = () <- N -> Int)",
         "T(N) = (f = () <- N -> Int)",
@@ -97,7 +97,7 @@ fn mutual_service_rows_have_canonical_member_and_variable_order() {
 
 #[test]
 fn a_hidden_handler_obligation_is_rejected_at_the_definition() {
-    // §4.4: “When the parameter does not change, Ai and Bi must be equal”.
+    // “When the parameter does not change, Ai and Bi must be equal”.
     // An invariant service still retains a hidden same-form obligation.
     let source = "Svc(A) = (A, (A) -> Nil)\nwrap : <N>(() <- (Fail(Never), ..N) -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (body, svc) { body() <- (svc) }";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
@@ -114,7 +114,7 @@ fn a_hidden_handler_obligation_is_rejected_at_the_definition() {
 
 #[test]
 fn a_constructor_with_one_form_has_no_hidden_form_restriction() {
-    // §9.2: a constructor without parameters has only one service form.
+    // A constructor without parameters has only one service form.
     // Omitting its subtraction cannot hide an argument equality.
     types(
         "Only = ()\nwrap = <N>(body : () <- N -> Nil) -> Nil { body() <- (Only) }\nexample = () { wrap(() { Nil }) }",
@@ -123,7 +123,7 @@ fn a_constructor_with_one_form_has_no_hidden_form_restriction() {
 
 #[test]
 fn closed_row_aliases_merge_by_the_defined_direction() {
-    // §4.4: “when they have the same one, it is that type constructor
+    // “when they have the same one, it is that type constructor
     // with each pair of arguments put together the other way round”.
     // A row parameter follows the same rule as any other parameter.
     let source = "Dep = ()\nS(N) = (() <- N -> Nil)\nT(N) = (() <- N -> Nil)\nBad = T(S(Never) | S(Dep))\nuse = (x : Bad) { x }";
@@ -131,7 +131,7 @@ fn closed_row_aliases_merge_by_the_defined_direction() {
         types(source),
         types(&source.replace("S(Never) | S(Dep)", "S(Never)"))
     );
-    // Variance still applies to the row as a whole, as F2 explicitly says.
+    // Variance still applies to the row as a whole, for directed subtyping.
     types(
         "Other = ()\nS(A) = (A)\nT(N) = (() <- N -> Nil)\nwiden = (x : T(S(Int))) -> T(S(Int) | Other) { x }",
     );
@@ -139,7 +139,7 @@ fn closed_row_aliases_merge_by_the_defined_direction() {
 
 #[test]
 fn equivalent_nested_row_orders_do_not_change_handler_acceptance() {
-    // §4.4 defines unions as sets. F1's proof must use type equality,
+    // Unions are sets. The proof must use type equality,
     // including alias equality and union order, rather than source text.
     let base = "Dep = ()\nExtra = ()\nSvc(R) = (() <- R -> Nil)\nwrap : <N>(\n\t() <- (Svc(Extra | Dep), ..N) -> Nil,\n\tSvc(Dep | Extra),\n) <- N -> Nil = (body, svc) {\n    provided : Svc(Extra | Dep) = svc\n    body() <- (provided)\n}";
     let before = types(base);
@@ -154,7 +154,7 @@ fn equivalent_nested_row_orders_do_not_change_handler_acceptance() {
 fn row_kind_survives_an_alias_without_algebra() {
     // N stays a need row when a function alias is copied without
     // normalization, whether alone or beside a named service. Errors
-    // use an ordinary Fail argument now (§9.3), not a second row kind.
+    // use an ordinary Fail argument now, not a second row kind.
     for need in ["N", "(Dep, ..N)"] {
         let source = "Dep = ()
 Svc(A) = (() -> A)
@@ -177,7 +177,7 @@ bad = <N>(body: Row(N), one: Svc(Int), two: Svc(Nil)) {
 
 #[test]
 fn handler_witnesses_include_exact_bounds_of_annotation_holes() {
-    // §4.5: L <: v <: U proves v = T when L = T = U. A hole in a
+    // L <: v <: U proves v = T when L = T = U. A hole in a
     // invariant handler fixed to Int must prove the same witness as writing Int.
     let source = "Svc(A) = (f = (A) -> A)
 wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
@@ -206,7 +206,7 @@ wrap = <N>(body: () <- (Svc(Int), ..N) -> Int, svc: Svc(Int)) -> Int {
 
 #[test]
 fn a_handler_annotation_hole_cannot_hide_its_incompatible_value() {
-    // §9.2: the actual provider P must satisfy S by ordinary subtyping.
+    // The actual provider P must satisfy S by ordinary subtyping.
     // A covariant hole with incoming Int cannot provide Svc(String).
     for annotation in ["Int", "_"] {
         let source = format!(
@@ -224,7 +224,7 @@ fn a_handler_annotation_hole_cannot_hide_its_incompatible_value() {
 
 #[test]
 fn written_row_algebra_keeps_its_mode_before_normalization() {
-    // §4.4: “When the parameter does not change, Ai and Bi must be equal”.
+    // “When the parameter does not change, Ai and Bi must be equal”.
     // Keep the original algebra/alias coverage with an invariant row
     // parameter; directed parameters now follow ordinary intersection.
     let head = "Dep = ()
@@ -241,20 +241,20 @@ Alias(N) = T(N)
         for written in [
             format!("T({row})"),
             format!("Alias({row})"),
-            // The old `() -> Nil ! {row}` has no syntax-three form: a need
-            // list holds named service types only (syntax-3 §3.1).
+            // Need lists require named service types, so algebra over error
+            // values belongs inside the ordinary Fail argument.
             format!("() <- (Fail({row})) -> Nil"),
         ] {
             let source =
                 format!("{invariant_head}Written = {row}\nuse = (x : {written}) {{ x }}\n");
             let (graph, _, _) = common::check_files(&[("src/main.i", &source)]);
             let checked = ilang_check::check(&graph);
-            // Fail's argument is an ordinary value type after E3. Its
+            // Fail's argument is an ordinary value type in the need row. Its
             // invariant union/intersection error is E0503, as elsewhere;
             // the former separate error-row diagnostic no longer applies.
             let expected = if op == "-" && written.contains("Fail(") {
                 // A difference in an ordinary error value requires value
-                // subtyping (§4.4); this is no longer an error-row check.
+                // subtyping; this is no longer an error-row check.
                 "E0501"
             } else if op == "-" {
                 "E0515"
@@ -274,7 +274,7 @@ Alias(N) = T(N)
         types(&alias.replace("S(Never) | S(Dep)", "S(Never)"))
     );
     // Value unions keep ordinary variance; distinct row constructors may
-    // also coexist. Neither is a same-form collision under rule 4.
+    // also coexist. Neither is a collision between two forms of one service type.
     types(&format!(
         "{head}value = (x : {{ S(Never) | S(Dep) }}) {{ x }}
 "
@@ -287,8 +287,8 @@ Alias(N) = T(N)
 
 #[test]
 fn instantiated_output_rows_are_checked_even_when_unused() {
-    // §9.2 forbids two S forms in the returned callback's environment,
-    // whether it is invoked or left unused. §4.8 unions the two rows.
+    // Two S forms are forbidden in the returned callback's environment,
+    // whether it is invoked or left unused. The two rows are unioned.
     let source = "S(A) = (A)\nT(N) = (f = () <- N -> Nil)\nmerge = <N, M>(a : T(N), b : T(M)) {\n\tT(\n\t\tf = () {\n\t\t\ta.f()\n\t\t\tb.f()\n\t\t},\n\t)\n}\none = () <- (s : S(Int)) { Nil }\ntwo = () <- (s : S(String)) { Nil }\n\nmain = () {\n\tunused = merge(T(f = one), T(f = two))\n\tNil\n}";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
     let checked = ilang_check::check(&graph);
@@ -303,7 +303,7 @@ fn instantiated_output_rows_are_checked_even_when_unused() {
 
 #[test]
 fn function_type_joins_preserve_scalar_error_inclusion() {
-    // Rule 8 still governs scalar error value sets when function types
+    // Subtype comparison governs scalar error value sets when function types
     // are joined; the row mode must reach merge_arg as well as calls.
     types(
         "(\n\ti/fail\n)\none = () -> Nil { fail.raise(1) }\ntwo = () -> Nil { fail.raise(2) }\npick = (b : Bool) { b |> (True) { one } | (False) { two } }",
@@ -312,7 +312,7 @@ fn function_type_joins_preserve_scalar_error_inclusion() {
 
 #[test]
 fn a_directed_row_handler_keeps_the_callback_row_open() {
-    // §4.4: the need is an intersection; §4.5 rule 6 also determines
+    // The need is an intersection; function subtyping also determines
     // the direction of N. Handling S(N) must not put S(N) inside N.
     let shown = types(
         "S(N) = (f = () <- N -> Int)
@@ -321,7 +321,7 @@ wrap = <N>(svc: S(N)) -> Int { use() <- (svc) }",
     );
     // The retained key restriction is shown explicitly; A stays open to
     // every other service. The retained obligation uses the actual provider
-    // form S(A), as required by the directed P <: S check (§9.2).
+    // form S(A), as required by the directed P <: S check.
     assert_eq!(shown["app/main.wrap"], "(S(A)) <- (A - S(A)) -> Int");
     types(
         "Dep = (value = Int)\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s: S(N)) { s.f() }\nwrap = <N>(svc: S(N)) -> Int { use() <- (svc) }\nneed = () <- (d: Dep) { d.value }\nexample = () { wrap(S(f = () { need() })) <- (Dep(value = 1)) }\n",
@@ -330,7 +330,7 @@ wrap = <N>(svc: S(N)) -> Int { use() <- (svc) }",
 
 #[test]
 fn a_function_union_shows_the_intersection_of_its_service_needs() {
-    // §4.4 puts function environments together by the need merge of §9.2.
+    // Function environments combine by merging their service needs.
     let shown = types(
         "Yield(A) = ((A) -> Nil)\none = () <- (s : Yield(Int)) { Nil }\ntwo = () <- (s : Yield(String)) { Nil }\nfns = [one, two]",
     );
@@ -342,7 +342,7 @@ fn a_function_union_shows_the_intersection_of_its_service_needs() {
 
 #[test]
 fn equal_invariant_arguments_do_not_block_other_argument_meets() {
-    // §4.4: invariant arguments must be equal; the remaining arguments
+    // Invariant arguments must be equal; the remaining arguments
     // still follow their defined directions in the same service entry.
     let shown = types(
         "Cell(I, A) = (state = I, put = (I) -> Nil, value = A)\none = () <- (s : Cell(Int, Int)) { Nil }\ntwo = () <- (s : Cell(Int, 1)) { Nil }\nboth = () {\n\tone()\n\ttwo()\n}",
@@ -352,7 +352,7 @@ fn equal_invariant_arguments_do_not_block_other_argument_meets() {
 
 #[test]
 fn an_undetermined_need_argument_keeps_its_intersection() {
-    // §4.4: “a & T, with a type variable a, stays as it is.” The service
+    // “a & T, with a type variable a, stays as it is.” The service
     // meet must not constrain the ordinary value parameter A to Int.
     let shown = types(
         "Read(A) = (value = A)\nneed_int = () <- (r : Read(Int)) { Nil }\nboth = <A>(x : A) <- (r : Read(A)) {\n\tneed_int()\n\tx\n}",
@@ -377,7 +377,7 @@ fn closed_constructor_arguments_still_report_an_empty_need_meet() {
 
 #[test]
 fn inferred_handlers_keep_future_provider_constraints() {
-    // §9.2: a provided value must be a subtype of the needed service.
+    // A provided value must be a subtype of the needed service.
     // Generalizing an inferred row must retain that obligation for callers.
     let source = "S(A) = (value = A)\nread = () <- (s : S(String)) { s.value <> \"!\" }\nwith = <A>(x : A, f) { provided : S(A) = S(value = x) f() <- (provided) }\nmain = () {\n\twith(1, read)\n\tNil\n}";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
@@ -404,7 +404,7 @@ fn higher_order_entry_keeps_unprovided_service() {
 
 #[test]
 fn nested_forwarding_keeps_the_provided_services_own_need() {
-    // §9.2: providing S(Dep) handles S, not the Dep needed by its method.
+    // Providing S(Dep) handles S, not the Dep needed by its method.
     let shown = types(
         "Dep = (v = Int)\nget = () <- (d : Dep) { d.v }\nS(N) = (f = () <- N -> Int)\nuse = <N>() <- (s : S(N)) { s.f() }\nrun = <A, N>(f : () <- N -> A) { f() }\nfw = () { use() }\nfr = () { run(() { use() }) }\nmain = () {\n\t{\n\t\th = () { run(fr) }\n\t\tk = () { run(h) + fw() }\n\t\tk()\n\t\tNil\n\t} <- (S(f = () { get() }))\n}",
     );
@@ -451,7 +451,7 @@ fn a_value_argument_cannot_erase_a_shared_row_constraint() {
 
 #[test]
 fn catch_generalizes_its_stated_fail_entry_and_residual_row() {
-    // Rule B: the callback's (..N, Fail(E)) states the restriction on N.
+    // Handling: the callback's (..N, Fail(E)) states the restriction on N.
     // The scheme retains it; it is not an unexpressed provider obligation.
     let shown = types(
         "(i/fail)\nforward = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> Result(A, E) { fail.catch(body) }\n",
@@ -462,7 +462,7 @@ fn catch_generalizes_its_stated_fail_entry_and_residual_row() {
 
 #[test]
 fn catch_cannot_split_a_fail_entry_into_the_residual_row() {
-    // §2.10.4 Q1-B: choosing E = Int and N = Fail(String) would allow
+    // Choosing E = Int and N = Fail(String) would allow
     // an Error(String) to escape with the claimed Result(Nil, Int) type.
     let source = "(i/fail)\nsplit: (() <- (Fail(Int | String)) -> Nil) <- (Fail(String)) -> Result(Nil, Int) = (body) { fail.catch(body) }\n";
     let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
@@ -495,9 +495,8 @@ fn a_directed_handler_restriction_without_a_stated_entry_is_hidden() {
 
 #[test]
 fn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {
-    // Decision 2 (EF03/T4) removes universal-entry erasure. Preserve the
-    // original unused-head source as a negative case beside a real raise;
-    // a provider, not choosing E = Never, makes the pure callback valid.
+    // An unused Fail entry still requires its provider; choosing E = Never
+    // must not erase the service key. Check both unused and raised entries.
     let unused = "unused = <E>() <- (handler: Fail(E)) { Nil }\nrun = (f: () -> Nil) { f() }\nmain = () { run(() { unused() }) }\n";
     let provided = unused.replace(
         "unused() })",
@@ -522,7 +521,7 @@ fn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {
 
 #[test]
 fn a_sink_with_a_stored_callback_row_has_a_finite_instantiation() {
-    // E3 stores Fail in the callback row. The factory is pure and its
+    // The callback stores Fail in the callback row. The factory is pure and its
     // callback raises String; neither row contains the sink itself.
     let source = r#"(i/fail)
 Entry = (message = String)
@@ -759,7 +758,7 @@ fn a_covariant_handler_hole_retains_its_upper_bound() {
 
 #[test]
 fn a_filtered_callback_does_not_vacate_an_unused_fail_need() {
-    // Decision 2: excluding Fail excludes its key even when E = Never.
+    // excluding Fail excludes its key even when E = Never.
     // Keep both old sources: an unused head and a real raise must reject.
     let source = "(i/fail)\nNoError(N) = N - Fail(Never)\nrun = <N>(f: () <- (NoError(N)) -> Nil) { f() }\npure = <E>() <- (unused: Fail(E)) { Nil }\nmain = () { run(pure) }\n";
     let plain = source.replace("pure = <E>() <- (unused: Fail(E))", "pure = ()");
@@ -918,7 +917,7 @@ fn a_closed_provider_alias_retains_all_reader_diagnostics() {
 
 #[test]
 fn named_function_provider_keeps_call_and_binding_diagnostics() {
-    // §9.2: changing an inline provider function to a named helper must
+    // Changing an inline provider function to a named helper must
     // retain the same call and binding obligations. The lowering boundary
     // fix sees inline function expressions; this case also needs cached-row
     // validation when the closed provider contains only a function name.
@@ -948,7 +947,7 @@ fn named_function_provider_keeps_call_and_binding_diagnostics() {
 
 #[test]
 fn an_error_alias_uses_an_ordinary_value_parameter_after_e3() {
-    // §9.3 declares Fail(E) as ordinary data; E is not a need row. The
+    // Fail(E) is ordinary data; E is not a need row. The
     // corpus negative retains its row-kind intent with Row(N) <- N.
     let row =
         include_str!("../../../tests/review/cases/review-k4-lane/alias_kind_error/src/main.i");
@@ -969,8 +968,7 @@ fn an_error_alias_uses_an_ordinary_value_parameter_after_e3() {
 
 #[test]
 fn unused_service_heads_keep_the_required_environment_key() {
-    // Decision 2 (EF03/T4) drops §9.2's constructor-relative universal
-    // entry removal: simplifying the argument cannot supply a missing key.
+    // Simplifying a service argument cannot supply a missing constructor key.
     // Keep both unused-head cases and the original used-head control.
     for source in [
         include_str!("../../../tests/review/cases/review-k4s/min_main_3_0/src/main.i"),
@@ -987,8 +985,7 @@ fn unused_service_heads_keep_the_required_environment_key() {
 
 #[test]
 fn corpus_entry_errors_name_each_unprovided_service_once() {
-    // §2.10.11 replaces the planner's aggregate open-row error by the
-    // target's concrete missing keys. Repeated E0523 codes are distinct
+    // Entry diagnostics identify the target's concrete missing keys. Repeated E0523 codes are distinct
     // errors for S and T, not duplicate reports of one service.
     for (source, expected) in [
         (
@@ -1065,8 +1062,8 @@ fn a_vendored_sink_marker_keeps_its_row_invariant() {
 
 #[test]
 fn a_bottom_returning_method_can_satisfy_two_covariant_needs() {
-    // Decision 1; §4.4 intersects constructor arguments, and §11.7
-    // permits a function to stop or diverge. Read(Never) is inhabited.
+    // Constructor arguments intersect, while functions may stop or diverge.
+    // A stopping method therefore inhabits Read(Never).
     let shown = types(
         "Read(A) = (read = () -> A)\nf = () <- (r : Read(Int)) { r.read() }\ng = () <- (r : Read(String)) { r.read() }\nboth = () { f() g() }\nmain = () { both() <- (Read(read = () { panic(\"bottom\") })) }",
     );
@@ -1085,12 +1082,12 @@ fn a_bottom_returning_method_can_satisfy_two_covariant_needs() {
 
 #[test]
 fn a_two_parameter_method_meet_depends_on_required_data() {
-    // Decision 1 and §4.1: a function that stops inhabits () -> Never.
+    // A stopping function inhabits () -> Never.
     // This is the exact constructor shape of the b1 corpus summaries.
     let source = "S(A, N) = (() <- N -> A)\nleft = () <- (s: S(String, Never)) { Nil }\nright = () <- (s: S(Int, S(String, Never))) { Nil }\nboth = () { left() right() }\n";
     let shown = types(source);
     assert!(shown["app/main.both"].contains("S(Never,"), "{shown:?}");
-    // Decision 2: being inhabited does not provide the constructor key.
+    // being inhabited does not provide the constructor key.
     let provided = format!("{source}main = () {{ both() <- (S(() {{ panic(\"bottom\") }})) }}");
     types(&provided);
     let impossible = source.replace("S(A, N) = (() <- N -> A)", "S(A, N) = (A, () <- N -> A)");
@@ -1105,7 +1102,7 @@ fn a_two_parameter_method_meet_depends_on_required_data() {
 
 #[test]
 fn shipped_stored_callback_types_keep_their_need_invariant() {
-    // std-1 §3.1 and std-2 L5 require invariant N. Read the shipped
+    // Stored callback needs remain invariant. Read the shipped
     // declarations, rather than a second copy that could miss a port bug.
     let stream = include_str!("../../../std/src/stream.i");
     let log = include_str!("../../../std/src/log.i");
@@ -1141,7 +1138,7 @@ fn shipped_stored_callback_types_keep_their_need_invariant() {
 
 #[test]
 fn mixed_recursive_need_parameters_can_be_forwarded_as_values() {
-    // Decision 1/EF09: the same variable may occur in a need and an
+    // the same variable may occur in a need and an
     // ordinary parameter. Keep every original accepted corpus variant.
     for source in [
         include_str!("../../../tests/review/cases/review-k4s/mixed_recursive_0_0/src/main.i"),
@@ -1156,7 +1153,7 @@ fn mixed_recursive_need_parameters_can_be_forwarded_as_values() {
 
 #[test]
 fn provider_conflicts_keep_call_and_binding_diagnostics() {
-    // Spec §9.2: a provided P satisfies a need S only when P <: S.
+    // A provided P satisfies a need S only when P <: S.
     // Both the call obligation and the enclosing binding must retain the
     // Reader(String)/Reader(Int) conflict; keeping only the call loses reports.
     let source = include_str!("types/soundness.i");

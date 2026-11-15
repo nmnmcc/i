@@ -1,4 +1,4 @@
-//! Multi-shape function values at run time (syntax-3.md §2.6.5, §6.4): a
+//! Multi-shape function values at run time: a
 //! `$multi` holds one ordinary closure per shape group, and every indirect
 //! call site dispatches on the shape of its argument data when the callee is
 //! not a closure of its arity. The programs here are written directly in the
@@ -191,7 +191,7 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     let r = f.let_(Value::Op(Op::IntMul, vec![v, int(2)]));
     let body = add(f.done("body", Some(r)));
 
-    // E3's library catch calls the body inside a boundary.
+    // Library catch calls the body inside a boundary.
     let mut f = F::new(1);
     let r = f.call(Callee::Value(Atom::Global(GlobalId(4))), vec![]);
     let catch_body = add(f.done("catch_body", Some(r)));
@@ -339,8 +339,8 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     f.check(r, int(7));
     checks.push(("catch_ensure", f.done("catch_ensure", None)));
 
-    // E6 removes the source primitive. Private host-adapter pinning still
-    // retains an environment around a multi-shape value (§9.4).
+    // Row capture is ordinary source syntax. Private host-adapter pinning still
+    // retains an environment around a multi-shape value.
     let mut f = F::new(0);
     let k = f.let_(Value::OpEnv(Op::PinEnvironment, vec![g(0)], Env::Param));
     let r = f.call(Callee::Value(k), vec![int(5)]);

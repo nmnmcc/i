@@ -1,4 +1,5 @@
-//! Native packages (docs/design/native.md, N1, N2, N4 and §11): `i build`
+//! Native packages, the default target: a prebuilt runner plus the compiled
+//! program, rejecting only required imports that the runner cannot supply. `i build`
 //! makes one executable that runs without `i`.
 
 use std::{
@@ -502,7 +503,7 @@ fn imports_the_runner_cannot_supply_are_rejected() {
     );
     // The module itself still builds for an embedding host.
     assert!(i(&["build", "--target", "host"], &project).status.success());
-    // A service replaced with an ordinary i value needs no import (N4).
+    // A service replaced with an ordinary i value needs no import.
     let project = package(
         dir.path(),
         r#"(
@@ -557,9 +558,11 @@ fn start_up_is_quick() {
         assert!(run(&exe, &[]).status.success());
     }
     let each = start.elapsed() / 5;
-    // About: no compilation happens at start-up. Relative, not a wall-clock bound, so a busy
+    // About: no compilation happens at start-up. Relative, not a wall-clock
+    // bound, so a busy
     // machine does not fail it: running the executable must cost less than building it (a
-    // build compiles the program; start-up only loads the precompiled payload), and both are
+    // build compiles the program; start-up only loads the precompiled payload),
+    // and both are
     // slowed alike by load.
     assert!(
         each < build_time,

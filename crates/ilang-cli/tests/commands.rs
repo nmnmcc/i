@@ -1,4 +1,5 @@
-//! `i build`, `i run`, and `i test`, and the host exports of B.2 and B.5.
+//! `i build`, `i run`, and `i test`, and the host exports, including wire
+//! signatures and export names.
 
 use ilang_cli::{BuildOptions, Level, build};
 use ilang_host::{BitArray, HostOptions, Outcome, Program, Value};
@@ -372,7 +373,7 @@ bits = (b : Bool) -> Nil {
 }
 
 /// Host exports with host services: a sync service with errors, and an
-/// async service, whose exports are async (§10.2, B.5) and wait for the
+/// async service, whose exports are async and wait for the
 /// host through `ilang_resume:…`; their results come from `ilang_result:…`.
 #[test]
 fn host_exports_with_services_and_async() {
@@ -502,8 +503,8 @@ pure = (n : Int) { n + 1 }
 }
 
 /// An entry point is async when it may call a function of an async host
-/// service (§10.2); a test that gives a fake in its place is not (§9.7). The
-/// metadata lists only the host services that the entry points need (B.6).
+/// service; a test that gives a fake in its place is not. The
+/// metadata lists only the host services that the entry points need.
 #[test]
 fn async_entry_points_and_needed_services() {
     let spec = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec/9.7/fake_service.i");
@@ -660,7 +661,7 @@ fn git(dir: &Path, args: &[&str]) {
 }
 
 /// A package with a location, got from a local bare repository: its source
-/// positions have the `location@major ` prefix (§11.7), and `--offline` uses
+/// positions have the `location@major ` prefix, and `--offline` uses
 /// only the cache.
 #[test]
 fn located_packages() {
@@ -736,7 +737,7 @@ fn located_packages() {
 
 /// By default the host gives the answers of host functions to the module as
 /// they are, so an answer that is not correct stops the program with the
-/// positions of the call (B.2, §11.7). With `check_replies`, the host stops
+/// positions of the call. With `check_replies`, the host stops
 /// the program itself, with no positions.
 #[test]
 fn incorrect_host_answers_stop_in_the_module() {

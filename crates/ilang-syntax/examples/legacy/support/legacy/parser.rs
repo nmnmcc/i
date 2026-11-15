@@ -1,6 +1,6 @@
-//! A recursive-descent parser for i (§2.2 to §8.1).
+//! A recursive-descent parser for i.
 //!
-//! The line rule (§1.7) is one check: a token with `brk` never continues a
+//! The line rule is one check: a token with `brk` never continues a
 //! construct. Inside `( )`, `[ ]`, and `<< >>` such a token counts as a `,`;
 //! inside `{ }` and at the top level it begins the next statement, clause,
 //! constructor, or item.
@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 type PResult<X> = Result<X, Diagnostic>;
 
-/// What a `{` that begins an expression begins (§6.1).
+/// What a `{` that begins an expression begins.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Brace {
     Block,
@@ -31,7 +31,7 @@ pub struct ParseStats {
     pub braces: usize,
 }
 
-/// Parses a module in the syntax of §2.2. The module is complete as
+/// Parses a complete legacy module. The module is complete as
 /// far as the source allows; the diagnostics say what was wrong, sorted by
 /// position.
 pub fn parse_module_legacy(source: &str) -> (Module, Vec<Diagnostic>) {
@@ -51,9 +51,9 @@ pub fn parse_module_uncached(source: &str) -> (Module, Vec<Diagnostic>) {
     (module, diags)
 }
 
-/// Parses with `|>` at the level it had before syntax three stage 5: above
+/// Preserves the legacy precedence of `|>`: above
 /// `<>` and below `+`. Only `examples/migrate-syntax3-pipe.rs` uses it, to find the
-/// groups of an old source that other lanes add after the change.
+/// grouping of legacy input before conversion.
 #[doc(hidden)]
 pub fn parse_module_old_pipe(source: &str) -> (Module, Vec<Diagnostic>) {
     let (module, diags, _) = run_with(source, true, true);
@@ -111,7 +111,7 @@ struct Parser<'a> {
     pos: usize,
     diags: Vec<Diagnostic>,
     /// Set in a guard: a `->` ends the clause head, so it never makes a `( )`
-    /// a function (§6.1). Cleared inside brackets.
+    /// a function. Cleared inside brackets.
     guard: bool,
     /// The decision for each `{` that begins an expression, by the index of
     /// its token. A decision depends only on the tokens, so it
@@ -119,10 +119,10 @@ struct Parser<'a> {
     decided: HashMap<usize, Brace>,
     decisions: usize,
     /// Set when a pattern has `x: ( … )`, for the note on tuple types in a
-    /// clause (§7.1).
+    /// clause.
     tuple_type: bool,
     cache: bool,
-    /// The level of `|>` before syntax three stage 5 (see `parse_module_old_pipe`).
+    /// Legacy pipe precedence is needed to preserve grouping during migration.
     old_pipe: bool,
 }
 
@@ -156,7 +156,7 @@ fn binop(kind: &T) -> Option<BinOp> {
     })
 }
 
-/// `Name` of §6.1: `x`, `C`, `m.C`, or `m.x`, which is a field here.
+/// A name expression: `x`, `C`, `m.C`, or `m.x`, which is a field here.
 fn is_name(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Name { .. } => true,
@@ -182,7 +182,7 @@ fn starts_with_clauses(e: &Expr) -> bool {
 
 /// The parameters of a type definition head when it is a list of plain
 /// `UpName`s with no
-/// module and no arguments (§4.3).
+/// module and no arguments.
 fn head_params(types: &[TypeExpr]) -> Option<Vec<Ident>> {
     let upper = types
         .iter()
@@ -407,7 +407,7 @@ impl Parser<'_> {
         out
     }
 
-    // ---- Module (§2.2 to §2.5) ----
+    // ---- Module ----
 
     fn module(&mut self) -> Module {
         let mut module = Module {
@@ -487,7 +487,7 @@ impl Parser<'_> {
     }
 
     /// A `(` whose `)` is not followed by `=`: the imports or the exports
-    /// at the start of a file, and an error after it (§2.2).
+    /// at the start of a file, and an error after it.
     fn at_header_group(&self) -> bool {
         self.at(&T::LParen)
             && self.close[self.pos].is_some_and(|c| self.toks[c as usize + 1].kind != T::Eq)
@@ -581,7 +581,7 @@ impl Parser<'_> {
         let mut attributes = Vec::new();
         while self.at(&T::At) {
             attributes.push(self.attribute()?);
-            // §1.2: a `///` after an attribute is still before the item.
+            // A `///` after an attribute is still before the item.
             doc.extend(self.take_docs());
         }
         if self.at_header_group() {
@@ -634,7 +634,7 @@ impl Parser<'_> {
             let bstart = self.start();
             let Some(pattern) = self.binding_head()? else {
                 // `name: Type` with no `=` is a declaration; the checker
-                // reports it when `@external` is missing (§2.5).
+                // reports it when `@external` is missing.
                 if matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Colon {
                     let name = self.name()?;
                     self.bump();
@@ -670,7 +670,7 @@ impl Parser<'_> {
 
     /// `name ( UpName {, UpName} )` with the `(` on the line of the name,
     /// followed by `=` or `:`: a binding or a declaration with type
-    /// parameters (§2.5, §6.1 test 1).
+    /// parameters.
     fn at_type_params(&self) -> bool {
         if !matches!(self.kind(), T::Name(_)) {
             return false;
@@ -740,7 +740,7 @@ impl Parser<'_> {
     }
 
     /// `[name .] name (` … `)` with no `=` or `:` after the `)`: a
-    /// `MacroItem` (§2.2).
+    /// `MacroItem`.
     fn at_macro_item(&self) -> bool {
         if !matches!(self.kind(), T::Name(_)) {
             return false;
@@ -807,7 +807,7 @@ impl Parser<'_> {
         })
     }
 
-    /// §4.3.
+    /// Type application arguments must retain their written order.
     fn type_def(&mut self) -> PResult<TypeDef> {
         let name = self.up_name()?;
         let mut params = Vec::new();
@@ -893,10 +893,10 @@ impl Parser<'_> {
         })
     }
 
-    // ---- Statements (§6.10) ----
+    // ---- Statements ----
 
     /// The longest chain `p0 = p1 = … =` at the current position, as one
-    /// pattern (§6.1). Only a name may have `=` after it inside a pattern.
+    /// pattern. Only a name may have `=` after it inside a pattern.
     /// Returns `None`, and moves nothing, when there is no pattern and `=`.
     fn binding_head(&mut self) -> PResult<Option<Pattern>> {
         let mut pats = Vec::new();
@@ -1013,13 +1013,13 @@ impl Parser<'_> {
         Ok(Block { stmts, span })
     }
 
-    // ---- Expressions (§6.1) ----
+    // ---- Expressions ----
 
     fn expr(&mut self) -> PResult<Expr> {
         self.binary(0)
     }
 
-    /// The binding level of `op` (§6.9). `|>` is the weakest.
+    /// The binding level of `op`. `|>` is the weakest.
     fn level(&self, op: BinOp) -> u8 {
         use BinOp::*;
         if !self.old_pipe {
@@ -1151,7 +1151,7 @@ impl Parser<'_> {
                 value: p.expr()?,
             })
         })?;
-        // §6.6: arguments by position come before arguments by label.
+        // Arguments by position come before arguments by label.
         let mut labeled = false;
         for arg in &args {
             labeled |= arg.label.is_some();
@@ -1333,7 +1333,7 @@ impl Parser<'_> {
     }
 
     /// `(` at a primary: a function when `->`, or a `{` on the same line, comes
-    /// after its `)`; a tuple when not (§6.1, §1.7). In a guard, `->` does not
+    /// after its `)`; a tuple when not. In a guard, `->` does not
     /// count.
     fn label_start(&self) -> bool {
         matches!(
@@ -1360,7 +1360,7 @@ impl Parser<'_> {
     }
 
     fn type_datum(&mut self) -> PResult<TypeKind> {
-        // syntax-3 §2.3: `()` is the empty data type.
+        // `()` is the empty data type.
         if self.at(&T::RParen) {
             self.bump();
             return Ok(TypeKind::Record {
@@ -1430,7 +1430,7 @@ impl Parser<'_> {
         })
     }
 
-    /// After the `(` of a function (§6.8).
+    /// After the `(` of a function.
     fn function(&mut self) -> PResult<Function> {
         let params = self.seq(T::RParen, true, |p| {
             let env =
@@ -1493,7 +1493,7 @@ impl Parser<'_> {
         })
     }
 
-    /// The clauses of a clause block, from its `{` (§6.12).
+    /// The clauses of a clause block, from its `{`.
     fn clauses(&mut self) -> PResult<Vec<Clause>> {
         self.braced(Self::clause)
     }
@@ -1542,7 +1542,7 @@ impl Parser<'_> {
         Ok((guard, body))
     }
 
-    // ---- Deciding a `{` (§6.1) ----
+    // ---- Deciding a `{` ----
 
     /// Whether the `{` at the current token begins a block or a clause
     /// block. Each `{` is decided once; the answer is kept by its index.
@@ -1562,7 +1562,7 @@ impl Parser<'_> {
         b
     }
 
-    /// The tests of §6.1 on the first statement of the `{` at `at`. Moves
+    /// The first statement decides the brace form at `at`. Moves
     /// `pos`, which `decide` puts back.
     fn probe(&mut self, at: usize) -> Brace {
         let Some(end) = self.close[at] else {
@@ -1650,14 +1650,14 @@ impl Parser<'_> {
         false
     }
 
-    // ---- Patterns (§7.1) ----
+    // ---- Patterns ----
 
     fn pattern(&mut self) -> PResult<Pattern> {
         self.pattern_in(false)
     }
 
     /// `segment` is set at the top of a bit array segment, where `:` begins a
-    /// format and not a type (§8.1).
+    /// format and not a type.
     fn pattern_in(&mut self, segment: bool) -> PResult<Pattern> {
         if !(matches!(self.kind(), T::Name(_)) && *self.nth(1) == T::Eq) {
             return self.pattern_atom(segment);
@@ -1829,7 +1829,7 @@ impl Parser<'_> {
         })
     }
 
-    /// `[m.]C[(p, …, ..)]`: the parts and `..` (§7.1).
+    /// `[m.]C[(p, …, ..)]`: the parts and `..`.
     fn constructor_pattern(&mut self) -> PResult<PatternKind> {
         let module = self.qualifier()?;
         let name = self.up_name()?;
@@ -1897,7 +1897,7 @@ impl Parser<'_> {
         })
     }
 
-    // ---- Types (§3) ----
+    // ---- Types ----
 
     fn ty(&mut self) -> PResult<TypeExpr> {
         self.type_list(T::Pipe, Self::type_inter, TypeKind::Union)
@@ -1933,7 +1933,7 @@ impl Parser<'_> {
         })
     }
 
-    /// The part of a function type or a function after `->` (§3, §6.8).
+    /// The part of a function type or a function after `->`.
     #[allow(clippy::type_complexity)]
     fn arrow_tail(&mut self) -> PResult<(TypeExpr, Option<TypeExpr>, Option<TypeExpr>)> {
         let value = self.ty()?;
@@ -1948,7 +1948,7 @@ impl Parser<'_> {
         } else {
             None
         };
-        // §3: this `->` is the nearest one, and it has taken what it can.
+        // This `->` is the nearest one, and it has taken what it can.
         if self.at(&T::Caret) || self.at_joined(&T::Bang) {
             let msg = format!(
                 "the nearest `->` cannot take this {}: it already has one, or `!` came first; put the inner function type in `{{ }}`",

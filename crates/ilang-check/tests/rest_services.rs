@@ -1,4 +1,4 @@
-//! Syntax-three E6: captured need rows stay distinct from data.
+//! Captured need rows stay distinct from ordinary data.
 mod common;
 
 fn checked(source: &str) -> (Vec<String>, Vec<String>) {
@@ -121,7 +121,7 @@ fn e6_runtime_fixtures_type_check() {
 
 #[test]
 fn a_need_parameter_can_also_appear_in_a_value_type() {
-    // Decision 1 (EF01/EF09) removes §4.7's exclusive classification.
+    // A type parameter may occur in both value and need positions.
     // Retain the original mixed-use source as an acceptance regression;
     // known keys are still required for extracting/providing services.
     let (_, errors) = checked("f = <N>(x: N) <- (..env: N) { Nil }");
@@ -152,7 +152,7 @@ fn a_rest_head_declares_its_own_row_parameter() {
 
 #[test]
 fn an_unused_fail_parameter_keeps_its_service_key() {
-    // Decision 2: the declared Fail(E) need is real even at E = Never.
+    // the declared Fail(E) need is real even at E = Never.
     // Keep both original definitions as rejection cases; retain positive
     // callback coverage by passing the need on and by supplying its value.
     let original = "constrain = <E>(f: () <- (Fail(E)) -> Int) -> () -> Int { () { f() } }\npure = () { constrain(() { 42 })() }";

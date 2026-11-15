@@ -278,8 +278,8 @@ impl Query<'_> {
     }
 
     /// What makes the values of the type at `offset`: its constructors,
-    /// and for a service type the environment statements that give it
-    /// (§9.2). Of a constructor or a value, its definition.
+    /// and for a service type the environment statements that give it.
+    /// Of a constructor or a value, its definition.
     pub fn implementations_at(&self, m: ModuleId, offset: u32) -> Vec<Location> {
         let Some((owner, _, target)) = self.target_at_offset(m, offset) else {
             return Vec::new();
@@ -289,7 +289,7 @@ impl Query<'_> {
         };
         let p = self.program;
         let mut out = Vec::new();
-        // A name for a union (syntax three §2.8): the constructors of its
+        // A name for a union: the constructors of its
         // members, in the order written.
         let mut types = Vec::new();
         union_members(p, t, &mut types);
@@ -319,7 +319,7 @@ impl Query<'_> {
                         else {
                             continue;
                         };
-                        // A provide `e <- (C(…))` of syntax three lowers to
+                        // A provide `e <- (C(…))` of the source syntax lowers to
                         // an environment statement with no written type: its
                         // type is the one of the constructor it calls.
                         let provided = matches!(&ty.kind, TypeKind::Hole)
@@ -497,7 +497,7 @@ impl Query<'_> {
         };
         let mut out = Vec::new();
         for s in [ast.imports_span, ast.exports_span].into_iter().flatten() {
-            // The header group `( … )` of syntax three folds whole: the
+            // The header group `( … )` of the source syntax folds whole: the
             // span of the tree covers only the names inside it.
             let s = group_around(text, s);
             if lines(s) {

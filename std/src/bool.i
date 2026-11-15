@@ -1,4 +1,4 @@
-//// Functions for the built-in type `Bool { True False }`.
+//// Functions for the built-in type `Bool = True | False`.
 ////
 //// `&&` and `||` are operators and may not be used as values; `and` and
 //// `or` are the same as functions, for example for `list.fold`. They do

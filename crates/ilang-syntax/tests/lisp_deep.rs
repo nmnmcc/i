@@ -328,7 +328,7 @@ fn deep_quoted_lisp_text_restores_context_and_spans() {
 }
 
 /// A macro result deeper than the host stack is read into the tree of
-/// syntax three, and the tree is dropped, without overflowing.
+/// the source syntax, and the tree is dropped, without overflowing.
 #[test]
 fn deep_datum_is_read_and_dropped_as_the_new_tree() {
     use ilang_syntax::lisp::{Datum, DatumKind as K};

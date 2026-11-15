@@ -19,7 +19,7 @@
 //! The host gives the services and external functions of
 //! `ilang_host::services::testing` under `test:` namespaces, and, as by
 //! default, does not check their answers, so that the module stops for an
-//! answer that is not correct (B.2). With `output` lines, the texts that the entry gave to
+//! answer that is not correct. With `output` lines, the texts that the entry gave to
 //! `test:io/v1` `print` and to the functions of `test:async/v1` are exactly
 //! those, in order.
 //!
@@ -386,7 +386,7 @@ fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec"));
     let all = cases(&root);
-    // Cases waiting for a later syntax-three stage (open records leave in stage 6):
+    // Pending cases return early so unsupported forms do not mask other failures:
     // one case name per line, `#` starts a comment. They are skipped and counted.
     let pending: Vec<String> = std::fs::read_to_string(root.join("syn3-pending.txt"))
         .unwrap_or_default()

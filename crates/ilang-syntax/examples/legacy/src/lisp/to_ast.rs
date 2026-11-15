@@ -141,7 +141,7 @@ async fn type_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<TypeExpr> {
         K::Name(_) | K::UpName(_) => named_type(s, d, &[]).await?,
         K::Curly(xs) if xs.len() == 1 => return type_child(s, &xs[0]).await,
         K::Round(xs) if record_start(xs) => record_type(s, d, xs).await?,
-        // syntax-3 stage 6: `()` is the empty data type.
+        // `()` is the empty data type.
         K::Round(xs) if xs.is_empty() => TypeKind::Record {
             base: None,
             fields: Vec::new(),
@@ -563,8 +563,8 @@ async fn expression_inner<'a>(s: &Scheduler<'a>, d: &'a Datum) -> Result<Expr> {
         K::Curly(_) => ExprKind::Block(block_inner(s, d).await?),
         K::Round(xs) if record_start(xs) => record_expression(s, d, xs).await?,
         K::Round(xs) => match xs.as_slice() {
-            // `()` is the empty data, as the normal surface lowers it
-            // (syntax three §7.1 row 7): the empty tuple.
+            // `()` is the empty data, as the normal surface lowers it:
+            // the empty tuple.
             [] => ExprKind::Tuple(Vec::new()),
             [h, es @ ..] if symbol(h, ",") && !es.is_empty() => {
                 ExprKind::Tuple(expressions(s, es).await?)

@@ -1,4 +1,4 @@
-//! Native multicore support (multicore.md D8/P1, native.md N7/N10/N11).
+//! Native multicore support.
 //!
 //! The scheduler in `i/task` publishes the complete record of a portable task
 //! at `go` as bytes. Another instance of the same module (a worker) claims the
@@ -7,9 +7,9 @@
 //! the worker abandons the speculation and the maker runs its retained
 //! original. A finished speculation gives the encoded completion back to the
 //! maker, which ends the task with it. Only the owner of a GC object reads it
-//! to encode it (I4); a receiver decodes into its own heap.
+//! to encode it; a receiver decodes into its own heap.
 //!
-//! The codec keeps sharing and cycles (D9): every aggregate it enters gets the
+//! The codec keeps sharing and cycles: every aggregate it enters gets the
 //! next index, marked in its header as `core.portable` does, and a second
 //! visit writes a back reference. Values that cannot move (boundaries,
 //! continuations, host references, requests, runtime closures without a code
@@ -37,7 +37,7 @@ pub(super) const IMPORTS: &str = r#"
 (import "ilang:host/v1" "mc_share_drop" (func $host_mc_share_drop (param i64 i64 i64)))
 "#;
 
-/// The WASI target always runs one worker (D12).
+/// The WASI target always runs one worker.
 pub(super) const WASI_STUBS: &str = r#"
 (func $host_mc_publish (param i32 i32 i32) (result i64) (i64.const 0))
 (func $host_mc_claim (param i64) (result i32) (i32.const 1))

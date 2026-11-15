@@ -1,4 +1,4 @@
-//! E6 runtime regressions against ordinary library services and task.keep.
+//! Runtime regressions against ordinary library services and task.keep.
 use ilang_host::{HostImports, HostOptions, Outcome, Program};
 use ilang_wasm::{Numeric, Options};
 

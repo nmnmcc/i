@@ -523,8 +523,8 @@ impl TypedMacroQuery {
         };
         self.syntax_rows(s, t, &scope, ilang_syntax::lisp::definitions::NEW_ROWS)
     }
-    /// A type as syntax, in the rows before syntax three or (`new_rows`) in
-    /// the rows of syntax-3.md §6.8. The rows differ for function types, for
+    /// Type syntax must follow `new_rows` so the selected encoder agrees
+    /// with the decoder. The encodings differ for function types, for
     /// records with named fields and for the empty tuple.
     fn syntax_rows(&self, s: &mut QueryState, t: &Ty, scope: &Scope, new_rows: bool) -> Syntax {
         let atom = |kind| {
@@ -680,7 +680,7 @@ impl TypedMacroQuery {
                 let base = if args.is_empty() && !(new_rows && matches!(h, Head::Shape(_))) {
                     name
                 } else {
-                    // In the rows of §6.8 the empty data type is `(,)`.
+                    // The datum `(,)` distinguishes empty data from an empty call.
                     let mut xs = vec![name];
                     xs.extend(args.iter().map(|t| self.syntax_rows(s, t, scope, new_rows)));
                     round(xs)
@@ -722,8 +722,8 @@ impl TypedMacroQuery {
                     .collect();
                 let mut ret = self.syntax_rows(s, &f.ret, scope, new_rows);
                 if new_rows {
-                    // `(-> (, T…) (<- R (, (Fail E) N… .. V)))` (§6.8): the
-                    // reverse of `Cx::needs_row` in `syn3/lower.rs`. The
+                    // `(-> (, T…) (<- R (, (Fail E) N… .. V)))`: the
+                    // inverse of need-row construction during resolution. The
                     // error row is the entry `(Fail E)`; each member of the
                     // environment is an entry, and a member that is a type
                     // variable is a row variable, `.. V`. Needs that are one
@@ -1052,7 +1052,7 @@ mod tests {
         let mut ps = HashMap::new();
         let record = Ty::record(vec![("x".to_string(), Ty::Var(v))]);
         occurrences(&s, &record, Pol::Pos, &mut ps);
-        // Closed data is covariant in its parts (syntax-3 §6.2).
+        // Closed data is covariant in its parts.
         assert_eq!(ps[&v], Pol::Pos);
     }
     #[test]
@@ -1112,8 +1112,8 @@ mod tests {
         assert_eq!(bundle, again);
     }
     fn rows_query(signature: Ty) -> TypedMacroQuery {
-        // Fail is ordinary labelled prelude data after E3, including in
-        // frozen typed-macro observations (syntax-three §2.10.6).
+        // Fail is ordinary labelled prelude data in the need row, including in
+        // frozen typed-macro observations.
         let mut program = Program {
             prelude: Some(ModuleId(0)),
             ..Program::default()
