@@ -708,9 +708,35 @@ impl Coalescer<'_> {
         }
     }
 
-    /// `env`: the type is an environment, whose members have arguments that
-    /// are compared as equal (§4.5 rule 4), so they are both outputs and
-    /// inputs.
+    /// A fixed annotation hole denotes its exact value even when it occurs
+    /// only in a removed provider. Otherwise outer polarity simplification
+    /// could replace v in `v & Int` by Never before hiding mask-only variables.
+    /// L <: v <: U with L = U fixes v (§4.5); one-sided bounds stay open.
+    fn handler_witness(&mut self, t: &Ty, pos: bool, depth: u32) -> Ty {
+        let mut vars = Vec::new();
+        ty_vars(t, &mut vars);
+        let mut fixed = Vec::new();
+        for v in vars {
+            let state = &self.s.vars[v.0 as usize];
+            if state.name.is_some() || rigid(self.s, self.keep, v) {
+                continue;
+            }
+            if let Some(bound) = state.lower.iter().find(|bound| {
+                if !state.upper.contains(bound) {
+                    return false;
+                }
+                let mut free = Vec::new();
+                ty_vars(bound, &mut free);
+                free.is_empty()
+            }) {
+                fixed.push((v, bound.clone()));
+            }
+        }
+        self.go(&replace_all(t, &fixed), pos, depth, false)
+    }
+
+    /// `env`: the type is a need; service arguments follow the reverse of
+    /// their ordinary value variance (§4.5 rule 4, §9.2).
     fn go(&mut self, t: &Ty, pos: bool, depth: u32, env: bool) -> Ty {
         let env = env || self.s.is_row(t);
         match t {
@@ -912,7 +938,19 @@ impl Coalescer<'_> {
             Ty::Inter(ms) => Ty::Inter(ms.iter().map(|m| self.go(m, pos, depth, env)).collect()),
             Ty::Diff(a, h) => Ty::Diff(
                 Box::new(self.go(a, pos, depth, env)),
-                h.iter().map(|m| self.go(m, pos, depth, env)).collect(),
+                // A need difference records the supplied value form. Its
+                // arguments follow value variance, not required-service
+                // variance (§9.2); the subtracted side reverses polarity. Keep
+                // the actual bounds of annotation holes in the provider witness.
+                h.iter()
+                    .map(|m| {
+                        if env {
+                            self.handler_witness(m, !pos, depth)
+                        } else {
+                            self.go(m, pos, depth, false)
+                        }
+                    })
+                    .collect(),
             ),
             Ty::Both(a, b) => Ty::Both(
                 Box::new(self.go(a, true, depth, env)),
@@ -1095,14 +1133,7 @@ impl Norm<'_> {
                 let ms = if directed { self.meet_forms(ms) } else { ms };
                 self.union_in(ms, true)
             }
-            t => {
-                let t = self.norm(t);
-                if directed && self.s.vacuous(&t) {
-                    Ty::Never
-                } else {
-                    t
-                }
-            }
+            t => self.norm(t),
         }
     }
 
@@ -1110,18 +1141,24 @@ impl Norm<'_> {
     /// value intersection. The solver has checked invariant arguments.
     fn meet_forms(&self, ms: Vec<Ty>) -> Vec<Ty> {
         let mut out: Vec<Ty> = Vec::new();
+        // A merge preserves this key: its constructor stays the same and
+        // intersecting equal value sets leaves the value set unchanged.
+        // Keep the first position, and merge duplicates in input order.
+        let mut by_form = HashMap::default();
         for m in ms {
-            if self.s.vacuous(&m) {
-                continue;
-            }
-            if m.head().is_some()
-                && let Some(i) = out
-                    .iter()
-                    .position(|o| o.head() == m.head() && o.values() == m.values())
-            {
-                let old = std::mem::replace(&mut out[i], Ty::Never);
-                out[i] = self.merge(old, m, false);
-                continue;
+            if let Some(head) = m.head() {
+                let key = (head, m.values().clone());
+                match by_form.entry(key) {
+                    std::collections::hash_map::Entry::Occupied(entry) => {
+                        let i = *entry.get();
+                        let old = std::mem::replace(&mut out[i], Ty::Never);
+                        out[i] = self.merge(old, m, false);
+                        continue;
+                    }
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(out.len());
+                    }
+                }
             }
             out.push(m);
         }
@@ -1515,6 +1552,21 @@ impl Norm<'_> {
                     })
             });
             if !drop {
+                // An extremum replacing a variable that occurs once, by
+                // itself, introduces no variable or companion dependency.
+                // These substitutions commute: do consecutive
+                // independent steps together, before normalizing again.
+                // Keep the original barrier for naming, shared variables,
+                // and members of nontrivial unions/intersections.
+                let independent = matches!(by, Ty::Top | Ty::Never)
+                    && o.pos + o.neg == 1
+                    && with.is_some_and(|w| {
+                        !w.alone && w.groups.iter().all(|(group, _)| group.len() == 1)
+                    });
+                if independent {
+                    out.push((v, by));
+                    continue;
+                }
                 if out.is_empty() {
                     out.push((v, by));
                 }
@@ -1918,19 +1970,56 @@ impl AliasFold {
             })
     }
 
-    /// The arguments of the alias when `ms` is exactly its expansion.
-    fn fit(&self, ms: &[Ty]) -> Option<Vec<Ty>> {
-        if ms.len() != self.members.len() {
+    /// The number of members of the expansion.
+    pub(crate) fn len(&self) -> usize {
+        self.members.len()
+    }
+
+    /// Whether every member is a type defined in a program (a labelled
+    /// type, not a built-in one).
+    pub(crate) fn all_defined(&self) -> bool {
+        self.members.iter().all(|m| {
+            matches!(
+                m.head(),
+                Some(super::Head::Named(crate::hir::TypeRef::Custom(_)))
+            )
+        })
+    }
+
+    /// The members with the alias's parameters replaced by `args`.
+    pub(crate) fn members_with(&self, args: &[Ty]) -> Vec<Ty> {
+        self.members
+            .iter()
+            .map(|m| super::alias::map_vars(m, &mut |v| args[v.0 as usize].clone()))
+            .collect()
+    }
+
+    /// The number of parameters of the alias.
+    pub(crate) fn params(&self) -> usize {
+        self.params
+    }
+
+    /// Whether a member of the expansion has the type constructor `h`.
+    pub(crate) fn has_head(&self, h: super::Head) -> bool {
+        self.members.iter().any(|m| m.head() == Some(h))
+    }
+
+    /// The arguments of the alias, and the positions in `ms` of its
+    /// members, when `ms` contains exactly its expansion (and maybe more).
+    fn fit(&self, ms: &[Ty]) -> Option<(Vec<Ty>, Vec<usize>)> {
+        if ms.len() < self.members.len() {
             return None;
         }
         let mut args = vec![None; self.params];
+        let mut at = Vec::new();
         for p in &self.members {
-            let m = ms.iter().find(|m| m.head() == p.head())?;
-            if !fit_pattern(p, m, &mut args) {
+            let i = ms.iter().position(|m| m.head() == p.head())?;
+            if !fit_pattern(p, &ms[i], &mut args) {
                 return None;
             }
+            at.push(i);
         }
-        args.into_iter().collect()
+        Some((args.into_iter().collect::<Option<_>>()?, at))
     }
 }
 
@@ -1989,20 +2078,43 @@ fn fold_in(s: &Solver, t: &Ty) -> Ty {
         Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.clone()),
         Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
         Ty::Union(xs) => {
-            let xs: Vec<Ty> = xs.iter().map(go).collect();
+            let mut xs: Vec<Ty> = xs.iter().map(go).collect();
             let name =
                 |id: crate::hir::TypeId| s.type_names.get(id.0 as usize).map_or("", String::as_str);
-            let best = s
-                .alias_folds
-                .iter()
-                // A name with a module path is not in scope.
-                .filter(|f| !name(f.id).is_empty() && !name(f.id).contains('/'))
-                .filter_map(|f| f.fit(&xs).map(|args| (f.id, args)))
-                .min_by_key(|(id, _)| (name(*id).contains('.'), name(*id).len(), id.0));
-            match best {
-                Some((id, args)) => Ty::named(crate::hir::TypeRef::Custom(id), args),
-                None => Ty::Union(xs),
+            // Each time, the alias with the most members whose expansion is
+            // part of the union takes their place, so the result does not
+            // depend on how the union was put together: `String | True |
+            // False` is `String | Bool`.
+            loop {
+                let best = s
+                    .alias_folds
+                    .iter()
+                    // A name with a module path is not in scope.
+                    .filter(|f| !name(f.id).is_empty() && !name(f.id).contains('/'))
+                    .filter_map(|f| f.fit(&xs).map(|(args, at)| (f.id, args, at)))
+                    .min_by_key(|(id, _, at)| {
+                        (
+                            std::cmp::Reverse(at.len()),
+                            name(*id).contains('.'),
+                            name(*id).len(),
+                            id.0,
+                        )
+                    });
+                let Some((id, args, mut at)) = best else {
+                    break;
+                };
+                let folded = Ty::named(crate::hir::TypeRef::Custom(id), args);
+                if at.len() == xs.len() {
+                    return folded;
+                }
+                at.sort_unstable();
+                let first = at[0];
+                for i in at.into_iter().rev() {
+                    xs.remove(i);
+                }
+                xs.insert(first, folded);
             }
+            Ty::Union(xs)
         }
         Ty::Var(_) | Ty::Never | Ty::Top => t.clone(),
     }
@@ -2093,7 +2205,7 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
                 .map(|v| {
                     ShownType::Lit(
                         if *r == crate::hir::TypeRef::Builtin(crate::hir::BuiltinType::String) {
-                            ilang_syntax::print::string_literal(&v)
+                            ilang_syntax::syn3::string_literal(&v)
                         } else {
                             v
                         },
@@ -2314,6 +2426,9 @@ pub(crate) fn known_norm(s: &Solver, t: &Ty) -> Ty {
 pub(crate) fn show_known(s: &Solver, t: &Ty) -> String {
     let mut names: HashMap<V, String> = HashMap::default();
     let mut next = 0u8;
+    // A union that is a declared alias's expansion is shown by its name, as
+    // in other shown types (`Bool`, not `True | False`).
+    let t = &fold_aliases(s, t);
     render(
         t,
         &mut |v| {
@@ -2405,6 +2520,55 @@ mod lazy_display_tests {
     }
 
     #[test]
+    fn independent_service_arguments_are_simplified_in_one_step() {
+        // A need with distinct constructors used to eliminate one argument
+        // per pass, rescanning the whole wide need after each substitution.
+        // Assert the operation count, not elapsed time, for 2,048 entries.
+        let n = 2048;
+        let mut s = Solver::new(
+            (0..n)
+                .map(|i| (crate::hir::TypeId(i), vec![Variance::Co]))
+                .collect(),
+            (0..n).map(|i| format!("S{i:04}")).collect(),
+        );
+        let vs = vars(&mut s, n as usize);
+        let services = |argument: &dyn Fn(usize) -> Ty| {
+            Ty::Union(
+                (0..n)
+                    .map(|i| {
+                        Ty::named(
+                            TypeRef::Custom(crate::hir::TypeId(i)),
+                            vec![argument(i as usize)],
+                        )
+                    })
+                    .collect(),
+            )
+        };
+        let result = Ty::named(TypeRef::Builtin(BuiltinType::Int), Vec::new());
+        let t = Ty::Fn(Box::new(FnTy::new(
+            Vec::new(),
+            result.clone(),
+            services(&|i| Ty::Var(vs[i])),
+        )));
+        let mut trace = Steps {
+            start: Ty::Never,
+            steps: Vec::new(),
+            members: HashMap::default(),
+        };
+        let actual = simplify_steps(&s, &t, None, Opts::default(), Some(&mut trace)).unwrap();
+        assert_eq!(trace.steps.len(), 1);
+        assert_eq!(trace.steps[0].len(), n as usize);
+        assert_eq!(
+            actual,
+            Ty::Fn(Box::new(FnTy::new(
+                Vec::new(),
+                result,
+                services(&|_| Ty::Top),
+            )))
+        );
+    }
+
+    #[test]
     fn shown_and_scheme_is_shown_and_scheme() {
         // The checker simplifies the scheme of a definition once for its
         // text and for the check of the types it uses (§2.4): both must be
@@ -2490,7 +2654,10 @@ mod directed_need_simplification_tests {
     use crate::hir::{BuiltinType, TypeId, TypeRef};
 
     #[test]
-    fn a_single_need_that_becomes_vacuous_is_removed_after_simplification() {
+    fn a_single_need_keeps_its_constructor_after_argument_simplification() {
+        // Decision 2 (EF03): greatest within a constructor still requires
+        // an environment entry of that constructor. Argument simplification
+        // must not erase the key.
         let id = TypeId(0);
         let mut s = Solver::new(Default::default(), vec!["app.Svc".into()]);
         s.variance.insert(id, vec![Variance::Contra]);
@@ -2499,7 +2666,7 @@ mod directed_need_simplification_tests {
         let need = Ty::named(TypeRef::Custom(id), vec![variable]);
         assert_eq!(
             shown(&s, &function(need), Opts::default()).unwrap(),
-            function(Ty::Never)
+            function(Ty::named(TypeRef::Custom(id), vec![Ty::Never]))
         );
     }
 

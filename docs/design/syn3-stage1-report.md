@@ -45,7 +45,7 @@ Three places then cost more than polynomial or a high polynomial:
    of k ≈ n²/2 members).
 3. **A wrong result above 64 such variables.** The step loop stopped after 64
    steps, so from 8 members on `f0` was shown as
-   `(e: C0 | C1(Int & A & B & … & M2) | …) -> O2 | Int ^ E2 ! N` instead of the
+   `(e : C0 | C1(Int & A & B & … & M2) | …) -> O2 | Int ^ E2 ! N` instead of the
    simplified type.
 
 ## Fix
@@ -98,9 +98,9 @@ shortest name, then the first declared. Interpretation: "written in the
 source of the binding" is approximated by "named without a module" because
 display has no access to the binding's annotations.
 
-`first = (xs: List(Option(Int))) -> Int {…}` now shows
-`first : (xs: List(Option(Int))) -> Int`; the scaling fixtures show
-`f0 : (e: E(Int)) -> Int`.
+`first = (xs : List(Option(Int))) -> Int {…}` now shows
+`first : (xs : List(Option(Int))) -> Int`; the scaling fixtures show
+`f0 : (e : E(Int)) -> Int`.
 
 Changed goldens: none (the ilang-check goldens and the spec suite contain no
 union that is exactly a declared alias's expansion).
@@ -131,7 +131,7 @@ by orders of magnitude.
 
 `crates/ilang-check/tests/alias_unions.rs`:
 `nominal_union_recursive_match_scales` (generated sources for 8, 12, 16 and 22
-members; time bound and the shown type `(e: E(Int)) -> Int`) and
+members; time bound and the shown type `(e : E(Int)) -> Int`) and
 `union_is_displayed_by_its_declared_name`.
 
 # Stage 2: fitting of constructor patterns (D4)
@@ -150,9 +150,9 @@ Row 2 of `docs/design/syntax-3.md` §7.2 (on the `redesign` branch; §2.12).
 - Interpretation: while the values of `b` are not known (a parameter, a
   recursive group) or are all made by `C`, `fit` keeps `b <: Q`. Applying
   `Q | r - Q` there too (tried first) changed the shown types of existing
-  goldens: `first : (r: Result(A, B) | C - Result(Never, _)) -> A ! Assert`
+  goldens: `first : (r : Result(A, B) | C - Result(Never, _)) -> A ! Assert`
   in `tests/types/effects.i` and `may_fail.i`, and `User(…) = u` in
-  `labels.i` gave `u: A` with `! Assert` for a one-constructor pattern that
+  `labels.i` gave `u : A` with `! Assert` for a one-constructor pattern that
   cannot fail. Keeping `<: Q` when no other constructor is known keeps those
   principal types and still accepts every refutable member binding of a
   known union.

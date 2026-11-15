@@ -1,11 +1,11 @@
-field : (T | S) -> Int
+field : (T | S1) -> Int
 use_field : () -> 0
-field_rest : (A) -> Int
-use_rest : () -> (0, Int)
-update : (T | S) -> T
-update_open : (A) -> T
-use_update : () -> T
-item : (Box(A)) -> A | 0
+field_rest : (C) -> Int
+use_rest : () -> (0, 0)
+update : (T | S1) -> T
+update_open : (C) -> T
+use_update : () -> B
+item : (Box(C)) -> C | 0
 use_item : () -> Int
-wrong : (A) -> 0
+wrong : (C) -> 0
 39:32: error[E0512]: the constructor `B`, which made this value (§7.5), has no field with the label `f` (§4.8 rule 13)

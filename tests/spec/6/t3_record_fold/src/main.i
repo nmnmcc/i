@@ -10,7 +10,7 @@
 
 main = () {
 	r = list.fold([1, 2, 3], (n = 0, total = 0), (
-		acc: (n = Int, total = Int),
+		acc : (n = Int, total = Int),
 		x
 	) { (..acc, n = acc.n + 1, total = acc.total + x) })
 	s = list.fold([1, 2, 3], (n = 0), (acc, _) {

@@ -3,7 +3,7 @@
 (
 	main
 )
-choose = (b: Bool) { b |> (True) { (a = 1, b = 2) } | (False) { (a = "x") } }
+choose = (b : Bool) { b |> (True) { (a = 1, b = 2) } | (False) { (a = "x") } }
 
 main = () {
 	assert(choose(True).a == 1)

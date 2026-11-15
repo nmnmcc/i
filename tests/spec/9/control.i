@@ -9,7 +9,7 @@
 	i/resource
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -22,14 +22,14 @@ length = (xs, n) { xs |> ([]) { n } | ([_, ..rest]) { length(rest, n + 1) } }
 // The example of §9.4.
 Yield(A) = (emit = (A) -> Nil)
 
-collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
 			[]
 		} <- (
 			Yield(
-				emit = (x: A) {
+				emit = (x : A) {
 					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 				},
 			),
@@ -37,7 +37,7 @@ collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	})
 }
 
-emit = <A>(x) <- (y: Yield(A)) { y.emit(x) }
+emit = <A>(x) <- (y : Yield(A)) { y.emit(x) }
 
 count = (from, to) {
 	{ from > to } |>
@@ -185,7 +185,7 @@ test("cancel_runs_final_functions", () {
 // inside it; for the rest, it gets the environment of the place of `resume`.
 Name = (text = String)
 
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 
 deep = (b) {
 	{

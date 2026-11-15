@@ -83,7 +83,7 @@ fn charges_are_identical_before_and_after_optimization() {
 
 #[test]
 fn the_same_export_counts_longer_paths_and_ignores_the_program_target() {
-    let source = "(\n\tmeasure\n)\nmeasure = (n: Int) -> Int { n |> (0) { 0 } | (_) { measure(n - 1) + 1 } }\n";
+    let source = "(\n\tmeasure\n)\nmeasure = (n : Int) -> Int { n |> (0) { 0 } | (_) { measure(n - 1) + 1 } }\n";
     let manifest = "name = \"app\"\n[wasm]\nexports = [\"app/main.measure\"]\n";
     let native = compile_project(source, manifest, false, ilang_wasm::Target::Native);
     let wasi = compile_project(source, manifest, false, ilang_wasm::Target::Wasi);
@@ -125,21 +125,50 @@ fn work_and_allocation_stop_before_crossing_the_limit() {
 
 #[test]
 fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
-    let tail = compile(
-        "f = (n) { n |> (0) { Nil } | (_) { f(n - 1) } }\n\nmain = () { f(40) }\n",
-        false,
-    );
+    let tail_source = "f = (n) { n |> (0) { Nil } | (_) { f(n - 1) } }\n\nmain = () { f(40) }\n";
+    let baseline = compile(&tail_source.replace("f(40)", "f(0)"), false);
+    let tail = compile(tail_source, false);
     let non_tail = compile(
         "f = (n) { n |> (0) { 0 } | (_) { f(n - 1) + 1 } }\n\nmain = () {\n\tf(40)\n\tNil\n}\n",
         false,
     );
+    // E3/E5 entries include ordinary library catch/provider frames. Find the
+    // exact zero-recursion peak instead of assuming their old constant cost.
+    // Recursion must fit that same tight budget; it gets no extra frame units.
+    let mut low = 0;
+    let mut high = Limits::default().frames;
+    let (base, _) = run(&baseline, Limits::default());
+    assert!(matches!(base.unwrap(), Outcome::Ok(_)));
+    while low < high {
+        let mid = u64::midpoint(low, high);
+        let (outcome, budget) = run(
+            &baseline,
+            Limits {
+                frames: mid,
+                ..Limits::default()
+            },
+        );
+        match budget.exceeded() {
+            Some(Limit::Frames) => low = mid + 1,
+            None => {
+                assert!(matches!(outcome.unwrap(), Outcome::Ok(_)));
+                high = mid;
+            }
+            other => panic!("unexpected baseline limit: {other:?}"),
+        }
+    }
+    eprintln!("zero-recursion entry frame peak: {low}");
     let limits = Limits {
-        frames: 20,
+        frames: low,
         ..Limits::default()
     };
     let (ok, tail_budget) = run(&tail, limits);
     assert!(matches!(ok.unwrap(), Outcome::Ok(_)));
     assert_eq!(tail_budget.usage().frames, 0);
+    let deeper = compile(&tail_source.replace("f(40)", "f(400)"), false);
+    let (ok, deeper_budget) = run(&deeper, limits);
+    assert!(matches!(ok.unwrap(), Outcome::Ok(_)));
+    assert_eq!(deeper_budget.usage().frames, 0);
     let (_, nested) = run(&non_tail, limits);
     assert_eq!(nested.exceeded(), Some(Limit::Frames));
 }
@@ -240,7 +269,7 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
 	testlib = (test) = std/test
 	syntax = i/syntax)
       @external("test:syntax", "source")
-      source: () -> syntax.Syntax
+      source : () -> syntax.Syntax
 
       test("exercise", () {
         x = source()
@@ -312,7 +341,7 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
 fn logical_frame_limit_precedes_native_stack_exhaustion_for_large_expressions() {
     // All these argument values have to survive the recursive call.  They
     // are expression temporaries, not written local bindings.
-    let parameters = std::iter::repeat_n("_: Int", 900)
+    let parameters = std::iter::repeat_n("_ : Int", 900)
         .collect::<Vec<_>>()
         .join(", ");
     let arguments = (1..=900)
@@ -320,9 +349,7 @@ fn logical_frame_limit_precedes_native_stack_exhaustion_for_large_expressions() 
         .collect::<Vec<_>>()
         .join(", ");
     let source = format!(
-        "many = ({parameters}, last: Int) -> Int {{ last }}\n\
-         f = (n: Int) -> Int {{ n |> (0) {{ 0 }} | (_) {{ many({arguments}, f(n - 1)) }} }}\n\
-         main = () {{ f(3300) Nil }}\n"
+        "many = ({parameters}, last : Int) -> Int {{ last }}\nf = (n : Int) -> Int {{ n |> (0) {{ 0 }} | (_) {{ many({arguments}, f(n - 1)) }} }}\nmain = () {{ f(3300) Nil }}\n"
     );
     let mut usage = Vec::new();
     for optimized in [false, true] {

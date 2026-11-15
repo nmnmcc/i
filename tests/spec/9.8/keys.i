@@ -8,8 +8,8 @@
 )
 
 main = () {
-	a: Key(Int) = key.new()
-	b: Key(Int) = key.new()
+	a : Key(Int) = key.new()
+	b : Key(Int) = key.new()
 	x = key.wrap(a, 37)
 	assert(a == a)
 	assert(a != b)

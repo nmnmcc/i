@@ -12,7 +12,7 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text : String) <- (out : Out) { out.print(text) }
 
 main = () {
 	result = fail.catch(() {

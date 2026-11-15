@@ -2,7 +2,7 @@
 //! R2_FIXTURE_DUMP generates fixtures; ordinary runs check the transformation.
 use ilang_cli::{BuildOptions, Level, build};
 use ilang_syntax::{
-    ast::{ItemKind, PatternKind},
+    ast::{DItem, ExprKind, ItemKind, PatternKind},
     parse_module,
 };
 use std::{fs, path::PathBuf};
@@ -68,7 +68,7 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
             let mut edits = Vec::new();
             let mut entries = 0;
             for item in &module.items {
-                if let ItemKind::Binding(binding) = &item.kind
+                if let ItemKind::Bind(binding) = &item.kind
                     && let PatternKind::Var(name) = &binding.pattern.kind
                     && name == "main"
                 {
@@ -76,7 +76,15 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
                 }
                 for attribute in &item.attributes {
                     if attribute.module.is_none() && attribute.name.name == "host" {
-                        let (namespace, span) = &attribute.args[0];
+                        let Some(DItem::Pos(value)) =
+                            attribute.args.as_deref().and_then(|args| args.first())
+                        else {
+                            panic!("host attribute has its namespace argument")
+                        };
+                        let ExprKind::String(namespace) = &value.kind else {
+                            panic!("host namespace is a written string")
+                        };
+                        let span = value.span.0;
                         edits.push((
                             span.start as usize,
                             span.end as usize,
@@ -86,8 +94,18 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
                 }
             }
             assert_eq!(entries, 1, "one main in {}", file.display());
-            let exports_group = module.exports_span.map(|span| group(&text, span));
-            let imports_group = module.imports_span.map(|span| group(&text, span));
+            let exports_group = module
+                .exports
+                .iter()
+                .map(|item| item.span.0)
+                .reduce(ilang_syntax::span::Span::to)
+                .map(|span| group(&text, span));
+            let imports_group = module
+                .imports
+                .iter()
+                .map(|item| item.span.0)
+                .reduce(ilang_syntax::span::Span::to)
+                .map(|span| group(&text, span));
             if let Some((start, end)) = exports_group {
                 edits.push((start, end, exports));
             } else {

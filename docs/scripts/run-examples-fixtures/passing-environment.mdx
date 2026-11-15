@@ -1,0 +1,11 @@
+```i run env.HOME_EXAMPLE=fixed title="src/main.i"
+(
+	i/process
+	i/stdio
+)
+main = () { stdio.print(process.env("HOME_EXAMPLE")) }
+```
+
+```text
+fixed
+```

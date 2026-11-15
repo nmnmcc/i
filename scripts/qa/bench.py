@@ -23,7 +23,7 @@ def workloads():
                 declarations = ['A0 = value' if value else 'A0 = Int'] + [f'A{i} = A{i-1}' for i in range(1, n)]
                 if reverse:
                     declarations.reverse()
-                yield f'alias-{n}-{"value" if value else "ordinary"}-{"reverse" if reverse else "forward"}', 'value: Int = 1\n' + '\n'.join(declarations) + f'\nx: A{n-1} = 2\n'
+                yield f'alias-{n}-{"value" if value else "ordinary"}-{"reverse" if reverse else "forward"}', "value : Int = 1\n" + '\n'.join(declarations) + f'\nx: A{n-1} = 2\n'
     for n in [16, 64, 256, 1024]:
         union = ' | '.join(str(i) for i in range(n))
         yield f'literal-union-{n}', f'Input = {union}\nf = (x: Input) {{ x }}\n'
@@ -32,7 +32,7 @@ def workloads():
         defs = '\n'.join(f'T{i} {{ T{i} }}' for i in range(n))
         union = ' | '.join(f'T{i}' for i in range(n))
         yield f'wide-union-{n}', defs + f'\nf = (x: {union}) {{ x }}\n'
-    head = 'S(N) { S(f: () -> Int ! N, m: (N) -> Nil) }\nuse(N) = (s ! S(N)) { s.f() }\n'
+    head = "S(N) { S(f : () -> Int ! N, m : (N) -> Nil) }\nuse(N) = (s ! S(N)) { s.f() }\n"
     defs = '\n'.join(f'f{i} = (k: Int) {{ k |> {{ 0 -> use() _ -> f{(i+1)%100}(k - 1) }} }}' for i in range(100))
     yield 'service-ring-100', head + defs + '\n'
 

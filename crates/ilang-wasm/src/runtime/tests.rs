@@ -1253,9 +1253,50 @@ fn host_boundary_values_round_trip_and_reject_incorrect_values() {
            (call $equal (local.get $v)
              (call $abi_bits_in (local.get $address) (local.get $length))))",
     );
+    checks.define(
+        "(func $int_wire (param $v eqref) (param $s i32) (param $x i32) (param $n i32) (result i32)
+           (local $sign i32) (local $address i32) (local $count i32)
+           (call $abi_int_out (local.get $v))
+           (local.set $count) (local.set $address) (local.set $sign)
+           (i32.and (i32.eq (local.get $sign) (local.get $s))
+             (i32.and (i32.eq (local.get $count) (local.get $n))
+               (if (result i32) (local.get $n) (then (i32.ne (local.get $address) (i32.const 0)))
+                 (else (i32.eq (local.get $address) (local.get $x)))))))",
+    );
+    for n in [
+        0_i64,
+        1,
+        -1,
+        i32::MIN.into(),
+        i32::MAX.into(),
+        -2147483649,
+        2147483648,
+    ] {
+        let count = i32::from(i32::try_from(n).is_err());
+        let inline = if count == 0 { n as i32 } else { 0 };
+        checks.check(
+            format!("Int wire {n}"),
+            format!(
+                "(call $int_wire {} (i32.const {}) (i32.const {inline}) (i32.const {count}))",
+                int(n),
+                n.signum()
+            ),
+        );
+        if count == 0 {
+            checks.check(
+                format!("inline Int take {n}"),
+                format!("(call $equal {} (call $abi_int_take (i32.const {}) (i32.const {inline}) (i32.const 0)))", int(n), n.signum()),
+            );
+        }
+    }
     for value in [
         int(0),
         int(-1),
+        int(1),
+        int(i64::from(i32::MIN)),
+        int(i64::from(i32::MAX)),
+        int(i64::from(i32::MIN) - 1),
+        int(i64::from(i32::MAX) + 1),
         int(1 << 40),
         big("-340282366920938463463374607431768211457"),
     ] {
@@ -1333,8 +1374,16 @@ fn host_boundary_values_round_trip_and_reject_incorrect_values() {
             "(drop (call $abi_int_in (i32.const 0) (i32.const 64) (i32.const 1)))",
         ),
         (
-            "int without parts",
+            "inline int zero with nonzero sign",
             "(drop (call $abi_int_in (i32.const 1) (i32.const 0) (i32.const 0)))",
+        ),
+        (
+            "inline positive value with negative sign",
+            "(drop (call $abi_int_in (i32.const -1) (i32.const 1) (i32.const 0)))",
+        ),
+        (
+            "inline negative value with positive sign",
+            "(drop (call $abi_int_in (i32.const 1) (i32.const -1) (i32.const 0)))",
         ),
         (
             "last part 0",

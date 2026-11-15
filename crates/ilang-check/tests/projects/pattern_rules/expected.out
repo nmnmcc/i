@@ -7,7 +7,7 @@ src/main.i:11:14: error[E0219]: two parameters of this function have the label `
 src/main.i:13:22: error[E0219]: two parameters of this function have the label `l`
 src/main.i:13:30: error[E0218]: the parameters of this function bind `l` more than once
 src/main.i:15:15: error[E0218]: the parameters of this function bind `s` more than once
-src/main.i:17:22: error[E0218]: the parameters of this function bind `n` more than once
+src/main.i:17:23: error[E0218]: the parameters of this function bind `n` more than once
 src/main.i:21:13: error[E0220]: every choice of a clause binds the same names, but not all bind `b`
 src/main.i:22:14: error[E0220]: every choice of a clause binds the same names, but not all bind `x`, `y`
 src/main.i:24:29: error[E0220]: every choice of a clause binds the same names, but not all bind `k`

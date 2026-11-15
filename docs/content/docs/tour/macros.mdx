@@ -1,0 +1,189 @@
+---
+title: Macros
+description: Use a package macro, write a small syntax macro, and inspect its expansion.
+---
+
+Generate code at compile time, then use it through ordinary module imports.
+
+```i test stdout=exact package=tour title="test/example_test.i"
+(
+	testlib = (test) = std/test
+)
+test("addition", () { assert(2 + 3 == 5) })
+```
+
+```text
+pass tour/example_test.addition
+1 passed, 0 failed
+```
+
+`test` registers a function in the package’s test collection; `assert` uses the runner’s assertion service. The manifest needs `std` and `[test] collection = "std/test.tests"`.
+
+## A syntax template
+
+```scheme file=src/macros.is title="src/macros.is"
+(, twice)
+(@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+	(twice) = tour/macros
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(twice(21)),
+	)
+}
+```
+
+```text
+42
+```
+
+In `.is`, `(, twice)` exports, `=` binds, and `->` constructs a function; braces hold a block and line breaks are whitespace. The backtick quotes syntax, `~value` inserts argument syntax, and `_` infers the result. `@macro` definitions require `.is` and a separate importing module; `.i` and `.is` are two forms of the same code and can import each other without filename extensions.
+
+## Expanded code
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect({
+			saved = 21
+			saved + saved
+		}),
+	)
+}
+```
+
+```text
+42
+```
+
+`i expand --to i src/main.i` shows this block in place of `twice(21)`. The default `--to is` is needed for quotations; `--trace` prints individual expansions to standard error.
+
+## One evaluation
+
+```scheme file=src/macros.is title="src/macros.is"
+(, twice)
+(@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+	(twice) = tour/macros
+)
+main = () <- (io : Io) {
+	value = () {
+		io.print("argument")
+		21
+	}
+	io.print(
+		core.inspect(
+			twice(value()),
+		),
+	)
+}
+```
+
+```text
+argument
+42
+```
+
+Arguments arrive as syntax; the generated program decides when to evaluate them.
+
+## Caller names
+
+```scheme file=src/macros.is title="src/macros.is"
+(, twice)
+(@ macro (= twice (-> (, value) _ `{(= saved ~value) (+ saved saved)})))
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+	(twice) = tour/macros
+)
+main = () <- (io : Io) {
+	saved = 10
+	io.print(
+		core.inspect(twice(saved + 1)),
+	)
+}
+```
+
+```text
+22
+```
+
+This is hygiene: caller syntax keeps its scope, while generated names belong to the macro expansion. Expansion output spells both names `saved`, hiding that distinction; labels are compared by text.
+
+## Definition names
+
+```scheme file=src/macros.is title="src/macros.is"
+(, twice)
+(= _double (-> (, value) _ (+ value value)))
+(@ macro (= twice (-> (, value) _ `(_double ~value))))
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+	(twice) = tour/macros
+)
+_double = (_) { 0 }
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(twice(21)),
+	)
+}
+```
+
+```text
+42
+```
+
+Template references resolve in the defining module. Macros have no host file, network, or clock services; their output is deterministic. Large macro expansions may hit compiler limits sooner than expected.
+
+## Selected branches
+
+```scheme file=src/sugar.is title="src/sugar.is"
+(, if)
+(= _branches
+  (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
+(@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
+```
+
+```i test stdout=exact package=tour title="test/sugar_test.i"
+(
+	testlib = (test) = std/test
+	i/fail
+	sugar = (if) = tour/sugar
+)
+sign = (n) { if(n < 0, "negative", "not negative") }
+test("if is a macro", () {
+	assert(sign(-1) == "negative")
+	assert(sign(0) == "not negative")
+	assert(fail.catch(() { if(True, 42, fail.raise("unused")) }) == Ok(42))
+})
+```
+
+```text
+pass tour/sugar_test.if is a macro
+1 passed, 0 failed
+```
+
+`_branches` builds the branch function at expansion time; only the selected expression runs at runtime.
+
+Continue with [packages](/docs/tour/packages).

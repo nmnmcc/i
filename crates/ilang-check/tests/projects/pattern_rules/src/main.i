@@ -12,9 +12,9 @@ params = (p, p) { p }
 
 labels = (_ = x = l, _ = y = l) { x }
 
-env = (s) <- (s: Assert) { s }
+env = (s) <- (s : Assert) { s }
 
-typed = (n: Int, _ = n = m) { n }
+typed = (n : Int, _ = n = m) { n }
 
 choices = (v) {
 	v |>

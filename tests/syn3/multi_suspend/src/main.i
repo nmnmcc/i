@@ -12,14 +12,14 @@
 /// with 10.
 ask =
 	(b) -> Int { control.suspend(b, (k) { control.resume(k, 10) }) + 1 }
-	| (b, extra: Int) -> Int { extra }
+	| (b, extra : Int) -> Int { extra }
 
 /// A multi-shape value as the body of a boundary.
-body = (b) -> Int { ask(b) * 2 } | (b, x: Int) -> Int { x }
+body = (b) -> Int { ask(b) * 2 } | (b, x : Int) -> Int { x }
 
 run = (f, b) -> Int { f(b) * 3 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	io.print(
 		core.inspect(control.boundary((b) { run(ask, b) })),
 	)

@@ -1,0 +1,55 @@
+---
+title: Compiler architecture
+description: Trace a program from parsing through execution.
+---
+
+Trace a working operation through the compiler and host.
+
+```i run package=architecture title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(core.bit_size(<<1, 2>>)),
+	)
+}
+```
+
+```text
+16
+```
+
+Follow `bit_size` from [its declaration](https://github.com/nmnmcc/i/blob/main/lib/i/core.i), through `CORE` and `CORE_FUNCS` in [lower.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/lower.rs), to `$core_bit_size` in [runtime/core.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/runtime/core.rs); [runtime/tests.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/runtime/tests.rs) exercises it.
+
+## Pipeline
+
+| Boundary | Entry and result |
+| --- | --- |
+| Packages | [load](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/src/lib.rs) assembles a `PackageGraph` of packages, modules, and `Sources`. |
+| Tokens | [lexer::lex3](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/lexer.rs) produces `Lexed` tokens and spans. |
+| Syntax | [Parser::module](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/parse.rs) via `syn3::parse_module` produces `ast::Module`; [parse_module](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/lib.rs) also collects transition diagnostics. |
+| Names | [resolve_parsed](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/lib.rs) calls [resolve::resolve](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/resolve.rs) and [order](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/order.rs) to produce [hir::Program](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/hir.rs). |
+| Types | [types::check_selected](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/types/mod.rs) returns `types::Typed` alongside HIR. `Checked` carries optional program/types and diagnostics. |
+| Lowering | [lower_tests_numeric](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/lower.rs) produces A-normal [ir::Program](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/ir.rs); [control::split](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/control.rs) splits suspending calls. |
+| Emission | [emit::wat](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/emit/mod.rs) and `wat::parse_str` produce validated Wasm bytes. |
+| Optimization | `ilang_cli::optimize` returns O0 bytes unchanged; O2/O3 call [Binaryen](https://github.com/nmnmcc/i/blob/main/crates/ilang-binaryen/src/lib.rs) and validate its output. |
+| Execution | `Built::host_program` calls [Program::from_bytes](https://github.com/nmnmcc/i/blob/main/crates/ilang-host/src/lib.rs); `Instance` executes calls, and `Program::run_entry` returns `Outcome`. |
+
+## Macros
+
+[ilang-macro](https://github.com/nmnmcc/i/blob/main/crates/ilang-macro/src/lib.rs) coordinates preparation, execution, expansion, and rechecking. `Prepared` holds bindings/templates; [Session](https://github.com/nmnmcc/i/blob/main/crates/ilang-macro/src/session.rs) tracks invocation marks/depth, while `Transaction` delays effects until validation. Follow [item_phase3](https://github.com/nmnmcc/i/blob/main/crates/ilang-macro/src/item_phase3.rs) and [typed3](https://github.com/nmnmcc/i/blob/main/crates/ilang-macro/src/typed3.rs) for expansion phases.
+
+## Starting points
+
+| Change | Neighbor to follow |
+| --- | --- |
+| Package layout | [manifest.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-package/src/manifest.rs) and [modules.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-package/src/modules.rs). |
+| Diagnostic | `code` constants in `check/lib.rs`; `resolve.rs::module_of` emits `UNKNOWN_NAME` (E0201), span, and message. |
+| Library export | `std/src/bool.i::not` and `std/test/bool_test.i`. |
+| Formatting | [print.rs::data_item](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/print.rs) writes labelled fields; `data` selects layout. Follow `formatter_layout` in [syn3.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/tests/syn3.rs). |
+| Editor feature | [server.rs::hover](https://github.com/nmnmcc/i/blob/main/crates/ilang-lsp/src/server.rs) advertises/dispatches the request, uses [checker queries](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/query.rs), and converts positions/ranges; [protocol.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-lsp/tests/protocol.rs) tests it. |
+| CLI or executable | [CLI main](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/src/main.rs) selects commands; [runner main](https://github.com/nmnmcc/i/blob/main/crates/ilang-runner/src/main.rs) starts native packages. `BuildOptions` and `Built` belong to the CLI library. |
+
+The [design notes](/docs/contributing/design-notes) provide implementation context; check their claims against these entry points.

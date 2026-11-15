@@ -8,18 +8,18 @@
 )
 
 area =
-	(r: Float) -> Float { 3.0 *. r *. r }
-	| (w: Float, h: Float) -> Float { w *. h }
+	(r : Float) -> Float { 3.0 *. r *. r }
+	| (w : Float, h : Float) -> Float { w *. h }
 
-first = <A>(xs: List(A), d: A) -> A { xs |> ([]) { d } | ([x, ..]) { x } }
+first = <A>(xs : List(A), d : A) -> A { xs |> ([]) { d } | ([x, ..]) { x } }
 
 /// A call with labels through a value.
 via = (c) { c("b.com", port = 8080) }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	f = first([area], area)
 	io.print(
 		core.inspect(f(2.0)),
 	)
-	io.print(via((host: String, port = p: Int) { host }))
+	io.print(via((host : String, port = p : Int) { host }))
 }

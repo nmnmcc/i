@@ -6,7 +6,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -126,7 +126,7 @@ own_assert = () {
 	check(show(nested), "Ok((Error(AssertionFailure(\"assert\")), 2))")
 	// The `Assert` of an outer `catch`, used inside an inner one, goes to the
 	// outer one.
-	get = () <- (a: Assert) { a }
+	get = () <- (a : Assert) { a }
 	outer = assertion.catch(() {
 		a = get()
 		assertion.catch(() { assert(False) <- (a) })

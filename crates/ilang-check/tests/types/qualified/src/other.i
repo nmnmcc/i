@@ -13,6 +13,6 @@ T = (Int)
 
 Shown = ()
 
-mk = (n: Int) { T(n) }
+mk = (n : Int) { T(n) }
 
 far = () { third.make() }

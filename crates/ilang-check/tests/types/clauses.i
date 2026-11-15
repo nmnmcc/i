@@ -19,16 +19,16 @@ mutual = () {
 	)
 	(even(4), odd(5))
 }
-get = (opt: Option(User)) { opt |> (Some(u)) { u.name } }
-map = (opts: List(Option(User))) {
+get = (opt : Option(User)) { opt |> (Some(u)) { u.name } }
+map = (opts : List(Option(User))) {
 	list_map(opts, (Some(u)) { u.name } | (None) { "" })
 }
-list_map = <A, B>(xs: List(A), f: (A) -> B) {
+list_map = <A, B>(xs : List(A), f : (A) -> B) {
 	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..list_map(rest, f)] }
 }
 expected = () {
-	(u) { u.name } |> (f: (User) -> String) { f(User(name = "bob")) }
+	(u) { u.name } |> (f : (User) -> String) { f(User(name = "bob")) }
 }
 f = (x) { x + 1 }
 subject_scope = () { (x) { f(x) * 2 } |> (f) { f(1) } }
-empty = (x: Never) { core.never(x) }
+empty = (x : Never) { core.never(x) }

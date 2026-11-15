@@ -28,8 +28,8 @@ pairs = (a, b) {
 
 typed = (v) {
 	v |>
-		(x: Int) { x }
-		| (s: String) { string.length(s) }
-		| (t: (Int, Int)) { t.0 }
+		(x : Int) { x }
+		| (s : String) { string.length(s) }
+		| (t : (Int, Int)) { t.0 }
 		| (_) { 0 }
 }

@@ -81,7 +81,7 @@ pins silently on every worker count; it never becomes P3's visible stop.
 
 **D12. The worker count is the host's choice and cannot be seen.** A browser without cross-origin isolation, a module that fails a condition of D7, and any host that just wants one worker, all run one worker. No `i/task` API shows worker indices, the worker count, or queue claims. *Reason:* D1.
 
-**D13. A typed key for scheduler state.** The scheduler is ordinary i code, and one non-generic `Scheduler` service must hold the buffers of channels of many element types, the values of many `share` calls, and the waiting receivers of each. Rank-1 i has no existential, no top type and no type test on a type variable, so this cannot be typed without a new primitive. The note asks G2 for one general, safe primitive, in a new library module `i/key` of the package `i` (§1.3 names have no `.`, so `key.new` is the module name `key` and the export `new`, as `control.keep_env` is): `key.new(A): () -> Key(A)` gives a new key on each call; `key.wrap(A): (k: Key(A), value: A) -> Keyed` and `key.unwrap(A): (k: Key(A), x: Keyed) -> Lookup(A)`, where `Lookup(A) { Found(A) Missing }` is an ordinary custom type of `i/key`, so `Found` and `Missing` are not built-in names and a module gets them as it gets the constructors of any library type. `unwrap` gives the value only when `x` was made with the same key. `Key(A)` and `Keyed` are **built-in types** (spec §4.2, §11.1, §11.8 and §12 name them, and the new spec section for `i/key` defines them), not custom types of `i/core`: a custom type with no constructors would make its values host references (§10.3), so keys would not be portable, and the checker gives every parameter of such a type `Variance::Bi` (`infer.rs:2242`), whose constraints are dropped (`solve.rs:363`). Safety needs two things: **`Key(A)` is invariant in `A`** (§4.5 rule 7 gets the row, and `builtin_variance` in `solve.rs:1285-1292` gets `Key: [Inv]`; with no row, or with the same direction, `wrap` at `Int` and `unwrap` at `String` with one monomorphic key would type check and be an unchecked cast), and `key.new()` is not a direct value, so `k = key.new()` is not generalized (§4.7, the value restriction). Under §4.7, a key that is not generalized may still be given to `wrap` at two types (its parameter collects `Int | String`); then `unwrap` gives `Int | String`, and using it at a narrower type is a compile error. A key is the same only as itself, like a function, and gets an id in the multicore wave (D6); a `Keyed` is portable when its value is. *Reason:* the alternative, handles that carry typed closures, makes handles non-portable as soon as those closures reach scheduler state. The primitive is general: per-task storage (open question 3), typed heterogeneous maps (plugin registries, typed property bags, request context in a web framework), and typed event buses, besides the scheduler. The exact names are track R's, and the primitive needs G2's approval (open question 7).
+**D13. A typed key for scheduler state.** The scheduler is ordinary i code, and one non-generic `Scheduler` service must hold the buffers of channels of many element types, the values of many `share` calls, and the waiting receivers of each. Rank-1 i has no existential, no top type and no type test on a type variable, so this cannot be typed without a new primitive. The note asks G2 for one general, safe primitive, in a new library module `i/key` of the package `i` (§1.3 names have no `.`, so `key.new` is the module name `key` and the export `new`, as `control.keep_env` is): `key.new(A): () -> Key(A)` gives a new key on each call; `key.wrap(A) : (k : Key(A), value : A) -> Keyed` and `key.unwrap(A) : (k : Key(A), x : Keyed) -> Lookup(A)`, where `Lookup(A) { Found(A) Missing }` is an ordinary custom type of `i/key`, so `Found` and `Missing` are not built-in names and a module gets them as it gets the constructors of any library type. `unwrap` gives the value only when `x` was made with the same key. `Key(A)` and `Keyed` are **built-in types** (spec §4.2, §11.1, §11.8 and §12 name them, and the new spec section for `i/key` defines them), not custom types of `i/core`: a custom type with no constructors would make its values host references (§10.3), so keys would not be portable, and the checker gives every parameter of such a type `Variance::Bi` (`infer.rs:2242`), whose constraints are dropped (`solve.rs:363`). Safety needs two things: **`Key(A)` is invariant in `A`** (§4.5 rule 7 gets the row, and `builtin_variance` in `solve.rs:1285-1292` gets `Key: [Inv]`; with no row, or with the same direction, `wrap` at `Int` and `unwrap` at `String` with one monomorphic key would type check and be an unchecked cast), and `key.new()` is not a direct value, so `k = key.new()` is not generalized (§4.7, the value restriction). Under §4.7, a key that is not generalized may still be given to `wrap` at two types (its parameter collects `Int | String`); then `unwrap` gives `Int | String`, and using it at a narrower type is a compile error. A key is the same only as itself, like a function, and gets an id in the multicore wave (D6); a `Keyed` is portable when its value is. *Reason:* the alternative, handles that carry typed closures, makes handles non-portable as soon as those closures reach scheduler state. The primitive is general: per-task storage (open question 3), typed heterogeneous maps (plugin registries, typed property bags, request context in a web framework), and typed event buses, besides the scheduler. The exact names are track R's, and the primitive needs G2's approval (open question 7).
 
 ## 3. The rules
 
@@ -96,8 +96,8 @@ Test of exactness: in
 
 ```i
 f = (b) {
-  unused = b
-  () { 1 }
+	unused = b
+	() { 1 }
 }
 ```
 
@@ -207,11 +207,11 @@ prescription for entry bootstrap:
 
 
 ```i
-go = <A, E, N>(body: () <- (Fail(E), Scheduler, ..N) -> A) <- (
-	s: Scheduler,
+go = <A, E, N>(body : () <- (Fail(E), Scheduler, ..N) -> A) <- (
+	s : Scheduler,
 ) -> Task(A, E) {
 	start = {
-		control.keep_env((own: Scheduler) {
+		control.keep_env((own : Scheduler) {
 			{
 				r = task.unwind_inside(body)
 				r
@@ -328,7 +328,7 @@ Facts at c69515c:
 - `ilang-host` makes and joins a new 48 MiB thread for every call (`invoke_in`, `lib.rs:1162`).
 - Both hosts insist on exactly one pending async import per yield (`lib.rs:1050`, `ilang.mjs:733`). The C/R request table lifts this per worker; that is needed for `i/task` to overlap I/O even with one worker.
 - The module exports an unshared memory (`runtime/mod.rs:334`).
-- wasmtime is built without the `threads` feature (`crates/ilang-host/Cargo.toml:15`), and the config does not turn on `wasm_threads` (`lib.rs:629`).
+- wasmtime is built without the `threads` feature (`crates/ilang-host/Cargo.toml : 15`), and the config does not turn on `wasm_threads` (`lib.rs:629`).
 - Each `Store` reserves its own GC heap, 256 MiB by default (`lib.rs:1131`).
 - `HostReference` is `Arc<dyn Any + Send + Sync>` (`lib.rs:349`); `reference_id` numbers are per instance (`State.next_reference`, `lib.rs:602`).
 - The JS bridge copies with `.slice()` before decoding (`ilang.mjs:378`), which a `SharedArrayBuffer` view needs.
@@ -408,11 +408,11 @@ No section is renumbered; new content is added as subsections or sentences. The 
 
 **§9.2 Environment and services.** Add after the bullet "A service is a normal value. …":
 
-> - `control.keep_env(f)` (§9.4) gives a function that, wherever it is called, calls `f` with the services that were bound at the place of the `keep_env` call when it ran. It keeps every service bound there, also those that `f` does not need. An environment statement inside `f`, as in `(x: S) { ! T = x  body() }`, gives `T` its own value there as usual.
+> - `control.keep_env(f)` (§9.4) gives a function that, wherever it is called, calls `f` with the services that were bound at the place of the `keep_env` call when it ran. It keeps every service bound there, also those that `f` does not need. An environment statement inside `f`, as in `(x : S) { ! T = x  body() }`, gives `T` its own value there as usual.
 
 **§9.4 Control.** Add a row to the table:
 
-> | `control.keep_env` | `(f: (x: S) -> A ^ E ! N) -> { (x: S) -> A ^ E } ! N` |
+> | `control.keep_env` | `(f : (x : S) -> A ^ E ! N) -> { (x : S) -> A ^ E } ! N` |
 
 Add to rule 3:
 
@@ -437,8 +437,8 @@ Add rule 7:
 > | Function | Type | What it does |
 > |---|---|---|
 > | `new` | `() -> Key(A)` | A new key, the same only as itself |
-> | `wrap` | `(k: Key(A), value: A) -> Keyed` | The value, marked with the key |
-> | `unwrap` | `(k: Key(A), x: Keyed) -> Lookup(A)` | `Found(v)` when `x` was made with `k` from `v`, and `Missing` when not |
+> | `wrap` | `(k : Key(A), value : A) -> Keyed` | The value, marked with the key |
+> | `unwrap` | `(k : Key(A), x : Keyed) -> Lookup(A)` | `Found(v)` when `x` was made with `k` from `v`, and `Missing` when not |
 >
 > `Lookup(A) { Found(A) Missing }` is a custom type of `i/key`, not a built-in name.
 
@@ -487,7 +487,7 @@ and add `i/key` (§9.8) to the list of modules in the last sentence.
 
 **§13 The module `i/core`.** Add the rows:
 
-> | `portable` | `(value: A) -> Bool` | `True` when the value is portable (§11.9) |
+> | `portable` | `(value : A) -> Bool` | `True` when the value is portable (§11.9) |
 
 The `hash` row: "Which number is not fixed." becomes:
 
@@ -542,7 +542,7 @@ The `hash` row: "Which number is not fixed." becomes:
 
 **Now (track R):**
 
-- **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `( k: b )` is False.
+- **T1** `tests/spec/13/portable.i`. True for: an Int, a big Int, a Float, a String, a bit array, `[]`, a tuple and a list of these, a top-level function, a constructor, a closure that captures only data, a closure that captures another such closure, a local recursive function (it holds itself), and two local functions that call each other. False for: a boundary `b` (inside `control.boundary`), a continuation (inside `suspend`), a closure that captures `b`, a local recursive function that also captures `b`, a list holding such a closure, a custom value with a boundary field. After records land: `( k : b )` is False.
 - **T2** `tests/spec/9.7`, with a host fixture as in `tests/spec/11/equality_externals.i`: `portable` of a host reference is False, and of a tuple that holds one too.
 - **T3** `tests/spec/11/equality.i` stays unchanged; it guards that §11.4 did not change.
 - **T4** Captures are exact: the example of part 3.1 is True; a closure whose only use of `b` is in a clause that never runs is False. Both run at O0 and O2 and give the same answers.
@@ -593,7 +593,7 @@ The `hash` row: "Which number is not fixed." becomes:
 ## 17. Open questions
 
 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x: Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 5. Which general typed byte-state transaction interface implements part 7 without running i code under a lock? Recommended: ordinary request-mode services; require the MC-D prototype before MC-I.

@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -81,7 +81,7 @@ Small = (size = Int)
 Big = (name = String, size = Int)
 Sized = Small | Big
 
-sizes = (xs: List(Sized)) -> List(Int) {
+sizes = (xs : List(Sized)) -> List(Int) {
 	xs |>
 		([]) { [] }
 		// `size` is field 0 of `Small` and field 1 of `Big`.

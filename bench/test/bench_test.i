@@ -14,7 +14,7 @@ size = 1_000_000
 
 // Numbers that look random: x * 75 + 74 modulo 65537. Every step fits in
 // a small Int.
-randoms = (n: Int) -> List(Int) {
+randoms = (n : Int) -> List(Int) {
 	go = (i, x, acc) {
 		i |>
 			(0) { acc }
@@ -26,7 +26,7 @@ randoms = (n: Int) -> List(Int) {
 	go(n, 1, [])
 }
 
-check = (ok: Bool, what: String) -> Nil {
+check = (ok : Bool, what : String) -> Nil {
 	ok |> (True) { Nil } | (False) { panic(what) }
 }
 
@@ -58,7 +58,7 @@ test("list_sort", () {
 })
 
 // A merge of two sorted lists, written out.
-merge = (xs: List(Int), ys: List(Int), acc: List(Int)) -> List(Int) {
+merge = (xs : List(Int), ys : List(Int), acc : List(Int)) -> List(Int) {
 	xs |>
 		([]) { list.append(list.reverse(acc), ys) }
 		| ([x, ..xs2]) {

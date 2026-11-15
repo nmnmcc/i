@@ -1,24 +1,24 @@
 Dep = (Int)
-get = () <- (d: Dep) {
+get = () <- (d : Dep) {
 	Dep(x) = d
 	x
 }
 S(N) = (() <- N -> Int)
-use = <N>() <- (s: S(N)) {
+use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
 }
-make = <N>(f: () <- N -> Int) {
+make = <N>(f : () <- N -> Int) {
 	inner = (g) {
 		local = () { g(f) }
 		local()
 	}
 	inner
 }
-run = <N>(f: () <- N -> Int) { f() }
+run = <N>(f : () <- N -> Int) { f() }
 
 main = () {
-	_syn3_0: S(Dep) = S(() { get() })
+	_syn3_0 : S(Dep) = S(() { get() })
 	{
 		wrapped = make(() { use() })
 		assert(wrapped(run) == 11)

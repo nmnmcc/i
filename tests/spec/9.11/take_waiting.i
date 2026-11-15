@@ -7,4 +7,4 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later: Later) { request.take(later.echo("pending")) }
+main = () <- (later : Later) { request.take(later.echo("pending")) }

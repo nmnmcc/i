@@ -10,10 +10,10 @@
 	i/control
 )
 
-Paused = (Continuation(Nil, Paused, Never))
+Paused = (Continuation(Nil, PausedSum, Never))
 
 Done = ()
-Paused = Paused | Done
+PausedSum = Paused | Done
 // Three frames that wait.
 f1 = (b) {
 	x = f2(b)

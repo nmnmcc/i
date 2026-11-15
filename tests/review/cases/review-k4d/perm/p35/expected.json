@@ -1,6 +1,6 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.uset : (A) <- (T(A, N), ..N) -> A\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.closed : () -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.ping : (Int) <- (S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.both : () <- (S(N), T(Int, N), ..N) -> Int\napp/main.pong : (Int) <- (S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.get : () <- (Dep) -> Int\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:11:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:30:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n2 errors\n"
+      "stdout": "app/main.uset : (A) <- (Fail(Never), T(A, N), ..N) -> A\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.closed : () <- (Fail(Never)) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.ping : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.both : () <- (Fail(Never), S(N), T(Int, N), ..N) -> Int\napp/main.pong : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.get : () <- (Dep) -> Int\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.main : () <- (Fail(Never)) -> Nil\n",
+      "stderr": "src/main.i:11:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:33:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n2 errors\n"
     }
   }
 }

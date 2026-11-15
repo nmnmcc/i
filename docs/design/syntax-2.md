@@ -137,12 +137,12 @@ upstream snapshots read on 2026-11-11, not pinned historical evidence.
   (:1731), loops on `Vbar` for alternatives, then reads the guard, arrow and
   expression. Take this separation of head and body. i can share a token only
   after fixing its brace probe; Gleam's distinct token avoids that cost.
-- **Elixir.** `elixir/lib/elixir/src/elixir_parser.yrl:75,84` gives bare bar and
+- **Elixir.** `elixir/lib/elixir/src/elixir_parser.yrl : 75,84` gives bare bar and
   arrow operators separate precedence; :206–209 explicitly warns about pipe
   precedence with calls without parentheses. Take the dedicated diagnostic
   approach. i's required call parentheses avoid that particular ambiguity,
   but a bare bar still needs the context rules in §4.2.
-- **OCaml.** `ocaml/stdlib/stdlib.ml:48` declares the two-character pipe as
+- **OCaml.** `ocaml/stdlib/stdlib.ml : 48` declares the two-character pipe as
   `%revapply`. It is ordinary reverse application, not shell stream wiring.
   i retains its existing first-argument insertion and evaluation order rather
   than importing OCaml's operator implementation or all of its precedence.
@@ -172,7 +172,7 @@ references remove one ambiguity; they do not dictate i's choice.
 
 ### Named record top and error slots
 
-- **Dart.** `dart-sdk/sdk/lib/core/record.dart:7–16,58–69` describes `Record` as
+- **Dart.** `dart-sdk/sdk/lib/core/record.dart : 7–16,58–69` describes `Record` as
   the supertype of record shapes and records field-name conflicts with Object
   members and positional getters. Take the named set of record values.
   i has no Object methods on records, and its labels remain ordinary strings;
@@ -186,7 +186,7 @@ references remove one ambiguity; they do not dictate i's choice.
   a suffix expression, an optional bang, and a type expression. Take a
   dedicated effect/error slot rather than overload the guard marker. i cannot
   copy bang because bang already identifies its independent environment axis.
-- **Swift typed throws.** `swift/lib/Parse/ParseExpr.cpp:132–157` parses effect
+- **Swift typed throws.** `swift/lib/Parse/ParseExpr.cpp : 132–157` parses effect
   specifiers around function arrows; `ParseStmt.cpp`, `parseStmtDo`
   (:2177–2201), parses the thrown type inside a matching parenthesis pair.
   Take explicit effect boundaries and misplaced-marker errors; do not add
@@ -267,7 +267,7 @@ well as after a function arrow. The relayed explanation “left of arrow means
 alternatives” and “types only after colon/arrow” is therefore not exact.
 
 Examples: `n.{ p ? p | ready -> 1 _ -> 0 }` has a pipe in a guard.
-`n.{ x: Int | y -> x _ -> 0 }` has the value type `y` in a union; it does not
+`n.{ x : Int | y -> x _ -> 0 }` has the value type `y` in a union; it does not
 bind an alternative `y`. The same holds for literal types. This preserves
 spec §7.1's no-backtracking type rule and T2; capitalization is not a parser
 oracle (`parser.rs:1494–1508`, `:1653–1687`, `:1760–1878`).
@@ -365,8 +365,8 @@ Otherwise `..` or label-colon selects a record type; other nonempty contents
 select a positional tuple type. Empty contents are an error suggesting
 `Record`. Function type parameter lists may still be empty and may have labels
 (`parser.rs:1782–1816`). A parenthesised record used as a function parameter
-type needs its own nesting: `((a: Int)) -> T` takes one record argument;
-`(a: Int) -> T` takes one Int argument labelled `a`.
+type needs its own nesting: `((a : Int)) -> T` takes one record argument;
+`(a : Int) -> T` takes one Int argument labelled `a`.
 
 **D4.** Record values have name or noninterpolated string labels. Record types
 also have declared uppercase label parameters. Preserve duplicate-label,
@@ -377,23 +377,23 @@ that pattern; it is not a record field.
 
 | Meeting point | Required reading / result (prototype exercised each) |
 |---|---|
-| `(a: b)` in an expression | Record whose field value is `b`. |
-| `(a: b) { a }` | Function whose parameter has value type `b`; then checking decides whether `b` is in scope. |
-| `(a: Int)` in a pattern | One-item tuple pattern containing a type test/annotation. |
+| `(a : b)` in an expression | Record whose field value is `b`. |
+| `(a : b) { a }` | Function whose parameter has value type `b`; then checking decides whether `b` is in scope. |
+| `(a : Int)` in a pattern | One-item tuple pattern containing a type test/annotation. |
 | `f(a: b)` and `f (a: b)` | Labelled call, not a record argument. Use `f((a: b))` for that. |
-| `f` then `(a: b)` on the next line in a block | Two expressions; the second is a record. A break inside an enclosing parenthesis instead separates items. |
-| `(name: path)` at file start | Invalid header, not a record expression statement. Top-level expression statements are not permitted. Imports use `name = package/module`, not colon. |
+| `f` then `(a : b)` on the next line in a block | Two expressions; the second is a record. A break inside an enclosing parenthesis instead separates items. |
+| `(name : path)` at file start | Invalid header, not a record expression statement. Top-level expression statements are not permitted. Imports use `name = package/module`, not colon. |
 | `(name: std/path)` at file start | Still invalid; the slash does not validate the colon. |
 | `(a, b) = value` at file start | Existing tuple-pattern binding. |
-| Block's first expression `(a: b)` | Record if no function suffix follows. No brace-record scan needed. |
+| Block's first expression `(a : b)` | Record if no function suffix follows. No brace-record scan needed. |
 | `(n) { (name: n) }` | Function returning a record; function bodies remain blocks. |
 | `()` as call argument, tuple/list part, RHS, guard or clause body | Empty record, except where a following function suffix or a pattern context decides otherwise. A record guard subsequently fails Bool checking. |
 | `() { ... }`, `() -> Nil { ... }`, `() -> Nil` in a type | Empty parameter lists. |
-| `List((a: Int))`, `List((a: Int) -> T)` | Record argument type versus function argument type. |
-| `x: (a: Int) -> 1` in a clause | The type parser takes the arrow; no clause arrow remains. Error. Use `x: { (a: Int) } -> 1`. This is the old tuple/function-type boundary applied to records. |
-| `(f: (x) -> Int { x })` | One-field record, with no extra comma. |
-| `(1, name: "ada")`, `(name: "ada", 1)` | Errors, in either order; type counterparts also fail. |
-| `retry(3, body: f)`, `User(String, age: Int)` in a constructor declaration | Existing mixed argument/field lists, pending confirmation. |
+| `List((a : Int))`, `List((a : Int) -> T)` | Record argument type versus function argument type. |
+| `x : (a : Int) -> 1` in a clause | The type parser takes the arrow; no clause arrow remains. Error. Use `x : { (a : Int) } -> 1`. This is the old tuple/function-type boundary applied to records. |
+| `(f : (x) -> Int { x })` | One-field record, with no extra comma. |
+| `(1, name : "ada")`, `(name : "ada", 1)` | Errors, in either order; type counterparts also fail. |
+| `retry(3, body: f)`, `User(String, age : Int)` in a constructor declaration | Existing mixed argument/field lists, pending confirmation. |
 
 A naked typed function at the start of an ordinary brace group still hits the
 existing clause/function ambiguity: `{ (x) -> Int { x } }` is rejected after
@@ -422,7 +422,7 @@ rules. It does not become unconstrained `R`.
 irrefutable unit pattern or a test of all records. Those would contradict
 “records have no pattern” or change matching silently. The diagnostic can
 suggest a binder/discard if the value is unused; it must not promise that
-`_: Record` tests emptiness. Existing record tests remain head-based and must
+`_ : Record` tests emptiness. Existing record tests remain head-based and must
 satisfy spec §4.8 rule 11 (records@0d0ce19:482–488).
 
 **N3.** Add `Record` as a normal built-in type name with no type arguments,
@@ -573,7 +573,7 @@ Add D4's mixed-data error, without any comma-based exception.
   Keep one-item tuples and brace grouping.
 - §6.6: retain all call rules, including positional arguments before labelled
   arguments, **if Q5 is confirmed**. Add “A labelled argument is not a record
-  argument; pass `(label: value)` inside the call to pass a record.”
+  argument; pass `(label : value)` inside the call to pass a record.”
 - §6.8: change only the return error marker. Function bodies remain blocks.
 - §6.9: replace the level-6 entry and its pipe examples by bar. Add match
   suffixes to the list stronger than unary. Delete the paragraph requiring
@@ -608,7 +608,7 @@ same-frame semantics explicitly. §11.6's match references use this definition.
 Change the tuple-pattern production to require at least one pattern. Keep
 constructor field/rest and list/rest patterns, string-prefix patterns, choices
 and literal patterns. Add N2's empty-pattern error. There is still no record
-pattern. `(x: Int)` still tests/annotates the single tuple part.
+pattern. `(x : Int)` still tests/annotates the single tuple part.
 
 In §7.1's longest-type paragraph delete the sentence saying that a question
 marker after a function type is part of that type and requires grouping before
@@ -684,7 +684,7 @@ normal-surface printing. They are already structural data in a deliberately
 different surface. Then bare `.is` `()` remains a parameter list, not the
 normal surface's empty value; `(,)` is removed in expression, type and pattern
 positions. The comma round-trip justification disappears: the normal surface
-prints `(f: (x) -> Int { x })` without a comma. Do not independently invent a
+prints `(f : (x) -> Int { x })` without a comma. Do not independently invent a
 second parenthesised `.is` record grammar. Ask M1/coordinator to confirm this
 mapping, particularly if “braces hold only code” was meant for both surfaces.
 
@@ -871,10 +871,10 @@ prototype:
 | `3 \| (n) { n + 1 }` | `4`, P1. |
 | `False \|\| True` | `True`; Bool short circuit unchanged, P1. |
 | `False \| True` | Callability error with Boolean-or hint, P5. |
-| `(name: "ada").name` | `"ada"`, D4 and existing record field rule. |
-| `(..(a: 1), a: "x").a` | `"x"`; Without plus replacement, not intersection, D4/N1. |
+| `(name : "ada").name` | `"ada"`, D4 and existing record field rule. |
+| `(..(a : 1), a : "x").a` | `"x"`; Without plus replacement, not intersection, D4/N1. |
 | `() == ()` | `True`; existing structural record equality, N1. |
-| Function taking `(a: Int)` called with `()` | Type error: record top does not guarantee field `a`, N1. |
+| Function taking `(a : Int)` called with `()` | Type error: record top does not guarantee field `a`, N1. |
 | A record field containing a function, with no trailing comma | Parses as a record; calling its field gives that function's result, D2. |
 | `() -> Nil` as annotation and `() { Nil }` as value | Both accepted; zero function parameters are not empty tuples, D2/D3. |
 | Empty tuple pattern | Syntax error, N2. |
@@ -920,13 +920,13 @@ record formatter must land together with T3's syntax consumers.
 | `ilang-syntax/tests/{lex,parse,golden,format,spec}.rs` and fixture directories | New boundary matrix; reparse/canonical-tree and idempotence properties; reviewed new diagnostic goldens. Current properties are in `tests/format.rs:1–9` and `tests/spec.rs:29–54`. |
 | `crates/ilang-check/src/hir.rs:221–260`, `resolve.rs:810,1418,1795,2514`; `types/display.rs:1357` and T3's shown types | Normal `Record` name, no empty tuple surface, record display, preserved single-clause lowering, and scoped pipe/or diagnostic. Use T3's existing structural type representation. |
 | `crates/ilang-wasm/src/lower.rs:1562–1580,2289,2342`; T3 runtime record inspector | Verify tuple arity removal at the source boundary; retain existing Case lowering; print record delimiters. Existing nominal `Record` names are unrelated. |
-| `scripts/old-syntax-check:105–125,143–185`, its JSON, tests and docs; `scripts/a2-meaning`; `scripts/wat-diff:67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
+| `scripts/old-syntax-check : 105–125,143–185`, its JSON, tests and docs; `scripts/a2-meaning`; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
 | `docs/spec.md`, `docs/design/{syntax,records,meta}.md` | Apply §5 together. Do not leave two accepted contradictory grammars. |
 | `editors/vscode`, package templates, Rust/JS embedded sources, all changed `.i`, comments and text/type expectations | Inventory by source role; update highlighting for caret, bar and match dot; preserve CR/CRLF and layout-sensitive tests. |
 
 The plan locates the first migration's one-off A2 programs in the shared cache,
 not `scripts/`, and at :411–429 says only two partitions were replayable. The checked-in
-`scripts/a2-meaning:1–80` is an audit of changed one-clause semantics that calls
+`scripts/a2-meaning : 1–80` is an audit of changed one-clause semantics that calls
 an old formatter-report interface; it is not a general second migrator. The current formatter command takes only project, check and paths
 (`crates/ilang-cli/src/commands/fmt.rs:15–43`), with no old-source conversion
 mode to reuse.
@@ -963,7 +963,7 @@ claiming the old commands can simply be rerun.
    metadata is preserved. If new source spans change `$site_data`, use the
    existing **separate** `wat-diff` site-masked mode with the same site count;
    label this normalized equality, not byte equality. Its `--byte-equal` mode
-   explicitly forbids masking (`scripts/wat-diff:419–422`). Do not authorize
+   explicitly forbids masking (`scripts/wat-diff : 419–422`). Do not authorize
    nominal renumbering or broad allowed-difference lists for this task.
 7. Empty-tuple removal is an explicit exception to both AST and WAT equality.
    Record allocation and tuple allocation are different lowering paths
@@ -1014,12 +1014,12 @@ I attacked soundness, implementability and source agreement separately.
 
 **Soundness counterexamples retained for the implementation.**
 
-- A function requiring field `a: Int` must reject an empty record. Do not read
+- A function requiring field `a : Int` must reject an empty record. Do not read
   the name `Record` as an exact zero-field shape, and do not erase a required
   field during parenthesis disambiguation.
-- Replacing `a: Int` by `a: String` with a spread must give the String field,
+- Replacing `a : Int` by `a : String` with a spread must give the String field,
   not the impossible intersection. Parenthesis parsing cannot alter Without.
-- A union of `(a: Int)` and `(b: String)` cannot be distinguished at runtime
+- A union of `(a : Int)` and `(b : String)` cannot be distinguished at runtime
   merely by a typed record clause. The existing head-test obligation remains;
   the syntax probe's acceptance of a type is not proof of a valid program.
 - `Record { Record }` must still declare an ordinary nominal type. Parser

@@ -23,7 +23,7 @@
 /// float_text.to_string(1.0e20)   // "1.0e20"
 /// float_text.to_string(-0.0025)  // "-0.0025"
 /// ```
-to_string = (x: Float) -> String {
+to_string = (x : Float) -> String {
 	bits = core.float_to_bits(x)
 	// The fields of the bits are taken apart with shifts and masks, so that
 	// every number below stays under 2^62 for ordinary Floats, where the
@@ -42,7 +42,7 @@ to_string = (x: Float) -> String {
 
 // The pieces of the text of the positive Float with this exponent field and
 // fraction.
-positive = (encoded: Int, fraction: Int) -> List(String) {
+positive = (encoded : Int, fraction : Int) -> List(String) {
 	// v = r / s × 2^e, with the midpoint distances minus / s and plus / s.
 	// At an exact normal power of two the binade below has half the spacing.
 	(mantissa, r, minus, plus, e) = { encoded == 0 } |>
@@ -86,21 +86,21 @@ positive = (encoded: Int, fraction: Int) -> List(String) {
 }
 
 // floor(a / b) for b > 0.
-floor_divide = (a: Int, b: Int) -> Int {
+floor_divide = (a : Int, b : Int) -> Int {
 	{ a < 0 } |> (True) { 0 - { b - 1 - a } / b } | (False) { a / b }
 }
 
 // 10^n, by squaring.
 // 10^n for n from 0 to 340: a power of 10^16 from a table, times a power
 // below 10^16, which the runtime multiplies in 64 bits.
-power_of_ten = (n: Int) -> Int { sixteens(n / 16) * small_power(n % 16, 1) }
+power_of_ten = (n : Int) -> Int { sixteens(n / 16) * small_power(n % 16, 1) }
 
-small_power = (n: Int, acc: Int) -> Int {
+small_power = (n : Int, acc : Int) -> Int {
 	{ n == 0 } |> (True) { acc } | (False) { small_power(n - 1, acc * 10) }
 }
 
 // 10^(16 k).
-sixteens = (k: Int) -> Int {
+sixteens = (k : Int) -> Int {
 	k |>
 		(0) { 1 }
 		| (1) { 10000000000000000 }
@@ -164,14 +164,14 @@ sixteens = (k: Int) -> Int {
 
 // Exact normalization, part one: the smallest `s × 10^j` above `r`, with
 // `k` counting the steps.
-grow = (r: Int, s: Int, k: Int) -> (Int, Int) {
+grow = (r : Int, s : Int, k : Int) -> (Int, Int) {
 	next = s * 10
 	{ r < next } |> (True) { (s, k) } | (False) { grow(r, next, k + 1) }
 }
 
 // Exact normalization, part two: `1 <= r/s`. Multiplying the numerator and
 // both margins together keeps the round-to-nearest interval.
-shrink = (r: Int, s: Int, minus: Int, plus: Int, k: Int) -> (
+shrink = (r : Int, s : Int, minus : Int, plus : Int, k : Int) -> (
 	Int,
 	Int,
 	Int,
@@ -185,13 +185,13 @@ shrink = (r: Int, s: Int, minus: Int, plus: Int, k: Int) -> (
 // The digits, last first, until the rest is inside the rounding interval,
 // and the decimal exponent `k` after rounding.
 generate = (
-	r: Int,
-	s: Int,
-	minus: Int,
-	plus: Int,
-	inclusive: Bool,
-	acc: List(Int),
-	k: Int
+	r : Int,
+	s : Int,
+	minus : Int,
+	plus : Int,
+	inclusive : Bool,
+	acc : List(Int),
+	k : Int
 ) -> (List(Int), Int) {
 	digit = r / s
 	rest = r - digit * s
@@ -226,7 +226,7 @@ generate = (
 
 // Adds one to the last digit; `True` when the first digit carries out,
 // and then the digits are a single 1.
-carry = (reversed: List(Int)) -> (List(Int), Bool) {
+carry = (reversed : List(Int)) -> (List(Int), Bool) {
 	reversed |>
 		([d, ..rest] ? d < 9) { ([d + 1, ..rest], False) }
 		| ([_]) { ([1], True) }
@@ -239,21 +239,23 @@ carry = (reversed: List(Int)) -> (List(Int), Bool) {
 }
 
 // Without zeros at the end, keeping at least one digit.
-trim = (reversed: List(Int)) -> List(Int) {
+trim = (reversed : List(Int)) -> List(Int) {
 	reversed |> ([0, ..rest] ? rest != []) { trim(rest) } | (_) { reversed }
 }
 
-reverse_onto = (list: List(Int), acc: List(Int)) -> List(Int) {
+reverse_onto = (list : List(Int), acc : List(Int)) -> List(Int) {
 	list |> ([]) { acc } | ([x, ..xs]) { reverse_onto(xs, [x, ..acc]) }
 }
 
-length = (list: List(Int), n: Int) -> Int {
+length = (list : List(Int), n : Int) -> Int {
 	list |> ([]) { n } | ([_, ..xs]) { length(xs, n + 1) }
 }
 
 // §11.8: the shortest digits, in scientific notation once whole decimal
 // output would imply precision above 2^53, or would need many zeros.
-layout = (digits: List(Int), n: Int, k: Int, imprecise: Bool) -> List(String) {
+layout = (digits : List(Int), n : Int, k : Int, imprecise : Bool) -> List(
+	String,
+) {
 	point = k - n
 	lower = { n == 1 } |> (True) { -4 } | (False) { -2 - n }
 	upper = { n == 1 || k >= 11 } |> (True) { 2 } | (False) { 1 }
@@ -284,7 +286,7 @@ layout = (digits: List(Int), n: Int, k: Int, imprecise: Bool) -> List(String) {
 }
 
 // The digits with a point after the first `k` of them.
-split = (digits: List(Int), k: Int, acc: List(String)) -> List(String) {
+split = (digits : List(Int), k : Int, acc : List(String)) -> List(String) {
 	{ k == 0 } |>
 		(True) { reverse_texts(acc, [".", ..texts(digits, [])]) }
 		| (False) {
@@ -294,45 +296,45 @@ split = (digits: List(Int), k: Int, acc: List(String)) -> List(String) {
 		}
 }
 
-reverse_texts = (list: List(String), acc: List(String)) -> List(String) {
+reverse_texts = (list : List(String), acc : List(String)) -> List(String) {
 	list |> ([]) { acc } | ([x, ..xs]) { reverse_texts(xs, [x, ..acc]) }
 }
 
-append = (front: List(String), back: List(String)) -> List(String) {
+append = (front : List(String), back : List(String)) -> List(String) {
 	reverse_texts(reverse_texts(front, []), back)
 }
 
 // `count` zeros before `rest`.
-zeros = (count: Int, rest: List(String)) -> List(String) {
+zeros = (count : Int, rest : List(String)) -> List(String) {
 	{ count <= 0 } |>
 		(True) { rest }
 		| (False) { zeros(count - 1, ["0", ..rest]) }
 }
 
 // The text of each digit, before `rest`.
-texts = (digits: List(Int), rest: List(String)) -> List(String) {
+texts = (digits : List(Int), rest : List(String)) -> List(String) {
 	reverse_texts(digit_list(digits, []), rest)
 }
 
-digit_list = (digits: List(Int), acc: List(String)) -> List(String) {
+digit_list = (digits : List(Int), acc : List(String)) -> List(String) {
 	digits |>
 		([]) { acc }
 		| ([d, ..ds]) { digit_list(ds, [digit_text(d), ..acc]) }
 }
 
 // The decimal digits of a small exponent, with `-` when it is negative.
-int_text = (e: Int) -> List(String) {
+int_text = (e : Int) -> List(String) {
 	{ e < 0 } |>
 		(True) { ["-", ..int_digits(-e, [])] }
 		| (False) { int_digits(e, []) }
 }
 
-int_digits = (e: Int, acc: List(String)) -> List(String) {
+int_digits = (e : Int, acc : List(String)) -> List(String) {
 	next = [digit_text(e % 10), ..acc]
 	{ e < 10 } |> (True) { next } | (False) { int_digits(e / 10, next) }
 }
 
-digit_text = (d: Int) -> String {
+digit_text = (d : Int) -> String {
 	d |>
 		(0) { "0" }
 		| (1) { "1" }

@@ -1,0 +1,229 @@
+---
+title: Services and errors
+description: Take services from a caller, provide test implementations, and handle errors and optional values.
+---
+
+Take services from your caller, substitute test implementations, and handle failures as values.
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+)
+main = () <- (io : Io) { io.print("hello") }
+```
+
+```text
+hello
+```
+
+`i run` supplies `Io`, assertions, a top-level failure handler, and the scheduler to `main`; importing a service type does not create an implementation. `io.print` appends a line feed.
+
+## A caller’s service
+
+```i file=src/greeting.i title="src/greeting.i"
+(
+	Greeting(..)
+	message
+)
+Greeting = (read = () -> String)
+message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	(Greeting, message) = tour/greeting
+)
+main = () <- (io : Io) {
+	io.print(message() <- (Greeting(read = () { "reader" })))
+}
+```
+
+```text
+hello, reader
+```
+
+A service is an ordinary labelled value; `<-` gives this call its `Greeting`. Calls without an explicit provision pass their needs to the caller.
+
+## A test implementation
+
+```i file=src/greeting.i title="src/greeting.i"
+(
+	Greeting(..)
+	message
+)
+Greeting = (read = () -> String)
+message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
+```
+
+```i test stdout=exact package=tour title="test/greeting_test.i"
+(
+	testlib = (test) = std/test
+	(Greeting, message) = tour/greeting
+)
+test("a fake greeting", () {
+	assert({ message() <- (Greeting(read = () { "test" })) } == "hello, test")
+})
+```
+
+```text
+pass tour/greeting_test.a fake greeting
+1 passed, 0 failed
+```
+
+The test runner supplies assertions; the project manifest needs `std` and `[test] collection = "std/test.tests"`. The [macros page](/docs/tour/macros) shows test registration.
+
+## Forwarded needs
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+)
+Greeting = (read = () -> String)
+message = () <- (g : Greeting) -> String { g.read() }
+welcome : () <- (Greeting) -> String = () { message() <> "!" }
+main = () <- (io : Io) {
+	io.print(welcome() <- (Greeting(read = () { "hello" })))
+}
+```
+
+```text
+hello!
+```
+
+A written `() -> String` would leave `Greeting` unsupplied and be rejected. Needs combine by service type, independently of local names or order.
+
+## Parsing errors
+
+```i run package=tour title="src/main.i"
+(
+	i/fail
+	i/core
+	(Io) = i/io
+	std/int
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(int.parse("42")),
+	)
+	io.print(
+		core.inspect(fail.catch(() { int.parse("oops") })),
+	)
+}
+```
+
+```text
+42
+Error(Nil)
+```
+
+`int.parse` returns an integer and raises `Nil` through `Fail(Nil)` for invalid input. `fail.catch` turns success or failure into a built-in `Result` value.
+
+## Missing values
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+	std/list
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(list.first([7, 8])),
+	)
+	empty : List(Int) = []
+	io.print(
+		core.inspect(list.first(empty)),
+	)
+}
+```
+
+```text
+Some(7)
+None
+```
+
+`Option` comes from `std/option`. Match its cases with the [branches](/docs/tour/functions-and-branches) used earlier.
+
+## Raised errors
+
+```i run package=tour title="src/main.i"
+(
+	i/fail
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(fail.catch(() { 42 })),
+	)
+	answer = fail.catch(() { fail.raise("bad input") })
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+Ok(42)
+Error("bad input")
+```
+
+The callback delays work until `fail.catch` has installed `Fail(E)`; error values can have any type. An unhandled error terminates the program. A stop, such as `panic`, also terminates it and escapes `fail.catch`.
+
+## Result conversion
+
+```i run package=tour title="src/main.i"
+(
+	i/fail
+	i/core
+	(Io) = i/io
+	std/result
+)
+main = () <- (io : Io) {
+	stored : Result(Int, String) = Error("bad input")
+	answer = fail.catch(() { result.to_error(stored) })
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+Error("bad input")
+```
+
+`result.to_error` unwraps a stored `Result`, raising its `Error` value through `Fail`.
+
+## A fixed clock
+
+```i test stdout=exact package=tour title="test/clock_test.i"
+(
+	testlib = (test) = std/test
+	i/fail
+)
+
+Clock = (now = () -> Int)
+
+Late = (by = Int)
+
+remaining = (deadline) <- (clock : Clock) {
+	deadline - clock.now() |>
+		(left ? left < 0) { fail.raise(Late(by = 0 - left)) }
+		| (left) { left }
+}
+
+test("a test gives its own clock", () {
+	{
+		assert(remaining(42) == 2)
+		late = fail.catch(() { remaining(30) })
+		expected = Error(Late(by = 10))
+		assert(late == expected)
+	} <- (Clock(now = () { 40 }))
+})
+```
+
+```text
+pass tour/clock_test.a test gives its own clock
+1 passed, 0 failed
+```
+
+Provision after a block supplies its calls, including the nested callback. The current compiler omits field labels when printing labelled errors.
+
+Continue with [resources](/docs/tour/resources).

@@ -5,7 +5,7 @@ use crate::{
 };
 use ilang_check::Parsed;
 use ilang_package::{Diagnostic, PackageGraph, SourceId};
-use ilang_syntax::lisp::expansion;
+use ilang_syntax::lisp::expansion3 as expansion;
 
 /// Checks all macro signatures and capabilities of one module under the full
 /// compiler environment available in item position. Dependencies must have
@@ -42,20 +42,21 @@ pub fn module(
     let mut entries = Vec::new();
     let mut wrappers = Vec::new();
     for definition in &definitions {
-        let binding = prepared
+        for binding in prepared
             .bindings
             .iter()
-            .find(|b| b.module == root.path && b.name == definition.name)
-            .expect("validated macro was prepared");
-        let (path, name) =
-            prepare::add_wrapper(&mut graph, &mut selected, binding, MacroPosition::Item);
-        let wrapper_source = selected.last().expect("wrapper was appended").source;
-        wrappers.push((
-            wrapper_source,
-            definition.name.clone(),
-            root.ast.items[definition.item].span,
-        ));
-        entries.push((path, name));
+            .filter(|b| b.module == root.path && b.name == definition.name)
+        {
+            let (path, name) =
+                prepare::add_wrapper(&mut graph, &mut selected, binding, MacroPosition::Item);
+            let wrapper_source = selected.last().expect("wrapper was appended").source;
+            wrappers.push((
+                wrapper_source,
+                definition.name.clone(),
+                root.ast.items[definition.item].span.0,
+            ));
+            entries.push((path, name));
+        }
     }
     let refs = entries
         .iter()
@@ -66,7 +67,7 @@ pub fn module(
         Err(CompileError::Internal(message)) => Err(vec![Diagnostic::error(
             ilang_check::code::MACRO_RESERVED,
             Some(source),
-            root.ast.items[definitions[0].item].span,
+            root.ast.items[definitions[0].item].span.0,
             format!("compiler error while compiling macros: {message}"),
         )]),
         Err(CompileError::Program(mut diagnostics)) => {

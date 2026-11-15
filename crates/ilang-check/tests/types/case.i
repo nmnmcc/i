@@ -22,7 +22,7 @@ sign = (n) { n |> (0) { 0 } | (m ? m > 0) { 1 } | (_) { -1 } }
 guarded_only = (x) { x |> (1) { 1 } | (y ? y > 2) { y } }
 
 // Type tests.
-describe = (v) { v |> (_: Int) { "int" } | (s: String) { s } }
+describe = (v) { v |> (_ : Int) { "int" } | (s : String) { s } }
 
 // Choices bind the same names.
 choice = (r) { r |> (Ok(v)) { v } | (Error(v)) { v } }
@@ -34,7 +34,7 @@ mixed = (b) { b |> (True) { 1 } | (False) { "no" } }
 named = (r) { r |> (Ok(_) = whole) { whole } | (Error(_)) { Ok(0) } }
 
 // A type variable in a type test is a compile error.
-bad = <A>(v: A) { v |> (x: A ? True) { x } | (_) { panic("unreachable") } }
+bad = <A>(v : A) { v |> (x : A ? True) { x } | (_) { panic("unreachable") } }
 
 // A catch-all next to a pattern whose parts are tested.
 first_one = (p) { p |> ((1, x)) { x } | (_) { 0 } }

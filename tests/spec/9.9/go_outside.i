@@ -8,7 +8,7 @@
 
 main = () {
 	task.scope((outer) {
-		carrier: task.Channel(task.Group(Never)) = task.channel()
+		carrier : task.Channel(task.Group(Never)) = task.channel()
 		task.go(outer, () {
 			scope = task.receive(carrier)
 			task.go(scope, () { Nil })

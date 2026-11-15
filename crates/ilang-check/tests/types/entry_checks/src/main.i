@@ -30,43 +30,43 @@ Clock = (now = () -> Int)
 Handle = Opaque
 
 // Host exports: parameters, value, and errors that the host can take.
-add = (a: Int, b: Int) { a + b }
+add = (a : Int, b : Int) { a + b }
 
-opaque = (h: Handle, flag: Bool) { flag |> (True) { h } | (False) { h } }
+opaque = (h : Handle, flag : Bool) { flag |> (True) { h } | (False) { h } }
 
-errors = (x: Int) -> Nil {
+errors = (x : Int) -> Nil {
 	x |> (0) { fail.raise(1) } | (1) { fail.raise("one") } | (_) { Nil }
 }
 
 // `Never` is not a type that the host can take (§10.3).
-never = (s: String) { panic(s) }
+never = (s : String) { panic(s) }
 
-never_param = (x: Never) -> Int { x + 1 }
+never_param = (x : Never) -> Int { x + 1 }
 
-bad_param = (xs: List(Int)) { 1 }
+bad_param = (xs : List(Int)) { 1 }
 
 bad_value = () { (1, 2) }
 
 generic = (x) { x }
 
-bad_errors: () <- (Fail((Int, Int))) -> Int = () { fail.raise((1, 2)) }
+bad_errors : () <- (Fail((Int, Int))) -> Int = () { fail.raise((1, 2)) }
 
-twice_error: () <- (Fail(Handle)) -> Int = () { 1 }
+twice_error : () <- (Fail(Handle)) -> Int = () { 1 }
 
 // A host export is a function.
 number = 1
 
 // The environment of an entry point: host services and `Assert` only.
-with_host = () <- (s: Storage) {
+with_host = () <- (s : Storage) {
 	assert(s.read("k") == "v")
 	1
 }
 
-with_clock = () <- (c: Clock) { c.now() }
+with_clock = () <- (c : Clock) { c.now() }
 
-main = () <- (s: Storage, c: Clock) {
+main = () <- (s : Storage, c : Clock) {
 	s.read(c.now() |> core_text)
 	Nil
 }
 
-core_text = (n: Int) { "x" }
+core_text = (n : Int) { "x" }

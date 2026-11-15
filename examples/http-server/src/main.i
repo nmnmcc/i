@@ -40,7 +40,7 @@ reply = (status, text) {
 	)
 }
 
-handle = (req: http.Request) {
+handle = (req : http.Request) {
 	(req.method, req.target) |>
 		((http.Method("GET"), "/health")) {
 			r = http.response(http.Status(200))
@@ -55,7 +55,7 @@ handle = (req: http.Request) {
 		| ((http.Method("POST"), "/users")) {
 			fail.catch(() { bit_array.to_string(req.body) }) |>
 				(Ok(text)) {
-					parsed: Result(User, schema.ParseError) = {
+					parsed : Result(User, schema.ParseError) = {
 						e4_call_arg_0 = user_schema()
 						e4_call_arg_1 = text
 						fail.catch(() {

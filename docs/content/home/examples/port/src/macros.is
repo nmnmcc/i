@@ -1,0 +1,3 @@
+(, twice)
+(@ macro (: twice (-> (, Int) Int)))
+(@ macro (= twice (-> (, value) _ `(+ ~value ~value))))

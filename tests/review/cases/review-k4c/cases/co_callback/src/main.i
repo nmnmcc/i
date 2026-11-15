@@ -1,3 +1,3 @@
 S(A) = (value = A)
-use = <A>() <- (s: S(A)) { s.value }
-wrap = <A>(x: A, f) { f(() { use() }) }
+use = <A>() <- (s : S(A)) { s.value }
+wrap = <A>(x : A, f) { f(() { use() }) }

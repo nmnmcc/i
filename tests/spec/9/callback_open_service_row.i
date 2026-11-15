@@ -5,11 +5,11 @@ First = (run = () -> Nil)
 
 Second = (run = () -> Nil)
 
-operation = () <- (second: Second) { second.run() }
+operation = () <- (second : Second) { second.run() }
 
-handle = <A, N>(body: () <- N -> A) -> A { body() }
+handle = <A, N>(body : () <- N -> A) -> A { body() }
 
-wrapper = (p: (send = _)) { handle(() { p.send() }) }
+wrapper = (p : (send = _)) { handle(() { p.send() }) }
 
 main = () {
 	wrapper((send = () { operation() })) <- (

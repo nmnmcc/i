@@ -3,7 +3,7 @@
 (
 	main
 )
-pair = <A, A>(x: A) { (x, x) }
+pair = <A, A>(x : A) { (x, x) }
 
 main = () {
 	assert(True)

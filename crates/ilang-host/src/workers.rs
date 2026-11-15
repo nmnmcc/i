@@ -625,6 +625,7 @@ impl Worker {
         }
         linker.define_unknown_imports_as_traps(&pool.module)?;
         let mut state = State::worker();
+        state.abi_version = pool.abi.version;
         state.workers = Some(Arc::clone(pool));
         if let Some(resources) = pool
             .resources

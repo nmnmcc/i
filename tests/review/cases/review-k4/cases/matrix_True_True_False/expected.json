@@ -1,6 +1,6 @@
 {
-  "compiler": "beb26bce4bd21d6901d5b01e517cbbf176652948",
-  "binary_sha256": "054a62b4f1dcd6d72877d717f6b84886dc2df10610984a3d343606841a98f2e7",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil\napp/main.f : () <- (S(N), ..N) -> Nil\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.f : () <- (S(N), ..N) -> Nil\napp/main.main : () -> Nil\n",
       "stderr": ""
     },
     "test0": {

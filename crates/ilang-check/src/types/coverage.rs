@@ -1133,7 +1133,7 @@ impl Checker<'_> {
                     true
                 }
                 Pat::Ctor(Ctor::Lit(Lit::Str(s)), _) if b == BuiltinType::String => {
-                    out.push(ilang_syntax::print::string_literal(s));
+                    out.push(ilang_syntax::syn3::string_literal(s));
                     true
                 }
                 _ => false,
@@ -1249,9 +1249,22 @@ impl Checker<'_> {
                 .join(" | "),
             Pat::Except(h, set) => {
                 let t = Ty::lit(scalar_head(*h).unwrap(), set.clone());
-                format!("_: {}", super::display::show_known(&self.s, &t))
+                format!("_ : {}", super::display::show_known(&self.s, &t))
             }
-            Pat::Head(h, n) => format!("_: {}", self.show_head(*h, *n)),
+            // A type with one constructor is shown as that constructor:
+            // `False`, `Some(..)` (syntax three: sums are unions of them).
+            Pat::Head(Head::Named(TypeRef::Custom(id)), _) if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.len() == 1) =>
+            {
+                let TypeBody::Custom(cs) = &self.p.ty(*id).body else {
+                    unreachable!("checked above")
+                };
+                if cs[0].fields.is_empty() {
+                    cs[0].name.clone()
+                } else {
+                    format!("{}(..)", cs[0].name)
+                }
+            }
+            Pat::Head(h, n) => format!("_ : {}", self.show_head(*h, *n)),
             Pat::Ctor(Ctor::Shape(shape), args) => {
                 let parts: Vec<String> = args.iter().map(|a| self.show_pat(a)).collect();
                 shape.text(&parts)
@@ -1276,17 +1289,17 @@ impl Checker<'_> {
             Pat::Ctor(Ctor::Lit(l), _) => match l {
                 Lit::Int(s) => s.clone(),
                 Lit::Float(b) => format!("{:?}", f64::from_bits(*b)),
-                Lit::Str(s) => ilang_syntax::print::string_literal(s),
+                Lit::Str(s) => ilang_syntax::syn3::string_literal(s),
                 Lit::Prefix(p, z) => {
                     let start = if p.is_empty() && !z.is_empty() {
                         "_".into()
                     } else {
-                        format!("{} <> _", ilang_syntax::print::string_literal(p))
+                        format!("{} <> _", ilang_syntax::syn3::string_literal(p))
                     };
                     if z.is_empty() {
                         start
                     } else {
-                        format!("{start} <> {}", ilang_syntax::print::string_literal(z))
+                        format!("{start} <> {}", ilang_syntax::syn3::string_literal(z))
                     }
                 }
                 Lit::Bits => "<<..>>".into(),

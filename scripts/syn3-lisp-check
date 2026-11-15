@@ -25,13 +25,13 @@ for name in ['crates/ilang-cli/tests/macro_run.rs', 'crates/ilang-cli/tests/type
                 '{body}', '(-> (, value) _ `7)')
         elif value.startswith('(->'):
             source = '(@ macro (= m ' + value + '))\n'
-        elif re.match(r'^m \(->', value):
+        elif re.match(r'^[a-z_][A-Za-z0-9_]* \(->', value):
             source = '(@ macro (: ' + value + '))\n'
         elif value.startswith('{}(@ macro'):
             source = value[2:]
         if source is not None:
             sources.append((name + ':' + str(host[:start].count('\n') + 1), source))
-tool = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')) / 'debug/examples/parse-snippets'
+tool = check['parser_driver']()
 if not tool.is_file():
     raise SystemExit('run scripts/check-snippets first to build the parser driver')
 data = b''.join(str(len(source.encode())).encode() + b'\n' + source.encode() for _, source in sources)

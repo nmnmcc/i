@@ -1,0 +1,182 @@
+---
+title: A tour of the language
+description: Read a function type through an example.
+---
+
+Use `i check --types` to see a function’s arguments, services, errors, and result.
+
+```i types package=tour title="src/main.i"
+(
+	std/int
+)
+
+(
+	Input(..)
+	read_count
+)
+
+Input = (read = () -> String)
+
+read_count = (extra) <- (input : Input) { int.parse(input.read()) + extra }
+```
+
+```text
+tour/main.read_count : (Int) <- (Fail(Nil), Input) -> Int
+```
+
+- `(Int)` says the argument is an integer.
+- `Input` after `<-` names the service used to read text.
+- `Fail(Nil)` says invalid text raises `Nil` through a service in that same list.
+- `-> Int` says the result is an integer.
+
+## Tour pages
+
+1. [Values and data](/docs/tour/values-and-data)
+2. [Functions and branches](/docs/tour/functions-and-branches)
+3. [Types and inference](/docs/tour/types-and-inference)
+4. [Types from top to bottom](/docs/tour/types-from-top-to-bottom)
+5. [Services and errors](/docs/tour/services-and-errors)
+6. [Resources](/docs/tour/resources)
+7. [Concurrency](/docs/tour/concurrency)
+8. [Macros](/docs/tour/macros)
+9. [Packages](/docs/tour/packages)
+
+## A call
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+	std/int
+)
+
+Input = (read = () -> String)
+
+read_count = (extra) <- (input : Input) { int.parse(input.read()) + extra }
+
+main = () <- (io : Io) {
+	answer = read_count(2) <- (Input(read = () { "40" }))
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+42
+```
+
+`i run` supplies `Io` and a top-level failure handler to the program entry.
+
+## Services
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+	std/int
+)
+
+Input = (read = () -> String)
+
+read_count = (extra) <- (input : Input) { int.parse(input.read()) + extra }
+
+main = () <- (io : Io) {
+	left = read_count(2) <- (Input(read = () { "40" }))
+	right = read_count(2) <- (Input(read = () { "8" }))
+	io.print(core.inspect((left, right)))
+}
+```
+
+```text
+(42, 10)
+```
+
+The provision applies to this call.
+
+## Caught errors
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/fail
+	(Io) = i/io
+	std/int
+)
+
+Input = (read = () -> String)
+
+read_count = (extra) <- (input : Input) { int.parse(input.read()) + extra }
+
+main = () <- (io : Io) {
+	good = fail.catch(() { read_count(2) <- (Input(read = () { "40" })) })
+	bad = fail.catch(() { read_count(2) <- (Input(read = () { "oops" })) })
+	io.print(core.inspect(good))
+	io.print(core.inspect(bad))
+}
+```
+
+```text
+Ok(42)
+Error(Nil)
+```
+
+`fail.catch` supplies `Fail` while the callback runs.
+
+## Results
+
+```i types package=tour title="src/main.i"
+(
+	std/int
+)
+
+(
+	Input(..)
+	read_text
+)
+
+Input = (read = () -> String)
+
+read_count = (extra) <- (input : Input) { int.parse(input.read()) + extra }
+
+read_text = (extra) { int.to_string(read_count(extra)) }
+```
+
+```text
+tour/main.read_count : (Int) <- (Fail(Nil), Input) -> Int
+tour/main.read_text : (Int) <- (Fail(Nil), Input) -> String
+```
+
+Text conversion changes the result type and keeps the service needs.
+
+## Supplied services
+
+```i types package=tour title="src/main.i"
+(
+	std/int
+)
+
+(
+	Input(..)
+	fixed_count
+)
+
+Input = (read = () -> String)
+
+read_count = (extra) <- (input : Input) { int.parse(input.read()) + extra }
+
+fixed_count = (extra) { read_count(extra) <- (Input(read = () { "40" })) }
+```
+
+```text
+tour/main.read_count : (Int) <- (Fail(Nil), Input) -> Int
+tour/main.fixed_count : (Int) <- (Fail(Nil)) -> Int
+```
+
+The function provides `Input`, so its callers still need `Fail(Nil)`.
+
+## Scratch project
+
+Install [i](/docs/getting-started/install), then run `i new tour` and `cd tour`.
+
+In `i.toml`, move `std` from `[dev-dependencies]` to `[dependencies]` and set its path to your local `std` directory.
+
+Replace `src/main.i` with each example; use `i check --types` for type listings, `i run` for output, and `i fmt` for layout.

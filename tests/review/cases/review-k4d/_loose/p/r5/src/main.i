@@ -2,13 +2,13 @@
 	(Io) = i/io
 )
 Dep = (v = Int)
-get = () <- (d: Dep) { d.v }
+get = () <- (d : Dep) { d.v }
 S(N) = (f = () <- N -> Int)
-use = <N>() <- (s: S(N)) { s.f() }
-run = <A, N>(body: () <- N -> A) { body() }
+use = <N>() <- (s : S(N)) { s.f() }
+run = <A, N>(body : () <- N -> A) { body() }
 fw = () { use() }
 fr = () { run(() { use() }) }
-tell = (x: Int) {
+tell = (x : Int) {
 	x |>
 		(0) { "zero" }
 		| (1) { "one" }
@@ -19,7 +19,7 @@ tell = (x: Int) {
 }
 
 main = <N>() {
-	local: () <- (S(N), ..N) -> Int = () { fw() }
+	local : () <- (S(N), ..N) -> Int = () { fw() }
 	local()
 	Nil
 }

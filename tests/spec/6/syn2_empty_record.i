@@ -3,7 +3,7 @@
 (
 	main
 )
-identity = (r: ()) { r }
+identity = (r : ()) { r }
 main = () {
 	assert(identity(()) == ())
 	Nil

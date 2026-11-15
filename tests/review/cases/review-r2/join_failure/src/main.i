@@ -9,12 +9,12 @@
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	r = fail.catch(() {
 		task.scope((s) {
-			armed: task.Channel(Nil) = task.channel()
-			joining: task.Channel(Nil) = task.channel()
-			parent: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
+			joining : task.Channel(Nil) = task.channel()
+			parent : task.Channel(Nil) = task.channel()
 			t = task.go(s, () {
 				resource.ensure(
 					() {

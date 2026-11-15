@@ -1,2 +1,2 @@
-even = (n: odd) { odd(n) }
+even = (n : odd) { odd(n) }
 odd = (n) { even(n) }

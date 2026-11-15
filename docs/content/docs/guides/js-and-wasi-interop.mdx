@@ -1,0 +1,103 @@
+---
+title: Host and WASI interop
+description: Run a WASI command and call exports through the host SDK.
+---
+
+Run a WASI command and call an exported function through the host SDK.
+
+```toml file=i.toml title="i.toml"
+name = "guide_interop"
+
+[dependencies]
+
+[wasm]
+exports = ["guide_interop/main.add"]
+```
+
+```i run package=guide_interop title="src/main.i"
+(
+	i/stdio
+)
+
+(
+	add
+)
+add = (a : Int, b : Int) -> Int { a + b }
+main = () { stdio.print("hello from Wasm") }
+```
+
+```text
+hello from Wasm
+```
+
+Create `guide-interop/` in the i source folder; run commands there. The Wasm engine needs garbage collection, typed function references, tail calls, and exception handling with `exnref`.
+
+## WASI command
+
+```sh
+i build --target wasi --opt 2
+```
+
+```text
+built ./build/guide_interop.wasm
+```
+
+```sh
+wasmtime run build/guide_interop.wasm
+```
+
+```text
+hello from Wasm
+```
+
+```sh
+node --no-warnings ../bindings/javascript/wasi-run.mjs build/guide_interop.wasm
+```
+
+```text
+hello from Wasm
+```
+
+The Node runner uses `node:wasi`; `--no-warnings` suppresses its experimental-API notice. `_start` initializes the module and runs the entry; normal return exits with status 0, and a stop exits with status 1.
+
+For files, pass the runner a JSON options argument with `preopens`, `args`, and `env`; this example needs no filesystem grant. WASI supplies streams, clock, entropy, arguments, environment, and filesystem adapters; unmet networking, TLS, process-spawning, or working-directory needs are rejected ([service and path rules](/docs/standard/generated/chapter-appendix-b#section-b-7)).
+
+## Host export
+
+```sh
+i build --target nodejs --opt 2
+```
+
+```text
+built ./build/guide_interop.wasm
+```
+
+The `nodejs` target supplies standard IO. This replaces the WASI module and writes `build/guide_interop.bindings.json`; use separate `--out` paths to retain both targets.
+
+```sh
+cat > host.mjs <<'EOF'
+import { readFile } from "node:fs/promises";
+import { instantiate } from "../bindings/javascript/ilang.mjs";
+
+const app = await instantiate(
+  await readFile(new URL("./build/guide_interop.wasm", import.meta.url)),
+  { standardServices: true },
+);
+await app.run();
+console.log(app.call("guide_interop/main.add", [20n, 22n]).toString());
+EOF
+node host.mjs
+```
+
+```text
+hello from Wasm
+42
+```
+
+`instantiate` reads ABI metadata, supplies runtime imports, links selected services, and initializes once. `standardServices: true` supplies Node services, including output; `call` selects a configured export by full name. Integers cross this boundary as `bigint`; await `run()` so asynchronous entry work finishes before calling an export.
+
+The SDK handles value encoding, buffers, and the asynchronous entry protocol.
+
+Use the host SDK: `js` and `nodejs` builds produce only Wasm and `.bindings.json`, without generated `.mjs`/`.d.ts` loaders or an `ilang.js` section, and `@js` is not available yet.
+
+[Host ABI](/docs/standard/generated/chapter-appendix-b) · [Compiler development](/docs/contributing/building-and-testing)

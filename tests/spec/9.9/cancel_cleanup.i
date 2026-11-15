@@ -13,12 +13,12 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text : String) <- (out : Out) { out.print(text) }
 
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
-			gate: task.Channel(Nil) = task.channel()
+			gate : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {

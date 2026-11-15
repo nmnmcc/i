@@ -59,16 +59,16 @@ Node(K, V) = Empty | One(K, V) | Many(K, V) | Branch(K, V)
 new = <K, V>() -> Dict(K, V) { Dict(0, Empty) }
 
 /// The number of entries. This takes one step.
-size = <K, V>(dict: Dict(K, V)) -> Int {
+size = <K, V>(dict : Dict(K, V)) -> Int {
 	Dict(n, _) = dict
 	n
 }
 
 /// `True` when the dict has no entries.
-is_empty = <K, V>(dict: Dict(K, V)) -> Bool { size(dict) == 0 }
+is_empty = <K, V>(dict : Dict(K, V)) -> Bool { size(dict) == 0 }
 
 // The two bits of a hash for a level of the tree.
-slot = (hash: Int, depth: Int) -> Int {
+slot = (hash : Int, depth : Int) -> Int {
 	core.bit_and(core.shift_right(hash, depth * 2), 3)
 }
 
@@ -77,12 +77,14 @@ slot = (hash: Int, depth: Int) -> Int {
 /// ```i
 /// dict.new() |> dict.insert(1, "a") |> dict.get(1)  // Some("a")
 /// ```
-get = <K, V>(from: Dict(K, V), get: K) -> Option(V) {
+get = <K, V>(from : Dict(K, V), get : K) -> Option(V) {
 	Dict(_, root) = from
 	find(root, core.hash(get), get, 0)
 }
 
-find = <K, V>(node: Node(K, V), hash: Int, key: K, depth: Int) -> Option(V) {
+find = <K, V>(node : Node(K, V), hash : Int, key : K, depth : Int) -> Option(
+	V,
+) {
 	node |>
 		(Empty) { None }
 		| (One(h, k, v)) {
@@ -103,7 +105,7 @@ find = <K, V>(node: Node(K, V), hash: Int, key: K, depth: Int) -> Option(V) {
 		}
 }
 
-find_entry = <K, V>(entries: List((K, V)), key: K) -> Option(V) {
+find_entry = <K, V>(entries : List((K, V)), key : K) -> Option(V) {
 	entries |>
 		([]) { None }
 		| ([(k, v), ..rest]) {
@@ -114,7 +116,7 @@ find_entry = <K, V>(entries: List((K, V)), key: K) -> Option(V) {
 }
 
 /// `True` when the key is in the dict.
-has = <K, V>(dict: Dict(K, V), key: K) -> Bool {
+has = <K, V>(dict : Dict(K, V), key : K) -> Bool {
 	get(dict, key) |> (Some(_)) { True } | (None) { False }
 }
 
@@ -124,17 +126,20 @@ has = <K, V>(dict: Dict(K, V), key: K) -> Bool {
 /// ```i
 /// dict.new() |> dict.insert("a", 1) |> dict.to_list  // [("a", 1)]
 /// ```
-insert = <K, V>(into: Dict(K, V), for: K, insert: V) -> Dict(K, V) {
+insert = <K, V>(into : Dict(K, V), for : K, insert : V) -> Dict(K, V) {
 	Dict(n, root) = into
 	(node, added) = put(root, core.hash(for), for, insert, 0)
 	added |> (True) { Dict(n + 1, node) } | (False) { Dict(n, node) }
 }
 
 // Puts an entry in a node. Gives the new node, and whether the key is new.
-put = <K, V>(node: Node(K, V), hash: Int, key: K, value: V, depth: Int) -> (
-	Node(K, V),
-	Bool,
-) {
+put = <K, V>(
+	node : Node(K, V),
+	hash : Int,
+	key : K,
+	value : V,
+	depth : Int
+) -> (Node(K, V), Bool) {
 	node |>
 		(Empty) { (One(hash, key, value), True) }
 		| (One(h, k, v)) {
@@ -180,10 +185,10 @@ put = <K, V>(node: Node(K, V), hash: Int, key: K, value: V, depth: Int) -> (
 }
 
 put_entry = <K, V>(
-	entries: List((K, V)),
-	key: K,
-	value: V,
-	before: List((K, V))
+	entries : List((K, V)),
+	key : K,
+	value : V,
+	before : List((K, V))
 ) -> (List((K, V)), Bool) {
 	entries |>
 		([]) { (reverse_onto(before, [(key, value)]), True) }
@@ -196,11 +201,11 @@ put_entry = <K, V>(
 
 // A branch with two leaves whose hashes are different.
 join = <K, V>(
-	depth: Int,
-	x: Node(K, V),
-	hx: Int,
-	y: Node(K, V),
-	hy: Int
+	depth : Int,
+	x : Node(K, V),
+	hx : Int,
+	y : Node(K, V),
+	hy : Int
 ) -> Node(K, V) {
 	i = slot(hx, depth)
 	j = slot(hy, depth)
@@ -210,7 +215,7 @@ join = <K, V>(
 }
 
 // Puts a node in slot `i` of a branch. `base` is `Empty` or a branch.
-place = <K, V>(i: Int, node: Node(K, V), base: Node(K, V)) -> Node(K, V) {
+place = <K, V>(i : Int, node : Node(K, V), base : Node(K, V)) -> Node(K, V) {
 	(a, b, c, d) = base |>
 		(Branch(a, b, c, d)) { (a, b, c, d) }
 		| (_) { (Empty, Empty, Empty, Empty) }
@@ -223,13 +228,13 @@ place = <K, V>(i: Int, node: Node(K, V), base: Node(K, V)) -> Node(K, V) {
 
 /// The dict without the entry for a key. If the key is not there, the dict
 /// is the same.
-delete = <K, V>(from: Dict(K, V), delete: K) -> Dict(K, V) {
+delete = <K, V>(from : Dict(K, V), delete : K) -> Dict(K, V) {
 	Dict(n, root) = from
 	(node, removed) = remove(root, core.hash(delete), delete, 0)
 	removed |> (True) { Dict(n - 1, node) } | (False) { from }
 }
 
-remove = <K, V>(node: Node(K, V), hash: Int, key: K, depth: Int) -> (
+remove = <K, V>(node : Node(K, V), hash : Int, key : K, depth : Int) -> (
 	Node(K, V),
 	Bool,
 ) {
@@ -276,7 +281,7 @@ remove = <K, V>(node: Node(K, V), hash: Int, key: K, depth: Int) -> (
 
 // A branch with only one leaf below it becomes that leaf, so that the form
 // of the tree depends only on its keys.
-shrink = <K, V>(node: Node(K, V)) -> Node(K, V) {
+shrink = <K, V>(node : Node(K, V)) -> Node(K, V) {
 	node |>
 		(Branch(Empty, Empty, Empty, Empty)) { Empty }
 		| (
@@ -291,9 +296,9 @@ shrink = <K, V>(node: Node(K, V)) -> Node(K, V) {
 }
 
 remove_entry = <K, V>(
-	entries: List((K, V)),
-	key: K,
-	before: List((K, V))
+	entries : List((K, V)),
+	key : K,
+	before : List((K, V))
 ) -> Option(List((K, V))) {
 	entries |>
 		([]) { None }
@@ -308,13 +313,13 @@ remove_entry = <K, V>(
 /// when the key is there and `None` when not.
 ///
 /// ```i
-/// increment = (x) { x |> { Some(n) -> n + 1  None -> 0 } }
+/// increment = (x) { x |> (Some(n)) { n + 1 } | (None) { 0 } }
 /// dict.upsert(counts, "a", increment)
 /// ```
 upsert = <K, V, N>(
-	dict: Dict(K, V),
-	in: K,
-	with: (Option(V)) <- N -> V
+	dict : Dict(K, V),
+	in : K,
+	with : (Option(V)) <- N -> V
 ) -> Dict(K, V) {
 	insert(
 		dict,
@@ -325,7 +330,10 @@ upsert = <K, V, N>(
 
 /// Changes the value for a key with a function, when the key is there. If
 /// not, the dict is the same.
-update = <K, V, N>(dict: Dict(K, V), in: K, with: (V) <- N -> V) -> Dict(K, V) {
+update = <K, V, N>(dict : Dict(K, V), in : K, with : (V) <- N -> V) -> Dict(
+	K,
+	V,
+) {
 	get(dict, in) |>
 		(Some(value)) { insert(dict, in, with(value)) }
 		| (None) { dict }
@@ -337,7 +345,7 @@ update = <K, V, N>(dict: Dict(K, V), in: K, with: (V) <- N -> V) -> Dict(K, V) {
 /// ```i
 /// dict.from_list([("a", 1), ("b", 2)]) |> dict.get("b")  // Some(2)
 /// ```
-from_list = <K, V>(list: List((K, V))) -> Dict(K, V) {
+from_list = <K, V>(list : List((K, V))) -> Dict(K, V) {
 	go = (rest, dict) {
 		rest |> ([]) { dict } | ([(k, v), ..xs]) { go(xs, insert(dict, k, v)) }
 	}
@@ -347,18 +355,18 @@ from_list = <K, V>(list: List((K, V))) -> Dict(K, V) {
 /// Combines every entry with an accumulator, as `list.fold` does. The order
 /// of the entries is not fixed (see the module documentation).
 fold = <K, V, Acc, N>(
-	over: Dict(K, V),
-	from: Acc,
-	with: (Acc, K, V) <- N -> Acc
+	over : Dict(K, V),
+	from : Acc,
+	with : (Acc, K, V) <- N -> Acc
 ) -> Acc {
 	Dict(_, root) = over
 	fold_node(root, from, with)
 }
 
 fold_node = <K, V, Acc, N>(
-	node: Node(K, V),
-	acc: Acc,
-	f: (Acc, K, V) <- N -> Acc
+	node : Node(K, V),
+	acc : Acc,
+	f : (Acc, K, V) <- N -> Acc
 ) -> Acc {
 	node |>
 		(Empty) { acc }
@@ -378,9 +386,9 @@ fold_node = <K, V, Acc, N>(
 }
 
 fold_entries = <K, V, Acc, N>(
-	entries: List((K, V)),
-	acc: Acc,
-	f: (Acc, K, V) <- N -> Acc
+	entries : List((K, V)),
+	acc : Acc,
+	f : (Acc, K, V) <- N -> Acc
 ) -> Acc {
 	entries |>
 		([]) { acc }
@@ -388,22 +396,22 @@ fold_entries = <K, V, Acc, N>(
 }
 
 /// The entries as a list of pairs, in the order of `fold`.
-to_list = <K, V>(dict: Dict(K, V)) -> List((K, V)) {
+to_list = <K, V>(dict : Dict(K, V)) -> List((K, V)) {
 	reverse_onto(fold(dict, [], (acc, k, v) { [(k, v), ..acc] }), [])
 }
 
 /// The keys, in the order of `fold`.
-keys = <K, V>(dict: Dict(K, V)) -> List(K) {
+keys = <K, V>(dict : Dict(K, V)) -> List(K) {
 	reverse_onto(fold(dict, [], (acc, k, _) { [k, ..acc] }), [])
 }
 
 /// The values, in the order of `fold`.
-values = <K, V>(dict: Dict(K, V)) -> List(V) {
+values = <K, V>(dict : Dict(K, V)) -> List(V) {
 	reverse_onto(fold(dict, [], (acc, _, v) { [v, ..acc] }), [])
 }
 
 /// Calls a function with every entry, in the order of `fold`.
-each = <K, V, A, N>(dict: Dict(K, V), with: (K, V) <- N -> A) -> Nil {
+each = <K, V, A, N>(dict : Dict(K, V), with : (K, V) <- N -> A) -> Nil {
 	fold(dict, Nil, (_, k, v) {
 		with(k, v)
 		Nil
@@ -415,7 +423,7 @@ each = <K, V, A, N>(dict: Dict(K, V), with: (K, V) <- N -> A) -> Nil {
 /// ```i
 /// dict.from_list([(1, 2)]) |> dict.map_values((k, v) { k + v })  // {1 -> 3}
 /// ```
-map_values = <K, V, W, N>(in: Dict(K, V), with: (K, V) <- N -> W) -> Dict(
+map_values = <K, V, W, N>(in : Dict(K, V), with : (K, V) <- N -> W) -> Dict(
 	K,
 	W,
 ) {
@@ -423,7 +431,7 @@ map_values = <K, V, W, N>(in: Dict(K, V), with: (K, V) <- N -> W) -> Dict(
 	Dict(n, map_node(root, with))
 }
 
-map_node = <K, V, W, N>(node: Node(K, V), f: (K, V) <- N -> W) -> Node(K, W) {
+map_node = <K, V, W, N>(node : Node(K, V), f : (K, V) <- N -> W) -> Node(K, W) {
 	node |>
 		(Empty) { Empty }
 		| (One(h, k, v)) { One(h, k, f(k, v)) }
@@ -438,9 +446,9 @@ map_node = <K, V, W, N>(node: Node(K, V), f: (K, V) <- N -> W) -> Node(K, W) {
 }
 
 map_entries = <K, V, W, N>(
-	entries: List((K, V)),
-	f: (K, V) <- N -> W,
-	acc: List((K, W))
+	entries : List((K, V)),
+	f : (K, V) <- N -> W,
+	acc : List((K, W))
 ) -> List((K, W)) {
 	entries |>
 		([]) { reverse_onto(acc, []) }
@@ -448,14 +456,17 @@ map_entries = <K, V, W, N>(
 }
 
 /// Keeps only the entries for which the function gives `True`.
-filter = <K, V, N>(in: Dict(K, V), keeping: (K, V) <- N -> Bool) -> Dict(K, V) {
+filter = <K, V, N>(in : Dict(K, V), keeping : (K, V) <- N -> Bool) -> Dict(
+	K,
+	V,
+) {
 	fold(in, in, (acc, k, v) {
 		keeping(k, v) |> (True) { acc } | (False) { delete(acc, k) }
 	})
 }
 
 /// Keeps only the entries whose keys are in the list.
-take = <K, V>(from: Dict(K, V), keeping: List(K)) -> Dict(K, V) {
+take = <K, V>(from : Dict(K, V), keeping : List(K)) -> Dict(K, V) {
 	go = (rest, acc) {
 		rest |>
 			([]) { acc }
@@ -469,7 +480,7 @@ take = <K, V>(from: Dict(K, V), keeping: List(K)) -> Dict(K, V) {
 }
 
 /// Takes out the entries whose keys are in the list.
-drop = <K, V>(from: Dict(K, V), drop: List(K)) -> Dict(K, V) {
+drop = <K, V>(from : Dict(K, V), drop : List(K)) -> Dict(K, V) {
 	go = (rest, acc) {
 		rest |> ([]) { acc } | ([k, ..ks]) { go(ks, delete(acc, k)) }
 	}
@@ -483,7 +494,7 @@ drop = <K, V>(from: Dict(K, V), drop: List(K)) -> Dict(K, V) {
 /// dict.merge(dict.from_list([(1, "a")]), dict.from_list([(1, "b"), (2, "c")]))
 /// // {1 -> "b", 2 -> "c"}
 /// ```
-merge = <K, V>(into: Dict(K, V), from: Dict(K, V)) -> Dict(K, V) {
+merge = <K, V>(into : Dict(K, V), from : Dict(K, V)) -> Dict(K, V) {
 	fold(from, into, (acc, k, v) { insert(acc, k, v) })
 }
 
@@ -491,9 +502,9 @@ merge = <K, V>(into: Dict(K, V), from: Dict(K, V)) -> Dict(K, V) {
 /// put together with a function of the value of `dict` and the value of
 /// `other`.
 combine = <K, V, N>(
-	dict: Dict(K, V),
-	other: Dict(K, V),
-	with: (V, V) <- N -> V
+	dict : Dict(K, V),
+	other : Dict(K, V),
+	with : (V, V) <- N -> V
 ) -> Dict(K, V) {
 	fold(other, dict, (acc, k, v) {
 		get(acc, k) |>
@@ -508,7 +519,7 @@ combine = <K, V, N>(
 /// ```i
 /// dict.group([1, 2, 3, 4], (x) { x % 2 })  // {1 -> [1, 3], 0 -> [2, 4]}
 /// ```
-group = <V, K, N>(list: List(V), by: (V) <- N -> K) -> Dict(K, List(V)) {
+group = <V, K, N>(list : List(V), by : (V) <- N -> K) -> Dict(K, List(V)) {
 	go = (rest, acc) {
 		rest |>
 			([]) { acc }
@@ -526,6 +537,6 @@ group = <V, K, N>(list: List(V), by: (V) <- N -> K) -> Dict(K, List(V)) {
 	reversed
 }
 
-reverse_onto = <A>(list: List(A), acc: List(A)) -> List(A) {
+reverse_onto = <A>(list : List(A), acc : List(A)) -> List(A) {
 	list |> ([]) { acc } | ([x, ..xs]) { reverse_onto(xs, [x, ..acc]) }
 }

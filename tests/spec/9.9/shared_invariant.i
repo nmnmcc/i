@@ -5,4 +5,4 @@
 	i/task
 )
 
-widen = (x: task.Shared(Int)) -> task.Shared(Int | String) { x }
+widen = (x : task.Shared(Int)) -> task.Shared(Int | String) { x }

@@ -65,66 +65,66 @@ DivisionByZero = ()
 TimeError = DivisionByZero
 
 /// Makes a duration from an exact count of nanoseconds.
-nanoseconds = (count: Int) -> Duration { Duration(count) }
+nanoseconds = (count : Int) -> Duration { Duration(count) }
 
 /// Makes a duration from an exact count of milliseconds.
-milliseconds = (count: Int) -> Duration { Duration(count * 1000000) }
+milliseconds = (count : Int) -> Duration { Duration(count * 1000000) }
 
 /// Makes a duration from an exact count of seconds.
-seconds = (count: Int) -> Duration { Duration(count * 1000000000) }
+seconds = (count : Int) -> Duration { Duration(count * 1000000000) }
 
 /// Makes a duration from an exact count of minutes.
-minutes = (count: Int) -> Duration { Duration(count * 60000000000) }
+minutes = (count : Int) -> Duration { Duration(count * 60000000000) }
 
 /// Makes a duration from an exact count of hours.
-hours = (count: Int) -> Duration { Duration(count * 3600000000000) }
+hours = (count : Int) -> Duration { Duration(count * 3600000000000) }
 
 /// Returns the signed nanosecond payload.
-to_nanoseconds = (duration: Duration) -> Int {
+to_nanoseconds = (duration : Duration) -> Int {
 	Duration(count) = duration
 	count
 }
 
-add = (first: Duration, second: Duration) -> Duration {
+add = (first : Duration, second : Duration) -> Duration {
 	Duration(to_nanoseconds(first) + to_nanoseconds(second))
 }
 
-subtract = (first: Duration, second: Duration) -> Duration {
+subtract = (first : Duration, second : Duration) -> Duration {
 	Duration(to_nanoseconds(first) - to_nanoseconds(second))
 }
 
-scale = (duration: Duration, by: Int) -> Duration {
+scale = (duration : Duration, by : Int) -> Duration {
 	Duration(to_nanoseconds(duration) * by)
 }
 
 /// Divides toward zero, or returns DivisionByZero for a zero divisor.
-divide = (duration: Duration, by: Int) -> Result(Duration, TimeError) {
+divide = (duration : Duration, by : Int) -> Result(Duration, TimeError) {
 	{ by == 0 } |>
 		(True) { Error(DivisionByZero) }
 		| (False) { Ok(Duration(to_nanoseconds(duration) / by)) }
 }
 
-compare = (first: Duration, second: Duration) -> Order {
+compare = (first : Duration, second : Duration) -> Order {
 	int.compare(to_nanoseconds(first), to_nanoseconds(second))
 }
 
 /// Makes an epoch position from signed Unix nanoseconds.
-from_unix_nanoseconds = (count: Int) -> Instant { Instant(count) }
+from_unix_nanoseconds = (count : Int) -> Instant { Instant(count) }
 
-unix_nanoseconds = (instant: Instant) -> Int {
+unix_nanoseconds = (instant : Instant) -> Int {
 	Instant(count) = instant
 	count
 }
 
-shift = (instant: Instant, by: Duration) -> Instant {
+shift = (instant : Instant, by : Duration) -> Instant {
 	Instant(unix_nanoseconds(instant) + to_nanoseconds(by))
 }
 
 /// Returns end minus start, so reversing the arguments reverses the sign.
-between = (start: Instant, end: Instant) -> Duration {
+between = (start : Instant, end : Instant) -> Duration {
 	Duration(unix_nanoseconds(end) - unix_nanoseconds(start))
 }
 
-compare_instants = (first: Instant, second: Instant) -> Order {
+compare_instants = (first : Instant, second : Instant) -> Order {
 	int.compare(unix_nanoseconds(first), unix_nanoseconds(second))
 }

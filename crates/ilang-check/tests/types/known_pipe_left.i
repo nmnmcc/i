@@ -4,13 +4,13 @@
 // the other arguments give.
 User = (name = String, age = Int)
 
-apply = <A>(f: (User) -> A, x: User) -> A { f(x) }
+apply = <A>(f : (User) -> A, x : User) -> A { f(x) }
 
-map = <A, B>(xs: List(A), f: (A) -> B) -> List(B) {
+map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
 	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 
-flip = <A, B>(f: (A) -> B, xs: List(A)) -> List(B) { map(xs, f) }
+flip = <A, B>(f : (A) -> B, xs : List(A)) -> List(B) { map(xs, f) }
 
 u = User(name = "bob", age = 3)
 
@@ -19,7 +19,7 @@ left_fn = (u) { u.name } |> apply(u)
 left_fn_later = (u) { u.age } |> flip([User(name = "ann", age = 4)])
 
 // A tuple on the left: its parts have the parts of the expected type.
-pair = (p: ((User) -> Int, Int)) { p }
+pair = (p : ((User) -> Int, Int)) { p }
 
 left_tuple = ((u) { u.age }, 1) |> pair
 

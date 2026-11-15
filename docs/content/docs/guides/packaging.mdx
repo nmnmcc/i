@@ -1,0 +1,143 @@
+---
+title: Packaging
+description: Build native executables and Wasm modules; keep dependency inputs.
+---
+
+Build a native executable, a WASI command, or a module for an embedding host.
+
+```toml file=i.toml title="i.toml"
+name = "guide_build"
+
+[dependencies]
+```
+
+```i run package=guide_build title="src/main.i"
+(
+	i/stdio
+)
+main = () { stdio.print("ready") }
+```
+
+```text
+ready
+```
+
+Create `guide-build/` with these files; run commands there. This program needs no downloaded dependencies.
+
+## Native executable
+
+```sh
+i build --opt 2
+```
+
+```text
+built ./build/guide_build
+```
+
+```sh
+./build/guide_build
+```
+
+```text
+ready
+```
+
+Build messages go to standard error. The default `native` target bundles the runtime and ahead-of-time program; running it needs no compiler. It targets the building machine's OS and architecture, without cross-compilation; filenames use the package name or selected named entry.
+
+## WASI command
+
+```sh
+i build --target wasi --opt 2
+```
+
+```text
+built ./build/guide_build.wasm
+```
+
+```sh
+wasmtime run build/guide_build.wasm
+```
+
+```text
+ready
+```
+
+This target uses WASI preview 1.
+
+## Host module
+
+```i run package=guide_build title="src/main.i"
+main = () { Nil }
+```
+
+```text
+```
+
+The `host` target supplies no standard IO; use `nodejs` for programs that print.
+
+```sh
+i build --target host --opt 2 --out build/guide_host.wasm
+ls build/guide_host.wasm build/guide_host.bindings.json
+```
+
+```text
+built build/guide_host.wasm
+build/guide_host.bindings.json
+build/guide_host.wasm
+```
+
+Keep the binding-plan sidecar for hosts authorizing its declarations. The host ABI and WASI command use different entry protocols; the Node SDK loads host modules in the [interop guide](/docs/guides/js-and-wasi-interop). `--out` preserves both artifacts; otherwise Wasm targets overwrite `build/<package-name>.wasm`.
+
+## Local dependencies
+
+```toml file=i.toml title="i.toml"
+name = "guide_build"
+
+[dependencies]
+std = { path = "../std" }
+```
+
+```i run package=guide_build title="src/main.i"
+(
+	i/stdio
+	std/int
+)
+main = () { stdio.print(int.to_string(42)) }
+```
+
+```text
+42
+```
+
+Paths are relative to `i.toml`; `i.lock` leaves local contents unpinned. Located dependencies use git tags `vmajor.minor.patch`; minimal version selection chooses the highest reached requirement per package and major version, so publishing a tag alone changes no requirements.
+
+## Lock records
+
+```sh
+i check --offline
+test ! -f i.lock && echo 'no lock records'
+```
+
+```text
+no lock records
+```
+
+For located dependencies, commit `i.toml` and `i.lock` together: records contain location, version, commit, and a `sha256-` hash over sorted paths, lengths, and committed bytes. Records include every manifest reached in normal or test configuration, even if a higher version compiles. The loader verifies cached files and consumes that snapshot, rejecting changed tags or mismatches.
+
+## Repeated builds
+
+```sh
+i build --target wasi --opt 2 --out build/first.wasm
+i build --target wasi --opt 2 --out build/second.wasm
+cmp build/first.wasm build/second.wasm && echo 'identical Wasm'
+```
+
+```text
+built build/first.wasm
+built build/second.wasm
+identical Wasm
+```
+
+Identical local builds at one optimization level do not establish identical bytes across compiler versions, platforms, or levels. Macros have controlled compile-time services, fresh state per run, and portable `hash`; reuse requires identical inputs. Verified dependencies support repeatability without guaranteeing identical native executables across environments; release timestamps and archive normalization have separate rules in `docs/release.md`.
+
+[Lock records](/docs/standard/generated/chapter-2#section-2-8) · [Macro inputs](/docs/standard/generated/chapter-14#section-14-9) · [Compiler development](/docs/contributing/building-and-testing)

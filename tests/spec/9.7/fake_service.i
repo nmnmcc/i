@@ -14,7 +14,7 @@ Kv = (get = (String) <- (Fail(String)) -> String)
 @host("test:async/v1", "async")
 Later = (echo = (String) -> String)
 
-greeting = () <- (kv: Kv, later: Later) {
+greeting = () <- (kv : Kv, later : Later) {
 	later.echo("hello " <> kv.get("name"))
 }
 
@@ -25,7 +25,7 @@ test("with_fakes", () {
 	)
 })
 
-test("with_the_host", () <- (later: Later) {
+test("with_the_host", () <- (later : Later) {
 	greeting() |> ("hello name") { Nil } | (other) { panic(other) } <- (
 		Kv(get = (key) { key }),
 	)

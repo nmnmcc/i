@@ -7,7 +7,7 @@
 @host("test:bad/v1")
 Bad = (nan = () -> Float)
 
-half = () <- (bad: Bad) {
+half = () <- (bad : Bad) {
 	x = bad.nan()
 	x /. 2.0
 }

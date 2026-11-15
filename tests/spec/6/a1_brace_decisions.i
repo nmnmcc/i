@@ -14,7 +14,7 @@ take_prefix = ("ab" <> rest = s) { s } | (_) { "" }
 main = () {
 	assert(
 		{
-			id = <A>(x: A) -> A { x }
+			id = <A>(x : A) -> A { x }
 			id(3)
 		} ==
 			3,
@@ -28,14 +28,14 @@ main = () {
 	)
 	assert(
 		{
-			k: (Int) -> Int = identity
+			k : (Int) -> Int = identity
 			k(5)
 		} ==
 			5,
 	)
 	assert(
 		{
-			x: Int = 6
+			x : Int = 6
 			x
 		} ==
 			6,

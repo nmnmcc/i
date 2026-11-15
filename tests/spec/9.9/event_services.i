@@ -8,7 +8,7 @@
 
 Name = (text = String)
 
-read = () <- (name: Name) { name.text }
+read = () <- (name : Name) { name.text }
 
 make = () {
 	task.map(

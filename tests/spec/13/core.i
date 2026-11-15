@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -235,7 +235,7 @@ test("bit_arrays", () {
 	)
 })
 
-in_range = (h: Int) { h >= 0 && h < 4294967296 }
+in_range = (h : Int) { h >= 0 && h < 4294967296 }
 
 test("inspect_and_hash", () {
 	check(core.inspect(Ok([1])), "Ok([1])")

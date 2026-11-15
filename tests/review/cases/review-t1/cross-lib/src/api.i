@@ -24,4 +24,4 @@ Modes = "v00"
 	| "v18"
 	| "v99"
 last = "v99"
-identity = (m: Modes) { m }
+identity = (m : Modes) { m }

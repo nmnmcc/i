@@ -1,0 +1,3 @@
+(, get)
+(= helper 42)
+(@ macro (= get (-> (,) _ `(-> (, helper) _ helper))))

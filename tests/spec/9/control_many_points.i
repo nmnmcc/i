@@ -6,7 +6,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -15,7 +15,7 @@ check = (got: String, want: String) {
 // Many calls that may suspend, in the clauses of matches with guards and
 // in nested matches. A program that suspends at each of them and resumes at
 // once gives the same values as one that does not suspend.
-f = (s: (Int) -> Int, x: Int) {
+f = (s : (Int) -> Int, x : Int) {
 	a0 = x
 	a1 = a0 % 3 |> (0) { s(a0 + 1) } | (_) { a0 + 2 }
 	a2 = a1 % 4 |>

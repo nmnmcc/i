@@ -635,9 +635,6 @@ impl Solver {
     /// member of `M` with the same type constructor that satisfies it as
     /// a value. Needs compare services in reverse (§4.5 rule 4).
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
-        if self.vacuous(l) {
-            return;
-        }
         self.constrain_in(l, r, Mode::Env);
     }
 
@@ -1301,12 +1298,6 @@ impl Solver {
                 if h.iter()
                     .any(|m| m.value_head() == l.value_head() && !m.values().disjoint(l.values()))
                 {
-                    // Dropped entries still disappear in a filtered row.
-                    // A fresh Fail(E) can choose E = Never; an actual error
-                    // bound cannot and reports the failed constraint.
-                    if env == Mode::Env && self.vacate(l) {
-                        return;
-                    }
                     let partial = !l.values().is_all()
                         || h.iter()
                             .any(|m| m.head() == l.head() && !m.values().is_all());
@@ -1323,10 +1314,6 @@ impl Solver {
                     self.constrain_in(l, a, env);
                 }
             }
-            (Ty::Con(..), _)
-                if env == Mode::Env
-                    && !matches!(r, Ty::Con(..) if r.head() == l.head())
-                    && self.vacate(l) => {}
             (Ty::Con(h1, s1, a1), Ty::Con(h2, s2, a2)) if h1 == h2 && a1.len() == a2.len() => {
                 if (env == Mode::Env && s1 != s2) || (env != Mode::Env && !s1.subset(s2)) {
                     self.fail(
@@ -1884,7 +1871,6 @@ impl Solver {
                 let m = vars[0].clone();
                 self.constrain_in(rest.as_ref().unwrap_or(l), &m, env);
             }
-            0 if env == Mode::Env && self.vacate(l) => {}
             0 => self.fail(
                 if rest.is_some() {
                     FailKind::Values
@@ -2272,7 +2258,7 @@ impl Solver {
                 // this use. Validate its current needs when forming the row.
                 self.diff_bound_mode(a, hs, mode);
             }
-            if matches!(m, Ty::Never) || mode == Mode::Env && self.vacuous(&m) || out.contains(&m) {
+            if matches!(m, Ty::Never) || out.contains(&m) {
                 continue;
             }
             if matches!(m, Ty::Top) {
@@ -2315,48 +2301,6 @@ impl Solver {
     /// (§4.4). `a & T` with a type variable stays.
     pub fn inter(&mut self, ms: Vec<Ty>) -> Ty {
         self.normalize_mode(Ty::Inter(ms), Mode::Value)
-    }
-
-    /// A closed need without this constructor can fit it only if the
-    /// entry is vacuous (§9.2). Constrain fresh arguments to that form;
-    /// known or rigid incompatible arguments still report an error.
-    fn vacate(&mut self, t: &Ty) -> bool {
-        let Ty::Con(h, values, args) = t else {
-            return false;
-        };
-        if args.is_empty() || !values.is_all() {
-            return false;
-        }
-        let variances: Vec<_> = self.variances(*h, args.len()).collect();
-        if variances.contains(&Variance::Inv) {
-            return false;
-        }
-        let rows: Vec<_> = self.rows(*h, args.len()).collect();
-        for ((arg, variance), row) in args.iter().zip(variances).zip(rows) {
-            match variance {
-                Variance::Contra => self.constrain_in(arg, &Ty::Never, row),
-                Variance::Co => self.constrain_in(&Ty::Top, arg, row),
-                _ => {}
-            }
-        }
-        true
-    }
-
-    pub(crate) fn vacuous(&self, t: &Ty) -> bool {
-        let Ty::Con(h, values, args) = t else {
-            return false;
-        };
-        !args.is_empty()
-            && values.is_all()
-            && self
-                .variances(*h, args.len())
-                .zip(args)
-                .all(|(v, a)| match v {
-                    Variance::Contra => matches!(a, Ty::Never),
-                    Variance::Co => matches!(a, Ty::Top),
-                    Variance::Bi => true,
-                    Variance::Inv => false,
-                })
     }
 
     fn inter_in(&mut self, ms: Vec<Ty>, mode: Mode) -> Ty {

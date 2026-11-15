@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Parse repository i snippets with the syntax-three parser, so that no text of
-the syntax before it remains; see check-snippets.md."""
+the syntax before it remains; see check-snippets.md. --reuse-parser uses the
+driver built by an earlier run when only snippets or registry data changed.
+"""
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sys
 
@@ -106,29 +109,56 @@ def identity(path, source):
 
 NEXT_SYNTAX = (
     "tests/syn3/",
-    "crates/ilang-syntax/src/syn3/",
+    "crates/ilang-syntax/src/ast.rs",
+    "crates/ilang-syntax/src/parse.rs",
+    "crates/ilang-syntax/src/print.rs",
+    "crates/ilang-syntax/src/print/",
+    "crates/ilang-syntax/src/walk.rs",
+    "crates/ilang-syntax/src/rows.rs",
+    "crates/ilang-syntax/src/rows/",
+    "crates/ilang-syntax/src/facts.rs",
+    "crates/ilang-syntax/src/facts/",
+    "crates/ilang-syntax/src/group.rs",
+    "crates/ilang-syntax/src/surface.rs",
+    "crates/ilang-syntax/src/deep.rs",
+    "crates/ilang-syntax/src/syn3.rs",
     "crates/ilang-syntax/tests/syn3",
-    "crates/ilang-syntax/examples/migrate-syntax3",
+    "crates/ilang-syntax/examples/legacy/",
     "crates/ilang-syntax/examples/support/legacy/",
 )
+
+# These paths have their own parser/positive-and-negative contract checks.
+# The runner fixture Markdown is test input, not documentation to validate as
+# uniformly successful source. See docs/scripts/run-examples-test.
+SEPARATELY_CHECKED = NEXT_SYNTAX + ("docs/scripts/run-examples-fixtures/",)
+
+
+def markdown_snippets(path, text):
+    for match in re.finditer(r'(?m)^```(i|scheme)(?:[ \t]([^\n]*))?\n(.*?)^```[ \t]*$', text, re.S):
+        options = dict(word.split('=', 1) for word in shlex.split(match[2] or '') if '=' in word)
+        filename = options.get('file', options.get('title', ''))
+        if match[1] == 'scheme' and not filename.endswith('.is'):
+            continue  # Unrelated Scheme examples are not i source.
+        yield dict(path=path, line=text[:match.start()].count('\n') + 1,
+                   source=match[3], start=match.start(), end=match.end(), host=text,
+                   kind='markdown', surface='lisp' if match[1] == 'scheme' else 'normal')
 
 
 def snippets():
     registered = json.loads(DATA.read_text())
-    paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.i", "*.md", "*.rs", "*.js", "*.mjs"], cwd=ROOT, text=True).splitlines()
+    paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.i", "*.md", "*.mdx", "*.rs", "*.js", "*.mjs"], cwd=ROOT, text=True).splitlines()
     for path in sorted(set(paths)):
         file = ROOT / path
         if not file.is_file():
             continue
-        # Sources of the next syntax are read by its own parser and tests, not by this check.
-        if path.startswith(NEXT_SYNTAX):
+        # Dedicated checks own these sources, including deliberately invalid fixtures.
+        if path.startswith(SEPARATELY_CHECKED):
             continue
         text = file.read_bytes().decode()
         if path.endswith(".i"):
             yield dict(path=path, line=1, source=re.sub(r"(?m)^// old-syntax-check:.*\n?", "", text), start=0, end=len(text), host=text, kind="file")
-        elif path.endswith(".md"):
-            for m in re.finditer(r"(?m)^```i(?:[ \t][^\n]*)?\n(.*?)^```[ \t]*$", text, re.S):
-                yield dict(path=path, line=text[:m.start()].count("\n") + 1, source=m[1], start=m.start(), end=m.end(), host=text, kind="markdown")
+        elif path.endswith((".md", ".mdx")):
+            yield from markdown_snippets(path, text)
         else:
             read = rust_strings if path.endswith(".rs") else js_strings
             for start, end, value in read(text):
@@ -136,10 +166,16 @@ def snippets():
                     yield dict(path=path, line=text[:start].count("\n") + 1, source=value, start=start, end=end, host=text, kind="embedded")
 
 
-def parse(sources):
+def parser_driver():
+    if os.environ.get('I_SNIPPET_PARSER'):
+        return Path(os.environ['I_SNIPPET_PARSER']).resolve()
+    return Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/examples/parse-snippets"
+
+
+def parse(sources, *, lisp=False):
     data = b"".join(str(len(s.encode())).encode() + b"\n" + s.encode() for s in sources)
-    tool = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/examples/parse-snippets"
-    out = subprocess.check_output([str(tool)], input=data).decode().splitlines()
+    tool = parser_driver()
+    out = subprocess.check_output([str(tool)] + (['--lisp'] if lisp else []), input=data).decode().splitlines()
     it = iter(out)
     return [[(lambda c, m: c + ": " + bytes.fromhex(m).decode())(*next(it).split(" ", 1))
              for _ in range(int(next(it)))] for _ in sources]
@@ -197,7 +233,11 @@ def main():
         if heavy.is_file():
             command = [str(heavy), "direnv", "exec", str(shell)] + command
             break
-    subprocess.run(command, check=True)
+    if "--reuse-parser" in sys.argv or os.environ.get('I_SNIPPET_PARSER'):
+        if not parser_driver().is_file():
+            raise SystemExit("--reuse-parser requires the driver from an earlier check-snippets run")
+    else:
+        subprocess.run(command, check=True)
     config = json.loads(DATA.read_text())
     config.pop("_syn2_old_forms", None)
     all_snippets = list(snippets())
@@ -214,7 +254,16 @@ def main():
         for old, new in entry.get("substitutions", []):
             source = source.replace(old, new)
         sources.append(source)
-    results = parse(sources)
+    results = [None] * len(sources)
+    for lisp in (False, True):
+        indices = [index for index, item in enumerate(all_snippets)
+                   if (item.get('surface') == 'lisp') == lisp]
+        if not indices:
+            continue
+        group = [sources[index] for index in indices]
+        actuals = parse(group, lisp=True) if lisp else parse(group)
+        for index, actual in zip(indices, actuals):
+            results[index] = actual
     if "--regenerate" in sys.argv:
         regenerate(all_snippets, results)
         return

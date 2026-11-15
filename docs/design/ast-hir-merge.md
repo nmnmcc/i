@@ -41,7 +41,7 @@ mechanical first stage exists, but it is preparation and not a merge (section 5)
 
 ### 1.1 Syntax trees (old AST and syntax three), not in the HIR
 
-- **Unresolved names.** `ExprKind::Name { module: Option<Ident>, name: Ident }`,
+- **Unresolved names.** `ExprKind : : Name { module : Option<Ident>, name : Ident }`,
   `PatternKind::Constructor { module, name, .. }` / syn3 `Ctor`, `TypeKind::Named { module, name, args }`.
   `m.x` is a `Field` in the tree because the parser cannot tell a module from a value
   (`ast.rs:248-253`). In the HIR, `m.x` becomes `ExprKind::Name(ValueRef)` and the module ident and its
@@ -50,7 +50,7 @@ mechanical first stage exists, but it is preparation and not a merge (section 5)
   `ItemKind::MacroItem`, `TypeKind::Call` ("kept for macros"), and syn3 `Quoted`, `ItemKind::Macro`,
   `Attribute.args: Option<Vec<DItem>>`. The HIR has no quote expression: `quote_lower.rs` (160 lines)
   rewrites quote expressions before resolution, and the resolver rejects any that are left
-  (`resolve.rs:3311-3318`). A quote pattern becomes a *resolved* `PatternKind::Quote { template, syntax: TypeId, functions: [DefId; 5], captures }`
+  (`resolve.rs:3311-3318`). A quote pattern becomes a *resolved* `PatternKind : : Quote { template, syntax : TypeId, functions : [DefId; 5], captures }`
   (`hir.rs:585-590`, `resolve.rs:3827-3880`).
 - **Surface sugar (syntax three only).** `Interp`, `Data(Vec<DItem>)`, `Chain(Vec<Function>)`,
   `Provide`, `Pipe`, `PatternKind::And`, `DPItem`, `PItem` keys and choices, `Function.generics/guard/services`,
@@ -58,7 +58,7 @@ mechanical first stage exists, but it is preparation and not a merge (section 5)
   them. The printer needs them, because the tree is built so that `parse(print(t)) == t`. This is
   why `Sp` takes no part in equality (`syn3/ast.rs:13-21`).
 - **Old-AST desugarable forms.** `ExprKind::Clauses` (a clause block that is not on the right of `|>`),
-  `Case` with one clause, and `RecordUpdate { constructor: Box<Expr> }`. The resolver
+  `Case` with one clause, and `RecordUpdate { constructor : Box<Expr> }`. The resolver
   desugars them (`clause_function`, `resolve.rs:3492-3541`; single-clause case to a block, `resolve.rs:3368-3402`).
 - **Items as written.** `Module { doc, imports, exports, items, imports_span, exports_span }`,
   `Item { doc, attributes, kind, span }`, `Attribute`, `ImportItem`, `ExportItem`, `TypeDef { alias_pattern, params, head, body }`,
@@ -75,12 +75,12 @@ mechanical first stage exists, but it is preparation and not a merge (section 5)
 
 ### 1.2 The HIR, not in the syntax trees
 
-- **Resolved references and ids.** `ValueRef::{Local(VarId), Def(DefId), Ctor(CtorRef)}`, `Binder { var: VarId }`,
-  `TypeKind::Var(TyVarId)`, `TypeKind::Named { ty: TypeRef }`, `TypeKind::Of { value, site: OfId, projection }`,
-  `RecordUpdate { ctor: CtorRef, ctor_span }`, `RecordLabel.parameter: Option<TyVarId>`, and `Param::Env { var }`.
+- **Resolved references and ids.** `ValueRef::{Local(VarId), Def(DefId), Ctor(CtorRef)}`, `Binder { var : VarId }`,
+  `TypeKind::Var(TyVarId)`, `TypeKind : : Named { ty : TypeRef }`, `TypeKind : : Of { value, site : OfId, projection }`,
+  `RecordUpdate { ctor : CtorRef, ctor_span }`, `RecordLabel.parameter: Option<TyVarId>`, and `Param::Env { var }`.
   The AST has no node ids. Where later phases need identity, they key on spans:
-  `Program.expansion_scopes: HashMap<(ModuleId, Span), _>`, `typed_originals: HashMap<(ModuleId, Span), Expr>`
-  (`hir.rs:60-63`), and `CheckedInputs { expressions: HashMap<Span, Expr>, binders: HashMap<Span, VarId> }` (`resolve.rs:4574-4577`).
+  `Program.expansion_scopes : HashMap<(ModuleId, Span), _>`, `typed_originals : HashMap<(ModuleId, Span), Expr>`
+  (`hir.rs:60-63`), and `CheckedInputs { expressions : HashMap<Span, Expr>, binders : HashMap<Span, VarId> }` (`resolve.rs:4574-4577`).
 - **Error nodes.** `ExprKind::Error`, `PatternKind::Error(Vec<Pattern>)`, `TypeKind::Error`. Neither syntax tree has
   error nodes. The parsers recover by skipping (`syn3/parse.rs:292`, `parser.rs:378`). A module with
   a syntax error is not expanded (`ilang-macro/src/project.rs:44-47`), and the LSP falls back to
@@ -203,7 +203,7 @@ extension slots for phase-only variants, uninhabited in the other phase.
 
 - Deleted: the HIR node definitions, 372 lines (measured). The 182 copy lines do not go away.
   The renamer still has to build a new tree, because the type of every name changes. In GHC,
-  `rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeNames)` (`ghc/compiler/GHC/Rename/Expr.hs:300`)
+  `rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeNames)` (`ghc/compiler/GHC/Rename/Expr.hs : 300`)
   rebuilds the tree just as `resolve.rs` does. A generic `map_names` fold could replace the copy
   arms, but it would itself be about 150-200 lines (estimate: one arm per variant, the size of `hir.rs`'s `visit_expr_mut`, 115 lines, plus patterns and types).
 - Added (estimate): the generic tree is the union of syn3's 18 and the HIR's 18 expression kinds, about 26
@@ -287,7 +287,7 @@ pass.
   (`hir.rs:131-157`, `Program::origin`, over `lisp::scoped::ScopedSource`). A merge removes none of these
   needs. What does hurt today is the HIR dropping written-name spans (`query.rs:953`). That is fixable inside the HIR,
   as OCaml does: `Texp_ident of Path.t * Longident.t loc * Types.value_description` keeps
-  the written long identifier with its location next to the resolved path (`ocaml/typing/typedtree.mli:184`).
+  the written long identifier with its location next to the resolved path (`ocaml/typing/typedtree.mli : 184`).
 - **Formatting.** Comments are not in any tree; both formatters lex again and merge by span. The formatter
   needs the exact written shape (sugar, groups, `Sp`-insensitive equality). A HIR-shaped or
   generic tree that drops or adds forms would break the `parse(print(t)) == t` tests. Gleam keeps
@@ -321,14 +321,14 @@ the written tree separate from the resolved one:
 - rustc: `rustc_ast` is expanded by macros and lowered to `rustc_hir`. `rustc_ast_lowering/src/lib.rs:1-31` says the
   lowering is "mostly a simple procedure, much like a fold" and treats ids and spans as the
   hard part (12017 lines in `rustc_ast_lowering/src/*.rs`).
-- GHC: the types are shared through Trees that Grow (`GhcPass 'Parsed/'Renamed/'Typechecked`, `GHC/Hs/Extension/Pass.hs:38`;
-  `IdGhcP` at `GHC/Hs/Extension.hs:159-162`), but the renamer still rebuilds the tree (`GHC/Rename/Expr.hs:300`),
-  and phase-only forms need extension constructors (`XXExprGhcRn`/`XXExprGhcTc`, `GHC/Hs/Expr.hs:652-689`).
+- GHC: the types are shared through Trees that Grow (`GhcPass 'Parsed/'Renamed/'Typechecked`, `GHC/Hs/Extension/Pass.hs : 38`;
+  `IdGhcP` at `GHC/Hs/Extension.hs : 159-162`), but the renamer still rebuilds the tree (`GHC/Rename/Expr.hs : 300`),
+  and phase-only forms need extension constructors (`XXExprGhcRn`/`XXExprGhcTc`, `GHC/Hs/Expr.hs : 652-689`).
   The saving is in shared declarations, at the cost of 380 type families.
 - OCaml: `Parsetree` (1193 lines) and `Typedtree` (971 lines) are separate, and the typed tree keeps the written
-  identifier (`typedtree.mli:184`).
-- Lean 4: macros work on `Syntax`, which has `missing` for parse errors (`Init/Prelude.lean:5146`); elaboration produces `Expr`
-  (`Lean/Expr.lean:300`); the LSP maps back through info trees that store the `Syntax` (`Lean/Elab/InfoTree/Types.lean:74-89`, `ElabInfo.stx`).
+  identifier (`typedtree.mli : 184`).
+- Lean 4: macros work on `Syntax`, which has `missing` for parse errors (`Init/Prelude.lean : 5146`); elaboration produces `Expr`
+  (`Lean/Expr.lean : 300`); the LSP maps back through info trees that store the `Syntax` (`Lean/Elab/InfoTree/Types.lean : 74-89`, `ElabInfo.stx`).
 - Roc (now in Zig): `src/parse/AST.zig` (3355 lines) and the canonical IR `src/canonicalize/CIR.zig`/`Expression.zig`
   are separate, and canonicalization (`Can.zig`, 21529 lines) also removes sugar (`roc/Glossary.md`, "can" section).
 - Gleam: separate `UntypedExpr` and `TypedExpr`; only the item wrappers are generic (section 3b).
@@ -352,7 +352,7 @@ Move the leaf vocabulary that all three trees share out of `ast.rs`, so that del
   `pub use crate::ast::{BinOp, LitValue, UnOp}`, so it keeps working. Repoint it to `crate::leaf` only if no lane is editing it.
 - Do **not** edit `hir.rs`, `types/infer.rs`, `types/lits.rs`, `types/known.rs`, `types/typed_macro.rs` or `ilang-wasm/src/lower.rs`.
   They keep compiling through the re-export (`ilang_syntax::ast::{BinOp, UnOp, Ident, LitValue}`), and other lanes are editing several of them.
-- Leave `Ident` alone. The HIR uses `ast::Ident { name, span: Span }` (`hir.rs:14`) and syn3 uses `Ident { name, span: Sp }`.
+- Leave `Ident` alone. The HIR uses `ast : : Ident { name, span : Span }` (`hir.rs:14`) and syn3 uses `Ident { name, span : Sp }`.
   Choosing between them is a design decision (see stage 2), not a mechanical move.
 - Check: `cargo build` and the test suite with no expected changes, since all moved items are plain type definitions with derives.
   Risk: a merge conflict in `ast.rs` if a parser lane edits those exact lines. They are leaf enums that the syntax-three work does not change.

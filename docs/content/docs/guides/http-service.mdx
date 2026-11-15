@@ -1,0 +1,200 @@
+---
+title: HTTP service
+description: Test a JSON handler and serve it over a local socket.
+---
+
+Test a JSON handler without sockets, then serve it over local HTTP.
+
+```toml file=i.toml title="i.toml"
+name = "guide_http"
+
+[dependencies]
+std = { path = "../std" }
+
+[test]
+collection = "std/test.tests"
+```
+
+```i file=src/handler.i title="src/handler.i"
+(
+	i/fail
+	std/http
+	std/json
+	std/schema
+	std/bit_array
+)
+
+(
+	handle
+)
+User = (name = String)
+user_schema = () {
+	schema.field(
+		schema.object(User(name = "")),
+		"name",
+		schema.string,
+		(user) { user.name },
+		(_, name) { User(name = name) },
+	)
+}
+reply = (status, value) {
+	base = http.response(http.Status(status))
+	text = json.print(value)
+	http.Response(
+		..base,
+		headers = http.Headers([("Content-Type", "application/json")]),
+		body = <<text:utf8>>,
+	)
+}
+invalid = () { reply(422, json.Object([("error", json.Text("invalid user"))])) }
+handle = (req : http.Request) {
+	(req.method, req.target) |>
+		((http.Method("GET"), "/health")) {
+			reply(200, json.Object([("status", json.Text("ok"))]))
+		}
+		| ((http.Method("POST"), "/users")) {
+			fail.catch(() {
+				text = bit_array.to_string(req.body)
+				schema.parse(user_schema(), text)
+			}) |>
+				(Ok(user)) {
+					reply(
+						200,
+						schema.encode(user_schema(), user),
+					)
+				}
+				| (Error(_)) { invalid() }
+		}
+		| (_) { reply(404, json.Object([("error", json.Text("not found"))])) }
+}
+```
+
+```i file=src/main.i title="src/main.i"
+(
+	i/net
+	i/task
+	i/stdio
+	std/http
+	guide_http/handler
+)
+main = () {
+	listener = net.listen("127.0.0.1", 18080)
+	stdio.print("listening on 127.0.0.1:18080")
+	task.run(() { http.serve(listener, handler.handle) })
+}
+```
+
+```i test stdout=exact package=guide_http title="test/handler_test.i"
+(
+	testlib = (test) = std/test
+	std/http
+	guide_http/handler
+)
+test("health and missing route", () {
+	health = handler.handle(http.request(http.Method("GET"), "/health"))
+	assert(health.status == http.Status(200))
+	assert(http.body_text(health) == "{\"status\":\"ok\"}")
+	missing = handler.handle(http.request(http.Method("GET"), "/missing"))
+	assert(missing.status == http.Status(404))
+})
+test("JSON request", () {
+	http.Complete(req, <<>>) = http.feed_request(
+		<<>>,
+		<<
+			"POST /users HTTP/1.1\r\nContent-Length: 14\r\n\r\n{\"name\":\"Ada\"}":utf8,
+		>>,
+	)
+	response = handler.handle(req)
+	assert(response.status == http.Status(200))
+	assert(http.body_text(response) == "{\"name\":\"Ada\"}")
+	assert(
+		handler.handle(http.Request(..req, body = <<"{}":utf8>>)).status ==
+			http.Status(422),
+	)
+	assert(
+		handler.handle(http.Request(..req, body = <<"{":utf8>>)).status ==
+			http.Status(422),
+	)
+	assert(
+		handler.handle(http.Request(..req, body = <<255>>)).status ==
+			http.Status(422),
+	)
+})
+```
+
+```text
+pass guide_http/handler_test.health and missing route
+pass guide_http/handler_test.JSON request
+2 passed, 0 failed
+```
+
+Create `guide-http/` beside `std/`; run commands there. `http.feed_request` returns a request and leftover bytes. Requests also carry headers and trailers; these tests need no network service.
+
+```sh
+i test --opt 0
+i test --opt 2
+```
+
+```text
+pass guide_http/handler_test.health and missing route
+pass guide_http/handler_test.JSON request
+2 passed, 0 failed
+```
+
+Each command prints this result; targets match exactly, so `/health?x=1` misses; `http.route` offers segment patterns and query-independent path matching. UTF-8 conversion and schema parsing raise errors; one `fail.catch` turns either failure into a 422 response. The schema requires `name`; every response, including errors, sets `Content-Type: application/json`.
+
+## Server
+
+```sh
+i run --opt 2
+```
+
+```text
+listening on 127.0.0.1:18080
+```
+
+The server buffers request bodies and handles connections within a structured task scope; `task.run` supplies its task runner. The command stays running; use another terminal for requests and Ctrl-C to stop it.
+
+## Requests
+
+```sh
+curl -sS -w '\n%{http_code}\n' http://127.0.0.1:18080/health
+```
+
+```text
+{"status":"ok"}
+200
+```
+
+```sh
+curl -sS -w '\n%{http_code}\n' -H 'Content-Type: application/json' \
+  -d '{"name":"Ada"}' http://127.0.0.1:18080/users
+```
+
+```text
+{"name":"Ada"}
+200
+```
+
+```sh
+curl -sS -w '\n%{http_code}\n' -H 'Content-Type: application/json' \
+  -d '{}' http://127.0.0.1:18080/users
+```
+
+```text
+{"error":"invalid user"}
+422
+```
+
+```sh
+curl -sS -w '\n%{http_code}\n' http://127.0.0.1:18080/missing
+```
+
+```text
+{"error":"not found"}
+404
+```
+
+`curl -w` adds a newline and the status after each body.
+
+[Testing](/docs/guides/testing)

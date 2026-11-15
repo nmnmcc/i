@@ -87,7 +87,7 @@ test('WASI rejects unavailable Net, Tls and Process at compile time', { timeout:
   const dir = await mkdtemp(join(tmpdir(), 'i-wasi-unavailable-'));
   try {
     await mkdir(join(dir, 'src')); await writeFile(join(dir, 'i.toml'), 'name = "app"\n');
-    for (const [source, service] of [['(\n\ti/tls\n)\nmain = () <- (t: tls.Tls) { Nil }', 'Tls'], ['(\n\ti/process\n)\nmain = () <- (p: process.Process) { Nil }', 'Process']]) {
+    for (const [source, service] of [["(\n\ti/tls\n)\nmain = () <- (t : tls.Tls) { Nil }", 'Tls'], ["(\n\ti/process\n)\nmain = () <- (p : process.Process) { Nil }", 'Process']]) {
       await writeFile(join(dir, 'src/main.i'), source);
       const out = spawnSync(cli, ['build', '--project', dir, '--target', 'wasi'], { encoding: 'utf8' });
       assert.notEqual(out.status, 0); assert.match(out.stderr, new RegExp(service)); assert.match(out.stderr, /wasi/i);

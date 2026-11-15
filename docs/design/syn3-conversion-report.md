@@ -76,14 +76,13 @@ lane runs; the lists it names are the authority.
    (`Checker::warn_never_matches`, `types/infer.rs`). Test:
    `literal_types::fitted_choices_keep_the_deferred_binding_error`.
    In short: an error became a warning plus an `Assert` need.
-2. **Still to come: sums are unions, not families of constructors** (§2.8).
-   The lowering of this stage still reads `Event(A) = Start(A) | Stop(A)` with
-   its members just before it as one type with two constructors (today's tree),
-   so facts "across every constructor of the family" (literal-types §5.3) are
-   unchanged, and a member of such a union written as a type elsewhere
-   (`f = (x: Start(Int))`) is not defined (E0202). Lane/fa's final tree makes
-   each member its own labelled type. Test that will change then:
-   `types::pattern::shared_place_tests`.
+2. **Sums are unions, not families of constructors** (§2.8; landed with
+   stage 3, lane/s3). The lowering no longer absorbs the data definitions
+   before `Event(A) = Start(A) | Stop(A)` into one multi-constructor type:
+   each member is its own labelled type and the sum is the alias of their
+   union, so `f = (x : Start(Int))` is defined, and
+   `types::pattern::shared_place_tests` asserts that `Start` and `Stop` no
+   longer share their fields. See `docs/design/syn3-stage3-report.md`.
 3. **`()` as a value is the empty data** of type `()` (§7.1 row 7): `f = (()) { 1 }`
    is called as `f(())` (fixture `tests/spec/7/syn3_empty_data_argument.i`).
    The Lisp source surface writes this as `(,)` (§14.3); `()` has no source
@@ -94,7 +93,7 @@ lane runs; the lists it names are the authority.
    (E0101, §3.2), so the rest of such a file is no longer checked. The
    converter notes them (`lowercase-type-param`, a loss), and the five review
    cases that are error fixtures record E0101.
-5. **`fail: Fail(E)` in a function head** is the function's error part, as
+5. **`fail : Fail(E)` in a function head** is the function's error part, as
    `Fail(E)` in a need of a function type: the head has no service `Fail`
    (`Cx::params_of`, `ret`; patch from lane/cG2).
 
@@ -134,7 +133,7 @@ against the printed actual output before updating its expectation:
   returns `Int`. Its old annotation-label error disappears; without an error
   the existing unused-binding warnings are no longer suppressed. All known
   type comparison warnings stay. §3: "a function type has no parameter names";
-  §6.8: `(name: T)` is positional and labels require `label = p`.
+  §6.8: `(name : T)` is positional and labels require `label = p`.
 - `labels`: migrated successful calls are positional and return their written
   result. The intentional calls with labels still check rejection in this
   transitional front end, duplicate arguments, missing arity and unknown
@@ -297,7 +296,7 @@ format templates converted with their substitutions retained. Two constructor
 documentation comments in the new task scheduler had been placed after the
 converted union by the comment printer; they were moved onto their own new
 types (`Woken`, `Away`). No comment was dropped. A mixed callback annotation
-was changed from `send: _` to the data type field `send = _`.
+was changed from `send : _` to the data type field `send = _`.
 
 Positional binder hints are no longer field keys in shown function types:
 `(x) { x }` displays `(A) -> A` (§4.6), while actual labels of the data shape
@@ -634,7 +633,7 @@ The first complete checker run found nine test failures: eight row-scheme
 cases and the captured-row coalescing case. Corrections retain written wider
 needs as binding types (syntax-3 §7.3: "A written `! N` that is wider than
 what the body needs is kept as a type annotation on the binding
-(`f: (P) <- … -> R = …`), so that the type does not change."). The inferred
+(`f : (P) <- … -> R = …`), so that the type does not change."). The inferred
 provider fixture also keeps its original S(A) annotation. Bare legacy ! N
 callback annotations retain Fail(Never), avoiding an unconstrained error
 variable in this transitional lowerer. Four remaining expected strings only
@@ -917,7 +916,7 @@ stream/tree lines were truncated and are not a complete diagnostic inventory.
 | A1 old_guard_lines 56 in its two copies | 2 | `case`, `if`, and the old brace clauses no longer form a match. Under §2.5 / §3.3 the free `\|` must join function literals; recovery also reaches the arrow and `_` in expression positions. E0101 remains, with a further E0106. |
 | A1 capture and its five confirmed/loose copies | 6 | Their intentionally invalid `src/types.i` still contains `export (Box(..))` and `Box { Box(Int) }`. E0101 remains at the old export; §3.2's removal of constructor lists adds a second E0101 at `Box {`. The converted caller is not the rejection's cause. |
 | K4d typediff_41_16 and typediff_46_85 | 2 | Both retain the invalid `/* … */` delimiters. The old diagnostic dump between them is now line-commented, eliminating secondary errors in that dump while preserving the unsupported opening delimiter's E0101. Spec §1.2 defines only `//` comments; no block-comment feature was added, and no original error code was lost. |
-| K4s mut_ord_tmp | 1 | The original illegal typed binding in an expression position is retained as `run(h1: _ = …)`. §2.3 / §3.3 read a call's data items, where `:` cannot introduce a label or a binding. It fails at that item, rather than producing two legacy pattern-recovery E0101 reports. |
+| K4s mut_ord_tmp | 1 | The original illegal typed binding in an expression position is retained as `run(h1 : _ = …)`. §2.3 / §3.3 read a call's data items, where `:` cannot introduce a label or a binding. It fails at that item, rather than producing two legacy pattern-recovery E0101 reports. |
 | Native3 alias/direct/external/int_assign/raw_ctor | 5 | The retained old `import(…)` / `export(…)` text now parses as ordinary calls with data arguments (§3.3), not header groups (§7.3). Resolver E0234 rejects those top-level macro-reserved calls; E0201 reports the unbound module/value that the call did not import. The main E0101 is therefore completely replaced by later-phase E0234/E0201; these programs remain rejected. |
 | Native3 field/injection_control/positive; std1 stream/stream-positive | 5 | P0 (§3.5) explicitly makes bare `!` and `^` lexer errors, so retained old service/error syntax adds E0001 before recovery. Main's E0101/E0102 do **not** disappear completely in these cases: the streams have E0101×5/E0102×3 → E0101×11/E0102×5 plus E0001×10 each; field, injection_control and positive retain respectively 2, 7 and 1 E0101, adding 1, 3 and 1 E0001. These are removed-token errors, not generic substitutes for a dropped type error. |
 | Rec loose/probes | 1 | Conversion dropped the illegal type spread `..R`, which incorrectly removed E0541. Restore that syntax so the closed-data rule is tested rather than silently deleting its counterexample. Under §2.3, “A data type has no spread”; syntax three diagnoses it in the parser (E0107), before resolution. Thus E0541 is replaced by the direct no-type-spread error. The original E0210 import rejection is independently pinned by `library::unknown_library_path_is_missing` for `i/record`, and both E0202 lookups by `front_end::closed_data_has_no_record_type_even_without_a_spread_error`; all 15 tests in these two binaries pass. The existing corpus requirement now names E0107 and documents that split, keeping all three original negative-test intents. |
@@ -945,7 +944,7 @@ unconvertible list, so conversion cannot silently erase it again.
 
 Authority for all restored needs, §7.3: “A written `! N` that is wider than
 what the body needs is kept as a type annotation on the binding
-(`f: (P) <- … -> R = …`), so that the type does not change.” The literals also
+(`f : (P) <- … -> R = …`), so that the type does not change.” The literals also
 retain their original empty error channel through the transition lowerer's
 `Fail(Never)` marker. The restored type spread follows §2.3: “A data type has
 no spread.” The old removed-library/type checks were split out, not dropped.

@@ -35,7 +35,7 @@ fn deep_values_and_memory_boundaries_match_the_runtime_oracle() {
 
     assert!(
         output.status.success(),
-        "runtime oracle failed ({}). Run inside Devenv, or set WASMTIME and WASM_TOOLS.\nstdout:\n{}\nstderr:\n{}",
+        "runtime oracle failed ({}). Run inside Devenv, or set WASMTIME and WASM_TOOLS.\nstdout :\n{}\nstderr :\n{}",
         output.status,
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr),

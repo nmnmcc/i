@@ -12,3 +12,6 @@ ilang-package.workspace = true
 ilang-check.workspace = true
 ilang-wasm.workspace = true
 ilang-host.workspace = true
+
+[dev-dependencies]
+migration-syntax = { package = "ilang-syntax-migration", path = "../ilang-syntax/examples/legacy" }

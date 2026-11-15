@@ -1,0 +1,4 @@
+(, (= syntax (/ i syntax)) (= fail (/ i fail)) (= a (/ probe a)))
+(, pick)
+(@ macro (: pick (-> [A] (, A) Int)))
+(@ macro (= pick (-> (, value) _ (|> ((. syntax members) ((. syntax type_of) value)) (| (-> (, [first .. rest]) _ (|> ((. syntax subtype) first `(. a Tag)) (| (-> (, (. syntax Yes)) _ `7) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message "first member is not a.Tag") (= at value))))))) (-> (, []) _ `0))))))

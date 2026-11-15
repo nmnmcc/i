@@ -1,4 +1,4 @@
-nested = (p: (String, String)) {
+nested = (p : (String, String)) {
 	p |>
 		(("k00000", "k00000")) { 0 }
 		| (("k00000", "k00001")) { 0 }

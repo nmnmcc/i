@@ -7,7 +7,7 @@
 	(Some, None) = std/option
 )
 
-round = <A>(s: schema.Schema(A, schema.SchemaError), value: A) -> Bool {
+round = <A>(s : schema.Schema(A, schema.SchemaError), value : A) -> Bool {
 	{
 		e4_call_arg_0 = s
 		e4_call_arg_1 = schema.encode(s, value)
@@ -441,7 +441,7 @@ user = user_schema()
 Schema(DecodedUser, _) = user
 
 test("alias_type", () {
-	x: DecodedUser = User(name = "A", addresses = [], role = Admin)
+	x : DecodedUser = User(name = "A", addresses = [], role = Admin)
 	assert(round(user, x))
 })
 
@@ -513,8 +513,8 @@ test("optional_field_path", () {
 })
 
 test("literal_types", () {
-	s: Schema("yes", schema.SchemaError) = schema.literal_string("yes")
-	n: Schema(7, schema.SchemaError) = schema.literal_int(7)
+	s : Schema("yes", schema.SchemaError) = schema.literal_string("yes")
+	n : Schema(7, schema.SchemaError) = schema.literal_int(7)
 	assert(
 		{
 			e4_call_arg_0 = s
@@ -540,14 +540,14 @@ test("structural_record_round", () {
 		"name",
 		schema.string,
 		(r) { r.name },
-		(r: (name = String, age = Int), name) { (..r, name = name) },
+		(r : (name = String, age = Int), name) { (..r, name = name) },
 	)
 	person = schema.field(
 		names,
 		"age",
 		schema.int,
 		(r) { r.age },
-		(r: (name = String, age = Int), age) { (..r, age = age) },
+		(r : (name = String, age = Int), age) { (..r, age = age) },
 	)
 	assert(round(person, (name = "Ada", age = 36)))
 })

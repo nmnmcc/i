@@ -5,7 +5,7 @@ wide : (Int) -> Bool
 5:2: warning[W0502]: this value is not used, and working it out does nothing
 9:13: warning[W0503]: both sides are constants, `5` and `1`, which can never be equal, so `==` is always `False` (§6.9)
 11:14: warning[W0503]: both sides are constants, `5` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
-14:19: warning[W0503]: the two sides have the known types `Int` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
+14:20: warning[W0503]: the two sides have the known types `Int` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
 9:1: warning[W0504]: top-level binding `same` is not used
 11:1: warning[W0504]: top-level binding `other` is not used
 14:1: warning[W0504]: top-level binding `wide` is not used

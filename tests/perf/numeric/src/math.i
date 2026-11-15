@@ -91,7 +91,7 @@ significand_limit = 9007199254740992
 /// float.to_string(2.5)     // "2.5"
 /// float.to_string(1.0e20)  // "1.0e20"
 /// ```
-to_string = (x: Float) -> String { core.inspect(x) }
+to_string = (x : Float) -> String { core.inspect(x) }
 
 /// Reads a Float: an optional `-` or `+`, one or more digits, `.`, one or
 /// more digits, and then an optional exponent: `e` or `E`, an optional `-`
@@ -105,22 +105,22 @@ to_string = (x: Float) -> String { core.inspect(x) }
 /// float.parse("-2.0e-3")  // Ok(-0.002)
 /// float.parse("1")        // Error(Nil)
 /// ```
-parse = (text: String) -> Result(Float, Nil) {
+parse = (text : String) -> Result(Float, Nil) {
 	<<text:utf8>> |>
 		(<<45, rest:bytes>>) { whole(rest, True, 0, 0, 0) }
 		| (<<43, rest:bytes>>) { whole(rest, False, 0, 0, 0) }
 		| (bytes) { whole(bytes, False, 0, 0, 0) }
 }
 
-is_digit = (byte: Int) -> Bool { byte >= 48 && byte <= 57 }
+is_digit = (byte : Int) -> Bool { byte >= 48 && byte <= 57 }
 
 // The digits before the point.
 whole = (
-	bytes: BitArray,
-	negative: Bool,
-	coefficient: Int,
-	significant: Int,
-	count: Int
+	bytes : BitArray,
+	negative : Bool,
+	coefficient : Int,
+	significant : Int,
+	count : Int
 ) -> Result(Float, Nil) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
@@ -140,11 +140,11 @@ whole = (
 
 // The digits after the point.
 fraction = (
-	bytes: BitArray,
-	negative: Bool,
-	coefficient: Int,
-	significant: Int,
-	digits: Int
+	bytes : BitArray,
+	negative : Bool,
+	coefficient : Int,
+	significant : Int,
+	digits : Int
 ) -> Result(Float, Nil) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
@@ -179,14 +179,14 @@ fraction = (
 }
 
 // The number of significant digits, not counting zeros at the start.
-count_significant = (previous: Int, digit: Int) -> Int {
+count_significant = (previous : Int, digit : Int) -> Int {
 	{ previous == 0 && digit == 0 } |> (True) { 0 } | (False) { previous + 1 }
 }
 
 // When an exponent is greater than any digits could make up for, its exact
 // size has no effect, so it is kept at `limit + 1`. Every byte is still read,
 // so that bad text after it is still found.
-exponent = (bytes: BitArray, value: Int, count: Int, limit: Int) -> Result(
+exponent = (bytes : BitArray, value : Int, count : Int, limit : Int) -> Result(
 	Int,
 	Nil,
 ) {
@@ -203,10 +203,10 @@ exponent = (bytes: BitArray, value: Int, count: Int, limit: Int) -> Result(
 
 // The Float nearest to `coefficient` × 10^`exponent`.
 decimal = (
-	negative: Bool,
-	coefficient: Int,
-	digits: Int,
-	exponent: Int
+	negative : Bool,
+	coefficient : Int,
+	digits : Int,
+	exponent : Int
 ) -> Result(Float, Nil) {
 	sign = negative |> (True) { sign_mask } | (False) { 0 }
 	magnitude = digits + exponent - 1
@@ -238,7 +238,7 @@ decimal = (
 
 // The bits of the Float nearest to `numerator / denominator`, which is more
 // than 0.
-ratio_bits = (numerator: Int, denominator: Int) -> Result(Int, Nil) {
+ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
 	e = radix_order(numerator, denominator, 2)
 	{ e > 1023 } |>
 		(True) { Error(Nil) }
@@ -282,7 +282,7 @@ ratio_bits = (numerator: Int, denominator: Int) -> Result(Int, Nil) {
 // floor(log_radix(numerator / denominator)), with few comparisons: the
 // factors radix^1, radix^2, radix^4, … are found by squaring, and then used
 // from the greatest down.
-radix_order = (numerator: Int, denominator: Int, radix: Int) -> Int {
+radix_order = (numerator : Int, denominator : Int, radix : Int) -> Int {
 	{ numerator >= denominator } |>
 		(True) { order_factors(numerator, denominator, radix, 1, []).0 }
 		| (False) {
@@ -292,11 +292,11 @@ radix_order = (numerator: Int, denominator: Int, radix: Int) -> Int {
 }
 
 order_factors = (
-	numerator: Int,
-	denominator: Int,
-	factor: Int,
-	e: Int,
-	factors: List((Int, Int))
+	numerator : Int,
+	denominator : Int,
+	factor : Int,
+	e : Int,
+	factors : List((Int, Int))
 ) -> (Int, Int) {
 	{ numerator >= denominator * factor } |>
 		(True) {
@@ -312,10 +312,10 @@ order_factors = (
 }
 
 order_search = (
-	numerator: Int,
-	denominator: Int,
-	factors: List((Int, Int)),
-	o: Int
+	numerator : Int,
+	denominator : Int,
+	factors : List((Int, Int)),
+	o : Int
 ) -> (Int, Int) {
 	factors |>
 		([]) { (o, denominator) }
@@ -328,7 +328,7 @@ order_search = (
 }
 
 // numerator / denominator, rounded to the nearest, with ties to even.
-round_ratio = (numerator: Int, denominator: Int) -> Int {
+round_ratio = (numerator : Int, denominator : Int) -> Int {
 	q = numerator / denominator
 	twice = { numerator % denominator } * 2
 	{ twice > denominator || { twice == denominator && q % 2 == 1 } } |>
@@ -336,7 +336,7 @@ round_ratio = (numerator: Int, denominator: Int) -> Int {
 		| (False) { q }
 }
 
-int_power = (base: Int, e: Int) -> Int {
+int_power = (base : Int, e : Int) -> Int {
 	go = (base, e, acc) {
 		e |>
 			(0) { acc }
@@ -350,7 +350,7 @@ int_power = (base: Int, e: Int) -> Int {
 }
 
 /// Compares two Floats. `0.0` and `-0.0` are `Equal`.
-compare = (a: Float, with: Float) -> Order {
+compare = (a : Float, with : Float) -> Order {
 	{ a == with } |>
 		(True) { Equal }
 		| (False) { { a <. with } |> (True) { Less } | (False) { Greater } }
@@ -358,7 +358,7 @@ compare = (a: Float, with: Float) -> Order {
 
 /// Compares two Floats, and gives `Equal` when they are no more than
 /// `tolerating` apart.
-loosely_compare = (a: Float, with: Float, tolerating: Float) -> Order {
+loosely_compare = (a : Float, with : Float, tolerating : Float) -> Order {
 	loosely_equals(a, with, tolerating) |>
 		(True) { Equal }
 		| (False) { compare(a, with) }
@@ -369,7 +369,7 @@ loosely_compare = (a: Float, with: Float, tolerating: Float) -> Order {
 /// ```i
 /// float.loosely_equals(0.1 +. 0.2, 0.3, 1.0e-9)  // True
 /// ```
-loosely_equals = (a: Float, with: Float, tolerating: Float) -> Bool {
+loosely_equals = (a : Float, with : Float, tolerating : Float) -> Bool {
 	// `a -. with` is not finite when they are far apart, so it is not used.
 	{ a >=. with } |>
 		(True) { a -. tolerating <=. with }
@@ -377,18 +377,18 @@ loosely_equals = (a: Float, with: Float, tolerating: Float) -> Bool {
 }
 
 /// The smaller of two Floats.
-min = (a: Float, b: Float) -> Float {
+min = (a : Float, b : Float) -> Float {
 	{ a <. b } |> (True) { a } | (False) { b }
 }
 
 /// The greater of two Floats.
-max = (a: Float, b: Float) -> Float {
+max = (a : Float, b : Float) -> Float {
 	{ a >. b } |> (True) { a } | (False) { b }
 }
 
 /// The Float, but not less than `min` and not greater than `max`. When
 /// `min` is greater than `max`, the two bounds are swapped.
-clamp = (x: Float, min: Float, max: Float) -> Float {
+clamp = (x : Float, min : Float, max : Float) -> Float {
 	(low, high) = { min <=. max } |>
 		(True) { (min, max) }
 		| (False) { (max, min) }
@@ -398,16 +398,16 @@ clamp = (x: Float, min: Float, max: Float) -> Float {
 }
 
 /// The Float without its sign.
-abs = (x: Float) -> Float { { x <. 0.0 } |> (True) { -.x } | (False) { x } }
+abs = (x : Float) -> Float { { x <. 0.0 } |> (True) { -.x } | (False) { x } }
 
 /// The Float with the other sign.
-negate = (x: Float) -> Float { -.x }
+negate = (x : Float) -> Float { -.x }
 
 /// The smallest whole number that is not less than `x`.
-ceiling = (x: Float) -> Float { core.ceiling(x) }
+ceiling = (x : Float) -> Float { core.ceiling(x) }
 
 /// The greatest whole number that is not greater than `x`.
-floor = (x: Float) -> Float { core.floor(x) }
+floor = (x : Float) -> Float { core.floor(x) }
 
 /// The nearest whole number, as an Int. A half goes away from zero.
 ///
@@ -415,13 +415,13 @@ floor = (x: Float) -> Float { core.floor(x) }
 /// float.round(2.5)    // 3
 /// float.round(-2.5)   // -3
 /// ```
-round = (x: Float) -> Int {
+round = (x : Float) -> Int {
 	{ x <. 0.0 } |>
 		(True) { -round_positive(-.x) }
 		| (False) { round_positive(x) }
 }
 
-round_positive = (x: Float) -> Int {
+round_positive = (x : Float) -> Int {
 	f = core.floor(x)
 	// `x -. f` is exact for `x >= 0`.
 	{ x -. f >=. 0.5 } |>
@@ -430,10 +430,10 @@ round_positive = (x: Float) -> Int {
 }
 
 /// The Float without its fraction, as an Int, rounded toward zero.
-truncate = (x: Float) -> Int { core.truncate(x) }
+truncate = (x : Float) -> Int { core.truncate(x) }
 
 /// `True` when the Float is a whole number.
-is_integer = (x: Float) -> Bool { core.floor(x) == x }
+is_integer = (x : Float) -> Bool { core.floor(x) == x }
 
 /// The Float rounded to `precision` digits after the point. A negative
 /// precision rounds to tens, hundreds, and so on. The result is the
@@ -443,7 +443,7 @@ is_integer = (x: Float) -> Bool { core.floor(x) == x }
 /// float.to_precision(2.43434348473, 2)  // 2.43
 /// float.to_precision(547890.453444, -3)  // 548000.0
 /// ```
-to_precision = (x: Float, precision: Int) -> Float {
+to_precision = (x : Float, precision : Int) -> Float {
 	{ precision <= 0 } |>
 		(True) {
 			factor = core.to_float(int_power(10, -precision))
@@ -465,7 +465,7 @@ to_precision = (x: Float, precision: Int) -> Float {
 /// float.power(2.0, 10)  // Ok(1024.0)
 /// float.power(-.2.0, -1)  // Ok(-.0.5)
 /// ```
-power = (base: Float, of: Int) -> Result(Float, Nil) {
+power = (base : Float, of : Int) -> Result(Float, Nil) {
 	{ base == 0.0 && of < 0 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -492,26 +492,26 @@ power = (base: Float, of: Int) -> Result(Float, Nil) {
 /// float.square_root(4.0)   // Ok(2.0)
 /// float.square_root(-1.0)  // Error(Nil)
 /// ```
-square_root = (x: Float) -> Result(Float, Nil) {
+square_root = (x : Float) -> Result(Float, Nil) {
 	{ x <. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(core.sqrt(x)) }
 }
 
 /// The sum of the Floats. The sum of no Floats is `0.0`. A sum that is not
 /// finite stops the program.
-sum = (numbers: List(Float)) -> Float {
+sum = (numbers : List(Float)) -> Float {
 	go = (rest, acc) { rest |> ([]) { acc } | ([x, ..xs]) { go(xs, acc +. x) } }
 	go(numbers, 0.0)
 }
 
 /// The product of the Floats. The product of no Floats is `1.0`. A product
 /// that is not finite stops the program.
-product = (numbers: List(Float)) -> Float {
+product = (numbers : List(Float)) -> Float {
 	go = (rest, acc) { rest |> ([]) { acc } | ([x, ..xs]) { go(xs, acc *. x) } }
 	go(numbers, 1.0)
 }
 
 /// `a /. by`, or `Error(Nil)` when `by` is `0.0`.
-divide = (a: Float, by: Float) -> Result(Float, Nil) {
+divide = (a : Float, by : Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |> (True) { Error(Nil) } | (False) { Ok(a /. by) }
 }
 
@@ -521,20 +521,20 @@ divide = (a: Float, by: Float) -> Result(Float, Nil) {
 /// ```i
 /// float.modulo(13.3, 3.3)  // Ok(0.10000000000000053)
 /// ```
-modulo = (a: Float, by: Float) -> Result(Float, Nil) {
+modulo = (a : Float, by : Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |>
 		(True) { Error(Nil) }
 		| (False) { Ok(a -. core.floor(a /. by) *. by) }
 }
 
 /// `a +. b`, as a function.
-add = (a: Float, b: Float) -> Float { a +. b }
+add = (a : Float, b : Float) -> Float { a +. b }
 
 /// `a -. b`, as a function.
-subtract = (a: Float, b: Float) -> Float { a -. b }
+subtract = (a : Float, b : Float) -> Float { a -. b }
 
 /// `a *. b`, as a function.
-multiply = (a: Float, b: Float) -> Float { a *. b }
+multiply = (a : Float, b : Float) -> Float { a *. b }
 
 /// `e` to the power `x`. A result too big for a Float gives `Error(Nil)`;
 /// that is for `x` greater than about 709.78.
@@ -542,7 +542,7 @@ multiply = (a: Float, b: Float) -> Float { a *. b }
 /// ```i
 /// float.exponential(1.0)  // Ok(2.718281828459045)
 /// ```
-exponential = (x: Float) -> Result(Float, Nil) {
+exponential = (x : Float) -> Result(Float, Nil) {
 	{ x >. 7.09782712893383973096e2 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -563,7 +563,7 @@ exponential = (x: Float) -> Result(Float, Nil) {
 /// float.logarithm(1.0)  // Ok(0.0)
 /// float.logarithm(0.0)  // Error(Nil)
 /// ```
-logarithm = (x: Float) -> Result(Float, Nil) {
+logarithm = (x : Float) -> Result(Float, Nil) {
 	{ x <=. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(log_positive(x)) }
 }
 
@@ -576,7 +576,7 @@ logarithm = (x: Float) -> Result(Float, Nil) {
 /// float.real_power(16.0, 0.5)  // Ok(4.0)
 /// float.real_power(-.8.0, 1.0 /. 3.0)  // Error(Nil)
 /// ```
-real_power = (base: Float, of: Float) -> Result(Float, Nil) {
+real_power = (base : Float, of : Float) -> Result(Float, Nil) {
 	fractional = core.ceiling(of) -. of >. 0.0
 	{ { base <. 0.0 && fractional } || { base == 0.0 && of <. 0.0 } } |>
 		(True) { Error(Nil) }
@@ -601,27 +601,27 @@ ln2_lo = 1.90821492927058770002e-10
 
 inverse_ln2 = 1.442695040888963387
 
-bits_of = (x: Float) -> Int { core.float_to_bits(x) }
+bits_of = (x : Float) -> Int { core.float_to_bits(x) }
 
-from_bits = (x: Int) -> Float { core.float_from_bits(x) }
+from_bits = (x : Int) -> Float { core.float_from_bits(x) }
 
-abs_bits = (x: Float) -> Float { from_bits(bits_of(x) % sign_mask) }
+abs_bits = (x : Float) -> Float { from_bits(bits_of(x) % sign_mask) }
 
-high = (x: Float) -> Int { bits_of(x) / word }
+high = (x : Float) -> Int { bits_of(x) / word }
 
-positive_high = (x: Float) -> Int { high(x) % 0x8000_0000 }
+positive_high = (x : Float) -> Int { high(x) % 0x8000_0000 }
 
-with_high = (x: Float, high_word: Int) -> Float {
+with_high = (x : Float, high_word : Int) -> Float {
 	from_bits(high_word * word + bits_of(x) % word)
 }
 
-without_low = (x: Float) -> Float { from_bits(bits_of(x) / word * word) }
+without_low = (x : Float) -> Float { from_bits(bits_of(x) / word * word) }
 
-two_power = (e: Int) -> Float { from_bits({ e + 1023 } * mantissa_unit) }
+two_power = (e : Int) -> Float { from_bits({ e + 1023 } * mantissa_unit) }
 
 // `value` × 2^`e`, for -1075 <= e <= 1024. The scale for subnormal results
 // is split, so that it is not rounded to zero before the multiplication.
-scale = (value: Float, e: Int) -> Float {
+scale = (value : Float, e : Int) -> Float {
 	{ e > 1023 } |>
 		(True) { value *. 2.0 *. two_power(e - 1) }
 		| (False) {
@@ -633,7 +633,7 @@ scale = (value: Float, e: Int) -> Float {
 		}
 }
 
-exp_polynomial = (x: Float) -> Float {
+exp_polynomial = (x : Float) -> Float {
 	square = x *. x
 	x -.
 		square *.
@@ -656,7 +656,7 @@ exp_polynomial = (x: Float) -> Float {
 			}
 }
 
-exp_finite = (value: Float) -> Float {
+exp_finite = (value : Float) -> Float {
 	hx = positive_high(value)
 	{ hx < 0x3e30_0000 } |>
 		(True) { 1.0 +. value }
@@ -693,7 +693,7 @@ exp_finite = (value: Float) -> Float {
 		}
 }
 
-log_positive = (input: Float) -> Float {
+log_positive = (input : Float) -> Float {
 	(value, correction) = { positive_high(input) < 0x0010_0000 } |>
 		(True) { (input *. 1.8014398509481984e16, -54) }
 		| (False) { (input, 0) }
@@ -778,7 +778,7 @@ log_positive = (input: Float) -> Float {
 
 // The high and low halves of log2(x), which keep their precision when they
 // are multiplied by a large exponent. This matters for bases near one.
-log2_split = (input: Float) -> (Float, Float) {
+log2_split = (input : Float) -> (Float, Float) {
 	(value, correction) = { high(input) < 0x0010_0000 } |>
 		(True) { (input *. 9007199254740992.0, -53) }
 		| (False) { (input, 0) }
@@ -847,7 +847,7 @@ log2_split = (input: Float) -> (Float, Float) {
 	(hi, lo)
 }
 
-log2_close_to_one = (x: Float) -> (Float, Float) {
+log2_close_to_one = (x : Float) -> (Float, Float) {
 	t = x -. 1.0
 	w = t *. t *. { 0.5 -. t *. { 0.3333333333333333333333 -. t *. 0.25 } }
 	u = 1.44269502162933349609 *. t
@@ -857,7 +857,7 @@ log2_close_to_one = (x: Float) -> (Float, Float) {
 }
 
 // `base` to the power `exponent`. A negative base has a whole exponent.
-pow = (base: Float, exponent: Float) -> Result(Float, Nil) {
+pow = (base : Float, exponent : Float) -> Result(Float, Nil) {
 	exponent |>
 		(0.0) { Ok(1.0) }
 		| (1.0) { Ok(base) }
@@ -904,14 +904,14 @@ pow = (base: Float, exponent: Float) -> Result(Float, Nil) {
 }
 
 // `True` when a whole Float is odd. Floats of 2^53 or more are even.
-is_odd_whole = (x: Float) -> Bool {
+is_odd_whole = (x : Float) -> Bool {
 	y = abs(x)
 	{ y >=. 9007199254740992.0 } |>
 		(True) { False }
 		| (False) { core.truncate(y) % 2 != 0 }
 }
 
-pow_extreme = (base: Float, exponent: Float, direction: Float) -> Result(
+pow_extreme = (base : Float, exponent : Float, direction : Float) -> Result(
 	Float,
 	Nil,
 ) {
@@ -923,10 +923,10 @@ pow_extreme = (base: Float, exponent: Float, direction: Float) -> Result(
 }
 
 pow_exp2 = (
-	exponent: Float,
-	log_hi: Float,
-	log_lo: Float,
-	direction: Float
+	exponent : Float,
+	log_hi : Float,
+	log_lo : Float,
+	direction : Float
 ) -> Result(Float, Nil) {
 	y_hi = without_low(exponent)
 	p_lo = { exponent -. y_hi } *. log_hi +. exponent *. log_lo
@@ -970,10 +970,10 @@ pi = 3.141592653589793
 tau = 6.283185307179586
 
 /// Tests the sign bit, distinguishing the two zeros.
-sign_bit = (x: Float) -> Bool { core.float_to_bits(x) >= sign_mask }
+sign_bit = (x : Float) -> Bool { core.float_to_bits(x) >= sign_mask }
 
 /// Copies only the sign bit, preserving all other magnitude bits.
-copy_sign = (magnitude: Float, sign: Float) -> Float {
+copy_sign = (magnitude : Float, sign : Float) -> Float {
 	core.float_from_bits(
 		core.bit_and(core.float_to_bits(magnitude), sign_mask - 1) +
 			{ sign_bit(sign) |> (True) { sign_mask } | (False) { 0 } },
@@ -982,7 +982,7 @@ copy_sign = (magnitude: Float, sign: Float) -> Float {
 
 // All finite inputs are integer multiples of 2^-1074. This common scale avoids
 // rational normalization, including for extreme atan2 ratios and exact norms.
-dyadic = (x: Float) -> Int {
+dyadic = (x : Float) -> Int {
 	bits = core.float_to_bits(x)
 	fraction = core.bit_and(bits, fraction_unit - 1)
 	exponent = core.bit_and(core.shift_right(bits, 52), 2047)
@@ -992,27 +992,31 @@ dyadic = (x: Float) -> Int {
 	sign_bit(x) |> (True) { -magnitude } | (False) { magnitude }
 }
 
-int_abs = (n: Int) -> Int { { n < 0 } |> (True) { -n } | (False) { n } }
+int_abs = (n : Int) -> Int { { n < 0 } |> (True) { -n } | (False) { n } }
 
-int_min = (a: Int, b: Int) -> Int { { a < b } |> (True) { a } | (False) { b } }
+int_min = (a : Int, b : Int) -> Int {
+	{ a < b } |> (True) { a } | (False) { b }
+}
 
-int_max = (a: Int, b: Int) -> Int { { a > b } |> (True) { a } | (False) { b } }
+int_max = (a : Int, b : Int) -> Int {
+	{ a > b } |> (True) { a } | (False) { b }
+}
 
 // Denominator is positive. Int / truncates; directed division must not.
-down = (n: Int, d: Int) -> Int {
+down = (n : Int, d : Int) -> Int {
 	n / d - { { n < 0 && n % d != 0 } |> (True) { 1 } | (False) { 0 } }
 }
 
-up = (n: Int, d: Int) -> Int { -down(-n, d) }
+up = (n : Int, d : Int) -> Int { -down(-n, d) }
 
 Fixed = (lo = Int, hi = Int)
 
-fixed_ratio = (n: Int, d: Int, p: Int) -> Fixed {
+fixed_ratio = (n : Int, d : Int, p : Int) -> Fixed {
 	scaled = core.shift_left(n, p)
 	Fixed(lo = down(scaled, d), hi = up(scaled, d))
 }
 
-fixed_float = (x: Float, p: Int) -> Fixed {
+fixed_float = (x : Float, p : Int) -> Fixed {
 	n = dyadic(x)
 	{ p >= 1074 } |>
 		(True) {
@@ -1025,25 +1029,25 @@ fixed_float = (x: Float, p: Int) -> Fixed {
 		}
 }
 
-fixed_add = (a: Fixed, b: Fixed) -> Fixed {
+fixed_add = (a : Fixed, b : Fixed) -> Fixed {
 	Fixed(lo = a.lo + b.lo, hi = a.hi + b.hi)
 }
 
-fixed_neg = (a: Fixed) -> Fixed { Fixed(lo = -a.hi, hi = -a.lo) }
+fixed_neg = (a : Fixed) -> Fixed { Fixed(lo = -a.hi, hi = -a.lo) }
 
-fixed_sub = (a: Fixed, b: Fixed) -> Fixed { fixed_add(a, fixed_neg(b)) }
+fixed_sub = (a : Fixed, b : Fixed) -> Fixed { fixed_add(a, fixed_neg(b)) }
 
-fixed_scale = (a: Fixed, k: Int) -> Fixed {
+fixed_scale = (a : Fixed, k : Int) -> Fixed {
 	{ k >= 0 } |>
 		(True) { Fixed(lo = a.lo * k, hi = a.hi * k) }
 		| (False) { Fixed(lo = a.hi * k, hi = a.lo * k) }
 }
 
-fixed_div_int = (a: Fixed, d: Int) -> Fixed {
+fixed_div_int = (a : Fixed, d : Int) -> Fixed {
 	Fixed(lo = down(a.lo, d), hi = up(a.hi, d))
 }
 
-fixed_mul = (a: Fixed, b: Fixed, p: Int) -> Fixed {
+fixed_mul = (a : Fixed, b : Fixed, p : Int) -> Fixed {
 	aa = a.lo * b.lo
 	ab = a.lo * b.hi
 	ba = a.hi * b.lo
@@ -1053,7 +1057,7 @@ fixed_mul = (a: Fixed, b: Fixed, p: Int) -> Fixed {
 	Fixed(lo = core.shift_right(low, p), hi = -core.shift_right(-high, p))
 }
 
-fixed_div = (a: Fixed, b: Fixed, p: Int) -> Option(Fixed) {
+fixed_div = (a : Fixed, b : Fixed, p : Int) -> Option(Fixed) {
 	{ b.lo <= 0 && b.hi >= 0 } |>
 		(True) { None }
 		| (False) {
@@ -1080,17 +1084,17 @@ fixed_div = (a: Fixed, b: Fixed, p: Int) -> Option(Fixed) {
 		}
 }
 
-fixed_radius = (a: Fixed) -> Int { int_max(int_abs(a.lo), int_abs(a.hi)) }
+fixed_radius = (a : Fixed) -> Int { int_max(int_abs(a.lo), int_abs(a.hi)) }
 
-fixed_widen = (a: Fixed, radius: Int) -> Fixed {
+fixed_widen = (a : Fixed, radius : Int) -> Fixed {
 	Fixed(lo = a.lo - radius, hi = a.hi + radius)
 }
 
 // Machin terms are divided individually with directed rounding. The first
 // omitted term bounds each alternating remainder. No denominators accumulate.
-reciprocal_atan = (k: Int, p: Int) -> Fixed {
+reciprocal_atan = (k : Int, p : Int) -> Fixed {
 	scale = core.shift_left(1, p)
-	go = (power: Int, index: Int, sum: Fixed, positive: Bool) -> Fixed {
+	go = (power : Int, index : Int, sum : Fixed, positive : Bool) -> Fixed {
 		denominator = power * { 2 * index + 1 }
 		{ denominator > scale } |>
 			(True) { fixed_widen(sum, 1) }
@@ -1108,7 +1112,7 @@ reciprocal_atan = (k: Int, p: Int) -> Fixed {
 	go(k, 0, Fixed(lo = 0, hi = 0), True)
 }
 
-fixed_pi = (p: Int) -> Fixed {
+fixed_pi = (p : Int) -> Fixed {
 	fixed_sub(
 		fixed_scale(reciprocal_atan(5, p), 16),
 		fixed_scale(reciprocal_atan(239, p), 4),
@@ -1118,9 +1122,9 @@ fixed_pi = (p: Int) -> Fixed {
 // |z| <= 1/2. All recurrences enclose their exact terms; at the first next
 // term whose power bound is <= one unit, the remaining alternating tail is
 // <= one unit too. Width from arithmetic is retained, never guessed away.
-small_atan = (z: Fixed, p: Int) -> Fixed {
+small_atan = (z : Fixed, p : Int) -> Fixed {
 	square = fixed_mul(z, z, p)
-	go = (power: Fixed, index: Int, sum: Fixed) -> Fixed {
+	go = (power : Fixed, index : Int, sum : Fixed) -> Fixed {
 		term = fixed_div_int(power, 2 * index + 1)
 		next_sum = fixed_add(sum, term)
 		next = fixed_neg(fixed_mul(power, square, p))
@@ -1132,7 +1136,7 @@ small_atan = (z: Fixed, p: Int) -> Fixed {
 }
 
 // z is nonnegative; interval extension of exact inverse/addition identities.
-positive_atan = (z: Fixed, pi_bounds: () -> Fixed, p: Int) -> Fixed {
+positive_atan = (z : Fixed, pi_bounds : () -> Fixed, p : Int) -> Fixed {
 	scale = core.shift_left(1, p)
 	one = Fixed(lo = scale, hi = scale)
 	{ z.lo >= scale } |>
@@ -1149,7 +1153,7 @@ positive_atan = (z: Fixed, pi_bounds: () -> Fixed, p: Int) -> Fixed {
 		| (False) { positive_atan_small(z, p) }
 }
 
-positive_atan_small = (z: Fixed, p: Int) -> Fixed {
+positive_atan_small = (z : Fixed, p : Int) -> Fixed {
 	scale = core.shift_left(1, p)
 	{ z.hi <= scale / 2 } |>
 		(True) { small_atan(z, p) }
@@ -1169,7 +1173,7 @@ positive_atan_small = (z: Fixed, p: Int) -> Fixed {
 
 // Reduction gets p+exponent+guard bits, then outward rescaling. If an integer
 // quadrant cannot yet be selected uniquely, double the reduction precision.
-reduce_angle = (x: Float, p: Int, work: Int) -> (Int, Fixed) {
+reduce_angle = (x : Float, p : Int, work : Int) -> (Int, Fixed) {
 	pi_bounds = fixed_pi(work)
 	half_pi = fixed_div_int(pi_bounds, 2)
 	fixed_div(fixed_float(x, work), half_pi, work) |>
@@ -1200,11 +1204,11 @@ reduce_angle = (x: Float, p: Int, work: Int) -> (Int, Fixed) {
 
 // On |r|<1 terms alternate and decrease. Interval recurrence encloses the
 // exact Taylor sum; two units bound the first omitted term and its tail.
-fixed_sincos = (r: Fixed, cosine: Bool, p: Int) -> Fixed {
+fixed_sincos = (r : Fixed, cosine : Bool, p : Int) -> Fixed {
 	square = fixed_mul(r, r, p)
 	scale = core.shift_left(1, p)
 	initial = cosine |> (True) { Fixed(lo = scale, hi = scale) } | (False) { r }
-	go = (term: Fixed, k: Int, sum: Fixed) -> Fixed {
+	go = (term : Fixed, k : Int, sum : Fixed) -> Fixed {
 		next_sum = fixed_add(sum, term)
 		d = cosine |>
 			(True) { { 2 * k + 1 } * { 2 * k + 2 } }
@@ -1220,7 +1224,7 @@ fixed_sincos = (r: Fixed, cosine: Bool, p: Int) -> Fixed {
 	go(initial, 0, Fixed(lo = 0, hi = 0))
 }
 
-trig_bounds = (x: Float, p: Int) -> (Fixed, Fixed) {
+trig_bounds = (x : Float, p : Int) -> (Fixed, Fixed) {
 	magnitude = core.bit_and(core.float_to_bits(x), sign_mask - 1)
 	exponent = core.shift_right(magnitude, 52) - 1023
 	(q, r) = reduce_angle(x, p, p + int_max(0, exponent) + 32)
@@ -1233,12 +1237,12 @@ trig_bounds = (x: Float, p: Int) -> (Fixed, Fixed) {
 		| (_) { (fixed_neg(c), s) }
 }
 
-integer_sqrt = (n: Int) -> Int {
+integer_sqrt = (n : Int) -> Int {
 	{ n == 0 } |>
 		(True) { 0 }
 		| (False) {
 			initial = core.shift_left(1, { radix_order(n, 1, 2) + 2 } / 2)
-			go = (x: Int) -> Int {
+			go = (x : Int) -> Int {
 				next = { x + n / x } / 2
 				{ next >= x } |> (True) { x } | (False) { go(next) }
 			}
@@ -1246,7 +1250,7 @@ integer_sqrt = (n: Int) -> Int {
 		}
 }
 
-fixed_sqrt_ratio = (n: Int, d: Int, p: Int) -> Fixed {
+fixed_sqrt_ratio = (n : Int, d : Int, p : Int) -> Fixed {
 	scaled = core.shift_left(n, 2 * p)
 	k = integer_sqrt(scaled / d)
 	Fixed(
@@ -1255,7 +1259,7 @@ fixed_sqrt_ratio = (n: Int, d: Int, p: Int) -> Fixed {
 	)
 }
 
-signed_bits = (n: Int, p: Int) -> Result(Int, Nil) {
+signed_bits = (n : Int, p : Int) -> Result(Int, Nil) {
 	{ n == 0 } |>
 		(True) { Ok(0) }
 		| (False) {
@@ -1274,7 +1278,7 @@ signed_bits = (n: Int, p: Int) -> Result(Int, Nil) {
 		}
 }
 
-certify = (bounds: Fixed, p: Int) -> Option(Result(Float, Nil)) {
+certify = (bounds : Fixed, p : Int) -> Option(Result(Float, Nil)) {
 	(signed_bits(bounds.lo, p), signed_bits(bounds.hi, p)) |>
 		((Ok(a), Ok(b)) ? a == b) { Some(Ok(core.float_from_bits(a))) }
 		| ((Error(_), Error(_)) ? bounds.lo > 0 || bounds.hi < 0) {
@@ -1287,13 +1291,13 @@ certify = (bounds: Fixed, p: Int) -> Option(Result(Float, Nil)) {
 // operations; the explicit evaluation order is the same in every Wasm engine.
 Double = (hi = Float, lo = Float)
 
-two_sum = (a: Float, b: Float) -> Double {
+two_sum = (a : Float, b : Float) -> Double {
 	s = a +. b
 	v = s -. a
 	Double(hi = s, lo = { a -. { s -. v } } +. { b -. v })
 }
 
-two_product = (a: Float, b: Float) -> Double {
+two_product = (a : Float, b : Float) -> Double {
 	product = a *. b
 	split_a = splitter *. a
 	ah = split_a -. { split_a -. a }
@@ -1306,19 +1310,19 @@ two_product = (a: Float, b: Float) -> Double {
 	Double(hi = product, lo = error)
 }
 
-double_add = (a: Double, b: Double) -> Double {
+double_add = (a : Double, b : Double) -> Double {
 	high = two_sum(a.hi, b.hi)
 	two_sum(high.hi, high.lo +. a.lo +. b.lo)
 }
 
-double_neg = (a: Double) -> Double { Double(hi = -.a.hi, lo = -.a.lo) }
+double_neg = (a : Double) -> Double { Double(hi = -.a.hi, lo = -.a.lo) }
 
-double_mul = (a: Double, b: Double) -> Double {
+double_mul = (a : Double, b : Double) -> Double {
 	high = two_product(a.hi, b.hi)
 	two_sum(high.hi, high.lo +. { a.hi *. b.lo } +. { a.lo *. b.hi })
 }
 
-double_div = (a: Double, d: Float) -> Double {
+double_div = (a : Double, d : Float) -> Double {
 	q = a.hi /. d
 	product = two_product(q, d)
 	remainder = { { a.hi -. product.hi } -. product.lo } +. a.lo
@@ -1364,12 +1368,12 @@ fast_unit_min = 3.8725919148493183e-121
 
 fast_unit_max = 2.5822498780869086e120
 
-quick_sum = (a: Float, b: Float) -> Double {
+quick_sum = (a : Float, b : Float) -> Double {
 	s = a +. b
 	Double(hi = s, lo = b -. { s -. a })
 }
 
-double_mul_fast = (a: Double, b: Double) -> Double {
+double_mul_fast = (a : Double, b : Double) -> Double {
 	a_high = a.hi
 	a_low = a.lo
 	b_high = b.hi
@@ -1388,7 +1392,7 @@ double_mul_fast = (a: Double, b: Double) -> Double {
 
 // Coefficients dominate products by at least two. Load immutable fields once;
 // generic record field access otherwise repeats casts and checked array reads.
-double_add_coefficient = (value: Double, coefficient: Double) -> Double {
+double_add_coefficient = (value : Double, coefficient : Double) -> Double {
 	coefficient_high = coefficient.hi
 	value_high = value.hi
 	high = coefficient_high +. value_high
@@ -1396,7 +1400,7 @@ double_add_coefficient = (value: Double, coefficient: Double) -> Double {
 	quick_sum(high, low +. coefficient.lo +. value.lo)
 }
 
-double_quotient = (a: Double, b: Double) -> Double {
+double_quotient = (a : Double, b : Double) -> Double {
 	q = a.hi /. b.hi
 	residual = double_add(
 		a,
@@ -1405,7 +1409,7 @@ double_quotient = (a: Double, b: Double) -> Double {
 	two_sum(q, { residual.hi +. residual.lo } /. b.hi)
 }
 
-double_root = (x: Double) -> Double {
+double_root = (x : Double) -> Double {
 	root = core.sqrt(x.hi)
 	residual = double_add(
 		x,
@@ -1417,7 +1421,7 @@ double_root = (x: Double) -> Double {
 // In the fast regions the endpoints are normal and nonzero, so IEEE equality
 // implies identical bits. This avoids constructing arbitrary-precision bit
 // integers merely to compare two normal Float values. Zero ambiguity refines.
-fast_round = (value: Double, absolute_radius: Float) -> Option(Float) {
+fast_round = (value : Double, absolute_radius : Float) -> Option(Float) {
 	radius = abs(value.hi) *. rounding_radius +. absolute_radius
 	low = value.hi +. { value.lo -. radius }
 	high = value.hi +. { value.lo +. radius }
@@ -1428,7 +1432,7 @@ fast_round = (value: Double, absolute_radius: Float) -> Option(Float) {
 
 Reduced = (q = Float, quadrant = Float, argument = Double)
 
-fast_reduce = (x: Float) -> Option(Reduced) {
+fast_reduce = (x : Float) -> Option(Reduced) {
 	{ abs(x) >. fast_angle_limit } |>
 		(True) { None }
 		| (False) {
@@ -1457,7 +1461,7 @@ fast_reduce = (x: Float) -> Option(Reduced) {
 		}
 }
 
-reduced_value = (reduced: Reduced, cosine: Bool) -> Double {
+reduced_value = (reduced : Reduced, cosine : Bool) -> Double {
 	r = reduced.argument
 	square = double_mul_fast(r, r)
 	k = reduced.quadrant
@@ -1473,7 +1477,7 @@ reduced_value = (reduced: Reduced, cosine: Bool) -> Double {
 	negative |> (True) { double_neg(value) } | (False) { value }
 }
 
-fast_sincos = (x: Float, cosine: Bool) -> Option(Float) {
+fast_sincos = (x : Float, cosine : Bool) -> Option(Float) {
 	fast_reduce(x) |>
 		(None) { None }
 		| (Some(reduced)) {
@@ -1484,7 +1488,7 @@ fast_sincos = (x: Float, cosine: Bool) -> Option(Float) {
 		}
 }
 
-fast_tangent = (x: Float) -> Option(Float) {
+fast_tangent = (x : Float) -> Option(Float) {
 	fast_reduce(x) |>
 		(None) { None }
 		| (Some(reduced)) {
@@ -1505,7 +1509,7 @@ fast_tangent = (x: Float) -> Option(Float) {
 // The table center is an exactly represented multiple of 1/16. The reduced
 // argument has magnitude <=1/32 (plus rounding slack), so nine atan terms
 // suffice; the first omitted term is <=|r|^19/19.
-fast_atan_unit = (z: Double) -> Double {
+fast_atan_unit = (z : Double) -> Double {
 	index = core.floor(z.hi *. fast_sixteen +. fast_half)
 	center = index /. fast_sixteen
 	base = index |>
@@ -1539,7 +1543,7 @@ fast_atan_unit = (z: Double) -> Double {
 	double_add(base, correction)
 }
 
-positive_angle = (y: Double, x: Double) -> Double {
+positive_angle = (y : Double, x : Double) -> Double {
 	{ y.hi >. x.hi } |>
 		(True) {
 			double_add(
@@ -1552,7 +1556,7 @@ positive_angle = (y: Double, x: Double) -> Double {
 		| (False) { fast_atan_unit(double_quotient(y, x)) }
 }
 
-fast_arctangent = (x: Float) -> Option(Float) {
+fast_arctangent = (x : Float) -> Option(Float) {
 	a = positive_angle(
 		Double(hi = abs(x), lo = fast_zero),
 		Double(hi = fast_one, lo = fast_zero),
@@ -1561,7 +1565,7 @@ fast_arctangent = (x: Float) -> Option(Float) {
 	fast_round(signed, fast_zero)
 }
 
-fast_angle = (y: Float, x: Float) -> Option(Float) {
+fast_angle = (y : Float, x : Float) -> Option(Float) {
 	largest = max(abs(x), abs(y))
 	smallest = min(abs(x), abs(y))
 	{ largest >. fast_magnitude_max || smallest <. fast_magnitude_min } |>
@@ -1581,7 +1585,7 @@ fast_angle = (y: Float, x: Float) -> Option(Float) {
 		}
 }
 
-fast_inverse = (x: Float, cosine: Bool) -> Option(Float) {
+fast_inverse = (x : Float, cosine : Bool) -> Option(Float) {
 	lower = two_sum(fast_one, -.x)
 	upper = two_sum(fast_one, x)
 	root = double_root(double_mul_fast(lower, upper))
@@ -1599,7 +1603,7 @@ fast_inverse = (x: Float, cosine: Bool) -> Option(Float) {
 	fast_round(signed, fast_zero)
 }
 
-fast_norm = (x: Float, y: Float) -> Option(Float) {
+fast_norm = (x : Float, y : Float) -> Option(Float) {
 	largest = max(abs(x), abs(y))
 	{ largest <. fast_magnitude_min || largest >. fast_magnitude_max } |>
 		(True) { None }
@@ -1613,7 +1617,7 @@ fast_norm = (x: Float, y: Float) -> Option(Float) {
 		}
 }
 
-fast_units = (x: Float, factor: Double) -> Option(Float) {
+fast_units = (x : Float, factor : Double) -> Option(Float) {
 	{ abs(x) <. fast_unit_min || abs(x) >. fast_unit_max } |>
 		(True) { None }
 		| (False) {
@@ -1644,7 +1648,9 @@ Math = Sine
 	| UnitsIn
 	| UnitsOut
 
-math_bounds = (operation: Math, x: Float, y: Float, p: Int) -> Option(Fixed) {
+math_bounds = (operation : Math, x : Float, y : Float, p : Int) -> Option(
+	Fixed,
+) {
 	scale = core.shift_left(1, p)
 	common = core.shift_left(1, 1074)
 	operation |>
@@ -1752,7 +1758,7 @@ math_bounds = (operation: Math, x: Float, y: Float, p: Int) -> Option(Fixed) {
 		}
 }
 
-refine_math = (operation: Math, x: Float, y: Float, p: Int) -> Result(
+refine_math = (operation : Math, x : Float, y : Float, p : Int) -> Result(
 	Float,
 	Nil,
 ) {
@@ -1767,14 +1773,14 @@ refine_math = (operation: Math, x: Float, y: Float, p: Int) -> Result(
 
 // The real functions here are bounded; Error is unreachable by F3/F4. Keep
 // this exhaustive rather than adding an Assert effect or constructing infinity.
-unbounded_result = (result: Result(Float, Nil)) -> Float {
+unbounded_result = (result : Result(Float, Nil)) -> Float {
 	result |>
 		(Ok(value)) { value }
 		| (Error(_)) { panic("bounded real function overflowed") }
 }
 
 /// Real sine in radians; preserves both zero signs. Correctly rounded.
-sin = (x: Float) -> Float {
+sin = (x : Float) -> Float {
 	{ abs(x) <=. 7.450580596923828e-9 } |>
 		(True) { x }
 		| (False) {
@@ -1785,7 +1791,7 @@ sin = (x: Float) -> Float {
 }
 
 /// Real cosine in radians; either zero gives +1. Correctly rounded.
-cos = (x: Float) -> Float {
+cos = (x : Float) -> Float {
 	{ abs(x) <=. 7.450580596923828e-9 } |>
 		(True) { 1.0 }
 		| (False) {
@@ -1797,7 +1803,7 @@ cos = (x: Float) -> Float {
 
 /// Real tangent, rounded once, rather than a quotient of rounded sin/cos.
 /// Binary-rational angles are never exact poles; rounded overflow gives Error.
-tan = (x: Float) -> Result(Float, Nil) {
+tan = (x : Float) -> Result(Float, Nil) {
 	{ abs(x) <=. 7.450580596923828e-9 } |>
 		(True) { Ok(x) }
 		| (False) {
@@ -1808,7 +1814,7 @@ tan = (x: Float) -> Result(Float, Nil) {
 }
 
 /// Real arcsine; outside [-1,1] gives Error before arithmetic. Keeps zero sign.
-asin = (x: Float) -> Result(Float, Nil) {
+asin = (x : Float) -> Result(Float, Nil) {
 	{ abs(x) >. 1.0 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -1827,7 +1833,7 @@ asin = (x: Float) -> Result(Float, Nil) {
 }
 
 /// Real arccosine; outside [-1,1] gives Error; +1 gives +0 and -1 gives pi.
-acos = (x: Float) -> Result(Float, Nil) {
+acos = (x : Float) -> Result(Float, Nil) {
 	{ abs(x) >. 1.0 } |>
 		(True) { Error(Nil) }
 		| (False) {
@@ -1844,7 +1850,7 @@ acos = (x: Float) -> Result(Float, Nil) {
 }
 
 /// Real arctangent; preserves zero signs. Correctly rounded.
-atan = (x: Float) -> Float {
+atan = (x : Float) -> Float {
 	{ abs(x) <=. 7.450580596923828e-9 } |>
 		(True) { x }
 		| (False) {
@@ -1864,7 +1870,7 @@ atan = (x: Float) -> Float {
 
 /// Argument of x+i*y, in [-pi,pi], sign from y. Signed zero axes precede
 /// comparisons; nonzero ratios are exact, including extreme exponent gaps.
-atan2 = (y: Float, x: Float) -> Float {
+atan2 = (y : Float, x : Float) -> Float {
 	{ y == 0.0 } |>
 		(True) { sign_bit(x) |> (True) { copy_sign(pi, y) } | (False) { y } }
 		| (False) {
@@ -1882,11 +1888,11 @@ atan2 = (y: Float, x: Float) -> Float {
 
 /// Rounded sqrt(x*x+y*y), without intermediate Float overflow. Exact square
 /// comparisons resolve midpoint ties. Both zeros give +0, independently of sign.
-hypot = (x: Float, y: Float) -> Result(Float, Nil) {
+hypot = (x : Float, y : Float) -> Result(Float, Nil) {
 	fast_norm(x, y) |> (Some(value)) { Ok(value) } | (None) { exact_norm(x, y) }
 }
 
-exact_norm = (x: Float, y: Float) -> Result(Float, Nil) {
+exact_norm = (x : Float, y : Float) -> Result(Float, Nil) {
 	a = dyadic(x)
 	b = dyadic(y)
 	sum = a * a + b * b
@@ -1938,12 +1944,12 @@ exact_norm = (x: Float, y: Float) -> Result(Float, Nil) {
 		}
 }
 
-ratio_bits_positive_zero = (n: Int, d: Int) -> Result(Int, Nil) {
+ratio_bits_positive_zero = (n : Int, d : Int) -> Result(Int, Nil) {
 	{ n == 0 } |> (True) { Ok(0) } | (False) { ratio_bits(n, d) }
 }
 
 /// Rounded real degrees*pi/180, using real pi. Preserves the input zero sign.
-radians = (degrees: Float) -> Float {
+radians = (degrees : Float) -> Float {
 	{ degrees == 0.0 } |>
 		(True) { degrees }
 		| (False) {
@@ -1956,7 +1962,7 @@ radians = (degrees: Float) -> Float {
 }
 
 /// Rounded real radians*180/pi. Preserves zero signs; rounded overflow is Error.
-degrees = (radians: Float) -> Result(Float, Nil) {
+degrees = (radians : Float) -> Result(Float, Nil) {
 	{ radians == 0.0 } |>
 		(True) { Ok(radians) }
 		| (False) {
@@ -2220,7 +2226,7 @@ sine_high_12 = sine_coefficient_12.hi
 
 sine_high_13 = sine_coefficient_13.hi
 
-sine_polynomial = (square: Double) -> Double {
+sine_polynomial = (square : Double) -> Double {
 	w = square.hi
 	w_low = square.lo
 	split_w = splitter *. w
@@ -2389,7 +2395,7 @@ cosine_high_12 = cosine_coefficient_12.hi
 
 cosine_high_13 = cosine_coefficient_13.hi
 
-cosine_polynomial = (square: Double) -> Double {
+cosine_polynomial = (square : Double) -> Double {
 	w = square.hi
 	w_low = square.lo
 	split_w = splitter *. w
@@ -2559,7 +2565,7 @@ atan_high_7 = atan_coefficient_7.hi
 
 atan_high_8 = atan_coefficient_8.hi
 
-atan_polynomial = (square: Double) -> Double {
+atan_polynomial = (square : Double) -> Double {
 	w = square.hi
 	w_low = square.lo
 	split_w = splitter *. w
@@ -2648,6 +2654,6 @@ atan_polynomial = (square: Double) -> Double {
 }
 
 // END GENERATED FAST COEFFICIENTS
-fast_sin = (x: Float) -> Float {
+fast_sin = (x : Float) -> Float {
 	fast_sincos(x, False) |> (Some(v)) { v } | (None) { x }
 }

@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -75,6 +75,6 @@ test("recursion_inside_closures", () {
 })
 
 test("parameters_that_name_the_whole_value", () {
-	g = ((a, b) = all, c: Int) { show((all, a + b + c)) }
+	g = ((a, b) = all, c : Int) { show((all, a + b + c)) }
 	check(g((1, 2), 3), "((1, 2), 6)")
 })

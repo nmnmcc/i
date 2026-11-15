@@ -7,7 +7,7 @@
 Unit = { () }
 
 main = () {
-	u: Unit = { () }
+	u : Unit = { () }
 	assert(u == ())
 	Nil
 }

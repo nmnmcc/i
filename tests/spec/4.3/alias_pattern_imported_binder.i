@@ -2,6 +2,6 @@
 // expect: compile-error E0537
 Box(A) = (A)
 
-value: Box(Int) = Box(1)
+value : Box(Int) = Box(1)
 
 Box(Int) = value

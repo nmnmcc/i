@@ -8,15 +8,15 @@
 )
 
 loop =
-	(n: Int) -> Int { n }
-	| (n: Int, acc: Int) -> Int {
+	(n : Int) -> Int { n }
+	| (n : Int, acc : Int) -> Int {
 		n |> (0) { acc } | (_) { again(loop, n - 1, acc + 2) }
 	}
 
 /// Calls the value `f` in tail position.
-again = (f, n: Int, acc: Int) -> Int { f(n, acc) }
+again = (f, n : Int, acc : Int) -> Int { f(n, acc) }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	io.print(
 		core.inspect(again(loop, 1_000_000, 0)),
 	)

@@ -336,11 +336,11 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     // a source copy; the IO and continuation queries are unused by this pure unit probe.
     let source = include_str!("../../../lib/i/task.i");
     let source = source.replace(
-        "@external(\"ilang:request\", \"observe_change\")\nobserve_change: (Key(Nil)) -> Request(Nil)",
-        "observe_change = (_root: Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
+        "@external(\"ilang:request\", \"observe_change\")\nobserve_change : (Key(Nil)) -> Request(Nil)",
+        "observe_change = (_root : Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
     ).replace(
-        "@external(\"ilang:request\", \"has_work\")\nhas_work: (Ticket) -> Bool",
-        "has_work = (_ticket: Ticket) -> Bool { False }",
+        "@external(\"ilang:request\", \"has_work\")\nhas_work : (Ticket) -> Bool",
+        "has_work = (_ticket : Ticket) -> Bool { False }",
     );
     let begin = source
         .find("@external(\"ilang:control\", \"finalizing\")")
@@ -358,8 +358,8 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
            worker_publish = (_job: Job) -> Int { 0 }\n\
            worker_claim = (_ticket: Int) -> Bool { True }\n\
            worker_adopt = (_ticket: Int, _task: Int) -> Nil { Nil }\n\
-           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never, Never) { panic(\"no workers\") }\n\
-           worker_away = (_k: Continuation(StepAnswer, Turn, Never, Never)) -> Bool { False }\n\
+           worker_placeholder = () -> Continuation(StepAnswer, Turn, Never) { panic(\"no workers\") }\n\
+           worker_away = (_k: Continuation(StepAnswer, Turn, Never)) -> Bool { False }\n\
            worker_send = (_task: Int, _resume: Resume) -> Nil { Nil }\n\
            worker_inbox = () -> Int { 0 }\n\
            worker_message = () -> Remote { panic(\"no workers\") }\n\
@@ -375,7 +375,7 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         + r#"
 
 main = () {
-  k: Key(String) = key.new()
+  k : Key(String) = key.new()
   extension = key.wrap(k, "extension")
   prefix = key.wrap(k, "prefix")
   later = key.wrap(k, "later")
@@ -520,4 +520,32 @@ fn preserved_review_request_programs_run_with_their_embedder_services() {
             }
         }
     }
+}
+
+#[test]
+fn task_run_discharges_scheduler_in_the_printed_entry_need() {
+    // Spec §9.9: run provides Scheduler to its body and retains Runner at
+    // its caller. Keep the exact program that exposed the leaked need.
+    let source = include_str!("../../../tests/spec/9.9/task_run_environment_type.i");
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(directory.path().join("src")).unwrap();
+    std::fs::write(directory.path().join("src/main.i"), source).unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["check", "--types", "--offline", "--project"])
+        .arg(directory.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let shown = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        shown
+            .lines()
+            .any(|line| line == "app/main.main : () <- (Assert, Fail(Never), task.Runner) -> Nil"),
+        "{shown}"
+    );
 }

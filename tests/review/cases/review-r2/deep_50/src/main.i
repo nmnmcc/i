@@ -8,7 +8,7 @@
 	rng = i/random
 	(Io) = i/io
 )
-deep = (n: Int) -> Nil {
+deep = (n : Int) -> Nil {
 	{ n == 0 } |>
 		(True) { task.yield() }
 		| (False) {
@@ -19,7 +19,7 @@ deep = (n: Int) -> Nil {
 		}
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	deep(50)
 	io.print("deep-ok")
 }

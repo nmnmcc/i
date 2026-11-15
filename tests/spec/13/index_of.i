@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: Result(Int, Nil), want: Result(Int, Nil)) {
+check = (got : Result(Int, Nil), want : Result(Int, Nil)) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) {

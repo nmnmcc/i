@@ -5,7 +5,7 @@
 	i/task
 )
 
-widen = (e: task.Event(Int, Never, Never)) -> task.Event(
+widen = (e : task.Event(Int, Never, Never)) -> task.Event(
 	Int | String,
 	String,
 	task.Scheduler,

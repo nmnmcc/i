@@ -2,6 +2,6 @@
 // expect: compile-error E0535
 Box(A) = (A)
 
-value: Int = 1
+value : Int = 1
 
 Box(_) = value

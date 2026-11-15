@@ -1,0 +1,46 @@
+---
+title: Contributing
+description: Choose a change and start with a focused regression.
+---
+
+Turn a small behavior into a regression test, then change its implementation.
+
+```i test stdout=exact package=contributing title="test/regression_test.i"
+(
+	testlib = (test) = std/test
+	std/bool
+)
+test("a regression", () { assert(bool.not(True) == False) })
+```
+
+```text
+pass contributing/regression_test.a regression
+1 passed, 0 failed
+```
+
+For this change, the source is [std/src/bool.i](https://github.com/nmnmcc/i/blob/main/std/src/bool.i) and neighboring tests live in [std/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/std/test/bool_test.i). For language behavior, begin with the relevant [standard](/docs/standard) text, then a case under `tests/spec`.
+
+## Sources
+
+[Repository layout](/docs/contributing/repository-layout) locates files; [compiler architecture](/docs/contributing/compiler-architecture) traces their connections. [Building and testing](/docs/contributing/building-and-testing) supplies focused commands, and [sending changes](/docs/contributing/how-to-send-changes) gives a worked case.
+
+The project favors a small language, immutable values and bindings, structured task lifetimes, and ordinary library features for services and tests; simplicity precedes optimization. Its goal is a complete standalone language and useful library, without checker-accepted invalid programs trapping at runtime.
+
+**Current limits:** that safety goal is not yet met; T8/F2 records a checked program that traps, alongside other [known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md); a specified stop is a separate outcome.
+
+## Open work
+
+The gap register's probe names refer to external review inputs; add repository regression cases when implementing them.
+
+| Area | Gap identifiers and work |
+| --- | --- |
+| Tasks | C03: captured scope removal; C04: retain only needed environments. |
+| Patterns | P13: data-rest syntax and unique known shapes; P15: never-used branch warnings. |
+| Services | EF10: row projection; EF11: resource scope lifecycle and API. |
+| Types | T12: invariant intersections; T13: impossible data; T14: written differences; T15: unused-parameter invariance; T16: well-formed applications; T23: polymorphic function types inside data. |
+| Text and macros | SX16: negative Float spelling; MP08: source-level budget and frame charges. |
+| Soundness | T8/F2: relaxed written parameters give invalid known result types; parameter rigidity remains open. |
+
+## Documentation
+
+Edit authored pages under `docs/content`; the home page is `docs/content/home/index.mdx`. Complete examples run at both optimization levels. The [library generator](https://github.com/nmnmcc/i/blob/main/docs/scripts/generate-library.py) reads `lib/i` and `std/src`; improve their documentation comments to change generated pages. [Design notes](/docs/contributing/design-notes) distinguish implementation context from proposals.

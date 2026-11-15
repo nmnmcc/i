@@ -4,7 +4,7 @@ a = () { Nil }
 b = () { Nil }
 
 @external("only")
-c: (Int) -> Int
+c : (Int) -> Int
 
 @host("app:h/v1", "sync")
 H = (f = () -> Nil)
@@ -21,4 +21,4 @@ T = ()
 @deprecated("older")
 f = 1
 
-g: (Int) -> Int
+g : (Int) -> Int

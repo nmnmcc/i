@@ -2,4 +2,4 @@
 	(Box) = review/lib
 )
 Box(Item) = lib.v
-x: Item = 2
+x : Item = 2
