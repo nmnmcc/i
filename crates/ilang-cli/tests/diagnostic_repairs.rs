@@ -227,6 +227,24 @@ fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
     );
     let diagnostics = check(&[(
         "src/main.i",
+        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = word({ value : String = 2\n value })\n_ = bad\n",
+    )]);
+    assert_eq!(
+        diagnostics.matches("error[E0501]").count(),
+        2,
+        "{diagnostics}"
+    );
+    assert!(!diagnostics.contains("error[E0552]"), "{diagnostics}");
+    assert!(
+        diagnostics.contains("`2` is not a subtype of `String`"),
+        "{diagnostics}"
+    );
+    assert!(
+        diagnostics.contains("`word` does not accept argument 1 with type `String`"),
+        "{diagnostics}"
+    );
+    let diagnostics = check(&[(
+        "src/main.i",
         "word = (0, 0 | 1) { \"zero\" } | (1, 0 | 1) { \"one\" }\nbad = word(2, 3)\n_ = bad\n",
     )]);
     assert_eq!(

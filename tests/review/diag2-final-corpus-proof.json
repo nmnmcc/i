@@ -24453,5 +24453,752 @@
         }
       ]
     }
-  ]
+  ],
+  "rendered_message_classes": [
+    {
+      "code": "E0001",
+      "before": "`!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "after": "i has no `!` operator. To negate a Boolean `x`, import `i/core` and write `core.not(x)`.",
+      "occurrences": 2
+    },
+    {
+      "code": "E0201",
+      "before": "`Io` is not defined",
+      "after": "`Io` is not defined. Import `(Io) = i/io` to use `Io`.",
+      "occurrences": 2
+    },
+    {
+      "code": "E0201",
+      "before": "`core` is not defined; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } | (_) { other }`; write guards with `?` instead of `if`",
+      "after": "`core` is not defined. Import `i/core` to use the module `core`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } | (_) { other }`; write guards with `?` instead of `if`",
+      "occurrences": 3
+    },
+    {
+      "code": "E0201",
+      "before": "`io` is not defined",
+      "after": "`io` is not defined. Import `i/io` to use the module `io`.",
+      "occurrences": 2
+    },
+    {
+      "code": "E0201",
+      "before": "`resource` is not defined; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } | (_) { other }`; write guards with `?` instead of `if`",
+      "after": "`resource` is not defined. Import `i/resource` to use the module `resource`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } | (_) { other }`; write guards with `?` instead of `if`",
+      "occurrences": 2
+    },
+    {
+      "code": "E0225",
+      "before": "an environment row may only be bound, captured or provided after `<-`; it is not ordinary data (§9.4)",
+      "after": "an environment row may only be bound, captured or provided after `<-`; it is not ordinary data",
+      "occurrences": 6
+    },
+    {
+      "code": "E0225",
+      "before": "two explicit services or two spreads in provided data have one service key (§9.2)",
+      "after": "two explicit services or two spreads in provided data have one service key",
+      "occurrences": 18
+    },
+    {
+      "code": "E0318",
+      "before": "the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3); the host gives this value, so it must be all of `String`, not `\"off\" | \"on\"`",
+      "after": "the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors; the host gives this value, so it must be all of `String`, not `\"off\" | \"on\"`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0320",
+      "before": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3)",
+      "after": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors",
+      "occurrences": 2
+    },
+    {
+      "code": "E0320",
+      "before": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3); the host gives this value, so it must be all of `String`, not `\"a\"`",
+      "after": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors; the host gives this value, so it must be all of `String`, not `\"a\"`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0501",
+      "before": "`(True)` is not a subtype of `Bool`",
+      "after": "`(True)` is not a subtype of `Bool`. Parentheses construct one-item data. Use braces `{ }` to group an expression: `{ True }`.",
+      "occurrences": 2
+    },
+    {
+      "code": "E0504",
+      "before": "a value of `S(_, _)` could go to more than one type variable of `Fail(Never) | _ | _` (§4.4)",
+      "after": "a value of `S(_, _)` could go to more than one type variable of `Fail(Never) | _ | _`",
+      "occurrences": 6
+    },
+    {
+      "code": "E0505",
+      "before": "this type has itself inside it, through a type variable (§4.7)",
+      "after": "this type has itself inside it, through a type variable",
+      "occurrences": 207
+    },
+    {
+      "code": "E0506",
+      "before": "`.a` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)",
+      "after": "`.a` needs a known type for its value; write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving",
+      "occurrences": 1
+    },
+    {
+      "code": "E0506",
+      "before": "`.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`",
+      "after": "`.k` needs a known type for its value; write its type, such as `x: (A, B)`",
+      "occurrences": 2
+    },
+    {
+      "code": "E0506",
+      "before": "a spread `..e` needs a known type for `e` with exactly one member, which is data (§2.3), but it has `(a1 = 1) | (b1 = 1)`",
+      "after": "a spread `..e` needs a known type for `e` with exactly one member, which is data, but it has `(a1 = 1) | (b1 = 1)`",
+      "occurrences": 2
+    },
+    {
+      "code": "E0506",
+      "before": "a spread `..e` needs a known type for `e` with exactly one member, which is data (§2.3), but it has `_`",
+      "after": "a spread `..e` needs a known type for `e` with exactly one member, which is data, but it has `_`",
+      "occurrences": 36
+    },
+    {
+      "code": "E0512",
+      "before": "`.size` needs every member of the known type `String` of its value to be a custom type (§6.7), but `String` is not one",
+      "after": "`.size` needs every member of the known type `String` of its value to be a custom type, but `String` is not one",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`B(_)` and `B(A(Int, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`B(_)` and `B(A(Int, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 12
+    },
+    {
+      "code": "E0515",
+      "before": "`B(_)` and `B(A(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`B(_)` and `B(A(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 14
+    },
+    {
+      "code": "E0515",
+      "before": "`B(_)` and `B(A(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 15:12 needs it)",
+      "after": "`B(_)` and `B(A(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 15:12 needs it)",
+      "occurrences": 6
+    },
+    {
+      "code": "E0515",
+      "before": "`Cell(String)` and `Cell(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`Cell(String)` and `Cell(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "`Consumer(Int)` and `Consumer(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 3:43 needs it)",
+      "after": "`Consumer(Int)` and `Consumer(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 3:43 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(1)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(1)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Dep | T(Dep))` and `S(Dep | S(Dep | T(Dep)) | T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Dep | T(Dep))` and `S(Dep | S(Dep | T(Dep)) | T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 4
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Dep | T(Dep))` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Dep | T(Dep))` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Dep | T(Dep))` and `S(T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Dep | T(Dep))` and `S(T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Dep)` and `S(Dep | S(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Dep)` and `S(Dep | S(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Dep)` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Dep)` and `S(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 44
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 13:2 needs it)",
+      "after": "`S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 13:2 needs it)",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 5:12 needs it)",
+      "after": "`S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 5:12 needs it)",
+      "occurrences": 4
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Int)` and `S(\"s\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Int)` and `S(\"s\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Int)` and `S(Int | String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Int)` and `S(Int | String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Int)` and `S(Int | String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (in the expansion of `test`: `(-> (,) _ {((-> (,) _ (|> (bad) (| (-> (, 2) _ Nil) (-> (, other) _ (panic other))))))})`)",
+      "after": "`S(Int)` and `S(Int | String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (in the expansion of `test`: `(-> (,) _ {((-> (,) _ (|> (bad) (| (-> (, 2) _ Nil) (-> (, other) _ (panic other))))))})`)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (in the expansion of `test`: `(-> (,) _ {((-> (,) _ (|> (bad) (| (-> (, 2) _ Nil) (-> (, other) _ (panic other))))))})`)",
+      "after": "`S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (in the expansion of `test`: `(-> (,) _ {((-> (,) _ (|> (bad) (| (-> (, 2) _ Nil) (-> (, other) _ (panic other))))))})`)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 8:8 needs it)",
+      "after": "`S(Int)` and `S(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 8:8 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Never)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Never)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 12
+    },
+    {
+      "code": "E0515",
+      "before": "`S(Never)` and `S(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(Never)` and `S(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 4
+    },
+    {
+      "code": "E0515",
+      "before": "`S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 11:2 needs it)",
+      "after": "`S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 11:2 needs it)",
+      "occurrences": 10
+    },
+    {
+      "code": "E0515",
+      "before": "`S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 13:6 needs it)",
+      "after": "`S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 13:6 needs it)",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "`S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 18:3 needs it)",
+      "after": "`S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 18:3 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(String)` and `S(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(String)` and `S(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(String, Never)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(String, Never)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 6
+    },
+    {
+      "code": "E0515",
+      "before": "`S(String, _)` and `S(1, Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 14:2 needs it)",
+      "after": "`S(String, _)` and `S(1, Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 14:2 needs it)",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "`S(String, _)` and `S(1, Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 16:6 needs it)",
+      "after": "`S(String, _)` and `S(1, Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 16:6 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(String, _)` and `S(Int, Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(String, _)` and `S(Int, Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(_)` and `S(Dep | S(Dep | T(Dep)) | T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(_)` and `S(Dep | S(Dep | T(Dep)) | T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(_)` and `S(Dep | S(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(_)` and `S(Dep | S(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 28
+    },
+    {
+      "code": "E0515",
+      "before": "`S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 10:24 needs it)",
+      "after": "`S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 10:24 needs it)",
+      "occurrences": 8
+    },
+    {
+      "code": "E0515",
+      "before": "`S(_)` and `S(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(_)` and `S(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "`S(_)` and `S(T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 22:27 needs it)",
+      "after": "`S(_)` and `S(T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 22:27 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`S(_, _)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`S(_, _)` and `S(Int, S(String, Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "`State(1)` and `State(2)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`State(1)` and `State(2)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`String` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`String` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 4
+    },
+    {
+      "code": "E0515",
+      "before": "`String` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 11:12 needs it)",
+      "after": "`String` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 11:12 needs it)",
+      "occurrences": 6
+    },
+    {
+      "code": "E0515",
+      "before": "`String` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 13:2 needs it)",
+      "after": "`String` and `Int` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 13:2 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`Svc(Int)` and `Svc(Nil)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`Svc(Int)` and `Svc(Nil)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 6
+    },
+    {
+      "code": "E0515",
+      "before": "`Svc(Int)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`Svc(Int)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "`Svc(String)` and `Svc(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`Svc(String)` and `Svc(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 18
+    },
+    {
+      "code": "E0515",
+      "before": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 11:12 needs it)",
+      "after": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 11:12 needs it)",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 16:4 needs it)",
+      "after": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 16:4 needs it)",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 19:4 needs it)",
+      "after": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 19:4 needs it)",
+      "occurrences": 6
+    },
+    {
+      "code": "E0515",
+      "before": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 22:9 needs it)",
+      "after": "`Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 22:9 needs it)",
+      "occurrences": 6
+    },
+    {
+      "code": "E0515",
+      "before": "`T(Dep)` and `T(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`T(Dep)` and `T(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "`T(S(Never))` and `T(T(S(Never)))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`T(S(Never))` and `T(T(S(Never)))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`T(_)` and `T(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`T(_)` and `T(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 7
+    },
+    {
+      "code": "E0515",
+      "before": "`T(_)` and `T(T(S(Never)))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)",
+      "after": "`T(_)` and `T(T(S(Never)))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "`_` and `_` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2) (the type at 19:4 needs it)",
+      "after": "`_` and `_` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 19:4 needs it)",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)",
+      "after": "the service requirements `S(\"hi\")` and `S(Int)` have an empty intersection and cannot be satisfied",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(Int)` and `S(\"hi\")` have an empty intersection and cannot be satisfied (§4.4, §9.2)",
+      "after": "the service requirements `S(Int)` and `S(\"hi\")` have an empty intersection and cannot be satisfied",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 10:11 needs it)",
+      "after": "the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (the type at 10:11 needs it)",
+      "occurrences": 2
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 11:12 needs it)",
+      "after": "the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (the type at 11:12 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 12:11 needs it)",
+      "after": "the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (the type at 12:11 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 9:12 needs it)",
+      "after": "the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (the type at 9:12 needs it)",
+      "occurrences": 6
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2)",
+      "after": "the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied",
+      "occurrences": 97
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 19:11 needs it)",
+      "after": "the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (the type at 19:11 needs it)",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 5:12 needs it)",
+      "after": "the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (the type at 5:12 needs it)",
+      "occurrences": 3
+    },
+    {
+      "code": "E0515",
+      "before": "the service requirements `S(String)` and `S(_)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 7:74 needs it)",
+      "after": "the service requirements `S(String)` and `S(_)` have an empty intersection and cannot be satisfied (the type at 7:74 needs it)",
+      "occurrences": 1
+    },
+    {
+      "code": "E0515",
+      "before": "the type hides the environment statement's obligation for `S(Dep)`: every instance must use the same service form (§4.8 rule 9, §9.2)",
+      "after": "the type hides the environment statement's obligation for `S(Dep)`: every instance must use the same service form",
+      "occurrences": 32
+    },
+    {
+      "code": "E0515",
+      "before": "the type hides the environment statement's obligation for `S(_)`: every instance must use the same service form (§4.8 rule 9, §9.2)",
+      "after": "the type hides the environment statement's obligation for `S(_)`: every instance must use the same service form",
+      "occurrences": 4
+    },
+    {
+      "code": "E0515",
+      "before": "the type hides the environment statement's obligation for `Svc(String)`: every instance must use the same service form (§4.8 rule 9, §9.2)",
+      "after": "the type hides the environment statement's obligation for `Svc(String)`: every instance must use the same service form",
+      "occurrences": 12
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `\"b\"`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `\"b\"`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"\", False)`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `(\"\", False)`",
+      "occurrences": 33
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"\", True)`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `(\"\", True)`",
+      "occurrences": 46
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"a\", False)`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `(\"a\", False)`",
+      "occurrences": 8
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"a\", True)`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `(\"a\", True)`",
+      "occurrences": 5
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"ab\", False)`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `(\"ab\", False)`",
+      "occurrences": 5
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"ab\", True)`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `(\"ab\", True)`",
+      "occurrences": 10
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"b\", False)`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `(\"b\", False)`",
+      "occurrences": 3
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"b\", True)`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `(\"b\", True)`",
+      "occurrences": 4
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `0`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `0`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `2`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `2`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `Pair(\"a\", \"\")`; the fields of `Pair` share one type, so they get the whole type `String` from literal patterns; if only these values can come, write the type, such as `Pair(\"a\" | \"b\")`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `Pair(\"a\", \"\")`; the fields of `Pair` share one type, so they get the whole type `String` from literal patterns; if only these values can come, write the type, such as `Pair(\"a\" | \"b\")`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[\"\", ..]`; the items of a list get the whole type `String` from literal patterns (§4.8); if only these values can come, write the type, such as `List(\"a\" | \"b\")`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `[\"\", ..]`; the items of a list get the whole type `String` from literal patterns; if only these values can come, write the type, such as `List(\"a\" | \"b\")`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0516",
+      "before": "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `_`",
+      "after": "the clauses do not cover every value of the subject: no clause without a guard matches `_`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0521",
+      "before": "`f` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `\"a\" | \"b\"`; the host gives this value, so it must be all of `String`, not `\"a\" | \"b\"`",
+      "after": "`f` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors, but it is `\"a\" | \"b\"`; the host gives this value, so it must be all of `String`, not `\"a\" | \"b\"`",
+      "occurrences": 1
+    },
+    {
+      "code": "E0523",
+      "before": "`app/main.Dep` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)",
+      "after": "`app/main.Dep` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code",
+      "occurrences": 436
+    },
+    {
+      "code": "E0523",
+      "before": "`app/main.Missing` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)",
+      "after": "`app/main.Missing` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code",
+      "occurrences": 4
+    },
+    {
+      "code": "E0523",
+      "before": "`app/main.Outer` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)",
+      "after": "`app/main.Outer` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code",
+      "occurrences": 16
+    },
+    {
+      "code": "E0523",
+      "before": "`app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)",
+      "after": "`app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code",
+      "occurrences": 564
+    },
+    {
+      "code": "E0523",
+      "before": "`app/main.Sink` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)",
+      "after": "`app/main.Sink` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code",
+      "occurrences": 8
+    },
+    {
+      "code": "E0523",
+      "before": "`app/main.T` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)",
+      "after": "`app/main.T` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code",
+      "occurrences": 40
+    },
+    {
+      "code": "W0501",
+      "before": "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)",
+      "after": "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard",
+      "occurrences": 1278
+    },
+    {
+      "code": "W0501",
+      "before": "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4); the value matched is always `3`",
+      "after": "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard; the value matched is always `3`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "both sides are constants, `\"a local name may cover a top-level name\"` and `\"\"`, which can never be equal, so `==` is always `False`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True` (§6.9)",
+      "after": "both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `!=` is always `True`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "both sides are constants, `\"a\"` and `\"b\"`, which can never be equal, so `==` is always `False`",
+      "occurrences": 9
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `\"ok\"` and `\"error\"`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "both sides are constants, `\"ok\"` and `\"error\"`, which can never be equal, so `==` is always `False`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`",
+      "occurrences": 10
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True` (§6.9)",
+      "after": "both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True`",
+      "occurrences": 9
+    },
+    {
+      "code": "W0503",
+      "before": "both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`",
+      "occurrences": 12
+    },
+    {
+      "code": "W0503",
+      "before": "the two sides have the known types `(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, … (5 more))` and `\"wrong\"`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "the two sides have the known types `(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, … (5 more))` and `\"wrong\"`, which can never be equal, so `==` is always `False`",
+      "occurrences": 3
+    },
+    {
+      "code": "W0503",
+      "before": "the two sides have the known types `Int - 1` and `1`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "the two sides have the known types `Int - 1` and `1`, which can never be equal, so `==` is always `False`",
+      "occurrences": 3
+    },
+    {
+      "code": "W0503",
+      "before": "the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False` (§6.9)",
+      "after": "the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False`",
+      "occurrences": 6
+    },
+    {
+      "code": "W0503",
+      "before": "the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False` (§6.9)",
+      "after": "the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False`",
+      "occurrences": 5
+    },
+    {
+      "code": "W0503",
+      "before": "the values `-20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | … (31 more)` and `\"wrong\"` can never be equal, so `==` is always `False` (§6.9)",
+      "after": "the values `-20 | -19 | -18 | -17 | -16 | -15 | -14 | -13 | -12 | -11 | … (31 more)` and `\"wrong\"` can never be equal, so `==` is always `False`",
+      "occurrences": 3
+    },
+    {
+      "code": "W0505",
+      "before": "this pattern never matches: no value of the known type of what it is fitted to matches it (§4.8)",
+      "after": "this pattern never matches: no value of the known type of what it is fitted to matches it",
+      "occurrences": 5
+    }
+  ],
+  "rendered_message_class_count": 124
 }

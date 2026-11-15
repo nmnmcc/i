@@ -128,7 +128,7 @@ All source message occurrences below are counted, including the legacy resolver 
 | the type of this external function is not one that the host can take (§10.1) | the type of this external function is not one that the host can take | 1 |
 | a string format in a pattern needs a string literal (§8.4) | a string format in a pattern needs a string literal | 1 |
 
-117 source message classes; 157 source occurrences. Exact Rust literals and locations are in `tests/review/diag2-diagnostic-wording.json`.
+117 source message classes; 157 source occurrences. Exact Rust literals and locations are in `tests/review/diag2-diagnostic-wording.json`. The table shows source format templates, including escaped format braces; the corpus proof records rendered messages and their occurrence counts.
 
 ## Call reporting
 
@@ -171,8 +171,10 @@ the remaining diagnostic count.
 The new CLI tests cover integers, strings, a second argument, a piped argument,
 a Boolean, one-item data, and two independently bad arguments. A separate test
 retains E0552 for a bad combination and its independent E0516 coverage error.
-A matching literal call remains accepted. The piped case produces its E0501
-while inferring the argument; the same rule includes that earlier diagnostic.
+A matching literal call remains accepted. The renderer sorts by source position and error code, so the piped case prints
+E0501 first. Deduplication only considers errors produced by the call's own
+argument constraints; unrelated errors inside an argument retain their original
+reporting.
 
 The original 8 archived inputs remain byte-for-byte unchanged. Their exact paths
 and SHA-256 values are in `tests/review/diag2-diagnostic-wording.json`. The

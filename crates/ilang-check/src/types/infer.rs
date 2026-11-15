@@ -2403,7 +2403,6 @@ impl<'a> Checker<'a> {
         let hidden = kfn
             .as_ref()
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
-        let argument_diagnostics = self.diags.len();
         for later in [false, true] {
             for (i, a) in values.iter().enumerate() {
                 if (params.is_some() && (known::open_fn(a) || self.selects(a))) != later {
@@ -2497,6 +2496,7 @@ impl<'a> Checker<'a> {
             Ty::Fn(ft) if !groups::is_multi(ft) && ft.arity() == Some(placed.len()) => {
                 let parts = ft.parts().expect("data parameter").to_vec();
                 for (i, ((t, s), p)) in placed.iter().zip(&parts).enumerate() {
+                    let argument_diagnostics = self.diags.len();
                     self.sub2(t, p, *s, callee.span);
                     if no_branch.is_some()
                         && self.diags[argument_diagnostics..].iter().any(|diagnostic| {

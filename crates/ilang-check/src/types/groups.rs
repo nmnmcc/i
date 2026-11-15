@@ -444,8 +444,9 @@ impl Checker<'_> {
 
     /// §2.6.2: the type of the callee at a direct call `f(d)` of a name
     /// with a table, from the known types of the argument parts, in the
-    /// order of the parameters. `None` when every branch is selected: the
-    /// callee has the type of its whole group.
+    /// order of the parameters. `Ok(None)` when every branch is selected:
+    /// the callee has the type of its whole group. `Err` describes an
+    /// unmatched call, so the caller can combine it with argument errors.
     pub(super) fn select_at_call(
         &mut self,
         callee: &Expr,

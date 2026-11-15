@@ -2865,5 +2865,36 @@
     "expected_message_assertions": 7,
     "ignored_test_descriptions": 4,
     "embedded_program_or_template_comments": 32
-  }
+  },
+  "call_message_classes": [
+    {
+      "when": "an individual argument constraint explains failed branch selection; finite literal type",
+      "before_codes": [
+        "E0552",
+        "E0501"
+      ],
+      "after_codes": [
+        "E0501"
+      ],
+      "dropped_duplicate": "E0552: no branch of this function can match these arguments: their known types are `({known})`",
+      "before_primary": "`{given}` is not a subtype of `{accepted}` (the type at {callee_position} needs it)",
+      "after": "`{given}` is not one of the values `{name}` accepts for argument {position}: `{accepted}`",
+      "source_occurrences": 1
+    },
+    {
+      "when": "an individual argument constraint explains failed branch selection; other type",
+      "before_codes": [
+        "E0552",
+        "E0501"
+      ],
+      "after_codes": [
+        "E0501"
+      ],
+      "dropped_duplicate": "E0552: no branch of this function can match these arguments: their known types are `({known})`",
+      "before_primary": "`{given}` is not a subtype of `{accepted}` (the type at {callee_position} needs it)",
+      "after": "`{name}` does not accept argument {position} with type `{given}`; this argument must be `{accepted}`",
+      "source_occurrences": 1
+    }
+  ],
+  "call_reporting_scope": "Only E0501 diagnostics produced by this call's own argument constraints can replace its pending E0552. Other diagnostics inside arguments and independent argument errors remain. The renderer sorts by source position and code."
 }
