@@ -1227,7 +1227,7 @@ impl Solver {
                 let mut unresolved = false;
                 let start = if has_concrete {
                     // A concrete constructor supplies the structural proof
-                    // independently of the variable members (§4.4). Keep
+                    // independently of the variable members. Keep
                     // that existing inference path before choosing among
                     // residual variables, including fresh pattern holes.
                     let mut trial = self.clone();
@@ -1271,8 +1271,9 @@ impl Solver {
                     if let Some(previous) = &solution {
                         if previous.vars != trial.vars {
                             // Our bounds cannot express this disjunction of
-                            // solutions. §4.7 requires an error here, rather
-                            // than publishing an arbitrary nonprincipal type.
+                            // solutions. The principal-type rule requires an error,
+                            // rather than publishing an arbitrary nonprincipal
+                            // type.
                             self.fail(FailKind::NonPrincipalIntersection, l, r);
                             return;
                         }
@@ -3287,7 +3288,7 @@ fn builtin_variance_values(b: BuiltinType) -> &'static [Variance] {
 }
 
 /// The solver represents a whole need by the "fits in" relation, whose
-/// direction is the reverse of service-value subtyping (§4.5 rule 4).
+/// direction is the reverse of service-value subtyping.
 /// Thus the contravariant N of Continuation uses a covariant row edge;
 /// the row comparison reverses the direction of its service entries.
 pub(super) fn builtin_constraint_variance(b: BuiltinType) -> &'static [Variance] {
@@ -3645,7 +3646,7 @@ mod literal_tests {
                 Ty::tuple(vec![string.clone(), b.clone()]),
             ];
             // Keep these as separate alternatives: normalized same-head
-            // constructors instead use §4.4's prescribed argument merge.
+            // constructors instead use the prescribed argument merge.
             if reverse {
                 operands.reverse();
             }

@@ -1181,7 +1181,7 @@ fn deferred_callback_need_meet_survives_generalization_and_transfer() {
     let helper = "Read(A) = (value = A)
 both = <A, B>(f: () <- (Read(A)) -> A, g: () <- (Read(B)) -> B) { f() g() }";
     // An open meet is admissible. Only the instance with disjoint closed
-    // callback requirements is forbidden by §9.2's empty-meet paragraph.
+    // callback requirements is rejected.
     types(helper);
     types(&format!(
         "{helper}\nneed_int = () <- (r: Read(Int)) {{ r.value }}\nuse = () {{ both(need_int, need_int) }}"
@@ -1252,7 +1252,7 @@ fn intersection_inference_never_selects_a_variable_by_operand_order() {
             assert!(errors[0].message.contains("principal type"));
         }
         // A stated Int member proves the constraint without specializing
-        // either generic component. §4.4 makes both spellings identical.
+        // either generic component: both spellings are identical.
         types(&format!(
             "choose = <A, B>(x: {intersection} & Int, a: A, b: B) {{ (x + 1, a, b) }}\nuse = () {{ choose(1, \"s\", 1) }}"
         ));
@@ -1269,7 +1269,7 @@ fn flexible_value_bounds_do_not_close_deferred_need_arguments() {
         .map_or(source, |(probe, _)| probe);
     types(source);
     types(&source.replace("read(x) read(y)", "read(y) read(x)"));
-    // Decision 1 also permits this genuinely value-bearing service while
+    // The same argument also permits this value-bearing service while
     // the argument bounds remain open; neither lower fixes an empty meet.
     let fields = source
         .replace("Read(A) = (read = () -> A)", "Read(A) = (value = A)")

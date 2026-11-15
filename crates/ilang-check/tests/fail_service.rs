@@ -1,4 +1,4 @@
-//! Fail uses ordinary service binding and provision (§9.2–§9.3).
+//! Fail uses ordinary service binding and provision.
 mod common;
 
 #[test]

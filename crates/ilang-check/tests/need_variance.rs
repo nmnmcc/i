@@ -1,4 +1,4 @@
-//! Need entries are input places (§4.4, §4.5 rules 4, 6 and 7).
+//! Need entries are input places.
 mod common;
 
 fn errors(source: &str) -> Vec<String> {
