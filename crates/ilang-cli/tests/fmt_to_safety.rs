@@ -959,6 +959,72 @@ fn permissions_kept_on_preflight_refusal() {
     assert_eq!(bytes(dir.path(), "b.i"), b"b = () { 1 } // note\n");
 }
 
+/// The implementation has no hook to observe its temporary file. This test
+/// watches the directory while a large conversion runs and, if it catches the
+/// temporary file, requires it to be no wider than the source. It is
+/// record-only: if the temporary file is never observed, the coverage is a
+/// gap and the test says so instead of pretending to pass.
+#[cfg(unix)]
+#[ignore = "record-only: observes the temporary file by polling; no hook exists"]
+#[test]
+fn temporary_file_is_not_wider_than_source() {
+    if skip_permissions_as_root("temporary_file_is_not_wider_than_source") {
+        return;
+    }
+    let dir = package();
+    // A large module keeps the temporary file on disk long enough to observe.
+    let mut source = String::new();
+    for n in 0..4000 {
+        source.push_str(&format!("f{n} = () {{ {n} }}\n"));
+    }
+    write_file(dir.path(), "a.i", &source);
+    set_mode(&dir.path().join("a.i"), 0o600);
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_i"))
+        .current_dir(dir.path())
+        .args(["fmt", "--to", "is", "a.i"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+
+    let mut observed: Option<u32> = None;
+    let deadline = Instant::now() + Duration::from_secs(120);
+    while Instant::now() < deadline {
+        if let Ok(entries) = std::fs::read_dir(dir.path()) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                if name.to_string_lossy().contains(".tmp-") {
+                    if let Ok(meta) = entry.metadata() {
+                        use std::os::unix::fs::PermissionsExt;
+                        observed = Some(meta.permissions().mode() & 0o777);
+                    }
+                }
+            }
+        }
+        if observed.is_some() {
+            break;
+        }
+        if let Some(_status) = child.try_wait().unwrap() {
+            break;
+        }
+        std::thread::sleep(Duration::from_micros(200));
+    }
+    let _ = child.wait();
+
+    match observed {
+        Some(mode) => assert_eq!(
+            mode & !0o600,
+            0,
+            "the temporary file mode {mode:o} is wider than the 0600 source"
+        ),
+        None => eprintln!(
+            "GAP temporary_file_is_not_wider_than_source: the temporary file was not observed \
+             during the run, so the creation mode could not be checked"
+        ),
+    }
+}
+
 // ---- f) ordinary `i fmt` and `fmt --check` are unchanged -----------------
 
 #[test]
