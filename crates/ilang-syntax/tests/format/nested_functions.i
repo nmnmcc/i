@@ -2,7 +2,7 @@ outer = <N>(xs : List(Int), f : (Int) <- N -> Int) -> List(Int) {
 	helper = (rest, acc) {
 		rest |>
 			([]) { list.reverse(acc) }
-			| ([x, ..more]) { helper(more, [f(x), ..acc]) }
+			& ([x, ..more]) { helper(more, [f(x), ..acc]) }
 	}
 	helper(xs, [])
 }

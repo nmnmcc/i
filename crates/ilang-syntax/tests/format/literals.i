@@ -10,10 +10,10 @@ strings = (
 patterns = (n) {
 	n |>
 		(-1000) { "minus a thousand" }
-		| (0x10) { "sixteen" }
-		| ("pre\n" <> rest) { rest }
-		| (-.1.5) { "minus one and a half" }
-		| (_) { "other" }
+		& (0x10) { "sixteen" }
+		& ("pre\n" <> rest) { rest }
+		& (-.1.5) { "minus one and a half" }
+		& (_) { "other" }
 }
 
 index = (t) { t.0 + t.1 + { 1 }.x }

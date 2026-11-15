@@ -377,13 +377,53 @@ fn p4_branch_join() {
     let nested = value("f = (a) { a |> (1) { 2 } | (_) { 3 } } | (b, c) { 4 }");
     assert_eq!(chain(&nested).len(), 2);
 
-    bad("h = f | g", "`|` joins only function literals");
-    bad("h = (a) { 1 } | g", "`|` joins only function literals");
+    bad("h = f & g", "`&` joins only function literals");
+    bad("h = (a) { 1 } & g", "`&` joins only function literals");
+    // a value-level `|` is removed syntax, and the hint gives the new join.
+    bad("h = (a) { 1 } | (b) { 2 }", "join the branches with `&`");
+    bad("h = (a) { 1 }\n\t| (b) { 2 }", "join the branches with `&`");
+    bad("h = f | g", "join the branches with `&`");
     // Overloading by shape.
     let show = value(
         "show =\n\t(n : Int) -> String { int.to_string(n) }\n\t| (s : String) -> Int { string.length(s) }\n\t| (a : Int, b : Int) -> Bool { a == b }\n\t| (host : String, port = p : Int) -> Conn { open(host, p) }\n",
     );
     assert_eq!(chain(&show).len(), 4);
+}
+
+#[test]
+fn p4_and_chain() {
+    // `&` joins function literals, on one line and across lines.
+    let one_line = value("f = (a) { 1 } & (b) { 2 }");
+    assert_eq!(chain(&one_line).len(), 2);
+    // A branch that begins a line begins it with `&`.
+    let leading = value("f =\n\t(a) { 1 }\n\t& (b) { 2 }\n\t& (c) { 3 }\n");
+    assert_eq!(chain(&leading).len(), 3);
+    // A trailing `&` also continues, with the branch on the next line.
+    let trailing = value("f = (a) { 1 } &\n\t(b) { 2 }\n");
+    assert_eq!(chain(&trailing).len(), 2);
+    // A generic branch joins like any other.
+    let generic = value("f = <A>(x : A) { x } & (n : Int) { n }");
+    assert_eq!(chain(&generic).len(), 2);
+    // Nesting: the inner chain ends at the outer `}`.
+    let nested = value("f = (a) { a |> (1) { 2 } & (_) { 3 } } & (b, c) { 4 }");
+    let outer = chain(&nested);
+    assert_eq!(outer.len(), 2);
+    let Stmt::Expr(inner) = &outer[0].body.stmts[0] else {
+        unreachable!()
+    };
+    assert!(matches!(&inner.kind, ExprKind::Pipe { rhs, .. } if chain(rhs).len() == 2));
+}
+
+#[test]
+fn p4_bar_stays_in_types_patterns_and_pipes() {
+    // A union type keeps `|`, also as the result of an arrow.
+    assert_eq!(ty("Int | String"), "Int | String");
+    ok("v : { Int | String } = 1\nf = (x) -> Int | String { x }\n");
+    // A pattern alternative keeps `|` in a parameter item.
+    ok("f = (0 | 1) { 1 }\n");
+    // `|>` is unchanged, and its right side may be a `&` chain.
+    let pipe = value("f = n |> (0 | 1) { n } & (_) { 0 }");
+    assert!(matches!(&pipe.kind, ExprKind::Pipe { rhs, .. } if chain(rhs).len() == 2));
 }
 
 #[test]

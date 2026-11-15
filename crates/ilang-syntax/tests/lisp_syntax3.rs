@@ -702,7 +702,7 @@ fn source_tree_index_keeps_the_written_operator_and_transition_literal_span() {
 #[test]
 fn source_tree_finds_the_original_multi_shape_argument() {
     use ilang_syntax::{ast, lisp::source_tree::SourceTree};
-    let source = "f = (x) { x } | (x, y) { x + y }";
+    let source = "f = (x) { x } & (x, y) { x + y }";
     let (module, diagnostics) = ilang_syntax::parse_module(source);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let ast::ItemKind::Binding(binding) = &module.items.last().unwrap().kind else {
@@ -712,7 +712,7 @@ fn source_tree_finds_the_original_multi_shape_argument() {
         .expression(binding.value.span)
         .unwrap();
     assert!(
-        syntax.show().starts_with("(| (-> (, x)"),
+        syntax.show().starts_with("(& (-> (, x)"),
         "{}",
         syntax.show()
     );
