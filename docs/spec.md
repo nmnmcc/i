@@ -1499,8 +1499,6 @@ that closing scope; it can open a fresh scope. After draining, the scope is
 The entry's root resource scope closes after its task run and all structured
 children and task finals end, before the entry returns to its host (§10.2).
 
-A final registration is removed before its final function starts. If that invocation suspends and its continuation is cancelled, cancellation discards the rest of the invocation and runs only other final functions still in place. Structured task cancellation instead shields an already running final function until it finishes (§9.9).
-
 A release that needs services is made with `keep` (§9.4). A final function may not raise errors. When the program stops (§11.7), final functions are not run.
 
 A structured task group waits for cancelled children and their final functions before it returns (§9.9). Those final functions may suspend and resume and use services, but may not raise errors. An unstarted child has no installed final functions. A host failure or a destroyed instance cannot run i final functions; the host instead releases its own work and resources (Appendix B).
