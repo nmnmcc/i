@@ -1,6 +1,6 @@
 {
-  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
-  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
+  "compiler": "c2ea38b4f043760ec5076088cc7c1aa82c99fe68",
+  "binary_sha256": "f655b0e14ebec0cc64152f3abd32e578099f14c3ac00ec78996f1160247f93f4",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.one : () <- (S(Int)) -> Int\napp/main.run : (() <- N -> Int, N) <- N -> Int\napp/main.bad : () -> Int\napp/main.generated_test : () -> Nil\n",
-      "stderr": "src/main.i:13:20: error[E0515]: `S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 13:2 needs it)\nsrc/main.i:16:61: error[E0501]: `Int - 2` is not a subtype of `String` (the type at 18:88 needs it)\n2 errors\n"
+      "stderr": "src/main.i:13:20: error[E0515]: `S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 13:2 needs it)\nsrc/main.i:16:61: error[E0501]: `Int - 2` is not a subtype of `String` (the type at src/main.i:16:55 needs it)\n2 errors\n"
     }
   }
 }
