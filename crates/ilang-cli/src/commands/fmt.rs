@@ -52,8 +52,8 @@ pub fn run(
 
     // A conversion run is planned for the whole file set before anything is
     // written. The ordinary formatting run keeps its one-file-at-a-time shape.
-    if to.is_some() {
-        return convert_run(&files, to.unwrap(), check);
+    if let Some(target) = to {
+        return convert_run(&files, target, check);
     }
 
     let mut failed = false;
