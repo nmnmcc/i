@@ -430,6 +430,8 @@ fn write_temporary(
     bytes: &[u8],
     mode: Option<u32>,
 ) -> anyhow::Result<PathBuf> {
+    #[cfg(not(unix))]
+    let _ = mode;
     let file_name = destination
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
