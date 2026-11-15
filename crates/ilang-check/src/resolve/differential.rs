@@ -53,24 +53,50 @@ fn file_key(graph: &PackageGraph, module: &ilang_check::hir::Module, job: &str) 
 }
 
 /// The one recorded file where the direct resolver's repair hint has no
-/// legacy counterpart, and the exact complete suffix it may add.
+/// legacy counterpart, and the two diagnostics it may add it to: the source
+/// span, the legacy message, and the complete message with the hint.
 const UNION_ALIAS_FILE: &str = "tests/spec/4.3/syn3_one_constructor.i";
-const UNION_ALIAS_HINT: &str = ". A union alias does not define its alternatives. Define each \
-                                alternative as its own type first: `Circle = (Float)`, then \
-                                `Square = (Float)`, then `Shape = Circle | Square`.";
+const UNION_ALIAS_ALLOWED: [(u32, u32, &str, &str); 2] = [
+    (
+        261,
+        267,
+        "the type `Circle` is not defined",
+        "the type `Circle` is not defined. A union alias does not define its alternatives. \
+         Define each alternative as its own type first: `Circle = (Float)`, then `Square = \
+         (Float)`, then `Shape = Circle | Square`.",
+    ),
+    (
+        277,
+        283,
+        "the type `Square` is not defined",
+        "the type `Square` is not defined. A union alias does not define its alternatives. \
+         Define each alternative as its own type first: `Circle = (Float)`, then `Square = \
+         (Float)`, then `Shape = Circle | Square`.",
+    ),
+];
 
-/// The message without that hint, and only for that file, that code, and that
-/// complete suffix. Every other difference is left to the comparison.
-fn without_union_alias_hint<'m>(key: &str, code: &str, message: &'m str) -> Option<&'m str> {
-    if key == UNION_ALIAS_FILE && code == ilang_check::code::UNKNOWN_TYPE {
-        message.strip_suffix(UNION_ALIAS_HINT)
-    } else {
-        None
+/// The legacy message, and only for that file, that code, that source span and
+/// that complete message. Anything else, including a different span, a changed
+/// word or an extra suffix, is left to the comparison unchanged.
+fn without_union_alias_hint<'m>(
+    key: &str,
+    code: &str,
+    span: (u32, u32),
+    message: &'m str,
+) -> Option<&'m str> {
+    if key != UNION_ALIAS_FILE || code != ilang_check::code::UNKNOWN_TYPE {
+        return None;
     }
+    UNION_ALIAS_ALLOWED
+        .iter()
+        .find_map(|&(start, end, old, full)| {
+            ((start, end) == span && full == message).then_some(old)
+        })
 }
 
 fn comparable_message<'m>(key: &str, d: &'m Diagnostic) -> &'m str {
-    without_union_alias_hint(key, d.code, &d.message).unwrap_or(&d.message)
+    without_union_alias_hint(key, d.code, (d.span.start, d.span.end), &d.message)
+        .unwrap_or(&d.message)
 }
 
 /// The texts that must be equal, by file. The key `<program>` holds the
@@ -118,11 +144,7 @@ fn texts(
         if !d.source.is_some_and(|s| sources.contains(&s)) {
             text.push_str(&format!(
                 "{:?} {} {:?} {:?} {}\n",
-                d.severity,
-                d.code,
-                d.source,
-                d.span,
-                comparable_message(d)
+                d.severity, d.code, d.source, d.span, d.message
             ));
         }
     }
@@ -739,39 +761,59 @@ fn resolve3_deep() {
 mod tests {
     use super::*;
 
-    const BODY: &str = "the type `Circle` is not defined";
-    const CODE: &str = "E0202";
+    const CIRCLE: (u32, u32) = (261, 267);
+    const CODE: &str = ilang_check::code::UNKNOWN_TYPE;
+    const CIRCLE_OLD: &str = "the type `Circle` is not defined";
+
+    fn circle_full() -> &'static str {
+        UNION_ALIAS_ALLOWED[0].3
+    }
 
     #[test]
-    fn only_the_recorded_union_alias_hint_is_ignored() {
-        let full = format!("{BODY}{UNION_ALIAS_HINT}");
+    fn only_the_two_recorded_union_alias_diagnostics_are_ignored() {
+        // The recorded pair: exact file, code, span and complete message.
         assert_eq!(
-            without_union_alias_hint(UNION_ALIAS_FILE, CODE, &full),
-            Some(BODY)
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, CIRCLE, circle_full()),
+            Some(CIRCLE_OLD)
+        );
+        // The legacy message alone is not rewritten.
+        assert_eq!(
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, CIRCLE, CIRCLE_OLD),
+            None
         );
         // Another file keeps the hint.
         assert_eq!(
-            without_union_alias_hint("tests/spec/4.3/other.i", CODE, &full),
+            without_union_alias_hint("tests/spec/4.3/other.i", CODE, CIRCLE, circle_full()),
             None
         );
         // Another code keeps the hint.
         assert_eq!(
-            without_union_alias_hint(UNION_ALIAS_FILE, "E0203", &full),
+            without_union_alias_hint(UNION_ALIAS_FILE, "E0203", CIRCLE, circle_full()),
             None
         );
-        // One changed word in the hint keeps the hint.
-        let changed = full.replacen("then `Shape`", "and then `Shape`", 1);
+        // Another span on the same file keeps the hint.
         assert_eq!(
-            without_union_alias_hint(UNION_ALIAS_FILE, CODE, &changed),
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, (262, 267), circle_full()),
+            None
+        );
+        // A changed word in the hint keeps the hint.
+        let changed = circle_full().replacen("Define each", "Define every", 1);
+        assert_ne!(changed, *circle_full());
+        assert_eq!(
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, CIRCLE, &changed),
             None
         );
         // An extra suffix after the hint keeps the hint.
-        let extra = format!("{full} Extra.");
+        let extra = format!("{} Extra.", circle_full());
         assert_eq!(
-            without_union_alias_hint(UNION_ALIAS_FILE, CODE, &extra),
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, CIRCLE, &extra),
             None
         );
-        // The old message, without the hint, is compared as it is.
-        assert_eq!(without_union_alias_hint(UNION_ALIAS_FILE, CODE, BODY), None);
+        // A missing prefix (the hint alone) keeps the text.
+        let sole_hint = &circle_full()[CIRCLE_OLD.len()..];
+        assert_eq!(
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, CIRCLE, sole_hint),
+            None
+        );
     }
 }
