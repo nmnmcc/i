@@ -276,7 +276,7 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
 /// with `create_new`, is cleaned up.
 fn write_conversion(plan: &Plan) -> anyhow::Result<()> {
     let destination = &plan.destination;
-    let dir = destination.parent().unwrap_or_else(|| Path::new("."));
+    let dir = parent_dir(destination);
     let mode = source_mode(&plan.source).map_err(|e| {
         anyhow::anyhow!(
             "cannot read the permissions of {}: {e}; the source is unchanged",
@@ -357,10 +357,9 @@ fn write_conversion(plan: &Plan) -> anyhow::Result<()> {
             destination.display()
         )
     })?;
-    if let Some(source_dir) = plan.source.parent() {
-        if let Err(e) = sync_dir(source_dir) {
-            eprintln!("warning: cannot sync {}: {e}", source_dir.display());
-        }
+    let source_dir = parent_dir(&plan.source);
+    if let Err(e) = sync_dir(source_dir) {
+        eprintln!("warning: cannot sync {}: {e}", source_dir.display());
     }
     Ok(())
 }
@@ -370,7 +369,7 @@ fn write_conversion(plan: &Plan) -> anyhow::Result<()> {
 /// failure leaves the original file intact. The file's content differs (the
 /// plan skips unchanged files).
 fn write_in_place(plan: &Plan) -> anyhow::Result<()> {
-    let dir = plan.source.parent().unwrap_or_else(|| Path::new("."));
+    let dir = parent_dir(&plan.source);
     let mode = source_mode(&plan.source).map_err(|e| {
         anyhow::anyhow!(
             "cannot read the permissions of {}: {e}; the file is unchanged",
@@ -552,6 +551,15 @@ fn rename_noreplace(from: &Path, to: &Path) -> std::io::Result<()> {
         Ok(())
     } else {
         Err(std::io::Error::last_os_error())
+    }
+}
+
+/// The directory that holds `path`. A bare file name has an empty parent,
+/// which is not a usable directory; it means the current directory.
+fn parent_dir(path: &Path) -> &Path {
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
     }
 }
 

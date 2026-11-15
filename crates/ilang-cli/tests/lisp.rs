@@ -451,3 +451,35 @@ fn a_refused_conversion_keeps_a_private_files_mode() {
     assert_eq!(mode_of(&file), 0o600);
     assert!(!file.with_extension("is").exists());
 }
+
+#[test]
+fn conversion_of_a_bare_file_name_in_the_current_directory_works_both_ways() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.i"), "// note\nf = () { 1 }\n").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=is", "a.i"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!dir.path().join("a.i").exists());
+    assert!(dir.path().join("a.is").exists());
+
+    let output = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=i", "a.is"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!dir.path().join("a.is").exists());
+    let text = std::fs::read_to_string(dir.path().join("a.i")).unwrap();
+    assert!(text.contains("// note"), "{text}");
+}
