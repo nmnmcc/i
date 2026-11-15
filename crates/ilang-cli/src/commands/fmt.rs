@@ -523,57 +523,71 @@ fn sync_dir(_dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Convert, parse the result, and compare it with the source module.
+/// Check that the conversion is a fixed point on the target surface: render
+/// the source to the target surface, convert that back, render to the target
+/// surface again, and require the two renderings to be equal.
 ///
-/// The comparison is the AST equality of `ilang_syntax::ast`: `Sp` leaves
-/// source offsets out of equality, so the two modules may have any spans. All
-/// other data participates, including string payloads and the module's doc
-/// comments. Blank lines, token spelling and the original layout necessarily
-/// change between the two surfaces and are not part of the criterion; a
-/// comment that has no place in the new surface is reported by the `lost`
-/// spans of the conversion and refused separately.
+/// The two surfaces necessarily differ in layout, token spelling and source
+/// spans, so those are not compared. What the formatter can carry -- comments,
+/// string and literal values, attribute and macro spelling -- does change the
+/// rendering, so a conversion that loses any of them is refused. Comments
+/// without a place in the new surface are reported and refused separately by
+/// the `lost` spans of the conversion, which give file, line and text.
 ///
-/// Known limits: floating-point NaN never equals itself, so a module with a
-/// NaN literal would be refused even though the conversion is sound. The
-/// check compares syntax, not evaluation; a construct that parses to the same
-/// tree but means something different to a later stage would not be caught.
+/// Known limits: this compares syntax, not evaluation, so a construct that
+/// prints the same but means something different to a later stage would not be
+/// caught; and it is a check of this printer's round trip, not a proof about
+/// ILang semantics.
 fn round_trip_diff(
     is_lisp: bool,
-    source: &str,
+    _source: &str,
     rendered: &str,
 ) -> Result<(), (u32, u32, String)> {
-    let (before, before_errors) = if is_lisp {
-        ilang_syntax::lisp::parse_source(source)
+    // Convert the rendered text back to the source surface and then to the
+    // target surface once more; the second rendering must equal the first.
+    let again = if is_lisp {
+        // Source is Lisp, so `rendered` is normal text. normal -> Lisp -> normal.
+        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(rendered)
+            .map_err(|diags| render_error("the converted module cannot be rendered back", &diags))?;
+        let (normal, _) = ilang_syntax::syn3::surface::lisp_to_normal(&lisp)
+            .map_err(|diags| render_error("the converted module cannot be rendered back", &diags))?;
+        format(&normal)
+            .map_err(|diags| render_error("the round trip cannot be printed", &diags))?
     } else {
-        ilang_syntax::parse_module(source)
+        // Source is normal, so `rendered` is Lisp text. Lisp -> normal -> Lisp.
+        let (normal, _) = ilang_syntax::syn3::surface::lisp_to_normal(rendered)
+            .map_err(|diags| render_error("the converted module cannot be rendered back", &diags))?;
+        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(&normal)
+            .map_err(|diags| render_error("the converted module cannot be rendered back", &diags))?;
+        ilang_syntax::lisp::format(&lisp)
+            .map_err(|diags| render_error("the round trip cannot be printed", &diags))?
     };
-    if !before_errors.is_empty() {
-        // The ordinary conversion path already reported parse errors.
+    if again == rendered {
         return Ok(());
     }
-    let (after, after_errors) = if is_lisp {
-        ilang_syntax::parse_module(rendered)
-    } else {
-        ilang_syntax::lisp::parse_source(rendered)
-    };
-    if !after_errors.is_empty() {
-        return Err((
-            1,
-            1,
-            format!(
-                "the converted module does not parse: {}",
-                diag_message(&after_errors)
-            ),
-        ));
-    }
-    if before == after {
-        return Ok(());
+    let a: Vec<&str> = rendered.lines().collect();
+    let b: Vec<&str> = again.lines().collect();
+    for (index, (left, right)) in a.iter().zip(b.iter()).enumerate() {
+        if left != right {
+            return Err((
+                (index + 1) as u32,
+                1,
+                format!(
+                    "line {} becomes {right:?} after a round trip, not {left:?}",
+                    index + 1
+                ),
+            ));
+        }
     }
     Err((
+        (a.len().min(b.len()) + 1) as u32,
         1,
-        1,
-        "the converted module is not structurally equivalent to the source".to_owned(),
+        format!("a round trip has {} lines, not {}", b.len(), a.len()),
     ))
+}
+
+fn render_error(what: &str, diags: &[ilang_syntax::Diagnostic]) -> (u32, u32, String) {
+    (1, 1, format!("{what}: {}", diag_message(diags)))
 }
 
 fn diag_message(diags: &[ilang_syntax::Diagnostic]) -> String {

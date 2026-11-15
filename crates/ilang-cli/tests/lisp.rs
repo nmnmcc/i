@@ -95,31 +95,39 @@ fn formatter_converts_files_both_ways_and_keeps_boundary_comments() {
 }
 
 #[test]
-fn conversion_reports_unplaced_comments_and_keeps_existing_destination() {
+fn conversion_refuses_an_unplaced_comment_and_keeps_the_source() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("sample.i");
-    std::fs::write(&file, "f = () { 1 // trailing\n}\n").unwrap();
+    let source = "f = () { 1 // trailing\n}\n";
+    std::fs::write(&file, source).unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["fmt", "--to=is"])
         .arg(&file)
         .output()
         .unwrap();
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(String::from_utf8_lossy(&out.stderr).contains("comment could not be preserved"));
+    assert!(!out.status.success());
+    let errors = String::from_utf8_lossy(&out.stderr);
+    assert!(errors.contains("sample.i:1:12:"), "{errors}");
+    assert!(errors.contains("trailing"), "{errors}");
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), source);
+    assert!(!file.with_extension("is").exists());
+}
+
+#[test]
+fn conversion_keeps_an_existing_destination() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("sample.i");
+    std::fs::write(&file, "f = () { 1 }\n").unwrap();
     let lisp = file.with_extension("is");
-    std::fs::write(&file, "existing = 42\n").unwrap();
+    std::fs::write(&lisp, "existing = 42\n").unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
-        .args(["fmt", "--to=i"])
-        .arg(&lisp)
+        .args(["fmt", "--to=is"])
+        .arg(&file)
         .output()
         .unwrap();
     assert!(!out.status.success());
-    assert_eq!(std::fs::read_to_string(file).unwrap(), "existing = 42\n");
-    assert!(lisp.exists());
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), "f = () { 1 }\n");
+    assert_eq!(std::fs::read_to_string(&lisp).unwrap(), "existing = 42\n");
 }
 
 #[test]
