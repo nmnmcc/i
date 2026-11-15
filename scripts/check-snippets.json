@@ -2994,15 +2994,11 @@
     "reason": "TOML manifest for the archived-program CLI tests, not i source.",
     "not_source": true
   },
-  "crates/ilang-cli/tests/commands.rs:7605d4ed451035f1": {
-    "not_source": true,
-    "reason": "Runtime stop output with source locations; colons are message punctuation and line/column separators, not annotations."
-  },
   "crates/ilang-check/src/resolve/differential.rs:158a229e560736bb": {
     "diagnostics": [
-      "E0101: a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-      "E0101: a named rest `..name` in a pattern needs stage 6 of syntax three, which this compiler does not have yet",
-      "E0101: two patterns joined by `=` that are not names need stage 9 of syntax three, which this compiler does not have yet"
+      "E0101: a rest `..` in a data pattern is not supported here",
+      "E0101: a named rest `..name` in a pattern is not supported here",
+      "E0101: two patterns joined by `=` must both be names here"
     ],
     "reason": "§7.1 keyed data and nested constructor data now have spec tests. This remaining EXTRA program retains exactly the data-rest, named-rest and two-nonname-conjunction gates."
   },
@@ -3015,23 +3011,23 @@
   "tests/spec/4.6/written_poly_union.i:ffec57640d8b2422": {
     "track": true,
     "diagnostics": [
-      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
-      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+      "E0101: a function type with type parameters must be the type of a binding",
+      "E0101: a function type with type parameters must be the type of a binding"
     ],
     "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate."
   },
   "tests/spec/4.6/written_poly_union_arity.i:c57418d50290abcb": {
     "track": true,
     "diagnostics": [
-      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
-      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+      "E0101: a function type with type parameters must be the type of a binding",
+      "E0101: a function type with type parameters must be the type of a binding"
     ],
     "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate."
   },
   "tests/spec/7/keyed_data_order.i:e5cf9ef0b4293e28": {
     "diagnostics": [
       "E0110: an item by position may not come after an item by label",
-      "E0101: an item by position may not come after an item by label (§7.1)"
+      "E0101: an item by position may not come after an item by label"
     ],
     "reason": "§7.1 still forbids a position after a label. Migrated from the old differential EXTRA probe, preserving the parser and pre-validation rejections."
   },
