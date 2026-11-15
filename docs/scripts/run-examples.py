@@ -20,7 +20,7 @@ import tomllib
 from example_fences import fences, generated, i_info, i_options, safe_file
 from paths import ROOT
 
-KINDS = ('run', 'test', 'test-fails', 'check', 'error', 'shown', 'shown-unchecked')
+KINDS = ('run', 'test', 'test-fails', 'check', 'types', 'format', 'error', 'shown', 'shown-unchecked')
 TIMEOUT = 60
 # Match diagnostic headers, not codes mentioned in their messages or source.
 DIAGNOSTIC = re.compile(r'(?m)^(?:[^\n]+:\d+:\d+: )?(?:error|warning|note)\[([A-Z]\d{4})\]:')
@@ -52,6 +52,10 @@ class Example:
     codes: frozenset = frozenset()
     package: str | None = None
     filename: str | None = None
+    environment: dict = field(default_factory=dict)
+    compare_test_output: bool = False
+    shared_files: dict = field(default_factory=dict)
+    compare_error_output: bool = False
 
 
 def read_page(page):
@@ -86,7 +90,10 @@ def read_page(page):
                 files.pop(path, None)
             pending.clear()
             output = ''
-            if kind in ('run', 'test-fails'):
+            options = i_options(block.info)[1]
+            compare_test_output = kind == 'test' and options.get('stdout') == 'exact'
+            compare_error_output = kind == 'error' and options.get('stderr') == 'exact'
+            if kind in ('run', 'test-fails', 'types', 'format') or compare_test_output or compare_error_output:
                 following = index + 1
                 # A failure transcript may show the reproduction command first.
                 if kind == 'test-fails':
@@ -95,13 +102,39 @@ def read_page(page):
                 if following >= len(blocks) or blocks[following].info != 'text' or not blocks[following].closed:
                     raise ValueError(kind + ' needs a closed text fence after it')
                 output = blocks[following].source
-            package = i_options(block.info)[1].get('package')
-            examples.append(Example(page, block.line, kind, block.source, files, output, codes, package, path))
+            shared_files = project_sources(page, options['project']) if 'project' in options else {}
+            package = options.get('package')
+            environment = {key[4:]: value for key, value in options.items() if key.startswith('env.')}
+            examples.append(Example(page, block.line, kind, block.source, files, output, codes,
+                                    package, path, environment, compare_test_output, shared_files, compare_error_output))
         except ValueError as error:
             failures.append(Failure(page, block.line, 'a valid example fence', str(error)))
     for name, block in pending.items():
         failures.append(Failure(page, block.line, 'an example after file=' + name, 'end of page'))
     return examples, failures, counts
+
+
+def project_sources(page, name):
+    """Load a page-relative, local template without exposing it as page prose."""
+    safe_file(name)
+    directory = page.parent / name
+    if directory.is_symlink() or not directory.is_dir() or not directory.resolve().is_relative_to(page.parent.resolve()):
+        raise ValueError('project= must name a local directory below the page')
+    sources = {}
+    try:
+        for file in sorted(directory.rglob('*')):
+            relative = file.relative_to(directory)
+            if relative.parts[0] in ('.git', 'target', 'build', 'generated'):
+                continue
+            if file.is_symlink():
+                raise ValueError('project= files must not be symlinks: ' + str(relative))
+            if file.is_file():
+                sources[safe_file(relative.as_posix())] = file.read_text()
+    except OSError as error:
+        raise ValueError('cannot read project=: ' + str(error)) from error
+    if not sources:
+        raise ValueError('project= directory has no files')
+    return sources
 
 
 def page_name(page):
@@ -130,7 +163,7 @@ def prepare(example, project):
     main = example.filename or (f'test/{page_name(example.page)}_test.i' if testing else 'src/main.i')
     if main in example.files:
         raise ValueError(f'file={main} duplicates the example source')
-    sources = {**example.files, main: example.source}
+    sources = {**example.shared_files, **example.files, main: example.source}
     manifest = tomllib.loads(sources.pop('i.toml', ''))
     manifest['name'] = name
     std = {'path': str(ROOT / 'std')}
@@ -159,9 +192,9 @@ def prepare(example, project):
     return main
 
 
-def invoke(command, project, timeout):
+def invoke(command, project, timeout, environment=None):
     """Kill the compiler and any children together when the deadline expires."""
-    env = {**os.environ, 'NO_COLOR': '1', 'RAYON_NUM_THREADS': '1', 'BINARYEN_CORES': '1'}
+    env = {**os.environ, 'NO_COLOR': '1', 'RAYON_NUM_THREADS': '1', 'BINARYEN_CORES': '1', **(environment or {})}
     with subprocess.Popen(command, cwd=project, env=env, stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE, start_new_session=True) as process:
         try:
@@ -189,43 +222,54 @@ def run_example(example, binary, timeout=TIMEOUT):
         levels = (0, 2) if example.kind in ('run', 'test', 'test-fails') else (None,)
         deadline = time.monotonic() + timeout
         for opt in levels:
-            action = {'error': 'check', 'shown': 'check', 'test-fails': 'test', 'shown-unchecked': 'fmt'}.get(example.kind, example.kind)
+            action = {'error': 'check', 'types': 'check', 'format': 'fmt', 'shown': 'check', 'test-fails': 'test', 'shown-unchecked': 'fmt'}.get(example.kind, example.kind)
             command = [str(binary), action]
-            command += [main] if example.kind == 'shown-unchecked' else ['--offline']
+            command += [main] if example.kind in ('shown-unchecked', 'format') else ['--offline']
+            if example.kind == 'types':
+                command += ['--types']
             if opt is not None:
                 command += ['--opt', str(opt)]
             label = example.kind + (f' --opt {opt}' if opt is not None else '')
             expected = {'run': f'exit 0 and stdout={example.output!r}',
-                        'test': 'exit 0 (all tests pass)',
+                        'test': (f'exit 0 and stdout={example.output!r}' if example.compare_test_output else 'exit 0 (all tests pass)'),
                         'test-fails': f'nonzero exit and stdout={example.output!r}',
                         'check': 'exit 0 and no diagnostics',
+                        'types': f'exit 0, no diagnostics and inferred types={example.output!r}',
+                        'format': f'exit 0 and formatted source={example.output!r}',
                         'shown': 'exit 0 and no diagnostics',
                         'shown-unchecked': 'syntax that parses (type checking intentionally omitted)',
-                        'error': 'nonzero exit and codes=' + repr(sorted(example.codes))}[example.kind]
+                        'error': 'nonzero exit and codes=' + repr(sorted(example.codes)) + (f' and stderr={example.output!r}' if example.compare_error_output else '')}[example.kind]
             try:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError('example deadline expired')
-                status, stdout, stderr = invoke(command, project, remaining)
+                status, stdout, stderr = invoke(command, project, remaining, example.environment)
             except (OSError, TimeoutError) as error:
                 failures.append(Failure(example.page, example.line, f'{label}: {expected}', str(error)))
                 continue
             codes = frozenset(DIAGNOSTIC.findall(stdout + '\n' + stderr))
+            details = ''
             if example.kind == 'run':
                 passed = status == 0 and output_matches(example.output, stdout)
             elif example.kind == 'test':
-                passed = status == 0
+                passed = status == 0 and (not example.compare_test_output or stdout == example.output)
             elif example.kind == 'test-fails':
                 passed = status > 0 and stdout == example.output
             elif example.kind in ('check', 'shown'):
                 passed = status == 0 and not stdout and not stderr
+            elif example.kind == 'types':
+                passed = status == 0 and not stderr and stdout == example.output
+            elif example.kind == 'format':
+                formatted = (project / main).read_text()
+                passed = status == 0 and not stderr and formatted == example.output
+                details = f', formatted source={formatted!r}'
             elif example.kind == 'shown-unchecked':
                 passed = status == 0
             else:
-                passed = status > 0 and codes == example.codes
+                passed = status > 0 and codes == example.codes and (not example.compare_error_output or stderr == example.output)
             if not passed:
                 failures.append(Failure(example.page, example.line, f'{label}: {expected}',
-                                        f'exit {status}, codes={sorted(codes)!r}, stdout={stdout!r}, stderr={stderr!r}'))
+                                        f'exit {status}, codes={sorted(codes)!r}, stdout={stdout!r}, stderr={stderr!r}{details}'))
     return failures
 
 

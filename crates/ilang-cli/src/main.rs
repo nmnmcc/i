@@ -689,15 +689,10 @@ fn check(project: &Path, offline: bool, types: bool, target: Option<Target>) -> 
             && !checked.diags.iter().any(Diagnostic::is_error)
             && let (Some(program), Some(typed)) = (&checked.program, &checked.types)
         {
-            for plan in ilang_check::providers::resolve_program_plans(
-                program,
-                typed,
-                &graph,
-                target.provider_target(),
-            )
-            .into_values()
+            for stub in
+                ilang_check::platform::stubs(program, typed, target.platform()).into_values()
             {
-                if let Err(more) = plan {
+                if let Err(more) = stub {
                     diags.extend(more);
                 }
             }

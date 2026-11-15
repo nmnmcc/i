@@ -126,8 +126,7 @@ pub fn resolve_with_types(
                 continue;
             }
             if let Some(typed) = typed {
-                let valid = matches!(typed.provider_scheme_types.get(&target_id),
-                    Some(ilang_check::types::ShownType::Fn(f)) if !f.group && f.params.is_empty());
+                let valid = typed.nullary_functions.contains(&target_id);
                 if !valid {
                     errors.push(report(
                         target,

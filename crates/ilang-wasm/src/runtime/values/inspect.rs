@@ -246,6 +246,7 @@ pub fn wat() -> String {
     (if (i32.eq (local.get $ctor) (i32.const 1)) (then (return {{error}})))
     (if (i32.eq (local.get $ctor) (i32.const 2)) (then (return {{assertion_failure}})))
     (if (i32.eq (local.get $ctor) (i32.const 3)) (then (return {{assert}})))
+    (if (i32.eq (local.get $ctor) (i32.const 4)) (then (return {{fail}})))
     (local.set $names (global.get $constructor_names))
     (local.set $index (i32.sub (local.get $ctor) (i32.const 16)))
     (if (i32.or (ref.is_null (local.get $names)) (i32.lt_s (local.get $index) (i32.const 0)))
@@ -430,6 +431,11 @@ pub fn wat() -> String {
       (else
         (local.set $ctor (struct.get $obj 1 (ref.cast (ref $obj) (local.get $value))))
         ;; The runtime's own labelled types have one field each.
+        (if (i32.eq (local.get $ctor) (i32.const 4))
+          (then
+            (call $ib_string {{raise_label}})
+            (call $ib_string {{label_eq}})
+            (return)))
         (if (i32.eq (local.get $ctor) (i32.const 2))
           (then (local.set $label {{message_label}}))
           (else (if (i32.eq (local.get $ctor) (i32.const 3))
@@ -470,6 +476,8 @@ pub fn wat() -> String {
             ("assert", "Assert"),
             ("message_label", "message"),
             ("fail_label", "fail"),
+            ("raise_label", "raise"),
+            ("fail", "Fail"),
             ("opaque", "//wasm(opaque)"),
             ("boundary", "//boundary"),
             ("continuation", "//continuation"),

@@ -1,20 +1,16 @@
 ---
 title: Files
-description: Write and read a project file, remove it, and handle missing paths.
+description: Write, read, and remove files; inspect errors and paths.
 ---
 
-This guide writes a file in the project directory, reads it back, and removes it. It then handles a missing file as a value. It assumes the tour's [services and errors](/docs/tour/services-and-errors) and a directory where you can create files.
+Write and read a local file, then handle a missing path.
 
-Create `guide-files/` at the root of a repository checkout, with this `i.toml`. Run commands from that directory.
-
-```toml
+```toml file=i.toml title="i.toml"
 name = "guide_files"
 
 [dependencies]
 std = { path = "../std" }
 ```
-
-Put this complete program in `src/main.i`:
 
 ```i run package=guide_files title="src/main.i"
 (
@@ -28,7 +24,7 @@ main = () {
 	fs.write_file(file, <<"hello from a file":utf8>>)
 	bytes = fs.read_file(file)
 	fs.remove(file)
-	Ok(text) = bit_array.to_string(bytes)
+	text = bit_array.to_string(bytes)
 	stdio.print(file)
 	stdio.print(text)
 }
@@ -39,13 +35,9 @@ guide-note.txt
 hello from a file
 ```
 
-Run it with `i run`. `fs.write_file` creates the file or truncates an existing one. Use the example's filename only for this exercise. `fs.read_file` returns bytes, and `bit_array.to_string` checks that those bytes are UTF-8. The file is removed before the conversion and printing, so successful runs leave no data file behind and print the same result each time.
+Create `guide-files/` beside `std/` in the i source folder and run `i run` there. `write_file` creates or truncates its path: reserve these filenames for the exercise. `bit_array.to_string` raises on invalid UTF-8; whole-file operations close their handles internally; use `fs.open`, `read`, `write`, and `close` with [resources](/docs/tour/resources) for handle operations.
 
-The bytes come from the read, rather than from the original string. `write_file` and `read_file` open and close their handles internally. For operations on an open handle, use `fs.open`, `fs.read`, `fs.write`, and `fs.close`; see the tour's [resources](/docs/tour/resources) for arranging a release around a use.
-
-## Handle a missing file and clean a path
-
-Replace `src/main.i` with this program. It creates and removes its own file first, so the missing-file result does not depend on a previous run.
+## A missing path
 
 ```i run package=guide_files title="src/main.i"
 (
@@ -66,6 +58,23 @@ main = () {
 			)
 		) { stdio.print(operation <> ": " <> missing <> ": " <> code) }
 		| (Ok(_)) { panic("expected a missing file") }
+}
+```
+
+```text
+open: guide-missing.txt: not_found
+```
+
+Replace `src/main.i` with this independent example. Keep the error's operation, path, and code in reports: a failed read can fail while opening, and failures other than `not_found` need different handling.
+
+## Path strings
+
+```i run package=guide_files title="src/main.i"
+(
+	i/stdio
+	std/path
+)
+main = () {
 	stdio.print(path.clean("reports/./draft/../result.txt"))
 	stdio.print(path.dir("reports/result.txt"))
 	stdio.print(path.base("reports/result.txt"))
@@ -73,16 +82,11 @@ main = () {
 ```
 
 ```text
-open: guide-missing.txt: not_found
 reports/result.txt
 reports
 result.txt
 ```
 
-`fail.catch` turns the raised `FsError` into an `Error` result. The error records an operation, a path, and a string code. Here the operation is `open`: reading the whole file first tries to open it. Keep those fields when reporting an error instead of treating every failure as a missing file.
+`std/path` uses POSIX strings with `/` separators; cleaning and parent resolution are lexical, without filesystem queries or symbolic-link resolution. Relative filesystem paths use the working directory.
 
-`std/path` works on POSIX path strings. Only `/` separates names. `join` combines parts and cleans the result; `clean` removes dot segments and resolves lexical parents. `dir` gets the cleaned directory part, and `base` gets the final name. These functions do not query the filesystem or resolve symbolic links. Relative paths in these runs refer to the working directory; run from the project directory to put the file there.
-
-## See also
-
-The [IO operations, §9.12](/docs/standard/generated/chapter-9#section-9-12) list the filesystem functions. Continue with [HTTP service](/docs/guides/http-service) to handle requests, or [testing](/docs/guides/testing) to check code without depending on real IO.
+[HTTP service](/docs/guides/http-service) · [Testing](/docs/guides/testing)

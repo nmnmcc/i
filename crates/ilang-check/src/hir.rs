@@ -328,8 +328,8 @@ impl BuiltinType {
     pub fn arity(self) -> usize {
         match self {
             BuiltinType::List | BuiltinType::Key | BuiltinType::Request => 1,
-            BuiltinType::Boundary => 3,
-            BuiltinType::Continuation => 4,
+            BuiltinType::Boundary => 2,
+            BuiltinType::Continuation => 3,
             _ => 0,
         }
     }
@@ -413,6 +413,10 @@ pub enum Stmt {
     Bind(Binding),
     /// `! T = e` (§6.10, §9.2). `ty` is one named type.
     Env {
+        /// Supply a whole data value or an opaque environment row.
+        spread: bool,
+        /// The syntax-three provide this item belongs to.
+        group: Option<Span>,
         ty: Type,
         value: Expr,
         span: Span,
@@ -554,7 +558,12 @@ pub enum Param {
         label: Option<String>,
     },
     /// `name ! T` (§6.11). `ty` is one named type.
-    Env { var: VarId, name: Ident, ty: Type },
+    Env {
+        rest: bool,
+        var: VarId,
+        name: Ident,
+        ty: Type,
+    },
 }
 
 #[derive(Clone, Debug)]

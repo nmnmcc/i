@@ -6,7 +6,6 @@ use crate::{ModuleKind, ModuleSource, Package, PackageGraph};
 /// The module paths and sources of the library modules, and of the prelude.
 pub const MODULES: &[(&str, &str)] = &[
     ("i/fail", include_str!("../../../lib/i/fail.i")),
-    ("i/failure", include_str!("../../../lib/i/failure.i")),
     ("i/control", include_str!("../../../lib/i/control.i")),
     ("i/resource", include_str!("../../../lib/i/resource.i")),
     ("i/assertion", include_str!("../../../lib/i/assertion.i")),
@@ -51,16 +50,6 @@ pub(crate) fn add(graph: &mut PackageGraph) {
             kind,
         });
     }
-    let text = format!(
-        "name = \"standard\"\n{}",
-        include_str!("../../../lib/provider-plan.toml")
-    );
-    let (manifest, diagnostics) = crate::manifest::parse_manifest(&text);
-    assert!(
-        diagnostics.is_empty(),
-        "invalid shipped provider plan: {diagnostics:?}"
-    );
-    let provider_plan = manifest.expect("shipped plan has a name").provider_plan;
     graph.packages.push(Package {
         name: "i".to_string(),
         dir: None,
@@ -70,7 +59,6 @@ pub(crate) fn add(graph: &mut PackageGraph) {
         modules,
         wasm_exports: Vec::new(),
         wasm_synchronous: Vec::new(),
-        provider_plan,
         entries: Vec::new(),
         location: None,
     });

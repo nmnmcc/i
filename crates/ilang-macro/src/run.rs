@@ -91,12 +91,6 @@ pub fn compile_owned(
     graph.packages[root].wasm_exports.clear();
     graph.packages[root].entries.clear();
     graph.entry = None;
-    // Compiler wrappers install the sandbox capabilities lexically. Runtime
-    // target plans belong to the user program, not this separate compiler
-    // program and its deliberately restricted import closure.
-    for package in &mut graph.packages {
-        package.provider_plan = Default::default();
-    }
     let checked = ilang_check::check_compiler_exports(&graph, parsed, entries);
     let mut diags = checked.diags;
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {

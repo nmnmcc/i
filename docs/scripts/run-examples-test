@@ -50,6 +50,19 @@ class RunnerTests(unittest.TestCase):
             'failing-shown': 1,
             'passing-shown-unchecked': 0,
             'failing-shown-unchecked': 1,
+            'passing-environment': 0,
+            'failing-environment': 2,
+            'passing-test-output': 0,
+            'failing-test-output': 2,
+            'passing-types': 0,
+            'failing-types': 1,
+            'passing-format': 0,
+            'failing-format': 1,
+            'passing-project': 0,
+            'failing-project-output': 2,
+            'missing-project': 1,
+            'passing-error-output': 0,
+            'failing-error-output': 1,
         }
         for name, count in expected.items():
             with self.subTest(fixture=name):
@@ -92,6 +105,35 @@ class RunnerTests(unittest.TestCase):
                 '  source = "error[E9999]: quoted"\n'
                 '  src/main.i:2:1: note: related error[E9999]: quoted\n')
         self.assertEqual(runner.DIAGNOSTIC.findall(text), ['E0201'])
+
+    def test_home_page_reuses_the_exact_program(self):
+        page = SCRIPTS.parent / 'content/home/index.mdx'
+        examples, failures, _ = runner.read_page(page)
+        self.assertFalse(failures)
+        primary = next(example.source for example in examples if example.kind == 'run')
+        shared = [example.shared_files for example in examples if example.kind == 'test']
+        self.assertEqual(len(shared), 4)
+        self.assertTrue(all(files['src/main.i'] == primary for files in shared))
+        self.assertTrue(all(example.compare_test_output for example in examples if example.kind == 'test'))
+
+    def test_shared_project_is_local_and_primary_overrides_it(self):
+        examples, errors, _ = runner.read_page(FIXTURES / 'passing-project.mdx')
+        self.assertFalse(errors)
+        with tempfile.TemporaryDirectory() as scratch:
+            project = Path(scratch)
+            runner.prepare(examples[0], project)
+            self.assertEqual((project / 'src/main.i').read_text(), examples[0].source)
+            self.assertTrue((project / 'src/helper.i').is_file())
+        with tempfile.TemporaryDirectory() as scratch:
+            page = Path(scratch) / 'page.mdx'
+            page.write_text('')
+            with self.assertRaises(ValueError):
+                runner.project_sources(page, '../elsewhere')
+            shared = Path(scratch) / 'shared'
+            shared.mkdir()
+            (shared / 'escape.i').symlink_to(SCRIPTS / 'run-examples.py')
+            with self.assertRaises(ValueError):
+                runner.project_sources(page, 'shared')
 
     def test_project_setup(self):
         examples, _, _ = runner.read_page(FIXTURES / 'passing.mdx')
@@ -148,7 +190,7 @@ class RunnerTests(unittest.TestCase):
         for info in ('scheme', 'scheme title="not-a-project-file"', 'toml', 'text'):
             self.assertIsNone(runner.i_info(info))
         self.assertEqual(runner.i_info('i error E0201 E0301 E0201')[2], {'E0201', 'E0301'})
-        for kind in ('run', 'test', 'test-fails', 'check', 'error E0201'):
+        for kind in ('run', 'test', 'test-fails', 'check', 'types', 'format', 'error E0201'):
             info = f'i {kind} package=hello title="src/main.i"'
             self.assertEqual(runner.i_options(info)[1]['package'], 'hello')
             self.assertEqual(runner.i_info(info)[1], 'src/main.i')
@@ -157,7 +199,8 @@ class RunnerTests(unittest.TestCase):
                      'i run package=i', 'i run package=Upper', 'i run package=one package=two',
                      'i shown', 'i check file=src/main.i', 'i file=src/a.is',
                      'i file=i.toml', 'i title="data.txt"', 'scheme file=src/a.i',
-                     'toml file=src/a.i', 'toml file=i.toml package=wrong'):
+                     'toml file=src/a.i', 'toml file=i.toml package=wrong',
+                     'i run stdout=exact', 'i error E0201 stderr=wrong', 'i run stderr=exact', 'i run project=../outside', 'i run project=/tmp/project', 'i file=src/a.i project=shared', 'i test stdout=wrong', 'i file=src/a.i env.PORT=8080'):
             with self.subTest(info=info), self.assertRaises(ValueError):
                 runner.i_info(info)
         for path in ('../a.i', '/tmp/a.i', 'src/../a.i', './a.i', 'src\\a.i'):
@@ -184,7 +227,10 @@ class RunnerTests(unittest.TestCase):
     def test_page_errors(self):
         for source in ('```i check\nmain = () { Nil }\n',
                        '```i file=src/a.i\na = 1\n```\n```i file=src/a.i\na = 2\n```\n',
-                       '```i file=../escape\ndata\n```\n'):
+                       '```i file=../escape\ndata\n```\n',
+                       '```i types\n(answer)\nanswer = 42\n```\n',
+                       '```i error E0201 stderr=exact\nmain = () { missing }\n```\n',
+                       '```i format\n(answer)\nanswer = 42\n```\n'):
             with tempfile.TemporaryDirectory() as scratch:
                 page = Path(scratch) / 'page.md'
                 page.write_text(source)

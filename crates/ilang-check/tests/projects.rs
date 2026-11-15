@@ -67,3 +67,48 @@ fn ok_projects_are_clean() {
         }
     }
 }
+
+#[test]
+fn an_external_fail_need_retains_the_host_error_shape() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    fs::create_dir(dir.path().join("src")).unwrap();
+    let source = "@external(\"app\", \"value\")\nvalue : () <- (Fail(String)) -> Int\n";
+    fs::write(dir.path().join("src/main.i"), source).unwrap();
+    let (graph, load_errors) = ilang_package::load(dir.path());
+    assert!(load_errors.is_empty(), "{load_errors:?}");
+    let checked = ilang_check::check(&graph);
+    assert!(
+        !checked.diags.iter().any(|d| d.is_error()),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+    let program = checked.program.unwrap();
+    let (_, external) = program
+        .external_fns
+        .iter()
+        .find(|(id, _)| {
+            program.def(**id).name == "value" && program.module(id.module).path == "app/main"
+        })
+        .unwrap();
+    assert_eq!(external.errors, [ilang_check::types::HostType::String]);
+    for (need, code) in [
+        ("Assert", "E0319"),
+        ("Fail(String), Assert", "E0319"),
+        ("Fail(List(Int))", "E0318"),
+        ("Fail(\"literal\")", "E0318"),
+    ] {
+        fs::write(
+            dir.path().join("src/main.i"),
+            source.replace("Fail(String)", need),
+        )
+        .unwrap();
+        let (graph, _) = ilang_package::load(dir.path());
+        let checked = ilang_check::check(&graph);
+        assert!(
+            checked.diags.iter().any(|d| d.code == code),
+            "{need}: {:?}",
+            graph.sources.render_all(&checked.diags)
+        );
+    }
+}

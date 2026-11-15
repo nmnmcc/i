@@ -58,6 +58,8 @@ def main():
         if not blocks:
             continue
         slug = page.relative_to(content).with_suffix('')
+        if slug == Path('home/index'):
+            slug = Path('.')
         if slug.name == 'index':
             slug = slug.parent
         html = ROOT / 'docs/dist' / slug / 'index.html'

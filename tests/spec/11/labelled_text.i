@@ -37,6 +37,10 @@ main = () {
 		core.inspect(Assert(fail = (_) { panic("unused") })) ==
 			"Assert(fail = //fn(a) { ... })",
 	)
+	assert(
+		core.inspect(Fail(raise = (_) { panic("unused") })) ==
+			"Fail(raise = //fn(a) { ... })",
+	)
 	// Display ordering does not change the values under the written keys.
 	mixed = Mixed(7, z = "last", a = 2)
 	mixed |> (Mixed(n, a = a, z = z)) { assert((n, a, z) == (7, 2, "last")) }
