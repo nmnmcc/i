@@ -277,7 +277,13 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
 fn write_conversion(plan: &Plan) -> anyhow::Result<()> {
     let destination = &plan.destination;
     let dir = destination.parent().unwrap_or_else(|| Path::new("."));
-    let temporary = write_temporary(dir, destination, plan.output.as_bytes())?;
+    let mode = source_mode(&plan.source).map_err(|e| {
+        anyhow::anyhow!(
+            "cannot read the permissions of {}: {e}; the source is unchanged",
+            plan.source.display()
+        )
+    })?;
+    let temporary = write_temporary(dir, destination, plan.output.as_bytes(), mode)?;
 
     // Atomically publish the temporary file at the destination, failing if the
     // destination already exists. `rename` would replace it, so it is not used:
@@ -365,7 +371,13 @@ fn write_conversion(plan: &Plan) -> anyhow::Result<()> {
 /// plan skips unchanged files).
 fn write_in_place(plan: &Plan) -> anyhow::Result<()> {
     let dir = plan.source.parent().unwrap_or_else(|| Path::new("."));
-    let temporary = write_temporary(dir, &plan.source, plan.output.as_bytes())?;
+    let mode = source_mode(&plan.source).map_err(|e| {
+        anyhow::anyhow!(
+            "cannot read the permissions of {}: {e}; the file is unchanged",
+            plan.source.display()
+        )
+    })?;
+    let temporary = write_temporary(dir, &plan.source, plan.output.as_bytes(), mode)?;
     // Read back the temporary file before it replaces anything.
     match std::fs::read(&temporary) {
         Ok(bytes) if bytes == plan.output.as_bytes() => {}
@@ -405,6 +417,7 @@ fn write_temporary(
     dir: &Path,
     destination: &Path,
     bytes: &[u8],
+    mode: Option<u32>,
 ) -> anyhow::Result<PathBuf> {
     let file_name = destination
         .file_name()
@@ -415,11 +428,17 @@ fn write_temporary(
             ".{file_name}.tmp-{}-{attempt}",
             std::process::id()
         ));
-        let mut file = match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&candidate)
-        {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        // Set the source's mode at creation, so even before writing the file is
+        // never more readable than the source. The mode is set again below, in
+        // case the process umask narrowed it.
+        #[cfg(unix)]
+        if let Some(mode) = mode {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(mode);
+        }
+        let mut file = match options.open(&candidate) {
             Ok(file) => file,
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => {
@@ -445,6 +464,23 @@ fn write_temporary(
                 candidate.display()
             ));
         }
+        drop(file);
+        #[cfg(unix)]
+        if let Some(mode) = mode {
+            use std::os::unix::fs::PermissionsExt;
+            if let Err(e) = std::fs::set_permissions(
+                &candidate,
+                std::fs::Permissions::from_mode(mode),
+            ) {
+                cleanup_temporary(&candidate);
+                return Err(anyhow::anyhow!(
+                    "cannot set the permissions of {}: {e}",
+                    candidate.display()
+                ));
+            }
+        }
+        // On non-Unix systems the mode is not carried over: there is no portable
+        // mode to read, and `set_permissions` only toggles the read-only flag.
         return Ok(candidate);
     }
     Err(anyhow::anyhow!(
@@ -517,6 +553,18 @@ fn rename_noreplace(from: &Path, to: &Path) -> std::io::Result<()> {
     } else {
         Err(std::io::Error::last_os_error())
     }
+}
+
+/// The permission bits of `path` on Unix, or `None` elsewhere.
+#[cfg(unix)]
+fn source_mode(path: &Path) -> std::io::Result<Option<u32>> {
+    use std::os::unix::fs::PermissionsExt;
+    Ok(Some(std::fs::metadata(path)?.permissions().mode() & 0o7777))
+}
+
+#[cfg(not(unix))]
+fn source_mode(_path: &Path) -> std::io::Result<Option<u32>> {
+    Ok(None)
 }
 
 /// Sync a directory entry. Directories cannot be opened as files on every

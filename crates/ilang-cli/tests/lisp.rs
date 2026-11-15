@@ -351,3 +351,103 @@ fn a_refused_batch_lists_every_file_as_not_converted_to_normal() {
         assert!(!file.with_extension("i").exists());
     }
 }
+
+#[cfg(unix)]
+fn running_as_root() -> bool {
+    std::process::Command::new("id")
+        .arg("-u")
+        .output()
+        .ok()
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim() == "0")
+        .unwrap_or(false)
+}
+
+#[cfg(unix)]
+fn mode_of(path: &std::path::Path) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+}
+
+#[cfg(unix)]
+fn make_private(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+#[test]
+fn conversion_keeps_a_private_files_mode_going_to_lisp() {
+    if running_as_root() {
+        eprintln!("skipped: running as root, mode checks are meaningless");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("main.i");
+    std::fs::write(&file, "f = () { 1 }\n").unwrap();
+    make_private(&file);
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=is"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(mode_of(&file.with_extension("is")), 0o600);
+}
+
+#[test]
+fn conversion_keeps_a_private_files_mode_going_to_normal() {
+    if running_as_root() {
+        eprintln!("skipped: running as root, mode checks are meaningless");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("main.is");
+    std::fs::write(&file, "(= f (-> (,) _ 1))\n").unwrap();
+    make_private(&file);
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=i"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(mode_of(&file.with_extension("i")), 0o600);
+}
+
+#[test]
+fn in_place_replacement_keeps_a_private_files_mode() {
+    if running_as_root() {
+        eprintln!("skipped: running as root, mode checks are meaningless");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("main.i");
+    // Already the target surface: this is an in-place rewrite.
+    std::fs::write(&file, "f = () {    1 }\n").unwrap();
+    make_private(&file);
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=i"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(mode_of(&file), 0o600);
+}
+
+#[test]
+fn a_refused_conversion_keeps_a_private_files_mode() {
+    if running_as_root() {
+        eprintln!("skipped: running as root, mode checks are meaningless");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("main.i");
+    std::fs::write(&file, "f = () { 1 // trailing\n}\n").unwrap();
+    make_private(&file);
+    let out = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=is"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert_eq!(mode_of(&file), 0o600);
+    assert!(!file.with_extension("is").exists());
+}
