@@ -1373,11 +1373,15 @@ fn function_of(d: &Datum) -> R<Function> {
         _ => Some(type_of(ret)?),
     };
     // A body is one expression. A Curly with one expression is a group in
-    // the body; any other Curly is the body's block.
+    // the body, so read the one part (not the braces); any other Curly is the
+    // body's block. Reading the braces as a block would add a block level
+    // every time a body that is itself one block is read and printed.
     let body = match &body.kind {
-        K::Curly(parts) if parts.len() != 1 || round(&parts[0], "=").is_some() => {
-            block_of(body, parts)?
-        }
+        K::Curly(parts) if parts.len() == 1 && round(&parts[0], "=").is_none() => Block {
+            stmts: vec![Stmt::Expr(expr_of(&parts[0])?)],
+            span: Sp(body.span),
+        },
+        K::Curly(parts) => block_of(body, parts)?,
         _ => Block {
             stmts: vec![Stmt::Expr(expr_of(body)?)],
             span: Sp(body.span),
