@@ -1713,12 +1713,43 @@ mod tests {
     use super::*;
     use crate::surface::ungrouped;
 
-    #[test]
-    fn a_function_body_that_is_a_block_keeps_both_blocks() {
-        // The body is an outer block whose only statement is an inner block.
-        // Printing only the inner block used to merge the two on the way back,
-        // dropping a block around the inner bindings.
-        let source = "f = (x : Int) -> Int {\n\t{\n\t\ty = x\n\t\tz = 1\n\t\ty + z\n\t}\n}\n";
+    fn function_body(module: &Module) -> &Block {
+        let ItemKind::Bind(b) = &module.items[0].kind else {
+            panic!("the first item is a binding")
+        };
+        let ExprKind::Chain(fs) = &b.value.kind else {
+            panic!("the value is a chain")
+        };
+        &fs[0].body
+    }
+
+    fn inner_block(module: &Module) -> &Block {
+        let body = function_body(module);
+        assert_eq!(body.stmts.len(), 1, "the body holds only the inner block");
+        let Stmt::Expr(e) = &body.stmts[0] else {
+            panic!("the body's statement is an expression")
+        };
+        let ExprKind::Block(inner) = &e.kind else {
+            panic!("the expression is a block")
+        };
+        inner
+    }
+
+    fn bound_names(block: &Block) -> Vec<String> {
+        block
+            .stmts
+            .iter()
+            .filter_map(|s| match s {
+                Stmt::Bind(b) => match &b.pattern.kind {
+                    PatternKind::Var(name) => Some(name.clone()),
+                    _ => None,
+                },
+                Stmt::Expr(_) => None,
+            })
+            .collect()
+    }
+
+    fn check(source: &str) -> (Module, Module) {
         let (module, errors) = crate::parse_module(source);
         assert!(errors.is_empty(), "{errors:?}");
         let text = to_lisp(&module);
@@ -1726,7 +1757,42 @@ mod tests {
         assert!(errors.is_empty(), "{errors:?}");
         assert_eq!(ungrouped(&module), ungrouped(&read), "{text}");
         assert_eq!(to_lisp(&read), text);
+        // The source printer round-trips the same tree.
+        let printed = crate::print::print_module(&module);
+        let (reparsed, errors) = crate::parse_module(&printed);
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(ungrouped(&module), ungrouped(&reparsed), "{printed}");
+        (module, read)
+    }
+
+    #[test]
+    fn a_function_body_that_is_a_block_keeps_both_blocks() {
+        // The body is an outer block whose only statement is an inner block.
+        // Printing only the inner block used to merge the two on the way back,
+        // dropping a block around the inner bindings.
+        let source = "f = (x : Int) -> Int {\n\t{\n\t\ty = x\n\t\tz = 1\n\t\ty + z\n\t}\n}\n";
+        let (module, read) = check(source);
+        let text = to_lisp(&module);
         // Two opening braces remain: the body block and the inner block.
         assert_eq!(text.matches('{').count(), 2, "{text}");
+        for module in [&module, &read] {
+            let inner = inner_block(module);
+            // The inner bindings keep their written order, and the value last.
+            assert_eq!(bound_names(inner), ["y", "z"]);
+            assert!(matches!(inner.stmts.last(), Some(Stmt::Expr(_))));
+        }
+    }
+
+    #[test]
+    fn an_inner_block_shadows_without_losing_its_bindings() {
+        // The inner block rebinds the parameter. If the outer block were
+        // dropped, the rebinding would move to the body's scope.
+        let source = "f = (x : Int) -> Int {\n\t{\n\t\tx = x + 1\n\t\tx\n\t}\n}\n";
+        let (module, read) = check(source);
+        for module in [&module, &read] {
+            let inner = inner_block(module);
+            assert_eq!(bound_names(inner), ["x"]);
+            assert_eq!(inner.stmts.len(), 2);
+        }
     }
 }
