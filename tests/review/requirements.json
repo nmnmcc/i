@@ -1859,12 +1859,12 @@
       "outcome": "accept",
       "types_contain": [
         "app/main.use : () <- (S(N), ..N) -> Int",
-        "app/main.fw : () <- (S(N), ..N) -> Int"
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q25$",
       "known_failure": false,
       "finding": "K4 runtime migration: q25",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a Owner decision 2 drops universal-entry removal: retain the explicitly written Fail(Never), as well as the exact principal use/fw schemes and original runtime stdout assertion (effects-e3-e6-corpus.md R4).",
       "origin": "tests/review/k4-migration.json",
       "run_stdout": ""
     },
@@ -1924,12 +1924,12 @@
       "outcome": "accept",
       "types_contain": [
         "app/main.use : () <- (S(N), ..N) -> Int",
-        "app/main.fw : () <- (S(N), ..N) -> Int"
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q30$",
       "known_failure": false,
       "finding": "K4 runtime migration: q30",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a Owner decision 2 drops universal-entry removal: retain the explicitly written Fail(Never), as well as the exact principal use/fw schemes and original runtime stdout assertion (effects-e3-e6-corpus.md R4).",
       "origin": "tests/review/k4-migration.json",
       "run_stdout": ""
     },
@@ -1989,12 +1989,12 @@
       "outcome": "accept",
       "types_contain": [
         "app/main.use : () <- (S(N), ..N) -> Int",
-        "app/main.fw : () <- (S(N), ..N) -> Int"
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q35$",
       "known_failure": false,
       "finding": "K4 runtime migration: q35",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a Owner decision 2 drops universal-entry removal: retain the explicitly written Fail(Never), as well as the exact principal use/fw schemes and original runtime stdout assertion (effects-e3-e6-corpus.md R4).",
       "origin": "tests/review/k4-migration.json",
       "run_stdout": ""
     },
@@ -2054,12 +2054,12 @@
       "outcome": "accept",
       "types_contain": [
         "app/main.use : () <- (S(N), ..N) -> Int",
-        "app/main.fw : () <- (S(N), ..N) -> Int"
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
       ],
       "pattern": "^review\\-k4\\-lane/q40$",
       "known_failure": false,
       "finding": "K4 runtime migration: q40",
-      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a",
+      "source": "docs/spec.md §§4.5, 4.8 rules 4–5, 9 and 13, 9.2–9.3; the original K4 runtime assertions at 9695b32a Owner decision 2 drops universal-entry removal: retain the explicitly written Fail(Never), as well as the exact principal use/fw schemes and original runtime stdout assertion (effects-e3-e6-corpus.md R4).",
       "origin": "tests/review/k4-migration.json",
       "run_stdout": ""
     },
@@ -2641,7 +2641,7 @@
       "run_stdout": ""
     },
     {
-      "pattern": "^review-k4d/(?:proj|_loose/p)/q(?:2[1-9]|3[0-9]|40)$",
+      "pattern": "^review-k4d/(?:proj|_loose/p)/q(?:2[1-46-9]|3[1-46-9])$",
       "known_failure": false,
       "outcome": "accept",
       "types_contain": [
@@ -3567,7 +3567,7 @@
       "known_failure": false,
       "outcome": "accept",
       "finding": "E1: local providers satisfy independent callback needs by value subtyping",
-      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4).\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both. Owner decision 2 withdraws universal-entry removal; these explicit providers supply the retained keys.",
       "origin": "docs/design/effects-e1-corpus.md"
     },
     {
@@ -3575,7 +3575,7 @@
       "known_failure": false,
       "outcome": "accept",
       "finding": "E1: local providers satisfy independent callback needs by value subtyping",
-      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4).\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both. Owner decision 2 withdraws universal-entry removal; these explicit providers supply the retained keys.",
       "origin": "docs/design/effects-e1-corpus.md"
     },
     {
@@ -3583,7 +3583,7 @@
       "known_failure": false,
       "outcome": "accept",
       "finding": "E1: local providers satisfy independent callback needs by value subtyping",
-      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4). An entry that every value of its type constructor satisfies, as `Fail(Never)`, is removed.\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both.",
+      "source": "docs/spec.md §9.2: \"A provided value of type `P` satisfies the need entry `S` when `P <: S` (§4.5 rule 4).\" Each call has a fresh need satisfied respectively by S(Int, Never) or S(String, Never); invariant N is Never in both. Owner decision 2 withdraws universal-entry removal; these explicit providers supply the retained keys.",
       "origin": "docs/design/effects-e1-corpus.md"
     },
     {
@@ -3687,6 +3687,220 @@
         "app/main.f : () -> (Int) -> Int"
       ],
       "run_stdout": ""
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/b1$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0225"
+      ],
+      "finding": "E6 main integration: Two explicit S providers in one provide must be rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/r6$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0225"
+      ],
+      "finding": "E6 main integration: Two explicit S providers in one provide must be rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/b10$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0505"
+      ],
+      "finding": "E6 main integration: The recursive type in bad must still be rejected at its definition.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/b10$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "E6 main integration: The incompatible S provider must still be rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/z3$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "E6 main integration: The incompatible Svc(String)/Svc(Int) provider obligation must remain rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review-k4d/_loose/p/z5$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0515"
+      ],
+      "finding": "E6 main integration: The incompatible Svc(String)/Svc(Int) provider obligation must remain rejected.",
+      "source": "docs/spec.md §4.7: A type that has itself inside it, through a type variable, is a compile error. §9.2: two explicit items, or two spreads, with one key are a compile error; a provided value of type P satisfies the need entry S when P <: S. See docs/design/e6-main-corpus-audit.md."
+    },
+    {
+      "pattern": "^review\\-k4s/min_main_3_0$",
+      "outcome": "reject",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.main : () <- (S("
+      ],
+      "finding": "Decision 2: an unused service head still requires its constructor key; reject the missing S before entry execution.",
+      "source": "Owner decision 2 (2026-11-14): \"Drop the Fail(Never) universal-entry removal.\" Spec §9.2: \"Type checking makes certain that every service is there when a call takes it. Getting it never fails at run time.\" Syntax-three §2.10.11: \"Otherwise it is the compile error ‘T is not provided by the target t’.\" See effects-e3-e6-corpus.md R4/R6.",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ]
+    },
+    {
+      "pattern": "^review\\-k4s/min_main_5_0$",
+      "outcome": "reject",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.main : () <- (S("
+      ],
+      "finding": "Decision 2: an unused service head still requires its constructor key; reject the missing S before entry execution.",
+      "source": "Owner decision 2 (2026-11-14): \"Drop the Fail(Never) universal-entry removal.\" Spec §9.2: \"Type checking makes certain that every service is there when a call takes it. Getting it never fails at run time.\" Syntax-three §2.10.11: \"Otherwise it is the compile error ‘T is not provided by the target t’.\" See effects-e3-e6-corpus.md R4/R6.",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ]
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/fuzz/e0505/21_135$",
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ],
+      "known_failure": false,
+      "types_contain": [
+        "Dep",
+        "S(",
+        "T("
+      ],
+      "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
+      "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
+    },
+    {
+      "pattern": "^review\\-k4s/min_main_6_0$",
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ],
+      "known_failure": false,
+      "types_contain": [
+        "S("
+      ],
+      "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
+      "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/fuzz/e0505/21_160$",
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ],
+      "known_failure": false,
+      "types_contain": [
+        "S(",
+        "T("
+      ],
+      "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
+      "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
+    },
+    {
+      "pattern": "^review\\-k4d/_loose/fuzz/e0505/21_243$",
+      "outcome": "reject",
+      "phase": "entry",
+      "diagnostic_codes": [
+        "E0523"
+      ],
+      "known_failure": false,
+      "types_contain": [
+        "S(",
+        "T("
+      ],
+      "finding": "E3/E5 corpus audit: every unprovided application service must still reject the entry at both optimization levels.",
+      "source": "syntax-3 §2.10.11: The need of an entry, after what the entry own code provides, may only contain platform services of the target. All other services are provided in main by i code. See docs/design/effects-e3-e6-corpus.md R6."
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_recursive_0_0$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.bad :",
+        "S("
+      ],
+      "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
+      "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_recursive_0_17$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.bad :",
+        "S("
+      ],
+      "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
+      "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_recursive_1_0$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.bad :",
+        "S("
+      ],
+      "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
+      "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
+    },
+    {
+      "pattern": "^review\\-k4s/mixed_recursive_1_17$",
+      "outcome": "accept",
+      "known_failure": false,
+      "types_contain": [
+        "app/main.bad :",
+        "S("
+      ],
+      "finding": "Decision 1/EF09: forwarding the same parameter as a value and in a need is valid; the S requirement remains.",
+      "source": "Owner decision 1 (2026-11-14): \"A need is a set of environments.\" This drops the exclusive ordinary/row-variable classification. Spec §9.4: \"A value of a row type may be bound, captured and provided after <-\". See effects-e3-e6-corpus.md R3."
+    },
+    {
+      "pattern": "^review-std2/replacement_unused$",
+      "outcome": "reject",
+      "known_failure": false,
+      "diagnostic_codes": [
+        "E0225"
+      ],
+      "finding": "Two explicit same-key service values are invalid even when the provided service is unused.",
+      "source": "Spec §9.2: \"An explicit item wins over an item from a spread with the same key; two explicit items, or two spreads, with one key are a compile error.\" See effects-e3-e6-corpus.md R2."
+    },
+    {
+      "pattern": "^review-k4d/(?:proj|_loose/p)/q(?:25|30|35|40)$",
+      "known_failure": false,
+      "outcome": "accept",
+      "types_contain": [
+        "app/main.use : () <- (S(N), ..N) -> Int",
+        "app/main.fw : () <- (Fail(Never), S(N), ..N) -> Int"
+      ],
+      "finding": "Principal service/field-access schemes retain the explicitly written Fail(Never) key under Decision 2.",
+      "source": "Owner decision 2: \"Drop the Fail(Never) universal-entry removal.\" Spec §9.2: \"Type checking makes certain that every service is there when a call takes it.\" Retain the exact use and fw scheme assertions, adding only fw's written Fail key. See effects-e3-e6-corpus.md R4.",
+      "origin": "K4 q21–q40 assertions formerly in tests/k4/review.py"
     }
   ],
   "transitions": [

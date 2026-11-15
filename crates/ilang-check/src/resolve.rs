@@ -139,6 +139,7 @@ struct Frame {
 
 #[derive(Clone, Debug)]
 struct TyFrame {
+    fn_depth: u32,
     names: HashMap<NameKey, TyVarId>,
 }
 
@@ -1497,6 +1498,7 @@ impl<'a> Resolver<'a> {
                         if let TypeBody::Custom(cs) = &mut self.p.types[t].body
                             && let TypeKind::Fn { env, .. } = &mut cs[0].fields[i].ty.kind
                         {
+                            needs.extend(env.take().map(|e| *e));
                             *env = Some(Box::new(Type {
                                 kind: TypeKind::Union(needs),
                                 span: f.ty.span,
@@ -1544,10 +1546,16 @@ impl<'a> Resolver<'a> {
         else {
             return None;
         };
+        // §2.10.12: no need, or exactly `! Fail(E)`; `E` is the errors.
+        let mut err = err.as_deref();
         if let Some(env) = env
             && !self.is_never(env)
         {
-            return None;
+            let e = self.fail_argument(env)?;
+            if err.is_some() {
+                return None;
+            }
+            err = Some(e);
         }
         let params = params
             .iter()
@@ -1581,6 +1589,22 @@ impl<'a> Resolver<'a> {
             errors: members,
             request_result: false,
         })
+    }
+
+    /// `E` for the type `Fail(E)` of the prelude.
+    fn fail_argument<'t>(&self, t: &'t Type) -> Option<&'t Type> {
+        match &t.kind {
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                args,
+            } if args.len() == 1
+                && self.p.ty(*id).name == "Fail"
+                && Some(self.p.ty(*id).module) == self.p.prelude =>
+            {
+                Some(&args[0])
+            }
+            _ => None,
+        }
     }
 
     /// The name of a prelude type that `t` names with no arguments.
@@ -1680,12 +1704,48 @@ impl<'a> Resolver<'a> {
             }
             return;
         };
-        for (part, what) in [(err, "errors"), (env, "an environment")] {
-            if let Some(part) = part {
+        if let Some(part) = err {
+            self.error(
+                code::EXTERNAL_EFFECTS,
+                part.span,
+                "an external function writes errors as a Fail(E) need (§10.1)",
+            );
+        }
+        if let Some(env) = env {
+            let expanded = self.expand(env);
+            if let Some(error) = self.fail_argument(&expanded).cloned() {
+                if let Some(span) = find_in_type(&error, &|k| matches!(k, TypeKind::Hole)) {
+                    self.error(code::EXTERNAL_HOLE, span,
+                        "the full type of an external function must be written, with no `_` (§10.1)");
+                } else if let Some(span) = find_in_type(&error, &|k| matches!(k, TypeKind::Var(_)))
+                {
+                    self.error(
+                        code::EXTERNAL_TYPE_VAR,
+                        span,
+                        "the type of an external function may not have type variables (§10.1)",
+                    );
+                } else {
+                    let valid = self.boundary_type(&error).is_some_and(|t| {
+                        let members = match t {
+                            Ty::Never => vec![],
+                            Ty::Union(ms) => ms,
+                            one => vec![one],
+                        };
+                        members.iter().all(|m| {
+                            self.host_member(m, false)
+                                .is_some_and(|h| !matches!(h, HostType::Opaque(_)))
+                        })
+                    });
+                    if !valid {
+                        self.error(code::EXTERNAL_HOST_TYPE, error.span,
+                            "the error of an external function must be a host-passable error type (§10.3)");
+                    }
+                }
+            } else if !self.is_never(&expanded) {
                 self.error(
                     code::EXTERNAL_EFFECTS,
-                    part.span,
-                    format!("an external function may not have {what} (§10.1)"),
+                    env.span,
+                    "an external function may have no need or exactly Fail(E) (§10.1)",
                 );
             }
         }
@@ -1822,7 +1882,10 @@ impl<'a> Resolver<'a> {
             names.insert(key, var);
             vars.push(var);
         }
-        self.ty_frames.push(TyFrame { names });
+        self.ty_frames.push(TyFrame {
+            names,
+            fn_depth: self.fn_depth,
+        });
         vars
     }
 

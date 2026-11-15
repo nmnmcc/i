@@ -179,8 +179,11 @@ fn generated_contributions_are_selected_independently() {
     ));
 }
 
+// E5 replaces target provider plans with explicit provision in i code. Keep
+// the collection-selection, async-factory, wrong-value, and missing-service
+// coverage of the former provider-plan case.
 #[test]
-fn selected_collection_uses_its_target_plan_and_transitive_requests() {
+fn selected_collection_uses_explicit_services_and_transitive_requests() {
     let dir = tempfile::tempdir().unwrap();
     project(dir.path());
     let source_path = dir.path().join("src/main.i");
@@ -188,18 +191,35 @@ fn selected_collection_uses_its_target_plan_and_transitive_requests() {
         std::fs::read_to_string(&source_path)
             .unwrap()
             .replacen("(m =", "(i/clock, i/fail, m =", 1);
-    source.push_str("Service = (value = Int)\nmake = () {\n\tfail.catch(() { clock.sleep_ns(1000) }) |>\n\t\t(Ok(_)) { Service(value = 42) }\n\t\t| (Error(_)) { panic(\"clock failed\") }\n}\nwrong = () { Service(value = 0) }\nread = () <- (s : Service) { assert(s.value == 42) }\nm.emit(anchor, configured, read())\n");
+    source.push_str(
+        r#"
+Service = (value = Int)
+make = () {
+    fail.catch(() { clock.sleep_ns(1000) }) |>
+        (Ok(_)) { Service(value = 42) }
+        | (Error(_)) { panic("clock failed") }
+}
+wrong = () { Service(value = 0) }
+read = () <- (s: Service) { assert(s.value == 42) }
+m.emit(anchor, configured, read() <- (make()))
+m.emit(anchor, wrong_configured, read() <- (wrong()))
+m.emit(anchor, unconfigured, read())
+"#,
+    );
     std::fs::write(source_path, source).unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n[providers.\"app/main.Service\"]\nnative = \"app/main.make\"\nnodejs = \"app/main.wrong\"\n").unwrap();
     let manifest = ilang_cli::collections(dir.path(), false, true).unwrap();
-    let handle = &manifest.entries.last().unwrap().handle;
+    let added = &manifest.entries[manifest.entries.len() - 3..];
     for level in [Level::O0, Level::O2] {
-        let selected =
-            ilang_cli::build_collection(dir.path(), options(level), handle, CollectionResult::Nil)
-                .unwrap_or_else(|error| panic!("{error}"));
+        let selected = ilang_cli::build_collection(
+            dir.path(),
+            options(level),
+            &added[0].handle,
+            CollectionResult::Nil,
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
         assert!(
             selected.is_async,
-            "factory's request dependency needs the async protocol"
+            "the factory's request dependency needs the async protocol"
         );
         assert!(
             ilang_cli::CollectionArtifact::from_wasm(&selected.built.wasm)
@@ -219,7 +239,7 @@ fn selected_collection_uses_its_target_plan_and_transitive_requests() {
             target: Target::Nodejs,
             ..options(Level::O0)
         },
-        handle,
+        &added[1].handle,
         CollectionResult::Nil,
     )
     .unwrap_or_else(|error| panic!("{error}"));
@@ -234,11 +254,11 @@ fn selected_collection_uses_its_target_plan_and_transitive_requests() {
             target: Target::Js,
             ..options(Level::O0)
         },
-        handle,
+        &added[2].handle,
         CollectionResult::Nil,
     )
     .err()
-    .expect("an absent target cell must fail the build")
+    .expect("an unprovided service must fail the build")
     .to_string();
     assert!(
         error.contains("app/main.Service") && error.contains("js"),

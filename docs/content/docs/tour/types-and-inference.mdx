@@ -64,9 +64,7 @@ Braces make `Point` a transparent alias; `ScreenPoint` has a distinct identity a
 
 ScreenPoint = (x = Int, y = Int)
 
-main = () {
-	stdio.print(core.inspect(ScreenPoint(x = 3, y = 4)))
-}
+main = () { stdio.print(core.inspect(ScreenPoint(x = 3, y = 4))) }
 ```
 
 ```text
@@ -188,7 +186,7 @@ tour/main.add_one : (Int) -> Int
 tour/main.main : () -> (7, "seven", List(1 | 2), Int)
 ```
 
-Run `i check --types` for the complete listing.
+`i check --types` lists parameters, results, and service needs, including `Fail(E)` for raised errors.
 
 The literal types `7` and `"seven"` each contain one value, usable as `Int` or `String`; the list also fits `List(Int)`.
 
@@ -235,7 +233,10 @@ Add = (Expr, Expr)
 Mul = (Expr, Expr)
 Expr = Num | Add | Mul
 eval = (e) {
-	e |> (Num(n)) { n } | (Add(a, b)) { eval(a) + eval(b) } | (Mul(a, b)) { eval(a) * eval(b) }
+	e |>
+		(Num(n)) { n }
+		| (Add(a, b)) { eval(a) + eval(b) }
+		| (Mul(a, b)) { eval(a) * eval(b) }
 }
 ```
 
@@ -271,7 +272,9 @@ Point = { (x = Int, y = Int) }
 x_of = (point : Point) { point.x }
 
 main = () {
-	stdio.print(core.inspect(x_of((x = 3, y = 4))))
+	stdio.print(
+		core.inspect(x_of((x = 3, y = 4))),
+	)
 }
 ```
 
@@ -283,4 +286,4 @@ An argument annotation supplies the field information needed for access; labelle
 
 ## Further reading
 
-[Services and errors](/docs/tour/services-and-errors).
+[Types from top to bottom](/docs/tour/types-from-top-to-bottom).

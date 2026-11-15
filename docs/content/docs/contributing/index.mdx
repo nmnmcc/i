@@ -10,9 +10,7 @@ Turn a small behavior into a regression test, then change its implementation.
 	testlib = (test) = std/test
 	std/bool
 )
-test("a regression", () {
-	assert(bool.not(True) == False)
-})
+test("a regression", () { assert(bool.not(True) == False) })
 ```
 
 ```text

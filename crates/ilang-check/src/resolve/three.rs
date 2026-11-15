@@ -29,7 +29,7 @@ use ilang_syntax::syn3::ast::resolved as o;
 use ilang_syntax::syn3::walk as nwalk;
 use pre::{
     AndPlan, ChainKind, Inner, Pre, addr, and_plan, attribute_call, attribute_strings, chain_kind,
-    head_params, id, is_core_never, is_match, keyed_plan, provide_apart,
+    head_params, id, is_core_never, is_match, keyed_plan,
 };
 use std::ops::{Deref, DerefMut};
 
@@ -390,7 +390,7 @@ enum VStmt<'x> {
     Service(String, &'x n::Expr),
     /// The environment statement of the service `e`, whose value is `e` or
     /// the fresh local that holds it.
-    Env(Option<String>, &'x n::Expr),
+    Env(Option<String>, &'x n::Expr, bool, Option<Span>),
 }
 
 enum VSubject<'x> {
@@ -1701,74 +1701,28 @@ impl<'a, 't> R3<'a, 't> {
         }
     }
 
-    /// The needs written after `<-` as the two rows of today's function
-    /// type: the error channel and the environment. This is the only place
-    /// where a need becomes a row: a `Fail(E)` entry is the error `E`, every
-    /// other entry is a member of the environment, and `..N` (or `<- N`) is
-    /// the row variable `N`, which also carries the errors when the
-    /// signature writes no `Fail` beside it (§7.3): its error is then the
-    /// type parameter `N%E` of the binding ([`Pre::row_err`]).
+    /// E3: one need, including ordinary Fail(E) entries and any rest.
     fn needs_row(&mut self, f: &n::FnType, span: Span) -> (Option<Type>, Option<Type>) {
-        fn need<'x>(
-            t: &'x n::Type,
-            spread: bool,
-            err: &mut Option<&'x n::Type>,
-            env: &mut Vec<&'x n::Type>,
-        ) {
-            if let n::TypeKind::Named {
-                module: None,
-                name,
-                args,
-            } = &t.kind
-                && name.name == "Fail"
-                && args.len() == 1
-                && !spread
-            {
-                *err = Some(&args[0]);
-                return;
-            }
-            env.push(t);
-        }
-        let mut err: Option<&n::Type> = None;
-        let mut env: Vec<&n::Type> = Vec::new();
-        match f.services.as_ref().map(|s| (&s.kind, s)) {
-            None => {}
-            Some((n::TypeKind::Data(items), _)) => {
-                for item in items {
-                    match item {
-                        n::TItem::Pos(t) => need(t, false, &mut err, &mut env),
-                        n::TItem::Spread(t) => need(t, true, &mut err, &mut env),
-                        n::TItem::Label(..) => {}
-                    }
-                }
-            }
-            // `<- N`: a row variable.
-            Some((_, t)) => need(t, true, &mut err, &mut env),
-        }
-        let err = match err {
-            Some(t) => Some(self.ty(t)),
-            // The errors that a row variable carries (§7.3).
-            None => self.pre().row_err.get(&addr(f)).map(|row| {
-                let carried = n::Type::new(
-                    n::TypeKind::Named {
-                        module: None,
-                        name: n::Ident::new(format!("{row}%E"), span),
-                        args: Vec::new(),
-                    },
-                    span,
-                );
-                self.ty(&carried)
-            }),
+        let types = match f.services.as_ref().map(|s| (&s.kind, s)) {
+            None => Vec::new(),
+            Some((n::TypeKind::Data(items), _)) => items
+                .iter()
+                .filter_map(|item| match item {
+                    n::TItem::Pos(ty) | n::TItem::Spread(ty) => Some(self.ty(ty)),
+                    n::TItem::Label(..) => None,
+                })
+                .collect(),
+            Some((_, ty)) => vec![self.ty(ty)],
         };
-        let env = match env.len() {
+        let env = match types.len() {
             0 => None,
-            1 => Some(self.ty(env[0])),
+            1 => types.into_iter().next(),
             _ => Some(Type {
-                kind: TypeKind::Union(env.iter().map(|t| self.ty(t)).collect()),
+                kind: TypeKind::Union(types),
                 span,
             }),
         };
-        (err, env)
+        (None, env)
     }
 
     // ---- Phase 4: values ----
@@ -1797,7 +1751,7 @@ impl<'a, 't> R3<'a, 't> {
                         let before = self.diags.len();
                         self.external_type(&t);
                         if self.diags.len() == before
-                            && let Some(f) = self.host_fn(&t, false)
+                            && let Some(f) = self.host_fn(&t, true)
                         {
                             self.p.external_fns.insert(
                                 DefId {
@@ -2357,11 +2311,7 @@ impl<'a, 't> R3<'a, 't> {
     fn chain(&mut self, fs: &[n::Function], span: Span) -> ExprKind {
         let synthetic = Span::new(span.start, span.start);
         fn services(f: &n::Function) -> Vec<&n::SItem> {
-            f.services
-                .iter()
-                .flatten()
-                .filter(|s| !s.rest && pre::fail_of(s).is_none())
-                .collect()
+            f.services.iter().flatten().collect()
         }
         let function = match chain_kind(fs) {
             ChainKind::Plain => {
@@ -2562,26 +2512,39 @@ impl<'a, 't> R3<'a, 't> {
         out: &mut Vec<VStmt<'x>>,
     ) {
         let mut envs = Vec::new();
-        if let n::ExprKind::Data(items) = &services.kind {
-            let apart = provide_apart(items);
-            for item in items {
-                let n::DItem::Pos(e) = item else {
-                    continue;
-                };
-                if apart {
-                    let name = self
-                        .pre()
-                        .services
-                        .get(&addr(e))
-                        .cloned()
-                        .unwrap_or_else(|| "%service".into());
-                    out.push(VStmt::Service(name.clone(), e));
-                    envs.push(VStmt::Env(Some(name), e));
-                } else {
-                    envs.push(VStmt::Env(None, e));
-                }
-            }
+        let items: Vec<(&n::Expr, bool)> = match &services.kind {
+            n::ExprKind::Data(items) => items
+                .iter()
+                .filter_map(|item| match item {
+                    n::DItem::Pos(value) => Some((value, false)),
+                    n::DItem::Spread(value) => Some((value, true)),
+                    n::DItem::Label(..) => None,
+                })
+                .collect(),
+            _ => vec![(services, true)],
+        };
+        let apart = items.len() > 1
+            && items
+                .iter()
+                .any(|(value, _)| !matches!(value.kind, n::ExprKind::Name { .. }));
+        for (value, spread) in items {
+            let name = if apart {
+                let name = self
+                    .pre()
+                    .services
+                    .get(&addr(value))
+                    .cloned()
+                    .unwrap_or_else(|| "%service".into());
+                out.push(VStmt::Service(name.clone(), value));
+                Some(name)
+            } else {
+                None
+            };
+            envs.push(VStmt::Env(name, value, spread, Some(services.span.0)));
         }
+        // Evaluate every item first; explicit entries override spreads in
+        // this provided group, independently of their source positions.
+        envs.sort_by_key(|item| matches!(item, VStmt::Env(_, _, false, _)));
         out.extend(envs);
         match &target.kind {
             n::ExprKind::Block(b) => self.flatten_block(b, out),
@@ -2620,14 +2583,14 @@ impl<'a, 't> R3<'a, 't> {
                     nwalk::pattern(&mut b.pattern.clone(), &mut uses);
                     nwalk::expr(&mut b.value.clone(), &mut uses);
                 }
-                VStmt::Expr(e) | VStmt::Service(_, e) | VStmt::Env(_, e) => {
+                VStmt::Expr(e) | VStmt::Service(_, e) | VStmt::Env(_, e, ..) => {
                     nwalk::expr(&mut (*e).clone(), &mut uses)
                 }
             }
         }
         let mut i = 0;
         while i < list.len() {
-            if let (VStmt::Bind(binding), Some(VStmt::Env(None, value))) =
+            if let (VStmt::Bind(binding), Some(VStmt::Env(None, value, false, group))) =
                 (&list[i], list.get(i + 1))
                 && self
                     .pre()
@@ -2657,6 +2620,8 @@ impl<'a, 't> R3<'a, 't> {
                     self.env_type(&contract);
                     let result = self.expr(&binding.value);
                     stmts.push(Stmt::Env {
+                        spread: false,
+                        group: *group,
                         ty: contract,
                         value: result,
                         span: value.span.0,
@@ -2675,7 +2640,7 @@ impl<'a, 't> R3<'a, 't> {
                     &[],
                     false,
                 )),
-                VStmt::Env(name, e) => {
+                VStmt::Env(name, e, spread, group) => {
                     // The key of the service is read from the type of its
                     // value: the type of the statement is `_`.
                     let span = e.span.0;
@@ -2684,6 +2649,8 @@ impl<'a, 't> R3<'a, 't> {
                         Some(name) => self.name_expr(name, span),
                     };
                     stmts.push(Stmt::Env {
+                        spread: *spread,
+                        group: *group,
                         ty: Type {
                             kind: TypeKind::Hole,
                             span,
@@ -2760,7 +2727,18 @@ impl<'a, 't> R3<'a, 't> {
             let ty = self.ty(&s.ty);
             // §9.2: two environment parameters of one function may
             // not have the same type constructor.
-            if let Some(head) = self.env_type(&ty) {
+            let own_row = matches!(ty.kind, TypeKind::Var(var) if self.ty_frames.last().is_some_and(|frame|
+                frame.fn_depth == self.fn_depth && frame.names.values().any(|id| *id == var)));
+            if s.rest && !own_row {
+                self.error(
+                    code::ENV_TYPE,
+                    ty.span,
+                    "a rest service pattern needs a type parameter of the function (§6.8)",
+                );
+            }
+            if !s.rest
+                && let Some(head) = self.env_type(&ty)
+            {
                 if env_heads.contains(&head) {
                     let tname = self.type_name(head);
                     self.error(
@@ -2783,7 +2761,12 @@ impl<'a, 't> R3<'a, 't> {
                 name: name.name.clone(),
                 span: name.span,
             });
-            params.push(Param::Env { var, name, ty });
+            params.push(Param::Env {
+                var,
+                name,
+                ty,
+                rest: s.rest,
+            });
         }
         // The written `-> R`: the needs are left to inference.
         let ret = f.ret.as_ref().map(|r| {
@@ -2801,7 +2784,7 @@ impl<'a, 't> R3<'a, 't> {
             };
             RetType {
                 value,
-                err: Some(r.error.map_or_else(hole, |e| self.ty(e))),
+                err: None,
                 env: Some(hole()),
             }
         });
@@ -3494,8 +3477,8 @@ pub(super) fn normalize_module(
 }
 
 /// Source facts shared with editor queries while the HIR retains absorbed sums.
-/// This reads the new tree, including the implicit error row parameters, without
-/// constructing the old tree.
+/// This reads the native tree without constructing a legacy syntax tree;
+/// errors stay in the ordinary need and introduce no synthetic parameters.
 pub(crate) type SourceFacts = (
     HashMap<(Span, Span), Vec<n::resolved::Ident>>,
     HashMap<usize, usize>,

@@ -33,6 +33,8 @@
 //!
 //! `cargo test -p ilang-cli --test spec -- <filter>` runs the cases whose
 //! path has the filter.
+//! `I_SPEC_TRACE=1` reports each case's build, load and run progress to
+//! standard error while the summary stays ordered by case name.
 
 use ilang_cli::{BuildError, BuildOptions, Level, build_entry, build_tests};
 use ilang_host::services::{Log, testing};
@@ -216,7 +218,10 @@ fn stop_text(stop: &ilang_host::Stop) -> String {
     }
 }
 
-fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
+fn run(project: &Path, opt: Level, trace: Option<&str>) -> Result<Outcome2, String> {
+    if let Some(name) = trace {
+        eprintln!("spec trace {name} {opt:?}: build");
+    }
     let manifest: toml_edit::DocumentMut = std::fs::read_to_string(project.join("i.toml"))
         .map_err(|e| e.to_string())?
         .parse()
@@ -251,7 +256,13 @@ fn run(project: &Path, opt: Level) -> Result<Outcome2, String> {
         }
         Err(e) => return Err(e.to_string()),
     };
+    if let Some(name) = trace {
+        eprintln!("spec trace {name} {opt:?}: load");
+    }
     let program = Program::from_bytes(&built.wasm).map_err(|e| format!("{e:#}"))?;
+    if let Some(name) = trace {
+        eprintln!("spec trace {name} {opt:?}: run");
+    }
     let options = |log: &Log| HostOptions::new(testing(log.clone()));
     let log = Log::default();
     let main = match &program.abi().entry {
@@ -455,8 +466,15 @@ fn main() {
 }
 
 fn run_case(case: &Case) -> Result<(), String> {
-    let o0 = run(&case.project, Level::O0).map_err(|e| format!("--opt 0: {e}"))?;
-    let o2 = run(&case.project, Level::O2).map_err(|e| format!("--opt 2: {e}"))?;
+    let trace = std::env::var_os("I_SPEC_TRACE").map(|_| case.name.as_str());
+    let o0 = run(&case.project, Level::O0, trace).map_err(|e| format!("--opt 0: {e}"))?;
+    if let Some(name) = trace {
+        eprintln!("spec trace {name} O0: done");
+    }
+    let o2 = run(&case.project, Level::O2, trace).map_err(|e| format!("--opt 2: {e}"))?;
+    if let Some(name) = trace {
+        eprintln!("spec trace {name} O2: done");
+    }
     if o0 != o2 {
         return Err(format!("--opt 0 and --opt 2 differ:\n{o0:#?}\n{o2:#?}"));
     }

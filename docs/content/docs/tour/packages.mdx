@@ -198,18 +198,23 @@ synchronous = ["tour/main.answer"]
 	(Io) = i/io
 	i/core
 )
+
 (
 	answer
 )
 answer = () { 42 }
-main = () <- (io : Io) { io.print(core.inspect(answer())) }
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(answer()),
+	)
+}
 ```
 
 ```text
 42
 ```
 
-Named entries supplement the default: `i run show` or `i build show` selects `"module.path.function"`; program arguments follow `--`. Host exports use `"package/module.function"`, with `synchronous` selecting a subset. `providers` and `provider_adapters` select host services.
+Named entries supplement the default: `i run show` or `i build show` selects `"module.path.function"`; program arguments follow `--`. Host exports use `"package/module.function"`, with `synchronous` selecting a subset. Program entries request host services through their function needs.
 
 Continue with the [guides](/docs/guides).
 

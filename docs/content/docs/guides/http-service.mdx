@@ -17,6 +17,7 @@ collection = "std/test.tests"
 
 ```i file=src/handler.i title="src/handler.i"
 (
+	i/fail
 	std/http
 	std/json
 	std/schema
@@ -52,16 +53,15 @@ handle = (req : http.Request) {
 			reply(200, json.Object([("status", json.Text("ok"))]))
 		}
 		| ((http.Method("POST"), "/users")) {
-			bit_array.to_string(req.body) |>
-				(Ok(text)) {
-					schema.parse(user_schema(), text) |>
-						(Ok(user)) {
-							reply(
-								200,
-								schema.encode(user_schema(), user),
-							)
-						}
-						| (Error(_)) { invalid() }
+			fail.catch(() {
+				text = bit_array.to_string(req.body)
+				schema.parse(user_schema(), text)
+			}) |>
+				(Ok(user)) {
+					reply(
+						200,
+						schema.encode(user_schema(), user),
+					)
 				}
 				| (Error(_)) { invalid() }
 		}
@@ -93,7 +93,7 @@ main = () {
 test("health and missing route", () {
 	health = handler.handle(http.request(http.Method("GET"), "/health"))
 	assert(health.status == http.Status(200))
-	assert(http.body_text(health) == Ok("{\"status\":\"ok\"}"))
+	assert(http.body_text(health) == "{\"status\":\"ok\"}")
 	missing = handler.handle(http.request(http.Method("GET"), "/missing"))
 	assert(missing.status == http.Status(404))
 })
@@ -106,7 +106,7 @@ test("JSON request", () {
 	)
 	response = handler.handle(req)
 	assert(response.status == http.Status(200))
-	assert(http.body_text(response) == Ok("{\"name\":\"Ada\"}"))
+	assert(http.body_text(response) == "{\"name\":\"Ada\"}")
 	assert(
 		handler.handle(http.Request(..req, body = <<"{}":utf8>>)).status ==
 			http.Status(422),
@@ -141,7 +141,7 @@ pass guide_http/handler_test.JSON request
 2 passed, 0 failed
 ```
 
-Each command prints this result. Targets match exactly, so `/health?x=1` misses; `http.route` offers segment patterns and query-independent path matching. The schema requires `name`; every response, including errors, sets `Content-Type: application/json`.
+Each command prints this result; targets match exactly, so `/health?x=1` misses; `http.route` offers segment patterns and query-independent path matching. UTF-8 conversion and schema parsing raise errors; one `fail.catch` turns either failure into a 422 response. The schema requires `name`; every response, including errors, sets `Content-Type: application/json`.
 
 ## Server
 

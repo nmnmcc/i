@@ -34,9 +34,7 @@ The filtered command for the existing case is `cargo test -p ilang-cli --test sp
 	testlib = (test) = std/test
 	std/bool
 )
-test("negation", () {
-	assert(bool.not(False) == True)
-})
+test("negation", () { assert(bool.not(False) == True) })
 ```
 
 ```text

@@ -135,7 +135,6 @@ fn graph_with_path_dependencies() {
         [
             "i/prelude",
             "i/fail",
-            "i/failure",
             "i/control",
             "i/resource",
             "i/assertion",
@@ -236,32 +235,41 @@ fn standard_library_modules() {
     );
 }
 
+// E5 removes dependency defaults: only the root's explicit entry is selected.
 #[test]
-fn provider_dependency_defaults_keep_authority_under_root_overrides() {
-    use ilang_package::providers::{Cell, Target};
+fn dependency_defaults_cannot_replace_the_roots_explicit_entry() {
     let dir = tempfile::tempdir().unwrap();
     write(
         dir.path(),
         &[
             (
                 "app/i.toml",
-                "name=\"app\"\n[dependencies]\ndep={path=\"../dep\"}\n[providers.\"dep/main.S\"]\nhost=\"app/main.fake\"\n",
+                "name=\"app\"\n[dependencies]\ndep={path=\"../dep\"}\n[entries]\nnative=\"main.main\"\n[providers.\"dep/main.S\"]\nhost=\"app/main.fake\"\n",
+            ),
+            (
+                "app/src/main.i",
+                "(dep = dep/main)\nmain = () { dep.value }\n",
             ),
             (
                 "dep/i.toml",
-                "name=\"dep\"\n[providers.\"dep/main.S\"]\njs=\"dep/main.js\"\nhost=\"dep/main.host\"\n",
+                "name=\"dep\"\n[entries]\nnative=\"main.other\"\n[providers.\"dep/main.S\"]\njs=\"dep/main.js\"\nhost=\"dep/main.host\"\n",
+            ),
+            (
+                "dep/src/main.i",
+                "(value)\nvalue = 42\nother = () { Nil }\n",
             ),
         ],
     );
-    let (graph, diags) = load(&dir.path().join("app"));
-    assert!(diags.is_empty(), "{diags:?}");
-    let root = graph.root.unwrap();
-    let rows = graph.selected_provider_rows();
-    let row = rows.iter().find(|r| r.row.service == "dep/main.S").unwrap();
-    assert_ne!(row.package, root);
-    assert_ne!(row.cells[&Target::Js].package, root);
-    assert_eq!(row.cells[&Target::Host].package, root);
+    let (graph, diagnostics) = load(&dir.path().join("app"));
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let root = &graph.packages[graph.root.unwrap()];
+    assert_eq!(root.entries.len(), 1);
+    assert_eq!(root.entries[0].0, "native");
+    assert_eq!(root.entries[0].1.function, "main");
+    let dep = &graph.packages[root.dependencies[0].1.unwrap()];
+    assert_eq!(dep.name, "dep");
     assert!(
-        matches!(row.cells[&Target::Host].cell, Cell::Factory { factory, .. } if factory == "app/main.fake")
+        dep.entries.is_empty(),
+        "a dependency cannot select an entry"
     );
 }

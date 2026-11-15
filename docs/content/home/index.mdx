@@ -30,7 +30,8 @@ description: "Fast enough, complete enough, easy to read, and light: a small fun
 )
 BadPort = ()
 read_port = () {
-	int.parse(process.env("PORT")) |>
+	text = process.env("PORT")
+	fail.catch(() { int.parse(text) }) |>
 		(Ok(port) ? port > 0 && port < 65536) { port }
 		| (_) { fail.raise(BadPort) }
 }
@@ -172,7 +173,7 @@ pass hello/macros_test.typed expansion
 </article>
 <article className="carousel-slide" data-home-slide="5" role="group" aria-roledescription="slide" aria-label="5 of 6" tabIndex={0}>
 <h2>An error stays in the type</h2>
-<p>A caller promising no service needs cannot leave BadPort unhandled; the checker rejects this call.</p>
+<p><code>int.parse</code> raises <code>Nil</code>; the reader converts it to <code>BadPort</code>, which this caller leaves unhandled.</p>
 <div className="slide-example">
 ```i error E0501 stderr=exact project=examples/port package=hello title="src/probe.i"
 (
@@ -186,7 +187,7 @@ pure : () -> Int = () { app.read_port() }
 ```
 
 ```text
-src/probe.i:8:1: error[E0501]: `app.BadPort` is not a subtype of `Never`
+src/probe.i:8:1: error[E0501]: `Fail(i/process.ProcessError | app.BadPort)` is not a subtype of `Never`
 1 error
 ```
 </div>

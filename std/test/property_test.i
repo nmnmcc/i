@@ -43,7 +43,7 @@ test("sampling_and_map_laws", () {
 	assert(leaf.children() == [])
 	sizes = property.make((s, _) { Some(property.tree(s, () { [] })) })
 	assert(root(sizes, -1, 0).value == 0)
-	Ok(gen) = property.int(-100, 100)
+	Ok(gen) = fail.catch(() { property.int(-100, 100) })
 	g = random.from_seed(17)
 	Some(a) = property.sample(gen, 9, g)
 	Some(b) = property.sample(gen, 9, g)
@@ -74,18 +74,40 @@ test("sampling_and_map_laws", () {
 })
 
 test("integer_rules", () {
-	assert(property.int(3, 2) == Error(property.InvalidRange(3, 2)))
-	assert(property.element([]) == Error(property.EmptyChoice))
 	assert(
-		property.list(property.constant(0), -1, 2) ==
+		fail.catch(() { property.int(3, 2) }) ==
+			Error(property.InvalidRange(3, 2)),
+	)
+	assert(
+		fail.catch(() { property.element([]) }) == Error(property.EmptyChoice),
+	)
+	assert(
+		{
+			e4_call_arg_0 = property.constant(0)
+			e4_call_arg_1 = -1
+			e4_call_arg_2 = 2
+			fail.catch(() {
+				property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+			})
+		} ==
 			Error(property.InvalidLength(-1, 2)),
 	)
 	assert(
-		property.list(property.constant(0), 3, 2) ==
+		{
+			e4_call_arg_0 = property.constant(0)
+			e4_call_arg_1 = 3
+			e4_call_arg_2 = 2
+			fail.catch(() {
+				property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+			})
+		} ==
 			Error(property.InvalidLength(3, 2)),
 	)
-	assert(property.string(-2) == Error(property.InvalidLength(0, -2)))
-	Ok(gen) = property.int(0, 10)
+	assert(
+		fail.catch(() { property.string(-2) }) ==
+			Error(property.InvalidLength(0, -2)),
+	)
+	Ok(gen) = fail.catch(() { property.int(0, 10) })
 	t = find_ten(gen, 0)
 	assert(
 		list.map(t.children(), (c) { c.value }) == [0, 5, 8, 9],
@@ -110,7 +132,7 @@ test("integer_rules", () {
 			}
 	}
 	verify(t, 0, 8)
-	Ok(positive) = property.int(3, 10)
+	Ok(positive) = fail.catch(() { property.int(3, 10) })
 	p = root(positive, 0, 0)
 	{ p.value == 3 } |>
 		(True) { assert(p.children() == []) }
@@ -133,9 +155,9 @@ valid_dependent = (t : property.Tree((Int, Int)), depth : Int) -> Nil {
 }
 
 test("dependent_and_size", () {
-	Ok(outer) = property.int(0, 5)
+	Ok(outer) = fail.catch(() { property.int(0, 5) })
 	dependent = property.flat_map(outer, (n) {
-		property.int(0, n) |>
+		fail.catch(() { property.int(0, n) }) |>
 			(Ok(gen)) { property.map(gen, (k) { (n, k) }) }
 			| (Error(_)) { property.constant((n, -1)) }
 	})
@@ -193,7 +215,7 @@ test("filter_prunes_whole_subtrees", () {
 })
 
 test("greedy_path_budget_and_replay", () {
-	Ok(ints) = property.int(0, 10)
+	Ok(ints) = fail.catch(() { property.int(0, 10) })
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
 	predicate = (x : Int) -> property.Verdict {
@@ -277,7 +299,7 @@ test("greedy_path_budget_and_replay", () {
 })
 
 test("structural_shrinking", () {
-	Ok(ints) = property.int(0, 10)
+	Ok(ints) = fail.catch(() { property.int(0, 10) })
 	ten = find_ten(ints, 0)
 	gen = property.map(property.make((_, _) { Some(ten) }), (x) { 100 - x })
 	property.Falsified(f) = property.check(gen, property.Config(
@@ -410,7 +432,7 @@ test("attempt_streams_seed_and_prefixes", () {
 				Some(value),
 		)
 	})
-	Ok(ints) = property.int(-100, 100)
+	Ok(ints) = fail.catch(() { property.int(-100, 100) })
 	predicate = (x : Int) -> property.Verdict { property.Fail(core.inspect(x)) }
 	a = property.check(
 		ints,
@@ -453,7 +475,14 @@ test("attempt_streams_seed_and_prefixes", () {
 })
 
 test("list_order_and_generated_bounds", () {
-	Ok(gen) = property.list(property.constant(7), 0, 4)
+	Ok(gen) = {
+		e4_call_arg_0 = property.constant(7)
+		e4_call_arg_1 = 0
+		e4_call_arg_2 = 4
+		fail.catch(() {
+			property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+		})
+	}
 	find_four = (seed : Int) -> property.Tree(List(Int)) {
 		assert(seed < 1000)
 		t = root(gen, 4, seed)
@@ -466,8 +495,8 @@ test("list_order_and_generated_bounds", () {
 		list.map(t.children(), (c) { list.length(c.value) }) ==
 			[0, 2, 2, 3, 3, 3, 3],
 	)
-	Ok(items) = property.int(-3, 3)
-	Ok(lists) = property.list(items, 2, 5)
+	Ok(items) = fail.catch(() { property.int(-3, 3) })
+	Ok(lists) = fail.catch(() { property.list(items, 2, 5) })
 	verify = (t : property.Tree(List(Int)), depth : Int) -> Nil {
 		assert(list.length(t.value) >= 2 && list.length(t.value) <= 5)
 		assert(list.all(t.value, (x) { x >= -3 && x <= 3 }))
@@ -481,7 +510,14 @@ test("list_order_and_generated_bounds", () {
 	)
 	assert(
 		property.sample(
-			property.list(property.make((_, _) { None }), 1, 1) |>
+			{
+				e4_call_arg_0 = property.make((_, _) { None })
+				e4_call_arg_1 = 1
+				e4_call_arg_2 = 1
+				fail.catch(() {
+					property.list(e4_call_arg_0, e4_call_arg_1, e4_call_arg_2)
+				})
+			} |>
 				(Ok(g)) { g }
 				| (Error(_)) { property.constant([]) },
 			1,
@@ -494,7 +530,7 @@ test("list_order_and_generated_bounds", () {
 test("finite_and_scalar_generators", () {
 	floats = property.float()
 	scalars = property.utf_codepoint()
-	Ok(strings) = property.string(5)
+	Ok(strings) = fail.catch(() { property.string(5) })
 	list.each(list.range(0, 99), (seed) {
 		t = root(floats, 3, seed)
 		bits = core.float_to_bits(t.value)
@@ -539,8 +575,8 @@ test("assertion_adapter_and_clients", () {
 		(x) { assert(x == 1) },
 		core.inspect,
 	)
-	Ok(items) = property.int(-10, 10)
-	Ok(lists) = property.list(items, 0, 10)
+	Ok(items) = fail.catch(() { property.int(-10, 10) })
+	Ok(lists) = fail.catch(() { property.list(items, 0, 10) })
 	property.test(
 		lists,
 		property.Config(
@@ -560,7 +596,7 @@ test("assertion_adapter_and_clients", () {
 		},
 		core.inspect,
 	)
-	Ok(strings) = property.string(20)
+	Ok(strings) = fail.catch(() { property.string(20) })
 	property.test(
 		strings,
 		property.Config(
@@ -580,7 +616,7 @@ test("assertion_adapter_and_clients", () {
 })
 
 test("negative_integer_boolean_element_and_list_element_order", () {
-	Ok(negative) = property.int(-10, 0)
+	Ok(negative) = fail.catch(() { property.int(-10, 0) })
 	find = (seed : Int) -> property.Tree(Int) {
 		assert(seed < 1000)
 		t = root(negative, 0, seed)
@@ -600,7 +636,9 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 				{ t.value |> (True) { [False] } | (False) { [] } },
 		)
 	})
-	Ok(choices) = property.element(["first", "second", "first"])
+	Ok(choices) = fail.catch(() {
+		property.element(["first", "second", "first"])
+	})
 	list.each(list.range(0, 49), (seed) {
 		t = root(choices, 0, seed)
 		assert(t.value == "first" || t.value == "second")
@@ -620,7 +658,7 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 	hand = property.make((_, _) {
 		Some(property.tree(1, () { [property.tree(0, () { [] })] }))
 	})
-	Ok(fixed) = property.list(hand, 2, 2)
+	Ok(fixed) = fail.catch(() { property.list(hand, 2, 2) })
 	t = root(fixed, 0, 0)
 	assert(
 		list.map(t.children(), (c) { c.value }) == [[0, 1], [1, 0]],
@@ -628,7 +666,7 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 })
 
 test("budget_prefixes_and_discarded_children", () {
-	Ok(ints) = property.int(0, 10)
+	Ok(ints) = fail.catch(() { property.int(0, 10) })
 	ten = find_ten(ints, 0)
 	gen = property.make((_, _) { Some(ten) })
 	// P7 also counts Discard; it never descends into that child.

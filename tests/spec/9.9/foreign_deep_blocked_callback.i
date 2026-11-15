@@ -15,8 +15,13 @@ Out = (print = (String) -> Nil)
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
+// Decision 2: install the real key required by a kept pure callback.
+without_fail = <A, N>(body : () <- (Fail(Never), ..N) -> A) -> A {
+	body() <- (Fail(raise = (_ : Never) { panic("fixture: impossible error") }))
+}
+
 main = () {
-	callback = control.keep_env((work : (() -> Nil, () -> Nil) -> Nil) {
+	callback = control.keep((work : (() -> Nil, () -> Nil) -> Nil) {
 		task.scope((s) {
 			gate : task.Channel(Nil) = task.channel()
 			parked : task.Channel(Nil) = task.channel()
@@ -25,15 +30,18 @@ main = () {
 				task.yield()
 				fail.raise("callback")
 			})
-			arm = control.keep_env((_ : Nil) { task.send(gate, Nil) })
-			park = control.keep_env((_ : Nil) { task.send(parked, Nil) })
-			work(() { arm(Nil) }, () { park(Nil) })
+			arm = control.keep((_ : Nil) { task.send(gate, Nil) })
+			park = control.keep((_ : Nil) { task.send(parked, Nil) })
+			work(
+				() { without_fail(() { arm(Nil) }) },
+				() { without_fail(() { park(Nil) }) },
+			)
 		})
 	})
 	assert(
 		task.run(() {
 			task.run(() {
-				work = control.keep_env((callbacks : (() -> Nil, () -> Nil)) {
+				work = control.keep((callbacks : (() -> Nil, () -> Nil)) {
 					(arm, park) = callbacks
 					task.scope((inner) {
 						child = task.go(inner, () {
@@ -54,7 +62,9 @@ main = () {
 				})
 				assert(
 					fail.catch(() {
-						callback((arm, park) { work((arm, park)) })
+						callback((arm, park) {
+							without_fail(() { work((arm, park)) })
+						})
 					}) ==
 						Error("callback"),
 				)

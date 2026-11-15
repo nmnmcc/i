@@ -634,6 +634,7 @@ fn call_uses(callee: &Callee, args: &[Atom], env: Env, f: &mut dyn FnMut(Local))
 fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
     match v {
         Value::Atom(a)
+        | Value::CapturedService(a, _)
         | Value::Field(a, _)
         | Value::ListHead(a)
         | Value::ListTail(a)
@@ -653,7 +654,9 @@ fn value_uses(v: &Value, f: &mut dyn FnMut(Local)) {
             args.iter().for_each(|a| atom_uses(a, f));
             env_uses(*env, f);
         }
-        Value::Service(env, _) | Value::ServiceRaw(env, _) => env_uses(*env, f),
+        Value::Service(env, _) | Value::ServiceRaw(env, _) | Value::Environment(env, _) => {
+            env_uses(*env, f)
+        }
         Value::Closure { captures, .. } => captures.iter().for_each(|a| atom_uses(a, f)),
         Value::Multi(groups) => groups.iter().for_each(|(_, a)| atom_uses(a, f)),
         Value::Record { fields, .. } => fields.iter().for_each(|a| atom_uses(a, f)),

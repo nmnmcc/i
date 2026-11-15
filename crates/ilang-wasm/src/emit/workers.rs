@@ -670,7 +670,7 @@ pub(super) const WAT: &str = r#"
 "#;
 
 /// `$codec_make_closure`: a closure of one of the arities of the module from
-/// its code number, and the code table. Code 1 is `$keep_call` (D4), 2 the
+/// its code number, and the code table. Code 1 is `$adapter_pin_call` (D4), 2 the
 /// runtime's `Assert` function, and `3 + i` the function `$f{i}`.
 pub(super) fn closures(
     arities: &std::collections::BTreeSet<u32>,
@@ -679,7 +679,10 @@ pub(super) fn closures(
 ) -> String {
     use std::fmt::Write;
     let mut out = String::new();
-    let mut names = vec!["$keep_call".to_string(), "$entry_assert_fail".to_string()];
+    let mut names = vec![
+        "$adapter_pin_call".to_string(),
+        "$entry_assert_fail".to_string(),
+    ];
     names.extend((0..funcs).map(|i| format!("$f{i}")));
     let _ = writeln!(
         out,
