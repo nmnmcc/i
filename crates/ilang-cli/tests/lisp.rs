@@ -389,7 +389,11 @@ fn conversion_keeps_a_private_files_mode_going_to_lisp() {
         .arg(&file)
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(mode_of(&file.with_extension("is")), 0o600);
 }
 
@@ -408,7 +412,11 @@ fn conversion_keeps_a_private_files_mode_going_to_normal() {
         .arg(&file)
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(mode_of(&file.with_extension("i")), 0o600);
 }
 
@@ -428,7 +436,11 @@ fn in_place_replacement_keeps_a_private_files_mode() {
         .arg(&file)
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(mode_of(&file), 0o600);
 }
 
@@ -509,7 +521,10 @@ fn a_first_write_failure_does_not_say_files_above_were_converted() {
     assert!(!output.status.success());
     let errors = String::from_utf8_lossy(&output.stderr);
     assert!(errors.contains("no file was converted"), "{errors}");
-    assert!(!errors.contains("files above were already converted"), "{errors}");
+    assert!(
+        !errors.contains("files above were already converted"),
+        "{errors}"
+    );
     assert!(source.exists());
     assert!(!source.with_extension("is").exists());
 }

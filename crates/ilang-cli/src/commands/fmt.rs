@@ -435,10 +435,7 @@ fn write_temporary(
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "output".to_owned());
     for attempt in 0..1024u32 {
-        let candidate = dir.join(format!(
-            ".{file_name}.tmp-{}-{attempt}",
-            std::process::id()
-        ));
+        let candidate = dir.join(format!(".{file_name}.tmp-{}-{attempt}", std::process::id()));
         let mut options = std::fs::OpenOptions::new();
         options.write(true).create_new(true);
         // Set the source's mode at creation, so even before writing the file is
@@ -456,33 +453,26 @@ fn write_temporary(
                 return Err(anyhow::anyhow!(
                     "cannot create a temporary file in {}: {e}",
                     dir.display()
-                ))
+                ));
             }
         };
         if let Err(e) = file.write_all(bytes) {
             drop(file);
             cleanup_temporary(&candidate);
-            return Err(anyhow::anyhow!(
-                "cannot write {}: {e}",
-                candidate.display()
-            ));
+            return Err(anyhow::anyhow!("cannot write {}: {e}", candidate.display()));
         }
         if let Err(e) = file.sync_all() {
             drop(file);
             cleanup_temporary(&candidate);
-            return Err(anyhow::anyhow!(
-                "cannot sync {}: {e}",
-                candidate.display()
-            ));
+            return Err(anyhow::anyhow!("cannot sync {}: {e}", candidate.display()));
         }
         drop(file);
         #[cfg(unix)]
         if let Some(mode) = mode {
             use std::os::unix::fs::PermissionsExt;
-            if let Err(e) = std::fs::set_permissions(
-                &candidate,
-                std::fs::Permissions::from_mode(mode),
-            ) {
+            if let Err(e) =
+                std::fs::set_permissions(&candidate, std::fs::Permissions::from_mode(mode))
+            {
                 cleanup_temporary(&candidate);
                 return Err(anyhow::anyhow!(
                     "cannot set the permissions of {}: {e}",
@@ -615,27 +605,27 @@ fn sync_dir(_dir: &Path) -> std::io::Result<()> {
 /// prints the same but means something different to a later stage would not be
 /// caught; and it is a check of this printer's round trip, not a proof about
 /// ILang semantics.
-fn round_trip_diff(
-    is_lisp: bool,
-    _source: &str,
-    rendered: &str,
-) -> Result<(), (u32, u32, String)> {
+fn round_trip_diff(is_lisp: bool, _source: &str, rendered: &str) -> Result<(), (u32, u32, String)> {
     // Convert the rendered text back to the source surface and then to the
     // target surface once more; the second rendering must equal the first.
     let again = if is_lisp {
         // Source is Lisp, so `rendered` is normal text. normal -> Lisp -> normal.
-        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(rendered)
-            .map_err(|diags| render_error("the converted module cannot be rendered back", &diags))?;
-        let (normal, _) = ilang_syntax::syn3::surface::lisp_to_normal(&lisp)
-            .map_err(|diags| render_error("the converted module cannot be rendered back", &diags))?;
-        format(&normal)
-            .map_err(|diags| render_error("the round trip cannot be printed", &diags))?
+        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(rendered).map_err(|diags| {
+            render_error("the converted module cannot be rendered back", &diags)
+        })?;
+        let (normal, _) = ilang_syntax::syn3::surface::lisp_to_normal(&lisp).map_err(|diags| {
+            render_error("the converted module cannot be rendered back", &diags)
+        })?;
+        format(&normal).map_err(|diags| render_error("the round trip cannot be printed", &diags))?
     } else {
         // Source is normal, so `rendered` is Lisp text. Lisp -> normal -> Lisp.
-        let (normal, _) = ilang_syntax::syn3::surface::lisp_to_normal(rendered)
-            .map_err(|diags| render_error("the converted module cannot be rendered back", &diags))?;
-        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(&normal)
-            .map_err(|diags| render_error("the converted module cannot be rendered back", &diags))?;
+        let (normal, _) =
+            ilang_syntax::syn3::surface::lisp_to_normal(rendered).map_err(|diags| {
+                render_error("the converted module cannot be rendered back", &diags)
+            })?;
+        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(&normal).map_err(|diags| {
+            render_error("the converted module cannot be rendered back", &diags)
+        })?;
         ilang_syntax::lisp::format(&lisp)
             .map_err(|diags| render_error("the round trip cannot be printed", &diags))?
     };
