@@ -809,6 +809,7 @@ dependencies = [
  "ilang-syntax",
  "ilang-syntax-migration",
  "ilang-wasm",
+ "libc",
  "num-bigint 0.5.1",
  "rcgen",
  "serde",

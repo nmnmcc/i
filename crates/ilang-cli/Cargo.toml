@@ -31,6 +31,7 @@ tempfile.workspace = true
 ilang-lsp.workspace = true
 ilang-macro.workspace = true
 ilang-syntax.workspace = true
+libc = "0.2"
 
 [dev-dependencies]
 migration-syntax = { package = "ilang-syntax-migration", path = "../ilang-syntax/examples/legacy" }
