@@ -1,0 +1,7 @@
+(, if)
+
+(@ macro
+  (= if
+    (-> (, c a b) _
+      {(= true_branch `(-> (, True) _ ~a))
+       `(|> ~c (| ~true_branch (-> (, False) _ ~b)))})))

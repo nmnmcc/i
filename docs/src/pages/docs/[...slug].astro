@@ -8,7 +8,7 @@ import { getPageImageUrl, getPageMarkdownUrl } from '@/lib/shared';
 export const prerender = true;
 
 export const getStaticPaths = (() => {
-  return source.getPages().map((page) => ({
+  return source.getPages().filter((page) => page.slugs.length > 0).map((page) => ({
     params: { slug: decodeURI(page.slugs.join('/')) || undefined },
     props: { page },
   }));

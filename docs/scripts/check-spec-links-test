@@ -40,7 +40,7 @@ class ReferenceTests(unittest.TestCase):
             dist, content = Path(scratch) / 'dist', Path(scratch) / 'content'
             dist.mkdir()
             page = dist / 'index.html'
-            source = content / 'home/index.mdx'
+            source = content / 'docs/index.mdx'
             source.parent.mkdir(parents=True)
             diagnostic = 'src/main.i:1:1: error[E0552]: no match (§2.6.2)\n'
             source.write_text('```i error E0552 stderr=exact\nbad = missing\n```\n```text\n' + diagnostic + '```\n')
@@ -145,13 +145,14 @@ class ReferenceTests(unittest.TestCase):
     def test_shared_transcripts_and_host_runs_count_complete_actions(self):
         with tempfile.TemporaryDirectory() as scratch:
             content = Path(scratch)
-            source = content / 'home/index.mdx'
+            source = content / 'docs/index.mdx'
             source.parent.mkdir()
             source.write_text('<div hidden>\n```i expand title="src/main.i"\n(answer)\nanswer = 42\n```\n'
                               '</div>\n```text title="expansion"\nanswer = 42\n```\n'
                               '```i types\n(answer)\nanswer = 42\n```\n```text\nanswer : 42\n```\n'
                               '```i run hosts=native,wasi,javascript\nmain = () { Nil }\n```\n```text\n```\n')
             self.assertEqual(example_count(Path('index.html'), content), 3)
+            self.assertEqual(example_count(Path('docs/index.html'), content), 0)
 
     def test_cli_warns_until_area_switch_is_enabled(self):
         with tempfile.TemporaryDirectory() as scratch:

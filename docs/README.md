@@ -28,11 +28,20 @@ Generation also runs before `npm run dev`. The standard's location is defined
 by `SPEC_PATH` in `scripts/paths.py` for the planned relocation.
 Generated pages are not edited by hand.
 
-The home page is rendered from `content/home/index.mdx`, a separate Fumadocs
-collection that uses the same code blocks and themes as the docs. Both parser
-checks and the example runner read it. Its shared project files are
-read by the runner without repeating them in the rendered page; their equality
-with the displayed deadline and macro sources is checked by `scripts/run-examples-test`.
+The home page is the first documentation page, authored in `content/docs/index.mdx`.
+It uses the same docs layout, sidebar, search and themes as the rest of the site.
+`/` is canonical; Astro builds `/docs/` as a meta-refresh redirect with a canonical
+link to `/`, preserving existing entry links. The source loader maps the first
+page to `/`, so search, the sidebar and previous/next navigation use one entry.
+The home page omits page actions, a footer and the default skip-to-content hash
+link to preserve its short, hash-free layout. Other documentation pages keep
+that accessibility link. The slot adapter and browser checks pin this behavior.
+Navigation to and from `/` uses a full page load. The home page opts out of Astro
+view transitions so changing between a scrolling docs page and the single-screen
+page cannot abort a Chromium transition when the scrollbar width changes.
+Both parser checks and the example runner read the page. Shared project files
+live in `content/docs/examples/`; their equality with the displayed deadline and
+macro sources is checked by `scripts/run-examples-test`.
 Set `I_SNIPPET_PARSER` to an existing `parse-snippets` driver from the same tree
 to run the parser checks without a Cargo build.
 
@@ -215,7 +224,11 @@ choices, source limits of fourteen lines and sixty-four columns, and plain wordi
 in headless Chromium using the repository's existing root Playwright dependency.
 It needs an existing browser and never downloads one. It measures four viewport
 sizes, verifies selection with and without JavaScript, keyboard navigation, source
-fit, output wrapping, and the 120-word budget. Screenshots and measurements go to
+fit, output wrapping, the 120-word budget, sidebar separation, local DM font loads,
+and text contrast (at least 4.5:1 for home text and the dark desktop sidebar).
+It opens and closes the phone sidebar, follows a link from it, checks the static
+redirect and previous-page link, and searches for the canonical home entry.
+First-screen and full-page screenshots and measurements go to
 `DOCS_LAYOUT_OUTPUT` or a temporary directory. The docs CI checks do not install
 a browser; this browser check is an explicit review gate.
 

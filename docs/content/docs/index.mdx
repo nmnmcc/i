@@ -1,30 +1,239 @@
 ---
-title: Documentation
-description: Run a program, learn the language, and find a function.
+title: i — the language for the rest of us
+description: "Functions, data, checked types and services, compiled to WebAssembly."
 ---
 
-Run a complete program, then follow the links for your next task.
-
+<div className="home-page">
+<div className="home-intro">
+<p className="home-eyebrow">The i programming language</p>
+<h1>The language for the rest of us</h1>
+<fieldset className="home-selector" aria-label="Choose an example">
+<legend hidden>Examples</legend>
+<label className="home-choice" htmlFor="choice-simple">
+<input type="radio" name="home-example" id="choice-simple" value="simple" aria-controls="panel-simple" aria-labelledby="title-simple" aria-describedby="description-simple" defaultChecked={true} />
+<span className="choice-title" id="title-simple">Simple enough</span><br />
+<span className="choice-description" id="description-simple">Functions, data and a few symbols. That's the language.</span>
+</label>
+<label className="home-choice" htmlFor="choice-safe">
+<input type="radio" name="home-example" id="choice-safe" value="safe" aria-controls="panel-safe" aria-labelledby="title-safe" aria-describedby="description-safe" />
+<span className="choice-title" id="title-safe">Safe enough</span><br />
+<span className="choice-description" id="description-safe">The type shows what a function needs and how it can fail.</span>
+</label>
+<label className="home-choice" htmlFor="choice-testable">
+<input type="radio" name="home-example" id="choice-testable" value="testable" aria-controls="panel-testable" aria-labelledby="title-testable" aria-describedby="description-testable" />
+<span className="choice-title" id="title-testable">Testable enough</span><br />
+<span className="choice-description" id="description-testable">Hand a function a fake clock.</span>
+</label>
+<label className="home-choice" htmlFor="choice-precise">
+<input type="radio" name="home-example" id="choice-precise" value="precise" aria-controls="panel-precise" aria-labelledby="title-precise" aria-describedby="description-precise" />
+<span className="choice-title" id="title-precise">Precise enough</span><br />
+<span className="choice-description" id="description-precise">Types say what values can be, no more.</span>
+</label>
+<label className="home-choice" htmlFor="choice-extensible">
+<input type="radio" name="home-example" id="choice-extensible" value="extensible" aria-controls="panel-extensible" aria-labelledby="title-extensible" aria-describedby="description-extensible" />
+<span className="choice-title" id="title-extensible">Extensible enough</span><br />
+<span className="choice-description" id="description-extensible">Write your own <code>if</code> when you need one.</span>
+</label>
+<label className="home-choice" htmlFor="choice-fast">
+<input type="radio" name="home-example" id="choice-fast" value="fast" aria-controls="panel-fast" aria-labelledby="title-fast" aria-describedby="description-fast" />
+<span className="choice-title" id="title-fast">Fast enough</span><br />
+<span className="choice-description" id="description-fast">Compiles to WebAssembly and runs where you need it.</span>
+</label>
+</fieldset>
+</div>
+<div className="home-display">
+<div className="example-stage">
+<section className="example-panel" id="panel-simple" aria-labelledby="title-simple">
 ```i run package=hello title="src/main.i"
 (
-	(Io) = i/io
+	i/stdio
+	std/int
 )
 
-main = () <- (io : Io) { io.print("hello") }
+Ready = ()
+Waiting = (Int)
+message =
+	(Ready) { "ready" }
+	| (Waiting(minutes)) { int.to_string(minutes) <> " min left" }
+main = () {
+	stdio.print(message(Ready))
+	stdio.print(message(Waiting(2)))
+}
 ```
 
+```text title="i run"
+ready
+2 min left
+```
+</section>
+<section className="example-panel" id="panel-safe" aria-labelledby="title-safe">
+```i types project=examples/deadline package=hello title="src/main.i"
+(
+	i/fail
+	(Clock, now) = time/clock
+)
+
+(
+	remaining
+	Late(..)
+)
+
+Late = ()
+remaining = (due) {
+	due - now() |> (n ? n < 0) { fail.raise(Late) } | (n) { n }
+}
+```
+
+```text title="i check --types"
+hello/main.remaining : (Int) <- (Clock, Fail(Late)) -> Int
+```
+</section>
+<section className="example-panel" id="panel-testable" aria-labelledby="title-testable">
+```i test stdout=exact project=examples/deadline package=hello title="test/deadline_test.i"
+(
+	testlib = (test) = std/test
+	i/fail
+	app = hello/main
+	(Clock) = time/clock
+)
+
+test("a fake clock", () {
+	{
+		assert(app.remaining(42) == 2)
+		expired = fail.catch(() { app.remaining(30) })
+		assert(expired == Error(app.Late))
+	} <- (Clock(now = () { 40 }))
+})
+```
+
+```text title="i test"
+pass hello/deadline_test.a fake clock
+1 passed, 0 failed
+```
+</section>
+<section className="example-panel" id="panel-precise" aria-labelledby="title-precise">
+```i types package=hello title="src/main.i"
+(
+	word
+)
+
+word = (n) { n |> (0) { "zero" } | (1) { "one" } }
+```
+
+```text title="i check --types"
+hello/main.word : (0 | 1) -> "one" | "zero"
+```
+
+```i error E0552 E0501 stderr=exact project=examples/words package=hello title="src/probe.i"
+(
+	app = hello/main
+)
+
+bad = app.word(2)
+```
+
+```text title="i check"
+src/probe.i:5:7: error[E0552]: no branch of this function can match these arguments: their known types are `(2)` (syntax three §2.6.2)
+src/probe.i:5:16: error[E0501]: `2` is not a subtype of `0 | 1` (the type at 5:7 needs it)
+2 errors
+```
+</section>
+<section className="example-panel" id="panel-extensible" aria-labelledby="title-extensible">
+```i run project=examples/sugar package=hello title="src/main.i"
+(
+	i/stdio
+	sugar = (if) = hello/sugar
+)
+
+unit = (n) { if(n == 1, "minute", "minutes") }
+main = () { stdio.print(unit(2)) }
+```
+
+<div hidden>
 ```text
-hello
+minutes
+```
+</div>
+
+<div hidden>
+```i expand project=examples/sugar package=hello title="src/main.i"
+(
+	i/stdio
+	sugar = (if) = hello/sugar
+)
+
+unit = (n) { if(n == 1, "minute", "minutes") }
+main = () { stdio.print(unit(2)) }
+```
+</div>
+
+```text title="i expand --to i src/main.i"
+// hello/main
+(
+	i/stdio
+	sugar = (if) = hello/sugar
+)
+
+unit = (n) { n == 1 |> (True) { "minute" } | (False) { "minutes" } }
+
+main = () { stdio.print(unit(2)) }
+
 ```
 
-[Install i](/docs/getting-started/install) and [create a package](/docs/getting-started/first-program) to run it locally.
+<details className="macro-definition">
+<summary>Lisp surface: src/sugar.is</summary>
+```scheme file=src/sugar.is title="src/sugar.is"
+(, if)
 
-## Sections
+(@ macro
+  (= if
+    (-> (, c a b) _
+      {(= true_branch `(-> (, True) _ ~a))
+       `(|> ~c (| ~true_branch (-> (, False) _ ~b)))})))
+```
+</details>
 
-- [Tour](/docs/tour): values, functions, services, resources, tasks, and macros.
-- [Guides](/docs/guides): command-line tools, files, HTTP services, tests, packaging, and host integration.
-- [Library](/docs/library): modules, exports, and function documentation.
-- [Standard](/docs/standard): the language definition.
-- [Contributing](/docs/contributing): sources, focused checks, and changes.
+<div hidden>
+```i check project=examples/sugar package=hello title="src/main.i"
+(
+	i/stdio
+	sugar = (if) = hello/sugar
+)
 
-[Some features are not available yet](/docs/contributing/roadmap).
+unit = (n) { if(n == 1, "minute", "minutes") }
+main = () { stdio.print(unit(2)) }
+```
+</div>
+</section>
+<section className="example-panel" id="panel-fast" aria-labelledby="title-fast">
+```i run hosts=native,wasi,javascript transcripts=hosts package=hello title="src/main.i"
+(
+	i/stdio
+)
+
+main = () { stdio.print("2 min left") }
+```
+
+<div className="host-run">
+<pre className="host-command">{"i run"}</pre>
+```text title="Native"
+2 min left
+```
+</div>
+<div className="host-run">
+<pre className="host-command">{"i run --target wasi"}</pre>
+```text title="WASI"
+2 min left
+```
+</div>
+<div className="host-run">
+<pre className="host-command">{"i run --target nodejs"}</pre>
+```text title="JavaScript"
+2 min left
+```
+</div>
+</section>
+</div>
+
+</div>
+</div>

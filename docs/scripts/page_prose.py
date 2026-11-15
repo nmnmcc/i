@@ -70,7 +70,9 @@ def source_for_page(path, content):
     if content is None:
         return None
     if str(path) == 'index.html':
-        return content / 'home/index.mdx'
+        return content / 'docs/index.mdx'
+    if str(path) == 'docs/index.html':
+        return None  # Static redirect; its authored page is rendered at /.
     stem = content / path.parent
     for candidate in (stem.with_suffix('.mdx'), stem / 'index.mdx', stem.with_suffix('.md'), stem / 'index.md'):
         if candidate.is_file():

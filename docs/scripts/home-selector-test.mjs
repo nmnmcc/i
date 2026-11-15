@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 
-const page = readFileSync(new URL('../content/home/index.mdx', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../content/docs/index.mdx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../src/styles/home.css', import.meta.url), 'utf8');
 const keys = ['simple', 'safe', 'testable', 'precise', 'extensible', 'fast'];
 // Escape delimiters so the snippet inventory does not read regex syntax as source literals.
@@ -35,12 +35,20 @@ test('all displayed program sources fit fourteen lines and sixty-four columns', 
   }
 });
 
-test('page removes the port hero, lone Enough, hashes and carousel', () => {
+test('the first docs page has no entry buttons, port hero, hashes or carousel', () => {
   assert.doesNotMatch(page, /\bPort\b|PORT=|examples\/port|hero-signature|home-carousel|href=[\x22\x27]#/);
   assert.doesNotMatch(page, />Enough\.<\//);
-  assert.match(page, /href=\x22\/docs\/tour\x22/);
-  assert.match(page, /href=\x22\/docs\/getting-started\/install\x22/);
-  assert.doesNotMatch(readFileSync(new URL('../src/pages/index.astro', import.meta.url), 'utf8'), /<script>/);
+  assert.doesNotMatch(page, /home-actions|home-button|Read the tour|href=/);
+  const root = readFileSync(new URL('../src/pages/index.astro', import.meta.url), 'utf8');
+  assert.doesNotMatch(root, /<script>|<Home\b/);
+  assert.match(root, /<Docs\b/);
+  assert.match(root, /getEntry\('docs', 'index.mdx'\)/);
+  assert.match(root, /canonical=\x22\/\x22/);
+  assert.match(root, /transitions=\{false\}/);
+  const config = readFileSync(new URL('../astro.config.mjs', import.meta.url), 'utf8');
+  assert.match(config, /redirects: \{ '\/docs': '\/' \}/);
+  const tree = JSON.parse(readFileSync(new URL('../content/docs/meta.json', import.meta.url), 'utf8'));
+  assert.equal(tree.pages[0], 'index');
 });
 
 test('ordinary macro use comes before expansion and the Lisp definition', () => {
