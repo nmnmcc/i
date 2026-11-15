@@ -1175,3 +1175,105 @@ fn provider_conflicts_keep_call_and_binding_diagnostics() {
         graph.sources.render_all(&diags)
     );
 }
+
+#[test]
+fn deferred_callback_need_meet_survives_generalization_and_transfer() {
+    let helper = "Read(A) = (value = A)
+both = <A, B>(f: () <- (Read(A)) -> A, g: () <- (Read(B)) -> B) { f() g() }";
+    // An open meet is admissible. Only the instance with disjoint closed
+    // callback requirements is forbidden by §9.2's empty-meet paragraph.
+    types(helper);
+    types(&format!(
+        "{helper}\nneed_int = () <- (r: Read(Int)) {{ r.value }}\nuse = () {{ both(need_int, need_int) }}"
+    ));
+    for imported in [false, true] {
+        let calls = "need_int = () <- (r: Read(Int)) { r.value }
+need_string = () <- (r: Read(String)) { r.value }
+use = () { both(need_int, need_string) }";
+        let local = format!("{helper}\n{calls}");
+        let library = format!("(Read(..), both)\n{helper}");
+        let main = format!("(app/helper)\nRead(A) = helper.Read(A)\nboth = helper.both\n{calls}");
+        let files = if imported {
+            vec![
+                ("src/helper.i", library.as_str()),
+                ("src/main.i", main.as_str()),
+            ]
+        } else {
+            vec![("src/main.i", local.as_str())]
+        };
+        let method_files: Vec<_> = files
+            .iter()
+            .map(|(path, source)| {
+                (
+                    *path,
+                    source
+                        .replace("Read(A) = (value = A)", "Read(A) = (read = () -> A)")
+                        .replace("r.value", "r.read()"),
+                )
+            })
+            .collect();
+        let method_refs: Vec<_> = method_files
+            .iter()
+            .map(|(path, source)| (*path, source.as_str()))
+            .collect();
+        let (method_graph, _, method_diags) = common::check_files(&method_refs);
+        assert!(
+            !method_diags.iter().any(|d| d.is_error()),
+            "{:?}",
+            method_graph.sources.render_all(&method_diags)
+        );
+        let (graph, _, diags) = common::check_files(&files);
+        let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
+        assert_eq!(errors.len(), 1, "{:?}", graph.sources.render_all(&diags));
+        assert_eq!(
+            errors[0].code,
+            "E0515",
+            "{:?}",
+            graph.sources.render_all(&diags)
+        );
+        assert!(
+            errors[0].message.contains("empty intersection"),
+            "{:?}",
+            graph.sources.render_all(&diags)
+        );
+    }
+}
+
+#[test]
+fn intersection_inference_never_selects_a_variable_by_operand_order() {
+    for intersection in ["A & B", "B & A"] {
+        for call in ["", "\nuse = () { choose(1, \"s\", 1) }"] {
+            let source =
+                format!("choose = <A, B>(x: {intersection}, a: A, b: B) {{ (x + 1, a, b) }}{call}");
+            let (graph, _, diags) = common::check_files(&[("src/main.i", &source)]);
+            let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
+            assert_eq!(errors.len(), 1, "{:?}", graph.sources.render_all(&diags));
+            assert_eq!(errors[0].code, "E0504");
+            assert!(errors[0].message.contains("principal type"));
+        }
+        // A stated Int member proves the constraint without specializing
+        // either generic component. §4.4 makes both spellings identical.
+        types(&format!(
+            "choose = <A, B>(x: {intersection} & Int, a: A, b: B) {{ (x + 1, a, b) }}\nuse = () {{ choose(1, \"s\", 1) }}"
+        ));
+    }
+}
+
+#[test]
+fn flexible_value_bounds_do_not_close_deferred_need_arguments() {
+    let source = include_str!("../../../tests/spec/9/need_meet_deferred_values.i");
+    // Keep the audit's original type-only probe here; the spec fixture's
+    // empty entry exists only to give its executable harness a root.
+    let source = source
+        .split_once("\nmain =")
+        .map_or(source, |(probe, _)| probe);
+    types(source);
+    types(&source.replace("read(x) read(y)", "read(y) read(x)"));
+    // Decision 1 also permits this genuinely value-bearing service while
+    // the argument bounds remain open; neither lower fixes an empty meet.
+    let fields = source
+        .replace("Read(A) = (read = () -> A)", "Read(A) = (value = A)")
+        .replace("r.read()", "r.value");
+    types(&fields);
+    types(&fields.replace("read(x) read(y)", "read(y) read(x)"));
+}

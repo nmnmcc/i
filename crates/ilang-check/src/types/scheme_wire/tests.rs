@@ -408,6 +408,8 @@ fn deferred_need_meets_survive_transfer_and_instantiation() {
     source.constrain(&meet, &x);
     source.constrain(&meet, &y);
     let scheme = Scheme { level: 0, ty: meet };
+    let source = source.scheme_snapshot();
+    assert!(source.has_obligations(&scheme.ty));
     let text = encode_test(&source, &scheme, &mut |_| "pkg:Svc".into());
     let mut restored = Solver::new(HashMap::new(), Vec::new());
     let decoded = decode(
@@ -423,8 +425,10 @@ fn deferred_need_meets_survive_transfer_and_instantiation() {
         .iter()
         .position(|s| s.need_meet.is_some())
         .unwrap() as u32);
+    assert!(restored.has_obligations(&decoded.ty));
     let mut map = HashMap::new();
-    restored.freshen(&decoded.ty, 0, &mut map);
+    let instance = restored.freshen(&decoded.ty, 0, &mut map);
+    assert!(restored.has_obligations(&instance));
     let fresh = map[&old];
     let upper = restored.vars[fresh.0 as usize].upper.clone();
     assert_eq!(upper.len(), 2);

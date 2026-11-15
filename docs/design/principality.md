@@ -2,12 +2,16 @@
 
 This is an audit of the language in [the spec](../spec.md), especially
 [§4.7](../spec.md#47-type-inference), against checker revision `180e00cf7`.
-It is not a proof that the current compiler finds a principal type for every
-binding. An order-sensitive intersection probe below disproves solution
-preservation by the current solver, even inside the permitted annotation
-fragment. Other extensions have conditional arguments and unproven parts.
-No language or checker change is proposed here; §4.7's principality sentence
-is a compiler requirement.
+It is not a proof that the compiler finds a principal type for every binding.
+The original observations below are against that audit revision. The two
+checker defects in §§1–2 are now fixed: ambiguous intersection specialization
+is rejected under §4.7, and deferred empty service meets retain E0515 through
+generalization. Their correction commits are recorded in those sections. Owner Decision 1,
+applied on 2026-11-15, changes the original method-only callback probe to
+an acceptance control: `Read(Never)` is inhabited. The deferred rejection
+regression now uses a required value field; see §2 and the merge ledger below.
+Other extensions have conditional arguments and unproven parts; §4.7's
+principality sentence remains a compiler requirement.
 
 For a fixed source program and environment, a principal scheme must be
 admissible and subsume every other admissible typing. Here “subsume” includes
@@ -33,11 +37,14 @@ the universal property.
 
 ## 1. The algebraic base
 
-**Verdict: holds for the cited calculi; not shown for the complete i base,
-and the current solver has a concrete non-principal inference below.
-The finite/cofinite scalar component does hold, because its operations are
-exact and closed.** A transfer argument for i must preserve solutions,
-rather than infer principality merely from being a smaller language.
+**Verdict: the order-dependent inference defect is fixed in `685a1b04c`,
+with follow-ups `cde147079` and `c51d1d5a5`, by reporting E0504 when the
+solver cannot find a principal type (§4.7).
+This is a conservative rejection, not a completeness proof or a general
+representation of relational intersection constraints. The cited calculi
+and the finite/cofinite scalar component retain their separate arguments.**
+A transfer argument for i must preserve solutions, rather than infer
+principality merely from being a smaller language.
 
 ### What the references establish
 
@@ -111,8 +118,8 @@ subtype constraints; decompose by the unique constructor; retain variable
 bounds; generalize only variables absent from the environment. Scalar
 normalization is lossless, as are the prescribed ground constructor merges.
 What is **not shown** is a completeness lemma for *all* reachable open
-constraints in this fragment. In fact `constrain_in` handles a left
-intersection by trying its concrete part and then variable parts, keeping
+constraints in this fragment. At the audit revision, `constrain_in` handled
+a left intersection by trying its concrete part and then variable parts, keeping
 the first successful variable bound. The probe below shows that the
 existing place restriction does not make this choice lossless. A proof for
 this implementation cannot simply assume that invariant; it needs an
@@ -171,6 +178,25 @@ current compiler's principal inference/solution preservation, **not** a
 proof that no principal scheme can exist in a better account of the
 language. Neither annotations nor tests are changed to hide it.
 
+**Correction (`685a1b04c`, `cde147079`, `c51d1d5a5`).**
+The two operand orders now receive E0504 at
+`x + 1`: the solver cannot infer a principal solution from the different
+successful specializations. It first checks whether an existing bound
+already proves the goal. It retains a successful structural constructor
+proof, then tries competing variable alternatives in isolated states.
+A unique remaining variable constraint keeps its ordinary diagnostic and
+recovery behavior. No failed speculative trial leaves bounds behind. Each
+read-only alternative gets its own proof budget, so an expensive earlier
+member cannot prevent a later proof. An ambiguous subproblem is not discarded
+as though it had no solutions. The definition-only probe also receives
+E0504. This intentionally removes the old accepted,
+nonprincipal schemes under §4.7's requirement to report an error where a
+principal type cannot be found. It does not claim the satisfying assignment
+above is invalid. Adding an explicit `Int` member to either intersection
+admits the call without specializing `A` or `B`; both orders have positive
+regressions. The two rejected orders and this positive case are fixtures
+under `tests/spec/4.4/`, with checker coverage in `row_schemes.rs`.
+
 The other base probes check successfully with `id : (A) -> A`,
 `bounded : (A & Int) -> A`, `join : (List(Int | String)) -> List(Int | String)`,
 `except_a : (String - "a") -> String - "a"`, and
@@ -182,7 +208,11 @@ counterexample.
 
 **Verdict: holds for merging fully determined, compatible entries, because
 the merge is their unique prescribed meet; not shown for the full open-row
-system. The compiler misses a required deferred E0515 rejection below.**
+system. The missed deferred E0515 rejection below is fixed in `161d07271`,
+with follow-ups `c9193f54c`, `cde147079`, `31e59eb2d` and `c51d1d5a5`;
+this retains a soundness obligation for genuinely empty whole-service
+meets. Decision 1 supersedes the earlier claim that the method-only
+`Read(Never)` probe itself must be rejected.**
 
 [§9.2, “Merging”](../spec.md#92-services) says that merging needs takes their
 intersection. Its next paragraph makes an empty service intersection an
@@ -205,19 +235,22 @@ the value lattice theorem to the surface `&` notation unchanged.
 For a contravariant service `Emit(A) = (emit = (A) -> Nil)`, the meet of
 `Emit(Int)` and `Emit(String)` is `Emit(Int | String)`. A provider must handle
 both. For covariant `Read(A) = (read = () -> A)`, the meet of `Read(Int)`
-and `Read(String)` would be `Read(Never)`, but §9.2 requires E0515 here.
-By contrast a meet whose input was already `Never` is permitted. This is a
-language-specific admissibility condition, not an unconditional lattice
-closure theorem. An invariant service argument needs equality, not a choice
+and `Read(String)` is `Read(Never)`. Under Owner Decision 1 and §4.1,
+a function that stops or diverges inhabits `() -> Never`, so this whole
+service remains inhabited and §9.2 does not require E0515. In contrast,
+`Read(A) = (value = A)` has no value at `Read(Never)` and its disjoint meet
+must fail. An invariant service argument needs equality, not a choice
 between forms. These ground operations introduce no alternative solution.
 
 The implementation uses an internal row collection and **not** ordinary
 value union for needs. In [solve.rs](../../crates/ilang-check/src/types/solve.rs),
 `Mode::Env`, `merge`'s environment case, and `merge_arg` reverse the argument
-operation as required. `Mode::Row` also exists for the separately represented
-error part of a function; it must not be confused with the service
-environment mode. `Fail` is specially lowered into that error part. The
-surface interpretation remains the intersection in §9.2.
+operation as required. At the original audit revision, errors also had a
+separately represented function component. The merged E3 implementation has
+only the ordinary function need: `Fail(E)` is ordinary labelled service data
+in that need, without a separate error component. Decision 2 retains the
+`Fail(Never)` key; simplifying its argument does not provide the service.
+The surface interpretation remains the intersection in §9.2.
 
 For an undetermined covariant argument, `need_meet` makes a fresh variable
 with *both* operands as upper bounds and retains `need_meet` metadata. It
@@ -302,7 +335,9 @@ The last candidate tries the erroneous split described in syntax three's
 rule B: hiding the String error in the residual row instead of returning it.
 Observed: `02-needs` checks with
 `both : () <- (Emit(Int | String)) -> Nil`; `02-empty` rejects with E0515,
-explicitly naming `Read(Int)` and `Read(String)`. `02-rows` checks with
+explicitly naming `Read(Int)` and `Read(String)` at that historical revision.
+Decision 1 now accepts this method-only `02-empty` probe, as explained above;
+only its required-value-field variant is empty. `02-rows` checks with
 `body : () <- (Fail(1 | "s")) -> Never` and
 `caught : () -> Result(Never, 1 | "s")`; `02-row-split` rejects with E0501
 because `"s"` is not a subtype of `Int`.
@@ -342,11 +377,14 @@ Observed: the generic definition checks with
 both : (() <- (Read(A)) -> A, () <- (Read(B)) -> B) <- (Read(A & B)) -> B
 ```
 
-The instantiated program **also checks**, showing
+The instantiated program **also checked at the original audit revision**, showing
 `use : () <- (Read(Never)) -> String`, with no E0515. This differs from the
 ground `02-empty` rejection, despite neither constituent service argument
-being `Never`. It violates the specified empty-meet admission condition;
-the current deferred path cannot be treated as preserving that obligation.
+being `Never`. The original audit called this a missed rejection. Owner
+Decision 1 supersedes that interpretation: a method-only `Read(Never)`
+is inhabited, and this exact program must remain accepted. Replacing the
+service by `Read(A) = (value = A)` and each `r.read()` by `r.value` tests
+the genuinely empty deferred meet while retaining the generalization path.
 
 A relevant audit boundary is `Checker::{generalize, rebuild}`:
 `Solver::has_obligations` protects hidden differences/handlers, but does not
@@ -354,6 +392,34 @@ test `need_meet`. Rebuilding a displayed `A & B` does not recreate the
 deferred meet's metadata. This is a candidate explanation for the observed
 loss, not a traced causal diagnosis. The scalar/ground proof and the
 `freshen` metadata-copying branch do not cover this path.
+
+**Correction (`161d07271`, `c9193f54c`, `cde147079`, `31e59eb2d`,
+`c51d1d5a5`).**
+The traced loss was at
+generalization: `has_obligations` ignored `need_meet`, so `generalize`
+rebuilt the simplified intersection without its marked variable or service
+forms. It now keeps the bounded scheme when a reachable variable carries
+that obligation. Scheme snapshots also retain `has_need_meets`; copying
+only the marked variables while dropping that flag disabled later checks.
+The transfer encoding already copies the obligation and both operands.
+Meet discovery also follows reverse inclusion links: a wider receiver can
+otherwise hide a marked predecessor. Instantiation copies that connected
+quantified graph with one map, stopping at nongeneralized variables and
+keeping the receiver's own bounds distinct from the meet's bounds. Handler
+discovery keeps its existing directed traversal. A regression checks a
+conflict in a fresh receiver instance while the original quantified bounds
+remain unchanged. Freshening retains input provenance for value variables
+connected to a meet, so provisional lower bounds alone do not close them.
+Equal concrete lower and upper bounds still determine an input. The
+ordinary-value control passes in both need orders. Callback need fitting
+preserves the late `NeedMeet` and
+its service pair instead of replacing it with a generic form mismatch. The callback helper alone remains admissible, as do
+compatible callback instances. After applying Decision 1, disjoint
+method-only instances remain accepted, whereas disjoint required-value-field
+instances report E0515 under §9.2. Fixtures under `tests/spec/9/` and checker tests cover the
+open definition, compatible instances, local and imported disjoint uses,
+retention through a receiving variable, snapshots, transfer and freshening.
+No original golden error line was removed.
 
 ## 3. Value-type reads and fitted patterns
 
@@ -857,8 +923,9 @@ after fitting/occurs checking. `group` uses monomorphic holders during
 mutual inference and generalizes afterwards. `Scheme::mono` and
 `instantiate` retain weak identities. `generalize` keeps unsimplified
 bounds for invariant sharing and recognized hidden difference/handler
-obligations, and rejects hidden handler witnesses. The deferred-meet
-counterexample in §2 shows why this is not a theorem for every obligation.
+obligations, and rejects hidden handler witnesses. The original deferred-meet
+counterexample in §2, now fixed, shows why checking that retention is
+necessary; the correction does not establish a theorem for every obligation.
 [solve.rs](../../crates/ilang-check/src/types/solve.rs),
 `extrude` and `freshen`, enforce levels and preserve row/meet metadata.
 
@@ -990,18 +1057,164 @@ paragraph also says “inference still finds principal types”; its scalar
 closure argument should be read with this limitation. This lane's spec
 edit is deliberately confined to §4.7.
 
+### Historical correction verification (2026-11-14)
+
+This ledger predates Owner Decision 1 and the merge of `a02d34100`. Its
+method-only rejection claims and older corpus interpretations are historical;
+the 2026-11-15 merge ledger supersedes them. Main has since adapted the
+alias criterion and the affected review fixtures to the owner decisions.
+
+The wrapped checker run on `c51d1d5a5` completed at 06:53 with **325 passed,
+4 existing stress tests ignored, and only
+`spec_corpus_reverse_order_and_recovery` filtered out**. Every existing
+golden, including every error line, is unchanged. The focused `deferred`
+row-scheme filter passed both tests: the local/imported callback rejection
+and the lower-bound-only acceptance control. `cargo fmt --all -- --check`
+and both unstaged/staged `git diff --check` checks passed.
+
+Two test-only clippy suggestions were then applied without changing the
+assertions' meaning or compiler logic. The unit/clippy retry and release CLI
+build passed. The positive spec fixtures received executable roots in
+`3e475c4c4`: the bounded intersection fixture asserts both orders' results,
+and the two type-only need controls have empty entries. The checker still
+tests the lower-only probe without that harness entry. The final test-only
+formatter correction is `967d9f2ba`; it changes no assertion or compiler logic.
+
+Every heavy command below ran through `/home/agent/Programming/i/.rd/cache/heavy`.
+Cargo commands also used `direnv exec /home/agent/Programming/i`; the wrapper
+selects this worktree's musl development environment.
+
+| Command | Result |
+| --- | --- |
+| `cargo test -p ilang-check --test row_schemes --locked deferred` | 2 passed: callback and lower-only controls |
+| `cargo test -p ilang-check --locked -- --skip spec_corpus_reverse_order_and_recovery` | 325 passed, 4 existing ignored, 1 requested filter |
+| `cargo test -p ilang-check --lib --locked` | 72 passed, 4 existing ignored after test-only clippy cleanup |
+| `cargo clippy -p ilang-check --all-targets --locked -- -D warnings` | Passed |
+| `cargo build -p ilang-cli --release --locked` | Passed |
+| `cargo test -p ilang-cli --release --test spec --locked -- 4.4/` | 5/5 passed at O0/O2 |
+| `cargo test -p ilang-cli --release --test spec --locked -- 4.5/` | 2/2 passed at O0/O2 |
+| `cargo test -p ilang-cli --release --test spec --locked -- 9/` | 153/153 passed at O0/O2 |
+| `./target/release/i test --project std --opt 0` | 2,171 passed, 0 failed |
+| `./target/release/i test --project std --opt 2` | 2,171 passed, 0 failed |
+| `python3 scripts/qa/corpus.py run --filter review-k4 --jobs 2` | Interrupted with exit 143 while isolating post-test wall-time waits; partial observations preserved |
+| Same corpus filter with `--compile-cache target/pfix/compile-cache` | All 1,225 completed: 908 checker acceptances, 317 rejections, no resource failures; exit 1 on 865 saved-output differences and three requirement failures |
+| `scripts/test-generation --mode short --binary ./target/release/i` | 32 base cases (20 accepted, 12 model rejections), 64 permutations, 32 annotation removals; no failures |
+| `cargo fmt --all -- --check` | Passed after the test-only layout correction |
+| `python3 -m py_compile scripts/qa/corpus.py` | Passed |
+| Corpus filter `review-k4d/_loose/p/b10` with the same cache and two jobs | 1/1 passed after the assertion-guard correction, with both E0505 and E0515 retained |
+| Checker comparison against starting commit `0c4942e1f` | All 1,225 corpus cases have identical complete diagnostics and shown root types; all match current CLI observations; nine audit controls have the intended outcomes |
+
+The focused/clippy retry after the fixture entry changes also passed.
+The first corpus attempt was interrupted to isolate post-test wall-time
+timeouts: one process had printed its complete passing result but remained
+alive for over 35 wall seconds with about one CPU second used. The CLI runs
+global cache maintenance after commands. Its partial observations are
+preserved. The completed rerun used a worktree-local compile cache with the
+same saved bounds, two jobs, binary and assertions. Every recorded timeout
+disappeared. Generation used that cache too. No expected observation was
+changed.
+
+The raw saved-output comparison is **not green**. It has 589 cases changing
+only shown types, 267 changing diagnostics or runtime text, and nine changing
+phase sets or exits. Much of the display/wording difference is the inherited
+E3 removal of synthetic `Fail(E)` from opaque needs and E5 removal of provider
+plans, already described in the [E6 integration audit](e6-main-corpus-audit.md).
+Sixty-one changed observations exactly match newer saved observations of
+identical source files and manifests elsewhere in the selected corpus.
+
+The seven changed checker exits against the older observations are:
+
+- `review-k4d/_loose/fuzz/e0505/21_135` and
+  `review-k4-lane/alias_kind_error`: rejected before, accepted now.
+- `review-k4s/mixed_recursive_0_0`, `mixed_recursive_0_17`,
+  `mixed_recursive_1_0`, `mixed_recursive_1_17`: accepted before, now E0225
+  for treating an environment row as ordinary data (§9.4).
+- `review-k4s/std`: the vendored earlier std snapshot now reports five type
+  errors. The current std project passed all 2,171 tests at each level.
+
+Additionally, `review-k4s/min_main_3_0` and `min_main_5_0` now reach their
+entries: their unused local closures no longer leave a need on `main`.
+The starting checker produces the same diagnostics and shown types for all
+these cases. They predate pfix; no corpus checker acceptance changes between
+`0c4942e1f` and this correction. The baseline comparison does not separately
+execute the old runtime. Existing baseline files remain byte-for-byte intact.
+
+Two requirement failures were a runner contradiction, corrected separately
+in `3d9fdec57`. `b10` explicitly requires both a structural-recursion E0505
+and its provider E0515, but the runner unconditionally forbade E0505 while
+checking either requirement. It now permits E0505 only when an applicable
+requirement explicitly requests it; each requirement still needs its own
+code. Only `b10` has such a requirement. Its replay passes without changing
+either diagnostic line or any expectation. This follows §4.7's recursive-type
+paragraph and retains §9.2's independent provider check.
+
+The remaining `alias_kind_error` requirement asks for E0515 on a program
+whose alias is `Row(N) = () <- (Fail(N)) -> Nil` and whose ordinary values
+have types `Svc(Int)` and `Svc(Nil)`, with covariant `Svc(A) = (() -> A)`.
+Here `N` is an error-payload type. §9.3 says “An error may be a value of any
+type”; §4.4 merges these value types as `Svc(Int | Nil)`. It is not an opaque
+service row, and its payload constructors are not service keys under `<-`.
+The old rejection criterion needs review against those paragraphs; it has
+not been weakened or rewritten to claim a green corpus.
+
+The comparison with `0c4942e1f` uses an exact source snapshot of the checker,
+with unchanged package/syntax dependencies and the same package graphs for
+both versions. It compares complete diagnostics and shown root types, and
+checks the current version against the completed CLI observations. Its nine
+extra controls cover local/imported disjoint callbacks, open/lower-only
+needs, both intersection orders with and without a call, and the explicit
+`Int` positive case. A temporary-package lockfile setup failure was resolved
+by generating that package's lockfile offline; the workspace lockfile is
+unchanged.
+
+The initial comparison completed all 1,234 inputs: both checkers agreed on
+all 1,225 corpus inputs, but nine current results did not match the CLI
+because the harness had not expanded their top-level test macros. That
+validation failure was retained, not ignored. A second comparison expanded
+those nine with the unchanged macro implementation, passed the same parsed
+ASTs and hygiene to each checker, and again compared the complete output.
+All nine matched both the starting checker and the current CLI. No typed
+macro driver was shared between checker versions. Thus all 1,225 corpus
+comparisons are validated against the real CLI; none changes checker
+acceptance, diagnostics, or shown root types relative to the starting tip.
+The comparison harness and exact records are under ignored `target/pfix/`.
+
+The nine extra controls establish the intended changes separately:
+
+| Control | Starting checker | Corrected checker | Rule |
+|---|---|---|---|
+| Disjoint callback needs, local | Accepted | E0515 | §9.2 deferred empty meet |
+| Disjoint callback needs, imported | Accepted | E0515 | §9.2 through scheme transfer |
+| Open callback helper | Accepted | Accepted | §9.2 undetermined meet retained |
+| Lower-bound-only ordinary values | Accepted | Accepted | §4.4 value unions remain possible |
+| Original intersection, with call | E0501 at call | E0504 at definition | §4.7 principal type requirement |
+| Original intersection, definition only | Accepted | E0504 | §4.7 principal type requirement |
+| Swapped intersection, with call | Accepted | E0504 | §§4.4, 4.7 same intersection |
+| Swapped intersection, definition only | Accepted | E0504 | §§4.4, 4.7 same intersection |
+| Explicit `Int` intersection member | Accepted | Accepted | §4.5 existing subtype proof |
+
+The raw corpus command remains red against its old saved outputs and the
+unchanged alias criterion. This baseline comparison establishes the scope of
+pfix; it does not re-record those outputs or declare that criterion passed.
+
+The full workspace, unfiltered spec suite, unfiltered corpus and
+`scripts/dev-verify` are reserved for the coordinator and were not run here.
+
 ## Unproven parts
 
 1. Solution-preserving constraint decomposition for i's restricted open
    union/intersection/difference normal forms and closure under
-   substitution. The concrete left-intersection counterexample must be
-   resolved before the current solver could satisfy such a theorem.
+   substitution. The concrete left-intersection counterexample now receives
+   the required principality error rather than an arbitrary specialization;
+   general relational intersection constraints remain unsupported.
    MLstruct's theorem does not transfer automatically to a negation-free
    implementation.
 2. A principal representation for directed service rows with lacks/handled
    obligations, invariance and deferred meets; rejection of all forbidden
-   empty meets in later instances. The demonstrated accepted `Read(Never)`
-   instance must first be brought into agreement with E0515.
+   empty meets in later instances. The required-value-field variant reports
+   E0515 after the obligation-retention corrections; method-only
+   `Read(Never)` remains inhabited under Decision 1. The finite
+   regressions do not establish the full invariant for every transformation.
 3. Principality relative to read-completion demands, retaining sharing
    through aliases, invariant positions and read batches; unrelated-group
    order independence under the conservative dependency rule. Fitted
@@ -1019,3 +1232,39 @@ edit is deliberately confined to §4.7.
 7. The combined whole-program theorem for weak values, generalization,
    completion and snapshots. A printed monotype alone does not specify the
    shared constraint problem.
+
+
+### Main integration (2026-11-15)
+
+Merged `a02d341005c7329391bfd2941f4e16faeac216b9` after fetching origin.
+The three conflicts were resolved as follows:
+
+- `row_schemes.rs`: retained all main tests, then reapplied the three lane
+  tests. Decision 1 changes the method-only callback probe to an acceptance
+  control, locally and across modules. The deferred rejection probe now uses
+  `Read(A) = (value = A)` with disjoint Int/String fields. The original
+  method-only spec fixture remains an acceptance fixture; a new field fixture
+  preserves the rejection intent, and the imported negative uses that shape.
+- `scripts/check-snippets.json`: kept main's current registrations and its
+  removal of obsolete registrations. This lane adds no registration there.
+- `scripts/qa/corpus.py`: kept main's `diagnostic_codes_match` helper and
+  phase-aware `expected_cycle` guard, which supersede the lane's earlier
+  inline E0505 guard without losing the separate required diagnostic check.
+
+The solver/inference changes merged automatically. Main's whole-service
+inhabitance check, no universal-entry removal, explicit duplicate-provider
+E0225 behavior, and checker performance changes are retained. No changes
+relative to main remain in `std/`, `lib/`, or `examples/`: all 75 exported
+Fail conversions in `effects-e4.md` and their adapted callers are unchanged.
+The first merged focused `deferred` row-scheme run passes both tests,
+including method-only acceptance and required-field rejection locally and
+across modules. Final merged verification is recorded separately below.
+
+
+The merged checker gate passes **363 tests**, with four existing stress tests
+ignored and only `spec_corpus_reverse_order_and_recovery` filtered out.
+All 53 row-scheme tests and all current main goldens retain their error lines.
+Strict all-target clippy on `ilang-check` and the release CLI build pass.
+A subsequent focused `deferred` run passes both tests after adding the
+required-value-field lower-bound control in both call orders, while retaining
+its method-only counterpart. Chapter 4.4 passes all five cases at O0/O2.

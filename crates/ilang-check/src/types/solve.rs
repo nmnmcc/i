@@ -115,6 +115,9 @@ pub(crate) enum FailKind {
     NeedMeet,
     /// A value could go to more than one type variable of a union.
     Ambiguous,
+    /// Distinct intersection members admit different specializations.
+    /// The solver cannot choose one as a principal solution.
+    NonPrincipalIntersection,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -292,6 +295,7 @@ impl Solver {
         snapshot.vars = self.vars.clone();
         snapshot.row_params = self.row_params.clone();
         snapshot.has_handlers = self.has_handlers;
+        snapshot.has_need_meets = self.has_need_meets;
         snapshot.comparison_wrappers = self.comparison_wrappers.clone();
         snapshot.alias_folds = self.alias_folds.clone();
         snapshot
@@ -734,28 +738,39 @@ impl Solver {
         }
     }
 
-    /// Hidden difference constraints cannot be thrown away by rebuilding
-    /// only the visible type. Keep the bounded scheme in this case.
+    /// Hidden difference and need-meet constraints cannot be thrown away by
+    /// rebuilding only the visible type. Keep the bounded scheme in this case.
     pub fn has_obligations(&self, t: &Ty) -> bool {
-        if !self.has_handlers {
+        self.retained_obligations(t, true)
+    }
+
+    fn retained_obligations(&self, t: &Ty, handlers: bool) -> bool {
+        if !(handlers && self.has_handlers) && !self.has_need_meets {
             return false;
         }
         let mut edges = Vec::new();
         bound_vars(self, t, true, false, &mut edges);
-        let mut todo: Vec<_> = edges.drain(..).map(|e| e.0).collect();
+        let mut todo: Vec<_> = edges.drain(..).map(|e| (e.0, handlers)).collect();
         let mut seen = HashSet::default();
-        while let Some(v) = todo.pop() {
-            if !seen.insert(v) {
+        while let Some((v, handlers)) = todo.pop() {
+            if !seen.insert((v, handlers)) {
                 continue;
             }
             let st = self.var(v);
-            if st.difference {
+            if (handlers && st.difference) || st.need_meet.is_some() {
                 return true;
             }
             for b in st.lower.iter().chain(&st.upper) {
                 bound_vars(self, b, true, false, &mut edges);
             }
-            todo.extend(edges.drain(..).map(|e| e.0));
+            todo.extend(edges.drain(..).map(|e| (e.0, handlers)));
+            if self.has_need_meets {
+                // A meet may reach a wider variable through an inclusion
+                // stored only at the predecessor. Its admissibility still
+                // constrains the instance. Handler discovery keeps its
+                // existing directed traversal.
+                todo.extend(st.from.iter().chain(&st.into).map(|v| (*v, false)));
+            }
         }
         false
     }
@@ -1182,27 +1197,96 @@ impl Solver {
                 self.constrain_in(&l2, r, env);
             }
             (Ty::Inter(ms), _) => {
-                // `a & T <: R` is true when `T <: R` or when `a <: R`.
-                // The members that are not type variables
-                // are tried first; when they fail, each variable is tried.
-                // Only the members with a type constructor are put together
-                // into one: the others (variables, differences, unions that
-                // stay) are tried one by one, so that the type tried is
-                // always smaller than `l`.
+                // An intersection's order has no meaning. Trying its
+                // members in place used to specialize the first variable
+                // that accepted a bound, losing other valid solutions.
                 let (conc, vars): (Vec<Ty>, Vec<Ty>) = ms.iter().cloned().partition(Ty::is_headed);
                 let mut tries = Vec::new();
-                if !conc.is_empty() {
+                let has_concrete = !conc.is_empty();
+                if has_concrete {
                     tries.push(self.normalize_mode(Ty::Inter(conc), env));
                 }
                 tries.extend(vars);
+                if tries.len() == 1 {
+                    self.constrain_in(&tries[0], r, env);
+                    return;
+                }
+                // A bound that already proves the goal needs no choice,
+                // even if another member could be specialized to prove it.
+                if tries.iter().any(|t| {
+                    let mut demand = super::prove::Demand::new(super::prove::Demand::LIMIT);
+                    super::prove::prove_mode(self, t, r, env, &mut demand)
+                        == super::prove::Verdict::Proven
+                }) {
+                    return;
+                }
                 let before = self.failures.len();
-                let last = tries.len().saturating_sub(1);
-                for (i, t) in tries.iter().enumerate() {
-                    self.constrain_in(t, r, env);
-                    if self.failures.len() == before || i == last {
-                        break;
+                let mut solution: Option<Self> = None;
+                let mut unresolved = false;
+                let start = if has_concrete {
+                    // A concrete constructor supplies the structural proof
+                    // independently of the variable members (§4.4). Keep
+                    // that existing inference path before choosing among
+                    // residual variables, including fresh pattern holes.
+                    let mut trial = self.clone();
+                    trial.constrain_in(&tries[0], r, env);
+                    if trial.failures.len() == before {
+                        *self = trial;
+                        return;
                     }
-                    self.failures.truncate(before);
+                    unresolved = trial.failures[before..].iter().any(|f| {
+                        matches!(
+                            f.kind,
+                            FailKind::Ambiguous | FailKind::NonPrincipalIntersection
+                        )
+                    });
+                    if tries.len() == 2 && !unresolved {
+                        // There is only one remaining constraint, so apply
+                        // it directly, retaining its ordinary diagnostic and
+                        // recovery state rather than an invented root error.
+                        self.constrain_in(&tries[1], r, env);
+                        return;
+                    }
+                    1
+                } else {
+                    0
+                };
+                for t in &tries[start..] {
+                    let mut trial = self.clone();
+                    trial.constrain_in(t, r, env);
+                    if trial.failures.len() != before {
+                        // An unsupported choice is not evidence that this
+                        // alternative has no solution. Do not discard it in
+                        // favor of a different specialization either.
+                        unresolved |= trial.failures[before..].iter().any(|f| {
+                            matches!(
+                                f.kind,
+                                FailKind::Ambiguous | FailKind::NonPrincipalIntersection
+                            )
+                        });
+                        continue;
+                    }
+                    if let Some(previous) = &solution {
+                        if previous.vars != trial.vars {
+                            // Our bounds cannot express this disjunction of
+                            // solutions. §4.7 requires an error here, rather
+                            // than publishing an arbitrary nonprincipal type.
+                            self.fail(FailKind::NonPrincipalIntersection, l, r);
+                            return;
+                        }
+                    } else {
+                        solution = Some(trial);
+                    }
+                }
+                if unresolved {
+                    self.fail(FailKind::NonPrincipalIntersection, l, r);
+                } else if let Some(solution) = solution {
+                    *self = solution;
+                } else {
+                    // No failed alternative may leave bounds in the solver.
+                    // Report the complete goal rather than an arbitrary last
+                    // member, so operand order cannot select the diagnostic.
+                    self.fail(FailKind::Mismatch, l, r);
                 }
             }
             (Ty::Diff(a, h), _) => self.diff_left(a, h, r, env),
@@ -1257,8 +1341,22 @@ impl Solver {
                         self.constrain_by(y, x, v, row);
                     }
                     if self.failures.len() > before {
+                        // Argument fitting can determine a deferred meet
+                        // elsewhere in the instantiated scheme. Keep that
+                        // obligation's service pair, rather than disguising
+                        // it as a mismatch of the callback's own need.
+                        let meet = self.failures[before..]
+                            .iter()
+                            .find(|f| f.kind == FailKind::NeedMeet)
+                            .cloned();
                         self.failures.truncate(before);
-                        self.fail(FailKind::EnvForms, &need, &provider);
+                        if let Some(meet) = meet {
+                            let left = self.known_need_form(&meet.lhs);
+                            let right = self.known_need_form(&meet.rhs);
+                            self.fail(FailKind::NeedMeet, &left, &right);
+                        } else {
+                            self.fail(FailKind::EnvForms, &need, &provider);
+                        }
                     }
                     return;
                 }
@@ -1627,6 +1725,11 @@ impl Solver {
             Ty::Never => None,
             Ty::Var(v) => {
                 let (vars, members) = self.reach(vec![*v], true);
+                // Even an input is determined when equal concrete lower
+                // and upper bounds fix it. Lower bounds alone may widen.
+                if members.len() == 1 && self.reach(vec![*v], false).1.contains(&members[0]) {
+                    return Some(members);
+                }
                 if members.is_empty()
                     || vars.iter().any(|v| {
                         let state = self.var(*v);
@@ -1962,6 +2065,11 @@ impl Solver {
     /// Instantiates a type scheme: copies the variables deeper than `above`
     /// to new variables at the current level, with their bounds.
     pub fn freshen(&mut self, t: &Ty, above: u32, map: &mut StdHashMap<V, V>) -> Ty {
+        let reverse = self.level_of(t) > above && self.retained_obligations(t, false);
+        self.freshen_in(t, above, map, reverse)
+    }
+
+    fn freshen_in(&mut self, t: &Ty, above: u32, map: &mut StdHashMap<V, V>, reverse: bool) -> Ty {
         if self.level_of(t) <= above {
             return t.clone();
         }
@@ -1974,22 +2082,54 @@ impl Solver {
                 map.insert(*v, nv);
                 self.var_mut(nv).row = self.var(*v).row;
                 self.var_mut(nv).difference = self.var(*v).difference;
+                if reverse
+                    && self.var(*v).row == Mode::Value
+                    && self.var(*v).input
+                    && self.retained_obligations(&Ty::Var(*v), false)
+                {
+                    // An instantiated input may acquire only lower bounds
+                    // from ordinary arguments. Do not mistake those for a
+                    // closed meet operand. Row closure keeps its own policy.
+                    self.var_mut(nv).input = true;
+                }
                 let handled = self.var(*v).handled.clone();
                 let handled = handled
                     .iter()
-                    .map(|h| self.freshen(h, above, map))
+                    .map(|h| self.freshen_in(h, above, map, reverse))
                     .collect();
                 self.var_mut(nv).handled = handled;
                 if let Some((a, b)) = self.var(*v).need_meet.clone() {
-                    let a = self.freshen(&a, above, map);
-                    let b = self.freshen(&b, above, map);
+                    let a = self.freshen_in(&a, above, map, reverse);
+                    let b = self.freshen_in(&b, above, map, reverse);
                     self.var_mut(nv).need_meet = Some((a, b));
                 }
                 let (lower, upper) = (self.var(*v).lower.clone(), self.var(*v).upper.clone());
-                let lower = lower.iter().map(|b| self.freshen(b, above, map)).collect();
-                let upper = upper.iter().map(|b| self.freshen(b, above, map)).collect();
+                let lower = lower
+                    .iter()
+                    .map(|b| self.freshen_in(b, above, map, reverse))
+                    .collect();
+                let upper = upper
+                    .iter()
+                    .map(|b| self.freshen_in(b, above, map, reverse))
+                    .collect();
                 self.set_lower(nv, lower);
                 self.set_upper(nv, upper);
+                if reverse {
+                    // The scheme's admissibility may live at a meet that
+                    // flows to this variable. Copy its connected quantified
+                    // bounds with this same map; do not attach the meet's
+                    // upper bounds to the wider receiver itself.
+                    let edges: Vec<_> = self
+                        .var(*v)
+                        .from
+                        .iter()
+                        .chain(&self.var(*v).into)
+                        .copied()
+                        .collect();
+                    for w in edges {
+                        self.freshen_in(&Ty::Var(w), above, map, true);
+                    }
+                }
                 Ty::Var(nv)
             }
             Ty::Union(ms) if self.is_row(t) => {
@@ -1997,10 +2137,15 @@ impl Solver {
                 // Otherwise generalization can leave its only receiver
                 // behind, losing comparisons of forms instantiated later.
                 let mode = self.mode(t);
-                let ms = ms.iter().map(|m| self.freshen(m, above, map)).collect();
+                let ms = ms
+                    .iter()
+                    .map(|m| self.freshen_in(m, above, map, reverse))
+                    .collect();
                 self.union_mode(ms, mode)
             }
-            _ => self.map_children(t, Pol::Pos, &mut |s, x, _| s.freshen(x, above, map)),
+            _ => self.map_children(t, Pol::Pos, &mut |s, x, _| {
+                s.freshen_in(x, above, map, reverse)
+            }),
         }
     }
 
@@ -3385,6 +3530,128 @@ mod literal_tests {
     }
 
     #[test]
+    fn intersection_constructor_proofs_and_unique_failures_keep_their_behavior() {
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
+        let other = Ty::tuple(vec![]);
+        let boxed = |arg| Ty::named(TypeRef::Custom(TypeId(0)), vec![arg]);
+        for reverse in [false, true] {
+            let mut s = solver();
+            s.variance.insert(TypeId(0), vec![Variance::Co]);
+            let (a, result) = (s.fresh(), s.fresh());
+            let mut parts = vec![a.clone(), boxed(int.clone())];
+            if reverse {
+                parts.reverse();
+            }
+            s.constrain(
+                &Ty::Inter(parts),
+                &Ty::Union(vec![boxed(result.clone()), other.clone()]),
+            );
+            assert!(s.failures.is_empty());
+            assert!(s.var(variable(&a)).upper.is_empty());
+            assert_eq!(
+                s.var(variable(&result)).lower.as_slice(),
+                std::slice::from_ref(&int)
+            );
+
+            let mut s = solver();
+            let a = s.fresh();
+            s.constrain(&int, &a);
+            let mut parts = vec![a, int.clone()];
+            if reverse {
+                parts.reverse();
+            }
+            s.constrain(&Ty::Inter(parts), &string);
+            assert_eq!(s.failures.len(), 1);
+            assert_eq!(s.failures[0].lhs, int);
+            assert_eq!(s.failures[0].rhs, string);
+        }
+    }
+
+    #[test]
+    fn intersection_alternatives_do_not_choose_or_leak_bounds() {
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
+        for reverse in [false, true] {
+            let mut s = solver();
+            let (a, b) = (s.fresh(), s.fresh());
+            let mut operands = vec![a.clone(), b.clone()];
+            if reverse {
+                operands.reverse();
+            }
+            let lhs = Ty::Inter(operands);
+            s.constrain(&lhs, &int);
+            assert_eq!(s.failures.len(), 1);
+            assert_eq!(s.failures[0].kind, FailKind::NonPrincipalIntersection);
+            assert!(s.var(variable(&a)).upper.is_empty());
+            assert!(s.var(variable(&b)).upper.is_empty());
+
+            // A prior bound proves the goal in either order; nothing new
+            // should be imposed on the other variable.
+            s.failures.clear();
+            s.constrain(&b, &int);
+            s.constrain(&lhs, &int);
+            assert!(s.failures.is_empty());
+            assert!(s.var(variable(&a)).upper.is_empty());
+
+            let mut s = solver();
+            let (a, b) = (s.fresh(), s.fresh());
+            let mut operands = [
+                Ty::tuple(vec![a.clone(), int.clone()]),
+                Ty::tuple(vec![string.clone(), b.clone()]),
+            ];
+            // Keep these as separate alternatives: normalized same-head
+            // constructors instead use §4.4's prescribed argument merge.
+            if reverse {
+                operands.reverse();
+            }
+            // A union alternative first constrains a, then fails at the
+            // second tuple part. That failed trial must leave a untouched.
+            let first = Ty::Union(vec![operands[0].clone(), operands[1].clone()]);
+            let second = Ty::Union(vec![operands[1].clone(), operands[0].clone()]);
+            s.constrain(
+                &Ty::Inter(vec![first, second]),
+                &Ty::tuple(vec![int.clone(), string.clone()]),
+            );
+            assert_eq!(s.failures.len(), 1);
+            assert!(s.var(variable(&a)).upper.is_empty());
+            assert!(s.var(variable(&b)).upper.is_empty());
+        }
+    }
+
+    #[test]
+    fn deferred_need_meet_predecessors_are_instantiated_with_the_receiver() {
+        let mut s = solver();
+        s.level = 1;
+        let (x, y) = (s.fresh(), s.fresh());
+        let service = TypeRef::Custom(TypeId(0));
+        let a = Ty::named(service, vec![x.clone()]);
+        let b = Ty::named(service, vec![y.clone()]);
+        let meet = s.need_meet(&x, &y, &a, &b, Mode::Value, 1);
+        let receiver = s.fresh();
+        s.constrain(&meet, &receiver);
+        assert!(s.has_obligations(&receiver));
+        s.level = 2;
+        let mut map = StdHashMap::new();
+        let instance = s.freshen(&receiver, 0, &mut map);
+        assert!(s.has_obligations(&instance));
+        assert!(map.contains_key(&variable(&meet)));
+        s.constrain(
+            &Ty::Var(map[&variable(&x)]),
+            &Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]),
+        );
+        assert!(s.failures.is_empty());
+        s.constrain(
+            &Ty::Var(map[&variable(&y)]),
+            &Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]),
+        );
+        assert!(s.failures.iter().any(|f| f.kind == FailKind::NeedMeet));
+        assert!(s.var(variable(&meet)).need_meet.is_some());
+        assert!(s.var(variable(&x)).upper.is_empty());
+        assert!(s.var(variable(&y)).upper.is_empty());
+    }
+
+    #[test]
     fn deferred_need_meet_keeps_both_upper_bounds_and_reports_late_conflicts() {
         let service = TypeRef::Custom(TypeId(0));
         let mut s = solver();
@@ -3393,6 +3660,12 @@ mod literal_tests {
         let b = Ty::named(service, vec![y.clone()]);
         let meet = s.need_meet(&x, &y, &a, &b, Mode::Value, 0);
         assert!(s.failures.is_empty());
+        assert!(s.has_obligations(&meet));
+        assert!(!s.has_obligations(&Ty::Never));
+        let mut receiving = s.clone();
+        let receiver = receiving.fresh();
+        receiving.constrain(&meet, &receiver);
+        assert!(receiving.has_obligations(&receiver));
         let Ty::Var(v) = meet else {
             panic!("a deferred meet is a variable")
         };
