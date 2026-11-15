@@ -535,7 +535,7 @@ fn expr(e: &Expr) -> Datum {
         ExprKind::BitArray(xs) => at(K::Bits(xs.iter().map(|s| segment(s, expr)).collect()), span),
         ExprKind::Block(b) => block(b),
         ExprKind::Chain(fs) if fs.len() == 1 => function(&fs[0]),
-        ExprKind::Chain(fs) => form("|", span, fs.iter().map(function)),
+        ExprKind::Chain(fs) => form("&", span, fs.iter().map(function)),
         ExprKind::Call { callee, args } => apply(expr(callee), span, ditems(args)),
         ExprKind::Provide { target, services } => form_in(
             "<-",
@@ -1455,11 +1455,17 @@ fn expr_of(d: &Datum) -> R<Expr> {
             match symbol(head) {
                 Some(",") => ExprKind::Data(ditems_of(rest)?),
                 Some("->") => ExprKind::Chain(vec![function_of(d)?]),
-                Some("|") => {
+                Some("&") => {
                     if rest.len() < 2 {
-                        return err(d, "a chain `(| F1 F2 …)` has two or more functions");
+                        return err(d, "a chain `(& F1 F2 …)` has two or more functions");
                     }
                     ExprKind::Chain(rest.iter().map(function_of).collect::<R<_>>()?)
+                }
+                Some("|") => {
+                    return err(
+                        d,
+                        "`|` no longer joins function values: join the branches with `&`, as `(& F1 F2 …)`",
+                    );
                 }
                 Some("|>") => match rest {
                     [l, r] => ExprKind::Pipe {
