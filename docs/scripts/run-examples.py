@@ -238,7 +238,7 @@ def host_commands(binary, opt, project, environment):
     (project / 'wasi-run.mjs').write_text(
         f'import {{ runWasi }} from {json.dumps((ROOT / "bindings/javascript/wasi-run.mjs").as_uri())};\n'
         'process.exitCode = await runWasi(process.argv[2], JSON.parse(process.argv[3] ?? "{}"));\n')
-    for host, target in (('wasi', 'wasi'), ('javascript', 'host')):
+    for host, target in (('wasi', 'wasi'), ('javascript', 'nodejs')):
         output = 'build/' + host + '.wasm'
         build = [str(binary), 'build', '--offline', '--opt', str(opt), '--target', target, '--out', output]
         run = ([node, '--no-warnings', 'wasi-run.mjs', output]
