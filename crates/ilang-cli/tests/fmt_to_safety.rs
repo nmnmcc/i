@@ -95,7 +95,10 @@ fn trailing_comment_is_refused_i_to_is() {
     assert_eq!(
         stderr_of(&out),
         "a.i:1:14: error: converting to `is` would lose this text: \"// trailing\"\n\
-         a.i: the source is unchanged; nothing in this run was converted\n"
+         a.i: the source is unchanged; nothing in this run was converted\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.i\n"
     );
     assert_eq!(bytes(dir.path(), "a.i"), source.as_bytes());
     assert_missing(dir.path(), "a.is");
@@ -113,7 +116,10 @@ fn nested_trailing_comment_is_refused_i_to_is() {
     assert_eq!(
         stderr_of(&out),
         "a.i:3:7: error: converting to `is` would lose this text: \"// nested trailing\"\n\
-         a.i: the source is unchanged; nothing in this run was converted\n"
+         a.i: the source is unchanged; nothing in this run was converted\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.i\n"
     );
     assert_eq!(bytes(dir.path(), "a.i"), source.as_bytes());
     assert_missing(dir.path(), "a.is");
@@ -132,7 +138,10 @@ fn eof_comment_without_newline_is_refused_i_to_is() {
     assert_eq!(
         stderr_of(&out),
         "a.i:2:1: error: converting to `is` would lose this text: \"// last note\"\n\
-         a.i: the source is unchanged; nothing in this run was converted\n"
+         a.i: the source is unchanged; nothing in this run was converted\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.i\n"
     );
     assert_eq!(bytes(dir.path(), "a.i"), source.as_bytes());
     assert_missing(dir.path(), "a.is");
@@ -149,7 +158,10 @@ fn eof_comment_with_newline_is_refused_i_to_is() {
     assert_eq!(
         stderr_of(&out),
         "a.i:2:1: error: converting to `is` would lose this text: \"// last note\"\n\
-         a.i: the source is unchanged; nothing in this run was converted\n"
+         a.i: the source is unchanged; nothing in this run was converted\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.i\n"
     );
     assert_eq!(bytes(dir.path(), "a.i"), source.as_bytes());
     assert_missing(dir.path(), "a.is");
@@ -168,7 +180,10 @@ fn trailing_and_eof_comments_are_refused_is_to_i() {
         stderr_of(&out),
         "a.is:2:21: error: converting to `i` would lose this text: \"// trailing\"\n\
          a.is:4:1: error: converting to `i` would lose this text: \"// last note\"\n\
-         a.is: the source is unchanged; nothing in this run was converted\n"
+         a.is: the source is unchanged; nothing in this run was converted\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.is\n"
     );
     assert_eq!(bytes(dir.path(), "a.is"), source.as_bytes());
     assert_missing(dir.path(), "a.i");
@@ -333,7 +348,11 @@ fn unrepresentable_lisp_module_is_refused_before_any_write() {
     assert_eq!(out.stdout, b"");
     assert_eq!(
         stderr_of(&out),
-        "quote.is:1:1: error[E0101]: the module cannot be represented in the other surface\n"
+        "quote.is:1:1: error[E0101]: the module cannot be represented in the other surface\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 good.is\n\
+         \x20 quote.is\n"
     );
     assert_eq!(bytes(dir.path(), "good.is"), b"(= f (-> (,) _ 1))\n");
     assert_eq!(bytes(dir.path(), "quote.is"), b"(= q `(f 1))\n");
@@ -355,7 +374,10 @@ fn existing_destination_is_not_overwritten_is_to_i() {
     assert_eq!(out.stdout, b"");
     assert_eq!(
         stderr_of(&out),
-        "a.is: error: a.i already exists; it will not be overwritten\n"
+        "a.is: error: a.i already exists; it will not be overwritten\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.is\n"
     );
     assert_eq!(bytes(dir.path(), "a.is"), b"(= f (-> (,) _ 1))\n");
     assert_eq!(bytes(dir.path(), "a.i"), existing.as_bytes());
@@ -373,7 +395,10 @@ fn existing_untracked_destination_is_not_overwritten() {
     assert_eq!(out.stdout, b"");
     assert_eq!(
         stderr_of(&out),
-        "a.i: error: a.is already exists; it will not be overwritten\n"
+        "a.i: error: a.is already exists; it will not be overwritten\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.i\n"
     );
     assert_eq!(bytes(dir.path(), "a.i"), b"greeting = () { \"hi\" }\n");
     assert_eq!(bytes(dir.path(), "a.is"), existing.as_bytes());
@@ -404,7 +429,10 @@ fn existing_tracked_destination_is_not_overwritten() {
     assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
     assert_eq!(
         stderr_of(&out),
-        "a.i: error: a.is already exists; it will not be overwritten\n"
+        "a.i: error: a.is already exists; it will not be overwritten\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.i\n"
     );
     assert_eq!(bytes(dir.path(), "a.i"), b"greeting = () { \"hi\" }\n");
     assert_eq!(bytes(dir.path(), "a.is"), existing.as_bytes());
@@ -433,7 +461,12 @@ fn mixed_batch_with_one_lossy_file_is_refused_entirely() {
     assert_eq!(
         stderr_of(&out),
         "b.i:1:14: error: converting to `is` would lose this text: \"// note\"\n\
-         b.i: the source is unchanged; nothing in this run was converted\n"
+         b.i: the source is unchanged; nothing in this run was converted\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.i\n\
+         \x20 b.i\n\
+         \x20 c.i\n"
     );
     for name in ["a.i", "b.i", "c.i"] {
         assert!(dir.path().join(name).exists(), "{name} must stay");
@@ -459,20 +492,18 @@ fn preflight_refusal_reports_all_unconverted_i_to_is() {
     let out = i(dir.path(), &["--to", "is", "a.i", "b.i", "c.i"]);
     assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
     assert_eq!(out.stdout, b"");
-    let err = stderr_of(&out);
-    let lower = err.to_lowercase();
-    assert!(
-        lower.contains("no files were converted")
-            || lower.contains("nothing was converted")
-            || lower.contains("nothing in this run was converted"),
-        "the report must say that nothing was converted:\n{err}"
+    // The report says that nothing was converted and lists every file of the
+    // batch, not only the one that caused the refusal.
+    assert_eq!(
+        stderr_of(&out),
+        "b.i:1:14: error: converting to `is` would lose this text: \"// note\"\n\
+         b.i: the source is unchanged; nothing in this run was converted\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.i\n\
+         \x20 b.i\n\
+         \x20 c.i\n"
     );
-    // Every file of the batch is named in the unconverted report, not only the
-    // one that caused the refusal.
-    for name in ["a.i", "b.i", "c.i"] {
-        assert!(err.contains(name), "the report must name {name}:\n{err}");
-    }
-    assert!(err.contains("not converted"), "{err}");
     for name in ["a.i", "b.i", "c.i"] {
         assert_eq!(
             bytes(dir.path(), name),
@@ -499,18 +530,16 @@ fn preflight_refusal_reports_all_unconverted_is_to_i() {
 
     let out = i(dir.path(), &["--to", "i", "a.is", "b.is", "c.is"]);
     assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
-    let err = stderr_of(&out);
-    let lower = err.to_lowercase();
-    assert!(
-        lower.contains("no files were converted")
-            || lower.contains("nothing was converted")
-            || lower.contains("nothing in this run was converted"),
-        "the report must say that nothing was converted:\n{err}"
+    assert_eq!(
+        stderr_of(&out),
+        "b.is:1:20: error: converting to `i` would lose this text: \"// note\"\n\
+         b.is: the source is unchanged; nothing in this run was converted\n\
+         no files were converted: the check phase refused the batch and nothing was written\n\
+         files not converted (all left as they were):\n\
+         \x20 a.is\n\
+         \x20 b.is\n\
+         \x20 c.is\n"
     );
-    for name in ["a.is", "b.is", "c.is"] {
-        assert!(err.contains(name), "the report must name {name}:\n{err}");
-    }
-    assert!(err.contains("not converted"), "{err}");
     assert_eq!(bytes(dir.path(), "a.is"), b"(= a (-> (,) _ 1))\n");
     assert_eq!(bytes(dir.path(), "b.is"), b"(= b (-> (,) _ 1)) // note\n");
     assert_eq!(bytes(dir.path(), "c.is"), b"(= c (-> (,) _ 2))\n");
@@ -575,28 +604,20 @@ fn read_only_destination_directory_write_failure_keeps_source_and_lists_converte
     );
     assert_ne!(out.status.code(), Some(0), "{}", stderr_of(&out));
     assert_eq!(out.stdout, b"");
-    let err = stderr_of(&out);
-    // The failure itself is a real I/O error from a read-only directory.
-    assert!(
-        err.contains(
-            "ro/b.i: error: cannot create a temporary file in ro: Permission denied (os error 13)"
-        ),
-        "{err}"
-    );
-    // The report lists both what was converted and what was not.
-    assert!(err.contains("already converted in this run:"), "{err}");
-    assert!(err.contains("  aa/a.i -> aa/a.is"), "{err}");
-    assert!(err.contains("not converted"), "{err}");
-    assert!(
-        err.contains("ro/b.i") && err.contains("zz/c.i"),
-        "the report must name the files left unconverted:\n{err}"
-    );
-
-    // The failing file is named as the point where the run stopped, so the
-    // three states -- converted, failed, not converted -- are all reported.
-    assert!(
-        err.contains("ro/b.i: conversion stopped"),
-        "the report must name the failing file:\n{err}"
+    // The real I/O error, then the three groups: converted, failed, and not
+    // processed. Every file of the batch appears exactly where its state says.
+    assert_eq!(
+        stderr_of(&out),
+        "converted aa/a.i -> aa/a.is\n\
+         ro/b.i: error: cannot create a temporary file in ro: Permission denied (os error 13)\n\
+         already converted in this run (destination written, source removed):\n\
+         \x20 aa/a.i -> aa/a.is\n\
+         failed:\n\
+         \x20 ro/b.i -> ro/b.is: source is unchanged, destination was not written\n\
+         not processed (left as they were):\n\
+         \x20 zz/c.i\n\
+         recover each converted file by converting it back (`i fmt --to i DESTINATION`) or by restoring the source from version control\n\
+         ro/b.i: conversion stopped; the files above were already converted\n"
     );
 
     // The first file was converted and its source removed.
@@ -654,12 +675,18 @@ fn in_place_target_survives_a_later_write_failure() {
 
     let out = i(dir.path(), &["--to", "is", "aa/b.is", "ro/c.i"]);
     assert_ne!(out.status.code(), Some(0), "{}", stderr_of(&out));
-    let err = stderr_of(&out);
-    assert!(
-        err.contains(
-            "ro/c.i: error: cannot create a temporary file in ro: Permission denied (os error 13)"
-        ),
-        "{err}"
+    assert_eq!(
+        stderr_of(&out),
+        "ro/c.i: error: cannot create a temporary file in ro: Permission denied (os error 13)\n\
+         already converted in this run (destination written, source removed):\n\
+         \x20 none\n\
+         already formatted in place:\n\
+         \x20 aa/b.is\n\
+         failed:\n\
+         \x20 ro/c.i -> ro/c.is: source is unchanged, destination was not written\n\
+         not processed (left as they were):\n\
+         \x20 none\n\
+         ro/c.i: conversion stopped; the files above were already converted\n"
     );
     // The in-place file holds exactly the formatted bytes, and its content is
     // still a valid module.
