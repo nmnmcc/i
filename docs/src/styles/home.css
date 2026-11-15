@@ -37,6 +37,7 @@ html:has(.home-doc-page) { scrollbar-gutter: auto; }
 .macro-definition figure.shiki > div:first-child:not([role='region']) { display: none; }
 .host-run { display: grid; grid-template-columns: minmax(0, 1fr) 10rem; align-items: center; gap: 1rem; }
 .home-page .host-command { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; }
+.home-page .host-command pre { padding-left: var(--padding-left); padding-right: var(--padding-right); }
 @media (max-width: 800px) {
   .home-page { height: auto; grid-template-columns: minmax(0, 1fr); padding: 1.25rem; gap: 1.5rem; }
   .home-page h1 { max-width: 18ch; font-size: 2rem; }

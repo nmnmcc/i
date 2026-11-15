@@ -231,6 +231,11 @@ redirect and previous-page link, and searches for the canonical home entry.
 First-screen and full-page screenshots and measurements go to
 `DOCS_LAYOUT_OUTPUT` or a temporary directory. The docs CI checks do not install
 a browser; this browser check is an explicit review gate.
+Every visible home block is checked for a text inset at least as large as the
+source block padding, including the opened macro definition. The first-program
+guide is checked at desktop and phone sizes for the same code/transcript padding.
+Set `DOCS_LAYOUT_SHOTS=fast,first-program` to retake just those images without
+reducing the layout checks.
 
 For the second item, click its native label or use
 `document.querySelector('#choice-safe').click()` without changing the URL.

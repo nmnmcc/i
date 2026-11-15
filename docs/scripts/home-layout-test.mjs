@@ -14,6 +14,7 @@ const dist = join(root, 'docs/dist');
 const executablePath = process.env.CHROMIUM_BIN;
 assert.ok(executablePath, 'Set CHROMIUM_BIN to an existing Chromium executable; this check never downloads a browser.');
 const output = process.env.DOCS_LAYOUT_OUTPUT ?? await mkdtemp(join(tmpdir(), 'i-home-layout-'));
+const requestedShots = process.env.DOCS_LAYOUT_SHOTS?.split(',');
 await mkdir(output, { recursive: true });
 const keys = ['simple', 'safe', 'testable', 'precise', 'extensible', 'fast'];
 const source = await readFile(join(root, 'docs/content/docs/index.mdx'), 'utf8');
@@ -45,7 +46,27 @@ let browser;
 const measurements = [];
 const pageErrors = [];
 const screenshotFiles = [];
+const guideMeasurements = [];
+async function blockInsets(page, selector) {
+  return page.locator(selector).evaluate((scope) => [...scope.querySelectorAll('pre')]
+    .filter((pre) => pre.getClientRects().length && !pre.closest('[hidden], details:not([open])'))
+    .flatMap((pre) => {
+      const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const offset = node.textContent.search(/\S/);
+        if (offset < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, offset); range.setEnd(node, offset + 1);
+        const box = pre.closest('figure') ?? pre;
+        return [{ title: box.querySelector('figcaption')?.textContent ?? pre.textContent.trim().split('\n')[0],
+          leftOffset: range.getBoundingClientRect().left - box.getBoundingClientRect().left }];
+      }
+      return [];
+    }));
+}
 async function screenshots(page, prefix, key, directory = output) {
+  if (requestedShots && !requestedShots.includes(key)) return;
   await mkdir(directory, { recursive: true });
   await page.evaluate(() => window.scrollTo(0, 0));
   for (const mode of ['first', 'full']) {
@@ -77,6 +98,8 @@ try {
       }
       assert.ok(await page.locator('#choice-simple').isChecked());
       assert.equal(await page.locator('.example-panel:visible').count(), 1);
+      const sourcePadding = await page.locator('#panel-simple code.language-i .line').first().evaluate((line) => parseFloat(getComputedStyle(line).paddingLeft));
+      assert.ok(sourcePadding > 0, `${prefix}: source padding must be positive`);
       let baseline;
       for (const key of keys) {
         await page.locator(`label[for="choice-${key}"]`).click();
@@ -112,6 +135,9 @@ try {
           return { scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, stage: rect(document.querySelector('.example-stage')), sidebar: sidebar ? rect(sidebar) : null, intro, display, labels, panel: rect(panel), contentTop: Math.min(intro.top, display.top), contentBottom: Math.max(intro.bottom, display.bottom), contrast, fonts, fontRequests, blocks };
         });
         const label = `${prefix} ${key}`;
+        data.insets = await blockInsets(page, '.home-page');
+        for (const block of data.insets) assert.ok(block.leftOffset + .01 >= sourcePadding,
+          `${label}: ${block.title} text inset ${block.leftOffset}px is less than source padding ${sourcePadding}px`);
         assert.ok(data.scrollHeight <= (width > 800 ? height : height * 1.5), `${label}: scrollHeight ${data.scrollHeight}`);
         assert.equal(data.scrollWidth, data.clientWidth, `${label}: horizontal page overflow`);
         assert.ok(data.fonts.length > 0 && data.fonts.every((font) => /^(?:DM Sans|DM Mono)$/.test(font)), `${label}: unexpected loaded font ${data.fonts}`);
@@ -156,6 +182,7 @@ try {
       await page.locator('label[for="choice-extensible"]').click();
       await page.locator('.macro-definition summary').click();
       const expanded = await page.locator('#panel-extensible').evaluate((el) => ({ bottom: el.getBoundingClientRect().bottom, stage: el.parentElement.getBoundingClientRect().bottom, height: document.documentElement.scrollHeight }));
+      for (const block of await blockInsets(page, '.home-page')) assert.ok(block.leftOffset + .01 >= sourcePadding, `${prefix}: expanded macro block lost left padding`);
       assert.ok(expanded.bottom <= expanded.stage + 1, `${prefix}: open macro definition exceeds stage`);
       assert.ok(expanded.height <= (width > 800 ? height : height * 1.5));
       if (width > 800) {
@@ -191,6 +218,23 @@ try {
       await context.close();
     }
   }
+  // Ordinary command fences must retain the same padding outside the home page.
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    for (const theme of ['light', 'dark']) {
+      const context = await browser.newContext({ viewport: { width, height }, colorScheme: theme, reducedMotion: 'reduce' });
+      const page = await context.newPage();
+      page.on('pageerror', (error) => pageErrors.push(String(error)));
+      await page.goto(`http://127.0.0.1:${server.address().port}/docs/getting-started/first-program`, { waitUntil: 'networkidle' });
+      await page.evaluate(() => document.fonts.ready);
+      const padding = await page.locator('#nd-page code.language-i .line').first().evaluate((line) => parseFloat(getComputedStyle(line).paddingLeft));
+      const insets = await blockInsets(page, '#nd-page');
+      assert.ok(insets.length > 0 && insets.every((block) => block.leftOffset + .01 >= padding), `${width} ${theme}: guide code or command padding missing`);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `${width} ${theme}: guide page overflow`);
+      guideMeasurements.push({ viewport: [width, height], theme, padding, insets });
+      await screenshots(page, `${width}x${height}-${theme}`, 'first-program');
+      await context.close();
+    }
+  }
   // The canonical entry is searchable, and ordinary docs link back to it.
   const nav = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   nav.on('pageerror', (error) => pageErrors.push(String(error)));
@@ -218,7 +262,7 @@ try {
   assert.equal(await nav.locator('a[href^="#"]').count(), 0);
   await nav.close();
   assert.deepEqual(pageErrors, []);
-  await writeFile(join(output, 'measurements.json'), JSON.stringify({ proseWords, sourceMetrics, measurements, screenshotFiles }, null, 2));
+  await writeFile(join(output, 'measurements.json'), JSON.stringify({ proseWords, sourceMetrics, measurements, guideMeasurements, screenshotFiles }, null, 2));
   console.log(`${measurements.length} layouts passed; ${proseWords} prose words; screenshots: ${output}`);
 } finally {
   await browser?.close();
