@@ -55,3 +55,11 @@ test('plain wording and clean inferred service types stay in the page', () => {
   assert.doesNotMatch(page, /\b(novel|unique|powerful|revolutionary|advanced|first|only|guarantee|set-theoretic|capability|intersection)\b|effect system|principal types|i\/request\.(?:Await|Owner)/i);
   assert.match(page, /remaining : \(Int\) <- \(Clock, Fail\(Late\)\) -> Int/);
 });
+
+test('Fast shows the reader-facing run commands without runner flags', () => {
+  const fast = panels.find((match) => match[1] === 'fast')[2];
+  const commands = [...fast.matchAll(/<pre className=\x22host-command\x22>\{([^\n]+)\}<\/pre>/g)]
+    .map((match) => JSON.parse(match[1]));
+  assert.deepEqual(commands, ['i run', 'i run --target wasi', 'i run --target nodejs']);
+  assert.doesNotMatch(fast, /--offline|--opt|2>\/dev\/null|\.mjs/);
+});

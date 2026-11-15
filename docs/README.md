@@ -46,15 +46,18 @@ The displayed deadline function and macro definitions must match their shared fi
 
 - `i run`: complete `src/main.i`; the next fence is `text`, with exact stdout
   (one trailing newline is tolerated). Runs at `--opt 0` and `--opt 2`.
-  Add `hosts=native,wasi,javascript` to compare that same stdout on all three
-  hosts at both levels: `i run`, a WASI build run by Node's WASI runner, and a
-  host build run by the JavaScript SDK with `standardServices: true`. Node must
-  be on PATH. Each example's existing deadline covers all six runs and builds;
-  an unavailable host or a failed build fails the example, rather than skipping it.
+  Add `hosts=native,wasi,javascript` to compare stdout on all three hosts at
+  both levels using `i run`, `i run --target wasi` and `i run --target nodejs`.
+  The runner adds `--offline` and `--opt` as hidden verification flags.
+  WASI uses the CLI when Wasmtime is available (`WASMTIME` or `wasmtime` on PATH).
+  Without it, the runner builds the WASI target and executes it with the local
+  Node WASI driver; Node must then be on PATH. A present but failing runtime
+  fails the example without falling back. The JavaScript target always uses
+  `i run --target nodejs`. Each example's deadline covers all six runs and any
+  fallback builds; an unavailable runtime fails the example rather than skipping it.
   Add `transcripts=hosts` to show three independent `text` transcripts, in native,
   WASI, JavaScript order. Each host is compared with its own transcript at both
-  levels; command fences may appear before them. The temporary project gets
-  small `wasi-run.mjs` and `host-run.mjs` SDK drivers, not generated CLI loaders.
+  levels; command fences may appear before them.
 - `i test`: complete `test/<page>_test.i`; every test must pass at both levels.
   Add `stdout=exact` and an immediately following `text` fence to compare its
   transcript as well as its exit status at both levels.
