@@ -339,8 +339,8 @@ fn show_as_writes_every_row_in_its_position() {
         ),
         (
             Item,
-            "(= pick (| (-> (, 0 y) _ y) (-> (, x _) _ x)))",
-            "pick = (0, y) { y } | (x, _) { x }",
+            "(= pick (& (-> (, 0 y) _ y) (-> (, x _) _ x)))",
+            "pick = (0, y) { y } & (x, _) { x }",
         ),
         (Attribute, "macro", "@macro"),
         (Attribute, "(. m custom)", "@m.custom"),

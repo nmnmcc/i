@@ -70,7 +70,7 @@ fn nominal_union_recursive_match_scales() {
 
 #[test]
 fn union_is_displayed_by_its_declared_name() {
-    let source = "Some(A) = (A)\nNone = ()\nOption(A) = Some(A) | None\nfirst = (xs : List(Option(Int))) -> Int {\n\txs |> ([Some(x), ..r]) { x } | (_) { 0 }\n}\npick = (b : Bool) { b |> (True) { Some(1) } | (False) { None } }\nmain = () { first([pick(True)]) }\n";
+    let source = "Some(A) = (A)\nNone = ()\nOption(A) = Some(A) | None\nfirst = (xs : List(Option(Int))) -> Int {\n\txs |> ([Some(x), ..r]) { x } & (_) { 0 }\n}\npick = (b : Bool) { b |> (True) { Some(1) } & (False) { None } }\nmain = () { first([pick(True)]) }\n";
     let lines = lines(source);
     for expected in [
         "app/main.first : (List(Option(Int))) -> Int",

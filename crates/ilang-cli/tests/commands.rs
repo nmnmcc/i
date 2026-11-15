@@ -122,7 +122,7 @@ fn test_runs_each_test() {
         ("src/lib.i", " (twice)\n\ntwice = (n : Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { Nil } | (_) { panic(\"no\") } })\n\ntest(\"bad\", () { panic(\"bad\") })\n",
+            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { Nil } & (_) { panic(\"no\") } })\n\ntest(\"bad\", () { panic(\"bad\") })\n",
         ),
     ]);
     let out = i(&["test"], dir.path());
@@ -265,13 +265,13 @@ fn host_exports_give_errors() {
 divide = (a : Int, b : Int) {
 	b |>
 		(0) { fail.raise("division by zero") }
-		| (1) { fail.raise(a) }
-		| (_) { a / b }
+		& (1) { fail.raise(a) }
+		& (_) { a / b }
 }
 
 // `Nil` and `Bool` errors have their own tags.
 check = (n : Int) -> Float {
-	n |> (0) { fail.raise(Nil) } | (1) { fail.raise(True) } | (_) { 1.5 }
+	n |> (0) { fail.raise(Nil) } & (1) { fail.raise(True) } & (_) { 1.5 }
 }
 
 // The `Assert` of a host export stops the program (§9.6).
@@ -282,7 +282,7 @@ positive = (n : Int) {
 
 // A `BitArray` error.
 bits = (b : Bool) -> Nil {
-	b |> (True) { fail.raise(<<1, 2>>) } | (False) { Nil }
+	b |> (True) { fail.raise(<<1, 2>>) } & (False) { Nil }
 }
 "#,
         ),

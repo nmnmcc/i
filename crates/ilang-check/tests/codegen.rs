@@ -31,7 +31,7 @@ second = (t : (Int, String)) { t.1 }
 minus = (a : Int, b : Int) { a - b }
 by_label = Cat(name = "a", lives = 9)
 piped = 5 |> minus(1)
-tests = (x) { x |> (_ : { Int | String }) { 1 } | (_ : (Int, Int)) { 2 } | (_) { 3 } }
+tests = (x) { x |> (_ : { Int | String }) { 1 } & (_ : (Int, Int)) { 2 } & (_) { 3 } }
 env = () <- (c : Watch) { c.now() <- (c) }
 mono = minus(1, 2)
 age = (Cat(name = name, lives = l)) { l }
@@ -44,9 +44,9 @@ Handle = Opaque
 div = (a : Int, h : Handle) {
 	a |>
 		(0) { fail.raise("zero") }
-		| (1) { fail.raise(a) }
-		| (2) { fail.raise(Nil) }
-		| (_) { a }
+		& (1) { fail.raise(a) }
+		& (2) { fail.raise(Nil) }
+		& (_) { a }
 }
 "#;
 

@@ -137,7 +137,7 @@ alias = forgotten
 has_argument = (n : Int) { assert(n > 0) }
 returns_int = () { 1 }
 never_returns = () { panic("stop") }
-union_result = (b : Bool) { b |> (True) { Nil } | (False) { 1 } }
+union_result = (b : Bool) { b |> (True) { Nil } & (False) { 1 } }
 with_environment = () <- (a : Assert) { assert(True) }
 "#,
         ),
@@ -233,7 +233,7 @@ guard = True
 value = 1
 read = (<<n:u(size)>>) {
 	xs = [value]
-	n |> (0 ? guard) { xs } | (_) { [] }
+	n |> (0 ? guard) { xs } & (_) { [] }
 }
 "#
         )])

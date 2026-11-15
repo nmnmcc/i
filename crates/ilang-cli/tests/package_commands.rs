@@ -569,7 +569,7 @@ fn published(w: &World, src: &str) -> PathBuf {
             ("src/api.i", src),
             (
                 "test/api_test.i",
-                "(\n\ttestlib = (test) = std/test\n\tpub/api\n)\n\ntest(\"works\", () { api.one |> (1) { Nil } | (other) { panic(\"no\") } })\n",
+                "(\n\ttestlib = (test) = std/test\n\tpub/api\n)\n\ntest(\"works\", () { api.one |> (1) { Nil } & (other) { panic(\"no\") } })\n",
             ),
         ],
     );

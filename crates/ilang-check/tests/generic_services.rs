@@ -241,11 +241,11 @@ fn repeated_helpers_keep_a_finite_principal_row() {
 #[test]
 fn catching_an_unknown_callback_keeps_its_error_cases_reachable() {
     let (_, checked) = check(
-        "(i/fail)\nprobe = (handler) { fail.catch(() { handler() }) |> (Ok(value)) { value } | (Error(_: String)) { 0 } | (Error(_)) { 1 } }",
+        "(i/fail)\nprobe = (handler) { fail.catch(() { handler() }) |> (Ok(value)) { value } & (Error(_: String)) { 0 } & (Error(_)) { 1 } }",
     );
     common::expect_unused(&checked.diags, &["probe"]);
     let (_, checked) = check(
-        "(i/fail)\npure = () { fail.catch(() { 1 }) |> (Ok(value)) { value } | (Error(_)) { 0 } }",
+        "(i/fail)\npure = () { fail.catch(() { 1 }) |> (Ok(value)) { value } & (Error(_)) { 0 } }",
     );
     assert!(
         checked.diags.iter().any(|d| d.code == "W0501"),

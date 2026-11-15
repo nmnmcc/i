@@ -260,7 +260,7 @@ fn query_recovery_keeps_unrelated_results() {
 fn expanded_places_and_constant_head_alias_parts() {
     // checking only each Of misses the union surrounding two local holders.
     bad(
-        "pick = <A, B>(a : A, b : B, c : Bool) {\n\tresult = c |> (True) { a } | (False) { b }\n\t(result, a, b)\n}\nuse = (f : pick) { f }",
+        "pick = <A, B>(a : A, b : B, c : Bool) {\n\tresult = c |> (True) { a } & (False) { b }\n\t(result, a, b)\n}\nuse = (f : pick) { f }",
         code::TYPE_PLACE,
     );
     bad(
@@ -939,15 +939,15 @@ fn independent_review_reproducers() {
 #[test]
 fn normalized_shapes_preserve_skips_and_nested_heads() {
     let (_, c) = good(
-        "Box(A) = (A)\nleft : Int = 1\nright : Int = 2\nv = True |> (True) { Box(left) } | (False) { Box(right) }\nBox(Item) = v",
+        "Box(A) = (A)\nleft : Int = 1\nright : Int = 2\nv = True |> (True) { Box(left) } & (False) { Box(right) }\nBox(Item) = v",
     );
     assert_eq!(alias(&c, "Item"), "Int");
     let (_, c) = good(
-        "Outer(A) = (A)\nBox(A) = (A)\nleft : Int = 1\nright : Int = 2\nv = True |> (True) { Outer(Box(left)) } | (False) { Outer(Box(right)) }\nOuter(Box(Item)) = v",
+        "Outer(A) = (A)\nBox(A) = (A)\nleft : Int = 1\nright : Int = 2\nv = True |> (True) { Outer(Box(left)) } & (False) { Outer(Box(right)) }\nOuter(Box(Item)) = v",
     );
     assert_eq!(alias(&c, "Item"), "Int");
     good(
-        "Cell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nput = <A>(c : Cell(A), x : A) { c.set(x) }\nPair(A, B) = { (A, B) }\npack = <A>(a : Cell(A), b : Bool) {\n\t(a, b |> (True) { (1, a) } | (False) { (2, a) })\n}\n(a, v) = pack(cell(1), True)\nPair(Item, _) = v\nlater = () { put(a, \"s\") }",
+        "Cell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nput = <A>(c : Cell(A), x : A) { c.set(x) }\nPair(A, B) = { (A, B) }\npack = <A>(a : Cell(A), b : Bool) {\n\t(a, b |> (True) { (1, a) } & (False) { (2, a) })\n}\n(a, v) = pack(cell(1), True)\nPair(Item, _) = v\nlater = () { put(a, \"s\") }",
     );
 }
 

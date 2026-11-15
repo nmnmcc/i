@@ -69,7 +69,7 @@ fn run(wasm: &[u8], limits: Limits) -> (Result<Outcome, anyhow::Error>, MacroBud
 
 #[test]
 fn charges_are_identical_before_and_after_optimization() {
-    let source = "f = (n) { n |> (0) { [\"end\"] } | (_) { [\"x\", ..f(n - 1)] } }\n\nmain = () {\n\tf(5)\n\tNil\n}\n";
+    let source = "f = (n) { n |> (0) { [\"end\"] } & (_) { [\"x\", ..f(n - 1)] } }\n\nmain = () {\n\tf(5)\n\tNil\n}\n";
     let a = compile(source, false);
     let b = compile(source, true);
     let (out_a, count_a) = run(&a, Limits::default());
@@ -83,7 +83,7 @@ fn charges_are_identical_before_and_after_optimization() {
 
 #[test]
 fn the_same_export_counts_longer_paths_and_ignores_the_program_target() {
-    let source = "(\n\tmeasure\n)\nmeasure = (n : Int) -> Int { n |> (0) { 0 } | (_) { measure(n - 1) + 1 } }\n";
+    let source = "(\n\tmeasure\n)\nmeasure = (n : Int) -> Int { n |> (0) { 0 } & (_) { measure(n - 1) + 1 } }\n";
     let manifest = "name = \"app\"\n[wasm]\nexports = [\"app/main.measure\"]\n";
     let native = compile_project(source, manifest, false, ilang_wasm::Target::Native);
     let wasi = compile_project(source, manifest, false, ilang_wasm::Target::Wasi);
@@ -125,11 +125,11 @@ fn work_and_allocation_stop_before_crossing_the_limit() {
 
 #[test]
 fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
-    let tail_source = "f = (n) { n |> (0) { Nil } | (_) { f(n - 1) } }\n\nmain = () { f(40) }\n";
+    let tail_source = "f = (n) { n |> (0) { Nil } & (_) { f(n - 1) } }\n\nmain = () { f(40) }\n";
     let baseline = compile(&tail_source.replace("f(40)", "f(0)"), false);
     let tail = compile(tail_source, false);
     let non_tail = compile(
-        "f = (n) { n |> (0) { 0 } | (_) { f(n - 1) + 1 } }\n\nmain = () {\n\tf(40)\n\tNil\n}\n",
+        "f = (n) { n |> (0) { 0 } & (_) { f(n - 1) + 1 } }\n\nmain = () {\n\tf(40)\n\tNil\n}\n",
         false,
     );
     // Entries include ordinary library catch/provider frames. Find the
@@ -189,7 +189,7 @@ fn data_dependent_work_and_allocation_grow_with_values() {
 
 #[test]
 fn frame_accounting_restores_after_errors_and_continuation_resume() {
-    let source = "(\n\ti/fail\n\ti/control\n)\ninner = (n) { n |> (0) { fail.raise(\"err\") } | (_) { inner(n - 1) + 1 } }\n\nmain = () {\n\tfail.catch(() { inner(5) })\n\tcontrol.boundary((b) { control.suspend(b, (k) { control.resume(k, 1) }) })\n\tNil\n}\n";
+    let source = "(\n\ti/fail\n\ti/control\n)\ninner = (n) { n |> (0) { fail.raise(\"err\") } & (_) { inner(n - 1) + 1 } }\n\nmain = () {\n\tfail.catch(() { inner(5) })\n\tcontrol.boundary((b) { control.suspend(b, (k) { control.resume(k, 1) }) })\n\tNil\n}\n";
     for optimized in [false, true] {
         let wasm = compile(source, optimized);
         let (outcome, budget) = run(&wasm, Limits::default());
@@ -349,7 +349,7 @@ fn logical_frame_limit_precedes_native_stack_exhaustion_for_large_expressions() 
         .collect::<Vec<_>>()
         .join(", ");
     let source = format!(
-        "many = ({parameters}, last : Int) -> Int {{ last }}\nf = (n : Int) -> Int {{ n |> (0) {{ 0 }} | (_) {{ many({arguments}, f(n - 1)) }} }}\nmain = () {{ f(3300) Nil }}\n"
+        "many = ({parameters}, last : Int) -> Int {{ last }}\nf = (n : Int) -> Int {{ n |> (0) {{ 0 }} & (_) {{ many({arguments}, f(n - 1)) }} }}\nmain = () {{ f(3300) Nil }}\n"
     );
     let mut usage = Vec::new();
     for optimized in [false, true] {

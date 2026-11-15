@@ -197,7 +197,7 @@ Service = (value = Int)
 make = () {
     fail.catch(() { clock.sleep_ns(1000) }) |>
         (Ok(_)) { Service(value = 42) }
-        | (Error(_)) { panic("clock failed") }
+        & (Error(_)) { panic("clock failed") }
 }
 wrong = () { Service(value = 0) }
 read = () <- (s: Service) { assert(s.value == 42) }

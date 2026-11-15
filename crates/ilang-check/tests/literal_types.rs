@@ -94,11 +94,11 @@ fn expressions_do_not_widen_or_compute_arithmetic() {
 #[test]
 fn missing_values_report_coverage_and_later_constraints_are_kept() {
     // Immediate Values is replaced by E0516; a later binding adds E0501.
-    let (ds, _) = check("f = (n : Int) { n |> (0) { \"zero\" } | (1) { \"one\" } }\n");
+    let (ds, _) = check("f = (n : Int) { n |> (0) { \"zero\" } & (1) { \"one\" } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "E0516");
     assert!(ds[0].1.ends_with("matches `2`"), "{ds:?}");
-    let (ds, _) = check("f : (Int) -> String = (0) { \"zero\" } | (1) { \"one\" }\n");
+    let (ds, _) = check("f : (Int) -> String = (0) { \"zero\" } & (1) { \"one\" }\n");
     assert_eq!(ds.len(), 2, "{ds:?}");
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     assert!(ds.iter().any(|d| d.0 == "E0516"), "{ds:?}");
@@ -107,7 +107,7 @@ fn missing_values_report_coverage_and_later_constraints_are_kept() {
 #[test]
 fn scalar_matches_infer_literals_but_fitting_keeps_whole_types() {
     // A literal may narrow a match, while fitting must retain the full input type.
-    let (ds, lines) = check("kind = (\"a\") { 1 } | (\"b\") { 2 }\nfit = (\"a\") { 1 }\n");
+    let (ds, lines) = check("kind = (\"a\") { 1 } & (\"b\") { 2 }\nfit = (\"a\") { 1 }\n");
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
         lines
@@ -141,7 +141,7 @@ fn equality_diagnostics_distinguish_the_operator() {
 fn shared_fields_do_not_infer_an_empty_parameter() {
     // Repeated written parameters keep String and require coverage.
     let (ds, lines) = check(
-        "Pair(A) = (A, A)\nk = (p) { p |> (Pair(\"a\", \"x\")) { 1 } | (Pair(\"b\", \"y\")) { 2 } }\nx = () { k(Pair(\"a\", \"x\")) }\n",
+        "Pair(A) = (A, A)\nk = (p) { p |> (Pair(\"a\", \"x\")) { 1 } & (Pair(\"b\", \"y\")) { 2 } }\nx = () { k(Pair(\"a\", \"x\")) }\n",
     );
     assert_eq!(ds.iter().filter(|d| d.0 == "E0516").count(), 1, "{ds:?}");
     assert!(!ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
@@ -172,7 +172,7 @@ f = () {
 			list.fold(
 				[1, 2, 3, 4],
 				0,
-				{ (n, _) { { n == 3 } |> (True) { n } | (False) { n + 1 } } },
+				{ (n, _) { { n == 3 } |> (True) { n } & (False) { n + 1 } } },
 			) ==
 				3,
 		)
@@ -186,7 +186,7 @@ f = () {
 #[test]
 fn prefix_witness_does_not_match_a_prefix_row() {
     // Concrete witnesses: after the empty string and the prefix "a", choose "b".
-    let (ds, _) = check("f = (s : String) { s |> (\"\") { 0 } | (\"a\" <> _) { 1 } }\n");
+    let (ds, _) = check("f = (s : String) { s |> (\"\") { 0 } & (\"a\" <> _) { 1 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "E0516");
     assert!(ds[0].1.ends_with("matches `\"b\"`"), "{ds:?}");
@@ -195,7 +195,7 @@ fn prefix_witness_does_not_match_a_prefix_row() {
 #[test]
 fn inferred_host_export_cannot_receive_a_restricted_scalar() {
     // The host validates form only; inferred input sets must be All.
-    let (ds, _) = check_export("(\n\tf\n)\nf = (\"a\") { 1 } | (\"b\") { 2 }\n", true);
+    let (ds, _) = check_export("(\n\tf\n)\nf = (\"a\") { 1 } & (\"b\") { 2 }\n", true);
     assert!(ds.iter().any(|d| d.0 == "E0521"), "{ds:?}");
 }
 
@@ -222,9 +222,9 @@ fn guarded_list_heads_leave_tail_items_unrestricted() {
         r#"probe = (xs : List(Int)) -> Nil {
 	xs |>
 		([]) { Nil }
-		| ([37, a, b, ..tail] ? a >= 0 && b >= 0) { Nil }
-		| ([37, .._]) { Nil }
-		| ([x, ..tail]) { Nil }
+		& ([37, a, b, ..tail] ? a >= 0 && b >= 0) { Nil }
+		& ([37, .._]) { Nil }
+		& ([x, ..tail]) { Nil }
 }
 "#,
     );
@@ -247,7 +247,7 @@ fn grouped_negatives_supply_the_same_written_group_facts() {
 fn shared_list_items_need_coverage_but_an_option_parameter_keeps_literals() {
     // Shared places get whole scalars; a once-occurring Some(A) keeps literals.
     let (ds, lines) = check(
-        "(\n\t(Option, Some, None) = std/option\n)\nk = (Some(\"a\")) { 1 } | (None) { 2 }\n",
+        "(\n\t(Option, Some, None) = std/option\n)\nk = (Some(\"a\")) { 1 } & (None) { 2 }\n",
     );
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
@@ -255,7 +255,7 @@ fn shared_list_items_need_coverage_but_an_option_parameter_keeps_literals() {
         "{lines:?}"
     );
     let (ds, _) =
-        check("k = (xs) { xs |> ([]) { 0 } | ([\"a\", ..]) { 1 } | ([\"b\", ..]) { 2 } }\n");
+        check("k = (xs) { xs |> ([]) { 0 } & ([\"a\", ..]) { 1 } & ([\"b\", ..]) { 2 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "E0516");
     assert!(
@@ -271,11 +271,11 @@ fn nested_missing_values_are_one_coverage_error() {
     // One E0516 is required rather than E0501 for immediate Values.
     for (source, witness) in [
         (
-            "f = (r : Result(Int, Nil)) { r |> (Ok(0)) { 1 } | (Error(_)) { 2 } }",
+            "f = (r : Result(Int, Nil)) { r |> (Ok(0)) { 1 } & (Error(_)) { 2 } }",
             "Ok(1)",
         ),
         (
-            "f = (n : { Int | Nil }) { n |> (0) { 1 } | (Nil) { 2 } }",
+            "f = (n : { Int | Nil }) { n |> (0) { 1 } & (Nil) { 2 } }",
             "1",
         ),
     ] {
@@ -308,23 +308,23 @@ fn typed_complements_keep_the_head_and_cover_cross_columns() {
     // Each excluded scalar value has its own specialization.
     let cases = [
         (
-            "f = (s : String) { s |> (\"a\") { 0 } | (x : String - \"a\") { 1 } }",
+            "f = (s : String) { s |> (\"a\") { 0 } & (x : String - \"a\") { 1 } }",
             None,
         ),
         (
-            "f = (s : String) { s |> (\"a\") { 0 } | (x : String - \"a\" - \"b\") { 1 } }",
+            "f = (s : String) { s |> (\"a\") { 0 } & (x : String - \"a\" - \"b\") { 1 } }",
             Some("\"b\""),
         ),
         (
-            "f = (s : String) { s |> (\"a\") { 0 } | (\"\" <> r) { 1 } }",
+            "f = (s : String) { s |> (\"a\") { 0 } & (\"\" <> r) { 1 } }",
             None,
         ),
         (
-            "f = (p : (String, Bool)) {\n\tp |> ((x : String - \"a\", _)) { 1 } | ((\"a\", True)) { 2 }\n}",
+            "f = (p : (String, Bool)) {\n\tp |> ((x : String - \"a\", _)) { 1 } & ((\"a\", True)) { 2 }\n}",
             Some("(\"a\", False)"),
         ),
         (
-            "f = (m : { \"a\" | \"b\" | \"c\" }) { m |> (\"a\") { 0 } | (x : String - \"a\") { 1 } }",
+            "f = (m : { \"a\" | \"b\" | \"c\" }) { m |> (\"a\") { 0 } & (x : String - \"a\") { 1 } }",
             None,
         ),
     ];
@@ -383,7 +383,7 @@ fn narrowing_checks_the_entire_row_and_ignores_guards() {
 fn prefix_after_complement_does_not_erase_other_columns() {
     // An excluded string starting with a prefix prevents treating
     // that Except row as covering the whole prefix.
-    let source = "h = (n : Int) { n }\nf = (p : (String, Int)) {\n\tp |> ((x : String - \"ab\", _)) { 0 } | ((\"a\" <> r, t)) { h(t) } | (_) { 2 }\n}\n";
+    let source = "h = (n : Int) { n }\nf = (p : (String, Int)) {\n\tp |> ((x : String - \"ab\", _)) { 0 } & ((\"a\" <> r, t)) { h(t) } & (_) { 2 }\n}\n";
     let (ds, _) = check(source);
     assert!(!ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     // The last wildcard is redundant: the two preceding rows cover String.
@@ -536,7 +536,7 @@ fn literal_values_use_numeric_and_decoded_scalar_identity() {
         assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     }
     let (ds, _) =
-        check("f = (m : { \"\\u{0}\" | \"a\" | \"b\" }) { m |> (\"a\") { 1 } | (\"b\") { 2 } }\n");
+        check("f = (m : { \"\\u{0}\" | \"a\" | \"b\" }) { m |> (\"a\") { 1 } & (\"b\") { 2 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert!(ds[0].1.contains("matches `\"\\u{0000}\"`"), "{ds:?}");
 }
@@ -545,12 +545,12 @@ fn literal_values_use_numeric_and_decoded_scalar_identity() {
 fn shared_parameters_require_all_combinations_of_a_written_finite_set() {
     // Inference keeps a shared head whole; written finite sets constrain coverage.
     let (ds, _) = check(
-        "Pair(A) = (A, A)\nf = (p : Pair(\"a\" | \"b\")) {\n\tp |> (Pair(\"a\", \"a\")) { 0 } | (Pair(\"b\", \"b\")) { 1 }\n}\n",
+        "Pair(A) = (A, A)\nf = (p : Pair(\"a\" | \"b\")) {\n\tp |> (Pair(\"a\", \"a\")) { 0 } & (Pair(\"b\", \"b\")) { 1 }\n}\n",
     );
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "E0516");
     let (ds, _) = check(
-        "Pair(A) = (A, A)\nf = (p : Pair(\"a\" | \"b\")) {\n\tp |>\n\t\t(Pair(\"a\", \"a\")) { 0 }\n\t\t| (Pair(\"b\", \"b\")) { 1 }\n\t\t| (Pair(\"a\", \"b\")) { 2 }\n\t\t| (Pair(\"b\", \"a\")) { 3 }\n}\n",
+        "Pair(A) = (A, A)\nf = (p : Pair(\"a\" | \"b\")) {\n\tp |>\n\t\t(Pair(\"a\", \"a\")) { 0 }\n\t\t& (Pair(\"b\", \"b\")) { 1 }\n\t\t& (Pair(\"a\", \"b\")) { 2 }\n\t\t& (Pair(\"b\", \"a\")) { 3 }\n}\n",
     );
     assert!(ds.is_empty(), "{ds:?}");
 }
@@ -570,7 +570,7 @@ use = () { s.put("GET") }
 stored = () <- (st : State("a")) { st.get() }
 e = (stored, 0).1
 apply = <A, B>(x : A, f : (A) -> B) { (f, f(x)) }
-q = apply("a", ("a") { 1 } | ("b") { 2 }).1
+q = apply("a", ("a") { 1 } & ("b") { 2 }).1
 "#;
     let (ds, _) = check(source);
     assert!(ds.is_empty(), "{ds:?}");
@@ -677,7 +677,7 @@ fn disjoint_guards_do_not_narrow_or_cover() {
         assert_eq!(ds.iter().filter(|d| d.0 == "W0503").count(), 1, "{ds:?}");
         assert_eq!(ds.iter().filter(|d| d.0 == "E0516").count(), 1, "{ds:?}");
     }
-    let (ds, lines) = check("f = (x : 1) { x |> (_ ? x == 2) { x } | (_) { 0 } }\n");
+    let (ds, lines) = check("f = (x : 1) { x |> (_ ? x == 2) { x } & (_) { 0 } }\n");
     assert_eq!(ds.len(), 1, "{ds:?}");
     assert_eq!(ds[0].0, "W0503");
     assert!(
@@ -686,7 +686,7 @@ fn disjoint_guards_do_not_narrow_or_cover() {
     );
     // The impossible guard does not let an invalid body escape checking.
     let (ds, _) = check(
-        "f = (x : 1) {\n\tx |>\n\t\t(_ ? x == 2) {\n\t\t\ty : 2 = x\n\t\t\ty\n\t\t}\n\t\t| (_) { 0 }\n}\n",
+        "f = (x : 1) {\n\tx |>\n\t\t(_ ? x == 2) {\n\t\t\ty : 2 = x\n\t\t\ty\n\t\t}\n\t\t& (_) { 0 }\n}\n",
     );
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
 }

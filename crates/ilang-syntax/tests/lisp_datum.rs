@@ -397,7 +397,7 @@ None = ()
 Option(A) = Some(A) | None
 value : (Int) -> Int
 value = (x) -> Int { x + 1 }
-choose = (x) { x |> (0) { "zero" } | (_) { "other" } }
+choose = (x) { x |> (0) { "zero" } & (_) { "other" } }
 "#;
     let (module, diagnostics) = ilang_syntax::parse_module(source);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");

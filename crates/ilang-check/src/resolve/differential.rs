@@ -509,23 +509,23 @@ fn resolve3_differential() {
 const EXTRA: &[&str] = &[
     // Written branch result unions and ordinary Fail service patterns use
     // the single need, including several forms of the same Fail key.
-    "f = (x: Int) -> Int { x } | (x: Float) -> Float { x }\ng = (x: Int) -> Int { x } | (x: Float) -> Float { x } | (x: String) { x }\nh = () <- (failure: Fail(Int)) { 1 }\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } | (x: Float) <- (failure: Fail(Int)) -> Float { x }\n",
+    "f = (x: Int) -> Int { x } & (x: Float) -> Float { x }\ng = (x: Int) -> Int { x } & (x: Float) -> Float { x } & (x: String) { x }\nh = () <- (failure: Fail(Int)) { 1 }\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } & (x: Float) <- (failure: Fail(Int)) -> Float { x }\n",
     // A finite callback need captured by a local annotation, then handled.
     "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d: Dependency) { Nil }\nuse = <N>() <- (s: S(N)) { S(f) = s  f() }\napply = <N>() { local: () <- N -> Nil = () { use() }  local() }\nmain = () { apply() <- (S(() { read() })) }\ntyped = () { provided: S(Dependency) = S(() { read() })  apply() <- (provided) }\n",
     // Shape dispatch must agree for named and inline groups, aliases, key order,
     // recursion and missing/duplicate shape diagnostics.
-    "(f, alias)\nf = (0) { 0 } | (n: Int) { f(n - 1) } | (x: Int, y: Int) { x + y }\nalias = f\na = alias(1, 2)\nb = 1 |> alias(2)\nc = f()\nlocal = () { g = (a = x: Int, z = y: Int) { x + y } | (x: Int) { x }  g(z = 2, a = 1) }\ninline = [(x: Int) { x } | (x: Int, y: Int) { x + y }]\n",
+    "(f, alias)\nf = (0) { 0 } & (n: Int) { f(n - 1) } & (x: Int, y: Int) { x + y }\nalias = f\na = alias(1, 2)\nb = 1 |> alias(2)\nc = f()\nlocal = () { g = (a = x: Int, z = y: Int) { x + y } & (x: Int) { x }  g(z = 2, a = 1) }\ninline = [(x: Int) { x } & (x: Int, y: Int) { x + y }]\n",
     // General parameter data, closed labelled parameter data, ordinary Fail
     // services and directed need rows use the same HIR as the transition.
     "(fail = i/fail)\nSvc(A) = (value = A)\nSynFail(E) = Fail(E)\nrun = <A, N>(f: () <- N -> A) { f() }\nlabelled: { (x = Int, y = Int) } -> Int = (x = a: Int, y = b: Int) { a + b }\nprovider = () <- (f: SynFail(Int)) { f }\nread = () <- (s: Svc(Int)) { s.value }\nprovided = () { read() <- (Svc(value = 1)) }\n",
     // Sums, data types, aliases, exports of members.
-    "(Shape(..), Circle, Pair(..), area, swap)\n\nCircle = (radius = Float)\nSquare = (side = Float)\nShape = Circle | Square\nPair(A, B) = (first = A, second = B)\nToken = Opaque\nId(A) = A\nBoth = (Int, Int)\nRec = (a = Int, b = Int)\n\narea = (s: Shape) -> Float {\n	s |> (Circle(radius = r)) { r } | (Square(side = _)) { 0.0 }\n}\nswap = <A, B>(p: Pair(A, B)) -> Pair(B, A) { Pair(first = p.second, second = p.first) }\n",
+    "(Shape(..), Circle, Pair(..), area, swap)\n\nCircle = (radius = Float)\nSquare = (side = Float)\nShape = Circle | Square\nPair(A, B) = (first = A, second = B)\nToken = Opaque\nId(A) = A\nBoth = (Int, Int)\nRec = (a = Int, b = Int)\n\narea = (s: Shape) -> Float {\n	s |> (Circle(radius = r)) { r } & (Square(side = _)) { 0.0 }\n}\nswap = <A, B>(p: Pair(A, B)) -> Pair(B, A) { Pair(first = p.second, second = p.first) }\n",
     // Keys in constructor patterns.
     // old-syntax-check: E0101
     "P = (x = Int, y = Int)\nf = (P(x = x, y = other)) { x + other }\ng = (P(x = _, y = y: Int)) { y }\nh = (P(x = a = b, ..)) { a + b }\nk = (P(x = whole: Int, y = _)) { whole }\nm = (p: P) { P(..p, x = 1) }\nn = (P(x = 0, y = y)) { y }\n",
     // Chains: clauses, guards, several positions, alternatives.
     // old-syntax-check: E0110,E0101
-    "f = (0) { 1 } | (n) { n }\ng = (x, y ? x > y) { x } | (x, y) { y }\nh = (1 | 2, a) { a } | (_, a) { a + 1 }\nk = (a = b, c) { (a, b, c) }\nm = (x) { x |> (0) { 1 } | (n ? n > 2) { 2 } | (_) { 3 } }\np = (x) { x |> (y) { y + 1 } }\nq = (x: Int) -> Int { x } | (x) { x }\nr = (x) { 1 } | (x, y) { 2 }\ns = (? True) { 1 }\nt = (x) { x |> (a, b) { a } | (c) { c } }\n",
+    "f = (0) { 1 } & (n) { n }\ng = (x, y ? x > y) { x } & (x, y) { y }\nh = (1 | 2, a) { a } & (_, a) { a + 1 }\nk = (a = b, c) { (a, b, c) }\nm = (x) { x |> (0) { 1 } & (n ? n > 2) { 2 } & (_) { 3 } }\np = (x) { x |> (y) { y + 1 } }\nq = (x: Int) -> Int { x } & (x) { x }\nr = (x) { 1 } & (x, y) { 2 }\ns = (? True) { 1 }\nt = (x) { x |> (a, b) { a } & (c) { c } }\n",
     // Data, calls, strings, index.
     // old-syntax-check: E0110,E0101,E0101
     "f = (x) { \"a\\(x)b\\(x)\" }\ng = (x) { \"\\(x)\" }\nh = () { a = (1, 2)  a.0 }\nk = () { (a = 1, b = 2) }\nm = (r) { (..r, a = 1) }\nn = () { (a = 2, 1) }\np = (f) { f(1, ..f) }\nq = () { () }\nr = (x) { x |> Some }\ns = (x) { core.never(x) }\nt = core.never\n",
@@ -568,8 +568,8 @@ const EXTRA_LISP: &[&str] = &[
     r#"
 (@ macro (: identity (-> [A] (, A) A)))
 (@ macro (= identity (-> (, x) _ x)))
-(@ macro (= guarded (| (-> (? (, x) True) _ x) (-> (, _) _ 0))))
-(@ macro (= wrapped (| (-> (, x y) _ x) (-> (, x y) _ y))))
+(@ macro (= guarded (& (-> (? (, x) True) _ x) (-> (, _) _ 0))))
+(@ macro (= wrapped (& (-> (, x y) _ x) (-> (, x y) _ y))))
 (@ macro (= generic (-> [A] (, x) _ x)))
 (@ macro (= bad_pattern (-> (, (, a b)) _ a)))
 "#,
@@ -589,7 +589,7 @@ fn resolve3_prepared_quotes() {
 (= both (-> (, `(f ~(= a b))) _ (, a b)))
 (= tuple (-> (, `(f ~(, a b))) _ (, a b)))
 (= choose (-> (, x) _
-  (|> x (| (-> (? (, `(f ~item)) False) _ item)
+  (|> x (& (-> (? (, `(f ~item)) False) _ item)
              (-> (, (| `(g ~item) `(h ~item))) _ item)
              (-> (, _) _ x)))))
 (= build (-> (, input rest) _ `(f ~input ~..rest)))

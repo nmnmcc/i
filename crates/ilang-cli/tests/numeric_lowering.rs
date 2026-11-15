@@ -609,10 +609,10 @@ make_float = (x : Float) { (v : Float) -> Float { v +. x } }
 bounded_float = (x : Float) -> Float {
 	{ x >=. -.1.0 } |>
 		(False) { x }
-		| (True) {
+		& (True) {
 			{ x <=. 1.0 } |>
 				(False) { x }
-				| (True) {
+				& (True) {
 					a = x *. 0.5 +. 0.25
 					a *. 0.5 -. 0.125
 				}
@@ -622,7 +622,7 @@ Left = (x = Float, y = Float)
 Right = (y = Float, x = Float)
 Pair = Left | Right
 relay = (f : (Float) -> Float, n : Int, x : Float) -> Float {
-	n |> (0) { f(x) } | (_) { relay(f, n - 1, x) }
+	n |> (0) { f(x) } & (_) { relay(f, n - 1, x) }
 }
 numeric_pair = (x : Float) -> (Float, Float) { (x +. 0.25, x *. 0.5) }
 step_float = (x : Float) -> Float { x *. 0.5 +. 0.25 }
@@ -633,24 +633,24 @@ suspend_int = (b, x : Int) -> Int {
 	a + 2
 }
 loop_down = (n : Int, acc : Int) -> Int {
-	n |> (0) { acc } | (_) { loop_down(n - 1, acc - n) }
+	n |> (0) { acc } & (_) { loop_down(n - 1, acc - n) }
 }
 loop_effect = (n : Int, acc : Int) -> Int {
 	n |>
 		(0) { acc }
-		| (_) {
+		& (_) {
 			record(core.inspect(acc))
 			loop_effect(n - 1, acc + n)
 		}
 }
 loop_int = (n : Int, sum : Int) -> Int {
-	n |> (0) { sum } | (_) { loop_int(n - 1, sum + n) }
+	n |> (0) { sum } & (_) { loop_int(n - 1, sum + n) }
 }
 fact = (n : Int, acc : Int) -> Int {
-	n |> (0) { acc } | (_) { fact(n - 1, acc * n) }
+	n |> (0) { acc } & (_) { fact(n - 1, acc * n) }
 }
 loop_float = (n : Int, sum : Float) -> Float {
-	n |> (0) { sum } | (_) { loop_float(n - 1, sum +. 0.25) }
+	n |> (0) { sum } & (_) { loop_float(n - 1, sum +. 0.25) }
 }
 resumed_g = (b, x : Float) -> Float {
 	y = control.suspend(b, (k) { control.resume(k, 1.0) })
@@ -667,27 +667,27 @@ resumed_h = (x : Float) -> Float {
 	})
 }
 helper_sq = (x : Float) -> Float { x *. x }
-sq_loop = (n : Int, acc : Float) -> Float { n |> (0) { acc } | (_) { sq_loop(n - 1, helper_sq(acc) +. 1.0) } }
-list_product = (xs : List(Float), acc : Float) -> Float { xs |> ([]) { acc } | ([a, ..rest]) { list_product(rest, acc *. a) } }
-fold_float = <A>(items : List(A), acc : Float, f : (Float, A) -> Float) -> Float { items |> ([]) { acc } | ([a, ..rest]) { fold_float(rest, f(acc, a), f) } }
+sq_loop = (n : Int, acc : Float) -> Float { n |> (0) { acc } & (_) { sq_loop(n - 1, helper_sq(acc) +. 1.0) } }
+list_product = (xs : List(Float), acc : Float) -> Float { xs |> ([]) { acc } & ([a, ..rest]) { list_product(rest, acc *. a) } }
+fold_float = <A>(items : List(A), acc : Float, f : (Float, A) -> Float) -> Float { items |> ([]) { acc } & ([a, ..rest]) { fold_float(rest, f(acc, a), f) } }
 list_match = (xs : List(Float), x : Float) -> Float {
 	xs |>
 		([0.0, a, ..rest]) { list_match(rest, a +. x) }
-		| ([a, b]) { a +. b +. x }
-		| ([]) { x }
-		| ([a, ..rest]) { list_match(rest, a *. x) }
+		& ([a, b]) { a +. b +. x }
+		& ([]) { x }
+		& ([a, ..rest]) { list_match(rest, a *. x) }
 }
 list_or_float = (v : { List(Float) | Float }, x : Float) -> Float {
 	v |>
 		([]) { x }
-		| ([a, ..rest]) { list_or_float(rest, a +. x) }
-		| (_ : Float) { x *. 2.0 }
+		& ([a, ..rest]) { list_or_float(rest, a +. x) }
+		& (_ : Float) { x *. 2.0 }
 }
 list_dot = (as : List(Float), bs : List(Float), acc : Float) -> Float {
 	as |>
 		([]) { acc }
-		| ([a, ..ar]) {
-			bs |> ([]) { acc } | ([b, ..br]) { list_dot(ar, br, acc +. a *. b) }
+		& ([a, ..ar]) {
+			bs |> ([]) { acc } & ([b, ..br]) { list_dot(ar, br, acc +. a *. b) }
 		}
 }
 helper_g = (x : Float) -> Float {
@@ -700,7 +700,7 @@ helper_deep = (x : Float) -> Float {
 	)
 }
 helper_loop = (n : Int, x : Float) -> Float {
-	n |> (0) { x } | (_) { helper_loop(n - 1, x *. 1.0e100) }
+	n |> (0) { x } & (_) { helper_loop(n - 1, x *. 1.0e100) }
 }
 helper_tail = (x : Float) -> Float { helper_loop(5, x) }
 helper_outer = (x : Float) -> Float {
@@ -710,13 +710,13 @@ helper_outer = (x : Float) -> Float {
 mixed_worker = (n : Int, acc : Int, f : Float) -> Float {
 	n |>
 		(0) { f +. core.to_float(acc) }
-		| (_) { mixed_worker(n - 1, acc + 1073741000, f *. 1.0e60) }
+		& (_) { mixed_worker(n - 1, acc + 1073741000, f *. 1.0e60) }
 }
 mixed_int = (n : Int, acc : Int) -> Int {
-	n |> (0) { acc } | (_) { mixed_int(n - 1, acc + 1073741000) }
+	n |> (0) { acc } & (_) { mixed_int(n - 1, acc + 1073741000) }
 }
 halve_int = (n : Int, acc : Int) -> Int {
-	n |> (0) { acc } | (_) { halve_int(n - 1, acc / 2) }
+	n |> (0) { acc } & (_) { halve_int(n - 1, acc / 2) }
 }
 scale_by = (k : Float) -> (Float) -> Float { (v : Float) -> Float { v *. k } }
 twice = (f : (Float) -> Float, x : Float) -> Float { f(f(x)) }
@@ -729,14 +729,14 @@ tie_add = (x : Float) -> Float {
 		(True) {
 			{ x >=. 0.0 } |>
 				(True) { x +. 1.7976931348623157e308 }
-				| (False) { 0.0 }
+				& (False) { 0.0 }
 		}
-		| (False) { 0.0 }
+		& (False) { 0.0 }
 }
 bounded_div = (x : Float, y : Float) -> Float {
 	{ y >=. -.1.0e-300 } |>
-		(True) { { y <=. 1.0e-300 } |> (True) { x /. y } | (False) { 0.0 } }
-		| (False) { 0.0 }
+		(True) { { y <=. 1.0e-300 } |> (True) { x /. y } & (False) { 0.0 } }
+		& (False) { 0.0 }
 }
 "#,
     );

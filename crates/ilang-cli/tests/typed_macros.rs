@@ -513,7 +513,7 @@ fn typed_macro_nested_queries_keep_parent_type_handles() {
 (@ macro (: outer (-> [A] (, A) A)))
 (@ macro (= outer (-> (, value) _ {(= t ((. syntax type_of) value)) `(inner {(= (: saved ~t) ~value) saved})})))
 (@ macro (: inner (-> [A] (, A) A)))
-(@ macro (= inner (-> (, value) _ (|> value (| (-> (, `{(= (: ~name ~annotation) ~arg) ~last}) _ {(= t ((. syntax type_of) arg)) (|> ((. syntax subtype) annotation t) (| (-> (, (. syntax Yes)) _ value) (-> (, _) _ value)))}) (-> (, _) _ value))))))
+(@ macro (= inner (-> (, value) _ (|> value (& (-> (, `{(= (: ~name ~annotation) ~arg) ~last}) _ {(= t ((. syntax type_of) arg)) (|> ((. syntax subtype) annotation t) (& (-> (, (. syntax Yes)) _ value) (-> (, _) _ value)))}) (-> (, _) _ value))))))
 "#;
     checked(
         macros,

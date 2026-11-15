@@ -85,8 +85,8 @@ fn mutual_service_rows_have_canonical_member_and_variable_order() {
         "T(N) = (f = () <- N -> Int)",
         "us = <N>() <- (s : S(N)) { s.f() }",
         "ut = <N>() <- (t : T(N)) { t.f() }",
-        "f = (n : Int) { n |> (0) { us() } | (_) { g(n - 1) } }",
-        "g = (n : Int) { n |> (0) { ut() } | (_) { f(n - 1) } }",
+        "f = (n : Int) { n |> (0) { us() } & (_) { g(n - 1) } }",
+        "g = (n : Int) { n |> (0) { ut() } & (_) { f(n - 1) } }",
     ];
     let expected = types(&defs.join("\n"));
     for order in [[1, 0, 3, 2, 5, 4], [0, 1, 3, 2, 4, 5], [1, 0, 2, 3, 5, 4]] {
@@ -306,7 +306,7 @@ fn function_type_joins_preserve_scalar_error_inclusion() {
     // Subtype comparison governs scalar error value sets when function types
     // are joined; the row mode must reach merge_arg as well as calls.
     types(
-        "(\n\ti/fail\n)\none = () -> Nil { fail.raise(1) }\ntwo = () -> Nil { fail.raise(2) }\npick = (b : Bool) { b |> (True) { one } | (False) { two } }",
+        "(\n\ti/fail\n)\none = () -> Nil { fail.raise(1) }\ntwo = () -> Nil { fail.raise(2) }\npick = (b : Bool) { b |> (True) { one } & (False) { two } }",
     );
 }
 
@@ -422,7 +422,7 @@ fn direct_forwarding_keeps_the_provided_services_own_need() {
 #[test]
 fn annotated_mutual_forwarding_keeps_finite_service_rows() {
     types(
-        "S(N) = (() <- N -> Int)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\nping = <N>(n : Int) <- (s : S(N)) -> Int {\n\tn |> (0) { use() } | (_) { pong(n - 1) }\n}\npong = (n : Int) { ping(n) }",
+        "S(N) = (() <- N -> Int)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\nping = <N>(n : Int) <- (s : S(N)) -> Int {\n\tn |> (0) { use() } & (_) { pong(n - 1) }\n}\npong = (n : Int) { ping(n) }",
     );
 }
 

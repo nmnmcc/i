@@ -394,14 +394,14 @@ mod tests {
         let cases = [
             "@macro\nm = (a, b) { a }",
             "@macro\nm = (a: Syntax, _b) { a }",
-            "@macro\nm = (0) { 1 } | (a) { a }",
-            "@macro\nm = (a, 0) { a } | (a, b) { b }",
-            "@macro\nm = (a) -> Syntax { a } | (b) { b }",
+            "@macro\nm = (0) { 1 } & (a) { a }",
+            "@macro\nm = (a, 0) { a } & (a, b) { b }",
+            "@macro\nm = (a) -> Syntax { a } & (b) { b }",
             "@macro\nm = <A>(a) { a }",
-            "@macro\nm = <A>(a : A) { a } | (b, c) { b }",
+            "@macro\nm = <A>(a : A) { a } & (b, c) { b }",
             // The interface comparison retains the separate mixed-data error.
             // old-syntax-check: E0101
-            "@macro\nm : { (Int, x = Int) | (Int) } -> Int\n@macro\nm = (x = a) { a } | (b) { b }",
+            "@macro\nm : { (Int, x = Int) | (Int) } -> Int\n@macro\nm = (x = a) { a } & (b) { b }",
             "@macro\nm = 1",
             "@macro\n(a, b) = (1, 2)",
             "@macro(\"x\")\nm = (a) { a }",
