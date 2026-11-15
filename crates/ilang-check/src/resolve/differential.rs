@@ -267,11 +267,11 @@ fn compare_inner(name: &str, dir: &Path, totals: &mut Totals, prepare_quotes: bo
     // errors; the spec runner checks inference and both runtime levels.
     if name.starts_with("tests/spec/7/keyed_data") {
         assert!(expected.iter().any(|d| {
-            d.message.contains("a key in a data pattern needs stage 6")
+            d.message.contains("a key in a data pattern is not supported here")
                 || (name.ends_with("keyed_data_constructor_bad.i")
                     || name.ends_with("keyed_data_constructor_missing.i"))
                     && d.message
-                        .contains("a pattern inside a labelled field needs stage 4")
+                        .contains("a pattern inside a labelled field is not supported here")
         }));
         let errors: Vec<_> = new_diags
             .iter()

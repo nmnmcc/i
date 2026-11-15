@@ -355,8 +355,8 @@ fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
             let (module, diagnostics) = migration_syntax::parse_module(&source);
             if !diagnostics.is_empty() {
                 assert!(diagnostics.iter().all(|d| d.code == native::Code::Unexpected && (d.message ==
-                    "a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet"
-                    || d.message == "a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name")),
+                    "a key in a data pattern is not supported here"
+                    || d.message == "a pattern inside a labelled field is not supported here; bind the field to a name and match the name")),
                     "{}: {diagnostics:?}", path.display());
                 continue;
             }
