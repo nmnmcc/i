@@ -1,6 +1,6 @@
 # Diagnostics lane verification
 
-NOT YET LANDABLE: runtime verification queued.
+focused checks passed; broad checks pending.
 
 Branch: `lane/diag2`. Source commit: `e13498261ff57e4f519381140f955418b4099d0b`. Main `a02d34100` was merged as `eed4a9ef01679ab525d80d5e1c176282ac75baa7`. The one conflict, `scripts/check-snippets.json`, kept main’s complete registry and reapplied exactly the lane’s three entries (two bang diagnostics and TOML-literal classification). Main’s removed stale entries stayed removed.
 
@@ -20,20 +20,20 @@ All heavy work uses `/home/agent/Programming/i/.rd/cache/heavy`. The focused scr
 
 | Command | Status | Last nonempty line |
 | --- | --- | --- |
-| cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- a_literal_outside_all_branches_gets_one_argument_error | queued | (no output) |
-| cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- an_unmatched_combination_still_reports_branch_selection | queued | (no output) |
-| cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- unmatched_types_keep_grouping_advice_and_independent_argument_errors | queued | (no output) |
-| cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- original_model_programs_get_actionable_repairs | queued | (no output) |
-| cargo test -p ilang-cli --test package_commands --release --locked -- add_checks_the_names | queued | (no output) |
-| cargo test -p ilang-check --test diagnostic_traps --release --locked -- two_spaced_constructor_parts_are_still_one_binding | queued | (no output) |
-| cargo test -p ilang-check --test diagnostic_traps --release --locked -- spaced_function_call_keeps_its_error_and_explains_the_line | queued | (no output) |
-| cargo test -p ilang-check --test diagnostic_traps --release --locked -- missing_known_parameter_type_explains_both_fixes | queued | (no output) |
-| cargo test -p ilang-check --test literal_types --release --locked -- empty_optional_accumulator_requires_a_written_tuple_shape | queued | (no output) |
-| cargo test -p ilang-cli --test spec --release --locked -- 6/ | queued | (no output) |
-| scripts/review-corpus run --binary ./target/release/i --filter review-t1/service_bad --keep-bounds --jobs 1 | queued | (no output) |
-| python3 /tmp/diag2-final-call-proof.py | queued | (no output) |
-| scripts/review-corpus run --binary ./target/release/i --filter review-t1/host_service --keep-bounds --jobs 1 | queued | (no output) |
-| direnv exec /home/agent/Programming/i cargo fmt --all -- --check | queued | (no output) |
+| cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- a_literal_outside_all_branches_gets_one_argument_error | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 11.46s |
+| cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- an_unmatched_combination_still_reports_branch_selection | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 3.03s |
+| cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- unmatched_types_keep_grouping_advice_and_independent_argument_errors | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 9.66s |
+| cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- original_model_programs_get_actionable_repairs | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 7.64s |
+| cargo test -p ilang-cli --test package_commands --release --locked -- add_checks_the_names | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 1.02s |
+| cargo test -p ilang-check --test diagnostic_traps --release --locked -- two_spaced_constructor_parts_are_still_one_binding | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.55s |
+| cargo test -p ilang-check --test diagnostic_traps --release --locked -- spaced_function_call_keeps_its_error_and_explains_the_line | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.11s |
+| cargo test -p ilang-check --test diagnostic_traps --release --locked -- missing_known_parameter_type_explains_both_fixes | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.70s |
+| cargo test -p ilang-check --test literal_types --release --locked -- empty_optional_accumulator_requires_a_written_tuple_shape | passed | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out; finished in 3.17s |
+| cargo test -p ilang-cli --test spec --release --locked -- 6/ | passed | spec: 28 cases skipped as pending (tests/spec/syn3-pending.txt) |
+| scripts/review-corpus run --binary ./target/release/i --filter review-t1/service_bad --keep-bounds --jobs 1 | passed | } |
+| python3 /tmp/diag2-final-call-proof.py | passed | PASS: 9 isolated inputs; 7 duplicate E0552 diagnostics dropped; all remaining codes and positions retained; E0552 retained for an unmatched combination; a matching literal remains accepted; no timeouts. |
+| scripts/review-corpus run --binary ./target/release/i --filter review-t1/host_service --keep-bounds --jobs 1 | passed | } |
+| direnv exec /home/agent/Programming/i cargo fmt --all -- --check | running | (no output) |
 | direnv exec /home/agent/Programming/i cargo check -p ilang-check --all-targets --locked | queued | (no output) |
 | direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test diagnostic_repairs --release --locked | queued | (no output) |
 | direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings | queued | (no output) |
