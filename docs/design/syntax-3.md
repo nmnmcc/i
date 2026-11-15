@@ -47,10 +47,10 @@ Each line gives the owner's words where the inputs quote them.
 
 | # | Decision | Owner's words (source) |
 |---|---|---|
-| O1 | Every symbol has one meaning: `{ }` computation, `( )` data, `->` result type, `\|` cases joined, `=` binding, `:` a type follows. A function is a computation with parameters. | Draft §2 ("每个符号只有一个含义") |
+| O1 | Every symbol has one meaning: `{ }` computation, `( )` data, `->` result type, `&` branches joined, `=` binding, `:` a type follows. A function is a computation with parameters. | Draft §2 ("每个符号只有一个含义") |
 | O2 | Parameters are always in brackets, with no omission rule; the parameter group is an ordinary pattern matched against the data made by the call. | Draft §3.2 |
 | O3 | Type first, and every branch may carry its own type. | "先写类型、再写实现" (Type First, draft §3.2) |
-| O4 | Several functions joined by `\|` are one function; the first written wins. Matching is sending a value into such a function. Clause blocks `{ p -> e }` are removed. | Draft §3.3 |
+| O4 | Several functions joined by `&` are one function; the first written wins. Matching is sending a value into such a function. Clause blocks `{ p -> e }` are removed. | Draft §3.3 |
 | O5 | Overloading is §3.3, not a separate feature. Overloading by arity is allowed and must be exact. | "这是 Erlang 中经典的功能", "精确地实现重载" (draft §3.4) |
 | O6 | Precision is required at the call site, including a function passed as an argument whose expected parameter type is fixed by the other arguments; `list.map([1, 2], show)` is `List(String)`. Where the place cannot see types, fall back to the union of all branches. Intersections of function types are not kept as first-class types. | "在调用处精确" (draft §3.4; answers 1c) |
 | O7 | Data is a finite map from keys (positions or labels, mixed) to values; shapes must match exactly; open records are deleted. | "全部封闭，删除开放记录" (draft §3.5) |
@@ -96,7 +96,7 @@ must be shown to the owner as such.
   labelled type of the same module.
 - **Rest only with a known shape** (draft §8.3, answers 8.3): `..` spread and
   `..rest` need a known shape; rest is data, not a list.
-- **D3**: `|` joins only function literals.
+- **D3**: `&` joins only function literals.
 - **D5**: a labelled type whose data is `()` is a value (`None`); `None()` is
   an error.
 - **D7**: a union equal to the expansion of a declared name is shown by that
@@ -192,7 +192,7 @@ look of the language.
 | Evaluation grammar against the rest | `ParamItem` admits `..rest` at the top of a parameter group | No rest at the top of a group, because shape groups must be syntactic (§2.4, [R4] Q7). |
 | Answers B1 claim against this note's analysis | "Checking against the selected domains is sound whether or not known types are reliable" | Not true in general; see §2.6.6. The choice stands; the guarantee is restated and the invariant "known types are facts" is added ([R4] Q9). |
 | Third round against fourth round on Q13 | The third round records `Node = (…)` "pending confirmation against the plain union name `Node = Name \| Int \| …`" | The fourth round settles it: with the outer parentheses, a labelled type. |
-| Today's Lisp surface against the new rows | Today a pipe `a \|> f` is written `(\| a f)` in `.is` files (`lisp/to_ast.rs`:489, `std/src/test.is`), while SYN3 uses `\|` for the branch join | The pipe head becomes `\|>`; `(\| …)` in an expression is a chain (§6.8). |
+| Today's Lisp surface against the new rows | Today a pipe `a \|> f` is written `(\| a f)` in `.is` files (`lisp/to_ast.rs`:489, `std/src/test.is`), while SYN3 uses `&` for the branch join | The pipe head becomes `\|>`; `(& …)` in an expression is a chain (§6.8). |
 | `meta.md` §2.3 against `spec.md` | The meta table writes a match as `e.{ p -> v }`; the spec and the code write `e \|> { … }` | The spec controls. The new rows in §6.8 replace both. |
 | O16 against the effects proposal | Reads `db ! Db` in blocks and `! Db = e` | Later owner text: `<-` in heads, `e <- (s)` (O24, O29). Mid-block reads disappear (review gap 6). |
 | Effects proposal `catch` against rule B | The proposal writes the body as `() <- (Fail(E)) -> A`, a closed need that rejects every body needing another service | The body is `() <- (..N, Fail(E)) -> A` (review Q1; confirmed by the coordinator). |
@@ -214,7 +214,8 @@ look of the language.
 | `{ }` | A computation in an expression (statements then a result, worked out in place); a group in a type. `{ }` creates every scope. |
 | `( )` | Data: a value, a type or a pattern of keys to parts. A call's brackets are data. A parameter group is a data pattern. |
 | `->` | The result part of a function or function type. |
-| `\|` | Cases joined: union in a type, alternatives in a parameter item, branch join after a function body. |
+| `\|` | Union in a type, alternatives in a parameter item. |
+| `&` | Branch join after a function body, intersection in a type. |
 | `=` | Binding, left to right: a statement, a key in data (`label = …`), a conjunction in a pattern, a type definition. |
 | `:` | The pattern or name on the left has the type on the right. Never a label. |
 | `?` | A guard, only at the end of a parameter group. |
@@ -334,17 +335,17 @@ connect = (host: String, port = p: Int) -> Conn { open(host, p) }
   binds type parameters for its parameter group, service pattern, result and
   body: `id = <A>(x : A) -> A { x }` (§2.16).
 
-### 2.5 Branches joined by `|`, and matching
+### 2.5 Branches joined by `&`, and matching
 
 **Chains.** `F1 | F2 | … | Fn`, where every `Fi` is a function literal, is
 one function value, a **chain** (O4). A single function literal is a chain of
-one branch. `|` may follow only the `}` of a function body, and the thing
+one branch. `&` may follow only the `}` of a function body, and the thing
 after it must be a function literal (D3).
 
 ```text
 gcd =
     (a: Int, 0) -> Int { a }
-    | (a: Int, b: Int) -> Int { gcd(b, a % b) }
+    & (a: Int, b: Int) -> Int { gcd(b, a % b) }
 ```
 
 **Shape groups.** The branches of a chain are partitioned by their shape.
@@ -388,14 +389,14 @@ one branch and no guard is typed as the binding of that branch's item to
 ```text
 label = opt |>
     (Some(v) ? string.is_empty(v)) { "empty" }
-    | (Some(v)) { v }
-    | (None) { "none" }
+    & (Some(v)) { v }
+    & (None) { "none" }
 
-kind = day |> (Sat | Sun) { "rest" } | (_) { "work" }
+kind = day |> (Sat | Sun) { "rest" } & (_) { "work" }
 ```
 
 **Tuple subjects.** `x |> f` passes `(x)`, so a pair subject is matched by a
-one-position pattern whose part is a pair: `p |> ((0, y)) { y } | ((x, _)) { x }`.
+one-position pattern whose part is a pair: `p |> ((0, y)) { y } & ((x, _)) { x }`.
 To match two values directly, write a two-position chain and call it.
 
 **Nesting.** A branch body is always braced, so an inner chain ends at the
@@ -409,9 +410,9 @@ shape (arity, labels), types, constructors and literals; so can overloading.
 ```text
 show =
     (n: Int) -> String { int.to_string(n) }
-    | (s: String) -> Int { string.length(s) }
-    | (a: Int, b: Int) -> Bool { a == b }
-    | (host: String, port = p: Int) -> Conn { open(host, p) }
+    & (s: String) -> Int { string.length(s) }
+    & (a: Int, b: Int) -> Bool { a == b }
+    & (host: String, port = p: Int) -> Conn { open(host, p) }
 ```
 
 Groups: `(1 position)` has branches 1 and 2 (rule 11, `n : Int` and
@@ -485,11 +486,11 @@ Results of the examples:
 | `show(1, 2)` | branch 3 | `Bool` |
 | `show("a.com", port = 80)` | branch 4 | `Conn` |
 | `show(x)` with `x : { Int \| String }` | branches 1, 2 | `String \| Int` |
-| `f(1)` with `f = (x : Int) { "a" } \| (x : { Int \| String }) { 1 }` | branch 1 (branch 2: `Int` taken, `String` disjoint from `1`) | `String` |
+| `f(1)` with `f = (x : Int) { "a" } & (x : { Int \| String }) { 1 }` | branch 1 (branch 2: `Int` taken, `String` disjoint from `1`) | `String` |
 | the same `f` with a guard on branch 1 | branches 1, 2 | `String \| Int` |
 | `gcd(b, a % b)` | both (`0` taken at key 1 for branch 2 leaves `Int - 0`, not disjoint from `Int`) | `Int` |
 | `gcd(5, 0)` | branch 1 (branch 2: `Int - 0` disjoint from `0`) | `Int` |
-| `f(Some(5))` with `f = (Some(0)) { "zero" } \| (Some(n)) { n }` | both (`Some(5)` and `Some(0)` are not disjoint; `Some` not taken) | `String \| Int` |
+| `f(Some(5))` with `f = (Some(0)) { "zero" } & (Some(n)) { n }` | both (`Some(5)` and `Some(0)` are not disjoint; `Some` not taken) | `String \| Int` |
 
 #### 2.6.3 Fallback
 
@@ -569,10 +570,10 @@ known type.** It is tested with the generated families of
 The solver then checks the argument against the selected domains
 (answers B1). This makes the inferred argument type agree with the selection,
 and it rejects a correct program when the known type is narrower than the
-inferred type: with `f = (0) { "z" } | (n : Int) { n }`, `x = 0 = n` and
+inferred type: with `f = (0) { "z" } & (n : Int) { n }`, `x = 0 = n` and
 `n : Int`, `f(x)` selects branch 1 and then needs `Int <: 0`. It does **not**
 make selection sound by itself if known types were not facts: with
-`h = (0, 0) { "a" } | (a : Int, b : Int) { 1 }`, the domains of the two
+`h = (0, 0) { "a" } & (a : Int, b : Int) { 1 }`, the domains of the two
 branches overlap, so a wrong known type `(1, 0)` for an actual `(0, 0)` would
 pass the check and run branch 1. The answers file says the check is sound
 "whether or not known types are reliable"; that is not the case, and the
@@ -635,7 +636,7 @@ patterns with the same items.
 box = (size = (3, 4))
 (size = whole = (w, h)) = box      // whole = (3, 4), w = 3, h = 4
 connect = (host, port = p) { open(host, p) }
-run = (mode = "fast") { quick() } | (mode = "slow") { careful() }
+run = (mode = "fast") { quick() } & (mode = "slow") { careful() }
 log_all = ((a, b) = args) { log(args) }
 t = (a, b) = pair
 ```
@@ -762,41 +763,41 @@ Splice = (Syntax)
 node = (syntax: Syntax) -> Node {
     raw_kind(syntax) |>
         (0) { Node(Name(raw_text(syntax))) }
-        | (1) { Node(Discard(raw_text(syntax))) }
-        | (2) { Node(Up(raw_text(syntax))) }
-        | (3) { Node(Symbol(raw_text(syntax))) }
-        | (4) { Node(raw_int(syntax)) }
-        | (5) { Node(raw_float(syntax)) }
-        | (6) { Node(Text(raw_text(syntax))) }
-        | (7) { Node(Round(children(syntax, 0, raw_length(syntax), []))) }
-        | (8) { Node(Square(children(syntax, 0, raw_length(syntax), []))) }
-        | (9) { Node(Curly(children(syntax, 0, raw_length(syntax), []))) }
-        | (10) { Node(Bits(children(syntax, 0, raw_length(syntax), []))) }
-        | (11) { Node(Quote(raw_child(syntax, 0))) }
-        | (12) { Node(Unquote(raw_child(syntax, 0))) }
-        | (13) { Node(Splice(raw_child(syntax, 0))) }
-        | (_) { panic("syntax: invalid node kind") }
+        & (1) { Node(Discard(raw_text(syntax))) }
+        & (2) { Node(Up(raw_text(syntax))) }
+        & (3) { Node(Symbol(raw_text(syntax))) }
+        & (4) { Node(raw_int(syntax)) }
+        & (5) { Node(raw_float(syntax)) }
+        & (6) { Node(Text(raw_text(syntax))) }
+        & (7) { Node(Round(children(syntax, 0, raw_length(syntax), []))) }
+        & (8) { Node(Square(children(syntax, 0, raw_length(syntax), []))) }
+        & (9) { Node(Curly(children(syntax, 0, raw_length(syntax), []))) }
+        & (10) { Node(Bits(children(syntax, 0, raw_length(syntax), []))) }
+        & (11) { Node(Quote(raw_child(syntax, 0))) }
+        & (12) { Node(Unquote(raw_child(syntax, 0))) }
+        & (13) { Node(Splice(raw_child(syntax, 0))) }
+        & (_) { panic("syntax: invalid node kind") }
 }
 
 make = (node: Node, like: Syntax) -> Syntax {
     result = node |>
         (Node(Name(value))) { raw_make_text(0, value, like) }
-        | (Node(Discard(value))) { raw_make_text(1, value, like) }
-        | (Node(Up(value))) { raw_make_text(2, value, like) }
-        | (Node(Symbol(value))) { raw_make_text(3, value, like) }
-        | (Node(value: Int)) { raw_make_int(value, like) }
-        | (Node(value: Float)) { raw_make_float(value, like) }
-        | (Node(Text(value))) { raw_make_text(6, value, like) }
-        | (Node(Round(items))) { raw_make_list(7, build_list(items, raw_list_new()), like) }
-        | (Node(Square(items))) { raw_make_list(8, build_list(items, raw_list_new()), like) }
-        | (Node(Curly(items))) { raw_make_list(9, build_list(items, raw_list_new()), like) }
-        | (Node(Bits(items))) { raw_make_list(10, build_list(items, raw_list_new()), like) }
-        | (Node(Quote(item))) { raw_make_one(11, item, like) }
-        | (Node(Unquote(item))) { raw_make_one(12, item, like) }
-        | (Node(Splice(item))) { raw_make_one(13, item, like) }
+        & (Node(Discard(value))) { raw_make_text(1, value, like) }
+        & (Node(Up(value))) { raw_make_text(2, value, like) }
+        & (Node(Symbol(value))) { raw_make_text(3, value, like) }
+        & (Node(value: Int)) { raw_make_int(value, like) }
+        & (Node(value: Float)) { raw_make_float(value, like) }
+        & (Node(Text(value))) { raw_make_text(6, value, like) }
+        & (Node(Round(items))) { raw_make_list(7, build_list(items, raw_list_new()), like) }
+        & (Node(Square(items))) { raw_make_list(8, build_list(items, raw_list_new()), like) }
+        & (Node(Curly(items))) { raw_make_list(9, build_list(items, raw_list_new()), like) }
+        & (Node(Bits(items))) { raw_make_list(10, build_list(items, raw_list_new()), like) }
+        & (Node(Quote(item))) { raw_make_one(11, item, like) }
+        & (Node(Unquote(item))) { raw_make_one(12, item, like) }
+        & (Node(Splice(item))) { raw_make_one(13, item, like) }
     raw_syntax_ok(result) |>
         (True) { raw_syntax_value(result) }
-        | (False) { fail.raise(SyntaxError(message = raw_syntax_error(result), at = like)) }
+        & (False) { fail.raise(SyntaxError(message = raw_syntax_error(result), at = like)) }
 }
 ```
 
@@ -1307,7 +1308,7 @@ first = <A>(xs: List(A)) -> Option(A) { … }
   as for polymorphic fields in OCaml and polymorphic function types in
   Scala 3. A rigid row variable is one opaque member of a need.
 - **Chains.** Each branch of a chain writes its own `<…>`, which scopes over
-  that branch only: `f = <A>(x : A) -> A { x } | <A>(x : A, y : A) -> A { y }`.
+  that branch only: `f = <A>(x : A) -> A { x } & <A>(x : A, y : A) -> A { y }`.
   Selection instantiates each candidate branch once (stage 11).
 - **Bounds.** A bound on a type variable is written as an intersection at the
   use, `x : A & Show`. Capabilities are passed as ordinary parameters or as
@@ -1520,11 +1521,11 @@ needs a comma.
 - **P3 Items.** In `Data`, `DataType`, `DataPat` and `Params`, an item whose
   first two tokens are a `name` and `=` is a labelled (key) item. `==` is one
   token, so `(a == b)` is positional. `..` begins a spread or rest.
-- **P4 Branch join.** After the `}` of a function body, a `|` (also at the
+- **P4 Branch join.** After the `}` of a function body, an `&` (also at the
   start of the next line, spec §1.7) continues the chain; the next token must
   begin a function literal (`(`, or `<` of `TypeParams`), else a compile
-  error says that `|` joins only function literals. A `|` after any other
-  expression is a compile error. A postfix call or field after a chain
+  error says that `&` joins only function literals. A value-level `|` is a
+  compile error that asks for `&`. A postfix call or field after a chain
   applies to the whole chain. Each branch writes its own `TypeParams`; they
   scope over that branch only (§2.16).
 - **P5 The `->` part.** Spec §1.7's last paragraph is unchanged except for
@@ -1574,9 +1575,9 @@ needs a comma.
   definition (spec §2.2, unchanged); its kind follows §2.8 from the written
   right side. Blocks have no type definitions (spec §4.3, unchanged).
 - **P13 Lines.** Spec §1.7 is unchanged except for the text about clauses: a
-  line that begins with `|` continues the line before, and a line that begins
-  with `(` begins a new statement. So every continued branch begins its line
-  with `|`. Directly inside `( )` (data, data types, data patterns, parameter
+  a line that begins with `|` or `&` continues the line before, and a line
+  that begins with `(` begins a new statement. So every continued branch
+  begins its line with `&`. Directly inside `( )` (data, data types, data patterns, parameter
   groups, service patterns, needs) a break is a `,`. Directly inside `{ }` a
   break ends a statement.
 - **P14 `<` at the start of a statement.** Spec §1.7 says that a line that
@@ -1591,7 +1592,7 @@ needs a comma.
   is two statements, not `log() < A > (x : A) { x }`. To continue a comparison
   across lines in that one form, put the operator at the end of the line
   before. The same look-ahead decides `<` at the start of a primary (P1),
-  after `|` of a chain (P4), and after `=` or `(` or `,`; in those places `<`
+  after `&` of a chain (P4), and after `=` or `(` or `,`; in those places `<`
   cannot be binary anyway.
 - **P15 `<-` and lines.** `<-` is read like a binary operator for line
   breaks: a line that begins with `<-` continues the line before, and a line
@@ -1613,10 +1614,10 @@ onward are new.
 
 | # | Form | Resolution under the final rules |
 |---|---|---|
-| G1 | `(p) -> A { e } \| (q) { f }` against a union `\|` | P5: the body's `{` ends the `->` part; `\|` after `}` is a join. No ambiguity. |
+| G1 | `(p) -> A { e } & (q) { f }` against a union `\|` | P5: the body's `{` ends the `->` part; `&` after `}` is a join. No ambiguity. |
 | G2 | A forgotten body: `(a) -> Int \| (b) -> Int { … }` | One function whose result is `Int \| (b) -> Int`. Deterministic and not an error [R4]; the type error that follows mentions the missing body when a result union has a function type member written without a group. |
-| G3 | A leading `\|` on a line | Continues the line before (P13). A line starting with `(` is a new statement. |
-| G4 | `x \|> (p) { e } \| (q) { f }` | `Branches` is a primary, so the whole chain is the right operand (P4, P11). |
+| G3 | A leading `&` on a line | Continues the line before (P13). A line starting with `(` is a new statement. |
+| G4 | `x \|> (p) { e } & (q) { f }` | `Branches` is a primary, so the whole chain is the right operand (P4, P11). |
 | G5 | `\|>` weakest | `x \|> g == 2` is `x \|> { g == 2 }`, which P11 rejects with a hint; today it is `{ x \|> g } == 2`. `x == 1 \|> core.not` becomes legal. Stage 5 rewrites the 28+ and 3+ lines in std (§7.2). |
 | G6 | `(x) { y }` | Always a function (P1). |
 | G7 | `f(x) { … }` | A call, then a block statement (P2). |
@@ -1634,7 +1635,7 @@ onward are new.
 | G19 | `db ! Db` | The read statement is removed (§2.10); `!` alone is a lexer error (P0). Today `db ! Db = make()` is silently two statements; the migrator rewrites every read into a head pattern (§7.3). |
 | G20 | `(Sat \| Sun, x)` | `\|` is tighter than `,` in a `PItem`. |
 | G21 | `(x : Int \| y)` | P8: two pattern alternatives, `x : Int` and `y`; rejected because they bind different names. `(x : Int \| x)` and `(True \| _ : Int)` are valid. A union annotation is `(x : { Int \| String })`. |
-| G22 | `f \| g` with names | Rejected by P4 (D3). |
+| G22 | `f & g` with names | Rejected by P4 (D3). |
 | G23 | Bare `None` | A value (D5); `None()` is an error in expressions and patterns. |
 | G24 | `T = (name = String)` against a binding | At the top level an item starting with an `UpName` is a type definition (P12): a labelled type. In a block there are no type definitions: it is a binding with the constructor pattern `T` and the value `(name = String)`, where `String` is an expression, so a compile error ("`String` is a type, not a value"). |
 | G25 | A data type against a data value where both could occur | No position admits both. Types are after `:` in a pattern, in the `->` part, the right side and head of a type definition, a declaration, a type macro's arguments; everything else in an expression is a value. The position is known before the brackets are read. |
@@ -1645,14 +1646,14 @@ onward are new.
 | G30 | `x : (n = Int) = (n = 1)` | P6(d): the type stops at `=` outside brackets; part `x : (n = Int)` is followed by `=`; `(n = 1)` is not, so it is the value. `a = (n = 1) = b` instead binds `a` and refutably matches `b` against the data pattern `(n = 1)`. |
 | G31 | `(..rest) { … }` | Rest is not allowed at the top of a parameter group: a compile error (§2.4). |
 | G32 | `((a) { a }, 1)` | P1 on the outer `(`: no `{` or `->` after its `)`, so data; the inner item is a function. |
-| G33 | `(f = (a) { a } \| (b) { b })` | The labelled item's value is a chain (P3, P4). |
+| G33 | `(f = (a) { a } & (b) { b })` | The labelled item's value is a chain (P3, P4). |
 | G34 | `{ (x) -> Int { x } }` | Now always a block whose value is a function. Today it is a clause block (spec §6.1). The legacy parser reads the old meaning during migration (§7.1). |
-| G35 | `(a) { 1 } \| (b) { 2 }(x)` | The call applies to the whole chain (P4). |
+| G35 | `(a) { 1 } & (b) { 2 }(x)` | The call applies to the whole chain (P4). |
 | G36 | `(port = 80) { … }` read as a default | It is a literal key pattern; there are no defaults (§2.4). A documentation point, not an ambiguity. |
 | G37 | `{ a = f  (b, c) = g }` on one line | Still one statement, because a same-line `(` is a call (spec §1.7, unchanged). With a lowercase `f`, `f(b, c)` is not a pattern part, so the value begins at `f` and the `=` after the call is a compile error; with a constructor, `mk = Pair  (b, c) = g` is the binding `mk = Pair(b, c) = g`, as today. |
 | G38 | `a = b = c = d` | P6(d): `a`, `b`, `c` are followed by `=`, so all three bind `d` (O13). |
 | G39 | `Opaque` in a type | Only the whole ungrouped right side of a type definition (§2.8); elsewhere an error. |
-| G40 | `-1` as a branch pattern | `\| (-1) { … }`: the `-` is inside the group; spec §1.7's clause-line problem with `-` is gone. |
+| G40 | `-1` as a branch pattern | `& (-1) { … }`: the `-` is inside the group; spec §1.7's clause-line problem with `-` is gone. |
 | G41 | `x<-1` | P0: `x`, `<-`, `1`; a provide of `1` to `x`, a compile error (`1` is not service data) whose message suggests `x < -1`. |
 | G42 | `<<-1` in a bit array | P0: `<<` is matched first; unchanged. |
 | G43 | `log()` then a line `<A>(x : A) { x }` | P14: a new statement. |
@@ -1695,10 +1696,10 @@ count(A, E, N) = (list: List(A), where: (A) -> Bool ^ E ! N) -> Int ^ E ! N {
 count = <A, N>(list: List(A), where: (A) <- N -> Bool) -> Int {
     go =
         ([], n) { n }
-        | ([x, ..xs], n) {
+        & ([x, ..xs], n) {
             where(x) |>
                 (True) { go(xs, n + 1) }
-                | (False) { go(xs, n) }
+                & (False) { go(xs, n) }
         }
     go(list, 0)
 }
@@ -1738,7 +1739,7 @@ Tree(A) = Leaf | Node(A)
 size = <A>(t: Tree(A)) -> Int {
     t |>
         (Leaf) { 0 }
-        | (Node(left = l, right = r, ..)) { size(l) + 1 + size(r) }
+        & (Node(left = l, right = r, ..)) { size(l) + 1 + size(r) }
 }
 ```
 
@@ -1813,11 +1814,11 @@ c = connect("a.com", port: 80)
 // after
 area =
     (r: Float) -> Float { 3.14159 *. r *. r }
-    | (w: Float, h: Float) -> Float { w *. h }
+    & (w: Float, h: Float) -> Float { w *. h }
 
 connect =
     (host: String) -> Conn { connect(host, port = 80) }
-    | (host: String, port = p: Int) -> Conn { open(host, p) }
+    & (host: String, port = p: Int) -> Conn { open(host, p) }
 
 c1 = area(2.0)                 // Float, branch 1
 c2 = connect("a.com")          // Conn, group (1 position)
@@ -1846,8 +1847,8 @@ describe = (opt: Option(String)) -> String {
 describe = (opt: Option(String)) -> String {
     opt |>
         (Some(v) ? string.is_empty(v)) { "empty" }
-        | (Some(v)) { v }
-        | (None) { "none" }
+        & (Some(v)) { v }
+        & (None) { "none" }
 }
 ```
 
@@ -1864,11 +1865,11 @@ pick = (p: (Int, Int)) -> Int {
 
 // after: the subject is a one-tuple holding the pair
 pick = (p: (Int, Int)) -> Int {
-    p |> ((0, y)) { y } | ((x, _)) { x }
+    p |> ((0, y)) { y } & ((x, _)) { x }
 }
 
 // after, written as a two-position chain
-pick2 = (0, y: Int) -> Int { y } | (x: Int, _) -> Int { x }
+pick2 = (0, y: Int) -> Int { y } & (x: Int, _) -> Int { x }
 pick3 = (p: (Int, Int)) -> Int { pick2(..p) }
 ```
 
@@ -1902,7 +1903,7 @@ Element {}                                 Element = Opaque
 
 // clause blocks as values
 list.map(opts, { Some(u) -> u.name  None -> "" })
-list.map(opts, (Some(u)) { u.name } | (None) { "" })
+list.map(opts, (Some(u)) { u.name } & (None) { "" })
 
 // alias binders in parameters flip
 swap = (t = (a, b)) { (b, a) }             swap = ((a, b) = t) { (b, a) }
@@ -2187,7 +2188,7 @@ The preamble's first exception becomes: "`x : T` in a parameter item is a type
 annotation when its branch is the only branch of its shape group, has no
 guard, and the item has no alternatives, and a test when not (§7.1). So with
 `v : { Int | String }`, `v |> (x : Int) { x }` is a compile error, but
-`v |> (x : Int) { x } | (_) { 0 }` is correct."
+`v |> (x : Int) { x } & (_) { 0 }` is correct."
 
 #### 5.2.8 §4.8 Typing rules: changed rules
 
@@ -2498,7 +2499,7 @@ not read.
   `<-` of a provide shows the keys it provides and which of them the left
   side needs. Signature help shows `<A, …>` and the need.
   Signature help lists one signature per shape group. Semantic tokens: labels
-  in data and types, the guard `?`, the join `|`.
+  in data and types, the guard `?`, the join `&`.
 - **tree-sitter** (`editors/tree-sitter-i`): remove `clause_block`, `clause`,
   `record`, `record_type`, `custom_type`, `environment_parameter`; add
   `branches`, `function` with `parameters` and `guard`, `data`, `data_type`,
@@ -2509,7 +2510,7 @@ not read.
   `|>`. The 10 corpus files are rewritten; `05-records.txt`
   becomes `05-data.txt`.
 - **VS Code and Zed** grammars (`editors/vscode`, `editors/zed`): scopes for
-  `|` after `}`, `?` in a group, `label =` in brackets; remove the clause
+  `&` after `}`, `?` in a group, `label =` in brackets; remove the clause
   arrow scope.
 
 ### 6.7 `i/syntax` positions
@@ -2591,8 +2592,8 @@ type.
 | Function with type parameters | `<A, N>(x : A) -> A { e }` | `(-> [A N] (, (: x A)) A e)` |
 | Provide | `e <- (s1, ..env)`, `app() <- live()` | `(<- e (, s1 .. env))`, `(<- (app) (live))` |
 | Function with a guard | `(p1, p2 ? g) { e }` | `(-> (? (, p1 p2) g) _ e)` |
-| Chain | `F1 \| F2` | `(\| F1 F2)` |
-| Pipe, match | `e \|> f`, `e \|> F1 \| F2` | `(\|> e f)`, `(\|> e (\| F1 F2))` |
+| Chain | `F1 & F2` | `(& F1 F2)` |
+| Pipe, match | `e \|> f`, `e \|> F1 & F2` | `(\|> e f)`, `(\|> e (& F1 F2))` |
 | Environment read `(! x N)`, environment statement `(! N e)` | removed | removed |
 | Clause block, clause, record, record update, environment parameter | removed | removed |
 
@@ -2633,14 +2634,14 @@ type.
 ```text
 // normal
 connect = (host: String, port = p: Int) -> Conn { open(host, p) }
-pick = (0, y) { y } | (x, _) { x }
-label = (opt) { opt |> (Some(v) ? string.is_empty(v)) { "empty" } | (Some(v)) { v } | (None) { "none" } }
+pick = (0, y) { y } & (x, _) { x }
+label = (opt) { opt |> (Some(v) ? string.is_empty(v)) { "empty" } & (Some(v)) { v } & (None) { "none" } }
 
 // Lisp
 (= connect (-> (, (: host String) (= port (: p Int))) Conn (open host p)))
-(= pick (| (-> (, 0 y) _ y) (-> (, x _) _ x)))
+(= pick (& (-> (, 0 y) _ y) (-> (, x _) _ x)))
 (= label (-> (, opt) _
-  (|> opt (| (-> (? (, (Some v)) ((. string is_empty) v)) _ "empty")
+  (|> opt (& (-> (? (, (Some v)) ((. string is_empty) v)) _ "empty")
              (-> (, (Some v)) _ v)
              (-> (, None) _ "none")))))
 ```
@@ -2696,10 +2697,10 @@ For example, two definitions of `std/src/test.is` after the conversion
 ```text
 (= text (-> (, x) _
   (|> ((. syntax node) x)
-      (| (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)
+      (& (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)
          (-> (, _) _ (panic "test name must be a string literal"))))))
 (= append (-> (, xs ys) _
-  (|> xs (| (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))
+  (|> xs (& (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))
 ```
 
 Today they are `(-> (x) _ {(| … {(-> ((. syntax Text) s) s) …})})` and
@@ -2780,11 +2781,11 @@ the new one from stage 8 to stage 12 (SYN2 did the same:
 | 5 | `\|>` level in today's syntax: group every `a \|> f OP b` (OP at levels 1 to 5) as `{ a \|> f } OP b` and every `a OP b \|> f` as `a OP { b \|> f }`; then move `\|>` to the lowest level | migrator (subcommand `pipe`); `crates/ilang-syntax/src/parser.rs`:1005-1056; fixture `tests/spec/6.9/syn3_pipe_weakest.i` | `scripts/dev-verify` passes before and after the level change, with no source edit between | Yes | Yes |
 | 6 | Remove open records in today's syntax: `Record`, type spreads, forgetting, label parameters, string and `UpName` labels, `i/record`, width subtyping; records become closed labelled data; tuples and records share `Head::Shape`; `()` has the type `()`; `Ty::Graph` deleted; record run time deleted; text form `(label = value)` | `crates/ilang-check/src/types/records.rs`, `records/` (deleted), `solve.rs`, `infer.rs`, `known.rs`, `display.rs`, `scheme_wire.rs`, `value_types.rs`, `alias.rs`, `mod.rs`; `crates/ilang-wasm/src/runtime/values/record.rs` (deleted), `values.rs`, `inspect.rs`, `lower.rs`; `lib/i/record.i` (deleted); the 23 test files that use open records rewritten or deleted; `tests/t3-record-*.py` (deleted) | `test ! -e crates/ilang-check/src/types/records.rs && ! grep -rn "Ty::Graph" crates`; `scripts/dev-verify` passes; fixture `tests/spec/11/syn3_data_equality.i` (`(a : 1) == (a : 1)`, `(1, 2) != (a : 1, b : 2)`, inspect `(a = 1)`) | No | Yes |
 | 7 | `FnTy` with one data parameter and one need row (no `err`) in today's syntax; arity failure becomes a shape mismatch; unions of functions of different shapes give a `Never` parameter; internal `Ty::Poly` with rigid checking and the level-escape check (§2.16) | `types/mod.rs`, `solve.rs`, `known.rs`, `infer.rs`, `display.rs`, `shown.rs`, `scheme_wire.rs`, `pattern.rs`, `coverage.rs`; fixture `tests/spec/4.4/syn3_fn_shapes.i` (`xs = [(a) { a }, (a, b) { a }]` checks with no E0502 and its shown parameter part is `{ Never }`) | `cargo test -p ilang-cli --test spec --locked`; a Rust unit test: `(x) { 1 }` against `<A>(A) -> A` fails and `(x) { x }` passes | No | Yes |
-| 8 | New parser, AST, printer, formatter, Lisp rows of §6.8 (data-form parameters, pipe head `\|>`, chain `\|`), `i/syntax` positions, tree-sitter, editor grammars, LSP syntax; the migrator converts every `.i`, `.is`, embedded Rust string and doc fence in one commit; spec §§ replaced by §5.2; chains with one shape group only (a chain with two groups is a temporary compile error); guards; `<-` (lexer P0, needs, service patterns, `e <- s` at the weakest level, P14, P15); `<A, …>` on function literals and types; no `!`, `^`, `name(A) =`; the Lisp rows of §6.8 for them | `crates/ilang-syntax/src/{lexer,parser,parser/*,ast,ast_eq,ast_clone,print,format,shape,walk}.rs`, `lisp/*`, `parser_legacy.rs` (kept); `crates/ilang-check/src/resolve.rs` (chain lowering), `hir.rs`; `lib/i/syntax.i`; `editors/**`; `crates/ilang-lsp`; migrator subcommand `convert` | `cargo run -p ilang-syntax --example migrate-syntax3 -- --verify` (for every file: `ast_eq(new_parse(print(convert(old_parse(f)))), convert(old_parse(f)))`, and no file outside the manual list fails to convert); `scripts/check-snippets`; a fixture file with `find_user`, `fail.raise`, `fail.catch`, `map`, `live` and a block provide (§2.10) parses and checks; `scripts/dev-verify` | Conversion yes; parser no | No |
+| 8 | New parser, AST, printer, formatter, Lisp rows of §6.8 (data-form parameters, pipe head `\|>`, chain `&`), `i/syntax` positions, tree-sitter, editor grammars, LSP syntax; the migrator converts every `.i`, `.is`, embedded Rust string and doc fence in one commit; spec §§ replaced by §5.2; chains with one shape group only (a chain with two groups is a temporary compile error); guards; `<-` (lexer P0, needs, service patterns, `e <- s` at the weakest level, P14, P15); `<A, …>` on function literals and types; no `!`, `^`, `name(A) =`; the Lisp rows of §6.8 for them | `crates/ilang-syntax/src/{lexer,parser,parser/*,ast,ast_eq,ast_clone,print,format,shape,walk}.rs`, `lisp/*`, `parser_legacy.rs` (kept); `crates/ilang-check/src/resolve.rs` (chain lowering), `hir.rs`; `lib/i/syntax.i`; `editors/**`; `crates/ilang-lsp`; migrator subcommand `convert` | `cargo run -p ilang-syntax --example migrate-syntax3 -- --verify` (for every file: `ast_eq(new_parse(print(convert(old_parse(f)))), convert(old_parse(f)))`, and no file outside the manual list fails to convert); `scripts/check-snippets`; a fixture file with `find_user`, `fail.raise`, `fail.catch`, `map`, `live` and a block provide (§2.10) parses and checks; `scripts/dev-verify` | Conversion yes; parser no | No |
 | E6 | (after 8) `..env : N` service patterns and library `keep`; delete `control.keep_env` only if its fixture passes on the library version (§2.10.8) | `infer.rs`, `lower.rs`, `lib/i/control.i`, `lib/i/task.i` | `tests/spec/9/keep_env.i` and a `task.keep` error-propagation fixture pass on `keep` | No | No |
 | 9 | Shape groups in the checker: chains with several groups; direct calls choose the group by shape; the multi-shape value type; a multi-shape value may only be called directly (temporary error) | `types/infer.rs`, `pattern.rs`, `coverage.rs`, `known.rs`, `scheme_wire.rs`; fixtures `tests/spec/6.12/syn3_connect.i` (answers 3c `connect`, runs) and `tests/spec/4.8/syn3_area_value.i` (`fs = [area]` shows `fs : List({ (Float) \| (Float, Float) } -> Float)`) | `cargo test -p ilang-cli --test spec --locked` | No | No |
 | 10 | Run time: `$multi`, shape ids in closures, the slow path at the 11 call sites, display; lift stage 9's temporary error | `crates/ilang-wasm/src/emit/mod.rs`, `emit/control.rs`, `ir.rs`, `lower.rs`, `runtime/values/inspect.rs`; fixtures `tests/spec/11/syn3_multi_value.i` (`fs = [area]`, `Some(f) = list.first(fs)`, prints `f(2.0)` and `f(3.0, 4.0)`), `tests/spec/11/syn3_multi_tail.i` (10^6 tail calls through a multi-shape value, constant stack), `tests/spec/9/syn3_multi_suspend.i` (a call through it across `control.suspend`) | `cargo test -p ilang-cli --test spec --locked` (both optimization levels); `scripts/bench` closure-call case within noise of stage 9 | No | No |
-| 11 | Selection by known types and by expected types; direct aliases | `types/infer.rs`, `known.rs`, `coverage.rs` (taken at every place) | fixture `tests/spec/4.8/syn3_select.i`: `s : String = show(1)` checks; `gcd` checks; `x : { String \| Int } = f(Some(5))` checks and `y : String = f(Some(5))` is rejected; `g = show; t : String = g(1)` checks; `h = (x) { show(x) }` shows `h : (Int \| String) -> { String \| Int }`; `list.map([1, 2], show)` shows `List(String)`; a chain with one generic branch (`<A>(x : A) { x } | (x : Int, y : Int) { y }`) selects and instantiates per branch; then `cargo test -p ilang-cli --test spec --locked` | No | No |
+| 11 | Selection by known types and by expected types; direct aliases | `types/infer.rs`, `known.rs`, `coverage.rs` (taken at every place) | fixture `tests/spec/4.8/syn3_select.i`: `s : String = show(1)` checks; `gcd` checks; `x : { String \| Int } = f(Some(5))` checks and `y : String = f(Some(5))` is rejected; `g = show; t : String = g(1)` checks; `h = (x) { show(x) }` shows `h : (Int \| String) -> { String \| Int }`; `list.map([1, 2], show)` shows `List(String)`; a chain with one generic branch (`<A>(x : A) { x } & (x : Int, y : Int) { y }`) selects and instantiates per branch; then `cargo test -p ilang-cli --test spec --locked` | No | No |
 | 12 | Delete the legacy parser, clause-block AST, brace decision, label and record leftovers, leftovers of `!`, `^` and binding-head type parameters, spec exceptions, stage 9's temporary error | `crates/ilang-syntax/src/parser_legacy.rs` and users | `test ! -e crates/ilang-syntax/src/parser_legacy.rs`; `scripts/dev-verify` | Yes | No |
 
 Order constraints of the effects stages: E1 follows stage 1 (the B2 fix);
@@ -2816,11 +2817,11 @@ printed unchanged.
 | `T {}` | `T = Opaque` | |
 | `T = (A, B)`, `T = (x : A)` | `T = { (A, B) }`, `T = { (x = A) }` | Keeps today's alias meaning (G16). |
 | `T(..)` export of a multi-constructor type | `T(..)` | D8 gives the same set. `T` alone becomes `T, C1, C2` (types only). |
-| Clause block `e \|> { p1 -> e1  p2 -> e2 }` | `e \|> (p1) { e1 } \| (p2) { e2 }` | A tuple pattern `(a, b)` becomes the item `((a, b))`. |
+| Clause block `e \|> { p1 -> e1  p2 -> e2 }` | `e \|> (p1) { e1 } & (p2) { e2 }` | A tuple pattern `(a, b)` becomes the item `((a, b))`. |
 | Clause with choices `p1 \| p2 -> e` | `(p1 \| p2) { e }` | |
 | Clause with a guard `p ? g -> e` | `(p ? g) { e }` | |
 | Clause pattern `n1 = … = nk = p` (names first) | `(p = n1 = … = nk)` | P7; when `p` is also a name, `(_ = n1 = … = p)`. |
-| A clause block as a value | a chain literal | `{ Some(u) -> u.name  None -> "" }` becomes `(Some(u)) { u.name } \| (None) { "" }`. |
+| A clause block as a value | a chain literal | `{ Some(u) -> u.name  None -> "" }` becomes `(Some(u)) { u.name } & (None) { "" }`. |
 | `x \|> {}`, `{}` | `core.never(x)`, `core.never` | |
 | Parameter `(t = (a, b))` | `((a, b) = t)` | Same for nested data patterns. |
 | Parameter `(x = label)`, `(x = label : T)` | `(_ = x = label)`, `(label : T = x)` | Today the label is `label` and both names are bound; signatures become positional (D1). |
@@ -2846,7 +2847,7 @@ printed unchanged.
 | `e \|> (x) { … }` (function literal) | unchanged text | Now a match (§7.1 row 6). The migrator lists these for review of stop-message expectations. |
 | Open records, `Record`, `i/record`, label parameters | not migrated | 23 test files (evaluation), rewritten by hand or deleted in stage 6. |
 | Inspect expectations in tests | regenerated | `(label : value)` becomes `(label = value)`; labelled constructor values gain their labels. |
-| `.is` files and Lisp strings in Rust tests | Lisp rows of §6.8 | Parameters `(a b)` become `(, a b)` and `()` becomes `(,)`; the pipe `(\| e f)` becomes `(\|> e f)`; a clause block `{ (-> p e) … }` becomes the chain `(\| (-> (, p) _ e) …)` and a match `(\| s { … })` becomes `(\|> s (\| …))`; `(: x e)` labels become `(= x e)`; `(U { … })` becomes several `(= C (, …))` items; `(! x N)` in the parameters becomes the service pattern `(<- R (, (: x N)))`; `(! N e)` statements become `(<- … (, e))`; `(! (^ R E) V)` result wrappers become `(<- R (, (Fail E) …))`; `i/syntax` node values gain `Node(…)` and lose the `Int` and `Float` wrappers. Quote patterns and templates are rewritten with the same rows. |
+| `.is` files and Lisp strings in Rust tests | Lisp rows of §6.8 | Parameters `(a b)` become `(, a b)` and `()` becomes `(,)`; the pipe `(\| e f)` becomes `(\|> e f)`; a clause block `{ (-> p e) … }` becomes the chain `(& (-> (, p) _ e) …)` and a match `(\| s { … })` becomes `(\|> s (& …))`; `(: x e)` labels become `(= x e)`; `(U { … })` becomes several `(= C (, …))` items; `(! x N)` in the parameters becomes the service pattern `(<- R (, (: x N)))`; `(! N e)` statements become `(<- … (, e))`; `(! (^ R E) V)` result wrappers become `(<- R (, (Fail E) …))`; `i/syntax` node values gain `Node(…)` and lose the `Int` and `Float` wrappers. Quote patterns and templates are rewritten with the same rows. |
 | Rust-embedded snippets and doc fences | converted | The `old-syntax-check` inventory lists them. |
 
 ## 8. Open questions

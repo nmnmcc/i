@@ -22,7 +22,7 @@ Every compiler must give the library modules above. The target modules `i/target
 
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a chain of branches is a function too (§6.12). A binding is a binding wherever it is written, and a parameter group is a pattern matched as a binding matches. Where two forms look the same, they have the same rules, with this exception, where the place of a form decides its rules:
 
-- `x : T` in a parameter item is a type annotation when its branch is the only branch of its shape group, has no guard, and the item has no alternatives, and a test when not (§7.1). So with `v : { Int | String }`, `v |> (x : Int) { x }` is a compile error, but `v |> (x : Int) { x } | (_) { 0 }` is correct.
+- `x : T` in a parameter item is a type annotation when its branch is the only branch of its shape group, has no guard, and the item has no alternatives, and a test when not (§7.1). So with `v : { Int | String }`, `v |> (x : Int) { x }` is a compile error, but `v |> (x : Int) { x } & (_) { 0 }` is correct.
 
 
 ## 0. How to read this document
@@ -154,7 +154,7 @@ A break ends something. What it ends depends on the brackets it is directly insi
 - Directly inside `( )` (data, data types, data patterns, parameter groups, service patterns and needs), `[ ]`, or `<< >>`, a break is the same as a `,`. A `,` at the end of a line may be left out.
 - Directly inside a `{ }` that groups a type (§3), a break is a compile error.
 
-With no break, as on one line, a statement is the longest expression that may be read from its start, and a `,` is needed between parts. So statements may share a line: `b |> (True) { 1 } | (False) { 0 }`.
+With no break, as on one line, a statement is the longest expression that may be read from its start, and a `,` is needed between parts. So statements may share a line: `b |> (True) { 1 } & (False) { 0 }`.
 
 But a statement that starts with `(`, `-`, or `-.` begins a new line, because the expression before it on the same line goes on with it. In `{ a = f  (b, c) = g … }`, `f(b, c)` is read as a call, so the statement is the expression `f(b, c)` followed by a stray `=`, a compile error. With a constructor, the one binding may be correct and mean something else: `{ mk = Pair  (b, c) = g … }` is the binding `mk = Pair(b, c) = g`, which takes `g` apart, and it does not bind `mk` to `Pair`.
 
@@ -162,7 +162,7 @@ From this rule:
 
 - When `(` is on the same line as the expression before it, it is a call (§6.6). When `(` is the first thing on a line, it begins a new statement or part.
 - The `{` of a function body (§6.8) is on the same line as the `)` or the type before it.
-- A line that ends in an operator, `,`, `=`, `:`, `->`, `<-`, `(`, `[`, `{`, or `<<` goes on in the next line. A line that begins with `.`, `|`, `?`, `->`, `<-`, or a binary operator other than `-` and `-.` goes on from the line before. So a branch of a chain that begins a line begins it with `|` (§6.12), and a provide may begin a line with `<-`.
+- A line that ends in an operator, `,`, `=`, `:`, `->`, `<-`, `(`, `[`, `{`, or `<<` goes on in the next line. A line that begins with `.`, `|`, `&`, `?`, `->`, `<-`, or a binary operator other than `-` and `-.` goes on from the line before. So a branch of a chain that begins a line begins it with `&` (§6.12), a union or a pattern alternative may begin a line with `|`, and a provide may begin a line with `<-`.
 - `a` and then `- b` on the next line are two statements. To write `a - b` on two lines, put `-` at the end of the first line.
 - A line whose first tokens are `<`, one or more `UpName`s with `,` between them, `>` and `(` begins a new statement: a function with type parameters (§6.8). To go on with a comparison in that form on the next line, put the operator at the end of the line before.
 
@@ -192,7 +192,7 @@ lines. The Lisp surface is laid out
 by Lisp convention (cljfmt indentation): a datum that fits stays on one
 line; closing brackets never begin a line and are gathered at the end of the
 form's last line; indentation is with spaces. A broken block-like form (`=`,
-`->`, `|`, `.`, `@`, `:`, `!`) keeps its head and distinguished first parts
+`->`, `|`, `&`, `.`, `@`, `:`, `!`) keeps its head and distinguished first parts
 on the head line and indents its body two spaces; another call either keeps
 its first argument on the head line and aligns the others under it, or puts
 its arguments under the head, one space in; `{`, `[` and `<<` align their
@@ -866,11 +866,11 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 8. **Operators** are not functions. Each has the types of §6.9. `a |> f(b)` has the type of `f(a, b)`.
 9. **Blocks.** `{ s1 … sn e }` has the type of `e`, with the names bound by `s1 … sn` (§6.10). The need of a block is the merge of the needs of its statements and of `e`.
 10. **Bindings.** For `p = e` with `e : A`: `p` is fitted to `A` (below). If `p` may fail for `A` (§7.3), then `Assert` is in `N`.
-11. **Groups.** This rule is for a shape group of a chain (§6.12) with more than one branch or with a guard. Let it be called with data of type `B`: in a match `e |> C` with `e : A`, the one-position data `(A)`; in a call, the argument data type. The parameter patterns (each alternative of `|` counts) are looked at by **place**. The top place is the argument data. Below a pattern at a place, its parts are at places of their own: the part under each key of a data pattern, the part under each key of a constructor's data, and the parts and the rest of a list. Places below different constructors are different places. At each place, let `B` be the type of the values there (the argument data at the top place, and else the part type of the pattern type above it), and let `P` be the union of the pattern types (below) of the patterns at that place that are not catch-alls. Patterns at one place with the same type constructor use the same new type variables, so `Ok(v)` and `Error(e)` at one place give `Ok(b1) | Error(b2)`, and `Some(v)` and `None` give `Some(b) | None`. A type test `x : T` at a place also needs `B <: T | r - T`, with a new type variable `r`: it takes every value whose type constructor is that of a member of `T`, and that, for a member of `Int` or `String`, is in the value set of that member (§7.1), so those values must be in `T`. So `v |> (x : Box(Int)) { … } | (y : Box(String)) { … }` with `v : Box(Int | String)` is a compile error. A data or constructor pattern with `..` counts as having a catch-all at the places of the keys that it leaves out. If some branch without a guard has a catch-all at that place or at a place above it, then `B <: P | r - P`, with a new type variable `r`: a value that no pattern takes may still come there. If not, then `B <: P`. So a group with only literal branches and no catch-all takes only those values: `(0) { "zero" } | (1) { "one" }` has the type `(0 | 1) -> "one" | "zero"`. In a match `e |> C` whose subject already has a type with values that are in no literal of `P`, so that `B <: P` is not true only for that reason, as `(n : Int) { n |> (0) { "zero" } | (1) { "one" } }`, the error is the one of §7.4, with a value that no branch matches, and no other error is given for it. A chain that is not the right side of a match gets its values later, through the type of its parameter: from a call, or from the type it is given to, as in `list.map(xs, (0) { "zero" } | (1) { "one" })` with `xs : List(Int)`. Then there are two errors: a type error where the values come, and the error of §7.4 at the chain. A catch-all at a place gets the type of rule 12. Every guard has the type `Bool`, each branch body has its own type `Ri`, and the need of every guard and body is part of the need `N` of the chain. The group has the type `{ B } <- N -> R1 | … | Rn`, and a match has the type `R1 | … | Rn`. Making the chain needs nothing, as for a function in rule 4. Coverage (§7.4) is checked with the types that inference finds.
+11. **Groups.** This rule is for a shape group of a chain (§6.12) with more than one branch or with a guard. Let it be called with data of type `B`: in a match `e |> C` with `e : A`, the one-position data `(A)`; in a call, the argument data type. The parameter patterns (each alternative of `|` counts) are looked at by **place**. The top place is the argument data. Below a pattern at a place, its parts are at places of their own: the part under each key of a data pattern, the part under each key of a constructor's data, and the parts and the rest of a list. Places below different constructors are different places. At each place, let `B` be the type of the values there (the argument data at the top place, and else the part type of the pattern type above it), and let `P` be the union of the pattern types (below) of the patterns at that place that are not catch-alls. Patterns at one place with the same type constructor use the same new type variables, so `Ok(v)` and `Error(e)` at one place give `Ok(b1) | Error(b2)`, and `Some(v)` and `None` give `Some(b) | None`. A type test `x : T` at a place also needs `B <: T | r - T`, with a new type variable `r`: it takes every value whose type constructor is that of a member of `T`, and that, for a member of `Int` or `String`, is in the value set of that member (§7.1), so those values must be in `T`. So `v |> (x : Box(Int)) { … } & (y : Box(String)) { … }` with `v : Box(Int | String)` is a compile error. A data or constructor pattern with `..` counts as having a catch-all at the places of the keys that it leaves out. If some branch without a guard has a catch-all at that place or at a place above it, then `B <: P | r - P`, with a new type variable `r`: a value that no pattern takes may still come there. If not, then `B <: P`. So a group with only literal branches and no catch-all takes only those values: `(0) { "zero" } & (1) { "one" }` has the type `(0 | 1) -> "one" | "zero"`. In a match `e |> C` whose subject already has a type with values that are in no literal of `P`, so that `B <: P` is not true only for that reason, as `(n : Int) { n |> (0) { "zero" } & (1) { "one" } }`, the error is the one of §7.4, with a value that no branch matches, and no other error is given for it. A chain that is not the right side of a match gets its values later, through the type of its parameter: from a call, or from the type it is given to, as in `list.map(xs, (0) { "zero" } & (1) { "one" })` with `xs : List(Int)`. Then there are two errors: a type error where the values come, and the error of §7.4 at the chain. A catch-all at a place gets the type of rule 12. Every guard has the type `Bool`, each branch body has its own type `Ri`, and the need of every guard and body is part of the need `N` of the chain. The group has the type `{ B } <- N -> R1 | … | Rn`, and a match has the type `R1 | … | Rn`. Making the chain needs nothing, as for a function in rule 4. Coverage (§7.4) is checked with the types that inference finds.
 
     A group with one branch and no guard is not typed by this rule. It is the function of rule 4: its parameter group is fitted to the parameter type (below), it is not checked for coverage, and `Assert` is in its need when the pattern may fail. A match `s |> (p) { e }` with such a chain is typed as the binding `p = s` followed by `e` (rule 10), with the one difference that `p` is not generalized, as a parameter is not. So the subject `s` gets the expected type that a binding gives its value (below).
 
-12. **Narrowing.** Let a catch-all be at some place in a parameter pattern of a group, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the branch's pattern matches, with a value of `T` at that place, is matched by an earlier branch of the group without a guard. In the same way, a value `v` of an earlier `Int` or `String` literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the pattern matches with it at that place is matched by an earlier branch without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. So in `s |> ("a") { 0 } | (rest) { f(rest) }` with `s : String`, `rest` gets `String - "a"`. Guarded branches take nothing.
+12. **Narrowing.** Let a catch-all be at some place in a parameter pattern of a group, and let `B` be the type of the values at that place. A type constructor `T` is **taken** at that place when every value that the branch's pattern matches, with a value of `T` at that place, is matched by an earlier branch of the group without a guard. In the same way, a value `v` of an earlier `Int` or `String` literal pattern at that place, and a member of the type of an earlier type test at that place, is **taken** when every value that the pattern matches with it at that place is matched by an earlier branch without a guard. The catch-all gets the type `B - H`, where `H` is the union of the taken members: each taken type constructor with new type variables as its arguments, the literal type of each taken value, and each taken member of a type test. So in `s |> ("a") { 0 } & (rest) { f(rest) }` with `s : String`, `rest` gets `String - "a"`. Guarded branches take nothing.
 13. **Keys.** For `v.k` and `v.f`, `v` must have a known type or a structural hint (below), and every member of it must be data with that key, or a labelled type whose data has that key and whose constructor may be used here (§2.4). The inferred result is the union of those parts with the type arguments from the corresponding bound forms, or the constructor-pattern arguments already supplied by §7.5. The inferred type of `v`, using its branch-local view when there is one (§7.5), must fit the bound. If not, it is a compile error. The bound takes all Int and String values at covariant places, removes exclusions of only some of those values there, and takes fresh holes at noncovariant places. Use this bound also when a known function type constrains a call. Known key results are obtained separately from the original known facts, not by narrowing the inferred result to them. A known type may have fewer values than the inferred type: after `x = "a" = s` with `s : String`, `x` has the type `String` and the known type `"a"`, and `(x, 0).0` is correct.
 14. **Generalization.** A binding whose value is a direct value is generalized (§4.7) after its value is typed. Other bindings and parameter groups are not.
 
@@ -882,7 +882,7 @@ Alternatives `q1 | … | qn` may occur in a parameter item of any shape group (�
 
 The **pattern type** of a pattern that is not a catch-all, and its parts, are:
 
-- A literal of `Int` or `String`, also `-` and an integer literal: in a group typed by rule 11, its literal type (§4.2); where it is fitted, `Int` or `String`, so that every value of that type may come there and the pattern may fail (§7.3). At a place whose type is shared with another place, or inside one, also `Int` or `String`: an item of a list pattern, because all the items of a list have one type, and a key of a constructor whose written data has a type parameter that occurs more than once in it (counting through names), as both parts of `Twin(A) = (A, A)`, and the parts of the data of `W(A) = ((A, A))`. A literal type at one such place would be a type for all of them. So when that type is not written and does not come from the subject, a group that matches those places only with literals is not covered (§7.4): `(xs) { xs |> ([]) { 0 } | (["a", ..]) { 1 } | (["b", ..]) { 2 } }` gives `xs` the type `List(String)`, and the error names a value such as `[""]`. With `(xs : List("a" | "b"))` written, the same chain is covered. A float literal: `Float`.
+- A literal of `Int` or `String`, also `-` and an integer literal: in a group typed by rule 11, its literal type (§4.2); where it is fitted, `Int` or `String`, so that every value of that type may come there and the pattern may fail (§7.3). At a place whose type is shared with another place, or inside one, also `Int` or `String`: an item of a list pattern, because all the items of a list have one type, and a key of a constructor whose written data has a type parameter that occurs more than once in it (counting through names), as both parts of `Twin(A) = (A, A)`, and the parts of the data of `W(A) = ((A, A))`. A literal type at one such place would be a type for all of them. So when that type is not written and does not come from the subject, a group that matches those places only with literals is not covered (§7.4): `(xs) { xs |> ([]) { 0 } & (["a", ..]) { 1 } & (["b", ..]) { 2 } }` gives `xs` the type `List(String)`, and the error names a value such as `[""]`. With `(xs : List("a" | "b"))` written, the same chain is covered. A float literal: `Float`.
 - `C(…)`: `C(b1, …, bm)`, the labelled type `C` with a new type variable for each type parameter. The part for each item is the part of its data type at that item's key, with these variables.
 - A data pattern: the data type of its shape, with a new type variable at each key. The part for each item is the variable at its key; a rest `..r` gets the data type of the remaining keys of the unique known shape (§7.1).
 - `[p1, …, pn]` and `[p1, …, pn, ..r]`: `List(b)`, with a new type variable. The part for each `pi` is `b`, and `r` gets `List(b)`.
@@ -916,7 +916,7 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
 - A match `e |> C` has the union of the known types of its branch bodies when they all have one.
 - The names of a parameter group get known types as names in patterns (below), but the argument data has no known type. So `x : T` gives `x` the type `T`, and a parameter with no type has no known type. A name of a service pattern `x : T` has `T`.
 - A built-in name, an imported name, and a member `m.x` of an imported module have their type scheme. So does the name of a generalized binding (§4.7), local or top-level, where it is used outside its own value and outside its group. A type variable in such a scheme that is not generalized is replaced by the matching part of the known type of the binding's value, or by `_`. A constructor has its function type, or its type when it is a value.
-- A function expression has the type made from: for its parameter data, the shape of its parameter group, with the type written at the top of each item (as in `x : T`), or else the type it gets from an expected type (below), or else `_`; and for the result, the written `->` part, or else the known type of its body, or else `_`. A chain literal has, for each shape group, a known function type made in the same way, with the union of the known types of its branch bodies as the result when they all have one; a chain with several groups has the known multi-shape type `{ D1 | … | Dn } <- N -> R` of §6.12. When the parameter of a group has a known type `B`, from a written type or from an expected type, every parameter pattern of the group is a pattern fitted to a value with the known type `B`, as in a match (below), and the narrowing of rule 12 is used in the same way. So with `opts : List(Option(User))`, `list.map(opts, (Some(u)) { u.name } | (None) { "" })` is correct.
+- A function expression has the type made from: for its parameter data, the shape of its parameter group, with the type written at the top of each item (as in `x : T`), or else the type it gets from an expected type (below), or else `_`; and for the result, the written `->` part, or else the known type of its body, or else `_`. A chain literal has, for each shape group, a known function type made in the same way, with the union of the known types of its branch bodies as the result when they all have one; a chain with several groups has the known multi-shape type `{ D1 | … | Dn } <- N -> R` of §6.12. When the parameter of a group has a known type `B`, from a written type or from an expected type, every parameter pattern of the group is a pattern fitted to a value with the known type `B`, as in a match (below), and the narrowing of rule 12 is used in the same way. So with `opts : List(Option(User))`, `list.map(opts, (Some(u)) { u.name } & (None) { "" })` is correct.
 - A name used inside the value of its own binding, and a top-level name of the same group, get their known types only from what is written, because their values are not yet known there: from `x : T` at the top of the binding's pattern when it is there, or else from what is written in the value, with `_` for the rest. So a function that uses its own result in `.f` or `.k` needs a written `->` part. Every other name bound by a pattern gets its known type as below.
 - A known type may have `_` in it, for a part that is not known. A part that is `_` has no known type, but the rest of the type is still known. So the shape of a function is known even when its types are not.
 - A call `f(d)`, also when written with `|>`, has a known type when `f` has a known function type, and every type variable of its result gets a type when its parameter type is matched with the known type of the argument data (below). Then it has the result type with those types put in. A constructor with data is a call.
@@ -935,7 +935,7 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
 - In a match `e |> C`, every parameter pattern of the one-position group of `C` is a pattern fitted to a value with the known type of `e` (below), also when the group has one branch and no guard. So with `opt : Option(User)`, `opt |> (Some(u)) { u.name }` is correct, as `Some(u) = opt` followed by `u.name` is.
 - **Names in patterns**: when a pattern `q` is fitted to a value with a known type `B`: a catch-all gets `B`, less the members that rule 12 takes out. If `q` is not a catch-all, take the one member of `B` with the type constructor of `Q`; for a literal pattern with the value `v`, only that value, if the member has it: `B & v`, with `v` the literal type of the value (not `B & Q`, because where a pattern is fitted `Q` is the whole `Int` or `String`); if there is not exactly one, the names of `q` get no known type. The parts of `q` then have the known part types of that member, with its type arguments put in; the binder `r` of a string prefix, suffix, or combined pattern has the known type `String`, all its values, because the known type of the whole value says nothing about its remaining part. A name part of a conjunction gets that member. The name `x` of `x : T` gets `T`, whatever the value.
 
-So `(u) { u.name }` needs a type, `(u : User) { u.name }`, but with `opt : Option(User)`, `opt |> (Some(u)) { u.name } | (None) { "" }` is correct.
+So `(u) { u.name }` needs a type, `(u : User) { u.name }`, but with `opt : Option(User)`, `opt |> (Some(u)) { u.name } & (None) { "" }` is correct.
 
 ## 5. Names and scope
 
@@ -970,7 +970,7 @@ List      = "[" [ Expr { "," Expr } [ "," ".." Expr ] [ "," ] ] "]" .
 Block     = "{" { Statement } Expr "}" .
 Statement = Binding | Expr .
 Binding   = Pattern "=" Expr .
-Branches  = Function { "|" Function } .
+Branches  = Function { "&" Function } .
 Function  = [ TypeParams ] Params [ "<-" SvcPat ] [ "->" Union ] Block .
 Params    = "(" [ PItem { "," PItem } [ "," ] ] [ "?" Expr ] ")" .
 SvcPat    = "(" [ SvcItem { "," SvcItem } [ "," ] ] ")" .
@@ -982,7 +982,7 @@ SvcItem   = name ":" Annot | ".." name ":" Annot .
 - **Function or data.** A `(` that begins a primary is the `Params` of a function when its matching `)` is followed by `->`, or by `{` on the same line, or by `<-` and a bracket group whose matching `)` is followed on the same line by `->` or `{`; that group is then the service pattern. Otherwise the `(` begins `Data`, and a `<-` after the data is a provide (§9.2). A primary that begins with `<` is a function with type parameters, and its `>` must be followed by `(`. The decision is made before the contents of the brackets are read. Function bodies are always blocks.
 - **Calls.** A `Data` on the same line right after a postfix expression is a call (§1.7). So `f(x) { … }` is a call and then a block.
 - **Items.** In `Data`, a data type, a data pattern and `Params`, an item whose first two tokens are a `name` and `=` is a labelled item. `==` is one token, so `(a == b)` has one position. `..` begins a spread or a rest.
-- **Branches.** After the `}` of a function body, a `|`, also at the start of the next line, joins the next branch, which must begin a function (`(`, or the `<` of type parameters); anything else after it is a compile error. A `|` after any other expression is a compile error. A call, `.f` or `.k` after a chain applies to the whole chain.
+- **Branches.** After the `}` of a function body, an `&`, also at the start of the next line, joins the next branch, which must begin a function (`(`, or the `<` of type parameters); anything else after it is a compile error. A `|` in the place of a value-level chain separator is a compile error that says to join the branches with `&`. A call, `.f` or `.k` after a chain applies to the whole chain.
 - **The `->` part.** In the `->` part of a function, a `{` right after `->`, `|`, `&` or `-` is part of the type (§3); the first other `{` not inside brackets is the body.
 - **Statements.** A statement reads pattern parts while each is followed by `=`. If at least one is, the statement is a binding: the parts read form its pattern, and its value begins at the first part not followed by `=`. Otherwise the statement is an expression. A lowercase name followed by `(` is never a pattern part (§7.1), so `id(A) = …` is an expression followed by a stray `=`, a compile error.
 - **Guards.** `?` inside `Params` begins the guard, after the last item, and the guard ends at the matching `)`. A `?` in any other pattern is a compile error.
@@ -1074,13 +1074,13 @@ An expression statement that is not the last, and whose working out can do nothi
 
 - The type of `e` must be a subtype of the pattern type of `p` (§4.8 rule 10). So `x : Int = e` says that `e` has the type `Int`, and `(a, b) = v` with `v : { (Int, Int) | Nil }` is a compile error; a match is used for this.
 - If `p` can not fail for the type of `e` (§7.3), the binding needs no service.
-- If not, as in `Ok(v) = r`, when it runs, the binding works like the match `e |> (p) { … } | (_) { a.fail(AssertionFailure(message = m)) }`, where the first branch goes on with the rest of the block. The binding is still typed by §4.8 rule 10, not by rule 11. Here `a` is the `Assert` service, and `m` is the text `pattern `, then the source text of `p`, then ` did not match `, then the text form (§11.8) of the value. So `Assert` is in the need of the binding (§9.6).
+- If not, as in `Ok(v) = r`, when it runs, the binding works like the match `e |> (p) { … } & (_) { a.fail(AssertionFailure(message = m)) }`, where the first branch goes on with the rest of the block. The binding is still typed by §4.8 rule 10, not by rule 11. Here `a` is the `Assert` service, and `m` is the text `pattern `, then the source text of `p`, then ` did not match `, then the text form (§11.8) of the value. So `Assert` is in the need of the binding (§9.6).
 - A pattern is a conjunction of parts, `p1 = … = pk`: `a = (x, y) = e` binds `e` to `a` and to `(x, y)`, and `a = b = c = d` binds `a`, `b` and `c` to `d`.
 
 A **direct value** is an expression that is made without running any code: a function expression or a chain; a literal, also with `-` or `-.` before it, also when the literal is inside groups (`-{1}`, `-.{1.5}`); a name; or data with no spread, a list, a constructor call, or a group `{ e }` whose parts are direct values. When the value of a binding is a direct value, the names of the binding may also be used inside the function bodies in that value. This is the same for every binding, local or top-level. So a local function may call itself, and one binding of data may make functions that call one another:
 
 ```i
-fact = (0) { 1 } | (n : Int) { n * fact(n - 1) }
+fact = (0) { 1 } & (n : Int) { n * fact(n - 1) }
 
 (even, odd) = ((n) { n == 0 || odd(n - 1) }, (n) { n != 0 && even(n - 1) })
 ```
@@ -1097,27 +1097,27 @@ A function's parameter group is a data pattern (§7). When the function is calle
 
 ### 6.12 Branches and matching
 
-A **chain** `F1 | … | Fn` of function expressions, with `n ≥ 1`, is one function value. Each branch may write its own type parameters, which are in scope in that branch only. The branches are grouped by shape: a **shape group** has the branches whose parameter groups have one shape, in the order written. When the chain is called with data, the group with the shape of the data is used, and in it the first branch whose parameter group matches the data and whose guard, if it has one, is `True` is taken; the value of its body is the value of the call. A guard is any expression of type `Bool`. It is worked out only after its parameter group matched, and it may use the names of the group and of the service pattern. Alternatives in an item are tried in order.
+A **chain** `F1 & … & Fn` of function expressions, with `n ≥ 1`, is one function value. Each branch may write its own type parameters, which are in scope in that branch only. The branches are grouped by shape: a **shape group** has the branches whose parameter groups have one shape, in the order written. When the chain is called with data, the group with the shape of the data is used, and in it the first branch whose parameter group matches the data and whose guard, if it has one, is `True` is taken; the value of its body is the value of the call. A guard is any expression of type `Bool`. It is worked out only after its parameter group matched, and it may use the names of the group and of the service pattern. Alternatives in an item are tried in order.
 
 ```i
-gcd = (a : Int, 0) -> Int { a } | (a : Int, b : Int) -> Int { gcd(b, a % b) }
+gcd = (a : Int, 0) -> Int { a } & (a : Int, b : Int) -> Int { gcd(b, a % b) }
 
 area =
 	(r : Float) -> Float { 3.14159 *. r *. r }
-	| (w : Float, h : Float) -> Float { w *. h }
+	& (w : Float, h : Float) -> Float { w *. h }
 
 label = (opt) {
 	opt |>
 		(Some(v) ? string.is_empty(v)) { "empty" }
-		| (Some(v)) { v }
-		| (None) { "none" }
+		& (Some(v)) { v }
+		& (None) { "none" }
 }
 ```
 
 - A group with one branch and no guard is a function of one shape: its parameter group is fitted (§4.8), `x : T` in it is a type annotation unless its item has alternatives, it is not checked for coverage, and when it may fail it reports to `Assert`.
 - Any other group is typed by §4.8 rule 11, and its branches must cover every value of its parameter type (§7.4). If not, it is a compile error. A guarded branch is not counted for coverage.
 - A chain whose groups all have one shape has the type `{ B } <- N -> R`, where `R` is the union of its branch results. A chain with several groups has the type `{ B1 | … | Bm } <- N -> R`, where `Bi` is the parameter type of group `i` and `R` the union of the results of all branches. All branches of a chain share one need `N`, the merge of the needs of their guards and bodies and of their service patterns. Calling such a value with data of shape `S` uses the group of shape `S`, at run time also when the value went through data, a list or another function.
-- `e |> C`, where `C` is a chain, is a **match**, and `e` is its **subject**. It works out `e` and calls `C` with `(e)`, so it uses the group of shape "one position". A match adds no call frame: the branches run in the place of the match, a call in a branch body of a match in tail position is in tail position (§11.6), and the match is not one of the calls in a stop message (§11.7). Branches of other shapes in a matched chain can never run. To match a pair, write a pattern for it in one position: `p |> ((0, y)) { y } | ((x, _)) { x }`.
+- `e |> C`, where `C` is a chain, is a **match**, and `e` is its **subject**. It works out `e` and calls `C` with `(e)`, so it uses the group of shape "one position". A match adds no call frame: the branches run in the place of the match, a call in a branch body of a match in tail position is in tail position (§11.6), and the match is not one of the calls in a stop message (§11.7). Branches of other shapes in a matched chain can never run. To match a pair, write a pattern for it in one position: `p |> ((0, y)) { y } & ((x, _)) { x }`.
 - A branch that can never be used gives a compile warning.
 - A chain is a direct value (§6.10), as every function is. Where §2.5, §5, and §6.10 speak of the function bodies in a value, the guards and branch bodies of a chain count as function bodies. Each time a chain is worked out, it makes a new value, which is the same only as itself (§11.4).
 - `core.never : <A>(Never) -> A` (§13) is the match on `Never`: `core.never(x)` is correct only when `x` has no values.
@@ -1128,7 +1128,7 @@ label = (opt) {
 2. In that group, a branch is skipped when, at some key, the known type of that item of the data is disjoint (§4.5 rule 3) from the branch's pattern type at that key less what earlier unguarded branches of the group take there (§4.8 rule 12, applied at every place). An item with no known type is never disjoint from anything. Every branch that is not skipped is selected. When none is selected, it is a compile error that names the known types of the items.
 3. The call is typed as a call of the function type whose parameter is the union of the parameter types of the selected branches and whose result is the union of their results.
 
-So with `show = (n : Int) -> String { int.to_string(n) } | (s : String) -> Int { string.length(s) }`, `show(1)` has the type `String`, `show(x)` with `x : { Int | String }` has the type `String | Int`, and `h = (x) { show(x) }` gives `h` the type `(Int | String) -> String | Int`. A name used where a function type is expected selects for that type (§4.8), so `list.map([1, 2], show)` is a `List(String)`. Selection chooses only a type; at run time the first matching branch is always taken.
+So with `show = (n : Int) -> String { int.to_string(n) } & (s : String) -> Int { string.length(s) }`, `show(1)` has the type `String`, `show(x)` with `x : { Int | String }` has the type `String | Int`, and `h = (x) { show(x) }` gives `h` the type `(Int | String) -> String | Int`. A name used where a function type is expected selects for that type (§4.8), so `list.map([1, 2], show)` is a `List(String)`. Selection chooses only a type; at run time the first matching branch is always taken.
 
 ## 7. Patterns
 
@@ -1195,9 +1195,9 @@ Empty domains are determined by §4.1. They are covered vacuously, and no branch
 
 The branches of a shape group whose parameter has the type `A` **cover** `A` when, for every value of `A`, some branch without a guard has a parameter group that matches it. A branch with a guard is not counted. A branch is **never used** when no value in the applicable parameter domain can reach it: every value in that domain that its pattern matches is matched by an earlier branch without a guard. Values outside the domain do not make a branch useful. In an inline match, use only the one-position shape group and the possible incoming subject values; branches of other shapes are never used (§6.12).
 
-A literal pattern matches its own value, and string prefix/suffix patterns match the strings with their fixed ends. So literal patterns cover an `Int` or `String` member whose value set is finite, when every value in it is matched: with `m : { "GET" | "POST" }`, `m |> ("GET") { 1 } | ("POST") { 2 }` is covered. Literal patterns alone never cover a member with all its values, or with all but a finite set; a catch-all, a type test such as `x : String - "a"`, or, for `String`, the patterns `"" <> r` and `r <> ""`, which match every string, must take the other values. A literal in an item of a list pattern, or at a key of a constructor whose type parameter occurs more than once in its data (`Twin(A) = (A, A)`), has the whole `Int` or `String` (§4.8), so such literals cover a finite set only when that type is written or comes from the subject: `(xs : List("a" | "b")) { xs |> ([]) { 0 } | (["a", ..]) { 1 } | (["b", ..]) { 2 } }` is covered, and the same chain with `(xs)` is not. Literal patterns of Float and BitArray never cover their type. A union is covered when every member is covered. Data of one shape is one type constructor.
+A literal pattern matches its own value, and string prefix/suffix patterns match the strings with their fixed ends. So literal patterns cover an `Int` or `String` member whose value set is finite, when every value in it is matched: with `m : { "GET" | "POST" }`, `m |> ("GET") { 1 } & ("POST") { 2 }` is covered. Literal patterns alone never cover a member with all its values, or with all but a finite set; a catch-all, a type test such as `x : String - "a"`, or, for `String`, the patterns `"" <> r` and `r <> ""`, which match every string, must take the other values. A literal in an item of a list pattern, or at a key of a constructor whose type parameter occurs more than once in its data (`Twin(A) = (A, A)`), has the whole `Int` or `String` (§4.8), so such literals cover a finite set only when that type is written or comes from the subject: `(xs : List("a" | "b")) { xs |> ([]) { 0 } | (["a", ..]) { 1 } | (["b", ..]) { 2 } }` is covered, and the same chain with `(xs)` is not. Literal patterns of Float and BitArray never cover their type. A union is covered when every member is covered. Data of one shape is one type constructor.
 
-When the values that are not covered are only values of `Int` or `String` that no literal pattern takes, the type of the group already says so (§4.8 rule 11: `(n : Int) { n |> (0) { "zero" } | (1) { "one" } }` needs `Int <: 0 | 1`). In a match whose subject already has such a type, that is reported as this error alone, with a value that no branch matches, such as `2`. A chain that is not the right side of a match gets these values later, through its parameter, so there it is a type error where the values come and also this error (§4.8 rule 11). When a value that is not covered is at a list item place, or at such a key, where the branches have only literals, the message also says to write that type, such as `List("a" | "b")` or `Twin("a" | "b")`.
+When the values that are not covered are only values of `Int` or `String` that no literal pattern takes, the type of the group already says so (§4.8 rule 11: `(n : Int) { n |> (0) { "zero" } & (1) { "one" } }` needs `Int <: 0 | 1`). In a match whose subject already has such a type, that is reported as this error alone, with a value that no branch matches, such as `2`. A chain that is not the right side of a match gets these values later, through its parameter, so there it is a type error where the values come and also this error (§4.8 rule 11). When a value that is not covered is at a list item place, or at such a key, where the branches have only literals, the message also says to write that type, such as `List("a" | "b")` or `Twin("a" | "b")`.
 
 Only a group with more than one branch or with a guard must cover the type of its parameter (§6.12). A group with one branch and no guard is not checked for coverage: when its pattern may fail, it reports to `Assert`.
 
@@ -1210,7 +1210,7 @@ The view supplies both the inferred type used for the key bound (§4.8 rule 13) 
 ```i
 A = (value = Int)
 B = (other = String)
-f = (v : { A | B }) { v |> (A(value = _)) { v.value } | (B(other = _)) { 0 } }
+f = (v : { A | B }) { v |> (A(value = _)) { v.value } & (B(other = _)) { 0 } }
 main = () { f(A(value = 7)) }
 ```
 
@@ -1285,8 +1285,8 @@ A function with no parameters, `() <- N -> A`, is a **computation** that has not
 retry = <A, E, N>(times : Int, body : () <- (..N, Fail(E)) -> A) -> A {
 	fail.catch(body) |>
 		(Ok(value)) { value }
-		| (Error(error) ? times > 1) { retry(times - 1, body) }
-		| (Error(error)) { fail.raise(error) }
+		& (Error(error) ? times > 1) { retry(times - 1, body) }
+		& (Error(error)) { fail.raise(error) }
 }
 
 user = () { retry(3, () { load_user("1") }) }
@@ -1398,8 +1398,8 @@ load = (id) { parse_user(http_get(id)) }
 safe = (id) {
 	fail.catch(() { load(id) }) |>
 		(Ok(user)) { user }
-		| (Error(_ : ParseError)) { default_user }
-		| (Error(other)) {
+		& (Error(_ : ParseError)) { default_user }
+		& (Error(other)) {
 			fail.raise(
 				other, // other: HttpError
 			)
@@ -1518,7 +1518,7 @@ An `Assert` service is where failures are reported. Its `fail` never gives back 
 assert = (c : Bool) <- (a : Assert) -> Nil {
 	c |>
 		(True) { Nil }
-		| (False) { a.fail(AssertionFailure(message = "assert")) }
+		& (False) { a.fail(AssertionFailure(message = "assert")) }
 }
 // assert : (Bool) <- (Assert) -> Nil
 ```
@@ -2542,7 +2542,7 @@ A call in tail position uses no more stack. Tail positions are: the last express
 
 
 
-So in `loop = (0) { Done } | (n) { loop(n - 1) }`, the call `loop(n - 1)` uses no more stack. A match adds no call frame (§6.12).
+So in `loop = (0) { Done } & (n) { loop(n - 1) }`, the call `loop(n - 1)` uses no more stack. A match adds no call frame (§6.12).
 
 
 ### 11.7 Stops
@@ -2769,7 +2769,7 @@ The `{ }` around the right side of a name whose right side is a data type is par
 | Function with a service pattern | `(id : String) <- (db : Db) -> User { e }`, `(f) <- (..env : N) { e }` | `(-> (, (: id String)) (<- User (, (: db Db))) e)`, `(-> (, f) (<- _ (, .. (: env N))) e)` |
 | Function with type parameters | `<A, N>(x : A) -> A { e }` | `(-> [A N] (, (: x A)) A e)` |
 | Function with a guard | `(p1, p2 ? g) { e }` | `(-> (? (, p1 p2) g) _ e)` |
-| Chain, match | `F1 \| F2`, `e \|> F1 \| F2` | `(\| F1 F2)`, `(\|> e (\| F1 F2))` |
+| Chain, match | `F1 & F2`, `e \|> F1 & F2` | `(& F1 F2)`, `(\|> e (& F1 F2))` |
 | Provide | `e <- (s1, ..env)`, `app() <- live()` | `(<- e (, s1 .. env))`, `(<- (app) (live))` |
 | Quote | none | `` `d `` |
 
@@ -2788,7 +2788,7 @@ The `{ }` around the right side of a name whose right side is a data type is par
 | Quote pattern | none | `` `d `` |
 
 - In the position of an expression, `(-> …)` is a function: an optional `Square` of type parameters, the parameter data pattern, the result (`_` when no `->` part is written, or `(<- R needs)` with a service pattern), and the body, which is any one expression. In the position of a type, `(-> …)` is a function type. In an expression, `(<- e s)` is a provide.
-- `(| …)` in the position of an expression is a chain of two or more functions.
+- `(& …)` in the position of an expression is a chain of two or more functions.
 - `(,)` is the empty data wherever data is written. The empty `()` has no position.
 - In the position of a data pattern item, `(= n …)` whose first part is a name is a labelled item: `n` is the label and the other parts are its pattern. So `(size = whole = (w, h))` is `(, (= size whole (, w h)))`, and `((a, b) = args)` is `(, (= (, a b) args))`.
 - `|`, `&` and `-` take two or more parts in a type. A string interpolation of the normal surface is written as the `<>` of its parts (§1.6).
@@ -2861,7 +2861,7 @@ A **syntax macro** is a top-level binding in a `.is` file with the attribute `@m
 (@ macro
   (= unless
     (-> (, cond body) _
-      `(|> ~cond (| (-> (, True) _ Nil) (-> (, False) _ ~body))))))
+      `(|> ~cond (& (-> (, True) _ Nil) (-> (, False) _ ~body))))))
 ```
 
 A **macro call** is written in these ways in both surfaces, where `m` is a name, or `a.m` with a module name `a`, that is a macro there:
