@@ -1,6 +1,6 @@
 {
   "baseline": "4bbfc4b7beeaad30f52481576e148bc45a33ef9c",
-  "method": "Apply the reviewed source-literal wording map to diagnostic message bodies only; retain original observation metadata. Independent compiler reruns are recorded separately.",
+  "method": "Apply the reviewed source-literal wording map to diagnostic message bodies only. Replace references carrying needed information with explicit host-type and variance rules. Retain original observation metadata; independent compiler reruns are recorded separately.",
   "unchanged_fields": [
     "codes",
     "positions",

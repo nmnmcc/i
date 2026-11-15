@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:14: error[E0320]: a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors; the host gives this value, so it must be all of `String`, not `\"a\"`\n1 error\n"
+      "stderr": "src/main.i:2:14: error[E0320]: a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors; the host gives this value, so it must be all of `String`, not `\"a\"`\n1 error\n"
     }
   }
 }

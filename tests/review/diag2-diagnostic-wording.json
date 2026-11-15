@@ -136,7 +136,8 @@
       "category": "diagnostic messages",
       "section_marks": 2,
       "before": "\"a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3){input_note}\"",
-      "after": "\"a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors{input_note}\""
+      "after": "\"a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors{input_note}\"",
+      "plain_rule_added": true
     },
     {
       "path": "crates/ilang-check/src/resolve.rs",
@@ -176,7 +177,8 @@
       "category": "diagnostic messages",
       "section_marks": 1,
       "before": "\"the error of an external function must be a host-passable error type (§10.3)\"",
-      "after": "\"the error of an external function must be a host-passable error type\""
+      "after": "\"the error of an external function must be `Never` or a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; opaque types cannot be errors\"",
+      "plain_rule_added": true
     },
     {
       "path": "crates/ilang-check/src/resolve.rs",
@@ -328,7 +330,8 @@
       "category": "diagnostic messages",
       "section_marks": 2,
       "before": "\"a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3){input_note}\"",
-      "after": "\"a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors{input_note}\""
+      "after": "\"a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors{input_note}\"",
+      "plain_rule_added": true
     },
     {
       "path": "crates/ilang-check/src/resolve/legacy.rs",
@@ -368,7 +371,8 @@
       "category": "diagnostic messages",
       "section_marks": 1,
       "before": "\"the error of an external function must be a host-passable error type (§10.3)\"",
-      "after": "\"the error of an external function must be a host-passable error type\""
+      "after": "\"the error of an external function must be `Never` or a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; opaque types cannot be errors\"",
+      "plain_rule_added": true
     },
     {
       "path": "crates/ilang-check/src/resolve/legacy.rs",
@@ -960,7 +964,8 @@
       "category": "diagnostic messages",
       "section_marks": 1,
       "before": "\"the whole expanded value-type annotation has a variable union or intersection in an illegal place (§4.4)\"",
-      "after": "\"the whole expanded value-type annotation has a variable union or intersection in an illegal place\""
+      "after": "\"the expanded value-type annotation puts type variables in an unsupported place: a union of two or more different type variables is allowed only in an output position, and an intersection with a type variable only in an input position\"",
+      "plain_rule_added": true
     },
     {
       "path": "crates/ilang-check/tests/diagnostic_traps.rs",
@@ -1304,7 +1309,8 @@
       "category": "diagnostic messages",
       "section_marks": 1,
       "before": "\"the type of this external function is not one that the host can take (§10.1)\"",
-      "after": "\"the type of this external function is not one that the host can take\""
+      "after": "\"an external function needs a fully written function type with positional parameters. Parameters and results may use only `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types. Its only allowed need is `Fail(E)`, where `E` contains only the six built-in types\"",
+      "plain_rule_added": true
     },
     {
       "path": "crates/ilang-wasm/src/lower.rs",
@@ -1447,7 +1453,7 @@
     {
       "category": "diagnostic messages",
       "before": "\"a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3){input_note}\"",
-      "after": "\"a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors{input_note}\"",
+      "after": "\"a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors{input_note}\"",
       "occurrences": 2,
       "section_marks": 4,
       "locations": [
@@ -1506,7 +1512,7 @@
     {
       "category": "diagnostic messages",
       "before": "\"the error of an external function must be a host-passable error type (§10.3)\"",
-      "after": "\"the error of an external function must be a host-passable error type\"",
+      "after": "\"the error of an external function must be `Never` or a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; opaque types cannot be errors\"",
       "occurrences": 2,
       "section_marks": 2,
       "locations": [
@@ -2228,7 +2234,7 @@
     {
       "category": "diagnostic messages",
       "before": "\"the whole expanded value-type annotation has a variable union or intersection in an illegal place (§4.4)\"",
-      "after": "\"the whole expanded value-type annotation has a variable union or intersection in an illegal place\"",
+      "after": "\"the expanded value-type annotation puts type variables in an unsupported place: a union of two or more different type variables is allowed only in an output position, and an intersection with a type variable only in an input position\"",
       "occurrences": 1,
       "section_marks": 1,
       "locations": [
@@ -2550,7 +2556,7 @@
     {
       "category": "diagnostic messages",
       "before": "\"the type of this external function is not one that the host can take (§10.1)\"",
-      "after": "\"the type of this external function is not one that the host can take\"",
+      "after": "\"an external function needs a fully written function type with positional parameters. Parameters and results may use only `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types. Its only allowed need is `Fail(E)`, where `E` contains only the six built-in types\"",
       "occurrences": 1,
       "section_marks": 1,
       "locations": [

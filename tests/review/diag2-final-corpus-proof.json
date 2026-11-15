@@ -71,7 +71,7 @@
           "phase": "check",
           "header": "src/main.i:4:14: error[E0320]:",
           "before": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3)",
-          "after": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors"
+          "after": "a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors"
         }
       ]
     },
@@ -14147,7 +14147,7 @@
           "phase": "check",
           "header": "src/main.i:3:14: error[E0320]:",
           "before": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3)",
-          "after": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors"
+          "after": "a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors"
         }
       ]
     },
@@ -23957,7 +23957,7 @@
           "phase": "check",
           "header": "src/main.i:2:14: error[E0320]:",
           "before": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3); the host gives this value, so it must be all of `String`, not `\"a\"`",
-          "after": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors; the host gives this value, so it must be all of `String`, not `\"a\"`"
+          "after": "a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors; the host gives this value, so it must be all of `String`, not `\"a\"`"
         }
       ]
     },
@@ -24506,13 +24506,13 @@
     {
       "code": "E0320",
       "before": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3)",
-      "after": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors",
+      "after": "a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors",
       "occurrences": 2
     },
     {
       "code": "E0320",
       "before": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3); the host gives this value, so it must be all of `String`, not `\"a\"`",
-      "after": "a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors; the host gives this value, so it must be all of `String`, not `\"a\"`",
+      "after": "a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors; the host gives this value, so it must be all of `String`, not `\"a\"`",
       "occurrences": 1
     },
     {
@@ -25200,5 +25200,10 @@
       "occurrences": 5
     }
   ],
-  "rendered_message_class_count": 124
+  "rendered_message_class_count": 124,
+  "explicit_rule_records": [
+    "review-js/thrown",
+    "review-native/handle",
+    "review-t1/host_service"
+  ]
 }

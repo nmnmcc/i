@@ -1559,7 +1559,7 @@ impl Checker<'_> {
         }
         let expanded = written(self, t, &HashMap::new(), &mut HashSet::new());
         if invalid(&self.s, &expanded, pol) {
-            self.error(code::TYPE_PLACE,t.span,"the whole expanded value-type annotation has a variable union or intersection in an illegal place");
+            self.error(code::TYPE_PLACE,t.span,"the expanded value-type annotation puts type variables in an unsupported place: a union of two or more different type variables is allowed only in an output position, and an intersection with a type variable only in an input position");
         }
     }
 }

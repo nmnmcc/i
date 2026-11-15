@@ -1525,7 +1525,7 @@ impl<'a> Resolver<'a> {
                         _ => String::new(),
                     };
                     self.error(code::HOST_TYPE, f.ty.span,
-                        format!("a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors{input_note}"));
+                        format!("a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors{input_note}"));
                 }
             }
         }
@@ -1741,7 +1741,7 @@ impl<'a> Resolver<'a> {
                         self.error(
                             code::EXTERNAL_HOST_TYPE,
                             error.span,
-                            "the error of an external function must be a host-passable error type",
+                            "the error of an external function must be `Never` or a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; opaque types cannot be errors",
                         );
                     }
                 }

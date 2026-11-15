@@ -1981,7 +1981,7 @@ impl<'a> Lowerer<'a> {
             self.error(
                 d.module,
                 def.span,
-                "the type of this external function is not one that the host can take",
+                "an external function needs a fully written function type with positional parameters. Parameters and results may use only `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types. Its only allowed need is `Fail(E)`, where `E` contains only the six built-in types",
             );
             return None;
         };
