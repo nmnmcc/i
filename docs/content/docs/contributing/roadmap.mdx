@@ -54,13 +54,18 @@ E0501
 ```i run package=roadmap title="src/main.i"
 (
 	i/core
+	i/fail
 	(Io) = i/io
 	std/json
 	std/time
 )
 main = () <- (io : Io) {
-	io.print(core.inspect(json.parse("oops")))
-	io.print(core.inspect(time.divide(time.seconds(1), 0)))
+	io.print(
+		core.inspect(fail.catch(() { json.parse("oops") })),
+	)
+	io.print(
+		core.inspect(fail.catch(() { time.divide(time.seconds(1), 0) })),
+	)
 }
 ```
 
@@ -69,7 +74,7 @@ Error(JsonError(0, "expected value"))
 Error(DivisionByZero)
 ```
 
-**Current limits:** [std-v3.md](https://github.com/nmnmcc/i/blob/main/docs/design/std-v3.md) remains a plan: today's `json.parse` and `time.divide` return `Result`, JSON has separate `pretty`, and time lacks the proposed high-level `Clock`; consult [known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) for conformance work.
+`json.parse` and `time.divide` raise errors through `Fail`; `fail.catch` makes them values. [std-v3.md](https://github.com/nmnmcc/i/blob/main/docs/design/std-v3.md) remains partly a plan: JSON has separate `pretty`, and time lacks the proposed high-level `Clock`.
 
 ## Current limitations
 
