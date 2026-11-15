@@ -1,6 +1,6 @@
 {
-  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
-  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
+  "compiler": "c2cd0b67bee65316a3b06c09486eb38d709d74e4",
+  "binary_sha256": "6c85bbe1bbe0f3f4587f3094255771257bc80c819fe2d28d714a6c2f5cb6f54b",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -32,7 +32,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
+      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name\n"
     },
     "test2": {
       "command": [
@@ -53,7 +53,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
+      "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name\n"
     }
   }
 }
