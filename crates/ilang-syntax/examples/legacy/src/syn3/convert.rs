@@ -1209,7 +1209,7 @@ impl Cx<'_> {
                     self.note(
                         a.value.span,
                         "labelled-call",
-                        "a call with an argument by label of a function whose parameters the text does not show: the labels are kept as labelled items; the stage 4 migrator (`labels`) makes the call positional",
+                        "this call's parameter order is not visible in the source, so its labels were kept. Write the arguments by position once you know the function's parameter order",
                     );
                 }
                 args.iter().map(|a| self.arg(a)).collect()

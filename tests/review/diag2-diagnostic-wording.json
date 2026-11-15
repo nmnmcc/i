@@ -1319,6 +1319,15 @@
       "section_marks": 1,
       "before": "\"a string format in a pattern needs a string literal (§8.4)\"",
       "after": "\"a string format in a pattern needs a string literal\""
+    },
+    {
+      "path": "crates/ilang-syntax/examples/legacy/src/syn3/convert.rs",
+      "line": 1212,
+      "category": "diagnostic messages",
+      "section_marks": 0,
+      "before": "\"a call with an argument by label of a function whose parameters the text does not show: the labels are kept as labelled items; the stage 4 migrator (`labels`) makes the call positional\"",
+      "after": "\"this call's parameter order is not visible in the source, so its labels were kept. Write the arguments by position once you know the function's parameter order\"",
+      "plain_rule_added": true
     }
   ],
   "classes": [
@@ -2572,10 +2581,20 @@
       "locations": [
         "crates/ilang-wasm/src/lower.rs:4289"
       ]
+    },
+    {
+      "category": "diagnostic messages",
+      "before": "\"a call with an argument by label of a function whose parameters the text does not show: the labels are kept as labelled items; the stage 4 migrator (`labels`) makes the call positional\"",
+      "after": "\"this call's parameter order is not visible in the source, so its labels were kept. Write the arguments by position once you know the function's parameter order\"",
+      "occurrences": 1,
+      "section_marks": 0,
+      "locations": [
+        "crates/ilang-syntax/examples/legacy/src/syn3/convert.rs:1212"
+      ]
     }
   ],
-  "source_message_classes": 117,
-  "source_message_occurrences": 157,
+  "source_message_classes": 118,
+  "source_message_occurrences": 158,
   "snippet_expectations": [
     {
       "entry": "crates/ilang-check/tests/diagnostic_traps.rs:4e85fa57c5a5a045",

@@ -127,8 +127,9 @@ All source message occurrences below are counted, including the legacy resolver 
 | synchronous export &#96;{}&#96; needs an asynchronous platform service (§2.6.2) | synchronous export &#96;{}&#96; needs an asynchronous platform service | 1 |
 | the type of this external function is not one that the host can take (§10.1) | an external function needs a fully written function type with positional parameters. Parameters and results may use only &#96;Nil&#96;, &#96;Bool&#96;, &#96;Int&#96;, &#96;Float&#96;, &#96;String&#96;, &#96;BitArray&#96;, or opaque types. Its only allowed need is &#96;Fail(E)&#96;, where &#96;E&#96; contains only the six built-in types | 1 |
 | a string format in a pattern needs a string literal (§8.4) | a string format in a pattern needs a string literal | 1 |
+| a call with an argument by label of a function whose parameters the text does not show: the labels are kept as labelled items; the stage 4 migrator (&#96;labels&#96;) makes the call positional | this call's parameter order is not visible in the source, so its labels were kept. Write the arguments by position once you know the function's parameter order | 1 |
 
-117 source message classes; 157 source occurrences. Exact Rust literals and locations are in `tests/review/diag2-diagnostic-wording.json`. The table shows source format templates, including escaped format braces; the corpus proof records rendered messages and their occurrence counts.
+118 source message classes; 158 source occurrences. Exact Rust literals and locations are in `tests/review/diag2-diagnostic-wording.json`. The table shows source format templates, including escaped format braces; the corpus proof records rendered messages and their occurrence counts.
 
 ## Call reporting
 
