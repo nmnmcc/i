@@ -118,7 +118,7 @@ These programs are [examples/tour](examples/tour) and [examples/echo](examples/e
 - One function type carries the parameters, the needed services and the result; an error is a service, so errors and dependencies need no other mechanism.
 - Structured concurrency only: tasks, scopes, channels and events, and no task outlives its scope.
 - No library is special. Services, schemas, HTTP, logging and tests are i code over the general features.
-- Two surfaces, `.i` and `.is`, for one language; `i fmt` converts between them, and both use the same macros. It refuses a conversion that would drop a comment or other content, or whose target file already exists, and then changes no file.
+- Two surfaces, `.i` and `.is`, for one language; `i fmt` converts between them, and both use the same macros. It checks every file first and, if any conversion would drop a comment or other content or a target already exists, refuses the whole conversion and changes no file.
 - One compiler output, WasmGC, for every host; `i build` makes one static native executable.
 
 ## Install
@@ -143,7 +143,7 @@ The compiler, the optimizer, the library, the formatter and the language server 
 | `i test [FILTER]` | Build and run the tests |
 | `i build [NAME]` | Build one static native executable; `--target js`, `nodejs`, `wasi` or `host` builds a Wasm module |
 | `i spec` | Read the language standard |
-| `i fmt` | Format `.i` and `.is` files; `--to` converts a file to the other surface, refusing with a non-zero exit and no file changed if it would drop content or the target exists |
+| `i fmt` | Format `.i` and `.is` files; `--to` converts a file to the other surface, checking every file first and refusing the whole conversion if any would drop content or a target exists |
 | `i expand` | Print a module after macro expansion |
 | `i add`, `remove`, `update`, `deps`, `publish` | Manage dependencies: packages are git repositories, with minimal version selection |
 | `i lsp` | Run the language server |

@@ -215,11 +215,14 @@ It preserves the same code as defined by §14.1, including definition kind.
 A successful conversion between surfaces preserves that same code; conversion
 there and back may change layout and literal spelling, but not the parsed
 program. If the destination surface cannot represent the program, conversion
-reports an error and leaves the source unchanged. Conversion also refuses, with
-a non-zero exit and no file changed, when it would drop a comment or any other
-content, or when the target file already exists. The new file is fully written
-before the original is deleted, and a batch conversion checks every file before
-it writes any of them.
+reports an error and leaves the source unchanged. Conversion first checks every
+file and writes nothing: if any conversion would drop a comment or other
+content, or any target file already exists, it refuses the whole conversion
+with a non-zero exit and changes no file. Once all checks pass, if a write then
+fails, for example from an I/O error or a target that another process creates
+in the meantime, the files already converted stay converted and the command
+lists them; the remaining files are left as they were, not damaged or lost. A
+new file is fully written before its original is deleted.
 
 ## 2. Modules
 
