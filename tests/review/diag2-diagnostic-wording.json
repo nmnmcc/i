@@ -2896,5 +2896,15 @@
       "source_occurrences": 1
     }
   ],
-  "call_reporting_scope": "Only E0501 diagnostics produced by this call's own argument constraints can replace its pending E0552. Other diagnostics inside arguments and independent argument errors remain. The renderer sorts by source position and code."
+  "call_reporting_scope": "Only E0501 diagnostics produced by this call's own argument constraints can replace its pending E0552. Other diagnostics inside arguments and independent argument errors remain. The renderer sorts by source position and code.",
+  "original_embedded_mark_roles": {
+    "i_test_input_comments": 1,
+    "generated_package_template_comments": 1,
+    "wat_runtime_and_emitter_comments": 28
+  },
+  "merged_embedded_mark_roles": {
+    "i_test_input_comments": 1,
+    "generated_package_template_comments": 1,
+    "wat_runtime_and_emitter_comments": 30
+  }
 }

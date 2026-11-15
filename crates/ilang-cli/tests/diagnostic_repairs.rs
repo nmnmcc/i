@@ -227,7 +227,7 @@ fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
     );
     let diagnostics = check(&[(
         "src/main.i",
-        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = word({ value : String = 2\n value })\n_ = bad\n",
+        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = word({ value : String = 2\n _ = value\n \"two\" })\n_ = bad\n",
     )]);
     assert_eq!(
         diagnostics.matches("error[E0501]").count(),
@@ -240,7 +240,8 @@ fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
         "{diagnostics}"
     );
     assert!(
-        diagnostics.contains("`word` does not accept argument 1 with type `String`"),
+        diagnostics
+            .contains("`\"two\"` is not one of the values `word` accepts for argument 1: `0 | 1`"),
         "{diagnostics}"
     );
     let diagnostics = check(&[(

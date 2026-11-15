@@ -4,7 +4,7 @@ Baseline: `4bbfc4b7b`, with main `a02d34100` merged.
 
 This is a reporting change only. The original inventory at `982ba1524` has 136 Rust literals and 169 section marks: 116 message literals / 128 marks; nine test/assertion literals / 11 marks (seven expected-message marks and four ignored-test-description marks); 11 embedded program or package-template literals / 30 marks. The merged baseline has 154 literals and 189 marks: 134 message literals / 146 marks; nine test/assertion literals / 11 marks (the same seven expected-message marks and four ignored-test-description marks); 11 embedded programs/templates / 32 marks.
 
-The 30 original embedded marks include comments in generated WAT and i source, rather than compiler diagnostics. Those programs and templates remain exact. Four test-ignore descriptions are also retained; the other five assertion literals now test the same language rules in plain words.
+Of the 30 original embedded marks, one is in an i test input comment, one is in the generated package-template comment, and 28 are in WAT runtime/emitter comments. These are not compiler diagnostic messages. Those programs and templates remain exact. Four test-ignore descriptions are also retained; the other five assertion literals now test the same language rules in plain words.
 
 All source message occurrences below are counted, including the legacy resolver and migration tools. They are potential diagnostic emitters, even when their parser path is dormant.
 
@@ -169,7 +169,8 @@ and its unsatisfied parameter constraint. The CLI's error-count footer follows
 the remaining diagnostic count.
 
 The new CLI tests cover integers, strings, a second argument, a piped argument,
-a Boolean, one-item data, and two independently bad arguments. A separate test
+a Boolean, one-item data, an independent binding error inside an argument, and
+two independently bad arguments. A separate test
 retains E0552 for a bad combination and its independent E0516 coverage error.
 A matching literal call remains accepted. The renderer sorts by source position and error code, so the piped case prints
 E0501 first. Deduplication only considers errors produced by the call's own
