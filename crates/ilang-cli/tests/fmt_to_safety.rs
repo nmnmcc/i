@@ -564,6 +564,7 @@ fn read_only_destination_directory_write_failure_keeps_source_and_lists_converte
     // A writable file after the failing one: it must be reported as not
     // converted and must keep its bytes.
     write_file(dir.path(), "zz/c.i", "c = () { 3 }\n");
+    set_mode(&dir.path().join("ro/b.i"), 0o600);
     let ro = dir.path().join("ro");
     std::fs::set_permissions(&ro, std::fs::Permissions::from_mode(0o555)).unwrap();
     let _restore = RestorePermissions(ro);
@@ -605,6 +606,11 @@ fn read_only_destination_directory_write_failure_keeps_source_and_lists_converte
     // The failing source and the unprocessed one are untouched, and neither
     // has a partial target.
     assert_eq!(bytes(dir.path(), "ro/b.i"), b"b = () { 2 }\n");
+    assert_eq!(
+        mode_of(&dir.path().join("ro/b.i")),
+        0o600,
+        "a write failure must not change the source mode"
+    );
     assert_missing(dir.path(), "ro/b.is");
     assert_eq!(bytes(dir.path(), "zz/c.i"), b"c = () { 3 }\n");
     assert_missing(dir.path(), "zz/c.is");
@@ -828,6 +834,129 @@ fn no_comments_round_trips_is_to_i_and_back() {
         &module_of_lisp(source),
         &module_of_lisp(&text(dir.path(), "a.is")),
     );
+}
+
+// ---- permissions: a conversion keeps the source file's mode --------------
+
+/// Run the binary under `umask 022` through a shell, so the mode of a newly
+/// created file is predictable.
+#[cfg(unix)]
+fn i_with_umask(dir: &Path, args: &[&str]) -> Output {
+    let binary = env!("CARGO_BIN_EXE_i");
+    Command::new("sh")
+        .current_dir(dir)
+        .arg("-c")
+        .arg("umask 022; exec \"$0\" \"$@\"")
+        .arg(binary)
+        .args(args)
+        .output()
+        .unwrap()
+}
+
+#[cfg(unix)]
+fn set_mode(path: &Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+}
+
+#[cfg(unix)]
+fn mode_of(path: &Path) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+}
+
+#[cfg(unix)]
+fn skip_permissions_as_root(test: &str) -> bool {
+    if running_as_root() {
+        eprintln!(
+            "SKIPPED {test}: running as root (uid 0); the permission tests are meant to run \
+             unprivileged, as the orchestrator requires"
+        );
+        return true;
+    }
+    false
+}
+
+#[cfg(unix)]
+#[test]
+fn permissions_kept_i_to_is() {
+    if skip_permissions_as_root("permissions_kept_i_to_is") {
+        return;
+    }
+    let dir = package();
+    write_file(dir.path(), "a.i", "f = () { 1 }\n");
+    set_mode(&dir.path().join("a.i"), 0o600);
+
+    let out = i_with_umask(dir.path(), &["fmt", "--to", "is", "a.i"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr_of(&out));
+    assert_missing(dir.path(), "a.i");
+    assert_eq!(
+        mode_of(&dir.path().join("a.is")),
+        0o600,
+        "the target must keep the source mode"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn permissions_kept_is_to_i() {
+    if skip_permissions_as_root("permissions_kept_is_to_i") {
+        return;
+    }
+    let dir = package();
+    write_file(dir.path(), "a.is", "(= f (-> (,) _ 1))\n");
+    set_mode(&dir.path().join("a.is"), 0o600);
+
+    let out = i_with_umask(dir.path(), &["fmt", "--to", "i", "a.is"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr_of(&out));
+    assert_missing(dir.path(), "a.is");
+    assert_eq!(
+        mode_of(&dir.path().join("a.i")),
+        0o600,
+        "the target must keep the source mode"
+    );
+}
+
+/// A file that is already the target surface is rewritten in place; its mode
+/// must not change either.
+#[cfg(unix)]
+#[test]
+fn permissions_kept_when_rewriting_in_place() {
+    if skip_permissions_as_root("permissions_kept_when_rewriting_in_place") {
+        return;
+    }
+    let dir = package();
+    write_file(dir.path(), "a.is", "(= f\n(-> (,) _ 1))\n");
+    set_mode(&dir.path().join("a.is"), 0o600);
+
+    let out = i_with_umask(dir.path(), &["fmt", "--to", "is", "a.is"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr_of(&out));
+    assert_eq!(
+        mode_of(&dir.path().join("a.is")),
+        0o600,
+        "an in-place rewrite must keep the mode"
+    );
+}
+
+/// A refusal in the check phase changes neither bytes nor mode.
+#[cfg(unix)]
+#[test]
+fn permissions_kept_on_preflight_refusal() {
+    if skip_permissions_as_root("permissions_kept_on_preflight_refusal") {
+        return;
+    }
+    let dir = package();
+    write_file(dir.path(), "a.i", "a = () { 1 }\n");
+    write_file(dir.path(), "b.i", "b = () { 1 } // note\n");
+    set_mode(&dir.path().join("a.i"), 0o600);
+    set_mode(&dir.path().join("b.i"), 0o600);
+
+    let out = i_with_umask(dir.path(), &["fmt", "--to", "is", "a.i", "b.i"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
+    assert_eq!(mode_of(&dir.path().join("a.i")), 0o600);
+    assert_eq!(mode_of(&dir.path().join("b.i")), 0o600);
+    assert_eq!(bytes(dir.path(), "a.i"), b"a = () { 1 }\n");
+    assert_eq!(bytes(dir.path(), "b.i"), b"b = () { 1 } // note\n");
 }
 
 // ---- f) ordinary `i fmt` and `fmt --check` are unchanged -----------------
