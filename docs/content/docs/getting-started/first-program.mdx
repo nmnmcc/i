@@ -27,6 +27,7 @@ Put `i` on `PATH` and keep a copy of the i sources containing `std/`. The comman
 (
 	greeting
 )
+
 /// A greeting for a name.
 greeting = (who : String) -> String { "Hello, " <> who <> "!" }
 main = () <- (io : Io) { io.print(greeting("hello")) }
@@ -58,6 +59,7 @@ Hello, hello!
 (
 	greeting
 )
+
 /// A greeting for a name.
 greeting = (who : String) -> String { "Hello, " <> who <> "!" }
 main = () <- (io : Io) { io.print(greeting("world")) }
@@ -86,6 +88,7 @@ Hello, world!
 (
 	greeting
 )
+
 /// A greeting for a name.
 greeting = (who : String) -> String { "Hello, " <> who <> "!" }
 main = () <- (io : Io) { io.print(greeting("world")) }
@@ -96,6 +99,7 @@ main = () <- (io : Io) { io.print(greeting("world")) }
 	testlib = (test) = std/test
 	hello/main
 )
+
 test("greets", () { assert(main.greeting("i") == "Hello, i!") })
 test("greets the world", () {
 	assert(main.greeting("world") == "Hello, world!")

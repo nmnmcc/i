@@ -10,6 +10,7 @@ Try a feature and identify a concrete boundary for your next change.
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	record = (a = 1)
 	io.print(core.inspect(record.a))
@@ -59,6 +60,7 @@ E0501
 	std/json
 	std/time
 )
+
 main = () <- (io : Io) {
 	io.print(
 		core.inspect(fail.catch(() { json.parse("oops") })),

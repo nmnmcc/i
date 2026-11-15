@@ -49,6 +49,7 @@ description: "Functions, data, checked types and services, compiled to WebAssemb
 	i/stdio
 	std/int
 )
+
 Ready = ()
 Waiting = (Int)
 message =
@@ -76,6 +77,7 @@ ready
 	remaining
 	Late(..)
 )
+
 Late = ()
 remaining = (deadline) {
 	left = deadline - clock.now()
@@ -95,6 +97,7 @@ hello/main.remaining : (Int) <- (Clock, Fail(Late)) -> Int
 	app = hello/main
 	(Clock) = time/clock
 )
+
 test("a fake clock", () {
 	{
 		assert(app.remaining(42) == 2)
@@ -114,6 +117,7 @@ pass hello/deadline_test.a fake clock
 (
 	word
 )
+
 word = (n) { n |> (0) { "zero" } | (1) { "one" } }
 ```
 
@@ -125,6 +129,7 @@ hello/main.word : (0 | 1) -> "one" | "zero"
 (
 	app = hello/main
 )
+
 bad = app.word(2)
 ```
 
@@ -140,6 +145,7 @@ src/probe.i:4:16: error[E0501]: `2` is not a subtype of `0 | 1` (the type at 4:7
 	i/stdio
 	sugar = (if) = hello/sugar
 )
+
 unit = (n) { if(n == 1, "minute", "minutes") }
 main = () { stdio.print(unit(2)) }
 ```
@@ -156,6 +162,7 @@ minutes
 	i/stdio
 	sugar = (if) = hello/sugar
 )
+
 unit = (n) { if(n == 1, "minute", "minutes") }
 main = () { stdio.print(unit(2)) }
 ```
@@ -178,6 +185,7 @@ main = () { stdio.print(unit(2)) }
 <summary>Lisp surface: src/sugar.is</summary>
 ```scheme file=src/sugar.is title="src/sugar.is"
 (, if)
+
 (@ macro
   (= if
     (-> (, c a b) _
@@ -193,6 +201,7 @@ main = () { stdio.print(unit(2)) }
 	i/stdio
 	sugar = (if) = hello/sugar
 )
+
 unit = (n) { if(n == 1, "minute", "minutes") }
 main = () { stdio.print(unit(2)) }
 ```
@@ -203,6 +212,7 @@ main = () { stdio.print(unit(2)) }
 (
 	i/stdio
 )
+
 main = () { stdio.print("2 min left") }
 ```
 

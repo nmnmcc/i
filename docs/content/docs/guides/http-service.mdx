@@ -27,6 +27,7 @@ collection = "std/test.tests"
 (
 	handle
 )
+
 User = (name = String)
 user_schema = () {
 	schema.field(
@@ -77,6 +78,7 @@ handle = (req : http.Request) {
 	std/http
 	guide_http/handler
 )
+
 main = () {
 	listener = net.listen("127.0.0.1", 18080)
 	stdio.print("listening on 127.0.0.1:18080")
@@ -90,6 +92,7 @@ main = () {
 	std/http
 	guide_http/handler
 )
+
 test("health and missing route", () {
 	health = handler.handle(http.request(http.Method("GET"), "/health"))
 	assert(health.status == http.Status(200))

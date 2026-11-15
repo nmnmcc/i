@@ -10,6 +10,7 @@ Look up the definition behind a working program.
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) { io.print(core.inspect(42)) }
 ```
 
@@ -26,6 +27,7 @@ Find `inspect` in [i/core](/docs/standard/generated/chapter-13); the [library re
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	io.print(
 		core.inspect(core.bit_size(<<1, 2>>)),
@@ -47,6 +49,7 @@ main = () <- (io : Io) {
 	(Io) = i/io
 	std/int
 )
+
 main = () <- (io : Io) {
 	io.print(
 		core.inspect(int.parse("42")),

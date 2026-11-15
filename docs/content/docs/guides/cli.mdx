@@ -25,6 +25,7 @@ collection = "std/test.tests"
 	Options(..)
 	parser
 )
+
 Options = (name = String, count = Int)
 parser = () {
 	cli.map2(cli.argument("name", "Name to greet", cli.text), cli.option(
@@ -44,6 +45,7 @@ parser = () {
 	(None) = std/option
 	guide_cli/options
 )
+
 greet = (name, count) {
 	{ count > 0 } |>
 		(True) {
@@ -84,6 +86,7 @@ main = () {
 	std/cli
 	guide_cli/options
 )
+
 test("parses arguments", () {
 	assert(
 		cli.parse(options.parser(), ["Ada", "--count", "2"]) ==

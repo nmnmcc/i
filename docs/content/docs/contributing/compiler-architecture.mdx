@@ -10,6 +10,7 @@ Trace a working operation through the compiler and host.
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	io.print(
 		core.inspect(core.bit_size(<<1, 2>>)),
