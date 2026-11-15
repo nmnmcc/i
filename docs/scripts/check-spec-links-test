@@ -35,6 +35,32 @@ class ReferenceTests(unittest.TestCase):
         self.assertEqual(parser.sections, 2)
         self.assertEqual(len(parser.links), 1)
 
+    def test_exact_compiler_diagnostics_keep_their_section_notes(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            dist, content = Path(scratch) / 'dist', Path(scratch) / 'content'
+            dist.mkdir()
+            page = dist / 'index.html'
+            source = content / 'home/index.mdx'
+            source.parent.mkdir(parents=True)
+            diagnostic = 'src/main.i:1:1: error[E0552]: no match (§2.6.2)\n'
+            source.write_text('```i error E0552 stderr=exact\nbad = missing\n```\n```text\n' + diagnostic + '```\n')
+            html = '<pre><code>' + diagnostic + '</code></pre>'
+            page.write_text(html)
+            result = measure(page, dist, content)
+            self.assertFalse(result['failed'])
+            self.assertEqual((result['raw_sections'], result['sections'], result['diagnostic_sections']), (1, 0, 1))
+            for extra in ('<p>§2.6.2</p>', '<a href="/docs/standard">rules</a>'):
+                page.write_text(html + extra)
+                self.assertTrue(measure(page, dist, content)['failed'])
+            page.write_text(html.replace('no match', 'edited message'))
+            self.assertTrue(measure(page, dist, content)['failed'])
+            page.write_text('<template>' + html + '</template>')
+            result = measure(page, dist, content)
+            self.assertEqual((result['raw_sections'], result['diagnostic_sections']), (0, 0))
+            page.write_text(html)
+            source.write_text(source.read_text().replace(' stderr=exact', ''))
+            self.assertTrue(measure(page, dist, content)['failed'])
+
     def test_relative_encoded_and_external_targets(self):
         for target in ('/docs/standard', '/docs/standard/chapter-9#errors',
                        'https://github.com/nmnmcc/i/blob/main/docs/spec.md#services',
@@ -61,17 +87,18 @@ class ReferenceTests(unittest.TestCase):
         html += '<div hidden>hidden prose</div><p>Last word.</p></article>'
         self.assertEqual(prose_words(html), 6)
         self.assertEqual(prose_words('<main id="nd-home-layout"><div class="home-page">Inside</div>Outside</main>'), 2)
+        self.assertEqual(prose_words('<label><span>Simple enough</span><br><span>Functions and data.</span></label>'), 5)
 
     def test_home_hash_links_and_hard_prose_limit(self):
         with tempfile.TemporaryDirectory() as scratch:
             dist = Path(scratch)
             home = dist / 'index.html'
-            home.write_text('<main data-page-content>' + 'word ' * 221 + '<a href="#slide">next</a></main>')
+            home.write_text('<main data-page-content>' + 'word ' * 121 + '<a href="#slide">next</a></main>')
             result = measure(home, dist)
             self.assertTrue(result['failed'])
-            self.assertEqual(result['words'], 222)
+            self.assertEqual(result['words'], 122)
             self.assertEqual(len(result['failures']), 2)
-            home.write_text('<main data-page-content>' + 'word ' * 220 + '</main>')
+            home.write_text('<main data-page-content>' + 'word ' * 120 + '</main>')
             self.assertFalse(measure(home, dist)['failed'])
 
     def test_each_budget_is_warned_then_enforced(self):
@@ -114,6 +141,17 @@ class ReferenceTests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_text('```i future-SYN3\nnot executable\n```\n')
             self.assertEqual(example_count(Path('docs/standard/generated/chapter-1/index.html'), content), 0)
+
+    def test_shared_transcripts_and_host_runs_count_complete_actions(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            content = Path(scratch)
+            source = content / 'home/index.mdx'
+            source.parent.mkdir()
+            source.write_text('<div hidden>\n```i expand title="src/main.i"\n(answer)\nanswer = 42\n```\n'
+                              '</div>\n```text title="expansion"\nanswer = 42\n```\n'
+                              '```i types\n(answer)\nanswer = 42\n```\n```text\nanswer : 42\n```\n'
+                              '```i run hosts=native,wasi,javascript\nmain = () { Nil }\n```\n```text\n```\n')
+            self.assertEqual(example_count(Path('index.html'), content), 3)
 
     def test_cli_warns_until_area_switch_is_enabled(self):
         with tempfile.TemporaryDirectory() as scratch:

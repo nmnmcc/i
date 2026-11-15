@@ -1,0 +1,12 @@
+```i run hosts=native,wasi,javascript transcripts=hosts package=hello title="src/main.i"
+(i/stdio)
+main = () { stdio.print("three hosts") }
+```
+
+```text title="Native"
+three hosts
+```
+
+```text title="WASI"
+three hosts
+```

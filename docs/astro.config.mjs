@@ -19,7 +19,7 @@ export default defineConfig({
       },
       components: './src/components/mdx.tsx',
       mdastPlugins: [fenceMetadata],
-      rehypeCodeOptions: { langs: [grammar], fallbackLanguage: 'text', engine: 'oniguruma' },
+      rehypeCodeOptions: { langs: [grammar], fallbackLanguage: 'text', engine: 'oniguruma', addLanguageClass: true },
       includeProcessedMarkdown: true,
     }),
   ],

@@ -63,6 +63,14 @@ class RunnerTests(unittest.TestCase):
             'missing-project': 1,
             'passing-error-output': 0,
             'failing-error-output': 1,
+            'passing-expand': 0,
+            'failing-expand': 1,
+            'passing-hosts': 0,
+            'failing-hosts': 6,
+            'passing-host-transcripts': 0,
+            'failing-host-transcripts': 2,
+            'failing-js-transcript': 2,
+            'missing-host-transcript': 1,
         }
         for name, count in expected.items():
             with self.subTest(fixture=name):
@@ -91,6 +99,14 @@ class RunnerTests(unittest.TestCase):
                     self.assertTrue(all('0 passed, 1 failed' in failure.actual for failure in failures))
                 if name == 'test-fails-with-success':
                     self.assertTrue(all('exit 0,' in failure.actual for failure in failures))
+                if name == 'failing-hosts':
+                    for host in ('run', 'wasi', 'javascript'):
+                        for level in (0, 2):
+                            self.assertTrue(any(f'{host} --opt {level}:' in failure.expected for failure in failures))
+                if name == 'failing-host-transcripts':
+                    self.assertTrue(all('wasi --opt' in failure.expected for failure in failures))
+                if name == 'failing-js-transcript':
+                    self.assertTrue(all('javascript --opt' in failure.expected for failure in failures))
                 for failure in failures:
                     self.assertRegex(str(failure), r'\.mdx:\d+: expected .+; actual .+')
 
@@ -106,15 +122,46 @@ class RunnerTests(unittest.TestCase):
                 '  src/main.i:2:1: note: related error[E9999]: quoted\n')
         self.assertEqual(runner.DIAGNOSTIC.findall(text), ['E0201'])
 
-    def test_home_page_reuses_the_exact_program(self):
+    def test_home_page_reuses_the_deadline_and_macro_sources(self):
         page = SCRIPTS.parent / 'content/home/index.mdx'
         examples, failures, _ = runner.read_page(page)
         self.assertFalse(failures)
-        primary = next(example.source for example in examples if example.kind == 'run')
-        shared = [example.shared_files for example in examples if example.kind == 'test']
-        self.assertEqual(len(shared), 4)
-        self.assertTrue(all(files['src/main.i'] == primary for files in shared))
+        deadline = next(example for example in examples if example.kind == 'types' and 'remaining = ' in example.source)
+        testing = next(example for example in examples if example.kind == 'test')
+        self.assertEqual(testing.shared_files['src/main.i'], deadline.source)
+        self.assertEqual(deadline.output, 'hello/main.remaining : (Int) <- (Clock, Fail(Late)) -> Int\n')
+        self.assertIn('Clock = (now = () -> Int)', testing.shared_files['time/src/clock.i'])
+        self.assertIn('clock = (Clock) = time/clock', deadline.source)
+        precise = next(example for example in examples if example.kind == 'types' and 'word = ' in example.source)
+        rejection = next(example for example in examples if example.kind == 'error')
+        self.assertEqual(rejection.shared_files['src/main.i'], precise.source)
+        self.assertIn('bad = app.word(2)', rejection.source)
+        self.assertEqual(rejection.codes, {'E0552', 'E0501'})
         self.assertTrue(all(example.compare_test_output for example in examples if example.kind == 'test'))
+        expansion = next(example for example in examples if example.kind == 'expand')
+        execution = next(example for example in examples if example.kind == 'run' and 'src/sugar.is' in example.shared_files)
+        self.assertEqual(expansion.source, execution.source)
+        definition_check = next(example for example in examples if example.kind == 'check')
+        self.assertEqual(definition_check.files['src/sugar.is'], execution.shared_files['src/sugar.is'])
+        self.assertEqual(sum(example.hosts for example in examples), 1)
+        hosts = next(example for example in examples if example.hosts)
+        self.assertEqual(hosts.host_outputs, dict.fromkeys(('native', 'wasi', 'javascript'), '2 min left\n'))
+        self.assertNotIn('Port', page.read_text())
+        self.assertFalse((page.parent / 'examples/port').exists())
+
+    def test_output_titles_and_host_metadata(self):
+        for info in ('text', 'text title="native / WASI / JavaScript"'):
+            self.assertTrue(runner.output_info(info))
+        for info in ('text file=answer.txt', 'text run', 'i'):
+            self.assertFalse(runner.output_info(info))
+        for info in ('i test hosts=native,wasi,javascript', 'i run hosts=unknown'):
+            with self.assertRaises(ValueError):
+                runner.i_info(info)
+
+    def test_host_runner_never_skips_an_unavailable_host(self):
+        with tempfile.TemporaryDirectory() as scratch, patch.object(runner.shutil, 'which', return_value=None):
+            with self.assertRaisesRegex(ValueError, 'needs Node.js'):
+                list(runner.host_commands(self.binary, 0, Path(scratch), {}))
 
     def test_shared_project_is_local_and_primary_overrides_it(self):
         examples, errors, _ = runner.read_page(FIXTURES / 'passing-project.mdx')

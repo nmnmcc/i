@@ -1,0 +1,7 @@
+(, if)
+(@ macro
+  (= if
+    (-> (, c a b) _
+      {(= yes `(-> (, True) _ ~a))
+       (= no `(-> (, False) _ ~b))
+       `(|> ~c (| ~yes ~no))})))

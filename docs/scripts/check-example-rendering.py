@@ -4,7 +4,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 import sys
 
-from example_fences import fences, generated, i_info, i_options
+from example_fences import fences, generated, i_info, i_options, output_info
 from paths import ROOT
 
 
@@ -54,7 +54,8 @@ def main():
     for page in sorted(content.rglob('*')):
         if page.suffix not in ('.md', '.mdx') or generated(page.relative_to(content)):
             continue
-        blocks = [block for block in fences(page.read_text()) if i_info(block.info)]
+        blocks = [block for block in fences(page.read_text())
+                  if i_info(block.info) or (output_info(block.info) and i_options(block.info)[1].get('title'))]
         if not blocks:
             continue
         slug = page.relative_to(content).with_suffix('')
