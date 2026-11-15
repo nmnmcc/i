@@ -14,7 +14,6 @@ std = { path = "../std" }
 
 ```i run package=guide_files title="src/main.i"
 (
-	i/fail
 	i/fs
 	i/stdio
 	std/path
@@ -25,7 +24,7 @@ main = () {
 	fs.write_file(file, <<"hello from a file":utf8>>)
 	bytes = fs.read_file(file)
 	fs.remove(file)
-	Ok(text) = fail.catch(() { bit_array.to_string(bytes) })
+	text = bit_array.to_string(bytes)
 	stdio.print(file)
 	stdio.print(text)
 }
@@ -36,7 +35,7 @@ guide-note.txt
 hello from a file
 ```
 
-Create `guide-files/` beside `std/` in the i source folder and run `i run` there. `write_file` creates or truncates its path: reserve these filenames for the exercise. `bit_array.to_string` checks UTF-8; whole-file operations close their handles internally; use `fs.open`, `read`, `write`, and `close` with [resources](/docs/tour/resources) for handle operations.
+Create `guide-files/` beside `std/` in the i source folder and run `i run` there. `write_file` creates or truncates its path: reserve these filenames for the exercise. `bit_array.to_string` raises on invalid UTF-8; whole-file operations close their handles internally; use `fs.open`, `read`, `write`, and `close` with [resources](/docs/tour/resources) for handle operations.
 
 ## A missing path
 
