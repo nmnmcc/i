@@ -648,6 +648,46 @@ fn read_only_destination_directory_write_failure_keeps_source_and_lists_converte
     }
 }
 
+/// A write failure on the very first file converts nothing and formats nothing,
+/// so the last line must not claim that files were converted.
+#[cfg(unix)]
+#[test]
+fn first_file_write_failure_reports_no_file_converted() {
+    use std::os::unix::fs::PermissionsExt;
+
+    if running_as_root() {
+        eprintln!(
+            "SKIPPED first_file_write_failure_reports_no_file_converted: running as root \
+             (uid 0), where a 0555 directory is still writable, so the write failure cannot \
+             be induced this way"
+        );
+        return;
+    }
+
+    let dir = package();
+    write_file(dir.path(), "ro/a.i", "a = () { 1 }\n");
+    set_mode(&dir.path().join("ro/a.i"), 0o600);
+    let ro = dir.path().join("ro");
+    std::fs::set_permissions(&ro, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let _restore = RestorePermissions(ro);
+
+    let out = i(dir.path(), &["--to", "is", "ro/a.i"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
+    assert_eq!(
+        stderr_of(&out),
+        "ro/a.i: error: cannot create a temporary file in ro: Permission denied (os error 13)\n\
+         already written in this run: none\n\
+         failed:\n\
+         \x20 ro/a.i -> ro/a.is: source is unchanged, destination was not written\n\
+         not processed (left as they were):\n\
+         \x20 none\n\
+         ro/a.i: conversion stopped; no file was converted\n"
+    );
+    assert_eq!(bytes(dir.path(), "ro/a.i"), b"a = () { 1 }\n");
+    assert_eq!(mode_of(&dir.path().join("ro/a.i")), 0o600);
+    assert_missing(dir.path(), "ro/a.is");
+}
+
 /// A batch may contain a file that is already the requested surface; it is
 /// formatted in place. A later write failure must leave that file complete and
 /// not truncated, and must not disturb the files after it.
@@ -686,7 +726,7 @@ fn in_place_target_survives_a_later_write_failure() {
          \x20 ro/c.i -> ro/c.is: source is unchanged, destination was not written\n\
          not processed (left as they were):\n\
          \x20 none\n\
-         ro/c.i: conversion stopped; the files above were already converted\n"
+         ro/c.i: conversion stopped; the files above were already formatted in place\n"
     );
     // The in-place file holds exactly the formatted bytes, and its content is
     // still a valid module.
