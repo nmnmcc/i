@@ -2177,6 +2177,41 @@
     "suffix": " (message = String)\n",
     "reason": "Complete this Entry binding-name replacement fragment with the actual remaining record definition from the fixture."
   },
+  "crates/ilang-check/tests/row_schemes.rs:7111383378a50a4c": {
+    "not_source": true,
+    "reason": "Delimiter used to split a fixture before its main declaration."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:d6b422875a7608fa": {
+    "substitutions": [
+      [
+        "{helper}",
+        "Read(A) = (value = A)\nboth = <A, B>(f: () <- (Read(A)) -> A, g: () <- (Read(B)) -> B) { f() g() }"
+      ]
+    ],
+    "reason": "Render the Rust format string with the helper source it splices; the runtime test checks the full generator."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:29527abbe4903308": {
+    "substitutions": [
+      [
+        "{calls}",
+        "need_int = () <- (r: Read(Int)) { r.value }\nneed_string = () <- (r: Read(String)) { r.value }\nuse = () { both(need_int, need_string) }"
+      ]
+    ],
+    "reason": "Render the Rust format string with the calls fragment it splices; the runtime test checks the full generator."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:ab1ff6b7647143ab": {
+    "substitutions": [
+      [
+        "{intersection}",
+        "A & B"
+      ],
+      [
+        "{call}",
+        "\nuse = () { choose(1, \"s\", 1) }"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative intersection and call; the runtime test checks the full generator."
+  },
   "crates/ilang-cli/tests/http.rs:5d670fc264ba0466": {
     "suffix": "() { Nil }\n",
     "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
