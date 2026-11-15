@@ -573,7 +573,9 @@ impl Solver {
                 || ParamModes::repeated(Variance::Inv, n),
                 |ms| ParamModes::from_slice(ms),
             ),
-            Head::Named(TypeRef::Builtin(b)) => ParamModes::from_slice(builtin_variance_values(b)),
+            Head::Named(TypeRef::Builtin(b)) => {
+                ParamModes::from_slice(builtin_constraint_variance(b))
+            }
             Head::Shape(_) | Head::Fn => ParamModes::repeated(Variance::Co, n),
         }
     }
@@ -3279,8 +3281,20 @@ fn builtin_variance_values(b: BuiltinType) -> &'static [Variance] {
         BuiltinType::List | BuiltinType::Request => &[Co],
         BuiltinType::Key => &[Inv],
         BuiltinType::Boundary => &[Inv, Inv],
-        BuiltinType::Continuation => &[Contra, Co, Co],
+        BuiltinType::Continuation => &[Contra, Co, Contra],
         _ => &[],
+    }
+}
+
+/// The solver represents a whole need by the "fits in" relation, whose
+/// direction is the reverse of service-value subtyping (§4.5 rule 4).
+/// Thus the contravariant N of Continuation uses a covariant row edge;
+/// the row comparison reverses the direction of its service entries.
+pub(super) fn builtin_constraint_variance(b: BuiltinType) -> &'static [Variance] {
+    if b == BuiltinType::Continuation {
+        &[Variance::Contra, Variance::Co, Variance::Co]
+    } else {
+        builtin_variance_values(b)
     }
 }
 
@@ -3291,6 +3305,36 @@ mod primitive_variance_tests {
     #[test]
     fn typed_keys_are_invariant() {
         assert_eq!(builtin_variance(BuiltinType::Key), vec![Variance::Inv]);
+    }
+
+    #[test]
+    fn continuation_needs_are_contravariant_service_values() {
+        assert_eq!(
+            builtin_variance(BuiltinType::Continuation),
+            vec![Variance::Contra, Variance::Co, Variance::Contra]
+        );
+        let reader = TypeId(0);
+        let mut solver = Solver::new(StdHashMap::from([(reader, vec![Variance::Co])]), Vec::new());
+        let int = Ty::named(TypeRef::Builtin(BuiltinType::Int), vec![]);
+        let string = Ty::named(TypeRef::Builtin(BuiltinType::String), vec![]);
+        let wide = solver.union(vec![int.clone(), string]);
+        let paused = |a| {
+            Ty::named(
+                TypeRef::Builtin(BuiltinType::Continuation),
+                vec![
+                    int.clone(),
+                    int.clone(),
+                    Ty::named(TypeRef::Custom(reader), vec![a]),
+                ],
+            )
+        };
+        let narrow = paused(int.clone());
+        let wide = paused(wide);
+        let mut unsafe_conversion = solver.clone();
+        unsafe_conversion.constrain(&narrow, &wide);
+        assert!(!unsafe_conversion.failures.is_empty());
+        solver.constrain(&wide, &narrow);
+        assert!(solver.failures.is_empty());
     }
 }
 

@@ -1,0 +1,6 @@
+# spec: 4.4, 4.5
+# expect: compile-error E0501
+name = "std_need_entry_input"
+
+[dependencies]
+std = { path = "../../../../std" }

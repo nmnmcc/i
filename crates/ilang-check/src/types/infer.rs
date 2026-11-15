@@ -5,7 +5,7 @@
 use super::display;
 use super::groups;
 use super::known::{self, Knowledge};
-use super::solve::{FailKind, Mode, Pol, Solver, builtin_variance};
+use super::solve::{FailKind, Mode, Pol, Solver, builtin_constraint_variance, builtin_variance};
 use super::{FnTy, Head, HostSignature, HostType, Ty, Typed, Variance};
 use crate::code;
 use crate::hir::*;
@@ -4116,6 +4116,7 @@ fn row_parameters(p: &Program) -> HashMap<TypeId, Vec<Mode>> {
 /// The variance of every parameter of every custom
 /// type, from the definitions, by a fixpoint over all of them.
 pub(super) fn variances(p: &Program) -> HashMap<TypeId, Vec<Variance>> {
+    let rows = row_parameters(p);
     let mut table: HashMap<TypeId, Vec<Variance>> = HashMap::new();
     for (i, t) in p.types.iter().enumerate() {
         table.insert(TypeId(i as u32), vec![Variance::Bi; t.params.len()]);
@@ -4130,7 +4131,18 @@ pub(super) fn variances(p: &Program) -> HashMap<TypeId, Vec<Variance>> {
             let mut acc = table[&id].clone();
             for c in ctors {
                 for f in &c.fields {
-                    walk_variance(p, &f.ty, Variance::Co, &t.params, &mut acc, &table, 0);
+                    walk_variance(
+                        p,
+                        &f.ty,
+                        Variance::Co,
+                        &t.params,
+                        &mut acc,
+                        &VarianceTables {
+                            values: &table,
+                            rows: &rows,
+                        },
+                        0,
+                    );
                 }
             }
             if acc != table[&id] {
@@ -4145,17 +4157,24 @@ pub(super) fn variances(p: &Program) -> HashMap<TypeId, Vec<Variance>> {
     table
 }
 
+// Variances of whole rows use the solver's "fits in" direction. When
+// a row argument is an actual service type, visit its entries as inputs.
+struct VarianceTables<'a> {
+    values: &'a HashMap<TypeId, Vec<Variance>>,
+    rows: &'a HashMap<TypeId, Vec<Mode>>,
+}
+
 fn walk_variance(
     p: &Program,
     t: &Type,
     v: Variance,
     params: &[(String, TyVarId)],
     acc: &mut [Variance],
-    table: &HashMap<TypeId, Vec<Variance>>,
+    tables: &VarianceTables<'_>,
     depth: u32,
 ) {
     let go = |t: &Type, v: Variance, acc: &mut [Variance]| {
-        walk_variance(p, t, v, params, acc, table, depth)
+        walk_variance(p, t, v, params, acc, tables, depth)
     };
     match &t.kind {
         TypeKind::Var(tv) => {
@@ -4172,22 +4191,34 @@ fn walk_variance(
                     let map: HashMap<TyVarId, &Type> =
                         def.params.iter().map(|x| x.1).zip(args).collect();
                     let expanded = subst(body, &map);
-                    walk_variance(p, &expanded, v, params, acc, table, depth + 1);
+                    walk_variance(p, &expanded, v, params, acc, tables, depth + 1);
                 }
                 return;
             }
             let vs = match ty {
-                TypeRef::Custom(id) => table[id].clone(),
-                TypeRef::Builtin(b) => builtin_variance(*b),
+                TypeRef::Custom(id) => tables.values[id].clone(),
+                TypeRef::Builtin(b) => builtin_constraint_variance(*b).to_vec(),
             };
-            for (a, w) in args.iter().zip(vs) {
+            let rows = match ty {
+                TypeRef::Custom(id) => tables.rows[id].clone(),
+                TypeRef::Builtin(BuiltinType::Continuation) => {
+                    vec![Mode::Value, Mode::Value, Mode::Env]
+                }
+                TypeRef::Builtin(BuiltinType::Boundary) => vec![Mode::Value, Mode::Env],
+                _ => vec![Mode::Value; args.len()],
+            };
+            for ((a, w), row) in args.iter().zip(vs).zip(rows) {
                 let pv = match w {
                     Variance::Bi => continue,
                     Variance::Co => v,
                     Variance::Contra => v.flip(),
                     Variance::Inv => Variance::Inv,
                 };
-                go(a, pv, acc);
+                if row == Mode::Env {
+                    walk_env_variance(p, a, pv, params, acc, tables, depth);
+                } else {
+                    go(a, pv, acc);
+                }
             }
         }
         TypeKind::Tuple(ts) | TypeKind::Union(ts) | TypeKind::Inter(ts) => {
@@ -4211,7 +4242,7 @@ fn walk_variance(
             ps.iter().for_each(|x| go(&x.ty, v.flip(), acc));
             go(ret, v, acc);
             env.iter()
-                .for_each(|x| walk_env_variance(p, x, v, params, acc, table, depth));
+                .for_each(|x| walk_env_variance(p, x, v, params, acc, tables, depth));
         }
         TypeKind::Lit(_) | TypeKind::Of { .. } | TypeKind::Hole | TypeKind::Error => {}
     }
@@ -4227,21 +4258,21 @@ fn walk_env_variance(
     v: Variance,
     params: &[(String, TyVarId)],
     acc: &mut [Variance],
-    table: &HashMap<TypeId, Vec<Variance>>,
+    tables: &VarianceTables<'_>,
     depth: u32,
 ) {
     match &t.kind {
         TypeKind::Union(ts) | TypeKind::Inter(ts) => ts
             .iter()
-            .for_each(|a| walk_env_variance(p, a, v, params, acc, table, depth)),
+            .for_each(|a| walk_env_variance(p, a, v, params, acc, tables, depth)),
         TypeKind::Diff(ts) => {
-            walk_env_variance(p, &ts[0], v, params, acc, table, depth);
+            walk_env_variance(p, &ts[0], v, params, acc, tables, depth);
             ts[1..]
                 .iter()
-                .for_each(|a| walk_variance(p, a, Variance::Inv, params, acc, table, depth));
+                .for_each(|a| walk_variance(p, a, Variance::Inv, params, acc, tables, depth));
         }
-        TypeKind::Named { .. } => walk_variance(p, t, v.flip(), params, acc, table, depth),
-        _ => walk_variance(p, t, v, params, acc, table, depth),
+        TypeKind::Named { .. } => walk_variance(p, t, v.flip(), params, acc, tables, depth),
+        _ => walk_variance(p, t, v, params, acc, tables, depth),
     }
 }
 

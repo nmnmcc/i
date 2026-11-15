@@ -4132,17 +4132,10 @@ scope_call : <A, E, N>(
 ) <- (Fail(E), ..N) -> ScopeResult(A) = (body, witness, mode, own) {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
-		| (AttachedScheduler(..) = attached) {
-			owner = { retain(request.open_owner()) <- (attached.root) }
+		| (AttachedScheduler(..)) {
+			// Keep the opener's services across scheduler suspension.
 			kept = control.keep((_ : Nil) {
-				resource.ensure(
-					() {
-						retain(scope_call_body(body, witness, mode, own)) <- (
-							owner,
-						)
-					},
-					() { request.close_owner(owner) },
-				)
+				retain(scope_call_body(body, witness, mode, own))
 			})
 			retain(kept(Nil))
 		}

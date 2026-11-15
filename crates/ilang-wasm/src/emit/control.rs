@@ -14,7 +14,8 @@ use super::*;
 ///
 /// # Control
 ///
-/// - A boundary is a `$boundary` whose field 8 is 1 while it is active.
+/// - A boundary is a `$boundary` whose field 8 is 1 while it is active,
+///   0 while paused or closed, and 2 once an escape has invalidated it.
 /// - `suspend` throws `$capture` with a `$cap`: the boundary, `f`, and the
 ///   frame records so far. Each frame that the exception goes through adds
 ///   its record at the end (`$capture_rethrow`), so the list is innermost
@@ -436,6 +437,12 @@ pub(super) const EFFECTS: &str = r#"
   (return_call $boundary_core (local.get $b) (local.get $env) (local.get $body) (ref.null $sub) (local.get $v)
     (i32.const 0)))
 
+;; Activity 2 records an escape that has invalidated this boundary. A
+;; capture and re-entry during cleanup must preserve that state (§9.4).
+(func $boundary_set_active (param $b (ref $boundary)) (param $on i32)
+  (if (i32.ne (struct.get $boundary 8 (local.get $b)) (i32.const 2))
+    (then (struct.set $boundary 8 (local.get $b) (local.get $on)))))
+
 ;; The active boundary `b`, in the place where `env` is: calls `body(b)`,
 ;; or re-enters the records `sub` with `v` in the mode `mode` when `body`
 ;; is null. It is not active once the code inside it is not on the stack
@@ -452,11 +459,11 @@ pub(super) const EFFECTS: &str = r#"
           (if (result eqref) (ref.is_null (local.get $body))
             (then (call $tramp_run (local.get $sub) (local.get $env) (local.get $v) (local.get $mode)))
             (else (call $call1 (local.get $body) (local.get $b) (local.get $env))))))
-      (struct.set $boundary 8 (local.get $b) (i32.const 0))
+      (call $boundary_set_active (local.get $b) (i32.const 0))
       (return (local.get $r)))
     (local.set $x)
     (local.set $c)
-    (struct.set $boundary 8 (local.get $b) (i32.const 0))
+    (call $boundary_set_active (local.get $b) (i32.const 0))
     (if (ref.eq (struct.get $cap 0 (local.get $c)) (local.get $b))
       (then
         ;; Rule 2: `f(k)` is done in the place of the boundary.
@@ -472,7 +479,7 @@ pub(super) const EFFECTS: &str = r#"
     (unreachable))
   (local.set $x)
   (local.set $f)
-  (struct.set $boundary 8 (local.get $b) (i32.const 0))
+  (call $boundary_set_active (local.get $b) (i32.const 0))
   ;; `control.escape(b, v)` for this boundary: it ends with `v`.
   (if (ref.test (ref $escaped) (local.get $f))
     (then
@@ -489,7 +496,7 @@ pub(super) const EFFECTS: &str = r#"
   (local $saved (ref $values)) (local $b (ref $boundary))
   (local.set $saved (ref.as_non_null (struct.get $frame 1 (local.get $frame))))
   (local.set $b (ref.cast (ref $boundary) (array.get $values (local.get $saved) (i32.const 0))))
-  (struct.set $boundary 8 (local.get $b) (i32.const 1))
+  (call $boundary_set_active (local.get $b) (i32.const 1))
   (return_call $boundary_core (local.get $b) (local.get $env) (ref.null eq)
     (ref.cast (ref null $sub) (array.get $values (local.get $saved) (i32.const 1)))
     (local.get $v) (local.get $mode)))
@@ -514,15 +521,22 @@ pub(super) const EFFECTS: &str = r#"
   (i32.sub (array.len (local.get $b)) (i32.const 4)))
 
 (func $light_set_active (param $b (ref $env)) (param $on i32)
-  (array.set $env (local.get $b) (call $light_base (local.get $b)) (ref.i31 (local.get $on))))
+  (if (i32.ne
+      (i31.get_u (ref.cast (ref i31) (array.get $env (local.get $b) (call $light_base (local.get $b)))))
+      (i32.const 2))
+    (then
+      (array.set $env (local.get $b) (call $light_base (local.get $b)) (ref.i31 (local.get $on))))))
 
 ;; Whether the boundary `b` (a `$boundary` or a light one) is active.
 (func $boundary_active (param $b eqref) (result i32)
   (local $l (ref $env))
   (if (ref.test (ref $boundary) (local.get $b))
-    (then (return (struct.get $boundary 8 (ref.cast (ref $boundary) (local.get $b))))))
+    (then (return (i32.eq
+      (struct.get $boundary 8 (ref.cast (ref $boundary) (local.get $b))) (i32.const 1)))))
   (local.set $l (ref.cast (ref $env) (local.get $b)))
-  (i31.get_u (ref.cast (ref i31) (array.get $env (local.get $l) (call $light_base (local.get $l))))))
+  (i32.eq
+    (i31.get_u (ref.cast (ref i31) (array.get $env (local.get $l) (call $light_base (local.get $l)))))
+    (i32.const 1)))
 
 ;; The body of the light boundary `b` gave `r`.
 (func $light_done (param $b eqref) (param $r eqref) (result eqref)
@@ -632,7 +646,7 @@ pub(super) const EFFECTS: &str = r#"
 (func $control_suspend (param $b eqref) (param $f eqref) (result eqref)
   (local $boundary (ref $boundary))
   (local.set $boundary (ref.cast (ref $boundary) (local.get $b)))
-  (if (i32.eqz (struct.get $boundary 8 (local.get $boundary)))
+  (if (i32.eqz (call $boundary_active (local.get $boundary)))
     (then (call $stop_boundary_inactive) (unreachable)))
   (throw $capture (struct.new $cap (local.get $boundary) (local.get $f) (ref.null $flist) (ref.null $flist)
     (ref.null $flist) (ref.null $flist))))
@@ -648,6 +662,11 @@ pub(super) const EFFECTS: &str = r#"
 (func $escape_payload (param $b eqref) (param $v eqref) (result (ref $escaped))
   (if (i32.eqz (call $boundary_active (local.get $b)))
     (then (call $stop_boundary_inactive) (unreachable)))
+  ;; Invalidate before the throw can run a final, including one that
+  ;; suspends to an outer boundary and is resumed later (§9.4 rule 5).
+  (if (ref.test (ref $boundary) (local.get $b))
+    (then (call $boundary_set_active (ref.cast (ref $boundary) (local.get $b)) (i32.const 2)))
+    (else (call $light_set_active (ref.cast (ref $env) (local.get $b)) (i32.const 2))))
   (struct.new $escaped (ref.as_non_null (local.get $b)) (local.get $v)))
 
 ;; The continuation `k`, used now: stops when it was already used (rule 5).
@@ -744,7 +763,7 @@ pub(super) const EFFECTS: &str = r#"
   (local $c (ref $cont)) (local $b (ref $boundary))
   (local.set $c (call $continuation_take (local.get $k)))
   (local.set $b (struct.get $cont 9 (local.get $c)))
-  (struct.set $boundary 8 (local.get $b) (i32.const 1))
+  (call $boundary_set_active (local.get $b) (i32.const 1))
   (return_call $boundary_core (local.get $b) (local.get $env) (ref.null eq) (struct.get $cont 10 (local.get $c))
     (local.get $v) (i32.const 0)))
 
