@@ -5,7 +5,7 @@
 //! The checks in this file pin the observable behaviour: the exit code, the
 //! exact diagnostic lines (file, line, column and the text that would be lost),
 //! and the exact bytes and existence of the source and target files. They are
-//! written against the contract in `docs/spec.md`: conversion checks every file
+//! written against the conversion contract: conversion checks every file
 //! first and writes nothing; a conversion that would drop a comment or other
 //! content, or whose target exists, refuses the whole run; a write failure
 //! keeps the source and lists the files already converted; a new file is fully
@@ -301,8 +301,8 @@ fn doc_comments_survive_both_directions() {
 
 // ---- lossless beyond comments ---------------------------------------------
 
-/// Literal spelling may be canonicalised between surfaces (spec §1: a
-/// conversion may change literal spelling but not the parsed program). So a
+/// Literal spelling may be canonicalised between surfaces (a conversion may
+/// change literal spelling but not the parsed program). So a
 /// base prefix, digit separators and a trailing dot are allowed to change; the
 /// parsed values are compared instead. Blank lines are layout and may change
 /// too. Attributes and macro calls keep their meaning, which `Module` equality
