@@ -245,10 +245,12 @@ between forms. These ground operations introduce no alternative solution.
 The implementation uses an internal row collection and **not** ordinary
 value union for needs. In [solve.rs](../../crates/ilang-check/src/types/solve.rs),
 `Mode::Env`, `merge`'s environment case, and `merge_arg` reverse the argument
-operation as required. `Mode::Row` also exists for the separately represented
-error part of a function; it must not be confused with the service
-environment mode. `Fail` is specially lowered into that error part. The
-surface interpretation remains the intersection in §9.2.
+operation as required. At the original audit revision, errors also had a
+separately represented function component. The merged E3 implementation has
+only the ordinary function need: `Fail(E)` is ordinary labelled service data
+in that need, without a separate error component. Decision 2 retains the
+`Fail(Never)` key; simplifying its argument does not provide the service.
+The surface interpretation remains the intersection in §9.2.
 
 For an undetermined covariant argument, `need_meet` makes a fresh variable
 with *both* operands as upper bounds and retains `need_meet` metadata. It
@@ -333,7 +335,9 @@ The last candidate tries the erroneous split described in syntax three's
 rule B: hiding the String error in the residual row instead of returning it.
 Observed: `02-needs` checks with
 `both : () <- (Emit(Int | String)) -> Nil`; `02-empty` rejects with E0515,
-explicitly naming `Read(Int)` and `Read(String)`. `02-rows` checks with
+explicitly naming `Read(Int)` and `Read(String)` at that historical revision.
+Decision 1 now accepts this method-only `02-empty` probe, as explained above;
+only its required-value-field variant is empty. `02-rows` checks with
 `body : () <- (Fail(1 | "s")) -> Never` and
 `caught : () -> Result(Never, 1 | "s")`; `02-row-split` rejects with E0501
 because `"s"` is not a subtype of `Int`.
@@ -1255,3 +1259,12 @@ Fail conversions in `effects-e4.md` and their adapted callers are unchanged.
 The first merged focused `deferred` row-scheme run passes both tests,
 including method-only acceptance and required-field rejection locally and
 across modules. Final merged verification is recorded separately below.
+
+
+The merged checker gate passes **363 tests**, with four existing stress tests
+ignored and only `spec_corpus_reverse_order_and_recovery` filtered out.
+All 53 row-scheme tests and all current main goldens retain their error lines.
+Strict all-target clippy on `ilang-check` and the release CLI build pass.
+A subsequent focused `deferred` run passes both tests after adding the
+required-value-field lower-bound control in both call orders, while retaining
+its method-only counterpart. Chapter 4.4 passes all five cases at O0/O2.

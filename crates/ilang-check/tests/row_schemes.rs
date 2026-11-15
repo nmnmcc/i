@@ -1272,4 +1272,11 @@ fn flexible_value_bounds_do_not_close_deferred_need_arguments() {
         .map_or(source, |(probe, _)| probe);
     types(source);
     types(&source.replace("read(x) read(y)", "read(y) read(x)"));
+    // Decision 1 also permits this genuinely value-bearing service while
+    // the argument bounds remain open; neither lower fixes an empty meet.
+    let fields = source
+        .replace("Read(A) = (read = () -> A)", "Read(A) = (value = A)")
+        .replace("r.read()", "r.value");
+    types(&fields);
+    types(&fields.replace("read(x) read(y)", "read(y) read(x)"));
 }
