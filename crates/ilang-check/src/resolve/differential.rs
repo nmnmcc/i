@@ -52,20 +52,25 @@ fn file_key(graph: &PackageGraph, module: &ilang_check::hir::Module, job: &str) 
         .into_owned()
 }
 
-/// The direct resolver appends a repair hint to an undefined union alternative
-/// (`resolve/three.rs`'s `union_payload_hint`); the frozen legacy resolver
-/// predates repair hints. Compare that diagnostic by its code, span and core
-/// message, and only for this exact suffix: every other message is compared
-/// verbatim. The hint itself stays pinned for the CLI by
-/// `crates/ilang-cli/tests/fixtures/diagnostic_repairs/t6-a2-r3.stderr`.
-fn comparable_message(d: &Diagnostic) -> &str {
-    const HINT: &str = ". A union alias does not define its alternatives.";
-    if d.code == ilang_check::code::UNKNOWN_TYPE
-        && let Some(cut) = d.message.find(HINT)
-    {
-        return &d.message[..cut];
+/// The one recorded file where the direct resolver's repair hint has no
+/// legacy counterpart, and the exact complete suffix it may add.
+const UNION_ALIAS_FILE: &str = "tests/spec/4.3/syn3_one_constructor.i";
+const UNION_ALIAS_HINT: &str = ". A union alias does not define its alternatives. Define each \
+                                alternative as its own type first: `Circle = (Float)`, then \
+                                `Square = (Float)`, then `Shape = Circle | Square`.";
+
+/// The message without that hint, and only for that file, that code, and that
+/// complete suffix. Every other difference is left to the comparison.
+fn without_union_alias_hint<'m>(key: &str, code: &str, message: &'m str) -> Option<&'m str> {
+    if key == UNION_ALIAS_FILE && code == ilang_check::code::UNKNOWN_TYPE {
+        message.strip_suffix(UNION_ALIAS_HINT)
+    } else {
+        None
     }
-    &d.message
+}
+
+fn comparable_message<'m>(key: &str, d: &'m Diagnostic) -> &'m str {
+    without_union_alias_hint(key, d.code, &d.message).unwrap_or(&d.message)
 }
 
 /// The texts that must be equal, by file. The key `<program>` holds the
@@ -87,6 +92,7 @@ fn texts(
     let mut out = BTreeMap::new();
     for (i, module) in program.modules.iter().enumerate() {
         let id = ModuleId(i as u32);
+        let key = file_key(graph, module, job);
         let mut text = show(module);
         for t in &program.types {
             if t.module == id {
@@ -100,11 +106,11 @@ fn texts(
                     d.severity,
                     d.code,
                     d.span,
-                    comparable_message(d)
+                    comparable_message(&key, d)
                 ));
             }
         }
-        assert!(out.insert(file_key(graph, module, job), text).is_none());
+        assert!(out.insert(key, text).is_none());
     }
     let sources: BTreeSet<_> = program.modules.iter().map(|m| m.source).collect();
     let mut text = String::new();
@@ -290,7 +296,8 @@ fn compare_inner(name: &str, dir: &Path, totals: &mut Totals, prepare_quotes: bo
     // errors; the spec runner checks inference and both runtime levels.
     if name.starts_with("tests/spec/7/keyed_data") {
         assert!(expected.iter().any(|d| {
-            d.message.contains("a key in a data pattern is not supported here")
+            d.message
+                .contains("a key in a data pattern is not supported here")
                 || (name.ends_with("keyed_data_constructor_bad.i")
                     || name.ends_with("keyed_data_constructor_missing.i"))
                     && d.message
@@ -726,4 +733,45 @@ fn resolve3_deep() {
     assert!(errors.is_empty(), "{errors:?}");
     // The HIR is as deep as the tree: it is dropped on a deep stack too.
     syn3::deep::deep(move || drop(program));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BODY: &str = "the type `Circle` is not defined";
+    const CODE: &str = "E0202";
+
+    #[test]
+    fn only_the_recorded_union_alias_hint_is_ignored() {
+        let full = format!("{BODY}{UNION_ALIAS_HINT}");
+        assert_eq!(
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, &full),
+            Some(BODY)
+        );
+        // Another file keeps the hint.
+        assert_eq!(
+            without_union_alias_hint("tests/spec/4.3/other.i", CODE, &full),
+            None
+        );
+        // Another code keeps the hint.
+        assert_eq!(
+            without_union_alias_hint(UNION_ALIAS_FILE, "E0203", &full),
+            None
+        );
+        // One changed word in the hint keeps the hint.
+        let changed = full.replacen("then `Shape`", "and then `Shape`", 1);
+        assert_eq!(
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, &changed),
+            None
+        );
+        // An extra suffix after the hint keeps the hint.
+        let extra = format!("{full} Extra.");
+        assert_eq!(
+            without_union_alias_hint(UNION_ALIAS_FILE, CODE, &extra),
+            None
+        );
+        // The old message, without the hint, is compared as it is.
+        assert_eq!(without_union_alias_hint(UNION_ALIAS_FILE, CODE, BODY), None);
+    }
 }
