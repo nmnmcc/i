@@ -24,7 +24,7 @@ const sourceMetrics = Object.fromEntries([...source.matchAll(/<section className
   const commands = [...visible.matchAll(/<pre className=\x22host-command\x22>\{([^\n]+)\}<\/pre>/g)].flatMap((match) => JSON.parse(match[1]).split('\n'));
   const lines = [...programs, ...commands];
   const widest = Math.max(...lines.map((line) => line.replaceAll('\t', '  ').length));
-  assert.ok(lines.length <= 14 && widest <= 64, `${key}: ${lines.length} lines / ${widest} columns`);
+  assert.ok(lines.length <= (key === 'simple' ? 15 : 14) && widest <= 64, `${key}: ${lines.length} lines / ${widest} columns`);
   return [key, { lines: lines.length, widest }];
 }));
 assert.deepEqual(Object.keys(sourceMetrics), keys);

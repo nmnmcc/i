@@ -55,6 +55,7 @@ Waiting = (Int)
 message =
 	(Ready) { "ready" }
 	| (Waiting(minutes)) { int.to_string(minutes) <> " min left" }
+
 main = () {
 	stdio.print(message(Ready))
 	stdio.print(message(Waiting(2)))
