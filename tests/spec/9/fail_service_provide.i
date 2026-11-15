@@ -7,5 +7,5 @@
 )
 
 main = () {
-	fail.raise("x") <- (Fail(raise = (s: String) { panic("custom " <> s) }))
+	fail.raise("x") <- (Fail(raise = (s : String) { panic("custom " <> s) }))
 }

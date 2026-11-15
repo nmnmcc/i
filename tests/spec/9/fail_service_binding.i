@@ -7,11 +7,11 @@
 	i/fail
 )
 
-raise = () <- (h: Fail(String)) { h.raise("x") }
+raise = () <- (h : Fail(String)) { h.raise("x") }
 
 main = () {
 	answer = control.boundary((b) {
-		raise() <- (Fail(raise = (s: String) { control.escape(b, s) }))
+		raise() <- (Fail(raise = (s : String) { control.escape(b, s) }))
 	})
 	assert(answer == "x")
 	assert(fail.catch(() { raise() }) == Error("x"))

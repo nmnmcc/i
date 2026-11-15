@@ -8,10 +8,10 @@
 	i/request
 )
 
-same = (before: request.Owner) <- (inside: request.Owner) { before == inside }
+same = (before : request.Owner) <- (inside : request.Owner) { before == inside }
 
 main = () {
-	task.test(random.from_seed(7), [], () <- (before: request.Owner) {
+	task.test(random.from_seed(7), [], () <- (before : request.Owner) {
 		assert(
 			task.both(() { same(before) }, () { same(before) }) == (True, True),
 		)
@@ -21,7 +21,7 @@ main = () {
 		assert(
 			task.map_concurrently([1, 2], (_) { same(before) }) == [True, True],
 		)
-		request.within(() <- (inner: request.Owner) {
+		request.within(() <- (inner : request.Owner) {
 			assert(inner != before)
 			assert(task.scope((_) { same(inner) }))
 			assert(

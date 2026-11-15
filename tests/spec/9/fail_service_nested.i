@@ -7,19 +7,19 @@
 	i/fail
 )
 
-raise = (s: String) <- (h: Fail(String)) { h.raise(s) }
+raise = (s : String) <- (h : Fail(String)) { h.raise(s) }
 
 main = () {
 	answer = control.boundary((b) {
-		outer = Fail(raise = (s: String) { control.escape(b, "outer " <> s) })
-		inner = Fail(raise = (s: String) { control.escape(b, "inner " <> s) })
+		outer = Fail(raise = (s : String) { control.escape(b, "outer " <> s) })
+		inner = Fail(raise = (s : String) { control.escape(b, "inner " <> s) })
 		// The inner provide wins for the same constructor.
 		raise("x") <- (inner) <- (outer)
 	})
 	assert(answer == "inner x")
 	answer2 = control.boundary((b) {
 		fail.raise("y") <- (
-			Fail(raise = (s: String) { control.escape(b, "direct " <> s) }),
+			Fail(raise = (s : String) { control.escape(b, "direct " <> s) }),
 		)
 	})
 	assert(answer2 == "direct y")

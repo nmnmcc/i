@@ -11,7 +11,7 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-main = () <- (out: Out) {
+main = () <- (out : Out) {
 	control.boundary((b) {
 		resource.ensure(
 			() {
