@@ -1,0 +1,335 @@
+{
+  "branch": "lane/diag2",
+  "source_commit": "e13498261ff57e4f519381140f955418b4099d0b",
+  "merge_commit": "eed4a9ef01679ab525d80d5e1c176282ac75baa7",
+  "main": "a02d341005c7329391bfd2941f4e16faeac216b9",
+  "generated_at": "2026-11-15T11:35:47.982094+08:00",
+  "status": "NOT YET LANDABLE: runtime verification queued",
+  "last_fully_verified_commit": "4bbfc4b7beeaad30f52481576e148bc45a33ef9c",
+  "static_checks": {
+    "diagnostic_section_references": 0,
+    "original_inventory": {
+      "diagnostic_marks": 128,
+      "expected_message_marks": 7,
+      "ignored_test_description_marks": 4,
+      "embedded_program_template_marks": 30
+    },
+    "merged_inventory_marks": 189,
+    "remaining_protected_marks": 36,
+    "unchanged_archived_inputs": 8,
+    "source_message_classes": 118,
+    "source_message_occurrences": 158,
+    "additional_call_message_classes": 2,
+    "corpus_records": 771,
+    "corpus_messages": 3302,
+    "rendered_corpus_message_classes": 124,
+    "message_only_and_header_preservation": true,
+    "library_std_examples_and_generated_content_identical_to_main": true
+  },
+  "commands": [
+    {
+      "label": "literal-call",
+      "command": "cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- a_literal_outside_all_branches_gets_one_argument_error",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": [
+        {
+          "time": "09:55:57",
+          "label": "literal-call",
+          "exit": 101,
+          "finished": "10:01:36"
+        },
+        {
+          "time": "10:02:14",
+          "label": "literal-call",
+          "exit": 143,
+          "finished": "10:14:17"
+        }
+      ]
+    },
+    {
+      "label": "combination",
+      "command": "cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- an_unmatched_combination_still_reports_branch_selection",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "other-arguments",
+      "command": "cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- unmatched_types_keep_grouping_advice_and_independent_argument_errors",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "archive",
+      "command": "cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- original_model_programs_get_actionable_repairs",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "dependency-name",
+      "command": "cargo test -p ilang-cli --test package_commands --release --locked -- add_checks_the_names",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "spaced-constructor",
+      "command": "cargo test -p ilang-check --test diagnostic_traps --release --locked -- two_spaced_constructor_parts_are_still_one_binding",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "spaced-call",
+      "command": "cargo test -p ilang-check --test diagnostic_traps --release --locked -- spaced_function_call_keeps_its_error_and_explains_the_line",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "known-parameter",
+      "command": "cargo test -p ilang-check --test diagnostic_traps --release --locked -- missing_known_parameter_type_explains_both_fixes",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "known-tuple",
+      "command": "cargo test -p ilang-check --test literal_types --release --locked -- empty_optional_accumulator_requires_a_written_tuple_shape",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "spec-6",
+      "command": "cargo test -p ilang-cli --test spec --release --locked -- 6/",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "corpus-single",
+      "command": "scripts/review-corpus run --binary ./target/release/i --filter review-t1/service_bad --keep-bounds --jobs 1",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "call-proof",
+      "command": "python3 /tmp/diag2-final-call-proof.py",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "corpus-host",
+      "command": "scripts/review-corpus run --binary ./target/release/i --filter review-t1/host_service --keep-bounds --jobs 1",
+      "wrapper": "All commands in one heavy direnv exec invocation, sequentially.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "fmt",
+      "command": "direnv exec /home/agent/Programming/i cargo fmt --all -- --check",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "check",
+      "command": "direnv exec /home/agent/Programming/i cargo check -p ilang-check --all-targets --locked",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "repairs",
+      "command": "direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test diagnostic_repairs --release --locked",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "clippy",
+      "command": "direnv exec /home/agent/Programming/i cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "release",
+      "command": "direnv exec /home/agent/Programming/i cargo build --release -p ilang-cli --locked",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "snippets",
+      "command": "scripts/check-snippets",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "corpus",
+      "command": "scripts/review-corpus run --binary ./target/release/i --case-list tests/review/diag2-final-cases.json --keep-bounds --jobs 1",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "spec-2.4",
+      "command": "direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --release --locked -- 2.4/",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "spec-4.3",
+      "command": "direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --release --locked -- 4.3/",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "spec-9",
+      "command": "direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test spec --release --locked -- 9/",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "ilang-fmt",
+      "command": "./target/release/i fmt --check lib std bench examples",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "std",
+      "command": "./target/release/i test --project std --opt 0",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "docs-generate",
+      "command": "devenv shell -- bash -c 'cd docs && exec npm run generate'",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "docs-build",
+      "command": "heavy_docs npm exec -- astro build",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "docs-placeholders",
+      "command": "devenv shell -- bash -c 'cd docs && exec npm run check:placeholders'",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "docs-links",
+      "command": "devenv shell -- bash -c 'cd docs && exec npm run check:links'",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "docs-rendering",
+      "command": "devenv shell -- bash -c 'cd docs && exec npm run check:rendering'",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "docs-example-parser",
+      "command": "devenv shell -- bash -c 'cd docs && exec python3 scripts/check-examples.py'",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    },
+    {
+      "label": "docs-examples",
+      "command": "heavy_docs python3 scripts/run-examples.py --no-placeholders --jobs 1",
+      "wrapper": "Each heavy command uses heavy; direct snippet/doc checks acquire it internally where needed.",
+      "status": "queued",
+      "last_nonempty_line": "(no output)",
+      "runs": []
+    }
+  ],
+  "all_recorded_attempts": [
+    {
+      "time": "09:55:57",
+      "label": "literal-call",
+      "exit": 101,
+      "finished": "10:01:36"
+    },
+    {
+      "time": "10:02:14",
+      "label": "literal-call",
+      "exit": 143,
+      "finished": "10:14:17"
+    }
+  ],
+  "preliminary_attempt": {
+    "command": "heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test diagnostic_repairs --release --locked -- a_literal_outside_all_branches_gets_one_argument_error",
+    "exit": 101,
+    "last_line": "error: test failed, to rerun pass `-p ilang-cli --test diagnostic_repairs`",
+    "reason": "The actual output was the intended single E0501 at 2:16 followed by the existing 1 error footer; the new expected string omitted that footer. The expectation now includes it.",
+    "unexecuted_debug_command": "heavy direnv exec /home/agent/Programming/i cargo test -p ilang-cli --test diagnostic_repairs --locked -- a_literal_outside_all_branches_gets_one_argument_error",
+    "unexecuted_debug_result": "Canceled while queued; switched to the warm release profile.",
+    "other_queue_cancellations": "Canceled queued invocations to batch focused commands in one slot and refresh the wrapper after g30 ended; no test executed in those canceled waits."
+  },
+  "timeouts_in_own_corpus_runs": [],
+  "coordinator_gate_timeouts_not_from_this_lane": [
+    "review-native3/_loose/design-cases/borrowed-request/test2",
+    "review-native3/_loose/design-cases/events/test2",
+    "review-t1/stress-keys-2000/test2"
+  ],
+  "coordinator_owned_checks_not_run": [
+    "cargo test --workspace",
+    "unfiltered spec suite",
+    "unfiltered review corpus",
+    "scripts/dev-verify"
+  ]
+}
