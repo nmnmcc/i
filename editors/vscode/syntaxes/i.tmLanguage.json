@@ -443,7 +443,8 @@
           "match": "\\+|-|\\*|/|%"
         },
         {
-          "name": "keyword.operator.type.intersection.i",
+          "comment": "§2.5 chains joined with `&`, §1.5 type intersection.",
+          "name": "keyword.operator.chain.i",
           "match": "&"
         },
         {

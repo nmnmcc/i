@@ -2,7 +2,7 @@
 Branches, guards and matches
 ==================
 kind = (n : Int) {
-	n |> (0) { "zero" } | (k ? k < 0) { "negative" } | (_) { "positive" }
+	n |> (0) { "zero" } & (k ? k < 0) { "negative" } & (_) { "positive" }
 }
 
 ---

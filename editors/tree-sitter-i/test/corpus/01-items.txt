@@ -20,8 +20,8 @@ Greeting = (name = String, times = Int)
 repeat = (text : String, times : Int, sep : String) -> String {
 	times |>
 		(0) { "" }
-		| (1) { text }
-		| (_) { text <> sep <> repeat(text, times - 1, sep) }
+		& (1) { text }
+		& (_) { text <> sep <> repeat(text, times - 1, sep) }
 }
 
 greet = (g : Greeting) { repeat("hello \(g.name)!", g.times, " ") }
