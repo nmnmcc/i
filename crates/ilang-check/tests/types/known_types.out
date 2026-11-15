@@ -60,55 +60,55 @@ untyped_field : (A) -> Never
 option_name : (Option(User)) -> String
 annotated : (Int) -> Int
 annotated_call : Int
-14:16: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-16:18: warning[W0503]: the two sides have the known types `Float` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-18:17: warning[W0503]: the two sides have the known types `BitArray` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-20:19: warning[W0503]: the two sides have the known types `(1, _)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-22:17: warning[W0503]: the two sides have the known types `List(1 | "a")` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-24:26: warning[W0503]: the two sides have the known types `List(_)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-26:18: warning[W0503]: the two sides have the known types `List(Never)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-29:19: warning[W0503]: the two sides have the known types `Int` and `"s"`, which can never be equal, so `==` is always `False` (§6.9)
-31:20: warning[W0503]: the two sides have the known types `Bool` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-33:22: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-35:16: warning[W0503]: the two sides have the known types `Float` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-37:16: warning[W0503]: the two sides have the known types `Float` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-40:27: warning[W0503]: the two sides have the known types `1 | "a"` and `Float`, which can never be equal, so `==` is always `False` (§6.9)
-45:27: warning[W0503]: the two sides have the known types `Box("a")` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-47:28: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-50:30: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-54:32: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-60:23: warning[W0503]: the two sides have the known types `(String) -> Never` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-62:22: warning[W0503]: the two sides have the known types `(Bool) -> Bool` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-64:19: warning[W0503]: the two sides have the known types `(a) -> a` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-68:2: warning[W0503]: the two sides have the known types `(Int) -> Int` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-72:16: warning[W0503]: the two sides have the known types `(a) -> Box(a)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-74:19: warning[W0503]: the two sides have the known types `Nil` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-78:19: warning[W0503]: the two sides have the known types `(Int) <- (_) -> String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-80:16: warning[W0503]: the two sides have the known types `(Int, _) <- (_) -> Int` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-87:4: warning[W0503]: the two sides have the known types `(Int) <- (_) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+14:16: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
+16:18: warning[W0503]: the two sides have the known types `Float` and `1`, which can never be equal, so `==` is always `False`
+18:17: warning[W0503]: the two sides have the known types `BitArray` and `1`, which can never be equal, so `==` is always `False`
+20:19: warning[W0503]: the two sides have the known types `(1, _)` and `1`, which can never be equal, so `==` is always `False`
+22:17: warning[W0503]: the two sides have the known types `List(1 | "a")` and `1`, which can never be equal, so `==` is always `False`
+24:26: warning[W0503]: the two sides have the known types `List(_)` and `1`, which can never be equal, so `==` is always `False`
+26:18: warning[W0503]: the two sides have the known types `List(Never)` and `1`, which can never be equal, so `==` is always `False`
+29:19: warning[W0503]: the two sides have the known types `Int` and `"s"`, which can never be equal, so `==` is always `False`
+31:20: warning[W0503]: the two sides have the known types `Bool` and `1`, which can never be equal, so `==` is always `False`
+33:22: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
+35:16: warning[W0503]: the two sides have the known types `Float` and `1`, which can never be equal, so `==` is always `False`
+37:16: warning[W0503]: the two sides have the known types `Float` and `1`, which can never be equal, so `==` is always `False`
+40:27: warning[W0503]: the two sides have the known types `1 | "a"` and `Float`, which can never be equal, so `==` is always `False`
+45:27: warning[W0503]: the two sides have the known types `Box("a")` and `1`, which can never be equal, so `==` is always `False`
+47:28: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False`
+50:30: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
+54:32: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False`
+60:23: warning[W0503]: the two sides have the known types `(String) -> Never` and `1`, which can never be equal, so `==` is always `False`
+62:22: warning[W0503]: the two sides have the known types `(Bool) -> Bool` and `1`, which can never be equal, so `==` is always `False`
+64:19: warning[W0503]: the two sides have the known types `(a) -> a` and `1`, which can never be equal, so `==` is always `False`
+68:2: warning[W0503]: the two sides have the known types `(Int) -> Int` and `1`, which can never be equal, so `==` is always `False`
+72:16: warning[W0503]: the two sides have the known types `(a) -> Box(a)` and `1`, which can never be equal, so `==` is always `False`
+74:19: warning[W0503]: the two sides have the known types `Nil` and `1`, which can never be equal, so `==` is always `False`
+78:19: warning[W0503]: the two sides have the known types `(Int) <- (_) -> String` and `1`, which can never be equal, so `==` is always `False`
+80:16: warning[W0503]: the two sides have the known types `(Int, _) <- (_) -> Int` and `1`, which can never be equal, so `==` is always `False`
+87:4: warning[W0503]: the two sides have the known types `(Int) <- (_) -> _` and `1`, which can never be equal, so `==` is always `False`
 87:4: warning[W0502]: this value is not used, and working it out does nothing
-93:2: warning[W0503]: the two sides have the known types `(_) <- (_) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+93:2: warning[W0503]: the two sides have the known types `(_) <- (_) -> _` and `1`, which can never be equal, so `==` is always `False`
 93:2: warning[W0502]: this value is not used, and working it out does nothing
-101:3: warning[W0503]: the two sides have the known types `(Int) -> _` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+101:3: warning[W0503]: the two sides have the known types `(Int) -> _` and `1`, which can never be equal, so `==` is always `False`
 101:3: warning[W0502]: this value is not used, and working it out does nothing
-108:13: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-112:18: warning[W0503]: the two sides have the known types `Box(1)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-118:37: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-129:18: warning[W0503]: the two sides have the known types `1 | "a"` and `Float`, which can never be equal, so `==` is always `False` (§6.9)
-135:36: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False` (§6.9)
+108:13: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
+112:18: warning[W0503]: the two sides have the known types `Box(1)` and `1`, which can never be equal, so `==` is always `False`
+118:37: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False`
+129:18: warning[W0503]: the two sides have the known types `1 | "a"` and `Float`, which can never be equal, so `==` is always `False`
+135:36: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False`
 138:2: warning[W0502]: this value is not used, and working it out does nothing
-142:19: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-145:22: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-147:37: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-149:30: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-153:2: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-163:2: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-168:2: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-173:2: warning[W0503]: the two sides have the known types `Box(String)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-178:2: warning[W0503]: the two sides have the known types `Int` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-182:24: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-182:34: warning[W0503]: the two sides have the known types `List(String)` and `1`, which can never be equal, so `==` is always `False` (§6.9)
-187:33: warning[W0503]: the two sides have the known types `Int | String` and `Float`, which can never be equal, so `==` is always `False` (§6.9)
-195:17: warning[W0503]: the two sides have the known types `Int | String` and `Nil`, which can never be equal, so `==` is always `False` (§6.9)
-201:2: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
-210:25: error[E0506]: `.name` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)
+142:19: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
+145:22: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
+147:37: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
+149:30: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
+153:2: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
+163:2: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
+168:2: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
+173:2: warning[W0503]: the two sides have the known types `Box(String)` and `1`, which can never be equal, so `==` is always `False`
+178:2: warning[W0503]: the two sides have the known types `Int` and `"a"`, which can never be equal, so `==` is always `False`
+182:24: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
+182:34: warning[W0503]: the two sides have the known types `List(String)` and `1`, which can never be equal, so `==` is always `False`
+187:33: warning[W0503]: the two sides have the known types `Int | String` and `Float`, which can never be equal, so `==` is always `False`
+195:17: warning[W0503]: the two sides have the known types `Int | String` and `Nil`, which can never be equal, so `==` is always `False`
+201:2: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
+210:25: error[E0506]: `.name` needs a known type for its value; write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving

@@ -1,5 +1,5 @@
-src/main.i:5:1: error[E0310]: a host service has exactly one constructor, and every field has a label and a function type (§9.7)
-src/main.i:7:1: error[E0310]: a host service has exactly one constructor, and every field has a label and a function type (§9.7)
-src/main.i:10:1: error[E0310]: a host service has exactly one constructor, and every field has a label and a function type (§9.7)
-src/main.i:13:1: error[E0310]: a host service has exactly one constructor, and every field has a label and a function type (§9.7)
+src/main.i:5:1: error[E0310]: a host service has exactly one constructor, and every field has a label and a function type
+src/main.i:7:1: error[E0310]: a host service has exactly one constructor, and every field has a label and a function type
+src/main.i:10:1: error[E0310]: a host service has exactly one constructor, and every field has a label and a function type
+src/main.i:13:1: error[E0310]: a host service has exactly one constructor, and every field has a label and a function type
 src/other.i:2:11: error[E0311]: the host service `First` of `app/main` also has the namespace `app:b/v1` and a field `read`

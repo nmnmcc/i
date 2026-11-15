@@ -3,7 +3,7 @@ fine : (A & List(A)) -> List(A)
 id : (A) -> A
 mono : () -> 1
 unbound : () -> 1
-2:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
-5:2: error[E0505]: this type has itself inside it, through a type variable (§4.7)
-17:2: error[E0505]: this type has itself inside it, through a type variable (§4.7)
-21:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)
+2:1: error[E0505]: this type has itself inside it, through a type variable
+5:2: error[E0505]: this type has itself inside it, through a type variable
+17:2: error[E0505]: this type has itself inside it, through a type variable
+21:1: error[E0505]: this type has itself inside it, through a type variable

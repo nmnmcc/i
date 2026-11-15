@@ -11,7 +11,7 @@ checked : () -> Result(1, AssertionFailure)
 checked_library : () -> Result("x", AssertionFailure)
 inc : (A & Int) -> A
 mixed : List(1 | "a")
-91:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False` (§6.9)
+91:10: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`
 98:2: warning[W0502]: this value is not used, and working it out does nothing
 21:1: warning[W0504]: top-level binding `user` is not used
 29:1: warning[W0504]: top-level binding `fixed` is not used

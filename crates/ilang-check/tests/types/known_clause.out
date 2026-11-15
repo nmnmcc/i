@@ -8,4 +8,4 @@ use_update : () -> B
 item : (Box(C)) -> C | 0
 use_item : () -> Int
 wrong : (C) -> 0
-39:32: error[E0512]: the constructor `B`, which made this value (§7.5), has no field with the label `f` (§4.8 rule 13)
+39:32: error[E0512]: the constructor `B`, which made this value, has no field with the label `f`

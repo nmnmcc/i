@@ -21,7 +21,7 @@ apply : ((A) <- N -> B, A) <- N -> B
 compose : ((A) <- N -> B, (C) <- N2 -> A) -> (C) <- (..N, ..N2) -> B
 twice : ((A | B) <- N -> B & C, A) <- N -> C
 ignore : (A) -> 1
-30:8: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False` (§6.9)
+30:8: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
 40:2: warning[W0502]: this value is not used, and working it out does nothing
 2:1: warning[W0504]: top-level binding `one` is not used
 4:1: warning[W0504]: top-level binding `pi` is not used

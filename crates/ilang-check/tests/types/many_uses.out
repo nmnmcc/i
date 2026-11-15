@@ -4,4 +4,4 @@ main : () -> Int
 take_int : (Boundary(Int, Never)) -> Nil
 take_string : (Boundary(String, Never)) -> Nil
 g : (Boundary(Int, Never)) -> Nil
-31:14: error[E0503]: `String` and `Int` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4) (the type at 31:2 needs it)
+31:14: error[E0503]: `String` and `Int` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (the type at 31:2 needs it)
