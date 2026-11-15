@@ -446,6 +446,79 @@ fn mixed_batch_with_one_lossy_file_is_refused_entirely() {
     }
 }
 
+/// When the check phase refuses one file, the whole batch is refused. The
+/// report must say that nothing was converted and name every file of the batch
+/// that was left unconverted.
+#[test]
+fn preflight_refusal_reports_all_unconverted_i_to_is() {
+    let dir = package();
+    write_file(dir.path(), "a.i", "a = () { 1 }\n");
+    write_file(dir.path(), "b.i", "b = () { 1 } // note\n");
+    write_file(dir.path(), "c.i", "c = () { 2 }\n");
+
+    let out = i(dir.path(), &["--to", "is", "a.i", "b.i", "c.i"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
+    assert_eq!(out.stdout, b"");
+    let err = stderr_of(&out);
+    let lower = err.to_lowercase();
+    assert!(
+        lower.contains("no files were converted")
+            || lower.contains("nothing was converted")
+            || lower.contains("nothing in this run was converted"),
+        "the report must say that nothing was converted:\n{err}"
+    );
+    // Every file of the batch is named in the unconverted report, not only the
+    // one that caused the refusal.
+    for name in ["a.i", "b.i", "c.i"] {
+        assert!(err.contains(name), "the report must name {name}:\n{err}");
+    }
+    assert!(err.contains("not converted"), "{err}");
+    for name in ["a.i", "b.i", "c.i"] {
+        assert_eq!(
+            bytes(dir.path(), name),
+            match name {
+                "a.i" => b"a = () { 1 }\n".as_slice(),
+                "b.i" => b"b = () { 1 } // note\n".as_slice(),
+                _ => b"c = () { 2 }\n".as_slice(),
+            }
+        );
+    }
+    for name in ["a.is", "b.is", "c.is"] {
+        assert_missing(dir.path(), name);
+    }
+}
+
+/// The same preflight reporting from Lisp to normal, so both directions are
+/// covered.
+#[test]
+fn preflight_refusal_reports_all_unconverted_is_to_i() {
+    let dir = package();
+    write_file(dir.path(), "a.is", "(= a (-> (,) _ 1))\n");
+    write_file(dir.path(), "b.is", "(= b (-> (,) _ 1)) // note\n");
+    write_file(dir.path(), "c.is", "(= c (-> (,) _ 2))\n");
+
+    let out = i(dir.path(), &["--to", "i", "a.is", "b.is", "c.is"]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
+    let err = stderr_of(&out);
+    let lower = err.to_lowercase();
+    assert!(
+        lower.contains("no files were converted")
+            || lower.contains("nothing was converted")
+            || lower.contains("nothing in this run was converted"),
+        "the report must say that nothing was converted:\n{err}"
+    );
+    for name in ["a.is", "b.is", "c.is"] {
+        assert!(err.contains(name), "the report must name {name}:\n{err}");
+    }
+    assert!(err.contains("not converted"), "{err}");
+    assert_eq!(bytes(dir.path(), "a.is"), b"(= a (-> (,) _ 1))\n");
+    assert_eq!(bytes(dir.path(), "b.is"), b"(= b (-> (,) _ 1)) // note\n");
+    assert_eq!(bytes(dir.path(), "c.is"), b"(= c (-> (,) _ 2))\n");
+    for name in ["a.i", "b.i", "c.i"] {
+        assert_missing(dir.path(), name);
+    }
+}
+
 // ---- d) a real write failure ---------------------------------------------
 
 #[cfg(unix)]
@@ -516,6 +589,13 @@ fn read_only_destination_directory_write_failure_keeps_source_and_lists_converte
     assert!(
         err.contains("ro/b.i") && err.contains("zz/c.i"),
         "the report must name the files left unconverted:\n{err}"
+    );
+
+    // The failing file is named as the point where the run stopped, so the
+    // three states -- converted, failed, not converted -- are all reported.
+    assert!(
+        err.contains("ro/b.i: conversion stopped"),
+        "the report must name the failing file:\n{err}"
     );
 
     // The first file was converted and its source removed.
