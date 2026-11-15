@@ -32,7 +32,11 @@ pass tour/example_test.addition
 	i/core
 	(twice) = tour/macros
 )
-main = () <- (io : Io) { io.print(core.inspect(twice(21))) }
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(twice(21)),
+	)
+}
 ```
 
 ```text
@@ -49,10 +53,12 @@ In `.is`, `(, twice)` exports, `=` binds, and `->` constructs a function; braces
 	i/core
 )
 main = () <- (io : Io) {
-	io.print(core.inspect({
-		saved = 21
-		saved + saved
-	}))
+	io.print(
+		core.inspect({
+			saved = 21
+			saved + saved
+		}),
+	)
 }
 ```
 
@@ -80,7 +86,11 @@ main = () <- (io : Io) {
 		io.print("argument")
 		21
 	}
-	io.print(core.inspect(twice(value())))
+	io.print(
+		core.inspect(
+			twice(value()),
+		),
+	)
 }
 ```
 
@@ -106,7 +116,9 @@ Arguments arrive as syntax; the generated program decides when to evaluate them.
 )
 main = () <- (io : Io) {
 	saved = 10
-	io.print(core.inspect(twice(saved + 1)))
+	io.print(
+		core.inspect(twice(saved + 1)),
+	)
 }
 ```
 
@@ -131,7 +143,11 @@ This is hygiene: caller syntax keeps its scope, while generated names belong to 
 	(twice) = tour/macros
 )
 _double = (_) { 0 }
-main = () <- (io : Io) { io.print(core.inspect(twice(21))) }
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(twice(21)),
+	)
+}
 ```
 
 ```text

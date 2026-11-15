@@ -59,7 +59,9 @@ Keep task handles inside their owning scope: returning one does not extend its l
 	(Io) = i/io
 )
 main = () <- (io : Io) {
-	io.print(core.inspect(task.both(() { 7 }, () { "eight" })))
+	io.print(
+		core.inspect(task.both(() { 7 }, () { "eight" })),
+	)
 }
 ```
 

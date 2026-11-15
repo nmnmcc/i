@@ -96,10 +96,7 @@ done
 	(Io) = i/io
 )
 main = () <- (io : Io) {
-	answer = resource.ensure(
-		() { 42 },
-		() { io.print("final") },
-	)
+	answer = resource.ensure(() { 42 }, () { io.print("final") })
 	io.print(core.inspect(answer))
 }
 ```
