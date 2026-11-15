@@ -571,7 +571,7 @@ impl Cx {
                         }
                         n::DItem::Label(l, _) => self.error(
                             l.span.0,
-                            "a provided service has no label: it is keyed by its type (§2.10.2)",
+                            "a provided service has no label: it is keyed by its type",
                         ),
                     }
                 }
@@ -618,7 +618,7 @@ impl Cx {
             if let Some(k) = &p.key {
                 self.error(
                     k.span.0,
-                    "a key on a parameter needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
+                    "a key on a function parameter is not supported here",
                 );
             }
         }
@@ -631,7 +631,7 @@ impl Cx {
             if !bound && !f.generics.is_empty() {
                 self.error(
                     f.generics[0].span.0,
-                    "type parameters on a function literal that is not the value of a binding need stage 7 of syntax three, which this compiler does not have yet",
+                    "a function literal with type parameters must be the value of a binding",
                 );
             }
         }
@@ -639,7 +639,7 @@ impl Cx {
         if let Some(other) = fs.iter().find(|f| f.params.len() != count) {
             self.error(
                 other.span.0,
-                "a chain whose branches have different shapes needs shape groups (stage 9 of syntax three), which this compiler does not have yet",
+                "a chain whose branches have different argument shapes is not supported here",
             );
         }
         match chain_kind(fs) {
@@ -707,7 +707,7 @@ impl Cx {
                 n::DItem::Label(_, e) => self.expr(e),
                 n::DItem::Pos(e) | n::DItem::Spread(e) => self.error(
                     e.span.0,
-                    "data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
+                    "data with labels has only labelled items after an optional first `..base`; mixed positional and labelled items are not supported here",
                 ),
             }
         }
@@ -862,7 +862,7 @@ impl Cx {
                         n::DPItem::Rest(None) => {}
                         n::DPItem::Rest(Some(b)) => self.error(
                             b.span.0,
-                            "a named rest `..name` in a pattern needs stage 6 of syntax three, which this compiler does not have yet",
+                            "a named rest `..name` in a pattern is not supported here",
                         ),
                     }
                 }
@@ -871,14 +871,12 @@ impl Cx {
                 for item in items {
                     match item {
                         n::DPItem::Pos(p) => self.pattern(p),
-                        n::DPItem::Key(l, _) => self.error(
-                            l.span.0,
-                            "a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-                        ),
-                        n::DPItem::Rest(_) => self.error(
-                            span,
-                            "a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-                        ),
+                        n::DPItem::Key(l, _) => {
+                            self.error(l.span.0, "a key in a data pattern is not supported here")
+                        }
+                        n::DPItem::Rest(_) => {
+                            self.error(span, "a rest `..` in a data pattern is not supported here")
+                        }
                     }
                 }
             }
@@ -906,7 +904,7 @@ impl Cx {
                 n::PatternKind::Discard(_) => {}
                 _ if core => self.error(
                     p.span.0,
-                    "two patterns joined by `=` that are not names need stage 9 of syntax three, which this compiler does not have yet",
+                    "two patterns joined by `=` must both be names here",
                 ),
                 _ => {
                     self.pattern(p);
@@ -920,7 +918,7 @@ impl Cx {
         {
             self.error(
                 core.span.0,
-                "a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name",
+                "a pattern inside a labelled field is not supported here; bind the field to a name and match the name",
             );
         }
     }
@@ -943,10 +941,9 @@ impl Cx {
                 for item in items {
                     match item {
                         n::TItem::Pos(t) | n::TItem::Spread(t) => self.ty(t),
-                        n::TItem::Label(label, _) => self.error(
-                            label.span.0,
-                            "a need has no label: it is keyed by its type (§2.10.2)",
-                        ),
+                        n::TItem::Label(label, _) => {
+                            self.error(label.span.0, "a need has no label: it is keyed by its type")
+                        }
                     }
                 }
             }
@@ -958,7 +955,7 @@ impl Cx {
         if !generics_taken && !f.generics.is_empty() {
             self.error(
                 f.generics[0].span.0,
-                "type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
+                "a function type with type parameters must be the type of a binding",
             );
         }
         match &f.param.kind {
@@ -1004,7 +1001,7 @@ impl Cx {
                             n::TItem::Label(_, t) => self.ty(t),
                             n::TItem::Pos(t) | n::TItem::Spread(t) => self.error(
                                 t.span.0,
-                                "a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)",
+                                "a data type with labels has only labelled items; mixed positional and labelled items are not supported here",
                             ),
                         }
                     }

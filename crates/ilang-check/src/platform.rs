@@ -179,7 +179,7 @@ fn not_provided(p: &Program, entry: DefId, service: &str, target: Target) -> Dia
         Some(p.module(entry.module).source),
         p.def(entry).span,
         format!(
-            "`{service}` is not provided by the target `{}`: the entry `{}.{}` needs it, so give it in the entry with i code (§2.10.11)",
+            "`{service}` is not provided by the target `{}`: the entry `{}.{}` needs it, so give it in the entry with i code",
             target.name(),
             p.module(entry.module).path,
             p.def(entry).name

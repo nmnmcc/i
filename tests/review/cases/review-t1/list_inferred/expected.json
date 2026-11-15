@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "probe/main.f : (List(String)) -> 0 | 1 | 2\n",
-      "stderr": "src/main.i:1:12: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `[\"\", ..]`; the items of a list get the whole type `String` from literal patterns (§4.8); if only these values can come, write the type, such as `List(\"a\" | \"b\")`\n1 error\n"
+      "stderr": "src/main.i:1:12: error[E0516]: the clauses do not cover every value of the subject: no clause without a guard matches `[\"\", ..]`; the items of a list get the whole type `String` from literal patterns; if only these values can come, write the type, such as `List(\"a\" | \"b\")`\n1 error\n"
     }
   }
 }

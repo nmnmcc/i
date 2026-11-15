@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code\n1 error\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code\n1 error\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code\n1 error\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code (§2.10.11)\n1 error\n"
+      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: error[E0523]: `app/main.S` is not provided by the target `native`: the entry `app/main.main` needs it, so give it in the entry with i code\n1 error\n"
     }
   }
 }

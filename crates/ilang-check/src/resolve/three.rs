@@ -1229,7 +1229,16 @@ impl<'a, 't> R3<'a, 't> {
             });
             match &shape.body {
                 ShapeBody::Alias(t) => {
+                    let before = self.diags.len();
+                    let hint = self.union_payload_hint(def, t);
                     let t = self.ty(t);
+                    if let Some(hint) = hint {
+                        for d in &mut self.diags[before..] {
+                            if d.code == code::UNKNOWN_TYPE {
+                                d.message.push_str(&hint);
+                            }
+                        }
+                    }
                     self.p.types[id.0 as usize].body = TypeBody::Alias(t);
                 }
                 ShapeBody::Custom(ctors) => {
@@ -1272,6 +1281,54 @@ impl<'a, 't> R3<'a, 't> {
         }
     }
 
+    /// A union alias cannot introduce constructors by applying their payloads.
+    /// Restrict the rewrite to an unparameterized alias of undefined heads;
+    /// existing generic types and type parameters keep their ordinary advice.
+    fn union_payload_hint(&self, def: &n::TypeDef, body: &n::Type) -> Option<String> {
+        let n::TypeKind::Union(members) = &body.kind else {
+            return None;
+        };
+        if !def.head.is_empty() || members.len() < 2 {
+            return None;
+        }
+        let mut definitions = Vec::new();
+        let mut alternatives = Vec::new();
+        for member in members {
+            let n::TypeKind::Named {
+                module: None,
+                name,
+                args,
+            } = &member.kind
+            else {
+                return None;
+            };
+            if args.is_empty()
+                || self.scopes[self.cur.0 as usize]
+                    .types
+                    .contains_key(&name.name)
+                || self.builtin_types.contains_key(&name.name)
+            {
+                return None;
+            }
+            let payload = args
+                .iter()
+                .map(ilang_syntax::syn3::print_type)
+                .collect::<Vec<_>>()
+                .join(", ");
+            definitions.push(format!("`{} = ({payload})`", name.name));
+            alternatives.push(name.name.as_str());
+        }
+        definitions.push(format!(
+            "`{} = {}`",
+            def.name.name,
+            alternatives.join(" | ")
+        ));
+        Some(format!(
+            ". A union alias does not define its alternatives. Define each alternative as its own type first: {}.",
+            definitions.join(", then ")
+        ))
+    }
+
     /// The form of the host services.
     fn host_forms(&mut self) {
         for mi in 0..self.parsed.len() {
@@ -1297,7 +1354,7 @@ impl<'a, 't> R3<'a, 't> {
                         self.error(
                             code::HOST_FORM,
                             def.name.span.0,
-                            "a host service has exactly one constructor, and every field has a label and a function type (§9.7)",
+                            "a host service has exactly one constructor, and every field has a label and a function type",
                         );
                     }
                 }
@@ -2668,7 +2725,7 @@ impl<'a, 't> R3<'a, 't> {
                 self.error(
                     code::ENV_TYPE,
                     ty.span,
-                    "a rest service pattern needs a type parameter of the function (§6.8)",
+                    "a rest service pattern needs a type parameter of the function",
                 );
             }
             if !s.rest
@@ -2679,7 +2736,7 @@ impl<'a, 't> R3<'a, 't> {
                     self.error(
                         code::ENV_PARAMS_SAME,
                         ty.span,
-                        format!("two environment parameters of this function have the type constructor `{tname}` (§9.2)"),
+                        format!("two environment parameters of this function have the type constructor `{tname}`"),
                     );
                 }
                 env_heads.push(head);

@@ -1,0 +1,20 @@
+{
+  "baseline": "4bbfc4b7beeaad30f52481576e148bc45a33ef9c",
+  "method": "Apply the reviewed source-literal wording map to diagnostic message bodies only. Replace references carrying needed information with explicit host-type and variance rules. Retain original observation metadata; independent compiler reruns are recorded separately.",
+  "unchanged_fields": [
+    "codes",
+    "positions",
+    "diagnostic counts",
+    "stdout",
+    "exit statuses",
+    "commands",
+    "phases",
+    "bounds",
+    "metadata"
+  ],
+  "records": 762,
+  "message_occurrences": 3289,
+  "diagnostic_counts_dropped": 0,
+  "case_list": "tests/review/diag2-citation-cases.json",
+  "detailed_before_after_changes": "tests/review/diag2-final-corpus-proof.json"
+}

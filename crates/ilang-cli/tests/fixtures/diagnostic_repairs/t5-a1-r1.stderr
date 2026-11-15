@@ -1,0 +1,3 @@
+src/main.i:118:9: error[E0001]: i has no `!` operator. To negate a Boolean `x`, import `i/core` and write `core.not(x)`.
+src/main.i:118:9: error[E0101]: expected an expression, found `!`
+2 errors

@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.main : () <- (Fail(Never)) -> Nil\napp/main.get : () <- (Dep) -> Int\napp/main.pong : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.ping : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.both : () <- (Fail(Never), S(N), T(Int, N), ..N) -> Int\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.closed : () <- (Fail(Never)) -> Int\napp/main.uset : (A) <- (Fail(Never), T(A, N), ..N) -> A\napp/main.run : (() <- N -> A) <- N -> A\napp/main.fr : () <- (S(N), ..N) -> Int\n",
-      "stderr": "src/main.i:1:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:25:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n2 errors\n"
+      "stderr": "src/main.i:1:1: error[E0505]: this type has itself inside it, through a type variable\nsrc/main.i:25:1: error[E0505]: this type has itself inside it, through a type variable\n2 errors\n"
     }
   }
 }

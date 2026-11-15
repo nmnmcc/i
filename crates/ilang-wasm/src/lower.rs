@@ -779,7 +779,7 @@ pub(crate) fn lower_tests_numeric(
                         Some(program.module(entry.module).source),
                         program.def(entry).span,
                         format!(
-                            "synchronous export `{}` needs an asynchronous platform service (§2.6.2)",
+                            "synchronous export `{}` needs an asynchronous platform service",
                             program.def(entry).name
                         ),
                     ));
@@ -1984,7 +1984,7 @@ impl<'a> Lowerer<'a> {
             self.error(
                 d.module,
                 def.span,
-                "the type of this external function is not one that the host can take (§10.1)",
+                "an external function needs a fully written function type with positional parameters. Parameters and results may use only `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types. Its only allowed need is `Fail(E)`, where `E` contains only the six built-in types",
             );
             return None;
         };
@@ -4289,7 +4289,7 @@ impl<'a> Lowerer<'a> {
                         self.error(
                             fx.module,
                             s.value.span,
-                            "a string format in a pattern needs a string literal (§8.4)",
+                            "a string format in a pattern needs a string literal",
                         );
                         continue;
                     };

@@ -957,7 +957,7 @@ impl Cx {
                     n::DItem::Label(l, _) => {
                         self.error(
                             l.span.0,
-                            "a provided service has no label: it is keyed by its type (§2.10.2)",
+                            "a provided service has no label: it is keyed by its type",
                         );
                         None
                     }
@@ -1060,7 +1060,7 @@ impl Cx {
             if !bound && !f.generics.is_empty() {
                 self.error(
                     f.generics[0].span.0,
-                    "type parameters on a function literal that is not the value of a binding need stage 7 of syntax three, which this compiler does not have yet",
+                    "a function literal with type parameters must be the value of a binding",
                 );
             }
         }
@@ -1246,7 +1246,7 @@ impl Cx {
                 n::DItem::Label(l, e) => out.push((id(l), self.expr(e))),
                 n::DItem::Pos(e) | n::DItem::Spread(e) => self.error(
                     e.span.0,
-                    "data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
+                    "data with labels has only labelled items after an optional first `..base`; mixed positional and labelled items are not supported here",
                 ),
             }
         }
@@ -1439,117 +1439,114 @@ impl Cx {
             return result;
         }
         let span = p.span.0;
-        let kind = match &p.kind {
-            n::PatternKind::Quote(q) if crate::lisp::syntax::ROWS3 => {
-                match super::lisp::quote_captures(&q.datum.0, true) {
-                    Ok(captures) => o::PatternKind::Quote {
-                        datum: q.datum.0.clone(),
-                        template: q.template,
-                        // Native quote preparation and type expansion update
-                        // the capture patterns. Keep their template slots and
-                        // replacements instead of reconstructing stale nodes.
-                        captures: (if q.captures.is_empty() {
-                            &captures
-                        } else {
-                            &q.captures
-                        })
+        let kind =
+            match &p.kind {
+                n::PatternKind::Quote(q) if crate::lisp::syntax::ROWS3 => {
+                    match super::lisp::quote_captures(&q.datum.0, true) {
+                        Ok(captures) => o::PatternKind::Quote {
+                            datum: q.datum.0.clone(),
+                            template: q.template,
+                            // Native quote preparation and type expansion update
+                            // the capture patterns. Keep their template slots and
+                            // replacements instead of reconstructing stale nodes.
+                            captures: (if q.captures.is_empty() {
+                                &captures
+                            } else {
+                                &q.captures
+                            })
+                            .iter()
+                            .map(|(splice, pattern)| (*splice, self.pattern(pattern)))
+                            .collect(),
+                        },
+                        Err(error) => {
+                            self.errors.push(error);
+                            o::PatternKind::Discard("_".into())
+                        }
+                    }
+                }
+                n::PatternKind::Quote(q) => {
+                    match crate::lisp::parse_pattern(&super::lisp::unconvert_quote(&q.datum.0)) {
+                        Ok(p) => p.kind.clone(),
+                        Err(d) => {
+                            self.errors.push(d);
+                            o::PatternKind::Discard("_".into())
+                        }
+                    }
+                }
+                n::PatternKind::Var(s) => o::PatternKind::Var(s.clone()),
+                n::PatternKind::Discard(s) => o::PatternKind::Discard(s.clone()),
+                n::PatternKind::Typed { binder: b, ty: t } => o::PatternKind::Typed {
+                    binder: binder(b),
+                    ty: self.ty(t),
+                },
+                n::PatternKind::Int { negative, value } => o::PatternKind::Int {
+                    negative: *negative,
+                    value: value.clone(),
+                },
+                n::PatternKind::Float { negative, value } => o::PatternKind::Float {
+                    negative: *negative,
+                    value: *value,
+                },
+                n::PatternKind::String(s) => o::PatternKind::String(s.clone()),
+                n::PatternKind::Prefix {
+                    prefix,
+                    suffix,
+                    rest,
+                } => o::PatternKind::Prefix {
+                    prefix: prefix.clone(),
+                    suffix: suffix.clone(),
+                    rest: binder(rest),
+                },
+                n::PatternKind::Ctor { module, name, args } => {
+                    let mut out = Vec::new();
+                    let mut spread = false;
+                    for item in args.iter().flatten() {
+                        match item {
+                            n::DPItem::Pos(p) => out.push(self.pattern(p)),
+                            n::DPItem::Key(l, p) => out.push(self.keyed(l, p)),
+                            n::DPItem::Rest(None) => spread = true,
+                            n::DPItem::Rest(Some(b)) => self.error(
+                                b.span.0,
+                                "a named rest `..name` in a pattern is not supported here",
+                            ),
+                        }
+                    }
+                    o::PatternKind::Constructor {
+                        module: opt_id(module),
+                        name: id(name),
+                        args: out,
+                        spread,
+                    }
+                }
+                n::PatternKind::Data(items) => {
+                    let mut out = Vec::new();
+                    for item in items {
+                        match item {
+                            n::DPItem::Pos(p) => out.push(self.pattern(p)),
+                            n::DPItem::Key(l, _) => self
+                                .error(l.span.0, "a key in a data pattern is not supported here"),
+                            n::DPItem::Rest(_) => self
+                                .error(span, "a rest `..` in a data pattern is not supported here"),
+                        }
+                    }
+                    o::PatternKind::Tuple(out)
+                }
+                n::PatternKind::List { items, rest } => o::PatternKind::List {
+                    items: items.iter().map(|i| self.pattern(i)).collect(),
+                    rest: rest.as_ref().map(|r| r.as_ref().map(binder)),
+                },
+                n::PatternKind::BitArray(segments) => o::PatternKind::BitArray(
+                    segments
                         .iter()
-                        .map(|(splice, pattern)| (*splice, self.pattern(pattern)))
+                        .map(|s| o::Segment {
+                            value: self.pattern(&s.value),
+                            format: self.format(&s.format),
+                            span: s.value.span.0,
+                        })
                         .collect(),
-                    },
-                    Err(error) => {
-                        self.errors.push(error);
-                        o::PatternKind::Discard("_".into())
-                    }
-                }
-            }
-            n::PatternKind::Quote(q) => {
-                match crate::lisp::parse_pattern(&super::lisp::unconvert_quote(&q.datum.0)) {
-                    Ok(p) => p.kind.clone(),
-                    Err(d) => {
-                        self.errors.push(d);
-                        o::PatternKind::Discard("_".into())
-                    }
-                }
-            }
-            n::PatternKind::Var(s) => o::PatternKind::Var(s.clone()),
-            n::PatternKind::Discard(s) => o::PatternKind::Discard(s.clone()),
-            n::PatternKind::Typed { binder: b, ty: t } => o::PatternKind::Typed {
-                binder: binder(b),
-                ty: self.ty(t),
-            },
-            n::PatternKind::Int { negative, value } => o::PatternKind::Int {
-                negative: *negative,
-                value: value.clone(),
-            },
-            n::PatternKind::Float { negative, value } => o::PatternKind::Float {
-                negative: *negative,
-                value: *value,
-            },
-            n::PatternKind::String(s) => o::PatternKind::String(s.clone()),
-            n::PatternKind::Prefix {
-                prefix,
-                suffix,
-                rest,
-            } => o::PatternKind::Prefix {
-                prefix: prefix.clone(),
-                suffix: suffix.clone(),
-                rest: binder(rest),
-            },
-            n::PatternKind::Ctor { module, name, args } => {
-                let mut out = Vec::new();
-                let mut spread = false;
-                for item in args.iter().flatten() {
-                    match item {
-                        n::DPItem::Pos(p) => out.push(self.pattern(p)),
-                        n::DPItem::Key(l, p) => out.push(self.keyed(l, p)),
-                        n::DPItem::Rest(None) => spread = true,
-                        n::DPItem::Rest(Some(b)) => self.error(
-                            b.span.0,
-                            "a named rest `..name` in a pattern needs stage 6 of syntax three, which this compiler does not have yet",
-                        ),
-                    }
-                }
-                o::PatternKind::Constructor {
-                    module: opt_id(module),
-                    name: id(name),
-                    args: out,
-                    spread,
-                }
-            }
-            n::PatternKind::Data(items) => {
-                let mut out = Vec::new();
-                for item in items {
-                    match item {
-                        n::DPItem::Pos(p) => out.push(self.pattern(p)),
-                        n::DPItem::Key(l, _) => self.error(
-                            l.span.0,
-                            "a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-                        ),
-                        n::DPItem::Rest(_) => self.error(
-                            span,
-                            "a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-                        ),
-                    }
-                }
-                o::PatternKind::Tuple(out)
-            }
-            n::PatternKind::List { items, rest } => o::PatternKind::List {
-                items: items.iter().map(|i| self.pattern(i)).collect(),
-                rest: rest.as_ref().map(|r| r.as_ref().map(binder)),
-            },
-            n::PatternKind::BitArray(segments) => o::PatternKind::BitArray(
-                segments
-                    .iter()
-                    .map(|s| o::Segment {
-                        value: self.pattern(&s.value),
-                        format: self.format(&s.format),
-                        span: s.value.span.0,
-                    })
-                    .collect(),
-            ),
-            n::PatternKind::And(parts) => return self.and(parts, None, span),
-        };
+                ),
+                n::PatternKind::And(parts) => return self.and(parts, None, span),
+            };
         pat(kind, span)
     }
 
@@ -1565,7 +1562,7 @@ impl Cx {
                 n::PatternKind::Discard(_) => discard = Some(self.pattern(p)),
                 _ if core.is_some() => self.error(
                     p.span.0,
-                    "two patterns joined by `=` that are not names need stage 9 of syntax three, which this compiler does not have yet",
+                    "two patterns joined by `=` must both be names here",
                 ),
                 _ => core = Some(self.pattern(p)),
             }
@@ -1592,7 +1589,7 @@ impl Cx {
                 _ => {
                     self.error(
                         core.span,
-                        "a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name",
+                        "a pattern inside a labelled field is not supported here; bind the field to a name and match the name",
                     );
                     core
                 }
@@ -1653,10 +1650,9 @@ impl Cx {
                 for item in items {
                     match item {
                         n::TItem::Pos(ty) | n::TItem::Spread(ty) => env.push(self.ty(ty)),
-                        n::TItem::Label(label, _) => self.error(
-                            label.span.0,
-                            "a need has no label: it is keyed by its type (§2.10.2)",
-                        ),
+                        n::TItem::Label(label, _) => {
+                            self.error(label.span.0, "a need has no label: it is keyed by its type")
+                        }
                     }
                 }
             }
@@ -1674,7 +1670,7 @@ impl Cx {
         if !generics_taken && !f.generics.is_empty() {
             self.error(
                 f.generics[0].span.0,
-                "type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
+                "a function type with type parameters must be the type of a binding",
             );
         }
         let mut params = Vec::new();
@@ -1764,7 +1760,7 @@ impl Cx {
                             )),
                             n::TItem::Pos(t) | n::TItem::Spread(t) => self.error(
                                 t.span.0,
-                                "a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)",
+                                "a data type with labels has only labelled items; mixed positional and labelled items are not supported here",
                             ),
                         }
                     }

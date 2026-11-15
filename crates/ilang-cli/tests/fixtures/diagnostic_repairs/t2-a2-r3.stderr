@@ -1,0 +1,5 @@
+src/main.i:12:12: error[E0203]: `i/process` has no `Fs`
+src/main.i:12:27: error[E0212]: `process` is put in by more than one import
+src/main.i:82:39: error[E0202]: the type `Fs` is not defined; to use a type variable, declare it after the name of the binding, as in `f(A) = …`
+src/main.i:82:51: error[E0225]: a service type is one named type `T(…)`: not a type variable, a union, or `Never`. `Stdio` here comes from `i/process`. `i/stdio` also exports a type named `Stdio`. Use `stdio.Stdio` if that is the type you intended.
+4 errors

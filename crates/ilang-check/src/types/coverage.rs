@@ -1176,7 +1176,7 @@ impl Checker<'_> {
                         let example = format!("{owner}({})", ls.join(" | "));
                         let start = if owner == "List" {
                             format!(
-                                "the items of a list get the whole type `{whole}` from literal patterns (§4.8)"
+                                "the items of a list get the whole type `{whole}` from literal patterns"
                             )
                         } else {
                             format!(

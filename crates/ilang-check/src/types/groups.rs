@@ -52,7 +52,6 @@ pub(crate) fn group_data(shape: ShapeId, parts: &[Ty]) -> Ty {
 use super::coverage::{Col, Ctor, Lit, Pat};
 use super::infer::{Checker, Scheme};
 use super::known::{self, Knowledge};
-use crate::code;
 use crate::hir::*;
 use ilang_syntax::span::Span;
 use std::rc::Rc;
@@ -444,34 +443,41 @@ impl Checker<'_> {
 
     /// The type of the callee at a direct call `f(d)` of a name
     /// with a table, from the known types of the argument parts, in the
-    /// order of the parameters. `None` when every branch is selected: the
-    /// callee has the type of its whole group.
-    pub(super) fn select_at_call(&mut self, callee: &Expr, known: &[Ty], span: Span) -> Option<Ty> {
-        let table = self.branch_table(callee)?;
+    /// order of the parameters. `Ok(None)` when every branch is selected:
+    /// the callee has the type of its whole group. `Err` describes an
+    /// unmatched call, so the caller can combine it with argument errors.
+    pub(super) fn select_at_call(
+        &mut self,
+        callee: &Expr,
+        known: &[Ty],
+        span: Span,
+    ) -> Result<Option<Ty>, String> {
+        let Some(table) = self.branch_table(callee) else {
+            return Ok(None);
+        };
         if known.len() != table.arity {
-            return None;
+            return Ok(None);
         }
         let selected = self.select(&table, known);
         if selected.len() == table.rows.len() {
-            return None;
+            return Ok(None);
         }
         if selected.is_empty() {
             let shown: Vec<String> = known
                 .iter()
                 .map(|k| super::display::show_known(&self.s, k))
                 .collect();
-            self.error(
-                code::NO_BRANCH_SELECTED,
-                span,
-                format!(
-                    "no branch of this function can match these arguments: their known types are `({})` (syntax three §2.6.2)",
-                    shown.join(", ")
-                ),
-            );
-            return None;
+            // The caller still checks every argument constraint. If one of
+            // those rejects an argument, it explains this same failure more
+            // precisely; otherwise the branch-selection error is needed.
+            return Err(format!(
+                "no branch of this function can match these arguments: their known types are `({})`",
+                shown.join(", ")
+            ));
         }
-        self.selected_fn(&table, &selected, span)
-            .map(|f| Ty::Fn(Box::new(f)))
+        Ok(self
+            .selected_fn(&table, &selected, span)
+            .map(|f| Ty::Fn(Box::new(f))))
     }
 
     /// A name with a table, used where one function type is

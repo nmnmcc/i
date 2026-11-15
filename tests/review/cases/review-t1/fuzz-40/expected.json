@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "probe/main.f : ((\"\" | \"a\" | \"ab\" | \"b\" | \"c\", Bool)) -> 0 | 1 | 2 | 3 | 4 | 5 | 6\nprobe/main.main : () <- (Assert) -> Nil\n",
-      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n"
+      "stderr": "src/main.i:5:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:8:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:9:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     }
   }
 }

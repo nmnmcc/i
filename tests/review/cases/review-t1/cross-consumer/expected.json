@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "probe/main.f : (\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | \"v10\" | \"v11\" | \"v12\" | \"v13\" | \"v14\" | \"v15\" | \"v16\" | \"v17\" | \"v18\" | \"v99\") -> \"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | \"v10\" | \"v11\" | \"v12\" | \"v13\" | \"v14\" | \"v15\" | \"v16\" | \"v17\" | \"v18\" | \"v99\"\nprobe/main.main : () <- (Assert) -> Nil\n",
-      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False`\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False`\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False` (§6.9)\nassertion failed: assert\nprobe/main:7:2\n"
+      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False`\nassertion failed: assert\nprobe/main:7:2\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 0,
       "stdout": "pass probe/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False`\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False` (§6.9)\nassertion failed: assert\nprobe/main:7:2\n"
+      "stderr": "src/main.i:7:9: warning[W0503]: the values `\"v00\" | \"v01\" | \"v02\" | \"v03\" | \"v04\" | \"v05\" | \"v06\" | \"v07\" | \"v08\" | \"v09\" | … (10 more)` and `\"v19\"` can never be equal, so `==` is always `False`\nassertion failed: assert\nprobe/main:7:2\n"
     }
   }
 }

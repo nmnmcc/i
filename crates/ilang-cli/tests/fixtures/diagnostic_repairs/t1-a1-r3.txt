@@ -1,0 +1,101 @@
+(
+	i/process
+	i/fs
+	i/fail
+	i/stdio
+	std/json
+	std/int
+	std/string
+	std/bit_array
+	(Some, None) = std/option
+)
+
+amount_value = (value) {
+	json.as_string(value) |>
+		(Some(text)) {
+			int.parse(text) |>
+				(Ok(amount) ? amount >= 0 && amount <= 1000) { Some(amount) }
+				| (_) { None }
+		}
+		| (_) { None }
+}
+
+apply_record = (record, balance) {
+	json.parse(record) |>
+		(Ok(value)) {
+			json.as_object(value) |>
+				(Some(_)) {
+					json.field(value, "op") |>
+						(Some(op_value)) {
+							json.as_string(op_value) |>
+								(Some(op)) {
+									op |>
+										("reset") { (True, 0) }
+										| ("credit") {
+											json.field(value, "amount") |>
+												(Some(amount)) {
+													amount_value(amount) |>
+														(Some(n)) { (True, balance + n) }
+														| (_) { (False, balance) }
+												}
+												| (_) { (False, balance) }
+										}
+										| ("debit") {
+											json.field(value, "amount") |>
+												(Some(amount)) {
+													amount_value(amount) |>
+														(Some(n) ? balance >= n) { (True, balance - n) }
+														| (_) { (False, balance) }
+												}
+												| (_) { (False, balance) }
+										}
+										| (_) { (False, balance) }
+								}
+								| (_) { (False, balance) }
+						}
+						| (_) { (False, balance) }
+				}
+				| (_) { (False, balance) }
+		}
+		| (_) { (False, balance) }
+}
+
+run_records = (records, balance, errors) {
+	records |>
+		([]) { stdio.print("TOTAL \(int.to_string(balance)) ERRORS \(int.to_string(errors))") }
+		| ([record, ..rest]) {
+			(success, next) = apply_record(record, balance)
+			success |>
+				(True) {
+					stdio.print("OK \(int.to_string(next))")
+					run_records(rest, next, errors)
+				}
+				| (False) {
+					stdio.print("ERROR \(int.to_string(balance))")
+					run_records(rest, balance, errors + 1)
+				}
+		}
+}
+
+run_text = (text) {
+	parts = string.split(text, "\n")
+	{ string.ends_with(text, "\n") } |>
+		(True) {
+			run_records(list.drop(parts, 1), 0, 0)
+		}
+		| (False) { run_records(parts, 0, 0) }
+}
+
+main = () {
+	process.args() |>
+		([path]) {
+			fail.catch(() { fs.read_file(path) }) |>
+				(Ok(bytes)) {
+					bit_array.to_string(bytes) |>
+						(Ok(text)) { run_text(text) }
+						| (_) { stdio.print("ERROR INPUT") }
+				}
+				| (_) { stdio.print("ERROR INPUT") }
+		}
+		| (_) { stdio.print("ERROR INPUT") }
+}

@@ -313,7 +313,7 @@ impl Cx<'_> {
             l.span,
             "string-label",
             format!(
-                "the label `{}` is not a name; syntax three has no string labels",
+                "the label `{}` is not a name; use a name rather than a string as a label",
                 l.name
             ),
         );
@@ -724,7 +724,7 @@ impl Cx<'_> {
                     p.span,
                     "lowercase-type-param",
                     format!(
-                        "the type parameter `{}` of `{}` is lowercase: the old compiler rejected it (E0232) and syntax three cannot parse the head (E0101); rename it by hand or keep the file as an error fixture",
+                        "the type parameter `{}` of `{}` is lowercase: type parameters need uppercase names; rename it by hand or keep the file as an error fixture",
                         p.name, def.name.name
                     ),
                 );
@@ -1204,7 +1204,7 @@ impl Cx<'_> {
                     self.note(
                         a.value.span,
                         "labelled-call",
-                        "a call with an argument by label of a function whose parameters the text does not show: the labels are kept as labelled items; the stage 4 migrator (`labels`) makes the call positional",
+                        "this call's parameter order is not visible in the source, so its labels were kept. Write the arguments by position once you know the function's parameter order",
                     );
                 }
                 args.iter().map(|a| self.arg(a)).collect()
@@ -1754,7 +1754,7 @@ impl Cx<'_> {
                     self.note(
                         t.span,
                         "open-record",
-                        "a record type with a spread or a removed label is an open record; data is closed in syntax three",
+                        "a record type with a spread or a removed label is an open record; data types cannot have a spread or a removed label",
                     );
                 }
                 let mut items = Vec::new();

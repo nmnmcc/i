@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\n",
-      "stderr": "src/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\nsrc/main.i:9:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)\n2 errors\n"
+      "stderr": "src/main.i:6:1: error[E0505]: this type has itself inside it, through a type variable\nsrc/main.i:9:1: error[E0505]: this type has itself inside it, through a type variable\n2 errors\n"
     }
   }
 }

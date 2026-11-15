@@ -1,0 +1,118 @@
+(
+	i/process
+	i/fs
+	i/fail
+	i/stdio
+	i/core
+	std/bit_array
+	std/int
+	std/json
+	std/list
+	(None, Some) = std/option
+)
+
+Outcome = Committed(Int, Int) | RolledBack(Int)
+
+read_text = (path) -> String {
+	bits = fs.read_file(path)
+	bit_array.to_string(bits) |>
+		(Ok(text)) { text }
+		| (Error(_)) { panic("invalid UTF-8") }
+}
+
+main = () {
+	args = process.args()
+	args |>
+		([root, script]) {
+			script_result = fail.catch(() { read_text(script) })
+			script_result |>
+				(Ok(text)) {
+					json.parse(text) |>
+						(Ok(json.Array(items))) {
+							lock = root <> "/.lock"
+							owned = fail.catch(() { fs.mkdir(lock) }) == Ok(Nil)
+							{ owned } |>
+								(True) {
+									journal = root <> "/journal"
+									snapshot = fail.catch(() { fs.read_file(journal) })
+									snapshot |>
+										(Ok(original)) {
+											result = process_steps(items, journal, 0)
+											result |>
+												(Committed(count, bytes)) {
+													stdio.print("COMMIT " <> int.to_string(count) <> " " <> int.to_string(bytes))
+												}
+												| (RolledBack(index)) {
+													fail.catch(() { fs.write_file(journal, original) })
+													stdio.print("ROLLBACK " <> int.to_string(index))
+												}
+											fail.catch(() { fs.remove(lock) })
+										}
+										| (Error(_)) {
+											fail.catch(() { fs.remove(lock) })
+											stdio.print("ERROR INPUT")
+										}
+								}
+								| (False) { stdio.print("ERROR LOCK") }
+						}
+						| (_) { stdio.print("ERROR INPUT") }
+				}
+				| (Error(_)) { stdio.print("ERROR INPUT") }
+		}
+		| (_) { stdio.print("ERROR INPUT") }
+}
+
+process_steps = (steps, journal, index) {
+	steps |>
+		([]) {
+			Ok(bytes) = fail.catch(() { fs.read_file(journal) })
+			Committed(index, core.bit_size(bytes) / 8)
+		}
+		| ([step, ..rest]) {
+			result = fail.catch(() { apply_step(step, journal) })
+			result |>
+				(Ok(True)) { process_steps(rest, journal, index + 1) }
+				| (_) { RolledBack(index) }
+		}
+}
+
+apply_step = (step, journal) {
+	step |> (json.Object(fields)) {
+		object = json.Object(fields)
+		json.field(object, "op") |>
+			(Some(json.Text("append"))) {
+				json.field(object, "text") |>
+					(Some(json.Text(text))) {
+						valid_ascii = core.codepoints(text) |> list.all((c) { core.codepoint_to_int(c) < 128 })
+						{ valid_ascii } |>
+							(True) {
+								Ok(file) = fs.open(journal, fs.Append)
+								Ok(_) = fs.write(file, <<text:utf8>>)
+								fs.close(file)
+								True
+							}
+							| (False) { False }
+					}
+					| (_) { False }
+			}
+			| (Some(json.Text("expect"))) {
+				json.field(object, "length") |>
+					(Some(json.Text(token))) {
+						int.parse(token) |>
+							(Ok(length)) {
+								{ length >= 0 && length <= 65536 } |>
+									(True) {
+										bytes = fs.read_file(journal)
+										core.bit_size(bytes) / 8 == length
+									}
+									| (False) { False }
+							}
+							| (_) { False }
+					}
+					| (_) { False }
+			}
+			| (Some(json.Text("abort"))) { False }
+			| (_) { False }
+	}
+	| (_) { False }
+}

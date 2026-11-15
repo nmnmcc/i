@@ -36,6 +36,8 @@ struct SourceExport {
 }
 #[cfg(test)]
 mod differential;
+mod hints;
+pub use hints::missing_module_message;
 #[cfg(test)]
 #[allow(dead_code)]
 mod legacy;
@@ -290,6 +292,9 @@ impl<'a> Resolver<'a> {
         if matches!(code, code::UNKNOWN_NAME | code::MACRO_RESERVED)
             && let Some(hint) = ilang_syntax::old_syntax_hint(&self.graph.sources.get(source).text)
         {
+            if message.ends_with('.') {
+                message.pop();
+            }
             message.push_str("; ");
             message.push_str(hint);
         }
@@ -437,7 +442,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::DEFINED_TWICE,
                 span,
-                format!("marked `{name}` conflicts with a name in its scope module (§5)"),
+                format!("marked `{name}` conflicts with a name in its scope module"),
             );
         }
     }
@@ -496,7 +501,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::MACRO_BINDER,
                     item.name.span,
-                    format!("marked `{name}` cannot be exported (§5)"),
+                    format!("marked `{name}` cannot be exported"),
                 );
                 continue;
             }
@@ -620,9 +625,7 @@ impl<'a> Resolver<'a> {
             let msg = if dev {
                 format!("`{first}` is a dev-dependency, so only modules under `test/` may use it")
             } else {
-                format!(
-                    "`{first}` is not `i`, the name of this package, or a dependency name (§2.1)"
-                )
+                format!("`{first}` is not `i`, the name of this package, or a dependency name")
             };
             self.error(code::UNKNOWN_PACKAGE, item.path[0].span, msg);
             return None;
@@ -638,7 +641,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::NO_MODULE,
                 item.span,
-                format!("there is no module `{written}`"),
+                self.missing_module_message(&written),
             );
             return None;
         };
@@ -1035,7 +1038,7 @@ impl<'a> Resolver<'a> {
                 code::NOT_A_MODULE,
                 m.span,
                 format!(
-                    "`{}` is a local value here, not a module; a local name covers a module name (§2.3)",
+                    "`{}` is a local value here, not a module; a local name covers a module name",
                     m.name
                 ),
             );
@@ -1191,7 +1194,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::UNKNOWN_NAME,
                     m.span,
-                    format!("there is no module `{}`", m.name),
+                    self.undefined_name_message(&m.name, true),
                 );
                 None
             }
@@ -1298,9 +1301,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::INVALID_RECORD_KEY,
                 label.span,
-                format!(
-                    "the label `{name}` is not a name; a label of data is a `name` (syntax-3 §2.3)"
-                ),
+                format!("the label `{name}` is not a name; a label of data is a `name`"),
             );
         }
     }
@@ -1374,11 +1375,11 @@ impl<'a> Resolver<'a> {
             _ => None,
         };
         if head.is_none() {
-            self.error(
-                code::ENV_TYPE,
-                t.span,
-                "a service type is one named type `T(…)`: not a type variable, a union, or `Never` (§9.2)",
-            );
+            let mut message =
+                "a service type is one named type `T(…)`: not a type variable, a union, or `Never`"
+                    .to_string();
+            message.push_str(&self.same_named_type_hint(t));
+            self.error(code::ENV_TYPE, t.span, message);
         }
         head
     }
@@ -1526,7 +1527,7 @@ impl<'a> Resolver<'a> {
                         _ => String::new(),
                     };
                     self.error(code::HOST_TYPE, f.ty.span,
-                        format!("a host field has ABI parameter, result and error types, and no written environment; request fields return Request(A) or Request(Result(A,E)), with no written errors (§9.7, §10.3){input_note}"));
+                        format!("a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors{input_note}"));
                 }
             }
         }
@@ -1698,7 +1699,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::EXTERNAL_NOT_FN,
                     t.span,
-                    "the type of an external function is a function type (§10.1)",
+                    "the type of an external function is a function type",
                 );
             }
             return;
@@ -1707,21 +1708,24 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::EXTERNAL_EFFECTS,
                 part.span,
-                "an external function writes errors as a Fail(E) need (§10.1)",
+                "an external function writes errors as a Fail(E) need",
             );
         }
         if let Some(env) = env {
             let expanded = self.expand(env);
             if let Some(error) = self.fail_argument(&expanded).cloned() {
                 if let Some(span) = find_in_type(&error, &|k| matches!(k, TypeKind::Hole)) {
-                    self.error(code::EXTERNAL_HOLE, span,
-                        "the full type of an external function must be written, with no `_` (§10.1)");
+                    self.error(
+                        code::EXTERNAL_HOLE,
+                        span,
+                        "the full type of an external function must be written, with no `_`",
+                    );
                 } else if let Some(span) = find_in_type(&error, &|k| matches!(k, TypeKind::Var(_)))
                 {
                     self.error(
                         code::EXTERNAL_TYPE_VAR,
                         span,
-                        "the type of an external function may not have type variables (§10.1)",
+                        "the type of an external function may not have type variables",
                     );
                 } else {
                     let valid = self.boundary_type(&error).is_some_and(|t| {
@@ -1736,15 +1740,18 @@ impl<'a> Resolver<'a> {
                         })
                     });
                     if !valid {
-                        self.error(code::EXTERNAL_HOST_TYPE, error.span,
-                            "the error of an external function must be a host-passable error type (§10.3)");
+                        self.error(
+                            code::EXTERNAL_HOST_TYPE,
+                            error.span,
+                            "the error of an external function must be `Never` or a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; opaque types cannot be errors",
+                        );
                     }
                 }
             } else if !self.is_never(&expanded) {
                 self.error(
                     code::EXTERNAL_EFFECTS,
                     env.span,
-                    "an external function may have no need or exactly Fail(E) (§10.1)",
+                    "an external function may have no need or exactly Fail(E)",
                 );
             }
         }
@@ -1757,19 +1764,19 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::EXTERNAL_HOLE,
                     span,
-                    "the full type of an external function must be written, with no `_` (§10.1)",
+                    "the full type of an external function must be written, with no `_`",
                 );
             } else if let Some(span) = find_in_type(part, &|k| matches!(k, TypeKind::Var(_))) {
                 self.error(
                     code::EXTERNAL_TYPE_VAR,
                     span,
-                    "the type of an external function may not have type variables (§10.1)",
+                    "the type of an external function may not have type variables",
                 );
             } else if !self.host_type(part, outgoing) {
                 self.error(
                     code::EXTERNAL_HOST_TYPE,
                     part.span,
-                    format!("the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3){}", if outgoing { String::new() } else { self.host_input_note(part) }),
+                    format!("the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors{}", if outgoing { String::new() } else { self.host_input_note(part) }),
                 );
             }
         }
@@ -1913,7 +1920,7 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::MACRO_BINDER,
                 span,
-                format!("`{name}` cannot bind a name with this macro origin (§5)"),
+                format!("`{name}` cannot bind a name with this macro origin"),
             );
         }
     }
@@ -2032,10 +2039,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::MACRO_RESERVED,
                     name.span,
-                    format!(
-                        "macro `{}` can only be used as a macro call (§4.1)",
-                        name.name
-                    ),
+                    format!("macro `{}` can only be used as a macro call", name.name),
                 );
             }
             return ExprKind::Error;
@@ -2115,7 +2119,7 @@ impl<'a> Resolver<'a> {
                     self.error(
                         code::UNKNOWN_NAME,
                         m.span,
-                        format!("`{}` is not defined", m.name),
+                        self.undefined_name_message(&m.name, false),
                     );
                     ExprKind::Error
                 }
@@ -2139,10 +2143,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::MACRO_RESERVED,
                     name.span,
-                    format!(
-                        "macro `{}` can only be used as a macro call (§4.1)",
-                        name.name
-                    ),
+                    format!("macro `{}` can only be used as a macro call", name.name),
                 );
                 ExprKind::Error
             }
@@ -2166,7 +2167,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::UNKNOWN_NAME,
                     name.span,
-                    format!("`{}` is not defined", name.name),
+                    self.undefined_name_message(&name.name, false),
                 );
                 ExprKind::Error
             }
@@ -2382,7 +2383,7 @@ impl<'a> Resolver<'a> {
                     code::EXPORT_HIDDEN_TYPE,
                     span,
                     format!(
-                        "{what} is exported, but its type uses the type `{name}` {}, which is not exported (§2.4)", if foreign { "of its defining module" } else { "of this module" }
+                        "{what} is exported, but its type uses the type `{name}` {}, which is not exported", if foreign { "of its defining module" } else { "of this module" }
                     ),
                 );
             }

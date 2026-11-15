@@ -1,0 +1,2 @@
+src/main.i:84:16: error[E0201]: `list` is not defined. Import `std/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = std/property` to use `list`.
+1 error

@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.make : (() <- N -> Nil) -> () <- N -> Nil\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:6:1: error[E0515]: the type hides the environment statement's obligation for `S(_)`: every instance must use the same service form (§4.8 rule 9, §9.2)\n1 error\n"
+      "stderr": "src/main.i:6:1: error[E0515]: the type hides the environment statement's obligation for `S(_)`: every instance must use the same service form\n1 error\n"
     }
   }
 }

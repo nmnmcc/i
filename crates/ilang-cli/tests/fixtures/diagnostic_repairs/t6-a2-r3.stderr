@@ -1,0 +1,7 @@
+src/main.i:14:11: error[E0202]: the type `Committed` is not defined. A union alias does not define its alternatives. Define each alternative as its own type first: `Committed = (Int, Int)`, then `RolledBack = (Int)`, then `Outcome = Committed | RolledBack`.
+src/main.i:14:33: error[E0202]: the type `RolledBack` is not defined. A union alias does not define its alternatives. Define each alternative as its own type first: `Committed = (Int, Int)`, then `RolledBack = (Int)`, then `Outcome = Committed | RolledBack`.
+src/main.i:42:14: error[E0201]: `Committed` is not defined
+src/main.i:45:16: error[E0201]: `RolledBack` is not defined
+src/main.i:69:4: error[E0201]: `Committed` is not defined
+src/main.i:75:13: error[E0201]: `RolledBack` is not defined
+6 errors
