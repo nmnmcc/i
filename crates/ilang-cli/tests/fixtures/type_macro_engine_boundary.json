@@ -10,7 +10,7 @@
       "expected_old": "(\n  m = app/macros\n)\n\nf(N, N%E) = (g) {\n  x: (Int) -> Int ! N = g\n  x\n}\n"
     },
     {
-      "source": "(m = app/macros)\nf = m.id((x) { x } | (x, y) { x + y })\n",
+      "source": "(m = app/macros)\nf = m.id((x) { x } & (x, y) { x + y })\n",
       "expected_old": "(\n  m = app/macros\n)\n\nf = %multi(1: (x) { x }, 2: (x, y) { x + y })\n"
     },
     {
