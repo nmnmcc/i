@@ -62,8 +62,7 @@ fn cases() -> Vec<(String, String)> {
         })
         .collect::<Vec<_>>()
         .join(", ");
-    let mut cases =
-        vec![
+    let mut cases = vec![
         (
             literal("🙂中\u{80}\u{7f}\n\r\t\u{c}\"\\"),
             "\"🙂中\\u{0080}\\u{007F}\\n\\r\\t\\f\\\"\\\\\"".into(),
@@ -95,11 +94,17 @@ fn cases() -> Vec<(String, String)> {
             "Pair(False, \"name\")".into(),
         ),
         (
-            format!("(call $record (i32.const 17) (i64.const 41) {})", fields(&[integer(1)])),
+            format!(
+                "(call $record (i32.const 17) (i64.const 41) {})",
+                fields(&[integer(1)])
+            ),
             "Other(1)".into(),
         ),
         (
-            format!("(call $record (i32.const 18) (i64.const 41) {})", fields(&[])),
+            format!(
+                "(call $record (i32.const 18) (i64.const 41) {})",
+                fields(&[])
+            ),
             "//wasm(unknown)".into(),
         ),
         (format!("(call $result_ok {})", integer(1)), "Ok(1)".into()),
@@ -108,11 +113,17 @@ fn cases() -> Vec<(String, String)> {
             "Error(Nil)".into(),
         ),
         (
-            format!("(call $record (i32.const 2) (i64.const 1) {})", fields(&[literal("m")])),
+            format!(
+                "(call $record (i32.const 2) (i64.const 1) {})",
+                fields(&[literal("m")])
+            ),
             "AssertionFailure(message = \"m\")".into(),
         ),
         (
-            format!("(call $record (i32.const 4) (i64.const 3) {})", fields(&[object(7, 0, 1, no_bytes)])),
+            format!(
+                "(call $record (i32.const 4) (i64.const 3) {})",
+                fields(&[object(7, 0, 1, no_bytes)])
+            ),
             "Fail(raise = //fn(a) { ... })".into(),
         ),
         (
@@ -120,7 +131,12 @@ fn cases() -> Vec<(String, String)> {
             "[(1, \"a\"), Pair([])]".into(),
         ),
         (
-            object(9, 3, 10, "(array.new_fixed $bytes 2 (i32.const 170) (i32.const 85))"),
+            object(
+                9,
+                3,
+                10,
+                "(array.new_fixed $bytes 2 (i32.const 170) (i32.const 85))",
+            ),
             "<<82, 2:u2>>".into(),
         ),
         (
@@ -128,13 +144,15 @@ fn cases() -> Vec<(String, String)> {
             "<<5:u3>>".into(),
         ),
         (
-            object(9, 0, 16, "(array.new_fixed $bytes 2 (i32.const 0) (i32.const 255))"),
+            object(
+                9,
+                0,
+                16,
+                "(array.new_fixed $bytes 2 (i32.const 0) (i32.const 255))",
+            ),
             "<<0, 255>>".into(),
         ),
-        (
-            object(9, 0, 0, "(array.new_fixed $bytes 0)"),
-            "<<>>".into(),
-        ),
+        (object(9, 0, 0, "(array.new_fixed $bytes 0)"), "<<>>".into()),
         (object(7, 0, 0, no_bytes), "//fn() { ... }".into()),
         (object(7, 0, 2, no_bytes), "//fn(a, b) { ... }".into()),
         (

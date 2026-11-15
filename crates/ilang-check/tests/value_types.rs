@@ -643,7 +643,8 @@ fn spec_case_reverse_order_and_recovery(
             && !errors.is_empty()
             && errors.iter().all(|d| {
                 d.code == "E0101"
-                    && d.message == "a function type with type parameters must be the type of a binding"
+                    && d.message
+                        == "a function type with type parameters must be the type of a binding"
             });
         if !expects_compile_error && !pending_poly {
             return Err(format!("unexpected parse failure: {resolve_diags:?}"));
