@@ -10,6 +10,7 @@ Release acquired values after use, including when a computation raises an error.
 	i/resource
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	resource.acquire(
 		() { "handle" },
@@ -34,6 +35,7 @@ Strings stand in for handles so these examples need no files. `resource.scoped` 
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	answer = resource.acquire(
 		() { 40 },
@@ -56,6 +58,7 @@ released
 	i/resource
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	resource.acquire(
 		() {
@@ -95,6 +98,7 @@ done
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	answer = resource.ensure(() { 42 }, () { io.print("final") })
 	io.print(core.inspect(answer))
@@ -117,6 +121,7 @@ A final can use services, but cannot raise an error. `ensure` also runs it when 
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	answer = fail.catch(() {
 		resource.ensure(
@@ -155,6 +160,7 @@ Error("failed")
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	answer = fail.catch(() {
 		resource.acquire(

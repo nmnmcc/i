@@ -31,13 +31,16 @@ pub(super) fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     };
     let mut top = Vec::new();
     let mut end = 0;
+    let mut after_group = false;
     for datum in document.iter() {
-        builder.gap(end, datum.span.start, true, &mut top);
+        builder.top_gap(end, datum.span.start, after_group, &mut top);
         let id = builder.datum(datum);
         top.push(Item::Datum(id));
         end = datum.span.end;
+        after_group = matches!(&datum.kind, K::Round(parts)
+            if matches!(parts.first().map(|d| &d.kind), Some(K::Symbol(s)) if s == ","));
     }
-    builder.gap(end, source.len() as u32, true, &mut top);
+    builder.top_gap(end, source.len() as u32, after_group, &mut top);
     assert_eq!(
         builder.next,
         lexed.comments.len(),
@@ -122,6 +125,21 @@ struct Builder<'a> {
 }
 
 impl Builder<'_> {
+    /// Header forms separate from the next form or comment, even when the
+    /// source has no blank line. At EOF there is no separator to print.
+    fn top_gap(&mut self, from: u32, to: u32, after_group: bool, items: &mut Vec<Item>) {
+        let start = items.len();
+        self.gap(from, to, true, items);
+        if after_group && (to as usize != self.source.len() || items.len() > start) {
+            if !matches!(items.get(start), Some(Item::Blank)) {
+                items.insert(start, Item::Blank);
+            }
+            if let Some(Item::Comment { trailing, .. }) = items.get_mut(start + 1) {
+                *trailing = false;
+            }
+        }
+    }
+
     fn comment_text(comment: &Comment) -> String {
         if comment.text.starts_with("///") {
             comment.text.clone()

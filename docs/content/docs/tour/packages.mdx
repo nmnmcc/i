@@ -13,6 +13,7 @@ name = "tour"
 (
 	message
 )
+
 message = (name : String) -> String { "hello, " <> name }
 ```
 
@@ -21,6 +22,7 @@ message = (name : String) -> String { "hello, " <> name }
 	(Io) = i/io
 	greeting = tour/greeting
 )
+
 main = () <- (io : Io) { io.print(greeting.message("reader")) }
 ```
 
@@ -36,6 +38,7 @@ hello, reader
 (
 	message
 )
+
 prefix = "hello, "
 message = (name : String) -> String { prefix <> name }
 ```
@@ -45,6 +48,7 @@ message = (name : String) -> String { prefix <> name }
 	(Io) = i/io
 	greeting = (message) = tour/words/greeting
 )
+
 main = () <- (io : Io) { io.print(message("reader")) }
 ```
 
@@ -62,6 +66,7 @@ hello, reader
 	make
 	message
 )
+
 Greeting = (text = String)
 make = (name : String) -> Greeting { Greeting(text = "hello, " <> name) }
 message = (g : Greeting) -> String { g.text }
@@ -72,6 +77,7 @@ message = (g : Greeting) -> String { g.text }
 	(Io) = i/io
 	greeting = tour/greeting
 )
+
 main = () <- (io : Io) {
 	value : greeting.Greeting = greeting.make("reader")
 	io.print(greeting.message(value))
@@ -90,6 +96,7 @@ Exporting the type alone keeps its constructor and data inside the module.
 (
 	Greeting(..)
 )
+
 Greeting = (text = String)
 ```
 
@@ -98,6 +105,7 @@ Greeting = (text = String)
 	(Io) = i/io
 	(Greeting) = tour/greeting
 )
+
 main = () <- (io : Io) {
 	greeting = Greeting(text = "hello, reader")
 	io.print(greeting.text)
@@ -118,6 +126,7 @@ name = "words"
 (
 	message
 )
+
 message = (name : String) -> String { "hello, " <> name }
 ```
 
@@ -133,6 +142,7 @@ util = { path = "words" }
 	(Io) = i/io
 	greeting = util/greeting
 )
+
 main = () <- (io : Io) { io.print(greeting.message("package")) }
 ```
 
@@ -162,6 +172,7 @@ collection = "std/test.tests"
 (
 	message
 )
+
 message = (name : String) -> String { "hello, " <> name }
 ```
 
@@ -170,6 +181,7 @@ message = (name : String) -> String { "hello, " <> name }
 	testlib = (test) = std/test
 	(message) = tour/greeting
 )
+
 test("greeting", () { assert(message("reader") == "hello, reader") })
 ```
 
@@ -202,6 +214,7 @@ synchronous = ["tour/main.answer"]
 (
 	answer
 )
+
 answer = () { 42 }
 main = () <- (io : Io) {
 	io.print(

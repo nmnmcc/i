@@ -1,0 +1,9 @@
+(
+	i/core
+)
+
+
+
+// value
+@inline
+value = 1

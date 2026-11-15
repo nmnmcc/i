@@ -226,3 +226,45 @@ fn format_golden() {
         "formatted files differ: {failed:?} (run with UPDATE=1 to bless)"
     );
 }
+
+#[test]
+fn header_group_spacing() {
+    let import = "(\n\ti/core\n)";
+    let export = "(\n\tvalue\n)";
+    for gap in ["\n", "\n\n", "\n\n\n\n"] {
+        for headers in [
+            import.to_owned(),
+            export.to_owned(),
+            format!("{import}{gap}{export}"),
+        ] {
+            // Replace only the gap between complete groups, not their lines.
+            let spaced = if headers.starts_with(import) && headers.ends_with(export) {
+                format!("{import}\n\n{export}")
+            } else {
+                headers.clone()
+            };
+            for next in [
+                "value = 1\n",
+                "// next\nvalue = 1\n",
+                "@inline\nvalue = 1\n",
+                "/// value\nvalue = 1\n",
+                "// end\n",
+            ] {
+                let source = format!("{headers}{gap}{next}");
+                check(&source).unwrap();
+                assert_eq!(format(&source).unwrap(), format!("{spaced}\n\n{next}"));
+            }
+            let source = format!("{headers}{gap}");
+            check(&source).unwrap();
+            assert_eq!(format(&source).unwrap(), format!("{spaced}\n"));
+        }
+    }
+    for source in [
+        "value = 1\n",
+        "// next\nvalue = 1\n",
+        "@inline\nvalue = 1\n",
+    ] {
+        check(source).unwrap();
+        assert_eq!(format(source).unwrap(), source);
+    }
+}

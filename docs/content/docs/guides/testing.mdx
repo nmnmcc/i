@@ -21,6 +21,7 @@ std = { path = "../std" }
 (
 	count
 )
+
 count = (n : Int) -> Int { n + 1 }
 ```
 
@@ -29,6 +30,7 @@ count = (n : Int) -> Int { n + 1 }
 	testlib = (test) = std/test
 	guide_tests/count
 )
+
 test("adds one", () { assert(count.count(2) == 3) })
 ```
 
@@ -71,6 +73,7 @@ Each command prints this result. Filters match substrings, with no exact-name or
 (
 	testlib = (test, suite, each, skip, fails) = std/test
 )
+
 suite("arithmetic", () {
 	test("addition", () { assert(1 + 1 == 2) })
 	each("double", [("zero", 0), ("two", 2)], (n) { assert(n + n == 2 * n) })
@@ -96,6 +99,7 @@ Use each test file independently when comparing counts. `fails` expects a runtim
 (
 	testlib = (test, only) = std/test
 )
+
 test("other", () { assert(False) })
 only("working", () { assert(True) })
 ```
@@ -114,6 +118,7 @@ Any `only` contribution skips ordinary tests; remove focus before a full run. Th
 (
 	testlib = (test) = std/test
 )
+
 test("wrong sum", () { assert(1 + 1 == 3) })
 ```
 
@@ -131,7 +136,7 @@ i test --opt 2
 ```text
 FAIL guide_tests/failure_test.wrong sum
   assertion failed: assert
-guide_tests/failure_test:4:24
+guide_tests/failure_test:5:24
 0 passed, 1 failed
 ```
 
@@ -146,6 +151,7 @@ Exit status is 1; the position identifies the assertion. Remove this file before
 	std/property
 	std/list
 )
+
 test("reverse twice", () {
 	numbers = property.int(-10, 10)
 	lists = property.list(numbers, 0, 12)
@@ -182,6 +188,7 @@ Generator builders raise an error for invalid bounds. On failure the runner repo
 	Clock(..)
 	remaining
 )
+
 Clock = (now = () -> Int)
 remaining = (deadline) <- (clock : Clock) { deadline - clock.now() }
 ```
@@ -191,6 +198,7 @@ remaining = (deadline) <- (clock : Clock) { deadline - clock.now() }
 	testlib = (test) = std/test
 	guide_tests/deadline
 )
+
 test("fixed clock", () {
 	{ assert(deadline.remaining(42) == 2) } <- (deadline.Clock(now = () { 40 }))
 })

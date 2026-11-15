@@ -565,7 +565,8 @@ impl Printer<'_> {
                 Some(c) if start != 0 && c.span.start < start => c.span.start,
                 _ => start,
             };
-            let blank = !after_run && (self.src.is_none() || self.blank_before(gap));
+            let after_group = i == 0 && (!m.imports.is_empty() || !m.exports.is_empty());
+            let blank = after_group || !after_run && (self.src.is_none() || self.blank_before(gap));
             let lead = if anchored {
                 self.leading(start)
             } else {
@@ -580,7 +581,10 @@ impl Printer<'_> {
         }
         let rest = self.leading(u32::MAX);
         if !rest.is_empty() {
-            sep(&mut out, false);
+            sep(
+                &mut out,
+                m.items.is_empty() && (!m.imports.is_empty() || !m.exports.is_empty()),
+            );
             out.extend(rest);
         }
         cat(out)

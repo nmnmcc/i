@@ -626,7 +626,7 @@ fn an_error_stops_a_test() {
         match ilang_cli::run_test(&program, "i.tool.0") {
             ilang_host::TestResult::Stopped(stop) => assert_eq!(
                 stop.message.as_deref(),
-                Some("error: \"oops\"\napp/app_test:8:1\nexpanded from std/test:11:17")
+                Some("error: \"oops\"\napp/app_test:8:1\nexpanded from std/test:13:17")
             ),
             other => panic!("{other:?}"),
         }

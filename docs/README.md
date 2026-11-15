@@ -11,8 +11,8 @@ npm run dev
 The development server prints its local URL. `npm run build` generates the
 standard and library reference before building the static site in `dist/`.
 `npm run check:links` checks the built local links; `npm run check:examples`
-checks fenced i examples with the repository's parser and snippet registry,
-then executes complete examples against the tree's compiler.
+checks module-header blank lines, then fenced i examples with the repository's
+parser and snippet registry, then executes complete examples against the tree's compiler.
 `npm run check:rendering` verifies the built i blocks' titles and highlighted
 source, including that execution metadata stays out of the displayed code.
 After building, `npm run check:placeholders` runs its negative-fixture tests
@@ -35,6 +35,36 @@ read by the runner without repeating them in the rendered page; their equality
 with the hero is checked by `scripts/run-examples-test`.
 Set `I_SNIPPET_PARSER` to an existing `parse-snippets` driver from the same tree
 to run the parser checks without a Cargo build.
+
+The header spacing check is also available as `npm run check:format`. From
+the repository root, apply its mechanical fix with:
+
+```sh
+I_BIN=target/release/i python3 docs/scripts/format-fences.py --write
+```
+
+It checks authored `docs/content` Markdown and `docs/spec.md` by default;
+optional file/directory arguments select another scope. It uses the same
+fence reader and complete-module metadata as the example runner, including
+supporting `.is` files. It adds or removes only blank lines after the import
+and export groups, before a following comment or attribute, and at the end
+of a header-only module. Other formatting stays as written, including
+deliberately unformatted `i format` inputs. The corresponding formatter-output
+`text` fence is repaired too. Valid bare `i` module fragments are included;
+unparseable fragments and declared parser-error examples stay unchanged as
+they do under `i fmt`. Generated pages and unrelated Scheme fences are ignored.
+
+For `i error` and `i types`, it updates a following transcript's line-leading
+`file.i:line:column` or `file.is:line:column` locations only when the referenced
+nonblank source line is identical after the edit. Columns and messages are
+preserved. Locations in unchanged/external files stay untouched. It refuses
+undeclared syntax errors, malformed or unclosed fences, CRLF files, inline
+header content needing a nonblank-line edit, ambiguous/out-of-range local
+locations, embedded local locations, unqualified positions, and runtime locations
+that would need review. All pages are validated before any write; a refusal
+writes nothing. Build the compiler first or set `I_BIN`; this script never
+builds it. Its failing fixture, exact fixed output and refusal/idempotence
+tests run in `check:format`, which is part of `check:examples`.
 
 Example fences in authored pages use these info strings:
 

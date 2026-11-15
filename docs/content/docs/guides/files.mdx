@@ -19,6 +19,7 @@ std = { path = "../std" }
 	std/path
 	std/bit_array
 )
+
 main = () {
 	file = path.join([".", "guide-note.txt"])
 	fs.write_file(file, <<"hello from a file":utf8>>)
@@ -46,6 +47,7 @@ Create `guide-files/` beside `std/` in the i source folder and run `i run` there
 	i/stdio
 	std/path
 )
+
 main = () {
 	file = path.join([".", "guide-missing.txt"])
 	// Create and remove it so the missing-file case is repeatable.

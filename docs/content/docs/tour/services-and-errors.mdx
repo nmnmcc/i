@@ -9,6 +9,7 @@ Take services from your caller, substitute test implementations, and handle fail
 (
 	(Io) = i/io
 )
+
 main = () <- (io : Io) { io.print("hello") }
 ```
 
@@ -25,6 +26,7 @@ hello
 	Greeting(..)
 	message
 )
+
 Greeting = (read = () -> String)
 message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 ```
@@ -34,6 +36,7 @@ message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 	(Io) = i/io
 	(Greeting, message) = tour/greeting
 )
+
 main = () <- (io : Io) {
 	io.print(message() <- (Greeting(read = () { "reader" })))
 }
@@ -52,6 +55,7 @@ A service is an ordinary labelled value; `<-` gives this call its `Greeting`. Ca
 	Greeting(..)
 	message
 )
+
 Greeting = (read = () -> String)
 message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 ```
@@ -61,6 +65,7 @@ message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 	testlib = (test) = std/test
 	(Greeting, message) = tour/greeting
 )
+
 test("a fake greeting", () {
 	assert({ message() <- (Greeting(read = () { "test" })) } == "hello, test")
 })
@@ -79,6 +84,7 @@ The test runner supplies assertions; the project manifest needs `std` and `[test
 (
 	(Io) = i/io
 )
+
 Greeting = (read = () -> String)
 message = () <- (g : Greeting) -> String { g.read() }
 welcome : () <- (Greeting) -> String = () { message() <> "!" }
@@ -102,6 +108,7 @@ A written `() -> String` would leave `Greeting` unsupplied and be rejected. Need
 	(Io) = i/io
 	std/int
 )
+
 main = () <- (io : Io) {
 	io.print(
 		core.inspect(int.parse("42")),
@@ -127,6 +134,7 @@ Error(Nil)
 	(Io) = i/io
 	std/list
 )
+
 main = () <- (io : Io) {
 	io.print(
 		core.inspect(list.first([7, 8])),
@@ -153,6 +161,7 @@ None
 	i/core
 	(Io) = i/io
 )
+
 main = () <- (io : Io) {
 	io.print(
 		core.inspect(fail.catch(() { 42 })),
@@ -178,6 +187,7 @@ The callback delays work until `fail.catch` has installed `Fail(E)`; error value
 	(Io) = i/io
 	std/result
 )
+
 main = () <- (io : Io) {
 	stored : Result(Int, String) = Error("bad input")
 	answer = fail.catch(() { result.to_error(stored) })
