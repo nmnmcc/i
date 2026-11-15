@@ -229,26 +229,25 @@ def output_matches(expected, actual):
 
 
 def host_commands(binary, opt, project, environment):
-    """Compile each host separately; compare the same program output on all three."""
-    node = shutil.which('node')
-    if not node:
-        raise ValueError('hosts= needs Node.js for the WASI runner and JavaScript SDK')
-    host_driver = project / 'host-run.mjs'
-    host_driver.write_text(
-        'import { readFile } from "node:fs/promises";\n'
-        f'import {{ instantiate }} from {json.dumps((ROOT / "bindings/javascript/ilang.mjs").as_uri())};\n'
-        'const app = await instantiate(await readFile(new URL("./build/javascript.wasm", import.meta.url)),\n'
-        '  { standardServices: true });\nawait app.run();\n')
-    (project / 'wasi-run.mjs').write_text(
-        f'import {{ runWasi }} from {json.dumps((ROOT / "bindings/javascript/wasi-run.mjs").as_uri())};\n'
-        'process.exitCode = await runWasi(process.argv[2], JSON.parse(process.argv[3] ?? "{}"));\n')
-    for host, target in (('wasi', 'wasi'), ('javascript', 'nodejs')):
-        output = 'build/' + host + '.wasm'
-        build = [str(binary), 'build', '--offline', '--opt', str(opt), '--target', target, '--out', output]
-        run = ([node, '--no-warnings', 'wasi-run.mjs', output]
-               + ([json.dumps({'env': environment})] if environment else [])
-               if host == 'wasi' else [node, 'host-run.mjs'])
-        yield host, build, run
+    """Use the displayed CLI commands, with a Node WASI fallback if needed."""
+    flags = ['--offline', '--opt', str(opt)]
+    runtime = environment.get('WASMTIME', os.environ.get('WASMTIME', 'wasmtime'))
+    if shutil.which(runtime, path=environment.get('PATH')):
+        yield 'wasi', None, [str(binary), 'run', '--target', 'wasi', *flags]
+    else:
+        node = shutil.which('node', path=environment.get('PATH'))
+        if not node:
+            raise ValueError('hosts= needs wasmtime or Node.js to execute WASI')
+        (project / 'wasi-run.mjs').write_text(
+            f'import {{ runWasi }} from {json.dumps((ROOT / "bindings/javascript/wasi-run.mjs").as_uri())};\n'
+            'process.exitCode = await runWasi(process.argv[2], JSON.parse(process.argv[3] ?? "{}"));\n')
+        output = 'build/wasi.wasm'
+        build = [str(binary), 'build', '--target', 'wasi', *flags, '--out', output]
+        run = [node, '--no-warnings', 'wasi-run.mjs', output]
+        if environment:
+            run.append(json.dumps({'env': environment}))
+        yield 'wasi', build, run
+    yield 'javascript', None, [str(binary), 'run', '--target', 'nodejs', *flags]
 
 
 def run_example(example, binary, timeout=TIMEOUT):
@@ -316,11 +315,12 @@ def run_example(example, binary, timeout=TIMEOUT):
             if example.hosts:
                 try:
                     for host, build, run in host_commands(binary, opt, project, example.environment):
-                        status, stdout, stderr = invoke(build, project, max(.001, deadline - time.monotonic()), example.environment)
-                        if status != 0:
-                            failures.append(Failure(example.page, example.line, f'{host} build --opt {opt}: exit 0',
-                                                    f'exit {status}, stdout={stdout!r}, stderr={stderr!r}'))
-                            continue
+                        if build is not None:
+                            status, stdout, stderr = invoke(build, project, max(.001, deadline - time.monotonic()), example.environment)
+                            if status != 0:
+                                failures.append(Failure(example.page, example.line, f'{host} build --opt {opt}: exit 0',
+                                                        f'exit {status}, stdout={stdout!r}, stderr={stderr!r}'))
+                                continue
                         status, stdout, stderr = invoke(run, project, max(.001, deadline - time.monotonic()), example.environment)
                         host_output = example.host_outputs.get(host, example.output)
                         if status != 0 or not output_matches(host_output, stdout):

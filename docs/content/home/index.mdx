@@ -207,19 +207,19 @@ main = () { stdio.print("2 min left") }
 ```
 
 <div className="host-run">
-<pre className="host-command">{"i run --offline --opt 0"}</pre>
+<pre className="host-command">{"i run"}</pre>
 ```text title="Native"
 2 min left
 ```
 </div>
 <div className="host-run">
-<pre className="host-command">{"i build --offline --target wasi --opt 0 \\\n  --out build/wasi.wasm 2>/dev/null\nnode --no-warnings wasi-run.mjs build/wasi.wasm"}</pre>
+<pre className="host-command">{"i run --target wasi"}</pre>
 ```text title="WASI"
 2 min left
 ```
 </div>
 <div className="host-run">
-<pre className="host-command">{"i build --offline --target nodejs --opt 0 \\\n  --out build/javascript.wasm 2>/dev/null\nnode host-run.mjs"}</pre>
+<pre className="host-command">{"i run --target nodejs"}</pre>
 ```text title="JavaScript"
 2 min left
 ```

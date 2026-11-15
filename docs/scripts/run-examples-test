@@ -160,8 +160,52 @@ class RunnerTests(unittest.TestCase):
 
     def test_host_runner_never_skips_an_unavailable_host(self):
         with tempfile.TemporaryDirectory() as scratch, patch.object(runner.shutil, 'which', return_value=None):
-            with self.assertRaisesRegex(ValueError, 'needs Node.js'):
+            with self.assertRaisesRegex(ValueError, 'needs wasmtime or Node.js'):
                 list(runner.host_commands(self.binary, 0, Path(scratch), {}))
+
+    def test_host_cli_commands_when_wasmtime_is_available(self):
+        for level in (0, 2):
+            with self.subTest(level=level), tempfile.TemporaryDirectory() as scratch:
+                project = Path(scratch)
+                with patch.dict(os.environ, {'WASMTIME': '/runtime/wasmtime'}), \
+                        patch.object(runner.shutil, 'which', return_value='/runtime/wasmtime') as which:
+                    commands = list(runner.host_commands(self.binary, level, project, {}))
+                which.assert_called_once_with('/runtime/wasmtime', path=None)
+                self.assertEqual(commands, [
+                    ('wasi', None, [str(self.binary), 'run', '--target', 'wasi', '--offline', '--opt', str(level)]),
+                    ('javascript', None, [str(self.binary), 'run', '--target', 'nodejs', '--offline', '--opt', str(level)]),
+                ])
+                self.assertEqual(list(project.iterdir()), [])
+
+    def test_wasi_fallback_keeps_nodejs_on_the_cli(self):
+        for level in (0, 2):
+            with self.subTest(level=level), tempfile.TemporaryDirectory() as scratch:
+                project = Path(scratch)
+                environment = {'WASMTIME': 'missing-wasmtime', 'GREETING': 'hello'}
+                with patch.object(runner.shutil, 'which', side_effect=[None, '/runtime/node']):
+                    wasi, javascript = list(runner.host_commands(self.binary, level, project, environment))
+                self.assertEqual(wasi[:2], ('wasi', [str(self.binary), 'build', '--target', 'wasi',
+                                                   '--offline', '--opt', str(level), '--out', 'build/wasi.wasm']))
+                self.assertEqual(wasi[2][:4], ['/runtime/node', '--no-warnings', 'wasi-run.mjs', 'build/wasi.wasm'])
+                self.assertEqual(runner.json.loads(wasi[2][4]), {'env': environment})
+                self.assertIn('runWasi', (project / 'wasi-run.mjs').read_text())
+                self.assertFalse((project / 'host-run.mjs').exists())
+                self.assertEqual(javascript, ('javascript', None, [str(self.binary), 'run', '--target', 'nodejs',
+                                                                 '--offline', '--opt', str(level)]))
+
+    def test_present_but_failing_wasmtime_does_not_fall_back(self):
+        examples, errors, _ = runner.read_page(FIXTURES / 'passing-host-transcripts.mdx')
+        self.assertFalse(errors)
+        def invoke(command, *args):
+            if '--target' in command and command[command.index('--target') + 1] == 'wasi':
+                return 1, '', 'runtime failed'
+            return 0, 'three hosts\n', ''
+        with patch.object(runner.shutil, 'which', return_value='/runtime/wasmtime'), \
+                patch.object(runner, 'invoke', side_effect=invoke) as invoked:
+            failures = runner.run_example(examples[0], self.binary)
+        self.assertEqual(len(failures), 2)
+        self.assertTrue(all('wasi --opt' in failure.expected for failure in failures))
+        self.assertTrue(all(call.args[0][1] == 'run' for call in invoked.call_args_list))
 
     def test_shared_project_is_local_and_primary_overrides_it(self):
         examples, errors, _ = runner.read_page(FIXTURES / 'passing-project.mdx')
