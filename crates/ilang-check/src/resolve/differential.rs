@@ -52,6 +52,22 @@ fn file_key(graph: &PackageGraph, module: &ilang_check::hir::Module, job: &str) 
         .into_owned()
 }
 
+/// The direct resolver appends a repair hint to an undefined union alternative
+/// (`resolve/three.rs`'s `union_payload_hint`); the frozen legacy resolver
+/// predates repair hints. Compare that diagnostic by its code, span and core
+/// message, and only for this exact suffix: every other message is compared
+/// verbatim. The hint itself stays pinned for the CLI by
+/// `crates/ilang-cli/tests/fixtures/diagnostic_repairs/t6-a2-r3.stderr`.
+fn comparable_message(d: &Diagnostic) -> &str {
+    const HINT: &str = ". A union alias does not define its alternatives.";
+    if d.code == ilang_check::code::UNKNOWN_TYPE
+        && let Some(cut) = d.message.find(HINT)
+    {
+        return &d.message[..cut];
+    }
+    &d.message
+}
+
 /// The texts that must be equal, by file. The key `<program>` holds the
 /// parts of the program that belong to no module.
 fn texts(
@@ -81,7 +97,10 @@ fn texts(
             if d.source == Some(module.source) {
                 text.push_str(&format!(
                     "{:?} {} {:?} {}\n",
-                    d.severity, d.code, d.span, d.message
+                    d.severity,
+                    d.code,
+                    d.span,
+                    comparable_message(d)
                 ));
             }
         }
@@ -93,7 +112,11 @@ fn texts(
         if !d.source.is_some_and(|s| sources.contains(&s)) {
             text.push_str(&format!(
                 "{:?} {} {:?} {:?} {}\n",
-                d.severity, d.code, d.source, d.span, d.message
+                d.severity,
+                d.code,
+                d.source,
+                d.span,
+                comparable_message(d)
             ));
         }
     }
