@@ -66,10 +66,7 @@ fn module_of_i(source: &str) -> ilang_syntax::ast::Module {
 /// Parse a `.is` module, insisting that it parses.
 fn module_of_lisp(source: &str) -> ilang_syntax::ast::Module {
     let (module, errors) = ilang_syntax::lisp::parse_source(source);
-    assert!(
-        errors.is_empty(),
-        "unexpected .is parse errors: {errors:?}"
-    );
+    assert!(errors.is_empty(), "unexpected .is parse errors: {errors:?}");
     module
 }
 
@@ -170,7 +167,8 @@ fn eof_comment_with_newline_is_refused_i_to_is() {
 #[test]
 fn trailing_and_eof_comments_are_refused_is_to_i() {
     let dir = package();
-    let source = "// kept note\n(= f (-> (,) _ 1))  // trailing\n(= g (-> (,) _ 2))\n// last note\n";
+    let source =
+        "// kept note\n(= f (-> (,) _ 1))  // trailing\n(= g (-> (,) _ 2))\n// last note\n";
     write_file(dir.path(), "a.is", source);
 
     let out = i(dir.path(), &["--to", "i", "a.is"]);
@@ -220,7 +218,10 @@ fn comments_and_comment_like_strings_convert_i_to_is() {
         "text with // and /* and */ inside",
         "and //",
     ] {
-        assert!(converted.contains(kept), "missing {kept:?} in:\n{converted}");
+        assert!(
+            converted.contains(kept),
+            "missing {kept:?} in:\n{converted}"
+        );
     }
     assert_parsed_equal(&module_of_i(source), &module_of_lisp(&converted));
 
@@ -256,13 +257,19 @@ fn comments_and_comment_like_strings_convert_is_to_i() {
         "// inner note",
         "text with // and /* and */ inside",
     ] {
-        assert!(converted.contains(kept), "missing {kept:?} in:\n{converted}");
+        assert!(
+            converted.contains(kept),
+            "missing {kept:?} in:\n{converted}"
+        );
     }
     assert_parsed_equal(&module_of_lisp(source), &module_of_i(&converted));
 
     let out = i(dir.path(), &["--to", "is", "a.i"]);
     assert_eq!(out.status.code(), Some(0), "{}", stderr_of(&out));
-    assert_parsed_equal(&module_of_lisp(source), &module_of_lisp(&text(dir.path(), "a.is")));
+    assert_parsed_equal(
+        &module_of_lisp(source),
+        &module_of_lisp(&text(dir.path(), "a.is")),
+    );
 }
 
 #[test]
@@ -598,10 +605,7 @@ fn read_only_destination_directory_write_failure_keeps_source_and_lists_converte
     std::fs::set_permissions(&ro, std::fs::Permissions::from_mode(0o555)).unwrap();
     let _restore = RestorePermissions(ro);
 
-    let out = i(
-        dir.path(),
-        &["--to", "is", "aa/a.i", "ro/b.i", "zz/c.i"],
-    );
+    let out = i(dir.path(), &["--to", "is", "aa/a.i", "ro/b.i", "zz/c.i"]);
     assert_ne!(out.status.code(), Some(0), "{}", stderr_of(&out));
     assert_eq!(out.stdout, b"");
     // The real I/O error, then the three groups: converted, failed, and not
