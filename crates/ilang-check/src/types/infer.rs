@@ -559,7 +559,7 @@ impl<'a> Checker<'a> {
                     code::TOP_LEVEL_EFFECT,
                     binding.span,
                     format!(
-                        "a top-level binding may not need an environment (§2.5), but this one has `{}`",
+                        "a top-level binding may not need an environment, but this one has `{}`",
                         display::show(&self.s, &f.lhs)
                     ),
                 );
@@ -608,7 +608,7 @@ impl<'a> Checker<'a> {
                 self.s
                     .constrain(&Ty::named(self.b.assert, Vec::new()), &pending.env);
                 if let Some(f) = std::mem::take(&mut self.s.failures).into_iter().next() {
-                    self.error(code::TYPE_MISMATCH, pending.span, format!("this pattern may fail, so it needs `Assert` (§7.3), but `Assert` is not allowed here: `Assert` is not a subtype of `{}`",display::show(&self.s,&f.rhs)));
+                    self.error(code::TYPE_MISMATCH, pending.span, format!("this pattern may fail, so it needs `Assert`, but `Assert` is not allowed here: `Assert` is not a subtype of `{}`",display::show(&self.s,&f.rhs)));
                 }
             }
         }
@@ -865,12 +865,12 @@ impl<'a> Checker<'a> {
                 for d in trial.diags[before..].iter_mut().filter(|d| d.is_error()) {
                     d.message = if result_only {
                         format!(
-                            "a result-only signature variable has no lower evidence, so the output cannot choose its type (§15.7.5): {}",
+                            "a result-only signature variable has no lower evidence, so the output cannot choose its type: {}",
                             d.message
                         )
                     } else {
                         format!(
-                            "the output does not have the declared result type; a call's type cannot depend on its expansion (§15.7.5): {}",
+                            "the output does not have the declared result type; a call's type cannot depend on its expansion: {}",
                             d.message
                         )
                     };
@@ -1008,7 +1008,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::ENTRY_TYPE,
                 span,
-                format!("entry `{name}` must be a function value (§10.2)"),
+                format!("entry `{name}` must be a function value"),
             );
             return false;
         };
@@ -1016,7 +1016,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::ENTRY_PARAMS,
                 span,
-                format!("entry `{name}` has no parameters but environment parameters (§10.2)"),
+                format!("entry `{name}` has no parameters but environment parameters"),
             );
             return false;
         }
@@ -1048,7 +1048,9 @@ impl<'a> Checker<'a> {
                 self.error(
                     code::ENTRY_TYPE,
                     span,
-                    format!("`{name}` is a host export, so it is a function (§10.2), but its type is `{t}`"),
+                    format!(
+                        "`{name}` is a host export, so it is a function, but its type is `{t}`"
+                    ),
                 );
             }
             return;
@@ -1108,7 +1110,7 @@ impl<'a> Checker<'a> {
                     code::ENTRY_TYPE,
                     span,
                     format!(
-                        "`{name}` is a host export, so {what} must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors (§10.3), but it is `{t}`{suffix}"
+                        "`{name}` is a host export, so {what} must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors, but it is `{t}`{suffix}"
                     ),
                 );
             }
@@ -1158,7 +1160,7 @@ impl<'a> Checker<'a> {
                 code::ENTRY_TYPE,
                 span,
                 format!(
-                    "`{name}` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray` (§10.3), but they are `{e}`"
+                    "`{name}` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, but they are `{e}`"
                 ),
             );
         }
@@ -1262,7 +1264,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::EXPORT_HIDDEN_TYPE,
                 d.span,
-                format!("`{}` is exported, but its inferred type uses the type `{name}`{location}, which is not exported (§2.4)", d.name),
+                format!("`{}` is exported, but its inferred type uses the type `{name}`{location}, which is not exported", d.name),
             );
         }
     }
@@ -1341,7 +1343,7 @@ impl<'a> Checker<'a> {
                     self.error(
                         code::TYPE_PLACE,
                         t.span,
-                        "a union with two or more type variables as members may only be in an output place (§4.4): inference could not choose the variable for a value that comes here",
+                        "a union with two or more type variables as members may only be in an output place: inference could not choose the variable for a value that comes here",
                     );
                 }
                 for a in ts {
@@ -1357,7 +1359,7 @@ impl<'a> Checker<'a> {
                     self.error(
                         code::TYPE_PLACE,
                         t.span,
-                        "an intersection with a type variable may only be in an input place (§4.4): inference could not give a value that is in both",
+                        "an intersection with a type variable may only be in an input place: inference could not give a value that is in both",
                     );
                 }
                 for a in ts {
@@ -1425,7 +1427,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::TYPE_OCCURS,
                 span,
-                "this type has itself inside it, through a type variable (§4.7)",
+                "this type has itself inside it, through a type variable",
             );
         }
         let failures = self.s.failures.len();
@@ -1445,7 +1447,7 @@ impl<'a> Checker<'a> {
                 self.error(
                     code::TYPE_OCCURS,
                     span,
-                    "this type has itself inside it, through a type variable (§4.7)",
+                    "this type has itself inside it, through a type variable",
                 );
             }
         }
@@ -1573,24 +1575,24 @@ impl<'a> Checker<'a> {
             FailKind::Invariant => (
                 code::TYPE_INVARIANT,
                 format!(
-                    "`{l}` and `{r}` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together (§4.4)"
+                    "`{l}` and `{r}` must be equal: they are arguments of two forms of one type constructor whose parameter does not change, which are put together"
                 ),
             ),
             FailKind::NeedMeet => (
                 code::ENV_FORMS,
                 format!(
-                    "the service requirements `{l}` and `{r}` have an empty intersection and cannot be satisfied (§4.4, §9.2)"
+                    "the service requirements `{l}` and `{r}` have an empty intersection and cannot be satisfied"
                 ),
             ),
             FailKind::EnvForms => (
                 code::ENV_FORMS,
                 format!(
-                    "`{l}` and `{r}` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)"
+                    "`{l}` and `{r}` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal"
                 ),
             ),
             FailKind::Ambiguous => (
                 code::TYPE_AMBIGUOUS,
-                format!("a value of `{l}` could go to more than one type variable of `{r}` (§4.4)"),
+                format!("a value of `{l}` could go to more than one type variable of `{r}`"),
             ),
         };
         if let Some(o) = other {
@@ -1800,7 +1802,7 @@ impl<'a> Checker<'a> {
                         self.error(
                             code::TYPE_DIFF_VAR,
                             part.span,
-                            "the right side of `-` may only have members with a type constructor (§4.4)",
+                            "the right side of `-` may only have members with a type constructor",
                         );
                         continue;
                     }
@@ -1952,7 +1954,7 @@ impl<'a> Checker<'a> {
         let row_allowed = std::mem::take(&mut self.row_value_allowed);
         let result = self.infer_k_inner(e, expected);
         if self.s.mode(&result.0) == Mode::Env && !row_allowed {
-            self.error(code::ENV_TYPE, e.span, "an environment row may only be bound, captured or provided after `<-`; it is not ordinary data (§9.4)");
+            self.error(code::ENV_TYPE, e.span, "an environment row may only be bound, captured or provided after `<-`; it is not ordinary data");
         }
         self.row_value_allowed = row_allowed;
         // A name with a selection table, where a function type is expected.
@@ -2075,7 +2077,7 @@ impl<'a> Checker<'a> {
                                     code::NEEDS_KNOWN_TYPE,
                                     b.span,
                                     format!(
-                                        "a spread `..e` needs a known type for `e` with exactly one member, which is data (§2.3), but it has `{k}`"
+                                        "a spread `..e` needs a known type for `e` with exactly one member, which is data, but it has `{k}`"
                                     ),
                                 );
                                 return (self.s.fresh(), Knowledge::unknown());
@@ -2289,15 +2291,15 @@ impl<'a> Checker<'a> {
             };
             let message = if single(&lk.fact) && single(&rk.fact) {
                 format!(
-                    "both sides are constants, `{l}` and `{r}`, which can never be equal, so `{operator}` is always `{result}` (§6.9)"
+                    "both sides are constants, `{l}` and `{r}`, which can never be equal, so `{operator}` is always `{result}`"
                 )
             } else if finite(&lk.fact) && finite(&rk.fact) {
                 format!(
-                    "the values `{l}` and `{r}` can never be equal, so `{operator}` is always `{result}` (§6.9)"
+                    "the values `{l}` and `{r}` can never be equal, so `{operator}` is always `{result}`"
                 )
             } else {
                 format!(
-                    "the two sides have the known types `{l}` and `{r}`, which can never be equal, so `{operator}` is always `{result}` (§6.9)"
+                    "the two sides have the known types `{l}` and `{r}`, which can never be equal, so `{operator}` is always `{result}`"
                 )
             };
             self.warning(code::EQ_DISJOINT, span, message);
@@ -2342,7 +2344,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::CALL_LABELS,
                 a.span,
-                "an argument by label may only be given to a constructor; give the arguments of a function by position (§6.6)",
+                "an argument by label may only be given to a constructor; give the arguments of a function by position",
             );
         }
         let to: Option<Vec<usize>> = if args.iter().any(|a| a.label.is_some()) {
@@ -2352,7 +2354,7 @@ impl<'a> Checker<'a> {
                     self.error(
                         code::NEEDS_KNOWN_TYPE,
                         callee.span,
-                        "a call with an argument by label needs a known function type for the function (§6.6, §4.8); write the type of the function, or give the arguments by position",
+                        "a call with an argument by label needs a known function type for the function; write the type of the function, or give the arguments by position",
                     );
                     None
                 }
@@ -2401,6 +2403,7 @@ impl<'a> Checker<'a> {
         let hidden = kfn
             .as_ref()
             .map_or_else(Vec::new, |k| self.hidden_inputs(k));
+        let argument_diagnostics = self.diags.len();
         for later in [false, true] {
             for (i, a) in values.iter().enumerate() {
                 if (params.is_some() && (known::open_fn(a) || self.selects(a))) != later {
@@ -2477,19 +2480,63 @@ impl<'a> Checker<'a> {
         // Syntax three §2.6.2: a direct call of a name with a selection
         // table has the type of the branches that the known types of the
         // arguments select.
-        let f = if args.iter().all(|a| a.label.is_none()) {
+        let selection = if args.iter().all(|a| a.label.is_none()) {
             let ks: Vec<Ty> = typed.iter().map(|x| x.1.fact.clone()).collect();
-            self.select_at_call(callee, &ks, span).unwrap_or(f)
+            self.select_at_call(callee, &ks, span)
         } else {
-            f
+            Ok(None)
         };
+        let (f, no_branch) = match selection {
+            Ok(selected) => (selected.unwrap_or(f), None),
+            Err(message) => (f, Some(message)),
+        };
+        let mut argument_mismatch = false;
         let typed_argument_types =
             typed_definition.map(|_| placed.iter().map(|(t, _)| t.clone()).collect());
         let t = match &f {
             Ty::Fn(ft) if !groups::is_multi(ft) && ft.arity() == Some(placed.len()) => {
                 let parts = ft.parts().expect("data parameter").to_vec();
-                for ((t, s), p) in placed.iter().zip(&parts) {
+                for (i, ((t, s), p)) in placed.iter().zip(&parts).enumerate() {
                     self.sub2(t, p, *s, callee.span);
+                    if no_branch.is_some()
+                        && self.diags[argument_diagnostics..].iter().any(|diagnostic| {
+                            diagnostic.code == code::TYPE_MISMATCH && diagnostic.span == *s
+                        })
+                    {
+                        let given = display::show(&self.s, t);
+                        let accepted = display::show(&self.s, p);
+                        let grouping_hint = (t.head()
+                            == Some(Head::Shape(super::ShapeId::positional(1)))
+                            && scalar_requirement(p))
+                        .then(|| self.parenthesized_data_hint(*s))
+                        .flatten();
+                        let text = &self.sources.get(self.p.module(self.module).source).text;
+                        let name = text
+                            .get(callee.span.start as usize..callee.span.end as usize)
+                            .filter(|name| !name.is_empty())
+                            .unwrap_or("this function");
+                        for diagnostic in &mut self.diags[argument_diagnostics..] {
+                            if diagnostic.code == code::TYPE_MISMATCH && diagnostic.span == *s {
+                                argument_mismatch = true;
+                                // Keep the solver's constraint and argument
+                                // location; only replace its explanation.
+                                diagnostic.message = if t.values().is_finite() {
+                                    format!(
+                                        "`{given}` is not one of the values `{name}` accepts for argument {}: `{accepted}`",
+                                        i + 1
+                                    )
+                                } else {
+                                    format!(
+                                        "`{name}` does not accept argument {} with type `{given}`; this argument must be `{accepted}`",
+                                        i + 1
+                                    )
+                                };
+                                if let Some(hint) = &grouping_hint {
+                                    diagnostic.message.push_str(hint);
+                                }
+                            }
+                        }
+                    }
                 }
                 self.add_env(ft.env.clone());
                 ft.ret.clone()
@@ -2516,6 +2563,11 @@ impl<'a> Checker<'a> {
                 r
             }
         };
+        if let Some(message) = no_branch
+            && !argument_mismatch
+        {
+            self.error(code::NO_BRANCH_SELECTED, span, message);
+        }
         if let Some(definition) = typed_definition {
             let mut input_spans = HashSet::new();
             for value in &values {
@@ -2790,7 +2842,7 @@ impl<'a> Checker<'a> {
                 code::CALL_LABELS,
                 span,
                 format!(
-                    "every parameter must get one argument (§6.6), but {} get{} none",
+                    "every parameter must get one argument, but {} get{} none",
                     missing.join(", "),
                     if missing.len() == 1 { "s" } else { "" }
                 ),
@@ -2898,7 +2950,7 @@ impl<'a> Checker<'a> {
                     code::NEEDS_KNOWN_TYPE,
                     name.span,
                     format!(
-                        "`.{}` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u : User) {{ u.name }}`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) {{ u.name }}`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)",
+                        "`.{}` needs a known type for its value; write the parameter's type, for example `(u : User) {{ u.name }}`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) {{ u.name }}`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving",
                         name.name
                     ),
                 );
@@ -2923,7 +2975,7 @@ impl<'a> Checker<'a> {
                         code::NO_FIELD,
                         name.span,
                         format!(
-                            "`.{}` needs every member of the known type `{k}` of its value to be a custom type (§6.7), but `{m}` is not one",
+                            "`.{}` needs every member of the known type `{k}` of its value to be a custom type, but `{m}` is not one",
                             name.name
                         ),
                     );
@@ -2957,7 +3009,7 @@ impl<'a> Checker<'a> {
                 code::NOT_EXPORTED,
                 name.span,
                 format!(
-                    "cannot select field `{}`: the constructors of `{}` are not exported from `{}` (§2.4, §6.7)",
+                    "cannot select field `{}`: the constructors of `{}` are not exported from `{}`",
                     name.name,
                     ty.name,
                     self.p.module(ty.module).path
@@ -2980,13 +3032,13 @@ impl<'a> Checker<'a> {
                 None => {
                     let message = if known_ctor.is_some() {
                         format!(
-                            "the constructor `{}`, which made this value (§7.5), has no field with the label `{}` (§4.8 rule 13)",
+                            "the constructor `{}`, which made this value, has no field with the label `{}`",
                             self.ctor_name(*c),
                             name.name
                         )
                     } else {
                         format!(
-                            "not every constructor of `{}` has a field with the label `{}` (§4.8 rule 13)",
+                            "not every constructor of `{}` has a field with the label `{}`",
                             self.p.ty(c.ty).name,
                             name.name
                         )
@@ -3064,7 +3116,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::NEEDS_KNOWN_TYPE,
                 index_span,
-                "`.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`",
+                "`.k` needs a known type for its value; write its type, such as `x: (A, B)`",
             );
             return (self.s.fresh(), Knowledge::unknown());
         }
@@ -3107,7 +3159,7 @@ impl<'a> Checker<'a> {
                         code::NO_FIELD,
                         key_span,
                         format!(
-                            "`.{key_text}` needs every member of the known type `{whole}` of its value to be data (§4.8 rule 13), but `{m}` is not"
+                            "`.{key_text}` needs every member of the known type `{whole}` of its value to be data, but `{m}` is not"
                         ),
                     );
                     return (self.s.fresh(), Knowledge::unknown());
@@ -3118,7 +3170,7 @@ impl<'a> Checker<'a> {
                 self.error(
                     code::NO_FIELD,
                     key_span,
-                    format!("the data `{m}` has no part `{key_text}` (§2.3)"),
+                    format!("the data `{m}` has no part `{key_text}`"),
                 );
                 return (self.s.fresh(), Knowledge::unknown());
             };
@@ -3145,7 +3197,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::NEEDS_KNOWN_TYPE,
                 key_span,
-                format!("`.{key_text}` needs a known type for its value (§4.8 rule 13)"),
+                format!("`.{key_text}` needs a known type for its value"),
             );
             return (self.s.fresh(), Knowledge::unknown());
         };
@@ -3175,7 +3227,7 @@ impl<'a> Checker<'a> {
                 code::NOT_KNOWN_CTOR,
                 ctor_span,
                 format!(
-                    "`{cname}(..v, …)` needs `v` to be known to be made by `{cname}` (§6.7): its type has other constructors, so `v` must be a name matched with `{cname}(…)` (§7.5)"
+                    "`{cname}(..v, …)` needs `v` to be known to be made by `{cname}`: its type has other constructors, so `v` must be a name matched with `{cname}(…)`"
                 ),
             );
         }
@@ -3263,7 +3315,7 @@ impl<'a> Checker<'a> {
             self.error(
                 code::BAD_FORMAT,
                 f.name.span,
-                format!("there is no bit array format `{name}` (§8.2)"),
+                format!("there is no bit array format `{name}`"),
             );
             return self.s.fresh();
         };
@@ -3277,12 +3329,12 @@ impl<'a> Checker<'a> {
             (Some(true), None) => self.error(
                 code::BAD_FORMAT,
                 f.name.span,
-                format!("the format `{name}` needs a length: `{name}(n)` (§8.2)"),
+                format!("the format `{name}` needs a length: `{name}(n)`"),
             ),
             (Some(false), Some(_)) => self.error(
                 code::BAD_FORMAT,
                 f.name.span,
-                format!("the format `{name}` has no length (§8.2)"),
+                format!("the format `{name}` has no length"),
             ),
             _ => {}
         }
@@ -3334,7 +3386,7 @@ impl<'a> Checker<'a> {
                             _ => Vec::new(),
                         };
                         let rest = self.s.env_without_row(&env, &v, &outside).unwrap_or_else(|()| {
-                            self.error(code::ENV_TYPE, value.span, "an opaque callback need must use the captured row parameter when other keys are excluded; write that row and its explicit service keys (§9.4)");
+                            self.error(code::ENV_TYPE, value.span, "an opaque callback need must use the captured row parameter when other keys are excluded; write that row and its explicit service keys");
                             env.clone()
                         });
                         let mut keys = self.s.env_keys(&rest);
@@ -3360,7 +3412,7 @@ impl<'a> Checker<'a> {
                                     self.error(
                                         code::ENV_TYPE,
                                         value.span,
-                                        "provided data has two parts with one service key (§9.2)",
+                                        "provided data has two parts with one service key",
                                     );
                                 }
                                 keys.push(r);
@@ -3368,7 +3420,7 @@ impl<'a> Checker<'a> {
                                 self.error(
                                     code::ENV_TYPE,
                                     value.span,
-                                    "each provided part must have one known service type (§9.2)",
+                                    "each provided part must have one known service type",
                                 );
                             }
                         }
@@ -3377,7 +3429,11 @@ impl<'a> Checker<'a> {
                             .insert((self.module, *span), super::EnvSupply::Data(keys));
                         self.s.env_diff(env, parts.clone())
                     } else {
-                        self.error(code::ENV_TYPE, value.span, "a whole provide needs positional data or a captured environment row (§9.2)");
+                        self.error(
+                            code::ENV_TYPE,
+                            value.span,
+                            "a whole provide needs positional data or a captured environment row",
+                        );
                         env
                     };
                     self.flush(*span, None);
@@ -3403,7 +3459,7 @@ impl<'a> Checker<'a> {
                         self.error(
                             code::ENV_TYPE,
                             value.span,
-                            "a provided service is keyed by its type, and the type of this value is not known to be one service type: give it a written type (syntax-3 §2.10.2)",
+                            "a provided service is keyed by its type, and the type of this value is not known to be one service type: give it a written type",
                         );
                         return self.block(&stmts[i + 1..], *span, expected);
                     };
@@ -3564,7 +3620,11 @@ impl<'a> Checker<'a> {
                 (true, true) => true,
             };
             if duplicate {
-                self.error(code::ENV_TYPE, span, "two explicit services or two spreads in provided data have one service key (§9.2)");
+                self.error(
+                    code::ENV_TYPE,
+                    span,
+                    "two explicit services or two spreads in provided data have one service key",
+                );
                 break;
             }
         }
@@ -3921,7 +3981,7 @@ impl<'a> Checker<'a> {
             self.warning(
                 code::PATTERN_DISJOINT,
                 span,
-                "this pattern never matches: no value of the known type of what it is fitted to matches it (§4.8)",
+                "this pattern never matches: no value of the known type of what it is fitted to matches it",
             );
         }
     }
@@ -3943,7 +4003,7 @@ impl<'a> Checker<'a> {
         };
         for service in self.s.hidden_handlers(&simple, level) {
             self.error(code::ENV_FORMS, span, format!(
-                "the type hides the environment statement's obligation for `{}`: every instance must use the same service form (§4.8 rule 9, §9.2)",
+                "the type hides the environment statement's obligation for `{}`: every instance must use the same service form",
                 display::show(&self.s, &service)));
         }
         if has_both(&simple) || self.s.has_obligations(t) {

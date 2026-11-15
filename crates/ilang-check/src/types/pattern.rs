@@ -165,9 +165,7 @@ impl Checker<'_> {
             self.warning(
                 code::PATTERN_DISJOINT,
                 q.span,
-                format!(
-                    "this pattern never matches: no value of this type is made by `{name}` (§4.8)"
-                ),
+                format!("this pattern never matches: no value of this type is made by `{name}`"),
             );
         }
     }
@@ -422,14 +420,14 @@ impl Checker<'_> {
                 self.error(
                     code::BIT_PATTERN,
                     seg.value.span,
-                    format!("the format `{name}` in a pattern needs a string literal, which gives the bits to match (§8.4)"),
+                    format!("the format `{name}` in a pattern needs a string literal, which gives the bits to match"),
                 );
             }
             if matches!(name, "bits" | "bytes") && f.arg.is_none() && i + 1 < segs.len() {
                 self.error(
                     code::BIT_PATTERN,
                     f.name.span,
-                    format!("`{name}` with no length takes all the bits that are left, so it may only be the last segment (§8.4)"),
+                    format!("`{name}` with no length takes all the bits that are left, so it may only be the last segment"),
                 );
             }
         }
@@ -460,7 +458,7 @@ impl Checker<'_> {
                             self.error(
                                 code::PATTERN_FIELDS,
                                 a.span,
-                                format!("the constructor has no field with the label `{l}` (§7.1)"),
+                                format!("the constructor has no field with the label `{l}`"),
                             );
                             None
                         }
@@ -469,7 +467,7 @@ impl Checker<'_> {
                         self.error(
                             code::PATTERN_FIELDS,
                             a.span,
-                            "this part is matched by label, so it needs a name at its top that is the label of a field (§7.1)",
+                            "this part is matched by label, so it needs a name at its top that is the label of a field",
                         );
                         None
                     }
@@ -499,7 +497,7 @@ impl Checker<'_> {
                     self.error(
                         code::PATTERN_FIELDS,
                         a.span,
-                        "this field is matched more than once (§7.1)",
+                        "this field is matched more than once",
                     );
                 } else {
                     out.push((a, i));
@@ -512,7 +510,7 @@ impl Checker<'_> {
                 code::PATTERN_FIELDS,
                 span,
                 format!(
-                    "the constructor has {} field{}, and every one must be matched, or `..` must leave the rest out (§7.1)",
+                    "the constructor has {} field{}, and every one must be matched, or `..` must leave the rest out",
                     fields.len(),
                     if fields.len() == 1 { "" } else { "s" }
                 ),
@@ -888,7 +886,7 @@ impl Checker<'_> {
                     .is_some(),
             };
             if !useful {
-                let mut message = "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)".to_string();
+                let mut message = "this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard".to_string();
                 if let Ok(t) =
                     super::display::shown(&self.s, &c.subject, super::display::Opts::default())
                 {
@@ -922,7 +920,7 @@ impl Checker<'_> {
         if let Some(w) = missing {
             let text = self.show_pat(&w[0]);
             let mut message = format!(
-                "the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `{text}`"
+                "the clauses do not cover every value of the subject: no clause without a guard matches `{text}`"
             );
             if let Some(hint) = self.shared_hint(&w[0], &rows) {
                 message.push_str("; ");
@@ -1070,7 +1068,7 @@ impl Checker<'_> {
                     self.error(
                         code::CASE_TYPE_VAR,
                         ty.span,
-                        "in a test, `x: T` tests the type constructor, so `T` may not have a type variable as a member (§7.1)",
+                        "in a test, `x: T` tests the type constructor, so `T` may not have a type variable as a member",
                     );
                     Pat::Wild(None)
                 } else {

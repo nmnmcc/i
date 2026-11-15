@@ -2132,13 +2132,13 @@
   "crates/ilang-check/tests/diagnostic_traps.rs:4e85fa57c5a5a045": {
     "reason": "Intentional §1.7 regression: a spaced lowercase call followed by a stray = remains E0101 and gains the one-binding explanation.",
     "diagnostics": [
-      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line (§1.7)"
+      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line"
     ]
   },
   "tests/spec/1.7/one_binding_function_error.i:b00b44846a80cdbf": {
     "reason": "Intentional §1.7 regression: a spaced lowercase call followed by a stray = remains E0101 and gains the one-binding explanation.",
     "diagnostics": [
-      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line (§1.7)"
+      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line"
     ]
   },
   "crates/ilang-check/tests/diagnostic_traps.rs:24dcfaf171c4adcd": {
@@ -2721,7 +2721,7 @@
   },
   "docs/design/principality.md:52714feb4c9a2b57": {
     "diagnostics": [
-      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+      "E0101: a function type with type parameters must be the type of a binding"
     ],
     "reason": "A probe of the principality note: a written polymorphic parameter type is not supported yet, and the note records the diagnostic."
   },
@@ -2729,13 +2729,13 @@
     "track": "SYN3",
     "reason": "Mixed positional/labelled data still awaits stage 6; E6 environment capture and provide forms have landed.",
     "diagnostics": [
-      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)"
+      "E0101: data with labels has only labelled items after an optional first `..base`; mixed positional and labelled items are not supported here"
     ]
   },
   "editors/vscode/test/sample.i:35e4233e887c3d88": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
+      "E0101: a function type with type parameters must be the type of a binding",
       "E0003: unknown escape",
       "E0106: a discard binds nothing, so it may not be used as a value",
       "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
@@ -2843,7 +2843,7 @@
   },
   "crates/ilang-check/src/resolve/differential.rs:c7d1290a9ba8bc14": {
     "diagnostics": [
-      "E0101: a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name"
+      "E0101: a pattern inside a labelled field is not supported here; bind the field to a name and match the name"
     ],
     "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
   },
@@ -2857,7 +2857,7 @@
   "crates/ilang-check/src/resolve/differential.rs:eb5cba8498c94b57": {
     "diagnostics": [
       "E0110: an item by position may not come after an item by label",
-      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
+      "E0101: data with labels has only labelled items after an optional first `..base`; mixed positional and labelled items are not supported here",
       "E0101: `..` is the first item of a constructor call"
     ],
     "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
@@ -2865,15 +2865,15 @@
   "crates/ilang-check/src/resolve/differential.rs:ff4a2bc9c99582dc": {
     "diagnostics": [
       "E0101: provided services have no labels: each is keyed by its own type",
-      "E0101: a provided service has no label: it is keyed by its type (§2.10.2)"
+      "E0101: a provided service has no label: it is keyed by its type"
     ],
     "reason": "Provided labels remain invalid (§2.10.2); E6 whole-environment capture, spread and provide forms now parse."
   },
   "crates/ilang-check/src/resolve/differential.rs:c67eeff3531f0976": {
     "diagnostics": [
-      "E0101: type parameters on a function literal that is not the value of a binding need stage 7 of syntax three, which this compiler does not have yet",
+      "E0101: a function literal with type parameters must be the value of a binding",
       "E0110: an item by position may not come after an item by label",
-      "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)",
+      "E0101: a data type with labels has only labelled items; mixed positional and labelled items are not supported here",
       "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`",
       "E0101: a need has no label: a service is keyed by its own type"
     ],
@@ -2881,12 +2881,12 @@
   },
   "crates/ilang-check/src/resolve/differential.rs:5c74a67df3474805": {
     "diagnostics": [
-      "E0101: a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
-      "E0101: a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0101: a rest `..` in a data pattern is not supported here",
+      "E0101: a key in a data pattern is not supported here",
       "E0110: an item by position may not come after an item by label",
-      "E0101: a named rest `..name` in a pattern needs stage 6 of syntax three, which this compiler does not have yet",
-      "E0101: a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name",
-      "E0101: two patterns joined by `=` that are not names need stage 9 of syntax three, which this compiler does not have yet"
+      "E0101: a named rest `..name` in a pattern is not supported here",
+      "E0101: a pattern inside a labelled field is not supported here; bind the field to a name and match the name",
+      "E0101: two patterns joined by `=` must both be names here"
     ],
     "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
   },
@@ -2942,7 +2942,7 @@
   "crates/ilang-syntax/src/lisp/expansion3.rs:a46e80fc91b8e9e9": {
     "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
     "diagnostics": [
-      "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)"
+      "E0101: a data type with labels has only labelled items; mixed positional and labelled items are not supported here"
     ]
   },
   "crates/ilang-check/tests/generic_services.rs:f1ca0fc31fd5ee01": {

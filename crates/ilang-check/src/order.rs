@@ -131,7 +131,7 @@ pub fn order(program: &mut Program, diags: &mut Vec<Diagnostic>) {
                     Some(module.source),
                     b.binding.pattern.span,
                     format!(
-                        "the value of {name} is needed to work out itself (§2.5); only names inside the function bodies of a direct value may refer back"
+                        "the value of {name} is needed to work out itself; only names inside the function bodies of a direct value may refer back"
                     ),
                 ));
             }

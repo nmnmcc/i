@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.one : () <- (S(Int)) -> Int\napp/main.two : () <- (S(String)) -> String\napp/main.join : (() <- N -> Int, () <- N2 -> String) <- (..N, ..N2) -> (Int, String)\napp/main.bad : () <- (S(Never)) -> (Int, String)\n",
-      "stderr": "src/main.i:5:22: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 5:12 needs it)\n1 error\n"
+      "stderr": "src/main.i:5:22: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (the type at 5:12 needs it)\n1 error\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:5:22: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 5:12 needs it)\n1 error\n"
+      "stderr": "src/main.i:5:22: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (the type at 5:12 needs it)\n1 error\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:5:22: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 5:12 needs it)\n1 error\n"
+      "stderr": "src/main.i:5:22: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (the type at 5:12 needs it)\n1 error\n"
     }
   }
 }

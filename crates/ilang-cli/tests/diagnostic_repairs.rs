@@ -6,6 +6,10 @@ use std::path::Path;
 use std::process::Command;
 
 fn check(files: &[(&str, &str)]) -> String {
+    check_status(files, 1)
+}
+
+fn check_status(files: &[(&str, &str)], status: i32) -> String {
     let dir = tempfile::tempdir().unwrap();
     let std = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../std")
@@ -29,7 +33,7 @@ fn check(files: &[(&str, &str)]) -> String {
         .arg(dir.path())
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(status));
     String::from_utf8(output.stderr).unwrap()
 }
 
@@ -66,7 +70,9 @@ fn original_model_programs_get_actionable_repairs() {
         // T6/i/attempt-2/execution-00/round-3/project/src/main.i
         archived!("t6-a2-r3"),
     ] {
-        assert_eq!(check(&[("src/main.i", source)]), expected, "{name}");
+        let diagnostics = check(&[("src/main.i", source)]);
+        assert_eq!(diagnostics, expected, "{name}");
+        assert!(!diagnostics.contains('§'), "{name}: {diagnostics}");
     }
 }
 
@@ -132,4 +138,103 @@ fn one_item_data_repair_also_explains_numeric_scalars() {
         !diagnostics.contains("Parentheses construct"),
         "{diagnostics}"
     );
+}
+
+#[test]
+fn a_literal_outside_all_branches_gets_one_argument_error() {
+    // Supervisor's original app.word(2) example. No matching archive program
+    // exists; unlike the archived fixtures, this is a new regression input.
+    let diagnostics = check(&[
+        (
+            "src/main.i",
+            "(app = app/words)\nbad = app.word(2)\n_ = bad\n",
+        ),
+        (
+            "src/words.i",
+            "(word)\nword = (0) { \"zero\" } | (1) { \"one\" }\n",
+        ),
+    ]);
+    assert_eq!(
+        diagnostics,
+        "src/main.i:2:16: error[E0501]: `2` is not one of the values `app.word` accepts for argument 1: `0 | 1`\n1 error\n"
+    );
+    // Strings and a later argument use the same rule, including piped calls.
+    for source in [
+        "word = (\"zero\") { 0 } | (\"one\") { 1 }\nbad = word(\"two\")\n_ = bad\n",
+        "word = (x : Int, 0) { x } | (x : Int, 1) { x }\nbad = word(3, 2)\n_ = bad\n",
+        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = 2 |> word()\n_ = bad\n",
+    ] {
+        let diagnostics = check(&[("src/main.i", source)]);
+        assert_eq!(diagnostics.matches("error[").count(), 1, "{diagnostics}");
+        assert!(diagnostics.contains("error[E0501]"), "{diagnostics}");
+        assert!(
+            diagnostics.contains("accepts for argument"),
+            "{diagnostics}"
+        );
+    }
+    let diagnostics = check_status(
+        &[(
+            "src/main.i",
+            "word = (0) { \"zero\" } | (1) { \"one\" }\ngood = word(0)\n_ = good\n",
+        )],
+        0,
+    );
+    assert!(diagnostics.is_empty(), "{diagnostics}");
+}
+
+#[test]
+fn an_unmatched_combination_still_reports_branch_selection() {
+    let diagnostics = check(&[(
+        "src/main.i",
+        "word = (0, 0) { \"zero\" } | (1, 1) { \"one\" }\nbad = word(0, 1)\n_ = bad\n",
+    )]);
+    // The definition independently fails coverage: keep that E0516 too.
+    assert_eq!(
+        diagnostics.matches("error[E0552]").count(),
+        1,
+        "{diagnostics}"
+    );
+    assert_eq!(
+        diagnostics.matches("error[E0516]").count(),
+        1,
+        "{diagnostics}"
+    );
+    assert!(!diagnostics.contains("error[E0501]"), "{diagnostics}");
+    assert!(
+        diagnostics.contains("known types are `(0, 1)`"),
+        "{diagnostics}"
+    );
+    assert!(!diagnostics.contains('§'), "{diagnostics}");
+}
+
+#[test]
+fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
+    let diagnostics = check(&[(
+        "src/main.i",
+        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = word(True)\n_ = bad\n",
+    )]);
+    assert_eq!(
+        diagnostics,
+        "src/main.i:2:12: error[E0501]: `word` does not accept argument 1 with type `True`; this argument must be `0 | 1`\n1 error\n"
+    );
+    let diagnostics = check(&[(
+        "src/main.i",
+        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = word((2))\n_ = bad\n",
+    )]);
+    assert_eq!(
+        diagnostics,
+        "src/main.i:2:12: error[E0501]: `word` does not accept argument 1 with type `(2)`; this argument must be `0 | 1`. Parentheses construct one-item data. Use braces `{ }` to group an expression: `{ 2 }`.\n1 error\n"
+    );
+    let diagnostics = check(&[(
+        "src/main.i",
+        "word = (0, 0 | 1) { \"zero\" } | (1, 0 | 1) { \"one\" }\nbad = word(2, 3)\n_ = bad\n",
+    )]);
+    assert_eq!(
+        diagnostics.matches("error[E0501]").count(),
+        2,
+        "{diagnostics}"
+    );
+    assert!(!diagnostics.contains("error[E0552]"), "{diagnostics}");
+    assert!(diagnostics.contains("argument 1: `0 | 1`"), "{diagnostics}");
+    assert!(diagnostics.contains("argument 2: `0 | 1`"), "{diagnostics}");
 }

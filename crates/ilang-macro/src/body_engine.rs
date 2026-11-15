@@ -160,7 +160,7 @@ impl<'a> BodyEngine<'a> {
     > {
         if mac.definition.signature.is_some() && position != MacroPosition::Expression {
             let message = if position == MacroPosition::Item {
-                "a typed macro cannot make items; use a syntax macro (§15.7.5)"
+                "a typed macro cannot make items; use a syntax macro"
             } else {
                 "a typed macro is allowed only as an expression call; it cannot give a type"
             };

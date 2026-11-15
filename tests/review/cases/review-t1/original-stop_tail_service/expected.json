@@ -11,7 +11,7 @@
       ],
       "exit": 0,
       "stdout": "spec/main_test.check : (Bool) <- (Assert) -> Nil\nspec/main_test.apply : ((A) <- N -> B, A) <- N -> List(B)\nspec/main_test.main : () <- (Assert) -> Nil\n",
-      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass spec/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\n"
     },
     "run0": {
       "command": [
@@ -32,7 +32,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
+      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
     },
     "test2": {
       "command": [
@@ -42,7 +42,7 @@
       ],
       "exit": 0,
       "stdout": "pass spec/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\n"
+      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\n"
     },
     "run2": {
       "command": [
@@ -53,7 +53,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False` (§6.9)\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
+      "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\nthe package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)\n"
     }
   }
 }

@@ -59,7 +59,7 @@ pub fn check(program: &Program, graph: &PackageGraph, diags: &mut Vec<Diagnostic
                 code::COMPILER_CAPABILITY,
                 Some(m.source),
                 program.def(d).span,
-                "an ordinary entry cannot reach a compiler-owned operation (§2.1)",
+                "an ordinary entry cannot reach a compiler-owned operation",
             ));
         }
     }
@@ -84,8 +84,12 @@ pub fn check(program: &Program, graph: &PackageGraph, diags: &mut Vec<Diagnostic
                 .into_iter()
                 .filter_map(|(d, inside)| (!b.binding.direct || !inside).then_some(d));
             if reaches_compiler(program, refs) {
-                diags.push(Diagnostic::error(code::COMPILER_CAPABILITY, Some(m.source), b.binding.span,
-                    "an ordinary entry's initialization cannot reach a compiler-owned operation (§2.1)"));
+                diags.push(Diagnostic::error(
+                    code::COMPILER_CAPABILITY,
+                    Some(m.source),
+                    b.binding.span,
+                    "an ordinary entry's initialization cannot reach a compiler-owned operation",
+                ));
             }
         }
     }
@@ -108,7 +112,7 @@ pub fn check_selected(
                 code::COMPILER_CAPABILITY,
                 Some(module.source),
                 program.def(d).span,
-                "an ordinary entry cannot reach a compiler-owned operation (§2.1)",
+                "an ordinary entry cannot reach a compiler-owned operation",
             ));
         }
     }
@@ -134,8 +138,12 @@ pub fn check_selected(
                 .into_iter()
                 .filter_map(|(id, inside)| (!binding.binding.direct || !inside).then_some(id));
             if reaches_compiler(program, refs) {
-                diags.push(Diagnostic::error(code::COMPILER_CAPABILITY, Some(module.source), binding.binding.span,
-                    "an ordinary entry's initialization cannot reach a compiler-owned operation (§2.1)"));
+                diags.push(Diagnostic::error(
+                    code::COMPILER_CAPABILITY,
+                    Some(module.source),
+                    binding.binding.span,
+                    "an ordinary entry's initialization cannot reach a compiler-owned operation",
+                ));
             }
         }
     }

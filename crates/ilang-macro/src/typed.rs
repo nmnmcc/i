@@ -322,7 +322,7 @@ impl Driver {
                         d.related.push(ilang_package::DiagnosticNote {
                             source: p.source,
                             span,
-                            message: "a typed macro cannot choose by the type inside a binding with type variables; a type query answered NotKnown here (§15.7.5)".into(),
+                            message: "a typed macro cannot choose by the type inside a binding with type variables; a type query answered NotKnown here".into(),
                         });
                     }
                 }

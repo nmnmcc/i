@@ -288,7 +288,7 @@ pub fn check_compiler_exports(
             code::COMPILER_CAPABILITY,
             Some(program.module(id.module).source),
             def.span,
-            "a macro program cannot execute an external declaration outside package i (§8)",
+            "a macro program cannot execute an external declaration outside package i",
         ));
     }
     let mut checked = check_resolved_inner(graph, Some(program), diags, &[], false);
@@ -303,7 +303,7 @@ pub fn check_compiler_exports(
                     code::COMPILER_CAPABILITY,
                     Some(program.module(entry.module).source),
                     program.def(entry).span,
-                    "a compiler wrapper must install its allowed services and cannot request a host service (§8)",
+                    "a compiler wrapper must install its allowed services and cannot request a host service",
                 ));
             }
         }

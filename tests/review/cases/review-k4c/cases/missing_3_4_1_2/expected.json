@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () <- (Dep) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> Nil\napp/main.main : () <- (Fail(Never)) -> Nil\n",
-      "stderr": "src/main.i:15:4: error[E0504]: a value of `S(_, _)` could go to more than one type variable of `Fail(Never) | _ | _` (§4.4)\n1 error\n"
+      "stderr": "src/main.i:15:4: error[E0504]: a value of `S(_, _)` could go to more than one type variable of `Fail(Never) | _ | _`\n1 error\n"
     }
   }
 }

@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (Dep, S(N), ..N) -> Int\napp/main.h1 : () <- (N - Dep, S(N)) -> Int\napp/main.main : () <- (N - Dep - S(Dep) - S(Dep | T(Dep)), T(N)) -> Nil\n",
-      "stderr": "src/main.i:24:7: error[E0501]: `S(_)` is not a subtype of `Dep | T(Dep)` (the type at 22:30 needs it)\nsrc/main.i:40:8: error[E0225]: two explicit services or two spreads in provided data have one service key (§9.2)\n2 errors\n"
+      "stderr": "src/main.i:24:7: error[E0501]: `S(_)` is not a subtype of `Dep | T(Dep)` (the type at 22:30 needs it)\nsrc/main.i:40:8: error[E0225]: two explicit services or two spreads in provided data have one service key\n2 errors\n"
     }
   }
 }

@@ -15,7 +15,7 @@ fn two_spaced_constructor_parts_are_still_one_binding() {
     assert!(!ds[0].is_error());
     assert_eq!(
         ds[0].message,
-        "this is one binding, not two; to write two, put the second on its own line (§1.7)"
+        "this is one binding, not two; to write two, put the second on its own line"
     );
     for source in [
         source.replace("Pair  (", "Pair("),
@@ -40,7 +40,7 @@ fn spaced_function_call_keeps_its_error_and_explains_the_line() {
     assert!(
         ds.iter().any(|d| d.code == "E0101"
             && d.message.ends_with(
-                "this is one binding, not two; to write two, put the second on its own line (§1.7)"
+                "this is one binding, not two; to write two, put the second on its own line"
             )),
         "{ds:?}"
     );
@@ -62,7 +62,7 @@ fn missing_known_parameter_type_explains_both_fixes() {
     assert!(ds[0].is_error());
     assert_eq!(
         ds[0].message,
-        "`.name` needs a known type for its value (§6.7, §4.8); write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving (§4.8)"
+        "`.name` needs a known type for its value; write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving"
     );
     for source in [
         source.replace("(u) {", "(u : User) {"),

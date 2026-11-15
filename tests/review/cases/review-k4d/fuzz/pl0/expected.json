@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.twice : (() <- N -> Int) <- N -> Int\napp/main.with_int : (() <- N -> A) <- (N - Svc(Int)) -> A\napp/main.with_dep : (() <- N -> A) <- (N - Dep) -> A\napp/main.with_cov : (() <- N -> A, B) <- (N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () -> 1\napp/main.h1 : () <- (Svc(B & A)) -> A\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:26:31: error[E0501]: `Svc(_)` is not a subtype of `Never` (the type at 26:23 needs it)\nsrc/main.i:28:7: error[E0501]: `Cov(_)` is not a subtype of `Never` (the type at 27:23 needs it)\nsrc/main.i:30:24: error[E0225]: two explicit services or two spreads in provided data have one service key (§9.2)\nsrc/main.i:34:31: error[E0501]: `Dep` is not a subtype of `Never` (the type at 34:23 needs it)\n4 errors\n"
+      "stderr": "src/main.i:26:31: error[E0501]: `Svc(_)` is not a subtype of `Never` (the type at 26:23 needs it)\nsrc/main.i:28:7: error[E0501]: `Cov(_)` is not a subtype of `Never` (the type at 27:23 needs it)\nsrc/main.i:30:24: error[E0225]: two explicit services or two spreads in provided data have one service key\nsrc/main.i:34:31: error[E0501]: `Dep` is not a subtype of `Never` (the type at 34:23 needs it)\n4 errors\n"
     }
   }
 }

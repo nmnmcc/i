@@ -377,7 +377,10 @@ fn add_checks_the_names() {
     let project = dir.display().to_string();
     for bad in ["i", "app", "Lib", "bad-name"] {
         let err = w.fails(&["add", bad, "example.com/lib@1.0.0", "--project", &project]);
-        assert!(err.contains("§2.6"), "{bad}: {err}");
+        assert!(
+            err.contains("not `i`, and not the name of this package"),
+            "{bad}: {err}"
+        );
     }
     w.ok(&["add", "lib", "example.com/lib@1.0.0", "--project", &project]);
     let err = w.fails(&[

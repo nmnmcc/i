@@ -1716,7 +1716,7 @@ impl Parser<'_> {
 
 /// The line rule is unchanged; this only explains a likely misplaced statement (§1.7).
 pub const ONE_BINDING_HINT: &str =
-    "this is one binding, not two; to write two, put the second on its own line (§1.7)";
+    "this is one binding, not two; to write two, put the second on its own line";
 
 fn spaced_binding_call(source: &str, toks: &[Token], open: usize, eq: usize) -> bool {
     if open == 0 || toks[open].kind != T::LParen {

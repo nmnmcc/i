@@ -119,7 +119,7 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
 fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     if !is_name(name) || name == "i" {
         bail!(
-            "the package name `{name}` must be a name (§1.3): a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i`"
+            "the package name `{name}` must be a name: a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i`"
         );
     }
     let dir = path.unwrap_or_else(|| PathBuf::from(name));
@@ -456,14 +456,14 @@ fn add(
     // §2.6: the dependency names.
     if !is_name(name) || name == "i" || name == file.manifest.name {
         bail!(
-            "the dependency name `{name}` must be a name (§1.3), not `i`, and not the name of this package (§2.6)"
+            "the dependency name `{name}` must be a name, not `i`, and not the name of this package"
         );
     }
     if let Some(other) = file.find(name)
         && other != dev
     {
         bail!(
-            "`{name}` is already in `[{}]`; a dependency name and a dev-dependency name may not be the same (§2.6)",
+            "`{name}` is already in `[{}]`; a dependency name and a dev-dependency name may not be the same",
             TABLES[other as usize]
         );
     }
@@ -478,7 +478,7 @@ fn add(
                     let tags = fetched_tags(&mut git()?, &place.repository)?;
                     let newest = tags.last().ok_or_else(|| {
                         anyhow!(
-                            "`{}` has no tag `vX.Y.Z`, so it has no version (§2.7)",
+                            "`{}` has no tag `vX.Y.Z`, so it has no version",
                             place.repository
                         )
                     })?;

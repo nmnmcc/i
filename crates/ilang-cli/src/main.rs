@@ -467,7 +467,7 @@ fn cmd_run(
     let program = b.host_program()?;
     if program.abi().entry.is_none() {
         anyhow::bail!(
-            "the package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name (§10.2)"
+            "the package has no program entry; define `main` in `src/main.i` or run or build a declared entry by name"
         );
     }
     let mut options = ilang_host::HostOptions::new(ilang_host::services::stdout_with_args(args));
@@ -533,7 +533,7 @@ fn cmd_test(
     target: Target,
 ) -> anyhow::Result<ExitCode> {
     if target == Target::Wasi {
-        anyhow::bail!("the WASI target runs a command entry and does not compile tests (§B.7)");
+        anyhow::bail!("the WASI target runs a command entry and does not compile tests");
     }
     let manifest_text = std::fs::read_to_string(project.join("i.toml"))?;
     let manifest: toml_edit::DocumentMut = manifest_text.parse()?;

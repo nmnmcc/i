@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "app/main.read : () <- (S(String)) -> String\napp/main.read_int : () <- (S(Int)) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.join : (() <- N -> String, () <- N2 -> Int) <- (..N, ..N2) -> Int\napp/main.bad : () <- (S(Never)) -> Int\n",
-      "stderr": "src/main.i:10:22: error[E0515]: the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (§4.4, §9.2) (the type at 10:11 needs it)\n1 error\n"
+      "stderr": "src/main.i:10:22: error[E0515]: the service requirements `S(Int)` and `S(String)` have an empty intersection and cannot be satisfied (the type at 10:11 needs it)\n1 error\n"
     }
   }
 }

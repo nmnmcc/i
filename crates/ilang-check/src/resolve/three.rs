@@ -1362,7 +1362,7 @@ impl<'a, 't> R3<'a, 't> {
                         self.error(
                             code::HOST_FORM,
                             def.name.span.0,
-                            "a host service has exactly one constructor, and every field has a label and a function type (§9.7)",
+                            "a host service has exactly one constructor, and every field has a label and a function type",
                         );
                     }
                 }
@@ -2733,7 +2733,7 @@ impl<'a, 't> R3<'a, 't> {
                 self.error(
                     code::ENV_TYPE,
                     ty.span,
-                    "a rest service pattern needs a type parameter of the function (§6.8)",
+                    "a rest service pattern needs a type parameter of the function",
                 );
             }
             if !s.rest
@@ -2744,7 +2744,7 @@ impl<'a, 't> R3<'a, 't> {
                     self.error(
                         code::ENV_PARAMS_SAME,
                         ty.span,
-                        format!("two environment parameters of this function have the type constructor `{tname}` (§9.2)"),
+                        format!("two environment parameters of this function have the type constructor `{tname}`"),
                     );
                 }
                 env_heads.push(head);

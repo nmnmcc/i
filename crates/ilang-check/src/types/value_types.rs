@@ -1559,7 +1559,7 @@ impl Checker<'_> {
         }
         let expanded = written(self, t, &HashMap::new(), &mut HashSet::new());
         if invalid(&self.s, &expanded, pol) {
-            self.error(code::TYPE_PLACE,t.span,"the whole expanded value-type annotation has a variable union or intersection in an illegal place (§4.4)");
+            self.error(code::TYPE_PLACE,t.span,"the whole expanded value-type annotation has a variable union or intersection in an illegal place");
         }
     }
 }

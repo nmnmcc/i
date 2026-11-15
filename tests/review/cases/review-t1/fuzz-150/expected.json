@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "probe/main.f : ((\"\" | \"a\" | \"ab\" | \"b\" | \"c\", Bool)) -> 0 | 1 | 2 | 3 | 4\n",
-      "stderr": "src/main.i:2:2: error[E0516]: the clauses do not cover every value of the subject (§7.4): no clause without a guard matches `(\"\", True)`\nsrc/main.i:6:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\nsrc/main.i:7:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard (§7.4)\n1 error\n"
+      "stderr": "src/main.i:2:2: error[E0516]: the clauses do not cover every value of the subject: no clause without a guard matches `(\"\", True)`\nsrc/main.i:6:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\nsrc/main.i:7:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n1 error\n"
     }
   }
 }

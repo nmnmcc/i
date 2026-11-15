@@ -209,7 +209,13 @@ fn empty_optional_accumulator_requires_a_written_tuple_shape() {
     )
     .unwrap();
     let (ds, _) = check(&source);
-    assert_eq!(ds,vec![("E0506".into(),"`.k` needs a known type for its value (§4.8 rule 13); write its type, such as `x: (A, B)`".into())]);
+    assert_eq!(
+        ds,
+        vec![(
+            "E0506".into(),
+            "`.k` needs a known type for its value; write its type, such as `x: (A, B)`".into()
+        )]
+    );
     let (ds, _) = check(&source.replace("(Some(p))", "(Some(p: (Int, Int)))"));
     assert!(ds.is_empty(), "{ds:?}");
 }
