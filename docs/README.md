@@ -139,10 +139,17 @@ under `docs`: its deliberately valid and invalid inputs are checked by
 validation. Both workflows run this command after building; failures propagate.
 
 The per-page check (`npm run check:spec-links`) counts section marks and links
-targeting `/docs/standard` or a file named `spec.md`. Home allows neither, and
-also rejects every in-page `href="#…"`. Tour and getting-started allow one
+targeting `/docs/standard` or a file named `spec.md`. Home allows no authored
+section marks or specification links, and rejects every in-page `href="#…"`.
+Tour and getting-started allow one
 combined reference; guides allow two. Library pages allow no specification
 links. Contributor and standard pages are exempt from citation limits.
+
+Section notes in complete compiler diagnostics are preserved verbatim. A section
+mark in a rendered `pre` block is excluded from authored-citation counts only
+when its whole text matches an `i error stderr=exact` transcript on that page;
+`check:examples` compares that transcript with the real compiler. Edited output,
+surrounding prose and specification links still count.
 
 The same check prints prose words and complete example counts for every built
 page. Prose is the authored page content (`#nd-home-layout` / `.home-page` or `#nd-page`), including

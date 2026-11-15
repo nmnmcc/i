@@ -48,6 +48,7 @@ test('ordinary macro use comes before expansion and the Lisp definition', () => 
   assert.ok(macro.indexOf('```i run') < macro.indexOf('```text title="i expand'));
   assert.ok(macro.indexOf('```text title="i expand') < macro.indexOf('```scheme'));
   assert.match(macro, /<summary>Lisp surface: src\/sugar\.is<\/summary>/);
+  assert.ok(page.includes('Write your own <code>if</code> when you need one.'));
 });
 
 test('plain wording and clean inferred service types stay in the page', () => {

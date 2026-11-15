@@ -1,2 +1,2 @@
 [dependencies]
-clock={path="clock"}
+time={path="time"}

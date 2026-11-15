@@ -35,6 +35,32 @@ class ReferenceTests(unittest.TestCase):
         self.assertEqual(parser.sections, 2)
         self.assertEqual(len(parser.links), 1)
 
+    def test_exact_compiler_diagnostics_keep_their_section_notes(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            dist, content = Path(scratch) / 'dist', Path(scratch) / 'content'
+            dist.mkdir()
+            page = dist / 'index.html'
+            source = content / 'home/index.mdx'
+            source.parent.mkdir(parents=True)
+            diagnostic = 'src/main.i:1:1: error[E0552]: no match (§2.6.2)\n'
+            source.write_text('```i error E0552 stderr=exact\nbad = missing\n```\n```text\n' + diagnostic + '```\n')
+            html = '<pre><code>' + diagnostic + '</code></pre>'
+            page.write_text(html)
+            result = measure(page, dist, content)
+            self.assertFalse(result['failed'])
+            self.assertEqual((result['raw_sections'], result['sections'], result['diagnostic_sections']), (1, 0, 1))
+            for extra in ('<p>§2.6.2</p>', '<a href="/docs/standard">rules</a>'):
+                page.write_text(html + extra)
+                self.assertTrue(measure(page, dist, content)['failed'])
+            page.write_text(html.replace('no match', 'edited message'))
+            self.assertTrue(measure(page, dist, content)['failed'])
+            page.write_text('<template>' + html + '</template>')
+            result = measure(page, dist, content)
+            self.assertEqual((result['raw_sections'], result['diagnostic_sections']), (0, 0))
+            page.write_text(html)
+            source.write_text(source.read_text().replace(' stderr=exact', ''))
+            self.assertTrue(measure(page, dist, content)['failed'])
+
     def test_relative_encoded_and_external_targets(self):
         for target in ('/docs/standard', '/docs/standard/chapter-9#errors',
                        'https://github.com/nmnmcc/i/blob/main/docs/spec.md#services',

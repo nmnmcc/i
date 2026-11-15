@@ -1,6 +1,6 @@
 (
 	i/fail
-	clock = (Clock) = clock/clock
+	clock = (Clock) = time/clock
 )
 
 (

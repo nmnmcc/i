@@ -3,7 +3,8 @@ from html.parser import HTMLParser
 from pathlib import PurePosixPath
 from urllib.parse import unquote, urljoin, urlsplit
 import re
-from page_prose import prose_words, example_count, budget
+from page_prose import prose_words, example_count, budget, source_for_page
+from example_fences import fences, generated, i_info, i_options, output_info
 
 
 def is_spec_target(href, page='/'):
@@ -55,6 +56,50 @@ class References(HTMLParser):
             self.sections += data.count('§')
 
 
+def checked_diagnostics(page):
+    """Only stderr=exact transcripts are compared with the real compiler in CI."""
+    if page is None or not page.is_file() or generated(page):
+        return set()
+    blocks = list(fences(page.read_text()))
+    outputs = set()
+    for block, following in zip(blocks, blocks[1:]):
+        info = i_info(block.info)
+        if (info and info[0] == 'error' and i_options(block.info)[1].get('stderr') == 'exact'
+                and following.closed and output_info(following.info)):
+            outputs.add(following.source.removesuffix('\n'))
+    return outputs
+
+
+class DiagnosticSections(HTMLParser):
+    """Recognize whole rendered pre blocks, without exempting surrounding prose."""
+    def __init__(self, outputs):
+        super().__init__(convert_charrefs=True)
+        self.outputs = outputs
+        self.ignored = []
+        self.pre = None
+        self.sections = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ('head', 'script', 'style', 'template'):
+            self.ignored.append(tag)
+        elif tag == 'pre' and not self.ignored:
+            self.pre = []
+
+    def handle_endtag(self, tag):
+        if self.ignored:
+            if tag == self.ignored[-1]:
+                self.ignored.pop()
+        elif tag == 'pre' and self.pre is not None:
+            text = ''.join(self.pre)
+            if text.removesuffix('\n') in self.outputs:
+                self.sections += text.count('§')
+            self.pre = None
+
+    def handle_data(self, data):
+        if self.pre is not None and not self.ignored:
+            self.pre.append(data)
+
+
 def area(path):
     if str(path) == 'index.html':
         return 'home'
@@ -67,6 +112,11 @@ def measure(file, dist, content=None, enforced_areas=()):
     parser = References('/' + str(path))
     parser.feed(html)
     parser.close()
+    diagnostic = DiagnosticSections(checked_diagnostics(source_for_page(path, content)))
+    diagnostic.feed(html)
+    diagnostic.close()
+    raw_sections = parser.sections
+    parser.sections -= diagnostic.sections
     group = area(path)
     total = parser.sections + len(parser.links)
     limit = {'home': 0, 'tour': 1, 'getting-started': 1, 'guides': 2}.get(group)
@@ -89,6 +139,7 @@ def measure(file, dist, content=None, enforced_areas=()):
     if enforced:
         failures.extend(issues)
     return dict(page=str(path), area=group, sections=parser.sections, links=len(parser.links),
+                raw_sections=raw_sections, diagnostic_sections=diagnostic.sections,
                 total=total, limit=limit, failed=bool(failures), targets=parser.links,
                 words=words, examples=examples, hash_links=parser.hash_links,
                 failures=failures, warnings=[] if enforced else issues)

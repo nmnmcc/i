@@ -32,7 +32,7 @@ description: "Functions, data, checked types and services, compiled to WebAssemb
 <label className="home-choice" htmlFor="choice-extensible">
 <input type="radio" name="home-example" id="choice-extensible" value="extensible" aria-controls="panel-extensible" aria-labelledby="title-extensible" aria-describedby="description-extensible" />
 <span className="choice-title" id="title-extensible">Extensible enough</span><br />
-<span className="choice-description" id="description-extensible">Write your own if when you need one.</span>
+<span className="choice-description" id="description-extensible">Write your own <code>if</code> when you need one.</span>
 </label>
 <label className="home-choice" htmlFor="choice-fast">
 <input type="radio" name="home-example" id="choice-fast" value="fast" aria-controls="panel-fast" aria-labelledby="title-fast" aria-describedby="description-fast" />
@@ -69,7 +69,7 @@ ready
 ```i types project=examples/deadline package=hello title="src/main.i"
 (
 	i/fail
-	clock = (Clock) = clock/clock
+	clock = (Clock) = time/clock
 )
 
 (
@@ -93,7 +93,7 @@ hello/main.remaining : (Int) <- (Clock, Fail(Late)) -> Int
 	testlib = (test) = std/test
 	i/fail
 	app = hello/main
-	(Clock) = clock/clock
+	(Clock) = time/clock
 )
 test("a fake clock", () {
 	{
@@ -121,16 +121,17 @@ word = (n) { n |> (0) { "zero" } | (1) { "one" } }
 hello/main.word : (0 | 1) -> "one" | "zero"
 ```
 
-```i error E0501 stderr=exact project=examples/words package=hello title="src/probe.i"
+```i error E0552 E0501 stderr=exact project=examples/words package=hello title="src/probe.i"
 (
 	app = hello/main
 )
-bad = { app.word }(2)
+bad = app.word(2)
 ```
 
 ```text title="i check"
-src/probe.i:4:20: error[E0501]: `2` is not a subtype of `0 | 1` (the type at 4:7 needs it)
-1 error
+src/probe.i:4:7: error[E0552]: no branch of this function can match these arguments: their known types are `(2)` (syntax three §2.6.2)
+src/probe.i:4:16: error[E0501]: `2` is not a subtype of `0 | 1` (the type at 4:7 needs it)
+2 errors
 ```
 </section>
 <section className="example-panel" id="panel-extensible" aria-labelledby="title-extensible">
