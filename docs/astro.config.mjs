@@ -11,11 +11,11 @@ grammar.name = 'i';
 export default defineConfig({
   site: 'https://i.nmnm.cc',
   base: '/',
+  redirects: { '/docs': '/' },
   integrations: [
     fumadocs({
       collections: {
         docs: { dir: 'content/docs' },
-        home: { dir: 'content/home' },
       },
       components: './src/components/mdx.tsx',
       mdastPlugins: [fenceMetadata],

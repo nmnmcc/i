@@ -3,6 +3,8 @@ import { usePathname } from 'fumadocs-core/framework';
 import { useFooterItems } from 'fumadocs-ui/utils/use-footer-items';
 import type { TOCItemType } from 'fumadocs-core/toc';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
+import { Container as DocsContainer } from 'fumadocs-ui/layouts/docs/slots/container';
+import { Children, type ComponentProps } from 'react';
 import {
   DocsDescription,
   DocsPage,
@@ -20,6 +22,7 @@ export interface DocsProps extends ProviderProps {
   description?: string;
   toc: TOCItemType[];
   markdownUrl: string;
+  home?: boolean;
 }
 
 function ReaderFooter(props: FooterProps) {
@@ -33,6 +36,13 @@ function ReaderFooter(props: FooterProps) {
   return <PageFooter {...props} data-page-chrome="" items={{ previous: keep(items.previous), next: keep(items.next) }} />;
 }
 
+function HomeDocsContainer({ children, ...props }: ComponentProps<typeof DocsContainer>) {
+  // The default container receives the skip-to-content hash link first. This
+  // short, single-screen page has no hash navigation; keep all docs chrome.
+  const [, ...content] = Children.toArray(children);
+  return <DocsContainer {...props}>{content}</DocsContainer>;
+}
+
 /**
  * The React island of docs pages, the content is passed as children.
  */
@@ -42,6 +52,7 @@ export function Docs({
   description,
   toc,
   markdownUrl,
+  home = false,
   children,
   ...props
 }: DocsProps) {
@@ -49,15 +60,18 @@ export function Docs({
 
   return (
     <Provider {...props}>
-      <DocsLayout {...baseOptions()} tree={data.tree}>
-        <DocsPage toc={toc} slots={{ footer: ReaderFooter }}>
+      <DocsLayout {...baseOptions()} tree={data.tree} slots={home ? { container: HomeDocsContainer } : undefined}>
+        {home ? <DocsPage full toc={[]} breadcrumb={{ enabled: false }} footer={{ enabled: false }}
+          tableOfContent={{ enabled: false }} tableOfContentPopover={{ enabled: false }} className="home-doc-page">
+          {children}
+        </DocsPage> : <DocsPage toc={toc} slots={{ footer: ReaderFooter }}>
           <DocsTitle>{title}</DocsTitle>
           <DocsDescription>{description}</DocsDescription>
           <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
             <MarkdownCopyButton markdownUrl={markdownUrl} />
           </div>
           {children}
-        </DocsPage>
+        </DocsPage>}
       </DocsLayout>
     </Provider>
   );

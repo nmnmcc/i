@@ -6,9 +6,11 @@ interface Props {
   title: string;
   description?: string;
   image?: string;
+  canonical?: string;
+  transitions?: boolean;
 }
 
-const { title, description, image } = Astro.props;
+const { title, description, image, canonical, transitions = true } = Astro.props;
 ---
 
 <html lang="en" transition:animate="none">
@@ -17,9 +19,10 @@ const { title, description, image } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
+    {canonical && <link rel="canonical" href={new URL(canonical, Astro.site)} />}
     {description && <meta name="description" content={description} />}
     {image && <meta property="og:image" content={image} />}
-    <ClientRouter />
+    {transitions && <ClientRouter />}
   </head>
   <body class="flex flex-col min-h-screen">
     <slot />

@@ -1,18 +1,21 @@
 ---
 import Layout from '@/layouts/Layout.astro';
-import { Home } from '@/components/home';
+import { Docs } from '@/components/docs';
+import { source } from '@/lib/source';
+import { getPageImageUrl } from '@/lib/shared';
 import { getEntry, render } from 'astro:content';
 import '@/styles/home.css';
 
-const home = await getEntry('home', 'index.mdx');
+const home = await getEntry('docs', 'index.mdx');
 if (!home) throw new Error('The checked home-page content is missing.');
 const { Content } = await render(home);
+const pageTree = await source.serializePageTree(source.getPageTree());
 ---
 
-<Layout title={home.data.title} description={home.data.description}>
-  <Home client:load pathname={Astro.url.pathname} params={Astro.params}>
+<Layout title={home.data.title} description={home.data.description} canonical="/" transitions={false} image={getPageImageUrl({ slugs: [] }).url}>
+  <Docs client:load home tree={pageTree} title={home.data.title} toc={[]} markdownUrl="/docs/index.md" pathname={Astro.url.pathname} params={Astro.params}>
     <div class="home-content">
       <Content components={{ wrapper: 'div', h1: 'h1', h2: 'h2', h3: 'h3', h4: 'h4', h5: 'h5', h6: 'h6' }} />
     </div>
-  </Home>
+  </Docs>
 </Layout>

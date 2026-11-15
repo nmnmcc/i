@@ -123,7 +123,7 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(runner.DIAGNOSTIC.findall(text), ['E0201'])
 
     def test_home_page_reuses_the_deadline_and_macro_sources(self):
-        page = SCRIPTS.parent / 'content/home/index.mdx'
+        page = SCRIPTS.parent / 'content/docs/index.mdx'
         examples, failures, _ = runner.read_page(page)
         self.assertFalse(failures)
         deadline = next(example for example in examples if example.kind == 'types' and 'remaining = ' in example.source)
@@ -131,7 +131,7 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(testing.shared_files['src/main.i'], deadline.source)
         self.assertEqual(deadline.output, 'hello/main.remaining : (Int) <- (Clock, Fail(Late)) -> Int\n')
         self.assertIn('Clock = (now = () -> Int)', testing.shared_files['time/src/clock.i'])
-        self.assertIn('clock = (Clock) = time/clock', deadline.source)
+        self.assertIn('(Clock, now) = time/clock', deadline.source)
         precise = next(example for example in examples if example.kind == 'types' and 'word = ' in example.source)
         rejection = next(example for example in examples if example.kind == 'error')
         self.assertEqual(rejection.shared_files['src/main.i'], precise.source)
