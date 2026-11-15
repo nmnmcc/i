@@ -1065,11 +1065,11 @@ fn temporary_file_is_not_wider_than_source() {
         if let Ok(entries) = std::fs::read_dir(dir.path()) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
-                if name.to_string_lossy().contains(".tmp-") {
-                    if let Ok(meta) = entry.metadata() {
-                        use std::os::unix::fs::PermissionsExt;
-                        observed = Some(meta.permissions().mode() & 0o777);
-                    }
+                if name.to_string_lossy().contains(".tmp-")
+                    && let Ok(meta) = entry.metadata()
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    observed = Some(meta.permissions().mode() & 0o777);
                 }
             }
         }
