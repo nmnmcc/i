@@ -5,10 +5,22 @@ use crate::{
     walk::{Visitor, Walk},
 };
 
-struct Unspan;
+#[derive(Default)]
+struct Unspan {
+    groups: std::collections::HashMap<Span, Span>,
+}
 impl Visitor for Unspan {
     fn span(&mut self, span: &mut Span) {
         *span = Span::default();
+    }
+    fn provide_group(&mut self, group: &mut Option<Span>) {
+        if let Some(span) = group {
+            let next = self.groups.len() as u32 + 1;
+            *span = *self
+                .groups
+                .entry(*span)
+                .or_insert_with(|| Span::new(next, next));
+        }
     }
 }
 
@@ -16,7 +28,7 @@ impl Visitor for Unspan {
 /// String literals, names and documentation are never interpreted as spans.
 pub fn shape(module: &Module) -> String {
     let mut module = module.clone();
-    module.walk(&mut Unspan);
+    module.walk(&mut Unspan::default());
     format!("{module:?}")
 }
 
@@ -46,7 +58,7 @@ impl Visitor for Canon {
 pub(crate) fn canonical(module: &Module) -> Module {
     let mut module = module.clone();
     module.walk(&mut Canon);
-    module.walk(&mut Unspan);
+    module.walk(&mut Unspan::default());
     module
 }
 
@@ -79,8 +91,8 @@ pub fn equivalent_expression(a: &Expr, b: &Expr) -> bool {
     let mut b = b.clone();
     a.walk(&mut Canon);
     b.walk(&mut Canon);
-    a.walk(&mut Unspan);
-    b.walk(&mut Unspan);
+    a.walk(&mut Unspan::default());
+    b.walk(&mut Unspan::default());
     let mut af = Floats(Vec::new());
     let mut bf = Floats(Vec::new());
     a.walk(&mut af);
@@ -160,5 +172,22 @@ mod deep_tests {
             unreachable!()
         };
         assert!(equivalent_expression(&p.value, &m.value));
+    }
+}
+
+#[cfg(test)]
+mod provide_group_tests {
+    #[test]
+    fn canonical_spans_preserve_the_provided_data_groups() {
+        let parse = |source| {
+            let (module, errors) = crate::parse_module(source);
+            assert!(errors.is_empty(), "{errors:?}");
+            module
+        };
+        let together = parse("f = () { g() <- (a, b) }");
+        let reformatted = parse("f = () {\n  g() <- (\n    a,\n    b,\n  )\n}\n");
+        let separately = parse("f = () { g() <- (b) <- (a) }");
+        assert!(super::equivalent(&together, &reformatted));
+        assert!(!super::equivalent(&together, &separately));
     }
 }

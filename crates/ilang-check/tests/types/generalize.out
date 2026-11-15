@@ -4,7 +4,7 @@ ids : (1 | "a") -> 1 | "a"
 use_ids : () -> (1 | "a", 1 | "a")
 local : () -> (1, "a")
 local_mono : () -> (1 | "a", 1 | "a")
-param : ((1 | "a") <- (Fail(E), ..N) -> A & B) <- (Fail(E), ..N) -> (A, B)
+param : ((1 | "a") <- N -> A & B) <- N -> (A, B)
 fact : (Int) -> Int
 loop : (A) -> Never
 even : (Int) -> Bool

@@ -26,7 +26,11 @@ Find `inspect` in [i/core](/docs/standard/generated/chapter-13); the [library re
 	i/core
 	(Io) = i/io
 )
-main = () <- (io : Io) { io.print(core.inspect(core.bit_size(<<1, 2>>))) }
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(core.bit_size(<<1, 2>>)),
+	)
+}
 ```
 
 ```text
@@ -43,14 +47,18 @@ main = () <- (io : Io) { io.print(core.inspect(core.bit_size(<<1, 2>>))) }
 	(Io) = i/io
 	std/int
 )
-main = () <- (io : Io) { io.print(core.inspect(int.parse("42"))) }
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(int.parse("42")),
+	)
+}
 ```
 
 ```text
-Ok(42)
+42
 ```
 
-Find package functions such as `parse` under [std/int](/docs/library/generated/std-int); built-in names have their own [chapter](/docs/standard/generated/chapter-12).
+Find `parse` and its required `Fail(Nil)` service under [std/int](/docs/library/generated/std-int); built-in names have their own [chapter](/docs/standard/generated/chapter-12).
 
 ## Command lookup
 

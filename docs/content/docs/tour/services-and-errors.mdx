@@ -93,26 +93,31 @@ hello!
 
 A written `() -> String` would leave `Greeting` unsupplied and be rejected. Needs combine by service type, independently of local names or order.
 
-## Returned errors
+## Parsing errors
 
 ```i run package=tour title="src/main.i"
 (
+	i/fail
 	i/core
 	(Io) = i/io
 	std/int
 )
 main = () <- (io : Io) {
-	io.print(core.inspect(int.parse("42")))
-	io.print(core.inspect(int.parse("oops")))
+	io.print(
+		core.inspect(int.parse("42")),
+	)
+	io.print(
+		core.inspect(fail.catch(() { int.parse("oops") })),
+	)
 }
 ```
 
 ```text
-Ok(42)
+42
 Error(Nil)
 ```
 
-`Result` is built in; `std/int.parse` uses `Nil` as its error value. Neither case leaves the computation early.
+`int.parse` returns an integer and raises `Nil` through `Fail(Nil)` for invalid input. `fail.catch` turns success or failure into a built-in `Result` value.
 
 ## Missing values
 
@@ -123,9 +128,13 @@ Error(Nil)
 	std/list
 )
 main = () <- (io : Io) {
-	io.print(core.inspect(list.first([7, 8])))
+	io.print(
+		core.inspect(list.first([7, 8])),
+	)
 	empty : List(Int) = []
-	io.print(core.inspect(list.first(empty)))
+	io.print(
+		core.inspect(list.first(empty)),
+	)
 }
 ```
 
@@ -145,7 +154,9 @@ None
 	(Io) = i/io
 )
 main = () <- (io : Io) {
-	io.print(core.inspect(fail.catch(() { 42 })))
+	io.print(
+		core.inspect(fail.catch(() { 42 })),
+	)
 	answer = fail.catch(() { fail.raise("bad input") })
 	io.print(core.inspect(answer))
 }
@@ -165,20 +176,20 @@ The callback delays work until `fail.catch` has installed `Fail(E)`; error value
 	i/fail
 	i/core
 	(Io) = i/io
-	std/int
 	std/result
 )
 main = () <- (io : Io) {
-	answer = fail.catch(() { result.to_error(int.parse("oops")) })
+	stored : Result(Int, String) = Error("bad input")
+	answer = fail.catch(() { result.to_error(stored) })
 	io.print(core.inspect(answer))
 }
 ```
 
 ```text
-Error(Nil)
+Error("bad input")
 ```
 
-`result.to_error` raises the `Error` case, so a returned error joins the raised ones.
+`result.to_error` unwraps a stored `Result`, raising its `Error` value through `Fail`.
 
 ## A fixed clock
 

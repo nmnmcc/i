@@ -23,6 +23,7 @@ Put `i` on `PATH` and keep a copy of the i sources containing `std/`. The comman
 (
 	(Io) = i/io
 )
+
 (
 	greeting
 )
@@ -53,6 +54,7 @@ Hello, hello!
 (
 	(Io) = i/io
 )
+
 (
 	greeting
 )
@@ -80,6 +82,7 @@ Hello, world!
 (
 	(Io) = i/io
 )
+
 (
 	greeting
 )
@@ -94,7 +97,9 @@ main = () <- (io : Io) { io.print(greeting("world")) }
 	hello/main
 )
 test("greets", () { assert(main.greeting("i") == "Hello, i!") })
-test("greets the world", () { assert(main.greeting("world") == "Hello, world!") })
+test("greets the world", () {
+	assert(main.greeting("world") == "Hello, world!")
+})
 ```
 
 ```text

@@ -1,6 +1,6 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(B & A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- (Fail(E), ..N) -> A) <- (Fail(E), ..N) -> A\napp/main.twice : (() <- (Fail(E), ..N) -> Int) <- (Fail(E), ..N) -> Int\napp/main.with_int : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Svc(Int)) -> A\napp/main.with_dep : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Dep) -> A\napp/main.with_cov : (() <- (Fail(E), ..N) -> A, B) <- (Fail(E), N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () -> Never\napp/main.h1 : () <- (Dep) -> Int\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.twice : (() <- N -> Int) <- N -> Int\napp/main.with_int : (() <- N -> A) <- (N - Svc(Int)) -> A\napp/main.with_dep : (() <- N -> A) <- (N - Dep) -> A\napp/main.with_cov : (() <- N -> A, B) <- (N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () -> Never\napp/main.h1 : () <- (Dep) -> Int\napp/main.main : () -> Nil\n",
       "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:23:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:25:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "test0": {

@@ -57,8 +57,8 @@ use_int = () { mono(1) }
 
 use_string = () { mono("a") }
 
-// After a problem, the forms of an environment are shown as they are.
-State(S) = (get = () -> S)
+// Decision 1: required value fields make the meet empty; preserve error display.
+State(S) = (value = S)
 
 state_int = () <- (st : State(Int)) { 1 }
 

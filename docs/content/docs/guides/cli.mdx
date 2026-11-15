@@ -55,7 +55,7 @@ greet = (name, count) {
 main = () {
 	{ process.args() == ["--help"] } |>
 		(True) {
-			Ok(usage) = cli.help(options.parser(), "greet")
+			usage = cli.help(options.parser(), "greet")
 			stdio.write(<<usage:utf8>>)
 			stdio.flush()
 		}
@@ -79,6 +79,7 @@ main = () {
 
 ```i test stdout=exact package=guide_cli title="test/options_test.i"
 (
+	i/fail
 	testlib = (test) = std/test
 	std/cli
 	guide_cli/options
@@ -86,22 +87,24 @@ main = () {
 test("parses arguments", () {
 	assert(
 		cli.parse(options.parser(), ["Ada", "--count", "2"]) ==
-			Ok(options.Options(name = "Ada", count = 2)),
+			options.Options(name = "Ada", count = 2),
 	)
 	assert(
 		cli.parse(options.parser(), ["Ada", "--count=2"]) ==
-			Ok(options.Options(name = "Ada", count = 2)),
+			options.Options(name = "Ada", count = 2),
 	)
 	assert(
 		cli.parse(options.parser(), ["-c", "1", "--", "-name"]) ==
-			Ok(options.Options(name = "-name", count = 1)),
+			options.Options(name = "-name", count = 1),
 	)
 	assert(
-		cli.parse(options.parser(), ["Ada"]) ==
+		fail.catch(() { cli.parse(options.parser(), ["Ada"]) }) ==
 			Error(cli.MissingArgument(name = "--count")),
 	)
 	assert(
-		cli.parse(options.parser(), ["Ada", "--count=bad"]) ==
+		fail.catch(() {
+			cli.parse(options.parser(), ["Ada", "--count=bad"])
+		}) ==
 			Error(
 				cli.InvalidArgument(
 					index = 1,
@@ -113,9 +116,7 @@ test("parses arguments", () {
 	)
 	assert(
 		cli.help(options.parser(), "greet") ==
-			Ok(
-				"Usage: greet\n  <name>\tName to greet\n  --count, -c VALUE\tNumber of greetings\n",
-			),
+			"Usage: greet\n  <name>\tName to greet\n  --count, -c VALUE\tNumber of greetings\n",
 	)
 })
 ```
@@ -125,7 +126,7 @@ pass guide_cli/options_test.parses arguments
 1 passed, 0 failed
 ```
 
-Create `guide-cli/` beside `std/`; run commands there. Both `argument` and `option` require a value. Error indexes start at zero; an attached value belongs to its option's token.
+Create `guide-cli/` beside `std/`; run commands there. `cli.parse` returns the parsed value or raises an error; `fail.catch` captures failures for assertions. Both `argument` and `option` require a value; error indexes start at zero, and an attached value belongs to its option's token.
 
 ```sh
 i test --opt 0
@@ -167,7 +168,7 @@ Usage: greet
   --count, -c VALUE	Number of greetings
 ```
 
-The parser reserves no help option: `main` handles exactly `["--help"]`. `cli.help` ends its string with a newline; `stdio.write` adds none and needs flushing before exit. Help and successful actions exit with status 0.
+The parser reserves no help option: `main` handles exactly `["--help"]`. `cli.help` raises definition errors; its help string ends with a newline, so `stdio.write` avoids an extra line but needs flushing before exit. Help and successful actions exit with status 0.
 
 ## Parse failure
 

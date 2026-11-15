@@ -439,8 +439,8 @@ const CANCEL_OUT: &str = r#"(
 
 // Hands k2 out of the cancel, to the boundary `b0` around it.
 Out = (put = (Inner) -> Nil)
-Inner = (Continuation(Nil, Int, Never, Out))
-Paused = (Continuation(Nil, Outer, Never, Out))
+Inner = (Continuation(Nil, Int, Out))
+Paused = (Continuation(Nil, Outer, Out))
 Done = ()
 Outer = Paused | Done
 Handed = (Inner)
@@ -530,7 +530,7 @@ main = () {
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Never, Out))
+const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Out))
 Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 ThirdSum = Third | Over
@@ -583,7 +583,7 @@ const ENV_TAIL_RESUME: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, PausedSum, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Name))
 Done = ()
 PausedSum = Paused | Done
 
@@ -623,7 +623,7 @@ const ENV_TAIL_CANCEL: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, PausedSum, Never, Name))
+Paused = (Continuation(Nil, PausedSum, Name))
 Done = ()
 PausedSum = Paused | Done
 
@@ -668,7 +668,7 @@ const CANCEL_INNER: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, PausedSum, Never, Io))
+Paused = (Continuation(Nil, PausedSum, Io))
 Done = ()
 PausedSum = Paused | Done
 
@@ -716,10 +716,10 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, PausedSum, Int, Never))
+Paused = (Continuation(Nil, PausedSum, Fail(Int)))
 Done = ()
 PausedSum = Paused | Done
-Held = (Continuation(Nil, HeldSum, Never, Never))
+Held = (Continuation(Nil, HeldSum, Fail(Int)))
 Over = ()
 HeldSum = Held | Over
 

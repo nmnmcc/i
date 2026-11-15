@@ -1,9 +1,16 @@
 // spec: 9.5
-// expect: compile-error E0501
-// A final function may not give typed errors.
+// expect: pass
+// Owner decision 9 permits typed final errors; preserve the same final error.
 (
 	i/resource
 	i/fail
 )
 
-main = () { resource.ensure(() { Nil }, () { fail.raise("final") }) }
+main = () {
+	assert(
+		fail.catch(() {
+			resource.ensure(() { Nil }, () { fail.raise("final") })
+		}) ==
+			Error("final"),
+	)
+}

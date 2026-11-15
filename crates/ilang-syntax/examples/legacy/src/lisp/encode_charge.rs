@@ -36,7 +36,8 @@ enum Task<'a> {
     Result(&'a TypeExpr, Option<&'a TypeExpr>, Option<&'a TypeExpr>),
     ResultError(&'a TypeExpr, Option<&'a TypeExpr>),
     Block(&'a Block),
-    Statement(&'a Stmt),
+    Statement(&'a Stmt, bool),
+    ProvideGroup(bool),
     ClauseList(&'a [Clause]),
     Clause(&'a Clause),
     ClauseHead(&'a Clause),
@@ -415,23 +416,49 @@ pub(super) fn item<E>(
             }
             Param(param) => match param {
                 crate::ast::Param::Pattern(p) => work.push(Pattern(p)),
-                crate::ast::Param::Env { name, ty } => {
-                    bracket(&mut f, &mut work, 3)?;
+                crate::ast::Param::Env { name, ty, rest } => {
+                    bracket(&mut f, &mut work, if *rest { 4 } else { 3 })?;
                     work.push(Type(ty));
                     work.push(Atom(&name.name));
+                    if *rest {
+                        work.push(Atom(".."));
+                    }
                     work.push(Atom("!"));
                 }
             },
             Block(block) => {
                 bracket(&mut f, &mut work, block.stmts.len())?;
-                work.extend(block.stmts.iter().rev().map(Statement));
+                work.extend(block.stmts.iter().enumerate().rev().map(|(index, stmt)| {
+                    Statement(stmt, super::starts_provide_group(&block.stmts, index))
+                }));
             }
-            Statement(stmt) => match stmt {
+            ProvideGroup(first) => {
+                bracket(&mut f, &mut work, 2)?;
+                work.push(Atom(if first { "+" } else { "=" }));
+                work.push(Atom(".."));
+            }
+            Statement(stmt, first) => match stmt {
                 Stmt::Bind(b) => work.push(Binding(b)),
-                Stmt::Env { ty, value, .. } => {
-                    bracket(&mut f, &mut work, 3)?;
+                Stmt::Env {
+                    ty,
+                    value,
+                    spread,
+                    group,
+                    ..
+                } => {
+                    bracket(
+                        &mut f,
+                        &mut work,
+                        3 + usize::from(*spread) + usize::from(group.is_some()),
+                    )?;
                     work.push(Expr(value));
                     work.push(Type(ty));
+                    if *spread {
+                        work.push(Atom(".."));
+                    }
+                    if group.is_some() {
+                        work.push(ProvideGroup(first));
+                    }
                     work.push(Atom("!"));
                 }
                 Stmt::Expr(e) => work.push(Expr(e)),
