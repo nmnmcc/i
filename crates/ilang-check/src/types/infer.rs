@@ -1573,7 +1573,7 @@ impl<'a> Checker<'a> {
             FailKind::NonPrincipalIntersection => (
                 code::TYPE_AMBIGUOUS,
                 format!(
-                    "cannot infer a principal type for `{l} <: {r}`: different intersection members admit different bounds (§4.4, §4.7)"
+                    "cannot infer a principal type for `{l} <: {r}`: different intersection members admit different bounds"
                 ),
             ),
         };
