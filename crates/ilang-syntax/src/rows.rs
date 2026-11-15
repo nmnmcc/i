@@ -465,7 +465,11 @@ fn function(f: &Function) -> Datum {
         }
     };
     let body = match f.body.stmts.as_slice() {
-        [Stmt::Expr(e)] => expr(e),
+        // A body of one block expression keeps its own block: `function_of`
+        // reads a one-part Curly body as a group, so printing only the inner
+        // block would merge the two blocks when the text is read back. Any
+        // other single expression still drops the body braces.
+        [Stmt::Expr(e)] if !matches!(e.kind, ExprKind::Block(_)) => expr(e),
         _ => block(&f.body),
     };
     form(
@@ -1703,3 +1707,26 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
 }
 
 // ---- Quotes of the older Lisp rows ----
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::surface::ungrouped;
+
+    #[test]
+    fn a_function_body_that_is_a_block_keeps_both_blocks() {
+        // The body is an outer block whose only statement is an inner block.
+        // Printing only the inner block used to merge the two on the way back,
+        // dropping a block around the inner bindings.
+        let source = "f = (x : Int) -> Int {\n\t{\n\t\ty = x\n\t\tz = 1\n\t\ty + z\n\t}\n}\n";
+        let (module, errors) = crate::parse_module(source);
+        assert!(errors.is_empty(), "{errors:?}");
+        let text = to_lisp(&module);
+        let (read, errors) = from_lisp(&text);
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(ungrouped(&module), ungrouped(&read), "{text}");
+        assert_eq!(to_lisp(&read), text);
+        // Two opening braces remain: the body block and the inner block.
+        assert_eq!(text.matches('{').count(), 2, "{text}");
+    }
+}
