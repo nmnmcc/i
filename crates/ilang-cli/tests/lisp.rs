@@ -483,3 +483,33 @@ fn conversion_of_a_bare_file_name_in_the_current_directory_works_both_ways() {
     let text = std::fs::read_to_string(dir.path().join("a.i")).unwrap();
     assert!(text.contains("// note"), "{text}");
 }
+
+#[cfg(unix)]
+#[test]
+fn a_first_write_failure_does_not_say_files_above_were_converted() {
+    if running_as_root() {
+        eprintln!("skipped: running as root, a read-only directory is writable");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("a.i");
+    std::fs::write(&source, "// note\nf = () { 1 }\n").unwrap();
+    let other = dir.path().join("b.i");
+    std::fs::write(&other, "g = () { 2 }\n").unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o555)).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=is"])
+        .arg(&source)
+        .arg(&other)
+        .output()
+        .unwrap();
+    // Make the temporary directory removable again.
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(!output.status.success());
+    let errors = String::from_utf8_lossy(&output.stderr);
+    assert!(errors.contains("no file was converted"), "{errors}");
+    assert!(!errors.contains("files above were already converted"), "{errors}");
+    assert!(source.exists());
+    assert!(!source.with_extension("is").exists());
+}

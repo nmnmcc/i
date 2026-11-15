@@ -250,8 +250,20 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
             // one that failed (with the state of its source and destination),
             // and the ones that were never touched.
             report_write_failure(&plans, index);
+            let converted = plans[..index]
+                .iter()
+                .filter(|plan| plan.rename_source)
+                .count();
+            let formatted = index - converted;
+            let summary = if converted > 0 {
+                "the files above were already converted"
+            } else if formatted > 0 {
+                "the files above were already formatted in place"
+            } else {
+                "no file was converted"
+            };
             return Err(anyhow::anyhow!(
-                "{}: conversion stopped; the files above were already converted",
+                "{}: conversion stopped; {summary}",
                 plan.source.display()
             ));
         }
