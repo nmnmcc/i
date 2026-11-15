@@ -215,6 +215,8 @@ Reviewer claim-to-rule tables belong in reports, not page text.
 The home selector uses native radio inputs and CSS `:has()`. Clicking a label,
 Tab and arrow keys work without page JavaScript. Inactive example regions are
 removed from display; the stage keeps a fixed height when the selection changes.
+Desktop columns start at the top. Paired command/output boxes stretch to equal
+heights with equal row gaps; the browser check measures all three properties.
 On phones the selected sentence appears below the compact two-column list.
 Output, diagnostic and expansion blocks wrap; source uses two-column tabs and
 may scroll horizontally on phones at .75rem. `check:selector` checks the six

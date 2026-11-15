@@ -132,7 +132,8 @@ try {
           const fonts = [...document.fonts].filter((font) => font.status === 'loaded').map((font) => font.family.replaceAll('"', ''));
           const fontRequests = performance.getEntriesByType('resource').filter((r) => /\.(?:woff2?|ttf|otf)(?:\?|$)/.test(r.name)).map((r) => r.name);
           const labels = [...document.querySelectorAll('.home-choice')].map(rect);
-          return { scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, stage: rect(document.querySelector('.example-stage')), sidebar: sidebar ? rect(sidebar) : null, intro, display, labels, panel: rect(panel), contentTop: Math.min(intro.top, display.top), contentBottom: Math.max(intro.bottom, display.bottom), contrast, fonts, fontRequests, blocks };
+          const hostRows = [...panel.querySelectorAll('.host-run')].map((row) => ({ box: rect(row), command: rect(row.querySelector('.host-command')), output: rect(row.querySelector('figure:has(code.language-text)')) }));
+          return { scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, stage: rect(document.querySelector('.example-stage')), sidebar: sidebar ? rect(sidebar) : null, intro, display, labels, hostRows, panel: rect(panel), contentTop: Math.min(intro.top, display.top), contentBottom: Math.max(intro.bottom, display.bottom), contrast, fonts, fontRequests, blocks };
         });
         const label = `${prefix} ${key}`;
         data.insets = await blockInsets(page, '.home-page');
@@ -146,7 +147,15 @@ try {
         assert.ok(data.panel.top >= data.stage.top - 1 && data.panel.bottom <= data.stage.bottom + 1, `${label}: example exceeds its fixed stage`);
         if (width > 800) {
           assert.ok(data.contentBottom <= height, `${label}: content is below viewport`);
-          assert.ok(data.contentTop <= height * .25 && height - data.contentBottom <= height * .25, `${label}: oversized blank band`);
+          assert.ok(data.contentTop <= 32, `${label}: content should start near the top`);
+          assert.ok(Math.abs(data.intro.top - data.display.top) <= 1 && Math.abs(data.panel.top - data.display.top) <= 1, `${label}: columns and example should be top-aligned`);
+          assert.equal(data.hostRows.length, key === 'fast' ? 3 : 0, `${label}: paired command/output rows`);
+          for (const row of data.hostRows) {
+            assert.ok(Math.abs(row.command.top - row.output.top) <= 1, `${label}: command/output tops differ`);
+            assert.ok(Math.abs(row.command.height - row.output.height) <= 1, `${label}: command/output heights differ`);
+          }
+          const gaps = data.hostRows.slice(1).flatMap((row, i) => ['command', 'output'].map((side) => row[side].top - data.hostRows[i][side].bottom));
+          assert.ok(gaps.every((gap) => gap >= 0 && Math.abs(gap - gaps[0]) <= 1), `${label}: command/output row gaps differ: ${gaps}`);
           assert.ok(data.intro.left >= data.sidebar.right && data.intro.right <= data.display.left, `${label}: sidebar and columns overlap`);
           assert.ok(data.display.right <= data.clientWidth, `${label}: content exceeds viewport`);
           for (let i = 1; i < data.labels.length; i++) assert.ok(data.labels[i].top >= data.labels[i - 1].bottom, `${label}: selector text overlaps`);

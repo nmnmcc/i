@@ -69,5 +69,7 @@ test('Fast shows the reader-facing run commands without runner flags', () => {
   const commands = [...fast.matchAll(/<pre className=\x22host-command\x22>\{([^\n]+)\}<\/pre>/g)]
     .map((match) => JSON.parse(match[1]));
   assert.deepEqual(commands, ['i run', 'i run --target wasi', 'i run --target nodejs']);
+  assert.ok(fast.includes('text title="Node.js"'));
+  assert.ok(!fast.includes('title="JavaScript"'));
   assert.doesNotMatch(fast, /--offline|--opt|2>\/dev\/null|\.mjs/);
 });
