@@ -53,7 +53,7 @@ def evaluate(rows):
 
 def literal_match(domain, rows):
     # §6.12: a match passes its subject in one position, including a pair.
-    branches = '\n| '.join(f'(({PATTERNS[p]}, {BOOLS[q]})' +
+    branches = '\n& '.join(f'(({PATTERNS[p]}, {BOOLS[q]})' +
                            (' ? False' if guard else '') + f') {{ {i} }}'
                            for i, (p, q, guard) in enumerate(rows))
     return f'f = (x : {domain}) {{ x |>\n{branches}\n}}'
@@ -105,6 +105,10 @@ def service_case(seed):
             'annotation': ("pass = (x : Int) -> Int { x }", 'pass = (x) { x }')}
 
 
+def diagnostic_codes(stderr):
+    return set(re.findall(r'error\[([^]]+)\]', stderr))
+
+
 def validate(binary, project, case, bound):
     project.joinpath('src/main.i').write_text('\n'.join(case['declarations']) + '\n')
     output, _ = invoke(binary, project, ['check', '--types'], bound)
@@ -112,8 +116,11 @@ def validate(binary, project, case, bound):
         return 'termination', output
     if (output['exit'] == 0) != case['accept']:
         return 'model-acceptance', output
-    if output['exit'] == 1 and 'rows' in case and 'E0516' not in output['stderr']:
-        return 'model-diagnostic', output
+    if output['exit'] == 1 and 'rows' in case:
+        # The model's only rejection is incomplete coverage (§7.4). Require exactly
+        # that code: a syntax error or an unrelated rejection is not the model's.
+        if diagnostic_codes(output['stderr']) != {'E0516'}:
+            return 'model-diagnostic', output
     if output['exit'] == 0:
         outcomes = []
         for opt in [0, 2]:
