@@ -132,7 +132,7 @@ try {
           const fonts = [...document.fonts].filter((font) => font.status === 'loaded').map((font) => font.family.replaceAll('"', ''));
           const fontRequests = performance.getEntriesByType('resource').filter((r) => /\.(?:woff2?|ttf|otf)(?:\?|$)/.test(r.name)).map((r) => r.name);
           const labels = [...document.querySelectorAll('.home-choice')].map(rect);
-          const hostRows = [...panel.querySelectorAll('.host-run')].map((row) => ({ box: rect(row), command: rect(row.querySelector('.host-command')), output: rect(row.querySelector('figure:has(code.language-text)')) }));
+          const hostRows = [...panel.querySelectorAll('.host-run')].map((row) => ({ box: rect(row), command: rect(row.querySelector('.host-command')), output: rect(row.querySelector('figure:has(code.language-text)')), commandText: rect(row.querySelector('.host-command pre')), outputText: rect(row.querySelector('figure:has(code.language-text) pre')) }));
           return { scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, stage: rect(document.querySelector('.example-stage')), sidebar: sidebar ? rect(sidebar) : null, intro, display, labels, hostRows, panel: rect(panel), contentTop: Math.min(intro.top, display.top), contentBottom: Math.max(intro.bottom, display.bottom), contrast, fonts, fontRequests, blocks };
         });
         const label = `${prefix} ${key}`;
@@ -153,6 +153,7 @@ try {
           for (const row of data.hostRows) {
             assert.ok(Math.abs(row.command.top - row.output.top) <= 1, `${label}: command/output tops differ`);
             assert.ok(Math.abs(row.command.height - row.output.height) <= 1, `${label}: command/output heights differ`);
+            assert.ok(Math.abs(row.commandText.top - row.outputText.top) <= 1, `${label}: command text is not on the output text line`);
           }
           const gaps = data.hostRows.slice(1).flatMap((row, i) => ['command', 'output'].map((side) => row[side].top - data.hostRows[i][side].bottom));
           assert.ok(gaps.every((gap) => gap >= 0 && Math.abs(gap - gaps[0]) <= 1), `${label}: command/output row gaps differ: ${gaps}`);

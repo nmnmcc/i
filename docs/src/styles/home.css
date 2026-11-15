@@ -38,6 +38,8 @@ html:has(.home-doc-page) { scrollbar-gutter: auto; }
 .host-run { display: grid; grid-template-columns: minmax(0, 1fr) 10rem; align-items: stretch; gap: 1rem; }
 .home-page .host-command { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; }
 .home-page .host-command pre { padding-left: var(--padding-left); padding-right: var(--padding-right); }
+/* The output box has a title bar the command box lacks; sink the command text so both lines share a row. */
+@media (min-width: 801px) { .host-run > .host-command { display: grid; align-content: end; } }
 @media (max-width: 800px) {
   .home-page { height: auto; grid-template-columns: minmax(0, 1fr); padding: 1.25rem; gap: 1.5rem; }
   .home-page h1 { max-width: 18ch; font-size: 2rem; }
