@@ -3033,5 +3033,20 @@
   },
   "crates/ilang-wasm/src/runtime/values/inspect/tests.rs:bccfcbd33ac84fc3": {
     "not_source": "Expected core.inspect text for a built-in Fail value; //fn is the specified function display, not source code."
+  },
+  "crates/ilang-cli/tests/fmt_to_safety.rs:207e46ecaf2cf141": {
+    "not_source": "Expected-output substring: the attribute alone is not a complete item; the test converts and parses the whole module separately"
+  },
+  "crates/ilang-cli/tests/fmt_to_safety.rs:09bc62c760930805": {
+    "not_source": "Expected-output substring: the attribute alone is not a complete item; the test converts and parses the whole module separately"
+  },
+  "crates/ilang-cli/tests/fmt_to_safety.rs:ea7e09688ea7bfaa": {
+    "not_source": "Expected-output substring: a macro attribute alone is not a complete item; the test converts and parses the whole module separately"
+  },
+  "crates/ilang-cli/tests/fmt_to_safety.rs:3b1d1820403751dd": {
+    "not_source": "Rust format string in an English skip message, not i source"
+  },
+  "crates/ilang-cli/tests/fmt_to_safety.rs:3efda719859a84ab": {
+    "not_source": "Rust format template for generated i source; the runtime test converts the generated module"
   }
 }
