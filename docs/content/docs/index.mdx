@@ -124,7 +124,7 @@ word = (n) { n |> (0) { "zero" } | (1) { "one" } }
 hello/main.word : (0 | 1) -> "one" | "zero"
 ```
 
-```i error E0552 E0501 stderr=exact project=examples/words package=hello title="src/probe.i"
+```i error E0501 stderr=exact project=examples/words package=hello title="src/probe.i"
 (
 	app = hello/main
 )
@@ -133,9 +133,8 @@ bad = app.word(2)
 ```
 
 ```text title="i check"
-src/probe.i:5:7: error[E0552]: no branch of this function can match these arguments: their known types are `(2)` (syntax three §2.6.2)
-src/probe.i:5:16: error[E0501]: `2` is not a subtype of `0 | 1` (the type at 5:7 needs it)
-2 errors
+src/probe.i:5:16: error[E0501]: `2` is not one of the values `app.word` accepts for argument 1: `0 | 1`
+1 error
 ```
 </section>
 <section className="example-panel" id="panel-extensible" aria-labelledby="title-extensible">
