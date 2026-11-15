@@ -205,7 +205,15 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
     }
 
     if failed {
-        // Phase two never starts: no destination was created and no source removed.
+        // Phase two never starts: no destination was created and no source
+        // removed. Say so, and list every file in the batch as not converted.
+        eprintln!(
+            "no files were converted: the check phase refused the batch and nothing was written"
+        );
+        eprintln!("files not converted (all left as they were):");
+        for file in files {
+            eprintln!("  {}", file.display());
+        }
         return Ok(ExitCode::FAILURE);
     }
 
@@ -230,8 +238,7 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
 
     // Phase two: write. The source of a converted file stays in place until its
     // destination is durable, complete and read back byte for byte.
-    let mut converted: Vec<(PathBuf, PathBuf)> = Vec::new();
-    for plan in &plans {
+    for (index, plan) in plans.iter().enumerate() {
         let step = if plan.rename_source {
             write_conversion(plan)
         } else {
@@ -239,7 +246,10 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
         };
         if let Err(e) = step {
             eprintln!("{}: error: {e}", plan.source.display());
-            report_converted(&converted);
+            // Say what happened to every file: the ones already written, the
+            // one that failed (with the state of its source and destination),
+            // and the ones that were never touched.
+            report_write_failure(&plans, index);
             return Err(anyhow::anyhow!(
                 "{}: conversion stopped; the files above were already converted",
                 plan.source.display()
@@ -251,7 +261,6 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
                 plan.source.display(),
                 plan.destination.display()
             );
-            converted.push((plan.source.clone(), plan.destination.clone()));
         }
     }
     Ok(ExitCode::SUCCESS)
@@ -268,7 +277,13 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
 fn write_conversion(plan: &Plan) -> anyhow::Result<()> {
     let destination = &plan.destination;
     let dir = destination.parent().unwrap_or_else(|| Path::new("."));
-    let temporary = write_temporary(dir, destination, plan.output.as_bytes())?;
+    let mode = source_mode(&plan.source).map_err(|e| {
+        anyhow::anyhow!(
+            "cannot read the permissions of {}: {e}; the source is unchanged",
+            plan.source.display()
+        )
+    })?;
+    let temporary = write_temporary(dir, destination, plan.output.as_bytes(), mode)?;
 
     // Atomically publish the temporary file at the destination, failing if the
     // destination already exists. `rename` would replace it, so it is not used:
@@ -356,7 +371,13 @@ fn write_conversion(plan: &Plan) -> anyhow::Result<()> {
 /// plan skips unchanged files).
 fn write_in_place(plan: &Plan) -> anyhow::Result<()> {
     let dir = plan.source.parent().unwrap_or_else(|| Path::new("."));
-    let temporary = write_temporary(dir, &plan.source, plan.output.as_bytes())?;
+    let mode = source_mode(&plan.source).map_err(|e| {
+        anyhow::anyhow!(
+            "cannot read the permissions of {}: {e}; the file is unchanged",
+            plan.source.display()
+        )
+    })?;
+    let temporary = write_temporary(dir, &plan.source, plan.output.as_bytes(), mode)?;
     // Read back the temporary file before it replaces anything.
     match std::fs::read(&temporary) {
         Ok(bytes) if bytes == plan.output.as_bytes() => {}
@@ -396,6 +417,7 @@ fn write_temporary(
     dir: &Path,
     destination: &Path,
     bytes: &[u8],
+    mode: Option<u32>,
 ) -> anyhow::Result<PathBuf> {
     let file_name = destination
         .file_name()
@@ -406,11 +428,17 @@ fn write_temporary(
             ".{file_name}.tmp-{}-{attempt}",
             std::process::id()
         ));
-        let mut file = match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&candidate)
-        {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        // Set the source's mode at creation, so even before writing the file is
+        // never more readable than the source. The mode is set again below, in
+        // case the process umask narrowed it.
+        #[cfg(unix)]
+        if let Some(mode) = mode {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(mode);
+        }
+        let mut file = match options.open(&candidate) {
             Ok(file) => file,
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => {
@@ -436,6 +464,23 @@ fn write_temporary(
                 candidate.display()
             ));
         }
+        drop(file);
+        #[cfg(unix)]
+        if let Some(mode) = mode {
+            use std::os::unix::fs::PermissionsExt;
+            if let Err(e) = std::fs::set_permissions(
+                &candidate,
+                std::fs::Permissions::from_mode(mode),
+            ) {
+                cleanup_temporary(&candidate);
+                return Err(anyhow::anyhow!(
+                    "cannot set the permissions of {}: {e}",
+                    candidate.display()
+                ));
+            }
+        }
+        // On non-Unix systems the mode is not carried over: there is no portable
+        // mode to read, and `set_permissions` only toggles the read-only flag.
         return Ok(candidate);
     }
     Err(anyhow::anyhow!(
@@ -508,6 +553,18 @@ fn rename_noreplace(from: &Path, to: &Path) -> std::io::Result<()> {
     } else {
         Err(std::io::Error::last_os_error())
     }
+}
+
+/// The permission bits of `path` on Unix, or `None` elsewhere.
+#[cfg(unix)]
+fn source_mode(path: &Path) -> std::io::Result<Option<u32>> {
+    use std::os::unix::fs::PermissionsExt;
+    Ok(Some(std::fs::metadata(path)?.permissions().mode() & 0o7777))
+}
+
+#[cfg(not(unix))]
+fn source_mode(_path: &Path) -> std::io::Result<Option<u32>> {
+    Ok(None)
 }
 
 /// Sync a directory entry. Directories cannot be opened as files on every
@@ -597,28 +654,74 @@ fn diag_message(diags: &[ilang_syntax::Diagnostic]) -> String {
         .unwrap_or_else(|| "unknown error".to_owned())
 }
 
-fn report_converted(converted: &[(PathBuf, PathBuf)]) {
-    if converted.is_empty() {
-        eprintln!("no files were converted before the failure");
-        return;
+/// Report the three groups of a run that failed while writing: what was
+/// written, what failed and the state of both of its files, and what was not
+/// processed.
+fn report_write_failure(plans: &[Plan], failed: usize) {
+    let converted: Vec<&Plan> = plans[..failed]
+        .iter()
+        .filter(|plan| plan.rename_source)
+        .collect();
+    let formatted: Vec<&Plan> = plans[..failed]
+        .iter()
+        .filter(|plan| !plan.rename_source)
+        .collect();
+    if converted.is_empty() && formatted.is_empty() {
+        eprintln!("already written in this run: none");
+    } else {
+        eprintln!("already converted in this run (destination written, source removed):");
+        if converted.is_empty() {
+            eprintln!("  none");
+        }
+        for plan in &converted {
+            eprintln!(
+                "  {} -> {}",
+                plan.source.display(),
+                plan.destination.display()
+            );
+        }
+        if !formatted.is_empty() {
+            eprintln!("already formatted in place:");
+            for plan in &formatted {
+                eprintln!("  {}", plan.source.display());
+            }
+        }
     }
-    eprintln!("already converted in this run:");
-    for (source, destination) in converted {
+    let plan = &plans[failed];
+    eprintln!("failed:");
+    eprintln!(
+        "  {} -> {}: source {}, destination {}",
+        plan.source.display(),
+        plan.destination.display(),
+        if plan.source.exists() {
+            "is unchanged"
+        } else {
+            "was removed"
+        },
+        if plan.destination.exists() {
+            "exists and may be incomplete"
+        } else {
+            "was not written"
+        }
+    );
+    eprintln!("not processed (left as they were):");
+    if failed + 1 >= plans.len() {
+        eprintln!("  none");
+    }
+    for plan in &plans[failed + 1..] {
+        eprintln!("  {}", plan.source.display());
+    }
+    let old_extension = plans
+        .first()
+        .and_then(|plan| plan.source.extension())
+        .map(|e| e.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "i".to_owned());
+    if !converted.is_empty() {
         eprintln!(
-            "  {} -> {}",
-            source.display(),
-            destination.display()
+            "recover each converted file by converting it back (`i fmt --to {old_extension} DESTINATION`) \
+             or by restoring the source from version control"
         );
     }
-    eprintln!(
-        "recover each one by converting it back (`i fmt --to {} DESTINATION`) or by \
-         restoring the source from version control",
-        converted
-            .first()
-            .and_then(|(source, _)| source.extension())
-            .map(|e| e.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "i".to_owned())
-    );
 }
 
 fn report_diags(file: &Path, source: &str, diags: &[ilang_syntax::Diagnostic]) {
