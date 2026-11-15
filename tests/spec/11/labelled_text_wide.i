@@ -1,0 +1,169 @@
+// spec: 11.8
+// expect: pass
+// Exercise bounded metadata initialization for both fields and constructors.
+(
+	i/core
+)
+
+Wide = (
+	field_39 = Int,
+	field_38 = Int,
+	field_37 = Int,
+	field_36 = Int,
+	field_35 = Int,
+	field_34 = Int,
+	field_33 = Int,
+	field_32 = Int,
+	field_31 = Int,
+	field_30 = Int,
+	field_29 = Int,
+	field_28 = Int,
+	field_27 = Int,
+	field_26 = Int,
+	field_25 = Int,
+	field_24 = Int,
+	field_23 = Int,
+	field_22 = Int,
+	field_21 = Int,
+	field_20 = Int,
+	field_19 = Int,
+	field_18 = Int,
+	field_17 = Int,
+	field_16 = Int,
+	field_15 = Int,
+	field_14 = Int,
+	field_13 = Int,
+	field_12 = Int,
+	field_11 = Int,
+	field_10 = Int,
+	field_09 = Int,
+	field_08 = Int,
+	field_07 = Int,
+	field_06 = Int,
+	field_05 = Int,
+	field_04 = Int,
+	field_03 = Int,
+	field_02 = Int,
+	field_01 = Int,
+	field_00 = Int,
+)
+Unused0 = ()
+Unused1 = ()
+Unused2 = ()
+Unused3 = ()
+Unused4 = ()
+Unused5 = ()
+Unused6 = ()
+Unused7 = ()
+Unused8 = ()
+Unused9 = ()
+Unused10 = ()
+Unused11 = ()
+Unused12 = ()
+Unused13 = ()
+Unused14 = ()
+Unused15 = ()
+Unused16 = ()
+Unused17 = ()
+Unused18 = ()
+Unused19 = ()
+Unused20 = ()
+Unused21 = ()
+Unused22 = ()
+Unused23 = ()
+Unused24 = ()
+Unused25 = ()
+Unused26 = ()
+Unused27 = ()
+Unused28 = ()
+Unused29 = ()
+Unused30 = ()
+Unused31 = ()
+Unused32 = ()
+Unused33 = ()
+Unused34 = ()
+Unused35 = ()
+Unused36 = ()
+Unused37 = ()
+Unused38 = ()
+Unused39 = ()
+Unused40 = ()
+Unused41 = ()
+Unused42 = ()
+Unused43 = ()
+Unused44 = ()
+Unused45 = ()
+Unused46 = ()
+Unused47 = ()
+Unused48 = ()
+Unused49 = ()
+Unused50 = ()
+Unused51 = ()
+Unused52 = ()
+Unused53 = ()
+Unused54 = ()
+Unused55 = ()
+Unused56 = ()
+Unused57 = ()
+Unused58 = ()
+Unused59 = ()
+Unused60 = ()
+Unused61 = ()
+Unused62 = ()
+Unused63 = ()
+Unused64 = ()
+Unused65 = ()
+Unused66 = ()
+Unused67 = ()
+Unused68 = ()
+Unused69 = ()
+
+main = () {
+	assert(
+		core.inspect(
+			Wide(
+				field_00 = 0,
+				field_01 = 1,
+				field_02 = 2,
+				field_03 = 3,
+				field_04 = 4,
+				field_05 = 5,
+				field_06 = 6,
+				field_07 = 7,
+				field_08 = 8,
+				field_09 = 9,
+				field_10 = 10,
+				field_11 = 11,
+				field_12 = 12,
+				field_13 = 13,
+				field_14 = 14,
+				field_15 = 15,
+				field_16 = 16,
+				field_17 = 17,
+				field_18 = 18,
+				field_19 = 19,
+				field_20 = 20,
+				field_21 = 21,
+				field_22 = 22,
+				field_23 = 23,
+				field_24 = 24,
+				field_25 = 25,
+				field_26 = 26,
+				field_27 = 27,
+				field_28 = 28,
+				field_29 = 29,
+				field_30 = 30,
+				field_31 = 31,
+				field_32 = 32,
+				field_33 = 33,
+				field_34 = 34,
+				field_35 = 35,
+				field_36 = 36,
+				field_37 = 37,
+				field_38 = 38,
+				field_39 = 39,
+			),
+		) ==
+			"Wide(field_00 = 0, field_01 = 1, field_02 = 2, field_03 = 3, field_04 = 4, field_05 = 5, field_06 = 6, field_07 = 7, field_08 = 8, field_09 = 9, field_10 = 10, field_11 = 11, field_12 = 12, field_13 = 13, field_14 = 14, field_15 = 15, field_16 = 16, field_17 = 17, field_18 = 18, field_19 = 19, field_20 = 20, field_21 = 21, field_22 = 22, field_23 = 23, field_24 = 24, field_25 = 25, field_26 = 26, field_27 = 27, field_28 = 28, field_29 = 29, field_30 = 30, field_31 = 31, field_32 = 32, field_33 = 33, field_34 = 34, field_35 = 35, field_36 = 36, field_37 = 37, field_38 = 38, field_39 = 39)",
+	)
+}

@@ -109,7 +109,11 @@ fn cases() -> Vec<(String, String)> {
         ),
         (
             format!("(call $record (i32.const 2) (i64.const 1) {})", fields(&[literal("m")])),
-            "AssertionFailure(\"m\")".into(),
+            "AssertionFailure(message = \"m\")".into(),
+        ),
+        (
+            format!("(call $record (i32.const 4) (i64.const 3) {})", fields(&[object(7, 0, 1, no_bytes)])),
+            "Fail(raise = //fn(a) { ... })".into(),
         ),
         (
             list(&[tuple(&[integer(1), literal("a")]), pair(&[list(&[])])]),

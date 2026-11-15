@@ -1,0 +1,2 @@
+(, require_string)
+(@ macro (= require_string (-> (, item) _ `(= generated (-> (,) String 1)))))

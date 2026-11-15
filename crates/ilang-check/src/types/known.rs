@@ -155,7 +155,7 @@ pub(super) fn top_written(mut q: &Pattern) -> Option<&Type> {
     loop {
         match &q.kind {
             PatternKind::Typed { ty, .. } => return Some(ty),
-            PatternKind::Named { pattern, .. } => q = pattern,
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => q = pattern,
             _ => return None,
         }
     }
@@ -619,13 +619,17 @@ impl Checker<'_> {
             PatternKind::Quote { syntax, .. } => Head::Named(TypeRef::Custom(*syntax)),
             PatternKind::Var(_) | PatternKind::Discard => return b.clone(),
             PatternKind::Typed { ty, .. } => return self.kconv(ty, &HashMap::new()),
-            PatternKind::Named { pattern, .. } => return self.member_for_ty(pattern, b),
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+                return self.member_for_ty(pattern, b);
+            }
             PatternKind::Int { .. } => prim(BuiltinType::Int),
             PatternKind::Float { .. } => prim(BuiltinType::Float),
             PatternKind::String(_) | PatternKind::Prefix { .. } => prim(BuiltinType::String),
             PatternKind::BitArray(_) => prim(BuiltinType::BitArray),
             PatternKind::Constructor { ctor, .. } => Head::Named(TypeRef::Custom(ctor.ty)),
-            PatternKind::Tuple(ps) => Head::Shape(super::ShapeId::positional(ps.len() as u32)),
+            PatternKind::Tuple(_) | PatternKind::Data { .. } => {
+                Head::Shape(q.data_shape().unwrap())
+            }
             PatternKind::List { .. } => Head::Named(TypeRef::Builtin(BuiltinType::List)),
             PatternKind::Error(_) => return Ty::Top,
         };
@@ -657,6 +661,7 @@ impl Checker<'_> {
                     self.fit_known(pattern, &Knowledge::certain(ty), in_case);
                 }
             }
+            PatternKind::Keyed { pattern, .. } => self.fit_known(pattern, b, in_case),
             PatternKind::Var(x) => self.kbind(x.var, b.clone(), in_case),
             PatternKind::Typed {
                 binder: Some(x),
@@ -712,8 +717,8 @@ impl Checker<'_> {
                     self.fit_known(arg, &k, in_case);
                 }
             }
-            PatternKind::Tuple(ps) => {
-                let data = b.member(Head::Shape(super::ShapeId::positional(ps.len() as u32)));
+            PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => {
+                let data = b.member(Head::Shape(q.data_shape().unwrap()));
                 for (i, x) in ps.iter().enumerate() {
                     self.fit_known(x, &data.part(i), in_case);
                 }

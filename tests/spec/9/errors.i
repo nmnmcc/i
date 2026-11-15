@@ -1,4 +1,4 @@
-// spec: 9.1, 9.3
+// spec: 9.1, 9.3, 11.8
 // expect: pass
 (
 	testlib = (test) = std/test
@@ -133,15 +133,15 @@ test("safe_example", () {
 	{
 		check(
 			show(fail.catch(() { safe("1") })),
-			"Ok(User(\"ann\"))",
+			"Ok(User(name = \"ann\"))",
 		)
 		check(
 			show(fail.catch(() { safe("2") })),
-			"Ok(User(\"default\"))",
+			"Ok(User(name = \"default\"))",
 		)
 		check(
 			show(fail.catch(() { safe("3") })),
-			"Error(HttpError(404))",
+			"Error(HttpError(status = 404))",
 		)
 	} <- (fake)
 })

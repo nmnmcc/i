@@ -2239,10 +2239,14 @@ impl<'a, 't> R3<'a, 't> {
                     },
                 }
             }
-            E::Index { target, index } => ExprKind::TupleIndex {
+            E::Index {
+                target,
+                index,
+                index_span,
+            } => ExprKind::TupleIndex {
                 target: Box::new(self.expr(target)),
                 index: index.clone(),
-                index_span: Span::new(span.end.saturating_sub(1), span.end),
+                index_span: index_span.0,
             },
             E::Unary { op, expr } => ExprKind::Unary {
                 op: *op,
@@ -2891,6 +2895,16 @@ impl<'a, 't> R3<'a, 't> {
 
     // ---- Patterns ----
 
+    /// Data patterns have their own binders: the enclosing field label is
+    /// metadata, rather than a name in their conjunction.
+    fn keyed_data(p: &n::Pattern) -> bool {
+        match &p.kind {
+            n::PatternKind::Data(_) => true,
+            n::PatternKind::And(parts) => parts.iter().any(Self::keyed_data),
+            _ => false,
+        }
+    }
+
     fn keyed<'x>(&self, l: &'x n::Ident, p: &'x n::Pattern) -> AndPlan<'x> {
         let pre = self.pre();
         keyed_plan(l, p, || {
@@ -2921,6 +2935,7 @@ impl<'a, 't> R3<'a, 't> {
                 for item in args.iter().flatten() {
                     match item {
                         n::DPItem::Pos(p) => self.binders(p, out),
+                        n::DPItem::Key(_, p) if Self::keyed_data(p) => self.binders(p, out),
                         n::DPItem::Key(l, p) => self.plan_binders(&self.keyed(l, p), out),
                         n::DPItem::Rest(_) => {}
                     }
@@ -2928,8 +2943,9 @@ impl<'a, 't> R3<'a, 't> {
             }
             P::Data(items) => {
                 for item in items {
-                    if let n::DPItem::Pos(p) = item {
-                        self.binders(p, out);
+                    match item {
+                        n::DPItem::Pos(p) | n::DPItem::Key(_, p) => self.binders(p, out),
+                        n::DPItem::Rest(_) => {}
                     }
                 }
             }
@@ -3143,6 +3159,15 @@ impl<'a, 't> R3<'a, 't> {
                             }
                             _ => self.pattern(a, binders, shared),
                         }),
+                        n::DPItem::Key(l, a) if Self::keyed_data(a) => {
+                            parts.push(Pattern {
+                                kind: PatternKind::Keyed {
+                                    label: id(l),
+                                    pattern: Box::new(self.pattern(a, binders, shared)),
+                                },
+                                span: Span::new(l.span.0.start, a.span.0.end),
+                            });
+                        }
                         n::DPItem::Key(l, a) => {
                             let plan = self.keyed(l, a);
                             parts.push(self.ctor_part(&plan, binders, shared));
@@ -3161,16 +3186,38 @@ impl<'a, 't> R3<'a, 't> {
                     None => PatternKind::Error(parts),
                 }
             }
-            // Keys and rest items in data patterns are currently unsupported.
-            P::Data(items) => PatternKind::Tuple(
-                items
-                    .iter()
-                    .filter_map(|item| match item {
-                        n::DPItem::Pos(a) => Some(self.pattern(a, binders, shared)),
-                        _ => None,
-                    })
-                    .collect(),
-            ),
+            P::Data(items) => {
+                let mut positions = Vec::new();
+                let mut labels = std::collections::BTreeMap::new();
+                for item in items {
+                    match item {
+                        n::DPItem::Pos(a) => positions.push(self.pattern(a, binders, shared)),
+                        n::DPItem::Key(l, a) => {
+                            let part = self.pattern(a, binders, shared);
+                            if labels.insert(l.name.clone(), part).is_some() {
+                                self.r.error(
+                                    code::PATTERN_FIELDS,
+                                    l.span.0,
+                                    "this field is matched more than once",
+                                );
+                            }
+                        }
+                        // Rest patterns remain a pre-validation error.
+                        n::DPItem::Rest(_) => {}
+                    }
+                }
+                if labels.is_empty() {
+                    PatternKind::Tuple(positions)
+                } else {
+                    let shape =
+                        crate::types::ShapeId::new(positions.len() as u32, labels.keys().cloned());
+                    positions.extend(labels.into_values());
+                    PatternKind::Data {
+                        shape,
+                        parts: positions,
+                    }
+                }
+            }
             P::List { items, rest } => {
                 let items = items
                     .iter()

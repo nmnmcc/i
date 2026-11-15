@@ -18,7 +18,9 @@ const LITERAL_CANDIDATES: bool = true;
 pub(crate) fn catch_all(p: &Pattern) -> bool {
     match &p.kind {
         PatternKind::Var(_) | PatternKind::Discard => true,
-        PatternKind::Named { pattern, .. } => catch_all(pattern),
+        PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+            catch_all(pattern)
+        }
         _ => false,
     }
 }
@@ -28,10 +30,11 @@ pub(crate) fn binders(p: &Pattern, out: &mut Vec<VarId>) {
     crate::hir::pattern_binders(p, &mut |b| out.push(b.var));
 }
 
-/// The label of a part of a constructor pattern: the last name in
-/// the chain of `=` at its top.
+/// The explicit label of a constructor part, or the last name in the legacy
+/// representation of its top-level `=` chain.
 pub(crate) fn part_label(p: &Pattern) -> Option<&str> {
     match &p.kind {
+        PatternKind::Keyed { label, .. } => Some(&label.name),
         PatternKind::Var(b) => Some(&b.name),
         PatternKind::Typed {
             binder: Some(b), ..
@@ -97,7 +100,7 @@ struct Visit<'p> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Step {
     Field(CtorRef, u32),
-    Part(u32, u32),
+    Part(super::ShapeId, u32),
     Item(u32),
     Rest,
 }
@@ -126,6 +129,7 @@ impl Checker<'_> {
     /// Gives every name of a catch-all the type `t`.
     fn bind_catch_all(&mut self, p: &Pattern, t: &Ty, in_case: bool) {
         match &p.kind {
+            PatternKind::Keyed { pattern, .. } => self.bind_catch_all(pattern, t, in_case),
             PatternKind::Var(b) => self.bind(b, t.clone(), in_case),
             PatternKind::Named { binder, pattern } => {
                 self.bind(binder, t.clone(), in_case);
@@ -171,15 +175,17 @@ impl Checker<'_> {
     }
 
     fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
-        if catch_all(q) {
+        if let PatternKind::Keyed { pattern, .. } = &q.kind {
+            self.fit_in(pattern, b, in_case);
+        } else if catch_all(q) {
             self.bind_catch_all(q, b, in_case);
-        } else if let PatternKind::Tuple(ps) = &q.kind
+        } else if let PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } = &q.kind
             && !in_case
         {
             // The parts of a fitted tuple are fitted one by one, so that a
             // constructor part may fail as at the top: `(Ok(a), Ok(b)) = …`.
             let parts: Vec<Ty> = ps.iter().map(|_| self.s.fresh()).collect();
-            self.sub(b, &Ty::tuple(parts.clone()), q.span);
+            self.sub(b, &Ty::data(q.data_shape().unwrap(), parts.clone()), q.span);
             for (p, t) in ps.iter().zip(&parts) {
                 self.fit_in(p, t, in_case);
             }
@@ -228,6 +234,7 @@ impl Checker<'_> {
     /// are fitted to the parts of `Q`.
     fn pat(&mut self, q: &Pattern, in_case: bool) -> Ty {
         match &q.kind {
+            PatternKind::Keyed { pattern, .. } => self.param_in(pattern, in_case),
             PatternKind::Var(_) | PatternKind::Discard => self.param_in(q, in_case),
             PatternKind::Named { binder, pattern } => {
                 let t = self.param_in(pattern, in_case);
@@ -257,9 +264,10 @@ impl Checker<'_> {
                     self.family(t, ctor.ty, q.span)
                 }
             }
-            PatternKind::Tuple(ps) => {
-                Ty::tuple(ps.iter().map(|x| self.param_in(x, in_case)).collect())
-            }
+            PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => Ty::data(
+                q.data_shape().unwrap(),
+                ps.iter().map(|x| self.param_in(x, in_case)).collect(),
+            ),
             PatternKind::List { items, rest } => {
                 let e = self.s.fresh();
                 for x in items {
@@ -1043,6 +1051,9 @@ impl Checker<'_> {
             });
             return (places[at].ty.clone(), Pat::Wild(Some(id)));
         }
+        if let PatternKind::Keyed { pattern, .. } = &q.kind {
+            return self.visit(pattern, at, v, places);
+        }
         if let PatternKind::Named { binder, pattern } = &q.kind {
             let (t, pat) = self.visit(pattern, at, v, places);
             self.bind(binder, t.clone(), true);
@@ -1210,9 +1221,9 @@ impl Checker<'_> {
                     Pat::Ctor(Ctor::Custom(*ctor), parts),
                 )
             }
-            PatternKind::Tuple(ps) => {
-                let n = ps.len() as u32;
-                let h = Head::Shape(super::ShapeId::positional(n));
+            PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => {
+                let shape = q.data_shape().unwrap();
+                let h = Head::Shape(shape);
                 let parts = self.shared(places, at, h, ps.len());
                 let kdata = places[at].known.member(h);
                 let mut pats = Vec::new();
@@ -1220,17 +1231,14 @@ impl Checker<'_> {
                     let c = self.child(
                         places,
                         at,
-                        Step::Part(n, i as u32),
+                        Step::Part(shape, i as u32),
                         parts[i].clone(),
                         kdata.part(i),
                     );
                     pats.push(self.visit(x, c, v, places).1);
                 }
                 places[at].seen.push((v.clause, v.unguarded, h, ps.len()));
-                (
-                    Ty::tuple(parts),
-                    Pat::Ctor(Ctor::Shape(super::ShapeId::positional(n)), pats),
-                )
+                (Ty::data(shape, parts), Pat::Ctor(Ctor::Shape(shape), pats))
             }
             PatternKind::List { items, rest } => {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));
@@ -1315,7 +1323,9 @@ impl Checker<'_> {
 fn top_ctor(p: &Pattern) -> Option<CtorRef> {
     match &p.kind {
         PatternKind::Constructor { ctor, .. } => Some(*ctor),
-        PatternKind::Named { pattern, .. } => top_ctor(pattern),
+        PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+            top_ctor(pattern)
+        }
         _ => None,
     }
 }
@@ -1327,12 +1337,14 @@ fn ctor_binders(p: &Pattern, out: &mut Vec<(VarId, Option<CtorRef>)>) {
         PatternKind::Quote { captures, .. } => {
             captures.iter().for_each(|(_, p)| ctor_binders(p, out))
         }
+        PatternKind::Keyed { pattern, .. } => ctor_binders(pattern, out),
         PatternKind::Named { binder, pattern } => {
             out.push((binder.var, top_ctor(pattern)));
             ctor_binders(pattern, out);
         }
         PatternKind::Constructor { args: ps, .. }
         | PatternKind::Tuple(ps)
+        | PatternKind::Data { parts: ps, .. }
         | PatternKind::Error(ps) => ps.iter().for_each(|q| ctor_binders(q, out)),
         PatternKind::List { items, .. } => items.iter().for_each(|q| ctor_binders(q, out)),
         PatternKind::BitArray(segs) => segs.iter().for_each(|s| ctor_binders(&s.value, out)),

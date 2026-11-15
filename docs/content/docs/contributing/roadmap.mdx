@@ -72,7 +72,7 @@ main = () <- (io : Io) {
 ```
 
 ```text
-Error(JsonError(0, "expected value"))
+Error(JsonError(offset = 0, reason = "expected value"))
 Error(DivisionByZero)
 ```
 
@@ -80,17 +80,9 @@ Error(DivisionByZero)
 
 ## Current limitations
 
-### Keyed data patterns
-
-Keyed data patterns are not available yet; use field access (DOC1).
-
 ### Data-rest patterns
 
 Data-rest patterns are not available yet; list rest patterns work (P13).
-
-### Labelled value printing
-
-`core.inspect` omits field labels when printing labelled values, including errors (DOC2).
 
 ### Resource scopes
 

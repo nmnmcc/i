@@ -38,10 +38,15 @@ data = b''.join(str(len(source.encode())).encode() + b'\n' + source.encode() for
 result = subprocess.check_output([str(tool), '--lisp'], input=data).decode().splitlines()
 output = iter(result)
 failures = []
-for (name, _) in sources:
+for (name, source) in sources:
     diagnostics = [next(output).split(' ', 1) for _ in range(int(next(output)))]
-    if diagnostics:
-        failures.append(name + ': ' + '; '.join(code + ': ' + bytes.fromhex(message).decode() for code, message in diagnostics))
+    actual = [code + ': ' + bytes.fromhex(message).decode() for code, message in diagnostics]
+    # Negative syntax fixtures pin every parser/pre-validation diagnostic,
+    # including the complete message; all other files must parse cleanly.
+    expected = [line.removeprefix('// parser-error: ') for line in source.splitlines()
+                if line.startswith('// parser-error: ')]
+    if actual != expected:
+        failures.append(f'{name}: expected {expected!r}; actual {actual!r}')
 if failures:
     raise SystemExit('\n'.join(failures))
 print(f'syn3-lisp-check: {len(files)} repository .is files and {len(sources)-len(files)} CLI macro source fragments parsed')

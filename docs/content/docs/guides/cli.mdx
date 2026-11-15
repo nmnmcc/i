@@ -180,15 +180,15 @@ i run --opt 2 -- Ada
 ```
 
 ```text
-MissingArgument("--count")
+MissingArgument(name = "--count")
 Usage: greet
   <name>	Name to greet
   --count, -c VALUE	Number of greetings
 
-error: MissingArgument("--count")
+error: MissingArgument(name = "--count")
 guide_cli/main:17:1
 ```
 
-Exit status is 1. `cli.run` writes the error and usage to standard error, then raises; the entry handler reports the uncaught error. Printed labelled errors omit their field labels.
+Exit status is 1. `cli.run` writes the error and usage to standard error, then raises; the entry handler reports the uncaught error. Printed labelled errors include their field labels (§11.8).
 
 [Files](/docs/guides/files)

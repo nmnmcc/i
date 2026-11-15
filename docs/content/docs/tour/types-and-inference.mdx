@@ -68,10 +68,10 @@ main = () { stdio.print(core.inspect(ScreenPoint(x = 3, y = 4))) }
 ```
 
 ```text
-ScreenPoint(3, 4)
+ScreenPoint(x = 3, y = 4)
 ```
 
-`core.inspect` currently omits field names from labelled values.
+`core.inspect` includes the constructor and field names. Positional fields come first, then labelled fields in UTF-8 byte order of their labels (§11.8).
 
 ## Annotations
 

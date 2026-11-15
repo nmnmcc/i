@@ -66,3 +66,8 @@ by the CLI's macro-run and typed-macro tests. Each fragment is put in its
 actual declaration or macro-binding context. This catches old Lisp rows
 that do not resemble normal-surface bindings; the runtime test binaries
 still exercise their typing, expansion and execution.
+
+A negative `.is` syntax fixture lists each complete expected diagnostic in
+a `// parser-error: E0101: message` comment. The Lisp check compares the whole
+ordered list, including messages; an unlisted diagnostic or a missing expected
+diagnostic fails. Files without these comments must parse without diagnostics.

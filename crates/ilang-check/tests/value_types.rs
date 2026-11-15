@@ -593,7 +593,10 @@ enum SpecCase {
 /// in normal and
 /// reversed type-tie order. Each case is loaded into its own package graph, so
 /// the result does not depend on any other case.
-fn spec_case_reverse_order_and_recovery(path: &std::path::Path) -> Result<SpecCase, String> {
+fn spec_case_reverse_order_and_recovery(
+    path: &std::path::Path,
+    pending: bool,
+) -> Result<SpecCase, String> {
     let options = ilang_package::LoadOptions {
         write_lock: false,
         offline: true,
@@ -631,7 +634,18 @@ fn spec_case_reverse_order_and_recovery(path: &std::path::Path) -> Result<SpecCa
     let (p, resolve_diags) = ilang_check::resolve_program(&g);
     // Parser-rejected cases have no inference graph to permute.
     let Some(mut p) = p else {
-        if !expects_compile_error {
+        // POLY1's intended passing case is explicitly pending in the shared
+        // spec inventory. Still check its precise current refusal; do not
+        // hide load failures or unrelated parser errors, or skip any case
+        // that does produce an inference graph.
+        let errors: Vec<_> = resolve_diags.iter().filter(|d| d.is_error()).collect();
+        let pending_poly = pending
+            && !errors.is_empty()
+            && errors.iter().all(|d| {
+                d.code == "E0101"
+                    && d.message == "type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+            });
+        if !expects_compile_error && !pending_poly {
             return Err(format!("unexpected parse failure: {resolve_diags:?}"));
         }
         return Ok(SpecCase::Rejected);
@@ -689,8 +703,14 @@ fn spec_corpus_reverse_order_and_recovery() {
     // take the next case from a shared index. Every failure is collected with
     // its path and reported together at the end.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec");
+    let pending: Vec<_> = std::fs::read_to_string(root.join("syn3-pending.txt"))
+        .unwrap()
+        .lines()
+        .map(|line| line.split('#').next().unwrap_or("").trim().to_owned())
+        .filter(|line| !line.is_empty())
+        .collect();
     let mut cases = Vec::new();
-    for section in std::fs::read_dir(root).unwrap() {
+    for section in std::fs::read_dir(&root).unwrap() {
         let section = section.unwrap().path();
         if !section.is_dir() {
             continue;
@@ -716,18 +736,18 @@ fn spec_corpus_reverse_order_and_recovery() {
                     loop {
                         let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         let Some(path) = cases.get(i) else { break };
-                        let result =
-                            std::panic::catch_unwind(|| spec_case_reverse_order_and_recovery(path))
-                                .unwrap_or_else(|panic| {
-                                    let message = panic
-                                        .downcast_ref::<String>()
-                                        .cloned()
-                                        .or_else(|| {
-                                            panic.downcast_ref::<&str>().map(|s| s.to_string())
-                                        })
-                                        .unwrap_or_else(|| "non-string panic".into());
-                                    Err(format!("panicked: {message}"))
-                                });
+                        let is_pending = pending.iter().any(|name| path == &root.join(name));
+                        let result = std::panic::catch_unwind(|| {
+                            spec_case_reverse_order_and_recovery(path, is_pending)
+                        })
+                        .unwrap_or_else(|panic| {
+                            let message = panic
+                                .downcast_ref::<String>()
+                                .cloned()
+                                .or_else(|| panic.downcast_ref::<&str>().map(|s| s.to_string()))
+                                .unwrap_or_else(|| "non-string panic".into());
+                            Err(format!("panicked: {message}"))
+                        });
                         out.push((path, result));
                     }
                     out

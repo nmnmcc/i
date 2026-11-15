@@ -1,4 +1,4 @@
-// spec: 6.4, 6.5, 6.7, 4.3
+// spec: 6.4, 6.5, 6.7, 4.3, 11.8
 // expect: pass
 (
 	testlib = (test) = std/test
@@ -48,18 +48,18 @@ test("lists", () {
 
 test("custom", () {
 	u = User(name = "ann", age = 31)
-	check(show(u), "User(\"ann\", 31)")
+	check(show(u), "User(age = 31, name = \"ann\")")
 	check(u.name, "ann")
 	check(show(u.age), "31")
 	older = User(..u, age = u.age + 1)
-	check(show(older), "User(\"ann\", 32)")
-	check(show(u), "User(\"ann\", 31)")
+	check(show(older), "User(age = 32, name = \"ann\")")
+	check(show(u), "User(age = 31, name = \"ann\")")
 	renamed = User(..u, name = "bob", age = 1)
-	check(show(renamed), "User(\"bob\", 1)")
+	check(show(renamed), "User(age = 1, name = \"bob\")")
 	check(show(Pair(1, "x")), "Pair(1, \"x\")")
 	p = Point(1, 2, label = "p")
 	check(p.label, "p")
-	check(show(Point(..p, label = "q")), "Point(1, 2, \"q\")")
+	check(show(Point(..p, label = "q")), "Point(1, 2, label = \"q\")")
 })
 
 Wide = (width = Float, depth = Float)
@@ -102,7 +102,7 @@ test("fields_by_constructor", () {
 test("known_constructor", () {
 	s = Rect(width = 1.0, height = 2.0)
 	s |>
-		(Rect(..)) { check(show(Rect(..s, height = 9.0)), "Rect(1.0, 9.0)") }
+		(Rect(..)) { check(show(Rect(..s, height = 9.0)), "Rect(height = 9.0, width = 1.0)") }
 		| (_) { panic("no") }
 	Circle(radius = 1.5) |>
 		(Circle(..) = c) { check(show(c.radius), "1.5") }

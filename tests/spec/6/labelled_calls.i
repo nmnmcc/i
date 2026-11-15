@@ -1,4 +1,4 @@
-// spec: 6.6, 6.11
+// spec: 6.6, 6.11, 11.8
 // expect: pass
 (
 	testlib = (test) = std/test
@@ -42,8 +42,8 @@ test("labels", () {
 	)
 	check(describe("ann", 3, "oslo"), "ann/3/oslo")
 	check(describe("ann", 3, "oslo"), "ann/3/oslo")
-	check(show(User(age = 3, name = "x")), "User(\"x\", 3)")
-	check(show(User(name = "x", age = 3)), "User(\"x\", 3)")
+	check(show(User(age = 3, name = "x")), "User(age = 3, name = \"x\")")
+	check(show(User(name = "x", age = 3)), "User(age = 3, name = \"x\")")
 	check(
 		show(relabel(1, (10, 20), 100)),
 		"132",
@@ -66,5 +66,5 @@ test("pipes", () {
 	check("ann" |> describe(3, "oslo"), "ann/3/oslo")
 	check(show([1, 2] |> core.inspect |> core.byte_size), "6")
 	check(show(5 |> (n) { n * 2 }), "10")
-	check(show("x" |> User(age = 1)), "User(\"x\", 1)")
+	check(show("x" |> User(age = 1)), "User(age = 1, name = \"x\")")
 })

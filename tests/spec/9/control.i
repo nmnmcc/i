@@ -1,4 +1,4 @@
-// spec: 9.4, 9.2, 9.3, 9.5, 11.6
+// spec: 9.4, 9.2, 9.3, 9.5, 11.6, 11.8
 // expect: pass
 (
 	testlib = (test) = std/test
@@ -450,7 +450,7 @@ assertions_in_generators = () {
 			emit(1)
 			assert(False)
 		})
-		emit(show(a) == "Error(AssertionFailure(\"assert\"))")
+		emit(show(a) == "Error(AssertionFailure(message = \"assert\"))")
 	})
 	check(show(r), "[1, True]")
 	c = assertion.catch(() {
@@ -460,7 +460,7 @@ assertions_in_generators = () {
 			emit(2)
 		})
 	})
-	check(show(c), "Error(AssertionFailure(\"assert\"))")
+	check(show(c), "Error(AssertionFailure(message = \"assert\"))")
 }
 
 test("assertions_in_generators", () { assertions_in_generators() })

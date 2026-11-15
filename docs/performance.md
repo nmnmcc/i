@@ -100,6 +100,74 @@ script gives instruction counts for the same things from now on.
 The memory of `i test --project std` is the backend (the Wasm module, Binaryen and Wasmtime's
 code generation), not inference, which is why `i check --project std` stays small.
 
+## Syntax-three front-end cost
+
+The review recorded these measurements for
+`tests/review/cases/review-t1/stress-keys-2000`, three runs per configuration,
+with `RAYON_NUM_THREADS=1` and `BINARYEN_CORES=1`. These are the supplied
+historical measurements, retained as reported; they are not new timings.
+
+| `i test` level | `9b806113` wall / peak RSS | `5e08939f0` wall / peak RSS | Increase |
+|---|---|---|---|
+| `--opt 0` | 0.39 s / 54 MB | 0.45 s / 69 MB | 0.06 s / 15 MB |
+| `--opt 2` | 0.82 s / 128 MB | 0.87 s / 145 MB | 0.05 s / 17 MB |
+
+Repeat the timing command on the stored project directly, through the
+shared heavy wrapper. The corpus driver adds a `qa_startup` test and a
+`std/test` dependency; that is a different workload. Do not use its prepared
+project for comparison with this table, or run the corpus driver for the
+performance measurement.
+
+On 2026-11-14, a release build of `9b806113` and this lane immediately
+before/after the allocation changes gave the following medians. Each row
+uses three timed runs after one warmup, the same stored project, `--offline`,
+and the two thread limits above. RSS is GNU time's KiB; heap sizes below
+are heaptrack's decimal MB. Shared-machine scheduling affected wall times,
+so these runs establish the memory change, not a wall-time speedup.
+
+| Tree | O0 wall / CPU / RSS | O2 wall / CPU / RSS |
+|---|---|---|
+| `9b806113` rebuilt | 0.41 s / 0.39 s / 54,212 KiB | 0.87 s / 0.84 s / 128,152 KiB |
+| DOC1–5, before allocation changes | 0.95 s / 0.52 s / 66,592 KiB | 1.30 s / 0.99 s / 148,400 KiB |
+| Borrow/move trees and release parsed items after resolution | 0.49 s / 0.45 s / 62,180 KiB | 0.90 s / 0.88 s / 143,916 KiB |
+
+Heaptrack 1.5.0 (`--record-only`, O0) counted 3,585,139 allocations before
+the changes and 3,394,655 afterward: 190,484 fewer. Full backtraces
+(`heaptrack_print --shorten-templates 0 --merge-backtraces 0`) identify
+`resolve` cloning every parsed module, followed by `facts::groups::module`
+cloning each already-owned binding and item. The resolver now borrows the
+input modules and group normalization moves its owned bindings. These
+changes alone lowered median RSS to 62,348 KiB, but did not lower the
+31.70 MB peak live heap. Releasing parsed item trees after resolution,
+before test-root inference, lowered peak live heap to 24.50 MB. Imports,
+scope metadata and the typed expanders' own source snapshots remain live.
+The rebuilt old compiler's peak live heap was 28.13 MB.
+
+The residual RSS difference is largely freed memory retained by glibc,
+measured rather than inferred from RSS. A profiling-only exit hook using
+`mallinfo2`, `/proc/self/status` and `malloc_trim(0)` measured:
+
+| Tree | Live allocator bytes | Free bytes in arenas | RSS before / after trim |
+|---|---:|---:|---:|
+| Rebuilt `9b806113` | 810,656 | 30,654,816 | 53,792 / 27,060 KiB |
+| After these changes | 812,816 | 37,566,704 | 61,120 / 28,552 KiB |
+
+Thus 6,911,888 extra bytes were free inside retained arenas at exit, while
+live allocations differed by only 2,160 bytes. The production compiler
+does not call `malloc_trim`; the portable fix is to avoid redundant tree
+allocations and shorten their lifetimes. Stage tracing independently put
+the pre-fix O0 peak at 59 MiB during checking versus 45 MiB in the old
+compiler; the final checking peak was 53 MiB. Stage tracing resets the
+kernel peak counter, so its runs are separate from the GNU time samples.
+
+Profiles and individual samples from this investigation are in the lane's
+ignored `target/docfix-profile/` directory (`raw-before-test.zst`,
+`raw-final-test.zst`, `raw-old-test.zst`, and `raw-*-{0,2}-{1,2,3}.json`).
+The old source was archived inside that directory and its binary built
+there with the same Binaryen source revision and release profile. An
+initial corpus-prepared workload and cold first runs were excluded from
+the warm, stored-project comparison above.
+
 ## Numeric lowering
 
 The six kernels in `tests/perf/numeric` isolate arithmetic, known calls,

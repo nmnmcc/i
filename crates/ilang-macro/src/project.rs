@@ -341,6 +341,13 @@ pub fn check_tests(graph: &mut PackageGraph, collection: Option<&str>) -> Projec
                 .map(|e| (e.target, true))
                 .collect();
             drop(resolve);
+            // Resolution has copied executable code into HIR. Collection lookup
+            // below needs only imports and scope metadata from Parsed; typed
+            // expanders retain their own immutable source snapshots. Release the
+            // original item trees before inference raises its memory high-water.
+            for module in &mut expanded.parsed {
+                module.ast.items.clear();
+            }
             let check = ilang_syntax::trace::stage("check");
             let mut checked = ilang_check::check_resolved_selected(graph, program, diags, &roots);
             drop(check);

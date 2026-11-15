@@ -868,11 +868,21 @@ impl Cx {
                 }
             }
             n::PatternKind::Data(items) => {
+                let mut keyed = false;
                 for item in items {
                     match item {
-                        n::DPItem::Pos(p) => self.pattern(p),
-                        n::DPItem::Key(l, _) => {
-                            self.error(l.span.0, "a key in a data pattern is not supported here")
+                        n::DPItem::Pos(p) => {
+                            if keyed {
+                                self.error(
+                                    p.span.0,
+                                    "an item by position may not come after an item by label",
+                                );
+                            }
+                            self.pattern(p);
+                        }
+                        n::DPItem::Key(_, p) => {
+                            keyed = true;
+                            self.pattern(p);
                         }
                         n::DPItem::Rest(_) => {
                             self.error(span, "a rest `..` in a data pattern is not supported here")
@@ -914,7 +924,10 @@ impl Cx {
             }
         }
         if let (Some(_), Some(core)) = (label, core_at)
-            && !matches!(core.kind, n::PatternKind::Typed { .. })
+            && !matches!(
+                core.kind,
+                n::PatternKind::Typed { .. } | n::PatternKind::Data(_)
+            )
         {
             self.error(
                 core.span.0,

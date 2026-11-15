@@ -1380,10 +1380,14 @@ impl Cx {
                 target: Box::new(self.expr(target)),
                 name: id(name),
             },
-            n::ExprKind::Index { target, index } => o::ExprKind::TupleIndex {
+            n::ExprKind::Index {
+                target,
+                index,
+                index_span,
+            } => o::ExprKind::TupleIndex {
                 target: Box::new(self.expr(target)),
                 index: index.clone(),
-                index_span: Span::new(span.end.saturating_sub(1), span.end),
+                index_span: index_span.0,
             },
             n::ExprKind::Unary { op, expr: inner } => o::ExprKind::Unary {
                 op: *op,

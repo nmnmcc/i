@@ -1,6 +1,6 @@
 {
-  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
-  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
+  "compiler": "4431666950143d097164333c72a785e8a8abb5f1",
+  "binary_sha256": "7cc58004a49b3b6c58a2db930bd87c6192449f056612b9709864a7b157cf7df2",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "review/numeric.check : (Bool) -> Nil\nreview/numeric.id : (A) -> A\nreview/numeric.check_bits : (Float, Int) -> Nil\nreview/numeric.generated_test : () -> Nil\nreview/numeric.generated_test : () -> Nil\nreview/numeric.generated_test : () -> Nil\nreview/numeric.work : (Boundary(A & ResultStep, Never), Float, Int) -> ResultStep\nreview/numeric.advance : (ResultStep, Float) -> ResultStep\nreview/numeric.generated_test : () -> Nil\nreview/numeric.make : (Float) -> () -> Float\nreview/numeric.generated_test : () -> Nil\nreview/numeric.relay : ((Float) -> Float, Int, Float) -> Float\nreview/numeric.generated_test : () -> Nil\nreview/numeric.read : () <- (Bias) -> Float\nreview/numeric.generated_test : () -> Nil\nreview/numeric.generated_test : () -> Nil\n",
-      "stderr": "test/numeric.i:113:14: error[E0506]: `.k` needs a known type for its value; write its type, such as `x: (A, B)`\ntest/numeric.i:114:9: error[E0506]: `.k` needs a known type for its value; write its type, such as `x: (A, B)`\n2 errors\n"
+      "stderr": "test/numeric.i:113:16: error[E0506]: `.k` needs a known type for its value; write its type, such as `x: (A, B)`\ntest/numeric.i:114:11: error[E0506]: `.k` needs a known type for its value; write its type, such as `x: (A, B)`\n2 errors\n"
     }
   }
 }

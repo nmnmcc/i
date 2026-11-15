@@ -614,6 +614,11 @@ pub enum PatternKind {
         binder: Binder,
         pattern: Box<Pattern>,
     },
+    /// A written constructor-field label, without a binder.
+    Keyed {
+        label: Ident,
+        pattern: Box<Pattern>,
+    },
     Int {
         negative: bool,
         value: BigUint,
@@ -637,6 +642,11 @@ pub enum PatternKind {
         spread: bool,
     },
     Tuple(Vec<Pattern>),
+    /// Closed data, with parts in canonical key order.
+    Data {
+        shape: crate::types::ShapeId,
+        parts: Vec<Pattern>,
+    },
     /// `rest`: `None` is no rest; `Some(None)` is `..` or `.._`.
     List {
         items: Vec<Pattern>,
@@ -645,6 +655,19 @@ pub enum PatternKind {
     BitArray(Vec<Segment<Pattern>>),
     /// A pattern that could not be resolved, with its resolved parts.
     Error(Vec<Pattern>),
+}
+
+impl Pattern {
+    /// The complete shape of a closed data pattern.
+    pub fn data_shape(&self) -> Option<crate::types::ShapeId> {
+        match &self.kind {
+            PatternKind::Tuple(parts) => {
+                Some(crate::types::ShapeId::positional(parts.len() as u32))
+            }
+            PatternKind::Data { shape, .. } => Some(*shape),
+            _ => None,
+        }
+    }
 }
 
 // ---- Order ----
@@ -914,9 +937,12 @@ pub fn children<'a>(node: Node<'a>, mut f: impl FnMut(Node<'a>)) {
             PatternKind::Quote { captures, .. } => {
                 captures.iter().for_each(|(_, p)| f(Node::Pattern(p)))
             }
-            PatternKind::Named { pattern, .. } => f(Node::Pattern(pattern)),
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+                f(Node::Pattern(pattern))
+            }
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
+            | PatternKind::Data { parts: args, .. }
             | PatternKind::Error(args)
             | PatternKind::List { items: args, .. } => {
                 args.iter().for_each(|p| f(Node::Pattern(p)))
@@ -979,9 +1005,12 @@ pub fn binding_types(b: &Binding, f: &mut impl FnMut(&Type)) {
     fn pattern(p: &Pattern, f: &mut impl FnMut(&Type)) {
         match &p.kind {
             PatternKind::Typed { ty, .. } => f(ty),
-            PatternKind::Named { pattern: p, .. } => pattern(p, f),
+            PatternKind::Named { pattern: p, .. } | PatternKind::Keyed { pattern: p, .. } => {
+                pattern(p, f)
+            }
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
+            | PatternKind::Data { parts: args, .. }
             | PatternKind::Error(args) => {
                 for p in args {
                     pattern(p, f);
@@ -1128,9 +1157,12 @@ pub fn visit_expr_mut(e: &mut Expr, visit: &mut impl FnMut(&mut Expr) -> bool) {
                     pattern(p, f);
                 }
             }
-            PatternKind::Named { pattern: p, .. } => pattern(p, f),
+            PatternKind::Named { pattern: p, .. } | PatternKind::Keyed { pattern: p, .. } => {
+                pattern(p, f)
+            }
             PatternKind::Constructor { args, .. }
             | PatternKind::Tuple(args)
+            | PatternKind::Data { parts: args, .. }
             | PatternKind::Error(args)
             | PatternKind::List { items: args, .. } => {
                 for p in args {

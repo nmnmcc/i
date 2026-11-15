@@ -13,7 +13,7 @@ check = (got : String, want : String) {
 
 test("across_modules", () {
 	check(core.inspect(top.answer), "42")
-	check(core.inspect(top.colors), "[Red, Blue(0), Green]")
+	check(core.inspect(top.colors), "[Red, Blue(level = 0), Green]")
 })
 
 each = (xs : List(base.Color)) {

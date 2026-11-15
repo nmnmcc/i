@@ -1,0 +1,3 @@
+(= index (-> (, r) _ (. r 12)))
+(= field (-> (, r) _ (. r missing)))
+(= method (-> (, r) _ ((. r missing) 1)))

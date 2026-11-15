@@ -1,4 +1,4 @@
-// spec: 9.6, 6.10, 6.11
+// spec: 9.6, 6.10, 6.11, 11.8
 // expect: pass
 (
 	testlib = (test) = std/test
@@ -26,7 +26,7 @@ catch_assert = () {
 	)
 	check(
 		show(assertion.catch(() { assert(False) })),
-		"Error(AssertionFailure(\"assert\"))",
+		"Error(AssertionFailure(message = \"assert\"))",
 	)
 	check(
 		show(
@@ -55,7 +55,7 @@ failing_patterns = () {
 	)
 	check(
 		show(assertion.catch(() { first(Error("no")) })),
-		"Error(AssertionFailure(\"pattern Ok(v) did not match Error(\\\"no\\\")\"))",
+		"Error(AssertionFailure(message = \"pattern Ok(v) did not match Error(\\\"no\\\")\"))",
 	)
 	check(
 		show(param(Ok(1), (2, 3))),
@@ -63,7 +63,7 @@ failing_patterns = () {
 	)
 	check(
 		show(assertion.catch(() { param(Error(1), (2, 3)) })),
-		"Error(AssertionFailure(\"pattern Ok(v) did not match Error(1)\"))",
+		"Error(AssertionFailure(message = \"pattern Ok(v) did not match Error(1)\"))",
 	)
 	// Literals, lists, and nested patterns.
 	lit = (x) {
@@ -72,7 +72,7 @@ failing_patterns = () {
 	}
 	check(
 		show(assertion.catch(() { lit(2) })),
-		"Error(AssertionFailure(\"pattern 1 did not match 2\"))",
+		"Error(AssertionFailure(message = \"pattern 1 did not match 2\"))",
 	)
 	check(
 		show(assertion.catch(() { lit(1) })),
@@ -88,7 +88,7 @@ failing_patterns = () {
 	)
 	check(
 		show(assertion.catch(() { list([1, 2, 3]) })),
-		"Error(AssertionFailure(\"pattern [a, b] did not match [1, 2, 3]\"))",
+		"Error(AssertionFailure(message = \"pattern [a, b] did not match [1, 2, 3]\"))",
 	)
 	nested = (p) {
 		whole = (Ok(x), _) = p
@@ -123,7 +123,7 @@ own_assert = () {
 		inner = assertion.catch(() { assert(False) })
 		(inner, 2)
 	})
-	check(show(nested), "Ok((Error(AssertionFailure(\"assert\")), 2))")
+	check(show(nested), "Ok((Error(AssertionFailure(message = \"assert\")), 2))")
 	// The `Assert` of an outer `catch`, used inside an inner one, goes to the
 	// outer one.
 	get = () <- (a : Assert) { a }
@@ -131,7 +131,7 @@ own_assert = () {
 		a = get()
 		assertion.catch(() { assert(False) <- (a) })
 	})
-	check(show(outer), "Error(AssertionFailure(\"assert\"))")
+	check(show(outer), "Error(AssertionFailure(message = \"assert\"))")
 }
 
 test("own_assert", () { own_assert() })

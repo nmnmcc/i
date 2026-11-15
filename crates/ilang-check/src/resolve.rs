@@ -49,7 +49,7 @@ pub(crate) use three::source_facts;
 /// retained during resolution so later diagnostics map to written source.
 pub fn resolve(graph: &PackageGraph, parsed: &[crate::Parsed]) -> (Program, Vec<Diagnostic>) {
     ilang_syntax::syn3::deep::deep(|| {
-        let modules: Vec<_> = parsed.iter().map(|p| p.ast.clone()).collect();
+        let modules: Vec<_> = parsed.iter().map(|p| &p.ast).collect();
         resolve_native(graph, parsed, &modules, false)
     })
 }
@@ -59,12 +59,13 @@ pub fn resolve3(
     parsed: &[crate::Parsed],
     modules: &[ilang_syntax::syn3::ast::Module],
 ) -> (Program, Vec<Diagnostic>) {
-    resolve_native(graph, parsed, modules, true)
+    let modules: Vec<_> = modules.iter().collect();
+    resolve_native(graph, parsed, &modules, true)
 }
 fn resolve_native(
     graph: &PackageGraph,
     parsed: &[crate::Parsed],
-    modules: &[ilang_syntax::syn3::ast::Module],
+    modules: &[&ilang_syntax::syn3::ast::Module],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
     ilang_syntax::syn3::deep::deep(|| {
@@ -2754,7 +2755,9 @@ fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec
     fn top_type(p: &Pattern) -> Option<&Type> {
         match &p.kind {
             PatternKind::Typed { ty, .. } => Some(ty),
-            PatternKind::Named { pattern, .. } => top_type(pattern),
+            PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+                top_type(pattern)
+            }
             _ => None,
         }
     }
@@ -2768,12 +2771,14 @@ fn top_annotations(p: &Pattern, exported: &HashMap<VarId, String>, out: &mut Vec
             binder: Some(b),
             ty,
         } => check(b, Some(ty)),
+        PatternKind::Keyed { pattern, .. } => top_annotations(pattern, exported, out),
         PatternKind::Named { binder, pattern } => {
             check(binder, top_type(pattern));
             top_annotations(pattern, exported, out);
         }
         PatternKind::Constructor { args: ps, .. }
         | PatternKind::Tuple(ps)
+        | PatternKind::Data { parts: ps, .. }
         | PatternKind::Error(ps)
         | PatternKind::List { items: ps, .. } => {
             ps.iter().for_each(|a| top_annotations(a, exported, out))

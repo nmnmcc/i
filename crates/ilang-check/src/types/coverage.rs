@@ -1424,7 +1424,9 @@ pub(crate) fn fit_pat(p: &Program, q: &Pattern) -> Pat {
         return Pat::Ctor(Ctor::Lit(l), Vec::new());
     }
     match &q.kind {
-        PatternKind::Named { pattern, .. } => fit_pat(p, pattern),
+        PatternKind::Named { pattern, .. } | PatternKind::Keyed { pattern, .. } => {
+            fit_pat(p, pattern)
+        }
         PatternKind::Constructor { ctor, args, .. } => Pat::Ctor(
             Ctor::Custom(*ctor),
             field_order(p, *ctor, args)
@@ -1432,8 +1434,8 @@ pub(crate) fn fit_pat(p: &Program, q: &Pattern) -> Pat {
                 .map(|a| a.map_or(Pat::Wild(None), |a| fit_pat(p, a)))
                 .collect(),
         ),
-        PatternKind::Tuple(ps) => Pat::Ctor(
-            Ctor::Shape(super::ShapeId::positional(ps.len() as u32)),
+        PatternKind::Tuple(ps) | PatternKind::Data { parts: ps, .. } => Pat::Ctor(
+            Ctor::Shape(q.data_shape().unwrap()),
             ps.iter().map(|a| fit_pat(p, a)).collect(),
         ),
         PatternKind::List { items, rest } => list(

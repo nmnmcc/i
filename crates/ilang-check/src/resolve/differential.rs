@@ -166,6 +166,7 @@ fn first_difference(a: &str, b: &str) -> String {
 struct Totals {
     files: BTreeSet<String>,
     differ: BTreeSet<String>,
+    extensions: BTreeSet<String>,
     reports: Vec<(String, String)>,
     /// What was compared: bindings, diagnostics of the resolver, errors of
     /// the lowering.
@@ -261,6 +262,49 @@ fn compare_inner(name: &str, dir: &Path, totals: &mut Totals, prepare_quotes: bo
     let (new_program, new_diags) = resolve::resolve3(&graph, &direct, &modules);
     let old = texts(name, &graph, &old_program, &expected, false);
     let new = texts(name, &graph, &new_program, &new_diags, false);
+    // These keyed-data fixtures intentionally go beyond the frozen migration
+    // oracle. Keep checking its refusal and the native resolver's exact
+    // errors; the spec runner checks inference and both runtime levels.
+    if name.starts_with("tests/spec/7/keyed_data") {
+        assert!(expected.iter().any(|d| {
+            d.message.contains("a key in a data pattern needs stage 6")
+                || (name.ends_with("keyed_data_constructor_bad.i")
+                    || name.ends_with("keyed_data_constructor_missing.i"))
+                    && d.message
+                        .contains("a pattern inside a labelled field needs stage 4")
+        }));
+        let errors: Vec<_> = new_diags
+            .iter()
+            .filter(|d| d.is_error())
+            .map(|d| d.code)
+            .collect();
+        let wanted: &[&str] = if name.ends_with("keyed_data_duplicate.i") {
+            &["E0510"]
+        } else if name.ends_with("keyed_data_duplicate_binder.i") {
+            &["E0217"]
+        } else if name.ends_with("keyed_data_label_is_not_binder.i")
+            || name.ends_with("keyed_data_constructor_label.i")
+        {
+            &["E0201"]
+        } else if name.contains("keyed_data_order") {
+            &["E0101"]
+        } else {
+            &[]
+        };
+        assert_eq!(errors, wanted, "native resolution of {name}");
+        for file in new.keys() {
+            let key = if file == "<program>" {
+                format!("<program of {name}>")
+            } else {
+                file.clone()
+            };
+            if old.get(file) != new.get(file) {
+                totals.extensions.insert(key.clone());
+            }
+            totals.files.insert(key);
+        }
+        return;
+    }
     if old == new {
         totals.files.extend(old.into_keys().map(|file| {
             if file == "<program>" {
@@ -442,6 +486,7 @@ fn resolve3_differential() {
                     compare(name, dir, &mut totals);
                     let mut all = all.lock().unwrap();
                     all.files.extend(totals.files);
+                    all.extensions.extend(totals.extensions);
                     all.bindings += totals.bindings;
                     all.diagnostics += totals.diagnostics;
                     all.lowering += totals.lowering;
@@ -469,9 +514,18 @@ fn resolve3_differential() {
         .iter()
         .filter(|f| !f.starts_with("<program of "))
         .count();
-    let equal = files - differ;
+    let extension_files = totals
+        .extensions
+        .iter()
+        .filter(|f| !f.starts_with("<program of "))
+        .count();
+    let equal = files - differ - extension_files;
     let programs = totals.files.len() - files;
-    let programs_equal = programs - (totals.differ.len() - differ);
+    let programs_equal =
+        programs - (totals.differ.len() - differ) - (totals.extensions.len() - extension_files);
+    eprintln!(
+        "resolve3 spec extensions: {extension_files} files checked against the new language rule"
+    );
     eprintln!(
         "resolve3 differential: {equal} files equal / {} total ({} top-level bindings, {} resolver diagnostics, {} lowering errors over {} packages)",
         files,
@@ -492,7 +546,7 @@ fn resolve3_differential() {
             "normal-surface files not compared: {missing:#?}"
         );
         eprintln!(
-            "resolve3 coverage: all {} repository .i files compared",
+            "resolve3 coverage: all {} repository .i files compared or checked as specified extensions",
             expected.len()
         );
     }
@@ -535,9 +589,13 @@ const EXTRA: &[&str] = &[
     // Row variables and function types.
     // old-syntax-check: E0101,E0110,E0101,E0107,E0101
     "run = <A, N>(body: () <- N -> A) -> A { body() }\ncatch = <A, E, N>(body: () <- (Fail(E), ..N) -> A) -> A { body() }\nboth: <A, N>(() <- (..N) -> A) -> A = (body) { body() }\nlocal = () { inner = <N>(f: () <- N -> Int) { f() }  inner }\nbad = () { <A>(a: A) { a } }\nt: ((a = Int, Int)) -> Int = (x) { 1 }\nu: { Int | Float } -> Int = (x) { 1 }\nv: (x = Int, ..Int) -> Int = (x) { 1 }\nw: () <- (Fail(Int), Fail(Float), a = Int) -> Int = () { 1 }\n",
-    // Unsupported patterns must preserve diagnostic order.
-    // old-syntax-check: E0101,E0101,E0110,E0101,E0101,E0101
-    "f = ((a, ..)) { a }\ng = ((a = b, c)) { c }\nP = (x = Int, y = Int)\nh = (P(..rest)) { rest }\nk = (P(x = (a, b))) { a }\nm = ((a, b) = (c, d)) { a }\nn = (key = x) { x }\np = ([a, ..rest] = whole) { whole }\nq = (\"ab\" <> rest) { rest }\n",
+    // Patterns that the checker cannot type. The nested constructor-data probe
+    // has checked type and shape failures in keyed_data_constructor_bad.i,
+    // beside the positive keyed_data_constructor.i cases. The old keyed-data
+    // probe is now tests/spec/7/keyed_data_order.i and keyed_data_order_lisp:
+    // keys are accepted, but a position after a label is still rejected.
+    // old-syntax-check: E0101,E0101,E0101
+    "f = ((a, ..)) { a }\nP = (x = Int, y = Int)\nh = (P(..rest)) { rest }\nm = ((a, b) = (c, d)) { a }\nn = (key = x) { x }\np = ([a, ..rest] = whole) { whole }\nq = (\"ab\" <> rest) { rest }\n",
     // Attributes, declarations, heads.
     // old-syntax-check: E0101,E0101
     "@external(\"m\", \"f\")\nf: (Int) -> Int\n@external(\"m\")\ng: (Int) -> Int\n@deprecated(note = \"x\")\nh = 1\n@host(\"ns\")\nSvc = (run = (Int) -> Int)\n@host(\"ns2\")\nBad = (Int)\n@other\nk = 2\nBox(a) = (a)\nWrap(List(A)) = (A)\nAlias(List(A)) = A\nx = 1\nElem(List(A)) = x\nm: <A>(A) -> A\nimport()\n",
@@ -548,7 +606,6 @@ const EXTRA: &[&str] = &[
 const EXTRA_LISP: &[&str] = &[
     r#"
 (= mixed (, (= a 1) 2))
-(= data (-> (, (, (= a b) c)) _ c))
 (: row (-> (, (= a Int) Int) (<- Int (, (Fail Int) (Fail String) (= a Int)))))
 (= row (-> (,) _ 1))
 (= service (<- (row) (, (= a 1))))

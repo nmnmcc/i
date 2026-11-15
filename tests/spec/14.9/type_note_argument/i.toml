@@ -1,0 +1,7 @@
+# spec: 14.9, 4.8
+# expect: compile-error E0501
+name = "spec"
+[dependencies]
+std = { path = "../../../../std" }
+[test]
+collection = "std/test.tests"

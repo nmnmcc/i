@@ -181,6 +181,25 @@ main = () {
 
 `__unused` discards without binding; the conjunction matches one value with both patterns.
 
+## Keyed data patterns
+
+```i run package=tour title="src/main.i"
+(
+	i/stdio
+)
+
+main = () {
+	(name = name, age = _) = (name = "Ada", age = 36)
+	stdio.print(name)
+}
+```
+
+```text
+Ada
+```
+
+A keyed data pattern matches each labelled part by its key. This pattern binds `name` and discards the age; the labels may be written in either order.
+
 ## Constructor patterns
 
 ```i run package=tour title="src/main.i"
@@ -231,7 +250,7 @@ main = () {
 ((0, []), (2, []), (2, [3]))
 ```
 
-Record patterns with named fields and `..rest` in record or tuple patterns are not available yet; use field access or list patterns instead.
+Rest patterns for data (`..rest` inside `( )`) are not available yet; list rests work as shown above. This difference is recorded in [the known gaps](https://github.com/nmnmcc/i/blob/main/docs/design/spec-known-gaps.md) (P13).
 
 ## Text patterns
 

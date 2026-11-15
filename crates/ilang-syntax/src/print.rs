@@ -997,7 +997,7 @@ impl Printer<'_> {
             ExprKind::Field { target, name } => {
                 cat(vec![self.target(target), t(format!(".{}", name.name))])
             }
-            ExprKind::Index { target, index } => {
+            ExprKind::Index { target, index, .. } => {
                 cat(vec![self.target(target), t(format!(".{index}"))])
             }
             ExprKind::Unary { op, expr } => {
