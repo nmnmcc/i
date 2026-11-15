@@ -244,3 +244,110 @@ fn macro_quote_formats_in_lisp_and_cannot_convert_to_normal() {
     assert_eq!(std::fs::read_to_string(&file).unwrap(), before);
     assert!(!file.with_extension("i").exists());
 }
+
+#[test]
+fn a_failed_write_lists_converted_failed_and_untouched_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("a.i");
+    // A name whose temporary file cannot be created (NAME_MAX), so the write
+    // fails in the middle of the batch after `first` succeeded.
+    let middle = dir.path().join(format!("{}.i", "m".repeat(245)));
+    let last = dir.path().join("z.i");
+    for file in [&first, &middle, &last] {
+        std::fs::write(file, "f = () { 1 }\n").unwrap();
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=is"])
+        .arg(&first)
+        .arg(&middle)
+        .arg(&last)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let errors = String::from_utf8_lossy(&output.stderr);
+    let first_destination = first.with_extension("is");
+    let middle_destination = middle.with_extension("is");
+
+    // Group one: already converted, target written and source removed.
+    assert!(errors.contains("already converted in this run"), "{errors}");
+    assert!(
+        errors.contains(&format!(
+            "{} -> {}",
+            first.display(),
+            first_destination.display()
+        )),
+        "{errors}"
+    );
+    assert!(!first.exists());
+    assert_eq!(
+        std::fs::read_to_string(&first_destination).unwrap(),
+        "(= f (-> (,) _ 1))\n"
+    );
+
+    // Group two: the failing file, with the state of both of its paths.
+    assert!(errors.contains("failed:"), "{errors}");
+    assert!(errors.contains(&middle.display().to_string()), "{errors}");
+    assert!(errors.contains("source is unchanged"), "{errors}");
+    assert!(errors.contains("destination was not written"), "{errors}");
+    assert!(middle.exists());
+    assert!(!middle_destination.exists());
+
+    // Group three: untouched files.
+    assert!(errors.contains("not processed"), "{errors}");
+    assert!(errors.contains(&last.display().to_string()), "{errors}");
+    assert!(last.exists());
+    assert!(!last.with_extension("is").exists());
+}
+
+#[test]
+fn a_refused_batch_lists_every_file_as_not_converted_to_lisp() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("a.i");
+    let bad = dir.path().join("b.i");
+    let last = dir.path().join("c.i");
+    std::fs::write(&first, "f = () { 1 }\n").unwrap();
+    std::fs::write(&bad, "g = () { 2 // trailing\n}\n").unwrap();
+    std::fs::write(&last, "h = () { 3 }\n").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=is"])
+        .arg(&first)
+        .arg(&bad)
+        .arg(&last)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let errors = String::from_utf8_lossy(&output.stderr);
+    assert!(errors.contains("no files were converted"), "{errors}");
+    for file in [&first, &bad, &last] {
+        assert!(errors.contains(&file.display().to_string()), "{errors}");
+        assert!(file.exists());
+        assert!(!file.with_extension("is").exists());
+    }
+}
+
+#[test]
+fn a_refused_batch_lists_every_file_as_not_converted_to_normal() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("a.is");
+    // A macro definition has no normal spelling.
+    let bad = dir.path().join("b.is");
+    let last = dir.path().join("c.is");
+    std::fs::write(&first, "(= f (-> (,) _ 1))\n").unwrap();
+    std::fs::write(&bad, "(@ macro (= f (-> (, x) _ x)))\n").unwrap();
+    std::fs::write(&last, "(= h (-> (,) _ 3))\n").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["fmt", "--to=i"])
+        .arg(&first)
+        .arg(&bad)
+        .arg(&last)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let errors = String::from_utf8_lossy(&output.stderr);
+    assert!(errors.contains("no files were converted"), "{errors}");
+    for file in [&first, &bad, &last] {
+        assert!(errors.contains(&file.display().to_string()), "{errors}");
+        assert!(file.exists());
+        assert!(!file.with_extension("i").exists());
+    }
+}

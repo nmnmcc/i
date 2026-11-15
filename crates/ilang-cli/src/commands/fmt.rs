@@ -205,7 +205,15 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
     }
 
     if failed {
-        // Phase two never starts: no destination was created and no source removed.
+        // Phase two never starts: no destination was created and no source
+        // removed. Say so, and list every file in the batch as not converted.
+        eprintln!(
+            "no files were converted: the check phase refused the batch and nothing was written"
+        );
+        eprintln!("files not converted (all left as they were):");
+        for file in files {
+            eprintln!("  {}", file.display());
+        }
         return Ok(ExitCode::FAILURE);
     }
 
@@ -230,8 +238,7 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
 
     // Phase two: write. The source of a converted file stays in place until its
     // destination is durable, complete and read back byte for byte.
-    let mut converted: Vec<(PathBuf, PathBuf)> = Vec::new();
-    for plan in &plans {
+    for (index, plan) in plans.iter().enumerate() {
         let step = if plan.rename_source {
             write_conversion(plan)
         } else {
@@ -239,7 +246,10 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
         };
         if let Err(e) = step {
             eprintln!("{}: error: {e}", plan.source.display());
-            report_converted(&converted);
+            // Say what happened to every file: the ones already written, the
+            // one that failed (with the state of its source and destination),
+            // and the ones that were never touched.
+            report_write_failure(&plans, index);
             return Err(anyhow::anyhow!(
                 "{}: conversion stopped; the files above were already converted",
                 plan.source.display()
@@ -251,7 +261,6 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
                 plan.source.display(),
                 plan.destination.display()
             );
-            converted.push((plan.source.clone(), plan.destination.clone()));
         }
     }
     Ok(ExitCode::SUCCESS)
@@ -597,28 +606,74 @@ fn diag_message(diags: &[ilang_syntax::Diagnostic]) -> String {
         .unwrap_or_else(|| "unknown error".to_owned())
 }
 
-fn report_converted(converted: &[(PathBuf, PathBuf)]) {
-    if converted.is_empty() {
-        eprintln!("no files were converted before the failure");
-        return;
+/// Report the three groups of a run that failed while writing: what was
+/// written, what failed and the state of both of its files, and what was not
+/// processed.
+fn report_write_failure(plans: &[Plan], failed: usize) {
+    let converted: Vec<&Plan> = plans[..failed]
+        .iter()
+        .filter(|plan| plan.rename_source)
+        .collect();
+    let formatted: Vec<&Plan> = plans[..failed]
+        .iter()
+        .filter(|plan| !plan.rename_source)
+        .collect();
+    if converted.is_empty() && formatted.is_empty() {
+        eprintln!("already written in this run: none");
+    } else {
+        eprintln!("already converted in this run (destination written, source removed):");
+        if converted.is_empty() {
+            eprintln!("  none");
+        }
+        for plan in &converted {
+            eprintln!(
+                "  {} -> {}",
+                plan.source.display(),
+                plan.destination.display()
+            );
+        }
+        if !formatted.is_empty() {
+            eprintln!("already formatted in place:");
+            for plan in &formatted {
+                eprintln!("  {}", plan.source.display());
+            }
+        }
     }
-    eprintln!("already converted in this run:");
-    for (source, destination) in converted {
+    let plan = &plans[failed];
+    eprintln!("failed:");
+    eprintln!(
+        "  {} -> {}: source {}, destination {}",
+        plan.source.display(),
+        plan.destination.display(),
+        if plan.source.exists() {
+            "is unchanged"
+        } else {
+            "was removed"
+        },
+        if plan.destination.exists() {
+            "exists and may be incomplete"
+        } else {
+            "was not written"
+        }
+    );
+    eprintln!("not processed (left as they were):");
+    if failed + 1 >= plans.len() {
+        eprintln!("  none");
+    }
+    for plan in &plans[failed + 1..] {
+        eprintln!("  {}", plan.source.display());
+    }
+    let old_extension = plans
+        .first()
+        .and_then(|plan| plan.source.extension())
+        .map(|e| e.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "i".to_owned());
+    if !converted.is_empty() {
         eprintln!(
-            "  {} -> {}",
-            source.display(),
-            destination.display()
+            "recover each converted file by converting it back (`i fmt --to {old_extension} DESTINATION`) \
+             or by restoring the source from version control"
         );
     }
-    eprintln!(
-        "recover each one by converting it back (`i fmt --to {} DESTINATION`) or by \
-         restoring the source from version control",
-        converted
-            .first()
-            .and_then(|(source, _)| source.extension())
-            .map(|e| e.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "i".to_owned())
-    );
 }
 
 fn report_diags(file: &Path, source: &str, diags: &[ilang_syntax::Diagnostic]) {
