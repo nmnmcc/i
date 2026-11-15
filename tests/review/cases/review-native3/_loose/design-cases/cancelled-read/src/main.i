@@ -4,7 +4,7 @@
 	i/net
 	i/task
 )
-twice = (stream: net.Stream) {
+twice = (stream : net.Stream) {
 	task.race(() { net.read(stream, 1) }, () { <<>> })
 	net.read(stream, 1)
 }

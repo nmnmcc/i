@@ -1,0 +1,24 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import { Home } from '@/components/home';
+import { getEntry, render } from 'astro:content';
+import '@/styles/home.css';
+
+const home = await getEntry('home', 'index.mdx');
+if (!home) throw new Error('The checked home-page content is missing.');
+const { Content } = await render(home);
+---
+
+<Layout title={home.data.title} description={home.data.description}>
+  <Home client:load pathname={Astro.url.pathname} params={Astro.params}>
+    <div class="home-content">
+      <Content components={{ wrapper: 'div', h1: 'h1', h2: 'h2', h3: 'h3', h4: 'h4', h5: 'h5', h6: 'h6' }} />
+    </div>
+  </Home>
+</Layout>
+
+<script>
+  import { initializeCarousels } from '@/scripts/home-carousel';
+  initializeCarousels();
+  document.addEventListener('astro:page-load', initializeCarousels);
+</script>

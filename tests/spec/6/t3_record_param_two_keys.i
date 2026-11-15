@@ -7,8 +7,8 @@
 (
 	main
 )
-pick = <K>(a: K, b: K) -> (k = Int) {
-	r: (k = Int) = record.put((), a, 1)
+pick = <K>(a : K, b : K) -> (k = Int) {
+	r : (k = Int) = record.put((), a, 1)
 	record.put(r, b, 2)
 }
 

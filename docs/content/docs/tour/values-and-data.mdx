@@ -1,0 +1,292 @@
+---
+title: Values and data
+description: Define names and build immutable numbers, strings, records, tuples, lists, and labelled values.
+---
+
+Build data from numbers and text, then create updated values without changing the originals.
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	// A local name starts here.
+	answer = 42
+	line_count2 = answer
+	_unused = line_count2
+	stdio.print(core.inspect(answer))
+}
+```
+
+```text
+42
+```
+
+`core.inspect` returns a `String`; use it to print values other than strings.
+
+A local name is available after its binding until the block ends; names such as `answer`, `line_count`, and `_unused` need no declarations.
+
+## Integers
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	whole = 1_000 + 0x10
+	stdio.print(core.inspect(whole))
+	stdio.print(core.inspect((0o10, 0b10, 3 * 4 - 2)))
+	stdio.print(core.inspect(7 / 2))
+	stdio.print(core.inspect(7 % 2))
+	stdio.print(core.inspect(-7 / 2))
+}
+```
+
+```text
+1016
+(8, 2, 10)
+3
+1
+-3
+```
+
+`Int` arithmetic does not overflow; division rounds toward zero.
+
+## Floats
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	stdio.print(core.inspect(7.0 /. 2.0))
+	stdio.print(core.inspect(1.5 +. 2.0))
+	stdio.print(core.inspect(-.1.5))
+	stdio.print(core.inspect(3.0 -. 1.0 *. 2.0))
+	stdio.print(
+		core.inspect(core.to_float(7)),
+	)
+}
+```
+
+```text
+3.5
+3.5
+-1.5
+1.0
+7.0
+```
+
+`Float` holds finite binary64 numbers; integer and float arithmetic use separate operators, with explicit conversion between the types.
+
+## Strings
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	name = "Ada"
+	stdio.print("Hello, \(name)!")
+	stdio.print("count: \(core.inspect(3))")
+	stdio.print("a" <> "b")
+	stdio.print(#"a\nb"#)
+}
+```
+
+```text
+Hello, Ada!
+count: 3
+ab
+a\nb
+```
+
+Strings hold Unicode text; interpolation requires a string result, so numbers need conversion.
+
+The hashes in the raw string keep `\n` literal.
+
+## Multi-line strings
+
+```i format package=tour title="src/main.i"
+lines = """
+	alpha
+	beta
+	"""
+```
+
+```text
+lines = "alpha\nbeta"
+```
+
+The closing delimiter’s indentation is removed, along with the opening and closing line breaks; `i fmt` rewrites this value as an escaped single-line string.
+
+## Record updates
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	original = (name = "Ada", score = 4)
+	updated = (..original, score = original.score + 1)
+	stdio.print(core.inspect(original))
+	stdio.print(core.inspect(updated))
+}
+```
+
+```text
+(name = "Ada", score = 4)
+(name = "Ada", score = 5)
+```
+
+Values are immutable; the spread creates new data, and a later field replaces the copied field.
+
+Field labels do not create local bindings.
+
+## Tuples
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	player = (name = "Ada", score = 5)
+	pair = (player.name, player.score)
+	stdio.print(core.inspect((pair.0, pair.1)))
+	stdio.print(core.inspect(("one")))
+	stdio.print(core.inspect(()))
+}
+```
+
+```text
+("Ada", 5)
+("one")
+()
+```
+
+A single parenthesized item is still data; use braces for expression grouping.
+
+Positions count from zero; positions and labels together give data its shape.
+
+## Lists
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	tail = [2, 3]
+	numbers = [1, ..tail]
+	stdio.print(core.inspect(numbers))
+	stdio.print(core.inspect(tail))
+	stdio.print(core.inspect([]))
+}
+```
+
+```text
+[1, 2, 3]
+[2, 3]
+[]
+```
+
+The rest of a list is another list, which can be reused unchanged.
+
+## Booleans
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	ready : Bool = True
+	left = 5 + 2
+	right = 1 + 1
+	stdio.print(
+		core.inspect((ready && False, ready || False, core.not(ready))),
+	)
+	stdio.print(core.inspect((left > right, 1.5 <. 2.0)))
+	stdio.print(core.inspect((left == right, left != right)))
+}
+```
+
+```text
+(False, True, False)
+(True, True)
+(False, True)
+```
+
+Float ordering operators carry a dot, as their arithmetic operators do; `<=`, `>=`, `<=.`, and `>=.` also include equality.
+
+## Labelled data
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+Present = (Int)
+Absent = ()
+Maybe = Present | Absent
+
+main = () {
+	found : Maybe = Present(7)
+	stdio.print(core.inspect(found))
+	stdio.print(core.inspect(Absent))
+}
+```
+
+```text
+Present(7)
+Absent
+```
+
+`Present` adds an identity to its payload; the empty constructor `Absent` is already a value.
+
+The union adds no wrapper; [annotations](/docs/tour/types-and-inference#annotations) can name that union.
+
+These value types also describe a function’s arguments and result.
+
+## Bit arrays
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	packet = <<65, 2:u3>>
+	stdio.print(core.inspect(packet))
+	stdio.print(
+		core.inspect(core.bit_size(packet)),
+	)
+}
+```
+
+```text
+<<65, 2:u3>>
+11
+```
+
+Segments also support explicit byte order and text encodings.
+
+## Further reading
+
+[Functions and branches](/docs/tour/functions-and-branches).

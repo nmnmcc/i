@@ -1,9 +1,9 @@
 // Statements that are not the last and do nothing give W0502 (§6.10).
 Pair = (Int, Int)
 
-f = (x: Int) { x }
+f = (x : Int) { x }
 
-warned = (x: Int, y: Float) {
+warned = (x : Int, y : Float) {
 	1
 	"text"
 	x
@@ -18,7 +18,7 @@ warned = (x: Int, y: Float) {
 
 // A call, `|>`, a match, a block, a bit array, and a Float operator, which
 // may stop (§11.3), are not warned about.
-not_warned = (x: Int, y: Float) {
+not_warned = (x : Int, y : Float) {
 	f(x)
 	x |> f
 	x |> (_) { 1 }

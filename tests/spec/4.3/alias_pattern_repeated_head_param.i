@@ -2,6 +2,6 @@
 // expect: compile-error E0532
 Pair(A) = { (A, A) }
 
-value: (Int, Int) = (1, 2)
+value : (Int, Int) = (1, 2)
 
 Pair(Item) = value

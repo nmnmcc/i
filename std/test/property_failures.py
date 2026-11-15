@@ -28,6 +28,6 @@ try:
         assert result.returncode == 1
         assert '0 passed, 1 failed' in output
         assert output.count('std/property v1: falsified') == 1
-        assert 'seed: 42' in output and 'original: 1' in output and 'smallest: 1' in output
+        assert "seed : 42" in output and "original : 1" in output and "smallest : 1" in output
 finally:
     fixture.unlink(missing_ok=True)

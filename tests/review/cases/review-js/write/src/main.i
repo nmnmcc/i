@@ -7,7 +7,7 @@ Wasi = (
 	load = (Int, Int) -> BitArray,
 	fd_write = (Int, Int, Int, Int) -> Int,
 )
-more = (fd: Int, address: Int, count: Int, io: Int) <- (w: Wasi) -> Nil {
+more = (fd : Int, address : Int, count : Int, io : Int) <- (w : Wasi) -> Nil {
 	case
 	count
 	(0) { Nil }
@@ -25,7 +25,7 @@ more = (fd: Int, address: Int, count: Int, io: Int) <- (w: Wasi) -> Nil {
 				| (_) { Nil }
 		}
 }
-write = (fd: Int, bytes: BitArray) <- (w: Wasi) {
+write = (fd : Int, bytes : BitArray) <- (w : Wasi) {
 	count = core.bit_size(bytes) / 8
 	resource.acquire(
 		() { w.alloc(count) },

@@ -35,7 +35,7 @@ fn unused_audit() {
         let text = std::fs::read_to_string(&path).unwrap();
         let (module, _) = ilang_syntax::parse_module(&text);
         for item in module.items {
-            if matches!(&item.kind, ast::ItemKind::MacroItem { name, .. }
+            if matches!(&item.kind, ast::ItemKind::Macro { name, .. }
                 if matches!(name.name.as_str(), "test" | "skip" | "only" | "fails"))
             {
                 tests += 1;
@@ -46,14 +46,16 @@ fn unused_audit() {
                 };
                 *test_counts.entry(group.to_string()).or_default() += 1;
             } else if relative.contains("/test/")
-                && let ast::ItemKind::Binding(b) = &item.kind
-                && let ast::ExprKind::Fn(f) = &b.value.kind
-                && f.params.iter().all(|p| matches!(p, ast::Param::Env { .. }))
+                && let ast::ItemKind::Bind(b) = &item.kind
+                && let ast::ExprKind::Chain(functions) = &b.value.kind
+                && let [f] = functions.as_slice()
+                && f.guard.is_none()
+                && f.params.is_empty()
             {
-                let (line, _) = LineIndex::new(&text).line_col(b.pattern.span.start);
+                let (line, _) = LineIndex::new(&text).line_col(b.pattern.span.0.start);
                 zero.push(format!(
                     "{relative}:{line}\t{}",
-                    &text[b.pattern.span.start as usize..b.pattern.span.end as usize]
+                    &text[b.pattern.span.0.start as usize..b.pattern.span.0.end as usize]
                 ));
             }
         }

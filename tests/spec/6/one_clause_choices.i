@@ -6,7 +6,7 @@
 Ok(A) = (A)
 Error(E) = (E)
 Result(A, E) = Ok(A) | Error(E)
-unwrap = (r: Result(Int, Int)) { r |> (Ok(v) | Error(v)) { v } }
+unwrap = (r : Result(Int, Int)) { r |> (Ok(v) | Error(v)) { v } }
 
 main = () {
 	assert(unwrap(Ok(7)) == 7)

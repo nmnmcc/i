@@ -1,0 +1,112 @@
+---
+title: Standard library reference
+description: Find an export and try it in a complete program.
+---
+
+Find a function in its module reference and call it in your program.
+
+```i run package=lookup title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+	std/bool
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(bool.not(True)),
+	)
+}
+```
+
+```text
+False
+```
+
+[bool](/docs/library/generated/std-bool) lists `not` among its exports; select an export for its declaration and source documentation.
+
+## Text
+
+```i run package=lookup title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+	std/string
+)
+main = () <- (io : Io) {
+	text = string.trim("  héllo  ")
+	io.print(text)
+	io.print(
+		core.inspect(string.length(text)),
+	)
+	io.print(
+		core.inspect(string.byte_size(text)),
+	)
+}
+```
+
+```text
+héllo
+5
+6
+```
+
+[string](/docs/library/generated/std-string) documents index units and costs alongside its functions.
+
+## Lists
+
+```i run package=lookup title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+	std/list
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(list.map([1, 2, 3], (n) { n * 2 })),
+	)
+}
+```
+
+```text
+[2, 4, 6]
+```
+
+[list](/docs/library/generated/std-list) includes callback signatures.
+
+## Parsed numbers
+
+```i run package=lookup title="src/main.i"
+(
+	i/core
+	i/fail
+	(Io) = i/io
+	std/int
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(int.parse("42")),
+	)
+	io.print(
+		core.inspect(fail.catch(() { int.parse("oops") })),
+	)
+}
+```
+
+```text
+42
+Error(Nil)
+```
+
+[int](/docs/library/generated/std-int) documents accepted input and the `Fail(Nil)` service required for parsing.
+
+## Dependencies
+
+Add `std = { path = "../std" }` under `[dependencies]` in `i.toml`; paths are package-relative. Test-only imports use `[dev-dependencies]`. Compiler-supplied `i/…` modules need no dependency.
+
+## Modules
+
+**std:** [bit_array](/docs/library/generated/std-bit-array) · [bool](/docs/library/generated/std-bool) · [calendar](/docs/library/generated/std-calendar) · [cli](/docs/library/generated/std-cli) · [crypto](/docs/library/generated/std-crypto) · [csv](/docs/library/generated/std-csv) · [dict](/docs/library/generated/std-dict) · [float](/docs/library/generated/std-float) · [http](/docs/library/generated/std-http) · [int](/docs/library/generated/std-int) · [json](/docs/library/generated/std-json) · [list](/docs/library/generated/std-list) · [log](/docs/library/generated/std-log) · [option](/docs/library/generated/std-option) · [order](/docs/library/generated/std-order) · [pair](/docs/library/generated/std-pair) · [path](/docs/library/generated/std-path) · [property](/docs/library/generated/std-property) · [regex](/docs/library/generated/std-regex) · [result](/docs/library/generated/std-result) · [schema](/docs/library/generated/std-schema) · [sequence](/docs/library/generated/std-sequence) · [set](/docs/library/generated/std-set) · [stream](/docs/library/generated/std-stream) · [string](/docs/library/generated/std-string) · [time](/docs/library/generated/std-time) · [uri](/docs/library/generated/std-uri).
+
+**i:** [assertion](/docs/library/generated/i-assertion) · [big](/docs/library/generated/i-big) · [bits](/docs/library/generated/i-bits) · [clock](/docs/library/generated/i-clock) · [control](/docs/library/generated/i-control) · [core](/docs/library/generated/i-core) · [fail](/docs/library/generated/i-fail) · [fetch](/docs/library/generated/i-fetch) · [float_text](/docs/library/generated/i-float-text) · [fs](/docs/library/generated/i-fs) · [io](/docs/library/generated/i-io) · [key](/docs/library/generated/i-key) · [net](/docs/library/generated/i-net) · [process](/docs/library/generated/i-process) · [random](/docs/library/generated/i-random) · [request](/docs/library/generated/i-request) · [resource](/docs/library/generated/i-resource) · [stdio](/docs/library/generated/i-stdio) · [syntax](/docs/library/generated/i-syntax) · [task](/docs/library/generated/i-task) · [tls](/docs/library/generated/i-tls).
+
+Reference introductions come from `////` comments and exports from `///`; declarations use checked types when available, otherwise source text. [Packages](/docs/tour/packages) explains imports.

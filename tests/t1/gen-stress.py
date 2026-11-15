@@ -9,7 +9,7 @@ def source(part, n):
     if part == 'keys':
         return 'keys = [' + ', '.join(keys) + ']\n'
     if part == 'pick':
-        return 'pick = (s: String) { s |> {\n' + ''.join(f'{s} -> {i}\n' for i, s in enumerate(keys)) + '_ -> -1\n} }\n'
+        return "pick = (s : String) { s |> {\n" + ''.join(f'{s} -> {i}\n' for i, s in enumerate(keys)) + '_ -> -1\n} }\n'
     if part == 'calls':
         # Two statements make the RHS indirect (§6.10). The returned
         # function is instantiated once; the local f has a shared monotype.
@@ -17,7 +17,7 @@ def source(part, n):
     if part == 'alias':
         return 'Many = ' + ' | '.join(keys) + '\n' + ''.join(f'f{i} = (x: Many) {{ x }}\n' for i in range(100))
     if part == 'nested':
-        return 'nested = (p: (String, String)) { p |> {\n' + ''.join(f'({a}, {b}) -> 0\n' for a in keys for b in keys) + '_ -> 1\n} }\n'
+        return "nested = (p : (String, String)) { p |> {\n" + ''.join(f'({a}, {b}) -> 0\n' for a in keys for b in keys) + '_ -> 1\n} }\n'
     raise ValueError(part)
 
 

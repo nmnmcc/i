@@ -9,7 +9,7 @@
 )
 
 // `é` counts as one column.
-inner = (s: String) {
+inner = (s : String) {
 	x = core.byte_size("éé")
 	{ x > 100 } |> (True) { s } | (False) { "é" <> panic("deep") }
 }

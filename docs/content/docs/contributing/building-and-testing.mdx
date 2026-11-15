@@ -1,0 +1,78 @@
+---
+title: Building and testing
+description: Run a focused regression and select the checks for your change.
+---
+
+Run a focused regression before choosing the wider checks for your change.
+
+```i test stdout=exact package=checks title="test/bool_test.i"
+(
+	testlib = (test) = std/test
+	std/bool
+)
+test("negation", () { assert(bool.not(True) == False) })
+```
+
+```text
+pass checks/bool_test.negation
+1 passed, 0 failed
+```
+
+The docs runner supplies the manifest and compares this transcript at O0/O2. Repository commands below run from the root; `I=target/release/i` selects an existing CLI.
+
+## Filtered tests
+
+```sh
+"$I" test --project std --opt 0 std/bool_test.negate_true_test
+```
+
+```text
+pass std/bool_test.negate_true_test
+1 passed, 0 failed
+```
+
+```sh
+"$I" test --project std --opt 2 std/bool_test.negate_true_test
+```
+
+```text
+pass std/bool_test.negate_true_test
+1 passed, 0 failed
+```
+
+The name filter selects execution; package checking can still include other modules.
+
+## Setup
+
+[Development setup](https://github.com/nmnmcc/i/blob/main/docs/development.md) uses `git submodule update --init crates/ilang-binaryen/binaryen`, then `devenv shell`. The pinned shell supplies the toolchain, command runtimes, CMake, Wasmtime, wasm-tools, and matching Playwright browsers. Binaryen is built from source and linked into the CLI; its first build takes minutes, later builds reuse it.
+
+CI builds with `cargo build --release --locked -p ilang-cli`. Shared redesign worktrees route Cargo work through the heavy queue described in [testing.md](https://github.com/nmnmcc/i/blob/main/docs/testing.md).
+
+## Check selection
+
+These commands are defined in [dev-verify](https://github.com/nmnmcc/i/blob/main/scripts/dev-verify) and [CI](https://github.com/nmnmcc/i/blob/main/.github/workflows/ci.yml).
+
+| Change | Command or part |
+| --- | --- |
+| Checker | `cargo test -p ilang-check --locked` |
+| One spec case | `cargo test -p ilang-cli --test spec --locked -- a1_entry_exports` |
+| Source formatting | `"$I" fmt --check lib std bench examples` |
+| Compiler formatting/lint | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings` |
+| Snippets | `scripts/check-snippets`; `python3 -I scripts/check-snippets-test` |
+| Runtime smoke | `./scripts/wasi-smoke "$I"` |
+| Generated models | `./scripts/test-generation --mode short --binary "$I"` |
+| Corpus shard | `./scripts/review-corpus run --binary target/release/i --shard 1/10 --jobs 4` |
+| SDK/browser checks | `./scripts/dev-verify js` |
+| Editor checks | `./scripts/dev-verify editors` |
+
+CI splits `rust-test` with `DEV_VERIFY_TEST_GROUP=check`, `spec`, `cli`, or `rest`. `rust-lint` runs formatting, lint, and snippets; `rust` combines lint/tests. Other accepted parts are `snippets`, `i`, `js`, `editors`; no argument selects `rust i js editors`. The `i` part tests `std`, `examples/hello`, and `bench` at O0/O2, then smoke, corpus, and generated models. Smoke covers Wasmtime and Node; generated failures retain source/observations.
+
+## Documentation checks
+
+From `docs`, run `npm ci`, `npm run build`, `npm run check:placeholders`, `npm run check:links`, `npm run check:rendering`, and `npm run check:examples`; [package.json](https://github.com/nmnmcc/i/blob/main/docs/package.json) defines them. Set `I_BIN` to an existing compiler and `I_SNIPPET_PARSER` to a matching prebuilt parser to avoid builds.
+
+## Corpus records
+
+Projects such as [review-native/fake](https://github.com/nmnmcc/i/blob/main/tests/review/cases/review-native/fake/i.toml) keep `i.toml`, `src/main.i`, and `expected.json` together. Observations include compiler identity, `check --types`, and test/main O0/O2 results. `manifest.json` records origins/rules; `inventory.json` accounts for occurrences; `requirements.json` independently records defects and required behavior. Resource caps are not performance guarantees; censored timeouts do not establish termination. Change expectations with the requiring spec paragraph, review semantic requirements independently, and promote fixed failures; [testing.md](https://github.com/nmnmcc/i/blob/main/docs/testing.md) documents regeneration.
+
+Full verification can be long; the repository gives no general memory estimate.

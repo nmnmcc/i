@@ -8,11 +8,11 @@
 
 Pair(A) = (A, A)
 
-list = (xs: List("a" | "b")) {
+list = (xs : List("a" | "b")) {
 	xs |> ([]) { 0 } | (["a", ..]) { 1 } | (["b", ..]) { 2 }
 }
 
-pair = (p: Pair("a" | "b")) {
+pair = (p : Pair("a" | "b")) {
 	p |>
 		(Pair("a", "a")) { 1 }
 		| (Pair("a", "b")) { 2 }
@@ -20,7 +20,7 @@ pair = (p: Pair("a" | "b")) {
 		| (Pair("b", "b")) { 4 }
 }
 
-complement = (s: String) { s |> ("a") { 0 } | (x: String - "a") { 1 } }
+complement = (s : String) { s |> ("a") { 0 } | (x : String - "a") { 1 } }
 
 test("closed_sets", () {
 	assert(list([]) == 0)

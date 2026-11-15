@@ -1,0 +1,3 @@
+(, (= syntax (/ i syntax)))
+(, id)
+(@ macro (= id (-> (, value) _ ((. syntax make) ((. syntax node) value) value))))

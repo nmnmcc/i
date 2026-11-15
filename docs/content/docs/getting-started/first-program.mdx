@@ -1,0 +1,135 @@
+---
+title: First program
+description: Create a package, run its program, and add tests.
+---
+
+Create, run, and test a package.
+
+```sh
+i new hello
+```
+
+```text
+made the package `hello` in `hello`
+run it with `i run --project hello`
+```
+
+Put `i` on `PATH` and keep a copy of the i sources containing `std/`. The command creates `i.toml`, `.gitignore`, `src/main.i`, and `test/main_test.i`; correct the manifest's `[dev-dependencies]` `std` path if needed, using an absolute path or one relative to the package directory.
+
+## Program
+
+```i run package=hello title="src/main.i"
+//// Greetings.
+(
+	(Io) = i/io
+)
+
+(
+	greeting
+)
+/// A greeting for a name.
+greeting = (who : String) -> String { "Hello, " <> who <> "!" }
+main = () <- (io : Io) { io.print(greeting("hello")) }
+```
+
+```text
+Hello, hello!
+```
+
+The generated source is shown with shorter documentation comments. The second parenthesized group exports `greeting` for other modules; `main` is the entry, and `i run` supplies its `Io` service.
+
+```sh
+cd hello
+i run
+```
+
+```text
+Hello, hello!
+```
+
+## A new greeting
+
+```i run package=hello title="src/main.i"
+//// Greetings.
+(
+	(Io) = i/io
+)
+
+(
+	greeting
+)
+/// A greeting for a name.
+greeting = (who : String) -> String { "Hello, " <> who <> "!" }
+main = () <- (io : Io) { io.print(greeting("world")) }
+```
+
+```text
+Hello, world!
+```
+
+```sh
+i run
+```
+
+```text
+Hello, world!
+```
+
+## Tests
+
+```i file=src/main.i title="src/main.i"
+//// Greetings.
+(
+	(Io) = i/io
+)
+
+(
+	greeting
+)
+/// A greeting for a name.
+greeting = (who : String) -> String { "Hello, " <> who <> "!" }
+main = () <- (io : Io) { io.print(greeting("world")) }
+```
+
+```i test stdout=exact package=hello title="test/main_test.i"
+(
+	testlib = (test) = std/test
+	hello/main
+)
+test("greets", () { assert(main.greeting("i") == "Hello, i!") })
+test("greets the world", () {
+	assert(main.greeting("world") == "Hello, world!")
+})
+```
+
+```text
+pass hello/main_test.greets
+pass hello/main_test.greets the world
+2 passed, 0 failed
+```
+
+Replace the generated test file with these two tests.
+
+```sh
+i test
+```
+
+```text
+pass hello/main_test.greets
+pass hello/main_test.greets the world
+2 passed, 0 failed
+```
+
+## Formatting and checking
+
+```sh
+i fmt
+i check
+```
+
+```text
+```
+
+`i fmt` rewrites source; `i check` checks without running it.
+
+[Values](/docs/tour/values-and-data) · [Functions](/docs/tour/functions-and-branches) · [Packages](/docs/tour/packages) · [Services](/docs/tour/services-and-errors) · [Editor set-up](/docs/getting-started/editor-set-up)

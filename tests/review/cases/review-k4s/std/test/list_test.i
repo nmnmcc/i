@@ -1700,7 +1700,7 @@ test("range_test", () {
 
 test("sort_stable_test", () {
 	pairs = [(2, "a"), (1, "b"), (2, "c"), (1, "d"), (0, "e"), (2, "f")]
-	by_first = (x: (Int, String), y: (Int, String)) { int.compare(x.0, y.0) }
+	by_first = (x : (Int, String), y : (Int, String)) { int.compare(x.0, y.0) }
 	assert(
 		list.sort(pairs, by_first) ==
 			[(0, "e"), (1, "b"), (1, "d"), (2, "a"), (2, "c"), (2, "f")],
@@ -1728,7 +1728,7 @@ test("sort_big_test", () {
 
 test("sort_stable_big_test", () {
 	xs = list.map(list.range(0, 99_999), (i) { (i % 10, i) })
-	sorted = list.sort(xs, (a: (Int, Int), b: (Int, Int)) {
+	sorted = list.sort(xs, (a : (Int, Int), b : (Int, Int)) {
 		int.compare(a.0, b.0)
 	})
 	// Within each key, the second parts keep their order.
@@ -1760,7 +1760,7 @@ test("min_max_test", () {
 	assert(list.max([], int.compare) == None)
 	assert(list.min(["b", "a", "c"], string.compare) == Some("a"))
 	// The first of equal elements is given.
-	by_first = (a: (Int, String), b: (Int, String)) { int.compare(a.0, b.0) }
+	by_first = (a : (Int, String), b : (Int, String)) { int.compare(a.0, b.0) }
 	assert(list.max([(1, "a"), (2, "b"), (2, "c")], by_first) == Some((2, "b")))
 	assert(list.min([(1, "a"), (2, "b"), (1, "c")], by_first) == Some((1, "a")))
 })
@@ -1866,14 +1866,14 @@ Counter = (step = Int)
 Yield(A) = (emit = (A) -> Nil)
 
 // A generator made with `i/control` (§9.4).
-collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
 			[]
 		} <- (
 			Yield(
-				emit = (x: A) {
+				emit = (x : A) {
 					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
 				},
 			),
@@ -1884,16 +1884,16 @@ collect = <A, N>(body: () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 test("environment_callbacks_test", () {
 	// A callback may need a service; `list.map` passes the environment on.
 	assert(
-		list.map([1, 2, 3], (x) <- (c: Counter) { x + c.step }) == [8, 9, 10],
+		list.map([1, 2, 3], (x) <- (c : Counter) { x + c.step }) == [8, 9, 10],
 	) <- (Counter(step = 7))
 })
 
 test("generator_callbacks_test", () {
-	ys = collect(() <- (y: Yield(Int)) {
+	ys = collect(() <- (y : Yield(Int)) {
 		list.each([1, 2, 3], (x) { y.emit(x * 10) })
 	})
 	assert(ys == [10, 20, 30])
-	zs = collect(() <- (y: Yield(Int)) {
+	zs = collect(() <- (y : Yield(Int)) {
 		list.fold([1, 2, 3], 0, (acc, x) {
 			y.emit(acc)
 			acc + x

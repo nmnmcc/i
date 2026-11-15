@@ -14,24 +14,29 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text : String) <- (out : Out) { out.print(text) }
+
+// Decision 2: install the real key required by a kept pure callback.
+without_fail = <A, N>(body : () <- (Fail(Never), ..N) -> A) -> A {
+	body() <- (Fail(raise = (_ : Never) { panic("fixture: impossible error") }))
+}
 
 main = () {
-	callback = control.keep((work: (() -> Nil) -> Nil) {
+	callback = control.keep((work : (() -> Nil) -> Nil) {
 		task.scope((s) {
-			gate: task.Channel(Nil) = task.channel()
+			gate : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.receive(gate)
 				fail.raise("callback")
 			})
-			signal = control.keep((_: Nil) { task.send(gate, Nil) })
-			work(() { signal(Nil) })
+			signal = control.keep((_ : Nil) { task.send(gate, Nil) })
+			work(() { without_fail(() { signal(Nil) }) })
 		})
 	})
 	assert(
 		task.run(() {
 			task.run(() {
-				work = control.keep((notify: () -> Nil) {
+				work = control.keep((notify : () -> Nil) {
 					task.scope((inner) {
 						task.go(inner, () {
 							resource.ensure(
@@ -49,7 +54,9 @@ main = () {
 					})
 				})
 				assert(
-					fail.catch(() { callback((notify) { work(notify) }) }) ==
+					fail.catch(() {
+						callback((notify) { without_fail(() { work(notify) }) })
+					}) ==
 						Error("callback"),
 				)
 				42

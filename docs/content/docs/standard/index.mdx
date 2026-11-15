@@ -1,0 +1,79 @@
+---
+title: The language standard
+description: Find a definition, an operation, or a numbered section.
+---
+
+Look up the definition behind a working program.
+
+```i run package=lookup title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) { io.print(core.inspect(42)) }
+```
+
+```text
+42
+```
+
+Find `inspect` in [i/core](/docs/standard/generated/chapter-13); the [library reference](/docs/library/generated/i-core) provides export documentation.
+
+## Bit counts
+
+```i run package=lookup title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(core.bit_size(<<1, 2>>)),
+	)
+}
+```
+
+```text
+16
+```
+
+[Bit arrays](/docs/standard/generated/chapter-8) supplies the construction syntax.
+
+## Library functions
+
+```i run package=lookup title="src/main.i"
+(
+	i/core
+	(Io) = i/io
+	std/int
+)
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(int.parse("42")),
+	)
+}
+```
+
+```text
+42
+```
+
+Find `parse` and its required `Fail(Nil)` service under [std/int](/docs/library/generated/std-int); built-in names have their own [chapter](/docs/standard/generated/chapter-12).
+
+## Command lookup
+
+```sh
+i spec --version
+```
+
+```text
+Version: 1.0; Date: 2026-11-14
+```
+
+Use `i spec --toc` for chapters, `i spec 2.1` for a section and its subsections, `i spec --search words` for matching sections, and `i spec --help` for options. Generated chapters retain numbered subsection anchors.
+
+The current compiler does not implement [every feature yet](/docs/contributing/roadmap).
+
+## Chapters
+
+[Introduction](/docs/standard/generated/introduction) · [Reading](/docs/standard/generated/chapter-0) · [Words](/docs/standard/generated/chapter-1) · [Modules](/docs/standard/generated/chapter-2) · [Type syntax](/docs/standard/generated/chapter-3) · [Types](/docs/standard/generated/chapter-4) · [Names](/docs/standard/generated/chapter-5) · [Expressions](/docs/standard/generated/chapter-6) · [Patterns](/docs/standard/generated/chapter-7) · [Bits](/docs/standard/generated/chapter-8) · [Effects](/docs/standard/generated/chapter-9) · [Host](/docs/standard/generated/chapter-10) · [Runtime](/docs/standard/generated/chapter-11) · [Built-ins](/docs/standard/generated/chapter-12) · [Core](/docs/standard/generated/chapter-13) · [Macros](/docs/standard/generated/chapter-14) · [Choices](/docs/standard/generated/chapter-appendix-a) · [Interface](/docs/standard/generated/chapter-appendix-b) · [Strings](/docs/standard/generated/chapter-appendix-c).

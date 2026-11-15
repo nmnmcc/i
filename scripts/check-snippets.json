@@ -482,7 +482,7 @@
     "substitutions": [
       [
         "{MAIN}",
-        "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"héllo 𝕏 \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n"
+        "(\n\tutil = app/util\n)\n\n/// Adds two numbers.\nadd = (x, y) { x + y }\n\nUser = (name = String, age = Int)\n\ngreet = (u: User) { \"h\u00e9llo \ud835\udd4f \" <> u.name }\n\nmain = () { util.double(add(1, 2)) }\n"
       ],
       [
         "{{",
@@ -621,9 +621,6 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "crates/ilang-cli/tests/package_commands.rs:5888b0d352a6a1b0": {
-    "not_source": "search text in a test: the head of the template main"
-  },
   "crates/ilang-cli/tests/package_commands.rs:baccf998e7fb47a5": {
     "not_source": "search text in a test: a label of a host service"
   },
@@ -686,12 +683,6 @@
   "crates/ilang-lsp/tests/protocol.rs:36a9e7f1c95b82ff": {
     "reason": "Source replacement that removes the header in the LSP fixture"
   },
-  "crates/ilang-check/src/resolve.rs:d942f64886578d87": {
-    "not_source": "A name compared on the diagnostic path, not an i source"
-  },
-  "crates/ilang-check/src/resolve.rs:d46aee08cc49f6d1": {
-    "not_source": "A name compared on the diagnostic path, not an i source"
-  },
   "crates/ilang-check/tests/literal_types.rs:74282c580560b9e5": {
     "not_source": "Generated temporary Cargo-style i.toml dependency manifest"
   },
@@ -727,7 +718,7 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/03_mixed_headers/original/.invalid/src/main.i:a9d9b44168dfeedb": {
@@ -757,9 +748,6 @@
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/17_old_unbound_fn_group/original/.invalid/src/main.i:c0c365581d9f9e49": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
-  },
-  "tests/review/cases/review-a1/_loose/cases/18_old_expected_fn_group/original/.invalid/src/main.i:fc7e2229e11ead73": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/_loose/cases/20_old_alias_returns_fn/original/.invalid/src/main.i:aa26a225a69b2113": {
@@ -824,49 +812,49 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/once/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/capture/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/cases/04_header_order/.invalid/src/main.i:bc7528f08f9c0a6a": {
@@ -886,9 +874,6 @@
     "diagnostics": [
       "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file"
     ]
-  },
-  "tests/review/cases/review-a1/cases/18_old_expected_fn_group/.invalid/src/main.i:fc7e2229e11ead73": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/cases/21_old_alias_typed_fn/.invalid/src/main.i:bd4205ecf70c889e": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
@@ -926,21 +911,21 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-keep-layout/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-a1/confirmed/capture-plain/.invalid/src/types.i:47b7331c670212b3": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`"
     ]
   },
   "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/.invalid/src/main.i:dfa83f0c5b10d2f3": {
@@ -965,8 +950,8 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected `,`, `?` or `)`, found `!`"
     ]
@@ -1034,7 +1019,7 @@
   "tests/review/cases/review-rec/_loose/schema-union/.invalid/src/main.i:5988d6050671f785": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
       "E0101: expected an expression, found `->`",
       "E0101: expected an expression, found `->`",
@@ -1055,9 +1040,9 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
       "E0102: expected the function body, a `{` on the same line, found `?`",
@@ -1086,9 +1071,9 @@
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
       "E0102: expected the function body, a `{` on the same line, found `?`",
@@ -1122,111 +1107,6 @@
   "crates/ilang-cli/tests/r2_performance.rs:2dbd953bfd83802f": {
     "not_source": true,
     "reason": "Generated TOML manifest for the isolated interval measurement package; this is not i source."
-  },
-  "crates/ilang-cli/tests/wasi.rs:fe5a45081165354f": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:a54563504b5d686a": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:69730641c8a3038e": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:2f2f9eeda8da582e": {
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-cli/tests/wasi.rs:99e1343aed5932cb": {
-    "reason": "Materialize the source template rather than parse doubled Rust format braces",
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "proc_exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ]
   },
   "crates/ilang-wasm/tests/codegen.rs:0521135b5af7674d": {
     "prefix": "(i/control)\nf = (b, x) { a1 = x\n",
@@ -1366,9 +1246,6 @@
   "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:6167fd29bbd38815": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
-  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:40c04e1066476b93": {
-    "reason": "Intentional negative syntax example. (valid in syntax three)"
-  },
   "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:eb2f2775666edf45": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
@@ -1401,9 +1278,6 @@
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
   },
-  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:40c04e1066476b93": {
-    "reason": "Intentional negative syntax example. (valid in syntax three)"
-  },
   "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:b40bf9426d491496": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
@@ -1414,9 +1288,6 @@
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/direct/.invalid/src/main.i:2fcdef033b2b0fe3": {
-    "reason": "Intentional negative syntax example. (valid in syntax three)"
-  },
-  "tests/review/cases/review-native3/external/.invalid/src/main.i:d502a7a7a4d34576": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/field/.invalid/src/main.i:9cca1d56794833b3": {
@@ -1436,9 +1307,6 @@
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
       "E0101: expected `,`, `?` or `)`, found `!`"
     ]
-  },
-  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:72c356b5fbc3c09c": {
-    "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/positive/.invalid/src/main.i:05223b2c9df25096": {
     "reason": "Intentional negative syntax example.",
@@ -1570,26 +1438,6 @@
   "crates/ilang-cli/tests/macro_budget.rs:080eb357b7982bd5": {
     "not_source": "TOML manifest"
   },
-  "crates/ilang-cli/tests/macro_budget.rs:1b94955c0a0c81fc": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{parameters}",
-        "_: Int"
-      ],
-      [
-        "{arguments}",
-        "n"
-      ]
-    ]
-  },
   "crates/ilang-cli/tests/macro_run.rs:7f5fb3e68a8a2beb": {
     "not_source": "TOML manifest"
   },
@@ -1643,9 +1491,6 @@
   },
   "crates/ilang-macro/src/definition_world.rs:134ce6db26ee8173": {
     "not_source": "Invariant message"
-  },
-  "crates/ilang-syntax/src/lisp/to_ast.rs:0e503166f27db3d3": {
-    "not_source": "Lisp conversion diagnostic message"
   },
   "crates/ilang-syntax/src/lisp/to_source.rs:1ba075eafd01e22b": {
     "not_source": "Expected output format for a deep expression"
@@ -1784,10 +1629,6 @@
     "not_source": true,
     "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
   },
-  "crates/ilang-cli/tests/numeric_lowering.rs:2738ce9e7e1c2f7d": {
-    "not_source": true,
-    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
-  },
   "crates/ilang-cli/tests/numeric_lowering.rs:eec5224efc6b3aed": {
     "not_source": true,
     "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
@@ -1866,18 +1707,6 @@
   "crates/ilang-lsp/tests/protocol.rs:02f4d82a1d1b5450": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
-  "crates/ilang-lsp/tests/protocol.rs:2b1965c1b03ffba2": {
-    "reason": "Robustness test: broken input on purpose",
-    "diagnostics": [
-      "E0010: `{` is not closed",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0010: `(` is not closed",
-      "E0010: `{` is not closed",
-      "E0101: expected a closed `{`, found `{`",
-      "E0010: `(` is not closed",
-      "E0002: this string is not closed"
-    ]
-  },
   "crates/ilang-check/tests/alias_unions.rs:c4a37f2a714decb3": {
     "not_source": "Rust format template fragment of a generated i program"
   },
@@ -1889,46 +1718,6 @@
   },
   "crates/ilang-cli/tests/value_type_performance.rs:217fe1a139ac8e12": {
     "not_source": "Rust format string for a type name"
-  },
-  "crates/ilang-macro/src/prepare.rs:2bdef896cb528363": {
-    "substitutions": [
-      [
-        "{items}",
-        ""
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{}",
-        "app/macros"
-      ],
-      [
-        "{parameters}",
-        "arg0: syntax.Syntax"
-      ],
-      [
-        "{item_service}",
-        ""
-      ],
-      [
-        "{item_row}",
-        ""
-      ],
-      [
-        "target.app/macros",
-        "target.expand"
-      ],
-      [
-        "{arguments}",
-        "arg0"
-      ]
-    ]
   },
   "crates/ilang-cli/src/commands/package.rs:27726af531628f45": {
     "substitutions": [
@@ -1953,49 +1742,11 @@
       "E0106: a discard binds nothing, so it may not be used as a value"
     ]
   },
-  "editors/vscode/test/sample.i:4738af5a675ee645": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
-      "E0003: unknown escape",
-      "E0106: a discard binds nothing, so it may not be used as a value",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
-    ]
-  },
   "tests/spec/6/a1_wrong_pattern.i:03fa6b0f25d02282": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
     ]
-  },
-  "crates/ilang-check/tests/literal_types.rs:7791fb31d9b11242": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{need}",
-        "String"
-      ],
-      [
-        "{annotation}",
-        "String"
-      ],
-      [
-        "{pattern}",
-        "\"a\""
-      ],
-      [
-        "{catch}",
-        "t"
-      ]
-    ],
-    "reason": "Parse the actual generated match skeleton; test tables instantiate each narrowing case."
   },
   "tests/spec/7/suffix_two_binders.i:4c3e608318a03133": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
@@ -2076,13 +1827,6 @@
     ],
     "reason": "Render the source template; the test still exercises the generator"
   },
-  "docs/spec.md:8cd36264ae24baa3": {
-    "track": "SYN3",
-    "reason": "E6 whole/row provision now parses; the remaining mixed data/spread form is still future syntax (A2 unchanged).",
-    "diagnostics": [
-      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)"
-    ]
-  },
   "crates/ilang-cli/examples/migrate-syntax3-labels.rs:7372e79824e15040": {
     "not_source": "TOML manifest or manifest fragment"
   },
@@ -2118,11 +1862,8 @@
   "crates/ilang-lsp/tests/protocol.rs:0f1c00c95cc031e0": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
-  "crates/ilang-lsp/tests/protocol.rs:d27e00e4dc5cccc7": {
-    "not_source": "Position/search substring inside a complete source fixture"
-  },
   "crates/ilang-check/tests/front_end.rs:b6f419e1a1d303f6": {
-    "reason": "Independent negative type-head case: a lowercase head is rejected by syntax-three grammar (§2.8, §3.2), before checker errors.",
+    "reason": "Independent negative type-head case: a lowercase head is rejected by syntax-three grammar (\u00a72.8, \u00a73.2), before checker errors.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
@@ -2144,49 +1885,15 @@
     "not_source": "Rust progress-log format string, not an i type definition."
   },
   "crates/ilang-syntax/tests/string_forms.rs:68d70a8fa472acc8": {
-    "reason": "Interpolation is forbidden in patterns (spec §1.6); the migrated one-branch syntax still rejects the same negative case.",
+    "reason": "Interpolation is forbidden in patterns (spec \u00a71.6); the migrated one-branch syntax still rejects the same negative case.",
     "diagnostics": [
       "E0101: string interpolation is not allowed in patterns"
     ]
   },
   "crates/ilang-syntax/tests/string_forms.rs:f791f2429f546a31": {
-    "reason": "String patterns have exactly one binder (spec §7.1). The syntax-three parameter-item parser rejects the second <> part; the two-binder negative intent is retained.",
+    "reason": "String patterns have exactly one binder (spec \u00a77.1). The syntax-three parameter-item parser rejects the second <> part; the two-binder negative intent is retained.",
     "diagnostics": [
       "E0101: expected `,`, `?` or `)`, found `<>`"
-    ]
-  },
-  "tests/review/cases/review-runtime/echo-types/src/task.i:2905e07d4029594b": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters",
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
-  "tests/review/cases/review-s6/probe/src/main.i:70c3b6101c991c5f": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
-  "tests/review/cases/review-std1/factory/src/main.i:6af88000cc971bba": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
-  "tests/review/cases/review-std1/tree/src/main.i:317793d710d99a2d": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
-  "tests/review/cases/review-std1/variance/src/main.i:2d326cd3da5ff46c": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters",
-      "E0101: the head of a data type or an opaque type has only type parameters",
-      "E0101: the head of a data type or an opaque type has only type parameters",
-      "E0101: the head of a data type or an opaque type has only type parameters"
     ]
   },
   "crates/ilang-cli/tests/multicore.rs:32586dd5d3cd919b": {
@@ -2210,40 +1917,6 @@
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
   "crates/ilang-cli/tests/multicore.rs:b3d7af2754f74d3d": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:8e2a1c1281f9894b": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:220a24ce91164a08": {
     "substitutions": [
       [
         "{{",
@@ -2406,74 +2079,6 @@
     ],
     "reason": "Render the Rust format string with a representative port; check the full resulting program."
   },
-  "crates/ilang-cli/tests/multicore.rs:68026936c073b50a": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:b5e1cb94b1632476": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:dce9f9ef401d7b83": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:a61d3c1293ef6e72": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
   "crates/ilang-wasm/tests/codegen.rs:fc3b7cf6d9e48c43": {
     "not_source": "module path of a generated metadata test, not an i source"
   },
@@ -2488,51 +2093,11 @@
   "crates/ilang-wasm/tests/multi_shape.rs:4414029af964b61f": {
     "not_source": "Wasmtime preload argument, not i source."
   },
-  "crates/ilang-cli/tests/multicore.rs:b8adf43384a85784": {
-    "reason": "The copied-function fixture is a Rust format string; use its actual SPIN constant and unescape format braces.",
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ]
-  },
   "crates/ilang-wasm/tests/multi_shape.rs:6c0e82244f1f33bc": {
     "not_source": "Wasmtime --preload command argument guest={} rendered with a Wasm file path; not i source."
   },
   "crates/ilang-cli/tests/multicore.rs:7111383378a50a4c": {
     "not_source": "Delimiter used to split a fixture before its main declaration."
-  },
-  "crates/ilang-cli/tests/multicore.rs:8de0b702d7782f25": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{waiter}",
-        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
-      ]
-    ],
-    "suffix": "fail.raise(\"outer\")\n })\n}\n",
-    "reason": "Render the stress generator header with its actual waiter fixture prefix and closing tail."
-  },
-  "crates/ilang-cli/tests/multicore.rs:995dc31b7483facf": {
-    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(Nil) = task.channel()\n",
-    "suffix": "fail.raise(\"outer\")\n })\n}\n",
-    "reason": "A per-pair stress-generator block inside its actual main/scope header and closing tail."
   },
   "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:ee6bc6b74c40e304": {
     "reason": "A typed binding occurs in a call argument, retaining the original statement-in-expression-position counterexample.",
@@ -2564,43 +2129,63 @@
       "E0105: a block ends with an expression"
     ]
   },
-  "tests/review/cases/review-rec/_loose/probes/src/main.i:0678a9bb74604084": {
-    "reason": "Preserve the closed-data negative fixture instead of erasing its illegal type spread. Syntax-three §2.3: a data type has no spread. Main E0541 is diagnosed earlier as parser E0107; removed-module/type errors are independently retained in checker tests.",
+  "crates/ilang-check/tests/diagnostic_traps.rs:4e85fa57c5a5a045": {
+    "reason": "Intentional \u00a71.7 regression: a spaced lowercase call followed by a stray = remains E0101 and gains the one-binding explanation.",
     "diagnostics": [
-      "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
+      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line (\u00a71.7)"
     ]
+  },
+  "tests/spec/1.7/one_binding_function_error.i:b00b44846a80cdbf": {
+    "reason": "Intentional \u00a71.7 regression: a spaced lowercase call followed by a stray = remains E0101 and gains the one-binding explanation.",
+    "diagnostics": [
+      "E0101: expected an expression, found `=`; this is one binding, not two; to write two, put the second on its own line (\u00a71.7)"
+    ]
+  },
+  "crates/ilang-check/tests/diagnostic_traps.rs:24dcfaf171c4adcd": {
+    "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
   },
   "bindings/javascript/test/providers.test.mjs:b89cd1ef46e15e08": {
     "not_source": true,
     "reason": "TOML host-export manifest data; services are provided in the i entry."
   },
+  "crates/ilang-wasm/tests/codegen.rs:6694c492172dacaf": {
+    "suffix": "\n  a0\n}\n",
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-package/tests/load.rs:7c1fba0b38ce9b71": {
+    "not_source": true,
+    "reason": "TOML root/dependency manifests for the entry-default fixture, not i code."
+  },
+  "crates/ilang-package/tests/load.rs:484dbf1ace20d2a2": {
+    "not_source": true,
+    "reason": "TOML root/dependency manifests for the entry-default fixture, not i code."
+  },
   "crates/ilang-check/tests/rest_services.rs:cba1acee53aef38c": {
-    "reason": "The checked source replaces the semicolon with a newline before parsing; apply the same literal transformation.",
     "substitutions": [
       [
         ";",
         "\n"
       ]
-    ]
+    ],
+    "reason": "Apply the exact semicolon-to-newline replacement used by the rest-row fixture before parsing; its semantic rejection assertion remains."
   },
   "crates/ilang-check/tests/row_schemes.rs:1349e21bc6e31820": {
-    "not_source": true,
-    "reason": "Search needle for replacing the Entry definition in the assembled fixture, not an i program."
+    "suffix": " (message = String)\n",
+    "reason": "Complete this Entry binding-name replacement fragment with the actual remaining record definition from the fixture."
   },
   "crates/ilang-check/tests/row_schemes.rs:a3c551731c3dfc91": {
-    "reason": "Replacement prefix for the existing Entry definition; its original field data completes the fragment.",
-    "suffix": " (message = String)\n"
+    "suffix": " (message = String)\n",
+    "reason": "Complete this Entry binding-name replacement fragment with the actual remaining record definition from the fixture."
   },
   "crates/ilang-cli/tests/http.rs:5d670fc264ba0466": {
-    "not_source": true,
-    "reason": "Search needle for renaming the fixture entry before assembling the HTTP wrapper."
+    "suffix": "() { Nil }\n",
+    "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
   },
   "crates/ilang-cli/tests/http.rs:df75d3c57754e19a": {
-    "reason": "Replacement binding head for the existing main function; complete with a representative entry body.",
-    "suffix": "() { Nil }\n"
+    "suffix": "() { Nil }\n",
+    "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
   },
   "crates/ilang-cli/tests/http.rs:ef4fa58b5b0b6bad": {
-    "reason": "HTTP wrapper format string: Rust doubles braces and the source placeholder supplies the renamed entry.",
     "substitutions": [
       [
         "{{",
@@ -2612,32 +2197,773 @@
       ],
       [
         "{source}",
-        "(std/http)\n_http_test_body = () { Nil }\n"
+        "(http = std/http)\n_http_test_body = () { Nil }\n"
       ]
-    ]
+    ],
+    "reason": "Render the HTTP wrapper format string with a minimal imported body; runtime HTTP tests exercise the actual assembled programs."
   },
   "crates/ilang-cli/tests/rest_services.rs:42887e26a0a16e0d": {
     "not_source": true,
-    "reason": "Rust assertion failure text naming the optimization level and runtime outcome."
-  },
-  "crates/ilang-package/tests/load.rs:7c1fba0b38ce9b71": {
-    "not_source": true,
-    "reason": "A TOML manifest written to i.toml by the dependency entry-selection fixture."
-  },
-  "crates/ilang-package/tests/load.rs:484dbf1ace20d2a2": {
-    "not_source": true,
-    "reason": "A TOML manifest written to i.toml by the dependency entry-selection fixture."
+    "reason": "Rust assertion diagnostic format string for an Outcome, not i code."
   },
   "crates/ilang-package/tests/manifest.rs:4398f7ac72f10c87": {
     "not_source": true,
-    "reason": "TOML provider-table data or its TOML format template, parsed by the manifest tests."
+    "reason": "TOML provider-table fragment concatenated to the package manifest in the E5 regression, not i code."
   },
   "crates/ilang-package/tests/manifest.rs:9132145e5e389a5e": {
     "not_source": true,
-    "reason": "TOML provider-table data or its TOML format template, parsed by the manifest tests."
+    "reason": "TOML provider-table fragment concatenated to the package manifest in the E5 regression, not i code."
   },
-  "crates/ilang-wasm/tests/codegen.rs:6694c492172dacaf": {
-    "reason": "Prefix assembled by many_points; complete with the actual n=0 suffix of that generator.",
-    "suffix": "  a0\n}\n\nmain = () { control.boundary((b) { f(b, 0) })  Nil }\n"
+  "bindings/javascript/test/collections.test.mjs:60804377708cfc73": {
+    "not_source": true,
+    "reason": "Reviewed annotation conversion: host diagnostic, URI, metadata, or protocol identity; its colon is not an i annotation."
+  },
+  "bindings/javascript/test/collections.test.mjs:83780627ece961fa": {
+    "not_source": true,
+    "reason": "Reviewed annotation conversion: host diagnostic, URI, metadata, or protocol identity; its colon is not an i annotation."
+  },
+  "crates/ilang-check/src/query/actions.rs:f74082bf6dab9ef6": {
+    "substitutions": [
+      [
+        "{}",
+        "Int"
+      ]
+    ],
+    "reason": "Rust format! template in lisp_type: annotation_text supplies the rendered type; parse its complete generated source with Int in that slot."
+  },
+  "crates/ilang-check/src/types/scheme_wire/tests.rs:b6c43a27e253a773": {
+    "not_source": true,
+    "reason": "Reviewed annotation conversion: host diagnostic, URI, metadata, or protocol identity; its colon is not an i annotation."
+  },
+  "crates/ilang-check/tests/diagnostic_traps.rs:1c54e7195033f60e": {
+    "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
+  },
+  "crates/ilang-check/tests/known_facts.rs:74282c580560b9e5": {
+    "not_source": "TOML package manifest format used by the regression helper"
+  },
+  "crates/ilang-check/tests/literal_types.rs:b469df68067e6c5d": {
+    "not_source": "Expected inferred scheme display, not a source annotation; Typed::lines keeps the full Type grammar."
+  },
+  "crates/ilang-check/tests/literal_types.rs:c232af9957180e53": {
+    "not_source": "Expected inferred scheme display, not a source annotation; Typed::lines keeps the full Type grammar."
+  },
+  "crates/ilang-check/tests/literal_types.rs:c480d36f423b9781": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{need}",
+        "String"
+      ],
+      [
+        "{annotation}",
+        "String"
+      ],
+      [
+        "{pattern}",
+        "\"a\""
+      ],
+      [
+        "{catch}",
+        "t"
+      ]
+    ],
+    "reason": "Parse the actual generated match skeleton; test tables instantiate each narrowing case."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:1a6175b0d6ec4669": {
+    "prefix": "// Constraints that simplification and generalization must keep.\n\n// \u00a74.5 rule 4 and \u00a79.2: an environment provider must be a subtype of\n// the needed service, also when the function is generalized.\nReader(S) = (get = () -> S)\n",
+    "suffix": " = (body) {\n\t_syn3_0: IntReader = Reader(get = () -> Int { 1 })\n\tbody() <- (_syn3_0)\n}\n",
+    "reason": "The closed-alias regression's replacement text declares IntReader and ends in the with_int binding-name fragment. Complete it with the Reader prefix and the exact declaration tail after the test's following annotation replacement. The checker regression still checks the complete constructed module and pins all four E0515 diagnostics."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:2d87ebc136f4f8eb": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{head}",
+        "wrap = <N>(body: () <- (Fail(Never), Svc(Int), ..N) -> Int, svc: Svc(Int))"
+      ]
+    ],
+    "reason": "Render the witness test format template with its actual inferred function header; the other header is parsed separately."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:acd5972eba13e9a2": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{invariant_head}",
+        "Dep = ()\nS(N) = (() <- N -> Nil, (N) -> Nil)\nT(N) = (() <- N -> Nil)\nAlias(N) = T(N)\n"
+      ],
+      [
+        "{row}",
+        "S(Never) | S(Dep)"
+      ],
+      [
+        "{written}",
+        "T(S(Never) | S(Dep))"
+      ]
+    ],
+    "reason": "Render the row-algebra format template using its actual invariant service header and first union/function-type argument; the row-scheme test checks every generated operator and annotation."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:c447469afba2b59d": {
+    "prefix": "Svc(A) = (f = () -> A)\n",
+    "suffix": " {\n provided: Svc(Int) = svc\n body() <- (provided)\n}\n",
+    "reason": "Function header selected by the witness test; render it with the exact body appended by its format template."
+  },
+  "crates/ilang-cli/tests/commands.rs:7605d4ed451035f1": {
+    "not_source": true,
+    "reason": "Runtime stop output with source locations; colons are message punctuation and line/column separators, not annotations."
+  },
+  "crates/ilang-cli/tests/compile_cache.rs:817df942588a36b5": {
+    "not_source": "cache status prose checked with contains(), not an i annotation"
+  },
+  "crates/ilang-cli/tests/entries.rs:45557712f76a42e4": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/entries.rs:8d7768dd6917cb79": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/macro_budget.rs:fc8b25f21a41aa6a": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{parameters}",
+        "_: Int"
+      ],
+      [
+        "{arguments}",
+        "n"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/macro_run.rs:090fdb1b01bba12a": {
+    "reason": "Render the MP13 Rust format! template with its first item order and unescape Rust braces; the unit test exercises all three rendered variants.",
+    "substitutions": [
+      [
+        "{items}",
+        "m.inspect(T)\nm.emit(T)"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/multicore.rs:02e0aa8e18f76532": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:1fe6d808ca5d4464": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{waiter}",
+        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec \u00a79.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
+      ]
+    ],
+    "suffix": "fail.raise(\"outer\")\n })\n}\n",
+    "reason": "Render the stress generator header with its actual waiter fixture prefix and closing tail."
+  },
+  "crates/ilang-cli/tests/multicore.rs:203342379404a684": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:25af78ab3812c31f": {
+    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec \u00a79.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(Nil) = task.channel()\n",
+    "suffix": "fail.raise(\"outer\")\n })\n}\n",
+    "reason": "A per-pair stress-generator block inside its actual main/scope header and closing tail."
+  },
+  "crates/ilang-cli/tests/multicore.rs:2c4654c954432f13": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:40168b9e3c3116c9": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:82dec01a8a98ff48": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:cdebc84e89c86c07": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
+  },
+  "crates/ilang-cli/tests/multicore.rs:f820a8d62a6cce11": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:c00b42d9b7aef1ed": {
+    "not_source": true,
+    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
+  },
+  "crates/ilang-cli/tests/package_commands.rs:07c284cd8f2a26a7": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:2571ce03d469bbde": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:7c70477f5fb1c039": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:9015630e06ad4e25": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:993694097be64fea": {
+    "not_source": "search text in a test: the head of the template main"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:c47da3d374390ac6": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-cli/tests/wasi.rs:2f6554a443e2e077": {
+    "substitutions": [
+      [
+        "{IO}",
+        "((Io) = i/io)\n"
+      ],
+      [
+        "{attribute}",
+        "@host(\"app:greet/v1\")"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/wasi.rs:512d8d6c062ced47": {
+    "reason": "Materialize the source template rather than parse doubled Rust format braces",
+    "substitutions": [
+      [
+        "{wasi_module}",
+        "wasi_snapshot_preview1"
+      ],
+      [
+        "{name}",
+        "proc_exit"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/wasi.rs:75d260a3e18a3ce2": {
+    "substitutions": [
+      [
+        "{IO}",
+        "((Io) = i/io)\n"
+      ],
+      [
+        "{attribute}",
+        "@host(\"app:greet/v1\")"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/wasi.rs:7b5136d93dcd04b2": {
+    "substitutions": [
+      [
+        "{IO}",
+        "((Io) = i/io)\n"
+      ],
+      [
+        "{attribute}",
+        "@host(\"app:greet/v1\")"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/wasi.rs:b8180cef56db63bf": {
+    "substitutions": [
+      [
+        "{wasi_module}",
+        "wasi_snapshot_preview1"
+      ],
+      [
+        "{name}",
+        "exit"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-lsp/src/uri.rs:9f9424a25148417a": {
+    "not_source": true,
+    "reason": "Reviewed annotation conversion: host diagnostic, URI, metadata, or protocol identity; its colon is not an i annotation."
+  },
+  "crates/ilang-lsp/tests/protocol.rs:32fda7e52795222b": {
+    "not_source": "Position/search substring inside a complete source fixture"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:d821ac9892abd3e4": {
+    "reason": "Robustness test: broken input on purpose",
+    "diagnostics": [
+      "E0010: `{` is not closed",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { \u2026 }` is removed: write each constructor as its own labelled type, `C = (\u2026)`, and the sum as `Name = C1 | C2`",
+      "E0010: `(` is not closed",
+      "E0010: `{` is not closed",
+      "E0101: expected a closed `{`, found `{`",
+      "E0010: `(` is not closed",
+      "E0002: this string is not closed"
+    ]
+  },
+  "crates/ilang-macro/src/prepare.rs:79c665abf746d180": {
+    "substitutions": [
+      [
+        "{items}",
+        ""
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{}",
+        "app/macros"
+      ],
+      [
+        "{parameters}",
+        "arg0: syntax.Syntax"
+      ],
+      [
+        "{item_service}",
+        ""
+      ],
+      [
+        "{item_row}",
+        ""
+      ],
+      [
+        "target.app/macros",
+        "target.expand"
+      ],
+      [
+        "{arguments}",
+        "arg0"
+      ]
+    ]
+  },
+  "crates/ilang-package/tests/git.rs:2571ce03d469bbde": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-package/tests/git.rs:7d5664697bbe253e": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-package/tests/git.rs:d28ff2bb107da518": {
+    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
+  },
+  "crates/ilang-wasm/src/runtime/tests.rs:42fb13ce4e7230bd": {
+    "not_source": true,
+    "reason": "Reviewed annotation conversion: host diagnostic, URI, metadata, or protocol identity; its colon is not an i annotation."
+  },
+  "docs/design/principality.md:52714feb4c9a2b57": {
+    "diagnostics": [
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "A probe of the principality note: a written polymorphic parameter type is not supported yet, and the note records the diagnostic."
+  },
+  "docs/spec.md:1d31fa1e3d80b6c5": {
+    "track": "SYN3",
+    "reason": "Mixed positional/labelled data still awaits stage 6; E6 environment capture and provide forms have landed.",
+    "diagnostics": [
+      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)"
+    ]
+  },
+  "editors/vscode/test/sample.i:35e4233e887c3d88": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: type parameters on a function type that is not the type of a binding need stage 7 of syntax three, which this compiler does not have yet",
+      "E0003: unknown escape",
+      "E0106: a discard binds nothing, so it may not be used as a value",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
+    ]
+  },
+  "tests/review/cases/review-a1/_loose/cases/18_old_expected_fn_group/original/.invalid/src/main.i:42b07aa0ae5bb3f1": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
+  },
+  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:ba22210598eab895": {
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
+  },
+  "tests/review/cases/review-a1/cases/18_old_expected_fn_group/.invalid/src/main.i:42b07aa0ae5bb3f1": {
+    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
+  },
+  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:ba22210598eab895": {
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
+  },
+  "tests/review/cases/review-native3/external/.invalid/src/main.i:4c5e4fdb6620342b": {
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
+  },
+  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:c3560d130e85cfa8": {
+    "reason": "Intentional negative syntax example. (valid in syntax three)"
+  },
+  "tests/review/cases/review-rec/_loose/probes/src/main.i:621264ff6bc91a22": {
+    "reason": "Preserve the closed-data negative fixture instead of erasing its illegal type spread. Syntax-three \u00a72.3: a data type has no spread. Main E0541 is diagnosed earlier as parser E0107; removed-module/type errors are independently retained in checker tests.",
+    "diagnostics": [
+      "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
+    ]
+  },
+  "tests/review/cases/review-runtime/echo-types/src/task.i:d34f1075542b01ad": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-s6/probe/src/main.i:85c0687292ba6d00": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/factory/src/main.i:9083dc65664c46cf": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/tree/src/main.i:066350f997d0a19e": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/variance/src/main.i:9c635f662f81f9ba": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (\u00a72.8, \u00a73.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/spec/1.7/annotation_pipe_declaration_error.i:6e6c1b7e0fe5f843": {
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
+    ],
+    "reason": "Intentional new Annot boundary counter-example, spec \u00a73 and \u00a77.1; preserve the unbraced pipe."
+  },
+  "tests/spec/7/annotation_pipe_binding_error.i:0d0649f5406efd7b": {
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
+    ],
+    "reason": "Intentional new Annot boundary counter-example, spec \u00a73 and \u00a77.1; preserve the unbraced pipe."
+  },
+  "tests/spec/7/annotation_pipe_data_error.i:2c6dd3a7a430411f": {
+    "diagnostics": [
+      "E0101: expected `,` or `)`, found `|`"
+    ],
+    "reason": "Intentional new Annot boundary counter-example, spec \u00a73 and \u00a77.1; preserve the unbraced pipe."
+  },
+  "tests/spec/7/annotation_pipe_result_error.i:7629afddbfda0dcd": {
+    "diagnostics": [
+      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `|`"
+    ],
+    "reason": "Intentional new Annot boundary counter-example, spec \u00a73 and \u00a77.1; preserve the unbraced pipe."
+  },
+  "crates/ilang-check/src/resolve/three.rs:d942f64886578d87": {
+    "not_source": "A name compared on the diagnostic path, not an i source"
+  },
+  "crates/ilang-check/src/resolve/legacy.rs:d942f64886578d87": {
+    "not_source": "A name compared on the diagnostic path, not an i source"
+  },
+  "crates/ilang-check/src/resolve/three.rs:d46aee08cc49f6d1": {
+    "not_source": "A name compared on the diagnostic path, not an i source"
+  },
+  "crates/ilang-check/src/resolve/legacy.rs:d46aee08cc49f6d1": {
+    "not_source": "A name compared on the diagnostic path, not an i source"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:7372e79824e15040": {
+    "not_source": "Rust TOML manifest format template, not i source"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:7bf4286e23e784b2": {
+    "not_source": "Rust resolver-differential diagnostic format string, not i source"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:c7d1290a9ba8bc14": {
+    "diagnostics": [
+      "E0101: a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:bc8ef69fad3d090f": {
+    "diagnostics": [
+      "E0110: an item by position may not come after an item by label",
+      "E0101: a chain of branches with no parameter has nothing to choose by"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:eb5cba8498c94b57": {
+    "diagnostics": [
+      "E0110: an item by position may not come after an item by label",
+      "E0101: data with labels has only labelled items after an optional first `..base` (mixed data needs stage 6 of syntax three)",
+      "E0101: `..` is the first item of a constructor call"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:ff4a2bc9c99582dc": {
+    "diagnostics": [
+      "E0101: provided services have no labels: each is keyed by its own type",
+      "E0101: a provided service has no label: it is keyed by its type (\u00a72.10.2)"
+    ],
+    "reason": "Provided labels remain invalid (\u00a72.10.2); E6 whole-environment capture, spread and provide forms now parse."
+  },
+  "crates/ilang-check/src/resolve/differential.rs:c67eeff3531f0976": {
+    "diagnostics": [
+      "E0101: type parameters on a function literal that is not the value of a binding need stage 7 of syntax three, which this compiler does not have yet",
+      "E0110: an item by position may not come after an item by label",
+      "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)",
+      "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`",
+      "E0101: a need has no label: a service is keyed by its own type"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:5c74a67df3474805": {
+    "diagnostics": [
+      "E0101: a rest `..` in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0101: a key in a data pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0110: an item by position may not come after an item by label",
+      "E0101: a named rest `..name` in a pattern needs stage 6 of syntax three, which this compiler does not have yet",
+      "E0101: a pattern inside a labelled field needs stage 4 of syntax three, which this compiler does not have yet; bind the field to a name and match the name",
+      "E0101: two patterns joined by `=` that are not names need stage 9 of syntax three, which this compiler does not have yet"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:3520187651d4a622": {
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-check/src/resolve/differential.rs:30b0fe37fff13e45": {
+    "not_source": "Rust deep-expression format template; the test inserts 20000 bracket pairs before parsing"
+  },
+  "crates/ilang-macro/src/item_phase3.rs:0acb225eff8aa24b": {
+    "diagnostics": [
+      "E0301: removed @main attribute"
+    ],
+    "reason": "Intentionally removed @main attribute used to test built-in-attribute recognition"
+  },
+  "crates/ilang-syntax/src/lisp/to_source.rs:f9622f252bce8e60": {
+    "not_source": "Expected renderer substring ending before the value, not a complete program"
+  },
+  "crates/ilang-syntax/src/lisp/to_source.rs:348b6f495bab6cbe": {
+    "not_source": "Expected renderer substring ending before the value, not a complete program"
+  },
+  "crates/ilang-syntax/tests/lisp_datum.rs:6f00b960a1df6537": {
+    "not_source": "String-builder prefix; the test appends 2000 statements and the closing function brace"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:5c096acf951e25de": {
+    "prefix": "value = ",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:8102c2aebf844591": {
+    "suffix": "\nvalue = 0\n",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:a07c973a0f5ac738": {
+    "suffix": "\nvalue = 0\n",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:a65ba66a7b98e7b0": {
+    "prefix": "value = ",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:7008341f68f64862": {
+    "prefix": "f = (",
+    "suffix": ") { 0 }\n",
+    "reason": "A renderer grammar-position fragment, checked in its complete module context"
+  },
+  "crates/ilang-syntax/tests/lisp_syntax3.rs:47fd209da841119d": {
+    "not_source": "Rust export-header format template; the test substitutes each concrete export before parsing"
+  },
+  "crates/ilang-syntax/src/lisp/expansion3.rs:a46e80fc91b8e9e9": {
+    "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
+    "diagnostics": [
+      "E0101: a data type with labels has only labelled items (mixed data needs stage 6 of syntax three)"
+    ]
+  },
+  "crates/ilang-check/tests/generic_services.rs:f1ca0fc31fd5ee01": {
+    "not_source": "Replacement constructor prefix adding a required error value field; not a complete declaration."
+  },
+  "crates/ilang-check/tests/generic_services.rs:f9227ed0d1f1de21": {
+    "not_source": "Search fragment for replacing a constructor prefix in a complete regression source."
+  },
+  "crates/ilang-check/tests/rest_services.rs:79a56cb7c10b3ff7": {
+    "not_source": "Rust format template; forwarding supplies complete declarations and doubled braces belong to Rust formatting."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:09de51485266a15b": {
+    "not_source": "Search fragment for replacing one function head in a complete regression source."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:6ef77ad854a3321f": {
+    "not_source": "Prefix used to select an actual shipped declaration; no right-hand side is present in this search literal."
+  },
+  "crates/ilang-check/tests/row_schemes.rs:be6a0ac8f8bb9ed4": {
+    "not_source": "Rust format template completed with the actual shipped Stream, Step and Sink declarations before checking."
+  },
+  "crates/ilang-check/src/types/display.rs:a81e88c3ce345716": {
+    "not_source": "Rust format string for the synthetic solver type names in the 2048-entry operation-count regression"
   }
 }

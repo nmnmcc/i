@@ -2,8 +2,9 @@
 
 These modules are written by hand to test the Rust host (`crates/ilang-host`)
 and the JavaScript host (`bindings/javascript`) against the binary interface
-version 3 of `docs/spec.md` (Appendix B). They are not compiler output, except
-`compiled.wasm`.
+version 3 of `docs/spec.md` (Appendix B). They retain the legacy wire deliberately. `inline-int` tests version 5.
+They are not compiler output, except `compiled.wasm` and the R2 modules, which use the current compiler ABI (version 5).
+The hand-written version-3 fixtures deliberately keep the legacy Int limb encoding.
 
 Regenerate the checked-in binaries with `bash scripts/build-abi-fixture.sh` from
 the Devenv shell, which has wasm-tools (`WASM_TOOLS` can point at another
@@ -210,3 +211,10 @@ those bodies into O0/O2 host-export modules for Node and browser execution.
 Only temporary sources get entry wrappers and distinct test-host namespaces;
 the original spec cases still run through the Rust spec harness unchanged.
 `bash scripts/build-abi-fixture.sh` regenerates the modules, plans and case list.
+
+## inline-int.wat
+
+A version-5 Int echo through a host import, whose allocator and free function
+trap. Rust and JS use it to prove that inline values in all four directions
+never become buffer addresses. It also returns malformed inline values to
+check host validation. The older hand-written fixtures remain at version 3.

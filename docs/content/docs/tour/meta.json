@@ -1,0 +1,15 @@
+{
+  "title": "A tour of the language",
+  "pages": [
+    "index",
+    "values-and-data",
+    "functions-and-branches",
+    "types-and-inference",
+    "types-from-top-to-bottom",
+    "services-and-errors",
+    "resources",
+    "concurrency",
+    "macros",
+    "packages"
+  ]
+}

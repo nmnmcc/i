@@ -3,7 +3,7 @@
 (
 	main
 )
-_empty: (Never) -> Int = core.never
+_empty : (Never) -> Int = core.never
 
 main = () {
 	assert(True)

@@ -18,34 +18,34 @@ Log = (write = (String) -> Nil)
 
 Base = (value = Int)
 
-find_user = (id: String) <- (db: Db, log: Log) -> User {
+find_user = (id : String) <- (db : Db, log : Log) -> User {
 	log.write(id)
 	db.find(id)
 }
 
-map = <A, B, N>(xs: List(A), f: (A) <- N -> B) -> List(B) {
+map = <A, B, N>(xs : List(A), f : (A) <- N -> B) -> List(B) {
 	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 
 /// The closed form of `catch` over the library function: the body needs
 /// `Fail(E)` and whatever `N` stands for.
-attempt = <A, E, N>(body: () <- (..N, Fail(E)) -> A) -> Result(A, E) {
+attempt = <A, E, N>(body : () <- (..N, Fail(E)) -> A) -> Result(A, E) {
 	fail.catch(body)
 }
 
-must = (id: String) -> String {
+must = (id : String) -> String {
 	id |> ("") { fail.raise(NotFound(id = "empty")) } | (_) { id }
 }
 
-offset = (x: Int) <- (base: Base) -> Int { base.value + x }
+offset = (x : Int) <- (base : Base) -> Int { base.value + x }
 
-show = (r: Result(String, NotFound)) -> String {
+show = (r : Result(String, NotFound)) -> String {
 	r |>
 		(Ok(name)) { "ok \(name)" }
 		| (Error(NotFound(id = id))) { "not found \(id)" }
 }
 
-sum = (xs: List(Int)) -> Int {
+sum = (xs : List(Int)) -> Int {
 	xs |> ([]) { 0 } | ([x, ..rest]) { x + sum(rest) }
 }
 
@@ -59,7 +59,7 @@ fake_db = Db(
 
 quiet_log = Log(write = (text) { Nil })
 
-lookup = (id: String) -> Result(String, NotFound) {
+lookup = (id : String) -> Result(String, NotFound) {
 	attempt(() {
 		{
 			u = find_user(must(id))
@@ -68,7 +68,7 @@ lookup = (id: String) -> Result(String, NotFound) {
 	})
 }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	io.print(
 		show(lookup("1")),
 	)

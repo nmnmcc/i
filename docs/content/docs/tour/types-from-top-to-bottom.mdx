@@ -1,0 +1,209 @@
+---
+title: Types from top to bottom
+description: Value sets, unions, intersections, function inputs, and service requirements.
+---
+
+## Value sets
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	exact : 7 = 7
+	integer : Int = exact
+	stdio.print(core.inspect(integer))
+}
+```
+
+```text
+7
+```
+
+A type is a set of values; subtyping is inclusion between those sets. `A <: B` means every value in `A` belongs to `B`, so it can be used wherever `B` is required.
+
+## Top and bottom
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	empty : List(Never) = []
+	numbers : List(Int) = empty
+	stdio.print(core.inspect(numbers))
+}
+```
+
+```text
+[]
+```
+
+`Never` has no values and is below every type; an empty list needs no element value. Unlike `Never`, `Nil` and `()` each contain a value. The top would contain all values, but has no written spelling in i; “unknown top type” belongs to inference, and `_` is a hole.
+
+## Unions and intersections
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+Answer = Int | String
+
+main = () {
+	first : Answer = 7
+	second : Answer = "seven"
+	stdio.print(core.inspect((first, second)))
+}
+```
+
+```text
+(7, "seven")
+```
+
+A union contains either side: their least common supertype, or **join**. Merging matching constructors can admit more: `List(Int) | List(String)` also accepts mixed lists.
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+main = () {
+	shared : { 1 | 2 } & { 2 | 3 } = 2
+	stdio.print(core.inspect(shared))
+}
+```
+
+```text
+2
+```
+
+An intersection requires membership in both sets: their greatest common subtype, or **meet**. `Int & String` is `Never`.
+
+## Function inputs
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+render = (x : { Int | String }) -> String { core.inspect(x) }
+
+main = () {
+	both : { (Int) -> String } & { (String) -> String } = render
+	stdio.print(both(7))
+	stdio.print(both("seven"))
+}
+```
+
+```text
+7
+"seven"
+```
+
+Function parameters are **contravariant**: accepting more inputs permits substitution where fewer are required, when results and needs are the same.
+
+```i run package=tour title="src/main.i"
+(
+	i/stdio
+)
+
+f = (x : { Int | String }) -> String { "f accepted" }
+g = (x : { String | Bool }) -> String { "g accepted" }
+choose = (c : Bool) { c |> (True) { f } | (False) { g } }
+
+main = () {
+	first = choose(True)
+	second = choose(False)
+	stdio.print(first("shared"))
+	stdio.print(second("shared"))
+}
+```
+
+```text
+f accepted
+g accepted
+```
+
+Choosing one function gives a union of function types; only inputs accepted by both are safe.
+
+```i error E0501 package=tour title="src/main.i"
+f = (x : { Int | String }) -> String { "f accepted" }
+g = (x : { String | Bool }) -> String { "g accepted" }
+choose = (c : Bool) { c |> (True) { f } | (False) { g } }
+
+main = () {
+	chosen = choose(False)
+	chosen(7)
+}
+```
+
+E0501: `7` is not a subtype of `String`.
+
+## Service needs
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+Clock = (now = () -> Int)
+Offset = (amount = Int)
+
+reading = () <- (clock : Clock, offset : Offset) -> Int {
+	clock.now() + offset.amount
+}
+clock_only = () <- (clock : Clock) -> Int { clock.now() }
+permitted : () <- (Clock, Offset) -> Int = clock_only
+
+main = () {
+	values = { (reading(), permitted()) } <- (
+		Clock(now = () { 40 }),
+		Offset(amount = 2),
+	)
+	stdio.print(core.inspect(values))
+}
+```
+
+```text
+(42, 40)
+```
+
+A need is an intersection of requirements on the caller's environment, keyed by service type. Needs compare in reverse: a function requiring only `Clock` can replace one allowed to require `Clock` and `Offset`.
+
+## Chain abilities
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+show = (n : Int) -> String { core.inspect(n) } | (s : String) -> String { s }
+use_int = (f : (Int) -> String) { f(7) }
+use_string = (f : (String) -> String) { f("seven") }
+
+main = () {
+	stdio.print(show(7))
+	stdio.print(show("seven"))
+	stdio.print(use_int(show))
+	stdio.print(use_string(show))
+}
+```
+
+```text
+7
+seven
+7
+seven
+```
+
+The argument is an `Int` OR a `String`: a union. Parameter contravariance makes the chain both the function accepting `Int` AND the function accepting `String`: an intersection. The spelling is changing from `|` to `&` to match the intersection type, whose compiler representation is also pending; runnable examples keep `|` until then.

@@ -9,7 +9,7 @@
 )
 @host("review:pause", "async")
 Pause = (next = () -> Float)
-work = (x: Float) <- (pause: Pause) -> Float {
+work = (x : Float) <- (pause : Pause) -> Float {
 	y = x *. 0.5
 	z = pause.next()
 	// Both x and y must survive the host handoff; return exact zero sign.

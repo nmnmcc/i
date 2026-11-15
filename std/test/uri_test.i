@@ -9,7 +9,7 @@
 )
 
 // U3 and §6.3: every successful route to Uri preserves raw spelling.
-round_trip = (u: uri.Uri) -> Nil {
+round_trip = (u : uri.Uri) -> Nil {
 	assert(
 		{
 			e4_call_arg_0 = uri.to_string(u)
@@ -27,7 +27,7 @@ round_trip = (u: uri.Uri) -> Nil {
 	Nil
 }
 
-parse_good = (s: String) -> uri.Uri {
+parse_good = (s : String) -> uri.Uri {
 	Ok(u) = fail.catch(() { uri.parse(s) })
 	assert(uri.to_string(u) == s)
 	round_trip(u)

@@ -8,12 +8,12 @@
 )
 
 area =
-	(r: Float) -> Float { 3.0 *. r *. r }
-	| (w: Float, h: Float) -> Float { w *. h }
+	(r : Float) -> Float { 3.0 *. r *. r }
+	| (w : Float, h : Float) -> Float { w *. h }
 
 connect =
-	(host: String) -> String { connect(host, port = 80) }
-	| (host: String, port = p: Int) -> String { "\(host):\(core.inspect(p))" }
+	(host : String) -> String { connect(host, port = 80) }
+	| (host : String, port = p : Int) -> String { "\(host):\(core.inspect(p))" }
 
 fs = [area]
 
@@ -22,7 +22,7 @@ first = (xs, d) { xs |> ([]) { d } | ([x, .._]) { x } }
 
 pick = () { area }
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	f = first(fs, area)
 	io.print(
 		core.inspect(f(2.0)),

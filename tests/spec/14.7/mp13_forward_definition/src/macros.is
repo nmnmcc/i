@@ -1,0 +1,4 @@
+(, (= syntax (/ i syntax)))
+(, emit inspect)
+(@ macro (= emit (-> (, name) _ `(= ~name Int))))
+(@ macro (= inspect (-> (, name) _ {((. syntax definition) name) `{}})))

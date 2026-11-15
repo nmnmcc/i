@@ -6,7 +6,7 @@
 	(Some) = std/option
 )
 
-walk = (t: pbt.Tree((Int, Int)), depth: Int) -> Nil {
+walk = (t : pbt.Tree((Int, Int)), depth : Int) -> Nil {
 	(n, k) = t.value
 	assert(k >= 0 && k <= n)
 	{ depth > 0 } |>
@@ -18,7 +18,7 @@ test("dependent", () {
 	gen = pbt.flat_map(pbt.int(0, 6), (n) {
 		pbt.map(pbt.int(0, n), (k) { (n, k) })
 	})
-	go = (seed: Int) -> Nil {
+	go = (seed : Int) -> Nil {
 		{ seed < 20 } |>
 			(True) {
 				Some(t) = pbt.sample(gen, 10, random.from_seed(seed))

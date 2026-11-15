@@ -11,12 +11,12 @@
 @host("test:io/v1")
 Out = (print = (String) -> Nil)
 
-print = (text: String) <- (out: Out) { out.print(text) }
+print = (text : String) <- (out : Out) { out.print(text) }
 
 main = () {
 	assert(
 		task.scope((s) {
-			ready: task.Channel(Nil) = task.channel()
+			ready : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				task.receive(ready)
 				task.yield()

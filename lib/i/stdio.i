@@ -27,7 +27,7 @@ Stdio = (
 	flush_error = () -> Request(Result(Nil, String)),
 )
 
-read = (max_bytes: Int) <- (io: Stdio) {
+read = (max_bytes : Int) <- (io : Stdio) {
 	request.await_owned(io.read(max_bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -35,7 +35,7 @@ read = (max_bytes: Int) <- (io: Stdio) {
 		}
 }
 
-write = (bytes: BitArray) <- (io: Stdio) {
+write = (bytes : BitArray) <- (io : Stdio) {
 	request.await_owned(io.write(bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -43,7 +43,7 @@ write = (bytes: BitArray) <- (io: Stdio) {
 		}
 }
 
-write_error = (bytes: BitArray) <- (io: Stdio) {
+write_error = (bytes : BitArray) <- (io : Stdio) {
 	request.await_owned(io.write_error(bytes)) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -51,7 +51,7 @@ write_error = (bytes: BitArray) <- (io: Stdio) {
 		}
 }
 
-flush = () <- (io: Stdio) {
+flush = () <- (io : Stdio) {
 	request.await_owned(io.flush()) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -59,7 +59,7 @@ flush = () <- (io: Stdio) {
 		}
 }
 
-flush_error = () <- (io: Stdio) {
+flush_error = () <- (io : Stdio) {
 	request.await_owned(io.flush_error()) |>
 		(Ok(value)) { value }
 		| (Error(code)) {
@@ -67,13 +67,13 @@ flush_error = () <- (io: Stdio) {
 		}
 }
 
-print = (text: String) {
+print = (text : String) {
 	line = text <> "\n"
 	write(<<line:utf8>>)
 	flush()
 }
 
-print_error = (text: String) {
+print_error = (text : String) {
 	line = text <> "\n"
 	write_error(<<line:utf8>>)
 	flush_error()

@@ -70,7 +70,7 @@ test("path_relative_examples", () {
 	Nil
 })
 
-short_paths = (depth: Int) -> List(String) {
+short_paths = (depth : Int) -> List(String) {
 	depth |>
 		(0) { [""] }
 		| (_) {

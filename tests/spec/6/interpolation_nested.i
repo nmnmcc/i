@@ -2,7 +2,7 @@
 // expect: pass
 main = () {
 	x = "i"
-	identity = (s: String) { s }
+	identity = (s : String) { s }
 	assert("a\(identity("b\(x)c"))d" == "abicd")
 	assert("\({
 	y = "nested"

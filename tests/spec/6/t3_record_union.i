@@ -3,7 +3,7 @@
 (
 	main
 )
-id = (x: (a = 1) | (b = "x")) -> (a = Int) | (b = String) { x }
+id = (x : { (a = 1) | (b = "x") }) -> (a = Int) | (b = String) { x }
 
 main = () {
 	assert(id((a = 1)) == (a = 1))

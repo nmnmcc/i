@@ -4,7 +4,7 @@
 (
 	i/request
 )
-widen = (r: Request(Int | String)) { request.take(r) }
+widen = (r : Request(Int | String)) { request.take(r) }
 
 main = () {
 	assert(

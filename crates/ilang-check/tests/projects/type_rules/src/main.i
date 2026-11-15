@@ -40,4 +40,4 @@ N = Never
 
 K = Clock
 
-envs = () <- (c: Clock, u: U, n: Never, k: K, i: Int) { 1 <- (c, 1, 2) }
+envs = () <- (c : Clock, u : U, n : Never, k : K, i : Int) { 1 <- (c, 1, 2) }

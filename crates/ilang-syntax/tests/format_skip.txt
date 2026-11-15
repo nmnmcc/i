@@ -9,6 +9,8 @@ parse tests/review/cases/review-std1/tree/src/main.i
 parse tests/review/cases/review-std1/variance/src/main.i
 parse tests/spec/1.7/a1_same_line_negative.i
 parse tests/spec/1.7/a1_same_line_tuple.i
+parse tests/spec/1.7/annotation_pipe_declaration_error.i
+parse tests/spec/1.7/one_binding_function_error.i
 parse tests/spec/2.2/a1_empty_header.i
 parse tests/spec/2.2/a1_header_order.i
 parse tests/spec/2.2/a1_macro_attribute_same_line.i
@@ -29,5 +31,8 @@ parse tests/spec/6/raw_string_unterminated.i
 parse tests/spec/6/syn2_mixed_tuple.i
 parse tests/spec/6/syn2_old_brace_record.i
 parse tests/spec/6/syn2_old_mixed_tuple.i
+parse tests/spec/7/annotation_pipe_binding_error.i
+parse tests/spec/7/annotation_pipe_data_error.i
+parse tests/spec/7/annotation_pipe_result_error.i
 parse tests/spec/7/suffix_nonliteral.i
 parse tests/spec/7/suffix_two_binders.i

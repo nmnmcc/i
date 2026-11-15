@@ -1,6 +1,6 @@
 {
-  "compiler": "7e6b5909f8a6eb02bd2b3c16350f0e2e7ea90309",
-  "binary_sha256": "ed285d629efeafead8756068a2c4d4ad41e5b7b1842f0def2e6d86e2b52aa8fb",
+  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
+  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.ask : () <- (Svc(A)) -> A\napp/main.wrap : ((() <- (Svc(Never), ..N) -> Int) <- N -> Int, Svc(String)) <- (Svc(Never), ..N) -> Int\napp/main.tell : (Int) -> \"other\" | \"two\"\napp/main.main : () <- (Io) -> Nil\n",
+      "stdout": "app/main.ask : () <- (Svc(A)) -> A\napp/main.wrap : ((() <- (Svc(Never), ..N) -> Int) <- N -> Int, Svc(String)) <- (Fail(Never), Svc(Never), ..N) -> Int\napp/main.tell : (Int) -> \"other\" | \"two\"\napp/main.main : () <- (Fail(Never), Io) -> Nil\n",
       "stderr": "src/main.i:6:1: error[E0515]: `Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\nsrc/main.i:19:8: error[E0515]: `Svc(String)` and `Svc(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (§4.5 rule 4, §9.2)\n2 errors\n"
     }
   }

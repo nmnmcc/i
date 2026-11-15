@@ -19,7 +19,7 @@ pub mod types;
 mod unused;
 
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId, SourceId};
-use ilang_syntax::ast;
+use ilang_syntax::syn3::ast;
 
 /// The stable codes of the problems found by this crate.
 pub mod code {
@@ -57,6 +57,7 @@ pub mod code {
     pub const TYPE_PARAM_FORM: &str = "E0232";
     pub const MACRO_RESERVED: &str = "E0234";
     pub const MACRO_BINDER: &str = "E0235";
+    pub const MANY_CONSTRUCTORS: &str = "E0238";
     // E0229, E0233 and E0237 were temporary value-type reservations.
     pub const VALUE_TYPE_CIRCLE: &str = "E0530";
     pub const VALUE_TYPE_PLACE: &str = "E0531";
@@ -129,21 +130,39 @@ pub mod code {
     pub const EQ_DISJOINT: &str = "W0503";
     pub const UNUSED_BINDING: &str = "W0504";
     pub const PATTERN_DISJOINT: &str = "W0505";
+    pub const ONE_LINE_BINDING: &str = "W0506";
 }
 
 /// A parsed module of the graph.
-#[derive(Clone)]
 pub struct Parsed {
     pub package: PackageId,
     pub path: String,
     pub source: SourceId,
     pub kind: ModuleKind,
     pub ast: ast::Module,
+    /// Names and spans needed by the temporary transition boundary.
+    pub lowering: ilang_syntax::syn3::facts::Transition,
     /// Origins of names introduced by expansion in this module.
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// This module was built by the compiler and may call compiler internals.
     pub compiler_generated: bool,
     pub typed_macros: Option<std::sync::Arc<dyn typed_macro::Expander>>,
+}
+
+impl Clone for Parsed {
+    fn clone(&self) -> Self {
+        ilang_syntax::syn3::deep::deep(|| Self {
+            package: self.package,
+            path: self.path.clone(),
+            source: self.source,
+            kind: self.kind,
+            ast: self.ast.clone(),
+            lowering: self.lowering.clone(),
+            scoped: self.scoped.clone(),
+            compiler_generated: self.compiler_generated,
+            typed_macros: self.typed_macros.clone(),
+        })
+    }
 }
 
 /// Parses every module of the graph. Syntax errors keep their codes.
@@ -153,11 +172,16 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
             let source = graph.sources.get(m.source);
-            let (ast, errors) = if source.display.ends_with(".is") {
-                ilang_syntax::lisp::parse_source(&source.text)
+            let lisp = source.display.ends_with(".is");
+            let (ast, mut errors) = if lisp {
+                ilang_syntax::syn3::lisp::from_lisp(&source.text)
             } else {
-                ilang_syntax::parse_module(&source.text)
+                ilang_syntax::syn3::parse_module(&source.text)
             };
+            let (lowering, more) =
+                ilang_syntax::syn3::facts::Transition::capture_module(&ast, lisp);
+            errors.extend(more);
+            errors.sort_by_key(|d| (d.span.start, d.span.end));
             diags.extend(
                 errors
                     .into_iter()
@@ -169,6 +193,7 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
                 source: m.source,
                 kind: m.kind,
                 ast,
+                lowering,
                 scoped: None,
                 compiler_generated: false,
                 typed_macros: None,
@@ -182,17 +207,21 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 /// when a module has a syntax error, so that one mistake is not reported
 /// many times.
 pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
-    let (mut parsed, diags) = parse(graph);
+    let (mut parsed, mut diags) = parse(graph);
     if diags.iter().any(Diagnostic::is_error) {
         return (None, diags);
     }
     // Direct checking resolves quotes in the same form as the expansion driver.
     let mut templates = Vec::new();
     for module in &mut parsed {
-        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
-            &mut module.ast,
-            module.source.0,
-            &mut templates,
+        diags.extend(
+            ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+                &mut module.ast,
+                module.source.0,
+                &mut templates,
+            )
+            .into_iter()
+            .map(|d| Diagnostic::error(d.code.as_str(), Some(module.source), d.span, d.message)),
         );
     }
     let (program, more) = resolve_parsed(graph, &parsed);
@@ -262,7 +291,7 @@ pub fn check_compiler_exports(
             "a macro program cannot execute an external declaration outside package i (§8)",
         ));
     }
-    let mut checked = check_resolved(graph, Some(program), diags);
+    let mut checked = check_resolved_inner(graph, Some(program), diags, &[], false);
     if let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
         for &entry in &program.host_exports {
             if typed
@@ -330,11 +359,23 @@ fn check_resolved(
 
 pub fn check_resolved_selected(
     graph: &PackageGraph,
+    program: Option<hir::Program>,
+    diags: Vec<Diagnostic>,
+    selected: &[(hir::DefId, bool)],
+) -> Checked {
+    check_resolved_inner(graph, program, diags, selected, true)
+}
+
+fn check_resolved_inner(
+    graph: &PackageGraph,
     mut program: Option<hir::Program>,
     mut diags: Vec<Diagnostic>,
     selected: &[(hir::DefId, bool)],
+    ordinary: bool,
 ) -> Checked {
-    if let Some(p) = &program {
+    // Compiler wrappers are checked by macro_sandbox above. Their module
+    // initializers may construct shape dispatchers from compiler functions.
+    if ordinary && let Some(p) = &program {
         let targets: Vec<_> = selected.iter().map(|(target, _)| *target).collect();
         capabilities::check_selected(p, graph, &targets, &mut diags);
     }

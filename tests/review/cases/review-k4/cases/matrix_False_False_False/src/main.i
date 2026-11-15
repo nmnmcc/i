@@ -1,12 +1,12 @@
 S(N) = (() <- N -> Nil)
-use = <N>() <- (s: S(N)) {
+use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
 }
 run = (body) { body() }
-f = <N>() <- (s: S(N)) { run(() { use() }) }
+f = <N>() <- (s : S(N)) { run(() { use() }) }
 
 main = () {
-	_syn3_0: S(Never) = S(() { Nil })
+	_syn3_0 : S(Never) = S(() { Nil })
 	f() <- (_syn3_0)
 }

@@ -11,7 +11,7 @@ string_sink = () -> Sink(String) { new() }
 // The input of make reverses the direction of Sink's parameter.
 Back(A) = (sink = Sink(A))
 
-make = <A>(s: Sink(A)) { Back(sink = s) }
+make = <A>(s : Sink(A)) { Back(sink = s) }
 
 // The shared variable must remain when it relates an input to an output.
 wrap = (f) { Sink(put = f) }

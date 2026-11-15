@@ -11,7 +11,7 @@
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
-			armed: task.Channel(Nil) = task.channel()
+			armed : task.Channel(Nil) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {

@@ -4,10 +4,10 @@ FsError = ()
 Fs = (read = () <- (Fail(FsError), Await, Owner) -> BitArray)
 Settings = (read = () <- (Fail(FsError), Await, Owner) -> BitArray)
 
-read_file = () <- (f: Fs) { f.read() }
-filesystem = () <- (f: Fs) { Settings(read = () { read_file() <- (f) }) }
+read_file = () <- (f : Fs) { f.read() }
+filesystem = () <- (f : Fs) { Settings(read = () { read_file() <- (f) }) }
 fallback = () { Settings(read = () { <<>> }) }
-use = () <- (settings: Settings) { settings.read() }
+use = () <- (settings : Settings) { settings.read() }
 
 main = () {
 	{

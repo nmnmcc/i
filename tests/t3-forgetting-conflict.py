@@ -129,7 +129,7 @@ def main():
     substitute_first = normalize(generic, {"A": R0})
     print("Canonical generic source: Gone(A) = { ..{ a: Never } | { ..A, b: Never }, -a }")
     print("Normalize, then A = {..}:", normalize_first)
-    print("A = {..}, then normalize:", substitute_first)
+    print("A = {..}, then normalize :", substitute_first)
     assert normalize_first == substitute_first, (
         "joint §6 requires substitution stability, but records §4.3 E1/E2 "
         "and §4.5 give Never versus {..}; the union before E2 is canonical"

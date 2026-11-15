@@ -10,7 +10,7 @@
 )
 
 // Fix the schedule while checking path-derived random values and output.
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	task.test(rng.from_seed(73), [], () {
 		task.scope((s) {
 			task.go(s, () {

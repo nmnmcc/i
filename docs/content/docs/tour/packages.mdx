@@ -1,0 +1,221 @@
+---
+title: Packages
+description: Organize modules, control exports, and connect local or versioned packages.
+---
+
+Split a program into reusable modules and choose what callers can access.
+
+```toml file=i.toml title="i.toml"
+name = "tour"
+```
+
+```i file=src/greeting.i title="src/greeting.i"
+(
+	message
+)
+message = (name : String) -> String { "hello, " <> name }
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	greeting = tour/greeting
+)
+main = () <- (io : Io) { io.print(greeting.message("reader")) }
+```
+
+```text
+hello, reader
+```
+
+`i.toml` marks a package; `name` is its only required field. Names are lowercase identifiers; `i` is reserved. The default entry is `main` in `src/main.i`; a library needs no entry.
+
+## Nested modules
+
+```i file=src/words/greeting.i title="src/words/greeting.i"
+(
+	message
+)
+prefix = "hello, "
+message = (name : String) -> String { prefix <> name }
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	greeting = (message) = tour/words/greeting
+)
+main = () <- (io : Io) { io.print(message("reader")) }
+```
+
+```text
+hello, reader
+```
+
+`prefix` stays private. `.i` and `.is` paths omit extensions; nested directories add components, and two files cannot share a module path. Header groups are not data: imports precede exports and definitions, and unused headers can be omitted.
+
+## A private representation
+
+```i file=src/greeting.i title="src/greeting.i"
+(
+	Greeting
+	make
+	message
+)
+Greeting = (text = String)
+make = (name : String) -> Greeting { Greeting(text = "hello, " <> name) }
+message = (g : Greeting) -> String { g.text }
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	greeting = tour/greeting
+)
+main = () <- (io : Io) {
+	value : greeting.Greeting = greeting.make("reader")
+	io.print(greeting.message(value))
+}
+```
+
+```text
+hello, reader
+```
+
+Exporting the type alone keeps its constructor and data inside the module.
+
+## An exported constructor
+
+```i file=src/greeting.i title="src/greeting.i"
+(
+	Greeting(..)
+)
+Greeting = (text = String)
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	(Greeting) = tour/greeting
+)
+main = () <- (io : Io) {
+	greeting = Greeting(text = "hello, reader")
+	io.print(greeting.text)
+}
+```
+
+```text
+hello, reader
+```
+
+## Dependencies
+
+```toml file=words/i.toml title="words/i.toml"
+name = "words"
+```
+
+```i file=words/src/greeting.i title="words/src/greeting.i"
+(
+	message
+)
+message = (name : String) -> String { "hello, " <> name }
+```
+
+```toml file=i.toml title="i.toml"
+name = "app"
+
+[dependencies]
+util = { path = "words" }
+```
+
+```i run package=app title="src/main.i"
+(
+	(Io) = i/io
+	greeting = util/greeting
+)
+main = () <- (io : Io) { io.print(greeting.message("package")) }
+```
+
+```text
+hello, package
+```
+
+`path` is relative to the manifest; `util` is the caller’s import prefix for `words`. Only the package’s own name, `i`, and declared dependencies are visible; dependency dev-dependencies do not propagate. Module and package cycles are rejected.
+
+A location dependency such as `"github.com/alice/json@1.4.0"` uses Git, omits `https://`, and sets a minimum version; `//directory` before `@` selects a subpackage, and fetched packages cannot use path dependencies. Selection takes the greatest requested minimum per location and major version; distinct majors stay separate. `i.lock`, beside the root manifest, records reached locations, versions, tag commits, and package SHA-256 hashes; changed commits or bytes fail integrity checks, while local paths remain unlocked.
+
+`i add`, `i remove`, and `i update` maintain dependencies and locks; consult their help. `i cache status`, `gc`, and `clean` inspect, trim old then least-recently-used entries to the size target, and clear the global cache; `I_CACHE_DIR`, `XDG_CACHE_HOME/i`, then `~/.cache/i` choose its directory. `I_CACHE=off` disables caching without bypassing integrity checks.
+
+## Package tests
+
+```toml file=i.toml title="i.toml"
+name = "tour"
+
+[dev-dependencies]
+std = { path = "../std" }
+
+[test]
+collection = "std/test.tests"
+```
+
+```i file=src/greeting.i title="src/greeting.i"
+(
+	message
+)
+message = (name : String) -> String { "hello, " <> name }
+```
+
+```i test stdout=exact package=tour title="test/greeting_test.i"
+(
+	testlib = (test) = std/test
+	(message) = tour/greeting
+)
+test("greeting", () { assert(message("reader") == "hello, reader") })
+```
+
+```text
+pass tour/greeting_test.greeting
+1 passed, 0 failed
+```
+
+Here `../std` points to the standard library's directory. Tests can import source modules; source cannot import tests, and another package cannot import them. `[dependencies]` serves source and tests; `[dev-dependencies]` serves only tests.
+
+## Entries and exports
+
+```toml file=i.toml title="i.toml"
+name = "tour"
+
+[entries]
+show = "main.main"
+
+[wasm]
+exports = ["tour/main.answer"]
+synchronous = ["tour/main.answer"]
+```
+
+```i run package=tour title="src/main.i"
+(
+	(Io) = i/io
+	i/core
+)
+
+(
+	answer
+)
+answer = () { 42 }
+main = () <- (io : Io) {
+	io.print(
+		core.inspect(answer()),
+	)
+}
+```
+
+```text
+42
+```
+
+Named entries supplement the default: `i run show` or `i build show` selects `"module.path.function"`; program arguments follow `--`. Host exports use `"package/module.function"`, with `synchronous` selecting a subset. Program entries request host services through their function needs.
+
+Continue with the [guides](/docs/guides).
+
+The exact rules are in the [specification](/docs/standard/generated/chapter-2).

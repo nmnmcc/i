@@ -26,7 +26,7 @@ local = () {
 }
 
 // Type variables: `a` in the inner binding is the variable of `outer`.
-outer = <A>(x: A) -> A {
-	inner: (A) -> A = (y) { y }
+outer = <A>(x : A) -> A {
+	inner : (A) -> A = (y) { y }
 	inner(x)
 }

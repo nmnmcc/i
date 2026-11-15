@@ -1,13 +1,15 @@
 //! Prepares a macro module's parsed import closure for compiler execution.
 use ilang_check::Parsed;
 use ilang_package::{Diagnostic, PackageGraph};
-use ilang_syntax::lisp::{expansion, quote_lower, syntax::Syntax};
+use ilang_syntax::lisp::{expansion3 as expansion, syntax::Syntax};
 
 /// One source macro and its written argument names.
 #[derive(Clone, Debug)]
 pub struct MacroBinding {
     pub module: String,
     pub name: String,
+    /// Compiler-local shape-group binding; ordinary macros target their name.
+    pub target: String,
     pub parameters: Vec<String>,
     pub typed: bool,
 }
@@ -49,37 +51,53 @@ pub fn prepare(graph: &PackageGraph, parsed: &mut [Parsed]) -> Result<Prepared, 
     let mut bindings = Vec::new();
     let mut templates = Vec::new();
     for (module, definitions) in parsed.iter_mut().zip(found) {
-        for definition in &definitions {
-            if let Some(index) = definition.signature {
-                module.ast.items[index].attributes.clear();
-                // The runtime signature is not part of the compiler program.
-                module.ast.items[index].kind =
-                    ilang_syntax::ast::ItemKind::Binding(ilang_syntax::ast::Binding {
-                        pattern: ilang_syntax::ast::Pattern {
-                            kind: ilang_syntax::ast::PatternKind::Discard("_".into()),
-                            span: module.ast.items[index].span,
-                        },
-                        value: ilang_syntax::ast::Expr {
-                            kind: ilang_syntax::ast::ExprKind::Int(0u32.into()),
-                            span: module.ast.items[index].span,
-                        },
-                        type_params: Vec::new(),
-                        span: module.ast.items[index].span,
+        errors.extend(
+            crate::prepare3::compiler_module(
+                &mut module.ast,
+                module.source.0,
+                &definitions,
+                &mut templates,
+            )
+            .into_iter()
+            .map(|d| Diagnostic::error(d.code.as_str(), Some(module.source), d.span, d.message)),
+        );
+        for definition in definitions {
+            let span = module.ast.items[definition.item].span;
+            let variants = if definition.variants.is_empty() {
+                vec![ilang_syntax::lisp::expansion::MacroVariant {
+                    target: definition.name.clone(),
+                    parameters: definition.parameters,
+                    labels: definition.labels,
+                }]
+            } else {
+                definition.variants
+            };
+            for variant in variants {
+                if variant.target != definition.name
+                    && !module
+                        .ast
+                        .exports
+                        .iter()
+                        .any(|e| e.name.name == variant.target)
+                {
+                    module.ast.exports.push(ilang_syntax::ast::Export {
+                        name: ilang_syntax::ast::Ident::new(&variant.target, span.0),
+                        constructors: false,
+                        span,
                     });
+                }
+                bindings.push(MacroBinding {
+                    module: module.path.clone(),
+                    name: definition.name.clone(),
+                    target: variant.target,
+                    parameters: variant.parameters,
+                    typed: definition.signature.is_some(),
+                });
             }
         }
-        for definition in definitions {
-            let item = &mut module.ast.items[definition.item];
-            item.attributes
-                .retain(|a| !(a.module.is_none() && a.name.name == "macro"));
-            bindings.push(MacroBinding {
-                module: module.path.clone(),
-                name: definition.name,
-                parameters: definition.parameters,
-                typed: definition.signature.is_some(),
-            });
-        }
-        quote_lower::lower_expression_quotes(&mut module.ast, module.source.0, &mut templates);
+    }
+    if !errors.is_empty() {
+        return Err(errors);
     }
     Ok(Prepared {
         bindings,
@@ -168,7 +186,7 @@ pub(crate) fn import_indices(
                 errors.push(Diagnostic::error(
                     ilang_check::code::UNKNOWN_PACKAGE,
                     Some(module.source),
-                    first.span,
+                    first.span.0,
                     format!("unknown package `{}`", first.name),
                 ));
                 continue;
@@ -187,7 +205,7 @@ pub(crate) fn import_indices(
                 errors.push(Diagnostic::error(
                     ilang_check::code::NO_MODULE,
                     Some(module.source),
-                    import.span,
+                    import.span.0,
                     format!("there is no module `{path}`"),
                 ));
                 continue;
@@ -198,7 +216,7 @@ pub(crate) fn import_indices(
                 errors.push(Diagnostic::error(
                     ilang_check::code::SRC_IMPORTS_TEST,
                     Some(module.source),
-                    import.span,
+                    import.span.0,
                     "a source module cannot import a test module",
                 ));
                 continue;
@@ -279,13 +297,27 @@ _entry = ({parameters}) -> syntax.Syntax {{
 			(Ok(value)) {{ value }}
 			| (Error(syntax.SyntaxError(message, at))) {{ syntax._report_error(message, at) }}
 	}} <- (syntax._diagnostics()){items} <- (syntax._definitions()) <- (
-		Assert((failure: AssertionFailure) -> Never {{ panic(failure.message) }}),
+		Assert((failure : AssertionFailure) -> Never {{ panic(failure.message) }}),
 	)
 }}
 "#,
         binding.module, binding.name
     );
-    let (ast, diagnostics) = ilang_syntax::parse_module(&source);
+    let (mut ast, diagnostics) = ilang_syntax::syn3::parse_module(&source);
+    // Transition group names contain `%` and have no source spelling.
+    struct Select<'a>(&'a str, &'a str);
+    impl ilang_syntax::walk::Visitor for Select<'_> {
+        fn expr(&mut self, e: &mut ilang_syntax::ast::Expr, enter: bool) {
+            if enter
+                && let ilang_syntax::ast::ExprKind::Field { target, name } = &mut e.kind
+                && matches!(&target.kind, ilang_syntax::ast::ExprKind::Name { module: None, name } if name.name == "target")
+                && name.name == self.0
+            {
+                name.name = self.1.into();
+            }
+        }
+    }
+    ilang_syntax::walk::module(&mut ast, &mut Select(&binding.name, &binding.target));
     assert!(
         diagnostics.is_empty(),
         "compiler macro wrapper must parse: {diagnostics:?}"
@@ -304,6 +336,7 @@ _entry = ({parameters}) -> syntax.Syntax {{
         source: source_id,
         kind: ilang_package::ModuleKind::Src,
         ast,
+        lowering: Default::default(),
         scoped: None,
         compiler_generated: true,
         typed_macros: None,

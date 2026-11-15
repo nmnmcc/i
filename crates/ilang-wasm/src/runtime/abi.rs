@@ -7,7 +7,8 @@
 //! import parameters. Buffers come from `ilang_alloc`; an empty buffer has
 //! the address 0 and is not allocated.
 //!
-//! Every buffer that the host gives, also an empty one (an `Int` of count 0,
+//! Inline Ints (nonzero sign, count 0) have no buffer. Every actual buffer
+//! that the host gives, also an empty one (a zero `Int`,
 //! a `String` of length 0, a `BitArray` of 0 bits), must be inside memory:
 //! its address plus its size is at most the size of memory (B.2). The
 //! buffers of the results of an import are freed whenever their address is
@@ -46,11 +47,19 @@ const WAT: &str = r#"
   (call $float_get (local.get $value)))
 
 ;; Sign -1, 0 or 1; count little-endian u32 parts; the last part is not 0;
-;; zero is sign 0 and count 0.
+;; zero is sign 0 and count 0. With count 0 and nonzero sign, address is
+;; the signed i32 value; it must have that sign and is never an address.
 (func $abi_int_in (param $sign i32) (param $address i32) (param $count i32) (result eqref)
   (local $limbs (ref $limbs)) (local $i i32)
   (if (i32.gt_u (i32.add (local.get $sign) (i32.const 1)) (i32.const 2))
     (then (call $stop_host_value) unreachable))
+  (if (i32.and (i32.eqz (local.get $count)) (local.get $sign))
+    (then
+      (if (i32.ne (local.get $sign)
+            (i32.sub (i32.gt_s (local.get $address) (i32.const 0))
+                     (i32.lt_s (local.get $address) (i32.const 0))))
+        (then (call $stop_host_value) unreachable))
+      (return (call $int_from_i64 (i64.extend_i32_s (local.get $address))))))
   (if (i32.ne (i32.eqz (local.get $sign)) (i32.eqz (local.get $count)))
     (then (call $stop_host_value) unreachable))
   (call $abi_buffer_check (local.get $address)
@@ -68,9 +77,24 @@ const WAT: &str = r#"
   (call $int_pack (local.get $sign) (local.get $limbs)))
 (func $abi_int_out (param $value eqref) (result i32 i32 i32)
   (local $limbs (ref $limbs)) (local $count i32) (local $address i32) (local $i i32)
+  (local $sign i32) (local $x i32)
+  ;; The common i31 path neither creates limbs nor allocates linear memory.
+  (if (ref.test (ref i31) (local.get $value))
+    (then
+      (local.set $x (i31.get_s (ref.cast (ref i31) (local.get $value))))
+      (return (call $int_sign (local.get $value)) (local.get $x) (i32.const 0))))
+  (local.set $sign (call $int_sign (local.get $value)))
   (local.set $limbs (call $int_limbs (local.get $value)))
   (local.set $count (array.len (local.get $limbs)))
   (if (i32.eqz (local.get $count)) (then (return (i32.const 0) (i32.const 0) (i32.const 0))))
+  (if (i32.eq (local.get $count) (i32.const 1))
+    (then
+      (local.set $x (array.get $limbs (local.get $limbs) (i32.const 0)))
+      (if (i32.le_u (local.get $x)
+            (select (i32.const 2147483648) (i32.const 2147483647)
+              (i32.lt_s (local.get $sign) (i32.const 0))))
+        (then (return (local.get $sign)
+          (i32.mul (local.get $sign) (local.get $x)) (i32.const 0))))))
   (local.set $address (call $alloc (i32.shl (local.get $count) (i32.const 2))))
   (block $done (loop $each
     (br_if $done (i32.ge_u (local.get $i) (local.get $count)))
@@ -78,7 +102,7 @@ const WAT: &str = r#"
       (array.get $limbs (local.get $limbs) (local.get $i)))
     (local.set $i (i32.add (local.get $i) (i32.const 1)))
     (br $each)))
-  (call $int_sign (local.get $value)) (local.get $address) (local.get $count))
+  (local.get $sign) (local.get $address) (local.get $count))
 
 (func $abi_bytes_in (param $address i32) (param $length i32) (result (ref $bytes))
   (local $data (ref $bytes)) (local $i i32)
@@ -149,10 +173,13 @@ const WAT: &str = r#"
 
 ;; The results of an import: read, then the buffer is freed (B.3), also
 ;; when it is empty; `$free` does nothing for the address 0.
+(func $abi_int_free (param $sign i32) (param $address i32) (param $count i32)
+  (if (i32.or (local.get $count) (i32.eqz (local.get $sign)))
+    (then (call $free (local.get $address) (i32.shl (local.get $count) (i32.const 2))))))
 (func $abi_int_take (param $sign i32) (param $address i32) (param $count i32) (result eqref)
   (local $v eqref)
   (local.set $v (call $abi_int_in (local.get $sign) (local.get $address) (local.get $count)))
-  (call $free (local.get $address) (i32.shl (local.get $count) (i32.const 2)))
+  (call $abi_int_free (local.get $sign) (local.get $address) (local.get $count))
   (local.get $v))
 (func $abi_string_take (param $address i32) (param $length i32) (result eqref)
   (local $v eqref)

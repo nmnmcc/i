@@ -1,24 +1,24 @@
 RowPair(A, B) = A | B
 D = (Int)
-read = () <- (d: D) {
+read = () <- (d : D) {
 	D(n) = d
 	n
 }
 S(A, B) = (() <- A -> Int, () <- B -> Int)
-use = <A, B>() <- (s: S(A, B)) {
+use = <A, B>() <- (s : S(A, B)) {
 	S(f, g) = s
 	f() + g()
 }
-run = <N>(f: () <- N -> Int) { f() }
+run = <N>(f : () <- N -> Int) { f() }
 wrap = <A, B>() {
-	local: () <- (Fail(Never), S(A, B), RowPair(A, B)) -> Int = () {
+	local : () <- (Fail(Never), S(A, B), RowPair(A, B)) -> Int = () {
 		run(() { use() })
 	}
 	run(local)
 }
 
 main = () {
-	_syn3_0: S(D, Never) = S(() { read() }, () { 3 })
+	_syn3_0 : S(D, Never) = S(() { read() }, () { 3 })
 	{
 		assert(wrap() == 10)
 		Nil

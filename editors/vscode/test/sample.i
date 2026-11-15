@@ -18,7 +18,7 @@ Shape(A) = <B>(A, B) <- (Fail(String), ..N) -> A | Nil
 Console = (print = (String) -> Nil)
 
 @external("env", "now")
-now: () -> Float
+now : () -> Float
 
 @deprecated("use add")
 plus = (a, b) { a + b }
@@ -34,14 +34,14 @@ numbers = () {
 strings = "tab\t quote\" slash\\ \u{1F600} bad\q
 over two lines"
 
-floats = <A>(x: Float, y) -> Float {
+floats = <A>(x : Float, y) -> Float {
   z = -.x *. y +. 1.5 /. 2.0 -. 0.5
   z <. 1.0 || z >=. 2.0 && z <=. 3.0 || z >. 4.0 |>
     (True) { z }
     | (False) { 0.0 }
 }
 
-main = () <- (io: Console) {
+main = () <- (io : Console) {
   bits = <<1, 2: u16be, s: utf8, f: f64le, rest: bits>>
   [first, ..rest] = [1, 2, 3]
   user = User(..base, name = "x")
@@ -56,7 +56,7 @@ main = () <- (io: Console) {
 
 test("adds", () { assert(plus(1, 2) == 3) })
 
-identity(A) = (x: A) { x }
+identity(A) = (x : A) { x }
 import = (x) { x }
 export = import
 case = export

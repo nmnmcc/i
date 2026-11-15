@@ -1,5 +1,5 @@
 S(N) = (() <- N -> Nil)
-a = <N>(b: Bool) <- (s: S(N)) {
+a = <N>(b : Bool) <- (s : S(N)) {
 	b |>
 		(True) {
 			S(f) = s
@@ -7,4 +7,4 @@ a = <N>(b: Bool) <- (s: S(N)) {
 		}
 		| (False) { z(True) }
 }
-z = (b: Bool) { a(b) }
+z = (b : Bool) { a(b) }

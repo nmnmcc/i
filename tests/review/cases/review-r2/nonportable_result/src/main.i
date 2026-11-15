@@ -9,7 +9,7 @@
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	control.boundary((b) {
 		task.scope((s) {
 			task.go(s, () { b })

@@ -1,0 +1,176 @@
+---
+title: Resources
+description: Acquire values and release them after normal returns or errors.
+---
+
+Release acquired values after use, including when a computation raises an error.
+
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	resource.acquire(
+		() { "handle" },
+		(name) { io.print("release " <> name) },
+		(name) { io.print("use " <> name) },
+	)
+}
+```
+
+```text
+use handle
+release handle
+```
+
+Strings stand in for handles so these examples need no files. `resource.scoped` and the resource `Scope` type are not available yet.
+
+## A returned value
+
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = resource.acquire(
+		() { 40 },
+		(_) { io.print("released") },
+		(n) { n + 2 },
+	)
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+released
+42
+```
+
+## Nested acquisitions
+
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	resource.acquire(
+		() {
+			io.print("open outer")
+			"outer"
+		},
+		(name) { io.print("close " <> name) },
+		(_) {
+			resource.acquire(
+				() {
+					io.print("open inner")
+					"inner"
+				},
+				(name) { io.print("close " <> name) },
+				(_) { io.print("use both") },
+			)
+		},
+	)
+	io.print("done")
+}
+```
+
+```text
+open outer
+open inner
+use both
+close inner
+close outer
+done
+```
+
+## A final callback
+
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = resource.ensure(() { 42 }, () { io.print("final") })
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+final
+42
+```
+
+A final can use services, but cannot raise an error. `ensure` also runs it when a control escape unwinds the body.
+
+## A failed use
+
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	i/fail
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = fail.catch(() {
+		resource.ensure(
+			() {
+				resource.acquire(
+					() {
+						io.print("open")
+						"handle"
+					},
+					(name) { io.print("release " <> name) },
+					(_) { fail.raise("failed") },
+				)
+			},
+			() { io.print("final") },
+		)
+	})
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+open
+release handle
+final
+Error("failed")
+```
+
+[Task cancellation](/docs/tour/concurrency) also unwinds finals and waits for cleanup; a stop runs none of them.
+
+## A failed acquisition
+
+```i run package=tour title="src/main.i"
+(
+	i/resource
+	i/fail
+	i/core
+	(Io) = i/io
+)
+main = () <- (io : Io) {
+	answer = fail.catch(() {
+		resource.acquire(
+			() -> String { fail.raise("cannot open") },
+			(name) { io.print("release " <> name) },
+			(name) { io.print("use " <> name) },
+		)
+	})
+	io.print(core.inspect(answer))
+}
+```
+
+```text
+Error("cannot open")
+```
+
+Release is installed only after acquisition succeeds.
+
+Continue with [concurrency](/docs/tour/concurrency).

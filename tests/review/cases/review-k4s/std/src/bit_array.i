@@ -30,7 +30,7 @@
 )
 
 /// The UTF-8 bytes of a string.
-from_string = (string: String) -> BitArray { <<string:utf8>> }
+from_string = (string : String) -> BitArray { <<string:utf8>> }
 
 /// The string, when the bits are whole bytes of correct UTF-8, or
 /// `Error(Nil)`.
@@ -39,27 +39,27 @@ from_string = (string: String) -> BitArray { <<string:utf8>> }
 /// bit_array.to_string(<<104, 105>>)  // Ok("hi")
 /// bit_array.to_string(<<255>>)       // Error(Nil)
 /// ```
-to_string = (bits: BitArray) -> Result(String, Nil) {
+to_string = (bits : BitArray) -> Result(String, Nil) {
 	core.bit_array_to_string(bits)
 }
 
 /// `True` when the bits are whole bytes of correct UTF-8.
-is_utf8 = (bits: BitArray) -> Bool {
+is_utf8 = (bits : BitArray) -> Bool {
 	core.bit_array_to_string(bits) |> (Ok(_)) { True } | (Error(_)) { False }
 }
 
 /// The number of bits.
-bit_size = (bits: BitArray) -> Int { core.bit_size(bits) }
+bit_size = (bits : BitArray) -> Int { core.bit_size(bits) }
 
 /// The number of bytes, counting a last byte that is not whole as one.
 ///
 /// ```i
 /// bit_array.byte_size(<<1, 2:u4>>)  // 2
 /// ```
-byte_size = (bits: BitArray) -> Int { { core.bit_size(bits) + 7 } / 8 }
+byte_size = (bits : BitArray) -> Int { { core.bit_size(bits) + 7 } / 8 }
 
 /// The bits of `to`, then the bits of `suffix`.
-append = (to: BitArray, suffix: BitArray) -> BitArray {
+append = (to : BitArray, suffix : BitArray) -> BitArray {
 	<<to:bits, suffix:bits>>
 }
 
@@ -69,11 +69,11 @@ append = (to: BitArray, suffix: BitArray) -> BitArray {
 /// ```i
 /// bit_array.concat([<<1>>, <<2, 3>>])  // <<1, 2, 3>>
 /// ```
-concat = (bit_arrays: List(BitArray)) -> BitArray {
+concat = (bit_arrays : List(BitArray)) -> BitArray {
 	core.bit_array_concat(bit_arrays)
 }
 
-reverse = <A>(list: List(A)) -> List(A) {
+reverse = <A>(list : List(A)) -> List(A) {
 	go = (rest, acc) {
 		rest |> ([]) { acc } | ([x, ..xs]) { go(xs, [x, ..acc]) }
 	}
@@ -88,7 +88,7 @@ reverse = <A>(list: List(A)) -> List(A) {
 /// bit_array.slice(<<1, 2, 3, 4>>, 1, 2)   // Ok(<<2, 3>>)
 /// bit_array.slice(<<1, 2, 3, 4>>, 3, -2)  // Ok(<<2, 3>>)
 /// ```
-slice = (from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil) {
+slice = (from : BitArray, at : Int, take : Int) -> Result(BitArray, Nil) {
 	(start, length) = { take < 0 } |>
 		(True) { (at + take, -take) }
 		| (False) { (at, take) }
@@ -102,13 +102,13 @@ slice = (from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil) {
 }
 
 /// `True` when the bit array starts with the bits of `prefix`.
-starts_with = (bits: BitArray, prefix: BitArray) -> Bool {
+starts_with = (bits : BitArray, prefix : BitArray) -> Bool {
 	n = core.bit_size(prefix)
 	bits |> (<<start:bits(n), _:bits>>) { start == prefix } | (_) { False }
 }
 
 /// The bit array with zero bits after it, up to a whole number of bytes.
-pad_to_bytes = (bits: BitArray) -> BitArray {
+pad_to_bytes = (bits : BitArray) -> BitArray {
 	core.bit_size(bits) % 8 |> (0) { bits } | (r) { <<bits:bits, 0:u(8 - r)>> }
 }
 
@@ -121,7 +121,7 @@ pad_to_bytes = (bits: BitArray) -> BitArray {
 /// bit_array.compare(<<1, 2>>, <<1, 3>>)  // Less
 /// bit_array.compare(<<4:u8>>, <<4:u5>>)  // Greater
 /// ```
-compare = (a: BitArray, with: BitArray) -> Order {
+compare = (a : BitArray, with : BitArray) -> Order {
 	(a, with) |>
 		((<<x, xs:bits>>, <<y, ys:bits>>)) {
 			{ x == y } |>
@@ -140,7 +140,7 @@ compare = (a: BitArray, with: BitArray) -> Order {
 		}
 }
 
-int_order = (a: Int, b: Int) -> Order {
+int_order = (a : Int, b : Int) -> Order {
 	{ a == b } |>
 		(True) { Equal }
 		| (False) { { a < b } |> (True) { Less } | (False) { Greater } }
@@ -151,11 +151,11 @@ int_order = (a: Int, b: Int) -> Order {
 /// ```i
 /// bit_array.inspect(<<1, 2:u2>>)  // "<<1, 2:u2>>"
 /// ```
-inspect = (bits: BitArray) -> String { core.inspect(bits) }
+inspect = (bits : BitArray) -> String { core.inspect(bits) }
 
 hex_digits = "0123456789ABCDEF"
 
-char_at = (alphabet: String, i: Int) -> String {
+char_at = (alphabet : String, i : Int) -> String {
 	core.byte_slice(alphabet, i, 1) |> (Ok(s)) { s } | (Error(_)) { "" }
 }
 
@@ -164,7 +164,7 @@ char_at = (alphabet: String, i: Int) -> String {
 /// ```i
 /// bit_array.base16_encode(<<255, 1>>)  // "FF01"
 /// ```
-base16_encode = (bits: BitArray) -> String {
+base16_encode = (bits : BitArray) -> String {
 	go = (rest, acc) {
 		rest |>
 			(<<high:u4, low:u4, more:bits>>) {
@@ -182,7 +182,7 @@ base16_encode = (bits: BitArray) -> String {
 	go(pad_to_bytes(bits), [])
 }
 
-hex_value = (byte: Int) -> Int {
+hex_value = (byte : Int) -> Int {
 	{ byte >= 48 && byte <= 57 } |>
 		(True) { byte - 48 }
 		| (False) {
@@ -202,7 +202,7 @@ hex_value = (byte: Int) -> Int {
 /// ```i
 /// bit_array.base16_decode("ff01")  // Ok(<<255, 1>>)
 /// ```
-base16_decode = (input: String) -> Result(BitArray, Nil) {
+base16_decode = (input : String) -> Result(BitArray, Nil) {
 	go = (rest, acc) {
 		rest |>
 			(<<>>) { Ok(concat(reverse(acc))) }
@@ -222,7 +222,7 @@ standard = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
 url_safe = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
-encode64 = (bits: BitArray, alphabet: String, padding: Bool) -> String {
+encode64 = (bits : BitArray, alphabet : String, padding : Bool) -> String {
 	pad = padding |> (True) { "=" } | (False) { "" }
 	c = (i) { char_at(alphabet, i) }
 	go = (rest, acc) {
@@ -251,19 +251,19 @@ encode64 = (bits: BitArray, alphabet: String, padding: Bool) -> String {
 /// ```i
 /// bit_array.base64_encode(<<"hi":utf8>>, True)  // "aGk="
 /// ```
-base64_encode = (input: BitArray, padding: Bool) -> String {
+base64_encode = (input : BitArray, padding : Bool) -> String {
 	encode64(input, standard, padding)
 }
 
 /// Like `base64_encode`, with `-` and `_` in the place of `+` and `/`, so
 /// that the text may be used in a URL.
-base64_url_encode = (input: BitArray, padding: Bool) -> String {
+base64_url_encode = (input : BitArray, padding : Bool) -> String {
 	encode64(input, url_safe, padding)
 }
 
 // The value of a base 64 character, or -1. `62` and `63` are the characters
 // for 62 and 63 in this alphabet.
-value64 = (byte: Int, c62: Int, c63: Int) -> Int {
+value64 = (byte : Int, c62 : Int, c63 : Int) -> Int {
 	{ byte >= 65 && byte <= 90 } |>
 		(True) { byte - 65 }
 		| (False) {
@@ -285,7 +285,7 @@ value64 = (byte: Int, c62: Int, c63: Int) -> Int {
 		}
 }
 
-decode64 = (input: String, c62: Int, c63: Int) -> Result(BitArray, Nil) {
+decode64 = (input : String, c62 : Int, c63 : Int) -> Result(BitArray, Nil) {
 	v = (byte) { value64(byte, c62, c63) }
 	ok = (a, b) { a >= 0 && b >= 0 }
 	go = (rest, acc) {
@@ -322,11 +322,11 @@ decode64 = (input: String, c62: Int, c63: Int) -> Result(BitArray, Nil) {
 /// bit_array.base64_decode("aGk=")  // Ok(<<104, 105>>)
 /// bit_array.base64_decode("aGk")   // Ok(<<104, 105>>)
 /// ```
-base64_decode = (encoded: String) -> Result(BitArray, Nil) {
+base64_decode = (encoded : String) -> Result(BitArray, Nil) {
 	decode64(encoded, 43, 47)
 }
 
 /// Like `base64_decode`, with `-` and `_` in the place of `+` and `/`.
-base64_url_decode = (encoded: String) -> Result(BitArray, Nil) {
+base64_url_decode = (encoded : String) -> Result(BitArray, Nil) {
 	decode64(encoded, 45, 95)
 }

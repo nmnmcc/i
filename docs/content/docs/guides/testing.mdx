@@ -1,0 +1,206 @@
+---
+title: Testing
+description: Run tests, select cases, inspect failures, and substitute services.
+---
+
+Run unit tests, generate cases, and substitute a service implementation.
+
+```toml file=i.toml title="i.toml"
+name = "guide_tests"
+
+[dependencies]
+
+[test]
+collection = "std/test.tests"
+
+[dev-dependencies]
+std = { path = "../std" }
+```
+
+```i file=src/count.i title="src/count.i"
+(
+	count
+)
+count = (n : Int) -> Int { n + 1 }
+```
+
+```i test stdout=exact package=guide_tests title="test/count_test.i"
+(
+	testlib = (test) = std/test
+	guide_tests/count
+)
+test("adds one", () { assert(count.count(2) == 3) })
+```
+
+```text
+pass guide_tests/count_test.adds one
+1 passed, 0 failed
+```
+
+Create `guide-tests/` beside `std/` and run commands there. Tests import `src/` modules by package path; the loader reads `.i` and `.is` throughout `test/`, with `_test.i` a convention. Without a configured collection, no tests run.
+
+```sh
+i test --opt 0
+i test --opt 2
+```
+
+```text
+pass guide_tests/count_test.adds one
+1 passed, 0 failed
+```
+
+Each command prints this result. Imported `test` is a library macro taking a literal display name and a zero-argument body; the runner supplies `Assert` and starts a fresh instance for each selected test. Returning `Nil` passes; assertion failure, stop, or unhandled error fails.
+
+## Name filters
+
+```sh
+i test --project . --opt 2 'guide_tests/count_test.adds one'
+i test --project . --opt 2 'guide_tests/count_test.'
+```
+
+```text
+pass guide_tests/count_test.adds one
+1 passed, 0 failed
+```
+
+Each command prints this result. Filters match substrings, with no exact-name or file flag; include the module's trailing dot to select its tests. `--project` chooses the directory; `--opt` chooses the optimization level.
+
+## Suites and cases
+
+```i test stdout=exact package=guide_tests title="test/forms_test.i"
+(
+	testlib = (test, suite, each, skip, fails) = std/test
+)
+suite("arithmetic", () {
+	test("addition", () { assert(1 + 1 == 2) })
+	each("double", [("zero", 0), ("two", 2)], (n) { assert(n + n == 2 * n) })
+	skip("disabled", () { assert(False) })
+	fails("expected assertion", () { assert(False) })
+})
+```
+
+```text
+pass guide_tests/forms_test.arithmetic / addition
+pass guide_tests/forms_test.arithmetic / double / zero
+pass guide_tests/forms_test.arithmetic / double / two
+skip guide_tests/forms_test.arithmetic / disabled
+pass guide_tests/forms_test.arithmetic / expected assertion
+4 passed, 0 failed, 1 skipped
+```
+
+Use each test file independently when comparing counts. `fails` expects a runtime stop or raised error; a successful body fails it.
+
+## Focus
+
+```i test stdout=exact package=guide_tests title="test/focus_test.i"
+(
+	testlib = (test, only) = std/test
+)
+test("other", () { assert(False) })
+only("working", () { assert(True) })
+```
+
+```text
+skip guide_tests/focus_test.other
+pass guide_tests/focus_test.working
+1 passed, 0 failed, 1 skipped
+```
+
+Any `only` contribution skips ordinary tests; remove focus before a full run. The six forms shown are ordinary [library macros](/docs/tour/macros).
+
+## Failure output
+
+```i test-fails package=guide_tests title="test/failure_test.i"
+(
+	testlib = (test) = std/test
+)
+test("wrong sum", () { assert(1 + 1 == 3) })
+```
+
+```text
+FAIL guide_tests/failure_test.wrong sum
+  assertion failed: assert
+guide_tests/failure_test:4:24
+0 passed, 1 failed
+```
+
+```sh
+i test --opt 2
+```
+
+```text
+FAIL guide_tests/failure_test.wrong sum
+  assertion failed: assert
+guide_tests/failure_test:4:24
+0 passed, 1 failed
+```
+
+Exit status is 1; the position identifies the assertion. Remove this file before passing runs.
+
+## Generated cases
+
+```i test stdout=exact package=guide_tests title="test/reverse_test.i"
+(
+	testlib = (test) = std/test
+	i/core
+	std/property
+	std/list
+)
+test("reverse twice", () {
+	numbers = property.int(-10, 10)
+	lists = property.list(numbers, 0, 12)
+	property.test(
+		lists,
+		property.Config(
+			seed = 42,
+			cases = 50,
+			max_size = 12,
+			max_discards = 100,
+			max_shrinks = 100,
+		),
+		(xs) {
+			assert(
+				list.reverse(list.reverse(xs)) == xs,
+			)
+		},
+		core.inspect,
+	)
+})
+```
+
+```text
+pass guide_tests/reverse_test.reverse twice
+1 passed, 0 failed
+```
+
+Generator builders raise an error for invalid bounds. On failure the runner reports replay information and tries ordered smaller cases within `max_shrinks`; its best value on that path need not be a global minimum. Replay needs deterministic callbacks: keep the seed, generator code, library version, and dependencies in a failure report.
+
+## A fake service
+
+```i file=src/deadline.i title="src/deadline.i"
+(
+	Clock(..)
+	remaining
+)
+Clock = (now = () -> Int)
+remaining = (deadline) <- (clock : Clock) { deadline - clock.now() }
+```
+
+```i test stdout=exact package=guide_tests title="test/deadline_test.i"
+(
+	testlib = (test) = std/test
+	guide_tests/deadline
+)
+test("fixed clock", () {
+	{ assert(deadline.remaining(42) == 2) } <- (deadline.Clock(now = () { 40 }))
+})
+```
+
+```text
+pass guide_tests/deadline_test.fixed clock
+1 passed, 0 failed
+```
+
+Storage clients can accept substitute services in the same way.
+
+[Packaging](/docs/guides/packaging)

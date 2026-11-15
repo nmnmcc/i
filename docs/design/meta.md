@@ -174,13 +174,13 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 | Exports | `(x, U, U(..))` | `(, x U (U ..))` |
 | Built-in attribute | `@deprecated("old") Item`, `@host("ns", "async") Item` | `(@ (deprecated "old") Item)`, `(@ (host "ns" "async") Item)` |
 | Macro before an item | `@m Item`, `@a.m Item`, `@m(arg…) Item`, `@a.m(arg…) Item` | `(@ m Item)`, `(@ (. a m) Item)`, `(@ (m arg…) Item)`, `(@ ((. a m) arg…) Item)` |
-| Custom type | `U { C1(T, x: T) C2 }` | `(U { (C1 T (: x T)) C2 })` |
+| Custom type | `U { C1(T, x : T) C2 }` | `(U { (C1 T (: x T)) C2 })` |
 | Custom type with parameters | `U(A, B) { … }` | `((U A B) { … })` |
 | Type alias | `U = T`, `U(A) = T` | `(= U T)`, `(= (U A) T)` |
 | Binding | `p = e` | `(= p e)` |
 | Binding with type variables | `x(A, B) = e` | `(= (x A B) e)` |
 | Binding with type variables and a type | `x(A, B): T = e` | `(= (: (x A B) T) e)` |
-| Declaration | `x: T`, `x(A): T` | `(: x T)`, `(: (x A) T)` |
+| Declaration | `x : T`, `x(A): T` | `(: x T)`, `(: (x A) T)` |
 | Macro call as an item | `m(arg…)`, `a.m(arg…)` | `(m arg…)`, `((. a m) arg…)` |
 | Items from an expansion | none | `{ Item… }` |
 
@@ -205,12 +205,12 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 | Core form | Normal surface | Lisp surface |
 |---|---|---|
 | Union, intersection, difference | `A \| B \| C`, `A & B`, `A - B - C` | `(\| A B C)`, `(& A B)`, `(- A B C)` |
-| Function type | `(T1, x: T2) -> R` | `(-> (T1 (: x T2)) R)` |
+| Function type | `(T1, x : T2) -> R` | `(-> (T1 (: x T2)) R)` |
 | With errors and environment | `(T) -> R ^ E ! V` | `(-> (T) (! (^ R E) V))` |
 | With errors only, environment only | `(T) -> R ^ E`, `(T) -> R ! V` | `(-> (T) (^ R E))`, `(-> (T) (! R V))` |
 | Tuple type | `(T1, T2)`, `(T)` | `(, T1 T2)`, `(, T)` |
 | Value type | `x`, `a.x` | `x`, `(. a x)` |
-| Record type | `(x: T)`, `(..R, -x, y: U)`, `Record` | `{ (: x T) }`, `{ .. R (- x) (: y U) }`, `Record` |
+| Record type | `(x : T)`, `(..R, -x, y : U)`, `Record` | `{ (: x T) }`, `{ .. R (- x) (: y U) }`, `Record` |
 | Named type | `U`, `a.U`, `U(T1, T2)`, `a.U(T)` | `U`, `(. a U)`, `(U T1 T2)`, `((. a U) T)` |
 | Hole | `_` | `_` |
 | Group | `{ T }` | `{ T }` |
@@ -238,7 +238,7 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 | Unary operator | `-e`, `-.e` | `(- e)`, `(-. e)` |
 | Field, tuple part | `e.x`, `e.0` | `(. e x)`, `(. e 0)` |
 | Tuple | `(e1, e2)`, `(e)` | `(, e1 e2)`, `(, e)` |
-| Structural record | `()`, `(x: e)`, `(..e, x: v)` | `()`, `{ (: x e) }`, `{ .. e (: x v) }` |
+| Structural record | `()`, `(x : e)`, `(..e, x: v)` | `()`, `{ (: x e) }`, `{ .. e (: x v) }` |
 | Match | `e.{ p -> v }` | `(. e { (-> p v) })` |
 | List | `[e1, e2]`, `[e1, ..e2]` | `[e1 e2]`, `[e1 .. e2]` |
 | Bit array | `<<e1, e2: f, e3: f(e4)>>` | `<<e1 (: e2 f) (: e3 (f e4))>>` |
@@ -258,7 +258,7 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 - **Functions and clauses.** In the position of an expression, a `(-> …)` has three parts: the parameters, the result, and the body. The body is one expression. The result `_` means that the function has no `->` part, so its value, errors, and environment are all inferred (spec §6.8). Any other result is a `->` part, in which a missing `^` or `!` means `Never`; the normal `(x) -> _ { e }` is `(-> (x) (^ _ Never) e)`. A bare `_` alone denotes an omitted result; a grouped hole denotes a written result, equivalent to `(^ _ Never)`. A clause is a `(-> …)` with two parts, and it is only in a clause block. A function type also has two parts, and it is only in the position of a type. A macro that looks at a `(-> a b)` must know its position to know which of the two it is.
 - **Records and blocks.** In expression/type position a nonempty Curly starting with a labelled field or `..` is a structural record, before any group test. Empty record is the empty Round `()` only in expression position; its type is `Record`, and there is no empty-record pattern. Record field labels are text, including String labels and T3 label parameters in types. Spread/forgetting keep T3 source order and exact Without algebra. Other curly datums use the following rule. A `{ }` in the position of an expression is a clause block when it is empty, or when its first part is a `(-> …)` with two parts. Then every part must be a clause. When not, it is a block, and it has one or more parts.
 - A clause block with one clause, `{ (-> p e) }`, and the function `(-> (p) _ e)` are two distinct trees with the same function-value meaning. Rewriting a direct postfix match into a call is not an identity: preserve its tail-frame and known-constructor rules (spec §§6.12, 7.5, 11.6).
-- A clause head is `p`, `(| p1 p2 …)` with two or more choices, or `(? head g)` with a head of the first two kinds. `(| …)` is a compile error in every other position of a pattern. A choice that **ends in a type test** may only be the last choice, because the normal surface reads `x: T | p` as a union type, and a pattern has no group to stop it. A pattern ends in a type test when it is `(: x T)`, or `(= x p)` where `p` ends in a type test: `(| (= a (: b Int)) Unit)` would be `a = b: Int | Unit`, which is the one pattern `a = b: { Int | Unit }`. A clause block whose first clause head is a type test, as `{ n: Int -> … }`, is read as a clause block by syntax.md §6.1.
+- A clause head is `p`, `(| p1 p2 …)` with two or more choices, or `(? head g)` with a head of the first two kinds. `(| …)` is a compile error in every other position of a pattern. A choice that **ends in a type test** may only be the last choice, because the normal surface reads `x : { T | p }` as a union type, and a pattern has no group to stop it. A pattern ends in a type test when it is `(: x T)`, or `(= x p)` where `p` ends in a type test: `(| (= a (: b Int)) Unit)` would be `a = b : { Int | Unit }`, which is the one pattern `a = b : { Int | Unit }`. A clause block whose first clause head is a type test, as `{ n : Int -> … }`, is read as a clause block by syntax.md §6.1.
 - `(. a x)` is a member of a module or a field, as `a.x` is in the normal surface (spec §2.3). `(. a C)` is a constructor that is a member of a module, so `opt.Some(1)` is `((. opt Some) 1)`.
 - **String interpolation** (stream STR) has no row. It takes only `String` values, so it is sugar for `<>`: the parser of the normal surface changes it into the `<>` of its parts, from the left, with empty string parts left out, before the core tree. `"user-\(n)"` is `(<> "user-" n)`, and `"a\(x)b"` is `(<> (<> "a" x) "b")`. A string whose only part is one expression keeps one empty string part, so that the type of the expression is still checked as `String`: `"\(x)"` is `(<> "" x)`. So a macro sees the names in it, and the canonical printer of the normal surface writes the `<>` form back, as it writes `16` for `0x10`. The source formatter retains the interpolation spelling (STR coordinator ruling). The Lisp surface has no interpolation.
 
@@ -267,7 +267,7 @@ In the tables, `e` is an expression, `arg` a call argument (`e`, or `(: x e)` wi
 | Core form | Normal surface | Lisp surface |
 |---|---|---|
 | Name, discard | `x`, `_`, `__rest` | `x`, `_`, `__rest` |
-| Type test or annotation | `x: T`, `_: T` | `(: x T)`, `(: _ T)` |
+| Type test or annotation | `x : T`, `_ : T` | `(: x T)`, `(: _ T)` |
 | Literal | `1`, `-1`, `-.1.5`, `"a"` | `1`, `(- 1)`, `(-. 1.5)`, `"a"` |
 | String prefix | `"a" <> x` | `(<> "a" x)` |
 | String suffix (stream STR) | `x <> "a"` | `(<> x "a")` |
@@ -390,7 +390,7 @@ SyntaxError = (message = String, at = Syntax)
 | Function | Type | What it gives |
 |---|---|---|
 | `node` | `(Syntax) -> Node` | The node of the value |
-| `make` | `(node: Node, like: Syntax) -> Syntax ^ SyntaxError` | A new `Syntax` with this node, and the span and the scope of `like`. A `SyntaxError` when the node is an atom that is not one token of its kind (§3.1). §5 says how a name made in this way is looked up. |
+| `make` | `(node : Node, like : Syntax) -> Syntax ^ SyntaxError` | A new `Syntax` with this node, and the span and the scope of `like`. A `SyntaxError` when the node is an atom that is not one token of its kind (§3.1). §5 says how a name made in this way is looked up. |
 | `same_code` | `(Syntax, Syntax) -> Bool` | `True` when the two are the same datum. Spans and scopes are not looked at. Code that the compiler gives has no groups (§3.1), so for such code this is the same code of §1. |
 | `show` | `(Syntax) -> String` | The datum in the Lisp surface, on one line |
 | `show_as` | `(Syntax, Position) -> String ^ SyntaxError` | The code in the normal surface, read by §2.3 for this position. It is on one line, but for the line breaks that the printer must put in (§1); a `Curly` of items gives one item on each line. A `SyntaxError` when it fits no row, or when the normal surface cannot write it (§1). |
@@ -470,7 +470,9 @@ A **syntax macro** is a top-level binding in a `.is` file with the attribute `@m
 Used in a `.i` file:
 
 ```i
-(check = my/check)
+(
+	check = my/check
+)
 
 total_is_right = (cart) { check.that(total(cart) == 42) }
 ```
@@ -489,7 +491,7 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 | Type | `m(args)` | Types, integer literals, and strings, with no labels | A type |
 
 - The parser does not know which names are macros. The arguments are always read by the grammar of the position, as in the table, so a file can be read and formatted with no other file. From this, an argument in the position of an expression cannot be a type such as `Int | Nil` or `(Int) -> String`, a discard, or a list pattern with `..`.
-- In the normal surface, syntax.md already reads a macro call as an item, a macro before an item with any arguments or named with its module (`@a.m`), a macro call in a type, a call whose first argument is an `UpName` at the start of a statement or an item, as `decode(User, text)`, and a declaration `name [TypeParams] : Type` with no `=`, whatever its attributes, also one with no `@external` and one with a macro before it, as `@rpc fetch: (Id) -> User ! Http` (§1). It keeps each of them for macros, and the macro streams give them their meaning.
+- In the normal surface, syntax.md already reads a macro call as an item, a macro before an item with any arguments or named with its module (`@a.m`), a macro call in a type, a call whose first argument is an `UpName` at the start of a statement or an item, as `decode(User, text)`, and a declaration `name [TypeParams] : Type` with no `=`, whatever its attributes, also one with no `@external` and one with a macro before it, as `@rpc fetch : (Id) -> User ! Http` (§1). It keeps each of them for macros, and the macro streams give them their meaning.
 - `e | m` is the macro call `m(e)`, and `e | m(args)` is the macro call `m(e, args)`, as `|` works for every call (spec §6.9). This is only in the position of an expression.
 - The number of arguments must be the number of parameters of the macro. An argument with a label goes to the parameter with that label, by the rule of calls (spec §6.6), and the macro gets it with no label.
 - The arguments are not worked out. The macro gets their `Syntax`, and its result says if and when each of them is worked out.
@@ -633,7 +635,7 @@ query dependencies (including negative/fallback answers in §6). Reusing a
 partially expanded subtree is not a cache hit. `note(String)` is a buffered
 compiler diagnostic, replayed once with the successful invocation; it never
 becomes program output. It is the `note` field of `i/syntax.Diagnostics`,
-whose definition is `Diagnostics { Diagnostics(note: (String) -> Nil) }`.
+whose definition is `Diagnostics { Diagnostics(note : (String) -> Nil) }`.
 This ordinary service is available in syntax and typed macro runs.
 
 C8. No macro may generate another macro definition. Items may generate normal
@@ -669,7 +671,7 @@ From this:
 - A free name of a template means what it means in the module of the template. In §4.2, `failed`, `assert`, and `inspect` are the names of `my/check`, whatever the caller has. Two templates of different modules that are used in one run do not take the names of one another, because their scopes have different modules.
 - This has a limit. All templates of one module that are used in one run get the same scope: that module and the mark of the run. So when a macro puts the result of one template inside another, a name that the outer template binds takes a free name of the inner one with the same text. If `wrap` gives `` `(-> (limit) _ ~body) `` and `check` gives `` `(< 1 limit) ``, a macro that gives `(wrap (check))` binds the `limit` of `check` to the parameter of `wrap`, not to the top-level `limit` of the module. This is a limitation of these i rules; §13 compares, but does not equate, them with Racket. The author of the macro uses names that do not clash.
 - To make a name that the caller can see, a macro uses a name from its arguments, or `make(Name("it"), like: arg)`. A macro with no arguments cannot make such a name.
-- A name made like an argument has the caller's scope, so as a binder it takes the caller's names with the same text in the code from arguments that it is around. So a macro makes it like an argument only for a name that the caller is to use, as a top-level name. To bind a local name that the caller does not use, with a text that the macro gets as data, as the text of a field, the macro makes it like an atom of a template: ``make(Name(text), like: `x)``. That name has the scope of the macro's module and the mark of the run, as a binder of a template has. A constructor pattern takes a labeled field only through a part whose last `=` name is the label (spec §7.1), and that name is always bound (spec §6.11), so this is the only way to read a field by its label without taking a name of the caller. For `User { User(name: String) }` and a macro `field_or(v, T, fallback)` that gives `` `(| ~v { (-> (User ~n) (if_empty ~n ~fallback)) (-> _ ~fallback) }) ``, `n` must be ``make(Name("name"), like: `x)``. With `make(Name("name"), like: v)`, the call `field_or(u, User, name)` inside `(name) { … }` would bind the caller's `name` in `~fallback` to the field, and nothing would report it.
+- A name made like an argument has the caller's scope, so as a binder it takes the caller's names with the same text in the code from arguments that it is around. So a macro makes it like an argument only for a name that the caller is to use, as a top-level name. To bind a local name that the caller does not use, with a text that the macro gets as data, as the text of a field, the macro makes it like an atom of a template: ``make(Name(text), like: `x)``. That name has the scope of the macro's module and the mark of the run, as a binder of a template has. A constructor pattern takes a labeled field only through a part whose last `=` name is the label (spec §7.1), and that name is always bound (spec §6.11), so this is the only way to read a field by its label without taking a name of the caller. For `User { User(name : String) }` and a macro `field_or(v, T, fallback)` that gives `` `(| ~v { (-> (User ~n) (if_empty ~n ~fallback)) (-> _ ~fallback) }) ``, `n` must be ``make(Name("name"), like: `x)``. With `make(Name("name"), like: v)`, the call `field_or(u, User, name)` inside `(name) { … }` would bind the caller's `name` in `~fallback` to the field, and nothing would report it.
 - Only a template can reach a name of its module that is not exported. `make` cannot, by rule 2 or by rule 3, so a module cannot reach the private names of another module by using a `Syntax` that came from it: not from a template, and not from an answer of `Definitions` or `Types`.
 - Services are found by their type (spec §9.2), and errors go to the nearest handler, not by name. So marks do not keep them apart: **code from a template can take the services and the error handlers of the caller's code, and the caller's code can take those of the template.** A result that puts code from an argument after an environment statement, as `` `{ (! Assert quiet_assert) ~body } ``, or inside a function that handles errors, as `fail.catch`, changes which service or which handler that code uses. This is the same as for a normal function that takes a function and calls it, and the checks of §7.3 do not stop it. `i expand` (§9) shows it.
 - Because labels are text, a function in a template with the parameter `i`, used with a parameter `i` from the caller in the same list, has two parameters with one label, which is a compile error (spec §6.11). The message names the macro. The author of the macro uses another name.
@@ -691,7 +693,7 @@ From this:
 ```i
 Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
 
-definition = (of: Syntax) <- (d: Definitions) { d.definition(of) }
+definition = (of : Syntax) <- (d : Definitions) { d.definition(of) }
 // type: (of: Syntax) -> Syntax ^ SyntaxError ! Definitions
 ```
 

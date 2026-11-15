@@ -126,7 +126,7 @@ def migrate(binary, ctors, sources):
 # Files whose strings are inputs of the syntax before syntax three on purpose:
 # the migrator and its tests.
 OLD_ON_PURPOSE = (
-    "crates/ilang-syntax/examples/migrate-syntax3.rs",
+    "crates/ilang-syntax/examples/legacy/migrate-syntax3.rs",
     "crates/ilang-syntax/tests/syn3.rs",
     "crates/ilang-syntax/tests/syn3_lower.rs",
 )

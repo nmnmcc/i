@@ -7,7 +7,7 @@
 	i/request
 )
 
-ready_wait = <A>(r: Request(A)) <- (await: request.Await) {
+ready_wait = <A>(r : Request(A)) <- (await : request.Await) {
 	await.wait(request.ticket(r))
 }
 

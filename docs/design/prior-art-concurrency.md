@@ -95,7 +95,7 @@ The port does not rely on native stack switching. The ABI explanation in `go/src
 
 `otp/erts/emulator/beam/erl_process.c:erl_create_process` allocates a process and heap, sizes/copies its arguments, initializes execution registers and a termination continuation, and sets up links, monitors, and message queues. Its cost depends on the argument graph and heap requirements; “cheap process” does not mean zero copying or constant time. There is no caller-stack copy in this creation path.
 
-`erl_process.c:erts_schedule` accounts for consumed reductions and selects the next execution budget. The interpreter dispatch macros in `otp/erts/emulator/beam/emu/macros.tab:DISPATCH`, `DISPATCH_EXPORT`, `DISPATCH_FUN`, and `DISPATCH_RETURN` decrement `FCALLS` and transfer to `context_switch` when the budget is exhausted. This is compiler/runtime cooperation for preemption at dispatch points. It is not proof that an arbitrary long native function is preemptible; JIT and dirty-NIF scheduling were not audited here.
+`erl_process.c:erts_schedule` accounts for consumed reductions and selects the next execution budget. The interpreter dispatch macros in `otp/erts/emulator/beam/emu/macros.tab : DISPATCH`, `DISPATCH_EXPORT`, `DISPATCH_FUN`, and `DISPATCH_RETURN` decrement `FCALLS` and transfer to `context_switch` when the budget is exhausted. This is compiler/runtime cooperation for preemption at dispatch points. It is not proof that an arbitrary long native function is preemptible; JIT and dirty-NIF scheduling were not audited here.
 
 `otp/erts/emulator/beam/erl_message.c:erts_send_message` sizes and copies terms to receiver-owned storage or message fragments, with a self-send shortcut under the appropriate heap mode; `erts_queue_message` publishes a message. This is asynchronous mailbox delivery, not an unbuffered rendezvous. An i channel can borrow explicit wait queues but should not acquire an unbounded mailbox merely because processes are small.
 
@@ -118,7 +118,7 @@ There is a second useful BEAM lesson for i capture costs. `otp/erts/emulator/bea
 
 ## 3. OCaml 5 and Eio: one-shot fibers and structured lifetime
 
-`ocaml/runtime/fiber.c:alloc_size_class_stack_noexc`, `caml_alloc_stack`, and `caml_free_stack` allocate fiber stacks with per-domain size-class reuse. `caml_continuation_use_noexc` removes the stack pointer from a continuation, using a direct store in the single-domain case and a CAS where required; `caml_continuation_use` rejects a second use. `ocaml/stdlib/effect.ml:Deep.continue`, `Deep.discontinue`, and `Deep.match_with` connect this representation to continuation resume, exceptional resume, and handler execution. Take one-shot ownership transfer and the separation of storage reuse from language semantics. OCaml stack chunks are not the same representation as i heap frames.
+`ocaml/runtime/fiber.c:alloc_size_class_stack_noexc`, `caml_alloc_stack`, and `caml_free_stack` allocate fiber stacks with per-domain size-class reuse. `caml_continuation_use_noexc` removes the stack pointer from a continuation, using a direct store in the single-domain case and a CAS where required; `caml_continuation_use` rejects a second use. `ocaml/stdlib/effect.ml : Deep.continue`, `Deep.discontinue`, and `Deep.match_with` connect this representation to continuation resume, exceptional resume, and handler execution. Take one-shot ownership transfer and the separation of storage reuse from language semantics. OCaml stack chunks are not the same representation as i heap frames.
 
 `ocaml/runtime/domain.c:caml_domain_spawn` creates a platform thread and performs a startup handshake. A domain is not a cheap fiber. This distinction matters when comparing i worker creation with task creation: the former can be expensive without explaining every task switch.
 
@@ -160,7 +160,7 @@ Eio was read rather than described from memory. `eio/lib_eio/core/suspend.ml:ent
 
 ### Tokio
 
-`tokio/tokio/src/runtime/task/core.rs:Cell`, `Header`, `Core`, and `Trailer` separate task scheduling state and links, the future/result, and colder completion/ownership information. `tokio/tokio/src/runtime/task/state.rs:transition_to_notified_by_ref` coalesces repeated notifications and handles running versus sleeping tasks. `transition_to_notified_and_cancel` combines cancellation with the wake protocol. The lesson is not “use atomics on one worker”; it is “one runnable entry per task, with explicit state transitions.”
+`tokio/tokio/src/runtime/task/core.rs : Cell`, `Header`, `Core`, and `Trailer` separate task scheduling state and links, the future/result, and colder completion/ownership information. `tokio/tokio/src/runtime/task/state.rs:transition_to_notified_by_ref` coalesces repeated notifications and handles running versus sleeping tasks. `transition_to_notified_and_cancel` combines cancellation with the wake protocol. The lesson is not “use atomics on one worker”; it is “one runnable entry per task, with explicit state transitions.”
 
 `tokio/tokio/src/runtime/scheduler/current_thread/mod.rs:next_task` selects between a local FIFO and remote work; its scheduler loop periodically services IO (`CoreGuard::block_on` in this file). `tokio/tokio/src/runtime/scheduler/multi_thread/worker.rs:run_task` limits repeated LIFO-slot use, and `steal_work` probes other workers. Take local readiness and a fairness budget. Do not copy either LIFO preference or arbitrary live-future stealing into i: i has FIFO rules and Store-local continuations (`runtime.md` §6.4; `native.md:88`).
 
@@ -168,9 +168,9 @@ Eio was read rather than described from memory. `eio/lib_eio/core/suspend.ml:ent
 
 ### Effect
 
-`effect/packages/effect/src/internal/effect.ts:FiberImpl` stores context, interpreter stack, and lazily present children/observers. `forkUnsafe` constructs the child with the parent context and, unless using its daemon path, records the child relation. This is evidence that a task can share context and avoid eagerly allocating every optional collection; it is not a claim that Effect forbids detached fibers.
+`effect/packages/effect/src/internal/effect.ts : FiberImpl` stores context, interpreter stack, and lazily present children/observers. `forkUnsafe` constructs the child with the parent context and, unless using its daemon path, records the child relation. This is evidence that a task can share context and avoid eagerly allocating every optional collection; it is not a claim that Effect forbids detached fibers.
 
-`FiberImpl.runLoop` counts interpreter operations and consults the scheduler; `yieldNow` schedules a guarded resumption. `effect/packages/effect/src/Scheduler.ts:MixedScheduler.shouldYield` checks the operation count, and `Dispatcher` batches callbacks. This cooperates between interpreted effects; it cannot preempt arbitrary synchronous JavaScript inside one operation.
+`FiberImpl.runLoop` counts interpreter operations and consults the scheduler; `yieldNow` schedules a guarded resumption. `effect/packages/effect/src/Scheduler.ts : MixedScheduler.shouldYield` checks the operation count, and `Dispatcher` batches callbacks. This cooperates between interpreted effects; it cannot preempt arbitrary synchronous JavaScript inside one operation.
 
 `FiberImpl.interruptUnsafe` records interruption and defers action if running; `evaluate` processes child interruption before publishing its final exit. `forkIn` attaches an interrupting finalizer to a scope; `forkScoped` uses that route. `scopeClose` marks the scope closed before invoking finalizers and has empty/single-finalizer cases; `scopeCloseFinalizers` handles reverse-order sequential cleanup or a parallel fork-and-wait path. `asyncFinalizer` and `uninterruptibleMask` preserve the intended interruption state during cleanup. Take explicit closure state, cheap empty scopes, context sharing, and completion after cleanup. Leave its alternate concurrency policies unless i adopts them deliberately.
 
@@ -187,7 +187,7 @@ Eio was read rather than described from memory. `eio/lib_eio/core/suspend.ml:ent
 
 ## 6. Koka: avoid capturing a resumption when a direct call suffices
 
-`koka/lib/std/core/hnd.kk:Ev` carries a handler, marker, and handler evidence vector. `@perform1` selects the clause through the supplied evidence. `@evv-index` documents static indexing when the effect type permits it. `clause-control1` yields to the marker and protects the resumption; `clause-tail1` calls `under1` directly; `clause-tail-noop1` calls the operation directly without changing evidence. `under1` swaps to the handler evidence, restores it after the call, and extends a continuation only if the operation itself yields. The known solution is a direct operation call when resumption is exactly the tail return, while preserving the handler execution context.
+`koka/lib/std/core/hnd.kk : Ev` carries a handler, marker, and handler evidence vector. `@perform1` selects the clause through the supplied evidence. `@evv-index` documents static indexing when the effect type permits it. `clause-control1` yields to the marker and protects the resumption; `clause-tail1` calls `under1` directly; `clause-tail-noop1` calls the operation directly without changing evidence. `under1` swaps to the handler evidence, restores it after the call, and extends a continuation only if the operation itself yields. The known solution is a direct operation call when resumption is exactly the tail return, while preserving the handler execution context.
 
 This is not just an optimizer guessing from a function body. `koka/src/Type/Infer.hs:inferHandler` constructs tail clauses for `OpVal`/`OpFun` and control clauses for `OpControl`; it explicitly avoids an apparently tempting conversion from a nonresuming control clause to an exception clause because finalizer order differs. Take context-aware specialization and respect for finalizer order. Do not add Koka keywords, effect-row semantics, or multi-use resumption to i.
 
@@ -249,7 +249,7 @@ End = ()
 Fork = (D, D)
 D = End | Fork
 
-shared = (n: Int) -> D {
+shared = (n : Int) -> D {
 	n |>
 		(0) { End }
 		| (_) {
@@ -268,7 +268,7 @@ First attack found a real omission in an initial optimization direction: reducin
 ```i
 Read = (get = () -> Int)
 
-read = () <- (r: Read) { r.get() }
+read = () <- (r : Read) { r.get() }
 
 probe = () {
 	control.boundary((b) {
@@ -287,12 +287,12 @@ First attack rejected blanket tail-resume elimination. Only a proven transformat
 ### C. An apparently pure closure can still suspend
 
 ```i
-call = (f: () -> Int) { f() }
+call = (f : () -> Int) { f() }
 
 probe = () {
-  control.boundary((b) {
-    call(() { control.suspend(b, (k) { control.resume(k, 7) }) })
-  })
+	control.boundary((b) {
+		call(() { control.suspend(b, (k) { control.resume(k, 7) }) })
+	})
 }
 ```
 
@@ -304,10 +304,10 @@ A related negative probe resumes an aliased continuation a second time. Expected
 
 ```i
 probe = () {
-  task.scope((s) {
-    t = task.go(s, () { 1 })
-    task.join(t)
-  })
+	task.scope((s) {
+		t = task.go(s, () { 1 })
+		task.join(t)
+	})
 }
 ```
 

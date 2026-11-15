@@ -45,13 +45,13 @@ fn follows_cross_module_calls_but_not_unused_functions() {
         ),
         (
             "src/helper.i",
-            "(a)\n@external(\"test\", \"read\")\nread: () -> Int\na = () { b() }\nb = () { read() }\n",
+            "(a)\n@external(\"test\", \"read\")\nread : () -> Int\na = () { b() }\nb = () { read() }\n",
         ),
     ];
     assert_eq!(check(&modules, "entry"), ["read"]);
     let unused = [(
         "src/main.i",
-        "@external(\"test\", \"read\")\nread: () -> Int\nunused = () { read() }\nentry = () { 1 }\n",
+        "@external(\"test\", \"read\")\nread : () -> Int\nunused = () { read() }\nentry = () { 1 }\n",
     )];
     assert!(check(&unused, "entry").is_empty());
 }
@@ -60,7 +60,7 @@ fn follows_cross_module_calls_but_not_unused_functions() {
 fn follows_closures_in_executed_initializers() {
     let modules = [(
         "src/main.i",
-        "@external(\"test\", \"read\")\nread: () -> Int\napply = (f) { f() }\ninitial = apply(() { read() })\nentry = () { 1 }\n",
+        "@external(\"test\", \"read\")\nread : () -> Int\napply = (f) { f() }\ninitial = apply(() { read() })\nentry = () { 1 }\n",
     )];
     assert_eq!(check(&modules, "entry"), ["read"]);
 }

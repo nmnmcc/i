@@ -1,0 +1,92 @@
+---
+title: Files
+description: Write, read, and remove files; inspect errors and paths.
+---
+
+Write and read a local file, then handle a missing path.
+
+```toml file=i.toml title="i.toml"
+name = "guide_files"
+
+[dependencies]
+std = { path = "../std" }
+```
+
+```i run package=guide_files title="src/main.i"
+(
+	i/fs
+	i/stdio
+	std/path
+	std/bit_array
+)
+main = () {
+	file = path.join([".", "guide-note.txt"])
+	fs.write_file(file, <<"hello from a file":utf8>>)
+	bytes = fs.read_file(file)
+	fs.remove(file)
+	text = bit_array.to_string(bytes)
+	stdio.print(file)
+	stdio.print(text)
+}
+```
+
+```text
+guide-note.txt
+hello from a file
+```
+
+Create `guide-files/` beside `std/` in the i source folder and run `i run` there. `write_file` creates or truncates its path: reserve these filenames for the exercise. `bit_array.to_string` raises on invalid UTF-8; whole-file operations close their handles internally; use `fs.open`, `read`, `write`, and `close` with [resources](/docs/tour/resources) for handle operations.
+
+## A missing path
+
+```i run package=guide_files title="src/main.i"
+(
+	i/fs
+	i/fail
+	i/stdio
+	std/path
+)
+main = () {
+	file = path.join([".", "guide-missing.txt"])
+	// Create and remove it so the missing-file case is repeatable.
+	fs.write_file(file, <<>>)
+	fs.remove(file)
+	fail.catch(() { fs.read_file(file) }) |>
+		(
+			Error(
+				fs.FsError(operation = operation, path = missing, code = code),
+			)
+		) { stdio.print(operation <> ": " <> missing <> ": " <> code) }
+		| (Ok(_)) { panic("expected a missing file") }
+}
+```
+
+```text
+open: guide-missing.txt: not_found
+```
+
+Replace `src/main.i` with this independent example. Keep the error's operation, path, and code in reports: a failed read can fail while opening, and failures other than `not_found` need different handling.
+
+## Path strings
+
+```i run package=guide_files title="src/main.i"
+(
+	i/stdio
+	std/path
+)
+main = () {
+	stdio.print(path.clean("reports/./draft/../result.txt"))
+	stdio.print(path.dir("reports/result.txt"))
+	stdio.print(path.base("reports/result.txt"))
+}
+```
+
+```text
+reports/result.txt
+reports
+result.txt
+```
+
+`std/path` uses POSIX strings with `/` separators; cleaning and parent resolution are lexical, without filesystem queries or symbolic-link resolution. Relative filesystem paths use the working directory.
+
+[HTTP service](/docs/guides/http-service) · [Testing](/docs/guides/testing)

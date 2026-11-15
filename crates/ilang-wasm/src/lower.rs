@@ -42,8 +42,8 @@ use ilang_check::hir::{self, *};
 use ilang_check::platform::{self, Stub};
 use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
-use ilang_syntax::ast::{BinOp, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
+use ilang_syntax::syn3::ast::{BinOp, UnOp};
 use num_bigint::BigInt;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -85,9 +85,13 @@ struct CtorInfo {
 /// How a custom type is tested at run time (§7.1).
 #[derive(Clone, Copy, Debug)]
 enum TypeRepr {
-    Bool,
+    /// The prelude's `True` or `False`: the two values of `Bool = True | False`.
+    Bool(bool),
     Nil,
     Record(u32),
+    /// The prelude's `Ok` or `Error`: one constructor of the run-time type
+    /// of `Result = Ok | Error`, which the host also makes.
+    Ctor(u32, u32),
     /// A type with no constructors: its values are host references.
     Host,
 }
@@ -1107,9 +1111,11 @@ impl<'a> Lowerer<'a> {
             };
             let special = if Some(t.module) == prelude {
                 match t.name.as_str() {
-                    "Bool" => Some(TypeRepr::Bool),
+                    "True" => Some(TypeRepr::Bool(true)),
+                    "False" => Some(TypeRepr::Bool(false)),
                     "Nil" => Some(TypeRepr::Nil),
-                    "Result" => Some(TypeRepr::Record(0)),
+                    "Ok" => Some(TypeRepr::Ctor(0, 0)),
+                    "Error" => Some(TypeRepr::Ctor(0, 1)),
                     "AssertionFailure" => Some(TypeRepr::Record(1)),
                     "Assert" => Some(TypeRepr::Record(2)),
                     "Fail" => Some(TypeRepr::Record(3)),
@@ -1130,13 +1136,11 @@ impl<'a> Lowerer<'a> {
                     index: j as u32,
                 };
                 let repr = match (special, c.name.as_str()) {
-                    (Some(TypeRepr::Bool), "True") => CtorRepr::Bool(true),
-                    (Some(TypeRepr::Bool), _) => CtorRepr::Bool(false),
+                    (Some(TypeRepr::Bool(b)), _) => CtorRepr::Bool(b),
+                    (Some(TypeRepr::Ctor(ty, ctor)), _) => CtorRepr::Record { ctor, ty },
                     (Some(TypeRepr::Nil), _) => CtorRepr::Nil,
                     (Some(TypeRepr::Record(ty)), name) => CtorRepr::Record {
                         ctor: match name {
-                            "Ok" => 0,
-                            "Error" => 1,
                             "AssertionFailure" => 2,
                             "Assert" => 3,
                             _ => 4,
@@ -4146,9 +4150,16 @@ impl<'a> Lowerer<'a> {
                 },
             ),
             Head::Named(TypeRef::Custom(t)) => match self.types.get(&t) {
-                Some(TypeRepr::Bool) => Cond::Tag(v, 1),
+                Some(TypeRepr::Bool(b)) => Cond::And(
+                    Box::new(Cond::Tag(v.clone(), 1)),
+                    Box::new(Cond::Bool(v, *b)),
+                ),
                 Some(TypeRepr::Nil) => Cond::Tag(v, 0),
                 Some(TypeRepr::Record(id)) => Cond::Type(v, *id),
+                Some(TypeRepr::Ctor(id, ctor)) => Cond::And(
+                    Box::new(Cond::Type(v.clone(), *id)),
+                    Box::new(Cond::Ctor(v, *ctor)),
+                ),
                 Some(TypeRepr::Host) => Cond::Tag(v, 10),
                 None => match &self.program.ty(t).body {
                     TypeBody::Alias(Type {
@@ -4583,6 +4594,7 @@ fn abi_json(
                 serde_json::json!({
                     "params": names(&x.abi.params),
                     "result": x.abi.result.name(),
+                    "errors": names(&x.abi.errors),
                 }),
             ),
             ImportKind::Service | ImportKind::AsyncService => (
@@ -4603,7 +4615,7 @@ fn abi_json(
         }
     }
     let mut abi = serde_json::json!({
-        "version": 4,
+        "version": 5,
         "entry": entry,
         "tests": tests,
         "exports": map,

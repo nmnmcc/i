@@ -11,4 +11,4 @@ same = () { inc(5) == 1 }
 other = () { inc(5) == "s" }
 
 // Matching `a & Int` with `Int | String` gives `a` the whole known type.
-wide = (v: Int) { inc(v) == "s" }
+wide = (v : Int) { inc(v) == "s" }

@@ -10,8 +10,8 @@ i/control.escape : (Boundary(A, B), A) -> Never
 i/control.resume : (Continuation(A, B, C), A) <- C -> B
 i/control.cancel : (Continuation(A, B, C)) <- C -> Nil
 i/control.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B
-i/resource.ensure : (() <- (Fail(B), ..N) -> A, () <- (N - Fail(Never)) -> Nil) <- (Fail(B), ..N) -> A
-i/resource.acquire : (() <- (Fail(B), N & { Fail(B) | N2 } & { Fail(Never) | N2 - Fail(Never) }) -> A, (A) <- ({ N & { Fail(B) | N2 } & { Fail(Never) | N2 - Fail(Never) } } - Fail(Never)) -> Nil, (A) <- (Fail(B), N & { Fail(B) | N2 } & { Fail(Never) | N2 - Fail(Never) }) -> C) <- (Fail(B), ..N, ..N2) -> C
+i/resource.ensure : (() <- N -> A, () <- N -> Nil) <- N -> A
+i/resource.acquire : (() <- (Fail(B), ..N) -> A, (A) <- N -> Nil, (A) <- (Fail(B), ..N) -> C) <- (Fail(B), ..N) -> C
 i/assertion.catch : (() <- N -> A) <- (N - Assert) -> Result(A, AssertionFailure)
 i/request.new_root : (Key(Nil)) -> Key(Nil)
 i/request.end_root : (Key(Nil)) -> Nil
@@ -34,7 +34,7 @@ i/request.settled_root : (Root) -> Bool
 i/request.cancel_all : (Owner) -> Nil
 i/request.cancel_all_root : (Root) -> Nil
 i/request.retain : (A) -> A
-i/request.within : (() <- (Fail(B), Owner, ..N) -> A) <- (Fail(B), Root, ..N) -> A
+i/request.within : (() <- N -> A) <- (N - Owner, Root) -> A
 i/request.wait_none : (Owner) <- (Await) -> Nil
 i/request.wait_none_root : (Root) <- (Await) -> Nil
 i/request.ready : (A) -> Request(A)
@@ -50,7 +50,7 @@ i/request.wait_any : (List(Ticket)) -> Nil
 i/request.poll : () -> Nil
 i/request.entry_root : () -> Key(Nil)
 i/request.entry_end : () -> Nil
-i/request._entry : (() <- (Await, Fail(B), Owner, Root, ..N) -> A) <- (Fail(B), ..N) -> A
+i/request._entry : (() <- N -> A) <- (N - Await - Owner - Root) -> A
 i/request._provider_root : (List(Root), Key(Nil)) -> Root
 i/request._provider_owner : (List(Owner)) <- (Root) -> Owner
 i/request._provider_await : (List(Await)) -> Await
@@ -183,6 +183,7 @@ i/task.scope_reply_key : Key(ScopeReply)
 i/task.selection_key : Key(Selection)
 i/task.read : (Key(A), Keyed) -> A
 i/task.retain : (A) -> A
+i/task.without_error : (() <- (Fail(Never)) -> A) -> A
 i/task.unit_value : Keyed
 i/task.unit : () -> Keyed
 i/task.answer : (StepAnswer) -> Keyed
@@ -226,7 +227,7 @@ i/task.add_task : (State, TaskState) -> State
 i/task.set_scope : (State, ScopeState) -> State
 i/task.guarded : (Scheduler, Maybe(Address), () -> Completion) -> Completion
 i/task.complete : (() <- (Fail(B), ..N) -> A, Key(Result(A, B)), Key(B), Bool) <- N -> Completion
-i/task.make_start : (() <- (Fail(B), N & { Fail(Never) | request.Await | Runner | Scheduler | N2 }) -> A, Key(Result(A, B)), Key(B), Bool) <- (N2 - request.Await - Runner - Scheduler, ..N) -> Start
+i/task.make_start : (() <- (Fail(B), N & { Fail(Never) | request.Await | Runner | Scheduler | N2 }, Runner, Scheduler, request.Await) -> A, Key(Result(A, B)), Key(B), Bool) <- (N2 - request.Await - Runner - Scheduler, ..N) -> Start
 i/task.worker_enabled : () -> Bool
 i/task.worker_publish : (Job) -> Int
 i/task.worker_claim : (Int) -> Bool
@@ -256,8 +257,8 @@ i/task.yield : () <- (Scheduler) -> Nil
 i/task.top : (rng.Generator) <- (Runner) -> Runner
 i/task.observe_change : (Key(Nil)) -> Request(Nil)
 i/task.has_work : (Ticket) -> Bool
-i/task.wait_root : (Key(Nil), request.Root, List(Ticket)) -> RunControl
-i/task.root_poll : (Key(Nil), List(Ticket), Bool) -> RunControl
+i/task.wait_root : (Key(Nil), request.Root, List(Ticket)) -> ContinueRun
+i/task.root_poll : (Key(Nil), List(Ticket), Bool) -> ContinueRun
 i/task.root_forget : (Key(Nil)) -> Nil
 i/task.root_allocate : () -> List(Int)
 i/task.initial : (request.Root) -> Runner
@@ -342,15 +343,15 @@ i/task.loop : (State) -> RunReply
 i/task.scope_call_body : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
 i/task.scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), Scheduler, ..N) -> B
 i/task.local_scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), Scheduler, ..N) -> B
-i/task.go_key : (Group(A), () <- (Fail(A), N & { Fail(Never) | request.Await | Runner | Scheduler | N2 }) -> B, Key(Result(B, A))) <- (N2 - request.Await - Runner - Scheduler, Scheduler, ..N) -> Task(B, A)
-i/task.go : (Group(A), () <- (Fail(A), N & { Fail(A) | { Fail(Never) | request.Await | Runner | Scheduler | N } & { Scheduler | N } }) -> B) <- (Scheduler, ..N) -> Task(B, A)
+i/task.go_key : (Group(A), () <- (Fail(A), N & { Fail(Never) | request.Await | Runner | Scheduler | N2 }, Runner, Scheduler, request.Await) -> B, Key(Result(B, A))) <- (N2 - request.Await - Runner - Scheduler, Scheduler, ..N) -> Task(B, A)
+i/task.go : (Group(A), () <- (Fail(A), N & { Fail(A) | Scheduler | Runner | request.Await | { Fail(Never) | request.Await | Runner | Scheduler | N } & { Scheduler | N } }) -> B) <- (Scheduler, ..N) -> Task(B, A)
 i/task.branch_at : (List(Branch(A, B, C)), Int) -> Branch(A, B, C)
 i/task.sync_body : (Event(A, B, C), Scheduler) <- (Fail(B), ..C) -> A
 i/task.always : (A) -> Event(A, Never, Never)
 i/task.never : () -> Event(Never, Never, Never)
 i/task.branches_of : (List(Event(A, B, C))) -> List(Branch(A, B, C))
 i/task.choose : (List(Event(A, B, C))) -> Event(A, B, C)
-i/task.map : (Event(A, B, C), (A) <- (Fail(B), ..N) -> D) -> Event(D, B, C | N)
+i/task.map : (Event(A, B, C), (A) <- (Fail(F), ..N) -> D) -> Event(D, B | F, C | N)
 i/task.join_event : (Task(A, B)) -> Event(A, B, Never)
 i/task.join : (Task(A, B & C)) <- (Fail(C), Scheduler) -> A
 i/task.channel : () <- (Scheduler) -> Channel(A)
@@ -358,25 +359,25 @@ i/task.local_channel : () <- (Scheduler) -> Channel(A)
 i/task.send_event : (Channel(A), A) -> Event(Nil, Never, Never)
 i/task.receive_event : (Channel(A)) -> Event(A, Never, Never)
 i/task.send : (Channel(A), A) <- (Scheduler) -> Nil
-i/task.receive : (Channel(A)) <- (Scheduler) -> A
+i/task.receive : (Channel(A)) <- (Fail(Never), Scheduler) -> A
 i/task.share : (Group(A), B) <- (Scheduler) -> Shared(B)
 i/task.get : (Shared(A)) <- (Scheduler) -> A
 i/task.keep : ((A) <- (Fail(C), Runner, Scheduler, request.Await, ..N) -> B) <- (Scheduler, ..N) -> (A) <- (Fail(C), Scheduler) -> B
 i/task.ref : (A) <- (Scheduler) -> Ref(A)
 i/task.update : (Ref(A), (A) -> (A, B)) <- (Scheduler) -> B
 i/task.both : (() <- (Fail(B), ..N) -> A, () <- (Fail(B), ..N) -> C) <- (Fail(B), Scheduler, ..N) -> (A, C)
-i/task.race : (() <- (Fail(B), { Fail(Never) | request.Await | Runner | Scheduler | N } & { Fail(B) | N }) -> A, () <- (Fail(B), { Fail(Never) | request.Await | Runner | Scheduler | N } & { Fail(B) | N }) -> A) <- (Fail(B), Scheduler, ..N) -> A
+i/task.race : (() <- (Fail(B), Runner, Scheduler, request.Await, { Fail(Never) | request.Await | Runner | Scheduler | N } & { Fail(B) | N }) -> A, () <- (Fail(B), Runner, Scheduler, request.Await, { Fail(Never) | request.Await | Runner | Scheduler | N } & { Fail(B) | N }) -> A) <- (Fail(B), Scheduler, ..N) -> A
 i/task.spawn_values : (Group(A), List(B), (B) <- (Fail(A), ..N) -> C) <- (Scheduler, ..N) -> List(Task(C, A))
 i/task.join_values : (List(Task(A, B & C))) <- (Fail(C), Scheduler) -> List(A)
 i/task.map_concurrently : (List(A), (A) <- (Fail(C), ..N) -> B) <- (Fail(C), Scheduler, ..N) -> List(B)
-i/task.execute_body : (() <- (Fail(B), N & { Fail(B) | N2 & { Fail(Never) | request.Await | Runner | Scheduler | N3 } }) -> A, Runner, rng.Generator, Policy) <- (N2 - request.Owner - request.Root, N3 - request.Await - Runner - Scheduler - request.Owner - request.Root, ..N) -> Result(Result(A, B), ScheduleError)
-i/task.run : (() <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(B) } } & { N2 | Fail(B) } }) -> A) <- (Fail(B), Runner, ..N, ..N2) -> A
-i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(B) } } & { N2 | Fail(B) } }) -> A) <- (Fail(B | ScheduleError), Runner, ..N, ..N2) -> A
-i/task._entry : (() <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(B) } } & { N2 | Fail(B) } }) -> A) <- (Fail(B), N - Runner, N2 - Runner, request.Root) -> A
+i/task.execute_body : (() <- (Fail(B), N & { Fail(B) | Scheduler | Runner | request.Await | N2 & { Fail(Never) | request.Await | Runner | Scheduler | N3 } }, Runner, Scheduler, request.Await, request.Owner, request.Root) -> A, Runner, rng.Generator, Policy) <- (N2 - request.Owner - request.Root, N3 - request.Await - Runner - Scheduler - request.Owner - request.Root, ..N) -> Result(Result(A, B), NotRunnable)
+i/task.run : (() <- (Runner, Scheduler, request.Await, request.Owner, request.Root, ..N) -> A) <- (Runner, ..N) -> A
+i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(B), N & { Fail(B) | Scheduler | Runner | request.Await | request.Owner | request.Root | { Fail(B) | Scheduler | Runner | request.Await | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(Never) } } & { N2 | Fail(Never) } }, Runner, Scheduler, request.Await, request.Owner, request.Root) -> A) <- (Fail(B | NotRunnable), Runner, ..N, ..N2) -> A
+i/task._entry : (() <- (Runner, Scheduler, request.Await, request.Owner, request.Root, ..N) -> A) <- (N - Runner, request.Root) -> A
 i/task.scope_call : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
-i/task.execute : (() <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(C & B) } } & { N2 | Fail(C & B) } }) -> A, Runner, rng.Generator, Policy) <- (Fail(C), ..N, ..N2) -> Result(Result(A, B), ScheduleError)
+i/task.execute : (() <- (Fail(B), N & { Fail(B) | Scheduler | Runner | request.Await | request.Owner | request.Root | { Fail(B) | Scheduler | Runner | request.Await | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(Never) } } & { N2 | Fail(Never) } }, Runner, Scheduler, request.Await, request.Owner, request.Root) -> A, Runner, rng.Generator, Policy) <- (..N, ..N2) -> Result(Result(A, B), NotRunnable)
 i/task.sync : (Event(A, B, C | Fail(B))) <- (Fail(B), Scheduler, ..C) -> A
-i/task.root_active : (Key(Nil), Active) -> RunControl
+i/task.root_active : (Key(Nil), Active) -> ContinueRun
 i/task.cause_allowed : (State, TaskState, Cause) -> Bool
 i/task.frame_abort : (List(Frame)) -> Maybe(() -> Never)
 i/task.effective_active : (State, TaskState) -> Active
@@ -430,7 +431,7 @@ i/random.word : (Generator) -> (Int, Generator)
 i/random.space_for : (Int, Int) -> Int
 i/random.word_group : (Generator, Int, Int, Int) -> (Int, Generator)
 i/random.bounded : (Generator, Int, Int, Int) -> (Int, Generator)
-i/random.int : (Generator, Int) <- (Fail(RandomError)) -> (Int, Generator)
+i/random.int : (Generator, Int) <- (Fail(InvalidBound)) -> (Int, Generator)
 i/random.float : (Generator) -> (Float, Generator)
 i/random.native_split : (State) -> (State, State)
 i/random.edge : (State, Int) -> State
@@ -440,7 +441,7 @@ i/random.binary : (Int, List(Int), Int) -> (List(Int), Int)
 i/random.zeros : (State, Int) -> State
 i/random.follow : (State, List(Int)) -> State
 i/random.derive_path : (Generator, List(Int)) -> Generator
-i/random.at_path : (Generator, List(Int)) <- (Fail(RandomError)) -> Generator
+i/random.at_path : (Generator, List(Int)) <- (Fail(InvalidPath)) -> Generator
 i/syntax.definition : (Syntax) <- (Definitions, Fail(SyntaxError)) -> Syntax
 i/syntax.raw_note : (String) -> Nil
 i/syntax._diagnostics : () -> Diagnostics
@@ -559,7 +560,7 @@ i/process.terminate : (Child) <- (Fail(ProcessError), Process, request.Await, re
 i/process.close : (Child) <- (Process, request.Await, request.Owner) -> Nil
 i/process.stdio_mode : (Stdio) -> "inherit" | "null" | "piped"
 i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
-i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, Directory) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
+i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
 i/process.read_stdout : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
 i/process.read_stderr : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
 i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Nil

@@ -14,5 +14,5 @@ alias_use : ((Int, Int)) -> (Int, Int)
 pair_use : ((String, String)) -> (String, String)
 wrong : String
 wrong_ret : (Int) -> String
-50:1: error[E0501]: `1` is not a subtype of `String`
-52:29: error[E0501]: `Int` is not a subtype of `String` (the type at 52:20 needs it)
+52:1: error[E0501]: `1` is not a subtype of `String`
+54:29: error[E0501]: `Int` is not a subtype of `String` (the type at 54:20 needs it)

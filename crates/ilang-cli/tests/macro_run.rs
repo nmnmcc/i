@@ -130,7 +130,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
 
 #[test]
 fn syntax_crosses_the_compiler_export_without_losing_identity() {
-    let built = build("(syntax = i/syntax)\n(identity)\nidentity = (x: syntax.Syntax) { x }\n");
+    let built = build("(syntax = i/syntax)\n(identity)\nidentity = (x : syntax.Syntax) { x }\n");
     let original = input();
     for _ in 0..2 {
         let result =
@@ -144,7 +144,7 @@ fn syntax_crosses_the_compiler_export_without_losing_identity() {
 #[test]
 fn untrusted_external_cannot_be_supplied_to_a_macro_instance() {
     let built = build(
-        "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect: () -> Nil\nidentity = (x: syntax.Syntax) { effect() x }\n",
+        "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect : () -> Nil\nidentity = (x : syntax.Syntax) { effect() x }\n",
     );
     let error = ilang_macro::run::invoke(&built, "app/main.identity", &[input()]).unwrap_err();
     assert!(format!("{error:#}").contains("instantiate macro program"));
@@ -157,7 +157,7 @@ fn compiler_export_is_checked_and_executed_with_syntax_services() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(syntax = i/syntax)\nidentity = (x: syntax.Syntax) { syntax.node(x) x }\n",
+        "(syntax = i/syntax)\nidentity = (x : syntax.Syntax) { syntax.node(x) x }\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -185,7 +185,7 @@ fn expression_quote_is_compiled_and_keeps_unquote_identity() {
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let mut templates = Vec::new();
     for (id, module) in parsed.iter_mut().enumerate() {
-        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+        ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
             &mut module.ast,
             id as u32,
             &mut templates,
@@ -220,7 +220,7 @@ fn quote_splice_preserves_order_and_reuses_original_syntax() {
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let mut templates = Vec::new();
     for (id, module) in parsed.iter_mut().enumerate() {
-        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
+        ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
             &mut module.ast,
             id as u32,
             &mut templates,
@@ -283,7 +283,7 @@ fn compiler_program_selects_only_the_macro_import_closure() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, id)\n(@ macro (= id (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/unrelated.i"),
-        "@external(\"outside\", \"effect\")\neffect: () -> Int\ninitial = effect()\n",
+        "@external(\"outside\", \"effect\")\neffect : () -> Int\ninitial = effect()\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -318,7 +318,7 @@ fn compiler_run_preserves_uncatchable_macro_error_position() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.i"), "(syntax = i/syntax)\nreport = (x: syntax.Syntax) -> syntax.Syntax { syntax._report_error(\"bad macro\", x) }\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(syntax = i/syntax)\nreport = (x : syntax.Syntax) -> syntax.Syntax { syntax._report_error(\"bad macro\", x) }\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty());
     let (mut parsed, diagnostics) = ilang_check::parse(&graph);
@@ -639,9 +639,11 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
     );
     let definition = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "keep".into(),
         parameters: vec!["x".into()],
+        labels: vec![None],
     };
     let mut session = Session::default();
     let expanded = session
@@ -715,9 +717,11 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     let built = ilang_macro::run::compile(&graph, &parsed, &[(&path, &name)]).unwrap();
     let definition = MacroDefinition {
         signature: None,
+        variants: Vec::new(),
         item: 0,
         name: "wrap".into(),
         parameters: vec!["x".into()],
+        labels: vec![None],
     };
     let argument = input();
     let templates: Arc<[Syntax]> = prepared.templates.into();
@@ -841,7 +845,7 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
     module
         .ast
         .items
-        .extend(scoped.items(&generated, &exported).unwrap());
+        .extend(scoped.items3(&generated, &exported).unwrap());
     module.scoped = Some(scoped);
     let registry = ilang_macro::registry::Registry::new(&graph, &expanded).unwrap();
     assert!(registry.resolve(caller, None, &exported, &[]).is_some());
@@ -855,7 +859,7 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
 #[test]
 fn body_engine_expands_real_imported_macro_before_checking_arguments() {
     use ilang_host::syntax::DefinitionReply;
-    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
+    use ilang_macro::{body_engine::BodyEngine, body_walk3, registry::Registry};
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
@@ -896,21 +900,22 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
         resolver,
         &mut session,
     );
-    body_walk::expressions(&mut ast, &mut engine).unwrap();
-    let ilang_syntax::ast::ItemKind::Binding(binding) = &ast.items[0].kind else {
+    body_walk3::expressions(&mut ast, &mut engine).unwrap();
+    let ilang_syntax::syn3::ast::ItemKind::Bind(binding) = &ast.items[0].kind else {
         panic!("binding expected")
     };
-    let ilang_syntax::ast::ExprKind::Fn(fun) = &binding.value.kind else {
+    let ilang_syntax::syn3::ast::ExprKind::Chain(functions) = &binding.value.kind else {
         panic!("function expected")
     };
-    let ilang_syntax::ast::Stmt::Expr(expr) = &fun.body.stmts[0] else {
+    let fun = &functions[0];
+    let ilang_syntax::syn3::ast::Stmt::Expr(expr) = &fun.body.stmts[0] else {
         panic!("expression expected")
     };
-    let ilang_syntax::ast::ExprKind::Int(value) = &expr.kind else {
+    let ilang_syntax::syn3::ast::ExprKind::Int(value) = &expr.kind else {
         panic!("macro result was not an integer")
     };
     assert_eq!(value.to_string(), "123");
-    assert!(engine.scoped.origin(expr.span).is_some());
+    assert!(engine.scoped.origin(expr.span.0).is_some());
     let scoped = engine.scoped.clone();
     drop(engine);
     graph.sources.set_text(source, scoped.text().to_owned());
@@ -947,7 +952,7 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
 #[test]
 fn body_engine_expands_type_arguments_without_evaluating_them() {
     use ilang_host::syntax::DefinitionReply;
-    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
+    use ilang_macro::{body_engine::BodyEngine, body_walk3, registry::Registry};
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
@@ -956,7 +961,7 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, use_int)\n(@ macro (= use_int (-> (, (: x (. syntax Syntax))) (. syntax Syntax) `Int)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nx: m.use_int(Undefined)\nx = 1\n",
+        "(m = app/macros)\nx : m.use_int(Undefined)\nx = 1\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -984,20 +989,20 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
         resolver,
         &mut session,
     );
-    body_walk::expressions(&mut ast, &mut engine).unwrap();
-    let ilang_syntax::ast::ItemKind::Declaration { ty, .. } = &ast.items[0].kind else {
+    body_walk3::expressions(&mut ast, &mut engine).unwrap();
+    let ilang_syntax::syn3::ast::ItemKind::Decl { ty, .. } = &ast.items[0].kind else {
         panic!("declaration expected")
     };
     assert!(
-        matches!(&ty.kind, ilang_syntax::ast::TypeKind::Named { name, .. } if name.name == "Int")
+        matches!(&ty.kind, ilang_syntax::syn3::ast::TypeKind::Named { name, .. } if name.name == "Int")
     );
-    assert!(engine.scoped.origin(ty.span).is_some());
+    assert!(engine.scoped.origin(ty.span.0).is_some());
 }
 
 #[test]
 fn body_engine_expands_pipe_left_operand_as_first_argument() {
     use ilang_host::syntax::DefinitionReply;
-    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
+    use ilang_macro::{body_engine::BodyEngine, body_walk3, registry::Registry};
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
@@ -1034,17 +1039,18 @@ fn body_engine_expands_pipe_left_operand_as_first_argument() {
         resolver,
         &mut session,
     );
-    body_walk::expressions(&mut ast, &mut engine).unwrap();
-    let ilang_syntax::ast::ItemKind::Binding(binding) = &ast.items[0].kind else {
+    body_walk3::expressions(&mut ast, &mut engine).unwrap();
+    let ilang_syntax::syn3::ast::ItemKind::Bind(binding) = &ast.items[0].kind else {
         panic!("binding expected")
     };
-    let ilang_syntax::ast::ExprKind::Fn(fun) = &binding.value.kind else {
+    let ilang_syntax::syn3::ast::ExprKind::Chain(functions) = &binding.value.kind else {
         panic!("function expected")
     };
-    let ilang_syntax::ast::Stmt::Expr(expr) = &fun.body.stmts[0] else {
+    let fun = &functions[0];
+    let ilang_syntax::syn3::ast::Stmt::Expr(expr) = &fun.body.stmts[0] else {
         panic!("expression expected")
     };
-    let ilang_syntax::ast::ExprKind::Int(value) = &expr.kind else {
+    let ilang_syntax::syn3::ast::ExprKind::Int(value) = &expr.kind else {
         panic!("integer expected")
     };
     assert_eq!(value.to_string(), "42");
@@ -1055,7 +1061,7 @@ fn body_engine_discards_notes_if_macro_result_is_not_an_expression() {
     use ilang_host::syntax::DefinitionReply;
     use ilang_macro::{
         body_engine::{BodyEngine, Error},
-        body_walk,
+        body_walk3,
         registry::Registry,
     };
     use ilang_syntax::lisp::scoped::ScopedSource;
@@ -1095,7 +1101,7 @@ fn body_engine_discards_notes_if_macro_result_is_not_an_expression() {
         &mut session,
     );
     assert!(matches!(
-        body_walk::expressions(&mut ast, &mut engine),
+        body_walk3::expressions(&mut ast, &mut engine),
         Err(Error::Conversion(_))
     ));
     assert!(engine.transactions.is_empty());
@@ -1106,7 +1112,7 @@ fn body_engine_reports_invalid_macro_signature_at_its_definition() {
     use ilang_host::syntax::DefinitionReply;
     use ilang_macro::{
         body_engine::{BodyEngine, Error},
-        body_walk,
+        body_walk3,
         registry::Registry,
     };
     use ilang_syntax::lisp::scoped::ScopedSource;
@@ -1154,7 +1160,7 @@ fn body_engine_reports_invalid_macro_signature_at_its_definition() {
         resolver,
         &mut session,
     );
-    let Err(Error::Compile(diagnostics)) = body_walk::expressions(&mut ast, &mut engine) else {
+    let Err(Error::Compile(diagnostics)) = body_walk3::expressions(&mut ast, &mut engine) else {
         panic!("bad macro must fail")
     };
     assert!(
@@ -1297,13 +1303,13 @@ fn item_phase_runs_imported_calls_and_preserves_written_types() {
     assert_eq!(transactions.len(), 3);
     assert_eq!(ast.items.len(), 3);
     assert!(
-        matches!(&ast.items[0].kind, ilang_syntax::ast::ItemKind::Binding(b) if matches!(&b.pattern.kind, ilang_syntax::ast::PatternKind::Var(name) if name == "generated"))
+        matches!(&ast.items[0].kind, ilang_syntax::syn3::ast::ItemKind::Bind(b) if matches!(&b.pattern.kind, ilang_syntax::syn3::ast::PatternKind::Var(name) if name == "generated"))
     );
     assert!(
-        matches!(&ast.items[1].kind, ilang_syntax::ast::ItemKind::Binding(b) if matches!(&b.pattern.kind, ilang_syntax::ast::PatternKind::Var(name) if name == "f"))
+        matches!(&ast.items[1].kind, ilang_syntax::syn3::ast::ItemKind::Bind(b) if matches!(&b.pattern.kind, ilang_syntax::syn3::ast::PatternKind::Var(name) if name == "f"))
     );
     assert!(
-        matches!(&ast.items[2].kind, ilang_syntax::ast::ItemKind::TypeDef(t) if t.name.name == "T")
+        matches!(&ast.items[2].kind, ilang_syntax::syn3::ast::ItemKind::TypeDef(t) if t.name.name == "T")
     );
     assert!(ast.items[2].attributes.is_empty());
 }
@@ -1368,7 +1374,7 @@ fn item_phase_retries_definition_after_a_later_item() {
     assert_eq!(transactions.len(), 2);
     assert_eq!(ast.items.len(), 1);
     assert!(
-        matches!(&ast.items[0].kind, ilang_syntax::ast::ItemKind::TypeDef(t) if t.name.name == "T")
+        matches!(&ast.items[0].kind, ilang_syntax::syn3::ast::ItemKind::TypeDef(t) if t.name.name == "T")
     );
 }
 
@@ -1832,7 +1838,7 @@ fn checked_collection_validates_targets_and_duplicates() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(anchor)\nanchor = Nil\ngood = () { 42 }\nbad = (x: Int) { x }\nalias = good\n",
+        "(anchor)\nanchor = Nil\ngood = () { 42 }\nbad = (x : Int) { x }\nalias = good\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -1885,9 +1891,21 @@ fn checked_collection_validates_targets_and_duplicates() {
     assert_eq!(good.len(), 1);
     assert_eq!(program.def(good[0].target).name, "good");
     assert_eq!(good[0].data[0].1, "example");
+    // §6.6 and §14.5 call the initialized value, so an alias is a valid
+    // target. Keep scalar, nonempty-parameter and duplicate targets invalid.
+    let alias = collections::resolve(
+        &parsed,
+        program,
+        typed,
+        &[transaction(vec![request("alias")])],
+    )
+    .unwrap();
+    assert_eq!(alias.len(), 1);
+    assert_eq!(program.def(alias[0].target).name, "alias");
+    assert_eq!(alias[0].data[0].1, "example");
     for requests in [
         vec![request("bad")],
-        vec![request("alias")],
+        vec![request("anchor")],
         vec![request("good"), request("good")],
     ] {
         assert!(collections::resolve(&parsed, program, typed, &[transaction(requests)]).is_err());
@@ -2109,7 +2127,7 @@ fn shared_macro_code_reads_each_callers_definition_context() {
     for (module, ty, value) in [("a", "Int", "20"), ("b", "String", "\"b\"")] {
         std::fs::write(
             dir.path().join(format!("src/{module}.i")),
-            format!("(m = app/macros)\n(result)\nT = {ty}\nresult: m.read(T) = {value}\n"),
+            format!("(m = app/macros)\n(result)\nT = {ty}\nresult : m.read(T) = {value}\n"),
         )
         .unwrap();
     }
@@ -2252,11 +2270,11 @@ fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
-            use ilang_macro::{body_engine::BodyEngine, body_walk::Hook, registry::Registry};
+            use ilang_macro::{body_engine::BodyEngine, body_walk3::Hook, registry::Registry};
             use ilang_syntax::{
-                ast::{Expr, ExprKind},
                 lisp::scoped::ScopedSource,
                 span::Span,
+                syn3::ast::{DItem, Expr, ExprKind},
             };
             use std::sync::Arc;
             let dir = tempfile::tempdir().unwrap();
@@ -2283,12 +2301,12 @@ fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
             let span = Span::new(0, 1);
             let mut expr = Expr {
                 kind: ExprKind::Int(1u32.into()),
-                span,
+                span: span.into(),
             };
             for _ in 0..20_000 {
                 expr = Expr {
-                    kind: ExprKind::Tuple(vec![expr]),
-                    span,
+                    kind: ExprKind::Data(vec![DItem::Pos(expr)]),
+                    span: span.into(),
                 };
             }
             assert!(engine.is_direct(&expr, &[], 0));
@@ -2343,11 +2361,11 @@ fn cli_runs_task_scope_inside_expanded_macro_argument() {
 #[test]
 fn body_engine_expands_real_macro_under_deep_mixed_body() {
     use ilang_host::syntax::DefinitionReply;
-    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
+    use ilang_macro::{body_engine::BodyEngine, body_walk3, registry::Registry};
     use ilang_syntax::{
-        ast::{Block, Expr, ExprKind, ItemKind, Stmt},
         lisp::scoped::ScopedSource,
         span::Span,
+        syn3::ast::{Block, DItem, Expr, ExprKind, ItemKind, Stmt},
     };
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
@@ -2367,20 +2385,21 @@ fn body_engine_expands_real_macro_under_deep_mixed_body() {
     let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
     let source = module.source;
     let mut ast = module.ast.clone();
-    let ItemKind::Binding(binding) = &mut ast.items[0].kind else {
+    let ItemKind::Bind(binding) = &mut ast.items[0].kind else {
         panic!()
     };
-    let ExprKind::Fn(function) = &mut binding.value.kind else {
+    let ExprKind::Chain(functions) = &mut binding.value.kind else {
         panic!()
     };
+    let function = &mut functions[0];
     let Stmt::Expr(value) = &mut function.body.stmts[0] else {
         panic!()
     };
     let mut tree = std::mem::replace(
         value,
         Expr {
-            kind: ExprKind::Tuple(vec![]),
-            span: Span::default(),
+            kind: ExprKind::Data(vec![]),
+            span: Span::default().into(),
         },
     );
     for index in 0..10_000 {
@@ -2388,7 +2407,7 @@ fn body_engine_expands_real_macro_under_deep_mixed_body() {
         tree = Expr {
             span,
             kind: if index % 2 == 0 {
-                ExprKind::Tuple(vec![tree])
+                ExprKind::Data(vec![DItem::Pos(tree)])
             } else {
                 ExprKind::Block(Block {
                     stmts: vec![Stmt::Expr(tree)],
@@ -2415,23 +2434,27 @@ fn body_engine_expands_real_macro_under_deep_mixed_body() {
         resolver,
         &mut session,
     );
-    body_walk::expressions(&mut ast, &mut engine).unwrap();
-    let ItemKind::Binding(binding) = &ast.items[0].kind else {
+    body_walk3::expressions(&mut ast, &mut engine).unwrap();
+    let ItemKind::Bind(binding) = &ast.items[0].kind else {
         panic!()
     };
-    let ExprKind::Fn(function) = &binding.value.kind else {
+    let ExprKind::Chain(functions) = &binding.value.kind else {
         panic!()
     };
+    let function = &functions[0];
     let mut value = match &function.body.stmts[0] {
         Stmt::Expr(value) => value,
         _ => panic!(),
     };
     for index in (0..10_000).rev() {
         value = if index % 2 == 0 {
-            let ExprKind::Tuple(items) = &value.kind else {
+            let ExprKind::Data(items) = &value.kind else {
                 panic!()
             };
-            &items[0]
+            let DItem::Pos(child) = &items[0] else {
+                panic!()
+            };
+            child
         } else {
             let ExprKind::Block(block) = &value.kind else {
                 panic!()
@@ -2443,7 +2466,7 @@ fn body_engine_expands_real_macro_under_deep_mixed_body() {
         };
     }
     assert!(matches!(&value.kind, ExprKind::Int(n) if n.to_string() == "123"));
-    assert!(engine.scoped.origin(value.span).is_some());
+    assert!(engine.scoped.origin(value.span.0).is_some());
 }
 
 #[test]
@@ -2650,7 +2673,7 @@ fn macro_output_over_frame_budget_reports_the_limit() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, deep)
-(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (| (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Square) [x]) x)))))))
+(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (| (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Node) ((. syntax Square) [x])) x)))))))
 (@ macro (= deep (-> (, x) _ (nest 10000 x))))
 "#,
     )
@@ -2670,5 +2693,351 @@ fn macro_output_over_frame_budget_reports_the_limit() {
     assert!(
         stderr.contains("macro `deep`") && stderr.contains("frame limit exceeded"),
         "{stderr}"
+    );
+}
+
+#[test]
+fn definition_query_reads_a_member_exported_through_its_sum() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/types.i"),
+        "(m = app/macros)\n(T(..))\nC = (m.typ())\nD = ()\nT = C | D\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        r#"(, (= syntax (/ i syntax)))
+(, inspect typ)
+(@ macro (= typ (-> (,) _ `Int)))
+(@ macro (= inspect (-> (, x) _
+    (|> ((. syntax definition) x)
+        (| (-> (, `(= C (, Int))) _ `42)
+           (-> (, _) _ (panic "expected the written member definition")))))))
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros, types = app/types)\nmain = () { assert(m.inspect(types.C) == 42) }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["run", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn definition_query_reads_an_absorbed_generated_sum_member() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        r#"(, (= syntax (/ i syntax)))
+(, emit check typ)
+(@ macro (= typ (-> (,) _ `Int)))
+(@ macro (= check (-> (, x) _
+    (|> ((. syntax definition) x)
+        (| (-> (, `(= C (, Int))) _ `{})
+           (-> (, _) _ (panic "expected the generated member definition")))))))
+(@ macro (= emit (-> (,) _
+    `{(= C (, (typ))) (= D (,)) (= T (| C D)) (check C)})))
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nm.emit()\nmain = () { Nil }\n",
+    )
+    .unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["check", "--offline", "--project"])
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn multi_shape_arguments_keep_the_written_tree_in_both_surfaces() {
+    for (extension, source) in [
+        (
+            "i",
+            "(m = app/macros)\nf = m.id((x) { x } | (x, y) { x + y })\nmain = () { assert(f(3) == 3) assert(f(3, 4) == 7) }\n",
+        ),
+        (
+            "is",
+            "(, (= m (/ app macros)))\n(= f ((. m id) (| (-> (, x) _ x) (-> (, x y) _ (+ x y)))))\n(= main (-> (,) _ {(assert (== (f 3) 3)) (assert (== (f 3 4) 7))}))\n",
+        ),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(
+            dir.path().join("src/macros.is"),
+            "(, id)\n(@ macro (= id (-> (, e) _ e)))\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join(format!("src/main.{extension}")), source).unwrap();
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
+            .args(["run", "--offline", "--project"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{extension}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn type_macro_does_not_reclassify_a_written_definition_head() {
+    // Spec §4.7 classifies an alias pattern before expanding its right side.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        "(, id)\n(@ macro (= id (-> (, e) _ e)))\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        "(m = app/macros)\nvalue = 1\nAlias(A) = m.id(value)\nmain = () { Nil }\n",
+    )
+    .unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        checked
+            .diags
+            .iter()
+            .any(|d| d.code == ilang_check::code::TYPE_PARAM_UNUSED),
+        "{:?}",
+        checked.diags
+    );
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(|d| d.code == ilang_check::code::UNKNOWN_TYPE),
+        "{:?}",
+        checked.diags
+    );
+}
+
+#[test]
+fn type_macro_keeps_its_standalone_need_channel() {
+    use ilang_host::syntax::DefinitionReply;
+    use ilang_macro::{body_engine::BodyEngine, registry::Registry};
+    use ilang_syntax::lisp::scoped::ScopedSource;
+    use std::sync::Arc;
+    // The old and native engines agreed byte for byte before deletion.
+    // Keep the complete five answers as the independent historical oracle.
+    // §4 of syn3-final-ast.md removes the old production engine/tree; its
+    // standalone function-need and grouping boundaries remain asserted.
+    let oracle: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/type_macro_engine_boundary.json")).unwrap();
+    let cases = oracle["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 5);
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/macros.is"),
+        "(, id ignore)\n(@ macro (= id (-> (, e) _ e)))\n(@ macro (= ignore (-> (, e) _ `Int)))\n",
+    )
+    .unwrap();
+    for (case, text) in [
+        "(m = app/macros)\nf = <N>(g: (Int) <- N -> Int) {\n  x: m.id((Int) <- N -> Int) = g\n  x\n}\n",
+        "(m = app/macros)\nf = <N>(g) {\n  x: m.id((Int) <- N -> Int) = g\n  x\n}\n",
+        "(m = app/macros)\nf = m.id((x) { x } | (x, y) { x + y })\n",
+        "(m = app/macros)\nC = ()\nD = ()\nT = m.id(C | D)\n",
+        "(m = app/macros)\nC = ()\nT = C\nf: m.ignore(C) = 1\n",
+    ].into_iter().enumerate() {
+        std::fs::write(dir.path().join("src/main.i"), text).unwrap();
+        let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let (parsed, diagnostics) = ilang_check::parse(&graph);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let module = parsed.iter().find(|p| p.path == "app/main").unwrap();
+        let registry = Registry::new(&graph, &parsed).unwrap();
+            let mut session = ilang_macro::session::Session::default();
+            let mut engine = BodyEngine::new(
+                &graph,
+                &parsed,
+                &registry,
+                module.source,
+                ScopedSource::new(text.into()),
+                Arc::new(|at: &Syntax, _: &ilang_host::macro_budget::MacroBudget| {
+                    DefinitionReply::CompileError {
+                        message: "unexpected definition".into(),
+                        at: at.clone(),
+                    }
+                }),
+                &mut session,
+            );
+        let lowered = {
+                let mut tree = module.ast.clone();
+                for item in &mut tree.items {
+                    if let ilang_syntax::syn3::ast::ItemKind::TypeDef(def) = &mut item.kind {
+                        ilang_macro::body_walk3::type_definition(def, &mut engine).unwrap();
+                    }
+                }
+                ilang_macro::body_walk3::expressions(&mut tree, &mut engine).unwrap();
+                migration_syntax::syn3::lower::lower_with_transition(
+                    &tree,
+                    false,
+                    Some(engine.scoped.original_len()),
+                    &migration_syntax::syn3::lower::Transition::from_native(&module.lowering),
+                    Some(&migration_syntax::syn3::lower::Transition::from_native(engine.scoped.transition())),
+                )
+                .0
+                    };
+        let actual = migration_syntax::print::print_module(&lowered);
+        assert_eq!(cases[case]["source"].as_str().unwrap(), text);
+        // Syntax-three §6.1: err is removed; errors are ordinary Fail
+        // entries of the one need. Project only that deleted synthetic
+        // carrier from the independent historical oracle. Keep every
+        // macro/standalone-type/grouping boundary byte for byte.
+        let historical = cases[case]["expected_old"].as_str().unwrap();
+        assert_eq!(historical.matches(", N%E").count(), usize::from(case < 2));
+        let expected = historical.replace(", N%E", "").replace(" ^ N%E", "");
+        assert!(!actual.contains("N%E"), "removed carrier: {actual}");
+        assert_eq!(
+            actual, expected,
+            "expansion must retain its lowering boundary: {text}"
+        );
+    }
+}
+
+#[test]
+fn portable_macro_hash_matches_the_specification_vectors() {
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.9/mp09_portable_hash");
+    let (mut graph, ds) = ilang_cli::load(&project, false, true);
+    assert!(
+        !ds.iter().any(ilang_package::Diagnostic::is_error),
+        "{ds:?}"
+    );
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
+        "{}",
+        graph.sources.render_all(&checked.diags).join("\n")
+    );
+}
+
+#[test]
+fn syntax_macro_call_labels_require_explicit_parameter_labels() {
+    for (case, pass) in [("mp10_positional", false), ("mp10_explicit_label", true)] {
+        let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/spec/14.5")
+            .join(case);
+        let (mut graph, ds) = ilang_cli::load(&project, false, true);
+        assert!(
+            !ds.iter().any(ilang_package::Diagnostic::is_error),
+            "{ds:?}"
+        );
+        let checked = ilang_macro::project::check(&mut graph);
+        let errors = graph.sources.render_all(&checked.diags).join("\n");
+        assert_eq!(
+            !checked
+                .diags
+                .iter()
+                .any(ilang_package::Diagnostic::is_error),
+            pass,
+            "{errors}"
+        );
+        if !pass {
+            assert!(errors.contains("label does not match"), "{errors}");
+        }
+    }
+}
+
+#[test]
+fn unresolved_current_module_definitions_wait_for_item_expansion_to_settle() {
+    let macros = include_str!("../../../tests/spec/14.7/mp13_forward_definition/src/macros.is");
+    for items in [
+        "m.inspect(T)\nm.emit(T)",
+        "m.emit(T)\nm.inspect(T)",
+        "m.inspect(Missing)\nm.emit(T)",
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("i.toml"), "name = \"probe\"\n").unwrap();
+        std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
+        std::fs::write(
+            dir.path().join("src/main.i"),
+            format!("(m = probe/macros)\n{items}\nmain = () {{ Nil }}\n"),
+        )
+        .unwrap();
+        let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);
+        assert!(
+            !ds.iter().any(ilang_package::Diagnostic::is_error),
+            "{ds:?}"
+        );
+        let checked = ilang_macro::project::check(&mut graph);
+        let errors = graph.sources.render_all(&checked.diags).join("\n");
+        if items.contains("Missing") {
+            assert!(
+                checked
+                    .diags
+                    .iter()
+                    .any(ilang_package::Diagnostic::is_error),
+                "{errors}"
+            );
+            assert!(
+                errors.contains("Missing") && errors.contains("no definition"),
+                "{errors}"
+            );
+        } else {
+            assert!(
+                !checked
+                    .diags
+                    .iter()
+                    .any(ilang_package::Diagnostic::is_error),
+                "{errors}"
+            );
+        }
+    }
+}
+
+#[test]
+fn marked_local_parameter_can_shadow_a_macro_module_top_level_name() {
+    let project = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/spec/14.6/mp16_local_shadowing");
+    let (mut graph, ds) = ilang_cli::load(&project, false, true);
+    assert!(
+        !ds.iter().any(ilang_package::Diagnostic::is_error),
+        "{ds:?}"
+    );
+    let checked = ilang_macro::project::check(&mut graph);
+    assert!(
+        !checked
+            .diags
+            .iter()
+            .any(ilang_package::Diagnostic::is_error),
+        "{}",
+        graph.sources.render_all(&checked.diags).join("\n")
     );
 }

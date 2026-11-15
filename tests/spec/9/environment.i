@@ -5,7 +5,7 @@
 	i/core
 )
 
-check = (got: String, want: String) {
+check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
 		| (False) { panic(got <> " is not " <> want) }
@@ -16,17 +16,17 @@ show = (x) { core.inspect(x) }
 // The example of §9.2.
 Clock = (now = () -> Int)
 
-elapsed = (start: Int) <- (clock: Clock) { clock.now() - start }
+elapsed = (start : Int) <- (clock : Clock) { clock.now() - start }
 
 fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
 
 Name = (text = String)
 
-name = () <- (n: Name) { n.text }
+name = () <- (n : Name) { n.text }
 
 // Two services in one environment, and an environment parameter used
 // with a parameter pattern.
-both = ((a, b)) <- (clock: Clock, n: Name) { (a + b + clock.now(), n.text) }
+both = ((a, b)) <- (clock : Clock, n : Name) { (a + b + clock.now(), n.text) }
 
 // A closure made in one place gets its services from the place where it is
 // called (§9.2), not from where it was made.
@@ -58,12 +58,12 @@ from_outside = () {
 // An environment statement does not change which calls are in tail
 // position (§11.6). A million calls do not fit on the stack (32 MiB in the
 // Wasmtime host).
-count = (n, acc, name: Name) {
+count = (n, acc, name : Name) {
 	n |> (0) { acc } | (_) { count(n - 1, acc + 1, name) } <- (name)
 }
 
 // The environment of a tail call through a value.
-deep = (n) <- (k: Name) {
+deep = (n) <- (k : Name) {
 	n |>
 		(0) { k.text }
 		| (1) { apply(deep, 0) <- (Name(text = "last")) }
@@ -73,12 +73,12 @@ deep = (n) <- (k: Name) {
 apply = (f, n) { f(n) }
 
 // A service is a normal value: it may be stored and given.
-stored = () <- (clock: Clock) { clock }
+stored = () <- (clock : Clock) { clock }
 
 // A generic service.
 State(S) = (get = () -> S)
 
-read = <S>() <- (st: State(S)) { st.get() }
+read = <S>() <- (st : State(S)) { st.get() }
 
 test("example", () {
 	check(

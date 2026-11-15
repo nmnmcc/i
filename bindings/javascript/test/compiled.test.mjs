@@ -119,3 +119,31 @@ test("compiler binding plan authorizes context registrations on the JS host", as
   assert.equal(disposed, created);
   assert.ok([...contexts].every((context) => !context.live));
 });
+
+test("ABI 5 Int boundaries cross imports, exports, async replies and errors", async () => {
+  const { checkIntegers } = await import("../../../tests/browser/fixture-abi.mjs");
+  const value = await guest([], { tick: async n => n });
+  assert.equal(value.abi.version, 5);
+  assert.equal(await checkIntegers(value, GuestError), 13);
+  assert.equal(value.unusable, null);
+});
+
+test("the module rejects an inline Int whose sign does not match its value", async () => {
+  for (const [sign, n] of [[1, -1], [-1, 1], [1, 0], [2, 2]]) {
+    const value = await guest();
+    assert.throws(() => value.exports["app/ints.echo"](sign, n, 0), WebAssembly.RuntimeError);
+  }
+});
+
+for (const opt of [0, 2]) test(`compiled external Fail uses the caller at O${opt}`, async () => {
+  const bytes = await readFile(new URL(`../../../tests/browser/fixtures/external-fail-o${opt}.wasm`, import.meta.url));
+  const value = await instantiate(bytes, { imports: { "app:fallible/v1": { value: (text) => {
+    if (text === "bad") throw new GuestError("from-host");
+    return 42n;
+  } } } });
+  assert.deepEqual(value.abi.externals["app:fallible/v1"].value.errors, ["string"]);
+  assert.equal(value.call("app/main.call", ["good"]), 42n);
+  assert.throws(() => value.call("app/main.call", ["bad"]), (error) => error instanceof GuestError && error.value === "from-host");
+  assert.equal(value.call("app/main.call", ["good"]), 42n);
+  assert.equal(value.unusable, null);
+});

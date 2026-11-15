@@ -9,4 +9,4 @@
 	(Io) = i/io
 )
 
-main = () <- (io: Io) { task.sync(task.never()) }
+main = () <- (io : Io) { task.sync(task.never()) }

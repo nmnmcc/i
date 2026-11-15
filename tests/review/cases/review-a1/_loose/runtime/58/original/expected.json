@@ -1,6 +1,6 @@
 {
-  "compiler": "639a74274288632ad208dedd9a6c46cf1064395c",
-  "binary_sha256": "be18be38b956c33c116982063875f7d90bb7bd3286af7f3608b1cf467ef9f619",
+  "compiler": "c829216203ac222f43092428007a9c3026b14ac8",
+  "binary_sha256": "ed435649d4ef75158514981103ad983a059a299cca0d40f850c8e4598b401473",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10.0,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:1:10: error[E0201]: `a` is not defined\nsrc/main.i:1:16: error[E0201]: `a` is not defined\n2 errors\n"
+      "stderr": "src/main.i:1:11: error[E0201]: `a` is not defined\nsrc/main.i:1:17: error[E0201]: `a` is not defined\n2 errors\n"
     }
   }
 }

@@ -705,13 +705,17 @@ fn diamond_and_highest_reached_version() {
     // One package for `a`, whoever asks for it.
     let b_a = b_pkg.dependencies.iter().find(|(n, _)| n == "a").unwrap();
     assert_eq!(b_a.1, Some(a_id));
+    // §2.8 pins every consulted manifest, including superseded versions.
     // `e` is reached only through `a@1.0.0`: it has a version, and a line.
     assert_eq!(
         lock_lines(&app),
         [
+            "example.com/x/a 1.0.0",
             "example.com/x/a 1.1.0",
             "example.com/x/b 1.0.0",
+            "example.com/x/c 1.1.0",
             "example.com/x/c 1.2.0",
+            "example.com/x/d 1.2.0",
             "example.com/x/d 1.5.0",
             "example.com/x/e 0.1.0",
         ]
@@ -1115,4 +1119,174 @@ fn transitive_problems_say_where_they_come_from() {
         "{line}"
     );
     assert!(!app.join("i.lock").exists());
+}
+
+/// MP01: a committed link must not let an unchanged lock read outside bytes.
+#[cfg(unix)]
+#[test]
+fn located_source_links_cannot_escape_the_hashed_tree() {
+    use std::os::unix::fs::symlink;
+    for link in ["src/lib.i", "src", "test", "i.toml"] {
+        let w = World::new();
+        let r = w.repo("dep");
+        write(&r.work, &[("i.toml", "name = \"dep\"\n")]);
+        let outside = w.project(
+            "outside",
+            &[(
+                "lib.i",
+                include_str!("../../../tests/spec/2.8/mp01_external.i"),
+            )],
+        );
+        let target = if link.ends_with(".i") {
+            outside.join("lib.i")
+        } else if link == "i.toml" {
+            write(&outside, &[("i.toml", "name = \"dep\"\n")]);
+            fs::remove_file(r.work.join("i.toml")).unwrap();
+            outside.join("i.toml")
+        } else {
+            outside.clone()
+        };
+        fs::create_dir_all(r.work.join(link).parent().unwrap()).unwrap();
+        symlink(target, r.work.join(link)).unwrap();
+        r.commit_as_is("v1.0.0");
+        let app = w.project(
+            "app",
+            &[
+                (
+                    "i.toml",
+                    "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
+                ),
+                ("src/main.i", "main = () { Nil }\n"),
+            ],
+        );
+        let (g, ds) = w.load(&app, false);
+        assert!(!errors(&ds).is_empty(), "link {link} was accepted");
+        assert!(located(&g).is_empty());
+        assert!(!app.join("i.lock").exists());
+    }
+}
+
+#[test]
+fn cached_package_files_are_verified_on_every_load() {
+    for attack in ["edit", "manifest", "add", "remove", "forged-sidecar"] {
+        let w = World::new();
+        let r = w.repo("dep");
+        w.repo("peer").package("peer", &[], "1.0.0");
+        let commit = r.commit(
+            &[
+                ("i.toml", "name = \"dep\"\n"),
+                ("src/lib.i", "(value)\nvalue = 1\n"),
+            ],
+            "v1.0.0",
+        );
+        let app = w.project(
+            "app",
+            &[
+                (
+                    "i.toml",
+                    "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\npeer = \"example.com/peer@1.0.0\"\n",
+                ),
+                ("src/main.i", "main = () { Nil }\n"),
+            ],
+        );
+        let (g, ds) = w.load(&app, false);
+        no_errors(&g, &ds);
+        let locked = fs::read(app.join("i.lock")).unwrap();
+        let cache = w.cache().join("pkg/example.com%2fdep").join(commit);
+        let sidecar = fs::read(cache.with_extension("hash")).unwrap();
+        match attack {
+            "edit" | "forged-sidecar" => {
+                fs::remove_file(cache.join("src/lib.i")).unwrap();
+                fs::write(
+                    cache.join("src/lib.i"),
+                    include_str!("../../../tests/spec/2.8/mp02_cached.i"),
+                )
+                .unwrap();
+            }
+            "manifest" => {
+                fs::remove_file(cache.join("i.toml")).unwrap();
+                fs::write(cache.join("i.toml"), "name = \"impostor\"\n").unwrap();
+            }
+            "add" => fs::write(cache.join("src/extra.i"), "x = 2\n").unwrap(),
+            "remove" => fs::remove_file(cache.join("src/lib.i")).unwrap(),
+            _ => unreachable!(),
+        }
+        if attack == "forged-sidecar" {
+            fs::write(
+                cache.with_extension("hash"),
+                format!("sha256-{}\n", "0".repeat(64)),
+            )
+            .unwrap();
+        } else {
+            assert_eq!(fs::read(cache.with_extension("hash")).unwrap(), sidecar);
+        }
+        let mut options = w.options(false);
+        options.offline = true;
+        let (g, ds) = load_with(&app, &options);
+        assert_eq!(
+            errors(&ds),
+            [code::LOCK_MISMATCH],
+            "attack {attack}: {ds:?}"
+        );
+        assert!(located(&g).is_empty());
+        assert_eq!(fs::read(app.join("i.lock")).unwrap(), locked);
+    }
+}
+
+#[test]
+fn lock_pins_superseded_manifests_in_both_test_configurations() {
+    for dev in [false, true] {
+        let w = World::new();
+        let a = w.repo("a");
+        let b = w.repo("b");
+        let c = w.repo("c");
+        c.package("c", &[], "1.0.0");
+        c.package("c", &[], "1.1.0");
+        a.package("a", &["c = \"example.com/c@1.0.0\""], "1.0.0");
+        a.package("a", &[], "1.1.0");
+        b.package("b", &["a = \"example.com/a@1.1.0\""], "1.0.0");
+        let toml = format!(
+            "name = \"app\"\n[dependencies]\na = \"example.com/a@1.0.0\"\n{}b = \"example.com/b@1.0.0\"\n",
+            if dev { "[dev-dependencies]\n" } else { "" }
+        );
+        let app = w.project(
+            "app",
+            &[
+                ("i.toml", &toml),
+                (
+                    "src/main.i",
+                    include_str!("../../../tests/spec/2.8/mp03_main.i"),
+                ),
+            ],
+        );
+        // Even a build without tests pins inputs of the test configuration.
+        let (g, ds) = w.load(&app, false);
+        no_errors(&g, &ds);
+        assert_eq!(
+            lock_lines(&app),
+            [
+                "example.com/a 1.0.0",
+                "example.com/a 1.1.0",
+                "example.com/b 1.0.0",
+                "example.com/c 1.0.0"
+            ]
+        );
+        let locked = fs::read(app.join("i.lock")).unwrap();
+        // Only the historical, superseded input moves. All selected commits stay put.
+        a.package("a", &["c = \"example.com/c@1.1.0\""], "1.0.0");
+        for tests in [false, true] {
+            let mut options = w.options(tests);
+            options.cache = Some(w.path().join(format!("fresh-{tests}")));
+            let (g, ds) = load_with(&app, &options);
+            assert_eq!(errors(&ds), [code::LOCK_MISMATCH], "{ds:?}");
+            assert!(
+                g.sources
+                    .render_all(&ds)
+                    .iter()
+                    .any(|d| d.contains("example.com/a@1.0.0"))
+            );
+            assert!(located(&g).is_empty());
+            assert_eq!(fs::read(app.join("i.lock")).unwrap(), locked);
+        }
+    }
 }

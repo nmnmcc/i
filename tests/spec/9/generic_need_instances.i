@@ -7,7 +7,7 @@
 Yd(E) = (emit = (E) -> Nil)
 Br(E, N) = (decode = (Int) <- (Yd(E), ..N) -> Int)
 
-at = <E, N>(bs: List(Br(E, N)), i: Int) -> Br(E, N) {
+at = <E, N>(bs : List(Br(E, N)), i : Int) -> Br(E, N) {
 	bs |>
 		([]) { panic("empty") }
 		| ([b, ..rest]) {
@@ -15,8 +15,8 @@ at = <E, N>(bs: List(Br(E, N)), i: Int) -> Br(E, N) {
 		}
 }
 
-strings = (bs: List(Br(String, Never))) -> Br(String, Never) { at(bs, 0) }
-ints = (bs: List(Br(Int, Never))) -> Br(Int, Never) { at(bs, 0) }
+strings = (bs : List(Br(String, Never))) -> Br(String, Never) { at(bs, 0) }
+ints = (bs : List(Br(Int, Never))) -> Br(Int, Never) { at(bs, 0) }
 
 main = () {
 	strings([Br(decode = (_) { 1 })])

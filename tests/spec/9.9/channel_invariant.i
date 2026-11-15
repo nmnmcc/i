@@ -5,4 +5,4 @@
 	i/task
 )
 
-widen = (x: task.Channel(Int)) -> task.Channel(Int | String) { x }
+widen = (x : task.Channel(Int)) -> task.Channel(Int | String) { x }

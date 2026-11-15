@@ -10,9 +10,9 @@
 @host("test:async/v1", "async")
 Later = (double = (Int) <- (Fail(String)) -> Int, echo = (String) -> String)
 
-main = () <- (later: Later) {
+main = () <- (later : Later) {
 	task.scope((s) {
-		ready: task.Channel(Nil) = task.channel()
+		ready : task.Channel(Nil) = task.channel()
 		// Both children use the async Await route. Order the host log calls
 		// explicitly: workers may otherwise start either call first (§9.9).
 		assert(

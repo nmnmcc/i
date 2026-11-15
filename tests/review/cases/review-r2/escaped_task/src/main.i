@@ -9,7 +9,7 @@
 	(Io) = i/io
 )
 
-main = () <- (io: Io) {
+main = () <- (io : Io) {
 	t = task.scope((s) { task.go(s, () { 7 }) })
 	io.print(
 		core.inspect(task.join(t)),

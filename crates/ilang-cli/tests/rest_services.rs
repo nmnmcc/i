@@ -60,3 +60,45 @@ fn fail_comes_from_the_caller_on_call_resume_and_cancel() {
 fn task_keep_uses_the_invoking_catch_after_yield() {
     run(include_str!("../../../tests/spec/9/task_keep_error.i"));
 }
+
+#[test]
+fn external_host_errors_raise_through_the_callers_fail() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("src/main.i"),
+        include_str!("../../../tests/browser/fixtures/external-fail/src/main.i"),
+    )
+    .unwrap();
+    for opt in [ilang_cli::Level::O0, ilang_cli::Level::O2] {
+        let built = ilang_cli::build(
+            dir.path(),
+            ilang_cli::BuildOptions {
+                opt,
+                offline: true,
+                tests: false,
+                target: Default::default(),
+            },
+        )
+        .unwrap();
+        let mut imports = HostImports::default();
+        imports
+            .fallible_external("app:fallible/v1", "value", |args| {
+                let [ilang_host::Value::String(text)] = args else {
+                    panic!("one string")
+                };
+                Ok(if text == "bad" {
+                    Err(ilang_host::Value::String("from-host".into()))
+                } else {
+                    Ok(ilang_host::Value::Int(42.into()))
+                })
+            })
+            .unwrap();
+        let outcome = Program::from_bytes(&built.wasm)
+            .unwrap()
+            .run_entry(HostOptions::new(imports))
+            .unwrap();
+        assert!(matches!(outcome, Outcome::Ok(_)), "{opt:?}: {outcome:?}");
+    }
+}

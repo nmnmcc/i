@@ -2,4 +2,4 @@
 // expect: compile-error E0318
 Level = "a" | "b"
 @external("test:io/v1", "get")
-get: () -> Level
+get : () -> Level

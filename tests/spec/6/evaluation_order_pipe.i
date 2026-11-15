@@ -3,7 +3,7 @@
 // at: spec/main:10:2
 
 // `a |> f(b)` works out `a` first.
-pick = (n: Int) -> (Int, Int) -> Int { panic("callee") }
+pick = (n : Int) -> (Int, Int) -> Int { panic("callee") }
 
 main = () {
 	n = 1

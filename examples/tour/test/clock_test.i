@@ -8,7 +8,7 @@ Clock = (now = () -> Int)
 Late = (by = Int)
 
 // Inferred: (deadline: Int) -> Int ^ Late ! Clock
-remaining = (deadline) <- (clock: Clock) {
+remaining = (deadline) <- (clock : Clock) {
 	deadline - clock.now() |>
 		(left ? left < 0) { fail.raise(Late(by = 0 - left)) }
 		| (left) { left }

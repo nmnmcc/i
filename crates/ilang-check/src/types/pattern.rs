@@ -4,7 +4,7 @@
 
 use super::coverage::{self, Col, Ctor, Pat};
 use super::infer::{Checker, Scheme};
-use super::known;
+use super::known::{self, Knowledge};
 use super::{FnTy, Head, Ty};
 use crate::code;
 use crate::hir::*;
@@ -46,7 +46,7 @@ struct Place {
     /// `B`: the type of the values at this place.
     ty: Ty,
     /// The known type of the values at this place (§4.8).
-    known: Ty,
+    known: Knowledge,
     /// The pattern types of the patterns here that are not catch-alls.
     pats: Vec<Ty>,
     /// The arguments shared by the patterns here with one type constructor.
@@ -175,10 +175,39 @@ impl Checker<'_> {
     fn fit_in(&mut self, q: &Pattern, b: &Ty, in_case: bool) {
         if catch_all(q) {
             self.bind_catch_all(q, b, in_case);
+        } else if let PatternKind::Tuple(ps) = &q.kind
+            && !in_case
+        {
+            // The parts of a fitted tuple are fitted one by one, so that a
+            // constructor part may fail as at the top: `(Ok(a), Ok(b)) = …`.
+            let parts: Vec<Ty> = ps.iter().map(|_| self.s.fresh()).collect();
+            self.sub(b, &Ty::tuple(parts.clone()), q.span);
+            for (p, t) in ps.iter().zip(&parts) {
+                self.fit_in(p, t, in_case);
+            }
         } else {
             let t = self.pat(q, in_case);
+            // A constructor part whose known values are also made by other
+            // constructors may fail (syntax three D4, as in `fit`).
+            let t = match top_ctor(q) {
+                Some(c) if !in_case => {
+                    let (others, _) = self.made_by_others(b, Head::Named(TypeRef::Custom(c.ty)));
+                    if others { self.with_rest(t) } else { t }
+                }
+                _ => t,
+            };
             self.sub(b, &t, q.span);
         }
+    }
+
+    /// `T | r - T`, with a new type variable `r`.
+    fn with_rest(&mut self, t: Ty) -> Ty {
+        let mut members = Vec::new();
+        super::solve::flatten_union(std::slice::from_ref(&t), &mut members);
+        let r = self.s.fresh();
+        let rest = self.s.diff(r, members.clone());
+        members.push(rest);
+        Ty::Union(members)
     }
 
     /// The type of a parameter (rule 4): a new variable for a catch-all,
@@ -223,7 +252,12 @@ impl Checker<'_> {
                     let ft = fields[i].1.clone();
                     self.fit_in(arg, &ft, in_case);
                 }
-                Ty::named(TypeRef::Custom(ctor.ty), targs)
+                let t = Ty::named(TypeRef::Custom(ctor.ty), targs);
+                if in_case {
+                    t
+                } else {
+                    self.family(t, ctor.ty, q.span)
+                }
             }
             PatternKind::Tuple(ps) => {
                 Ty::tuple(ps.iter().map(|x| self.param_in(x, in_case)).collect())
@@ -241,6 +275,75 @@ impl Checker<'_> {
             }
             _ => self.leaf(q, in_case, false),
         }
+    }
+
+    /// The pattern type of a fitted constructor pattern `C(…)` (a binding, a
+    /// parameter, or a part of one): the declared union that `C` is a member
+    /// of, when there is one smallest such union of labelled types
+    /// (`Ok(v)` gives `Ok(A) | Error(B)`, that is `Result(A, B)`), and else
+    /// `C`'s own type. Before stage 3 the pattern type of `Ok(v)` was
+    /// `Result(A, B)`; syntax-3.md §2.12 keeps that: "So with `r : Ok(Int) |
+    /// Error(String)`, `Ok(v) = r` is correct and needs `Assert`, as today
+    /// with the multi-constructor `Result`". So an unknown value fitted to
+    /// `Ok(v)` is a `Result` and the pattern may fail (§7.3), as before.
+    fn family(&mut self, t: Ty, id: TypeId, span: Span) -> Ty {
+        let h = Head::Named(TypeRef::Custom(id));
+        let mut best: Option<&super::display::AliasFold> = None;
+        let mut tie = false;
+        for f in self.s.alias_folds.iter() {
+            if !f.has_head(h) || !f.all_defined() {
+                continue;
+            }
+            match best {
+                Some(b) if b.len() < f.len() => {}
+                Some(b) if b.len() == f.len() => tie = true,
+                _ => {
+                    best = Some(f);
+                    tie = false;
+                }
+            }
+        }
+        let Some(f) = best.filter(|_| !tie).cloned() else {
+            return t;
+        };
+        let args: Vec<Ty> = (0..f.params()).map(|_| self.s.fresh()).collect();
+        let members = f.members_with(&args);
+        let Some(m) = members.iter().find(|m| m.head() == Some(h)).cloned() else {
+            return t;
+        };
+        self.sub(&t, &m, span);
+        self.sub(&m, &t, span);
+        Ty::Union(members)
+    }
+
+    /// `p` with, for each member that is a labelled type of a declared
+    /// union (see `family`), the members of that union that `p` lacks.
+    fn with_families(&mut self, p: Ty, span: Span) -> Ty {
+        let mut members = Vec::new();
+        super::solve::flatten_union(std::slice::from_ref(&p), &mut members);
+        let mut heads: Vec<Head> = members.iter().filter_map(Ty::head).collect();
+        let mut extra = Vec::new();
+        for m in &members {
+            let Some(Head::Named(TypeRef::Custom(id))) = m.head() else {
+                continue;
+            };
+            let mut family = Vec::new();
+            let whole = self.family(m.clone(), id, span);
+            super::solve::flatten_union(std::slice::from_ref(&whole), &mut family);
+            for f in family {
+                if let Some(h) = f.head()
+                    && !heads.contains(&h)
+                {
+                    heads.push(h);
+                    extra.push(f);
+                }
+            }
+        }
+        if extra.is_empty() {
+            return p;
+        }
+        members.extend(extra);
+        Ty::Union(members)
     }
 
     /// The pattern types of literals, prefixes, and bit arrays, with their
@@ -486,10 +589,10 @@ impl Checker<'_> {
         subject: &Expr,
         clauses: &[Clause],
         span: Span,
-        expected: &Ty,
-    ) -> (Ty, Ty) {
+        expected: &Knowledge,
+    ) -> (Ty, Knowledge) {
         let fitted = clauses.len() == 1 && clauses[0].guard.is_none();
-        let (a, subject_known) = self.infer_k(subject, &Ty::Top);
+        let (a, subject_known) = self.infer_k(subject, &Knowledge::unknown());
         let mut places = vec![Place {
             ty: a.clone(),
             known: subject_known,
@@ -531,6 +634,16 @@ impl Checker<'_> {
             slack[i] = places[i].catch_here || places[i].parent.is_some_and(|p| slack[p]);
             let pats = std::mem::take(&mut places[i].pats);
             let p = self.union(pats, span);
+            // A member of a declared union of labelled types (a former
+            // constructor) stands for that union, as the type of the whole
+            // family did before stage 3 (§5.2.8 rule 11, "the coverage
+            // error in a match is unchanged"): the members no pattern takes
+            // are added, so they are reported by §7.4, not as a type error.
+            let p = if slack[i] {
+                p
+            } else {
+                self.with_families(p, span)
+            };
             let want = if slack[i] {
                 let mut members = Vec::new();
                 super::solve::flatten_union(std::slice::from_ref(&p), &mut members);
@@ -544,7 +657,10 @@ impl Checker<'_> {
             let b = places[i].ty.clone();
             let at = if i == 0 { subject.span } else { span };
             if fitted {
-                self.sub(&b, &want, at);
+                // A one-clause match reports what its pattern does not take
+                // as the error of §7.4 (`defer_failure` below), as it did
+                // when the members of a sum were constructors of one type.
+                self.sub_fitted_match(&b, &want, at);
             } else {
                 held.extend(self.sub_case(&b, &want, at));
             }
@@ -557,10 +673,10 @@ impl Checker<'_> {
             let (t, taken) = self.narrow(&rows, clauses, ci, choice, k as u32, &places[place]);
             self.bind_catch_all(pattern, &t, true);
             let known = match taken {
-                None => Ty::Never,
-                Some(taken) => {
-                    super::display::known_diff(&self.s, places[place].known.clone(), taken)
-                }
+                None => Knowledge::certain(Ty::Never),
+                Some(taken) => places[place]
+                    .known
+                    .map(|k| super::display::known_diff(&self.s, k.clone(), taken.clone())),
             };
             self.fit_known(pattern, &known, true);
         }
@@ -660,7 +776,7 @@ impl Checker<'_> {
                     .collect(),
             });
         }
-        (r, self.kunion(knowns))
+        (r, self.kunion_knowledge(knowns))
     }
 
     /// Rule 12: the type of the catch-all `id` of choice `choice` of clause
@@ -870,7 +986,7 @@ impl Checker<'_> {
         at: usize,
         step: Step,
         ty: Ty,
-        known: Ty,
+        known: Knowledge,
     ) -> usize {
         if let Some((_, i)) = places[at].children.iter().find(|c| c.0 == step) {
             return *i;
@@ -1049,7 +1165,7 @@ impl Checker<'_> {
                 if let Some(b) = binder {
                     self.bind(b, t.clone(), true);
                     let k = self.kconv(ty, &HashMap::new());
-                    self.kbind(b.var, k, true);
+                    self.kbind(b.var, Knowledge::certain(k), true);
                 }
                 (t, pat)
             }
@@ -1058,10 +1174,7 @@ impl Checker<'_> {
                 let n = self.p.ty(ctor.ty).params.len();
                 let targs = self.shared(places, at, h, n);
                 let fields = self.ctor_fields(*ctor, &targs);
-                let kargs = match known::member(&places[at].known, Some(h)) {
-                    Some(Ty::Con(_, _, xs)) => Some(xs),
-                    _ => None,
-                };
+                let kctor = places[at].known.member(h);
                 let mut parts = vec![Pat::Wild(None); fields.len()];
                 let matched = self.match_fields(q.span, &fields, args, *spread);
                 // Rule 11: `..` counts as a catch-all at the places of the
@@ -1071,10 +1184,10 @@ impl Checker<'_> {
                         if matched.iter().any(|m| m.1 == i) {
                             continue;
                         }
-                        let k = match &kargs {
-                            Some(xs) => self.field_known(*ctor, i, Some(xs)),
-                            None => Ty::Top,
-                        };
+                        let k = kctor.map(|t| match t {
+                            Ty::Con(_, _, xs) => self.field_known(*ctor, i, Some(xs)),
+                            _ => Ty::Top,
+                        });
                         let c = self.child(
                             places,
                             at,
@@ -1086,10 +1199,10 @@ impl Checker<'_> {
                     }
                 }
                 for (arg, i) in matched {
-                    let k = match &kargs {
-                        Some(xs) => self.field_known(*ctor, i, Some(xs)),
-                        None => Ty::Top,
-                    };
+                    let k = kctor.map(|t| match t {
+                        Ty::Con(_, _, xs) => self.field_known(*ctor, i, Some(xs)),
+                        _ => Ty::Top,
+                    });
                     let c = self.child(
                         places,
                         at,
@@ -1109,10 +1222,7 @@ impl Checker<'_> {
                 let n = ps.len() as u32;
                 let h = Head::Shape(super::ShapeId::positional(n));
                 let parts = self.shared(places, at, h, ps.len());
-                let kparts = match known::member(&places[at].known, Some(h)) {
-                    Some(Ty::Con(_, _, xs)) => xs,
-                    _ => vec![Ty::Top; ps.len()],
-                };
+                let kdata = places[at].known.member(h);
                 let mut pats = Vec::new();
                 for (i, x) in ps.iter().enumerate() {
                     let c = self.child(
@@ -1120,7 +1230,7 @@ impl Checker<'_> {
                         at,
                         Step::Part(n, i as u32),
                         parts[i].clone(),
-                        kparts[i].clone(),
+                        kdata.part(i),
                     );
                     pats.push(self.visit(x, c, v, places).1);
                 }
@@ -1134,11 +1244,8 @@ impl Checker<'_> {
                 let h = Head::Named(TypeRef::Builtin(BuiltinType::List));
                 let e = self.shared(places, at, h, 1).remove(0);
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e.clone()]);
-                let klist = known::member(&places[at].known, Some(h)).unwrap_or(Ty::Top);
-                let kitem = match &klist {
-                    Ty::Con(_, _, xs) if xs.len() == 1 => xs[0].clone(),
-                    _ => Ty::Top,
-                };
+                let klist = places[at].known.member(h);
+                let kitem = klist.part(0);
                 let mut pats = Vec::new();
                 for (i, x) in items.iter().enumerate() {
                     let c = self.child(places, at, Step::Item(i as u32), e.clone(), kitem.clone());
@@ -1357,22 +1464,19 @@ Solo(A) = (A, Int)
             },
             1
         ));
-        // The lowering of this stage reads `Event(A) = Start(A) | Stop(A)`
-        // as one type with the constructors `Start` and `Stop`, so `A` is
-        // written twice in the family. When syntax three's final tree lands
-        // (§2.8, "Sums are unions": two labelled types), each `A` is written
-        // once and these two become `!field_shared` of `Start` and `Stop`.
-        assert!(c.field_shared(
+        // One constructor per type (syntax three): `Start` and `Stop` are
+        // no longer one family, so their fields are not shared.
+        assert!(!c.field_shared(
             CtorRef {
-                ty: id("Event"),
+                ty: id("Start"),
                 index: 0
             },
             0
         ));
-        assert!(c.field_shared(
+        assert!(!c.field_shared(
             CtorRef {
-                ty: id("Event"),
-                index: 1
+                ty: id("Stop"),
+                index: 0
             },
             0
         ));

@@ -1,2 +1,2 @@
 @external("app", "read")
-read: () -> Int
+read : () -> Int

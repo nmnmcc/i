@@ -1,0 +1,4 @@
+(, (= syntax (/ i syntax)))
+(, id)
+(@ macro (: id (-> (, Int) Int)))
+(@ macro (= id (-> (, x) (<- _ (, (: d (. syntax Diagnostics)))) {((. d note) "note") x})))

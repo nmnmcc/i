@@ -5,4 +5,4 @@
 	i/task
 )
 
-widen = (x: task.Group(Int)) -> task.Group(Int | String) { x }
+widen = (x : task.Group(Int)) -> task.Group(Int | String) { x }

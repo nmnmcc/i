@@ -2,4 +2,6 @@
 (, m)
 (@ macro (: m (-> (, Int) Int)))
 (@ macro
-  (= m (-> (, value) _ ((. syntax make) ((. syntax Name) "helper") value))))
+  (= m
+    (-> (, value) _
+      ((. syntax make) ((. syntax Node) ((. syntax Name) "helper")) value))))

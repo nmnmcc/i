@@ -1,0 +1,55 @@
+---
+title: How to send changes
+description: Add a focused case and prepare a reviewable change.
+---
+
+Make a small regression case and prepare a change someone can review.
+
+```i run package=entry title="src/main.i"
+// spec: 10.2
+// expect: pass
+main = () { Nil }
+```
+
+```text
+
+```
+
+This is [tests/spec/10/a1_entry_exports.i](https://github.com/nmnmcc/i/blob/main/tests/spec/10/a1_entry_exports.i). It needs no imports or manifest. `pass` requires successful execution without a stop and passing collected tests.
+
+## A first change
+
+Choose the relevant [standard](/docs/standard) paragraph. For language changes, edit that text first, add a distinct case beside a related one, then implement it. Give the new case an unused, descriptive basename; discovery is recursive and needs no registration list.
+
+Keep `spec:` and `expect:` at the top. Other expectations are `compile-error` or `warning` with the actual diagnostic code, and `stop` with its first message line; `at:` checks further stop lines, and `output:` checks emitted text. Package cases use `#` headers in `i.toml`.
+
+## Focused checks
+
+The filtered command for the existing case is `cargo test -p ilang-cli --test spec --locked -- a1_entry_exports`; substitute your new basename. [The runner](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/tests/spec.rs) checks each header at O0/O2 and compares the levels. [Building and testing](/docs/contributing/building-and-testing) gives setup, the CLI build command, and the shared heavy-queue requirement.
+
+## Library cases
+
+```i test stdout=exact package=changes title="test/bool_test.i"
+(
+	testlib = (test) = std/test
+	std/bool
+)
+test("negation", () { assert(bool.not(False) == True) })
+```
+
+```text
+pass changes/bool_test.negation
+1 passed, 0 failed
+```
+
+Use the filter shown on [building and testing](/docs/contributing/building-and-testing#filtered-tests) to run an existing library case; filters select test names, without making package checking module-local. Widen verification to the changed layer, source formatting, compiler lint, snippets, and any affected docs or editor checks.
+
+## Corpus effects
+
+A language change includes its spec text, `tests/spec` case, and an account of its effect on `tests/review`. Recorded output is an observation; O0/O2 agreement can preserve a shared defect. Change expectations only with the requiring spec paragraph, review the separate semantic requirement, and promote fixed known failures. [The testing guide](https://github.com/nmnmcc/i/blob/main/docs/testing.md) documents deliberate regeneration.
+
+## Submission
+
+Use a plain English commit subject describing the change, following recent commits. The [README](https://github.com/nmnmcc/i/blob/main/README.md) and [development guide](https://github.com/nmnmcc/i/blob/main/docs/development.md) describe checks but provide no submission procedure; ask through the [issue tracker](https://github.com/nmnmcc/i/issues) for `nmnmcc/i`.
+
+[Compiler architecture](/docs/contributing/compiler-architecture) identifies implementation entry points.

@@ -1,0 +1,289 @@
+---
+title: Types and inference
+description: Name types, write annotations, define generic functions, and inspect the types inferred by the checker.
+---
+
+Describe interfaces with annotations and inspect what the checker infers for the rest.
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+increment = (x) { x + 1 }
+main = () {
+	stdio.print(
+		core.inspect(increment(4)),
+	)
+}
+```
+
+```text
+5
+```
+
+Inference checks unannotated code too; integer operators constrain their arguments.
+
+## Type names
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+Point = { (x = Int, y = Int) }
+ScreenPoint = (x = Int, y = Int)
+Hidden = ()
+Position = Point | Hidden
+
+main = () {
+	raw : Point = (x = 3, y = 4)
+	labelled = ScreenPoint(x = 3, y = 4)
+	position : Position = raw
+	stdio.print(core.inspect((raw, (labelled.x, labelled.y), position, Hidden)))
+}
+```
+
+```text
+((x = 3, y = 4), (3, 4), (x = 3, y = 4), Hidden)
+```
+
+Braces make `Point` a transparent alias; `ScreenPoint` has a distinct identity and a constructor.
+
+`Position` adds no constructor, while `Hidden` is already a value; a matching raw record belongs to `Point`, but cannot stand in for `ScreenPoint`.
+
+## Labelled inspection
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+ScreenPoint = (x = Int, y = Int)
+
+main = () { stdio.print(core.inspect(ScreenPoint(x = 3, y = 4))) }
+```
+
+```text
+ScreenPoint(3, 4)
+```
+
+`core.inspect` currently omits field names from labelled values.
+
+## Annotations
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+NumberOrText = Int | String
+show : (NumberOrText) -> String = (x) {
+	x |> (n : Int) { core.inspect(n) } | (s : String) { s }
+}
+choose : (Bool) -> { Int | String } = (flag) {
+	flag |> (True) { 7 } | (False) { "seven" }
+}
+
+main = () {
+	value : { Int | String } = choose(False)
+	count : Int = 7
+	stdio.print(show(value))
+	stdio.print(show(count))
+}
+```
+
+```text
+seven
+7
+```
+
+Braces keep a union inside an annotation; a named union avoids that grouping.
+
+Field labels use `=`, while annotations use `:`; `i fmt` spaces both symbols alike.
+
+## Type parameters
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+Box(A) = (A)
+identity = <A>(x : A) -> A { x }
+wrap = <A>(x : A) -> Box(A) { Box(x) }
+
+main = () {
+	stdio.print(
+		core.inspect((identity(5), identity("five"))),
+	)
+	stdio.print(
+		core.inspect((wrap(5), wrap("five"))),
+	)
+}
+```
+
+```text
+(5, "five")
+(Box(5), Box("five"))
+```
+
+`A` is in scope throughout the generic function, including its body; a generic type declares its parameters in its head.
+
+## Inferred parameters
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+identity = (x) { x }
+count = 7
+word = "seven"
+numbers = [1, 2]
+add_one = (x) { x + 1 }
+
+main = () {
+	stdio.print(
+		core.inspect((identity(count), identity(word))),
+	)
+	stdio.print(
+		core.inspect((numbers, add_one(2))),
+	)
+}
+```
+
+```text
+(7, "seven")
+([1, 2], 3)
+```
+
+An unannotated function can be generic too.
+
+## Literal types
+
+```i types package=tour title="src/main.i"
+identity = (x) { x }
+count = 7
+word = "seven"
+numbers = [1, 2]
+add_one = (x) { x + 1 }
+main = () { (identity(count), identity(word), numbers, add_one(2)) }
+```
+
+```text
+tour/main.identity : (A) -> A
+tour/main.count : 7
+tour/main.word : "seven"
+tour/main.numbers : List(1 | 2)
+tour/main.add_one : (Int) -> Int
+tour/main.main : () -> (7, "seven", List(1 | 2), Int)
+```
+
+`i check --types` lists parameters, results, and service needs, including `Fail(E)` for raised errors.
+
+The literal types `7` and `"seven"` each contain one value, usable as `Int` or `String`; the list also fits `List(Int)`.
+
+Integer arithmetic widens its result to `Int`.
+
+## Recursive types
+
+```i run package=tour title="src/main.i"
+(
+	i/stdio
+	std/int
+)
+
+Num = (Int)
+
+Add = (Expr, Expr)
+Mul = (Expr, Expr)
+Expr = Num | Add | Mul
+eval = (e) {
+	e |>
+		(Num(n)) { n }
+		| (Add(a, b)) { eval(a) + eval(b) }
+		| (Mul(a, b)) { eval(a) * eval(b) }
+}
+
+main = () {
+	sum = Add(Num(1), Num(5))
+	expr = Mul(sum, Num(7))
+	expr |> eval |> int.to_string |> stdio.print
+}
+```
+
+```text
+42
+```
+
+`Add` and `Mul` contain expressions themselves; the [constructor patterns](/docs/tour/functions-and-branches#constructor-patterns) expose the recursive parts.
+
+## Evaluator inference
+
+```i types package=tour title="src/main.i"
+Num = (Int)
+Add = (Expr, Expr)
+Mul = (Expr, Expr)
+Expr = Num | Add | Mul
+eval = (e) {
+	e |>
+		(Num(n)) { n }
+		| (Add(a, b)) { eval(a) + eval(b) }
+		| (Mul(a, b)) { eval(a) * eval(b) }
+}
+```
+
+```text
+tour/main.eval : (Expr) -> Int
+```
+
+The same evaluator needs no parameter or result annotation; its patterns and integer operators supply the constraints.
+
+## Type constraints
+
+```i types package=tour title="src/main.i"
+count : Int = 7
+main = () { count }
+```
+
+```text
+tour/main.count : Int
+tour/main.main : () -> Int
+```
+
+Replacing `7` with a string is a type error; an annotation constrains a value rather than converting it.
+
+## Field access
+
+```i run package=tour title="src/main.i"
+(
+	i/core
+	i/stdio
+)
+
+Point = { (x = Int, y = Int) }
+x_of = (point : Point) { point.x }
+
+main = () {
+	stdio.print(
+		core.inspect(x_of((x = 3, y = 4))),
+	)
+}
+```
+
+```text
+3
+```
+
+An argument annotation supplies the field information needed for access; labelled fields also require a visible constructor.
+
+## Further reading
+
+[Types from top to bottom](/docs/tour/types-from-top-to-bottom).

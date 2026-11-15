@@ -120,12 +120,17 @@ fn e6_runtime_fixtures_type_check() {
 }
 
 #[test]
-fn a_rest_type_parameter_cannot_also_be_a_value_type() {
+fn a_need_parameter_can_also_appear_in_a_value_type() {
+    // Decision 1 (EF01/EF09) removes §4.7's exclusive classification.
+    // Retain the original mixed-use source as an acceptance regression;
+    // known keys are still required for extracting/providing services.
     let (_, errors) = checked("f = <N>(x: N) <- (..env: N) { Nil }");
+    assert!(errors.is_empty(), "{errors:#?}");
+    let (_, errors) = checked("f = <N>(x: N) { Nil <- (x) }");
     assert!(
         errors
             .iter()
-            .any(|e| e.contains("cannot also be an ordinary value type")),
+            .any(|e| e.contains("not known to be one service type")),
         "{errors:#?}"
     );
 }
@@ -146,21 +151,36 @@ fn a_rest_head_declares_its_own_row_parameter() {
 }
 
 #[test]
-fn an_unused_fail_parameter_can_be_empty_but_a_real_error_cannot() {
-    let (types, errors) = checked(
-        "constrain = <E>(f: () <- (Fail(E)) -> Int) -> () -> Int { () { f() } }\npure = () { constrain(() { 42 })() }",
+fn an_unused_fail_parameter_keeps_its_service_key() {
+    // Decision 2: the declared Fail(E) need is real even at E = Never.
+    // Keep both original definitions as rejection cases; retain positive
+    // callback coverage by passing the need on and by supplying its value.
+    let original = "constrain = <E>(f: () <- (Fail(E)) -> Int) -> () -> Int { () { f() } }\npure = () { constrain(() { 42 })() }";
+    for source in [
+        original,
+        "raises = () <- (handler: Fail(String)) { handler.raise(\"error\") }\nconstrain = (f: () <- (Fail(String)) -> Int) -> () -> Int { () { f() } }",
+    ] {
+        let (_, errors) = checked(source);
+        assert!(
+            errors.iter().any(|e| e.contains("not a subtype")),
+            "{errors:#?}"
+        );
+    }
+    let forwarding = original.replace("-> () -> Int", "-> () <- (Fail(E)) -> Int");
+    let source = format!(
+        "{forwarding}\nprovided = () {{ constrain(() {{ 42 }})() <- (Fail(raise = (_: Never) {{ panic(\"unreachable\") }})) }}"
     );
+    let (shown, errors) = checked(&source);
     assert!(errors.is_empty(), "{errors:#?}");
     assert!(
-        types.iter().any(|t| t == "app/main.pure : () -> Int"),
-        "{types:#?}"
-    );
-    let (_, errors) = checked(
-        "raises = () <- (handler: Fail(String)) { handler.raise(\"error\") }\nconstrain = (f: () <- (Fail(String)) -> Int) -> () -> Int { () { f() } }",
+        shown
+            .iter()
+            .any(|t| t.starts_with("app/main.pure :") && t.contains("Fail(")),
+        "{shown:#?}"
     );
     assert!(
-        errors.iter().any(|e| e.contains("not a subtype")),
-        "{errors:#?}"
+        shown.iter().any(|t| t == "app/main.provided : () -> Int"),
+        "{shown:#?}"
     );
 }
 

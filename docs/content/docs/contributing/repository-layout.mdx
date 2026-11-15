@@ -1,0 +1,57 @@
+---
+title: Repository layout
+description: Locate a source file and its neighboring tests.
+---
+
+Find the source and test directory for a behavior you want to change.
+
+```i test stdout=exact package=layout title="test/bool_test.i"
+(
+	testlib = (test) = std/test
+	std/bool
+)
+test("negation", () { assert(bool.not(False) == True) })
+```
+
+```text
+pass layout/bool_test.negation
+1 passed, 0 failed
+```
+
+Follow [std/src/bool.i](https://github.com/nmnmcc/i/blob/main/std/src/bool.i) to the export and its documentation; [std/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/std/test/bool_test.i) holds the neighboring cases.
+
+## Directories
+
+| Path | Contents |
+| --- | --- |
+| `crates/` | Compiler workspace; every crate is a member. |
+| `lib/i/` | Compiler-supplied `i/` modules. |
+| `std/` | Standard library sources and tests. |
+| `tests/spec/` | Cases grouped by standard section. |
+| `tests/review/` | Review projects, observations, and semantic requirements. |
+| `tests/` | Other test fixtures as well as spec and review cases. |
+| `examples/` | Example packages. |
+| `editors/` | VS Code, Zed, and tree-sitter support. |
+| `docs/` | Standard, site, development documents, and design notes. |
+| `scripts/` | Verification, corpus, generation, and development tools. |
+| `bench/` | Benchmark package and tests. |
+| `bindings/` | Host SDK and bindings. |
+| `licenses/` | Included third-party licenses. |
+| `.github/` | Workflows, including CI. |
+
+## Crates
+
+| Crate | Responsibility |
+| --- | --- |
+| `ilang-syntax` | Tokens, parser, syntax tree, formatter. |
+| `ilang-package` | Manifests, modules, dependencies, package graph. |
+| `ilang-check` | Resolution, top-level ordering, type inference. |
+| `ilang-macro` | Macro execution and expansion. |
+| `ilang-wasm` | WasmGC generation and runtime. |
+| `ilang-binaryen` | WasmGC optimization. |
+| `ilang-host` | Wasmtime embedding and binary interface. |
+| `ilang-cli` | Command dispatch and load/check/build/run pipeline. |
+| `ilang-lsp` | Editor diagnostics and operations. |
+| `ilang-runner` | Native runner with an appended program. |
+
+[Compiler architecture](/docs/contributing/compiler-architecture) connects the stages; [building and testing](/docs/contributing/building-and-testing) identifies their checks.

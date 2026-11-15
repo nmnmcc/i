@@ -3,7 +3,7 @@
 (
 	main
 )
-read = (r: (name = String)) { r.name }
+read = (r : (name = String)) { r.name }
 main = () {
 	old = (name = "Ada")
 	new = (name = "Ada")

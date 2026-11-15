@@ -14,6 +14,6 @@ pair = (
 	},
 )
 
-use = (f: () -> Int) -> Int { f() }
+use = (f : () -> Int) -> Int { f() }
 
 test("total", () { assert(use(pair.1) == 1) })

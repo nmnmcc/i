@@ -8,12 +8,12 @@ id = (x) { x }
 ids = id(id)
 
 // The value restriction: `ids` has one type for all its uses.
-n: Int = ids(1)
+n : Int = ids(1)
 
-s: String = ids("a")
+s : String = ids("a")
 
 // E0501: mismatch, with the place of the other side.
-add = (x: Int) { x + 1 }
+add = (x : Int) { x + 1 }
 
 bad_arg = () { add("a") }
 
@@ -27,7 +27,7 @@ arity = () { add(1, 2) }
 arity_var = (f) { (f(1), f(1, 2)) }
 
 // E0504: a value that could go to two type variables.
-ambiguous = <A, B>(x: A | B) { x }
+ambiguous = <A, B>(x : { A | B }) { x }
 
 use_ambiguous = () { ambiguous(1) }
 
@@ -41,12 +41,12 @@ Square = (side = Float)
 // E0512: a field that not every constructor has.
 Shape = Circle | Square
 
-radius = (s: Shape) { s.radius }
+radius = (s : Shape) { s.radius }
 
 // E0509: a top-level binding may not give errors or need an environment.
 Clock = (now = () -> Int)
 
-now = () <- (c: Clock) { c.now() }
+now = () <- (c : Clock) { c.now() }
 
 top_env = now()
 

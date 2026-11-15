@@ -3,7 +3,7 @@
 // Joint J3: the pipe value is evaluated before the other written arguments.
 method = "GET"
 port = 8080
-take = (first: method, last: port) { (first, last) }
+take = (first : method, last : port) { (first, last) }
 
 main = () {
 	_ = panic("pipe value") |> take(panic("argument"))

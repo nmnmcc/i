@@ -150,6 +150,8 @@ enum Command {
     /// `$XDG_CACHE_HOME/i`, else `~/.cache/i`; `I_CACHE=off` turns it off).
     #[command(subcommand)]
     Cache(commands::cache::CacheCommand),
+    /// Read the language standard.
+    Spec(commands::spec::SpecArgs),
     /// Run the language server, on standard input and output.
     Lsp,
     /// Format source files; by default every `.i` and `.is` file in `src/` and `test/`.
@@ -261,6 +263,7 @@ fn main() -> ExitCode {
         ),
         Command::Package(c) => commands::package::run(c),
         Command::Cache(c) => return finish(commands::cache::run(c)),
+        Command::Spec(args) => return finish(commands::spec::run(args)),
         Command::Lsp => commands::lsp::run(),
         Command::Fmt {
             project,

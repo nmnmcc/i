@@ -1,5 +1,7 @@
 //! Tests of the lexer: the token sets of §1.7 and positions.
 
+#[path = "oracle.rs"]
+mod ilang_syntax;
 use ilang_syntax::lex;
 use ilang_syntax::span::LineIndex;
 use ilang_syntax::token::TokenKind as T;

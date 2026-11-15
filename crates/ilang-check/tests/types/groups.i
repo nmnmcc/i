@@ -9,7 +9,7 @@ f = (x) {
 
 h = (z) { g(z) }
 
-w: String = g(5)
+w : String = g(5)
 
 f1 = (x) { g1(x) }
 

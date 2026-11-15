@@ -5,10 +5,10 @@
 	i/key
 )
 
-wide = (k: Key(Int | String)) { key.wrap(k, "x") }
+wide = (k : Key(Int | String)) { key.wrap(k, "x") }
 
 main = () {
-	narrow: Key(Int) = key.new()
+	narrow : Key(Int) = key.new()
 	wide(narrow)
 	Nil
 }

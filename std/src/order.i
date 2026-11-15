@@ -29,7 +29,7 @@ Order = Less | Equal | Greater
 /// ```i
 /// order.negate(Less)  // Greater
 /// ```
-negate = (order: Order) -> Order {
+negate = (order : Order) -> Order {
 	order |> (Less) { Greater } | (Equal) { Equal } | (Greater) { Less }
 }
 
@@ -38,17 +38,17 @@ negate = (order: Order) -> Order {
 /// ```i
 /// list.sort([1, 3, 2], order.reverse(int.compare))  // [3, 2, 1]
 /// ```
-reverse = <A, N>(orderer: (A, A) <- N -> Order) -> (A, A) <- N -> Order {
+reverse = <A, N>(orderer : (A, A) <- N -> Order) -> (A, A) <- N -> Order {
 	(a, b) { orderer(b, a) }
 }
 
 /// `-1` for `Less`, `0` for `Equal`, and `1` for `Greater`.
-to_int = (order: Order) -> Int {
+to_int = (order : Order) -> Int {
 	order |> (Less) { -1 } | (Equal) { 0 } | (Greater) { 1 }
 }
 
 /// Compares two orders, with `Less < Equal < Greater`.
-compare = (a: Order, with: Order) -> Order {
+compare = (a : Order, with : Order) -> Order {
 	x = to_int(a)
 	y = to_int(with)
 	{ x == y } |>
@@ -57,12 +57,12 @@ compare = (a: Order, with: Order) -> Order {
 }
 
 /// The greater of two orders, with `Less < Equal < Greater`.
-max = (a: Order, b: Order) -> Order {
+max = (a : Order, b : Order) -> Order {
 	compare(a, b) |> (Less) { b } | (_) { a }
 }
 
 /// The smaller of two orders, with `Less < Equal < Greater`.
-min = (a: Order, b: Order) -> Order {
+min = (a : Order, b : Order) -> Order {
 	compare(a, b) |> (Greater) { b } | (_) { a }
 }
 
@@ -73,20 +73,20 @@ min = (a: Order, b: Order) -> Order {
 /// ```i
 /// order.break_tie(int.compare(1, 1), Less)  // Less
 /// ```
-break_tie = (in: Order, with: Order) -> Order {
+break_tie = (in : Order, with : Order) -> Order {
 	in |> (Equal) { with } | (_) { in }
 }
 
 /// Like `break_tie`, but `with` is only called when it is needed.
-lazy_break_tie = <N>(in: Order, with: () <- N -> Order) -> Order {
+lazy_break_tie = <N>(in : Order, with : () <- N -> Order) -> Order {
 	in |> (Equal) { with() } | (_) { in }
 }
 
 /// `True` for `Less`.
-is_less = (order: Order) -> Bool { order == Less }
+is_less = (order : Order) -> Bool { order == Less }
 
 /// `True` for `Equal`.
-is_equal = (order: Order) -> Bool { order == Equal }
+is_equal = (order : Order) -> Bool { order == Equal }
 
 /// `True` for `Greater`.
-is_greater = (order: Order) -> Bool { order == Greater }
+is_greater = (order : Order) -> Bool { order == Greater }

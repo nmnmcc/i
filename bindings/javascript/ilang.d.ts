@@ -11,7 +11,8 @@ export interface Signature {
 export interface EntryPoint { name: string; async?: boolean }
 /** The ilang.abi metadata. */
 export interface Abi {
-  version: 4;
+  /** Hosts also read legacy versions 3 and 4. */
+  version: 3 | 4 | 5;
   entry?: EntryPoint | null;
   tests?: EntryPoint[];
   exports?: Record<string, Signature>;

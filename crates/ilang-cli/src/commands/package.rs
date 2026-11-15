@@ -170,9 +170,9 @@ fn main_module(name: &str) -> String {
 (greeting)
 
 /// The greeting for `who`.
-greeting = (who: String) -> String {{ "Hello, " <> who <> "!" }}
+greeting = (who : String) -> String {{ "Hello, " <> who <> "!" }}
 
-main = () <- (io: Io) {{
+main = () <- (io : Io) {{
   io.print(greeting("{name}"))
 }}
 "#
@@ -532,6 +532,18 @@ fn remove(project: &Path, name: &str) -> Result<ExitCode> {
 // ---- i update ----
 
 fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
+    // Authenticate the current resolution before changing requirements. A
+    // version bump must not hide a moved historical tag (or corrupt cache),
+    // and a no-op update must not report success without checking integrity.
+    let (graph, diags) = load(project, false);
+    if diags.iter().any(|d| {
+        matches!(
+            d.code,
+            ilang_package::code::LOCK_MISMATCH | ilang_package::code::PACKAGE_FILES
+        )
+    }) {
+        return Err(problems(&graph, &diags));
+    }
     let mut file = PackageFile::read(project)?;
     let all: Vec<(bool, manifest::Dependency)> = file
         .manifest
@@ -849,6 +861,29 @@ fn check_clean(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Check the committed package tree, never the destinations of its links.
+fn check_source_links_at(project: &Path, revision: &str) -> Result<()> {
+    let prefix = git_in(project, &["rev-parse", "--show-prefix"])?;
+    let prefix = prefix.trim_end_matches('/');
+    let tree = if prefix.is_empty() {
+        revision.to_owned()
+    } else {
+        format!("{revision}:{prefix}")
+    };
+    let listing = git_in(project, &["ls-tree", "--full-tree", "-r", "-z", &tree])?;
+    let files = listing
+        .split('\0')
+        .filter_map(|entry| entry.split_once('\t'))
+        .filter(|(metadata, _)| metadata.starts_with("120000 "))
+        .map(|(_, path)| ilang_package::lock::PackageFile {
+            path: path.into(),
+            kind: ilang_package::lock::FileKind::Symlink,
+            bytes: Vec::new(),
+        })
+        .collect::<Vec<_>>();
+    ilang_package::git::check_source_links(&files).map_err(|e| anyhow!(e.message))
+}
+
 fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
     let version = parse_version(version.strip_prefix('v').unwrap_or(version))
         .ok_or_else(|| anyhow!("`{version}` is not a version `major.minor.patch`"))?;
@@ -861,6 +896,7 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
         .context("the package must be in a git repository with a commit")?;
     check_clean(project)?;
     println!("ok: the git working tree is clean");
+    check_source_links_at(project, "HEAD")?;
 
     // 2. `i check` and `i test` pass.
     check_and_test(project)?;
@@ -1066,6 +1102,11 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
     if git_in(&top, &["cat-file", "-e", &toml]).is_err() {
         return Ok(None);
     }
+    if let Err(error) = check_source_links_at(project, tag) {
+        // A major release can repair an old invalid package, but comparison
+        // must not read anything outside that old committed tree.
+        return Ok(Some(Err(error)));
+    }
     let tmp = tempfile::tempdir().context("a temporary directory could not be made")?;
     let archive = Command::new("git")
         .arg("-C")
@@ -1171,8 +1212,68 @@ type Interface = BTreeMap<String, Entry>;
 /// The interface of the package in `dir`, checked without its tests. The
 /// outer error is a problem of the tool; the inner one says that the
 /// package does not check.
+/// An unrestricted transformer can inspect syntax and call compile-time code.
+/// Its ordinary function type cannot prove client compatibility. Fingerprint
+/// the defining module and import closure, including module initializers.
+fn macro_contracts(graph: &PackageGraph, out: &mut Interface) -> Result<()> {
+    let (parsed_modules, _) = ilang_check::parse(graph);
+    for parsed in &parsed_modules {
+        if Some(parsed.package) != graph.root || parsed.kind != ModuleKind::Src {
+            continue;
+        }
+        let lisp = graph.sources.get(parsed.source).display.ends_with(".is");
+        let definitions = ilang_syntax::lisp::expansion::definitions(&parsed.ast, lisp)
+            .map_err(|_| anyhow!("invalid macro interface"))?;
+        let closure = ilang_macro::prepare::import_closure(graph, &parsed_modules, parsed.source)
+            .map_err(|ds| problems(graph, &ds))?;
+        let files = closure
+            .iter()
+            .map(|module| {
+                let identity = ilang_check::identity::package_identity(graph, module.package);
+                ilang_package::lock::PackageFile {
+                    path: format!("{identity:?}/{}", inner_path(&module.path)),
+                    kind: ilang_package::lock::FileKind::Regular,
+                    bytes: graph.sources.get(module.source).text.as_bytes().to_vec(),
+                }
+            })
+            .collect::<Vec<_>>();
+        let hash = ilang_package::lock::hash(&files);
+        for definition in definitions {
+            if !parsed
+                .ast
+                .exports
+                .iter()
+                .any(|e| e.name.name == definition.name)
+            {
+                continue;
+            }
+            let kind = if definition.signature.is_some() {
+                "typed"
+            } else {
+                "syntax"
+            };
+            let shapes = if definition.variants.is_empty() {
+                vec![definition.labels]
+            } else {
+                definition.variants.into_iter().map(|v| v.labels).collect()
+            };
+            let contract = format!("{kind} {shapes:?} {hash}");
+            out.insert(
+                format!("macro {}.{}", inner_path(&parsed.path), definition.name),
+                Entry {
+                    shown: contract.clone(),
+                    canonical: contract,
+                    alias: None,
+                    scheme: None,
+                },
+            );
+        }
+    }
+    Ok(())
+}
+
 fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
-    let (graph, mut diags) = ilang_package::load_with(
+    let (mut graph, mut diags) = ilang_package::load_with(
         dir,
         &LoadOptions {
             tests: false,
@@ -1183,7 +1284,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
     let Some(root) = graph.root else {
         return Ok(Err(problems(&graph, &diags)));
     };
-    let checked = ilang_check::check(&graph);
+    let checked = ilang_macro::project::check(&mut graph);
     diags.extend(checked.diags);
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {
         return Ok(Err(problems(&graph, &diags)));
@@ -1335,6 +1436,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             },
         );
     }
+    macro_contracts(&graph, &mut out)?;
     Ok(Ok(out))
 }
 
@@ -2129,22 +2231,22 @@ mod value_type_interfaces {
     #[test]
     fn exported_alias_uses_completed_body_not_private_source_spelling() {
         // X3: private renames are stable, changed closed public types differ.
-        let a = canonical("(A)\nprivate: Int = 1\nA = private");
-        assert_eq!(a, canonical("(A)\nother: Int = 1\nA = other"));
-        assert_ne!(a, canonical("(A)\nprivate: String = \"a\"\nA = private"));
+        let a = canonical("(A)\nprivate : Int = 1\nA = private");
+        assert_eq!(a, canonical("(A)\nother : Int = 1\nA = other"));
+        assert_ne!(a, canonical("(A)\nprivate : String = \"a\"\nA = private"));
         assert!(a["type api.A"].ends_with("= Int"));
     }
     #[test]
     fn completed_alias_keeps_formal_positions() {
         // X3: alpha-renaming cannot reorder formal parameter identities.
-        let a = canonical("(\n\tPair\n)\nport: Int = 1\nPair(A, B) = { (B, A, port) }");
+        let a = canonical("(\n\tPair\n)\nport : Int = 1\nPair(A, B) = { (B, A, port) }");
         assert_eq!(
             a,
-            canonical("(\n\tPair\n)\nother: Int = 2\nPair(X, Y) = { (Y, X, other) }")
+            canonical("(\n\tPair\n)\nother : Int = 2\nPair(X, Y) = { (Y, X, other) }")
         );
         assert_ne!(
             a,
-            canonical("(\n\tPair\n)\nport: Int = 1\nPair(A, B) = { (A, B, port) }")
+            canonical("(\n\tPair\n)\nport : Int = 1\nPair(A, B) = { (A, B, port) }")
         );
     }
     #[test]
@@ -2158,30 +2260,30 @@ mod value_type_interfaces {
             canonical("(A)\nv=\"a\"\nA=v")
         );
         // This is deliberately beyond the limited hover's first ten members.
-        let source = "(A)\nv: 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19=0\nA=v";
+        let source = "(A)\nv : { 0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19 }=0\nA=v";
         let a = canonical(source);
-        assert_ne!(a, canonical(&source.replace("18|19=0", "18|20=0")));
+        assert_ne!(a, canonical(&source.replace("18|19", "18|20")));
         assert!(!a["type api.A"].contains('…'));
         assert!(a["type api.A"].contains("19"));
     }
     #[test]
     fn commutative_alias_members_keep_canonical_formal_identity() {
-        let a = canonical("(\n\tT\n)\nport: Int = 1\nT(A, B) = { (B, A, Int | String, port) }");
-        let b = canonical("(\n\tT\n)\nvalue: Int = 2\nT(X, Y) = { (Y, X, String | Int, value) }");
+        let a = canonical("(\n\tT\n)\nport : Int = 1\nT(A, B) = { (B, A, Int | String, port) }");
+        let b = canonical("(\n\tT\n)\nvalue : Int = 2\nT(X, Y) = { (Y, X, String | Int, value) }");
         assert_eq!(a, b);
     }
     #[test]
     fn record_interfaces_preserve_label_parameters_and_field_sets() {
         // A label is concrete; rename the generic value type, keeping its key.
         let a = canonical(
-            "(f, Person)\nf = <A>(r: (item = A), key: String) -> Int { 1 }\nPerson = { (name = String, age = Int) }",
+            "(f, Person)\nf = <A>(r : (item = A), key : String) -> Int { 1 }\nPerson = { (name = String, age = Int) }",
         );
         let b = canonical(
-            "(f, Person)\nf = <Value>(r: (item = Value), key: String) -> Int { 1 }\nPerson = { (age = Int, name = String) }",
+            "(f, Person)\nf = <Value>(r : (item = Value), key : String) -> Int { 1 }\nPerson = { (age = Int, name = String) }",
         );
         assert_eq!(a, b);
         let changed = canonical(
-            "(f, Person)\nf = <Value>(r: (item = Value), key: String) -> Int { 1 }\nPerson = { (age = String, name = String) }",
+            "(f, Person)\nf = <Value>(r : (item = Value), key : String) -> Int { 1 }\nPerson = { (age = String, name = String) }",
         );
         assert_ne!(a, changed);
     }
@@ -2296,11 +2398,11 @@ mod value_type_interfaces {
         // changed retained scheme still requires a major version. As in
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.
-        let a = interface("(f)\nf = <K>(r: (item = Int), key: K) -> Int { r.item }");
+        let a = interface("(f)\nf = <K>(r : (item = Int), key : K) -> Int { r.item }");
         let same =
-            interface("(f)\nf = <LabelName>(r: (item = Int), key: LabelName) -> Int { r.item }");
+            interface("(f)\nf = <LabelName>(r : (item = Int), key : LabelName) -> Int { r.item }");
         let changed = interface(
-            "(f)\nf = <LabelName>(r: (item = String), key: LabelName) -> String { r.item }",
+            "(f)\nf = <LabelName>(r : (item = String), key : LabelName) -> String { r.item }",
         );
         assert!(Diff::new(&a, &same).unwrap().changed.is_empty());
         let diff = Diff::new(&a, &changed).unwrap();
@@ -2321,8 +2423,8 @@ mod value_type_interfaces {
         // changed retained scheme still requires a major version. As in
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.
-        let generic = interface("(f)\nf = (r: (a = _)) { r.a }");
-        let concrete = interface("(\n\tf\n)\nf = (r: (a = Int)) { r.a }");
+        let generic = interface("(f)\nf = (r : (a = _)) { r.a }");
+        let concrete = interface("(\n\tf\n)\nf = (r : (a = Int)) { r.a }");
         let diff = Diff::new(&generic, &concrete).unwrap();
         assert_eq!(
             diff.version_step(),
@@ -2333,7 +2435,7 @@ mod value_type_interfaces {
             "no semantic counterexample was proved"
         );
         assert_eq!(diff.representation.len(), 1);
-        let annotated = interface("(\n\tf\n)\nf = <A>(r: (a = A)) -> A { r.a }");
+        let annotated = interface("(\n\tf\n)\nf = <A>(r : (a = A)) -> A { r.a }");
         assert!(Diff::new(&generic, &annotated).unwrap().changed.is_empty());
     }
 
@@ -2344,8 +2446,8 @@ mod value_type_interfaces {
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.
         // K is an ordinary argument type; the closed field key is `item`.
-        let generic = interface("(f)\nf = <K, V>(r: (item = V), key: K) -> V { r.item }");
-        let concrete = interface("(f)\nf = <K>(r: (item = Int), key: K) -> Int { r.item }");
+        let generic = interface("(f)\nf = <K, V>(r : (item = V), key : K) -> V { r.item }");
+        let concrete = interface("(f)\nf = <K>(r : (item = Int), key : K) -> Int { r.item }");
         let diff = Diff::new(&generic, &concrete).unwrap();
         assert_eq!(
             diff.version_step(),
@@ -2357,7 +2459,7 @@ mod value_type_interfaces {
         );
         assert_eq!(diff.representation.len(), 1);
         let renamed = interface(
-            "(f)\nf = <LabelName, Item>(r: (item = Item), key: LabelName) -> Item { r.item }",
+            "(f)\nf = <LabelName, Item>(r : (item = Item), key : LabelName) -> Item { r.item }",
         );
         assert!(Diff::new(&generic, &renamed).unwrap().changed.is_empty());
     }
@@ -2366,18 +2468,18 @@ mod value_type_interfaces {
     fn generic_record_update_schemes_compare_after_binder_renaming() {
         // Closed updates still compare the replaced and preserved parts.
         let a = interface(
-            "(f)\nf = <Old, Keep, K, V>(r: (item = Old, keep = Keep), key: K, value: V) -> (item = V, keep = Keep) { (..r, item = value) }",
+            "(f)\nf = <Old, Keep, K, V>(r : (item = Old, keep = Keep), key : K, value : V) -> (item = V, keep = Keep) { (..r, item = value) }",
         );
         let b = interface(
-            "(f)\nf = <Before, Stay, LabelName, Item>(r: (keep = Stay, item = Before), key: LabelName, value: Item) -> (keep = Stay, item = Item) { (..r, item = value) }",
+            "(f)\nf = <Before, Stay, LabelName, Item>(r : (keep = Stay, item = Before), key : LabelName, value : Item) -> (keep = Stay, item = Item) { (..r, item = value) }",
         );
         assert!(Diff::new(&a, &b).unwrap().changed.is_empty());
     }
 
     #[test]
     fn record_scheme_comparison_is_independent_of_distributed_graph_shape() {
-        let joined = interface("(\n\tf\n)\nf = (r: (a = Int | String)) { r }");
-        let split = interface("(\n\tf\n)\nf = (r: (a = Int) | (a = String)) { r }");
+        let joined = interface("(\n\tf\n)\nf = (r : (a = Int | String)) { r }");
+        let split = interface("(\n\tf\n)\nf = (r : { (a = Int) | (a = String) }) { r }");
         assert!(Diff::new(&joined, &split).unwrap().changed.is_empty());
     }
 
@@ -2389,9 +2491,9 @@ mod value_type_interfaces {
         // a claim that a semantic counterexample was proved.
         // Field keys are concrete and independent of argument type parameters.
         let both =
-            interface("(\n\tf\n)\nf = <K>(r: (k = Int, fixed = String), key: K) -> Int { 1 }");
+            interface("(\n\tf\n)\nf = <K>(r : (k = Int, fixed = String), key : K) -> Int { 1 }");
         let override_field =
-            interface("(\n\tf\n)\nf = <K>(r: (fixed = String), key: K) -> Int { 1 }");
+            interface("(\n\tf\n)\nf = <K>(r : (fixed = String), key : K) -> Int { 1 }");
         let diff = Diff::new(&both, &override_field).unwrap();
         assert_eq!(
             diff.version_step(),
@@ -2411,10 +2513,11 @@ mod value_type_interfaces {
         // main's open_alias test, Unknown is a representation change, not
         // a claim that a semantic counterexample was proved.
         // Field keys are concrete and independent of argument type parameters.
-        let both =
-            interface("(\n\tf\n)\nf = <K, J>(r: (k = Int, j = String), k: K, j: J) -> Int { 1 }");
+        let both = interface(
+            "(\n\tf\n)\nf = <K, J>(r : (k = Int, j = String), k : K, j : J) -> Int { 1 }",
+        );
         let override_field =
-            interface("(\n\tf\n)\nf = <K, J>(r: (j = String), k: K, j: J) -> Int { 1 }");
+            interface("(\n\tf\n)\nf = <K, J>(r : (j = String), k : K, j : J) -> Int { 1 }");
         let diff = Diff::new(&both, &override_field).unwrap();
         assert_eq!(
             diff.version_step(),
@@ -2447,10 +2550,10 @@ mod value_type_interfaces {
     #[test]
     fn union_instantiation_covers_correlated_and_independent_parameters() {
         let old = interface(
-            "(\n\tpick\n)\npick = <A>(flag: Bool, x: A, y: A) -> (value = A) {\n\t(value = flag |> (True) { x } | (False) { y })\n}",
+            "(\n\tpick\n)\npick = <A>(flag : Bool, x : A, y : A) -> (value = A) {\n\t(value = flag |> (True) { x } | (False) { y })\n}",
         );
         let new = interface(
-            "(\n\tpick\n)\npick = <A, B>(flag: Bool, x: A, y: B) -> (value = A | B) {\n\t(value = flag |> (True) { x } | (False) { y })\n}",
+            "(\n\tpick\n)\npick = <A, B>(flag : Bool, x : A, y : B) -> (value = A | B) {\n\t(value = flag |> (True) { x } | (False) { y })\n}",
         );
         let diff = Diff::new(&old, &new).unwrap();
         assert!(diff.changed.is_empty());

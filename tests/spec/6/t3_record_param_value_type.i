@@ -7,6 +7,6 @@
 (
 	main
 )
-f = (getter: record.get) { Nil }
+f = (getter : record.get) { Nil }
 
 main = () { Nil }

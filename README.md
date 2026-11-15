@@ -142,6 +142,7 @@ The compiler, the optimizer, the library, the formatter and the language server 
 | `i run [NAME]` | Build and run `main`, or the entry `NAME` of `i.toml` |
 | `i test [FILTER]` | Build and run the tests |
 | `i build [NAME]` | Build one static native executable; `--target js`, `nodejs`, `wasi` or `host` builds a Wasm module |
+| `i spec` | Read the language standard |
 | `i fmt` | Format `.i` and `.is` files; `--to` converts a file to the other surface |
 | `i expand` | Print a module after macro expansion |
 | `i add`, `remove`, `update`, `deps`, `publish` | Manage dependencies: packages are git repositories, with minimal version selection |

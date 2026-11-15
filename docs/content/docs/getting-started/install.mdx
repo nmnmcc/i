@@ -1,0 +1,29 @@
+---
+title: Install
+description: Build the compiler from source code.
+---
+
+Build i from source code.
+
+```sh
+git submodule update --init crates/ilang-binaryen/binaryen
+devenv shell
+cargo build --release
+```
+
+Use Nix and devenv 2.4.0; the development shell supplies the pinned toolchain and Binaryen build tools. Git fetches the submodule; the first build compiles Binaryen from source.
+
+## Compiler path
+
+```sh
+export PATH="$PWD/target/release:$PATH"
+i --version
+```
+
+```text
+i 0.1.0
+```
+
+Run this from the i source folder, or invoke `target/release/i` directly. That executable includes library modules, the formatter, and the language server. i is in development with no published release or package; its archive scripts produce local releases only.
+
+[First program](/docs/getting-started/first-program)

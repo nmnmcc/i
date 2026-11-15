@@ -5,7 +5,7 @@ main = 1
 
 c = (x) { x }
 
-d = () <- (env: Assert) { Nil }
+d = () <- (env : Assert) { Nil }
 
 e = { () { Nil } }
 

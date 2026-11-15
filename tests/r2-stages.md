@@ -300,8 +300,8 @@ and src/main.i:
 Bundle = ()
 @host("probe", "request")
 Work = (start = () -> Request(Int))
-make = () <- (work: Work) { Bundle }
-probe = () <- (bundle: Bundle) { Nil }
+make = () <- (work : Work) { Bundle }
+probe = () <- (bundle : Bundle) { Nil }
 ```
 
 The entry's ordinary inferred environment contains only Bundle. Under the
