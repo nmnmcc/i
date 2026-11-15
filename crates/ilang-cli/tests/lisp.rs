@@ -374,6 +374,7 @@ fn make_private(path: &std::path::Path) {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
 }
 
+#[cfg(unix)]
 #[test]
 fn conversion_keeps_a_private_files_mode_going_to_lisp() {
     if running_as_root() {
@@ -397,6 +398,7 @@ fn conversion_keeps_a_private_files_mode_going_to_lisp() {
     assert_eq!(mode_of(&file.with_extension("is")), 0o600);
 }
 
+#[cfg(unix)]
 #[test]
 fn conversion_keeps_a_private_files_mode_going_to_normal() {
     if running_as_root() {
@@ -420,6 +422,7 @@ fn conversion_keeps_a_private_files_mode_going_to_normal() {
     assert_eq!(mode_of(&file.with_extension("i")), 0o600);
 }
 
+#[cfg(unix)]
 #[test]
 fn in_place_replacement_keeps_a_private_files_mode() {
     if running_as_root() {
@@ -444,6 +447,7 @@ fn in_place_replacement_keeps_a_private_files_mode() {
     assert_eq!(mode_of(&file), 0o600);
 }
 
+#[cfg(unix)]
 #[test]
 fn a_refused_conversion_keeps_a_private_files_mode() {
     if running_as_root() {
