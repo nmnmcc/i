@@ -377,6 +377,45 @@ fn new_package_copies_the_std_licenses_and_notices() {
     assert!(read(&dir.join("std/src/regex.i")).contains("Unicode license"));
 }
 
+/// Every regular file under `dir`, as paths relative to `dir`.
+fn files_under(dir: &std::path::Path, prefix: &std::path::Path, out: &mut Vec<PathBuf>) {
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        let relative = prefix.join(path.file_name().unwrap());
+        if path.is_dir() {
+            files_under(&path, &relative, out);
+        } else {
+            out.push(relative);
+        }
+    }
+}
+
+#[test]
+fn new_package_copies_every_std_source_file() {
+    let w = World::new();
+    w.ok(&["new", "demo"]);
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let copy = w.path().join("demo/std");
+    let mut files = Vec::new();
+    files_under(&source.join("src"), Path::new("src"), &mut files);
+    assert!(!files.is_empty());
+    for relative in files {
+        assert_eq!(
+            read(&copy.join(&relative)),
+            read(&source.join(&relative)),
+            "{}",
+            relative.display()
+        );
+    }
+    for relative in ["i.toml", "UNICODE-LICENSE"] {
+        assert_eq!(
+            read(&copy.join(relative)),
+            read(&source.join(relative)),
+            "{relative}"
+        );
+    }
+}
+
 #[test]
 fn new_with_a_path_and_bad_names() {
     let w = World::new();
