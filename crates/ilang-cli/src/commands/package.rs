@@ -117,27 +117,33 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
 // ---- i new ----
 
 fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
-    if !is_name(name) || name == "i" || name == "std" {
+    if !is_name(name) || name == "i" {
         bail!(
-            "the package name `{name}` must be a name: a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i` or `std`"
+            "the package name `{name}` must be a name: a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i`"
         );
     }
     let dir = path.unwrap_or_else(|| PathBuf::from(name));
     if dir.exists() && std::fs::read_dir(&dir)?.next().is_some() {
         bail!("`{}` is already there and is not empty", dir.display());
     }
+    // A package named `std` cannot depend on a dependency also named `std`;
+    // the copied package gets another dependency key. Nothing else changes.
+    let dependency = if name == "std" { "stdlib" } else { "std" };
     let mut files = vec![
         (
             "i.toml".to_string(),
             // `std` is an ordinary dependency, copied next to the program by
             // `i new`, so the manifest has no local absolute path.
             format!(
-                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = \"std\" }}\n"
+                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\n{dependency} = {{ path = \"std\" }}\n"
             ),
         ),
         (".gitignore".to_string(), "/build/\n".to_string()),
         ("src/main.i".to_string(), formatted(main_module(name))),
-        ("test/main_test.i".to_string(), formatted(test_module(name))),
+        (
+            "test/main_test.i".to_string(),
+            formatted(test_module(name, dependency)),
+        ),
     ];
     for (relative, text) in ilang_cli::std_package::STD_FILES {
         files.push((format!("std/{relative}"), text.to_string()));
@@ -180,10 +186,10 @@ main = () <- (io : Io) {{
     )
 }
 
-fn test_module(name: &str) -> String {
+fn test_module(name: &str, dependency: &str) -> String {
     format!(
         r#"(
-	testlib = (test) = std/test
+	testlib = (test) = {dependency}/test
 	{name}/main)
 
 
