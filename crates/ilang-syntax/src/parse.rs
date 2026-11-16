@@ -1041,8 +1041,7 @@ impl Parser<'_> {
             let amp = self.bump();
             let begins = self.at(&T::LParen) && self.at_function(self.pos) || self.at_generics();
             if !begins {
-                let msg =
-                    "`&` joins only function literals: a function literal `( … ) { … }` must follow it";
+                let msg = "`&` joins only function literals: a function literal `( … ) { … }` must follow it";
                 return Err(Diagnostic::new(Code::Unexpected, amp, msg));
             }
             branches.push(self.function()?);
