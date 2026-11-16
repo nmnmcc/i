@@ -33,6 +33,7 @@
 //!
 //! `cargo test -p ilang-cli --test spec -- <filter>` runs the cases whose
 //! path has the filter.
+//! `I_SPEC_SHARD=k/n` runs every n-th case from the k-th, for CI's shards.
 //! `I_SPEC_TRACE=1` reports each case's build, load and run progress to
 //! standard error while the summary stays ordered by case name.
 
@@ -412,6 +413,23 @@ fn main() {
             }
             Err(e) => failures.push(e),
         }
+    }
+    // `I_SPEC_SHARD=k/n` keeps every n-th ready case from the k-th (1-based),
+    // so that CI can run the suite in n jobs; the cases are in a stable order.
+    if let Some(shard) = std::env::var_os("I_SPEC_SHARD") {
+        let shard = shard.to_string_lossy().into_owned();
+        let (k, n) = shard
+            .split_once('/')
+            .and_then(|(k, n)| Some((k.parse::<usize>().ok()?, n.parse::<usize>().ok()?)))
+            .filter(|&(k, n)| 1 <= k && k <= n)
+            .unwrap_or_else(|| panic!("I_SPEC_SHARD must be k/n with 1 <= k <= n, not {shard:?}"));
+        ready = ready
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| i % n == k - 1)
+            .map(|(_, c)| c)
+            .collect();
+        println!("spec: shard {k} of {n}");
     }
     let total = ready.len();
     let results = Mutex::new(Vec::new());
