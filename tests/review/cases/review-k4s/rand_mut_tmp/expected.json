@@ -1,8 +1,8 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "5c7162a306383db858b441c648e01bca79ef9aef",
+  "binary_sha256": "76de82896d2d6eff1ab94e7e7230b8dd9a06c21124405bd439c14db91cab9cf5",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:17:13: error[E0101]: expected an expression, found `<-`\n1 error\n"
+      "stderr": "src/main.i:17:13: error[E0101]: expected an expression, found `<-`\nsrc/main.i:23:3: error[E0101]: `|` no longer joins function values: join the branches with `&`\nsrc/main.i:33:3: error[E0101]: `|` no longer joins function values: join the branches with `&`\nsrc/main.i:38:3: error[E0101]: `|` no longer joins function values: join the branches with `&`\n4 errors\n"
     }
   }
 }
