@@ -1519,10 +1519,10 @@
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
   },
-  "crates/ilang-cli/src/commands/package.rs:06f8b6b48e622d4f": {
+  "crates/ilang-cli/src/commands/package.rs:ac7dd3c38c3ce759": {
     "not_source": "TOML manifest template that `i new` writes: `std` is an ordinary dependency copied next to the program, so this is not i source."
   },
-  "crates/ilang-cli/tests/common/test_project.rs:06f8b6b48e622d4f": {
+  "crates/ilang-cli/tests/common/test_project.rs:ac7dd3c38c3ce759": {
     "not_source": "TOML manifest template that `i new` writes: `std` is an ordinary dependency copied next to the program, so this is not i source."
   },
   "crates/ilang-cli/tests/common/test_project.rs:df747cb87930f0f2": {
@@ -1722,11 +1722,15 @@
   "crates/ilang-cli/tests/value_type_performance.rs:217fe1a139ac8e12": {
     "not_source": "Rust format string for a type name"
   },
-  "crates/ilang-cli/src/commands/package.rs:27726af531628f45": {
+  "crates/ilang-cli/src/commands/package.rs:16dccb80e64855ff": {
     "substitutions": [
       [
         "{name}",
         "app"
+      ],
+      [
+        "{dependency}",
+        "std"
       ],
       [
         "{{",
@@ -3051,5 +3055,8 @@
   },
   "crates/ilang-cli/tests/fmt_to_safety.rs:3efda719859a84ab": {
     "not_source": "Rust format template for generated i source; the runtime test converts the generated module"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:9a401754e36c5860": {
+    "not_source": "TOML manifest or manifest fragment"
   }
 }
