@@ -163,19 +163,20 @@ inner() {
 
   echo
   echo "== README's first example, the one it says prints 42 =="
-  # If `i new` failed above, keep going and report every check that fails.
-  mkdir -p app/src
-  block "$work/README.md" '^```text' 1 > app/src/main.i
-  echo "\$ cat app/src/main.i"
-  cat app/src/main.i
+  # A package of its own, so that the template above stays as `i new` made it.
+  step "$work/bin/i" new readme_main
+  mkdir -p readme_main/src
+  block "$work/README.md" '^```text' 1 > readme_main/src/main.i
+  echo "\$ cat readme_main/src/main.i"
+  cat readme_main/src/main.i
   local promised
   promised=$(sed -n 's/.*`i run` prints `\([^`]*\)`.*/\1/p' "$work/README.md" | head -1)
   if [[ -z $promised ]]; then
     echo "  README does not say what \`i run\` prints  <-- FAILED"
     status=1
   else
-    echo "\$ i run --offline --project app   (README: prints $promised)"
-    if out=$("$work/bin/i" run --offline --project app 2>&1) && [[ $out == "$promised" ]]; then
+    echo "\$ i run --offline --project readme_main   (README: prints $promised)"
+    if out=$("$work/bin/i" run --offline --project readme_main 2>&1) && [[ $out == "$promised" ]]; then
       echo "$out"
       echo "  exit 0"
     else
@@ -190,20 +191,23 @@ inner() {
   step "$work/bin/i" new readme_test
   mkdir -p readme_test/test
   block "$work/README.md" '^```text' 2 > readme_test/test/clock_test.i
-  local name
-  name=$(sed -n 's/^test("\([^"]*\)".*/\1/p' readme_test/test/clock_test.i | head -1)
-  if [[ -z $name ]]; then
-    echo "  the README block has no test name  <-- FAILED"
+  local promised_pass expected_pass
+  promised_pass=$(sed -n 's/.*`i test` prints `\([^`]*\)`.*/\1/p' "$work/README.md" | head -1)
+  if [[ -z $promised_pass ]]; then
+    echo "  README does not say what \`i test\` prints  <-- FAILED"
     status=1
+    promised_pass="pass readme_test/clock_test.a"
   fi
-  echo "\$ i test --offline --project readme_test   (README: a passing test named '$name')"
+  # "pass tour/clock_test.a a test gives its own clock" -> our package's name.
+  expected_pass="pass readme_test/${promised_pass#pass */}"
+  echo "\$ i test --offline --project readme_test   (README: $expected_pass)"
   if out=$("$work/bin/i" test --offline --project readme_test 2>&1); then
     echo "$out"
-    if grep -qxE "pass readme_test/clock_test\.a $name" <<<"$out" &&
+    if grep -qxF -- "$expected_pass" <<<"$out" &&
       grep -qxE '[0-9]+ passed, 0 failed' <<<"$out"; then
       echo "  the documented test passes"
     else
-      echo "  <-- FAILED (expected 'pass readme_test/clock_test.a $name' and all passed)"
+      echo "  <-- FAILED (expected '$expected_pass' and all passed)"
       status=1
     fi
   else
@@ -233,6 +237,7 @@ inner() {
   echo
   echo "== the package moved and copied elsewhere =="
   cp -a app copied
+  cp -a readme_main moved-readme
   echo "\$ i check --offline --project copied"
   if out=$("$work/bin/i" check --offline --project copied 2>&1); then
     echo "  exit 0"
@@ -241,8 +246,8 @@ inner() {
     echo "  <-- FAILED"
     status=1
   fi
-  echo "\$ i run --offline --project copied   (README's first example again)"
-  if out=$("$work/bin/i" run --offline --project copied 2>&1) && [[ $out == "${promised:-42}" ]]; then
+  echo "\$ i run --offline --project moved-readme   (README's first example, moved)"
+  if out=$("$work/bin/i" run --offline --project moved-readme 2>&1) && [[ $out == "${promised:-42}" ]]; then
     echo "$out"
     echo "  exit 0"
   else
