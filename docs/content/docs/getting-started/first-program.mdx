@@ -16,6 +16,24 @@ run it with `i run --project hello`
 
 Put `i` on `PATH`. The command creates `i.toml`, `.gitignore`, `src/main.i`, `test/main_test.i`, and a copy of the standard library in `std/`; `i.toml` names that copy with `std = { path = "std" }` under `[dependencies]`, so the package needs no other source tree and stays portable when it moves.
 
+## The standard library copy
+
+The copy is 30 files, about 465 KiB: `std/i.toml`, `std/UNICODE-LICENSE`, and the sources under `std/src`. It is an ordinary path dependency, so you can read and change it like your own code.
+
+`.gitignore` lists only `/build/`, so `std/` is committed with the package and shipped by `i publish`. The copy keeps `std/UNICODE-LICENSE` and the copyright and licence notices in its source files; keep them when you redistribute the package.
+
+No command refreshes the copy: `i update` manages versioned dependencies, but `std/` is a plain directory. To move to a newer standard library, make a temporary package with the newer compiler and replace the directory:
+
+```sh
+i new refresh --path ../refresh
+rm -rf std
+cp -a ../refresh/std std
+rm -rf ../refresh
+i check
+```
+
+If the package itself is named `std`, its copy cannot use the dependency key `std`, because a package cannot depend on itself. `i new std` names the key `stdlib`, and code imports the copy as `stdlib/int`.
+
 ## Program
 
 ```i run package=hello title="src/main.i"
