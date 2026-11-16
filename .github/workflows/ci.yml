@@ -139,8 +139,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The groups of DEV_VERIFY_TEST_GROUP in scripts/dev-verify.
-        group: [check, spec, cli, rest]
+        # The groups of DEV_VERIFY_TEST_GROUP in scripts/dev-verify. The spec
+        # suite and ilang-cli's tests each took about 50 minutes in one job.
+        group: [check, spec-1/3, spec-2/3, spec-3/3, cli-heavy, cli, rest]
     env:
       DEV_VERIFY_TEST_GROUP: ${{ matrix.group }}
     steps:
@@ -167,7 +168,8 @@ jobs:
         run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: test-${{ matrix.group }}-${{ hashFiles('Cargo.lock') }}
+          # The shards of a group build the same tests, so they share its cache.
+          key: test-${{ startsWith(matrix.group, 'spec') && 'spec' || (startsWith(matrix.group, 'cli') && 'cli' || matrix.group) }}-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
