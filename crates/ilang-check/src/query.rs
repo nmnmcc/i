@@ -14,8 +14,6 @@ use crate::types::{Access, Typed};
 use crate::{Checked, order, parse, resolve, types};
 use ilang_package::{Diagnostic, PackageGraph, SourceId};
 mod tree;
-#[cfg(test)]
-mod tree_legacy;
 use ilang_syntax::span::Span;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
