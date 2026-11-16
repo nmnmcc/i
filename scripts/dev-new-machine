@@ -39,6 +39,21 @@ set -euo pipefail
 script=$(realpath -- "${BASH_SOURCE[0]}")
 here=$(dirname -- "$script")
 
+# What the README says the first example prints, and what it says `i test`
+# prints, from its own sentences rather than from a value written here. The
+# wording may change ("`i run` prints `42`", "`i run --project demo` prints
+# `42`"), so the text around the words is not fixed; the words are.
+readme_run_output() { # README
+  sed -n 's/.*`i run[^`]*` prints `\([^`]*\)`.*/\1/p' "$1" | head -1
+}
+
+readme_test_output() { # README
+  sed -n 's/.*`i test` prints `\([^`]*\)`.*/\1/p' "$1" | head -1
+}
+
+# Whether an output is the one the README promises.
+output_is() { [[ $1 == "$2" ]]; }
+
 # The contents of the N-th fenced block of a file whose opening line matches a
 # pattern, so that what is run is what the README shows, not a copy of it.
 block() { # file, opening-line regex, occurrence
@@ -170,13 +185,13 @@ inner() {
   echo "\$ cat readme_main/src/main.i"
   cat readme_main/src/main.i
   local promised
-  promised=$(sed -n 's/.*`i run` prints `\([^`]*\)`.*/\1/p' "$work/README.md" | head -1)
+  promised=$(readme_run_output "$work/README.md")
   if [[ -z $promised ]]; then
     echo "  README does not say what \`i run\` prints  <-- FAILED"
     status=1
   else
     echo "\$ i run --offline --project readme_main   (README: prints $promised)"
-    if out=$("$work/bin/i" run --offline --project readme_main 2>&1) && [[ $out == "$promised" ]]; then
+    if out=$("$work/bin/i" run --offline --project readme_main 2>&1) && output_is "$out" "$promised"; then
       echo "$out"
       echo "  exit 0"
     else
@@ -192,7 +207,7 @@ inner() {
   mkdir -p readme_test/test
   block "$work/README.md" '^```text' 2 > readme_test/test/clock_test.i
   local promised_pass expected_pass
-  promised_pass=$(sed -n 's/.*`i test` prints `\([^`]*\)`.*/\1/p' "$work/README.md" | head -1)
+  promised_pass=$(readme_test_output "$work/README.md")
   if [[ -z $promised_pass ]]; then
     echo "  README does not say what \`i test\` prints  <-- FAILED"
     status=1
@@ -247,12 +262,15 @@ inner() {
     status=1
   fi
   echo "\$ i run --offline --project moved-readme   (README's first example, moved)"
-  if out=$("$work/bin/i" run --offline --project moved-readme 2>&1) && [[ $out == "${promised:-42}" ]]; then
+  if [[ -z ${promised:-} ]]; then
+    echo "  the README names no output for the first example  <-- FAILED"
+    status=1
+  elif out=$("$work/bin/i" run --offline --project moved-readme 2>&1) && output_is "$out" "$promised"; then
     echo "$out"
     echo "  exit 0"
   else
     echo "${out:-<no output>}"
-    echo "  <-- FAILED (expected ${promised:-42})"
+    echo "  <-- FAILED (expected ${promised:-<none>})"
     status=1
   fi
   echo "\$ i test --offline --project copied"
@@ -328,7 +346,74 @@ root_side() {
   exec "${run[@]}"
 }
 
+# The extraction of README's promises, checked on the README here and on copies
+# where the promised output is another value and where there is none at all.
+self_test() {
+  local dir readme real changed none bad=0
+  dir=$(mktemp -d "${TMPDIR:-/var/tmp}/i-new-machine-selftest.XXXXXX")
+  readme=$(dirname -- "$script")/../README.md
+  real=$(readme_run_output "$readme") || true
+  if [[ -z $real ]]; then
+    echo "self-test: the README here names no output for its first example" >&2
+    bad=1
+  else
+    echo "self-test: the README's first example prints: $real"
+  fi
+  # The same sentence with another value: a run that printed the real value
+  # must not match it, so a wrong README cannot pass quietly.
+  changed="${real}9"
+  printf '%s\n' "\`i run --project demo\` prints \`$changed\`." >"$dir/changed.md"
+  if [[ $(readme_run_output "$dir/changed.md") != "$changed" ]]; then
+    echo "self-test: the changed sentence was not read: $(readme_run_output "$dir/changed.md")" >&2
+    bad=1
+  elif output_is "$real" "$changed"; then
+    echo "self-test: a run of $real matched the changed expectation $changed" >&2
+    bad=1
+  else
+    echo "self-test: a run of $real does not match the changed expectation $changed"
+  fi
+  # The README itself, in a copy, with its first example's promised output
+  # changed: the extraction must follow it, and the assertion must fail.
+  awk -v new="$changed" '
+    !done && /`i run/ { sub(/prints `[^`]*`/, "prints `" new "`"); done = 1 }
+    { print }
+  ' "$readme" >"$dir/readme.md"
+  if [[ $(readme_run_output "$dir/readme.md") != "$changed" ]]; then
+    echo "self-test: a copy of the README with $changed was read as '$(readme_run_output "$dir/readme.md")'" >&2
+    bad=1
+  elif output_is "$real" "$changed"; then
+    echo "self-test: the assertion accepted $real for a README that promises $changed" >&2
+    bad=1
+  else
+    echo "self-test: a copy of the README promising $changed makes the assertion fail"
+  fi
+  # No sentence at all is nothing to compare with, not a pass.
+  printf '%s\n' 'The program prints something.' >"$dir/none.md"
+  none=$(readme_run_output "$dir/none.md") || true
+  if [[ -n $none ]]; then
+    echo "self-test: a README without the sentence gave '$none'" >&2
+    bad=1
+  else
+    echo "self-test: a README without the sentence gives nothing, which is an error"
+  fi
+  # The older wording still reads.
+  printf '%s\n' '`i run` prints `7`.' >"$dir/old.md"
+  if [[ $(readme_run_output "$dir/old.md") != 7 ]]; then
+    echo "self-test: the older wording was not read" >&2
+    bad=1
+  fi
+  # `i test` as well.
+  printf '%s\n' 'which `i test` prints `pass tour/clock_test.a a test`.' >"$dir/test.md"
+  if [[ $(readme_test_output "$dir/test.md") != "pass tour/clock_test.a a test" ]]; then
+    echo 'self-test: the `i test` sentence was not read' >&2
+    bad=1
+  fi
+  rm -rf -- "$dir"
+  return "$bad"
+}
+
 case ${1:-} in
+  --self-test) self_test; exit $? ;;
   --inside) inner "$2" "$3"; exit $? ;;
   --root-side)
     shift
@@ -397,7 +482,9 @@ fi
 root=$(realpath -- "$here/..")
 
 # The checker of the manifests, before it is trusted in the namespace.
-echo "dev-new-machine: checking the manifest checker"
+echo "dev-new-machine: checking the README extraction and the manifest checker"
+self_test
+
 python3 -I "$here/manifest-paths" --self-test
 
 # The work directory must not be covered by a mask, so it is not under /tmp/oc-*
