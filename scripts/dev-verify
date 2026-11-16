@@ -108,7 +108,7 @@ rust-test() {
 }
 
 i() {
-  local i
+  local i example manifest
   if [[ -n "${DEV_VERIFY_I_BINARY:-}" ]]; then
     i="$(realpath "$DEV_VERIFY_I_BINARY")"
   else
@@ -117,6 +117,15 @@ i() {
     i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
   fi
   "$i" fmt --check lib std bench examples
+  # Every example with an `i.toml` must type check on its own.
+  for manifest in examples/*/i.toml; do
+    example="$(dirname "$manifest")"
+    echo "dev-verify: i check $example"
+    if ! "$i" check --project "$example"; then
+      echo "dev-verify: i check failed for $example" >&2
+      exit 1
+    fi
+  done
   ./scripts/dev-new-machine "$i"
   for level in 0 2; do
     "$i" test --project std --opt "$level"
