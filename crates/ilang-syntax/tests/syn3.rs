@@ -381,8 +381,8 @@ fn p4_branch_join() {
     bad("h = (a) { 1 } & g", "`&` joins only function literals");
     // a value-level `|` is removed syntax, and the hint gives the new join;
     // `&` is the join that replaces it.
-    bad("h = (a) { 1 } & (b) { 2 }", "join the branches with `&`");
-    bad("h = (a) { 1 }\n\t& (b) { 2 }", "join the branches with `&`");
+    bad("h = (a) { 1 } | (b) { 2 }", "join the branches with `&`");
+    bad("h = (a) { 1 }\n\t| (b) { 2 }", "join the branches with `&`");
     bad("h = f | g", "join the branches with `&`");
     assert_eq!(chain(&value("h = (a) { 1 } & (b) { 2 }")).len(), 2);
     // Overloading by shape.
