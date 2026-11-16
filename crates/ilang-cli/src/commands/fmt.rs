@@ -15,6 +15,7 @@
 //! clobbering an existing one, synced to disk, read back and compared with the
 //! rendered bytes, and only then is the source removed.
 
+use crate::output::outln;
 use ilang_syntax::format::format;
 use ilang_syntax::span::{LineIndex, Span};
 use std::io::Write;
@@ -70,7 +71,7 @@ pub fn run(
             Ok(out) if out == source => {}
             Ok(out) => {
                 if check {
-                    println!("{}", file.display());
+                    outln!("{}", file.display());
                     failed = true;
                 } else {
                     std::fs::write(file, out)
@@ -220,13 +221,13 @@ fn convert_run(files: &[PathBuf], target: &str, check: bool) -> anyhow::Result<E
     if check {
         for plan in &plans {
             if plan.rename_source {
-                println!(
+                outln!(
                     "{} -> {}",
                     plan.source.display(),
                     plan.destination.display()
                 );
             } else {
-                println!("{}", plan.source.display());
+                outln!("{}", plan.source.display());
             }
         }
         return Ok(if plans.is_empty() {

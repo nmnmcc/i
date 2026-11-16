@@ -177,9 +177,9 @@ fn render(text: &str) -> String {
 }
 
 fn display(text: &str, raw: bool) -> anyhow::Result<()> {
-    let mut stdout = std::io::stdout().lock();
+    let stdout = std::io::stdout();
     if raw || !stdout.is_terminal() {
-        stdout.write_all(text.as_bytes())?;
+        crate::output::write(text)?;
         return Ok(());
     }
     let rendered = render(text);
@@ -206,7 +206,7 @@ fn display(text: &str, raw: bool) -> anyhow::Result<()> {
             return Ok(());
         }
     }
-    stdout.write_all(rendered.as_bytes())?;
+    crate::output::write(&rendered)?;
     Ok(())
 }
 

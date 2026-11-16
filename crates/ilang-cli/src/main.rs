@@ -1,12 +1,14 @@
 //! The `i` command.
 
 mod commands;
+mod output;
 
 use clap::{Parser, Subcommand};
 use ilang_cli::{BuildOptions, level};
 use ilang_host::Outcome;
 use ilang_package::Diagnostic;
 use ilang_wasm::Target;
+use output::outln;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -228,7 +230,7 @@ fn main() -> ExitCode {
         } => match ilang_cli::collections(&project, tests, offline) {
             Ok(manifest) => match serde_json::to_string_pretty(&manifest) {
                 Ok(json) => {
-                    println!("{json}");
+                    outln!("{json}");
                     Ok(ExitCode::SUCCESS)
                 }
                 Err(error) => Err(error.into()),
@@ -281,6 +283,9 @@ fn main() -> ExitCode {
 fn finish(result: anyhow::Result<ExitCode>) -> ExitCode {
     match result {
         Ok(code) => code,
+        // The reader of standard output has gone, as in `i spec | head`; the
+        // output was cut short on purpose, so this is not a failure.
+        Err(e) if output::is_broken_pipe(&e) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e:#}");
             ExitCode::FAILURE
@@ -603,7 +608,7 @@ fn cmd_test(
             }
             if mode == "skip" || (focused && mode != "only") {
                 skipped += 1;
-                println!("skip {name}");
+                outln!("skip {name}");
                 continue;
             }
             let index = entry
@@ -638,23 +643,23 @@ fn cmd_test(
             let success = matches!(outcome, Ok(Outcome::Ok(_)));
             if outcome.is_ok() && success != (mode == "fails") {
                 passed += 1;
-                println!("pass {name}{took}");
+                outln!("pass {name}{took}");
             } else {
                 failed += 1;
-                println!("FAIL {name}{took}");
+                outln!("FAIL {name}{took}");
                 match outcome {
-                    Ok(Outcome::Stop(stop)) => println!("  {stop}"),
-                    Ok(Outcome::Err(error)) => println!("  error: {:?}", error.0),
-                    Err(error) => println!("  {error:#}"),
-                    Ok(Outcome::Ok(_)) => println!("  expected failure"),
+                    Ok(Outcome::Stop(stop)) => outln!("  {stop}"),
+                    Ok(Outcome::Err(error)) => outln!("  error: {:?}", error.0),
+                    Err(error) => outln!("  {error:#}"),
+                    Ok(Outcome::Ok(_)) => outln!("  expected failure"),
                 }
             }
         }
     }
     if skipped == 0 {
-        println!("{passed} passed, {failed} failed");
+        outln!("{passed} passed, {failed} failed");
     } else {
-        println!("{passed} passed, {failed} failed, {skipped} skipped");
+        outln!("{passed} passed, {failed} failed, {skipped} skipped");
     }
     Ok(if failed == 0 {
         ExitCode::SUCCESS
@@ -702,7 +707,7 @@ fn check(project: &Path, offline: bool, types: bool, target: Option<Target>) -> 
             for (i, m) in program.modules.iter().enumerate() {
                 if Some(m.package) == graph.root {
                     for line in typed.lines(program, ilang_check::hir::ModuleId(i as u32)) {
-                        println!("{line}");
+                        outln!("{line}");
                     }
                 }
             }

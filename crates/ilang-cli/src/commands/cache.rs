@@ -1,4 +1,5 @@
 //! `i cache`: the global cache store (see `ilang_host::store`).
+use crate::output::outln;
 use anyhow::{Result, bail};
 use ilang_host::store::{self, Limits, Store};
 use std::process::ExitCode;
@@ -67,11 +68,11 @@ pub fn run(command: CacheCommand) -> Result<ExitCode> {
     match command {
         CacheCommand::Status => {
             let store = Store::at(&dir, limits);
-            println!("directory: {}", dir.display());
+            outln!("directory: {}", dir.display());
             if store::disabled() {
-                println!("caching: off (I_CACHE)");
+                outln!("caching: off (I_CACHE)");
             }
-            println!(
+            outln!(
                 "limits: {} and {} days without use",
                 human(limits.max_size),
                 limits.max_age.as_secs() / (24 * 60 * 60)
@@ -81,14 +82,14 @@ pub fn run(command: CacheCommand) -> Result<ExitCode> {
                 .iter()
                 .fold((0, 0), |(e, b), k| (e + k.entries, b + k.bytes));
             for kind in &kinds {
-                println!(
+                outln!(
                     "{}: {} entries, {}",
                     kind.kind,
                     kind.entries,
                     human(kind.bytes)
                 );
             }
-            println!("total: {entries} entries, {}", human(bytes));
+            outln!("total: {entries} entries, {}", human(bytes));
         }
         CacheCommand::Gc { max_size, max_age } => {
             let store = Store::at(
@@ -102,7 +103,7 @@ pub fn run(command: CacheCommand) -> Result<ExitCode> {
                 eprintln!("another process is collecting the cache");
                 return Ok(ExitCode::FAILURE);
             };
-            println!(
+            outln!(
                 "removed {} entries ({}); kept {} entries ({})",
                 collected.removed_entries,
                 human(collected.removed_bytes),
@@ -115,7 +116,7 @@ pub fn run(command: CacheCommand) -> Result<ExitCode> {
             let Some(collected) = store.clean(tests.then_some(TEST_KINDS)) else {
                 bail!("cannot lock the cache directory {}", dir.display());
             };
-            println!(
+            outln!(
                 "removed {} entries ({})",
                 collected.removed_entries,
                 human(collected.removed_bytes)
