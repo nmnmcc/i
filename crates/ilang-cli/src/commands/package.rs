@@ -2114,7 +2114,11 @@ fn relative(from: &Path, to: &Path) -> String {
 mod syntax_templates {
     #[test]
     fn new_package_sources_parse() {
-        for source in [super::main_module("example"), super::test_module("example")] {
+        for source in [
+            super::main_module("example"),
+            super::test_module("example", "std"),
+            super::test_module("std", "stdlib"),
+        ] {
             assert!(ilang_syntax::parse_module(&source).1.is_empty(), "{source}");
         }
     }
