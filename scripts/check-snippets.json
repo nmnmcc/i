@@ -2077,7 +2077,7 @@
       ],
       [
         "{source}",
-        "(http = std/http)\n_http_test_body = () { Nil }\n"
+        "(http = i/http)\n_http_test_body = () { Nil }\n"
       ]
     ],
     "reason": "Render the HTTP wrapper format string with a minimal imported body; runtime HTTP tests exercise the actual assembled programs."
@@ -2469,7 +2469,7 @@
   "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:c3560d130e85cfa8": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
-  "tests/review/cases/review-rec/_loose/probes/src/main.i:621264ff6bc91a22": {
+  "tests/review/cases/review-rec/_loose/probes/src/main.i:7c6c6f2310812bc2": {
     "reason": "Preserve the closed-data negative fixture instead of erasing its illegal type spread. Syntax-three §2.3: a data type has no spread. Main E0541 is diagnosed earlier as parser E0107; removed-module/type errors are independently retained in checker tests.",
     "diagnostics": [
       "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
@@ -3054,7 +3054,8 @@
     "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
     "diagnostics": [
       "E0101: a data type with labels has only labelled items; mixed positional and labelled items are not supported here"
-    ]
+    ],
+    "substitutions": []
   },
   "docs/design/known-types-are-facts.md:cfcb5a862a1f675d": {
     "track": true,

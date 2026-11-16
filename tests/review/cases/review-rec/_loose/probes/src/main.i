@@ -15,8 +15,8 @@ pair_annotated = () -> (data = (Int, Int)) | (error = String) {
 
 // The written union requires an unestablished inclusion; U3 rejects it.
 choose = <R>(c: Bool, r: R & Record) {
-	c |> (True) { record.put(r, "a", 1) } | (False) { (b = 2) }
+	c |> (True) { record.put(r, "a", 1) } & (False) { (b = 2) }
 }
 choose_written = <R>(c: Bool, r: R & Record) -> (..R, a = 1) | (b = 2) {
-	c |> (True) { record.put(r, "a", 1) } | (False) { (b = 2) }
+	c |> (True) { record.put(r, "a", 1) } & (False) { (b = 2) }
 }

@@ -1,4 +1,4 @@
-// old-syntax-check: E0101
+// old-syntax-check: E0101,E0101,E0101,E0101
 S(N) = (() <- N -> Nil, (N) -> Nil)
 T(N) = (() <- N -> Nil, (N) -> Nil)
 use = <N>() <- (s: S(N)) {
