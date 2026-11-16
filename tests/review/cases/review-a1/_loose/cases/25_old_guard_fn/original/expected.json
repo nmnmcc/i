@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:35: error[E0101]: expected an expression, found `:`\nnote: src/main.i: if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } | (_) { other }`; write guards with `?` instead of `if`\n1 error\n"
+      "stderr": "src/main.i:2:35: error[E0101]: expected an expression, found `:`\nnote: src/main.i: if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\n1 error\n"
     }
   }
 }
