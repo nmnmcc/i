@@ -11,8 +11,14 @@ name = "i LSP"
 languages = ["i"]
 
 [grammars.i]
-# Canonical checkout. scripts/dev-editors zed prepares a portable dev copy
-# with the current worktree's absolute file URL and exact committed revision.
-repository = "file:///home/agent/Programming/i"
-commit = "HEAD"
+# The grammar lives in this repository. Zed clones it from Git and checks out
+# the revision named here, so this is a commit from the published repository:
+# `HEAD` or a branch name does not resolve in that clone. It names the last
+# commit that changed the grammar, `editors/tree-sitter-i`; after a grammar
+# change, commit it and update this pin in a later commit, since a commit
+# cannot name itself. scripts/dev-editors zed prepares a dev copy under
+# target/editor-dev/zed whose commit is the current commit of this checkout;
+# the copy keeps this repository, so that commit must be pushed first.
+repository = "https://github.com/nmnmcc/i"
+commit = "ff9ea00ac0b6af8db4fd7a79e9f4e7b5103b4fc7"
 path = "editors/tree-sitter-i"
