@@ -34,13 +34,8 @@ struct SourceExport {
     constructors: bool,
     span: Span,
 }
-#[cfg(test)]
-mod differential;
 mod hints;
 pub use hints::missing_module_message;
-#[cfg(test)]
-#[allow(dead_code)]
-mod legacy;
 mod three;
 pub use three::lowering_errors;
 pub(crate) use three::source_facts;
