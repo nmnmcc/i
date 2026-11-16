@@ -174,7 +174,7 @@ main = () { stdio.print(unit(2)) }
 	sugar = (if) = hello/sugar
 )
 
-unit = (n) { n == 1 |> (True) { "minute" } | (False) { "minutes" } }
+unit = (n) { n == 1 |> (True) { "minute" } & (False) { "minutes" } }
 
 main = () { stdio.print(unit(2)) }
 
@@ -189,7 +189,7 @@ main = () { stdio.print(unit(2)) }
   (= if
     (-> (, c a b) _
       {(= true_branch `(-> (, True) _ ~a))
-       `(|> ~c (| ~true_branch (-> (, False) _ ~b)))})))
+       `(|> ~c (& ~true_branch (-> (, False) _ ~b)))})))
 ```
 </details>
 

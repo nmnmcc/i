@@ -1,5 +1,5 @@
 (, if)
 
 (= _branches
-  (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
+  (-> (, then else) _ `(& (-> (, True) _ ~then) (-> (, False) _ ~else))))
 (@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))

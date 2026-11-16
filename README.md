@@ -97,7 +97,7 @@ main = () { stdio.print(sign(-1)) }
 `i run --project demo` prints `negative`, and `i expand --project demo` prints the code after expansion, with `sign` as a branch chain:
 
 ```text
-(= sign (-> (, n) _ (|> (< n 0) (| (-> (, True) _ "negative") (-> (, False) _ "not negative")))))
+(= sign (-> (, n) _ (|> (< n 0) (& (-> (, True) _ "negative") (-> (, False) _ "not negative")))))
 ```
 
 Concurrency is structured: a task belongs to a scope, and a scope ends only when all its tasks have ended. This is a TCP echo server that serves every connection in its own task and closes each one however it ends:
