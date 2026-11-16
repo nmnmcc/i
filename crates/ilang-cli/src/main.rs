@@ -62,7 +62,8 @@ enum Command {
     /// architecture of this machine only, with a baseline of CPU features
     /// (x86-64-v2 on x86-64); building for other targets and signing are not
     /// supported yet. `--target host` (or `ilang`), `js`, `nodejs` and `wasi`
-    /// write the Wasm module `build/<name>.wasm` instead.
+    /// write the Wasm module `build/<name>.wasm` instead, with the same
+    /// package name or entry NAME.
     Build {
         #[arg(long, default_value = ".")]
         project: PathBuf,
@@ -75,7 +76,8 @@ enum Command {
         /// Select a function declared in [entries].
         entry: Option<String>,
         /// The output file; by default `build/<name>` (native) or
-        /// `build/<name>.wasm` in the package.
+        /// `build/<name>.wasm` in the package, named after the package or
+        /// the selected entry.
         #[arg(long)]
         out: Option<PathBuf>,
         /// Provider column; ilang is an alias of host.
@@ -363,11 +365,9 @@ fn cmd_build(
         return Ok(ExitCode::FAILURE);
     };
     let native = target == Target::Native;
-    let name = if native {
-        entry.unwrap_or(&b.name)
-    } else {
-        &b.name
-    };
+    // Name the artifact after the selected entry, as native packages do, so
+    // that entries (and the package default) do not overwrite each other.
+    let name = entry.unwrap_or(&b.name);
     let default_out = out.is_none();
     let out = out.unwrap_or_else(|| {
         project.join("build").join(if native {
@@ -406,6 +406,16 @@ fn cmd_build(
         file.persist(&out)?;
     } else {
         std::fs::write(&out, &b.wasm)?;
+        if target == ilang_wasm::Target::Wasi && default_out {
+            // A WASI module has no binding plan. A plan left by an earlier
+            // non-WASI build of the same name in the generated `build/` would
+            // describe a module that is no longer there.
+            match std::fs::remove_file(out.with_extension("bindings.json")) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
     }
     if !native && target != ilang_wasm::Target::Wasi {
         std::fs::write(
