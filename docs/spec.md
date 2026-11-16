@@ -222,7 +222,9 @@ with a non-zero exit and changes no file. Once all checks pass, if a write then
 fails, for example from an I/O error or a target that another process creates
 in the meantime, the files already converted stay converted and the command
 lists them; the remaining files are left as they were, not damaged or lost. A
-new file is fully written before its original is deleted.
+new file is fully written before its original is deleted. When `--to` names the
+surface a file already has, that file is formatted in place and is never
+removed or renamed.
 
 ## 2. Modules
 
