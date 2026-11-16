@@ -118,7 +118,18 @@ fn main() {
         std_dir.join("i.toml").display()
     );
     println!("cargo:rerun-if-changed={}", std_dir.join("src").display());
-    let mut sources = vec![("i.toml".to_string(), std_dir.join("i.toml"))];
+    println!(
+        "cargo:rerun-if-changed={}",
+        std_dir.join("UNICODE-LICENSE").display()
+    );
+    // License files live beside `src/`; the copied package must carry them.
+    let mut sources = vec![
+        ("i.toml".to_string(), std_dir.join("i.toml")),
+        (
+            "UNICODE-LICENSE".to_string(),
+            std_dir.join("UNICODE-LICENSE"),
+        ),
+    ];
     fn collect(dir: &std::path::Path, prefix: &str, out: &mut Vec<(String, std::path::PathBuf)>) {
         let mut entries: Vec<_> = std::fs::read_dir(dir)
             .unwrap_or_else(|error| panic!("reading {}: {error}", dir.display()))

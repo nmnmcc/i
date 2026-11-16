@@ -334,6 +334,50 @@ fn new_package_tests_the_readme_service_example() {
 }
 
 #[test]
+fn new_package_named_std_uses_another_dependency_key() {
+    let w = World::new();
+    w.ok(&["new", "std"]);
+    let dir = w.path().join("std");
+    let manifest = read(&dir.join("i.toml"));
+    assert_eq!(manifest, test_project::new_manifest("std"));
+    assert!(!manifest.contains(env!("CARGO_MANIFEST_DIR")), "{manifest}");
+    assert!(
+        manifest.contains("stdlib = { path = \"std\" }"),
+        "{manifest}"
+    );
+    assert!(dir.join("std/src/int.i").is_file());
+    assert!(read(&dir.join("test/main_test.i")).contains("stdlib/test"));
+
+    let project = dir.display().to_string();
+    w.ok(&["check", "--project", &project]);
+    let out = w.ok(&["run", "--project", &project]);
+    assert_eq!(out, "Hello, std!\n");
+    let out = w.ok(&["test", "--project", &project]);
+    assert!(out.contains("1 passed, 0 failed"), "{out}");
+}
+
+#[test]
+fn new_package_copies_the_std_licenses_and_notices() {
+    let w = World::new();
+    w.ok(&["new", "demo"]);
+    let dir = w.path().join("demo");
+    // The Unicode licence lives beside `src/`, not inside it.
+    assert_eq!(
+        read(&dir.join("std/UNICODE-LICENSE")),
+        include_str!("../../../std/UNICODE-LICENSE")
+    );
+    // Notices inside the sources must survive the copy unchanged.
+    for (path, expected) in [
+        ("std/src/float.i", include_str!("../../../std/src/float.i")),
+        ("std/src/regex.i", include_str!("../../../std/src/regex.i")),
+    ] {
+        assert_eq!(read(&dir.join(path)), expected, "{path}");
+    }
+    assert!(read(&dir.join("std/src/float.i")).contains("BSD-style license"));
+    assert!(read(&dir.join("std/src/regex.i")).contains("Unicode license"));
+}
+
+#[test]
 fn new_with_a_path_and_bad_names() {
     let w = World::new();
     w.ok(&["new", "tool", "--path", "nested/place"]);
@@ -344,9 +388,7 @@ fn new_with_a_path_and_bad_names() {
     // The directory is not empty now.
     let err = w.fails(&["new", "tool", "--path", "nested/place"]);
     assert!(err.contains("not empty"), "{err}");
-    // `std` would collide with the standard-library dependency of the new
-    // package, so it is refused rather than made broken.
-    for bad in ["i", "std", "Big", "1x", "__bad", "a-b"] {
+    for bad in ["i", "Big", "1x", "__bad", "a-b"] {
         let err = w.fails(&["new", bad]);
         assert!(err.contains("must be a name"), "{bad}: {err}");
     }
