@@ -1519,8 +1519,11 @@
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
   },
-  "crates/ilang-cli/src/commands/package.rs:df747cb87930f0f2": {
-    "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
+  "crates/ilang-cli/src/commands/package.rs:06f8b6b48e622d4f": {
+    "not_source": "TOML manifest template that `i new` writes: `std` is an ordinary dependency copied next to the program, so this is not i source."
+  },
+  "crates/ilang-cli/tests/common/test_project.rs:06f8b6b48e622d4f": {
+    "not_source": "TOML manifest template that `i new` writes: `std` is an ordinary dependency copied next to the program, so this is not i source."
   },
   "crates/ilang-cli/tests/common/test_project.rs:df747cb87930f0f2": {
     "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
