@@ -66,3 +66,33 @@ fn unknown_section_reports_nearest_headings() {
     assert!(error.contains("nearest headings"));
     assert!(error.contains("4."));
 }
+
+/// `i spec | head` reads a line and goes away; the command must stop
+/// quietly, as `cat | head` does, rather than report a broken pipe.
+#[test]
+fn a_closed_reader_is_not_an_error() {
+    use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
+    let mut child = Command::new(env!("CARGO_BIN_EXE_i"))
+        .arg("spec")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let mut first = String::new();
+    BufReader::new(stdout).read_line(&mut first).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(first, "# The i Language\n");
+    assert!(
+        out.status.success(),
+        "status {:?}, standard error: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "standard error: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}

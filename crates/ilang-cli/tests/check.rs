@@ -33,6 +33,45 @@ fn check_types() {
     );
 }
 
+/// `i check --types | head`: the reader goes away after a line, which must
+/// end the run quietly with success instead of a panic or an error.
+#[test]
+fn check_types_tolerates_a_closed_reader() {
+    use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
+    if syn3_pending("check::check_types_tolerates_a_closed_reader") {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("src")).unwrap();
+    let source: String = (0..5000).map(|n| format!("n{n} = {n}\n")).collect();
+    std::fs::write(dir.path().join("src/main.i"), source).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_i"))
+        .args(["check", "--types", "--project"])
+        .arg(dir.path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let mut first = String::new();
+    BufReader::new(stdout).read_line(&mut first).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(first, "app/main.n0 : 0\n");
+    assert!(
+        out.status.success(),
+        "status {:?}, standard error: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "standard error: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
 #[test]
 fn check_reports_type_errors() {
     let dir = tempfile::tempdir().unwrap();

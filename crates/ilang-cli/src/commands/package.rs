@@ -12,6 +12,7 @@
 //! its modules declare, and the host services of the library modules that
 //! they import: a module that imports `i/io` can print.
 
+use crate::output::outln;
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Subcommand;
 use ilang_check::hir::{self, DefKind, TypeBody, TypeKind, TypeRef};
@@ -156,8 +157,8 @@ fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
         std::fs::write(&p, text)
             .with_context(|| format!("`{}` could not be written", p.display()))?;
     }
-    println!("made the package `{name}` in `{}`", dir.display());
-    println!("run it with `i run --project {}`", dir.display());
+    outln!("made the package `{name}` in `{}`", dir.display());
+    outln!("run it with `i run --project {}`", dir.display());
     Ok(ExitCode::SUCCESS)
 }
 
@@ -512,7 +513,7 @@ fn add(
     };
     file.set(dev, name, value)?;
     write_and_load(project, &file, &before)?;
-    println!("added `{name} = {shown}` to [{}]", TABLES[dev as usize]);
+    outln!("added `{name} = {shown}` to [{}]", TABLES[dev as usize]);
     Ok(ExitCode::SUCCESS)
 }
 
@@ -532,7 +533,7 @@ fn remove(project: &Path, name: &str) -> Result<ExitCode> {
             "the package could not be loaded, so `i.toml` and `i.lock` were not changed",
         ));
     }
-    println!("removed `{name}` from [{}]", TABLES[dev as usize]);
+    outln!("removed `{name}` from [{}]", TABLES[dev as usize]);
     Ok(ExitCode::SUCCESS)
 }
 
@@ -579,7 +580,7 @@ fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
         }
         let DependencySource::Location(loc) = &d.source else {
             if names.contains(&d.name) {
-                println!("`{}` is a path dependency; it has no versions", d.name);
+                outln!("`{}` is a path dependency; it has no versions", d.name);
             }
             continue;
         };
@@ -601,12 +602,12 @@ fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
         changes.push(format!("{}: {place} {} -> {newest}", d.name, loc.version));
     }
     if changes.is_empty() {
-        println!("every dependency is at the newest version of its major version");
+        outln!("every dependency is at the newest version of its major version");
         return Ok(ExitCode::SUCCESS);
     }
     write_and_load(project, &file, &before)?;
     for c in changes {
-        println!("updated {c}");
+        outln!("updated {c}");
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -763,13 +764,13 @@ fn deps(project: &Path, target: Option<ilang_wasm::Target>) -> Result<ExitCode> 
     let r = report(&graph)?;
     if target.is_none() {
         for p in r.packages.values() {
-            println!("{}{}", p.shown, if p.dev { " (dev)" } else { "" });
+            outln!("{}{}", p.shown, if p.dev { " (dev)" } else { "" });
             if p.permissions.is_empty() {
-                println!("  no host services and no external functions");
+                outln!("  no host services and no external functions");
             }
             for (what, at) in &p.permissions {
                 let at: Vec<&str> = at.iter().map(String::as_str).collect();
-                println!("  {what} ({})", at.join(", "));
+                outln!("  {what} ({})", at.join(", "));
             }
         }
     }
@@ -796,7 +797,7 @@ fn deps(project: &Path, target: Option<ilang_wasm::Target>) -> Result<ExitCode> 
     });
     for (entry, stub) in stubs {
         let stub = stub.map_err(|ds| problems(&graph, &ds))?;
-        println!(
+        outln!(
             "entry {}.{} ({}, {})",
             p.module(entry.module).path,
             p.def(entry).name,
@@ -804,13 +805,13 @@ fn deps(project: &Path, target: Option<ilang_wasm::Target>) -> Result<ExitCode> 
             if stub.is_async { "async" } else { "sync" }
         );
         for &h in &stub.hosts {
-            println!("  host {}.{}", p.module(p.ty(h).module).path, p.ty(h).name);
+            outln!("  host {}.{}", p.module(p.ty(h).module).path, p.ty(h).name);
         }
         if stub.requests() {
-            println!("  request root: Root, Owner, Await");
+            outln!("  request root: Root, Owner, Await");
         }
         if stub.tasks {
-            println!("  enter i/task.run");
+            outln!("  enter i/task.run");
         }
     }
     Ok(ExitCode::SUCCESS)
@@ -826,7 +827,7 @@ fn print_new_permissions(before: &Report, after: &Report) {
                 continue;
             }
             let at: Vec<&str> = at.iter().map(String::as_str).collect();
-            println!(
+            outln!(
                 "new permission: {} can use {what} ({})",
                 p.shown,
                 at.join(", ")
@@ -902,7 +903,7 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
     git_in(project, &["rev-parse", "--verify", "--quiet", "HEAD"])
         .context("the package must be in a git repository with a commit")?;
     check_clean(project)?;
-    println!("ok: the git working tree is clean");
+    outln!("ok: the git working tree is clean");
     check_source_links_at(project, "HEAD")?;
 
     // 2. `i check` and `i test` pass.
@@ -921,20 +922,20 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
     {
         bail!("the version {version} must be newer than every tag; the newest is v{p}");
     }
-    println!("ok: {version} is newer than every tag");
+    outln!("ok: {version} is newer than every tag");
 
     // 4. The public interface, compared with the newest tag.
     let now = interface_of(project, false)?
         .map_err(|e| e.context("the interface of the package could not be worked out"))?;
     match previous {
-        None => println!("ok: there is no earlier version to compare with"),
+        None => outln!("ok: there is no earlier version to compare with"),
         Some(p) => compare_with(project, p, version, &now)?,
     }
 
     // 5. The tag.
     let tag = format!("v{version}");
     if dry_run {
-        println!("dry run: every check passed; the tag {tag} was not made");
+        outln!("dry run: every check passed; the tag {tag} was not made");
         return Ok(ExitCode::SUCCESS);
     }
     git_in(project, &["tag", &tag])?;
@@ -944,8 +945,8 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
     } else {
         remotes.lines().next().unwrap_or("origin")
     };
-    println!("made the tag {tag}; nothing was pushed. To publish it:");
-    println!("  git push {remote} {tag}");
+    outln!("made the tag {tag}; nothing was pushed. To publish it:");
+    outln!("  git push {remote} {tag}");
     Ok(ExitCode::SUCCESS)
 }
 
@@ -1013,7 +1014,7 @@ fn check_and_test(project: &Path) -> Result<()> {
             failed.len()
         );
     }
-    println!(
+    outln!(
         "ok: the package checks, and its {count} test{} passed",
         if count == 1 { "" } else { "s" }
     );
@@ -1039,11 +1040,11 @@ fn compare_with(
     };
     let (needed, why) = match &earlier {
         None => {
-            println!("ok: {tag} has no package here, so there is nothing to compare with");
+            outln!("ok: {tag} has no package here, so there is nothing to compare with");
             return Ok(());
         }
         Some(Err(e)) => {
-            println!("the interface of {tag} could not be worked out: {e:#}");
+            outln!("the interface of {tag} could not be worked out: {e:#}");
             (
                 Step::Major,
                 "the interface of the earlier version is not known",
@@ -1075,7 +1076,7 @@ fn compare_with(
             step.name()
         );
     }
-    println!(
+    outln!(
         "ok: {why} since {tag}, and {version} is a new {} version",
         step.name()
     );
@@ -1171,7 +1172,7 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
                 .is_some_and(|s| ilang_syntax::old_syntax_marks(&graph.sources.get(s).text))
         })
     {
-        println!(
+        outln!(
             "the interface of `{tag}` is in the syntax from before {} (A3) and cannot be compared; check the interface by hand",
             env!("CARGO_PKG_VERSION")
         );
@@ -1941,12 +1942,12 @@ impl Diff {
             && self.representation.is_empty()
             && self.added.is_empty()
         {
-            println!("the public interface is the same as in {tag}");
+            outln!("the public interface is the same as in {tag}");
             return;
         }
-        println!("changes to the public interface since {tag}:");
+        outln!("changes to the public interface since {tag}:");
         for (k, v) in &self.removed {
-            println!("  removed {k}: {}", v.shown);
+            outln!("  removed {k}: {}", v.shown);
         }
         for (k, old, new) in &self.changed {
             // When the change does not show, the types are named by what
@@ -1956,15 +1957,15 @@ impl Diff {
             } else {
                 (&old.shown, &new.shown)
             };
-            println!("  changed {k}: {old}");
-            println!("       to {k}: {new}");
+            outln!("  changed {k}: {old}");
+            outln!("       to {k}: {new}");
         }
         for (k, old, new) in &self.representation {
-            println!("  changed representation of {k}: {}", old.shown);
-            println!("                     to {k}: {}", new.shown);
+            outln!("  changed representation of {k}: {}", old.shown);
+            outln!("                     to {k}: {}", new.shown);
         }
         for (k, v) in &self.added {
-            println!("  added {k}: {}", v.shown);
+            outln!("  added {k}: {}", v.shown);
         }
     }
 }
