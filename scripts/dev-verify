@@ -67,14 +67,24 @@ snippets() {
 CLI_HEAVY_TESTS=(package_commands value_type_performance many_tests macro_budget collections r2_runtime http)
 
 # DEV_VERIFY_TEST_GROUP splits the tests for CI, where one job would take close to an hour:
-# check (ilang-check), spec (or spec-K/N, the K-th of N shards of it), cli-heavy (the targets
+# check-heavy (ilang-check's value_types, about half of its time), check (the rest of ilang-check), spec (or spec-K/N, the K-th of N shards of it), cli-heavy (the targets
 # in CLI_HEAVY_TESTS), cli (the other tests of ilang-cli), rest (every other crate).
 # Unset: all of them.
 rust-test() {
   binaryen
   case "${DEV_VERIFY_TEST_GROUP:-}" in
     "") cargo test --workspace --locked ;;
-    check) cargo test -p ilang-check --locked ;;
+    check-heavy) cargo test -p ilang-check --locked --test value_types ;;
+    check)
+      # Every target of ilang-check but value_types, which is check-heavy.
+      targets=(--lib)
+      for file in crates/ilang-check/tests/*.rs; do
+        name="$(basename "$file" .rs)"
+        [ "$name" = value_types ] || targets+=(--test "$name")
+      done
+      cargo test -p ilang-check --locked --no-fail-fast "${targets[@]}"
+      cargo test -p ilang-check --locked --doc
+      ;;
     spec) cargo test -p ilang-cli --locked --test spec ;;
     spec-*/*) I_SPEC_SHARD="${DEV_VERIFY_TEST_GROUP#spec-}" cargo test -p ilang-cli --locked --test spec ;;
     cli-heavy)
