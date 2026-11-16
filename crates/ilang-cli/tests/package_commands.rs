@@ -214,7 +214,10 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     let out = w.ok(&["new", "demo"]);
     assert!(out.contains("demo"), "{out}");
     let dir = w.path().join("demo");
-    assert_eq!(read(&dir.join("i.toml")), test_project::manifest("demo"));
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        test_project::new_manifest("demo")
+    );
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
     assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
     assert!(read(&dir.join("src/main.i")).contains("main = () <- (io : Io)"));
@@ -273,18 +276,77 @@ fn two_new_packages_work_together() {
     );
 }
 
+/// The contents of the N-th fenced `text` block in a Markdown page.
+fn text_block(markdown: &str, want: usize) -> &str {
+    let opening = "```text\n";
+    let mut rest = markdown;
+    let mut seen = 0;
+    loop {
+        let start = rest
+            .find(opening)
+            .unwrap_or_else(|| panic!("README has no text block {want}"))
+            + opening.len();
+        let block = &rest[start..];
+        let end = block
+            .find("\n```")
+            .unwrap_or_else(|| panic!("README text block {want} is not closed"));
+        seen += 1;
+        if seen == want {
+            return &block[..end];
+        }
+        rest = &block[end + 1..];
+    }
+}
+
+#[test]
+fn new_package_is_portable_and_runs_the_readme_program() {
+    let w = World::new();
+    w.ok(&["new", "demo"]);
+    let dir = w.path().join("demo");
+    let manifest = read(&dir.join("i.toml"));
+    // No machine path; `std` is an ordinary dependency copied with the package.
+    assert_eq!(manifest, test_project::new_manifest("demo"));
+    assert!(!manifest.contains(env!("CARGO_MANIFEST_DIR")), "{manifest}");
+    assert!(dir.join("std/i.toml").is_file());
+    assert!(dir.join("std/src/int.i").is_file());
+
+    // The first README example imports `std/int` from a program, which now
+    // resolves as an ordinary dependency.
+    let readme = include_str!("../../../README.md");
+    write(&dir, &[("src/main.i", text_block(readme, 1))]);
+    let out = w.ok(&["run", "--project", &dir.display().to_string()]);
+    assert_eq!(out, "42\n");
+}
+
+#[test]
+fn new_package_tests_the_readme_service_example() {
+    let w = World::new();
+    w.ok(&["new", "svc"]);
+    let dir = w.path().join("svc");
+    let readme = include_str!("../../../README.md");
+    write(&dir, &[("test/clock_test.i", text_block(readme, 2))]);
+    let out = w.ok(&["test", "--project", &dir.display().to_string()]);
+    assert!(
+        out.contains("pass svc/clock_test.a test gives its own clock"),
+        "{out}"
+    );
+    assert!(out.contains("0 failed"), "{out}");
+}
+
 #[test]
 fn new_with_a_path_and_bad_names() {
     let w = World::new();
     w.ok(&["new", "tool", "--path", "nested/place"]);
     assert_eq!(
         read(&w.path().join("nested/place/i.toml")),
-        test_project::manifest("tool")
+        test_project::new_manifest("tool")
     );
     // The directory is not empty now.
     let err = w.fails(&["new", "tool", "--path", "nested/place"]);
     assert!(err.contains("not empty"), "{err}");
-    for bad in ["i", "Big", "1x", "__bad", "a-b"] {
+    // `std` would collide with the standard-library dependency of the new
+    // package, so it is refused rather than made broken.
+    for bad in ["i", "std", "Big", "1x", "__bad", "a-b"] {
         let err = w.fails(&["new", bad]);
         assert!(err.contains("must be a name"), "{bad}: {err}");
     }

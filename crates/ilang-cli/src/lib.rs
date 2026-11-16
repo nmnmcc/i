@@ -7,6 +7,12 @@ use std::path::Path;
 pub use ilang_binaryen::Level;
 pub use ilang_wasm::Target;
 
+/// The `std` package sources, embedded by build.rs and written by `i new`.
+/// They are ordinary package files; the compiler gives them no extra trust.
+pub mod std_package {
+    include!(concat!(env!("OUT_DIR"), "/std_package.rs"));
+}
+
 /// What to build.
 #[derive(Clone, Copy, Debug)]
 pub struct BuildOptions {

@@ -117,30 +117,31 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
 // ---- i new ----
 
 fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
-    if !is_name(name) || name == "i" {
+    if !is_name(name) || name == "i" || name == "std" {
         bail!(
-            "the package name `{name}` must be a name: a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i`"
+            "the package name `{name}` must be a name: a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i` or `std`"
         );
     }
     let dir = path.unwrap_or_else(|| PathBuf::from(name));
     if dir.exists() && std::fs::read_dir(&dir)?.next().is_some() {
         bail!("`{}` is already there and is not empty", dir.display());
     }
-    let std = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../std")
-        .canonicalize()?;
-    let files = [
+    let mut files = vec![
         (
             "i.toml".to_string(),
+            // `std` is an ordinary dependency, copied next to the program by
+            // `i new`, so the manifest has no local absolute path.
             format!(
-                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n",
-                std.to_str().expect("standard library path is UTF-8")
+                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = \"std\" }}\n"
             ),
         ),
         (".gitignore".to_string(), "/build/\n".to_string()),
         ("src/main.i".to_string(), formatted(main_module(name))),
         ("test/main_test.i".to_string(), formatted(test_module(name))),
     ];
+    for (relative, text) in ilang_cli::std_package::STD_FILES {
+        files.push((format!("std/{relative}"), text.to_string()));
+    }
     for (file, text) in &files {
         let p = dir.join(file);
         if let Some(parent) = p.parent() {
