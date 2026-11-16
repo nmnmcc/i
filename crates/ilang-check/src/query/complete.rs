@@ -164,7 +164,7 @@ impl Query<'_> {
                 };
             }
         }
-        // An unfinished branch such as `| () { ... }` can lower as a
+        // An unfinished branch such as `& () { ... }` can lower as a
         // different-shape function instead of a Case. The source still puts
         // this cursor in the pattern head of the match, not its body.
         if let Some(subject) = pipe_subject
@@ -1063,7 +1063,13 @@ fn in_source_branch_head(text: &str, offset: u32) -> bool {
             break;
         }
         match token.kind {
-            T::LParen => stack.push((T::LParen, matches!(previous, Some(T::Pipe | T::PipeGt)))),
+            // A branch head follows the chain separator `&` (or the match
+            // pipe `|>`); a removed `|` is still read so a buffer that has
+            // not been rewritten keeps its completions.
+            T::LParen => stack.push((
+                T::LParen,
+                matches!(previous, Some(T::Amp | T::Pipe | T::PipeGt)),
+            )),
             T::LBrace => stack.push((T::LBrace, false)),
             T::LBracket => stack.push((T::LBracket, false)),
             T::RParen | T::RBrace | T::RBracket => {

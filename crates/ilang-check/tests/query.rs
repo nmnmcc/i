@@ -232,7 +232,7 @@ fn definitions() {
         (main.clone(), "y".into())
     );
     assert_eq!(
-        f.definition("app/main", "v } |", 0),
+        f.definition("app/main", "v } &", 0),
         (main.clone(), "v".into())
     );
     // A top-level name of this module and of others.

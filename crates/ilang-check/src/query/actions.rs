@@ -632,8 +632,8 @@ pub(crate) fn lisp_clause(pattern: &str, body: &str) -> Option<String> {
     }
     let printed = ilang_syntax::syn3::lisp::to_lisp(&module);
     // The branches are the parts of the chain of the match:
-    // `(|> s (| (-> (, p) _ e) …))`.
-    let start = printed.find("(| (->")? + 3;
+    // `(|> s (& (-> (, p) _ e) …))`.
+    let start = printed.find("(& (->")? + 3;
     let b = printed.as_bytes();
     let mut depth = 0i32;
     let mut quoted = false;

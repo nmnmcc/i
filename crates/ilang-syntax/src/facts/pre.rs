@@ -132,7 +132,7 @@ pub fn chain_kind(fs: &[n::Function]) -> ChainKind {
     }
 }
 
-/// `a |> F1 | F2` is a match: one position per branch.
+/// `a |> F1 & F2` is a match: one position per branch.
 pub fn is_match(fs: &[n::Function], lisp: bool) -> bool {
     !lisp
         && fs.iter().all(|f| {
