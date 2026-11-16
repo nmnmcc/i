@@ -654,29 +654,6 @@
   "crates/ilang-package/tests/manifest.rs:a2c749a6a7e359fb": {
     "not_source": "TOML manifest or package-name token"
   },
-  "crates/ilang-wasm/tests/codegen.rs:b08e50fe7ba33d85": {
-    "prefix": "f = (b, x) {\n  a0 = x\n",
-    "suffix": "  a1\n}\n",
-    "substitutions": [
-      [
-        "{i}",
-        "1"
-      ],
-      [
-        "{p}",
-        "0"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
-  },
   "crates/ilang-lsp/tests/protocol.rs:aea9a4555851675d": {
     "reason": "Header-only source replacement in the LSP fixture"
   },
@@ -1145,31 +1122,6 @@
   "crates/ilang-cli/tests/r2_runtime.rs:e545c6b927783df9": {
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
-  "crates/ilang-cli/tests/tls.rs:783069f71ba1cc71": {
-    "substitutions": [
-      [
-        "{server:?}",
-        "\"server\""
-      ],
-      [
-        "{key:?}",
-        "\"key\""
-      ],
-      [
-        "{ca:?}",
-        "\"ca\""
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Materialize the Rust format template before parsing its i program."
   },
   "crates/ilang-package/tests/load.rs:29b81ce310a5da19": {
     "not_source": true,
@@ -1719,23 +1671,6 @@
   "crates/ilang-cli/tests/value_type_performance.rs:217fe1a139ac8e12": {
     "not_source": "Rust format string for a type name"
   },
-  "crates/ilang-cli/src/commands/package.rs:27726af531628f45": {
-    "substitutions": [
-      [
-        "{name}",
-        "app"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template; runtime tests still exercise the full generator"
-  },
   "tests/spec/1.7/a1_same_line_tuple.i:bb17b44ae2201195": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
@@ -1753,50 +1688,6 @@
     "diagnostics": [
       "E0101: expected `,`, `?` or `)`, found `<>`"
     ]
-  },
-  "crates/ilang-check/tests/types.rs:b08e50fe7ba33d85": {
-    "prefix": "f = (b, x) {\n  a0 = x\n",
-    "suffix": "  a1\n}\n",
-    "substitutions": [
-      [
-        "{i}",
-        "1"
-      ],
-      [
-        "{p}",
-        "0"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
-  },
-  "crates/ilang-check/src/query/actions.rs:de6c531222bb730f": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{pattern}",
-        "x"
-      ],
-      [
-        "{body}",
-        "0"
-      ]
-    ],
-    "reason": "Render the source template of the Lisp-branch helper"
   },
   "crates/ilang-check/src/types/shown.rs:ccfaa87f19759eaf": {
     "not_source": "a format string that builds a type name or an attribute head, not i source"
@@ -1939,58 +1830,7 @@
   "crates/ilang-cli/tests/r2_runtime.rs:070b6af6019524ce": {
     "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
   },
-  "crates/ilang-cli/tests/http.rs:af5cd8e64db33bfe": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
-  "crates/ilang-cli/tests/http.rs:0cef4a65c4bff658": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
   "crates/ilang-cli/tests/http.rs:72601bfd90ecbc03": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
-  "crates/ilang-cli/tests/http.rs:9800d04a16e9b3b0": {
     "substitutions": [
       [
         "{{",
@@ -2102,13 +1942,18 @@
   "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:ee6bc6b74c40e304": {
     "reason": "A typed binding occurs in a call argument, retaining the original statement-in-expression-position counterexample.",
     "diagnostics": [
-      "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
+      "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
     ]
   },
   "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:dd5c2f037478d5e2": {
     "reason": "A provide operation has no expression on its left, retaining a service statement where an expression is required.",
     "diagnostics": [
-      "E0101: expected an expression, found `<-`"
+      "E0101: expected an expression, found `<-`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
     ]
   },
   "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:36554751752e4970": {
@@ -2282,35 +2127,6 @@
   "crates/ilang-check/tests/literal_types.rs:c232af9957180e53": {
     "not_source": "Expected inferred scheme display, not a source annotation; Typed::lines keeps the full Type grammar."
   },
-  "crates/ilang-check/tests/literal_types.rs:c480d36f423b9781": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{need}",
-        "String"
-      ],
-      [
-        "{annotation}",
-        "String"
-      ],
-      [
-        "{pattern}",
-        "\"a\""
-      ],
-      [
-        "{catch}",
-        "t"
-      ]
-    ],
-    "reason": "Parse the actual generated match skeleton; test tables instantiate each narrowing case."
-  },
   "crates/ilang-check/tests/row_schemes.rs:1a6175b0d6ec4669": {
     "prefix": "// Constraints that simplification and generalization must keep.\n\n// §4.5 rule 4 and §9.2: an environment provider must be a subtype of\n// the needed service, also when the function is generalized.\nReader(S) = (get = () -> S)\n",
     "suffix": " = (body) {\n\t_syn3_0: IntReader = Reader(get = () -> Int { 1 })\n\tbody() <- (_syn3_0)\n}\n",
@@ -2376,26 +2192,6 @@
   "crates/ilang-cli/tests/entries.rs:8d7768dd6917cb79": {
     "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
   },
-  "crates/ilang-cli/tests/macro_budget.rs:fc8b25f21a41aa6a": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{parameters}",
-        "_: Int"
-      ],
-      [
-        "{arguments}",
-        "n"
-      ]
-    ]
-  },
   "crates/ilang-cli/tests/macro_run.rs:090fdb1b01bba12a": {
     "reason": "Render the MP13 Rust format! template with its first item order and unescape Rust braces; the unit test exercises all three rendered variants.",
     "substitutions": [
@@ -2412,23 +2208,6 @@
         "}"
       ]
     ]
-  },
-  "crates/ilang-cli/tests/multicore.rs:02e0aa8e18f76532": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
   "crates/ilang-cli/tests/multicore.rs:1fe6d808ca5d4464": {
     "substitutions": [
@@ -2483,40 +2262,6 @@
       [
         "{SPIN}",
         "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:40168b9e3c3116c9": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:82dec01a8a98ff48": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -2619,27 +2364,6 @@
       ]
     ]
   },
-  "crates/ilang-cli/tests/wasi.rs:75d260a3e18a3ce2": {
-    "substitutions": [
-      [
-        "{IO}",
-        "((Io) = i/io)\n"
-      ],
-      [
-        "{attribute}",
-        "@host(\"app:greet/v1\")"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
   "crates/ilang-cli/tests/wasi.rs:7b5136d93dcd04b2": {
     "substitutions": [
       [
@@ -2725,15 +2449,6 @@
     "reason": "Mixed positional/labelled data still awaits stage 6; E6 environment capture and provide forms have landed.",
     "diagnostics": [
       "E0101: data with labels has only labelled items after an optional first `..base`; mixed positional and labelled items are not supported here"
-    ]
-  },
-  "editors/vscode/test/sample.i:35e4233e887c3d88": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: a function type with type parameters must be the type of a binding",
-      "E0003: unknown escape",
-      "E0106: a discard binds nothing, so it may not be used as a value",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/18_old_expected_fn_group/original/.invalid/src/main.i:42b07aa0ae5bb3f1": {
@@ -2836,13 +2551,6 @@
     ],
     "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
   },
-  "crates/ilang-check/src/resolve/differential.rs:bc8ef69fad3d090f": {
-    "diagnostics": [
-      "E0110: an item by position may not come after an item by label",
-      "E0101: a chain of branches with no parameter has nothing to choose by"
-    ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
-  },
   "crates/ilang-check/src/resolve/differential.rs:eb5cba8498c94b57": {
     "diagnostics": [
       "E0110: an item by position may not come after an item by label",
@@ -2916,12 +2624,6 @@
   },
   "crates/ilang-syntax/tests/lisp_syntax3.rs:47fd209da841119d": {
     "not_source": "Rust export-header format template; the test substitutes each concrete export before parsing"
-  },
-  "crates/ilang-syntax/src/lisp/expansion3.rs:a46e80fc91b8e9e9": {
-    "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
-    "diagnostics": [
-      "E0101: a data type with labels has only labelled items; mixed positional and labelled items are not supported here"
-    ]
   },
   "crates/ilang-check/tests/generic_services.rs:f1ca0fc31fd5ee01": {
     "not_source": "Replacement constructor prefix adding a required error value field; not a complete declaration."
@@ -3050,5 +2752,622 @@
     ],
     "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate.",
     "substitutions": []
+  },
+  "crates/ilang-wasm/tests/codegen.rs:49929f2929b56dce": {
+    "prefix": "f = (b, x) {\n  a0 = x\n",
+    "suffix": "  a1\n}\n",
+    "substitutions": [
+      [
+        "{i}",
+        "1"
+      ],
+      [
+        "{p}",
+        "0"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
+  },
+  "crates/ilang-cli/tests/tls.rs:a1d5aef7cad97033": {
+    "substitutions": [
+      [
+        "{server:?}",
+        "\"server\""
+      ],
+      [
+        "{key:?}",
+        "\"key\""
+      ],
+      [
+        "{ca:?}",
+        "\"ca\""
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Materialize the Rust format template before parsing its i program."
+  },
+  "crates/ilang-cli/src/commands/package.rs:32cc7e39e939bc14": {
+    "substitutions": [
+      [
+        "{name}",
+        "app"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-check/tests/types.rs:49929f2929b56dce": {
+    "prefix": "f = (b, x) {\n  a0 = x\n",
+    "suffix": "  a1\n}\n",
+    "substitutions": [
+      [
+        "{i}",
+        "1"
+      ],
+      [
+        "{p}",
+        "0"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
+  },
+  "crates/ilang-check/src/query/actions.rs:67343a08c49aae60": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{pattern}",
+        "x"
+      ],
+      [
+        "{body}",
+        "0"
+      ]
+    ],
+    "reason": "Render the source template of the Lisp-branch helper"
+  },
+  "crates/ilang-cli/tests/http.rs:0864e7f8a201269f": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:5a0c88e79f161145": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-cli/tests/http.rs:32ed0ae27c59d146": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{port}",
+        "1234"
+      ]
+    ],
+    "reason": "Render the Rust format string with a representative port; check the full resulting program."
+  },
+  "crates/ilang-check/tests/literal_types.rs:195ae1c8d289fddb": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{need}",
+        "String"
+      ],
+      [
+        "{annotation}",
+        "String"
+      ],
+      [
+        "{pattern}",
+        "\"a\""
+      ],
+      [
+        "{catch}",
+        "t"
+      ]
+    ],
+    "reason": "Parse the actual generated match skeleton; test tables instantiate each narrowing case."
+  },
+  "crates/ilang-cli/tests/macro_budget.rs:3918fc22b8111295": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{parameters}",
+        "_: Int"
+      ],
+      [
+        "{arguments}",
+        "n"
+      ]
+    ]
+  },
+  "crates/ilang-cli/tests/multicore.rs:c414ae96779cf8b4": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:fedd76149f77cced": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:5b46861c947bbc74": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/wasi.rs:e07f4cf1e23e10d3": {
+    "substitutions": [
+      [
+        "{IO}",
+        "((Io) = i/io)\n"
+      ],
+      [
+        "{attribute}",
+        "@host(\"app:greet/v1\")"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "editors/vscode/test/sample.i:3172d6adba8d5e8e": {
+    "reason": "Intentional negative syntax example.",
+    "diagnostics": [
+      "E0101: a function type with type parameters must be the type of a binding",
+      "E0003: unknown escape",
+      "E0106: a discard binds nothing, so it may not be used as a value",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
+    ]
+  },
+  "crates/ilang-check/src/resolve/differential.rs:2f8526a1e928be69": {
+    "diagnostics": [
+      "E0110: an item by position may not come after an item by label",
+      "E0101: a chain of branches with no parameter has nothing to choose by"
+    ],
+    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
+  },
+  "crates/ilang-syntax/src/lisp/expansion3.rs:5400e87bb5b8b130": {
+    "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
+    "diagnostics": [
+      "E0101: a data type with labels has only labelled items; mixed positional and labelled items are not supported here"
+    ]
+  },
+  "docs/design/known-types-are-facts.md:cfcb5a862a1f675d": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/principality.md:643ed9a0a7e64a3f": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/std-1.md:7402a38741b39c49": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/lazy-reentry.md:44e911a821827ef0": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/records.md:583b1482ae9655b8": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/std-v3-style.md:baa713c72bb7bfe6": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:5c8f40239c311110": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "docs/design/runtime.md:cfaef6f00f00b02a": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/literal-types.md:1cd59e7a700c8321": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:93f438c1f8f8b257": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:1a1230fafe736c01": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "docs/design/principality.md:2b98dfaa5a95c2ed": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/prior-art-concurrency.md:600afc37e4110923": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/runtime.md:b1dec81ade56988c": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/runtime.md:53615126e92eb882": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/runtime.md:70e552ecffabbe78": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/meta.md:5a7c58484536a969": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/prior-art-numeric.md:d20385ece39bf096": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/std-v3-style.md:af03da8c6b8934c0": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/runtime.md:a6cf39f0e8abaf08": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:20089908623baaea": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "docs/design/std-v3-style.md:ed9985c8e0d84ee7": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/js.md:088a66de54ab2ec5": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:a97c99df48a9bbf6": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "docs/design/numeric-lowering.md:873565c6b1cc88b4": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/records.md:187ae591c048a8e5": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/std-3.md:f28e956ee9c3fd28": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/js.md:20f0c2ae115c0553": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:3498a29967f7ffe3": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:325231a4014b24db": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "docs/design/numeric-lowering.md:6de0ab1ef7016eef": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:2b3d9b80ff8fe368": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:ea1f211d0ac03d55": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "docs/design/js.md:665c21615b495cab": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/std-v3.md:79dca0c7857bd60d": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/numeric-lowering.md:e9173e9abb618857": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/std-v3-style.md:1f0ad591cbd35320": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/js.md:ab7f870efa75063b": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "crates/ilang-syntax/examples/chain-separators.rs:1afd8d96fef660d8": {
+    "not_source": "Rust output format string of the tool, not i source"
+  },
+  "docs/design/js.md:83ec3de8c280d5cb": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/principality.md:12084487af83fce3": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/types-joint.md:5f297d67c3243195": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/syntax.md:ad09810eae8bf8c9": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/types-joint.md:0b60892cdd44b7b0": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/principality.md:17ba919991b145e1": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/std-1.md:80bcff5d19f9b443": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/js.md:43e9218bbc7175ee": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/records.md:1ae1dbba985c073d": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "docs/design/records.md:9345df573c70461f": {
+    "track": true,
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ],
+    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
   }
 }

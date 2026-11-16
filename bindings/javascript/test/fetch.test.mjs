@@ -63,10 +63,10 @@ checked = <A, E, N>(body: () <- (Fail(E), http.Client, ..N) -> A) <- (handler: F
 		value
 	}) |>
 		(Ok(value)) { value }
-		| (Error(e)) { handler.raise(core.inspect(e)) }
+		& (Error(e)) { handler.raise(core.inspect(e)) }
 }
 text = (res: http.Response) {
-	fail.catch(() { http.body_text(res) }) |> (Ok(s)) { s } | (Error(_)) { panic("bad UTF-8") }
+	fail.catch(() { http.body_text(res) }) |> (Ok(s)) { s } & (Error(_)) { panic("bad UTF-8") }
 }
 get = (url: String) { checked(() { text(http.get(url)) }) }
 post = (url: String) { checked(() { text(http.post(url, <<"posted":utf8>>)) }) }
@@ -84,7 +84,7 @@ headers = (url: String) {
 		assert(text(res) == "sent")
 		http.header(res.headers, "X-Provider") |>
 			(Some(s)) { s }
-			| (None) { panic("missing response header") }
+			& (None) { panic("missing response header") }
 	})
 }
 status = (url: String) {
