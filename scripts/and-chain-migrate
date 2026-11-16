@@ -1,0 +1,522 @@
+#!/usr/bin/env python3
+"""Moves every value-level chain separator from `|` to `&` in the i sources.
+
+This is the replayable half of the `&`-chain migration. The parser says where a
+value-level chain is (`ExprKind::Chain`); the token stream says which byte is
+its separator. Nothing else is touched: `|` in types, `|` in pattern
+alternatives, `|>` and `|` inside strings or comments are never separator
+offsets, so they can never be rewritten.
+
+    scripts/and-chain-migrate --dry-run    # list files and offsets, counts per directory
+    scripts/and-chain-migrate --write      # rewrite the `|` bytes, exactly one byte per offset
+    scripts/and-chain-migrate --check      # exit 1 while a value-level `|` chain remains
+    scripts/and-chain-migrate --prove REV  # prove the rewritten files against REV
+
+Run it from the repository root. It reads the tracked `*.i` and `*.is` files
+(`git ls-files`), including the `_loose` and `.invalid` review copies and the
+editor, bench and example fixtures.
+
+`--write` refuses a file when a reported offset does not hold a `|` byte, and
+never writes a file the parser cannot read: those go to `and-chain-unparsed.json`
+with a reason, for the inventory in `.rd/cache/and-chains-751.json`.
+
+The offsets come from a small parser example:
+
+    heavy direnv exec . cargo build -p ilang-syntax --example chain-separators
+
+`--parser` (or `$AND_CHAIN_PARSER`) points at that binary; by default the
+script uses `target/debug/examples/chain-separators` under the root. The parser
+reports the separator of a chain whether it is written `|` or `&`, so the same
+report serves both texts: `--dry-run` and `--write` must run with the parser of
+the text being read (the old one for `|`), `--check` with the parser that reads
+the new text once `&` chains land, and `--prove` with both.
+
+Options:
+  --root PATH      the repository root (default: `git rev-parse --show-toplevel`)
+  --parser PATH    the parser example binary (default: see above)
+  --manifest PATH  where `--write` records unparsed files
+                   (default: `<root>/and-chain-unparsed.json`)
+  --parser-new PATH  with `--prove`: also parse the new text with this
+                   parser and require the same tree fingerprint
+  --quiet          with `--dry-run` or `--write`: only the counts and the totals
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+
+def run_git(root, args, input_bytes=None):
+    """Runs git and returns its stdout bytes; a failure exits with git's message."""
+    result = subprocess.run(
+        ["git", *args], cwd=root, input=input_bytes, capture_output=True
+    )
+    if result.returncode != 0:
+        sys.stderr.write(
+            "and-chain-migrate: git %s failed: %s\n"
+            % (" ".join(args), result.stderr.decode("utf-8", "replace").strip())
+        )
+        raise SystemExit(2)
+    return result.stdout
+
+
+def tracked_sources(root):
+    """Every tracked `*.i` and `*.is` file, in a stable order."""
+    out = run_git(root, ["ls-files", "-z", "--", "*.i", "*.is"])
+    paths = [p.decode("utf-8", "surrogateescape") for p in out.split(b"\0") if p]
+    return sorted(paths)
+
+
+def surface(path):
+    return "lisp" if path.endswith(".is") else "normal"
+
+
+class Parser:
+    """One process of the chain-separators example, fed requests in a batch."""
+
+    def __init__(self, binary):
+        self.binary = binary
+
+    def query(self, requests):
+        """`requests` is a list of `(path, surface)`; returns `path -> result`.
+
+        A result is `{"offsets": [...], "diags": [(code, message)], "ast": int}`
+        or `{"fail": "reason"}`.
+        """
+        if not requests:
+            return {}
+        text = "".join("%s %s\n" % (surface, path) for path, surface in requests)
+        result = subprocess.run(
+            [self.binary],
+            input=text.encode("utf-8", "surrogateescape"),
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            sys.stderr.write(result.stderr.decode("utf-8", "replace"))
+            raise SystemExit(
+                "and-chain-migrate: %s exited %d\n" % (self.binary, result.returncode)
+            )
+        return parse_report(result.stdout.decode("utf-8", "surrogateescape"))
+
+
+def parse_report(text):
+    """Reads the example's per-request groups back into a mapping."""
+    results = {}
+    current = None
+    for line in text.splitlines():
+        if line.startswith("FILE "):
+            current = {"offsets": [], "diags": [], "ast": None}
+            results[line[5:]] = current
+        elif line.startswith("FAIL "):
+            rest = line[5:]
+            path, _, reason = rest.partition(" ")
+            results[path] = {"fail": reason}
+            current = None
+        elif current is not None and line.startswith("SEP "):
+            current["offsets"].append(int(line[4:]))
+        elif current is not None and line.startswith("DIAG "):
+            rest = line[5:]
+            code, _, hexmessage = rest.partition(" ")
+            message = bytes.fromhex(hexmessage).decode("utf-8", "replace")
+            current["diags"].append((code, message))
+        elif current is not None and line.startswith("AST "):
+            current["ast"] = int(line[4:])
+        elif line == "END":
+            current = None
+    return results
+
+
+def group_of(path):
+    """The directory a count belongs to: `tests/spec`, `std`, `crates/x`, …"""
+    parts = path.split("/")
+    if len(parts) > 1 and parts[0] in {
+        "tests",
+        "docs",
+        "crates",
+        "editors",
+        "bench",
+        "lib",
+        "std",
+        "examples",
+    }:
+        return "/".join(parts[:2])
+    return parts[0]
+
+
+def unparsed_reason(result):
+    if "fail" in result:
+        return result["fail"]
+    diags = result["diags"]
+    if not diags:
+        return None
+    code, message = diags[0]
+    suffix = "" if len(diags) == 1 else " (and %d more)" % (len(diags) - 1)
+    return "%s: %s%s" % (code, message, suffix)
+
+
+def survey(root, parser, paths, quiet):
+    """Parses every file and returns `(offsets_by_path, unparsed, results)`."""
+    results = parser.query([(path, surface(path), ) for path in paths])
+    offsets = {}
+    unparsed = []
+    for path in paths:
+        result = results.get(path)
+        if result is None:
+            unparsed.append({"path": path, "reason": "the parser reported nothing"})
+            continue
+        reason = unparsed_reason(result)
+        if reason is not None:
+            unparsed.append({"path": path, "reason": reason})
+            continue
+        if result["offsets"]:
+            offsets[path] = result["offsets"]
+    if unparsed and not quiet:
+        sys.stderr.write(
+            "and-chain-migrate: %d file(s) the parser cannot read are left alone\n"
+            % len(unparsed)
+        )
+    return offsets, unparsed, results
+
+
+def count_table(offsets, paths):
+    """Counts per directory: files scanned, files with separators, separators."""
+    table = {}
+    for path in paths:
+        entry = table.setdefault(group_of(path), [0, 0, 0])
+        entry[0] += 1
+        if path in offsets:
+            entry[1] += 1
+            entry[2] += len(offsets[path])
+    return sorted(table.items())
+
+
+def report_counts(offsets, paths):
+    print("%-20s %8s %8s %10s" % ("directory", "files", "changed", "separators"))
+    total = [0, 0, 0]
+    for name, (files, changed, separators) in count_table(offsets, paths):
+        print("%-20s %8d %8d %10d" % (name, files, changed, separators))
+        total[0] += files
+        total[1] += changed
+        total[2] += separators
+    print("%-20s %8d %8d %10d" % ("total", total[0], total[1], total[2]))
+
+
+def read_bytes(root, path):
+    with open(os.path.join(root, path), "rb") as handle:
+        return handle.read()
+
+
+def rewrite(root, offsets, paths, quiet):
+    """Replaces the separator byte at each offset. Returns `(changed, refused)`."""
+    changed = 0
+    refused = []
+    for path in paths:
+        wanted = offsets.get(path)
+        if not wanted:
+            continue
+        data = read_bytes(root, path)
+        wrong = [o for o in wanted if data[o : o + 1] != b"|"]
+        if wrong:
+            refused.append(
+                {
+                    "path": path,
+                    "reason": "offset %d holds %r, not `|`"
+                    % (wrong[0], data[wrong[0] : wrong[0] + 1]),
+                }
+            )
+            continue
+        new = bytearray(data)
+        for offset in wanted:
+            new[offset] = ord("&")
+        if len(new) != len(data):
+            raise SystemExit("and-chain-migrate: %s changed length" % path)
+        with open(os.path.join(root, path), "wb") as handle:
+            handle.write(bytes(new))
+        changed += 1
+        if not quiet:
+            print("%s: %d separator(s)" % (path, len(wanted)))
+    return changed, refused
+
+
+def check(root, offsets, paths, unparsed):
+    """Exit 1 while a value-level `|` chain remains in a parseable file.
+
+    The report names the separator offsets of every chain the parser sees; a
+    chain that is already joined with `&` is not a `|` chain, so only the
+    offsets whose byte is still a `|` count.
+    """
+    if unparsed:
+        sys.stderr.write(
+            "and-chain-migrate: %d file(s) the parser cannot read are not checked\n"
+            % len(unparsed)
+        )
+    remaining = {}
+    for path in paths:
+        wanted = offsets.get(path)
+        if not wanted:
+            continue
+        data = read_bytes(root, path)
+        bars = [offset for offset in wanted if data[offset : offset + 1] == b"|"]
+        if bars:
+            remaining[path] = bars
+    if not remaining:
+        print("and-chain-migrate: no value-level `|` chain separator remains")
+        return 0
+    for path in paths:
+        if path in remaining:
+            print("%s: %d value-level `|` chain separator(s)" % (path, len(remaining[path])))
+    total = sum(len(remaining[path]) for path in remaining)
+    print(
+        "and-chain-migrate: %d separator(s) in %d file(s) still use `|`"
+        % (total, len(remaining))
+    )
+    return 1
+
+
+def file_at(root, rev, path):
+    """The bytes of `path` at `rev`, or None when that revision has no such file."""
+    result = subprocess.run(
+        ["git", "cat-file", "blob", "%s:%s" % (rev, path)],
+        cwd=root,
+        capture_output=True,
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
+def prove(root, rev, parser, parser_new, paths, quiet):
+    """Shows that the rewrite moved separator bytes and nothing else.
+
+    For every file that differs from `rev`: the byte diff of the old text and
+    the new text is exactly the separator set the parser reports for the old
+    text, every differing byte is `|` -> `&`, and the old parser reads the new
+    text with `&` mapped back as the very same tree.
+    """
+    proved = 0
+    skipped = 0
+    failures = []
+    offsets_total = 0
+    with tempfile.TemporaryDirectory(prefix="and-chain-prove-") as scratch:
+        old_files = {}
+        for path in paths:
+            new = read_bytes(root, path)
+            old = file_at(root, rev, path)
+            if old is None or old == new:
+                skipped += 1
+                continue
+            old_files[path] = (old, new)
+        requests = []
+        for path, (old, new) in old_files.items():
+            old_name = os.path.join(scratch, "%d-old" % len(requests))
+            with open(old_name, "wb") as handle:
+                handle.write(old)
+            requests.append((old_name, surface(path)))
+        old_results = parser.query(requests)
+        new_results = {}
+        if parser_new is not None:
+            requests = []
+            for path, (old, new) in old_files.items():
+                new_name = os.path.join(scratch, "%d-new" % len(requests))
+                with open(new_name, "wb") as handle:
+                    handle.write(new)
+                requests.append((new_name, surface(path)))
+            new_results = parser_new.query(requests)
+
+        for index, (path, (old, new)) in enumerate(old_files.items()):
+            old_name = os.path.join(scratch, "%d-old" % index)
+            old_result = old_results.get(old_name)
+            if old_result is None:
+                failures.append((path, "the parser reported nothing for the old text"))
+                continue
+            if unparsed_reason(old_result) is not None:
+                failures.append(
+                    (path, "the old text does not parse: " + unparsed_reason(old_result))
+                )
+                continue
+            if len(old) != len(new):
+                failures.append((path, "the file changed length"))
+                continue
+            diff = [i for i in range(len(old)) if old[i] != new[i]]
+            bad = [i for i in diff if old[i : i + 1] != b"|" or new[i : i + 1] != b"&"]
+            if bad:
+                failures.append(
+                    (
+                        path,
+                        "byte %d changed %r -> %r, not `|` -> `&`"
+                        % (bad[0], old[bad[0] : bad[0] + 1], new[bad[0] : bad[0] + 1]),
+                    )
+                )
+                continue
+            mapped_back = bytearray(new)
+            for offset in diff:
+                mapped_back[offset] = ord("|")
+            mapped_back = bytes(mapped_back)
+            if mapped_back != old:
+                failures.append((path, "`&` mapped back is not the old text"))
+                continue
+            expected = old_result["offsets"]
+            if diff != expected:
+                failures.append(
+                    (
+                        path,
+                        "the diff is not the separator set: %d bytes, %d separators"
+                        % (len(diff), len(expected)),
+                    )
+                )
+                continue
+            back_name = os.path.join(scratch, "%d-back" % index)
+            with open(back_name, "wb") as handle:
+                handle.write(mapped_back)
+            back_result = parser.query([(back_name, surface(path))])[back_name]
+            if back_result.get("ast") != old_result.get("ast"):
+                failures.append((path, "the old parser reads the mapped text differently"))
+                continue
+            if back_result.get("offsets") != expected:
+                failures.append((path, "the mapped text has other separators"))
+                continue
+            if parser_new is not None:
+                new_name = os.path.join(scratch, "%d-new" % index)
+                new_result = new_results.get(new_name)
+                if new_result is None:
+                    failures.append((path, "the new parser reported nothing"))
+                    continue
+                if new_result.get("ast") != old_result.get("ast"):
+                    failures.append((path, "the new parser reads a different tree"))
+                    continue
+                if new_result.get("offsets") != diff:
+                    failures.append(
+                        (path, "the new parser reports other separator offsets")
+                    )
+                    continue
+            proved += 1
+            offsets_total += len(diff)
+            if not quiet:
+                print("%s: %d separator(s)" % (path, len(diff)))
+    print(
+        "and-chain-migrate: %d file(s) proved, %d unchanged, %d separator(s) moved"
+        % (proved, skipped, offsets_total)
+    )
+    print("and-chain-migrate: the proof parser is %s at revision %s" % (parser.binary, rev))
+    if parser_new is None:
+        print(
+            "and-chain-migrate: the mapped-back text is byte-identical to the old text, "
+            "so the two trees are equal by construction; the substantive check above is "
+            "that the byte diff equals the separator set. Pass --parser-new to also "
+            "compare the tree the new parser reads."
+        )
+    if failures:
+        for path, reason in failures:
+            print("FAIL %s: %s" % (path, reason))
+        print("and-chain-migrate: %d file(s) failed the proof" % len(failures))
+        return 1
+    return 0
+
+
+def find_parser(root, explicit):
+    if explicit:
+        return explicit
+    from_env = os.environ.get("AND_CHAIN_PARSER")
+    if from_env:
+        return from_env
+    candidate = os.path.join(root, "target", "debug", "examples", "chain-separators")
+    if os.path.exists(candidate):
+        return candidate
+    raise SystemExit(
+        "and-chain-migrate: no parser example found; build it with\n"
+        "  heavy direnv exec . cargo build -p ilang-syntax --example chain-separators\n"
+        "or pass --parser PATH (or set $AND_CHAIN_PARSER)"
+    )
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(
+        prog="and-chain-migrate",
+        description="Moves value-level chain separators from `|` to `&`.",
+    )
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--dry-run", action="store_true", help="list files and offsets")
+    mode.add_argument("--write", action="store_true", help="rewrite the separator bytes")
+    mode.add_argument("--check", action="store_true", help="fail while a `|` chain remains")
+    mode.add_argument("--prove", metavar="REV", help="prove the rewrite against a revision")
+    parser.add_argument("--root", help="the repository root")
+    parser.add_argument("--parser", help="the chain-separators example binary")
+    parser.add_argument("--parser-new", metavar="PATH", help="a parser after the change")
+    parser.add_argument("--manifest", help="where --write records unparsed files")
+    parser.add_argument("--quiet", action="store_true", help="only counts and totals")
+    args = parser.parse_args(argv)
+
+    root = args.root
+    if root is None:
+        root = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
+        ).stdout.strip()
+        if not root:
+            raise SystemExit("and-chain-migrate: run this inside the repository")
+    binary = find_parser(root, args.parser)
+    reader = Parser(binary)
+    paths = tracked_sources(root)
+
+    if args.prove:
+        parser_new = Parser(args.parser_new) if args.parser_new else None
+        return prove(root, args.prove, reader, parser_new, paths, args.quiet)
+
+    offsets, unparsed, _ = survey(root, reader, paths, args.quiet or args.check)
+
+    if args.check:
+        return check(root, offsets, paths, unparsed)
+
+    if args.dry_run:
+        if not args.quiet:
+            for path in paths:
+                if path in offsets:
+                    print("%s: %s" % (path, " ".join(str(o) for o in offsets[path])))
+        report_counts(offsets, paths)
+        if unparsed:
+            print(
+                "and-chain-migrate: %d file(s) the parser cannot read (not rewritten)"
+                % len(unparsed)
+            )
+            if not args.quiet:
+                for entry in unparsed:
+                    print("  %s: %s" % (entry["path"], entry["reason"]))
+        return 0
+
+    changed, refused = rewrite(root, offsets, paths, args.quiet)
+    manifest = args.manifest or os.path.join(root, "and-chain-unparsed.json")
+    if changed or refused or not os.path.exists(manifest):
+        # A run that rewrote nothing keeps the manifest of the run that did,
+        # so the unparsed files of the migration are not replaced by the
+        # unparsed files of a later check with a different parser.
+        with open(manifest, "w", encoding="utf-8") as handle:
+            json.dump(
+                {
+                    "generated_by": "scripts/and-chain-migrate --write",
+                    "parser": binary,
+                    "unparsed": unparsed,
+                    "refused": refused,
+                },
+                handle,
+                indent=2,
+                ensure_ascii=False,
+            )
+            handle.write("\n")
+    print(
+        "and-chain-migrate: %d file(s) rewritten, %d separator(s); manifest %s"
+        % (
+            changed,
+            sum(len(offsets[path]) for path in offsets),
+            os.path.relpath(manifest, root),
+        )
+    )
+    report_counts(offsets, paths)
+    if refused:
+        for entry in refused:
+            print("REFUSED %s: %s" % (entry["path"], entry["reason"]))
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
