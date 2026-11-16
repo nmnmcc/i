@@ -175,8 +175,12 @@ The function provides `Input`, so its callers still need `Fail(Nil)`.
 
 ## Scratch project
 
-Install [i](/docs/getting-started/install), then run `i new tour` and `cd tour`.
+Install [i](/docs/getting-started/install), then run `i new tour` and `cd tour`. The new package has a copy of the standard library in `std/`, named by `std = { path = "std" }` in `i.toml`, so the examples below run as they are. The copy is committed with the package and is not refreshed by `i update`; [First program](/docs/getting-started/first-program) covers updating it.
 
-In `i.toml`, move `std` from `[dev-dependencies]` to `[dependencies]` and set its path to your local `std` directory.
+Remove the generated test first, because it tests the `main` that you replace:
+
+```sh
+rm test/main_test.i
+```
 
 Replace `src/main.i` with each example; use `i check --types` for type listings, `i run` for output, and `i fmt` for layout.

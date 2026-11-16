@@ -26,7 +26,16 @@ main = () {
 }
 ```
 
-`i run` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `&` are one function that matches its argument. No type is written, and every type is checked.
+`i new demo` makes a package with a copy of the standard library in `demo/std`; `demo/i.toml` names that copy with `std = { path = "std" }`:
+
+```sh
+i new demo
+rm demo/test/main_test.i
+```
+
+Write the program above to `demo/src/main.i`; the generated test is removed because it tests the program it replaces. `i run --project demo` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `&` are one function that matches its argument. No type is written, and every type is checked.
+
+The `std/` copy is an ordinary path dependency that belongs to the package: 30 files, about 465 KiB, readable and editable. `.gitignore` lists only `/build/`, so the copy is committed with the package and shipped by `i publish`. It includes `std/UNICODE-LICENSE` and the copyright notices in its sources; keep them when you redistribute it. Nothing refreshes the copy: `i update` handles versioned dependencies, not this directory. To move to a newer standard library, make a temporary package with the newer compiler and replace `std/` with that package's `std/`. A package named `std` imports the copy as `stdlib/…`.
 
 A function type has three parts, `(P) <- (S) -> R`: the parameters, the services the function needs, and the result. An error is a service too, `Fail(E)`. All of it is inferred. A service is an ordinary value: a function takes it with `<-` in its head, and the caller gives it with `<-` after an expression, so a test gives its own:
 
@@ -57,7 +66,7 @@ test("a test gives its own clock", () {
 })
 ```
 
-`i test` prints `pass tour/clock_test.a test gives its own clock`. `test` is not part of the language either. It is a macro of the standard library, and a macro is an i function from code to code. This one is written in the Lisp surface of the same language (`.is`), where code can be quoted. i has no `if`; here is one:
+This is `test/clock_test.i` in [examples/tour](examples/tour), where `i test` prints `pass tour/clock_test.a test gives its own clock`; in your own package the line has your package's name. `test` is not part of the language either. It is a macro of the standard library, and a macro is an i function from code to code. This one is written in the Lisp surface of the same language (`.is`), where code can be quoted. i has no `if`; here is one, and it is the whole of `src/sugar.is` in the example package [examples/tour](examples/tour):
 
 ```text
 (, if)
@@ -65,7 +74,31 @@ test("a test gives its own clock", () {
 (@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
 ```
 
-A module that imports it with `sugar = (if) = tour/sugar` writes `sign = (n) { if(n < 0, "negative", "not negative") }`, and `i expand` prints the code after expansion.
+A module's path is its package name, then its path under `src/` without the extension, so `tour/sugar` is `src/sugar.is` of the package `tour`. To use the macro in your own package, save the block above as `src/sugar.is` and import it with your package name, as in `sugar = (if) = demo/sugar` for a package named `demo`. Make a package and remove the test that `i new` writes for the program it generates:
+
+```sh
+i new demo
+rm demo/test/main_test.i
+```
+
+Then write `demo/src/main.i`:
+
+```text
+(
+	i/stdio
+	sugar = (if) = demo/sugar
+)
+
+sign = (n) { if(n < 0, "negative", "not negative") }
+
+main = () { stdio.print(sign(-1)) }
+```
+
+`i run --project demo` prints `negative`, and `i expand --project demo` prints the code after expansion, with `sign` as a branch chain:
+
+```text
+(= sign (-> (, n) _ (|> (< n 0) (| (-> (, True) _ "negative") (-> (, False) _ "not negative")))))
+```
 
 Concurrency is structured: a task belongs to a scope, and a scope ends only when all its tasks have ended. This is a TCP echo server that serves every connection in its own task and closes each one however it ends:
 

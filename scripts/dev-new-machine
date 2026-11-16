@@ -1,0 +1,720 @@
+#!/usr/bin/env bash
+# Proves that a copy of `i` can make a package, and check, run and test it, on
+# a machine that has no source tree of `i`: no `lib/`, no `std/`, no runner, no
+# Binaryen, no build cache. It also runs the first two examples of README.md,
+# which a new reader meets first, in packages of their own, and checks the
+# outputs the README promises (`42`, and the passing test).
+#
+#   scripts/dev-new-machine <path to i> [--evidence DIR]
+#
+# The binary is copied to a new directory, and the test runs in a namespace
+# where an empty tmpfs covers every source tree of `i` (this repository,
+# /home/agent/Programming, the other clones under /tmp), so the compiler, the
+# library sources and the runner can only come from the binary itself. HOME,
+# XDG_CACHE_HOME, I_CACHE_DIR and TMPDIR are fresh and empty. The real trees
+# are not moved or changed: the masks exist only in that namespace.
+#
+# Root in a namespace is needed to mount. Two ways are tried, and the test
+# fails, rather than passes, when neither works:
+#
+#   user  `unshare --user --mount --map-root-user`, the unprivileged way. It is
+#         the one a developer's computer uses.
+#   sudo  `sudo -n unshare --mount`, then the dialogs run as the ordinary user
+#         again (`setpriv`). GitHub's ubuntu-24.04 images restrict unprivileged
+#         user namespaces with AppArmor, so its runners need this way.
+#
+# DEV_NEW_MACHINE_MODE=user|sudo|root|auto chooses (default auto). `root` is
+# for a shell that is already root, as in a container; DEV_NEW_MACHINE_USER
+# names the user to run `i` as there.
+#
+# DEV_VERIFY_SKIP_NEW_MACHINE=1 skips the test loudly, for a computer without
+# `unshare` (macOS). It is an error when CI is set: a skipped acceptance is not
+# a passed one.
+#
+# --evidence DIR (or DEV_NEW_MACHINE_EVIDENCE=DIR) keeps the log, the masks and
+# copies of the `i.toml` files that the run made. KEEP_WORK=1 keeps the whole
+# work directory. Exit status: 0 when every step passed.
+set -euo pipefail
+
+script=$(realpath -- "${BASH_SOURCE[0]}")
+here=$(dirname -- "$script")
+
+# What the README says the first example prints, and what it says `i test`
+# prints, from its own sentences rather than from a value written here. The
+# wording may change ("`i run` prints `42`", "`i run --project demo` prints
+# `42`"), so the text around the words is not fixed; the words are.
+readme_run_output() { # README
+  sed -n 's/.*`i run[^`]*` prints `\([^`]*\)`.*/\1/p' "$1" | head -1
+}
+
+readme_test_output() { # README
+  sed -n 's/.*`i test` prints `\([^`]*\)`.*/\1/p' "$1" | head -1
+}
+
+# Whether an output is the one the README promises.
+output_is() { [[ $1 == "$2" ]]; }
+
+# The contents of the N-th fenced block of a file whose opening line matches a
+# pattern, so that what is run is what the README shows, not a copy of it.
+block() { # file, opening-line regex, occurrence
+  awk -v pat="$2" -v want="$3" '
+    $0 ~ pat && !inside { inside = 1; seen++; next }
+    inside && /^```/ { inside = 0; if (seen == want) exit; next }
+    inside && seen == want { print }
+  ' "$1"
+}
+
+inner() {
+  local work=$1 root=$2
+  cd -- "$work/proj"
+
+  local status=0
+  step() {
+    echo "\$ $*"
+    if "$@"; then
+      echo "  exit 0"
+    else
+      local code=$?
+      echo "  exit $code  <-- FAILED"
+      status=1
+    fi
+  }
+
+  echo "== the source tree is not reachable =="
+  local path
+  for path in "$root/Cargo.toml" "$root/crates/ilang-cli/src/commands/package.rs" \
+    "$root/lib/i/io.i" "$root/target/debug/i"; do
+    echo "\$ ls -d $path"
+    if ls -d -- "$path" 2>&1; then
+      echo "  still there  <-- FAILED"
+      status=1
+    else
+      echo "  gone, as it should be"
+    fi
+  done
+  # A path under another mask is gone, not empty: its parent's tmpfs covers
+  # it. Both are hidden, so both count as hidden, and only a path that is
+  # still there and has something in it fails.
+  while IFS= read -r path; do
+    if [[ ! -e $path ]]; then
+      echo "\$ ls -A $path"
+      echo "  gone with its parent's mask, as it should be"
+    elif [[ -n $(ls -A -- "$path" 2>&1) ]]; then
+      echo "\$ ls -A $path"
+      echo "  not masked  <-- FAILED"
+      status=1
+    else
+      echo "\$ ls -A $path"
+      echo "  empty, as it should be"
+    fi
+  done < "$work/masked"
+
+  # Regression: a path and one of its ancestors both in the list, which is what
+  # a checkout inside a masked directory looks like. The ancestor is mounted
+  # and the child is not mounted again, since it is not there any more.
+  if [[ -s $work/nested ]]; then
+    echo
+    echo "== nested masks: a child under a masked parent =="
+    local parent child
+    parent=$(sed -n 1p "$work/nested")
+    child=$(sed -n 2p "$work/nested")
+    echo "\$ grep -qx $parent $work/mounts"
+    if grep -qx -- "$parent" "$work/mounts"; then
+      echo "  the parent is mounted"
+    else
+      echo "  the parent is not mounted  <-- FAILED"
+      status=1
+    fi
+    echo "\$ grep -qx $child $work/mounts"
+    if grep -qx -- "$child" "$work/mounts"; then
+      echo "  the child is mounted too  <-- FAILED"
+      status=1
+    else
+      echo "  the child is covered by the parent, not mounted again"
+    fi
+    echo "\$ ls -d $child"
+    if [[ ! -e $child ]]; then
+      echo "  gone, as it should be"
+    else
+      echo "  still there  <-- FAILED"
+      status=1
+    fi
+  fi
+
+  echo
+  echo "== there is no network here =="
+  echo "\$ cat /proc/net/dev"
+  if [[ $(sed -n 's/^ *\([^ :]*\):.*/\1/p' /proc/net/dev | grep -v '^lo$' | wc -l) -ne 0 ]]; then
+    sed -n 's/^ *\([^ :]*\):.*/  \1/p' /proc/net/dev
+    echo "  there is an interface besides lo  <-- FAILED"
+    status=1
+  else
+    echo "  no interface but lo, as it should be"
+  fi
+  echo "\$ connect to 1.1.1.1:443"
+  if timeout 3 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443' 2>/dev/null; then
+    echo "  still connected  <-- FAILED"
+    status=1
+  else
+    echo "  nothing to connect to, as it should be"
+  fi
+
+  echo
+  echo "== i new =="
+  step "$work/bin/i" new app
+  if [[ -f app/i.toml ]]; then
+    echo "\$ cat app/i.toml"
+    cat app/i.toml
+  else
+    echo "  app/i.toml is missing  <-- FAILED"
+    status=1
+  fi
+
+  echo
+  echo "== the new package =="
+  step "$work/bin/i" check --project app
+  step "$work/bin/i" run --project app
+  step "$work/bin/i" test --project app
+
+  echo
+  echo "== a package named std =="
+  step "$work/bin/i" new std
+  if [[ -f std/i.toml ]]; then
+    echo "\$ cat std/i.toml"
+    cat std/i.toml
+  else
+    echo "  std/i.toml is missing  <-- FAILED"
+    status=1
+  fi
+  step "$work/bin/i" check --offline --project std
+  step "$work/bin/i" run --offline --project std
+  step "$work/bin/i" test --offline --project std
+
+  echo
+  echo "== the copied std carries the Unicode licence, as the repository's =="
+  for path in app/std std/std; do
+    echo "\$ cmp $work/UNICODE-LICENSE $path/UNICODE-LICENSE"
+    if cmp -s -- "$work/UNICODE-LICENSE" "$path/UNICODE-LICENSE"; then
+      echo "  the same file as the repository's"
+    else
+      echo "  missing or different  <-- FAILED"
+      status=1
+    fi
+  done
+
+  echo
+  echo "== README's first example, the one it says prints 42 =="
+  # A package of its own, so that the template above stays as `i new` made it.
+  step "$work/bin/i" new readme_main
+  mkdir -p readme_main/src
+  block "$work/README.md" '^```text' 1 > readme_main/src/main.i
+  echo "\$ cat readme_main/src/main.i"
+  cat readme_main/src/main.i
+  local promised
+  promised=$(readme_run_output "$work/README.md")
+  if [[ -z $promised ]]; then
+    echo "  README does not say what \`i run\` prints  <-- FAILED"
+    status=1
+  else
+    echo "\$ i run --offline --project readme_main   (README: prints $promised)"
+    if out=$("$work/bin/i" run --offline --project readme_main 2>&1) && output_is "$out" "$promised"; then
+      echo "$out"
+      echo "  exit 0"
+    else
+      echo "${out:-<no output>}"
+      echo "  <-- FAILED (expected $promised)"
+      status=1
+    fi
+  fi
+
+  echo
+  echo "== README's service and test example =="
+  step "$work/bin/i" new readme_test
+  mkdir -p readme_test/test
+  block "$work/README.md" '^```text' 2 > readme_test/test/clock_test.i
+  local promised_pass expected_pass
+  promised_pass=$(readme_test_output "$work/README.md")
+  if [[ -z $promised_pass ]]; then
+    echo "  README does not say what \`i test\` prints  <-- FAILED"
+    status=1
+    promised_pass="pass readme_test/clock_test.a"
+  fi
+  # "pass tour/clock_test.a a test gives its own clock" -> our package's name.
+  expected_pass="pass readme_test/${promised_pass#pass */}"
+  echo "\$ i test --offline --project readme_test   (README: $expected_pass)"
+  if out=$("$work/bin/i" test --offline --project readme_test 2>&1); then
+    echo "$out"
+    if grep -qxF -- "$expected_pass" <<<"$out" &&
+      grep -qxE '[0-9]+ passed, 0 failed' <<<"$out"; then
+      echo "  the documented test passes"
+    else
+      echo "  <-- FAILED (expected '$expected_pass' and all passed)"
+      status=1
+    fi
+  else
+    echo "$out"
+    echo "  <-- FAILED"
+    status=1
+  fi
+
+  echo
+  echo "== i new --path =="
+  step "$work/bin/i" new deep --path nested/dir
+  step "$work/bin/i" check --project nested/dir
+
+  echo
+  echo "== the native program (the runner is in the binary) =="
+  step "$work/bin/i" build --project app
+  echo "\$ ./app/build/app"
+  if out=$(./app/build/app 2>&1) && [[ $out == "Hello, app!" ]]; then
+    echo "$out"
+    echo "  exit 0"
+  else
+    echo "${out:-<no output>}"
+    echo "  <-- FAILED"
+    status=1
+  fi
+
+  echo
+  echo "== the package moved and copied elsewhere =="
+  cp -a app copied
+  cp -a readme_main moved-readme
+  echo "\$ i check --offline --project copied"
+  if out=$("$work/bin/i" check --offline --project copied 2>&1); then
+    echo "  exit 0"
+  else
+    echo "$out"
+    echo "  <-- FAILED"
+    status=1
+  fi
+  echo "\$ i run --offline --project moved-readme   (README's first example, moved)"
+  if [[ -z ${promised:-} ]]; then
+    echo "  the README names no output for the first example  <-- FAILED"
+    status=1
+  elif out=$("$work/bin/i" run --offline --project moved-readme 2>&1) && output_is "$out" "$promised"; then
+    echo "$out"
+    echo "  exit 0"
+  else
+    echo "${out:-<no output>}"
+    echo "  <-- FAILED (expected ${promised:-<none>})"
+    status=1
+  fi
+  echo "\$ i test --offline --project copied"
+  if out=$("$work/bin/i" test --offline --project copied 2>&1) && grep -qxE '[0-9]+ passed, 0 failed' <<<"$out"; then
+    echo "$out"
+    echo "  exit 0"
+  else
+    echo "${out:-<no output>}"
+    echo "  <-- FAILED"
+    status=1
+  fi
+  mv nested/dir moved-deep
+  echo "\$ i check --offline --project moved-deep   (moved with mv)"
+  if out=$("$work/bin/i" check --offline --project moved-deep 2>&1); then
+    echo "  exit 0"
+  else
+    echo "$out"
+    echo "  <-- FAILED"
+    status=1
+  fi
+
+  echo
+  echo "== no manifest names a path of this computer =="
+  # Every i.toml and i.lock the run made, as TOML (and lines, for the lock),
+  # rather than as text: an absolute path in a nested table, an inline table,
+  # an array or a multi-line string is an absolute path too.
+  local manifests=()
+  while IFS= read -r -d '' path; do
+    manifests+=("$path")
+  done < <(find "$work/proj" \( -name i.toml -o -name i.lock \) -print0 2>/dev/null)
+  if [[ ${#manifests[@]} -eq 0 ]]; then
+    echo "  no i.toml was made  <-- FAILED"
+    status=1
+  fi
+  for path in "${manifests[@]}"; do
+    echo "\$ manifest-paths $path"
+    if out=$(python3 -I "$work/manifest-paths" "$path" 2>&1); then
+      echo "  no absolute path"
+    else
+      local code=$?
+      [[ -n $out ]] && sed 's/^/    /' <<<"$out"
+      if [[ $code == 1 ]]; then
+        echo "  an absolute path  <-- FAILED"
+      else
+        echo "  the manifest could not be read  <-- FAILED"
+      fi
+      status=1
+    fi
+  done
+
+  return "$status"
+}
+
+# ---- the root side, inside the namespace ----
+
+# Mounts the masks, then runs `inner` as `uid` (empty: as it is).
+root_side() {
+  local work=$1 root=$2 uid=$3 gid=$4 path=$5
+  set -e
+  cd /
+  local mask
+  while IFS= read -r mask; do
+    mount -t tmpfs tmpfs "$mask"
+  done < "$work/mounts"
+  cd /
+  local run=(env "HOME=$work/home" "XDG_CACHE_HOME=$work/cache"
+    "I_CACHE_DIR=$work/cache/i" "TMPDIR=$work/tmp" "PATH=$path"
+    bash "$work/new-machine" --inside "$work" "$root")
+  if [[ -n $uid ]]; then
+    echo "dev-new-machine: running i as uid $uid, gid $gid"
+    exec setpriv --reuid="$uid" --regid="$gid" --init-groups "${run[@]}"
+  fi
+  exec "${run[@]}"
+}
+
+# The extraction of README's promises, checked on the README here and on copies
+# where the promised output is another value and where there is none at all.
+self_test() {
+  local dir readme real changed none bad=0
+  dir=$(mktemp -d "${TMPDIR:-/var/tmp}/i-new-machine-selftest.XXXXXX")
+  readme=$(dirname -- "$script")/../README.md
+  real=$(readme_run_output "$readme") || true
+  if [[ -z $real ]]; then
+    echo "self-test: the README here names no output for its first example" >&2
+    bad=1
+  else
+    echo "self-test: the README's first example prints: $real"
+  fi
+  # The same sentence with another value: a run that printed the real value
+  # must not match it, so a wrong README cannot pass quietly.
+  changed="${real}9"
+  printf '%s\n' "\`i run --project demo\` prints \`$changed\`." >"$dir/changed.md"
+  if [[ $(readme_run_output "$dir/changed.md") != "$changed" ]]; then
+    echo "self-test: the changed sentence was not read: $(readme_run_output "$dir/changed.md")" >&2
+    bad=1
+  elif output_is "$real" "$changed"; then
+    echo "self-test: a run of $real matched the changed expectation $changed" >&2
+    bad=1
+  else
+    echo "self-test: a run of $real does not match the changed expectation $changed"
+  fi
+  # The README itself, in a copy, with its first example's promised output
+  # changed: the extraction must follow it, and the assertion must fail.
+  awk -v new="$changed" '
+    !done && /`i run/ { sub(/prints `[^`]*`/, "prints `" new "`"); done = 1 }
+    { print }
+  ' "$readme" >"$dir/readme.md"
+  if [[ $(readme_run_output "$dir/readme.md") != "$changed" ]]; then
+    echo "self-test: a copy of the README with $changed was read as '$(readme_run_output "$dir/readme.md")'" >&2
+    bad=1
+  elif output_is "$real" "$changed"; then
+    echo "self-test: the assertion accepted $real for a README that promises $changed" >&2
+    bad=1
+  else
+    echo "self-test: a copy of the README promising $changed makes the assertion fail"
+  fi
+  # No sentence at all is nothing to compare with, not a pass.
+  printf '%s\n' 'The program prints something.' >"$dir/none.md"
+  none=$(readme_run_output "$dir/none.md") || true
+  if [[ -n $none ]]; then
+    echo "self-test: a README without the sentence gave '$none'" >&2
+    bad=1
+  else
+    echo "self-test: a README without the sentence gives nothing, which is an error"
+  fi
+  # The older wording still reads.
+  printf '%s\n' '`i run` prints `7`.' >"$dir/old.md"
+  if [[ $(readme_run_output "$dir/old.md") != 7 ]]; then
+    echo "self-test: the older wording was not read" >&2
+    bad=1
+  fi
+  # `i test` as well.
+  printf '%s\n' 'which `i test` prints `pass tour/clock_test.a a test`.' >"$dir/test.md"
+  if [[ $(readme_test_output "$dir/test.md") != "pass tour/clock_test.a a test" ]]; then
+    echo 'self-test: the `i test` sentence was not read' >&2
+    bad=1
+  fi
+  rm -rf -- "$dir"
+  return "$bad"
+}
+
+case ${1:-} in
+  --self-test) self_test; exit $? ;;
+  --inside) inner "$2" "$3"; exit $? ;;
+  --root-side)
+    shift
+    root_side "$@"
+    exit $?
+    ;;
+esac
+
+mode=${DEV_NEW_MACHINE_MODE:-auto}
+case $mode in
+  auto | user | sudo | root) ;;
+  *)
+    echo "dev-new-machine: DEV_NEW_MACHINE_MODE must be auto, user, sudo or root" >&2
+    exit 2
+    ;;
+esac
+
+evidence=${DEV_NEW_MACHINE_EVIDENCE:-}
+binary=
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --evidence)
+      evidence=${2:?--evidence needs a directory}
+      shift 2
+      ;;
+    *)
+      binary=$1
+      shift
+      ;;
+  esac
+done
+
+skip() {
+  local why=$1
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo "!! WARNING: the new-machine acceptance DID NOT RUN: $why"
+  echo "!! A copied \`i\` was NOT shown to make, check, run and test a package"
+  echo "!! without its source tree. Do not count this as a pass."
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+}
+
+if [[ -n ${DEV_VERIFY_SKIP_NEW_MACHINE:-} ]]; then
+  if [[ -n ${CI:-} || -n ${GITHUB_ACTIONS:-} ]]; then
+    echo "dev-new-machine: DEV_VERIFY_SKIP_NEW_MACHINE is set, but CI runs this test:" >&2
+    echo "dev-new-machine: it proves a copied \`i\` works without the source tree" >&2
+    exit 2
+  fi
+  skip "DEV_VERIFY_SKIP_NEW_MACHINE is set"
+  exit 0
+fi
+
+if [[ -z $binary ]]; then
+  echo "usage: scripts/dev-new-machine <path to i> [--evidence DIR]" >&2
+  exit 2
+fi
+binary=$(realpath -- "$binary")
+if [[ ! -x $binary ]]; then
+  echo "dev-new-machine: '$binary' is not an executable file" >&2
+  exit 2
+fi
+if ! command -v python3 >/dev/null; then
+  echo "dev-new-machine: python3 is needed (3.11+, for tomllib)" >&2
+  exit 2
+fi
+
+root=$(realpath -- "$here/..")
+
+# The checker of the manifests, before it is trusted in the namespace.
+echo "dev-new-machine: checking the README extraction and the manifest checker"
+self_test
+
+python3 -I "$here/manifest-paths" --self-test
+
+# The work directory must not be covered by a mask, so it is not under /tmp/oc-*
+# or /home/agent/Programming.
+work=$(mktemp -d "${TMPDIR:-/var/tmp}/i-new-machine.XXXXXX" 2>/dev/null ||
+  mktemp -d "/tmp/i-new-machine.XXXXXX")
+code=0
+finish() {
+  local status=$?
+  set +e
+  if [[ -n $evidence ]]; then
+    mkdir -p -- "$evidence"
+    cp -- "$work/log" "$evidence/log" 2>/dev/null
+    cp -- "$work/masked" "$evidence/masked" 2>/dev/null
+    cp -- "$work/proj/app/i.toml" "$evidence/app-i.toml" 2>/dev/null
+    cp -- "$work/proj/nested/dir/i.toml" "$evidence/deep-i.toml" 2>/dev/null
+    cp -- "$work/proj/readme_test/i.toml" "$evidence/readme-test-i.toml" 2>/dev/null
+    find "$work/proj" -name i.lock -exec cp -- {} "$evidence/" \; 2>/dev/null
+    {
+      echo "binary: $binary"
+      echo "sha256: $(sha256sum "$binary" | cut -d' ' -f1)"
+      echo "mode: $mode"
+      echo "exit: $status"
+      echo "when: $(date --iso-8601=seconds)"
+    } > "$evidence/summary"
+    echo "dev-new-machine: evidence in $evidence"
+  fi
+  rm -rf -- "${nested_top:-}" 2>/dev/null
+  if [[ -n ${KEEP_WORK:-} ]]; then
+    echo "dev-new-machine: work kept at $work"
+  else
+    rm -rf -- "$work"
+  fi
+  exit "$status"
+}
+trap finish EXIT
+mkdir -p "$work"/{bin,proj,home,cache/i,tmp}
+
+echo "dev-new-machine: binary $binary"
+echo "dev-new-machine: sha256 $(sha256sum "$binary" | cut -d' ' -f1)"
+echo "dev-new-machine: work    $work"
+
+cp -- "$binary" "$work/bin/i"
+cp -- "$script" "$work/new-machine"
+cp -- "$here/manifest-paths" "$work/manifest-paths"
+cp -- "$here/../README.md" "$work/README.md"
+cp -- "$here/../std/UNICODE-LICENSE" "$work/UNICODE-LICENSE"
+
+# The trees to hide: this repository, the other clones of it, and the default
+# place of the sources. A path is masked only if it exists here.
+masks=()
+add_mask() {
+  local path=$1
+  [[ -d $path ]] || return 0
+  [[ $path == "$work" || $path == "$work"/* ]] && return 0
+  masks+=("$path")
+}
+add_mask "$root"
+add_mask /home/agent/Programming
+
+# A pair of a directory and one inside it, both in the list: the shape of a
+# checkout under a masked directory, which is what a gate run sees. The child
+# is covered by the parent's tmpfs, so it must not be mounted again, and the
+# check must count it as hidden rather than as missing.
+nested_top=$(mktemp -d "${TMPDIR:-/var/tmp}/i-new-machine-nested.XXXXXX")
+mkdir -p "$nested_top/inside"
+echo "still here" > "$nested_top/inside/file"
+add_mask "$nested_top"
+add_mask "$nested_top/inside"
+printf '%s\n%s\n' "$nested_top" "$nested_top/inside" > "$work/nested"
+for path in /tmp/oc-* /tmp/opencode /tmp/orch /home/agent/.local/share/opencode/worktree; do
+  add_mask "$path"
+done
+# Any other clone of the repository under /tmp.
+for path in /tmp/*; do
+  [[ -d $path ]] || continue
+  [[ -f $path/Cargo.toml && -d $path/crates/ilang-cli ]] || continue
+  add_mask "$path"
+done
+printf '%s\n' "${masks[@]}" | sort -u > "$work/masked"
+
+# Only the least set is mounted: a path under another one is inside the tmpfs
+# of that one already, and mounting it again would fail, since it is not there
+# when the time comes. The full list stays, and is what the check verifies.
+: > "$work/mounts"
+while IFS= read -r path; do
+  covered=0
+  while IFS= read -r other; do
+    if [[ $other != "$path" && $path == "$other"/* ]]; then
+      covered=1
+      break
+    fi
+  done < "$work/masked"
+  if [[ $covered == 0 ]]; then
+    printf '%s\n' "$path" >> "$work/mounts"
+  fi
+done < "$work/masked"
+
+while IFS= read -r path; do
+  if [[ $work == "$path" || $work == "$path"/* ]]; then
+    echo "dev-new-machine: the work directory '$work' is inside '$path', which it must hide" >&2
+    echo "dev-new-machine: set TMPDIR to a directory outside the sources" >&2
+    exit 2
+  fi
+done < "$work/masked"
+
+echo "dev-new-machine: hiding in the test namespace (check list):"
+sed 's/^/  /' "$work/masked"
+echo "dev-new-machine: mounting (least set):"
+sed 's/^/  /' "$work/mounts"
+
+# ---- which way to get root in a namespace ----
+
+uid=
+gid=
+run=()
+why_user=
+why_sudo=
+if [[ $mode != sudo && $mode != root ]]; then
+  # Mounting in a user namespace needs the capabilities of that namespace, which
+  # Ubuntu 24.04 (and so GitHub's runners) deny to unconfined programs, so mount
+  # is part of the probe.
+  mkdir -p "$work/probe"
+  if why_user=$(unshare --user --net --mount --map-root-user \
+    bash -c 'mount -t tmpfs tmpfs "$1" && ls -A "$1"' _ "$work/probe" 2>&1); then
+    mode=user
+  else
+    why_user="unshare --user --mount --map-root-user cannot mount: ${why_user//$'\n'/ }"
+    mode=auto
+  fi
+fi
+if [[ $mode == auto ]]; then
+  if ! command -v sudo >/dev/null; then
+    why_sudo="there is no sudo"
+  elif ! sudo -n true 2>/dev/null; then
+    why_sudo="sudo needs a password (no NOPASSWD)"
+  elif why_sudo=$(sudo -n unshare --mount true 2>&1); then
+    mode=sudo
+  else
+    why_sudo="sudo -n unshare --mount: ${why_sudo//$'\n'/ }"
+  fi
+fi
+if [[ $mode == root ]]; then
+  if [[ $(id -u) != 0 ]]; then
+    echo "dev-new-machine: DEV_NEW_MACHINE_MODE=root needs a root shell" >&2
+    exit 2
+  fi
+fi
+
+case $mode in
+  user)
+    echo "dev-new-machine: unprivileged user namespaces work here"
+    run=(unshare --user --net --mount --map-root-user)
+    ;;
+  sudo)
+    if [[ -n $why_user ]]; then
+      echo "dev-new-machine: no unprivileged user namespace: $why_user"
+    else
+      echo "dev-new-machine: DEV_NEW_MACHINE_MODE=sudo"
+    fi
+    echo "dev-new-machine: using sudo unshare --mount, and running i as this user"
+    if ! sudo -n true 2>/dev/null; then
+      echo "dev-new-machine: sudo needs a password here (no NOPASSWD), so the test cannot run" >&2
+      exit 1
+    fi
+    run=(sudo -n unshare --net --mount)
+    uid=$(id -u)
+    gid=$(id -g)
+    ;;
+  root)
+    run=(unshare --net --mount)
+    if [[ -n ${DEV_NEW_MACHINE_USER:-} ]]; then
+      uid=$(id -u "$DEV_NEW_MACHINE_USER")
+      gid=$(id -g "$DEV_NEW_MACHINE_USER")
+    fi
+    ;;
+  *)
+    echo "dev-new-machine: this test needs a mount namespace with root in it, and neither way works:" >&2
+    echo "dev-new-machine:   unprivileged: ${why_user:-not tried}" >&2
+    echo "dev-new-machine:   sudo:         ${why_sudo:-not tried}" >&2
+    if ! command -v unshare >/dev/null; then
+      echo "dev-new-machine: unshare is not on this computer (macOS has none);" >&2
+      echo "dev-new-machine: set DEV_VERIFY_SKIP_NEW_MACHINE=1 to skip this test explicitly" >&2
+    fi
+    exit 1
+    ;;
+esac
+echo "dev-new-machine: mode $mode"
+
+# A root shell keeps the work directory for the user who runs `i`, so that it
+# can read the binary and write the package there.
+if [[ -n $uid && $(id -u) == 0 ]]; then
+  chown -R "$uid:$gid" "$work"
+fi
+
+set +e
+"${run[@]}" bash "$script" --root-side "$work" "$root" "$uid" "$gid" "$PATH" 2>&1 |
+  tee "$work/log" >&2
+# The log is written by tee above; the same output is on stderr, and in "$work/log".
+code=${PIPESTATUS[0]}
+set -e
+
+if [[ $code -ne 0 ]]; then
+  echo "dev-new-machine: FAILED (exit $code)" >&2
+  exit "$code"
+fi
+echo "dev-new-machine: ok"

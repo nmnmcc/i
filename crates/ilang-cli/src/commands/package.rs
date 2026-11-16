@@ -126,21 +126,28 @@ fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     if dir.exists() && std::fs::read_dir(&dir)?.next().is_some() {
         bail!("`{}` is already there and is not empty", dir.display());
     }
-    let std = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../std")
-        .canonicalize()?;
-    let files = [
+    // A package named `std` cannot depend on a dependency also named `std`;
+    // the copied package gets another dependency key. Nothing else changes.
+    let dependency = if name == "std" { "stdlib" } else { "std" };
+    let mut files = vec![
         (
             "i.toml".to_string(),
+            // `std` is an ordinary dependency, copied next to the program by
+            // `i new`, so the manifest has no local absolute path.
             format!(
-                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n",
-                std.to_str().expect("standard library path is UTF-8")
+                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\n{dependency} = {{ path = \"std\" }}\n"
             ),
         ),
         (".gitignore".to_string(), "/build/\n".to_string()),
         ("src/main.i".to_string(), formatted(main_module(name))),
-        ("test/main_test.i".to_string(), formatted(test_module(name))),
+        (
+            "test/main_test.i".to_string(),
+            formatted(test_module(name, dependency)),
+        ),
     ];
+    for (relative, text) in ilang_cli::std_package::STD_FILES {
+        files.push((format!("std/{relative}"), text.to_string()));
+    }
     for (file, text) in &files {
         let p = dir.join(file);
         if let Some(parent) = p.parent() {
@@ -179,10 +186,10 @@ main = () <- (io : Io) {{
     )
 }
 
-fn test_module(name: &str) -> String {
+fn test_module(name: &str, dependency: &str) -> String {
     format!(
         r#"(
-	testlib = (test) = std/test
+	testlib = (test) = {dependency}/test
 	{name}/main)
 
 
@@ -2107,7 +2114,11 @@ fn relative(from: &Path, to: &Path) -> String {
 mod syntax_templates {
     #[test]
     fn new_package_sources_parse() {
-        for source in [super::main_module("example"), super::test_module("example")] {
+        for source in [
+            super::main_module("example"),
+            super::test_module("example", "std"),
+            super::test_module("std", "stdlib"),
+        ] {
             assert!(ilang_syntax::parse_module(&source).1.is_empty(), "{source}");
         }
     }

@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""Reports the absolute paths in the manifests of a package.
+
+    scripts/manifest-paths FILE...
+
+A package must not name a path of the machine that made it: the `i.toml` and
+`i.lock` of a package that `i new` writes (or `i add` changes) have to work on
+another computer. So every string of an `i.toml` is read, in tables, inline
+tables and arrays alike, and one that is absolute is printed as
+
+    i.toml:dependencies.lib.path = "/home/me/i/lib"
+
+and the exit status is 1. A path is absolute when it starts with `/`, `file://`,
+`~/`, or a Windows drive letter as in `C:/…` or `C:\\…`; `\\\\server\\share` too.
+
+An `i.lock` is checked line by line, since it is a list of lines rather than
+TOML: the first word of a line is the location of a package.
+
+`--self-test` checks the checker itself on cases it must find and cases it must
+not, and is what the test runs; the exit status is 0 only when all agree.
+
+Exit status: 0 when no absolute path was found, 1 when one was, 2 when a file
+could not be read as an i.toml or an i.lock.
+
+Python 3.11 or newer is needed, for `tomllib`.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import sys
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python older than 3.11
+    sys.exit("scripts/manifest-paths: Python 3.11 or newer is needed (tomllib)")
+
+DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def absolute(text: str) -> bool:
+    return (
+        text.startswith("/")
+        or text.startswith("file://")
+        or text.startswith("~/")
+        or text.startswith("\\\\")
+        or DRIVE.match(text) is not None
+    )
+
+
+def walk(value, path, out):
+    if isinstance(value, str):
+        if absolute(value):
+            out.append((path, value))
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            walk(item, key if not path else f"{path}.{key}", out)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            walk(item, f"{path}[{index}]", out)
+
+
+def manifest(text: str) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    walk(tomllib.loads(text), "", out)
+    return out
+
+
+def lock(text: str) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        words = line.split()
+        if words and absolute(words[0]):
+            out.append((f"line {number}", words[0]))
+    return out
+
+
+def check(name: str, text: str) -> list[tuple[str, str]]:
+    if os.path.basename(name) == "i.lock":
+        return lock(text)
+    return manifest(text)
+
+
+def main(argv: list[str]) -> int:
+    if argv == ["--self-test"]:
+        return self_test()
+    if not argv:
+        print("usage: scripts/manifest-paths FILE... | --self-test", file=sys.stderr)
+        return 2
+    bad = 0
+    unreadable = 0
+    for name in argv:
+        try:
+            with open(name, "rb") as file:
+                text = file.read().decode("utf-8")
+            found = check(name, text)
+        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+            print(f"{name}: {error}", file=sys.stderr)
+            unreadable = 1
+            continue
+        for where, value in found:
+            print(f"{name}:{where} = {value!r}")
+            bad = 1
+    # 1: an absolute path; 2: a file that could not be read as it claims to be.
+    return 2 if unreadable and not bad else bad
+
+
+# The cases of `--self-test`: text, and whether it has an absolute path.
+CASES = [
+    # A plain key.
+    ('path = "/home/me/lib"\n', True),
+    # A table.
+    ('[dependencies.lib]\npath = "/home/me/lib"\n', True),
+    # A nested table.
+    ('[tool.deep.table]\nroot = "/srv/i"\n', True),
+    # An inline table.
+    ('lib = { path = "/home/me/lib", version = "1" }\n', True),
+    # A nested inline table.
+    ('tool = { deep = { root = "/srv/i" } }\n', True),
+    # An array.
+    ('paths = ["relative", "/absolute"]\n', True),
+    # An array of tables.
+    ('[[bin]]\npath = "/opt/i/main.i"\n', True),
+    # A multi-line basic string.
+    ('text = """\n/home/me/lib\n"""\n', True),
+    # A single-quoted literal string.
+    ("text = '/home/me/lib'\n", True),
+    # A `file://` URL.
+    ('touchstone = "file:///home/me/i"\n', True),
+    # A home directory.
+    ('root = "~/i/lib"\n', True),
+    # A Windows drive.
+    ('root = "C:/i/lib"\n', True),
+    ('root = "C:\\\\i\\\\lib"\n', True),
+    # A Windows share.
+    ('root = "\\\\\\\\server\\\\share"\n', True),
+    # What is fine: relative paths, and names with a `/` in them.
+    ('name = "app"\n[test]\ncollection = "i/test.tests"\n', False),
+    ('lib = { path = "../lib" }\n', False),
+    ('paths = ["src", "test/main.i", "./build"]\n', False),
+    # A key that is a name, not a path.
+    ('[dependencies]\ni = "github.com/i/i@1.0.0"\n', False),
+]
+
+LOCKS = [
+    ("/home/me/lib 1.0.0 abc sha256-x\n", True),
+    ("github.com/i/i@1.0.0 1.0.0 abc sha256-x\n", False),
+    ("file:///home/me/i 1.0.0 abc sha256-x\n", True),
+]
+
+
+def self_test() -> int:
+    bad = 0
+    for number, (text, expected) in enumerate(CASES, 1):
+        found = manifest(text)
+        if bool(found) != expected:
+            print(
+                f"self-test: case {number} should {'find' if expected else 'not find'} "
+                f"an absolute path, and gave {found!r}:\n{text}",
+                file=sys.stderr,
+            )
+            bad = 1
+    for number, (text, expected) in enumerate(LOCKS, 1):
+        found = lock(text)
+        if bool(found) != expected:
+            print(
+                f"self-test: i.lock case {number} gave {found!r}:\n{text}",
+                file=sys.stderr,
+            )
+            bad = 1
+    if bad:
+        return 1
+    print(f"self-test: {len(CASES)} i.toml cases and {len(LOCKS)} i.lock cases agree")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

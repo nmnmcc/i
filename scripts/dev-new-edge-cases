@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# The edges of `i new`: a package named `std`, a path with spaces in it,
+# something already there where the new package goes, the same directory used
+# twice, and a directory that cannot be written.
+#
+#   scripts/dev-new-edge-cases <path to i>
+#
+# Every failure has to say what went wrong and leave nothing half-written, and
+# nothing of the user's own may be overwritten. Only the files of a package
+# that `i new` made may change. Exit status: 0 when every case held.
+set -euo pipefail
+
+i=${1:-}
+if [[ -z $i ]]; then
+  echo "usage: scripts/dev-new-edge-cases <path to i>" >&2
+  exit 2
+fi
+i=$(realpath -- "$i")
+[[ -x $i ]] || { echo "dev-new-edge-cases: '$i' is not an executable file" >&2; exit 2; }
+
+work=$(mktemp -d "${TMPDIR:-/var/tmp}/i-new-edge.XXXXXX")
+trap 'chmod -R u+w "$work" 2>/dev/null; rm -rf -- "$work"' EXIT
+export HOME="$work/home" XDG_CACHE_HOME="$work/cache" I_CACHE_DIR="$work/cache/i"
+mkdir -p "$HOME" "$I_CACHE_DIR"
+
+bad=0
+fail() { echo "  $*  <-- FAILED"; bad=1; }
+ok() { echo "  $*"; }
+
+# Runs `i` in $work; sets OUT, ERR, CODE.
+run() {
+  OUT=$(cd "$work" && timeout 300 "$i" "$@" 2>"$work/stderr") && CODE=0 || CODE=$?
+  ERR=$(cat "$work/stderr")
+}
+
+expect_ok() { # what command...
+  local what=$1
+  shift
+  run "$@"
+  [[ $CODE -eq 0 ]] || fail "$what: exit $CODE: $ERR"
+}
+
+# A snapshot of every file of a directory, to compare before and after.
+snapshot() { (cd "$1" && find . -type f -print0 | sort -z | xargs -0 sha256sum); }
+
+echo "== a package named std =="
+run new std
+if [[ $CODE -ne 0 ]]; then
+  fail "i new std was refused: ${ERR:-<no stderr>}"
+else
+  ok "i new std made a package"
+  # The copied standard library cannot be a dependency also named std, so the
+  # manifest names it stdlib; it still points at the copy.
+  if grep -qx 'stdlib = { path = "std" }' "$work/std/i.toml"; then
+    ok "its manifest names the copy stdlib"
+  else
+    fail "its manifest does not name the copy stdlib: $(cat "$work/std/i.toml")"
+  fi
+  expect_ok "the std package checks" check --offline --project std
+  expect_ok "the std package runs" run --offline --project std
+  run test --offline --project std
+  [[ $CODE -eq 0 ]] && grep -qxE '[0-9]+ passed, 0 failed' <<<"$OUT" &&
+    ok "the std package tests pass" ||
+    fail "the std package: exit $CODE; $ERR$OUT"
+fi
+
+echo "== a path with spaces =="
+run new spaced --path "a dir with spaces"
+if [[ $CODE -eq 0 ]]; then
+  ok "made a package under 'a dir with spaces'"
+  expect_ok "spaces: check" check --offline --project "a dir with spaces"
+  expect_ok "spaces: run" run --offline --project "a dir with spaces"
+  run test --offline --project "a dir with spaces"
+  [[ $CODE -eq 0 ]] && grep -qxE '[0-9]+ passed, 0 failed' <<<"$OUT" &&
+    ok "spaces: tests pass" ||
+    fail "spaces: test exit $CODE; $ERR$OUT"
+else
+  fail "spaces: i new failed: ${ERR:-<no stderr>}"
+fi
+
+echo "== something already there =="
+mkdir -p "$work/taken/std"
+echo "mine" >"$work/taken/std/keep.txt"
+run new taken
+[[ $CODE -ne 0 ]] || fail "i new into a directory with a std/ of its own was allowed"
+grep -qiE 'not empty|already|exist' <<<"$ERR" ||
+  fail "the refusal does not say why: ${ERR:-<no stderr>}"
+[[ $(cat "$work/taken/std/keep.txt" 2>/dev/null) == mine ]] ||
+  fail "the user's std/keep.txt was changed"
+[[ ! -e $work/taken/i.toml ]] || fail "a refusal wrote i.toml"
+ok "refused without touching std/keep.txt"
+
+echo "== the same directory twice =="
+run new twice
+[[ $CODE -eq 0 ]] || fail "twice: the first i new failed: $ERR"
+before=$(snapshot "$work/twice")
+run new twice
+[[ $CODE -ne 0 ]] || fail "twice: a second i new on the same directory was allowed"
+[[ $(snapshot "$work/twice") == "$before" ]] ||
+  fail "twice: the second run changed the files of the first"
+ok "refused, and the first package is unchanged"
+
+echo "== a directory that cannot be written =="
+mkdir -p "$work/readonly"
+chmod 500 "$work/readonly"
+run new ro --path readonly
+chmod 700 "$work/readonly"
+[[ $CODE -ne 0 ]] || fail "i new into a read-only directory was allowed"
+[[ -z $(ls -A "$work/readonly") ]] ||
+  fail "i new left files behind in a read-only directory: $(ls -A "$work/readonly")"
+[[ -n $ERR ]] || fail "the write failure says nothing"
+ok "refused: ${ERR%%$'\n'*}"
+
+echo
+if [[ $bad -ne 0 ]]; then
+  echo "dev-new-edge-cases: FAILED" >&2
+  exit 1
+fi
+echo "dev-new-edge-cases: ok"

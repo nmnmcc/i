@@ -1471,8 +1471,11 @@
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
   },
-  "crates/ilang-cli/src/commands/package.rs:df747cb87930f0f2": {
-    "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
+  "crates/ilang-cli/src/commands/package.rs:ac7dd3c38c3ce759": {
+    "not_source": "TOML manifest template that `i new` writes: `std` is an ordinary dependency copied next to the program, so this is not i source."
+  },
+  "crates/ilang-cli/tests/common/test_project.rs:ac7dd3c38c3ce759": {
+    "not_source": "TOML manifest template that `i new` writes: `std` is an ordinary dependency copied next to the program, so this is not i source."
   },
   "crates/ilang-cli/tests/common/test_project.rs:df747cb87930f0f2": {
     "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
@@ -1670,6 +1673,27 @@
   },
   "crates/ilang-cli/tests/value_type_performance.rs:217fe1a139ac8e12": {
     "not_source": "Rust format string for a type name"
+  },
+  "crates/ilang-cli/src/commands/package.rs:3498a1f2e73f73d9": {
+    "substitutions": [
+      [
+        "{name}",
+        "app"
+      ],
+      [
+        "{dependency}",
+        "std"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template; runtime tests still exercise the full generator"
   },
   "tests/spec/1.7/a1_same_line_tuple.i:bb17b44ae2201195": {
     "reason": "Intentional negative syntax example.",
@@ -2801,23 +2825,6 @@
     ],
     "reason": "Materialize the Rust format template before parsing its i program."
   },
-  "crates/ilang-cli/src/commands/package.rs:32cc7e39e939bc14": {
-    "substitutions": [
-      [
-        "{name}",
-        "app"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template; runtime tests still exercise the full generator"
-  },
   "crates/ilang-check/tests/types.rs:49929f2929b56dce": {
     "prefix": "f = (b, x) {\n  a0 = x\n",
     "suffix": "  a1\n}\n",
@@ -3370,5 +3377,8 @@
       "E0101: `|` no longer joins function values: join the branches with `&`"
     ],
     "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
+  },
+  "crates/ilang-cli/tests/package_commands.rs:9a401754e36c5860": {
+    "not_source": "TOML manifest or manifest fragment"
   }
 }

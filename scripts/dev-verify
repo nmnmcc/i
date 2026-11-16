@@ -7,7 +7,15 @@
 #                                 (rust-lint: formatting, Clippy and snippets; rust-test: the tests)
 #   scripts/dev-verify snippets   every i snippet in the repository parses, or gives its registered
 #                                 diagnostics (scripts/check-snippets and its own tests)
-#   scripts/dev-verify i          the release `i`, and with it the i sources
+#   scripts/dev-verify i          the release `i`, and with it the i sources;
+#                                 `scripts/dev-new-machine` proves that a copy of
+#                                 that `i` still makes, checks, runs and tests a
+#                                 package on a machine without the source tree,
+#                                 including README's first two examples. It needs
+#                                 unprivileged user namespaces or passwordless
+#                                 sudo, and fails without either;
+#                                 DEV_VERIFY_SKIP_NEW_MACHINE=1 skips it, which
+#                                 is an error in CI
 #   scripts/dev-verify editors    VS Code tests, tree-sitter tests and Zed build
 #   scripts/dev-verify js         the JavaScript SDK and browser tests
 #
@@ -85,6 +93,7 @@ i() {
     i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
   fi
   "$i" fmt --check lib std bench examples
+  ./scripts/dev-new-machine "$i"
   for level in 0 2; do
     "$i" test --project std --opt "$level"
     "$i" test --project examples/hello --opt "$level"

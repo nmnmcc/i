@@ -214,7 +214,10 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
     let out = w.ok(&["new", "demo"]);
     assert!(out.contains("demo"), "{out}");
     let dir = w.path().join("demo");
-    assert_eq!(read(&dir.join("i.toml")), test_project::manifest("demo"));
+    assert_eq!(
+        read(&dir.join("i.toml")),
+        test_project::new_manifest("demo")
+    );
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
     assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
     assert!(read(&dir.join("src/main.i")).contains("main = () <- (io : Io)"));
@@ -273,13 +276,153 @@ fn two_new_packages_work_together() {
     );
 }
 
+/// The contents of the N-th fenced `text` block in a Markdown page.
+fn text_block(markdown: &str, want: usize) -> &str {
+    let opening = "```text\n";
+    let mut rest = markdown;
+    let mut seen = 0;
+    loop {
+        let start = rest
+            .find(opening)
+            .unwrap_or_else(|| panic!("README has no text block {want}"))
+            + opening.len();
+        let block = &rest[start..];
+        let end = block
+            .find("\n```")
+            .unwrap_or_else(|| panic!("README text block {want} is not closed"));
+        seen += 1;
+        if seen == want {
+            return &block[..end];
+        }
+        rest = &block[end + 1..];
+    }
+}
+
+#[test]
+fn new_package_is_portable_and_runs_the_readme_program() {
+    let w = World::new();
+    w.ok(&["new", "demo"]);
+    let dir = w.path().join("demo");
+    let manifest = read(&dir.join("i.toml"));
+    // No machine path; `std` is an ordinary dependency copied with the package.
+    assert_eq!(manifest, test_project::new_manifest("demo"));
+    assert!(!manifest.contains(env!("CARGO_MANIFEST_DIR")), "{manifest}");
+    assert!(dir.join("std/i.toml").is_file());
+    assert!(dir.join("std/src/int.i").is_file());
+
+    // The first README example imports `std/int` from a program, which now
+    // resolves as an ordinary dependency.
+    let readme = include_str!("../../../README.md");
+    write(&dir, &[("src/main.i", text_block(readme, 1))]);
+    let out = w.ok(&["run", "--project", &dir.display().to_string()]);
+    assert_eq!(out, "42\n");
+}
+
+#[test]
+fn new_package_tests_the_readme_service_example() {
+    let w = World::new();
+    w.ok(&["new", "svc"]);
+    let dir = w.path().join("svc");
+    let readme = include_str!("../../../README.md");
+    write(&dir, &[("test/clock_test.i", text_block(readme, 2))]);
+    let out = w.ok(&["test", "--project", &dir.display().to_string()]);
+    assert!(
+        out.contains("pass svc/clock_test.a test gives its own clock"),
+        "{out}"
+    );
+    assert!(out.contains("0 failed"), "{out}");
+}
+
+#[test]
+fn new_package_named_std_uses_another_dependency_key() {
+    let w = World::new();
+    w.ok(&["new", "std"]);
+    let dir = w.path().join("std");
+    let manifest = read(&dir.join("i.toml"));
+    assert_eq!(manifest, test_project::new_manifest("std"));
+    assert!(!manifest.contains(env!("CARGO_MANIFEST_DIR")), "{manifest}");
+    assert!(
+        manifest.contains("stdlib = { path = \"std\" }"),
+        "{manifest}"
+    );
+    assert!(dir.join("std/src/int.i").is_file());
+    assert!(read(&dir.join("test/main_test.i")).contains("stdlib/test"));
+
+    let project = dir.display().to_string();
+    w.ok(&["check", "--project", &project]);
+    let out = w.ok(&["run", "--project", &project]);
+    assert_eq!(out, "Hello, std!\n");
+    let out = w.ok(&["test", "--project", &project]);
+    assert!(out.contains("1 passed, 0 failed"), "{out}");
+}
+
+#[test]
+fn new_package_copies_the_std_licenses_and_notices() {
+    let w = World::new();
+    w.ok(&["new", "demo"]);
+    let dir = w.path().join("demo");
+    // The Unicode licence lives beside `src/`, not inside it.
+    assert_eq!(
+        read(&dir.join("std/UNICODE-LICENSE")),
+        include_str!("../../../std/UNICODE-LICENSE")
+    );
+    // Notices inside the sources must survive the copy unchanged.
+    for (path, expected) in [
+        ("std/src/float.i", include_str!("../../../std/src/float.i")),
+        ("std/src/regex.i", include_str!("../../../std/src/regex.i")),
+    ] {
+        assert_eq!(read(&dir.join(path)), expected, "{path}");
+    }
+    assert!(read(&dir.join("std/src/float.i")).contains("BSD-style license"));
+    assert!(read(&dir.join("std/src/regex.i")).contains("Unicode license"));
+}
+
+/// Every regular file under `dir`, as paths relative to `dir`.
+fn files_under(dir: &std::path::Path, prefix: &std::path::Path, out: &mut Vec<PathBuf>) {
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        let relative = prefix.join(path.file_name().unwrap());
+        if path.is_dir() {
+            files_under(&path, &relative, out);
+        } else {
+            out.push(relative);
+        }
+    }
+}
+
+#[test]
+fn new_package_copies_every_std_source_file() {
+    let w = World::new();
+    w.ok(&["new", "demo"]);
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let copy = w.path().join("demo/std");
+    let mut files = Vec::new();
+    files_under(&source.join("src"), Path::new("src"), &mut files);
+    assert!(!files.is_empty());
+    for relative in files {
+        assert_eq!(
+            read(&copy.join(&relative)),
+            read(&source.join(&relative)),
+            "{}",
+            relative.display()
+        );
+    }
+    for relative in ["i.toml", "UNICODE-LICENSE"] {
+        assert_eq!(
+            read(&copy.join(relative)),
+            read(&source.join(relative)),
+            "{relative}"
+        );
+    }
+}
+
 #[test]
 fn new_with_a_path_and_bad_names() {
     let w = World::new();
     w.ok(&["new", "tool", "--path", "nested/place"]);
     assert_eq!(
         read(&w.path().join("nested/place/i.toml")),
-        test_project::manifest("tool")
+        test_project::new_manifest("tool")
     );
     // The directory is not empty now.
     let err = w.fails(&["new", "tool", "--path", "nested/place"]);

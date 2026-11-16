@@ -2,6 +2,16 @@
 #![allow(dead_code)]
 use std::path::Path;
 
+/// The manifest that `i new` writes: `std` is a portable dependency copied
+/// next to the program, not a local absolute path.
+pub fn new_manifest(name: &str) -> String {
+    // A package named `std` cannot depend on itself; `i new` uses another key.
+    let dependency = if name == "std" { "stdlib" } else { "std" };
+    format!(
+        "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\n{dependency} = {{ path = \"std\" }}\n"
+    )
+}
+
 pub fn manifest(name: &str) -> String {
     let std = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../std")
