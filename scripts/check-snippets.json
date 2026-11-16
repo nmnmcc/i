@@ -104,6 +104,9 @@
   "crates/ilang-cli/tests/check.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
   },
+  "crates/ilang-cli/tests/check.rs:72d5e10ce2a4a30e": {
+    "not_source": "Rust format string for generated source"
+  },
   "crates/ilang-cli/tests/commands.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
   },
@@ -123,6 +126,9 @@
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/commands.rs:dc24981f7611b94d": {
+    "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-cli/tests/commands.rs:76df5d4e33397944": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/fmt.rs:dbceb65de7aa8500": {
