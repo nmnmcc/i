@@ -45,17 +45,23 @@ snapshot() { (cd "$1" && find . -type f -print0 | sort -z | xargs -0 sha256sum);
 
 echo "== a package named std =="
 run new std
-if [[ $CODE -eq 0 ]]; then
+if [[ $CODE -ne 0 ]]; then
+  fail "i new std was refused: ${ERR:-<no stderr>}"
+else
   ok "i new std made a package"
+  # The copied standard library cannot be a dependency also named std, so the
+  # manifest names it stdlib; it still points at the copy.
+  if grep -qx 'stdlib = { path = "std" }' "$work/std/i.toml"; then
+    ok "its manifest names the copy stdlib"
+  else
+    fail "its manifest does not name the copy stdlib: $(cat "$work/std/i.toml")"
+  fi
   expect_ok "the std package checks" check --offline --project std
+  expect_ok "the std package runs" run --offline --project std
   run test --offline --project std
   [[ $CODE -eq 0 ]] && grep -qxE '[0-9]+ passed, 0 failed' <<<"$OUT" &&
     ok "the std package tests pass" ||
     fail "the std package: exit $CODE; $ERR$OUT"
-else
-  ok "refused: ${ERR%%$'\n'*}"
-  [[ ! -e $work/std || -z $(ls -A $work/std 2>/dev/null) ]] ||
-    fail "a refusal left something behind in std/"
 fi
 
 echo "== a path with spaces =="

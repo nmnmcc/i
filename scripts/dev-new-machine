@@ -177,6 +177,32 @@ inner() {
   step "$work/bin/i" test --project app
 
   echo
+  echo "== a package named std =="
+  step "$work/bin/i" new std
+  if [[ -f std/i.toml ]]; then
+    echo "\$ cat std/i.toml"
+    cat std/i.toml
+  else
+    echo "  std/i.toml is missing  <-- FAILED"
+    status=1
+  fi
+  step "$work/bin/i" check --offline --project std
+  step "$work/bin/i" run --offline --project std
+  step "$work/bin/i" test --offline --project std
+
+  echo
+  echo "== the copied std carries the Unicode licence, as the repository's =="
+  for path in app/std std/std; do
+    echo "\$ cmp $work/UNICODE-LICENSE $path/UNICODE-LICENSE"
+    if cmp -s -- "$work/UNICODE-LICENSE" "$path/UNICODE-LICENSE"; then
+      echo "  the same file as the repository's"
+    else
+      echo "  missing or different  <-- FAILED"
+      status=1
+    fi
+  done
+
+  echo
   echo "== README's first example, the one it says prints 42 =="
   # A package of its own, so that the template above stays as `i new` made it.
   step "$work/bin/i" new readme_main
@@ -531,6 +557,7 @@ cp -- "$binary" "$work/bin/i"
 cp -- "$script" "$work/new-machine"
 cp -- "$here/manifest-paths" "$work/manifest-paths"
 cp -- "$here/../README.md" "$work/README.md"
+cp -- "$here/../std/UNICODE-LICENSE" "$work/UNICODE-LICENSE"
 
 # The trees to hide: this repository, the other clones of it, and the default
 # place of the sources. A path is masked only if it exists here.
