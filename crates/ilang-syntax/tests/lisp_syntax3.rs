@@ -105,11 +105,11 @@ fn show_as_groups_a_binary_operand_under_negation() {
 
 #[test]
 fn show_as_distinguishes_chains_pipes_and_matches() {
-    let chain = "(| (-> (, 0) _ 1) (-> (, _) _ 2))";
-    assert_eq!(shown(chain, Position::Expression), "(0) { 1 } | (_) { 2 }");
+    let chain = "(& (-> (, 0) _ 1) (-> (, _) _ 2))";
+    assert_eq!(shown(chain, Position::Expression), "(0) { 1 } & (_) { 2 }");
     assert_eq!(
         shown(&format!("(|> s {chain})"), Position::Expression),
-        "s |> (0) { 1 } | (_) { 2 }"
+        "s |> (0) { 1 } & (_) { 2 }"
     );
     assert_eq!(shown("(|> e f)", Position::Expression), "e |> f");
     // The rows in the legacy syntax are not read.
@@ -231,8 +231,8 @@ fn show_as_accepts_expressions_already_written_in_normal_surface() {
         "-{ x + y }",
         "(x) { x }",
         "(x : Int, y = (a, b)) -> Int { x }",
-        "(0) { 1 } | (_) { 2 }",
-        "x |> (0) { 1 } | (_) { 2 }",
+        "(0) { 1 } & (_) { 2 }",
+        "x |> (0) { 1 } & (_) { 2 }",
         "x |> f |> g(1)",
         "{\n\ty = x\n\ty\n}",
         "<<1, 2:size(8)>>",
@@ -339,8 +339,8 @@ fn show_as_writes_every_row_in_its_position() {
         ),
         (
             Item,
-            "(= pick (| (-> (, 0 y) _ y) (-> (, x _) _ x)))",
-            "pick = (0, y) { y } | (x, _) { x }",
+            "(= pick (& (-> (, 0 y) _ y) (-> (, x _) _ x)))",
+            "pick = (0, y) { y } & (x, _) { x }",
         ),
         (Attribute, "macro", "@macro"),
         (Attribute, "(. m custom)", "@m.custom"),
@@ -447,14 +447,14 @@ fn show_as_writes_every_row_in_its_position() {
         ),
         (
             Expression,
-            "(| (-> (, a) _ a) (-> (, b) _ b))",
-            "(a) { a } | (b) { b }",
+            "(& (-> (, a) _ a) (-> (, b) _ b))",
+            "(a) { a } & (b) { b }",
         ),
         (Expression, "(|> e f)", "e |> f"),
         (
             Expression,
-            "(|> opt (| (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\") (-> (, (Some v)) _ v) (-> (, None) _ \"none\")))",
-            "opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } | (Some(v)) { v } | (None) { \"none\" }",
+            "(|> opt (& (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\") (-> (, (Some v)) _ v) (-> (, None) _ \"none\")))",
+            "opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" }",
         ),
         (Expression, "(. a b)", "a.b"),
         (Expression, "(. m C)", "m.C"),
@@ -702,7 +702,7 @@ fn source_tree_index_keeps_the_written_operator_and_transition_literal_span() {
 #[test]
 fn source_tree_finds_the_original_multi_shape_argument() {
     use ilang_syntax::{ast, lisp::source_tree::SourceTree};
-    let source = "f = (x) { x } | (x, y) { x + y }";
+    let source = "f = (x) { x } & (x, y) { x + y }";
     let (module, diagnostics) = ilang_syntax::parse_module(source);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let ast::ItemKind::Binding(binding) = &module.items.last().unwrap().kind else {
@@ -712,7 +712,7 @@ fn source_tree_finds_the_original_multi_shape_argument() {
         .expression(binding.value.span)
         .unwrap();
     assert!(
-        syntax.show().starts_with("(| (-> (, x)"),
+        syntax.show().starts_with("(& (-> (, x)"),
         "{}",
         syntax.show()
     );

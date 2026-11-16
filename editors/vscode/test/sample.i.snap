@@ -239,7 +239,7 @@
 "{"  punctuation.brackets.curly.i
 "z"  variable.other.i
 "}"  punctuation.brackets.curly.i
-"|"  keyword.operator.choice.i
+"&"  keyword.operator.chain.i
 "("  punctuation.brackets.round.i
 "False"  constant.language.i
 ")"  punctuation.brackets.round.i
@@ -327,7 +327,7 @@
 "{"  punctuation.brackets.curly.i
 "1"  constant.numeric.integer.decimal.i
 "}"  punctuation.brackets.curly.i
-"|"  keyword.operator.choice.i
+"&"  keyword.operator.chain.i
 "("  punctuation.brackets.round.i
 "n"  variable.other.i
 "?"  keyword.operator.guard.i
@@ -340,7 +340,7 @@
 "%"  keyword.operator.arithmetic.i
 "3"  constant.numeric.integer.decimal.i
 "}"  punctuation.brackets.curly.i
-"|"  keyword.operator.choice.i
+"&"  keyword.operator.chain.i
 "("  punctuation.brackets.round.i
 "_"  variable.language.discard.i
 ")"  punctuation.brackets.round.i

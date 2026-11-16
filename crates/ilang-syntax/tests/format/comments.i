@@ -40,9 +40,9 @@ area = (shape) {
 		// before a clause
 		(Circle(r)) { r *. r }
 		// area of a circle
-		| (Square(s)) { s *. s }
+		& (Square(s)) { s *. s }
 		// area of a square
-		| (Point) { 0.0 }
+		& (Point) { 0.0 }
 	// after the last clause
 	y
 	// at the end of the block

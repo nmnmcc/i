@@ -270,7 +270,7 @@ fn bit_segment_binders_cover_later_sizes_and_only_their_clause() {
     // First segment binds m for the next size and that clause's body. It
     // must not leak to the next clause.
     assert_eq!(
-        calls("f = (<<m:u(8), _:u(m())>>) { m() } | (_) { m() }"),
+        calls("f = (<<m:u(8), _:u(m())>>) { m() } & (_) { m() }"),
         ["m"]
     );
 }
@@ -369,14 +369,14 @@ fn a_service_name_is_a_binder_of_its_function() {
     // In a chain that is one function over a match, the service names of
     // every branch cover every branch.
     assert_eq!(
-        calls("f = (0) <- (m: S) { m(1) } | (x) { m(2) }\ng = () { m(3) }"),
+        calls("f = (0) <- (m: S) { m(1) } & (x) { m(2) }\ng = () { m(3) }"),
         ["m"]
     );
 }
 
 #[test]
 fn a_match_binds_per_branch_at_the_same_function_depth() {
-    assert_eq!(calls("f = (x) { x |> (m) { m(1) } | (_) { m(2) } }"), ["m"]);
+    assert_eq!(calls("f = (x) { x |> (m) { m(1) } & (_) { m(2) } }"), ["m"]);
     // The value of `m` is not direct (it is a match), so `m` is not in
     // scope inside its own value.
     assert_eq!(calls("f = (x) { m = x |> (_) { m(1) }  m(2) }"), ["m"]);
@@ -384,9 +384,9 @@ fn a_match_binds_per_branch_at_the_same_function_depth() {
 
 #[test]
 fn a_clause_block_binds_the_first_choice_of_each_branch() {
-    assert_eq!(calls("f = (m) { m(1) } | (_) { m(2) }"), ["m"]);
-    assert_eq!(calls("f = (m, 0) { m(1) } | (_, _) { m(2) }"), ["m"]);
-    assert_eq!(calls("f = (m ? m(0)) { 1 } | (_ ? m(1)) { 2 }"), ["m"]);
+    assert_eq!(calls("f = (m) { m(1) } & (_) { m(2) }"), ["m"]);
+    assert_eq!(calls("f = (m, 0) { m(1) } & (_, _) { m(2) }"), ["m"]);
+    assert_eq!(calls("f = (m ? m(0)) { 1 } & (_ ? m(1)) { 2 }"), ["m"]);
 }
 
 #[test]
@@ -765,11 +765,11 @@ fn snippets_walk_as_their_lowered_trees() {
         "S = (f = () -> Int)\nf = (body) { provided: S = S(f = () { g() }) touch(provided) body() <- (provided) }",
         "S = (f = () -> Int)\nf = (body) { p: S = S(f = () { g() }) { p: S = S(f = () { h() }) body() <- (p) } <- (p) }",
         "f = () <- (failure: Fail(Int), service: S) -> Int { g() }",
-        "f = (x) <- (failure: Fail(Int)) -> Int { g(x) } | (x) <- (failure: Fail(Int)) { h(x) }",
+        "f = (x) <- (failure: Fail(Int)) -> Int { g(x) } & (x) <- (failure: Fail(Int)) { h(x) }",
         "Alias(E) = Fail(E)\nf = () <- (failure: Alias(Int)) { g() }",
         "f = (a, b) -> Int { g(a) |> h(b) }",
-        "f = (0, x) <- (s: S) -> Int { g(s, x) } | (n, _) <- (t: T) { h(n, t, s) }",
-        "f = (x) { x |> (Some(y)) { g(y) } | (None) { h(x) } }",
+        "f = (0, x) <- (s: S) -> Int { g(s, x) } & (n, _) <- (t: T) { h(n, t, s) }",
+        "f = (x) { x |> (Some(y)) { g(y) } & (None) { h(x) } }",
         "f = (x) { x |> (a) -> Int { g(a) } }",
         "f = (x) { y = (z) { y(z) }  w = (y, [y(1)], C(y(2)), y(3) |> C)  w(y) }",
         "f = (r) { C(..r, a = g(r)) |> h }",
@@ -779,7 +779,7 @@ fn snippets_walk_as_their_lowered_trees() {
         "f = (C(k = v), D(k2 = _), E(a = b: Int, ..)) { g(v, k, k2, a, b) }",
         "f = ((a, b) = c, [d, ..e]) { g(a, b, c, d, e) }",
         "f = (<<a:u(8), b:bytes(g(a))>>) { h(a, b) }",
-        "f = (x ? g(x)) { h(x) } | (y | y) { k(y) }",
+        "f = (x ? g(x)) { h(x) } & (y | y) { k(y) }",
         "f = (x) { \"a\\(g(x))b\" }",
         "f = (x) { core.never(x) }",
         "x: (m(Int), a = n(Int)) <- (S, Fail(o(Int)), ..N) -> p(Int)",

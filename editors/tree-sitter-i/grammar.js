@@ -117,8 +117,8 @@ module.exports = grammar({
     bit_format: $ => seq($.identifier, optional(seq('(', $._expression, ')'))),
     block: $ => seq('{', repeat(seq($._statement, optional($._break))), '}'),
     _statement: $ => choice($.binding, $._expression),
-    // `F1 | F2 | …` (§2.5); a match is `e |> F1 | F2`.
-    branches: $ => prec.left(seq($.function, repeat1(seq('|', $.function)))),
+    // `F1 & F2 & …` (§2.5); a match is `e |> F1 & F2`.
+    branches: $ => prec.left(seq($.function, repeat1(seq('&', $.function)))),
     function: $ => prec.right(seq(optional($.type_parameters), $.parameters, optional($.service_pattern), optional($.return_type), field('body', $.block))),
     type_parameters: $ => seq('<', list($.type_identifier, ','), '>'),
     parameters: $ => seq('(', list($.parameter, $._separator), optional($.guard), ')'),

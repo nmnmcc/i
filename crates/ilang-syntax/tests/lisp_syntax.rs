@@ -1329,7 +1329,7 @@ fn show_as_accepts_expressions_already_written_in_normal_surface() {
         "x + y",
         "-{ x + y }",
         "(x) { x }",
-        "x |> (1) { 2 } | (_) { 3 }",
+        "x |> (1) { 2 } & (_) { 3 }",
         "{ x y }",
         "<<1, 2>>",
     ];

@@ -102,7 +102,7 @@ fn wasm(source: &str) -> Result<Vec<u8>, Error> {
 #[test]
 fn metered_macro_program_is_valid_wasm() {
     let (graph, c, _dir) = checked(
-        "loop = (n) { n |> (0) { [\"x\"] } | (_) { [\"x\", ..loop(n - 1)] } }\n\nmain = () { loop(3) }\n",
+        "loop = (n) { n |> (0) { [\"x\"] } & (_) { [\"x\", ..loop(n - 1)] } }\n\nmain = () { loop(3) }\n",
     );
     let (wasm, _) = ilang_wasm::compile_macro(
         &graph,
@@ -125,7 +125,7 @@ fn function<'a>(wat: &'a str, name: &str) -> &'a str {
 #[test]
 fn tail_calls_are_return_calls() {
     let text = wat(
-        "loop = (n) { n |> (0) { 0 } | (_) { loop(n - 1) } }\nother = (n) { loop(n) + 1 }\neither = (n) { n == 0 || other(n) == 1 }\nright = (n) { n == 0 || right(n - 1) }\n\nmain = () { (either(1), right(1)) }\n",
+        "loop = (n) { n |> (0) { 0 } & (_) { loop(n - 1) } }\nother = (n) { loop(n) + 1 }\neither = (n) { n == 0 || other(n) == 1 }\nright = (n) { n == 0 || right(n - 1) }\n\nmain = () { (either(1), right(1)) }\n",
     );
     let l = function(&text, "app/main.loop");
     assert!(l.contains("(return_call $f"), "{l}");
@@ -317,7 +317,7 @@ fn many_points(n: usize) -> String {
     for i in 1..=n {
         let p = i - 1;
         s.push_str(&format!(
-            "  a{i} = {{ a{p} % 3 }} |> (0) {{ s(b, a{p} + 1) }} | (_) {{ a{p} + 2 }}\n"
+            "  a{i} = {{ a{p} % 3 }} |> (0) {{ s(b, a{p} + 1) }} & (_) {{ a{p} + 2 }}\n"
         ));
     }
     s.push_str(&format!(

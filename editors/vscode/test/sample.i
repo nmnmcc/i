@@ -38,7 +38,7 @@ floats = <A>(x : Float, y) -> Float {
   z = -.x *. y +. 1.5 /. 2.0 -. 0.5
   z <. 1.0 || z >=. 2.0 && z <=. 3.0 || z >. 4.0 |>
     (True) { z }
-    | (False) { 0.0 }
+    & (False) { 0.0 }
 }
 
 main = () <- (io : Console) {
@@ -48,8 +48,8 @@ main = () <- (io : Console) {
   label = user.name <> "!"
   n = first |>
     (0 | 1) { 1 }
-    | (n ? n > 10) { n % 3 }
-    | (_) { __ignored }
+    & (n ? n > 10) { n % 3 }
+    & (_) { __ignored }
   { 1 |> plus(2) } == 3 != False
   opt.map(Some(1), (x) { x * 2 }) <- (io)
 }

@@ -211,7 +211,7 @@ fn many_uses_of_a_parameter() {
         for i in 1..=n {
             let p = i - 1;
             source.push_str(&format!(
-                "  a{i} = {{ a{p} % 3 }} |> (0) {{ s(b, a{p} + 1) }} | (_) {{ a{p} + 2 }}\n"
+                "  a{i} = {{ a{p} % 3 }} |> (0) {{ s(b, a{p} + 1) }} & (_) {{ a{p} + 2 }}\n"
             ));
         }
         source.push_str(&format!("  a{n}\n}}\n"));

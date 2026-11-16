@@ -130,7 +130,7 @@ describe = (u : User) {
 	label <> greet(u)
 }
 
-first = (o) { o |> (Some(v)) { v } | (None) { 0 } }
+first = (o) { o |> (Some(v)) { v } & (None) { 0 } }
 
 Some(A) = (A)
 None = ()
@@ -340,7 +340,7 @@ fn completions_of_members() {
 fn completions_of_fields_from_inference() {
     let f = Fixture::new(&[(
         "src/main.i",
-        "Point = (x = Int, y = Int)\norigin = Point(x = 0, y = 0)\nf = () {\n\tp = origin\n\tp.x + origin.y\n}\ng = (o : Point) {\n\to |> (Point(..) ? True) { o.x } | (_) { panic(\"unreachable\") }\n}\n",
+        "Point = (x = Int, y = Int)\norigin = Point(x = 0, y = 0)\nf = () {\n\tp = origin\n\tp.x + origin.y\n}\ng = (o : Point) {\n\to |> (Point(..) ? True) { o.x } & (_) { panic(\"unreachable\") }\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     // A local name whose type is inferred.
@@ -575,7 +575,7 @@ fn completions_after_any_expression() {
 fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
     // The made-up binding covers the subject too, and its names
     // enter scope only in the body. Synthetic parameters never appear.
-    let source = "main = () {\n\tlocal = 4\n\t(x) { local + x } |> (f) { f(local) }\n}\nmany = (0) { 1 } | (_) { 2 }\nuse_many = () { apply(1, (0) { 1 } | (_) { 2 }) }\napply = (x, f) { f(x) }";
+    let source = "main = () {\n\tlocal = 4\n\t(x) { local + x } |> (f) { f(local) }\n}\nmany = (0) { 1 } & (_) { 2 }\nuse_many = () { apply(1, (0) { 1 } & (_) { 2 }) }\napply = (x, f) { f(x) }";
     let fixture = Fixture::new(&[("src/main.i", source)]);
     let subject = fixture.completions("app/main", "local + x", 0);
     assert!(subject.iter().any(|(n, _)| n == "local"), "{subject:?}");
@@ -583,7 +583,7 @@ fn new_match_scopes_cover_subjects_and_hide_synthetic_names() {
     assert!(!subject.iter().any(|(n, _)| n == "f"), "{subject:?}");
     let body = fixture.completions("app/main", "f(local)", 0);
     assert!(body.iter().any(|(n, _)| n == "f"), "{body:?}");
-    for needle in ["(0) { 1 } | (_) { 2 }\n", ", (0) { 1 }"] {
+    for needle in ["(0) { 1 } & (_) { 2 }\n", ", (0) { 1 }"] {
         let at = fixture.at("app/main", needle, 0, 0);
         let query = fixture.query();
         let module = fixture.module("app/main");
@@ -632,7 +632,7 @@ fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
 
 // ---- The queries for references, rename, navigation and code actions ----
 
-const SHAPES_Q: &str = "(\n\tShape(..)\n\tarea\n)\n\nCircle = (radius = Int)\nDot = ()\nShape = Circle | Dot\n\narea = (s : Shape) -> Int {\n\ts |> (Circle(radius = radius)) { radius * 3 } | (Dot) { 0 }\n}\n";
+const SHAPES_Q: &str = "(\n\tShape(..)\n\tarea\n)\n\nCircle = (radius = Int)\nDot = ()\nShape = Circle | Dot\n\narea = (s : Shape) -> Int {\n\ts |> (Circle(radius = radius)) { radius * 3 } & (Dot) { 0 }\n}\n";
 const MAIN_Q: &str = "(\n\t(Shape, Circle, area) = app/shapes\n)\n\nmain = () {\n\tc = Circle(radius = 2)\n\tarea(c) + area(Circle(radius = 1))\n}\n";
 
 fn shapes_fixture() -> Fixture {
@@ -723,7 +723,7 @@ fn query_rename_checks_kind_and_scope() {
 
 #[test]
 fn query_missing_clauses_of_a_match() {
-    let text = "Circle = (Int)\nDot = ()\nLine = ()\nShape = Circle | Dot | Line\n\nf = (s : Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n";
+    let text = "Circle = (Int)\nDot = ()\nLine = ()\nShape = Circle | Dot | Line\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } }\n";
     let f = Fixture::new(&[("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");
@@ -735,7 +735,7 @@ fn query_missing_clauses_of_a_match() {
     assert_eq!(c.patterns, vec!["Circle(..)", "Line"]);
     assert_eq!(
         c.edit.text,
-        " | (Circle(..)) { panic(\"todo\") } | (Line) { panic(\"todo\") } "
+        " & (Circle(..)) { panic(\"todo\") } & (Line) { panic(\"todo\") } "
     );
 }
 
@@ -813,7 +813,7 @@ fn query_unused_imports_and_fixes() {
 #[test]
 fn incomplete_syntax_three_branch_keeps_constructor_completion() {
     use ilang_check::query::CompletionContext;
-    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } & () { 2 } }\n";
     let f = Fixture::new(&[("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");

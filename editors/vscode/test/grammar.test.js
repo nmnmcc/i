@@ -157,6 +157,7 @@ test("token scopes of sample.i", async () => {
   has("<-", "keyword.operator.provide.i");
   has("->", "keyword.operator.arrow.i");
   has("|>", "keyword.operator.pipe.i");
+  has("&", "keyword.operator.chain.i");
   has("..", "keyword.operator.spread.i");
   has("<<", "punctuation.definition.bit-array.begin.i");
   has(">>", "punctuation.definition.bit-array.end.i");

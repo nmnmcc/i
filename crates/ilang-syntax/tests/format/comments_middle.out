@@ -22,7 +22,7 @@ f = (x) {
 			// before an arrow
 			1
 		}
-		| (B ? c) {
+		& (B ? c) {
 			// before a guard
 			2
 		}
@@ -42,7 +42,7 @@ g = (x) {
 			// after a bar
 			1
 		}
-		| (_) { 0 }
+		& (_) { 0 }
 	r = call(a = 1)
 	// after a label
 	s = { xs |> g } == ys

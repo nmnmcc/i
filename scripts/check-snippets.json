@@ -797,7 +797,7 @@
   "tests/review/cases/review-a1/_loose/cases/56_old_guard_lines/original/.invalid/src/main.i:9160f49b02878079": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
-      "E0101: `|` joins only function literals: it may follow only the `}` of a function body",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
       "E0101: expected an expression, found `->`",
       "E0106: a discard binds nothing, so it may not be used as a value"
     ]
@@ -1267,7 +1267,7 @@
   "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:ea9bf08abd8374b6": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
-      "E0101: `|` joins only function literals: it may follow only the `}` of a function body",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
       "E0101: expected an expression, found `->`",
       "E0106: a discard binds nothing, so it may not be used as a value"
     ]
@@ -1431,7 +1431,7 @@
   },
   "crates/ilang-cli/tests/entries.rs:e030cd5ab195b536": {
     "diagnostics": [
-      "E0101: `|` joins only function literals: it may follow only the `}` of a function body"
+      "E0101: `|` no longer joins function values: join the branches with `&`"
     ],
     "reason": "Intentional invalid bare pipe"
   },

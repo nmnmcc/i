@@ -282,7 +282,7 @@ struct Shape {
 /// function type.
 fn body_form(head: &str, parts: usize) -> Option<usize> {
     match head {
-        "=" | "|" | "@" | "." | ":" | "!" => Some(1),
+        "=" | "|" | "&" | "@" | "." | ":" | "!" => Some(1),
         "->" => Some(if parts == 4 { 2 } else { 1 }),
         _ => None,
     }

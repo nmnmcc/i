@@ -40,7 +40,7 @@ fn alias(c: &Checked, name: &str) -> String {
 fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
     // No reconstruction defaults an existing Con's set to All.
     let (_, c) = good(
-        "v = \"GET\"\nx : v = \"GET\"\nMethod = v\nBox(A) = (value = A)\nboxed = Box(value = 8080)\nBox(Port) = boxed\nPair(A, B) = { (A, B) }\nparts = (\"GET\", 8080)\nPair(Verb, Number) = parts\nchoice = True |> (True) { Box(value = 1) } | (False) { Box(value = 2) }\nBox(Choice) = choice\nConfig(A, B) = (method = A, port = B)\nconfig = Config(method = \"GET\", port = 8080)\nConfigType = config\nagain : ConfigType = Config(method = \"GET\", port = 8080)",
+        "v = \"GET\"\nx : v = \"GET\"\nMethod = v\nBox(A) = (value = A)\nboxed = Box(value = 8080)\nBox(Port) = boxed\nPair(A, B) = { (A, B) }\nparts = (\"GET\", 8080)\nPair(Verb, Number) = parts\nchoice = True |> (True) { Box(value = 1) } & (False) { Box(value = 2) }\nBox(Choice) = choice\nConfig(A, B) = (method = A, port = B)\nconfig = Config(method = \"GET\", port = 8080)\nConfigType = config\nagain : ConfigType = Config(method = \"GET\", port = 8080)",
     );
     for (name, want) in [
         ("Method", "\"GET\""),
@@ -64,7 +64,7 @@ fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
         code::TYPE_MISMATCH,
     );
     bad(
-        "Box(A) = (A)\nv = True |> (True) { Box(1) } | (False) { Box(2) }\nBox(Item) = v\nx : Item = 3",
+        "Box(A) = (A)\nv = True |> (True) { Box(1) } & (False) { Box(2) }\nBox(Item) = v\nx : Item = 3",
         code::TYPE_MISMATCH,
     );
     let (_, c) = good("v : Int - 0=1\nNonzero=v\nx : Nonzero=2");
@@ -89,7 +89,7 @@ fn j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls() {
 
 #[test]
 fn j1_j5_new_narrowed_binders_have_literal_types_original_subjects_do_not() {
-    let source = "read = (s : String) {\n\ts |> (other : String - \"a\") { 0 } | (key) {\n\t\tsame : key = \"a\"\n\t\t1\n\t}\n}";
+    let source = "read = (s : String) {\n\ts |> (other : String - \"a\") { 0 } & (key) {\n\t\tsame : key = \"a\"\n\t\t1\n\t}\n}";
     good(source);
     let (g, _) = good(source);
     let c = query::check_for_queries(&g);
@@ -105,11 +105,11 @@ fn j1_j5_new_narrowed_binders_have_literal_types_original_subjects_do_not() {
         .ends_with("\"a\"")
     );
     bad(
-        "only = (x : \"a\") -> \"a\" { x }\nread = (s : String) {\n\ts |> (other : String - \"a\") { 0 } | (key) {\n\t\tv = only(key)\n\t\tsame : v = \"b\"\n\t\t1\n\t}\n}",
+        "only = (x : \"a\") -> \"a\" { x }\nread = (s : String) {\n\ts |> (other : String - \"a\") { 0 } & (key) {\n\t\tv = only(key)\n\t\tsame : v = \"b\"\n\t\t1\n\t}\n}",
         code::TYPE_MISMATCH,
     );
     good(
-        "read = (s : String) {\n\ts |> (other : String - \"a\") { 0 } | (key) {\n\t\tsame : s = \"b\"\n\t\t1\n\t}\n}",
+        "read = (s : String) {\n\ts |> (other : String - \"a\") { 0 } & (key) {\n\t\tsame : s = \"b\"\n\t\t1\n\t}\n}",
     );
 }
 
@@ -137,7 +137,7 @@ fn j4_literal_fixation_orders_completion_and_rejects_later_widening() {
 
 #[test]
 fn j5_completed_literal_aliases_produce_exact_runtime_tests() {
-    let source = "source : { \"GET\"|\"POST\" }=\"GET\"\nMethods=source\nf=(x : { Int|String }){ x |> (m : Methods) { 1 } | (_) { 0 } }";
+    let source = "source : { \"GET\"|\"POST\" }=\"GET\"\nMethods=source\nf=(x : { Int|String }){ x |> (m : Methods) { 1 } & (_) { 0 } }";
     let (_, c) = good(source);
     let p = c.program.as_ref().unwrap();
     let module = common::module(p, "app/main");

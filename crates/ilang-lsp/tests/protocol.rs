@@ -979,7 +979,7 @@ fn typed_macro_hover_and_definition_through_call() {
 
 const LIB_TEXT: &str = "(\n\tshout\n\tTone(..)\n)\n\nLoud = ()\nQuiet = ()\n/// A tone of voice.\nTone = Loud | Quiet\n\n/// Makes a text louder.\nshout = (s : String) -> String { s <> \"!\" }\n";
 
-const SHAPES: &str = "(\n\tShape(..)\n\tarea\n\torigin\n\tClock(..)\n\tBox(..)\n)\n\nCircle = (radius = Int)\nRect = (width = Int, height = Int)\n/// A shape in the plane.\nShape = Circle | Rect\n\n/// A box of a value.\nBox(A) = (item = A)\n\n/// A clock service.\nClock = (now = () -> Int)\n\n/// The area of a shape.\narea = (s : Shape) -> Int {\n\ts |>\n\t\t(Circle(radius = radius)) { radius * radius * 3 }\n\t\t| (Rect(width = width, height = height)) { width * height }\n}\n\n/// The place where shapes start.\norigin : Int = 0\n";
+const SHAPES: &str = "(\n\tShape(..)\n\tarea\n\torigin\n\tClock(..)\n\tBox(..)\n)\n\nCircle = (radius = Int)\nRect = (width = Int, height = Int)\n/// A shape in the plane.\nShape = Circle | Rect\n\n/// A box of a value.\nBox(A) = (item = A)\n\n/// A clock service.\nClock = (now = () -> Int)\n\n/// The area of a shape.\narea = (s : Shape) -> Int {\n\ts |>\n\t\t(Circle(radius = radius)) { radius * radius * 3 }\n\t\t& (Rect(width = width, height = height)) { width * height }\n}\n\n/// The place where shapes start.\norigin : Int = 0\n";
 
 const APP_MAIN: &str = "(\n\tshapes = (Shape, Circle, area) = app/shapes\n\tlib/text\n)\n\n(\n\tmain\n)\n\n/// How big a shape is.\nsize = (s : Shape) -> Int {\n\ta = area(s)\n\ta + shapes.origin\n}\n\nmain = () {\n\tc = Circle(radius = 2)\n\tn = size(c)\n\tt = text.shout(\"hi\")\n\tn\n}\n";
 
@@ -1865,7 +1865,7 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } | () { 2 } }\n";
+    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } & () { 2 } }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2360,7 +2360,7 @@ fn lsp_code_action_removes_an_unused_import() {
 #[test]
 fn lsp_code_action_adds_the_missing_clauses() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2374,7 +2374,7 @@ fn lsp_code_action_adds_the_missing_clauses() {
     let actions = code_actions(&mut c, &main, d.range);
     let after = applied(action(&actions, "Add the missing clauses"), text, &main);
     assert!(
-        after.contains("| (Circle(1)) { 1 } | (Circle(..)) { panic(\"todo\") } | (Rect(..)) { panic(\"todo\") }"),
+        after.contains("& (Circle(1)) { 1 } & (Circle(..)) { panic(\"todo\") } & (Rect(..)) { panic(\"todo\") }"),
         "{after}"
     );
     // The new text checks.
@@ -2532,7 +2532,7 @@ fn lsp_folding_ranges() {
     let (area, _) = find(SHAPES, "area = ", 0);
     let (case, _) = find(SHAPES, "s |>", 0);
     assert!(ranges.iter().any(|f| f.start_line == area), "{ranges:?}");
-    // A match written over several lines as a chain `s |> (p) { … } | …`
+    // A match written over several lines as a chain `s |> (p) { … } & …`
     // folds from its subject to its last branch.
     assert!(
         ranges
@@ -3107,7 +3107,7 @@ fn lsp_capabilities_are_advertised() {
     c.shutdown();
 }
 
-const MATCH: &str = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } | (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
+const MATCH: &str = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
 
 #[test]
 fn lsp_code_action_missing_clauses_lisp_surface() {

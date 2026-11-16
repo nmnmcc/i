@@ -219,7 +219,7 @@ fn lowering_rejects_an_uncoalesced_partial_result() {
 fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
     // A top-level clause block is a known function,
     // and a failing one-clause match reports at p, adding no match frame.
-    let source = "f = (0) { 1 } | (_) { 2 }\nget = (o) { o |> (Ok(x)) { x } }\n\nmain = () {\n\tassert(f(1) == 2)\n\tget(Error(Nil))\n\tNil\n}\n";
+    let source = "f = (0) { 1 } & (_) { 2 }\nget = (o) { o |> (Ok(x)) { x } }\n\nmain = () {\n\tassert(f(1) == 2)\n\tget(Error(Nil))\n\tNil\n}\n";
     let dir = front_end_project(source);
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["build", "--wat", "--opt", "0", "--project"])

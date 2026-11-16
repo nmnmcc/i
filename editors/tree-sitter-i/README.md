@@ -18,7 +18,7 @@ uses the break as a separator in data and parameter lists. An operator at the
 end of a line or a continuing token at the beginning does not introduce a break.
 
 The grammar is syntax three (docs/design/syntax-3.md §3): data `( )` with
-`name = value` items, branches `(p) { e } | (q) { e }`, matches `e |> …`,
+`name = value` items, branches `(p) { e } & (q) { e }`, matches `e |> …`,
 service patterns and needs with `<-`, provide `e <- (s)`, and `<A, …>` type
 parameters on function literals and types. A binding's pattern is atoms joined
 by `=` (`a = (x, y) = e`); the last `=` begins the value. Known gap: a type

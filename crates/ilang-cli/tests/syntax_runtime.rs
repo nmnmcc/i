@@ -81,11 +81,11 @@ test("exercise", () -> Nil {
 			(syntax.Node(syntax.Round([first, second]))) {
 				syntax.node(value) |>
 					(syntax.Node(syntax.Round([again, _]))) { assert(first == again) }
-					| (_) { panic("unexpected syntax node") }
+					& (_) { panic("unexpected syntax node") }
 				assert(syntax.show(first) == "f")
 				assert(syntax.show(second) == "x")
 			}
-			| (_) { panic("unexpected syntax node") }
+			& (_) { panic("unexpected syntax node") }
 		made = syntax.make(syntax.Node(syntax.Name("made")), value)
 		assert(syntax.show(made) == "made")
 		assert(syntax.same_code(made, made))
@@ -108,7 +108,7 @@ test("exercise", () -> Nil {
 				assert(message != "")
 				assert(syntax.same_code(at, value))
 			}
-			| (Ok(_)) { panic("invalid syntax atom was accepted") }
+			& (Ok(_)) { panic("invalid syntax atom was accepted") }
 		comma = syntax.make(syntax.Node(syntax.Symbol(",")), value)
 		assert(syntax.show(comma) == ",")
 		bad = syntax.make(syntax.Node(syntax.Round(BAD)), value)
@@ -117,7 +117,7 @@ test("exercise", () -> Nil {
 				assert(message != "")
 				assert(syntax.same_code(at, bad))
 			}
-			| (Ok(_)) { panic("invalid expression was accepted") }
+			& (Ok(_)) { panic("invalid expression was accepted") }
 		Nil
 	} <- (syntax.Definitions(definition = (of) { of }))
 })
@@ -326,9 +326,9 @@ fn compiler_templates_rebuild_through_wasm() {
 )
 make_many = (value : syntax.Syntax, n : Int, acc : List(syntax.Syntax)) -> List(
 	syntax.Syntax,
-) { n |> (0) { acc } | (_) { make_many(value, n - 1, [value, ..acc]) } }
+) { n |> (0) { acc } & (_) { make_many(value, n - 1, [value, ..acc]) } }
 count = (items : List(syntax.Syntax), n : Int) -> Int {
-	items |> ([]) { n } | ([_, ..rest]) { count(rest, n + 1) }
+	items |> ([]) { n } & ([_, ..rest]) { count(rest, n + 1) }
 }
 
 test("exercise", () {
@@ -350,7 +350,7 @@ test("exercise", () {
 	assert(syntax.show(result) == "(f y)")
 	syntax.node(result) |>
 		(syntax.Node(syntax.Round([_, child]))) { assert(child == replacement) }
-		| (_) { panic("unexpected template") }
+		& (_) { panic("unexpected template") }
 	Nil
 })
 "#,
@@ -415,7 +415,7 @@ test("exercise", () {
 			assert(syntax.show(a) == "y")
 			assert(syntax.show(b) == "z")
 		}
-		| (_) { panic("wrong splice captures") }
+		& (_) { panic("wrong splice captures") }
 	failed = syntax._match(pattern, syntax._template(2))
 	assert(syntax._match_ok(failed) == False)
 	Nil
@@ -485,7 +485,7 @@ test("catchable", () -> Nil {
 				assert(message == "not visible")
 				assert(at == query)
 			}
-			| (Ok(_)) { panic("expected an error") }
+			& (Ok(_)) { panic("expected an error") }
 		Nil
 	} <- (syntax._definitions())
 })
@@ -649,12 +649,12 @@ test("item", () -> Nil {
 			assert(message != "")
 			assert(at == syntax._template(2))
 		}
-		| (Ok(_)) { panic("duplicate metadata was accepted") }
+		& (Ok(_)) { panic("duplicate metadata was accepted") }
 	fail.catch(() {
 		service.add(collection, target, [], syntax._template(3))
 	}) |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("unrelated source location was accepted") }
+		& (Ok(_)) { panic("unrelated source location was accepted") }
 	Nil
 })
 

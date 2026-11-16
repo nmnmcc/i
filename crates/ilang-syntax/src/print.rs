@@ -829,7 +829,7 @@ impl Printer<'_> {
             }
             out.extend(lead);
             if i > 0 {
-                out.push(t("| "));
+                out.push(t("& "));
             }
             out.push(self.function(f));
         }
@@ -983,7 +983,7 @@ impl Printer<'_> {
                 for f in fs_iter {
                     more.push(Doc::Line);
                     more.extend(self.leading(f.span.0.start));
-                    more.push(t("| "));
+                    more.push(t("& "));
                     more.push(self.function(f));
                 }
                 out.push(nest(cat(more)));

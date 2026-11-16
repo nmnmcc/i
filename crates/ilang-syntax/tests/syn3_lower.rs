@@ -57,11 +57,11 @@ fn constructor_named_like_its_sum() {
 #[test]
 fn matches_and_chains() {
     same(
-        "f = (n: Int) -> String {\n\tn |> (0) { \"zero\" } | (1 | 2) { \"few\" } | (x ? x > 9) { \"many\" } | (_) { \"some\" }\n}\n",
+        "f = (n: Int) -> String {\n\tn |> (0) { \"zero\" } & (1 | 2) { \"few\" } & (x ? x > 9) { \"many\" } & (_) { \"some\" }\n}\n",
         "f = (n: Int) -> String ! _ {\n\tn |> {\n\t\t0 -> \"zero\"\n\t\t1 | 2 -> \"few\"\n\t\tx ? x > 9 -> \"many\"\n\t\t_ -> \"some\"\n\t}\n}\n",
     );
     same(
-        "name = (Some(u)) { u } | (None) { \"\" }\n",
+        "name = (Some(u)) { u } & (None) { \"\" }\n",
         "name = {\n\tSome(u) -> u\n\tNone -> \"\"\n}\n",
     );
 }
@@ -122,7 +122,7 @@ fn type_parameters_and_row_variables() {
 
 #[test]
 fn several_positions() {
-    let text = shown("gcd = (a, 0) { a } | (a, b) { gcd(b, a % b) }\n");
+    let text = shown("gcd = (a, 0) { a } & (a, b) { gcd(b, a % b) }\n");
     assert!(text.contains("(%arg1, %arg2)"), "{text}");
 }
 
@@ -133,7 +133,7 @@ fn several_positions() {
 #[test]
 fn shape_groups() {
     let text = shown(
-        "area = (r : Float) { r } | (w : Float, h : Float) { w *. h }\n\nopen = (host : String, port = p : Int, addr = a : String) { p }\n",
+        "area = (r : Float) { r } & (w : Float, h : Float) { w *. h }\n\nopen = (host : String, port = p : Int, addr = a : String) { p }\n",
     );
     let bindings: Vec<&str> = text
         .lines()
@@ -158,7 +158,7 @@ fn shape_groups() {
         "{text}"
     );
     // A chain that is not bound to a name has its group functions in place.
-    let text = shown("fs = [(a) { a } | (a, b) { b }]\n");
+    let text = shown("fs = [(a) { a } & (a, b) { b }]\n");
     assert!(
         text.contains("%multi(1: (a) {") && text.contains("2: (a, b) {"),
         "{text}"
@@ -248,7 +248,7 @@ fn fail_in_a_function_head_is_an_ordinary_service() {
     // Check both a sole head and a service written on a later branch.
     for source in [
         "keep = () <- (fail : Fail(String)) { 1 }\n",
-        "late = (0) { 1 } | (n : Int) <- (fail : Fail(String)) { n }\n",
+        "late = (0) { 1 } & (n : Int) <- (fail : Fail(String)) { n }\n",
     ] {
         let (module, diags) = syn3::parse_lowered(source);
         assert!(diags.is_empty(), "{source}\n{diags:#?}");

@@ -442,7 +442,7 @@ paused = () {
 		})
 	} |>
 		(Paused(k)) { k }
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 	handed = control.boundary((b0) {
 		{
 			control.cancel(k)
@@ -451,7 +451,7 @@ paused = () {
 	})
 	handed |>
 		(Handed(Inner(k2))) { k2 }
-		| (Lost) { panic("k2 was not handed out") }
+		& (Lost) { panic("k2 was not handed out") }
 }
 "#;
 
@@ -474,7 +474,7 @@ Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 ThirdSum = Third | Over
 
-keep = (t) { t |> (Over) { Over } | (t) { t } }
+keep = (t) { t |> (Over) { Over } & (t) { t } }
 
 // Not in tail position, so the frame waits.
 inner = (k2) { control.resume(k2, Nil) + 1 }
@@ -507,7 +507,7 @@ main = () {
 		k2 = paused()
 		k3 = { control.boundary((b3) { o1(b3, k2) }) } |>
 			(Third(k3)) { k3 }
-			| (Over) { panic("not paused") }
+			& (Over) { panic("not paused") }
 		control.resume(k3, Nil)
 		Nil
 	} <- (Out(put = (k2) { Nil }))
@@ -546,7 +546,7 @@ main = () {
 			})
 		} |>
 			(Paused(k)) { k }
-			| (Done) { panic("not paused") }
+			& (Done) { panic("not paused") }
 		{
 			control.resume(k, Nil)
 			Nil
@@ -591,7 +591,7 @@ main = () {
 			})
 		} |>
 			(Paused(k)) { k }
-			| (Done) { panic("not paused") }
+			& (Done) { panic("not paused") }
 		{
 			control.cancel(k)
 			Nil
@@ -636,7 +636,7 @@ body = (outer) {
 main = () <- (io : Io) {
 	k = { control.boundary((outer) { body(outer) }) } |>
 		(Paused(k)) { k }
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 	say("cancel")
 	control.cancel(k)
 	say("cancel gave Nil")
@@ -681,7 +681,7 @@ paused = () {
 		})
 	} |>
 		(Paused(k)) { k }
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 }
 
 // `cancel` forwards the continuation need. Here it runs the ordinary code
@@ -700,7 +700,7 @@ main = () <- (io : Io) {
 		})
 		held |>
 			(Held(k2)) { control.resume(k2, Nil) }
-			| (Over) { panic("not held") }
+			& (Over) { panic("not held") }
 	})
 	io.print(core.inspect(r))
 }
@@ -1092,12 +1092,12 @@ fn nested_source(depth: u32) -> String {
 Done = ()
 More = (Int, Continuation(Nil, Step, Never))
 Step = Done | More
-check = (ok) { ok |> (True) { Nil } | (False) { panic("tree walk") } }
+check = (ok) { ok |> (True) { Nil } & (False) { panic("tree walk") } }
 emit = (b, n) { control.suspend(b, (k) { More(n, k) }) }
 copy = (b, step) {
 	step |>
 		(Done) { Nil }
-		| (More(v, k)) {
+		& (More(v, k)) {
 			emit(b, v)
 			copy(b, control.resume(k, Nil))
 		}
@@ -1105,7 +1105,7 @@ copy = (b, step) {
 walk = (b, n) {
 	n |>
 		(0) { emit(b, 0) }
-		| (_) {
+		& (_) {
 			copy(
 				b,
 				control.boundary((child) {
@@ -1117,14 +1117,14 @@ walk = (b, n) {
 			emit(b, -n)
 		}
 }
-next = (n) { { n > 0 } |> (True) { -n } | (False) { 1 - n } }
+next = (n) { { n > 0 } |> (True) { -n } & (False) { 1 - n } }
 drive = (step, count, sum, want) {
 	step |>
 		(Done) {
 			check(count == TreeCount)
 			check(sum == 0)
 		}
-		| (More(v, k)) {
+		& (More(v, k)) {
 			check(v == want)
 			drive(control.resume(k, Nil), count + 1, sum + v, next(want))
 		}
@@ -1183,14 +1183,14 @@ fn nested_resume_stack() {
 fn recursion_source(paused: bool) -> String {
     let source = bench_source(50_000, 1, false);
     let (source, _) = source.split_once("\nmain =").expect("benchmark entry");
-    let recurse = "rec = (n, body) { n |> (0) { body() } | (_) { rec(n - 1, body) + 1 } }";
+    let recurse = "rec = (n, body) { n |> (0) { body() } & (_) { rec(n - 1, body) + 1 } }";
     let main = if paused {
-        "done = (Done(n)) { n } | (_) { panic(\"not done\") }\n\
+        "done = (Done(n)) { n } & (_) { panic(\"not done\") }\n\
          \n\
          main = () {\n\
          \tk = control.boundary((b) { down(b, 50_000) }) |>\n\
          \t\t(More(_, k)) { k }\n\
-         \t\t| (_) { panic(\"not paused\") }\n\
+         \t\t& (_) { panic(\"not paused\") }\n\
          \tcheck(\n\
          \t\trec(50_000, () { done(control.resume(k, Nil)) }) == 100_000,\n\
          \t\t\"recursion lost a frame\",\n\
@@ -1245,23 +1245,23 @@ run = (b) {
 	x = inside(b)
 	Done(x <> "/" <> name())
 }
-check = (ok) { ok |> (True) { Nil } | (False) { panic("resume environment") } }
+check = (ok) { ok |> (True) { Nil } & (False) { panic("resume environment") } }
 
 main = () {
 	{
 		k = control.boundary((b) { run(b) }) |>
 			(More(_, k)) { k }
-			| (_) { panic("not paused") }
+			& (_) { panic("not paused") }
 		{
 			k2 = control.resume(k, Nil) |>
 				(More(s, k)) {
 					check(s == "inside")
 					k
 				}
-				| (_) { panic("not paused twice") }
+				& (_) { panic("not paused twice") }
 			control.resume(k2, Nil) |>
 				(Done(s)) { check(s == "inside/inside,inside/second") }
-				| (_) { panic("not done") } <- (Name(text = "second"))
+				& (_) { panic("not done") } <- (Name(text = "second"))
 		} <- (Name(text = "first"))
 	} <- (Name(text = "start"))
 }
@@ -1283,16 +1283,16 @@ fn counted_frames() {
 Done = ()
 More = (String, Continuation(Nil, Step, Never))
 Step = Done | More
-check = (ok) { ok |> (True) { Nil } | (False) { panic("counted frame") } }
+check = (ok) { ok |> (True) { Nil } & (False) { panic("counted frame") } }
 layer = (b, n) {
 	n |>
 		(0) {
 			control.suspend(b, (k) { More("start", k) })
 			"0"
 		}
-		| (_) {
+		& (_) {
 			x = layer(b, n - 1)
-			n |> (4) { control.suspend(b, (k) { More(x, k) }) } | (_) { Nil }
+			n |> (4) { control.suspend(b, (k) { More(x, k) }) } & (_) { Nil }
 			core.inspect(n) <> x
 		}
 }
@@ -1302,7 +1302,7 @@ next = (step, want) {
 			check(s == want)
 			k
 		}
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 }
 
 main = () {

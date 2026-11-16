@@ -351,39 +351,81 @@ fn p2_call() {
 #[test]
 fn p4_branch_join() {
     let gcd = value(
-        "gcd =\n\t(a : Int, 0) -> Int { a }\n\t| (a : Int, b : Int) -> Int { gcd(b, a % b) }\n",
+        "gcd =\n\t(a : Int, 0) -> Int { a }\n\t& (a : Int, b : Int) -> Int { gcd(b, a % b) }\n",
     );
     assert_eq!(chain(&gcd).len(), 2);
     // the body's `{` ends the `->` part; `|` after `}` is a join.
-    assert_eq!(chain(&value("f = (p) -> A { e } | (q) { f }")).len(), 2);
+    assert_eq!(chain(&value("f = (p) -> A { e } & (q) { f }")).len(), 2);
     // a forgotten body gives one function whose result is a union.
     let g2 = value("f = (a) -> Int | (b) -> Int { 1 }");
     let fs = chain(&g2);
     assert_eq!(fs.len(), 1);
     assert!(matches!(&fs[0].ret, Some(t) if matches!(t.kind, TypeKind::Union(_))));
     // the labelled item's value is a chain.
-    match value("x = (f = (a) { a } | (b) { b })").kind.clone() {
+    match value("x = (f = (a) { a } & (b) { b })").kind.clone() {
         ExprKind::Data(items) => {
             assert!(matches!(&items[0], DItem::Label(_, e) if chain(e).len() == 2))
         }
         other => panic!("{other:?}"),
     }
     // the call applies to the whole chain.
-    match value("x = (a) { 1 } | (b) { 2 }(y)").kind.clone() {
+    match value("x = (a) { 1 } & (b) { 2 }(y)").kind.clone() {
         ExprKind::Call { callee, .. } => assert_eq!(chain(&callee).len(), 2),
         other => panic!("{other:?}"),
     }
     // an inner chain ends at the outer `}`.
-    let nested = value("f = (a) { a |> (1) { 2 } | (_) { 3 } } | (b, c) { 4 }");
+    let nested = value("f = (a) { a |> (1) { 2 } & (_) { 3 } } & (b, c) { 4 }");
     assert_eq!(chain(&nested).len(), 2);
 
-    bad("h = f | g", "`|` joins only function literals");
-    bad("h = (a) { 1 } | g", "`|` joins only function literals");
+    bad("h = f & g", "`&` joins only function literals");
+    bad("h = (a) { 1 } & g", "`&` joins only function literals");
+    // a value-level `|` is removed syntax, and the hint gives the new join;
+    // `&` is the join that replaces it.
+    bad("h = (a) { 1 } | (b) { 2 }", "join the branches with `&`");
+    bad("h = (a) { 1 }\n\t| (b) { 2 }", "join the branches with `&`");
+    bad("h = f | g", "join the branches with `&`");
+    assert_eq!(chain(&value("h = (a) { 1 } & (b) { 2 }")).len(), 2);
     // Overloading by shape.
     let show = value(
-        "show =\n\t(n : Int) -> String { int.to_string(n) }\n\t| (s : String) -> Int { string.length(s) }\n\t| (a : Int, b : Int) -> Bool { a == b }\n\t| (host : String, port = p : Int) -> Conn { open(host, p) }\n",
+        "show =\n\t(n : Int) -> String { int.to_string(n) }\n\t& (s : String) -> Int { string.length(s) }\n\t& (a : Int, b : Int) -> Bool { a == b }\n\t& (host : String, port = p : Int) -> Conn { open(host, p) }\n",
     );
     assert_eq!(chain(&show).len(), 4);
+}
+
+#[test]
+fn p4_and_chain() {
+    // `&` joins function literals, on one line and across lines.
+    let one_line = value("f = (a) { 1 } & (b) { 2 }");
+    assert_eq!(chain(&one_line).len(), 2);
+    // A branch that begins a line begins it with `&`.
+    let leading = value("f =\n\t(a) { 1 }\n\t& (b) { 2 }\n\t& (c) { 3 }\n");
+    assert_eq!(chain(&leading).len(), 3);
+    // A trailing `&` also continues, with the branch on the next line.
+    let trailing = value("f = (a) { 1 } &\n\t(b) { 2 }\n");
+    assert_eq!(chain(&trailing).len(), 2);
+    // A generic branch joins like any other.
+    let generic = value("f = <A>(x : A) { x } & (n : Int) { n }");
+    assert_eq!(chain(&generic).len(), 2);
+    // Nesting: the inner chain ends at the outer `}`.
+    let nested = value("f = (a) { a |> (1) { 2 } & (_) { 3 } } & (b, c) { 4 }");
+    let outer = chain(&nested);
+    assert_eq!(outer.len(), 2);
+    let Stmt::Expr(inner) = &outer[0].body.stmts[0] else {
+        unreachable!()
+    };
+    assert!(matches!(&inner.kind, ExprKind::Pipe { rhs, .. } if chain(rhs).len() == 2));
+}
+
+#[test]
+fn p4_bar_stays_in_types_patterns_and_pipes() {
+    // A union type keeps `|`, also as the result of an arrow.
+    assert_eq!(ty("Int | String"), "Int | String");
+    ok("v : { Int | String } = 1\nf = (x) -> Int | String { x }\n");
+    // A pattern alternative keeps `|` in a parameter item.
+    ok("f = (0 | 1) { 1 }\n");
+    // `|>` is unchanged, and its right side may be a `&` chain.
+    let pipe = value("f = n |> (0 | 1) { n } & (_) { 0 }");
+    assert!(matches!(&pipe.kind, ExprKind::Pipe { rhs, .. } if chain(rhs).len() == 2));
 }
 
 #[test]
@@ -444,9 +486,9 @@ fn p11_pipe() {
         "a |> f(..t)",
         "{ x |> g } == 2",
         "x == 1 |> core.not",
-        "opt |> (Some(v) ? empty(v)) { \"empty\" } | (Some(v)) { v } | (None) { \"none\" }",
-        "day |> (Sat | Sun) { \"rest\" } | (_) { \"work\" }",
-        "p |> ((0, y)) { y } | ((x, _)) { x }",
+        "opt |> (Some(v) ? empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" }",
+        "day |> (Sat | Sun) { \"rest\" } & (_) { \"work\" }",
+        "p |> ((0, y)) { y } & ((x, _)) { x }",
     ] {
         assert_eq!(expr(e), e);
     }
@@ -456,7 +498,7 @@ fn p11_pipe() {
         "the right side of `|>` must be a name, a call",
     );
     // the whole chain is the right operand.
-    match syn3::parse_expr("x |> (p) { e } | (q) { f }")
+    match syn3::parse_expr("x |> (p) { e } & (q) { f }")
         .unwrap()
         .kind
         .clone()
@@ -468,9 +510,9 @@ fn p11_pipe() {
 
 #[test]
 fn p13_lines() {
-    // A line that begins with `|` continues; a line that begins with `(`
+    // A line that begins with `&` continues; a line that begins with `(`
     // begins a new statement; inside `( )` a break is a `,`.
-    let m = ok("f = () {\n\tr = x |>\n\t\t(1) { a }\n\t\t| (_) { b }\n\t(r, 1)\n}\n");
+    let m = ok("f = () {\n\tr = x |>\n\t\t(1) { a }\n\t\t& (_) { b }\n\t(r, 1)\n}\n");
     let ItemKind::Bind(b) = &m.items[0].kind else {
         unreachable!()
     };
@@ -480,7 +522,7 @@ fn p13_lines() {
         syn3::parse_expr("f(a, b = 1)").unwrap()
     );
 
-    ok("sign = (-1) { \"neg\" }\n\t| (0) { \"zero\" }\n\t| (_) { \"pos\" }\n");
+    ok("sign = (-1) { \"neg\" }\n\t& (0) { \"zero\" }\n\t& (_) { \"pos\" }\n");
 }
 
 // ---- Patterns ----
@@ -577,7 +619,7 @@ fn parameters_alternatives_guards() {
     ok("f = (xs ? list.any(xs, (x) { x > 0 })) { 1 }\n");
     ok("f = (\n\ta : Int\n\tb : Int\n\t? a > b\n) { a }\n");
     // a literal key pattern, not a default.
-    let f = value("run = (mode = \"fast\") { quick() } | (mode = \"slow\") { careful() }");
+    let f = value("run = (mode = \"fast\") { quick() } & (mode = \"slow\") { careful() }");
     assert_eq!(chain(&f).len(), 2);
     ok("log_all = ((a, b) = args) { log(args) }\n");
 
@@ -611,7 +653,7 @@ catch = <A, E, N>(body : () <- (..N, Fail(E)) -> A) -> Result(A, E) {
 map = <A, B, N>(xs : List(A), f : (A) <- N -> B) -> List(B) {
 	xs |>
 		([]) { [] }
-		| ([x, ..rest]) { [f(x), ..map(rest, f)] }
+		& ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 
 base = () <- (io : Io) -> (Config, Log) {
@@ -754,7 +796,7 @@ fn generics() {
     };
     assert_eq!(chain(&b.value)[0].body.stmts.len(), 2);
     // Each branch of a chain writes its own `<…>`.
-    let f = value("f = <A>(x : A) { 1 } | <B>(x : B, y : B) { 2 }");
+    let f = value("f = <A>(x : A) { 1 } & <B>(x : B, y : B) { 2 }");
     assert_eq!(chain(&f).len(), 2);
     assert_eq!(chain(&f)[1].generics[0].name, "B");
     // A comparison is still a comparison.
@@ -803,19 +845,19 @@ fn lexer() {
 
 #[test]
 fn formatter_layout() {
-    let long = "kind = day |> (Mon) { \"first day of the week\" } | (Tue) { \"second day of the week\" } | (_) { \"another day\" }\n";
+    let long = "kind = day |> (Mon) { \"first day of the week\" } & (Tue) { \"second day of the week\" } & (_) { \"another day\" }\n";
     assert_eq!(
         syn3::format(long).unwrap(),
-        "kind = day |>\n\t(Mon) { \"first day of the week\" }\n\t| (Tue) { \"second day of the week\" }\n\t| (_) { \"another day\" }\n"
+        "kind = day |>\n\t(Mon) { \"first day of the week\" }\n\t& (Tue) { \"second day of the week\" }\n\t& (_) { \"another day\" }\n"
     );
-    let gcd = "gcd = (a : Int, 0) -> Int { a } | (a : Int, b : Int) -> Int { gcd(b, a % b) } | (a : Int, b : Int, c : Int) -> Int { gcd(gcd(a, b), c) }\n";
+    let gcd = "gcd = (a : Int, 0) -> Int { a } & (a : Int, b : Int) -> Int { gcd(b, a % b) } & (a : Int, b : Int, c : Int) -> Int { gcd(gcd(a, b), c) }\n";
     assert_eq!(
         syn3::format(gcd).unwrap(),
-        "gcd =\n\t(a : Int, 0) -> Int { a }\n\t| (a : Int, b : Int) -> Int { gcd(b, a % b) }\n\t| (a : Int, b : Int, c : Int) -> Int { gcd(gcd(a, b), c) }\n"
+        "gcd =\n\t(a : Int, 0) -> Int { a }\n\t& (a : Int, b : Int) -> Int { gcd(b, a % b) }\n\t& (a : Int, b : Int, c : Int) -> Int { gcd(gcd(a, b), c) }\n"
     );
     assert_eq!(
-        syn3::format("kind = day |> (Sat | Sun) { \"rest\" } | (_) { \"work\" }\n").unwrap(),
-        "kind = day |> (Sat | Sun) { \"rest\" } | (_) { \"work\" }\n"
+        syn3::format("kind = day |> (Sat | Sun) { \"rest\" } & (_) { \"work\" }\n").unwrap(),
+        "kind = day |> (Sat | Sun) { \"rest\" } & (_) { \"work\" }\n"
     );
     // Comments stay; literals are printed as they are written.
     let source = "// before\nf = (x) {\n\t// first\n\ta = 0xFF // trailing\n\n\t// second\n\tg(a, x)\n\t// last\n}\n";
@@ -855,13 +897,13 @@ fn lisp_rows() {
         ("y = () { e }", "(= y (-> (,) _ e))"),
         ("y = (p1, p2 ? g) { e }", "(= y (-> (? (, p1 p2) g) _ e))"),
         (
-            "y = (a) { 1 } | (b) { 2 }",
-            "(= y (| (-> (, a) _ 1) (-> (, b) _ 2)))",
+            "y = (a) { 1 } & (b) { 2 }",
+            "(= y (& (-> (, a) _ 1) (-> (, b) _ 2)))",
         ),
         ("y = e |> f", "(= y (|> e f))"),
         (
-            "y = e |> (a) { 1 } | (b) { 2 }",
-            "(= y (|> e (| (-> (, a) _ 1) (-> (, b) _ 2))))",
+            "y = e |> (a) { 1 } & (b) { 2 }",
+            "(= y (|> e (& (-> (, a) _ 1) (-> (, b) _ 2))))",
         ),
         ("(p1, x = p2) = v", "(= (, p1 (= x p2)) v)"),
         ("(p, ..) = v", "(= (, p ..) v)"),
@@ -919,17 +961,17 @@ fn lisp_rows() {
 
 #[test]
 fn lisp_examples_of_the_note() {
-    let normal = "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\npick = (0, y) { y } | (x, _) { x }\nlabel = (opt) { opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } | (Some(v)) { v } | (None) { \"none\" } }\n";
-    let lisp_text = "(= connect (-> (, (: host String) (= port (: p Int))) Conn (open host p)))\n(= pick (| (-> (, 0 y) _ y) (-> (, x _) _ x)))\n(= label (-> (, opt) _\n  (|> opt (| (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\")\n             (-> (, (Some v)) _ v)\n             (-> (, None) _ \"none\")))))\n";
+    let normal = "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\npick = (0, y) { y } & (x, _) { x }\nlabel = (opt) { opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" } }\n";
+    let lisp_text = "(= connect (-> (, (: host String) (= port (: p Int))) Conn (open host p)))\n(= pick (& (-> (, 0 y) _ y) (-> (, x _) _ x)))\n(= label (-> (, opt) _\n  (|> opt (& (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\")\n             (-> (, (Some v)) _ v)\n             (-> (, None) _ \"none\")))))\n";
     let (read, diags) = lisp::from_lisp(lisp_text);
     assert!(diags.is_empty(), "{diags:#?}");
     assert_eq!(read, ok(normal));
     // The normal printer writes a body that is not a block in `{ }`.
     assert_eq!(
         syn3::print_module(&read),
-        "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\n\npick = (0, y) { y } | (x, _) { x }\n\nlabel = (opt) {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t| (Some(v)) { v }\n\t\t| (None) { \"none\" }\n}\n"
+        "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\n\npick = (0, y) { y } & (x, _) { x }\n\nlabel = (opt) {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t& (Some(v)) { v }\n\t\t& (None) { \"none\" }\n}\n"
     );
-    let test_is = "(= text (-> (, x) _\n  (|> ((. syntax node) x)\n      (| (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)\n         (-> (, _) _ (panic \"test name must be a string literal\"))))))\n(= append (-> (, xs ys) _\n  (|> xs (| (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))\n";
+    let test_is = "(= text (-> (, x) _\n  (|> ((. syntax node) x)\n      (& (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)\n         (-> (, _) _ (panic \"test name must be a string literal\"))))))\n(= append (-> (, xs ys) _\n  (|> xs (& (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))\n";
     let (read, diags) = lisp::from_lisp(test_is);
     assert!(diags.is_empty(), "{diags:#?}");
     let (again, diags) = lisp::from_lisp(&lisp::to_lisp(&read));
@@ -945,7 +987,7 @@ fn lisp_errors() {
     for (text, needle) in [
         ("(= y ())", "the empty data is `(,)`"),
         ("(= y (-> (a b) _ 1))", "data pattern `(, …)`"),
-        ("(= y (| a f))", "expected a function"),
+        ("(= y (& a f))", "expected a function"),
         ("(= y (-> (, .. r) _ 1))", "no rest"),
     ] {
         let (_, diags) = lisp::from_lisp(text);
@@ -1007,22 +1049,22 @@ fn convert_clauses_and_matches() {
         converted(
             "describe = (opt : Option(String)) -> String {\n\topt |> {\n\t\tSome(v) ? string.is_empty(v) -> \"empty\"\n\t\tSome(v) -> v\n\t\tNone -> \"none\"\n\t}\n}\n"
         ),
-        "describe = (opt : Option(String)) -> String {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t| (Some(v)) { v }\n\t\t| (None) { \"none\" }\n}\n"
+        "describe = (opt : Option(String)) -> String {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t& (Some(v)) { v }\n\t\t& (None) { \"none\" }\n}\n"
     );
     // A tuple pattern becomes the one item `((a, b))`.
     assert_eq!(
         converted(
             "pick = (p : (Int, Int)) -> Int {\n\tp |> {\n\t\t(0, y) -> y\n\t\t(x, _) -> x\n\t}\n}\n"
         ),
-        "pick = (p : (Int, Int)) -> Int { p |> ((0, y)) { y } | ((x, _)) { x } }\n"
+        "pick = (p : (Int, Int)) -> Int { p |> ((0, y)) { y } & ((x, _)) { x } }\n"
     );
     assert_eq!(
         converted("x = list.map(opts, { Some(u) -> u.name  None -> \"\" })\n"),
-        "x = list.map(opts, (Some(u)) { u.name } | (None) { \"\" })\n"
+        "x = list.map(opts, (Some(u)) { u.name } & (None) { \"\" })\n"
     );
     assert_eq!(
         converted("k = d |> { Sat | Sun -> 1  _ -> 2 }\n"),
-        "k = d |> (Sat | Sun) { 1 } | (_) { 2 }\n"
+        "k = d |> (Sat | Sun) { 1 } & (_) { 2 }\n"
     );
     assert_eq!(
         converted("absurd = (x : Never) { x |> {} }\n"),
@@ -1179,7 +1221,7 @@ fn convert_lisp_surface() {
     let text = lisp::to_lisp(&new);
     assert_eq!(
         text,
-        "(= append (-> (, xs ys) _ (|> xs (| (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))\n"
+        "(= append (-> (, xs ys) _ (|> xs (& (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))\n"
     );
     let (read, diags) = lisp::from_lisp(&text);
     assert!(diags.is_empty(), "{diags:#?}");

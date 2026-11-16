@@ -222,13 +222,13 @@ mod tests {
     #[test]
     fn written_facts_match_the_lowered_reader_in_both_surfaces() {
         let sources = [
-            "(choose)\nchoose = (x: Int) { x } | (x: Int, y: Int) { x + y }\nkeyed = (z = y: Int, a = x: Int) { x + y }\nf: { (Int) | (Int, Int) } -> Int = choose\n",
+            "(choose)\nchoose = (x: Int) { x } & (x: Int, y: Int) { x + y }\nkeyed = (z = y: Int, a = x: Int) { x + y }\nf: { (Int) | (Int, Int) } -> Int = choose\n",
             "//// module\n(app/other) (Choice(..), identity)\nA = ()\nB(T) = (T)\nChoice(T) = A | B(T)\nidentity = <T>(x: T) { x }\n",
             "@macro\n/// docs\nm = (x) { x }\nf = () { m(1) other.m(2) }\n",
             "f: <A, N>(A) <- N -> A = <A, N>(x: A) { x }\n",
             "Box(A) = (A)\nBox(Element) = source\nAlias = Int\nHost = Opaque\n",
             "@external\nf: <A>(A) -> A\n",
-            "f = (x ? ok(x)) { m(x) } | (_) { m(0) }\n",
+            "f = (x ? ok(x)) { m(x) } & (_) { m(0) }\n",
         ];
         for source in sources {
             let (tree, errors) = syn3::parse_module(source);

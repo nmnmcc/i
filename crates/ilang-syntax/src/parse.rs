@@ -824,8 +824,12 @@ impl Parser<'_> {
             );
         }
         if self.at(&T::Pipe) {
+            let msg = "`|` no longer joins function values: join the branches with `&`";
+            return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
+        }
+        if self.at(&T::Amp) {
             let msg =
-                "`|` joins only function literals: it may follow only the `}` of a function body";
+                "`&` joins only function literals: a function literal `( … ) { … }` must follow it";
             return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
         }
         Ok(lhs)
@@ -1030,17 +1034,22 @@ impl Parser<'_> {
         Ok(Segment { value, format })
     }
 
-    /// `Branches = Function { "|" Function }`.
+    /// `Branches = Function { "&" Function }`.
     fn chain(&mut self) -> PResult<ExprKind> {
         let mut branches = vec![self.function()?];
-        while self.at(&T::Pipe) {
-            let bar = self.bump();
+        while self.at(&T::Amp) {
+            let amp = self.bump();
             let begins = self.at(&T::LParen) && self.at_function(self.pos) || self.at_generics();
             if !begins {
-                let msg = "`|` joins only function literals: a function literal `( … ) { … }` must follow it";
-                return Err(Diagnostic::new(Code::Unexpected, bar, msg));
+                let msg =
+                    "`&` joins only function literals: a function literal `( … ) { … }` must follow it";
+                return Err(Diagnostic::new(Code::Unexpected, amp, msg));
             }
             branches.push(self.function()?);
+        }
+        if self.at(&T::Pipe) {
+            let msg = "`|` no longer joins function values: join the branches with `&`";
+            return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
         }
         Ok(ExprKind::Chain(branches))
     }

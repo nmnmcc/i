@@ -44,7 +44,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= choose (-> (, (: x (. syntax Syntax))) (. syntax Syntax) (|> x (| (-> (? (, `(f ~item)) False) _ item) (-> (, `(f ~`(g ~item))) _ item) (-> (, `(f ~item)) _ item) (-> (, `(s ~..[first .. rest])) _ first) (-> (, (| `(h ~item) `(i ~item))) _ item) (-> (, _) _ x))))))\n").unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= choose (-> (, (: x (. syntax Syntax))) (. syntax Syntax) (|> x (& (-> (? (, `(f ~item)) False) _ item) (-> (, `(f ~`(g ~item))) _ item) (-> (, `(f ~item)) _ item) (-> (, `(s ~..[first .. rest])) _ first) (-> (, (| `(h ~item) `(i ~item))) _ item) (-> (, _) _ x))))))\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -2121,7 +2121,7 @@ fn shared_macro_code_reads_each_callers_definition_context() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/macros.is"),
-        "(, (= syntax (/ i syntax)))\n(, read)\n(@ macro (= read (-> (, x) _ (|> ((. syntax definition) x) (| (-> (, `(= ~name ~value)) _ value) (-> (, _) _ (panic \"expected binding\")))))))\n",
+        "(, (= syntax (/ i syntax)))\n(, read)\n(@ macro (= read (-> (, x) _ (|> ((. syntax definition) x) (& (-> (, `(= ~name ~value)) _ value) (-> (, _) _ (panic \"expected binding\")))))))\n",
     )
     .unwrap();
     for (module, ty, value) in [("a", "Int", "20"), ("b", "String", "\"b\"")] {
@@ -2153,7 +2153,7 @@ fn cli_queries_a_dependency_type_after_its_type_macro_expands() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, make check)\n(@ macro (= typ (-> (,) _ `Int)))\n(@ macro (= make (-> (, x) _ `(= ~x (typ)))))\n(@ macro (= check (-> (, x) _ (|> ((. syntax definition) x) (| (-> (, `(= T Int)) _ `{}) (-> (, _) _ (panic \"wrong definition\")))))))\n").unwrap();
+    std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, make check)\n(@ macro (= typ (-> (,) _ `Int)))\n(@ macro (= make (-> (, x) _ `(= ~x (typ)))))\n(@ macro (= check (-> (, x) _ (|> ((. syntax definition) x) (& (-> (, `(= T Int)) _ `{}) (-> (, _) _ (panic \"wrong definition\")))))))\n").unwrap();
     std::fs::write(
         dir.path().join("src/types.i"),
         "(m = app/macros)\n(T)\nm.make(T)\n",
@@ -2673,7 +2673,7 @@ fn macro_output_over_frame_budget_reports_the_limit() {
         dir.path().join("src/macros.is"),
         r#"(, (= syntax (/ i syntax)))
 (, deep)
-(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (| (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Node) ((. syntax Square) [x])) x)))))))
+(= nest (-> (, (: n Int) (: x (. syntax Syntax))) (. syntax Syntax) (|> n (& (-> (, 0) _ x) (-> (, _) _ (nest (- n 1) ((. syntax make) ((. syntax Node) ((. syntax Square) [x])) x)))))))
 (@ macro (= deep (-> (, x) _ (nest 10000 x))))
 "#,
     )
@@ -2713,7 +2713,7 @@ fn definition_query_reads_a_member_exported_through_its_sum() {
 (@ macro (= typ (-> (,) _ `Int)))
 (@ macro (= inspect (-> (, x) _
     (|> ((. syntax definition) x)
-        (| (-> (, `(= C (, Int))) _ `42)
+        (& (-> (, `(= C (, Int))) _ `42)
            (-> (, _) _ (panic "expected the written member definition")))))))
 "#,
     )
@@ -2747,7 +2747,7 @@ fn definition_query_reads_an_absorbed_generated_sum_member() {
 (@ macro (= typ (-> (,) _ `Int)))
 (@ macro (= check (-> (, x) _
     (|> ((. syntax definition) x)
-        (| (-> (, `(= C (, Int))) _ `{})
+        (& (-> (, `(= C (, Int))) _ `{})
            (-> (, _) _ (panic "expected the generated member definition")))))))
 (@ macro (= emit (-> (,) _
     `{(= C (, (typ))) (= D (,)) (= T (| C D)) (check C)})))
@@ -2776,11 +2776,11 @@ fn multi_shape_arguments_keep_the_written_tree_in_both_surfaces() {
     for (extension, source) in [
         (
             "i",
-            "(m = app/macros)\nf = m.id((x) { x } | (x, y) { x + y })\nmain = () { assert(f(3) == 3) assert(f(3, 4) == 7) }\n",
+            "(m = app/macros)\nf = m.id((x) { x } & (x, y) { x + y })\nmain = () { assert(f(3) == 3) assert(f(3, 4) == 7) }\n",
         ),
         (
             "is",
-            "(, (= m (/ app macros)))\n(= f ((. m id) (| (-> (, x) _ x) (-> (, x y) _ (+ x y)))))\n(= main (-> (,) _ {(assert (== (f 3) 3)) (assert (== (f 3 4) 7))}))\n",
+            "(, (= m (/ app macros)))\n(= f ((. m id) (& (-> (, x) _ x) (-> (, x y) _ (+ x y)))))\n(= main (-> (,) _ {(assert (== (f 3) 3)) (assert (== (f 3 4) 7))}))\n",
         ),
     ] {
         let dir = tempfile::tempdir().unwrap();
@@ -2866,7 +2866,7 @@ fn type_macro_keeps_its_standalone_need_channel() {
     for (case, text) in [
         "(m = app/macros)\nf = <N>(g: (Int) <- N -> Int) {\n  x: m.id((Int) <- N -> Int) = g\n  x\n}\n",
         "(m = app/macros)\nf = <N>(g) {\n  x: m.id((Int) <- N -> Int) = g\n  x\n}\n",
-        "(m = app/macros)\nf = m.id((x) { x } | (x, y) { x + y })\n",
+        "(m = app/macros)\nf = m.id((x) { x } & (x, y) { x + y })\n",
         "(m = app/macros)\nC = ()\nD = ()\nT = m.id(C | D)\n",
         "(m = app/macros)\nC = ()\nT = C\nf: m.ignore(C) = 1\n",
     ].into_iter().enumerate() {

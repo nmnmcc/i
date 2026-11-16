@@ -185,14 +185,14 @@ fn heads_lists_blocks_and_prefixes() {
         "(= f (-> (, x) _ {(+ x 1)}))\n"
     );
     let out = check(
-        "(= f (-> (, x) _ {(= a `[one two three four five six seven eight nine ten eleven twelve thirteen fourteen]) (|> x (| (-> (, 0) _ `(~..a)) (-> (, _) _ `(~x))))}))\n",
+        "(= f (-> (, x) _ {(= a `[one two three four five six seven eight nine ten eleven twelve thirteen fourteen]) (|> x (& (-> (, 0) _ `(~..a)) (-> (, _) _ `(~x))))}))\n",
     );
     assert!(
         out.starts_with("(= f\n  (-> (, x) _\n    {(= a\n       `[one\n         two\n"),
         "{out}"
     );
     assert!(
-        out.ends_with("fourteen])\n     (|> x (| (-> (, 0) _ `(~..a)) (-> (, _) _ `(~x))))}))\n"),
+        out.ends_with("fourteen])\n     (|> x (& (-> (, 0) _ `(~..a)) (-> (, _) _ `(~x))))}))\n"),
         "{out}"
     );
     assert!(out.contains("`["));

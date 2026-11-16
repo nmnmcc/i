@@ -64,7 +64,7 @@ fn formatter_preserves_interpolation_with_nested_expressions() {
         "value = \"\"\"\n  a \\(f(\"x\"))\n  b\n  \"\"\"",
         r#"value = "a\({ // inner comment
 x })b" // outside"#,
-        r#"value = (s) { s |> ("a" <> r <> "b") { r } | (r <> "x") { r } | (_) { "" } }"#,
+        r#"value = (s) { s |> ("a" <> r <> "b") { r } & (r <> "x") { r } & (_) { "" } }"#,
         r#"value = (s) {
 	s |>
 		("a" <> r <> "b") {
@@ -72,7 +72,7 @@ x })b" // outside"#,
 			// suffix
 			r
 		}
-		| (_) { "" }
+		& (_) { "" }
 }"#,
         r#"value = (s) {
 	s |>
@@ -80,7 +80,7 @@ x })b" // outside"#,
 			// suffix
 			r
 		}
-		| (_) { "" }
+		& (_) { "" }
 }"#,
     ] {
         let (a, ds) = parse_module(source);

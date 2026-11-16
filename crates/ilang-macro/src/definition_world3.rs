@@ -133,7 +133,7 @@ T(A, B) = (A, B)
 U = Opaque
 V(A) = List(A)
 W((A, List(B)), C) = value
-f = <A, B>(a: A) { a } | <B, C>(b: B) { b }
+f = <A, B>(a: A) { a } & <B, C>(b: B) { b }
 g: <A, N>(A) <- N -> A = (a) { a }
 h: <A>(A) -> A
 k = 1

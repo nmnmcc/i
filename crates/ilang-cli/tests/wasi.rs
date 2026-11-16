@@ -237,7 +237,7 @@ fn stops_write_the_message_and_exit_with_1() {
 #[test]
 fn long_output_survives_short_writes() {
     let dir = package(&format!(
-        "{IO}\ndouble = (s : String, n : Int) {{\n  n\n  |> (0) {{ s }}\n  | (_) {{ double(s <> s, n - 1) }}\n}}\n\nlines = (n : Int) <- (io : Io) {{\n  n\n  |> (0) {{ Nil }}\n  | (_) {{\n    io.print(\"ünïcödé ✓\")\n    lines(n - 1)\n  }}\n}}\n\n\nmain = () <- (io : Io) {{\n  io.print(double(\"héllo ✓ \", 14))\n  lines(1000)\n}}\n"
+        "{IO}\ndouble = (s : String, n : Int) {{\n  n\n  |> (0) {{ s }}\n  & (_) {{ double(s <> s, n - 1) }}\n}}\n\nlines = (n : Int) <- (io : Io) {{\n  n\n  |> (0) {{ Nil }}\n  & (_) {{\n    io.print(\"ünïcödé ✓\")\n    lines(n - 1)\n  }}\n}}\n\n\nmain = () <- (io : Io) {{\n  io.print(double(\"héllo ✓ \", 14))\n  lines(1000)\n}}\n"
     ));
     let mut want = "héllo ✓ ".repeat(1 << 14);
     want.push('\n');
@@ -503,7 +503,7 @@ paused = () {
 		})
 	} |>
 		(Paused(k)) { k }
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 	handed = control.boundary((b0) {
 		{
 			control.cancel(k)
@@ -512,7 +512,7 @@ paused = () {
 	})
 	handed |>
 		(Handed(Inner(k2))) { k2 }
-		| (Lost) { panic("k2 was not handed out") }
+		& (Lost) { panic("k2 was not handed out") }
 }
 "#;
 
@@ -535,7 +535,7 @@ Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 ThirdSum = Third | Over
 
-keep = (t) { t |> (Over) { Over } | (t) { t } }
+keep = (t) { t |> (Over) { Over } & (t) { t } }
 
 // Not in tail position, so the frame waits.
 inner = (k2) { control.resume(k2, Nil) + 1 }
@@ -568,7 +568,7 @@ main = () {
 		k2 = paused()
 		k3 = { control.boundary((b3) { o1(b3, k2) }) } |>
 			(Third(k3)) { k3 }
-			| (Over) { panic("not paused") }
+			& (Over) { panic("not paused") }
 		control.resume(k3, Nil)
 		Nil
 	} <- (Out(put = (k2) { Nil }))
@@ -607,7 +607,7 @@ main = () {
 			})
 		} |>
 			(Paused(k)) { k }
-			| (Done) { panic("not paused") }
+			& (Done) { panic("not paused") }
 		{
 			control.resume(k, Nil)
 			Nil
@@ -652,7 +652,7 @@ main = () {
 			})
 		} |>
 			(Paused(k)) { k }
-			| (Done) { panic("not paused") }
+			& (Done) { panic("not paused") }
 		{
 			control.cancel(k)
 			Nil
@@ -697,7 +697,7 @@ body = (outer) {
 main = () <- (io : Io) {
 	k = { control.boundary((outer) { body(outer) }) } |>
 		(Paused(k)) { k }
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 	say("cancel")
 	control.cancel(k)
 	say("cancel gave Nil")
@@ -742,7 +742,7 @@ paused = () {
 		})
 	} |>
 		(Paused(k)) { k }
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 }
 
 // `cancel` has no errors in its type. Here it runs the ordinary code
@@ -761,7 +761,7 @@ main = () <- (io : Io) {
 		})
 		held |>
 			(Held(k2)) { control.resume(k2, Nil) }
-			| (Over) { panic("not held") }
+			& (Over) { panic("not held") }
 	})
 	io.print(core.inspect(r))
 }

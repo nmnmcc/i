@@ -133,7 +133,7 @@ fn http_timeout() {
 main = () {{
  task.run(() {{
   result = fail.catch(() {{ http.send_timeout(http.client().send, http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
-  result |> (Error(http.Timeout)) {{ Nil }} | (_) {{ panic("expected timeout") }}
+  result |> (Error(http.Timeout)) {{ Nil }} & (_) {{ panic("expected timeout") }}
  }})
 }}
 "#
@@ -151,7 +151,7 @@ fn http_dns() {
 
 main = () {
 	result = fail.catch(() { http.get("http://name.invalid/") })
-	result |> (Error(http.Dns(_))) { Nil } | (_) { panic("expected DNS error") }
+	result |> (Error(http.Dns(_))) { Nil } & (_) { panic("expected DNS error") }
 }
 "#,
     );
@@ -171,7 +171,7 @@ main = () {{
 	result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/") }})
 	result |>
 		(Error(http.Connect(_))) {{ Nil }}
-		| (_) {{ panic("expected connection error") }}
+		& (_) {{ panic("expected connection error") }}
 }}
 "#
     ));
@@ -259,7 +259,7 @@ main = () {{
 	result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/start") }})
 	result |>
 		(Error(http.Protocol("too many redirects"))) {{ Nil }}
-		| (_) {{ panic("expected redirect limit") }}
+		& (_) {{ panic("expected redirect limit") }}
 }}
 "#
     ));
@@ -466,15 +466,15 @@ read_pieces = (
 	piece = body.read(4096)
 	{ bit_array.byte_size(piece) == 0 } |>
 		(True) { (bit_array.concat(list.reverse(acc)), count) }
-		| (False) {
-			{ count == 0 } |> (True) { stdio.print("piece") } | (False) { Nil }
+		& (False) {
+			{ count == 0 } |> (True) { stdio.print("piece") } & (False) { Nil }
 			read_pieces(body, [piece, ..acc], count + 1)
 		}
 }
 handle = (req : http.Request, body : (read = _, trailers = _)) {
 	{ req.target == "/ignore" || req.target == "/next" } |>
 		(True) { http.response(http.Status(204)) }
-		| (False) { echo_upload(req, body) }
+		& (False) { echo_upload(req, body) }
 }
 echo_upload = (req : http.Request, body : (read = _, trailers = _)) {
 	(bytes, count) = read_pieces(body, [], 0)
@@ -486,7 +486,7 @@ echo_upload = (req : http.Request, body : (read = _, trailers = _)) {
 				http.header(body.trailers(), "X-End") == option.Some("yes"),
 			)
 		}
-		| (False) { assert(body.trailers() == http.Headers([])) }
+		& (False) { assert(body.trailers() == http.Headers([])) }
 	res = http.response(http.Status(200))
 	http.Response(..res, body = bytes)
 }
