@@ -6,23 +6,34 @@
    Zed downloads wasi-sdk for the tree-sitter parser, or uses `WASI_SDK_PATH`.
 2. In the repository development shell, run `scripts/dev-editors build` to build
    `target/release/i` (or run `scripts/dev-editors` to set up both editors).
-3. Commit grammar changes before installing. Run `scripts/dev-editors zed` from
-   the repository. This copies the extension into `target/editor-dev/zed` and
-   writes an absolute `file:///…` Git URL for this checkout, an exact commit SHA,
-   and `path = "editors/tree-sitter-i"` in that copy's manifest.
+3. Commit and push grammar changes before installing. Run
+   `scripts/dev-editors zed` from the repository. This copies the extension into
+   `target/editor-dev/zed` and writes the current commit of this checkout as the
+   copy's `commit`, keeping `path = "editors/tree-sitter-i"`. The manifest still
+   names the public repository, so Zed fetches that commit from it and needs the
+   commit to be reachable there: push before installing.
 4. In Zed open Extensions, choose **Install Dev Extension** (command palette:
    **extensions: install dev extension**) and select the printed directory.
 5. Open the repository root and an `.i` file. Zed starts **i Language Server**
    using `.zed/settings.json` and formats on save. Inspect Zed's language server
    logs if startup fails. `target/release/i lsp` must be executable.
 
-The tracked manifest uses the canonical `/home/agent/Programming/i` checkout and
-Git revision `HEAD`; the preparation command makes it work at any checkout path,
-including a linked worktree, without changing tracked files. Zed's builder fetches
-and checks out the grammar revision, rather than reading uncommitted source from
-that path. `commit` is Zed's supported alias for `rev`; both accept a Git revision,
-not a directory or `file://` URL. Grammar source lives in the same repository;
-no published tree-sitter repository is needed.
+The tracked manifest names the public repository and one of its commits, so a
+direct install of `editors/zed` works for anyone with a clone of that repository.
+The pinned commit is `ff9ea00ac` ("Editors highlight & as the chain separator"),
+the last change to the grammar in `editors/tree-sitter-i`.
+The preparation command instead makes a copy under `target/editor-dev/zed` that
+works at any checkout path, including a linked worktree, without changing
+tracked files: it rewrites the copy's `commit` to the current commit of this
+checkout. The copy keeps the public repository, so the commit must be reachable
+there for Zed to fetch it; push grammar changes before preparing the copy. Zed
+clones and checks out the grammar commit rather than reading uncommitted files.
+`commit` is Zed's supported alias for `rev`; both accept a Git revision the
+remote can serve, not a directory or a `file://` URL used as a revision, and not
+`HEAD` or a branch name. After a grammar change, commit it and update `commit`
+to that grammar commit in a later commit (a commit cannot name itself), then
+rerun `scripts/dev-editors zed` for local rebuilds. Grammar source lives in the
+same repository; no published tree-sitter repository is needed.
 
 After extension or grammar changes, commit, rerun `scripts/dev-editors zed`, then
 use **Rebuild** for the dev extension on Zed's Extensions page. Reinstall the dev
