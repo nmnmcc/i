@@ -127,6 +127,24 @@ inner() {
   fi
 
   echo
+  echo "== there is no network here =="
+  echo "\$ cat /proc/net/dev"
+  if [[ $(sed -n 's/^ *\([^ :]*\):.*/\1/p' /proc/net/dev | grep -v '^lo$' | wc -l) -ne 0 ]]; then
+    sed -n 's/^ *\([^ :]*\):.*/  \1/p' /proc/net/dev
+    echo "  there is an interface besides lo  <-- FAILED"
+    status=1
+  else
+    echo "  no interface but lo, as it should be"
+  fi
+  echo "\$ connect to 1.1.1.1:443"
+  if timeout 3 bash -c 'exec 3<>/dev/tcp/1.1.1.1/443' 2>/dev/null; then
+    echo "  still connected  <-- FAILED"
+    status=1
+  else
+    echo "  nothing to connect to, as it should be"
+  fi
+
+  echo
   echo "== i new =="
   step "$work/bin/i" new app
   if [[ -f app/i.toml ]]; then
@@ -213,6 +231,45 @@ inner() {
   fi
 
   echo
+  echo "== the package moved and copied elsewhere =="
+  cp -a app copied
+  echo "\$ i check --offline --project copied"
+  if out=$("$work/bin/i" check --offline --project copied 2>&1); then
+    echo "  exit 0"
+  else
+    echo "$out"
+    echo "  <-- FAILED"
+    status=1
+  fi
+  echo "\$ i run --offline --project copied   (README's first example again)"
+  if out=$("$work/bin/i" run --offline --project copied 2>&1) && [[ $out == "${promised:-42}" ]]; then
+    echo "$out"
+    echo "  exit 0"
+  else
+    echo "${out:-<no output>}"
+    echo "  <-- FAILED (expected ${promised:-42})"
+    status=1
+  fi
+  echo "\$ i test --offline --project copied"
+  if out=$("$work/bin/i" test --offline --project copied 2>&1) && grep -qxE '[0-9]+ passed, 0 failed' <<<"$out"; then
+    echo "$out"
+    echo "  exit 0"
+  else
+    echo "${out:-<no output>}"
+    echo "  <-- FAILED"
+    status=1
+  fi
+  mv nested/dir moved-deep
+  echo "\$ i check --offline --project moved-deep   (moved with mv)"
+  if out=$("$work/bin/i" check --offline --project moved-deep 2>&1); then
+    echo "  exit 0"
+  else
+    echo "$out"
+    echo "  <-- FAILED"
+    status=1
+  fi
+
+  echo
   echo "== no manifest names a path of this computer =="
   # Every i.toml and i.lock the run made, as TOML (and lines, for the lock),
   # rather than as text: an absolute path in a nested table, an inline table,
@@ -220,17 +277,23 @@ inner() {
   local manifests=()
   while IFS= read -r -d '' path; do
     manifests+=("$path")
-  done < <(find app nested \( -name i.toml -o -name i.lock \) -print0 2>/dev/null)
+  done < <(find "$work/proj" \( -name i.toml -o -name i.lock \) -print0 2>/dev/null)
   if [[ ${#manifests[@]} -eq 0 ]]; then
     echo "  no i.toml was made  <-- FAILED"
     status=1
   fi
   for path in "${manifests[@]}"; do
     echo "\$ manifest-paths $path"
-    if python3 -I "$work/manifest-paths" "$path"; then
+    if out=$(python3 -I "$work/manifest-paths" "$path" 2>&1); then
       echo "  no absolute path"
     else
-      echo "  an absolute path  <-- FAILED"
+      local code=$?
+      [[ -n $out ]] && sed 's/^/    /' <<<"$out"
+      if [[ $code == 1 ]]; then
+        echo "  an absolute path  <-- FAILED"
+      else
+        echo "  the manifest could not be read  <-- FAILED"
+      fi
       status=1
     fi
   done
@@ -452,7 +515,7 @@ if [[ $mode != sudo && $mode != root ]]; then
   # Ubuntu 24.04 (and so GitHub's runners) deny to unconfined programs, so mount
   # is part of the probe.
   mkdir -p "$work/probe"
-  if why_user=$(unshare --user --mount --map-root-user \
+  if why_user=$(unshare --user --net --mount --map-root-user \
     bash -c 'mount -t tmpfs tmpfs "$1" && ls -A "$1"' _ "$work/probe" 2>&1); then
     mode=user
   else
@@ -481,7 +544,7 @@ fi
 case $mode in
   user)
     echo "dev-new-machine: unprivileged user namespaces work here"
-    run=(unshare --user --mount --map-root-user)
+    run=(unshare --user --net --mount --map-root-user)
     ;;
   sudo)
     if [[ -n $why_user ]]; then
@@ -494,12 +557,12 @@ case $mode in
       echo "dev-new-machine: sudo needs a password here (no NOPASSWD), so the test cannot run" >&2
       exit 1
     fi
-    run=(sudo -n unshare --mount)
+    run=(sudo -n unshare --net --mount)
     uid=$(id -u)
     gid=$(id -g)
     ;;
   root)
-    run=(unshare --mount)
+    run=(unshare --net --mount)
     if [[ -n ${DEV_NEW_MACHINE_USER:-} ]]; then
       uid=$(id -u "$DEV_NEW_MACHINE_USER")
       gid=$(id -g "$DEV_NEW_MACHINE_USER")

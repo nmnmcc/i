@@ -19,6 +19,9 @@ TOML: the first word of a line is the location of a package.
 `--self-test` checks the checker itself on cases it must find and cases it must
 not, and is what the test runs; the exit status is 0 only when all agree.
 
+Exit status: 0 when no absolute path was found, 1 when one was, 2 when a file
+could not be read as an i.toml or an i.lock.
+
 Python 3.11 or newer is needed, for `tomllib`.
 """
 
@@ -86,6 +89,7 @@ def main(argv: list[str]) -> int:
         print("usage: scripts/manifest-paths FILE... | --self-test", file=sys.stderr)
         return 2
     bad = 0
+    unreadable = 0
     for name in argv:
         try:
             with open(name, "rb") as file:
@@ -93,12 +97,13 @@ def main(argv: list[str]) -> int:
             found = check(name, text)
         except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
             print(f"{name}: {error}", file=sys.stderr)
-            bad = 1
+            unreadable = 1
             continue
         for where, value in found:
             print(f"{name}:{where} = {value!r}")
             bad = 1
-    return bad
+    # 1: an absolute path; 2: a file that could not be read as it claims to be.
+    return 2 if unreadable and not bad else bad
 
 
 # The cases of `--self-test`: text, and whether it has an absolute path.
