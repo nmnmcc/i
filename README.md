@@ -35,6 +35,8 @@ rm demo/test/main_test.i
 
 Write the program above to `demo/src/main.i`; the generated test is removed because it tests the program it replaces. `i run --project demo` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `|` are one function that matches its argument. No type is written, and every type is checked.
 
+The `std/` copy is an ordinary path dependency that belongs to the package: 30 files, about 465 KiB, readable and editable. `.gitignore` lists only `/build/`, so the copy is committed with the package and shipped by `i publish`. It includes `std/UNICODE-LICENSE` and the copyright notices in its sources; keep them when you redistribute it. Nothing refreshes the copy: `i update` handles versioned dependencies, not this directory. To move to a newer standard library, make a temporary package with the newer compiler and replace `std/` with that package's `std/`. A package named `std` imports the copy as `stdlib/…`.
+
 A function type has three parts, `(P) <- (S) -> R`: the parameters, the services the function needs, and the result. An error is a service too, `Fail(E)`. All of it is inferred. A service is an ordinary value: a function takes it with `<-` in its head, and the caller gives it with `<-` after an expression, so a test gives its own:
 
 ```text

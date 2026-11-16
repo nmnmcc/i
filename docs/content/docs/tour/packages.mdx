@@ -152,6 +152,8 @@ hello, package
 
 `path` is relative to the manifest; `util` is the caller’s import prefix for `words`. Only the package’s own name, `i`, and declared dependencies are visible; dependency dev-dependencies do not propagate. Module and package cycles are rejected.
 
+If the package itself is named `std`, its copied standard library cannot use the dependency key `std`, because a package cannot depend on itself. `i new std` names the key `stdlib`, and source imports it as `stdlib/int`.
+
 A location dependency such as `"github.com/alice/json@1.4.0"` uses Git, omits `https://`, and sets a minimum version; `//directory` before `@` selects a subpackage, and fetched packages cannot use path dependencies. Selection takes the greatest requested minimum per location and major version; distinct majors stay separate. `i.lock`, beside the root manifest, records reached locations, versions, tag commits, and package SHA-256 hashes; changed commits or bytes fail integrity checks, while local paths remain unlocked.
 
 `i add`, `i remove`, and `i update` maintain dependencies and locks; consult their help. `i cache status`, `gc`, and `clean` inspect, trim old then least-recently-used entries to the size target, and clear the global cache; `I_CACHE_DIR`, `XDG_CACHE_HOME/i`, then `~/.cache/i` choose its directory. `I_CACHE=off` disables caching without bypassing integrity checks.
