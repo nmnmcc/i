@@ -23,21 +23,21 @@ read_manifest = (path) {
 								(Some(items)) {
 									list.try_map(items, json.as_string) |>
 										(Ok(paths)) { Ok(paths) }
-										| (Error(_)) { Error("invalid manifest") }
+										& (Error(_)) { Error("invalid manifest") }
 								}
-								| (None) { Error("invalid manifest") }
+								& (None) { Error("invalid manifest") }
 						}
-						| (Error(_)) { Error("invalid manifest") }
+						& (Error(_)) { Error("invalid manifest") }
 				}
-				| (Error(_)) { Error("invalid manifest") }
+				& (Error(_)) { Error("invalid manifest") }
 		}
-		| (Error(_)) { Error("manifest read failed") }
+		& (Error(_)) { Error("manifest read failed") }
 }
 
 append_sources = (paths, file, total) {
 	paths |>
 		([]) { Ok(total) }
-		| ([path, ..rest]) {
+		& ([path, ..rest]) {
 			fs.read_file(path) |>
 				(Ok(bytes)) {
 					fs.open(file, fs.Append) |>
@@ -54,16 +54,16 @@ append_sources = (paths, file, total) {
 												total + core.bit_size(bytes) / 8,
 											)
 										}
-										| (Error(_)) { Error("write failed") }
+										& (Error(_)) { Error("write failed") }
 								}
-								| (Error(_)) {
+								& (Error(_)) {
 									close_result
 									Error("write failed")
 								}
 						}
-						| (Error(_)) { Error("open failed") }
+						& (Error(_)) { Error("open failed") }
 				}
-				| (Error(_)) { Error("read failed") }
+				& (Error(_)) { Error("read failed") }
 		}
 }
 
@@ -75,7 +75,7 @@ run_job = (paths, destination, part) {
 				fs.rename(part, destination)
 				Ok(total)
 			}
-			| (Error(_)) { Error("copy failed") }
+			& (Error(_)) { Error("copy failed") }
 	})
 }
 
@@ -90,13 +90,13 @@ main = () <- (process : Process, fs : Fs, stdio : Stdio) {
 						(Ok(_)) {
 							run_job(paths, destination, part) |>
 								(Ok(total)) { stdio.print("OK " <> int.to_string(total)) }
-								| (Error(_)) { stdio.print("ERROR") }
+								& (Error(_)) { stdio.print("ERROR") }
 							fail.catch(() { fs.remove(part) })
 							fail.catch(() { fs.remove(lock) })
 						}
-						| (Error(_)) { stdio.print("ERROR") }
+						& (Error(_)) { stdio.print("ERROR") }
 				}
-				| (Error(_)) { stdio.print("ERROR") }
+				& (Error(_)) { stdio.print("ERROR") }
 		}
-		| (_) { stdio.print("ERROR") }
+		& (_) { stdio.print("ERROR") }
 }

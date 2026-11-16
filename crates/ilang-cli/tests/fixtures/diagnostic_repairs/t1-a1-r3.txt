@@ -15,9 +15,9 @@ amount_value = (value) {
 		(Some(text)) {
 			int.parse(text) |>
 				(Ok(amount) ? amount >= 0 && amount <= 1000) { Some(amount) }
-				| (_) { None }
+				& (_) { None }
 		}
-		| (_) { None }
+		& (_) { None }
 }
 
 apply_record = (record, balance) {
@@ -31,46 +31,46 @@ apply_record = (record, balance) {
 								(Some(op)) {
 									op |>
 										("reset") { (True, 0) }
-										| ("credit") {
+										& ("credit") {
 											json.field(value, "amount") |>
 												(Some(amount)) {
 													amount_value(amount) |>
 														(Some(n)) { (True, balance + n) }
-														| (_) { (False, balance) }
+														& (_) { (False, balance) }
 												}
-												| (_) { (False, balance) }
+												& (_) { (False, balance) }
 										}
-										| ("debit") {
+										& ("debit") {
 											json.field(value, "amount") |>
 												(Some(amount)) {
 													amount_value(amount) |>
 														(Some(n) ? balance >= n) { (True, balance - n) }
-														| (_) { (False, balance) }
+														& (_) { (False, balance) }
 												}
-												| (_) { (False, balance) }
+												& (_) { (False, balance) }
 										}
-										| (_) { (False, balance) }
+										& (_) { (False, balance) }
 								}
-								| (_) { (False, balance) }
+								& (_) { (False, balance) }
 						}
-						| (_) { (False, balance) }
+						& (_) { (False, balance) }
 				}
-				| (_) { (False, balance) }
+				& (_) { (False, balance) }
 		}
-		| (_) { (False, balance) }
+		& (_) { (False, balance) }
 }
 
 run_records = (records, balance, errors) {
 	records |>
 		([]) { stdio.print("TOTAL \(int.to_string(balance)) ERRORS \(int.to_string(errors))") }
-		| ([record, ..rest]) {
+		& ([record, ..rest]) {
 			(success, next) = apply_record(record, balance)
 			success |>
 				(True) {
 					stdio.print("OK \(int.to_string(next))")
 					run_records(rest, next, errors)
 				}
-				| (False) {
+				& (False) {
 					stdio.print("ERROR \(int.to_string(balance))")
 					run_records(rest, balance, errors + 1)
 				}
@@ -83,7 +83,7 @@ run_text = (text) {
 		(True) {
 			run_records(list.drop(parts, 1), 0, 0)
 		}
-		| (False) { run_records(parts, 0, 0) }
+		& (False) { run_records(parts, 0, 0) }
 }
 
 main = () {
@@ -93,9 +93,9 @@ main = () {
 				(Ok(bytes)) {
 					bit_array.to_string(bytes) |>
 						(Ok(text)) { run_text(text) }
-						| (_) { stdio.print("ERROR INPUT") }
+						& (_) { stdio.print("ERROR INPUT") }
 				}
-				| (_) { stdio.print("ERROR INPUT") }
+				& (_) { stdio.print("ERROR INPUT") }
 		}
-		| (_) { stdio.print("ERROR INPUT") }
+		& (_) { stdio.print("ERROR INPUT") }
 }

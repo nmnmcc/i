@@ -22,13 +22,13 @@ parse_amount = (value) {
 				(Ok(n)) {
 					{ n >= 0 && n <= 1000 } |>
 						(True) { Some(n) }
-						| (False) { None }
+						& (False) { None }
 				}
-				| (Error(_)) { None }
+				& (Error(_)) { None }
 		}
-		| (False) { None }
+		& (False) { None }
 	}
-	| (_) { None }
+	& (_) { None }
 }
 
 process_record = (line, balance) {
@@ -36,35 +36,35 @@ process_record = (line, balance) {
 		(Ok(json.Object(fields))) {
 			list.key_find(fields, "op") |>
 				(Some(json.Text("reset"))) { (True, balance) }
-				| (Some(json.Text("credit"))) {
+				& (Some(json.Text("credit"))) {
 					list.key_find(fields, "amount") |> parse_amount |>
 						(Some(amount)) { (True, balance + amount) }
-						| (_) { (False, balance) }
+						& (_) { (False, balance) }
 				}
-				| (Some(json.Text("debit"))) {
+				& (Some(json.Text("debit"))) {
 					list.key_find(fields, "amount") |> parse_amount |>
 						(Some(amount) ? balance >= amount) {
 							(True, balance - amount)
 						}
-						| (_) { (False, balance) }
+						& (_) { (False, balance) }
 				}
-				| (_) { (False, balance) }
+				& (_) { (False, balance) }
 		}
-		| (_) { (False, balance) }
+		& (_) { (False, balance) }
 }
 
 walk = (lines, balance, errors, output) {
 	lines |> ([]) {
 		(output, balance, errors)
 	}
-	| ([line, ..rest]) {
+	& ([line, ..rest]) {
 		(success, next) = process_record(line, balance)
 		state =
 			success
 				|> (True) {
 					(output <> "OK " <> int.to_string(next) <> "\n", next, errors)
 				}
-				| (False) {
+				& (False) {
 					(
 						output <> "ERROR " <> int.to_string(balance) <> "\n",
 						balance,
@@ -83,13 +83,13 @@ main = () {
 				bit_array.to_string(bytes) |>
 					(Ok(text)) {
 						lines =
-							{ text == "" } |> (True) { [] } | (False) {
+							{ text == "" } |> (True) { [] } & (False) {
 								parts = string.split(text, "\n")
 								{ string.ends_with(text, "\n") } |>
 									(True) {
 										list.take(parts, list.length(parts) - 1)
 									}
-									| (False) { parts }
+									& (False) { parts }
 							}
 						(output, balance, errors) = walk(lines, 0, 0, "")
 						stdio.write(<<output:utf8>>)
@@ -98,9 +98,9 @@ main = () {
 								int.to_string(errors),
 						)
 					}
-					| (_) { stdio.print("ERROR INPUT") }
+					& (_) { stdio.print("ERROR INPUT") }
 			}
-			| (_) { stdio.print("ERROR INPUT") }
+			& (_) { stdio.print("ERROR INPUT") }
 	}
-	| (_) { stdio.print("ERROR INPUT") }
+	& (_) { stdio.print("ERROR INPUT") }
 }

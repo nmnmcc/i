@@ -20,13 +20,13 @@ main = () {
 								(Ok(json.Array(source_paths))) {
 									run(source_paths, destination_path)
 								}
-								| (_) { stdio.print("ERROR") }
+								& (_) { stdio.print("ERROR") }
 						}
-						| (_) { stdio.print("ERROR") }
+						& (_) { stdio.print("ERROR") }
 				}
-				| (_) { stdio.print("ERROR") }
+				& (_) { stdio.print("ERROR") }
 		}
-		| (_) { stdio.print("ERROR") }
+		& (_) { stdio.print("ERROR") }
 }
 
 run = (source_paths, destination_path) {
@@ -44,15 +44,15 @@ run = (source_paths, destination_path) {
 			fs.remove(lock_path)
 			result |>
 				(Ok(count)) { stdio.print("OK " <> core.inspect(count)) }
-				| (_) { stdio.print("ERROR") }
+				& (_) { stdio.print("ERROR") }
 		}
-		| (_) { stdio.print("ERROR") }
+		& (_) { stdio.print("ERROR") }
 }
 
 append_sources = (paths, part_path, count) {
 	paths |>
 		([]) { count }
-		| ([path, ..rest]) {
+		& ([path, ..rest]) {
 			bytes = fs.read_file(path)
 			fs.write_file(part_path, bytes)
 			append_sources(rest, part_path, count + bit_array.byte_size(bytes))

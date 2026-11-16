@@ -17,7 +17,7 @@ read_text = (path) -> String {
 	bits = fs.read_file(path)
 	bit_array.to_string(bits) |>
 		(Ok(text)) { text }
-		| (Error(_)) { panic("invalid UTF-8") }
+		& (Error(_)) { panic("invalid UTF-8") }
 }
 
 main = () {
@@ -42,24 +42,24 @@ main = () {
 												(Committed(count, bytes)) {
 													stdio.print("COMMIT " <> int.to_string(count) <> " " <> int.to_string(bytes))
 												}
-												| (RolledBack(index)) {
+												& (RolledBack(index)) {
 													fail.catch(() { fs.write_file(journal, original) })
 													stdio.print("ROLLBACK " <> int.to_string(index))
 												}
 											fail.catch(() { fs.remove(lock) })
 										}
-										| (Error(_)) {
+										& (Error(_)) {
 											fail.catch(() { fs.remove(lock) })
 											stdio.print("ERROR INPUT")
 										}
 								}
-								| (False) { stdio.print("ERROR LOCK") }
+								& (False) { stdio.print("ERROR LOCK") }
 						}
-						| (_) { stdio.print("ERROR INPUT") }
+						& (_) { stdio.print("ERROR INPUT") }
 				}
-				| (Error(_)) { stdio.print("ERROR INPUT") }
+				& (Error(_)) { stdio.print("ERROR INPUT") }
 		}
-		| (_) { stdio.print("ERROR INPUT") }
+		& (_) { stdio.print("ERROR INPUT") }
 }
 
 process_steps = (steps, journal, index) {
@@ -68,11 +68,11 @@ process_steps = (steps, journal, index) {
 			Ok(bytes) = fail.catch(() { fs.read_file(journal) })
 			Committed(index, core.bit_size(bytes) / 8)
 		}
-		| ([step, ..rest]) {
+		& ([step, ..rest]) {
 			result = fail.catch(() { apply_step(step, journal) })
 			result |>
 				(Ok(True)) { process_steps(rest, journal, index + 1) }
-				| (_) { RolledBack(index) }
+				& (_) { RolledBack(index) }
 		}
 }
 
@@ -91,11 +91,11 @@ apply_step = (step, journal) {
 								fs.close(file)
 								True
 							}
-							| (False) { False }
+							& (False) { False }
 					}
-					| (_) { False }
+					& (_) { False }
 			}
-			| (Some(json.Text("expect"))) {
+			& (Some(json.Text("expect"))) {
 				json.field(object, "length") |>
 					(Some(json.Text(token))) {
 						int.parse(token) |>
@@ -105,14 +105,14 @@ apply_step = (step, journal) {
 										bytes = fs.read_file(journal)
 										core.bit_size(bytes) / 8 == length
 									}
-									| (False) { False }
+									& (False) { False }
 							}
-							| (_) { False }
+							& (_) { False }
 					}
-					| (_) { False }
+					& (_) { False }
 			}
-			| (Some(json.Text("abort"))) { False }
-			| (_) { False }
+			& (Some(json.Text("abort"))) { False }
+			& (_) { False }
 	}
-	| (_) { False }
+	& (_) { False }
 }
