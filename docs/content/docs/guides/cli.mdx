@@ -52,7 +52,7 @@ greet = (name, count) {
 			stdio.print("hello " <> name)
 			greet(name, count - 1)
 		}
-		| (False) { Nil }
+		& (False) { Nil }
 }
 main = () {
 	{ process.args() == ["--help"] } |>
@@ -61,7 +61,7 @@ main = () {
 			stdio.write(<<usage:utf8>>)
 			stdio.flush()
 		}
-		| (False) {
+		& (False) {
 			cli.run(options.parser(), "greet", (opts) {
 				{
 					log.write(

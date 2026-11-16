@@ -10,7 +10,7 @@ wrap = <N>(k : (() <- N -> Int) <- N -> Int, svc : Svc(String)) -> Int {
 	}
 	first() + k(() { ask() + 1 })
 }
-tell = (x : Int) { x |> (5) { "five" } | (_) { "other" } }
+tell = (x : Int) { x |> (5) { "five" } & (_) { "other" } }
 
 main = () <- (io : Io) {
 	_syn3_1 : Svc(Int) = Svc(f = () { 1 }, m = (_ : Int) { Nil })

@@ -1,8 +1,8 @@
 f = (x : ("a" | "ab" | "b" | "c" | "", Bool)) {
 	x |>
 		((_ : String - "a", _)) { 0 }
-		| ((_, _)) { 1 }
-		| ((_ : String - "ab" - "b", False)) { 2 }
+		& ((_, _)) { 1 }
+		& ((_ : String - "ab" - "b", False)) { 2 }
 }
 
 main = () {

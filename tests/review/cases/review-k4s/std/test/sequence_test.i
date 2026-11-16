@@ -110,11 +110,11 @@ check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
 			assert(sequence.at(a, i) == list.at(xs, i))
 			sequence.set(a, i, -10) |>
 				(None) { assert(i < 0 || i >= list.length(xs)) }
-				| (Some(changed)) {
+				& (Some(changed)) {
 					check(
 						changed,
 						list.index_map(xs, (x, j) {
-							{ i == j } |> (True) { -10 } | (False) { x }
+							{ i == j } |> (True) { -10 } & (False) { x }
 						}),
 					)
 				}
@@ -171,8 +171,8 @@ test("sequence_walks", () {
 reject_two = (x : Int) -> Int {
 	x |>
 		(2) { fail.raise("two") }
-		| (3) { panic("callback after first error") }
-		| (_) { x }
+		& (3) { panic("callback after first error") }
+		& (_) { x }
 }
 
 test("sequence_callback_errors", () {
@@ -202,7 +202,7 @@ model = (
 				check(s, xs)
 			})
 		}
-		| (_) {
+		& (_) {
 			next = prng(seed)
 			Some((s, xs)) = list.at(versions, next % list.length(versions))
 			n = list.length(xs)
@@ -210,49 +210,49 @@ model = (
 			x = next % 1000
 			(t, ys) = next % 10 |>
 				(0) { (sequence.push_front(s, x), [x, ..xs]) }
-				| (1) { (sequence.push_back(s, x), list.append(xs, [x])) }
-				| (2) {
+				& (1) { (sequence.push_back(s, x), list.append(xs, [x])) }
+				& (2) {
 					sequence.pop_front(s) |>
 						(None) { (s, xs) }
-						| (Some((v, rest))) {
+						& (Some((v, rest))) {
 							assert(Some(v) == list.first(xs))
 							(rest, list.drop(xs, 1))
 						}
 				}
-				| (3) {
+				& (3) {
 					sequence.pop_back(s) |>
 						(None) { (s, xs) }
-						| (Some((v, rest))) {
+						& (Some((v, rest))) {
 							assert(Some(v) == list.last(xs))
 							(rest, list.take(xs, n - 1))
 						}
 				}
-				| (4) {
+				& (4) {
 					sequence.set(s, i, x) |>
 						(None) {
 							assert(i < 0 || i >= n)
 							(s, xs)
 						}
-						| (Some(rest)) {
+						& (Some(rest)) {
 							(
 								rest,
 								list.index_map(xs, (v, j) {
-									{ i == j } |> (True) { x } | (False) { v }
+									{ i == j } |> (True) { x } & (False) { v }
 								}),
 							)
 						}
 				}
-				| (5) { (sequence.reverse(s), list.reverse(xs)) }
-				| (6) { (sequence.take(s, i), list.take(xs, i)) }
-				| (7) { (sequence.drop(s, i), list.drop(xs, i)) }
-				| (8) {
+				& (5) { (sequence.reverse(s), list.reverse(xs)) }
+				& (6) { (sequence.take(s, i), list.take(xs, i)) }
+				& (7) { (sequence.drop(s, i), list.drop(xs, i)) }
+				& (8) {
 					Some((other, zs)) = list.at(
 						versions,
 						prng(next) % list.length(versions),
 					)
 					(sequence.append(s, other), list.append(xs, zs))
 				}
-				| (_) { (sequence.append(s, s), list.append(xs, xs)) }
+				& (_) { (sequence.append(s, s), list.append(xs, xs)) }
 			check(t, ys)
 			check(s, xs)
 			assert(sequence.at(t, i) == list.at(ys, i))
@@ -281,14 +281,14 @@ test("sequence_persistent_model", () {
 drain = (s : sequence.Sequence(Int), low : Int, high : Int) -> Nil {
 	{ low >= high } |>
 		(True) { assert(sequence.is_empty(s)) }
-		| (False) {
+		& (False) {
 			{ { low + high } % 2 == 0 } |>
 				(True) {
 					Some((x, rest)) = sequence.pop_front(s)
 					assert(x == low)
 					drain(rest, low + 1, high)
 				}
-				| (False) {
+				& (False) {
 					Some((x, rest)) = sequence.pop_back(s)
 					assert(x == high - 1)
 					drain(rest, low, high - 1)
@@ -399,7 +399,7 @@ test("sequence_large_boundaries", () {
 })
 
 numbers = (n : Int) -> List(Int) {
-	{ n <= 0 } |> (True) { [] } | (False) { list.range(0, n - 1) }
+	{ n <= 0 } |> (True) { [] } & (False) { list.range(0, n - 1) }
 }
 
 Box = (value = Int)
@@ -454,7 +454,7 @@ test("sequence_callback_types_and_order", () {
 	union_error = (x : Int) -> Int {
 		{ x == 1 } |>
 			(True) { fail.raise(True) }
-			| (False) { fail.raise("other") }
+			& (False) { fail.raise("other") }
 	}
 	assert(
 		fail.catch(() { sequence.each(sequence.wrap(1), union_error) }) ==
@@ -488,7 +488,7 @@ test("sequence_independent_histories", () {
 		[(old, model), .._] = saved
 		(next, expected) = { x % 2 == 0 } |>
 			(True) { (sequence.push_front(old, -x), [-x, ..model]) }
-			| (False) { (sequence.push_back(old, x), list.append(model, [x])) }
+			& (False) { (sequence.push_back(old, x), list.append(model, [x])) }
 		check(next, expected)
 		[(next, expected), ..saved]
 	})

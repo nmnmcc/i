@@ -20,7 +20,7 @@ handle = (req : http.Request) {
 				trailers = r.trailers,
 			)
 		}
-		| ((http.Method("GET"), "/chunked")) {
+		& ((http.Method("GET"), "/chunked")) {
 			r = http.response(http.Status(200))
 			http.Response(
 				status = r.status,
@@ -30,7 +30,7 @@ handle = (req : http.Request) {
 				trailers = r.trailers,
 			)
 		}
-		| ((http.Method("POST"), "/post")) {
+		& ((http.Method("POST"), "/post")) {
 			r = http.response(http.Status(200))
 			http.Response(
 				status = r.status,
@@ -40,7 +40,7 @@ handle = (req : http.Request) {
 				trailers = r.trailers,
 			)
 		}
-		| (_) { http.response(http.Status(404)) }
+		& (_) { http.response(http.Status(404)) }
 }
 
 test("network_client", () {

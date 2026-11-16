@@ -52,7 +52,7 @@ test("folds", () {
 	xs = [3, 4, 5, 6, 7]
 	assert(
 		list.fold(xs, 0, (n, _) {
-			{ n == 3 } |> (True) { n } | (False) { n + 1 }
+			{ n == 3 } |> (True) { n } & (False) { n + 1 }
 		}) ==
 			3,
 	)
@@ -60,7 +60,7 @@ test("folds", () {
 		list.fold(
 			xs,
 			0,
-			{ (n, _) { { n == 3 } |> (True) { n } | (False) { n + 1 } } },
+			{ (n, _) { { n == 3 } |> (True) { n } & (False) { n + 1 } } },
 		) ==
 			3,
 	)
@@ -71,15 +71,15 @@ test("folds", () {
 			0,
 			flag |>
 				(True) {
-					(n, _) { { n == 3 } |> (True) { n } | (False) { n + 1 } }
+					(n, _) { { n == 3 } |> (True) { n } & (False) { n + 1 } }
 				}
-				| (False) { (n, _) { n + 1 } },
+				& (False) { (n, _) { n + 1 } },
 		) ==
 			3,
 	)
 	assert(
 		list.fold(xs, (0, 0), (p, x) {
-			{ p.0 == 3 } |> (True) { p } | (False) { (p.0 + 1, x) }
+			{ p.0 == 3 } |> (True) { p } & (False) { (p.0 + 1, x) }
 		}).0 ==
 			3,
 	)
@@ -91,15 +91,15 @@ test("folds", () {
 	)
 	acc = list.fold([3, 4, 5], [], (acc, x) {
 		acc |>
-			([h, ..]) { { h == 3 } |> (True) { acc } | (False) { [x, ..acc] } }
-			| ([]) { [x] }
+			([h, ..]) { { h == 3 } |> (True) { acc } & (False) { [x, ..acc] } }
+			& ([]) { [x] }
 	})
 	assert(acc == [3])
 	assert(
 		list.fold(xs, None, (acc, x) {
 			acc |>
 				(Some(p : (Int, Int))) { Some((p.0 + 1, x)) }
-				| (None) { Some((0, x)) }
+				& (None) { Some((0, x)) }
 		}) ==
 			Some((4, 7)),
 	)
@@ -121,6 +121,6 @@ loop = <S>(init : S, body : (S, (S) -> Nil) -> Nil) -> Nil {
 test("hidden_service_and_setter", () {
 	assert(with_feed(0, () <- (feed : Feed(Int)) { feed.put(5) }) == 5)
 	loop(0, (n, again) {
-		{ n == 3 } |> (True) { Nil } | (False) { again(n + 1) }
+		{ n == 3 } |> (True) { Nil } & (False) { again(n + 1) }
 	})
 })

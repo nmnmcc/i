@@ -54,7 +54,7 @@ Ready = ()
 Waiting = (Int)
 message =
 	(Ready) { "ready" }
-	| (Waiting(minutes)) { int.to_string(minutes) <> " min left" }
+	& (Waiting(minutes)) { int.to_string(minutes) <> " min left" }
 
 main = () {
 	stdio.print(message(Ready))
@@ -81,7 +81,7 @@ ready
 
 Late = ()
 remaining = (due) {
-	due - now() |> (n ? n < 0) { fail.raise(Late) } | (n) { n }
+	due - now() |> (n ? n < 0) { fail.raise(Late) } & (n) { n }
 }
 ```
 
@@ -118,7 +118,7 @@ pass hello/deadline_test.a fake clock
 	word
 )
 
-word = (n) { n |> (0) { "zero" } | (1) { "one" } }
+word = (n) { n |> (0) { "zero" } & (1) { "one" } }
 ```
 
 ```text title="i check --types"

@@ -90,18 +90,18 @@ Process = (
 	close = (Int) -> Request(Nil),
 )
 
-length = ([]) { 0 } | ([_, ..rest]) { 1 + length(rest) }
+length = ([]) { 0 } & ([_, ..rest]) { 1 + length(rest) }
 
 u32 = (n) { <<n % 256, n / 256 % 256, n / 65536 % 256, n / 16777216 % 256>> }
 
 encode_items =
 	([]) { <<>> }
-	| ([s, ..rest]) {
+	& ([s, ..rest]) {
 		bytes = <<s:utf8>>
 		n = core.bit_size(bytes) / 8
 		{ n <= 4294967295 } |>
 			(True) { Nil }
-			| (False) {
+			& (False) {
 				fail.raise(ProcessError(operation = "spawn", code = "invalid"))
 			}
 		core.bit_array_concat([u32(n), bytes, encode_items(rest)])
@@ -111,7 +111,7 @@ encode_args = (values) {
 	n = length(values)
 	{ n <= 4294967295 } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			fail.raise(ProcessError(operation = "spawn", code = "invalid"))
 		}
 	core.bit_array_concat([u32(n), encode_items(values)])
@@ -120,30 +120,30 @@ encode_args = (values) {
 decode_items = (bytes, count) {
 	(bytes, count) |>
 		((<<>>, 0)) { [] }
-		| ((<<a, b, c, d, rest:bytes>>, n) ? n > 0) {
+		& ((<<a, b, c, d, rest:bytes>>, n) ? n > 0) {
 			size = a + b * 256 + c * 65536 + d * 16777216
 			rest |>
 				(<<item:bytes(size), tail:bytes>>) {
 					text = core.bit_array_to_string(item) |>
 						(Ok(s)) { s }
-						| (Error(_)) { panic("process: invalid arguments") }
+						& (Error(_)) { panic("process: invalid arguments") }
 					[text, ..decode_items(tail, n - 1)]
 				}
-				| (_) { panic("process: invalid arguments") }
+				& (_) { panic("process: invalid arguments") }
 		}
-		| (_) { panic("process: invalid arguments") }
+		& (_) { panic("process: invalid arguments") }
 }
 
 decode_args =
 	(<<a, b, c, d, rest:bytes>>) {
 		decode_items(rest, a + b * 256 + c * 65536 + d * 16777216)
 	}
-	| (_) { panic("process: invalid arguments") }
+	& (_) { panic("process: invalid arguments") }
 
 args = () <- (raw : Arguments) {
 	request.await_owned(raw.args()) |>
 		(Ok(value)) { decode_args(value) }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "args", code = code))
 		}
 }
@@ -151,7 +151,7 @@ args = () <- (raw : Arguments) {
 env = (name) <- (raw : Environment) {
 	request.await_owned(raw.env(name)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "env", code = code))
 		}
 }
@@ -159,7 +159,7 @@ env = (name) <- (raw : Environment) {
 cwd = () <- (raw : WorkingDirectory) {
 	request.await_owned(raw.cwd()) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "cwd", code = code))
 		}
 }
@@ -167,7 +167,7 @@ cwd = () <- (raw : WorkingDirectory) {
 entropy = (bytes) <- (raw : Entropy) {
 	request.await_owned(raw.entropy(bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "entropy", code = code))
 		}
 }
@@ -178,7 +178,7 @@ spawn = (program, values) <- (raw : Process) {
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(code)) {
+				& (Error(code)) {
 					fail.raise(ProcessError(operation = "spawn", code = code))
 				}
 		},
@@ -187,7 +187,7 @@ spawn = (program, values) <- (raw : Process) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -198,7 +198,7 @@ spawn = (program, values) <- (raw : Process) {
 wait = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.wait(number)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "wait", code = code))
 		}
 }
@@ -206,7 +206,7 @@ wait = (Child(number)) <- (raw : Process) {
 terminate = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.terminate(number)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "terminate", code = code))
 		}
 }
@@ -215,7 +215,7 @@ close = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.close(number))
 }
 
-stdio_mode = (Inherit) { "inherit" } | (Null) { "null" } | (Piped) { "piped" }
+stdio_mode = (Inherit) { "inherit" } & (Null) { "null" } & (Piped) { "piped" }
 
 spawn_piped = (program, values, input, output, errors) <- (raw : Process) {
 	r = raw.spawn_piped(
@@ -229,7 +229,7 @@ spawn_piped = (program, values, input, output, errors) <- (raw : Process) {
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(code)) {
+				& (Error(code)) {
 					fail.raise(ProcessError(operation = "spawn", code = code))
 				}
 		},
@@ -238,7 +238,7 @@ spawn_piped = (program, values, input, output, errors) <- (raw : Process) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -259,10 +259,10 @@ spawn_config = (
 ) <- (raw : Process) {
 	(env_mode, entries) = environment |>
 		(InheritEnvironment(entries)) { ("inherit", entries) }
-		| (ReplaceEnvironment(entries)) { ("replace", entries) }
+		& (ReplaceEnvironment(entries)) { ("replace", entries) }
 	(cwd_mode, path) = directory |>
 		(InheritDirectory) { ("inherit", "") }
-		| (Directory(path)) { ("set", path) }
+		& (Directory(path)) { ("set", path) }
 	r = raw.spawn_config(
 		program,
 		encode_args(values),
@@ -278,7 +278,7 @@ spawn_config = (
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(code)) {
+				& (Error(code)) {
 					fail.raise(ProcessError(operation = "spawn", code = code))
 				}
 		},
@@ -287,7 +287,7 @@ spawn_config = (
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -298,7 +298,7 @@ spawn_config = (
 read_stdout = (Child(number), max) <- (raw : Process) {
 	request.await_owned(raw.read_stdout(number, max)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "read_stdout", code = code))
 		}
 }
@@ -306,7 +306,7 @@ read_stdout = (Child(number), max) <- (raw : Process) {
 read_stderr = (Child(number), max) <- (raw : Process) {
 	request.await_owned(raw.read_stderr(number, max)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "read_stderr", code = code))
 		}
 }
@@ -314,7 +314,7 @@ read_stderr = (Child(number), max) <- (raw : Process) {
 write_stdin = (Child(number), bytes) <- (raw : Process) {
 	request.await_owned(raw.write_stdin(number, bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "write_stdin", code = code))
 		}
 }
@@ -322,7 +322,7 @@ write_stdin = (Child(number), bytes) <- (raw : Process) {
 close_stdin = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.close_stdin(number)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ProcessError(operation = "close_stdin", code = code))
 		}
 }

@@ -13,7 +13,7 @@ loop = (
 ) -> Nil {
 	n |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			value = task.sync(
 				task.choose(
 					[
@@ -31,7 +31,7 @@ loop = (
 send = (c : task.Channel(Int), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			task.send(c, n)
 			send(c, n - 1)
 		}

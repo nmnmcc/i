@@ -13,7 +13,7 @@ get = (url: String) <- (handler: Fail(String)) {
 		(Ok(res)) {
 			fail.catch(() { http.body_text(res) }) |>
 				(Ok(text)) { text }
-				| (Error(_)) { panic("invalid UTF-8") }
+				& (Error(_)) { panic("invalid UTF-8") }
 		}
-		| (Error(error)) { handler.raise(core.inspect(error)) }
+		& (Error(error)) { handler.raise(core.inspect(error)) }
 }

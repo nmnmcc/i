@@ -28,10 +28,10 @@ fn quote_pattern_captures_typecheck_and_a_fallback_is_reachable() {
 #[test]
 fn nested_captures_choices_and_guards_typecheck() {
     for body in [
-        "(|> x (| (-> (? (, `(f ~item)) False) _ item) (-> (, `(g ~item)) _ item) (-> (, _) _ x)))",
-        "(|> x (| (-> (, (| `(f ~item) `(g ~item))) _ item) (-> (, _) _ x)))",
-        "(|> x (| (-> (, `(f ~`(g ~item))) _ item) (-> (, _) _ x)))",
-        "(|> x (| (-> (, `(f ~..[first ..rest])) _ first) (-> (, _) _ x)))",
+        "(|> x (& (-> (? (, `(f ~item)) False) _ item) (-> (, `(g ~item)) _ item) (-> (, _) _ x)))",
+        "(|> x (& (-> (, (| `(f ~item) `(g ~item))) _ item) (-> (, _) _ x)))",
+        "(|> x (& (-> (, `(f ~`(g ~item))) _ item) (-> (, _) _ x)))",
+        "(|> x (& (-> (, `(f ~..[first ..rest])) _ first) (-> (, _) _ x)))",
     ] {
         let source = format!(
             "(, (= syntax (/ i syntax)))\n(= choose (-> (, (: x (. syntax Syntax))) (. syntax Syntax) {body}))\n"

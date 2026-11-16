@@ -4,7 +4,7 @@ Dep = (v = Int)
 
 fw = () { use() }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 loop = (x) { x(x) }
 

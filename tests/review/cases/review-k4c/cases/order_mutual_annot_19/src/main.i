@@ -4,6 +4,6 @@ use = <N>() <- (s : S(N)) {
 	f()
 }
 wrap = () { run(() { a(True) }) }
-b = (x : Bool) -> Nil { x |> (True) { use() } | (False) { a(True) } }
-a = (x : Bool) -> Nil { x |> (True) { use() } | (False) { b(True) } }
+b = (x : Bool) -> Nil { x |> (True) { use() } & (False) { a(True) } }
+a = (x : Bool) -> Nil { x |> (True) { use() } & (False) { b(True) } }
 run = <N>(body : () <- N -> Nil) { body() }

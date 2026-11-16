@@ -82,7 +82,7 @@ test("paths", () {
 })
 
 advance = (g : random.Generator, n : Int) -> random.Generator {
-	{ n == 0 } |> (True) { g } | (False) { advance(random.word(g).1, n - 1) }
+	{ n == 0 } |> (True) { g } & (False) { advance(random.word(g).1, n - 1) }
 }
 
 // §9.10: k is at least one, even for bound 1; W uses one word, W+1 two.
@@ -102,7 +102,7 @@ test("boundaries", () {
 check_range = (g : random.Generator, below : Int, count : Int) -> Nil {
 	{ count == 0 } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			(value, next) = random.int(g, below)
 			assert(value >= 0 && value < below)
 			(f, _) = random.float(g)
@@ -124,7 +124,7 @@ test("ranges", () {
 check_float = (g : random.Generator, count : Int) -> Nil {
 	{ count == 0 } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			(u, next) = random.word(g)
 			(f, after) = random.float(g)
 			assert(after == next)
@@ -147,12 +147,12 @@ histogram = (g : random.Generator, count : Int, a : Int, b : Int, c : Int) -> (
 ) {
 	{ count == 0 } |>
 		(True) { (a, b, c) }
-		| (False) {
+		& (False) {
 			(n, next) = random.int(g, 3)
 			n |>
 				(0) { histogram(next, count - 1, a + 1, b, c) }
-				| (1) { histogram(next, count - 1, a, b + 1, c) }
-				| (_) { histogram(next, count - 1, a, b, c + 1) }
+				& (1) { histogram(next, count - 1, a, b + 1, c) }
+				& (_) { histogram(next, count - 1, a, b, c + 1) }
 		}
 }
 
@@ -167,7 +167,7 @@ test("small_bound_frequencies", () {
 walk = (g : random.Generator, count : Int) -> random.Generator {
 	{ count == 0 } |>
 		(True) { g }
-		| (False) { walk(random.split(g).0, count - 1) }
+		& (False) { walk(random.split(g).0, count - 1) }
 }
 
 test("deep_splits", () {

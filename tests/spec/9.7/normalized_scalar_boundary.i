@@ -19,8 +19,8 @@ main = () <- (kv : Kv) {
 	assert(kv.check(21) == 42)
 	fail.catch(() { kv.get("x") }) |>
 		(Error(e)) { assert(e == "no x") }
-		| (Ok(_)) { panic("missing error") }
+		& (Ok(_)) { panic("missing error") }
 	fail.catch(() { kv.check(200) }) |>
 		(Error(e : Int)) { assert(e == 200) }
-		| (_) { panic("missing Int error") }
+		& (_) { panic("missing Int error") }
 }

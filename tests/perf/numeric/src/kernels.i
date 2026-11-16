@@ -24,7 +24,7 @@ horner = (x : Float) -> Float {
 	f *. x +. 1.0
 }
 int_go = (n : Int, acc : Int) -> Int {
-	n |> (0) { acc } | (_) { int_go(n - 1, acc + n) }
+	n |> (0) { acc } & (_) { int_go(n - 1, acc + n) }
 }
 integer = (x : Float) -> Float {
 	core.to_float(
@@ -68,8 +68,8 @@ xs = [
 dot_go = (as : List(Float), bs : List(Float), sum : Float) -> Float {
 	as |>
 		([]) { sum }
-		| ([a, ..at]) {
-			bs |> ([]) { sum } | ([b, ..bt]) { dot_go(at, bt, sum +. a *. b) }
+		& ([a, ..at]) {
+			bs |> ([]) { sum } & ([b, ..bt]) { dot_go(at, bt, sum +. a *. b) }
 		}
 }
 dot = (x : Float) -> Float { dot_go(xs, xs, x) }
@@ -81,7 +81,7 @@ tuples = (x : Float) -> Float {
 	e +. f
 }
 fold = <A, B>(items : List(A), acc : B, f : (B, A) -> B) -> B {
-	items |> ([]) { acc } | ([a, ..rest]) { fold(rest, f(acc, a), f) }
+	items |> ([]) { acc } & ([a, ..rest]) { fold(rest, f(acc, a), f) }
 }
 closures = (x : Float) -> Float {
 	fold(xs, 0.0, (acc : Float, v : Float) -> Float { acc +. v *. x })

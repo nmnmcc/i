@@ -47,14 +47,14 @@ test("http_incremental", () {
 			(<<x, tail:bytes>>) {
 				http.feed_request(buffered, <<x>>) |>
 					(http.More(next)) { go(tail, next) }
-					| (http.Complete(req, left)) {
+					& (http.Complete(req, left)) {
 						assert(tail == <<>>)
 						assert(left == <<>>)
 						assert(req.body == <<"test":utf8>>)
 					}
-					| (http.Invalid(_)) { assert(False) }
+					& (http.Invalid(_)) { assert(False) }
 			}
-			| (_) { assert(False) }
+			& (_) { assert(False) }
 	}
 	go(input, <<>>)
 })
@@ -79,7 +79,7 @@ test("http_rejects", () {
 		assert(
 			http.feed_request(<<>>, <<s:utf8>>) |>
 				(http.Invalid(_)) { True }
-				| (_) { False },
+				& (_) { False },
 		)
 	})
 })
@@ -144,15 +144,15 @@ test("http_incremental_chunked_response", () {
 			(<<x, tail:bytes>>) {
 				http.feed_response(buffered, <<x>>) |>
 					(http.More(next)) { go(tail, next) }
-					| (http.Complete(res, left)) {
+					& (http.Complete(res, left)) {
 						assert(tail == <<>>)
 						assert(left == <<>>)
 						assert(res.body == <<"a":utf8>>)
 						assert(http.header(res.trailers, "x") == Some("y"))
 					}
-					| (http.Invalid(_)) { assert(False) }
+					& (http.Invalid(_)) { assert(False) }
 			}
-			| (_) { assert(False) }
+			& (_) { assert(False) }
 	}
 	go(input, <<>>)
 })
@@ -495,7 +495,7 @@ test("http_bad_0_get_http_1_0_r_n_r_n", () {
 	assert(
 		http.feed_request(<<>>, <<"GET / HTTP/1.0\r\n\r\n":utf8>>) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -503,7 +503,7 @@ test("http_bad_1_get_http_1_1_r_n_r_n", () {
 	assert(
 		http.feed_request(<<>>, <<"GET  / HTTP/1.1\r\n\r\n":utf8>>) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -511,7 +511,7 @@ test("http_bad_2_g_t_http_1_1_r_n_r_n", () {
 	assert(
 		http.feed_request(<<>>, <<"G@T / HTTP/1.1\r\n\r\n":utf8>>) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -519,7 +519,7 @@ test("http_bad_3_get_http_1_1_n_n", () {
 	assert(
 		http.feed_request(<<>>, <<"GET / HTTP/1.1\n\n":utf8>>) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -530,7 +530,7 @@ test("http_bad_4_get_http_1_1_r_n_fold_x_r_n_r_n", () {
 			<<"GET / HTTP/1.1\r\n Fold: x\r\n\r\n":utf8>>,
 		) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -541,7 +541,7 @@ test("http_bad_5_get_http_1_1_r_nbad_header_x_r_n_r_n", () {
 			<<"GET / HTTP/1.1\r\nBad Header: x\r\n\r\n":utf8>>,
 		) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -549,7 +549,7 @@ test("http_bad_6_get_http_1_1_r_nnocolon_r_n_r_n", () {
 	assert(
 		http.feed_request(<<>>, <<"GET / HTTP/1.1\r\nNoColon\r\n\r\n":utf8>>) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -560,7 +560,7 @@ test("http_bad_7_get_http_1_1_r_ncontent_length_1_r_n", () {
 			<<"GET / HTTP/1.1\r\nContent-Length: -1\r\n\r\n":utf8>>,
 		) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -571,7 +571,7 @@ test("http_bad_8_get_http_1_1_r_ncontent_length_x_r_n", () {
 			<<"GET / HTTP/1.1\r\nContent-Length: x\r\n\r\n":utf8>>,
 		) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -584,7 +584,7 @@ test("http_bad_9_get_http_1_1_r_ncontent_length_0_r_n", () {
 			>>,
 		) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -595,7 +595,7 @@ test("http_bad_10_get_http_1_1_r_ntransfer_encoding_gz", () {
 			<<"GET / HTTP/1.1\r\nTransfer-Encoding: gzip\r\n\r\n":utf8>>,
 		) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -608,7 +608,7 @@ test("http_bad_11_get_http_1_1_r_ntransfer_encoding_ch", () {
 			>>,
 		) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 
@@ -621,7 +621,7 @@ test("http_bad_12_get_http_1_1_r_ntransfer_encoding_ch", () {
 			>>,
 		) |>
 			(http.Invalid(_)) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 

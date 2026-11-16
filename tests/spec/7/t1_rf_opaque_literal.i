@@ -5,6 +5,6 @@ strict = (x : Box("a")) -> Int {
 	Box(value = value : "a") = x
 	1
 }
-f = (b : Box(String)) { b |> (x : Box("a")) { strict(x) } | (_) { 0 } }
+f = (b : Box(String)) { b |> (x : Box("a")) { strict(x) } & (_) { 0 } }
 
 main = () { f(Box(value = "b")) }

@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -193,7 +193,7 @@ test("strings", () {
 				"65",
 			)
 		}
-		| (_) { panic("no") }
+		& (_) { panic("no") }
 	check(
 		show(core.int_to_codepoint(233)),
 		"Ok(//utfcodepoint(é))",
@@ -274,7 +274,7 @@ test("as_values", () {
 				"False",
 			)
 		}
-		| (_) { panic("no") }
+		& (_) { panic("no") }
 	apply = (f, x) { f(x) }
 	check(apply(core.inspect, 1), "1")
 	check(

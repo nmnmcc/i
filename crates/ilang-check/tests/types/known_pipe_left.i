@@ -7,7 +7,7 @@ User = (name = String, age = Int)
 apply = <A>(f : (User) -> A, x : User) -> A { f(x) }
 
 map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
-	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] }
+	xs |> ([]) { [] } & ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 
 flip = <A, B>(f : (A) -> B, xs : List(A)) -> List(B) { map(xs, f) }

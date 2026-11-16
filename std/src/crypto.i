@@ -52,7 +52,7 @@ rotate = (x : Int, n : Int, width : Int) -> Int {
 nth = (xs : List(Int), n : Int) -> Int {
 	list.at(xs, n) |>
 		(Some(x)) { x }
-		| (None) { panic("crypto: schedule index") }
+		& (None) { panic("crypto: schedule index") }
 }
 
 Words = (Int, Int, Int, Int, Int, Int, Int, Int)
@@ -179,13 +179,13 @@ sha256 = (input : BitArray) -> BitArray {
 blocks32 = (input : BitArray, state : Words) -> Words {
 	input |>
 		(<<>>) { state }
-		| (<<block:bits(512), tail:bits>>) {
+		& (<<block:bits(512), tail:bits>>) {
 			blocks32(
 				tail,
 				add_words(state, rounds32(block, constants32, [], state), 32),
 			)
 		}
-		| (_) { panic("crypto: padded block size") }
+		& (_) { panic("crypto: padded block size") }
 }
 
 rounds32 = (
@@ -196,10 +196,10 @@ rounds32 = (
 ) -> Words {
 	constants |>
 		([]) { state }
-		| ([k, ..ks]) {
+		& ([k, ..ks]) {
 			(v, tail) = block |>
 				(<<v:u(32), tail:bits>>) { (v, tail) }
-				| (<<>>) {
+				& (<<>>) {
 					x = nth(schedule, 14)
 					y = nth(schedule, 1)
 					s0 = xor3(
@@ -220,7 +220,7 @@ rounds32 = (
 						<<>>,
 					)
 				}
-				| (_) { panic("crypto: word size") }
+				& (_) { panic("crypto: word size") }
 			Words(a, b, c, d, e, f, g, h) = state
 			ch = core.bit_xor(
 				core.bit_and(e, f),
@@ -356,13 +356,13 @@ sha512 = (input : BitArray) -> BitArray {
 blocks64 = (input : BitArray, state : Words) -> Words {
 	input |>
 		(<<>>) { state }
-		| (<<block:bits(1024), tail:bits>>) {
+		& (<<block:bits(1024), tail:bits>>) {
 			blocks64(
 				tail,
 				add_words(state, rounds64(block, constants64, [], state), 64),
 			)
 		}
-		| (_) { panic("crypto: padded block size") }
+		& (_) { panic("crypto: padded block size") }
 }
 
 rounds64 = (
@@ -373,10 +373,10 @@ rounds64 = (
 ) -> Words {
 	constants |>
 		([]) { state }
-		| ([k, ..ks]) {
+		& ([k, ..ks]) {
 			(v, tail) = block |>
 				(<<v:u(64), tail:bits>>) { (v, tail) }
-				| (<<>>) {
+				& (<<>>) {
 					x = nth(schedule, 14)
 					y = nth(schedule, 1)
 					s0 = xor3(
@@ -397,7 +397,7 @@ rounds64 = (
 						<<>>,
 					)
 				}
-				| (_) { panic("crypto: word size") }
+				& (_) { panic("crypto: word size") }
 			Words(a, b, c, d, e, f, g, h) = state
 			ch = core.bit_xor(
 				core.bit_and(e, f),
@@ -435,7 +435,7 @@ key_pad = (
 ) -> BitArray {
 	k = { bit_array.byte_size(key) > block } |>
 		(True) { hash(key) }
-		| (False) { key }
+		& (False) { key }
 	<<k:bytes, 0:u({ block - bit_array.byte_size(k) } * 8)>>
 }
 
@@ -443,10 +443,10 @@ xor_byte = (bytes : BitArray, mask : Int) -> BitArray {
 	go = (xs, acc) {
 		xs |>
 			(<<>>) { bit_array.concat(list.reverse(acc)) }
-			| (<<x, rest:bytes>>) {
+			& (<<x, rest:bytes>>) {
 				go(rest, [<<{ core.bit_xor(x, mask) }>>, ..acc])
 			}
-			| (_) { panic("crypto: padded key alignment") }
+			& (_) { panic("crypto: padded key alignment") }
 	}
 	go(bytes, [])
 }
@@ -473,7 +473,7 @@ hmac = (
 ) -> Result(BitArray, CryptoError) {
 	aligned([key, input]) |>
 		(False) { Error(UnalignedInput) }
-		| (True) { Ok(authenticate(prepare(key, block, hash), input)) }
+		& (True) { Ok(authenticate(prepare(key, block, hash), input)) }
 }
 
 _hmac_sha256_result = (key : BitArray, input : BitArray) -> Result(
@@ -506,22 +506,22 @@ expand = (
 ) -> Result(BitArray, CryptoError) {
 	{ length < 0 || length > 255 * size || bit_array.byte_size(prk) < size } |>
 		(True) { Error(InvalidLength) }
-		| (False) {
+		& (False) {
 			aligned([prk, info]) |>
 				(False) { Error(UnalignedInput) }
-				| (True) {
+				& (True) {
 					mac = prepare(prk, block, hash)
 					go = (left, counter, previous, acc) {
 						{ left <= 0 } |>
 							(True) { bit_array.concat(list.reverse(acc)) }
-							| (False) {
+							& (False) {
 								t = authenticate(
 									mac,
 									<<previous:bytes, info:bytes, counter>>,
 								)
 								n = { left < size } |>
 									(True) { left }
-									| (False) { size }
+									& (False) { size }
 								go(
 									left - n,
 									counter + 1,
@@ -557,7 +557,7 @@ _hkdf_sha256_result = (
 ) -> Result(BitArray, CryptoError) {
 	_hkdf_extract_sha256_result(salt, input) |>
 		(Error(e)) { Error(e) }
-		| (Ok(prk)) { _hkdf_expand_sha256_result(prk, info, length) }
+		& (Ok(prk)) { _hkdf_expand_sha256_result(prk, info, length) }
 }
 
 _hkdf_sha512_result = (
@@ -568,14 +568,14 @@ _hkdf_sha512_result = (
 ) -> Result(BitArray, CryptoError) {
 	_hkdf_extract_sha512_result(salt, input) |>
 		(Error(e)) { Error(e) }
-		| (Ok(prk)) { _hkdf_expand_sha512_result(prk, info, length) }
+		& (Ok(prk)) { _hkdf_expand_sha512_result(prk, info, length) }
 }
 
 xor_bits = (a : BitArray, b : BitArray) -> BitArray {
 	n = core.bit_size(a)
 	(a, b) |>
 		((<<x:u(n)>>, <<y:u(n)>>)) { <<{ core.bit_xor(x, y) }:u(n)>> }
-		| (_) { panic("crypto: equal digest lengths") }
+		& (_) { panic("crypto: equal digest lengths") }
 }
 
 _pbkdf2_sha256_result = (
@@ -586,18 +586,18 @@ _pbkdf2_sha256_result = (
 ) -> Result(BitArray, CryptoError) {
 	{ iterations <= 0 } |>
 		(True) { Error(InvalidIterations) }
-		| (False) {
+		& (False) {
 			{ length < 0 || length > 0xffff_ffff * 32 } |>
 				(True) { Error(InvalidLength) }
-				| (False) {
+				& (False) {
 					aligned([password, salt]) |>
 						(False) { Error(UnalignedInput) }
-						| (True) {
+						& (True) {
 							mac = prepare(password, 64, sha256)
 							iterate = (n, previous, acc) {
 								{ n == 0 } |>
 									(True) { acc }
-									| (False) {
+									& (False) {
 										next = authenticate(mac, previous)
 										iterate(
 											n - 1,
@@ -611,7 +611,7 @@ _pbkdf2_sha256_result = (
 									(True) {
 										bit_array.concat(list.reverse(acc))
 									}
-									| (False) {
+									& (False) {
 										first = authenticate(
 											mac,
 											<<salt:bytes, index:u(32)>>,
@@ -623,7 +623,7 @@ _pbkdf2_sha256_result = (
 										)
 										n = { left < 32 } |>
 											(True) { left }
-											| (False) { 32 }
+											& (False) { 32 }
 										go(
 											left - n,
 											index + 1,
@@ -642,24 +642,24 @@ _pbkdf2_sha256_result = (
 constant_time_equal = (a : BitArray, b : BitArray) -> Bool {
 	{ core.bit_size(a) != core.bit_size(b) } |>
 		(True) { False }
-		| (False) {
+		& (False) {
 			go = (x, y, diff) {
 				(x, y) |>
 					((<<>>, <<>>)) { diff == 0 }
-					| ((<<u, xs:bits>>, <<v, ys:bits>>)) {
+					& ((<<u, xs:bits>>, <<v, ys:bits>>)) {
 						go(
 							xs,
 							ys,
 							core.bit_or(diff, core.bit_xor(u, v)),
 						)
 					}
-					| (_) {
+					& (_) {
 						n = core.bit_size(x)
 						(x, y) |>
 							((<<u:u(n)>>, <<v:u(n)>>)) {
 								core.bit_or(diff, core.bit_xor(u, v)) == 0
 							}
-							| (_) { panic("crypto: equality length invariant") }
+							& (_) { panic("crypto: equality length invariant") }
 					}
 			}
 			go(a, b, 0)
@@ -669,7 +669,7 @@ constant_time_equal = (a : BitArray, b : BitArray) -> Bool {
 _random_bytes_result = (length : Int) -> Result(BitArray, CryptoError) {
 	{ length < 0 } |>
 		(True) { Error(InvalidLength) }
-		| (False) { Ok(process.entropy(length)) }
+		& (False) { Ok(process.entropy(length)) }
 }
 
 /// RFC 4231 HMAC-SHA-256: `hmac_sha256(<<1>>, <<2>>)`.

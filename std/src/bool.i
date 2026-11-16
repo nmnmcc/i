@@ -46,18 +46,18 @@ exclusive_nor = (a : Bool, b : Bool) -> Bool { a == b }
 
 /// `"True"` or `"False"`.
 to_string = (bool : Bool) -> String {
-	bool |> (True) { "True" } | (False) { "False" }
+	bool |> (True) { "True" } & (False) { "False" }
 }
 
 /// `1` for `True` and `0` for `False`.
-to_int = (bool : Bool) -> Int { bool |> (True) { 1 } | (False) { 0 } }
+to_int = (bool : Bool) -> Int { bool |> (True) { 1 } & (False) { 0 } }
 
 /// Compares two bools, with `False < True`.
 compare = (a : Bool, with : Bool) -> Order {
 	(a, with) |>
 		((True, False)) { Greater }
-		| ((False, True)) { Less }
-		| (_) { Equal }
+		& ((False, True)) { Less }
+		& (_) { Equal }
 }
 
 /// Gives `return` when `when` is `True`, and the value of `otherwise()`
@@ -67,7 +67,7 @@ compare = (a : Bool, with : Bool) -> Order {
 /// bool.guard(n < 0, "negative", () { "positive" })
 /// ```
 guard = <A, N>(when : Bool, return : A, otherwise : () <- N -> A) -> A {
-	when |> (True) { return } | (False) { otherwise() }
+	when |> (True) { return } & (False) { otherwise() }
 }
 
 /// Like `guard`, but the value for `True` is made by a function too.
@@ -75,4 +75,4 @@ lazy_guard = <A, N>(
 	when : Bool,
 	return : () <- N -> A,
 	otherwise : () <- N -> A
-) -> A { when |> (True) { return() } | (False) { otherwise() } }
+) -> A { when |> (True) { return() } & (False) { otherwise() } }

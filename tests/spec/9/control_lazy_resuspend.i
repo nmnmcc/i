@@ -10,7 +10,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -33,14 +33,14 @@ gen = (log, b, n) {
 			c = control.suspend(b, (k) { More(a, k) })
 			a <> c
 		}
-		| (3) {
+		& (3) {
 			x = resource.ensure(
 				() { gen(log, b, n - 1) },
 				() { note(log, "final") },
 			)
 			show(n) <> x
 		}
-		| (_) {
+		& (_) {
 			x = gen(log, b, n - 1)
 			show(n) <> x
 		}
@@ -50,7 +50,7 @@ gen = (log, b, n) {
 drive = (step, acc) {
 	step |>
 		(Done(s)) { acc <> "|" <> s }
-		| (More(v, k)) { drive(control.resume(k, v <> "!"), acc <> v) }
+		& (More(v, k)) { drive(control.resume(k, v <> "!"), acc <> v) }
 }
 
 // Resume, suspend, resume: every frame runs once, and the final function

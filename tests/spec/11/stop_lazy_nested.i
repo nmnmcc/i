@@ -58,7 +58,7 @@ resume = (p) {
 			x = control.resume(k, Nil)
 			x
 		}
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 }
 
 // A stop inside a resume inside a resumed computation shows the frames

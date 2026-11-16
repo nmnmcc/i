@@ -81,9 +81,9 @@ compare = (a : Int, b : Int) -> Int {
 	sa = sign(a)
 	sb = sign(b)
 	{ sa == sb } |>
-		(False) { { sa < sb } |> (True) { -1 } | (False) { 1 } }
-		| (True) {
-			{ sa == 0 } |> (True) { 0 } | (False) { sa * magnitude_order(a, b) }
+		(False) { { sa < sb } |> (True) { -1 } & (False) { 1 } }
+		& (True) {
+			{ sa == 0 } |> (True) { 0 } & (False) { sa * magnitude_order(a, b) }
 		}
 }
 
@@ -93,36 +93,36 @@ magnitude_order = (a : Int, b : Int) -> Int {
 	nb = size(b)
 	{ na == nb } |>
 		(True) { order_from(a, b, na - 1) }
-		| (False) { { na < nb } |> (True) { -1 } | (False) { 1 } }
+		& (False) { { na < nb } |> (True) { -1 } & (False) { 1 } }
 }
 
 order_from = (a : Int, b : Int, i : Int) -> Int {
 	{ i < 0 } |>
 		(True) { 0 }
-		| (False) {
+		& (False) {
 			x0 = limb(a, i)
 			y0 = limb(b, i)
 			{ x0 == y0 } |>
 				(False) { digit_order(x0, y0) }
-				| (True) {
+				& (True) {
 					{ i < 3 } |>
 						(True) { order_from(a, b, i - 1) }
-						| (False) {
+						& (False) {
 							x1 = limb(a, i - 1)
 							y1 = limb(b, i - 1)
 							{ x1 == y1 } |>
 								(False) { digit_order(x1, y1) }
-								| (True) {
+								& (True) {
 									x2 = limb(a, i - 2)
 									y2 = limb(b, i - 2)
 									{ x2 == y2 } |>
 										(False) { digit_order(x2, y2) }
-										| (True) {
+										& (True) {
 											x3 = limb(a, i - 3)
 											y3 = limb(b, i - 3)
 											{ x3 == y3 } |>
 												(False) { digit_order(x3, y3) }
-												| (True) {
+												& (True) {
 													order_from(a, b, i - 4)
 												}
 										}
@@ -133,7 +133,7 @@ order_from = (a : Int, b : Int, i : Int) -> Int {
 }
 
 digit_order = (a : Int, b : Int) -> Int {
-	{ a < b } |> (True) { -1 } | (False) { 1 }
+	{ a < b } |> (True) { -1 } & (False) { 1 }
 }
 
 /// `a + b`.
@@ -146,10 +146,10 @@ subtract = (a : Int, b : Int) -> Int { signed_add(a, sign(a), b, -sign(b)) }
 signed_add = (a : Int, sa : Int, b : Int, sb : Int) -> Int {
 	{ sb == 0 } |>
 		(True) { a }
-		| (False) {
+		& (False) {
 			{ sa == 0 } |>
-				(True) { { sb == sign(b) } |> (True) { b } | (False) { -b } }
-				| (False) {
+				(True) { { sb == sign(b) } |> (True) { b } & (False) { -b } }
+				& (False) {
 					{ sa == sb } |>
 						(True) {
 							n = max(size(a), size(b))
@@ -158,10 +158,10 @@ signed_add = (a : Int, sa : Int, b : Int, sb : Int) -> Int {
 								add_up(a, b, 0, n, 0, builder(n + 1)),
 							)
 						}
-						| (False) {
+						& (False) {
 							magnitude_order(a, b) |>
 								(0) { 0 }
-								| (1) {
+								& (1) {
 									finish(
 										sa,
 										subtract_up(
@@ -174,7 +174,7 @@ signed_add = (a : Int, sa : Int, b : Int, sb : Int) -> Int {
 										),
 									)
 								}
-								| (_) {
+								& (_) {
 									finish(
 										sb,
 										subtract_up(
@@ -203,13 +203,13 @@ add_up = (
 ) -> Digits {
 	{ i == n } |>
 		(True) { put(out, i, carry) }
-		| (False) {
+		& (False) {
 			x = limb(a, i)
 			y = limb(b, i)
 			limit = 1073741824 - y - carry
 			{ x >= limit } |>
 				(True) { add_up(a, b, i + 1, n, 1, put(out, i, x - limit)) }
-				| (False) {
+				& (False) {
 					add_up(a, b, i + 1, n, 0, put(out, i, x + y + carry))
 				}
 		}
@@ -226,7 +226,7 @@ subtract_up = (
 ) -> Digits {
 	{ i == n } |>
 		(True) { out }
-		| (False) {
+		& (False) {
 			difference = limb(a, i) - limb(b, i) - borrow
 			{ difference < 0 } |>
 				(True) {
@@ -239,7 +239,7 @@ subtract_up = (
 						put(out, i, difference + 1073741824),
 					)
 				}
-				| (False) {
+				& (False) {
 					subtract_up(a, b, i + 1, n, 0, put(out, i, difference))
 				}
 		}
@@ -250,22 +250,22 @@ multiply = (a : Int, b : Int) -> Int {
 	s = sign(a) * sign(b)
 	{ s == 0 } |>
 		(True) { 0 }
-		| (False) {
+		& (False) {
 			na = size(a)
 			nb = size(b)
 			{ na == 1 || nb == 1 } |>
 				(True) {
 					(x, d, n) = { na == 1 } |>
 						(True) { (b, limb(a, 0), nb) }
-						| (False) { (a, limb(b, 0), na) }
+						& (False) { (a, limb(b, 0), na) }
 					finish(
 						s,
 						scale_up(x, d, 0, n, 0, builder(n + 1)),
 					)
 				}
-				| (False) {
+				& (False) {
 					p = multiply_range(a, 0, na, b, 0, nb)
-					{ s < 0 } |> (True) { -p } | (False) { p }
+					{ s < 0 } |> (True) { -p } & (False) { p }
 				}
 		}
 }
@@ -283,7 +283,7 @@ multiply_range = (
 ) -> Int {
 	{ na == 0 || nb == 0 } |>
 		(True) { 0 }
-		| (False) {
+		& (False) {
 			{ min(na, nb) <= 16 || max(na, nb) > 2 * min(na, nb) } |>
 				(True) {
 					finish(
@@ -291,7 +291,7 @@ multiply_range = (
 						columns(a, ao, b, bo, na, nb, 0, 0, builder(na + nb)),
 					)
 				}
-				| (False) {
+				& (False) {
 					k = max(na, nb) / 2
 					low = multiply_range(a, ao, k, b, bo, k)
 					high = multiply_range(a, ao + k, na - k, b, bo + k, nb - k)
@@ -351,11 +351,11 @@ sum_halves = (
 ) -> Digits {
 	{ i == end } |>
 		(True) { put(out, i, carry) }
-		| (False) {
-			a = { i < k } |> (True) { limb(x, offset + i) } | (False) { 0 }
+		& (False) {
+			a = { i < k } |> (True) { limb(x, offset + i) } & (False) { 0 }
 			b = { i < n - k } |>
 				(True) { limb(x, offset + k + i) }
-				| (False) { 0 }
+				& (False) { 0 }
 			limit = 1073741824 - b - carry
 			{ a >= limit } |>
 				(True) {
@@ -370,7 +370,7 @@ sum_halves = (
 						put(out, i, a - limit),
 					)
 				}
-				| (False) {
+				& (False) {
 					sum_halves(
 						x,
 						offset,
@@ -398,11 +398,11 @@ combine = (
 ) -> Digits {
 	{ i == n } |>
 		(True) { out }
-		| (False) {
-			m = { i >= k } |> (True) { limb(middle, i - k) } | (False) { 0 }
+		& (False) {
+			m = { i >= k } |> (True) { limb(middle, i - k) } & (False) { 0 }
 			h = { i >= 2 * k } |>
 				(True) { limb(high, i - 2 * k) }
-				| (False) { 0 }
+				& (False) { 0 }
 			total = limb(low, i) + m + h + carry
 			combine(
 				low,
@@ -428,7 +428,7 @@ scale_up = (
 ) -> Digits {
 	{ i == n } |>
 		(True) { put(out, i, carry) }
-		| (False) {
+		& (False) {
 			digit = limb(x, i)
 			low = multiply_low(digit, d, carry)
 			high = multiply_high(digit, d, carry)
@@ -451,7 +451,7 @@ columns = (
 ) -> Digits {
 	{ k == na + nb - 1 } |>
 		(True) { put(out, k, carry) }
-		| (False) {
+		& (False) {
 			first = max(0, k - nb + 1)
 			(low, high, extra) = column(
 				a,
@@ -493,7 +493,7 @@ column = (
 ) -> (Int, Int, Int) {
 	{ i > last } |>
 		(True) { (low, high, extra) }
-		| (False) {
+		& (False) {
 			x = limb(a, ao + i)
 			y = limb(b, bo + k - i)
 			next = multiply_low(x, y, low)
@@ -502,7 +502,7 @@ column = (
 				(True) {
 					column(a, ao, b, bo, i + 1, last, k, next, high, extra)
 				}
-				| (False) {
+				& (False) {
 					limit = 1073741824 - carry
 					{ high >= limit } |>
 						(True) {
@@ -519,7 +519,7 @@ column = (
 								extra + 1,
 							)
 						}
-						| (False) {
+						& (False) {
 							column(
 								a,
 								ao,
@@ -537,18 +537,18 @@ column = (
 		}
 }
 
-max = (a : Int, b : Int) -> Int { { a > b } |> (True) { a } | (False) { b } }
+max = (a : Int, b : Int) -> Int { { a > b } |> (True) { a } & (False) { b } }
 
-min = (a : Int, b : Int) -> Int { { a < b } |> (True) { a } | (False) { b } }
+min = (a : Int, b : Int) -> Int { { a < b } |> (True) { a } & (False) { b } }
 
 /// `a / b`, rounded toward zero; 0 when `b` is 0.
 divide = (a : Int, b : Int) -> Int {
 	s = sign(a) * sign(b)
 	{ s == 0 } |>
 		(True) { 0 }
-		| (False) {
+		& (False) {
 			(q, _) = magnitude_divide(a, b)
-			{ s < 0 } |> (True) { -q } | (False) { q }
+			{ s < 0 } |> (True) { -q } & (False) { q }
 		}
 }
 
@@ -557,9 +557,9 @@ remainder = (a : Int, b : Int) -> Int {
 	sa = sign(a)
 	{ sa * sign(b) == 0 } |>
 		(True) { 0 }
-		| (False) {
+		& (False) {
 			(_, r) = magnitude_divide(a, b)
-			{ sa < 0 } |> (True) { -r } | (False) { r }
+			{ sa < 0 } |> (True) { -r } & (False) { r }
 		}
 }
 
@@ -569,12 +569,12 @@ to_text = (value : Int, radix : Int) -> String {
 	s = sign(value)
 	{ s == 0 } |>
 		(True) { "0" }
-		| (False) {
+		& (False) {
 			(chunk, width) = chunk_of(radix, radix, 1)
 			pieces = text_chunks(digits(value), chunk, radix, width, [])
 			{ s < 0 } |>
 				(True) { core.concat(["-", ..pieces]) }
-				| (False) { core.concat(pieces) }
+				& (False) { core.concat(pieces) }
 		}
 }
 
@@ -584,8 +584,8 @@ to_text = (value : Int, radix : Int) -> String {
 // both numbers directly by offset, with no operand lists.
 magnitude_divide = (a : Int, b : Int) -> (Int, Int) {
 	{ magnitude_order(a, b) < 0 } |>
-		(True) { (0, { sign(a) < 0 } |> (True) { -a } | (False) { a }) }
-		| (False) {
+		(True) { (0, { sign(a) < 0 } |> (True) { -a } & (False) { a }) }
+		& (False) {
 			m = size(b)
 			{ m == 1 } |>
 				(True) {
@@ -597,7 +597,7 @@ magnitude_divide = (a : Int, b : Int) -> (Int, Int) {
 						builder(size(a)),
 					)
 				}
-				| (False) {
+				& (False) {
 					factor = power_of_two(
 						normal_shift(limb(b, m - 1), 0),
 						1,
@@ -626,7 +626,7 @@ magnitude_divide = (a : Int, b : Int) -> (Int, Int) {
 					)
 					{ factor == 1 } |>
 						(True) { (q, r) }
-						| (False) {
+						& (False) {
 							(rest, _) = short_divide_number(
 								r,
 								factor,
@@ -643,7 +643,7 @@ magnitude_divide = (a : Int, b : Int) -> (Int, Int) {
 normalized = (x : Int, factor : Int) -> Int {
 	{ factor == 1 } |>
 		(True) { x }
-		| (False) {
+		& (False) {
 			finish(
 				1,
 				scale_up(
@@ -668,7 +668,7 @@ initial_remainder = (
 ) -> Digits {
 	{ i == n } |>
 		(True) { out }
-		| (False) {
+		& (False) {
 			initial_remainder(
 				x,
 				offset,
@@ -685,7 +685,7 @@ short_divide_number = (x : Int, d : Int, i : Int, r : Int, out : Digits) -> (
 ) {
 	{ i < 0 } |>
 		(True) { (finish(1, out), r) }
-		| (False) {
+		& (False) {
 			(q, next) = divide_digit(r, limb(x, i), d)
 			short_divide_number(x, d, i - 1, next, put(out, i, q))
 		}
@@ -704,7 +704,7 @@ long_divide = (
 ) -> (Int, Int) {
 	{ i < 0 } |>
 		(True) { (finish(1, q), r) }
-		| (False) {
+		& (False) {
 			a = limb(x, i)
 			(estimate, _) = divide_digit(limb(r, m - 1), limb(r, m - 2), top)
 			reduced = finish(
@@ -731,11 +731,11 @@ reduce_digit = (
 ) -> Digits {
 	{ i == n } |>
 		(True) { out }
-		| (False) {
+		& (False) {
 			digit = limb(y, i)
 			low = multiply_low(digit, d, carry)
 			high = multiply_high(digit, d, carry)
-			x = { i == 0 } |> (True) { a } | (False) { limb(r, i - 1) }
+			x = { i == 0 } |> (True) { a } & (False) { limb(r, i - 1) }
 			difference = x - low - borrow
 			{ difference < 0 } |>
 				(True) {
@@ -751,7 +751,7 @@ reduce_digit = (
 						put(out, i, difference + 1073741824),
 					)
 				}
-				| (False) {
+				& (False) {
 					reduce_digit(
 						r,
 						a,
@@ -786,17 +786,17 @@ correct = (r : Int, y : Int, digit : Int) -> (Int, Int) {
 				digit + 1,
 			)
 		}
-		| (False) { (digit, r) }
+		& (False) { (digit, r) }
 }
 
 normal_shift = (top : Int, s : Int) -> Int {
 	{ top >= 536870912 } |>
 		(True) { s }
-		| (False) { normal_shift(top * 2, s + 1) }
+		& (False) { normal_shift(top * 2, s + 1) }
 }
 
 power_of_two = (s : Int, acc : Int) -> Int {
-	{ s == 0 } |> (True) { acc } | (False) { power_of_two(s - 1, acc * 2) }
+	{ s == 0 } |> (True) { acc } & (False) { power_of_two(s - 1, acc * 2) }
 }
 
 // Division by one digit, from the most significant digit `top`; the
@@ -807,7 +807,7 @@ short_divide = (top : List(Int), d : Int, r : Int, acc : List(Int)) -> (
 ) {
 	top |>
 		([]) { (trim(acc), r) }
-		| ([a, ..rest]) {
+		& ([a, ..rest]) {
 			(q, next) = divide_digit(r, a, d)
 			short_divide(rest, d, next, [q, ..acc])
 		}
@@ -815,7 +815,7 @@ short_divide = (top : List(Int), d : Int, r : Int, acc : List(Int)) -> (
 
 // Text conversion alone uses lists of digits.
 reverse = (x : List(Int), acc : List(Int)) -> List(Int) {
-	x |> ([]) { acc } | ([d, ..ds]) { reverse(ds, [d, ..acc]) }
+	x |> ([]) { acc } & ([d, ..ds]) { reverse(ds, [d, ..acc]) }
 }
 
 trim = (x : List(Int)) -> List(Int) {
@@ -826,7 +826,7 @@ trim = (x : List(Int)) -> List(Int) {
 }
 
 drop_zeros = (x : List(Int)) -> List(Int) {
-	x |> ([0, ..rest]) { drop_zeros(rest) } | (_) { x }
+	x |> ([0, ..rest]) { drop_zeros(rest) } & (_) { x }
 }
 
 // ---- Text ----
@@ -836,7 +836,7 @@ chunk_of = (radix : Int, chunk : Int, width : Int) -> (Int, Int) {
 	next = chunk * radix
 	{ next >= 1073741824 } |>
 		(True) { (chunk, width) }
-		| (False) { chunk_of(radix, next, width + 1) }
+		& (False) { chunk_of(radix, next, width + 1) }
 }
 
 // Divides by `chunk` until nothing is left; each remainder is `width`
@@ -851,7 +851,7 @@ text_chunks = (
 	(q, r) = short_divide(reverse(x, []), chunk, 0, [])
 	{ q == [] } |>
 		(True) { chunk_text(r, radix, 0, False, acc) }
-		| (False) {
+		& (False) {
 			text_chunks(
 				q,
 				chunk,
@@ -875,45 +875,45 @@ chunk_text = (
 	rest = v / radix
 	{ rest == 0 && { core.not(padded) || width <= 1 } } |>
 		(True) { next }
-		| (False) { chunk_text(rest, radix, width - 1, padded, next) }
+		& (False) { chunk_text(rest, radix, width - 1, padded, next) }
 }
 
 digit_text = (d : Int) -> String {
 	d |>
 		(0) { "0" }
-		| (1) { "1" }
-		| (2) { "2" }
-		| (3) { "3" }
-		| (4) { "4" }
-		| (5) { "5" }
-		| (6) { "6" }
-		| (7) { "7" }
-		| (8) { "8" }
-		| (9) { "9" }
-		| (10) { "A" }
-		| (11) { "B" }
-		| (12) { "C" }
-		| (13) { "D" }
-		| (14) { "E" }
-		| (15) { "F" }
-		| (16) { "G" }
-		| (17) { "H" }
-		| (18) { "I" }
-		| (19) { "J" }
-		| (20) { "K" }
-		| (21) { "L" }
-		| (22) { "M" }
-		| (23) { "N" }
-		| (24) { "O" }
-		| (25) { "P" }
-		| (26) { "Q" }
-		| (27) { "R" }
-		| (28) { "S" }
-		| (29) { "T" }
-		| (30) { "U" }
-		| (31) { "V" }
-		| (32) { "W" }
-		| (33) { "X" }
-		| (34) { "Y" }
-		| (_) { "Z" }
+		& (1) { "1" }
+		& (2) { "2" }
+		& (3) { "3" }
+		& (4) { "4" }
+		& (5) { "5" }
+		& (6) { "6" }
+		& (7) { "7" }
+		& (8) { "8" }
+		& (9) { "9" }
+		& (10) { "A" }
+		& (11) { "B" }
+		& (12) { "C" }
+		& (13) { "D" }
+		& (14) { "E" }
+		& (15) { "F" }
+		& (16) { "G" }
+		& (17) { "H" }
+		& (18) { "I" }
+		& (19) { "J" }
+		& (20) { "K" }
+		& (21) { "L" }
+		& (22) { "M" }
+		& (23) { "N" }
+		& (24) { "O" }
+		& (25) { "P" }
+		& (26) { "Q" }
+		& (27) { "R" }
+		& (28) { "S" }
+		& (29) { "T" }
+		& (30) { "U" }
+		& (31) { "V" }
+		& (32) { "W" }
+		& (33) { "X" }
+		& (34) { "Y" }
+		& (_) { "Z" }
 }

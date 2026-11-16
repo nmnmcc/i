@@ -56,14 +56,14 @@ identity = (cert : BitArray, key : BitArray) -> (
 join = (items : List(String)) -> String {
 	items |>
 		([]) { "" }
-		| ([one]) { one }
-		| ([first, ..rest]) { core.concat([first, "\u{0}", join(rest)]) }
+		& ([one]) { one }
+		& ([first, ..rest]) { core.concat([first, "\u{0}", join(rest)]) }
 }
 
 slice = (text, start, len) {
 	core.byte_slice(text, start, len) |>
 		(Ok(v)) { v }
-		| (Error(_)) { panic("tls: invalid error") }
+		& (Error(_)) { panic("tls: invalid error") }
 }
 
 raise = (message) {
@@ -80,7 +80,7 @@ raise = (message) {
 				),
 			)
 		}
-		| (Error(_)) { panic("tls: invalid error") }
+		& (Error(_)) { panic("tls: invalid error") }
 }
 
 finish = (r : Request(Result(Int, String))) <- (raw : Tls) {
@@ -88,14 +88,14 @@ finish = (r : Request(Result(Int, String))) <- (raw : Tls) {
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(message)) { raise(message) }
+				& (Error(message)) { raise(message) }
 		},
 		() {
 			request.state(r) |>
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -149,25 +149,25 @@ dial = (host, port, opts) { connect(net.connect(host, port), host, opts) }
 alpn = (Stream(n)) <- (raw : Tls) {
 	request.await_owned(raw.alpn(n)) |>
 		(Ok(value)) { value }
-		| (Error(message)) { raise(message) }
+		& (Error(message)) { raise(message) }
 }
 
 read = (Stream(n), max) <- (raw : Tls) {
 	request.await_owned(raw.read(n, max)) |>
 		(Ok(value)) { value }
-		| (Error(message)) { raise(message) }
+		& (Error(message)) { raise(message) }
 }
 
 write = (Stream(n), bytes) <- (raw : Tls) {
 	request.await_owned(raw.write(n, bytes)) |>
 		(Ok(value)) { value }
-		| (Error(message)) { raise(message) }
+		& (Error(message)) { raise(message) }
 }
 
 shutdown_write = (Stream(n)) <- (raw : Tls) {
 	request.await_owned(raw.shutdown_write(n)) |>
 		(Ok(value)) { value }
-		| (Error(message)) { raise(message) }
+		& (Error(message)) { raise(message) }
 }
 
 close = (Stream(n)) <- (raw : Tls) { request.await_owned(raw.close(n)) }

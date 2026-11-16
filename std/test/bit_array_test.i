@@ -195,7 +195,7 @@ test("concat_slices_test", () {
 			)
 			Nil
 		}
-		| (_) { panic("no match") }
+		& (_) { panic("no match") }
 })
 
 test("concat_long_list_test", () {

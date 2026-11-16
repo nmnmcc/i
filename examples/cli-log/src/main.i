@@ -26,7 +26,7 @@ greet = (name, count) {
 			stdio.print("hello " <> name)
 			greet(name, count - 1)
 		}
-		| (False) { Nil }
+		& (False) { Nil }
 }
 
 main = () {

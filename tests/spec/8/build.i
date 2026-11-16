@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -68,7 +68,7 @@ test("strings", () {
 			check(show(<<c:utf16le_codepoint>>), "<<233, 0>>")
 			check(show(<<c:utf32be_codepoint>>), "<<0, 0, 0, 233>>")
 		}
-		| (_) { panic("no") }
+		& (_) { panic("no") }
 })
 
 test("order", () {

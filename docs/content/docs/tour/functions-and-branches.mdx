@@ -98,7 +98,7 @@ The final statement must be an expression; braces also group expressions, while 
 )
 
 size = (n : Int) {
-	n |> (0 | 1) { "small" } | (x ? x < 0) { "negative" } | (_) { "large" }
+	n |> (0 | 1) { "small" } & (x ? x < 0) { "negative" } & (_) { "large" }
 }
 
 main = () {
@@ -125,7 +125,7 @@ Guards do not prove coverage; `_` covers the remaining inputs, and alternative p
 )
 
 kind = (value : { Int | String }) {
-	value |> (n : Int) { core.inspect(n) } | (s : String) { s }
+	value |> (n : Int) { core.inspect(n) } & (s : String) { s }
 }
 
 main = () {
@@ -149,7 +149,7 @@ In a chain, the annotations test union members; a single ordinary parameter anno
 )
 
 main = () {
-	{ 2 < 3 } |> (True) { stdio.print("yes") } | (False) { stdio.print("no") }
+	{ 2 < 3 } |> (True) { stdio.print("yes") } & (False) { stdio.print("no") }
 }
 ```
 
@@ -211,7 +211,7 @@ A keyed data pattern matches each labelled part by its key. This pattern binds `
 Item = (value = Int)
 Empty = ()
 unpack = (value : { Item | Empty }) {
-	value |> (Item(value = n)) { n } | (Empty) { 0 }
+	value |> (Item(value = n)) { n } & (Empty) { 0 }
 }
 
 main = () {
@@ -236,7 +236,7 @@ Labelled constructor fields need labels in their patterns.
 )
 
 list_parts = (xs : List(Int)) {
-	xs |> ([]) { (0, []) } | ([x]) { (x, []) } | ([x, ..rest]) { (x, rest) }
+	xs |> ([]) { (0, []) } & ([x]) { (x, []) } & ([x, ..rest]) { (x, rest) }
 }
 
 main = () {
@@ -260,9 +260,9 @@ Rest patterns for data (`..rest` inside `( )`) are not available yet; list rests
 	i/stdio
 )
 
-prefix = (s : String) { s |> ("pre:" <> rest) { rest } | (_) { "no prefix" } }
-suffix = (s : String) { s |> (rest <> ".i") { rest } | (_) { "no suffix" } }
-middle = (s : String) { s |> ("[" <> rest <> "]") { rest } | (_) { "no pair" } }
+prefix = (s : String) { s |> ("pre:" <> rest) { rest } & (_) { "no prefix" } }
+suffix = (s : String) { s |> (rest <> ".i") { rest } & (_) { "no suffix" } }
+middle = (s : String) { s |> ("[" <> rest <> "]") { rest } & (_) { "no pair" } }
 
 main = () {
 	stdio.print(
@@ -288,9 +288,9 @@ One binder captures the variable text; fixed parts cannot overlap, and patterns 
 literal = (x : { Int | Float | String }) {
 	x |>
 		(-1) { "integer" }
-		| (-.1.5) { "float" }
-		| ("ok") { "string" }
-		| (_) { "other" }
+		& (-.1.5) { "float" }
+		& ("ok") { "string" }
+		& (_) { "other" }
 }
 
 main = () {
@@ -313,7 +313,7 @@ main = () {
 )
 
 packet = (bits : BitArray) {
-	bits |> (<<tag, body:bits>>) { (tag, body) } | (_) { (0, <<>>) }
+	bits |> (<<tag, body:bits>>) { (tag, body) } & (_) { (0, <<>>) }
 }
 
 main = () {
@@ -340,7 +340,7 @@ A bit pattern consumes the whole input; an unmarked segment reads eight bits.
 	i/stdio
 )
 
-describe = (n : Int) { n |> (0) { "zero" } | (1) { "one" } | (_) { "other" } }
+describe = (n : Int) { n |> (0) { "zero" } & (1) { "one" } & (_) { "other" } }
 main = () { stdio.print(describe(2)) }
 ```
 
@@ -361,7 +361,7 @@ A lone unguarded branch instead reports a failed pattern through `Assert`; see [
 )
 
 sum = (xs : List(Int), total : Int) -> Int {
-	xs |> ([]) { total } | ([x, ..rest]) { sum(rest, total + x) }
+	xs |> ([]) { total } & ([x, ..rest]) { sum(rest, total + x) }
 }
 
 main = () {
@@ -393,8 +393,8 @@ Expr = Num | Add | Mul
 eval = (e) {
 	e |>
 		(Num(n)) { n }
-		| (Add(a, b)) { eval(a) + eval(b) }
-		| (Mul(a, b)) { eval(a) * eval(b) }
+		& (Add(a, b)) { eval(a) + eval(b) }
+		& (Mul(a, b)) { eval(a) * eval(b) }
 }
 
 main = () {

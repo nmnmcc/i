@@ -18,7 +18,7 @@ bad : <N>() <- (Fail(Never), ..N) -> Int = () <- (
 
 pong = (n : Int) { ping(n) + uset(1) }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 loop = (x) { x(x) }
 

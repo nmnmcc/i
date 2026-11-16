@@ -11,13 +11,13 @@
 compile = (pattern : String) -> regex.Regex {
 	fail.catch(() { regex.compile(pattern) }) |>
 		(Ok(re)) { re }
-		| (Error(_)) { panic("test pattern") }
+		& (Error(_)) { panic("test pattern") }
 }
 
 text = (pattern : String, input : String) -> String {
 	regex.find(compile(pattern), input) |>
 		(Some(m)) { m.text }
-		| (None) { "<no match>" }
+		& (None) { "<no match>" }
 }
 
 test("literal", () {
@@ -362,7 +362,7 @@ test("error_lookahead", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -373,7 +373,7 @@ test("error_negative_lookahead", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -384,7 +384,7 @@ test("error_lookbehind", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -395,7 +395,7 @@ test("error_negative_lookbehind", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -406,7 +406,7 @@ test("error_backreference", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -417,7 +417,7 @@ test("error_named_backreference", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -428,7 +428,7 @@ test("error_unclosed_group", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -439,7 +439,7 @@ test("error_unclosed_class", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -450,7 +450,7 @@ test("error_reverse_range", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -461,7 +461,7 @@ test("error_empty_class", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -472,7 +472,7 @@ test("error_unknown_escape", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -483,7 +483,7 @@ test("error_trailing_escape", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -494,7 +494,7 @@ test("error_repeated_quantifier", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -505,7 +505,7 @@ test("error_leading_quantifier", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -516,7 +516,7 @@ test("error_reversed_bounds", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -527,7 +527,7 @@ test("error_large_count", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -538,7 +538,7 @@ test("error_duplicate_name", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -549,7 +549,7 @@ test("error_invalid_name", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -560,7 +560,7 @@ test("error_empty_name", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -571,7 +571,7 @@ test("error_unclosed_count", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -582,7 +582,7 @@ test("error_surrogate", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -593,7 +593,7 @@ test("error_large_scalar", () {
 			assert(reason != "")
 			Nil
 		}
-		| (Ok(_)) { panic("expected compile error") }
+		& (Ok(_)) { panic("expected compile error") }
 	Nil
 })
 
@@ -613,7 +613,7 @@ test("error_position", () {
 test("capture_index_name", () {
 	c = regex.captures(compile("(?<first>a+)(b)?"), "xaa") |>
 		(Some(c)) { c }
-		| (None) { panic("capture") }
+		& (None) { panic("capture") }
 	assert(
 		regex.group(c, 0) == Some(regex.Match(start = 1, end = 3, text = "aa")),
 	)
@@ -631,7 +631,7 @@ test("capture_index_name", () {
 test("capture_last_iteration", () {
 	c = regex.captures(compile("(a|b)+"), "ab") |>
 		(Some(c)) { c }
-		| (None) { panic("capture") }
+		& (None) { panic("capture") }
 	assert(
 		regex.group(c, 1) == Some(regex.Match(start = 1, end = 2, text = "b")),
 	)
@@ -641,7 +641,7 @@ test("capture_last_iteration", () {
 test("capture_alternation", () {
 	c = regex.captures(compile("(a)|(b)"), "b") |>
 		(Some(c)) { c }
-		| (None) { panic("capture") }
+		& (None) { panic("capture") }
 	assert(regex.group(c, 1) == None)
 	assert(
 		regex.group(c, 2) == Some(regex.Match(start = 0, end = 1, text = "b")),

@@ -39,5 +39,5 @@ panic : (String) -> Never
 assert = (c : Bool) <- (a : Assert) {
 	c |>
 		(True) { Nil }
-		| (False) { a.fail(AssertionFailure(message = "assert")) }
+		& (False) { a.fail(AssertionFailure(message = "assert")) }
 }

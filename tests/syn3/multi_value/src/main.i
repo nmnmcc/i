@@ -9,16 +9,16 @@
 
 area =
 	(r : Float) -> Float { 3.0 *. r *. r }
-	| (w : Float, h : Float) -> Float { w *. h }
+	& (w : Float, h : Float) -> Float { w *. h }
 
 connect =
 	(host : String) -> String { connect(host, port = 80) }
-	| (host : String, port = p : Int) -> String { "\(host):\(core.inspect(p))" }
+	& (host : String, port = p : Int) -> String { "\(host):\(core.inspect(p))" }
 
 fs = [area]
 
 /// The first item, or `d` for an empty list.
-first = (xs, d) { xs |> ([]) { d } | ([x, .._]) { x } }
+first = (xs, d) { xs |> ([]) { d } & ([x, .._]) { x } }
 
 pick = () { area }
 

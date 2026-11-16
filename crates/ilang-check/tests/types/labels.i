@@ -70,19 +70,19 @@ Node = (value = Int, rest = Int)
 walk = (n : Int) -> Node {
 	n |>
 		(0) { Node(value = 0, rest = 0) }
-		| (_) { Node(value = walk(n - 1).value + 1, rest = 0) }
+		& (_) { Node(value = walk(n - 1).value + 1, rest = 0) }
 }
 
 walk_unwritten = (n : Int) {
 	n |>
 		(0) { Node(value = 0, rest = 0) }
-		| (_) { Node(value = walk_unwritten(n - 1).value + 1, rest = 0) }
+		& (_) { Node(value = walk_unwritten(n - 1).value + 1, rest = 0) }
 }
 
 // In a group, the names are known from what is written.
 ping = (n : Int) { pong(n) }
 
-pong = (m : Int) { m |> (0) { 0 } | (_) { ping(m - 1) } }
+pong = (m : Int) { m |> (0) { 0 } & (_) { ping(m - 1) } }
 
 // A written positional signature determines the call interface.
 wins : (Int) -> Int = (y) { y }

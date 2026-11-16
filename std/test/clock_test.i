@@ -50,7 +50,7 @@ test("clock_fake", () {
 				request.ready(
 					{ n < 0 } |>
 						(True) { Error("invalid") }
-						| (False) { Ok(Nil) },
+						& (False) { Ok(Nil) },
 				)
 			},
 		),

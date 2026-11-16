@@ -58,9 +58,9 @@ Fs = (
 
 mode_string =
 	(ReadOnly) { "read" }
-	| (WriteTruncate) { "truncate" }
-	| (Append) { "append" }
-	| (ReadWrite) { "read_write" }
+	& (WriteTruncate) { "truncate" }
+	& (Append) { "append" }
+	& (ReadWrite) { "read_write" }
 
 open = (path, mode) <- (raw : Fs) {
 	r = raw.open(path, mode_string(mode))
@@ -68,7 +68,7 @@ open = (path, mode) <- (raw : Fs) {
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(code)) {
+				& (Error(code)) {
 					fail.raise(
 						FsError(operation = "open", path = path, code = code),
 					)
@@ -79,7 +79,7 @@ open = (path, mode) <- (raw : Fs) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -89,7 +89,7 @@ open = (path, mode) <- (raw : Fs) {
 read = (File(number), max_bytes) <- (raw : Fs) {
 	request.await_owned(raw.read(number, max_bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(FsError(operation = "read", path = "", code = code))
 		}
 }
@@ -97,7 +97,7 @@ read = (File(number), max_bytes) <- (raw : Fs) {
 write = (File(number), bytes) <- (raw : Fs) {
 	request.await_owned(raw.write(number, bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(FsError(operation = "write", path = "", code = code))
 		}
 }
@@ -105,7 +105,7 @@ write = (File(number), bytes) <- (raw : Fs) {
 flush = (File(number)) <- (raw : Fs) {
 	request.await_owned(raw.flush(number)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(FsError(operation = "flush", path = "", code = code))
 		}
 }
@@ -115,7 +115,7 @@ close = (File(number)) <- (raw : Fs) { request.await_owned(raw.close(number)) }
 remove = (path) <- (raw : Fs) {
 	request.await_owned(raw.remove(path)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(FsError(operation = "remove", path = path, code = code))
 		}
 }
@@ -123,7 +123,7 @@ remove = (path) <- (raw : Fs) {
 rename = (from, to) <- (raw : Fs) {
 	request.await_owned(raw.rename(from, to)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(FsError(operation = "rename", path = from, code = code))
 		}
 }
@@ -131,7 +131,7 @@ rename = (from, to) <- (raw : Fs) {
 mkdir = (path) <- (raw : Fs) {
 	request.await_owned(raw.mkdir(path)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(FsError(operation = "mkdir", path = path, code = code))
 		}
 }
@@ -139,7 +139,7 @@ mkdir = (path) <- (raw : Fs) {
 slice = (text, start, length) {
 	core.byte_slice(text, start, length) |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("fs: invalid string slice") }
+		& (Error(_)) { panic("fs: invalid string slice") }
 }
 
 list_parts = (text : String, start : Int) -> List(String) {
@@ -147,13 +147,13 @@ list_parts = (text : String, start : Int) -> List(String) {
 		(Ok(end)) {
 			[slice(text, start, end - start), ..list_parts(text, end + 1)]
 		}
-		| (Error(_)) { [] }
+		& (Error(_)) { [] }
 }
 
 list = (path) <- (raw : Fs) {
 	request.await_owned(raw.list(path)) |>
 		(Ok(value)) { list_parts(value, 0) }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(FsError(operation = "list", path = path, code = code))
 		}
 }
@@ -161,14 +161,14 @@ list = (path) <- (raw : Fs) {
 metadata = (path) <- (raw : Fs) {
 	size = request.await_owned(raw.size(path)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				FsError(operation = "metadata", path = path, code = code),
 			)
 		}
 	kind = request.await_owned(raw.kind(path)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				FsError(operation = "metadata", path = path, code = code),
 			)
@@ -179,7 +179,7 @@ metadata = (path) <- (raw : Fs) {
 temp_dir = () <- (raw : Fs) {
 	request.await_owned(raw.temp_dir()) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(FsError(operation = "temp_dir", path = "", code = code))
 		}
 }
@@ -188,7 +188,7 @@ read_chunks = (file) {
 	bytes = read(file, 65536)
 	core.bit_size(bytes) |>
 		(0) { <<>> }
-		| (_) { core.bit_array_concat([bytes, read_chunks(file)]) }
+		& (_) { core.bit_array_concat([bytes, read_chunks(file)]) }
 }
 
 read_file = (path) {
@@ -212,18 +212,18 @@ line_parts = (text : String, start : Int) -> List(String) {
 		(Ok(end)) {
 			[slice(text, start, end - start), ..line_parts(text, end + 1)]
 		}
-		| (Error(_)) {
+		& (Error(_)) {
 			done = start == core.byte_size(text)
 			done |>
 				(True) { [] }
-				| (False) { [slice(text, start, core.byte_size(text) - start)] }
+				& (False) { [slice(text, start, core.byte_size(text) - start)] }
 		}
 }
 
 read_lines = (path) {
 	core.bit_array_to_string(read_file(path)) |>
 		(Ok(text)) { line_parts(text, 0) }
-		| (Error(_)) {
+		& (Error(_)) {
 			fail.raise(
 				FsError(
 					operation = "read_lines",

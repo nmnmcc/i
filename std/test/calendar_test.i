@@ -10,7 +10,7 @@
 valid_date = (year : Int, month : Int, day : Int) -> calendar.Date {
 	fail.catch(() { calendar.date(year, month, day) }) |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("invalid test date") }
+		& (Error(_)) { panic("invalid test date") }
 }
 
 valid_time = (
@@ -21,13 +21,13 @@ valid_time = (
 ) -> calendar.TimeOfDay {
 	fail.catch(() { calendar.time_of_day(hour, minute, second, nanosecond) }) |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("invalid test time") }
+		& (Error(_)) { panic("invalid test time") }
 }
 
 valid_offset = (minutes : Int) -> calendar.Offset {
 	fail.catch(() { calendar.offset(minutes) }) |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("invalid test offset") }
+		& (Error(_)) { panic("invalid test offset") }
 }
 
 // validate in component order, without normalization.
@@ -114,7 +114,7 @@ test("calendar_validation", () {
 	})
 	assert(calendar.utc() == valid_offset(0))
 	list.each(list.range(1, 12), (month) {
-		expected = month |> (2) { 29 } | (4 | 6 | 9 | 11) { 30 } | (_) { 31 }
+		expected = month |> (2) { 29 } & (4 | 6 | 9 | 11) { 30 } & (_) { 31 }
 		assert(
 			fail.catch(() { calendar.days_in_month(2000, month) }) ==
 				Ok(expected),
@@ -181,19 +181,19 @@ before_year = (y : Int) -> Int {
 oracle_day = (year : Int, month : Int, day : Int) -> Int {
 	before_month = month |>
 		(1) { 0 }
-		| (2) { 31 }
-		| (3) { 59 }
-		| (4) { 90 }
-		| (5) { 120 }
-		| (6) { 151 }
-		| (7) { 181 }
-		| (8) { 212 }
-		| (9) { 243 }
-		| (10) { 273 }
-		| (11) { 304 }
-		| (_) { 334 }
+		& (2) { 31 }
+		& (3) { 59 }
+		& (4) { 90 }
+		& (5) { 120 }
+		& (6) { 151 }
+		& (7) { 181 }
+		& (8) { 212 }
+		& (9) { 243 }
+		& (10) { 273 }
+		& (11) { 304 }
+		& (_) { 334 }
 	leap = year % 400 == 0 || { year % 4 == 0 && year % 100 != 0 }
-	extra = { month > 2 && leap } |> (True) { 1 } | (False) { 0 }
+	extra = { month > 2 && leap } |> (True) { 1 } & (False) { 0 }
 	before_year(year) - before_year(1970) + before_month + extra + day - 1
 }
 
@@ -205,7 +205,7 @@ test("calendar_day_laws", () {
 		list.each(list.range(1, 12), (month) {
 			length = fail.catch(() { calendar.days_in_month(year, month) }) |>
 				(Ok(n)) { n }
-				| (Error(_)) { panic("test month") }
+				& (Error(_)) { panic("test month") }
 			list.each([1, length], (day) {
 				value = valid_date(year, month, day)
 				expected = oracle_day(year, month, day)
@@ -226,7 +226,7 @@ test("calendar_day_laws", () {
 	})
 	huge = fail.catch(() { int.power(10, 100) }) |>
 		(Ok(n)) { n }
-		| (Error(_)) { panic("test exponent") }
+		& (Error(_)) { panic("test exponent") }
 	list.each([-huge, huge, -719468, -719469, -719467, -1, 0, 1], (day) {
 		list.each([-1, 0, 1], (delta) {
 			n = day + delta
@@ -269,7 +269,7 @@ test("calendar_civil_boundaries", () {
 	)
 	huge = fail.catch(() { int.power(10, 100) }) |>
 		(Ok(n)) { n }
-		| (Error(_)) { panic("test exponent") }
+		& (Error(_)) { panic("test exponent") }
 	list.each([-1439, -60, 0, 60, 1439], (minutes) {
 		offset = valid_offset(minutes)
 		list.each([
@@ -325,7 +325,7 @@ test("calendar_text", () {
 		(input, expected) = pair
 		fail.catch(() { calendar.parse(input) }) |>
 			(Error(_)) { panic("valid calendar text rejected") }
-			| (Ok((civil, offset))) {
+			& (Ok((civil, offset))) {
 				assert(calendar.format(civil, offset) == expected)
 				assert(
 					fail.catch(() { calendar.parse(expected) }) ==

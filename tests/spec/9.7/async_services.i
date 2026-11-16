@@ -49,5 +49,5 @@ main = () <- (later : Later, io : Io) {
 
 // A test that may call an async function is async too.
 test("async_test", () <- (later : Later) {
-	later.double(21) |> (42) { Nil } | (n) { panic(core.inspect(n)) }
+	later.double(21) |> (42) { Nil } & (n) { panic(core.inspect(n)) }
 })

@@ -44,7 +44,7 @@ fr = () { run(() { use() }) }
 
 get = () <- (d : Dep) { d.v }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 fw = () { use() }
 

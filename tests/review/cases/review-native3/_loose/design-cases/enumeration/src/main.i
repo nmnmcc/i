@@ -11,7 +11,7 @@ main = () <- (gate : Gate, root : request.Root) {
 	pending = gate.wait()
 	task.scope((s) {
 		child = task.go(s, () {
-			request.outstanding_root(root) |> ([]) { 0 } | ([_, ..]) { 1 }
+			request.outstanding_root(root) |> ([]) { 0 } & ([_, ..]) { 1 }
 		})
 		count = task.join(child)
 		request.cancel(request.ticket(pending))

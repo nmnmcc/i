@@ -17,5 +17,5 @@ main = () {
 }
 
 list_length = <A>(l : List(A)) -> Int {
-	l |> ([]) { 0 } | ([_, ..rest]) { 1 + list_length(rest) }
+	l |> ([]) { 0 } & ([_, ..rest]) { 1 + list_length(rest) }
 }

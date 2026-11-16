@@ -66,10 +66,10 @@ _parse_result = <A>(schema : Schema(A, SchemaError), text : String) -> Result(
 ) {
 	fail.catch(() { json.parse(text) }) |>
 		(Error(e)) { Error(Syntax(e)) }
-		| (Ok(value)) {
+		& (Ok(value)) {
 			_decode_result(schema, value) |>
 				(Ok(x)) { Ok(x) }
-				| (Error(e)) { Error(Decode(e)) }
+				& (Error(e)) { Error(Decode(e)) }
 		}
 }
 
@@ -87,34 +87,34 @@ at = (part : Path, e : SchemaError) -> SchemaError {
 
 int = Schema(
 	read = (x) {
-		x |> (json.Integer(n)) { Ok(n) } | (_) { Error(error("int")) }
+		x |> (json.Integer(n)) { Ok(n) } & (_) { Error(error("int")) }
 	},
 	write = (x) { json.Integer(x) },
 )
 
 float = Schema(
 	read = (x) {
-		x |> (json.Number(n)) { Ok(n) } | (_) { Error(error("float")) }
+		x |> (json.Number(n)) { Ok(n) } & (_) { Error(error("float")) }
 	},
 	write = (x) { json.Number(x) },
 )
 
 string = Schema(
 	read = (x) {
-		x |> (json.Text(n)) { Ok(n) } | (_) { Error(error("string")) }
+		x |> (json.Text(n)) { Ok(n) } & (_) { Error(error("string")) }
 	},
 	write = (x) { json.Text(x) },
 )
 
 bool = Schema(
 	read = (x) {
-		x |> (json.Boolean(n)) { Ok(n) } | (_) { Error(error("bool")) }
+		x |> (json.Boolean(n)) { Ok(n) } & (_) { Error(error("bool")) }
 	},
 	write = (x) { json.Boolean(x) },
 )
 
 null = Schema(
-	read = (x) { x |> (json.Null) { Ok(()) } | (_) { Error(error("null")) } },
+	read = (x) { x |> (json.Null) { Ok(()) } & (_) { Error(error("null")) } },
 	write = (_) { json.Null },
 )
 
@@ -123,7 +123,7 @@ literal_string = <K>(value : K) -> Schema(K, SchemaError) {
 		read = (x) {
 			x |>
 				(json.Text(s) ? s == value) { Ok(value) }
-				| (_) { Error(error(value)) }
+				& (_) { Error(error(value)) }
 		},
 		write = (x) { json.Text(x) },
 	)
@@ -134,7 +134,7 @@ literal_int = <K>(value : K) -> Schema(K, SchemaError) {
 		read = (x) {
 			x |>
 				(json.Integer(n) ? n == value) { Ok(value) }
-				| (_) { Error(error("literal int")) }
+				& (_) { Error(error("literal int")) }
 		},
 		write = (x) { json.Integer(x) },
 	)
@@ -145,13 +145,13 @@ nullable = <A>(s : Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 		read = (x) {
 			x |>
 				(json.Null) { Ok(None) }
-				| (_) {
+				& (_) {
 					_decode_result(s, x) |>
 						(Ok(v)) { Ok(Some(v)) }
-						| (Error(e)) { Error(e) }
+						& (Error(e)) { Error(e) }
 				}
 		},
-		write = (x) { x |> (None) { json.Null } | (Some(v)) { encode(s, v) } },
+		write = (x) { x |> (None) { json.Null } & (Some(v)) { encode(s, v) } },
 	)
 }
 
@@ -162,7 +162,7 @@ list = <A>(s : Schema(A, SchemaError)) -> Schema(List(A), SchemaError) {
 		read = (x) {
 			x |>
 				(json.Array(xs)) { read_list(s, xs, 0) }
-				| (_) { Error(error("array")) }
+				& (_) { Error(error("array")) }
 		},
 		write = (xs) { json.Array(ls.map(xs, (v) { encode(s, v) })) },
 	)
@@ -175,13 +175,13 @@ read_list = <A>(
 ) -> Result(List(A), SchemaError) {
 	xs |>
 		([]) { Ok([]) }
-		| ([x, ..rest]) {
+		& ([x, ..rest]) {
 			_decode_result(s, x) |>
 				(Error(e)) { Error(at(Index(index), e)) }
-				| (Ok(v)) {
+				& (Ok(v)) {
 					read_list(s, rest, index + 1) |>
 						(Error(e)) { Error(e) }
-						| (Ok(tail)) { Ok([v, ..tail]) }
+						& (Ok(tail)) { Ok([v, ..tail]) }
 				}
 		}
 }
@@ -194,7 +194,7 @@ dict = <A>(s : Schema(A, SchemaError)) -> Schema(
 		read = (x) {
 			x |>
 				(json.Object(xs)) { read_dict(s, xs) }
-				| (_) { Error(error("object")) }
+				& (_) { Error(error("object")) }
 		},
 		write = (xs) {
 			json.Object(
@@ -213,13 +213,13 @@ read_dict = <A>(
 ) -> Result(ds.Dict(String, A), SchemaError) {
 	xs |>
 		([]) { Ok(ds.new()) }
-		| ([(k, v), ..rest]) {
+		& ([(k, v), ..rest]) {
 			_decode_result(s, v) |>
 				(Error(e)) { Error(at(Field(k), e)) }
-				| (Ok(value)) {
+				& (Ok(value)) {
 					read_dict(s, rest) |>
 						(Error(e)) { Error(e) }
-						| (Ok(tail)) { Ok(ds.insert(tail, k, value)) }
+						& (Ok(tail)) { Ok(ds.insert(tail, k, value)) }
 				}
 		}
 }
@@ -234,13 +234,13 @@ tuple = <A, B>(
 				(json.Array([one, two])) {
 					_decode_result(a, one) |>
 						(Error(e)) { Error(at(Index(0), e)) }
-						| (Ok(v)) {
+						& (Ok(v)) {
 							_decode_result(b, two) |>
 								(Error(e)) { Error(at(Index(1), e)) }
-								| (Ok(w)) { Ok((v, w)) }
+								& (Ok(w)) { Ok((v, w)) }
 						}
 				}
-				| (_) { Error(error("pair")) }
+				& (_) { Error(error("pair")) }
 		},
 		write = (x) {
 			(v, w) = x
@@ -252,7 +252,7 @@ tuple = <A, B>(
 object = <A>(empty : A) -> Schema(A, SchemaError) {
 	Schema(
 		read = (x) {
-			x |> (json.Object(_)) { Ok(empty) } | (_) { Error(error("object")) }
+			x |> (json.Object(_)) { Ok(empty) } & (_) { Error(error("object")) }
 		},
 		write = (_) { json.Object([]) },
 	)
@@ -269,13 +269,13 @@ field = <A, V>(
 		read = (x) {
 			_decode_result(base, x) |>
 				(Error(e)) { Error(e) }
-				| (Ok(r)) {
+				& (Ok(r)) {
 					json.field(x, key) |>
 						(None) { Error(at(Field(key), error("field"))) }
-						| (Some(v)) {
+						& (Some(v)) {
 							_decode_result(value, v) |>
 								(Error(e)) { Error(at(Field(key), e)) }
-								| (Ok(y)) { Ok(put(r, y)) }
+								& (Ok(y)) { Ok(put(r, y)) }
 						}
 				}
 		},
@@ -289,7 +289,7 @@ field = <A, V>(
 						),
 					)
 				}
-				| (_) { panic("schema: object builder invariant") }
+				& (_) { panic("schema: object builder invariant") }
 		},
 	)
 }
@@ -305,13 +305,13 @@ optional_field = <A, V>(
 		read = (x) {
 			_decode_result(base, x) |>
 				(Error(e)) { Error(e) }
-				| (Ok(r)) {
+				& (Ok(r)) {
 					json.field(x, key) |>
 						(None) { Ok(put(r, None)) }
-						| (Some(v)) {
+						& (Some(v)) {
 							_decode_result(value, v) |>
 								(Error(e)) { Error(at(Field(key), e)) }
-								| (Ok(y)) { Ok(put(r, Some(y))) }
+								& (Ok(y)) { Ok(put(r, Some(y))) }
 						}
 				}
 		},
@@ -320,13 +320,13 @@ optional_field = <A, V>(
 				(json.Object(entries)) {
 					get(r) |>
 						(None) { json.Object(entries) }
-						| (Some(v)) {
+						& (Some(v)) {
 							json.Object(
 								ls.append(entries, [(key, encode(value, v))]),
 							)
 						}
 				}
-				| (_) { panic("schema: object builder invariant") }
+				& (_) { panic("schema: object builder invariant") }
 		},
 	)
 }
@@ -340,7 +340,7 @@ map = <A, B>(
 		read = (x) {
 			_decode_result(s, x) |>
 				(Ok(v)) { Ok(forward(v)) }
-				| (Error(e)) { Error(e) }
+				& (Error(e)) { Error(e) }
 		},
 		write = (x) { encode(s, backward(x)) },
 	)
@@ -357,10 +357,10 @@ refine = <A>(
 		read = (x) {
 			_decode_result(s, x) |>
 				(Error(e)) { Error(e) }
-				| (Ok(v)) {
+				& (Ok(v)) {
 					predicate(v) |>
 						(True) { Ok(v) }
-						| (False) { Error(error(message)) }
+						& (False) { Error(error(message)) }
 				}
 		},
 		write = (x) { encode(s, x) },
@@ -383,7 +383,7 @@ union = <A>(
 		write = (x) {
 			ls.at(schemas, choose(x)) |>
 				(Some(s)) { encode(s, x) }
-				| (None) { panic("schema: union selector") }
+				& (None) { panic("schema: union selector") }
 		},
 	)
 }
@@ -394,10 +394,10 @@ read_union = <A>(
 ) -> Result(A, SchemaError) {
 	schemas |>
 		([]) { Error(error("union")) }
-		| ([s, ..rest]) {
+		& ([s, ..rest]) {
 			_decode_result(s, x) |>
 				(Ok(v)) { Ok(v) }
-				| (Error(_)) { read_union(rest, x) }
+				& (Error(_)) { read_union(rest, x) }
 		}
 }
 
@@ -412,17 +412,17 @@ tagged_union = <A>(
 				(Some(json.Text(name))) {
 					ls.find_map(cases, (entry) {
 						(k, s) = entry
-						{ k == name } |> (True) { Some(s) } | (False) { None }
+						{ k == name } |> (True) { Some(s) } & (False) { None }
 					}) |>
 						(Some(s)) { _decode_result(s, x) }
-						| (None) { Error(at(Field(key), error("tag"))) }
+						& (None) { Error(at(Field(key), error("tag"))) }
 				}
-				| (_) { Error(at(Field(key), error("tag"))) }
+				& (_) { Error(at(Field(key), error("tag"))) }
 		},
 		write = (x) {
 			ls.find_map(cases, (entry) {
 				(k, s) = entry
-				{ k == tag(x) } |> (True) { Some(s) } | (False) { None }
+				{ k == tag(x) } |> (True) { Some(s) } & (False) { None }
 			}) |>
 				(Some(s)) {
 					encode(s, x) |>
@@ -437,9 +437,9 @@ tagged_union = <A>(
 								],
 							)
 						}
-						| (_) { panic("schema: tagged union object invariant") }
+						& (_) { panic("schema: tagged union object invariant") }
 				}
-				| (None) { panic("schema: unknown tag") }
+				& (None) { panic("schema: unknown tag") }
 		},
 	)
 }

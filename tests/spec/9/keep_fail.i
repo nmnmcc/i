@@ -29,7 +29,7 @@ main = () {
 				fail.catch(() { control.resume(k, Nil) }) == Error("resumed"),
 			)
 		}
-		| (_) { panic("expected a paused kept call") }
+		& (_) { panic("expected a paused kept call") }
 	with_final = control.keep((b) {
 		resource.ensure(
 			() {
@@ -51,7 +51,7 @@ main = () {
 					Error("cancelled"),
 			)
 		}
-		| (_) { panic("expected a paused kept final") }
+		& (_) { panic("expected a paused kept final") }
 	// A handler provided inside the paused part still wins over the resumer.
 	inner_catch = control.keep((b) {
 		answer = fail.catch(() {
@@ -60,12 +60,12 @@ main = () {
 		})
 		answer |>
 			(Error("inside")) { Done }
-			| (_) { panic("lost the inner handler") }
+			& (_) { panic("lost the inner handler") }
 	})
 	third = fail.catch(() { control.boundary((b) { inner_catch(b) }) })
 	third |>
 		(Ok(Paused(k))) {
 			assert(fail.catch(() { control.resume(k, Nil) }) == Ok(Done))
 		}
-		| (_) { panic("expected a paused inner catch") }
+		& (_) { panic("expected a paused inner catch") }
 }

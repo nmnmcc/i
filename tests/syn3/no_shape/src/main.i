@@ -8,11 +8,11 @@
 
 area =
 	(r : Float) -> Float { 3.0 *. r *. r }
-	| (w : Float, h : Float) -> Float { w *. h }
+	& (w : Float, h : Float) -> Float { w *. h }
 
 connect =
 	(host : String) -> String { connect(host, port = 80) }
-	| (host : String, port = p : Int) -> String { "\(host):\(core.inspect(p))" }
+	& (host : String, port = p : Int) -> String { "\(host):\(core.inspect(p))" }
 
 main = () <- (io : Io) {
 	io.print(

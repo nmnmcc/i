@@ -8,16 +8,16 @@
 rounds = 3_000_000
 
 check = (ok : Bool, what : String) -> Nil {
-	ok |> (True) { Nil } | (False) { panic(what) }
+	ok |> (True) { Nil } & (False) { panic(what) }
 }
 
 caught = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
-		| (_) {
+		& (_) {
 			r = fail.catch(() { fail.raise(i) }) |>
 				(Ok(v)) { v }
-				| (Error(e)) { e + 1 }
+				& (Error(e)) { e + 1 }
 			caught(i - 1, acc + r)
 		}
 }
@@ -25,8 +25,8 @@ caught = (i : Int, acc : Int) -> Int {
 passed = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
-		| (_) {
-			r = fail.catch(() { i }) |> (Ok(v)) { v + 1 } | (Error(e)) { e }
+		& (_) {
+			r = fail.catch(() { i }) |> (Ok(v)) { v + 1 } & (Error(e)) { e }
 			passed(i - 1, acc + r)
 		}
 }
@@ -41,10 +41,10 @@ test("fail_passed", () { check(passed(rounds, 0) == total, "fail_passed") })
 builtin_caught = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
-		| (_) {
+		& (_) {
 			r = fail.catch(() { fail.raise(i) }) |>
 				(Ok(v)) { v }
-				| (Error(e)) { e + 1 }
+				& (Error(e)) { e + 1 }
 			builtin_caught(i - 1, acc + r)
 		}
 }
@@ -52,8 +52,8 @@ builtin_caught = (i : Int, acc : Int) -> Int {
 builtin_passed = (i : Int, acc : Int) -> Int {
 	i |>
 		(0) { acc }
-		| (_) {
-			r = fail.catch(() { i }) |> (Ok(v)) { v + 1 } | (Error(e)) { e }
+		& (_) {
+			r = fail.catch(() { i }) |> (Ok(v)) { v + 1 } & (Error(e)) { e }
 			builtin_passed(i - 1, acc + r)
 		}
 }

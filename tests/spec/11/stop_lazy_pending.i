@@ -42,6 +42,6 @@ main = () {
 		f1(b)
 		Done
 	})
-	p |> (Paused(k)) { control.resume(k, Nil) } | (Done) { panic("not paused") }
+	p |> (Paused(k)) { control.resume(k, Nil) } & (Done) { panic("not paused") }
 	Nil
 }

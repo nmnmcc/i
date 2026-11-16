@@ -7,7 +7,7 @@
 // A tail call of a function of a service keeps its position as the first
 // one; the tail call of `check` is gone.
 check = (c : Bool) <- (a : Assert) {
-	c |> (True) { Nil } | (False) { a.fail(AssertionFailure(message = "mine")) }
+	c |> (True) { Nil } & (False) { a.fail(AssertionFailure(message = "mine")) }
 }
 
 apply = (f, x) { [f(x)] }

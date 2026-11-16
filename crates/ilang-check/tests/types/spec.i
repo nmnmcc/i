@@ -9,10 +9,10 @@
 retry = <A, N>(times : Int, body : () <- N -> A) -> A {
 	fail.catch(body) |>
 		(Ok(value)) { value }
-		| (Error(error)) {
+		& (Error(error)) {
 			{ times > 1 } |>
 				(True) { retry(times - 1, body) }
-				| (False) { fail.raise(error) }
+				& (False) { fail.raise(error) }
 		}
 }
 
@@ -59,7 +59,7 @@ numbers = () {
 my_assert = (c : Bool) <- (a : Assert) {
 	c |>
 		(True) { Nil }
-		| (False) { a.fail(AssertionFailure(message = "assert")) }
+		& (False) { a.fail(AssertionFailure(message = "assert")) }
 }
 
 // type: (c: Bool) -> Nil ! Assert

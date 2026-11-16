@@ -11,7 +11,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -31,7 +31,7 @@ note = (log, text) {
 wait = (n, f) {
 	n |>
 		(0) { f() }
-		| (_) {
+		& (_) {
 			x = wait(n - 1, f)
 			x + 1
 		}
@@ -42,7 +42,7 @@ wait = (n, f) {
 layer = (log, n, last) {
 	n |>
 		(0) { last() }
-		| (_) {
+		& (_) {
 			x = resource.ensure(
 				() { wait(3, () { layer(log, n - 1, last) }) },
 				() { note(log, "final " <> show(n)) },
@@ -77,7 +77,7 @@ test("cancel_runs_finals_innermost_first", () {
 			})
 			Done
 		})
-		p |> (Paused(k)) { control.cancel(k) } | (Done) { panic("not paused") }
+		p |> (Paused(k)) { control.cancel(k) } & (Done) { panic("not paused") }
 		"cancelled"
 	})
 	check(r, "final 1 final 2 final 3 cancelled")

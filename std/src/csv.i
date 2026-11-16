@@ -54,11 +54,11 @@ _options_result = (delimiter : String, fields : Int, crlf : Bool) -> Result(
 						),
 					)
 				}
-				| (False) {
+				& (False) {
 					Ok(Options(delimiter = n, fields = fields, crlf = crlf))
 				}
 		}
-		| (_) {
+		& (_) {
 			Error(
 				CsvError(
 					line = 1,
@@ -77,13 +77,13 @@ raw = <E, N>(cursor : Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
 		([c, ..rest]) {
 			(l, k) = { c == 10 } |>
 				(True) { (line + 1, 1) }
-				| (False) { (line, column + 1) }
+				& (False) { (line, column + 1) }
 			(Some(c), Cursor(rest, source, l, k))
 		}
-		| ([]) {
+		& ([]) {
 			stream.pull(source) |>
 				(stream.Done) { (None, Cursor([], stream.new(), line, column)) }
-				| (stream.Next(chunk, tail)) {
+				& (stream.Next(chunk, tail)) {
 					raw(
 						Cursor(
 							list.map(
@@ -106,8 +106,8 @@ next = <E, N>(cursor : Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
 			(d, after) = raw(tail)
 			d |>
 				(Some(10)) { (Some(10), after) }
-				| (None) { (c, after) }
-				| (Some(value)) {
+				& (None) { (c, after) }
+				& (Some(value)) {
 					// Keep the already-pulled chunk. Replaying tail here would repeat a
 					// source effect when a bare CR falls at the end of a chunk.
 					Cursor(pending, source, _, _) = after
@@ -115,7 +115,7 @@ next = <E, N>(cursor : Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
 					(c, Cursor([value, ..pending], source, line, column))
 				}
 		}
-		| (_) { (c, tail) }
+		& (_) { (c, tail) }
 }
 
 text = (reversed : List(Int)) -> String {
@@ -123,7 +123,7 @@ text = (reversed : List(Int)) -> String {
 		list.map(list.reverse(reversed), (c) {
 			<<c:u(32)>> |>
 				(<<p:utf32be_codepoint>>) { core.from_codepoints([p]) }
-				| (_) { panic("csv: scalar invariant") }
+				& (_) { panic("csv: scalar invariant") }
 		}),
 	)
 }
@@ -159,10 +159,10 @@ read_row = <E, N>(
 						),
 					)
 				}
-				| (_) {
+				& (_) {
 					started |>
 						(False) { Ok((None, tail)) }
-						| (True) {
+						& (True) {
 							Ok(
 								(
 									Some(
@@ -179,7 +179,7 @@ read_row = <E, N>(
 						}
 				}
 		}
-		| (Some(ch)) {
+		& (Some(ch)) {
 			{ mode == 2 } |>
 				(True) {
 					ch |>
@@ -194,7 +194,7 @@ read_row = <E, N>(
 								startline,
 							)
 						}
-						| (_) {
+						& (_) {
 							read_row(
 								tail,
 								config,
@@ -206,7 +206,7 @@ read_row = <E, N>(
 							)
 						}
 				}
-				| (False) {
+				& (False) {
 					{ ch == config.delimiter } |>
 						(True) {
 							read_row(
@@ -219,7 +219,7 @@ read_row = <E, N>(
 								startline,
 							)
 						}
-						| (False) {
+						& (False) {
 							ch |>
 								(10) {
 									started |>
@@ -234,7 +234,7 @@ read_row = <E, N>(
 												cursor_line(tail),
 											)
 										}
-										| (True) {
+										& (True) {
 											Ok(
 												(
 													Some(
@@ -253,7 +253,7 @@ read_row = <E, N>(
 											)
 										}
 								}
-								| (34) {
+								& (34) {
 									mode |>
 										(0) {
 											read_row(
@@ -266,7 +266,7 @@ read_row = <E, N>(
 												startline,
 											)
 										}
-										| (3) {
+										& (3) {
 											read_row(
 												tail,
 												config,
@@ -277,7 +277,7 @@ read_row = <E, N>(
 												startline,
 											)
 										}
-										| (_) {
+										& (_) {
 											Error(
 												CsvError(
 													line = line,
@@ -287,7 +287,7 @@ read_row = <E, N>(
 											)
 										}
 								}
-								| (_) {
+								& (_) {
 									mode |>
 										(3) {
 											Error(
@@ -298,7 +298,7 @@ read_row = <E, N>(
 												),
 											)
 										}
-										| (_) {
+										& (_) {
 											read_row(
 												tail,
 												config,
@@ -324,10 +324,10 @@ row_stream = <E, N>(
 		parsed = read_row(cursor, config, 0, [], [], False, cursor_line(cursor))
 		parsed |>
 			(Error(e)) { stream.Next(Error(e), stream.new()) }
-			| (Ok((None, _))) { stream.Done }
-			| (Ok((Some(ReadRow(row, startline)), tail))) {
+			& (Ok((None, _))) { stream.Done }
+			& (Ok((Some(ReadRow(row, startline)), tail))) {
 				n = list.length(row)
-				expected = { width == 0 } |> (True) { n } | (False) { width }
+				expected = { width == 0 } |> (True) { n } & (False) { width }
 				{ expected > 0 && n != expected } |>
 					(True) {
 						stream.Next(
@@ -341,7 +341,7 @@ row_stream = <E, N>(
 							stream.new(),
 						)
 					}
-					| (False) {
+					& (False) {
 						stream.Next(
 							Ok(ReadRow(row, startline)),
 							row_stream(tail, config, expected),
@@ -359,7 +359,7 @@ rows = <E, N>(
 ) -> stream.Stream(Result(List(String), CsvError), E, N) {
 	stream.map(row_stream(Cursor([], source, 1, 1), config, config.fields), (
 		result
-	) { result |> (Error(e)) { Error(e) } | (Ok(ReadRow(row, _))) { Ok(row) } })
+	) { result |> (Error(e)) { Error(e) } & (Ok(ReadRow(row, _))) { Ok(row) } })
 }
 
 _parse_result = (input : String) -> Result(List(List(String)), CsvError) {
@@ -383,7 +383,7 @@ _parse_with_result = (input : String, config : Options) -> Result(
 header = (names : List(String), line : Int) -> Result(List(String), CsvError) {
 	{ list.length(list.unique(names)) == list.length(names) } |>
 		(True) { Ok(names) }
-		| (False) {
+		& (False) {
 			Error(
 				CsvError(line = line, column = 1, reason = "duplicate header"),
 			)
@@ -404,7 +404,7 @@ named = (names : List(String), row : List(String), line : Int) -> Result(
 				),
 			)
 		}
-		| (False) { Ok(dict.from_list(list.zip(names, row))) }
+		& (False) { Ok(dict.from_list(list.zip(names, row))) }
 }
 
 record_stream = <E, N>(
@@ -414,11 +414,11 @@ record_stream = <E, N>(
 	stream.make(() {
 		stream.pull(source) |>
 			(stream.Done) { stream.Done }
-			| (stream.Next(Error(e), _)) { stream.Next(Error(e), stream.new()) }
-			| (stream.Next(Ok(ReadRow(row, line)), tail)) {
+			& (stream.Next(Error(e), _)) { stream.Next(Error(e), stream.new()) }
+			& (stream.Next(Ok(ReadRow(row, line)), tail)) {
 				named(names, row, line) |>
 					(Error(e)) { stream.Next(Error(e), stream.new()) }
-					| (Ok(value)) {
+					& (Ok(value)) {
 						stream.Next(Ok(value), record_stream(tail, names))
 					}
 			}
@@ -435,11 +435,11 @@ records = <E, N>(
 			row_stream(Cursor([], source, 1, 1), config, config.fields),
 		) |>
 			(stream.Done) { stream.Done }
-			| (stream.Next(Error(e), _)) { stream.Next(Error(e), stream.new()) }
-			| (stream.Next(Ok(ReadRow(names, line)), tail)) {
+			& (stream.Next(Error(e), _)) { stream.Next(Error(e), stream.new()) }
+			& (stream.Next(Ok(ReadRow(names, line)), tail)) {
 				header(names, line) |>
 					(Error(e)) { stream.Next(Error(e), stream.new()) }
-					| (Ok(keys)) { stream.pull(record_stream(tail, keys)) }
+					& (Ok(keys)) { stream.pull(record_stream(tail, keys)) }
 			}
 	})
 }
@@ -483,7 +483,7 @@ quote = (field : String, delimiter : String, single_empty : Bool) -> String {
 			string.contains(field, "\n")
 	} |>
 		(True) { "\"" <> string.replace(field, "\"", "\"\"") <> "\"" }
-		| (False) { field }
+		& (False) { field }
 }
 
 /// Prints minimal quoting, with one LF after every row.
@@ -493,10 +493,10 @@ print = (rows : List(List(String))) -> String { print_with(rows, defaults()) }
 /// Prints with the configured delimiter and LF/CRLF. Empty rows print as `""`.
 print_with = (rows : List(List(String)), config : Options) -> String {
 	delimiter = text([config.delimiter])
-	ending = config.crlf |> (True) { "\r\n" } | (False) { "\n" }
+	ending = config.crlf |> (True) { "\r\n" } & (False) { "\n" }
 	core.concat(
 		list.map(rows, (row) {
-			values = row |> ([]) { [""] } | (_) { row }
+			values = row |> ([]) { [""] } & (_) { row }
 			string.join(
 				list.map(values, (field) {
 					quote(field, delimiter, values == [""])

@@ -808,7 +808,7 @@ test("uri_generated_round_trips", () {
 				assert(uri.to_string(u) == s)
 				round_trip(u)
 			}
-			| (Error(_)) { Nil }
+			& (Error(_)) { Nil }
 	}
 	list.each(list.range(0, 127), (n) {
 		Ok(cp) = string.utf_codepoint(n)

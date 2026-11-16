@@ -13,4 +13,4 @@ bad = () {
 	run(() { one() }, S(value = "hi")) <- (_syn3_0)
 }
 
-test("example", () { bad() |> (2) { Nil } | (other) { panic(other) } })
+test("example", () { bad() |> (2) { Nil } & (other) { panic(other) } })

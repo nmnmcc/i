@@ -8,7 +8,7 @@
 )
 
 repeat = (n, xs) {
-	{ n == 0 } |> (True) { xs } | (False) { repeat(n - 1, [Nil, ..xs]) }
+	{ n == 0 } |> (True) { xs } & (False) { repeat(n - 1, [Nil, ..xs]) }
 }
 
 main = () {
@@ -18,9 +18,9 @@ main = () {
 	)
 	control.boundary((b) {
 		recursive = (n) {
-			{ n == 0 } |> (True) { Nil } | (False) { recursive(n - 1) }
+			{ n == 0 } |> (True) { Nil } & (False) { recursive(n - 1) }
 		}
-		pinned = (n) { { n == 0 } |> (True) { b } | (False) { pinned(n - 1) } }
+		pinned = (n) { { n == 0 } |> (True) { b } & (False) { pinned(n - 1) } }
 		_unused = b
 		pure = () { 1 }
 		assert(core.portable(pure))
@@ -42,7 +42,7 @@ main = () {
 		assert(
 			core.not(
 				core.portable(() {
-					{ False } |> (True) { b } | (False) { Nil }
+					{ False } |> (True) { b } & (False) { Nil }
 				}),
 			),
 		)

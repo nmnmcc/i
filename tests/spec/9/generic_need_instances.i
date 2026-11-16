@@ -10,8 +10,8 @@ Br(E, N) = (decode = (Int) <- (Yd(E), ..N) -> Int)
 at = <E, N>(bs : List(Br(E, N)), i : Int) -> Br(E, N) {
 	bs |>
 		([]) { panic("empty") }
-		| ([b, ..rest]) {
-			{ i == 0 } |> (True) { b } | (False) { at(rest, i - 1) }
+		& ([b, ..rest]) {
+			{ i == 0 } |> (True) { b } & (False) { at(rest, i - 1) }
 		}
 }
 

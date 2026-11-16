@@ -10,7 +10,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -25,7 +25,7 @@ down = (b, n) {
 			control.suspend(b, (k) { control.resume(k, Nil) })
 			fail.raise(Bad(7))
 		}
-		| (_) {
+		& (_) {
 			x = down(b, n - 1)
 			x + 1
 		}
@@ -36,9 +36,9 @@ mid = (b, n) {
 	n |>
 		(25) {
 			r = fail.catch(() { down(b, 25) })
-			r |> (Ok(x)) { x } | (Error(Bad(c))) { c * 100 }
+			r |> (Ok(x)) { x } & (Error(Bad(c))) { c * 100 }
 		}
-		| (_) {
+		& (_) {
 			x = mid(b, n + 1)
 			x + 1
 		}

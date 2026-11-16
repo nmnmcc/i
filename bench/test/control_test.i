@@ -16,7 +16,7 @@ More = (Int, Continuation(Nil, Step, Never))
 Step = Done | More
 
 check = (ok : Bool, what : String) -> Nil {
-	ok |> (True) { Nil } | (False) { panic(what) }
+	ok |> (True) { Nil } & (False) { panic(what) }
 }
 
 // Suspends once for each number from `n` down to 1. The call after the
@@ -24,18 +24,18 @@ check = (ok : Bool, what : String) -> Nil {
 yields = (b, n) {
 	n |>
 		(0) { Done(0) }
-		| (_) {
+		& (_) {
 			control.suspend(b, (k) { More(n, k) })
 			yields(b, n - 1)
 		}
 }
 
 // Counts one more frame on the way back.
-deeper = (Done(d)) { Done(d + 1) } | (more) { more }
+deeper = (Done(d)) { Done(d + 1) } & (more) { more }
 
 // `depth` frames that wait under the suspends.
 down = (b, depth) {
-	depth |> (0) { yields(b, rounds) } | (_) { deeper(down(b, depth - 1)) }
+	depth |> (0) { yields(b, rounds) } & (_) { deeper(down(b, depth - 1)) }
 }
 
 // Resumes until the end. It runs outside the boundary and calls itself as
@@ -46,7 +46,7 @@ sum = (step, acc, depth) {
 			check(d == depth, "a frame was lost or ran twice")
 			acc
 		}
-		| (More(v, k)) { sum(control.resume(k, Nil), acc + v, depth) }
+		& (More(v, k)) { sum(control.resume(k, Nil), acc + v, depth) }
 }
 
 run = (depth) {

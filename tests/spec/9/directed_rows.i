@@ -20,7 +20,7 @@ Syn3ServiceFail(E) = Fail(E)
 
 both = () <- (f : Syn3ServiceFail(Int | String)) { need_int() }
 
-either = (n : Int) { n |> (0) { need_int() } | (_) { need_string() } }
+either = (n : Int) { n |> (0) { need_int() } & (_) { need_string() } }
 
 Yield(A) = (emit = (A) -> Nil)
 

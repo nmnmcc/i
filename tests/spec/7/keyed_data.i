@@ -7,14 +7,14 @@ Box = (value = Int)
 
 read = ((name = n, age = a)) { (n, a) }
 choose = (data : (name = String, age = Int)) {
-	data |> ((age = 0, name = n)) { n <> " baby" } | ((name = n, age = _)) { n }
+	data |> ((age = 0, name = n)) { n <> " baby" } & ((name = n, age = _)) { n }
 }
 
 // Equal part counts do not make different label sets one shape.
 shape = (data : { (a = Int) | (b = String) }) {
 	data |>
 		((a = n)) { n }
-		| ((b = s)) { { s == "yes" } |> (True) { 1 } | (False) { 0 } }
+		& ((b = s)) { { s == "yes" } |> (True) { 1 } & (False) { 0 } }
 }
 
 main = () {

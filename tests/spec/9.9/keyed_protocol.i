@@ -28,7 +28,7 @@ Start = (run = (Scheduler) -> Turn)
 read = (k, value) {
 	key.unwrap(k, value) |>
 		(key.Found(v)) { v }
-		| (key.Missing) { panic("prototype: wrong key") }
+		& (key.Missing) { panic("prototype: wrong key") }
 }
 
 identity = (x) { x }

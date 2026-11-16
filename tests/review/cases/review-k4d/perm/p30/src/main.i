@@ -55,4 +55,4 @@ get = () <- (d : Dep) { d.v }
 
 fr = () { run(() { use() }) }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }

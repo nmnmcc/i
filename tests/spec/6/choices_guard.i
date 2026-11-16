@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 // The choices are tried in order: the clause is taken with the first choice
@@ -17,15 +17,15 @@ check = (got : String, want : String) {
 pick = (p) {
 	p |>
 		((x, _) | (_, x) ? x > 10) { "big " <> core.inspect(x) }
-		| (_) { "small" }
+		& (_) { "small" }
 }
 
 // Each choice binds `n`; the guard is tried with each choice that matches.
 tag = (v) {
 	v |>
 		(Ok(n) | Error(n) ? n == 1) { "one" }
-		| (Ok(_)) { "ok" }
-		| (Error(_)) { "error" }
+		& (Ok(_)) { "ok" }
+		& (Error(_)) { "error" }
 }
 
 test("choices", () {

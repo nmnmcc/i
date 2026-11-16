@@ -16,7 +16,7 @@ snapshot = <A>(t : property.Tree(A), depth : Int) -> String {
 		{
 			{ depth == 0 } |>
 				(True) { "" }
-				| (False) {
+				& (False) {
 					core.inspect(
 						list.map(t.children(), (c) { snapshot(c, depth - 1) }),
 					)
@@ -34,7 +34,7 @@ root = <A>(gen : property.Gen(A), size : Int, seed : Int) -> property.Tree(A) {
 find_ten = (gen : property.Gen(Int), seed : Int) -> property.Tree(Int) {
 	assert(seed < 1000)
 	t = root(gen, 0, seed)
-	{ t.value == 10 } |> (True) { t } | (False) { find_ten(gen, seed + 1) }
+	{ t.value == 10 } |> (True) { t } & (False) { find_ten(gen, seed + 1) }
 }
 
 test("sampling_and_map_laws", () {
@@ -124,7 +124,7 @@ test("integer_rules", () {
 		assert(node.value >= 0 && node.value <= 10)
 		{ depth == 0 } |>
 			(True) { Nil }
-			| (False) {
+			& (False) {
 				list.each(node.children(), (c) {
 					assert(c.value < node.value)
 					verify(c, target, depth - 1)
@@ -136,11 +136,11 @@ test("integer_rules", () {
 	p = root(positive, 0, 0)
 	{ p.value == 3 } |>
 		(True) { assert(p.children() == []) }
-		| (False) {
+		& (False) {
 			assert(
 				list.first(p.children()) |>
 					(Some(c)) { c.value == 3 }
-					| (None) { False },
+					& (None) { False },
 			)
 		}
 })
@@ -149,7 +149,7 @@ valid_dependent = (t : property.Tree((Int, Int)), depth : Int) -> Nil {
 	assert(t.value.1 >= 0 && t.value.1 <= t.value.0)
 	{ depth == 0 } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			list.each(t.children(), (c) { valid_dependent(c, depth - 1) })
 		}
 }
@@ -159,7 +159,7 @@ test("dependent_and_size", () {
 	dependent = property.flat_map(outer, (n) {
 		fail.catch(() { property.int(0, n) }) |>
 			(Ok(gen)) { property.map(gen, (k) { (n, k) }) }
-			| (Error(_)) { property.constant((n, -1)) }
+			& (Error(_)) { property.constant((n, -1)) }
 	})
 	list.each(list.range(0, 19), (seed) {
 		valid_dependent(root(dependent, 4, seed), 4)
@@ -221,7 +221,7 @@ test("greedy_path_budget_and_replay", () {
 	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
 			(True) { property.Fail(core.inspect(x)) }
-			| (False) { property.Pass }
+			& (False) { property.Pass }
 	}
 	property.Falsified(f) = property.check(
 		gen,
@@ -468,7 +468,7 @@ test("attempt_streams_seed_and_prefixes", () {
 		), (s) {
 			{ s == 2 } |>
 				(True) { property.Pass }
-				| (False) { property.Discard }
+				& (False) { property.Discard }
 		}) ==
 			property.Passed(successes = 3, discards = 6),
 	)
@@ -488,7 +488,7 @@ test("list_order_and_generated_bounds", () {
 		t = root(gen, 4, seed)
 		{ list.length(t.value) == 4 } |>
 			(True) { t }
-			| (False) { find_four(seed + 1) }
+			& (False) { find_four(seed + 1) }
 	}
 	t = find_four(0)
 	assert(
@@ -502,7 +502,7 @@ test("list_order_and_generated_bounds", () {
 		assert(list.all(t.value, (x) { x >= -3 && x <= 3 }))
 		{ depth == 0 } |>
 			(True) { Nil }
-			| (False) { list.each(t.children(), (c) { verify(c, depth - 1) }) }
+			& (False) { list.each(t.children(), (c) { verify(c, depth - 1) }) }
 	}
 	list.each(list.range(0, 19), (seed) { verify(root(lists, 5, seed), 3) })
 	assert(
@@ -519,7 +519,7 @@ test("list_order_and_generated_bounds", () {
 				})
 			} |>
 				(Ok(g)) { g }
-				| (Error(_)) { property.constant([]) },
+				& (Error(_)) { property.constant([]) },
 			1,
 			random.from_seed(0),
 		) ==
@@ -620,7 +620,7 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 	find = (seed : Int) -> property.Tree(Int) {
 		assert(seed < 1000)
 		t = root(negative, 0, seed)
-		{ t.value == -10 } |> (True) { t } | (False) { find(seed + 1) }
+		{ t.value == -10 } |> (True) { t } & (False) { find(seed + 1) }
 	}
 	assert(
 		list.map(find(0).children(), (c) { c.value }) == [0, -5, -8, -9],
@@ -633,7 +633,7 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 	list.each(samples, (t) {
 		assert(
 			list.map(t.children(), (c) { c.value }) ==
-				{ t.value |> (True) { [False] } | (False) { [] } },
+				{ t.value |> (True) { [False] } & (False) { [] } },
 		)
 	})
 	Ok(choices) = fail.catch(() {
@@ -647,8 +647,8 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 		})
 		expected = index |>
 			(0) { [] }
-			| (1) { ["first"] }
-			| (_) { ["first", "second"] }
+			& (1) { ["first"] }
+			& (_) { ["first", "second"] }
 		assert(
 			list.map(t.children(), (c) { c.value }) == expected,
 		)
@@ -673,7 +673,7 @@ test("budget_prefixes_and_discarded_children", () {
 	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
 			(True) { property.Fail(core.inspect(x)) }
-			| (False) { property.Discard }
+			& (False) { property.Discard }
 	}
 	expected = [
 		([], 10),
@@ -719,8 +719,8 @@ test("dependent_branch_pruning_and_inner_alternatives", () {
 		property.make((s, _) {
 			n |>
 				(1) { None }
-				| (0) { Some(property.tree(0, () { [] })) }
-				| (_) {
+				& (0) { Some(property.tree(0, () { [] })) }
+				& (_) {
 					Some(
 						property.tree(20 + s, () {
 							[property.tree(21 + s, () { [] })]

@@ -65,7 +65,7 @@ listen = (address, port) <- (raw : Net) {
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(code)) {
+				& (Error(code)) {
 					fail.raise(
 						NetError(
 							operation = "listen",
@@ -80,7 +80,7 @@ listen = (address, port) <- (raw : Net) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close_listener(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -93,7 +93,7 @@ connect = (address, port) <- (raw : Net) {
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(code)) {
+				& (Error(code)) {
 					fail.raise(
 						NetError(
 							operation = "connect",
@@ -108,7 +108,7 @@ connect = (address, port) <- (raw : Net) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close_stream(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -121,7 +121,7 @@ accept = (Listener(number)) <- (raw : Net) {
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(code)) {
+				& (Error(code)) {
 					fail.raise(
 						NetError(
 							operation = "accept",
@@ -136,7 +136,7 @@ accept = (Listener(number)) <- (raw : Net) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close_stream(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -146,10 +146,10 @@ accept = (Listener(number)) <- (raw : Net) {
 local_port = (socket) <- (raw : Net) {
 	r = socket |>
 		(Listener(number)) { raw.local_port(number) }
-		| (Datagram(number)) { raw.datagram_port(number) }
+		& (Datagram(number)) { raw.datagram_port(number) }
 	request.await_owned(r) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				NetError(operation = "local_port", endpoint = "", code = code),
 			)
@@ -159,7 +159,7 @@ local_port = (socket) <- (raw : Net) {
 read = (Stream(number), max_bytes) <- (raw : Net) {
 	request.await_owned(raw.read(number, max_bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(NetError(operation = "read", endpoint = "", code = code))
 		}
 }
@@ -167,7 +167,7 @@ read = (Stream(number), max_bytes) <- (raw : Net) {
 write = (Stream(number), bytes) <- (raw : Net) {
 	request.await_owned(raw.write(number, bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				NetError(operation = "write", endpoint = "", code = code),
 			)
@@ -177,7 +177,7 @@ write = (Stream(number), bytes) <- (raw : Net) {
 shutdown_write = (Stream(number)) <- (raw : Net) {
 	request.await_owned(raw.shutdown_write(number)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				NetError(
 					operation = "shutdown_write",
@@ -199,19 +199,19 @@ close_listener = (Listener(number)) <- (raw : Net) {
 slice = (text, start, length) {
 	core.byte_slice(text, start, length) |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("net: invalid string slice") }
+		& (Error(_)) { panic("net: invalid string slice") }
 }
 
 parts = (text : String, start : Int) -> List(String) {
 	core.index_of(text, "\u{0}", start) |>
 		(Ok(end)) { [slice(text, start, end - start), ..parts(text, end + 1)] }
-		| (Error(_)) { [] }
+		& (Error(_)) { [] }
 }
 
 resolve = (name) <- (raw : Net) {
 	request.await_owned(raw.resolve(name)) |>
 		(Ok(value)) { parts(value, 0) }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				NetError(operation = "resolve", endpoint = name, code = code),
 			)
@@ -238,7 +238,7 @@ bind = (address, port) <- (raw : Net) {
 		() {
 			request.await(r) |>
 				(Ok(value)) { value }
-				| (Error(code)) {
+				& (Error(code)) {
 					fail.raise(
 						NetError(
 							operation = "bind",
@@ -253,7 +253,7 @@ bind = (address, port) <- (raw : Net) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close_datagram(value))
 				}
-				| (_) { Nil }
+				& (_) { Nil }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -263,7 +263,7 @@ bind = (address, port) <- (raw : Net) {
 send_to = (Datagram(number), address, port, bytes) <- (raw : Net) {
 	request.await_owned(raw.send_to(number, address, port, bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				NetError(
 					operation = "send_to",
@@ -278,7 +278,7 @@ send_to = (Datagram(number), address, port, bytes) <- (raw : Net) {
 receive_from = (Datagram(number), max_bytes) <- (raw : Net) {
 	request.await_owned(raw.receive_from(number, max_bytes)) |>
 		(Ok(value)) { decode_datagram(value) }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				NetError(
 					operation = "receive_from",
@@ -295,17 +295,17 @@ decode_datagram =
 			(<<address:bytes(size), data:bytes>>) {
 				text = core.bit_array_to_string(address) |>
 					(Ok(value)) { value }
-					| (Error(_)) { panic("net: invalid datagram address") }
+					& (Error(_)) { panic("net: invalid datagram address") }
 				(data = data, address = text, port = lo + hi * 256)
 			}
-			| (_) { panic("net: invalid datagram reply") }
+			& (_) { panic("net: invalid datagram reply") }
 	}
-	| (_) { panic("net: invalid datagram reply") }
+	& (_) { panic("net: invalid datagram reply") }
 
 local_address = (Datagram(number)) <- (raw : Net) {
 	request.await_owned(raw.local_address(number)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(
 				NetError(
 					operation = "local_address",

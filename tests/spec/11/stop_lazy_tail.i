@@ -29,7 +29,7 @@ step = (b) {
 	last(3)
 }
 
-last = (n) { n |> (0) { panic("after") } | (_) { last(n - 1) } }
+last = (n) { n |> (0) { panic("after") } & (_) { last(n - 1) } }
 
 main = () {
 	p = control.boundary((b) {
@@ -41,6 +41,6 @@ main = () {
 			x = control.resume(k, Nil)
 			x
 		}
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 	Nil
 }

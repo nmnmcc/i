@@ -9,7 +9,7 @@
 spawn = (s : task.Group(Never), n : Int) -> List(task.Task(Int, Never)) {
 	n |>
 		(0) { [] }
-		| (_) {
+		& (_) {
 			child = task.go(s, () {
 				task.yield()
 				n
@@ -21,7 +21,7 @@ spawn = (s : task.Group(Never), n : Int) -> List(task.Task(Int, Never)) {
 join_all = (tasks : List(task.Task(Int, Never)), sum : Int) -> Int {
 	tasks |>
 		([]) { sum }
-		| ([child, ..rest]) {
+		& ([child, ..rest]) {
 			value = task.join(child)
 			assert(task.join(child) == value)
 			join_all(rest, sum + value)

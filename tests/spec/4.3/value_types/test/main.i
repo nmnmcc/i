@@ -77,7 +77,7 @@ test("codec_projection_and_later_encode", () {
 	assert(size.encode(12) == "12")
 })
 
-test_type = (v : { Int | String }) { v |> (n : Port) { n + 1 } | (_) { 0 } }
+test_type = (v : { Int | String }) { v |> (n : Port) { n + 1 } & (_) { 0 } }
 
 test("completed_alias_type_tests", () {
 	assert(test_type(2) == 3)
@@ -99,7 +99,7 @@ test("matched_holder_and_original_subject", () {
 				y : x = "s"
 				y == "s"
 			}
-			| (_) { True }
+			& (_) { True }
 	}
 	assert(original(1))
 })

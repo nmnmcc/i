@@ -6,7 +6,7 @@
 Later = (double = (Int) <- (Fail(String)) -> Int)
 
 sum = (n : Int, total : Int) <- (later : Later) {
-	n |> (0) { total } | (_) { sum(n - 1, total + later.double(n)) }
+	n |> (0) { total } & (_) { sum(n - 1, total + later.double(n)) }
 }
 
 main = () {

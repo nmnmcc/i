@@ -53,6 +53,6 @@ Dep = (v = Int)
 
 S(N) = (f = () <- N -> Int)
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 fr = () { run(() { use() }) }

@@ -30,7 +30,7 @@ Stdio = (
 read = (max_bytes : Int) <- (io : Stdio) {
 	request.await_owned(io.read(max_bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(StdioError(operation = "read", code = code))
 		}
 }
@@ -38,7 +38,7 @@ read = (max_bytes : Int) <- (io : Stdio) {
 write = (bytes : BitArray) <- (io : Stdio) {
 	request.await_owned(io.write(bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(StdioError(operation = "write", code = code))
 		}
 }
@@ -46,7 +46,7 @@ write = (bytes : BitArray) <- (io : Stdio) {
 write_error = (bytes : BitArray) <- (io : Stdio) {
 	request.await_owned(io.write_error(bytes)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(StdioError(operation = "write_error", code = code))
 		}
 }
@@ -54,7 +54,7 @@ write_error = (bytes : BitArray) <- (io : Stdio) {
 flush = () <- (io : Stdio) {
 	request.await_owned(io.flush()) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(StdioError(operation = "flush", code = code))
 		}
 }
@@ -62,7 +62,7 @@ flush = () <- (io : Stdio) {
 flush_error = () <- (io : Stdio) {
 	request.await_owned(io.flush_error()) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(StdioError(operation = "flush_error", code = code))
 		}
 }

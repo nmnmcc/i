@@ -11,7 +11,7 @@
 // `é` counts as one column.
 inner = (s : String) {
 	x = core.byte_size("éé")
-	{ x > 100 } |> (True) { s } | (False) { "é" <> panic("deep") }
+	{ x > 100 } |> (True) { s } & (False) { "é" <> panic("deep") }
 }
 
 // The call of `inner` is a tail call: it is not in the message.
@@ -25,7 +25,7 @@ outer = (s) {
 each = (xs, f) {
 	xs |>
 		([]) { Nil }
-		| ([x, ..rest]) {
+		& ([x, ..rest]) {
 			// A call through a value.
 			f(x)
 			// A tail call: `each` is not repeated in the message.

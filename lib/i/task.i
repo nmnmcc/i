@@ -533,7 +533,7 @@ selection_key : Key(Selection) = key.new()
 read = <A>(k : Key(A), value : Keyed) -> A {
 	key.unwrap(k, value) |>
 		(key.Found(v)) { v }
-		| (key.Missing) { panic("task: invalid protocol key") }
+		& (key.Missing) { panic("task: invalid protocol key") }
 }
 
 retain = (value) { value }
@@ -552,8 +552,8 @@ unit = () { unit_value }
 answer = (reply : StepAnswer) {
 	reply |>
 		(Proceed(v)) { v }
-		| (CancelStep(cancel)) { cancel() }
-		| (ForwardStep(notice, value, discard, relay)) {
+		& (CancelStep(cancel)) { cancel() }
+		& (ForwardStep(notice, value, discard, relay)) {
 			relay(notice, value, discard)
 		}
 }
@@ -561,40 +561,40 @@ answer = (reply : StepAnswer) {
 ask = (own : Scheduler, command : Command) -> Keyed {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
-		| (AttachedScheduler(..) = attached) { answer(attached.step(command)) }
+		& (AttachedScheduler(..) = attached) { answer(attached.step(command)) }
 }
 
 check_run = (actual : Key(Nil), wanted : Key(Nil)) {
 	{ actual == wanted } |>
 		(True) { Nil }
-		| (False) { panic("task: handle of another run") }
+		& (False) { panic("task: handle of another run") }
 }
 
 portable = (value) {
 	core.portable(value) |>
 		(True) { Nil }
-		| (False) { panic("task: value is not portable") }
+		& (False) { panic("task: value is not portable") }
 }
 
 contains = <A>(xs : List(A), value : A) -> Bool {
-	xs |> ([]) { False } | ([x, ..rest]) { x == value || contains(rest, value) }
+	xs |> ([]) { False } & ([x, ..rest]) { x == value || contains(rest, value) }
 }
 
 append = <A>(xs : List(A), ys : List(A)) -> List(A) {
-	xs |> ([]) { ys } | ([x, ..rest]) { [x, ..append(rest, ys)] }
+	xs |> ([]) { ys } & ([x, ..rest]) { [x, ..append(rest, ys)] }
 }
 
 reverse = <A>(xs : List(A), acc : List(A)) -> List(A) {
-	xs |> ([]) { acc } | ([x, ..rest]) { reverse(rest, [x, ..acc]) }
+	xs |> ([]) { acc } & ([x, ..rest]) { reverse(rest, [x, ..acc]) }
 }
 
 without = <A>(xs : List(A), value : A) -> List(A) {
 	xs |>
 		([]) { [] }
-		| ([x, ..rest]) {
+		& ([x, ..rest]) {
 			{ x == value } |>
 				(True) { without(rest, value) }
-				| (False) { [x, ..without(rest, value)] }
+				& (False) { [x, ..without(rest, value)] }
 		}
 }
 
@@ -608,7 +608,7 @@ NoTasks = ()
 TaskNode(A) = (Int, Int, A, TaskTree(A), TaskTree(A))
 
 tree_height = <A>(tree : TaskTree(A)) -> Int {
-	tree |> (NoTasks) { 0 } | (TaskNode(h, _, _, _, _)) { h }
+	tree |> (NoTasks) { 0 } & (TaskNode(h, _, _, _, _)) { h }
 }
 
 tree_node = <A>(
@@ -619,7 +619,7 @@ tree_node = <A>(
 ) -> TaskTree(A) {
 	a = tree_height(left)
 	b = tree_height(right)
-	h = { a > b } |> (True) { a } | (False) { b }
+	h = { a > b } |> (True) { a } & (False) { b }
 	TaskNode(h + 1, id, task, left, right)
 }
 
@@ -636,7 +636,7 @@ tree_balance = <A>(
 				(True) {
 					tree_node(lid, lt, ll, tree_node(id, task, lr, right))
 				}
-				| (False) {
+				& (False) {
 					lr |>
 						(TaskNode(_, mid, mt, ml, mr)) {
 							tree_node(
@@ -646,13 +646,13 @@ tree_balance = <A>(
 								tree_node(id, task, mr, right),
 							)
 						}
-						| (NoTasks) { panic("task: invalid left rotation") }
+						& (NoTasks) { panic("task: invalid left rotation") }
 				}
 		}
-		| ((d, _, TaskNode(_, rid, rt, rl, rr)) ? d < -1) {
+		& ((d, _, TaskNode(_, rid, rt, rl, rr)) ? d < -1) {
 			{ tree_height(rr) >= tree_height(rl) } |>
 				(True) { tree_node(rid, rt, tree_node(id, task, left, rl), rr) }
-				| (False) {
+				& (False) {
 					rl |>
 						(TaskNode(_, mid, mt, ml, mr)) {
 							tree_node(
@@ -662,22 +662,22 @@ tree_balance = <A>(
 								tree_node(rid, rt, mr, rr),
 							)
 						}
-						| (NoTasks) { panic("task: invalid right rotation") }
+						& (NoTasks) { panic("task: invalid right rotation") }
 				}
 		}
-		| (_) { tree_node(id, task, left, right) }
+		& (_) { tree_node(id, task, left, right) }
 }
 
 tree_find = <A>(tree : TaskTree(A), wanted : Int) -> Maybe(A) {
 	tree |>
 		(NoTasks) { Absent }
-		| (TaskNode(_, id, task, left, right)) {
+		& (TaskNode(_, id, task, left, right)) {
 			{ wanted == id } |>
 				(True) { Present(task) }
-				| (False) {
+				& (False) {
 					{ wanted < id } |>
 						(True) { tree_find(left, wanted) }
-						| (False) { tree_find(right, wanted) }
+						& (False) { tree_find(right, wanted) }
 				}
 		}
 }
@@ -724,34 +724,34 @@ empty_store = <A>() -> TaskStore(A) {
 page_get = <A>(page : TaskPage(A), slot : Int) -> Maybe(A) {
 	slot |>
 		(0) { page.p0 }
-		| (1) { page.p1 }
-		| (2) { page.p2 }
-		| (_) { page.p3 }
+		& (1) { page.p1 }
+		& (2) { page.p2 }
+		& (_) { page.p3 }
 }
 
 page_put = <A>(page : TaskPage(A), slot : Int, value : Maybe(A)) -> TaskPage(
 	A,
 ) {
-	old = page_get(page, slot) |> (Absent) { 0 } | (_) { 1 }
-	new = value |> (Absent) { 0 } | (_) { 1 }
+	old = page_get(page, slot) |> (Absent) { 0 } & (_) { 1 }
+	new = value |> (Absent) { 0 } & (_) { 1 }
 	count = page.count + new - old
 	slot |>
 		(0) { TaskPage(..page, p0 = value, count = count) }
-		| (1) { TaskPage(..page, p1 = value, count = count) }
-		| (2) { TaskPage(..page, p2 = value, count = count) }
-		| (_) { TaskPage(..page, p3 = value, count = count) }
+		& (1) { TaskPage(..page, p1 = value, count = count) }
+		& (2) { TaskPage(..page, p2 = value, count = count) }
+		& (_) { TaskPage(..page, p3 = value, count = count) }
 }
 
 page_find = <A>(store : TaskStore(A), id : Int) -> TaskPage(A) {
 	store.first |>
 		(Present(c) ? c.id == id) { c.page }
-		| (_) {
+		& (_) {
 			store.second |>
 				(Present(c) ? c.id == id) { c.page }
-				| (_) {
+				& (_) {
 					tree_find(store.rows, id) |>
 						(Present(page)) { page }
-						| (Absent) { empty_page() }
+						& (Absent) { empty_page() }
 				}
 		}
 }
@@ -764,9 +764,9 @@ flush_page = <A>(
 		(Present(c) ? c.dirty) {
 			{ c.page.count == 0 } |>
 				(True) { drop_task(rows, c.id) }
-				| (False) { put_task(rows, c.id, c.page) }
+				& (False) { put_task(rows, c.id, c.page) }
 		}
-		| (_) { rows }
+		& (_) { rows }
 }
 
 write_slot = <A>(store : TaskStore(A), id : Int, value : Maybe(A)) -> TaskStore(
@@ -787,7 +787,7 @@ write_slot = <A>(store : TaskStore(A), id : Int, value : Maybe(A)) -> TaskStore(
 				),
 			)
 		}
-		| (_) {
+		& (_) {
 			store.second |>
 				(Present(c) ? c.id == number) {
 					TaskStore(
@@ -801,7 +801,7 @@ write_slot = <A>(store : TaskStore(A), id : Int, value : Maybe(A)) -> TaskStore(
 						),
 					)
 				}
-				| (_) {
+				& (_) {
 					page = page_find(store, number)
 					rows = flush_page(
 						drop_task(store.rows, number),
@@ -826,32 +826,32 @@ write_slot = <A>(store : TaskStore(A), id : Int, value : Maybe(A)) -> TaskStore(
 store_find = <A>(store : TaskStore(A), id : Int) -> Maybe(A) {
 	{ store.focus_id == id } |>
 		(True) { store.focus }
-		| (False) {
+		& (False) {
 			{ store.spare_id == id } |>
 				(True) { store.spare }
-				| (False) { page_get(page_find(store, id / 4), id % 4) }
+				& (False) { page_get(page_find(store, id / 4), id % 4) }
 		}
 }
 
 find_task = (store : TaskStore(TaskState), id : Int) -> TaskState {
 	store_find(store, id) |>
 		(Present(t)) { t }
-		| (Absent) { panic("task: task is gone") }
+		& (Absent) { panic("task: task is gone") }
 }
 
 flush_record = <A>(store : TaskStore(A)) -> TaskStore(A) {
 	store.spare |>
 		(Absent) { store }
-		| (Present(_)) { write_slot(store, store.spare_id, store.spare) }
+		& (Present(_)) { write_slot(store, store.spare_id, store.spare) }
 }
 
 store_update = <A>(store : TaskStore(A), id : Int, value : A) -> TaskStore(A) {
 	{ store.focus_id == id } |>
 		(True) { TaskStore(..store, focus = Present(value)) }
-		| (False) {
+		& (False) {
 			{ store.spare_id == id } |>
 				(True) { TaskStore(..store, spare = Present(value)) }
-				| (False) {
+				& (False) {
 					TaskStore(
 						..flush_record(write_slot(store, id, Absent)),
 						spare_id = id,
@@ -864,7 +864,7 @@ store_update = <A>(store : TaskStore(A), id : Int, value : A) -> TaskStore(A) {
 focus_task = <A>(store : TaskStore(A), id : Int) -> TaskStore(A) {
 	{ store.focus_id == id } |>
 		(True) { store }
-		| (False) {
+		& (False) {
 			{ store.spare_id == id } |>
 				(True) {
 					TaskStore(
@@ -875,10 +875,10 @@ focus_task = <A>(store : TaskStore(A), id : Int) -> TaskStore(A) {
 						spare = store.focus,
 					)
 				}
-				| (False) {
+				& (False) {
 					value = store_find(store, id) |>
 						(Present(t)) { t }
-						| (Absent) { panic("task: missing table row") }
+						& (Absent) { panic("task: missing table row") }
 					next = flush_record(write_slot(store, id, Absent))
 					TaskStore(
 						..next,
@@ -894,10 +894,10 @@ focus_task = <A>(store : TaskStore(A), id : Int) -> TaskStore(A) {
 put_task = <A>(tree : TaskTree(A), id : Int, task : A) -> TaskTree(A) {
 	tree |>
 		(NoTasks) { tree_node(id, task, NoTasks, NoTasks) }
-		| (TaskNode(_, old, value, left, right)) {
+		& (TaskNode(_, old, value, left, right)) {
 			{ id == old } |>
 				(True) { tree_node(id, task, left, right) }
-				| (False) {
+				& (False) {
 					{ id < old } |>
 						(True) {
 							tree_balance(
@@ -907,7 +907,7 @@ put_task = <A>(tree : TaskTree(A), id : Int, task : A) -> TaskTree(A) {
 								right,
 							)
 						}
-						| (False) {
+						& (False) {
 							tree_balance(
 								old,
 								value,
@@ -924,10 +924,10 @@ put_task = <A>(tree : TaskTree(A), id : Int, task : A) -> TaskTree(A) {
 update_task = <A>(tree : TaskTree(A), wanted : Int, value : A) -> TaskTree(A) {
 	tree |>
 		(NoTasks) { panic("task: missing task update") }
-		| (TaskNode(h, id, task, left, right)) {
+		& (TaskNode(h, id, task, left, right)) {
 			{ wanted == id } |>
 				(True) { TaskNode(h, id, value, left, right) }
-				| (False) {
+				& (False) {
 					{ wanted < id } |>
 						(True) {
 							TaskNode(
@@ -938,7 +938,7 @@ update_task = <A>(tree : TaskTree(A), wanted : Int, value : A) -> TaskTree(A) {
 								right,
 							)
 						}
-						| (False) {
+						& (False) {
 							TaskNode(
 								h,
 								id,
@@ -954,20 +954,20 @@ update_task = <A>(tree : TaskTree(A), wanted : Int, value : A) -> TaskTree(A) {
 tree_first = <A>(tree : TaskTree(A)) -> (Int, A) {
 	tree |>
 		(NoTasks) { panic("task: empty task index") }
-		| (TaskNode(_, id, t, NoTasks, _)) { (id, t) }
-		| (TaskNode(_, _, _, left, _)) { tree_first(left) }
+		& (TaskNode(_, id, t, NoTasks, _)) { (id, t) }
+		& (TaskNode(_, _, _, left, _)) { tree_first(left) }
 }
 
 drop_task = <A>(tree : TaskTree(A), wanted : Int) -> TaskTree(A) {
 	tree |>
 		(NoTasks) { NoTasks }
-		| (TaskNode(_, id, task, left, right)) {
+		& (TaskNode(_, id, task, left, right)) {
 			{ wanted == id } |>
 				(True) {
 					(left, right) |>
 						((NoTasks, _)) { right }
-						| ((_, NoTasks)) { left }
-						| (_) {
+						& ((_, NoTasks)) { left }
+						& (_) {
 							(next, value) = tree_first(right)
 							tree_balance(
 								next,
@@ -977,7 +977,7 @@ drop_task = <A>(tree : TaskTree(A), wanted : Int) -> TaskTree(A) {
 							)
 						}
 				}
-				| (False) {
+				& (False) {
 					{ wanted < id } |>
 						(True) {
 							tree_balance(
@@ -987,7 +987,7 @@ drop_task = <A>(tree : TaskTree(A), wanted : Int) -> TaskTree(A) {
 								right,
 							)
 						}
-						| (False) {
+						& (False) {
 							tree_balance(
 								id,
 								task,
@@ -1002,7 +1002,7 @@ drop_task = <A>(tree : TaskTree(A), wanted : Int) -> TaskTree(A) {
 tree_rows = <A>(tree : TaskTree(A), rest : List(A)) -> List(A) {
 	tree |>
 		(NoTasks) { rest }
-		| (TaskNode(_, _, task, left, right)) {
+		& (TaskNode(_, _, task, left, right)) {
 			tree_rows(left, [task, ..tree_rows(right, rest)])
 		}
 }
@@ -1010,7 +1010,7 @@ tree_rows = <A>(tree : TaskTree(A), rest : List(A)) -> List(A) {
 store_add = <A>(store : TaskStore(A), id : Int, value : A) -> TaskStore(A) {
 	store.focus |>
 		(Absent) { TaskStore(..store, focus_id = id, focus = Present(value)) }
-		| (_) {
+		& (_) {
 			TaskStore(
 				..flush_record(store),
 				spare_id = id,
@@ -1022,15 +1022,15 @@ store_add = <A>(store : TaskStore(A), id : Int, value : A) -> TaskStore(A) {
 drop_children = <A>(store : TaskStore(A), ids : List(Int)) -> TaskStore(A) {
 	ids |>
 		([]) { store }
-		| ([id, ..rest]) {
+		& ([id, ..rest]) {
 			next = { store.focus_id == id } |>
 				(True) { TaskStore(..store, focus_id = -1, focus = Absent) }
-				| (False) {
+				& (False) {
 					{ store.spare_id == id } |>
 						(True) {
 							TaskStore(..store, spare_id = -1, spare = Absent)
 						}
-						| (False) { write_slot(store, id, Absent) }
+						& (False) { write_slot(store, id, Absent) }
 				}
 			drop_children(next, rest)
 		}
@@ -1044,7 +1044,7 @@ address_index = (id : Address) -> Int {
 find_scope = (scopes : TaskStore(ScopeState), id : Address) -> ScopeState {
 	store_find(scopes, address_index(id)) |>
 		(Present(s)) { s }
-		| (Absent) { panic("task: scope is gone") }
+		& (Absent) { panic("task: scope is gone") }
 }
 
 put_scope = (scopes : TaskStore(ScopeState), scope : ScopeState) {
@@ -1052,7 +1052,7 @@ put_scope = (scopes : TaskStore(ScopeState), scope : ScopeState) {
 }
 
 active_live = (task : ActiveTask) {
-	request.state(task.alive) |> (request.Ready(_)) { True } | (_) { False }
+	request.state(task.alive) |> (request.Ready(_)) { True } & (_) { False }
 }
 
 record_task = (
@@ -1063,7 +1063,7 @@ record_task = (
 ) -> State {
 	previous = { new } |>
 		(True) { t }
-		| (False) { find_task(s.tasks, t.serial) }
+		& (False) { find_task(s.tasks, t.serial) }
 	was_clean = new || previous.clean
 	became_clean = core.not(was_clean) && t.clean
 	became_clean |>
@@ -1071,37 +1071,37 @@ record_task = (
 			request.take(t.alive)
 			Nil
 		}
-		| (False) { Nil }
+		& (False) { Nil }
 	added = new && core.not(t.clean)
 	count = s.active_count +
-		{ added |> (True) { 1 } | (False) { 0 } } -
-		{ became_clean |> (True) { 1 } | (False) { 0 } }
-	size = s.active_size + { added |> (True) { 1 } | (False) { 0 } }
+		{ added |> (True) { 1 } & (False) { 0 } } -
+		{ became_clean |> (True) { 1 } & (False) { 0 } }
+	size = s.active_size + { added |> (True) { 1 } & (False) { 0 } }
 	active = added |>
 		(True) { [ActiveTask(id = t.serial, alive = t.alive), ..s.active] }
-		| (False) { s.active }
+		& (False) { s.active }
 	compact = size > count * 2
 	active = compact |>
 		(True) { filter(active, active_live) }
-		| (False) { active }
-	size = compact |> (True) { count } | (False) { size }
-	ended = t.status |> (Ended) { True } | (_) { False }
-	was_ended = previous.status |> (Ended) { True } | (_) { False }
+		& (False) { active }
+	size = compact |> (True) { count } & (False) { size }
+	ended = t.status |> (Ended) { True } & (_) { False }
+	was_ended = previous.status |> (Ended) { True } & (_) { False }
 	unclean = {
 		ended && core.not(t.clean) && { new || core.not(was_ended) }
 	} |>
 		(True) { [t.serial, ..s.unclean] }
-		| (False) {
+		& (False) {
 			{ became_clean } |>
 				(True) { without(s.unclean, t.serial) }
-				| (False) { s.unclean }
+				& (False) { s.unclean }
 		}
 	changed = { new } |>
 		(True) { False }
-		| (False) {
+		& (False) {
 			previous.outcome |>
-				(Pending) { t.outcome |> (Pending) { False } | (_) { True } }
-				| (_) { False }
+				(Pending) { t.outcome |> (Pending) { False } & (_) { True } }
+				& (_) { False }
 		}
 	next = State(
 		..s,
@@ -1112,16 +1112,16 @@ record_task = (
 		unclean = unclean,
 		changed_sources = changed |>
 			(True) { [t.serial, ..s.changed_sources] }
-			| (False) { s.changed_sources },
+			& (False) { s.changed_sources },
 		cancel_history = s.cancel_history || t.cancelled_by != Absent,
 		message_history = s.message_history || core.not(t.messages == []),
 	)
 	became_clean |>
 		(False) { next }
-		| (True) {
+		& (True) {
 			t.parent |>
 				(Absent) { next }
-				| (Present(parent)) {
+				& (Present(parent)) {
 					scope = find_scope(next.scopes, parent)
 					set_scope(
 						next,
@@ -1140,17 +1140,17 @@ add_task = (s : State, t : TaskState) {
 }
 
 set_scope = (s : State, scope : ScopeState) {
-	closed = scope.mark |> (BodyOpen) { False } | (_) { True }
+	closed = scope.mark |> (BodyOpen) { False } & (_) { True }
 	ready = closed && scope.pending == 0 && core.not(scope.retiring)
 	updated = ready |>
 		(True) { ScopeState(..scope, retiring = True) }
-		| (False) { scope }
+		& (False) { scope }
 	State(
 		..s,
 		scopes = put_scope(s.scopes, updated),
 		dirty_scopes = ready |>
 			(True) { [scope.address, ..s.dirty_scopes] }
-			| (False) { s.dirty_scopes },
+			& (False) { s.dirty_scopes },
 		cancel_history = s.cancel_history || scope.cancellation != Absent,
 	)
 }
@@ -1195,11 +1195,11 @@ complete = <A, E, N>(
 ) -> Completion {
 	fail.catch(body) |>
 		(Ok(value)) {
-			{ check } |> (True) { portable(value) } | (False) { Nil }
+			{ check } |> (True) { portable(value) } & (False) { Nil }
 			Succeeded(key.wrap(result, Ok(value)))
 		}
-		| (Error(error)) {
-			{ check } |> (True) { portable(error) } | (False) { Nil }
+		& (Error(error)) {
+			{ check } |> (True) { portable(error) } & (False) { Nil }
 			Failed(key.wrap(result, Error(error)), key.wrap(errors, error))
 		}
 }
@@ -1214,7 +1214,7 @@ make_start : <A, E, N>(
 		kept = control.keep((own : Scheduler) {
 			own.state |>
 				(DetachedScheduler) { panic("task: no scheduler") }
-				| (AttachedScheduler(..) = attached) {
+				& (AttachedScheduler(..) = attached) {
 					{
 						local = control.keep((_ : Nil) {
 							complete(body, result, errors, check)
@@ -1280,7 +1280,7 @@ worker_share_drop : (Key(Nil), Address) -> Nil
 drop_shares = (s : State, ids : List(Address)) {
 	ids |>
 		([]) { Nil }
-		| ([id, ..rest]) {
+		& ([id, ..rest]) {
 			worker_share_drop(s.run, id)
 			drop_shares(s, rest)
 		}
@@ -1307,7 +1307,7 @@ remote_turn = (
 								run,
 							)
 						}
-						| (_) {
+						& (_) {
 							(
 								Stepped(
 									command,
@@ -1320,14 +1320,14 @@ remote_turn = (
 				}
 				// Requests of this worker are waited for here; the scheduler
 				// only sees a wait that a `Woken` message or a cancel ends.
-				| (Wait(tickets)) {
+				& (Wait(tickets)) {
 					(
 						Stepped(Wait([]), list_map(finals, (f) { f(k) })),
 						k,
 						tickets,
 					)
 				}
-				| (Register(_, _, _, _, final)) {
+				& (Register(_, _, _, _, final)) {
 					(
 						Stepped(
 							command,
@@ -1337,14 +1337,14 @@ remote_turn = (
 						[],
 					)
 				}
-				| (_) {
+				& (_) {
 					(Stepped(command, list_map(finals, (f) { f(k) })), k, [])
 				}
 		}
-		| (Finished(_, completion)) {
+		& (Finished(_, completion)) {
 			(Exited(completion), worker_placeholder(), [])
 		}
-		| (Sent(_)) { panic("task: a worker task was sent") }
+		& (Sent(_)) { panic("task: a worker task was sent") }
 }
 
 remote_begin = (job : Job) -> (
@@ -1381,7 +1381,7 @@ remote_resume = (input : (Continuation(StepAnswer, Turn, Never), Resume)) -> (
 publish = (s : State, task_path : List(Int), start : Start) -> Start {
 	{ s.scripted || core.not(s.top) || core.not(worker_enabled()) } |>
 		(True) { start }
-		| (False) {
+		& (False) {
 			Start(
 				..start,
 				ticket = worker_publish(
@@ -1414,26 +1414,26 @@ split_flags = (frames : List(Frame), flags : List(Bool)) -> (
 			(own, extra) = split_flags(rest, more)
 			([flag, ..own], extra)
 		}
-		| (_) { ([], flags) }
+		& (_) { ([], flags) }
 }
 
 apply_finals = (frames : List(Frame), flags : List(Bool)) -> List(Frame) {
 	(frames, flags) |>
 		(([], [])) { [] }
-		| (([f, ..rest], [flag, ..more])) {
+		& (([f, ..rest], [flag, ..more])) {
 			[Frame(..f, finishing = flag), ..apply_finals(rest, more)]
 		}
-		| (_) { panic("task: frames of a worker task changed") }
+		& (_) { panic("task: frames of a worker task changed") }
 }
 
 /// Take one message of a task on another worker, when no task is current.
 pull = (s : State) -> State {
 	{ s.top && s.current == Absent } |>
 		(False) { s }
-		| (True) {
+		& (True) {
 			worker_inbox() |>
 				(0) { s }
-				| (serial) {
+				& (serial) {
 					t = find_task(s.tasks, serial)
 					running = set_task(s, TaskState(..t, status = Running))
 					worker_message() |>
@@ -1446,14 +1446,14 @@ pull = (s : State) -> State {
 								Present(flags),
 							)
 						}
-						| (Exited(completion)) {
+						& (Exited(completion)) {
 							observe_completion(
 								running,
 								find_task(running.tasks, serial),
 								completion,
 							)
 						}
-						| (Woken) {
+						& (Woken) {
 							t.status |>
 								(WaitingTicket(k, _)) {
 									queue(
@@ -1476,7 +1476,7 @@ pull = (s : State) -> State {
 										serial,
 									)
 								}
-								| (_) { s }
+								& (_) { s }
 						}
 				}
 		}
@@ -1485,13 +1485,13 @@ pull = (s : State) -> State {
 path = () <- (own : Scheduler) {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
-		| (AttachedScheduler(..) = attached) { read(path_key, attached.path) }
+		& (AttachedScheduler(..) = attached) { read(path_key, attached.path) }
 }
 
 random = () <- (own : Scheduler) {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
-		| (AttachedScheduler(..) = attached) { attached.seed() }
+		& (AttachedScheduler(..) = attached) { attached.seed() }
 }
 
 yield = () <- (own : Scheduler) {
@@ -1502,7 +1502,7 @@ yield = () <- (own : Scheduler) {
 top = (seed : rng.Generator) <- (current : Runner) -> Runner {
 	current.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
-		| (AttachedRunner(..) = attached) {
+		& (AttachedRunner(..) = attached) {
 			Runner(state = AttachedRunner(..attached, seed = seed))
 		}
 }
@@ -1516,7 +1516,7 @@ has_work : (Ticket) -> Bool
 wait_root = (_run : Key(Nil), root : request.Root, tickets : List(Ticket)) {
 	{ request.count_root(root) > 0 } |>
 		(False) { request.wait_any(tickets) }
-		| (True) {
+		& (True) {
 			changed = observe_change(root.key)
 			resource.ensure(
 				() { request.wait_any([request.ticket(changed), ..tickets]) },
@@ -1529,7 +1529,7 @@ wait_root = (_run : Key(Nil), root : request.Root, tickets : List(Ticket)) {
 root_poll = (_run : Key(Nil), tickets : List(Ticket), runnable : Bool) {
 	{ runnable && core.not(tickets == []) } |>
 		(False) { Nil }
-		| (True) { request.poll() }
+		& (True) { request.poll() }
 	ContinueRun
 }
 
@@ -1555,8 +1555,8 @@ initial = (root : request.Root) -> Runner {
 run_control = (reply : StepAnswer) {
 	reply |>
 		(Proceed(_)) { ContinueRun }
-		| (CancelStep(abort)) { ParentCancel(abort) }
-		| (ForwardStep(notice, _, _, _)) { ForwardRun(notice) }
+		& (CancelStep(abort)) { ParentCancel(abort) }
+		& (ForwardStep(notice, _, _, _)) { ForwardRun(notice) }
 }
 
 make_scheduler = (
@@ -1569,13 +1569,13 @@ make_scheduler = (
 ) -> Scheduler {
 	upstream.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
-		| (AttachedRunner(..) = attached) {
+		& (AttachedRunner(..) = attached) {
 			route = (command : Command) {
 				control.suspend(b, (k) { Switched(id, command, k) })
 			}
 			policy = attached.policy |>
 				(Fifo) { Fifo }
-				| (Script(_)) { Script([]) }
+				& (Script(_)) { Script([]) }
 			runner = Runner(
 				state = AttachedRunner(
 					seed = attached.seed,
@@ -1599,7 +1599,7 @@ make_scheduler = (
 							(False) {
 								run_control(route(NestedWait(id, tickets)))
 							}
-							| (True) {
+							& (True) {
 								changed = observe_change(root.key)
 								resource.ensure(
 									() {
@@ -1644,7 +1644,7 @@ make_scheduler = (
 			generator = () {
 				fail.catch(() { rng.at_path(seed, task_path) }) |>
 					(Ok(g)) { g }
-					| (Error(_)) { panic("task: invalid task path") }
+					& (Error(_)) { panic("task: invalid task path") }
 			}
 			Scheduler(
 				state = AttachedScheduler(
@@ -1662,20 +1662,20 @@ make_scheduler = (
 }
 
 list_map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
-	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..list_map(rest, f)] }
+	xs |> ([]) { [] } & ([x, ..rest]) { [f(x), ..list_map(rest, f)] }
 }
 
 any = <A>(xs : List(A), f : (A) -> Bool) -> Bool {
-	xs |> ([]) { False } | ([x, ..rest]) { f(x) || any(rest, f) }
+	xs |> ([]) { False } & ([x, ..rest]) { f(x) || any(rest, f) }
 }
 
 filter = <A>(xs : List(A), f : (A) -> Bool) -> List(A) {
 	xs |>
 		([]) { [] }
-		| ([x, ..rest]) {
+		& ([x, ..rest]) {
 			{ f(x) } |>
 				(True) { [x, ..filter(rest, f)] }
-				| (False) { filter(rest, f) }
+				& (False) { filter(rest, f) }
 		}
 }
 
@@ -1683,13 +1683,13 @@ filter = <A>(xs : List(A), f : (A) -> Bool) -> List(A) {
 first_path = (a : List(Int), b : List(Int)) -> Bool {
 	a |>
 		([]) { True }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			b |>
 				([]) { False }
-				| ([y, ..ys]) {
+				& ([y, ..ys]) {
 					{ x == y } |>
 						(True) { first_path(xs, ys) }
-						| (False) { x < y }
+						& (False) { x < y }
 				}
 		}
 }
@@ -1697,29 +1697,29 @@ first_path = (a : List(Int), b : List(Int)) -> Bool {
 active_epochs = (frames : List(Frame)) -> List(Cause) {
 	frames |>
 		([]) { [] }
-		| ([f, ..rest]) {
+		& ([f, ..rest]) {
 			f.cause |>
 				(Absent) { active_epochs(rest) }
-				| (Present(c)) { [c, ..active_epochs(rest)] }
+				& (Present(c)) { [c, ..active_epochs(rest)] }
 		}
 }
 
 exemptions = (s : State, t : TaskState) {
 	{ s.epoch == 0 && core.not(s.message_history) } |>
 		(True) { t.immune }
-		| (False) { append(t.immune, active_epochs(t.frames)) }
+		& (False) { append(t.immune, active_epochs(t.frames)) }
 }
 
 frame_plan = (frames : List(Frame), cause : Cause) -> Maybe(CancelPlan) {
 	frames |>
 		([]) { Absent }
-		| ([f, ..rest]) {
+		& ([f, ..rest]) {
 			{ f.finishing } |>
 				(True) { Absent }
-				| (False) {
+				& (False) {
 					f.unwinding |>
 						(Present(_)) { Absent }
-						| (Absent) {
+						& (Absent) {
 							{ contains(f.immune, cause) } |>
 								(False) {
 									Present(
@@ -1738,10 +1738,10 @@ frame_plan = (frames : List(Frame), cause : Cause) -> Maybe(CancelPlan) {
 										),
 									)
 								}
-								| (True) {
+								& (True) {
 									frame_plan(rest, cause) |>
 										(Absent) { Absent }
-										| (Present(plan)) {
+										& (Present(plan)) {
 											Present(
 												CancelPlan(
 													frames = [f, ..plan.frames],
@@ -1763,32 +1763,32 @@ cause_for_chain = (s : State, t : TaskState, chain : List(Address)) -> Maybe(
 			{
 				t.cancelled_by |>
 					(Present(c)) { Present(c) }
-					| (Absent) { s.cancellation }
+					& (Absent) { s.cancellation }
 			} |>
 				(Absent) { Absent }
-				| (Present(c)) {
+				& (Present(c)) {
 					{ cause_allowed(s, t, c) } |>
 						(True) { Present(c) }
-						| (False) { Absent }
+						& (False) { Absent }
 				}
 		}
-		| ([id, ..rest]) {
+		& ([id, ..rest]) {
 			scope = find_scope(s.scopes, id)
 			scope.cancellation |>
 				(Absent) { cause_for_chain(s, t, rest) }
-				| (Present(c)) {
+				& (Present(c)) {
 					{
 						contains(t.immune, c) ||
 							core.not(cause_allowed(s, t, c))
 					} |>
 						(True) { cause_for_chain(s, t, rest) }
-						| (False) {
+						& (False) {
 							frame_plan(t.frames, c) |>
 								(Present(_)) { Present(c) }
-								| (Absent) {
+								& (Absent) {
 									t.status |>
 										(Dormant(_)) { Present(c) }
-										| (_) { cause_for_chain(s, t, rest) }
+										& (_) { cause_for_chain(s, t, rest) }
 								}
 						}
 				}
@@ -1804,26 +1804,26 @@ withdraw = (s : State, flag : Request(Registration)) -> State {
 			counted = adjust_waiters(s, row.leaves)
 			compact_sources(counted, row.leaves)
 		}
-		| (_) { s }
+		& (_) { s }
 }
 
 remove_registration = (s : State, task_path : Int) {
 	find_task(s.tasks, task_path).status |>
 		(WaitingEvent(_, flag)) { withdraw(s, flag) }
-		| (_) { s }
+		& (_) { s }
 }
 
 waiter_live = (w : Waiter) {
-	request.state(w.flag) |> (request.Ready(_)) { True } | (_) { False }
+	request.state(w.flag) |> (request.Ready(_)) { True } & (_) { False }
 }
 
 compact_queue = (q : WaitQueue) -> WaitQueue {
 	{ q.total > q.live * 2 } |>
 		(False) { q }
-		| (True) {
+		& (True) {
 			{ q.live == 0 } |>
 				(True) { no_waiters }
-				| (False) {
+				& (False) {
 					WaitQueue(
 						front = append(
 							filter(q.front, waiter_live),
@@ -1868,7 +1868,7 @@ queue_head = (
 						waiter = Absent,
 					)
 				}
-				| (_) {
+				& (_) {
 					queue_head(
 						WaitQueue(
 							front = reverse(q.back, []),
@@ -1881,13 +1881,13 @@ queue_head = (
 					)
 				}
 		}
-		| ([w, ..rest]) {
+		& ([w, ..rest]) {
 			{ waiter_live(w) } |>
 				(True) {
 					{
 						excluded |>
 							(Absent) { False }
-							| (Present(flag)) { flag == w.flag }
+							& (Present(flag)) { flag == w.flag }
 					} |>
 						(True) {
 							queue_head(
@@ -1901,7 +1901,7 @@ queue_head = (
 								[w, ..skipped],
 							)
 						}
-						| (False) {
+						& (False) {
 							QueueHead(
 								queue = WaitQueue(
 									front = append(
@@ -1916,7 +1916,7 @@ queue_head = (
 							)
 						}
 				}
-				| (False) {
+				& (False) {
 					queue_head(
 						WaitQueue(
 							front = rest,
@@ -1936,7 +1936,7 @@ queue_live = (q : WaitQueue) { q.live > 0 }
 adjust_waiters = (s : State, leaves : List(Leaf)) -> State {
 	leaves |>
 		([]) { s }
-		| ([leaf, ..rest]) {
+		& ([leaf, ..rest]) {
 			next = leaf |>
 				(SendLeaf(info, _)) {
 					c = find_channel(s.channels, read(address_key, info.id))
@@ -1951,7 +1951,7 @@ adjust_waiters = (s : State, leaves : List(Leaf)) -> State {
 						),
 					)
 				}
-				| (ReceiveLeaf(info)) {
+				& (ReceiveLeaf(info)) {
 					c = find_channel(s.channels, read(address_key, info.id))
 					set_channel(
 						s,
@@ -1964,7 +1964,7 @@ adjust_waiters = (s : State, leaves : List(Leaf)) -> State {
 						),
 					)
 				}
-				| (JoinLeaf(info)) {
+				& (JoinLeaf(info)) {
 					t = find_task(s.tasks, read(task_key, info.id))
 					t.outcome |>
 						(Pending) {
@@ -1979,9 +1979,9 @@ adjust_waiters = (s : State, leaves : List(Leaf)) -> State {
 								),
 							)
 						}
-						| (_) { s }
+						& (_) { s }
 				}
-				| (AlwaysLeaf(_)) { s }
+				& (AlwaysLeaf(_)) { s }
 			adjust_waiters(next, rest)
 		}
 }
@@ -1989,7 +1989,7 @@ adjust_waiters = (s : State, leaves : List(Leaf)) -> State {
 compact_sources = (s : State, leaves : List(Leaf)) -> State {
 	leaves |>
 		([]) { s }
-		| ([leaf, ..rest]) {
+		& ([leaf, ..rest]) {
 			next = leaf |>
 				(SendLeaf(info, _)) {
 					c = find_channel(s.channels, read(address_key, info.id))
@@ -1998,7 +1998,7 @@ compact_sources = (s : State, leaves : List(Leaf)) -> State {
 						ChannelState(..c, senders = compact_queue(c.senders)),
 					)
 				}
-				| (ReceiveLeaf(info)) {
+				& (ReceiveLeaf(info)) {
 					c = find_channel(s.channels, read(address_key, info.id))
 					set_channel(
 						s,
@@ -2008,7 +2008,7 @@ compact_sources = (s : State, leaves : List(Leaf)) -> State {
 						),
 					)
 				}
-				| (JoinLeaf(info)) {
+				& (JoinLeaf(info)) {
 					t = find_task(s.tasks, read(task_key, info.id))
 					t.outcome |>
 						(Pending) {
@@ -2020,9 +2020,9 @@ compact_sources = (s : State, leaves : List(Leaf)) -> State {
 								),
 							)
 						}
-						| (_) { s }
+						& (_) { s }
 				}
-				| (AlwaysLeaf(_)) { s }
+				& (AlwaysLeaf(_)) { s }
 			compact_sources(next, rest)
 		}
 }
@@ -2042,7 +2042,7 @@ queue = (s : State, task_path : Int) {
 	task = find_task(s.tasks, task_path)
 	{ task.queued } |>
 		(True) { s }
-		| (False) {
+		& (False) {
 			next = set_task(s, TaskState(..task, queued = True))
 			State(..next, ready_back = [task_path, ..next.ready_back])
 		}
@@ -2061,13 +2061,13 @@ reply = (
 	next = set_task(s, TaskState(..t, status = Runnable(k, value)))
 	{ switch } |>
 		(True) { queue(State(..next, current = Absent), task_path) }
-		| (False) { State(..next, current = Present(task_path)) }
+		& (False) { State(..next, current = Present(task_path)) }
 }
 
 accept_cancel = (s : State, t : TaskState, c : Cause) -> State {
 	{ contains(t.immune, c) || core.not(cause_allowed(s, t, c)) } |>
 		(True) { s }
-		| (False) {
+		& (False) {
 			t.status |>
 				(Dormant(_)) {
 					next = set_task(
@@ -2086,33 +2086,33 @@ accept_cancel = (s : State, t : TaskState, c : Cause) -> State {
 						ready_back = without(next.ready_back, t.serial),
 					)
 				}
-				| (Ended | Running | Away) { s }
-				| (_) {
+				& (Ended | Running | Away) { s }
+				& (_) {
 					frame_plan(t.frames, c) |>
 						(Absent) { s }
-						| (Present(plan)) {
+						& (Present(plan)) {
 							terminal = c.run != s.run ||
 								{
 									c.scope |>
 										(Absent) { True }
-										| (Present(id)) { contains(t.base, id) }
+										& (Present(id)) { contains(t.base, id) }
 								}
 							outcome = t.outcome |>
 								(Pending) {
 									{ terminal } |>
 										(True) { Cancelled(c) }
-										| (False) { Pending }
+										& (False) { Pending }
 								}
-								| (_) { t.outcome }
+								& (_) { t.outcome }
 							deferred = affected_nests(t, plan.frames) |>
 								([]) { False }
-								| (_) { True }
+								& (_) { True }
 							frames = list_map(plan.frames, (f : Frame) {
 								f.cause |>
 									(Present(cause) ? cause == c) {
 										Frame(..f, deferred = deferred)
 									}
-									| (_) { f }
+									& (_) { f }
 							})
 							updated = TaskState(
 								..t,
@@ -2128,7 +2128,7 @@ accept_cancel = (s : State, t : TaskState, c : Cause) -> State {
 												"task: missing cancellation delimiter",
 											)
 										}
-										| ([frame, .._]) {
+										& ([frame, .._]) {
 											frame.foreign |>
 												([]) {
 													cancel_response(
@@ -2137,7 +2137,7 @@ accept_cancel = (s : State, t : TaskState, c : Cause) -> State {
 														plan.abort,
 													)
 												}
-												| (hops) {
+												& (hops) {
 													forward_response(
 														saved,
 														updated,
@@ -2154,17 +2154,17 @@ accept_cancel = (s : State, t : TaskState, c : Cause) -> State {
 												}
 										}
 								}
-								| (True) {
+								& (True) {
 									t.driver |>
 										(Present(id)) {
 											notify_nested(saved, updated, id)
 										}
-										| (Absent) {
+										& (Absent) {
 											nested_abort(
 												affected_nests(t, plan.frames),
 											) |>
 												(Absent) { saved }
-												| (Present(abort)) {
+												& (Present(abort)) {
 													cancel_response(
 														saved,
 														updated,
@@ -2181,29 +2181,29 @@ accept_cancel = (s : State, t : TaskState, c : Cause) -> State {
 propagate_tasks = (s : State, rows : List(ActiveTask)) -> State {
 	rows |>
 		([]) { s }
-		| ([entry, ..rest]) {
+		& ([entry, ..rest]) {
 			store_find(s.tasks, entry.id) |>
 				(Present(t) ? core.not(t.clean)) {
 					next = cause_for_chain(s, t, t.chain) |>
 						(Absent) { s }
-						| (Present(c)) { accept_cancel(s, t, c) }
+						& (Present(c)) { accept_cancel(s, t, c) }
 					propagate_tasks(next, rest)
 				}
-				| (_) { propagate_tasks(s, rest) }
+				& (_) { propagate_tasks(s, rest) }
 		}
 }
 
 propagate = (s : State) {
 	{ s.cancel_history || s.cancellation != Absent } |>
 		(False) { s }
-		| (True) { propagate_tasks(s, reverse(s.active, [])) }
+		& (True) { propagate_tasks(s, reverse(s.active, [])) }
 }
 
 cancel_scope = (s : State, id : Address) -> State {
 	scope = find_scope(s.scopes, id)
 	scope.cancellation |>
 		(Present(_)) { s }
-		| (Absent) {
+		& (Absent) {
 			epoch = s.epoch + 1
 			set_scope(
 				State(..s, epoch = epoch),
@@ -2220,7 +2220,7 @@ cancel_scope = (s : State, id : Address) -> State {
 cancel_run = (s : State) -> State {
 	s.cancellation |>
 		(Present(_)) { s }
-		| (Absent) {
+		& (Absent) {
 			State(
 				..s,
 				epoch = s.epoch + 1,
@@ -2237,7 +2237,7 @@ check_scope = (s : State, t : TaskState, scope : ScopeInfo, message : String) {
 	check_run(s.run, scope.run)
 	{ contains(t.chain, read(address_key, scope.id)) } |>
 		(True) { Nil }
-		| (False) { panic(message) }
+		& (False) { panic(message) }
 }
 
 find_channel = (
@@ -2246,7 +2246,7 @@ find_channel = (
 ) -> ChannelState {
 	store_find(channels, address_index(id)) |>
 		(Present(c)) { c }
-		| (Absent) { panic("task: channel is gone") }
+		& (Absent) { panic("task: channel is gone") }
 }
 
 check_channel = (s : State, info : ChannelInfo) {
@@ -2258,17 +2258,17 @@ check_channel = (s : State, info : ChannelInfo) {
 check_leaf_run = (s : State, leaf : Leaf) {
 	leaf |>
 		(SendLeaf(c, _) | ReceiveLeaf(c)) { check_run(s.run, c.run) }
-		| (JoinLeaf(t)) { check_run(s.run, t.scope.run) }
-		| (AlwaysLeaf(_)) { Nil }
+		& (JoinLeaf(t)) { check_run(s.run, t.scope.run) }
+		& (AlwaysLeaf(_)) { Nil }
 }
 
 check_leaf = (s : State, t : TaskState, leaf : Leaf) {
 	leaf |>
 		(SendLeaf(c, _) | ReceiveLeaf(c)) { check_channel(s, c) }
-		| (JoinLeaf(task)) {
+		& (JoinLeaf(task)) {
 			check_scope(s, t, task.scope, "task: join outside its scope")
 		}
-		| (AlwaysLeaf(_)) { Nil }
+		& (AlwaysLeaf(_)) { Nil }
 }
 
 check_leaves = (s : State, t : TaskState, leaves : List(Leaf)) {
@@ -2280,10 +2280,10 @@ check_leaves = (s : State, t : TaskState, leaves : List(Leaf)) {
 leaf_at = (leaves : List(Leaf), index : Int) -> Leaf {
 	leaves |>
 		([]) { panic("task: invalid waiter leaf") }
-		| ([leaf, ..rest]) {
+		& ([leaf, ..rest]) {
 			{ index == 0 } |>
 				(True) { leaf }
-				| (False) { leaf_at(rest, index - 1) }
+				& (False) { leaf_at(rest, index - 1) }
 		}
 }
 
@@ -2304,7 +2304,7 @@ partner = (
 				waiter = head.waiter,
 			)
 		}
-		| (ReceiveLeaf(info)) {
+		& (ReceiveLeaf(info)) {
 			c = find_channel(s.channels, read(address_key, info.id))
 			head = queue_head(c.senders, excluded, [])
 			Partner(
@@ -2312,13 +2312,13 @@ partner = (
 				waiter = head.waiter,
 			)
 		}
-		| (_) { panic("task: invalid channel alternative") }
+		& (_) { panic("task: invalid channel alternative") }
 }
 
 commit_partner = (s : State, waiter : Waiter, payload : Keyed) -> State {
 	row = request.state(waiter.flag) |>
 		(request.Ready(row)) { row }
-		| (_) { panic("task: stale partner") }
+		& (_) { panic("task: stale partner") }
 	next = withdraw(s, waiter.flag)
 	t = find_task(next.tasks, row.task)
 	t.status |>
@@ -2333,7 +2333,7 @@ commit_partner = (s : State, waiter : Waiter, payload : Keyed) -> State {
 				True,
 			)
 		}
-		| (_) { panic("task: invalid event registration") }
+		& (_) { panic("task: invalid event registration") }
 }
 
 probe_leaf = (
@@ -2346,42 +2346,42 @@ probe_leaf = (
 		(AlwaysLeaf(value)) {
 			Commit(state = s, selection = Present(Selected(index, value)))
 		}
-		| (JoinLeaf(task)) {
+		& (JoinLeaf(task)) {
 			target = find_task(s.tasks, read(task_key, task.id))
 			target.outcome |>
 				(Pending) { Commit(state = s, selection = Absent) }
-				| (Success(value) | Failure(value)) {
+				& (Success(value) | Failure(value)) {
 					Commit(
 						state = s,
 						selection = Present(Selected(index, value)),
 					)
 				}
-				| (Cancelled(_)) {
+				& (Cancelled(_)) {
 					Commit(state = s, selection = Present(SelectedCancelled))
 				}
 		}
-		| (SendLeaf(_, value)) {
+		& (SendLeaf(_, value)) {
 			p = partner(s, leaf, excluded)
 			p.waiter |>
 				(Absent) { Commit(state = p.state, selection = Absent) }
-				| (Present(w)) {
+				& (Present(w)) {
 					Commit(
 						state = commit_partner(p.state, w, value),
 						selection = Present(Selected(index, unit())),
 					)
 				}
 		}
-		| (ReceiveLeaf(_)) {
+		& (ReceiveLeaf(_)) {
 			p = partner(s, leaf, excluded)
 			p.waiter |>
 				(Absent) { Commit(state = p.state, selection = Absent) }
-				| (Present(w)) {
+				& (Present(w)) {
 					row = request.state(w.flag) |>
 						(request.Ready(r)) { r }
-						| (_) { panic("task: stale waiter") }
+						& (_) { panic("task: stale waiter") }
 					value = leaf_at(row.leaves, w.index) |>
 						(SendLeaf(_, value)) { value }
-						| (_) { panic("task: invalid sender") }
+						& (_) { panic("task: invalid sender") }
 					Commit(
 						state = commit_partner(p.state, w, unit()),
 						selection = Present(Selected(index, value)),
@@ -2398,11 +2398,11 @@ probe = (
 ) -> Commit {
 	leaves |>
 		([]) { Commit(state = s, selection = Absent) }
-		| ([leaf, ..rest]) {
+		& ([leaf, ..rest]) {
 			result = probe_leaf(s, leaf, index, excluded)
 			result.selection |>
 				(Absent) { probe(result.state, rest, index + 1, excluded) }
-				| (_) { result }
+				& (_) { result }
 		}
 }
 
@@ -2414,7 +2414,7 @@ register_leaves = (
 ) -> State {
 	leaves |>
 		([]) { s }
-		| ([leaf, ..rest]) {
+		& ([leaf, ..rest]) {
 			waiter = Waiter(flag = flag, index = index)
 			next = leaf |>
 				(SendLeaf(info, _)) {
@@ -2427,7 +2427,7 @@ register_leaves = (
 						),
 					)
 				}
-				| (ReceiveLeaf(info)) {
+				& (ReceiveLeaf(info)) {
 					c = find_channel(s.channels, read(address_key, info.id))
 					set_channel(
 						s,
@@ -2437,7 +2437,7 @@ register_leaves = (
 						),
 					)
 				}
-				| (JoinLeaf(info)) {
+				& (JoinLeaf(info)) {
 					target = find_task(s.tasks, read(task_key, info.id))
 					set_task(
 						s,
@@ -2447,7 +2447,7 @@ register_leaves = (
 						),
 					)
 				}
-				| (AlwaysLeaf(_)) { panic("task: always cannot block") }
+				& (AlwaysLeaf(_)) { panic("task: always cannot block") }
 			register_leaves(next, flag, rest, index + 1)
 		}
 }
@@ -2470,7 +2470,7 @@ select = (
 				True,
 			)
 		}
-		| (Absent) {
+		& (Absent) {
 			id = s.registration + 1
 			flag = request.ready(
 				Registration(id = id, task = t.serial, leaves = leaves),
@@ -2491,7 +2491,7 @@ select = (
 wake_source_waiters = (s : State, rows : List(Waiter)) -> State {
 	rows |>
 		([]) { s }
-		| ([w, ..rest]) {
+		& ([w, ..rest]) {
 			request.state(w.flag) |>
 				(request.Ready(row)) {
 					result = probe(s, row.leaves, 0, Present(w.flag))
@@ -2499,7 +2499,7 @@ wake_source_waiters = (s : State, rows : List(Waiter)) -> State {
 						(Absent) {
 							panic("task: completed source did not become ready")
 						}
-						| (Present(selected)) {
+						& (Present(selected)) {
 							released = withdraw(result.state, w.flag)
 							t = find_task(released.tasks, row.task)
 							t.status |>
@@ -2514,18 +2514,18 @@ wake_source_waiters = (s : State, rows : List(Waiter)) -> State {
 										True,
 									)
 								}
-								| (_) { panic("task: invalid join waiter") }
+								& (_) { panic("task: invalid join waiter") }
 						}
 					wake_source_waiters(next, rest)
 				}
-				| (_) { wake_source_waiters(s, rest) }
+				& (_) { wake_source_waiters(s, rest) }
 		}
 }
 
 wake_source_rows = (s : State, rows : List(Int)) -> State {
 	rows |>
 		([]) { s }
-		| ([path, ..rest]) {
+		& ([path, ..rest]) {
 			t = find_task(s.tasks, path)
 			next = set_task(s, TaskState(..t, joiners = no_waiters))
 			wake_source_rows(
@@ -2548,13 +2548,13 @@ wake_sources = (s : State) {
 wake_tickets = (s : State, paths : List(Int)) -> State {
 	paths |>
 		([]) { s }
-		| ([p, ..rest]) {
+		& ([p, ..rest]) {
 			t = find_task(s.tasks, p)
 			next = t.status |>
 				(WaitingTicket(k, tickets)) {
 					{ any(tickets, request.settled) } |>
 						(False) { s }
-						| (True) {
+						& (True) {
 							queue(
 								set_task(
 									State(..s, waiting = without(s.waiting, p)),
@@ -2567,7 +2567,7 @@ wake_tickets = (s : State, paths : List(Int)) -> State {
 							)
 						}
 				}
-				| (_) { State(..s, waiting = without(s.waiting, p)) }
+				& (_) { State(..s, waiting = without(s.waiting, p)) }
 			wake_tickets(next, rest)
 		}
 }
@@ -2581,33 +2581,33 @@ lowest_error = (
 			(_, value) = best
 			value
 		}
-		| ([candidate, ..rest]) {
+		& ([candidate, ..rest]) {
 			(a, _) = candidate
 			(b, _) = best
 			{ first_path(a, b) } |>
 				(True) { lowest_error(rest, candidate) }
-				| (False) { lowest_error(rest, best) }
+				& (False) { lowest_error(rest, best) }
 		}
 }
 
 scope_reply = (scope : ScopeState) -> ScopeReply {
 	scope.errors |>
 		([first, ..rest]) { ScopeError(lowest_error(rest, first)) }
-		| ([]) {
+		& ([]) {
 			scope.winner |>
 				(Absent) { ScopeOk }
-				| (Present(value)) { ScopeWinner(value) }
+				& (Present(value)) { ScopeWinner(value) }
 		}
 }
 
 refresh_rows = (s : State, rows : List(Int)) -> State {
 	rows |>
 		([]) { s }
-		| ([path, ..rest]) {
+		& ([path, ..rest]) {
 			t = find_task(s.tasks, path)
 			{ t.open_scopes > 0 } |>
 				(True) { refresh_rows(s, rest) }
-				| (False) {
+				& (False) {
 					refresh_rows(
 						set_task(s, TaskState(..t, clean = True)),
 						rest,
@@ -2621,7 +2621,7 @@ refresh_clean = (s : State) { refresh_rows(s, s.unclean) }
 owned_channel_bad = (s : State, ids : List(Address)) -> Bool {
 	ids |>
 		([]) { False }
-		| ([id, ..rest]) {
+		& ([id, ..rest]) {
 			c = find_channel(s.channels, id)
 			queue_live(c.senders) ||
 				queue_live(c.receivers) ||
@@ -2632,15 +2632,15 @@ owned_channel_bad = (s : State, ids : List(Address)) -> Bool {
 owned_indices = (ids : List(Address)) -> List(Int) {
 	ids |>
 		([]) { [] }
-		| ([id, ..rest]) { [address_index(id), ..owned_indices(rest)] }
+		& ([id, ..rest]) { [address_index(id), ..owned_indices(rest)] }
 }
 
 retire_scope = (s : State, scope : ScopeState) -> State {
 	bad = owned_channel_bad(s, scope.owned_channels)
-	{ bad } |> (True) { panic("task: channel is gone") } | (False) { Nil }
+	{ bad } |> (True) { panic("task: channel is gone") } & (False) { Nil }
 	{ worker_enabled() } |>
 		(True) { drop_shares(s, scope.owned_shares) }
-		| (False) { Nil }
+		& (False) { Nil }
 	next = State(
 		..s,
 		scopes = drop_children(s.scopes, [address_index(scope.address)]),
@@ -2670,13 +2670,13 @@ retire_scope = (s : State, scope : ScopeState) -> State {
 				body.serial,
 			)
 		}
-		| (_) { queue_scope_end(next, body, scope) }
+		& (_) { queue_scope_end(next, body, scope) }
 }
 
 retire_scopes = (s : State) -> State {
 	s.dirty_scopes |>
 		([]) { s }
-		| ([id, ..rest]) {
+		& ([id, ..rest]) {
 			scope = find_scope(s.scopes, id)
 			next = retire_scope(State(..s, dirty_scopes = rest), scope)
 			retire_scopes(refresh_clean(next))
@@ -2697,13 +2697,13 @@ new_address = (t : TaskState) {
 }
 
 head_scope = (chain : List(Address)) {
-	chain |> ([]) { Absent } | ([id, .._]) { Present(id) }
+	chain |> ([]) { Absent } & ([id, .._]) { Present(id) }
 }
 
 find_share = (shares : TaskStore(ShareState), id : Address) -> Keyed {
 	store_find(shares, address_index(id)) |>
 		(Present(row)) { row.value }
-		| (Absent) { panic("task: shared value is gone") }
+		& (Absent) { panic("task: shared value is gone") }
 }
 
 prevalidate = (s : State, t : TaskState, command : Command) {
@@ -2711,14 +2711,14 @@ prevalidate = (s : State, t : TaskState, command : Command) {
 		(Spawn(info, _) | NewShare(info, _)) {
 			check_scope(s, t, info, "task: go outside its scope")
 		}
-		| (Select(leaves)) { check_leaves(s, t, leaves) }
-		| (SendNow(info, _)) { check_channel(s, info) }
-		| (GetShare(run, _, id) | UpdateRef(run, id, _)) {
+		& (Select(leaves)) { check_leaves(s, t, leaves) }
+		& (SendNow(info, _)) { check_channel(s, info) }
+		& (GetShare(run, _, id) | UpdateRef(run, id, _)) {
 			check_run(s.run, run)
 			find_share(s.shares, read(address_key, id))
 			Nil
 		}
-		| (_) { Nil }
+		& (_) { Nil }
 }
 
 add_forward = (
@@ -2728,10 +2728,10 @@ add_forward = (
 ) -> List(Forward) {
 	rows |>
 		([]) { [Forward(id = id, tickets = tickets)] }
-		| ([r, ..rest]) {
+		& ([r, ..rest]) {
 			{ r.id == id } |>
 				(True) { [Forward(id = id, tickets = tickets), ..rest] }
-				| (False) { [r, ..add_forward(rest, id, tickets)] }
+				& (False) { [r, ..add_forward(rest, id, tickets)] }
 		}
 }
 
@@ -2740,9 +2740,9 @@ end_frame = (frames : List(Frame), id : Address) -> List(Frame) {
 		([frame, ..rest]) {
 			frame.scope |>
 				(Present(owner) ? owner == id) { rest }
-				| (_) { panic("task: invalid scope delimiter") }
+				& (_) { panic("task: invalid scope delimiter") }
 		}
-		| ([]) { panic("task: missing scope delimiter") }
+		& ([]) { panic("task: missing scope delimiter") }
 }
 
 do_command = (
@@ -2753,7 +2753,7 @@ do_command = (
 ) -> State {
 	command |>
 		(Register(owner, abort, interrupt, relay, final)) {
-			foreign = t.nested |> ([]) { [] } | ([row, .._]) { row.active.hops }
+			foreign = t.nested |> ([]) { [] } & ([row, .._]) { row.active.hops }
 			frame = Frame(
 				scope = owner,
 				abort = abort,
@@ -2764,7 +2764,7 @@ do_command = (
 				final = final,
 				finishing = { worker_away(k) } |>
 					(True) { s.register_flag }
-					| (False) { final(k) },
+					& (False) { final(k) },
 				unwinding = Absent,
 				deferred = False,
 				cause = Absent,
@@ -2772,17 +2772,17 @@ do_command = (
 			next = set_task(s, TaskState(..t, frames = [frame, ..t.frames]))
 			owner |>
 				(Absent) { next }
-				| (Present(id)) {
+				& (Present(id)) {
 					scope = find_scope(next.scopes, id)
 					set_scope(next, ScopeState(..scope, foreign = foreign))
 				}
 		}
-		| (ExternalCancel) { cancel_run(s) }
-		| (Relay(notice, value, discard)) {
+		& (ExternalCancel) { cancel_run(s) }
+		& (Relay(notice, value, discard)) {
 			relay_notice(s, t, k, notice, value, discard)
 		}
-		| (FinishScope(info)) { finish_scope(s, t, k, info) }
-		| (NextRun) {
+		& (FinishScope(info)) { finish_scope(s, t, k, info) }
+		& (NextRun) {
 			index = t.spawn + 1
 			child_path = append(t.path, [index])
 			next = set_task(s, TaskState(..t, spawn = index))
@@ -2794,7 +2794,7 @@ do_command = (
 				False,
 			)
 		}
-		| (Spawn(info, start)) {
+		& (Spawn(info, start)) {
 			scope = find_scope(s.scopes, read(address_key, info.id))
 			index = t.spawn + 1
 			child_path = append(t.path, [index])
@@ -2803,7 +2803,7 @@ do_command = (
 				(Absent) {
 					(Dormant(publish(s, child_path, start)), Pending, False)
 				}
-				| (Present(cause)) { (Ended, Cancelled(cause), True) }
+				& (Present(cause)) { (Ended, Cancelled(cause), True) }
 			child = TaskState(
 				path = child_path,
 				serial = s.task_serial + 1,
@@ -2841,12 +2841,12 @@ do_command = (
 					children = [child.serial, ..scope.children],
 					pending = { clean } |>
 						(True) { scope.pending }
-						| (False) { scope.pending + 1 },
+						& (False) { scope.pending + 1 },
 				),
 			)
 			queued = { clean } |>
 				(True) { recorded }
-				| (False) { queue(recorded, child.serial) }
+				& (False) { queue(recorded, child.serial) }
 			reply(
 				queued,
 				t.serial,
@@ -2855,7 +2855,7 @@ do_command = (
 				False,
 			)
 		}
-		| (NewScope(witness, mode)) {
+		& (NewScope(witness, mode)) {
 			id = new_address(t)
 			info = ScopeInfo(
 				run = s.run,
@@ -2876,7 +2876,7 @@ do_command = (
 							{
 								f.unwinding |>
 									(Present(_)) { True }
-									| (Absent) { False }
+									& (Absent) { False }
 							}
 					}),
 				foreign = [],
@@ -2914,19 +2914,19 @@ do_command = (
 				False,
 			)
 		}
-		| (EndScope(info, completion)) {
+		& (EndScope(info, completion)) {
 			id = read(address_key, info.id)
 			scope = find_scope(s.scopes, id)
 			(mark, errors) = completion |>
 				(Succeeded(_)) { (BodyOk, scope.errors) }
-				| (Failed(_, error)) {
+				& (Failed(_, error)) {
 					scope.winner |>
 						(Absent) {
 							(BodyError, append(scope.errors, [(t.path, error)]))
 						}
-						| (Present(_)) { (BodyError, scope.errors) }
+						& (Present(_)) { (BodyError, scope.errors) }
 				}
-				| (Abandoned) { (BodyCancelled, scope.errors) }
+				& (Abandoned) { (BodyCancelled, scope.errors) }
 			body = TaskState(
 				..t,
 				frames = end_frame(t.frames, id),
@@ -2940,13 +2940,13 @@ do_command = (
 			)
 			mark |>
 				(BodyError | BodyCancelled) { cancel_scope(next, id) }
-				| (_) { next }
+				& (_) { next }
 		}
-		| (Yield) { queue(State(..s, current = Absent), t.serial) }
-		| (Wait(tickets) | NestedWait(_, tickets)) {
+		& (Yield) { queue(State(..s, current = Absent), t.serial) }
+		& (Wait(tickets) | NestedWait(_, tickets)) {
 			{ any(tickets, request.settled) } |>
 				(True) { queue(State(..s, current = Absent), t.serial) }
-				| (False) {
+				& (False) {
 					next = set_task(
 						s,
 						TaskState(..t, status = WaitingTicket(k, tickets)),
@@ -2961,8 +2961,8 @@ do_command = (
 					)
 				}
 		}
-		| (NestedActive(_, _)) { s }
-		| (ForwardWait(id, tickets)) {
+		& (NestedActive(_, _)) { s }
+		& (ForwardWait(id, tickets)) {
 			next = State(
 				..s,
 				forwards = add_forward(s.forwards, id, tickets),
@@ -2970,7 +2970,7 @@ do_command = (
 			)
 			queue(next, t.serial)
 		}
-		| (ForgetWait(id)) {
+		& (ForgetWait(id)) {
 			set_task(
 				State(
 					..s,
@@ -2985,7 +2985,7 @@ do_command = (
 				),
 			)
 		}
-		| (NewChannel(witness)) {
+		& (NewChannel(witness)) {
 			id = new_address(t)
 			info = ChannelInfo(
 				run = s.run,
@@ -3006,7 +3006,7 @@ do_command = (
 			)
 			next = row.owner |>
 				(Absent) { next }
-				| (Present(owner)) {
+				& (Present(owner)) {
 					scope = find_scope(next.scopes, owner)
 					set_scope(
 						next,
@@ -3024,19 +3024,19 @@ do_command = (
 				False,
 			)
 		}
-		| (SendNow(info, value)) {
+		& (SendNow(info, value)) {
 			{ portable_witness(info.witness) } |>
 				(True) { portable(value) }
-				| (False) { Nil }
+				& (False) { Nil }
 			select(s, t, k, [SendLeaf(info, value)])
 		}
-		| (Select(leaves)) { select(s, t, k, leaves) }
-		| (NewShare(info, value)) {
+		& (Select(leaves)) { select(s, t, k, leaves) }
+		& (NewShare(info, value)) {
 			portable(value)
 			id = new_address(t)
 			{ worker_enabled() } |>
 				(True) { worker_share_put(s.run, id, value) }
-				| (False) { Nil }
+				& (False) { Nil }
 			row = ShareState(
 				id = id,
 				owner = Present(read(address_key, info.id)),
@@ -3053,7 +3053,7 @@ do_command = (
 			)
 			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False)
 		}
-		| (NewRef(value)) {
+		& (NewRef(value)) {
 			portable(value)
 			id = new_address(t)
 			owner = head_scope(t.chain)
@@ -3067,7 +3067,7 @@ do_command = (
 			)
 			next = owner |>
 				(Absent) { next }
-				| (Present(owner)) {
+				& (Present(owner)) {
 					scope = find_scope(next.scopes, owner)
 					set_scope(
 						next,
@@ -3079,11 +3079,11 @@ do_command = (
 				}
 			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False)
 		}
-		| (UpdateRef(_, id, change)) {
+		& (UpdateRef(_, id, change)) {
 			address = read(address_key, id)
 			row = store_find(s.shares, address_index(address)) |>
 				(Present(row)) { row }
-				| (Absent) { panic("task: shared value is gone") }
+				& (Absent) { panic("task: shared value is gone") }
 			(value, answer) = change(row.value)
 			portable(value)
 			next = State(
@@ -3096,7 +3096,7 @@ do_command = (
 			)
 			reply(next, t.serial, k, Proceed(answer), False)
 		}
-		| (GetShare(_, _, id)) {
+		& (GetShare(_, _, id)) {
 			reply(
 				s,
 				t.serial,
@@ -3105,7 +3105,7 @@ do_command = (
 				False,
 			)
 		}
-		| (Drain) {
+		& (Drain) {
 			set_task(
 				State(..s, current = Absent),
 				TaskState(..t, status = WaitingDrain(k)),
@@ -3114,7 +3114,7 @@ do_command = (
 }
 
 cancellation_reply = (t : TaskState) {
-	t.status |> (Runnable(_, CancelStep(_))) { True } | (_) { False }
+	t.status |> (Runnable(_, CancelStep(_))) { True } & (_) { False }
 }
 
 finals_changed = (
@@ -3123,7 +3123,7 @@ finals_changed = (
 ) -> Bool {
 	frames |>
 		([]) { False }
-		| ([f, ..rest]) { f.finishing != f.final(k) || finals_changed(rest, k) }
+		& ([f, ..rest]) { f.finishing != f.final(k) || finals_changed(rest, k) }
 }
 
 update_finals = (
@@ -3132,7 +3132,7 @@ update_finals = (
 ) -> List(Frame) {
 	frames |>
 		([]) { [] }
-		| ([f, ..rest]) {
+		& ([f, ..rest]) {
 			[Frame(..f, finishing = f.final(k)), ..update_finals(rest, k)]
 		}
 }
@@ -3156,10 +3156,10 @@ on_command = (
 				),
 			)
 		}
-		| (Absent) {
+		& (Absent) {
 			{ finals_changed(original.frames, k) } |>
 				(False) { s }
-				| (True) {
+				& (True) {
 					set_task(
 						s,
 						TaskState(
@@ -3183,12 +3183,12 @@ on_command = (
 				..,
 			) | ExternalCancel | Relay(..) | FinishScope(..)
 		) { propagate(do_command(prepared, incoming, k, command)) }
-		| (_) {
+		& (_) {
 			checked = propagate(prepared)
 			caller = find_task(checked.tasks, task_path)
 			{ cancellation_reply(caller) } |>
 				(True) { checked }
-				| (False) { do_command(checked, caller, k, command) }
+				& (False) { do_command(checked, caller, k, command) }
 		}
 	deliver_deferred(next, task_path, command)
 }
@@ -3202,21 +3202,21 @@ observe_completion = (
 		(Pending) {
 			completion |>
 				(Succeeded(value)) { Success(value) }
-				| (Failed(value, _)) { Failure(value) }
-				| (Abandoned) {
+				& (Failed(value, _)) { Failure(value) }
+				& (Abandoned) {
 					Cancelled(
 						Cause(run = s.run, scope = Absent, epoch = s.epoch),
 					)
 				}
 		}
-		| (_) { t.outcome }
+		& (_) { t.outcome }
 	next = set_task(
 		State(..s, current = Absent),
 		TaskState(..t, status = Ended, frames = [], outcome = outcome),
 	)
 	t.parent |>
 		(Absent) { next }
-		| (Present(id)) {
+		& (Present(id)) {
 			scope = find_scope(next.scopes, id)
 			t.outcome |>
 				(Pending) {
@@ -3224,7 +3224,7 @@ observe_completion = (
 						(Failed(_, error)) {
 							scope.winner |>
 								(Present(_)) { next }
-								| (Absent) {
+								& (Absent) {
 									cancel_scope(
 										set_scope(
 											next,
@@ -3240,7 +3240,7 @@ observe_completion = (
 									)
 								}
 						}
-						| (Succeeded(value)) {
+						& (Succeeded(value)) {
 							(scope.mode, scope.winner, scope.errors) |>
 								((Racing, Absent, [])) {
 									cancel_scope(
@@ -3254,11 +3254,11 @@ observe_completion = (
 										id,
 									)
 								}
-								| (_) { next }
+								& (_) { next }
 						}
-						| (Abandoned) { next }
+						& (Abandoned) { next }
 				}
-				| (_) { next }
+				& (_) { next }
 		}
 }
 
@@ -3273,7 +3273,7 @@ turn = (s : State, t : TaskState) -> Turn {
 			worker_adopt(start.ticket, t.serial)
 			Sent(t.serial)
 		}
-		| (Dormant(start)) {
+		& (Dormant(start)) {
 			path = t.path
 			id = t.serial
 			run = s.run
@@ -3285,7 +3285,7 @@ turn = (s : State, t : TaskState) -> Turn {
 				Finished(id, body(own))
 			})
 		}
-		| (Runnable(k, value) ? worker_away(k)) {
+		& (Runnable(k, value) ? worker_away(k)) {
 			worker_send(
 				t.serial,
 				Resume(
@@ -3296,26 +3296,26 @@ turn = (s : State, t : TaskState) -> Turn {
 			)
 			Sent(t.serial)
 		}
-		| (Runnable(k, value)) { control.resume(k, value) }
-		| (_) { panic("task: task is not runnable") }
+		& (Runnable(k, value)) { control.resume(k, value) }
+		& (_) { panic("task: task is not runnable") }
 }
 
 interests_tasks = (s : State, paths : List(Int)) -> List(Ticket) {
 	paths |>
 		([]) { [] }
-		| ([path, ..rest]) {
+		& ([path, ..rest]) {
 			find_task(s.tasks, path).status |>
 				(WaitingTicket(_, tickets)) {
 					append(tickets, interests_tasks(s, rest))
 				}
-				| (_) { interests_tasks(s, rest) }
+				& (_) { interests_tasks(s, rest) }
 		}
 }
 
 interests_forward = (rows : List(Forward)) -> List(Ticket) {
 	rows |>
 		([]) { [] }
-		| ([row, ..rest]) { append(row.tickets, interests_forward(rest)) }
+		& ([row, ..rest]) { append(row.tickets, interests_forward(rest)) }
 }
 
 interests = (s : State) {
@@ -3326,8 +3326,8 @@ interests = (s : State) {
 apply_run_control = (s : State, result : RunControl) {
 	result |>
 		(ContinueRun) { s }
-		| (ForwardRun(notice)) { post_notice(s, notice) }
-		| (ParentCancel(abort)) {
+		& (ForwardRun(notice)) { post_notice(s, notice) }
+		& (ParentCancel(abort)) {
 			cancel_run(State(..s, outer_cancel = Present(abort)))
 		}
 }
@@ -3337,13 +3337,13 @@ finished_run = (s : State) { s.active_count == 0 }
 run_reply = (s : State) -> RunReply {
 	s.outer_cancel |>
 		(Present(abort)) { RunCancelled(abort) }
-		| (Absent) {
+		& (Absent) {
 			s.failure |>
 				(Present(p)) { RunError(p) }
-				| (Absent) {
+				& (Absent) {
 					find_task(s.tasks, s.root_id).outcome |>
 						(Success(v) | Failure(v)) { RunOk(v) }
-						| (_) { panic("task: missing root result") }
+						& (_) { panic("task: missing root result") }
 				}
 		}
 }
@@ -3353,10 +3353,10 @@ script_rows = (s : State, ids : List(ActiveTask), wanted : List(Int)) -> Maybe(
 ) {
 	ids |>
 		([]) { Absent }
-		| ([entry, ..rest]) {
+		& ([entry, ..rest]) {
 			store_find(s.tasks, entry.id) |>
 				(Present(t) ? t.path == wanted) { Present(t) }
-				| (_) { script_rows(s, rest, wanted) }
+				& (_) { script_rows(s, rest, wanted) }
 		}
 }
 
@@ -3373,15 +3373,15 @@ choose_turn = (state : State) -> State {
 				ready_back = [],
 			)
 		}
-		| (_) { state }
+		& (_) { state }
 	s.current |>
 		(Present(_)) { s }
-		| (Absent) {
+		& (Absent) {
 			s.choices |>
 				([]) {
 					s.ready |>
 						([]) { s }
-						| ([p, ..rest]) {
+						& ([p, ..rest]) {
 							focused = State(..s, tasks = focus_task(s.tasks, p))
 							t = find_task(focused.tasks, p)
 							next = set_task(
@@ -3391,7 +3391,7 @@ choose_turn = (state : State) -> State {
 							State(..next, current = Present(p), ready = rest)
 						}
 				}
-				| ([wanted, ..rest]) {
+				& ([wanted, ..rest]) {
 					script_task(s, wanted) |>
 						(Present(t) ? t.queued) {
 							focused = State(
@@ -3410,7 +3410,7 @@ choose_turn = (state : State) -> State {
 								choices = rest,
 							)
 						}
-						| (_) {
+						& (_) {
 							cancel_run(
 								State(
 									..s,
@@ -3427,18 +3427,18 @@ loop = (state : State) -> RunReply {
 	s = maintain(pull(state))
 	{ finished_run(s) } |>
 		(True) { run_reply(s) }
-		| (False) {
+		& (False) {
 			runner = s.runner
 			runner.state |>
 				(DetachedRunner) { panic("task: no scheduler") }
-				| (AttachedRunner(..) = attached) {
+				& (AttachedRunner(..) = attached) {
 					work = interests(s)
 					{ s.scripted && any(work, has_work) } |>
 						(True) { panic("task: test needs fake IO") }
-						| (False) { Nil }
+						& (False) { Nil }
 					polled = s.current |>
 						(Present(_) ? work == []) { s }
-						| (_) {
+						& (_) {
 							apply_run_control(
 								s,
 								attached.poll(
@@ -3456,11 +3456,11 @@ loop = (state : State) -> RunReply {
 							polled.cancellation == s.cancellation
 					} |>
 						(True) { polled }
-						| (False) { maintain(polled) }
+						& (False) { maintain(polled) }
 					chosen = choose_turn(after_poll)
 					prepared = { chosen.epoch == after_poll.epoch } |>
 						(True) { chosen }
-						| (False) { choose_turn(maintain(chosen)) }
+						& (False) { choose_turn(maintain(chosen)) }
 					prepared.current |>
 						(Present(p)) {
 							t = find_task(prepared.tasks, p)
@@ -3478,10 +3478,10 @@ loop = (state : State) -> RunReply {
 										),
 									)
 								}
-								| (ForwardRun(notice)) {
+								& (ForwardRun(notice)) {
 									loop(post_notice(prepared, notice))
 								}
-								| (ContinueRun) {
+								& (ContinueRun) {
 									running = set_task(
 										State(
 											..prepared,
@@ -3490,7 +3490,7 @@ loop = (state : State) -> RunReply {
 												(True) {
 													without(prepared.ready, p)
 												}
-												| (False) { prepared.ready },
+												& (False) { prepared.ready },
 											ready_back = { t.queued } |>
 												(True) {
 													without(
@@ -3498,7 +3498,7 @@ loop = (state : State) -> RunReply {
 														p,
 													)
 												}
-												| (False) {
+												& (False) {
 													prepared.ready_back
 												},
 										),
@@ -3520,7 +3520,7 @@ loop = (state : State) -> RunReply {
 												),
 											)
 										}
-										| (Sent(path)) {
+										& (Sent(path)) {
 											loop(
 												set_task(
 													running,
@@ -3534,7 +3534,7 @@ loop = (state : State) -> RunReply {
 												),
 											)
 										}
-										| (Finished(path, completion)) {
+										& (Finished(path, completion)) {
 											loop(
 												observe_completion(
 													running,
@@ -3548,10 +3548,10 @@ loop = (state : State) -> RunReply {
 										}
 								}
 						}
-						| (Absent) {
+						& (Absent) {
 							{ finished_run(prepared) } |>
 								(True) { run_reply(prepared) }
-								| (False) {
+								& (False) {
 									tickets = interests(prepared)
 									// A nested run also waits while a task of the
 									// entry run is away: its next step may end it.
@@ -3577,19 +3577,19 @@ loop = (state : State) -> RunReply {
 												),
 											)
 										}
-										| (False) {
+										& (False) {
 											{ possible } |>
 												(False) {
 													panic("task: deadlock")
 												}
-												| (True) {
+												& (True) {
 													{ prepared.scripted } |>
 														(True) {
 															panic(
 																"task: test needs fake IO",
 															)
 														}
-														| (False) { Nil }
+														& (False) { Nil }
 													loop(
 														apply_run_control(
 															prepared,
@@ -3622,8 +3622,8 @@ scope_call_body : <A, E, N>(
 	kept = control.keep((_ : Nil) {
 		fail.catch(() { body(handle) }) |>
 			(Ok(value)) { Succeeded(key.wrap(results, Ok(value))) }
-			| (Error(error)) {
-				{ checked } |> (True) { portable(error) } | (False) { Nil }
+			& (Error(error)) {
+				{ checked } |> (True) { portable(error) } & (False) { Nil }
 				Failed(key.wrap(results, Error(error)), key.wrap(errors, error))
 			}
 	})
@@ -3634,16 +3634,16 @@ scope_call_body : <A, E, N>(
 			})
 			mark = completed |>
 				(Succeeded(_)) { Succeeded(unit()) }
-				| (other) { other }
+				& (other) { other }
 			read(scope_reply_key, ask(own, EndScope(info, mark))) |>
 				(ScopeError(error)) { fail.raise(read(errors, error)) }
-				| (ScopeWinner(value)) { WinnerValue(value) }
-				| (ScopeOk) {
+				& (ScopeWinner(value)) { WinnerValue(value) }
+				& (ScopeOk) {
 					completed |>
 						(Succeeded(value)) {
 							BodyValue(fail.from_result(read(results, value)))
 						}
-						| (_) { panic("task: missing scope result") }
+						& (_) { panic("task: missing scope result") }
 				}
 		},
 		() {
@@ -3658,7 +3658,7 @@ scope = <A, E, N>(body : (Group(E)) <- (Fail(E), ..N) -> A) <- (
 ) -> A {
 	scope_call(body, Portable, Ordinary, own) |>
 		(BodyValue(value)) { value }
-		| (WinnerValue(_)) { panic("task: invalid scope winner") }
+		& (WinnerValue(_)) { panic("task: invalid scope winner") }
 }
 
 local_scope = <A, E, N>(body : (Group(E)) <- (Fail(E), ..N) -> A) <- (
@@ -3666,10 +3666,10 @@ local_scope = <A, E, N>(body : (Group(E)) <- (Fail(E), ..N) -> A) <- (
 ) -> A {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
-		| (AttachedScheduler(..) = attached) {
+		& (AttachedScheduler(..) = attached) {
 			scope_call(body, attached.witness, Ordinary, own) |>
 				(BodyValue(value)) { value }
-				| (WinnerValue(_)) { panic("task: invalid scope winner") }
+				& (WinnerValue(_)) { panic("task: invalid scope winner") }
 		}
 }
 
@@ -3698,10 +3698,10 @@ branch_at = <A, E, N>(branches : List(Branch(A, E, N)), index : Int) -> Branch(
 ) {
 	branches |>
 		([]) { panic("task: invalid selected alternative") }
-		| ([branch, ..rest]) {
+		& ([branch, ..rest]) {
 			{ index == 0 } |>
 				(True) { branch }
-				| (False) { branch_at(rest, index - 1) }
+				& (False) { branch_at(rest, index - 1) }
 		}
 }
 
@@ -3712,7 +3712,7 @@ sync_body = <A, E, N>(e : Event(A, E, N), own : Scheduler) -> A {
 			branch = branch_at(e.branches, index)
 			branch.decode(value)
 		}
-		| (SelectedCancelled) { panic("task: join of a cancelled task") }
+		& (SelectedCancelled) { panic("task: join of a cancelled task") }
 }
 
 always = <A>(value : A) -> Event(A, Never, Never) {
@@ -3737,7 +3737,7 @@ branches_of = <A, E, N>(events : List(Event(A, E, N))) -> List(
 ) {
 	events |>
 		([]) { [] }
-		| ([e, ..rest]) { append(e.branches, branches_of(rest)) }
+		& ([e, ..rest]) { append(e.branches, branches_of(rest)) }
 }
 
 choose = <A, E, N>(events : List(Event(A, E, N))) -> Event(A, E, N) {
@@ -3785,7 +3785,7 @@ channel = <A>() <- (own : Scheduler) -> Channel(A) {
 local_channel = <A>() <- (own : Scheduler) -> Channel(A) {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
-		| (AttachedScheduler(..) = attached) {
+		& (AttachedScheduler(..) = attached) {
 			Channel(
 				info = read(
 					channel_key,
@@ -3799,7 +3799,7 @@ local_channel = <A>() <- (own : Scheduler) -> Channel(A) {
 send_event = <A>(c : Channel(A), value : A) -> Event(Nil, Never, Never) {
 	{ portable_witness(c.info.witness) } |>
 		(True) { portable(value) }
-		| (False) { Nil }
+		& (False) { Nil }
 	Event(
 		identity = key.new(),
 		branches = [
@@ -3851,7 +3851,7 @@ keep = <S, A, E, N>(
 			(value, own) = input
 			own.state |>
 				(DetachedScheduler) { panic("task: no scheduler") }
-				| (AttachedScheduler(..) = attached) {
+				& (AttachedScheduler(..) = attached) {
 					retain(f(value)) <- (attached.waiter) <- (
 						attached.runner,
 					) <- (own)
@@ -3872,7 +3872,7 @@ ref = <A>(value : A) <- (own : Scheduler) -> Ref(A) {
 	id = ask(own, NewRef(key.wrap(values, value)))
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
-		| (AttachedScheduler(..) = attached) {
+		& (AttachedScheduler(..) = attached) {
 			Ref(run = attached.run, id = id, values = values)
 		}
 }
@@ -3918,7 +3918,7 @@ race = <A, E, N>(
 		own,
 	) |>
 		(WinnerValue(value)) { fail.from_result(read(results, value)) }
-		| (BodyValue(_)) { panic("task: missing race winner") }
+		& (BodyValue(_)) { panic("task: missing race winner") }
 }
 
 spawn_values : <A, B, E, N>(Group(E), List(A), (A) <- (Fail(E), ..N) -> B) <- (
@@ -3927,7 +3927,7 @@ spawn_values : <A, B, E, N>(Group(E), List(A), (A) <- (Fail(E), ..N) -> B) <- (
 ) -> List(Task(B, E)) = (s, xs, f) {
 	xs |>
 		([]) { [] }
-		| ([x, ..rest]) {
+		& ([x, ..rest]) {
 			child = go(s, () { f(x) })
 			[child, ..spawn_values(s, rest, f)]
 		}
@@ -3936,7 +3936,7 @@ spawn_values : <A, B, E, N>(Group(E), List(A), (A) <- (Fail(E), ..N) -> B) <- (
 join_values = <A, E>(tasks : List(Task(A, E))) -> List(A) {
 	tasks |>
 		([]) { [] }
-		| ([t, ..rest]) {
+		& ([t, ..rest]) {
 			value = join(t)
 			[value, ..join_values(rest)]
 		}
@@ -3962,7 +3962,7 @@ execute_body : <A, E, N>(
 ) <- N -> Result(Result(A, E), ScheduleError) = (body, runner, seed, policy) {
 	runner.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
-		| (AttachedRunner(..) = attached) {
+		& (AttachedRunner(..) = attached) {
 			prefix = attached.allocate()
 			run_id : Key(Nil) = key.new()
 			results : Key(Result(A, E)) = key.new()
@@ -4003,7 +4003,7 @@ execute_body : <A, E, N>(
 					)
 					(choices, scripted) = policy |>
 						(Fifo) { ([], False) }
-						| (Script(paths)) { (paths, True) }
+						& (Script(paths)) { (paths, True) }
 					routing = Runner(
 						state = AttachedRunner(
 							..attached,
@@ -4065,8 +4065,8 @@ execute_body : <A, E, N>(
 					)
 					ended |>
 						(RunOk(value)) { Ok(read(results, value)) }
-						| (RunError(path)) { Error(NotRunnable(path = path)) }
-						| (RunCancelled(abort)) { abort() }
+						& (RunError(path)) { Error(NotRunnable(path = path)) }
+						& (RunCancelled(abort)) { abort() }
 				} <- (root, owner)
 			} <- (attached.context)
 		}
@@ -4084,7 +4084,7 @@ run = <A, N>(
 ) <- (runner : Runner, ..env : N) -> A {
 	runner.state |>
 		(DetachedRunner) { panic("task: no scheduler") }
-		| (AttachedRunner(..) = attached) {
+		& (AttachedRunner(..) = attached) {
 			// The residual need, including any actual Fail, comes from run's
 			// caller. Internal completion bookkeeping cannot raise an error.
 			scheduled : () <- (
@@ -4106,7 +4106,7 @@ run = <A, N>(
 			)
 			result |>
 				(Ok(Ok(value))) { value }
-				| (Error(_)) { panic("task: invalid inherited schedule") }
+				& (Error(_)) { panic("task: invalid inherited schedule") }
 		}
 }
 
@@ -4117,7 +4117,7 @@ test = <A, E, N>(
 ) <- (runner : Runner) -> A {
 	execute(body, runner, seed, Script(choices)) |>
 		(Ok(result)) { fail.from_result(result) }
-		| (Error(error)) { fail.raise(error) }
+		& (Error(error)) { fail.raise(error) }
 }
 
 _entry = <A, N>(body : () <- N -> A) <- (root : request.Root) -> A {
@@ -4132,7 +4132,7 @@ scope_call : <A, E, N>(
 ) <- (Fail(E), ..N) -> ScopeResult(A) = (body, witness, mode, own) {
 	own.state |>
 		(DetachedScheduler) { panic("task: no scheduler") }
-		| (AttachedScheduler(..) = attached) {
+		& (AttachedScheduler(..) = attached) {
 			owner = { retain(request.open_owner()) <- (attached.root) }
 			kept = control.keep((_ : Nil) {
 				resource.ensure(
@@ -4183,7 +4183,7 @@ cause_allowed = (s : State, t : TaskState, cause : Cause) -> Bool {
 						{
 							cause.scope |>
 								(Absent) { True }
-								| (Present(source)) {
+								& (Present(source)) {
 									core.not(
 										contains(
 											find_scope(s.scopes, source).chain,
@@ -4201,10 +4201,10 @@ cause_allowed = (s : State, t : TaskState, cause : Cause) -> Bool {
 				{
 					cause.scope |>
 						(Absent) { True }
-						| (Present(source)) {
+						& (Present(source)) {
 							guard.anchor |>
 								(Absent) { False }
-								| (Present(anchor)) {
+								& (Present(anchor)) {
 									source == anchor ||
 										core.not(
 											contains(
@@ -4226,19 +4226,19 @@ cause_allowed = (s : State, t : TaskState, cause : Cause) -> Bool {
 frame_abort = (frames : List(Frame)) -> Maybe(() -> Never) {
 	frames |>
 		([]) { Absent }
-		| ([f, .._]) {
+		& ([f, .._]) {
 			{ f.finishing } |>
 				(True) { Absent }
-				| (False) {
+				& (False) {
 					f.unwinding |>
 						(Absent) { Present(f.interrupt) }
-						| (Present(_)) { Absent }
+						& (Present(_)) { Absent }
 				}
 		}
 }
 
 effective_active = (s : State, t : TaskState) -> Active {
-	relay = t.frames |> ([]) { empty_relay } | ([frame, .._]) { frame.relay }
+	relay = t.frames |> ([]) { empty_relay } & ([frame, .._]) { frame.relay }
 	hop = Hop(
 		run = s.run,
 		task = key.wrap(task_key, t.serial),
@@ -4248,13 +4248,13 @@ effective_active = (s : State, t : TaskState) -> Active {
 	)
 	own = { t.cleanup || foreign_active(t) } |>
 		(True) { Absent }
-		| (False) { frame_abort(t.frames) }
+		& (False) { frame_abort(t.frames) }
 	t.nested |>
 		([]) { Active(hops = [hop], abort = own, relay = relay) }
-		| ([row, .._]) {
+		& ([row, .._]) {
 			abort = own |>
 				(Absent) { Absent }
-				| (Present(_)) { nested_abort(t.nested) }
+				& (Present(_)) { nested_abort(t.nested) }
 			Active(
 				hops = [hop, ..row.active.hops],
 				abort = abort,
@@ -4270,8 +4270,8 @@ put_nest = (
 	active : Active
 ) -> List(Nest) {
 	old = filter(rows, (row : Nest) { row.id == id })
-	notified = old |> ([]) { [] } | ([row, .._]) { row.notified }
-	parent = old |> ([]) { anchor } | ([row, .._]) { row.anchor }
+	notified = old |> ([]) { [] } & ([row, .._]) { row.notified }
+	parent = old |> ([]) { anchor } & ([row, .._]) { row.anchor }
 	[
 		Nest(id = id, anchor = parent, active = active, notified = notified),
 		..filter(rows, (row : Nest) { row.id != id }),
@@ -4284,15 +4284,15 @@ register_driver = (s : State, task_path : Int, command : Command) -> State {
 		(NestedActive(id, active)) {
 			(put_nest(t.nested, id, frame_owner(t.frames), active), Present(id))
 		}
-		| (ForwardWait(id, _) | NestedWait(id, _)) {
+		& (ForwardWait(id, _) | NestedWait(id, _)) {
 			rows = { any(t.nested, (row : Nest) { row.id == id }) } |>
 				(True) { t.nested }
-				| (False) {
+				& (False) {
 					put_nest(t.nested, id, frame_owner(t.frames), empty_active)
 				}
 			(rows, Present(id))
 		}
-		| (ForgetWait(id)) {
+		& (ForgetWait(id)) {
 			(
 				list_map(t.nested, (row : Nest) {
 					{ row.id == id } |>
@@ -4302,34 +4302,34 @@ register_driver = (s : State, task_path : Int, command : Command) -> State {
 								active = Active(..row.active, abort = Absent),
 							)
 						}
-						| (False) { row }
+						& (False) { row }
 				}),
 				Absent,
 			)
 		}
-		| (_) { (t.nested, Absent) }
+		& (_) { (t.nested, Absent) }
 	set_task(s, TaskState(..t, nested = nested, driver = driver))
 }
 
 pending_frame = (frames : List(Frame)) -> Maybe(Frame) {
 	frames |>
 		([]) { Absent }
-		| ([f, .._]) {
-			{ f.deferred } |> (True) { Present(f) } | (False) { Absent }
+		& ([f, .._]) {
+			{ f.deferred } |> (True) { Present(f) } & (False) { Absent }
 		}
 }
 
 older_shield = (rows : List(Nest), id : Key(Nil)) -> Bool {
 	rows |>
 		([]) { False }
-		| ([row, ..rest]) {
+		& ([row, ..rest]) {
 			{ row.id == id } |>
 				(False) { older_shield(rest, id) }
-				| (True) {
+				& (True) {
 					any(rest, (older : Nest) {
 						older.active.abort |>
 							(Absent) { True }
-							| (Present(_)) { False }
+							& (Present(_)) { False }
 					})
 				}
 		}
@@ -4343,7 +4343,7 @@ cancel_response = (s : State, t : TaskState, abort : () -> Never) -> State {
 				_,
 			) | WaitingEvent(k, _) | WaitingDrain(k)
 		) { Runnable(k, CancelStep(abort)) }
-		| (_) { panic("task: invalid cancellation response") }
+		& (_) { panic("task: invalid cancellation response") }
 	released = remove_registration(s, t.serial)
 	latest = find_task(released.tasks, t.serial)
 	next = set_task(
@@ -4357,10 +4357,10 @@ cancel_response = (s : State, t : TaskState, abort : () -> Never) -> State {
 notify_nested = (s : State, t : TaskState, id : Key(Nil)) -> State {
 	pending_frame(t.frames) |>
 		(Absent) { s }
-		| (Present(frame)) {
+		& (Present(frame)) {
 			frame.cause |>
 				(Absent) { panic("task: invalid deferred cancellation") }
-				| (Present(cause)) {
+				& (Present(cause)) {
 					rows = affected_nests(t, t.frames)
 					relevant = any(rows, (row : Nest) { row.id == id })
 					notified = any(rows, (row : Nest) {
@@ -4370,7 +4370,7 @@ notify_nested = (s : State, t : TaskState, id : Key(Nil)) -> State {
 						core.not(relevant) || notified || older_shield(rows, id)
 					} |>
 						(True) { s }
-						| (False) {
+						& (False) {
 							nested = list_map(t.nested, (row : Nest) {
 								{ row.id == id } |>
 									(True) {
@@ -4379,7 +4379,7 @@ notify_nested = (s : State, t : TaskState, id : Key(Nil)) -> State {
 											notified = [cause, ..row.notified],
 										)
 									}
-									| (False) { row }
+									& (False) { row }
 							})
 							cancel_response(
 								s,
@@ -4395,18 +4395,18 @@ deliver_deferred = (s : State, path : Int, command : Command) -> State {
 	t = find_task(s.tasks, path)
 	{ cancellation_reply(t) } |>
 		(True) { s }
-		| (False) {
+		& (False) {
 			t.driver |>
 				(Present(id)) { notify_nested(s, t, id) }
-				| (Absent) {
+				& (Absent) {
 					pending_frame(t.frames) |>
 						(Absent) { s }
-						| (Present(frame)) {
+						& (Present(frame)) {
 							affected_nests(t, t.frames) |>
 								([]) {
 									frames = t.frames |>
 										([]) { [] }
-										| ([f, ..rest]) {
+										& ([f, ..rest]) {
 											[
 												Frame(..f, deferred = False),
 												..rest,
@@ -4420,14 +4420,14 @@ deliver_deferred = (s : State, path : Int, command : Command) -> State {
 												frame.abort,
 											)
 										}
-										| (hops) {
+										& (hops) {
 											frame.cause |>
 												(Absent) {
 													panic(
 														"task: missing deferred cause",
 													)
 												}
-												| (Present(cause)) {
+												& (Present(cause)) {
 													forward_response(
 														s,
 														TaskState(
@@ -4447,7 +4447,7 @@ deliver_deferred = (s : State, path : Int, command : Command) -> State {
 												}
 										}
 								}
-								| ([first, .._]) {
+								& ([first, .._]) {
 									command |>
 										(ForgetWait(_)) {
 											{
@@ -4457,14 +4457,14 @@ deliver_deferred = (s : State, path : Int, command : Command) -> State {
 												), (row : Nest) {
 													row.active.abort |>
 														(Absent) { True }
-														| (Present(_)) { False }
+														& (Present(_)) { False }
 												})
 											} |>
 												(True) { s }
-												| (False) {
+												& (False) {
 													first.active.abort |>
 														(Absent) { s }
-														| (Present(abort)) {
+														& (Present(abort)) {
 															cancel_response(
 																s,
 																t,
@@ -4473,7 +4473,7 @@ deliver_deferred = (s : State, path : Int, command : Command) -> State {
 														}
 												}
 										}
-										| (_) { s }
+										& (_) { s }
 								}
 						}
 				}
@@ -4481,7 +4481,7 @@ deliver_deferred = (s : State, path : Int, command : Command) -> State {
 }
 
 frame_owner = (frames : List(Frame)) -> Maybe(Address) {
-	frames |> ([]) { Absent } | ([f, .._]) { f.scope }
+	frames |> ([]) { Absent } & ([f, .._]) { f.scope }
 }
 
 anchor_within = (
@@ -4491,13 +4491,13 @@ anchor_within = (
 ) -> Bool {
 	frames |>
 		([]) { False }
-		| ([f, ..rest]) {
+		& ([f, ..rest]) {
 			{ f.scope == anchor } |>
 				(True) { True }
-				| (False) {
+				& (False) {
 					{ f.scope == target } |>
 						(True) { False }
-						| (False) { anchor_within(rest, anchor, target) }
+						& (False) { anchor_within(rest, anchor, target) }
 				}
 		}
 }
@@ -4505,7 +4505,7 @@ anchor_within = (
 affected_nests = (t : TaskState, frames : List(Frame)) -> List(Nest) {
 	frames |>
 		([]) { [] }
-		| ([f, .._]) {
+		& ([f, .._]) {
 			filter(t.nested, (row : Nest) {
 				anchor_within(t.frames, row.anchor, f.scope)
 			})
@@ -4515,16 +4515,16 @@ affected_nests = (t : TaskState, frames : List(Frame)) -> List(Nest) {
 nested_abort = (rows : List(Nest)) -> Maybe(() -> Never) {
 	rows |>
 		([]) { Absent }
-		| ([first, .._]) {
+		& ([first, .._]) {
 			{
 				any(rows, (row : Nest) {
 					row.active.abort |>
 						(Absent) { True }
-						| (Present(_)) { False }
+						& (Present(_)) { False }
 				})
 			} |>
 				(True) { Absent }
-				| (False) { first.active.abort }
+				& (False) { first.active.abort }
 		}
 }
 
@@ -4558,16 +4558,16 @@ empty_relay = (
 
 empty_active = Active(hops = [], abort = Absent, relay = empty_relay)
 
-foreign_active = (t : TaskState) { t.foreign |> ([]) { False } | (_) { True } }
+foreign_active = (t : TaskState) { t.foreign |> ([]) { False } & (_) { True } }
 
 frame_epoch = (frames : List(Frame)) -> Maybe(Cause) {
-	frames |> ([]) { Absent } | ([f, .._]) { f.cause }
+	frames |> ([]) { Absent } & ([f, .._]) { f.cause }
 }
 
 scope_token = (s : State, owner : Maybe(Address)) -> Key(Nil) {
 	owner |>
 		(Absent) { panic("task: foreign root delimiter") }
-		| (Present(id)) { find_scope(s.scopes, id).token }
+		& (Present(id)) { find_scope(s.scopes, id).token }
 }
 
 notice_with = (notice : ForeignNotice, hops : List(Hop)) -> ForeignNotice {
@@ -4575,17 +4575,17 @@ notice_with = (notice : ForeignNotice, hops : List(Hop)) -> ForeignNotice {
 		(BeginForeign(_, token, abort, cause)) {
 			BeginForeign(hops, token, abort, cause)
 		}
-		| (EndForeign(_, token)) { EndForeign(hops, token) }
+		& (EndForeign(_, token)) { EndForeign(hops, token) }
 }
 
 current_relay = (t : TaskState) -> (ForeignNotice, Keyed, Bool) -> Keyed {
 	t.driver |>
 		(Present(id)) {
 			rows = filter(t.nested, (row : Nest) { row.id == id })
-			rows |> ([]) { empty_relay } | ([row, .._]) { row.active.relay }
+			rows |> ([]) { empty_relay } & ([row, .._]) { row.active.relay }
 		}
-		| (Absent) {
-			t.nested |> ([]) { empty_relay } | ([row, .._]) { row.active.relay }
+		& (Absent) {
+			t.nested |> ([]) { empty_relay } & ([row, .._]) { row.active.relay }
 		}
 }
 
@@ -4595,16 +4595,16 @@ forward_response = (s : State, t : TaskState, notice : ForeignNotice) -> State {
 		(Runnable(k, Proceed(value))) {
 			Runnable(k, ForwardStep(notice, value, False, relay))
 		}
-		| (
+		& (
 			WaitingTicket(k, _) | WaitingScope(k, _) | WaitingEvent(
 				k,
 				_,
 			) | WaitingDrain(k)
 		) {
-			discard = t.driver |> (Absent) { True } | (Present(_)) { False }
+			discard = t.driver |> (Absent) { True } & (Present(_)) { False }
 			Runnable(k, ForwardStep(notice, unit(), discard, relay))
 		}
-		| (_) { t.status }
+		& (_) { t.status }
 	released = remove_registration(s, t.serial)
 	latest = find_task(released.tasks, t.serial)
 	next = set_task(
@@ -4619,7 +4619,7 @@ scope_end_reply = (s : State, t : TaskState, scope : ScopeState) -> StepAnswer {
 	value = key.wrap(scope_reply_key, scope_reply(scope))
 	scope.foreign |>
 		([]) { Proceed(value) }
-		| (hops) {
+		& (hops) {
 			ForwardStep(
 				EndForeign(hops, scope.token),
 				value,
@@ -4632,7 +4632,7 @@ scope_end_reply = (s : State, t : TaskState, scope : ScopeState) -> StepAnswer {
 queue_scope_end = (s : State, t : TaskState, scope : ScopeState) -> State {
 	scope.foreign |>
 		([]) { s }
-		| (hops) {
+		& (hops) {
 			set_task(
 				s,
 				TaskState(
@@ -4656,11 +4656,11 @@ finish_scope = (
 	alive = store_find(s.scopes, address_index(id)) != Absent
 	{ alive } |>
 		(False) { reply(s, t.serial, k, Proceed(unit()), False) }
-		| (True) {
+		& (True) {
 			scope = find_scope(s.scopes, id)
 			(frames, chain) = scope.mark |>
 				(BodyOpen) { (end_frame(t.frames, id), without(t.chain, id)) }
-				| (_) { (t.frames, t.chain) }
+				& (_) { (t.frames, t.chain) }
 			body = TaskState(
 				..t,
 				frames = frames,
@@ -4680,26 +4680,26 @@ anchor_epoch = (frames : List(Frame), anchor : Maybe(Address)) -> Maybe(
 ) {
 	frames |>
 		([]) { Absent }
-		| ([frame, ..rest]) {
+		& ([frame, ..rest]) {
 			{ frame.scope == anchor } |>
 				(True) { Present(frame.cause) }
-				| (False) { anchor_epoch(rest, anchor) }
+				& (False) { anchor_epoch(rest, anchor) }
 		}
 }
 
 unwinding_above = (frames : List(Frame), anchor : Maybe(Address)) -> Bool {
 	frames |>
 		([]) { False }
-		| ([frame, ..rest]) {
+		& ([frame, ..rest]) {
 			{ frame.scope == anchor } |>
 				(True) { False }
-				| (False) {
+				& (False) {
 					{ frame.finishing } |>
 						(True) { True }
-						| (False) {
+						& (False) {
 							frame.unwinding |>
 								(Present(_)) { True }
-								| (Absent) { unwinding_above(rest, anchor) }
+								& (Absent) { unwinding_above(rest, anchor) }
 						}
 				}
 		}
@@ -4712,7 +4712,7 @@ notice_ready = (t : TaskState, hop : Hop) -> Bool {
 notice_live = (t : TaskState, hop : Hop) -> Bool {
 	epoch_ok = anchor_epoch(t.frames, hop.anchor) |>
 		(Absent) { False }
-		| (Present(epoch)) { epoch == hop.epoch }
+		& (Present(epoch)) { epoch == hop.epoch }
 	tokens_ok = core.not(
 		any(t.foreign, (guard : ForeignGuard) {
 			core.not(contains(hop.foreign, guard.token))
@@ -4724,13 +4724,13 @@ notice_live = (t : TaskState, hop : Hop) -> Bool {
 post_notice = (s : State, notice : ForeignNotice) -> State {
 	notice_hops(notice) |>
 		([]) { s }
-		| ([hop, .._]) {
+		& ([hop, .._]) {
 			check_run(s.run, hop.run)
 			path = read(task_key, hop.task)
 			alive = store_find(s.tasks, path) != Absent
 			{ alive } |>
 				(False) { s }
-				| (True) {
+				& (True) {
 					t = find_task(s.tasks, path)
 					set_task(
 						s,
@@ -4743,14 +4743,14 @@ post_notice = (s : State, notice : ForeignNotice) -> State {
 apply_notice = (s : State, t : TaskState, notice : ForeignNotice) -> State {
 	notice_hops(notice) |>
 		([]) { s }
-		| ([hop, ..rest]) {
+		& ([hop, ..rest]) {
 			rest |>
 				([]) {
 					notice |>
 						(BeginForeign(_, token, abort, _)) {
 							{ notice_live(t, hop) } |>
 								(False) { s }
-								| (True) {
+								& (True) {
 									guards = [
 										ForeignGuard(
 											token = token,
@@ -4765,7 +4765,7 @@ apply_notice = (s : State, t : TaskState, notice : ForeignNotice) -> State {
 									)
 								}
 						}
-						| (EndForeign(_, token)) {
+						& (EndForeign(_, token)) {
 							set_task(
 								s,
 								TaskState(
@@ -4777,7 +4777,7 @@ apply_notice = (s : State, t : TaskState, notice : ForeignNotice) -> State {
 							)
 						}
 				}
-				| (_) { forward_response(s, t, notice_with(notice, rest)) }
+				& (_) { forward_response(s, t, notice_with(notice, rest)) }
 		}
 }
 
@@ -4785,10 +4785,10 @@ pump_task_messages = (s : State, path : Int) -> State {
 	t = find_task(s.tasks, path)
 	t.messages |>
 		([]) { s }
-		| ([notice, ..rest]) {
+		& ([notice, ..rest]) {
 			responsive = t.status |>
 				(Runnable(_, Proceed(_))) { True }
-				| (
+				& (
 					WaitingTicket(_, _) | WaitingScope(_, _) | WaitingEvent(
 						_,
 						_,
@@ -4796,21 +4796,21 @@ pump_task_messages = (s : State, path : Int) -> State {
 				) {
 					t.driver |>
 						(Present(_)) { True }
-						| (Absent) {
+						& (Absent) {
 							notice |>
 								(BeginForeign(..)) { True }
-								| (EndForeign(..)) { False }
+								& (EndForeign(..)) { False }
 						}
 				}
-				| (_) { False }
+				& (_) { False }
 			ready = notice |>
 				(EndForeign(..)) { True }
-				| (BeginForeign(hops, _, _, _)) {
-					hops |> ([hop]) { notice_ready(t, hop) } | (_) { True }
+				& (BeginForeign(hops, _, _, _)) {
+					hops |> ([hop]) { notice_ready(t, hop) } & (_) { True }
 				}
 			{ responsive && ready } |>
 				(False) { s }
-				| (True) {
+				& (True) {
 					updated = TaskState(..t, messages = rest)
 					apply_notice(set_task(s, updated), updated, notice)
 				}
@@ -4820,23 +4820,23 @@ pump_task_messages = (s : State, path : Int) -> State {
 pump_rows = (s : State, rows : List(ActiveTask)) -> State {
 	rows |>
 		([]) { s }
-		| ([entry, ..rest]) {
+		& ([entry, ..rest]) {
 			store_find(s.tasks, entry.id) |>
 				(Present(t) ? core.not(t.clean)) {
 					t.messages |>
 						([]) { pump_rows(s, rest) }
-						| (_) {
+						& (_) {
 							pump_rows(pump_task_messages(s, entry.id), rest)
 						}
 				}
-				| (_) { pump_rows(s, rest) }
+				& (_) { pump_rows(s, rest) }
 		}
 }
 
 pump_messages = (s : State) {
 	{ s.message_history } |>
 		(False) { s }
-		| (True) { pump_rows(s, reverse(s.active, [])) }
+		& (True) { pump_rows(s, reverse(s.active, [])) }
 }
 
 relay_notice = (
@@ -4873,8 +4873,8 @@ relay_notice = (
 				),
 			)
 		}
-		| (Runnable(_, CancelStep(_))) { next }
-		| (_) {
+		& (Runnable(_, CancelStep(_))) { next }
+		& (_) {
 			{ discard } |>
 				(True) {
 					notice |>
@@ -4887,30 +4887,30 @@ relay_notice = (
 								),
 							)
 						}
-						| (EndForeign(..)) {
+						& (EndForeign(..)) {
 							reply(next, t.serial, k, Proceed(value), True)
 						}
 				}
-				| (False) { reply(next, t.serial, k, Proceed(value), True) }
+				& (False) { reply(next, t.serial, k, Proceed(value), True) }
 		}
 }
 
 notice_hops = (notice : ForeignNotice) -> List(Hop) {
 	notice |>
 		(BeginForeign(hops, _, _, _)) { hops }
-		| (EndForeign(hops, _)) { hops }
+		& (EndForeign(hops, _)) { hops }
 }
 
 // Selected by package data with this module's private authority.
 _provider_runner = (seeds : List(Runner)) <- (root : request.Root) -> Runner {
 	seeds |>
 		([runner]) { runner }
-		| ([]) { initial(root) }
-		| (_) { panic("provider: invalid runner seed") }
+		& ([]) { initial(root) }
+		& (_) { panic("provider: invalid runner seed") }
 }
 
 _provider_scheduler = (seeds : List(Scheduler)) -> Scheduler {
 	seeds |>
 		([scheduler]) { scheduler }
-		| (_) { panic("provider: scheduler seed required") }
+		& (_) { panic("provider: scheduler seed required") }
 }

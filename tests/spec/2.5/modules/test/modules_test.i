@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 test("across_modules", () {
@@ -17,7 +17,7 @@ test("across_modules", () {
 })
 
 each = (xs : List(base.Color)) {
-	xs |> ([]) { [] } | ([c, ..rest]) { [base.describe(c), ..each(rest)] }
+	xs |> ([]) { [] } & ([c, ..rest]) { [base.describe(c), ..each(rest)] }
 }
 
 test("constructors_of_another_module", () {

@@ -8,7 +8,7 @@ None = ()
 Option(A) = Some(A) | None
 
 first = (xs : List(Option(Int))) -> Int {
-	xs |> ([Some(x), ..r]) { x } | (_) { 0 }
+	xs |> ([Some(x), ..r]) { x } & (_) { 0 }
 }
 
 main = () { assert(first([Some(3), None]) == 3) }

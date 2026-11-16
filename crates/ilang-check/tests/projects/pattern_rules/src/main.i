@@ -19,9 +19,9 @@ typed = (n : Int, _ = n = m) { n }
 choices = (v) {
 	v |>
 		((a, b) | (a, _)) { a }
-		| (Ok(x) | Error(y)) { x }
-		| (Ok(x) | Error(x)) { x }
-		| ([k, ..] | [_, k, ..] | []) { 0 }
+		& (Ok(x) | Error(y)) { x }
+		& (Ok(x) | Error(x)) { x }
+		& ([k, ..] | [_, k, ..] | []) { 0 }
 }
 
-ctor = (v) { v |> (Nope(x)) { x } | (Ok(n)) { n } }
+ctor = (v) { v |> (Nope(x)) { x } & (Ok(n)) { n } }

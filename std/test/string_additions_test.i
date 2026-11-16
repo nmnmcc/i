@@ -32,12 +32,12 @@ test("access_and_taking", () {
 			assert(string.drop_end(s, k) <> string.take_end(s, k) == s)
 		})
 		list.each(list.range(-n - 1, n + 1), (i) {
-			normalized = { i < 0 } |> (True) { n + i } | (False) { i }
+			normalized = { i < 0 } |> (True) { n + i } & (False) { i }
 			{ normalized >= 0 && normalized < n } |>
 				(True) {
 					assert(string.at(s, i) == Some(string.slice(s, i, 1)))
 				}
-				| (False) { assert(string.at(s, i) == None) }
+				& (False) { assert(string.at(s, i) == None) }
 		})
 	})
 })
@@ -94,7 +94,7 @@ test("count_replacement_and_last_split", () {
 			)
 			string.split_once_last(s, needle) |>
 				(None) { Nil }
-				| (Some((left, right))) { assert(left <> needle <> right == s) }
+				& (Some((left, right))) { assert(left <> needle <> right == s) }
 		})
 	})
 })
@@ -155,7 +155,7 @@ test("callbacks_run_once_in_order_and_stop_on_error", () {
 					calls.call(n)
 					{ n == 233 } |>
 						(True) { fail.raise("second") }
-						| (False) { c }
+						& (False) { c }
 				})
 			})
 			assert(result == Error("second"))

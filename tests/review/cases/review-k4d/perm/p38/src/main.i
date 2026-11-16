@@ -26,7 +26,7 @@ closed = () {
 	both() <- (Dep(v = 1), _syn3_0, _syn3_1)
 }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 run = <A, N>(body : () <- N -> A) { body() }
 

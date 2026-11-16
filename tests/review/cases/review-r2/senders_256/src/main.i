@@ -11,7 +11,7 @@
 spawn = (s, c, n : Int) {
 	{ n == 0 } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			task.go(s, () { task.send(c, n) })
 			spawn(s, c, n - 1)
 		}
@@ -21,7 +21,7 @@ spawn = (s, c, n : Int) {
 receive_all = (c, n : Int, seen : Int) {
 	{ n == 0 } |>
 		(True) { seen }
-		| (False) {
+		& (False) {
 			v = task.receive(c)
 			bit = core.shift_left(1, v)
 			assert(core.bit_and(seen, bit) == 0)

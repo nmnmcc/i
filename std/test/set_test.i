@@ -249,7 +249,7 @@ test("each_test", () {
 				|> set.each((member) {
 					member |>
 						(1 | 2 | 3) { Nil }
-						| (_) { panic("unexpected value") }
+						& (_) { panic("unexpected value") }
 				})
 		} ==
 			Nil,

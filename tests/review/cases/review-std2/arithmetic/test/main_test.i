@@ -3,14 +3,14 @@
 )
 
 fd = (a : Int, b : Int) -> Int {
-	{ a % b < 0 } |> (True) { a / b - 1 } | (False) { a / b }
+	{ a % b < 0 } |> (True) { a / b - 1 } & (False) { a / b }
 }
 
 day = (y : Int, m : Int, d : Int) -> Int {
-	y1 = { m <= 2 } |> (True) { y - 1 } | (False) { y }
+	y1 = { m <= 2 } |> (True) { y - 1 } & (False) { y }
 	era = fd(y1, 400)
 	yoe = y1 - era * 400
-	mp = { m > 2 } |> (True) { m - 3 } | (False) { m + 9 }
+	mp = { m > 2 } |> (True) { m - 3 } & (False) { m + 9 }
 	doy = fd(153 * mp + 2, 5) + d - 1
 	era * 146097 + 365 * yoe + fd(yoe, 4) - fd(yoe, 100) + doy - 719468
 }
@@ -24,8 +24,8 @@ civil = (n : Int) -> (Int, Int, Int) {
 	doy = doe - { 365 * yoe + fd(yoe, 4) - fd(yoe, 100) }
 	mp = fd(5 * doy + 2, 153)
 	d = doy - fd(153 * mp + 2, 5) + 1
-	m = { mp < 10 } |> (True) { mp + 3 } | (False) { mp - 9 }
-	yr = { m <= 2 } |> (True) { y + 1 } | (False) { y }
+	m = { mp < 10 } |> (True) { mp + 3 } & (False) { mp - 9 }
+	yr = { m <= 2 } |> (True) { y + 1 } & (False) { y }
 	(yr, m, d)
 }
 

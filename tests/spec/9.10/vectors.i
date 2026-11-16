@@ -11,7 +11,7 @@
 )
 
 advance = (g : random.Generator, n : Int) -> random.Generator {
-	{ n == 0 } |> (True) { g } | (False) { advance(random.word(g).1, n - 1) }
+	{ n == 0 } |> (True) { g } & (False) { advance(random.word(g).1, n - 1) }
 }
 
 test("words_0", () {

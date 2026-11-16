@@ -117,7 +117,7 @@ Function parameters are **contravariant**: accepting more inputs permits substit
 
 f = (x : { Int | String }) -> String { "f accepted" }
 g = (x : { String | Bool }) -> String { "g accepted" }
-choose = (c : Bool) { c |> (True) { f } | (False) { g } }
+choose = (c : Bool) { c |> (True) { f } & (False) { g } }
 
 main = () {
 	first = choose(True)
@@ -137,7 +137,7 @@ Choosing one function gives a union of function types; only inputs accepted by b
 ```i error E0501 package=tour title="src/main.i"
 f = (x : { Int | String }) -> String { "f accepted" }
 g = (x : { String | Bool }) -> String { "g accepted" }
-choose = (c : Bool) { c |> (True) { f } | (False) { g } }
+choose = (c : Bool) { c |> (True) { f } & (False) { g } }
 
 main = () {
 	chosen = choose(False)
@@ -187,7 +187,7 @@ A need is an intersection of requirements on the caller's environment, keyed by 
 	i/stdio
 )
 
-show = (n : Int) -> String { core.inspect(n) } | (s : String) -> String { s }
+show = (n : Int) -> String { core.inspect(n) } & (s : String) -> String { s }
 use_int = (f : (Int) -> String) { f(7) }
 use_string = (f : (String) -> String) { f("seven") }
 

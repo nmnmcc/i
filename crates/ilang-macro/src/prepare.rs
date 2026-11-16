@@ -300,7 +300,7 @@ _entry = ({parameters}) -> syntax.Syntax {{
 		body = () -> syntax.Syntax {{ target.{}({arguments}) }}
 		fail.catch(body) |>
 			(Ok(value)) {{ value }}
-			| (Error(syntax.SyntaxError(message, at))) {{ syntax._report_error(message, at) }}
+			& (Error(syntax.SyntaxError(message, at))) {{ syntax._report_error(message, at) }}
 	}} <- (syntax._diagnostics()){items} <- (syntax._definitions()) <- (
 		Assert((failure : AssertionFailure) -> Never {{ panic(failure.message) }}),
 	)

@@ -11,7 +11,7 @@ main = () {
 	Nil
 }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 uset : <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x : A) <- (
 	t : T(A, N),

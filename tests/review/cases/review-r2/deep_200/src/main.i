@@ -11,7 +11,7 @@
 deep = (n : Int) -> Nil {
 	{ n == 0 } |>
 		(True) { task.yield() }
-		| (False) {
+		& (False) {
 			task.scope((s) {
 				task.go(s, () { Nil })
 				deep(n - 1)

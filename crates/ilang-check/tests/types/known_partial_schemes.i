@@ -4,7 +4,7 @@
 User = (name = String, age = Int)
 
 map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
-	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] }
+	xs |> ([]) { [] } & ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 
 users = [User(name = "bob", age = 3)]

@@ -20,6 +20,6 @@ read_file = (path) <- (fs : Fs) { fs.read_file(path) }
 choose = () <- (t : Target) {
 	t |>
 		(Target(NodeJS(_))) { read_file("settings.txt") }
-		| (Target(Native)) { read_file("settings.txt") }
-		| (_) { <<>> }
+		& (Target(Native)) { read_file("settings.txt") }
+		& (_) { <<>> }
 }

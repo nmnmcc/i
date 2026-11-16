@@ -52,7 +52,7 @@ handle = (req : http.Request) {
 				trailers = r.trailers,
 			)
 		}
-		| ((http.Method("POST"), "/users")) {
+		& ((http.Method("POST"), "/users")) {
 			fail.catch(() { bit_array.to_string(req.body) }) |>
 				(Ok(text)) {
 					parsed : Result(User, schema.ParseError) = {
@@ -76,14 +76,14 @@ handle = (req : http.Request) {
 								),
 							)
 						}
-						| (Error(schema.Decode(error))) {
+						& (Error(schema.Decode(error))) {
 							reply(422, core.inspect(error.path))
 						}
-						| (Error(_)) { reply(422, "invalid JSON") }
+						& (Error(_)) { reply(422, "invalid JSON") }
 				}
-				| (Error(_)) { reply(422, "invalid UTF-8") }
+				& (Error(_)) { reply(422, "invalid UTF-8") }
 		}
-		| (_) { reply(404, "not found") }
+		& (_) { reply(404, "not found") }
 }
 
 main = () {

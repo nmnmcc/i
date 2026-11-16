@@ -37,9 +37,9 @@ op_neg = (a) { -.a == 1 }
 op_pipe = () { { 1 |> core.to_float } == 1 }
 
 // A a match has the union of its clause expressions, when they all have one.
-case_union = (b : Bool) { { b |> (True) { 1 } | (False) { "a" } } == 1.0 }
+case_union = (b : Bool) { { b |> (True) { 1 } & (False) { "a" } } == 1.0 }
 
-case_unknown = (b : Bool, x) { { b |> (True) { 1 } | (False) { x } } == "a" }
+case_unknown = (b : Bool, x) { { b |> (True) { 1 } & (False) { x } } == "a" }
 
 // A record update is the call of its constructor.
 update = (b : Box(Int)) { Box(..b, value = "a") == 1 }
@@ -83,7 +83,7 @@ fn_body = () { (x : Int, y) { x } == 1 }
 own = (n : Int) {
 	n |>
 		(0) { 0 }
-		| (_) {
+		& (_) {
 			own == 1
 			0
 		}
@@ -113,7 +113,7 @@ call_ctor = () { Box(value = 1) == 1 }
 
 // Matching a union: the type variable gets what the other members do not
 // take. `_` matches nothing.
-unwrap = <A>(x : { A | Nil }) -> A { x |> (Nil) { panic("nil") } | (y) { y } }
+unwrap = <A>(x : { A | Nil }) -> A { x |> (Nil) { panic("nil") } & (y) { y } }
 
 call_union = (u : { User | Nil }) { unwrap(u) == 1 }
 
@@ -130,7 +130,7 @@ call_join = () { either(1, "a") == 1.0 }
 
 // Differences and intersections in a scheme: the types are put in, and the
 // result is worked out again (§4.4).
-drop_nil = (x) { x |> (Nil) { panic("nil") } | (y) { y } }
+drop_nil = (x) { x |> (Nil) { panic("nil") } & (y) { y } }
 
 call_diff = (u : { User | Nil }) { drop_nil(u) == 1 }
 
@@ -179,20 +179,20 @@ pattern_annotation = (x) {
 }
 
 pattern_list = (xs : List(String)) {
-	xs |> ([x, ..rest]) { x == 1 || rest == 1 } | ([]) { False }
+	xs |> ([x, ..rest]) { x == 1 || rest == 1 } & ([]) { False }
 }
 
 pattern_case_part = (b : Box(Int | String)) {
 	b |>
 		(Box(value = value) ? True) { value == 1.0 }
-		| (_) { panic("unreachable") }
+		& (_) { panic("unreachable") }
 }
 
 // A catch-all gets `B` less the members that rule 12 takes out.
 pattern_narrowed = (x : { Int | String | Nil }) {
 	x |>
 		(_ : Nil) { 0 }
-		| (other) { { other == Nil } |> (True) { 1 } | (False) { 2 } }
+		& (other) { { other == Nil } |> (True) { 1 } & (False) { 2 } }
 }
 
 // A name that is not generalized gets its known type from its value.
@@ -210,7 +210,7 @@ Option(A) = Some(A) | None
 untyped_field = (u) { u.name }
 
 option_name = (opt : Option(User)) {
-	opt |> (Some(u)) { u.name } | (None) { "" }
+	opt |> (Some(u)) { u.name } & (None) { "" }
 }
 
 // A written positional signature determines the call interface (§6.6).

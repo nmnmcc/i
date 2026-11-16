@@ -15,7 +15,7 @@
 config = (delimiter : String, fields : Int, crlf : Bool) -> csv.Options {
 	fail.catch(() { csv.options(delimiter, fields, crlf) }) |>
 		(Ok(c)) { c }
-		| (Error(_)) { panic("test options") }
+		& (Error(_)) { panic("test options") }
 }
 
 PullProbe = (note = () -> Nil)
@@ -256,49 +256,49 @@ test("error_unicode_position", () {
 test("invalid_delimiter_0", () {
 	fail.catch(() { csv.options("", 0, False) }) |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("invalid delimiter") }
+		& (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_1", () {
 	fail.catch(() { csv.options("ab", 0, False) }) |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("invalid delimiter") }
+		& (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_2", () {
 	fail.catch(() { csv.options("\n", 0, False) }) |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("invalid delimiter") }
+		& (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_3", () {
 	fail.catch(() { csv.options("\r", 0, False) }) |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("invalid delimiter") }
+		& (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_4", () {
 	fail.catch(() { csv.options("\"", 0, False) }) |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("invalid delimiter") }
+		& (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_5", () {
 	fail.catch(() { csv.options("\u{0000}", 0, False) }) |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("invalid delimiter") }
+		& (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
 test("invalid_delimiter_6", () {
 	fail.catch(() { csv.options("�", 0, False) }) |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("invalid delimiter") }
+		& (Ok(_)) { panic("invalid delimiter") }
 	Nil
 })
 
@@ -343,7 +343,7 @@ test("width_infer_error", () {
 		(Error(csv.CsvError(reason = reason, ..))) {
 			assert(reason == "wrong number of fields")
 		}
-		| (Ok(_)) { panic("width") }
+		& (Ok(_)) { panic("width") }
 	Nil
 })
 
@@ -366,7 +366,7 @@ test("width_explicit_error", () {
 		fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
 	} |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("width") }
+		& (Ok(_)) { panic("width") }
 	Nil
 })
 
@@ -1016,7 +1016,7 @@ test("header_width", () {
 		fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
 	} |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("header width") }
+		& (Ok(_)) { panic("header width") }
 	Nil
 })
 
@@ -1057,7 +1057,7 @@ test("schema_error", () {
 		fail.catch(() { csv.decode(e4_call_arg_0, e4_call_arg_1) })
 	} |>
 		(Error(_)) { Nil }
-		| (Ok(_)) { panic("string must not coerce") }
+		& (Ok(_)) { panic("string must not coerce") }
 	Nil
 })
 

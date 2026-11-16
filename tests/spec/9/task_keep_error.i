@@ -22,5 +22,5 @@ main = () {
 					Error("saved"),
 			)
 		}
-		| (_) { panic("task.keep raised at creation") }
+		& (_) { panic("task.keep raised at creation") }
 }

@@ -31,8 +31,8 @@ checks = () <- (kv : Kv) {
 each = (xs : List(Int), f : (Int) -> String) -> String {
 	xs |>
 		([]) { "" }
-		| ([x]) { f(x) }
-		| ([x, ..rest]) { f(x) <> " " <> each(rest, f) }
+		& ([x]) { f(x) }
+		& ([x, ..rest]) { f(x) <> " " <> each(rest, f) }
 }
 
 main = () <- (kv : Kv) {
@@ -41,12 +41,12 @@ main = () <- (kv : Kv) {
 	// An error of the host goes through the program as an error (§9.3).
 	fail.catch(() { kv.get("x") }) |>
 		(Ok(_)) { panic("no error") }
-		| (Error(e)) { say(e) }
+		& (Error(e)) { say(e) }
 	say(checks())
 }
 
 // A service is a normal value (§9.2).
 test("services_are_values", () <- (kv : Kv) {
 	get = kv.get
-	get("lang") |> ("i language") { Nil } | (other) { panic(other) }
+	get("lang") |> ("i language") { Nil } & (other) { panic(other) }
 })

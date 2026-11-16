@@ -36,17 +36,17 @@ read_int = (
 ) -> Int {
 	value = little |>
 		(True) { read_little(bits, start, width, 0, 1) }
-		| (False) { read_big(bits, start, width, 0) }
+		& (False) { read_big(bits, start, width, 0) }
 	{ signed && width > 0 && value >= core.shift_left(1, width - 1) } |>
 		(True) { value - core.shift_left(1, width) }
-		| (False) { value }
+		& (False) { value }
 }
 
 // Big endian: the bits in chunks, most significant first.
 read_big = (bits : BitArray, start : Int, left : Int, acc : Int) -> Int {
 	{ left == 0 } |>
 		(True) { acc }
-		| (False) {
+		& (False) {
 			n = min(left, 14)
 			read_big(
 				bits,
@@ -68,7 +68,7 @@ read_little = (
 ) -> Int {
 	{ left == 0 } |>
 		(True) { acc }
-		| (False) {
+		& (False) {
 			n = min(left, 8)
 			read_little(
 				bits,
@@ -86,7 +86,7 @@ from_int = (value : Int, width : Int, little : Bool) -> BitArray {
 	core.bit_array_concat(
 		little |>
 			(True) { write_little(u, width, []) }
-			| (False) { write_big(u, width, []) },
+			& (False) { write_big(u, width, []) },
 	)
 }
 
@@ -94,7 +94,7 @@ from_int = (value : Int, width : Int, little : Bool) -> BitArray {
 write_big = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 	{ left == 0 } |>
 		(True) { acc }
-		| (False) {
+		& (False) {
 			n = min(left, 14)
 			low = core.bit_and(u, core.shift_left(1, n) - 1)
 			write_big(
@@ -110,7 +110,7 @@ write_big = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 write_little = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 	{ left == 0 } |>
 		(True) { reverse(acc, []) }
-		| (False) {
+		& (False) {
 			n = min(left, 8)
 			low = core.bit_and(u, core.shift_left(1, n) - 1)
 			write_little(
@@ -122,7 +122,7 @@ write_little = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 }
 
 reverse = (list : List(BitArray), acc : List(BitArray)) -> List(BitArray) {
-	list |> ([]) { acc } | ([x, ..xs]) { reverse(xs, [x, ..acc]) }
+	list |> ([]) { acc } & ([x, ..xs]) { reverse(xs, [x, ..acc]) }
 }
 
-min = (a : Int, b : Int) -> Int { { a < b } |> (True) { a } | (False) { b } }
+min = (a : Int, b : Int) -> Int { { a < b } |> (True) { a } & (False) { b } }

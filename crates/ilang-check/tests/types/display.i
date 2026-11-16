@@ -9,7 +9,7 @@ Ref(A) = (get = () -> A, set = (A) -> Nil)
 read = <A>(r : Ref(A)) { r.get() }
 
 either = <A, B>(r1 : Ref(A), r2 : Ref(B), c : Bool) {
-	c |> (True) { r1 } | (False) { r2 }
+	c |> (True) { r1 } & (False) { r2 }
 }
 
 make_int = (x) {
@@ -41,10 +41,10 @@ inter_unions = <A>(x : A & { Int | String } & { Int | Nil }) { x }
 rest = (v) {
 	v |>
 		([]) { 0 }
-		| ([_, ..]) { 1 }
-		| (Ok(_)) { 2 }
-		| (Error(_)) { 3 }
-		| (other) { other }
+		& ([_, ..]) { 1 }
+		& (Ok(_)) { 2 }
+		& (Error(_)) { 3 }
+		& (other) { other }
 }
 
 // A binding that is not generalized: each type variable is the union of

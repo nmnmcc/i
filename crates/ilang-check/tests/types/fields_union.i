@@ -22,7 +22,7 @@ name = (p : { Cat | Dog }) { p.name }
 
 value = (v : { Num | Text }) { v.value }
 
-label = (p : { Shape | Cat }) { p |> (Cat(..)) { p.name } | (_) { p.label } }
+label = (p : { Shape | Cat }) { p |> (Cat(..)) { p.name } & (_) { p.label } }
 
 generic = (b : { Box(Int) | Num }) { b.value }
 
@@ -45,12 +45,12 @@ no_known_type = (p) { p.name }
 
 // Narrowing through a known constructor (§7.5).
 known_ctor = (s : Shape) {
-	s |> (Circle(..)) { s.radius } | (Square(..)) { s.side }
+	s |> (Circle(..)) { s.radius } & (Square(..)) { s.side }
 }
 
 // Narrowing of the known type of a catch-all (rule 12).
 narrowed = (x : { Cat | Rock }) {
-	x |> (_ : Rock) { "" } | (other) { other.name }
+	x |> (_ : Rock) { "" } & (other) { other.name }
 }
 
 // A value with no written type, whose known type comes from a call.

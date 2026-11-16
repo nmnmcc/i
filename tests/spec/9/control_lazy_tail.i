@@ -9,12 +9,12 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-count = (n, acc) { n |> (0) { acc } | (_) { count(n - 1, acc + 1) } }
+count = (n, acc) { n |> (0) { acc } & (_) { count(n - 1, acc + 1) } }
 
 // 1000 frames that wait, then a loop of 1,000,000 tail calls after the
 // resume.
@@ -24,7 +24,7 @@ down = (b, n) {
 			control.suspend(b, (k) { control.resume(k, Nil) })
 			count(1000000, 0)
 		}
-		| (_) {
+		& (_) {
 			x = down(b, n - 1)
 			x + 1
 		}

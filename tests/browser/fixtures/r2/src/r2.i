@@ -97,7 +97,7 @@ cancel_probe = (owned : Bool) <- (gates : Gates, control : Control) {
 				task.send(armed, Nil)
 				{ owned } |>
 					(True) { request.await_owned(r) }
-					| (False) { request.await(r) }
+					& (False) { request.await(r) }
 			})
 			task.go(s, () {
 				task.receive(armed)
@@ -112,7 +112,7 @@ cancel_probe = (owned : Bool) <- (gates : Gates, control : Control) {
 			assert(request.state(r) == request.Cancelled)
 			control.check(1)
 		}
-		| (False) {
+		& (False) {
 			assert(request.state(r) == request.Waiting)
 			control.check(2)
 		}
@@ -182,7 +182,7 @@ nested_interest = () <- (gates : Gates) {
 bounded_cpu = (turns : Int) -> Never {
 	turns |>
 		(0) { panic("nested IO progress was not forwarded") }
-		| (_) {
+		& (_) {
 			task.yield()
 			bounded_cpu(turns - 1)
 		}
@@ -267,13 +267,13 @@ trace = (seed : Int) {
 	})
 	result |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("invalid replay script") }
+		& (Error(_)) { panic("invalid replay script") }
 }
 
 expected_one = (seed : Int, p : List(Int)) {
 	generator = fail.catch(() { random.at_path(random.from_seed(seed), p) }) |>
 		(Ok(g)) { g }
-		| (Error(_)) { panic("invalid expected path") }
+		& (Error(_)) { panic("invalid expected path") }
 	core.inspect((p, random.word(generator)))
 }
 

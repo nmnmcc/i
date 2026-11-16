@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -59,15 +59,15 @@ from_outside = () {
 // position (§11.6). A million calls do not fit on the stack (32 MiB in the
 // Wasmtime host).
 count = (n, acc, name : Name) {
-	n |> (0) { acc } | (_) { count(n - 1, acc + 1, name) } <- (name)
+	n |> (0) { acc } & (_) { count(n - 1, acc + 1, name) } <- (name)
 }
 
 // The environment of a tail call through a value.
 deep = (n) <- (k : Name) {
 	n |>
 		(0) { k.text }
-		| (1) { apply(deep, 0) <- (Name(text = "last")) }
-		| (_) { apply(deep, n - 1) <- (k) }
+		& (1) { apply(deep, 0) <- (Name(text = "last")) }
+		& (_) { apply(deep, n - 1) <- (k) }
 }
 
 apply = (f, n) { f(n) }

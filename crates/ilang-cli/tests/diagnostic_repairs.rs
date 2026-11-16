@@ -151,7 +151,7 @@ fn a_literal_outside_all_branches_gets_one_argument_error() {
         ),
         (
             "src/words.i",
-            "(word)\nword = (0) { \"zero\" } | (1) { \"one\" }\n",
+            "(word)\nword = (0) { \"zero\" } & (1) { \"one\" }\n",
         ),
     ]);
     assert_eq!(
@@ -160,9 +160,9 @@ fn a_literal_outside_all_branches_gets_one_argument_error() {
     );
     // Strings and a later argument use the same rule, including piped calls.
     for source in [
-        "word = (\"zero\") { 0 } | (\"one\") { 1 }\nbad = word(\"two\")\n_ = bad\n",
-        "word = (x : Int, 0) { x } | (x : Int, 1) { x }\nbad = word(3, 2)\n_ = bad\n",
-        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = 2 |> word()\n_ = bad\n",
+        "word = (\"zero\") { 0 } & (\"one\") { 1 }\nbad = word(\"two\")\n_ = bad\n",
+        "word = (x : Int, 0) { x } & (x : Int, 1) { x }\nbad = word(3, 2)\n_ = bad\n",
+        "word = (0) { \"zero\" } & (1) { \"one\" }\nbad = 2 |> word()\n_ = bad\n",
     ] {
         let diagnostics = check(&[("src/main.i", source)]);
         assert_eq!(diagnostics.matches("error[").count(), 1, "{diagnostics}");
@@ -175,7 +175,7 @@ fn a_literal_outside_all_branches_gets_one_argument_error() {
     let diagnostics = check_status(
         &[(
             "src/main.i",
-            "word = (0) { \"zero\" } | (1) { \"one\" }\ngood = word(0)\n_ = good\n",
+            "word = (0) { \"zero\" } & (1) { \"one\" }\ngood = word(0)\n_ = good\n",
         )],
         0,
     );
@@ -186,7 +186,7 @@ fn a_literal_outside_all_branches_gets_one_argument_error() {
 fn an_unmatched_combination_still_reports_branch_selection() {
     let diagnostics = check(&[(
         "src/main.i",
-        "word = (0, 0) { \"zero\" } | (1, 1) { \"one\" }\nbad = word(0, 1)\n_ = bad\n",
+        "word = (0, 0) { \"zero\" } & (1, 1) { \"one\" }\nbad = word(0, 1)\n_ = bad\n",
     )]);
     // The definition independently fails coverage: keep that E0516 too.
     assert_eq!(
@@ -211,7 +211,7 @@ fn an_unmatched_combination_still_reports_branch_selection() {
 fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
     let diagnostics = check(&[(
         "src/main.i",
-        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = word(True)\n_ = bad\n",
+        "word = (0) { \"zero\" } & (1) { \"one\" }\nbad = word(True)\n_ = bad\n",
     )]);
     assert_eq!(
         diagnostics,
@@ -219,7 +219,7 @@ fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
     );
     let diagnostics = check(&[(
         "src/main.i",
-        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = word((2))\n_ = bad\n",
+        "word = (0) { \"zero\" } & (1) { \"one\" }\nbad = word((2))\n_ = bad\n",
     )]);
     assert_eq!(
         diagnostics,
@@ -227,7 +227,7 @@ fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
     );
     let diagnostics = check(&[(
         "src/main.i",
-        "word = (0) { \"zero\" } | (1) { \"one\" }\nbad = word({ value : String = 2\n _ = value\n \"two\" })\n_ = bad\n",
+        "word = (0) { \"zero\" } & (1) { \"one\" }\nbad = word({ value : String = 2\n _ = value\n \"two\" })\n_ = bad\n",
     )]);
     assert_eq!(
         diagnostics.matches("error[E0501]").count(),
@@ -246,7 +246,7 @@ fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
     );
     let diagnostics = check(&[(
         "src/main.i",
-        "word = (0, 0 | 1) { \"zero\" } | (1, 0 | 1) { \"one\" }\nbad = word(2, 3)\n_ = bad\n",
+        "word = (0, 0 | 1) { \"zero\" } & (1, 0 | 1) { \"one\" }\nbad = word(2, 3)\n_ = bad\n",
     )]);
     assert_eq!(
         diagnostics.matches("error[E0501]").count(),

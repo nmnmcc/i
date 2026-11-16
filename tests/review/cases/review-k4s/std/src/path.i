@@ -30,19 +30,19 @@ clean = (path : String) -> String {
 	go = (rest : List(String), acc : List(String)) -> String {
 		rest |>
 			([]) { render(list.reverse(acc), rooted) }
-			| ([part, ..parts]) {
+			& ([part, ..parts]) {
 				part |>
 					(p ? p == "" || p == ".") { go(parts, acc) }
-					| (p ? p == "..") {
+					& (p ? p == "..") {
 						acc |>
 							([x, ..xs] ? x != "..") { go(parts, xs) }
-							| (_) {
+							& (_) {
 								rooted |>
 									(True) { go(parts, acc) }
-									| (False) { go(parts, ["..", ..acc]) }
+									& (False) { go(parts, ["..", ..acc]) }
 							}
 					}
-					| (_) { go(parts, [part, ..acc]) }
+					& (_) { go(parts, [part, ..acc]) }
 			}
 	}
 	go(segments(path), [])
@@ -53,7 +53,7 @@ clean = (path : String) -> String {
 join = (parts : List(String)) -> String {
 	list.filter(parts, (p) { p != "" }) |>
 		([]) { "" }
-		| (xs) { clean(string.join(xs, "/")) }
+		& (xs) { clean(string.join(xs, "/")) }
 }
 
 /// Cuts raw input after its last slash, keeping that slash in the first part.
@@ -66,10 +66,10 @@ split = (path : String) -> (String, String) {
 					string.from_codepoints(list.reverse(part)),
 				)
 			}
-			| ([c, ..cs]) {
+			& ([c, ..cs]) {
 				string.utf_codepoint_to_int(c) |>
 					(47) { go(cs, [], [c, ..list.append(part, directory)]) }
-					| (_) { go(cs, [c, ..part], directory) }
+					& (_) { go(cs, [c, ..part], directory) }
 			}
 	}
 	go(string.to_codepoints(path), [], [])
@@ -80,9 +80,9 @@ split = (path : String) -> (String, String) {
 base = (path : String) -> String {
 	go = (rest) {
 		rest |>
-			([]) { path |> ("") { "." } | (_) { "/" } }
-			| (["", ..xs]) { go(xs) }
-			| ([x, .._]) { x }
+			([]) { path |> ("") { "." } & (_) { "/" } }
+			& (["", ..xs]) { go(xs) }
+			& ([x, .._]) { x }
 	}
 	go(
 		list.reverse(segments(path)),
@@ -102,10 +102,10 @@ extension = (path : String) -> String {
 	go = (rest, suffix) {
 		rest |>
 			([]) { "" }
-			| ([c, ..cs]) {
+			& ([c, ..cs]) {
 				string.utf_codepoint_to_int(c) |>
 					(46) { string.from_codepoints([c, ..suffix]) }
-					| (_) { go(cs, [c, ..suffix]) }
+					& (_) { go(cs, [c, ..suffix]) }
 			}
 	}
 	go(
@@ -116,7 +116,7 @@ extension = (path : String) -> String {
 
 /// Tests only for a leading slash.
 is_absolute = (path : String) -> Bool {
-	path |> ("/" <> _) { True } | (_) { False }
+	path |> ("/" <> _) { True } & (_) { False }
 }
 
 /// A lexical route from one location to another. Different roots and unmatched
@@ -126,14 +126,14 @@ relative = (from : String, to : String) -> Result(String, RelativeError) {
 	b = clean(to)
 	{ is_absolute(a) != is_absolute(b) } |>
 		(True) { Error(DifferentRoots) }
-		| (False) {
+		& (False) {
 			go = (left, right) {
 				(left, right) |>
 					(([x, ..xs], [y, ..ys]) ? x == y) { go(xs, ys) }
-					| (_) {
+					& (_) {
 						list.contains(left, "..") |>
 							(True) { Error(UnknownParent) }
-							| (False) {
+							& (False) {
 								Ok(
 									render(
 										list.append(
@@ -160,7 +160,7 @@ segments = (path : String) -> List(String) {
 					[string.from_codepoints(list.reverse(part)), ..acc],
 				)
 			}
-			| ([c, ..cs]) {
+			& ([c, ..cs]) {
 				string.utf_codepoint_to_int(c) |>
 					(47) {
 						go(
@@ -169,7 +169,7 @@ segments = (path : String) -> List(String) {
 							[string.from_codepoints(list.reverse(part)), ..acc],
 						)
 					}
-					| (_) { go(cs, [c, ..part], acc) }
+					& (_) { go(cs, [c, ..part], acc) }
 			}
 	}
 	go(string.to_codepoints(path), [], [])
@@ -178,10 +178,10 @@ segments = (path : String) -> List(String) {
 render = (parts : List(String), rooted : Bool) -> String {
 	(rooted, parts) |>
 		((False, [])) { "." }
-		| ((True, _)) { string.concat(["/", string.join(parts, "/")]) }
-		| ((False, _)) { string.join(parts, "/") }
+		& ((True, _)) { string.concat(["/", string.join(parts, "/")]) }
+		& ((False, _)) { string.join(parts, "/") }
 }
 
 clean_segments = (path : String) -> List(String) {
-	path |> (".") { [] } | (_) { list.filter(segments(path), (p) { p != "" }) }
+	path |> (".") { [] } & (_) { list.filter(segments(path), (p) { p != "" }) }
 }

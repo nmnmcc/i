@@ -101,7 +101,7 @@ scale = (duration : Duration, by : Int) -> Duration {
 divide = (duration : Duration, by : Int) -> Result(Duration, TimeError) {
 	{ by == 0 } |>
 		(True) { Error(DivisionByZero) }
-		| (False) { Ok(Duration(to_nanoseconds(duration) / by)) }
+		& (False) { Ok(Duration(to_nanoseconds(duration) / by)) }
 }
 
 compare = (first : Duration, second : Duration) -> Order {

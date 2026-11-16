@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -24,37 +24,37 @@ Option(A) = Some(A) | None
 literal = (x : { Int | String }) {
 	x |>
 		(0) { "zero" }
-		| (-1) { "minus one" }
-		| (100000000000000000000) { "big" }
-		| (-100000000000000000000) { "minus big" }
-		| (_) { "other" }
+		& (-1) { "minus one" }
+		& (100000000000000000000) { "big" }
+		& (-100000000000000000000) { "minus big" }
+		& (_) { "other" }
 }
 
 float = (x) {
 	x |>
 		(0.0) { "zero" }
-		| (-.1.5) { "minus 1.5" }
-		| (2.5) { "2.5" }
-		| (_) { "other" }
+		& (-.1.5) { "minus 1.5" }
+		& (2.5) { "2.5" }
+		& (_) { "other" }
 }
 
 string = (s) {
 	s |>
 		("") { "empty" }
-		| ("abc") { "abc" }
-		| ("key=" <> value) { "value " <> value }
-		| ("é" <> _) { "starts with é" }
-		| ("x" <> rest = whole) { whole <> "/" <> rest }
-		| (_) { "other" }
+		& ("abc") { "abc" }
+		& ("key=" <> value) { "value " <> value }
+		& ("é" <> _) { "starts with é" }
+		& ("x" <> rest = whole) { whole <> "/" <> rest }
+		& (_) { "other" }
 }
 
 list = (xs) {
 	xs |>
 		([]) { "empty" }
-		| ([x]) { "one " <> show(x) }
-		| ([x, y]) { "two " <> show((x, y)) }
-		| ([1, ..]) { "starts with 1" }
-		| ([_, _, ..rest]) { "rest " <> show(rest) }
+		& ([x]) { "one " <> show(x) }
+		& ([x, y]) { "two " <> show((x, y)) }
+		& ([1, ..]) { "starts with 1" }
+		& ([_, _, ..rest]) { "rest " <> show(rest) }
 }
 
 test("literals", () {
@@ -102,21 +102,21 @@ test("constructors", () {
 	Point(1, 2, label = "p") |> (Point(x, y, label = label)) {
 		check(show((x, y, label)), "(1, 2, \"p\")")
 	}
-	Point(1, 2, label = "p") |> (Point(1, _, ..)) { Nil } | (_) { panic("no") }
+	Point(1, 2, label = "p") |> (Point(1, _, ..)) { Nil } & (_) { panic("no") }
 	Some(Some(3)) |>
 		(Some(None)) { panic("no") }
-		| (Some(Some(n))) { check(show(n), "3") }
-		| (None) { panic("no") }
+		& (Some(Some(n))) { check(show(n), "3") }
+		& (None) { panic("no") }
 	res : Result(List(Int), String) = Ok([1])
 	res |>
 		(Error(_)) { panic("no") }
-		| (Ok([])) { panic("no") }
-		| (Ok([x])) { check(show(x), "1") }
-		| (Ok(_)) { panic("no") }
+		& (Ok([])) { panic("no") }
+		& (Ok([x])) { check(show(x), "1") }
+		& (Ok(_)) { panic("no") }
 	(True, False, Nil) |>
 		((True, True, _)) { panic("no") }
-		| ((True, False, Nil)) { Nil }
-		| (_) { panic("no") }
+		& ((True, False, Nil)) { Nil }
+		& (_) { panic("no") }
 })
 
 test("named_and_tuples", () {
@@ -129,12 +129,12 @@ test("named_and_tuples", () {
 kind = (v : { Int | String | List(Int) | (Int, Int) | Nil | Bool | Float }) {
 	v |>
 		(i : Int) { "int " <> show(i) }
-		| (s : String) { "string " <> s }
-		| (_ : List(_)) { "list" }
-		| ((a, b)) { "pair " <> show(a + b) }
-		| (Nil) { "nil" }
-		| (b : Bool) { "bool " <> show(b) }
-		| (f : Float) { "float " <> show(f) }
+		& (s : String) { "string " <> s }
+		& (_ : List(_)) { "list" }
+		& ((a, b)) { "pair " <> show(a + b) }
+		& (Nil) { "nil" }
+		& (b : Bool) { "bool " <> show(b) }
+		& (f : Float) { "float " <> show(f) }
 }
 
 test("type_tests", () {
@@ -152,13 +152,13 @@ test("type_tests", () {
 choices = (x) {
 	x |>
 		(0 | 1 | 2) { "small" }
-		| (Some(n) | Ok(n) ? n > 10) { "big " <> show(n) }
-		| (_) { "other" }
+		& (Some(n) | Ok(n) ? n > 10) { "big " <> show(n) }
+		& (_) { "other" }
 }
 
-pick = (p) { p |> ((n, 0) | (0, n)) { n } | (_) { -1 } }
+pick = (p) { p |> ((n, 0) | (0, n)) { n } & (_) { -1 } }
 
-positive = (p) { p |> ((n, _) | (_, n) ? n > 0) { n } | (_) { -1 } }
+positive = (p) { p |> ((n, _) | (_, n) ? n > 0) { n } & (_) { -1 } }
 
 test("choices_and_guards", () {
 	check(choices(1), "small")
@@ -195,16 +195,16 @@ test("choices_and_guards", () {
 		"-1",
 	)
 	n = 4
-	r = n |> (x ? x > 5) { "more" } | (x ? x > 3) { "between" } | (_) { "less" }
+	r = n |> (x ? x > 5) { "more" } & (x ? x > 3) { "between" } & (_) { "less" }
 	check(r, "between")
 })
 
 guarded = (x : Option(Int)) {
 	x |>
 		(Some(n) ? n > 0) { "positive" }
-		| (Some(0)) { "zero" }
-		| (Some(_)) { "negative" }
-		| (None) { "none" }
+		& (Some(0)) { "zero" }
+		& (Some(_)) { "negative" }
+		& (None) { "none" }
 }
 
 test("guards", () {
@@ -217,8 +217,8 @@ test("guards", () {
 either = (v : Result(Int, String | Nil)) {
 	v |>
 		(Ok(n)) { show(n) }
-		| (Error(_ : Nil)) { "nil" }
-		| (Error(other)) { "error " <> other }
+		& (Error(_ : Nil)) { "nil" }
+		& (Error(other)) { "error " <> other }
 }
 
 test("narrowing", () {
@@ -229,7 +229,7 @@ test("narrowing", () {
 
 test("nested_case", () {
 	v = [1, 2] |>
-		([a, b]) { { a < b } |> (True) { "lt" } | (False) { "ge" } }
-		| (_) { "no" }
+		([a, b]) { { a < b } |> (True) { "lt" } & (False) { "ge" } }
+		& (_) { "no" }
 	check(v, "lt")
 })

@@ -87,7 +87,7 @@ test("path_relative_examples", () {
 short_paths = (depth : Int) -> List(String) {
 	depth |>
 		(0) { [""] }
-		| (_) {
+		& (_) {
 			[
 				"",
 				..list.flat_map(short_paths(depth - 1), (prefix) {
@@ -111,7 +111,7 @@ test("path_exhaustive_laws", () {
 		list.each(short_paths(3), (to) {
 			fail.catch(() { path.relative(from, to) }) |>
 				(Error(_)) { Nil }
-				| (Ok(r)) {
+				& (Ok(r)) {
 					assert(
 						path.clean(
 							path.join([path.clean(from), r]),

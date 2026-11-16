@@ -13,7 +13,7 @@ bad = () {
 	_syn3_1 : A(String, B(A(Int, Never))) = A((d : Int) {
 		d |>
 			(0) { "str" }
-			| (_) {
+			& (_) {
 				ub(d)
 				"str"
 			}

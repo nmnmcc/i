@@ -59,17 +59,17 @@ Box(A) = (value = A)
 unbox = (b : Box(Int)) { b.value }
 
 two_tests = (v : Box(Int | String)) {
-	v |> (x : Box(Int)) { unbox(x) + 1 } | (y : Box(String)) { 0 }
+	v |> (x : Box(Int)) { unbox(x) + 1 } & (y : Box(String)) { 0 }
 }
 
 test_then_ctor = (v : Box(Int | String)) {
-	v |> (x : Box(Int)) { unbox(x) + 1 } | (Box(..)) { 0 }
+	v |> (x : Box(Int)) { unbox(x) + 1 } & (Box(..)) { 0 }
 }
 
-lists = (l : List(Int | String)) { l |> (x : List(Int)) { x } | ([]) { [] } }
+lists = (l : List(Int | String)) { l |> (x : List(Int)) { x } & ([]) { [] } }
 
 test_ok = (v : { Box(Int) | String }) {
-	v |> (x : Box(Int)) { unbox(x) } | (s : String) { 0 }
+	v |> (x : Box(Int)) { unbox(x) } & (s : String) { 0 }
 }
 
 // §4.5 rule 2: `a & T <: R` when `a <: R`.

@@ -26,7 +26,7 @@ catch = <A, E, N>(body : () <- (Fail(E), ..N) -> A) -> Result(A, E) {
 
 /// Gives the error `x` for `Error(x)`.
 from_result = <A, E>(result : Result(A, E)) -> A {
-	result |> (Ok(value)) { value } | (Error(error)) { raise(error) }
+	result |> (Ok(value)) { value } & (Error(error)) { raise(error) }
 }
 
 /// Changes the errors.
@@ -34,5 +34,5 @@ map_error : <A, E, N, E2>(() <- (Fail(E), ..N) -> A, (E) <- N -> E2) <- (
 	Fail(E2),
 	..N,
 ) -> A = (body, with) {
-	catch(body) |> (Ok(value)) { value } | (Error(error)) { raise(with(error)) }
+	catch(body) |> (Ok(value)) { value } & (Error(error)) { raise(with(error)) }
 }

@@ -10,5 +10,5 @@ main = () {
 	x = key.wrap(k, 1)
 	key.unwrap(k, x) |>
 		(key.Found(text)) { assert(text <> "wrong" == "") }
-		| (key.Missing) { Nil }
+		& (key.Missing) { Nil }
 }

@@ -5,5 +5,5 @@ use = <N>() <- (s : S(N)) {
 }
 run = <N>(body : () <- N -> Nil) { body() }
 wrap = () { run(() { a(True) }) }
-b = (x : Bool) -> Nil { x |> (True) { use() } | (False) { a(True) } }
-a = (x : Bool) -> Nil { x |> (True) { use() } | (False) { b(True) } }
+b = (x : Bool) -> Nil { x |> (True) { use() } & (False) { a(True) } }
+a = (x : Bool) -> Nil { x |> (True) { use() } & (False) { b(True) } }

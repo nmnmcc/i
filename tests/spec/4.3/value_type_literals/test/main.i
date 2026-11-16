@@ -27,7 +27,7 @@ test("literal_fields_from_a_value", () {
 })
 
 accepts = (s : { Int | String }) {
-	s |> (_ : api.Methods) { True } | (_) { False }
+	s |> (_ : api.Methods) { True } & (_) { False }
 }
 
 test("literal_alias_runtime_tests", () {
@@ -54,7 +54,7 @@ test("narrowed_binder_and_original_subject", () {
 	read = (s : String) {
 		s |>
 			(_ : String - "a") { 0 }
-			| (key) {
+			& (key) {
 				same : key = "a"
 				original : s = "b"
 				assert(same == "a")

@@ -9,7 +9,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -18,7 +18,7 @@ show = (x) { core.inspect(x) }
 wait = (n, f) {
 	n |>
 		(0) { f() }
-		| (_) {
+		& (_) {
 			x = wait(n - 1, f)
 			x <> ""
 		}

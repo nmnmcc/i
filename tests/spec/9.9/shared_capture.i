@@ -14,7 +14,7 @@ Tree(A) = Tip(A) | Node(A)
 make = <A>(value : A, depth : Int) -> Tree(A) {
 	depth |>
 		(0) { Tip(value) }
-		| (_) {
+		& (_) {
 			child = make(value, depth - 1)
 			Node(child, child)
 		}
@@ -23,10 +23,10 @@ make = <A>(value : A, depth : Int) -> Tree(A) {
 spawn = (depth : Int) {
 	value = make(1, depth)
 	task.scope((s) {
-		child = task.go(s, () { value |> (Tip(_)) { 0 } | (Node(_, _)) { 1 } })
+		child = task.go(s, () { value |> (Tip(_)) { 0 } & (Node(_, _)) { 1 } })
 		assert(task.join(child) == 1)
 		shared = task.share(s, value)
-		task.get(shared) |> (Tip(_)) { assert(False) } | (Node(_, _)) { Nil }
+		task.get(shared) |> (Tip(_)) { assert(False) } & (Node(_, _)) { Nil }
 	})
 	assert(core.portable((value, value, [value, value])))
 	assert(core.portable(value))

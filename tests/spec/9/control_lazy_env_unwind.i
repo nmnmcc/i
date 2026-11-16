@@ -11,7 +11,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -84,9 +84,9 @@ test("error_keeps_inner_environment", () {
 				(Paused(k)) {
 					{ control.resume(k, Nil) } |>
 						(Done(s)) { s }
-						| (Paused(_)) { "paused again" } <- (Name(text = "out"))
+						& (Paused(_)) { "paused again" } <- (Name(text = "out"))
 				}
-				| (Done(s)) { s }
+				& (Done(s)) { s }
 		})
 		check(r, "in, Error(Bad(1))")
 	} <- (Name(text = "outside"))

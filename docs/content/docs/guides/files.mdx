@@ -59,7 +59,7 @@ main = () {
 				fs.FsError(operation = operation, path = missing, code = code),
 			)
 		) { stdio.print(operation <> ": " <> missing <> ": " <> code) }
-		| (Ok(_)) { panic("expected a missing file") }
+		& (Ok(_)) { panic("expected a missing file") }
 }
 ```
 

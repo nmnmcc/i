@@ -4,9 +4,9 @@
 	main
 )
 identity = (n) { n }
-classify = (0) { "zero" } | (_) { "other" }
+classify = (0) { "zero" } & (_) { "other" }
 guarded = (value : (Int) -> Int) {
-	value |> (f : (Int) -> Int ? True) { f(3) } | (_) { 0 }
+	value |> (f : (Int) -> Int ? True) { f(3) } & (_) { 0 }
 }
 
 main = () {

@@ -312,7 +312,7 @@ GateSink(E, N) = (
 
 gate_write = <E, N>(event : log.Entry) <- (sink : GateSink(E, N)) -> Nil {
 	GateSink(accept, send, _) = sink
-	accept(event.level) |> (True) { send(event) } | (False) { Nil }
+	accept(event.level) |> (True) { send(event) } & (False) { Nil }
 }
 
 GateS(N) = (() <- N -> Nil, (N) -> Nil)

@@ -7,7 +7,7 @@
 n = 1_000_000
 
 loop = (k : (Float) -> Float, i : Int, acc : Float) -> Float {
-	i |> (0) { acc } | (_) { loop(k, i - 1, 0.03 *. k(acc)) }
+	i |> (0) { acc } & (_) { loop(k, i - 1, 0.03 *. k(acc)) }
 }
 
 run = (k : (Float) -> Float) {

@@ -10,7 +10,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -36,16 +36,16 @@ layer = (log, hold, b, n) {
 			control.suspend(b, (k) { Paused(k) })
 			0
 		}
-		| (10) { guarded(log, hold, b, n, () { note(log, "final 10") }) }
-		| (50) {
+		& (10) { guarded(log, hold, b, n, () { note(log, "final 10") }) }
+		& (50) {
 			guarded(log, hold, b, n, () {
 				note(log, "final 50")
 				control.suspend(hold, (k2) { Held(k2) })
 				note(log, "final 50 again")
 			})
 		}
-		| (90) { guarded(log, hold, b, n, () { note(log, "final 90") }) }
-		| (_) {
+		& (90) { guarded(log, hold, b, n, () { note(log, "final 90") }) }
+		& (_) {
 			x = layer(log, hold, b, n - 1)
 			x + 1
 		}
@@ -67,7 +67,7 @@ test("cancel_deep", () {
 			})
 			p |>
 				(Paused(k)) { control.cancel(k) }
-				| (Done) { panic("not paused") }
+				& (Done) { panic("not paused") }
 			note(log, "cancelled")
 			Over
 		})
@@ -76,9 +76,9 @@ test("cancel_deep", () {
 				note(log, "resume")
 				{ control.resume(k2, Nil) } |>
 					(Over) { "end" }
-					| (Held(_)) { "held again" }
+					& (Held(_)) { "held again" }
 			}
-			| (Over) { "not held" }
+			& (Over) { "not held" }
 	})
 	check(r, "final 10 final 50 resume final 50 again final 90 cancelled end")
 })

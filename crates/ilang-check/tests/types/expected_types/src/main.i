@@ -14,7 +14,7 @@ names = list.map(users, (u) { u.name })
 
 // The call has the known type `List(String)`.
 first_name = () {
-	list.map(users, (u) { u.name }) |> ([n, ..]) { n == 1 } | ([]) { False }
+	list.map(users, (u) { u.name }) |> ([n, ..]) { n == 1 } & ([]) { False }
 }
 
 // Also with `|>`, with labels, and with more than one type variable.
@@ -40,7 +40,7 @@ in_block : (User) -> Int = {
 }
 
 in_case = (b : Bool) -> (User) -> String {
-	b |> (True) { (u) { u.name } } | (False) { (u) { "" } }
+	b |> (True) { (u) { u.name } } & (False) { (u) { "" } }
 }
 
 // The parts of a tuple and of a list.

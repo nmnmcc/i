@@ -9,7 +9,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -59,10 +59,10 @@ plain = (b) {
 test("environment_of_frames_that_wait", () {
 	{
 		p = control.boundary((b) { Done(plain(b)) })
-		k = p |> (Paused(k)) { k } | (Done(_)) { panic("not paused") }
+		k = p |> (Paused(k)) { k } & (Done(_)) { panic("not paused") }
 		{ control.resume(k, Nil) } |>
 			(Done(s)) { check(s, "twice/twice/one/two/resumer") }
-			| (Paused(_)) { panic("paused again") } <- (Name(text = "resumer"))
+			& (Paused(_)) { panic("paused again") } <- (Name(text = "resumer"))
 	} <- (Name(text = "start"))
 })
 
@@ -74,14 +74,14 @@ test("two_places", () {
 			y = leaf(b)
 			Done(x <> "," <> y)
 		})
-		k = p |> (Paused(k)) { k } | (Done(_)) { panic("not paused") }
+		k = p |> (Paused(k)) { k } & (Done(_)) { panic("not paused") }
 		{
 			k2 = { control.resume(k, Nil) } |>
 				(Paused(k2)) { k2 }
-				| (Done(_)) { panic("not paused again") }
+				& (Done(_)) { panic("not paused again") }
 			{ control.resume(k2, Nil) } |>
 				(Done(s)) { check(s, "first,second") }
-				| (Paused(_)) { panic("paused again") } <- (
+				& (Paused(_)) { panic("paused again") } <- (
 				Name(text = "second"),
 			)
 		} <- (Name(text = "first"))

@@ -160,7 +160,7 @@ test("rest_error_test", () {
 test("group_test", () {
 	assert(
 		list.group([Ok(10), Error("Wrong"), Ok(200), Ok(1)], (i) {
-			i |> (Ok(_)) { "Successful" } | (Error(_)) { "Failed" }
+			i |> (Ok(_)) { "Successful" } & (Error(_)) { "Failed" }
 		}) ==
 			{
 				dict.new()
@@ -300,7 +300,7 @@ test("try_map_ok_test", () {
 	fun = (x) {
 		{ x == 6 || x == 5 || x == 4 } |>
 			(True) { Ok(x * 2) }
-			| (False) { Error(x) }
+			& (False) { Error(x) }
 	}
 
 	assert(list.try_map([5, 6, 5, 6], fun) == Ok([10, 12, 10, 12]))
@@ -311,7 +311,7 @@ test("try_map_error_test", () {
 	fun = (x) {
 		{ x == 6 || x == 5 || x == 4 } |>
 			(True) { Ok(x * 2) }
-			| (False) { Error(x) }
+			& (False) { Error(x) }
 	}
 
 	assert(list.try_map([4, 6, 5, 7, 3], fun) == Error(7))
@@ -322,7 +322,7 @@ test("try_map_tco_test", () {
 	fun = (x) {
 		{ x == 6 || x == 5 || x == 4 } |>
 			(True) { Ok(x * 2) }
-			| (False) { Error(x) }
+			& (False) { Error(x) }
 	}
 
 	// TCO test
@@ -508,7 +508,7 @@ test("fold_until_test", () {
 		list.fold_until([1, 2, 3, 4], 0, (acc, n) {
 			{ n < 4 } |>
 				(True) { list.Continue(acc + n) }
-				| (False) { list.Stop(acc) }
+				& (False) { list.Stop(acc) }
 		}) ==
 			6,
 	)
@@ -517,7 +517,7 @@ test("fold_until_test", () {
 
 test("fold_until_tco_test", () {
 	r = list.fold_until(list.range(1, big), 0, (acc, x) {
-		{ x > 10 } |> (True) { Stop(acc) } | (False) { Continue(acc + x) }
+		{ x > 10 } |> (True) { Stop(acc) } & (False) { Continue(acc + x) }
 	})
 	assert(r == 55)
 	assert(
@@ -531,7 +531,7 @@ test("fold_until_tco_test", () {
 test("try_fold_ok_test", () {
 	assert(
 		list.try_fold([1, 2, 3], 0, (acc, i) {
-			{ i < 4 } |> (True) { Ok(acc + i) } | (False) { Error(Nil) }
+			{ i < 4 } |> (True) { Ok(acc + i) } & (False) { Error(Nil) }
 		}) ==
 			Ok(6),
 	)
@@ -541,7 +541,7 @@ test("try_fold_ok_test", () {
 test("try_fold_error_test", () {
 	assert(
 		list.try_fold([1, 2, 3], 0, (acc, i) {
-			{ i < 3 } |> (True) { Ok(acc + i) } | (False) { Error(Nil) }
+			{ i < 3 } |> (True) { Ok(acc + i) } & (False) { Error(Nil) }
 		}) ==
 			Error(Nil),
 	)
@@ -556,21 +556,21 @@ test("try_fold_tco_test", () {
 })
 
 test("find_map_found_test", () {
-	f = (x) { x |> (2) { Some(4) } | (_) { None } }
+	f = (x) { x |> (2) { Some(4) } & (_) { None } }
 
 	assert(list.find_map([1, 2, 3], f) == Some(4))
 	Nil
 })
 
 test("find_map_found_different_order_test", () {
-	f = (x) { x |> (2) { Some(4) } | (_) { None } }
+	f = (x) { x |> (2) { Some(4) } & (_) { None } }
 
 	assert(list.find_map([1, 3, 2], f) == Some(4))
 	Nil
 })
 
 test("find_map_not_found_test", () {
-	f = (x) { x |> (2) { Some(4) } | (_) { None } }
+	f = (x) { x |> (2) { Some(4) } & (_) { None } }
 
 	assert(list.find_map([1, 3], f) == None)
 	Nil
@@ -582,7 +582,7 @@ test("find_map_tco_test", () {
 		|> list.find_map((x) {
 			{ x == recursion_test_cycles } |>
 				(True) { Some(recursion_test_cycles) }
-				| (False) { None }
+				& (False) { None }
 		})
 	Nil
 })
@@ -637,9 +637,9 @@ test("all_short_circuit_test", () {
 		|> list.all((x) {
 			x |>
 				(1) { True }
-				| (2) { False }
+				& (2) { False }
 				// Crash if no short-circuit
-				| (_) { panic("unreachable") }
+				& (_) { panic("unreachable") }
 		})
 	Nil
 })
@@ -647,7 +647,7 @@ test("all_short_circuit_test", () {
 test("all_tco_test", () {
 	// TCO test
 	list.repeat(0, recursion_test_cycles)
-		|> list.all((x) { x |> (0) { True } | (_) { False } })
+		|> list.all((x) { x |> (0) { True } & (_) { False } })
 	Nil
 })
 
@@ -675,9 +675,9 @@ test("any_short_circuit_test", () {
 		|> list.any((x) {
 			x |>
 				(1) { False }
-				| (2) { True }
+				& (2) { True }
 				// Crash if no short-circuit
-				| (_) { panic("unreachable") }
+				& (_) { panic("unreachable") }
 		})
 	Nil
 })
@@ -1443,7 +1443,7 @@ test("scan_list_test", () {
 		list.scan([1, 2, 3, 4], [], (acc, i) {
 			int.is_even(i) |>
 				(True) { ["Even", ..acc] }
-				| (False) { ["Odd", ..acc] }
+				& (False) { ["Odd", ..acc] }
 		}) ==
 			[
 				["Odd"],
@@ -1748,7 +1748,7 @@ test("sort_effects_test", () {
 
 test("map_effects_test", () {
 	r = result.catch(() {
-		list.map([1, 2, 3], (x) { x |> (2) { fail.raise("two") } | (_) { x } })
+		list.map([1, 2, 3], (x) { x |> (2) { fail.raise("two") } & (_) { x } })
 	})
 	assert(r == Error("two"))
 	assert(result.catch(() { list.map([1, 2], (x) { x }) }) == Ok([1, 2]))

@@ -7,9 +7,9 @@ Ok(A) = (A)
 Error(E) = (E)
 Result(A, E) = Ok(A) | Error(E)
 identity = (n) { n }
-take_tuple = ((0, _) = t) { t } | (_) { (0, 0) }
-take_result = (Ok(v) = r) { v } | (_) { 0 }
-take_prefix = ("ab" <> rest = s) { s } | (_) { "" }
+take_tuple = ((0, _) = t) { t } & (_) { (0, 0) }
+take_result = (Ok(v) = r) { v } & (_) { 0 }
+take_prefix = ("ab" <> rest = s) { s } & (_) { "" }
 
 main = () {
 	assert(

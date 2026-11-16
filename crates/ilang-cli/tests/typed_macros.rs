@@ -127,7 +127,7 @@ fn typed_macro_labels_and_pipe() {
 fn typed_macro_type_of_observes_literal() {
     let m = declared(
         "m (-> [A] (, A) Int)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax subtype) t `Int) (| (-> (, (. syntax Yes)) _ `7) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"expected integer type\") (= at value))))))})",
+        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax subtype) t `Int) (& (-> (, (. syntax Yes)) _ `7) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"expected integer type\") (= at value))))))})",
     );
     checked(&m, "(m = app/macros)\nmain = () { assert(m.m(42) == 7) }").unwrap();
 }
@@ -147,7 +147,7 @@ fn typed_macro_type_of_rejects_fabricated_syntax() {
 fn typed_macro_signature_query_is_reflexive() {
     let m = declared(
         "m (-> [A] (, A) A)",
-        "(-> (, value) _ {(= s ((. syntax signature))) (|> ((. syntax subtype) s s) (| (-> (, (. syntax Yes)) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"signature is not reflexive\") (= at value))))))})",
+        "(-> (, value) _ {(= s ((. syntax signature))) (|> ((. syntax subtype) s s) (& (-> (, (. syntax Yes)) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"signature is not reflexive\") (= at value))))))})",
     );
     checked(&m, "(m = app/macros)\nmain = () { assert(m.m(42) == 42) }").unwrap();
 }
@@ -155,7 +155,7 @@ fn typed_macro_signature_query_is_reflexive() {
 fn typed_macro_members_preserve_finite_scalar_order() {
     let m = declared(
         "m (-> (, Int) Int)",
-        "(-> (, value) _ (|> ((. syntax members) `(| 2 10 Nil)) (-> (, [a b c]) _ (|> (== ((. syntax show) a) \"10\") (| (-> (, True) _ value) (-> (, False) _ ((. fail raise) ((. syntax SyntaxError) (= message \"wrong member order\") (= at value)))))))))",
+        "(-> (, value) _ (|> ((. syntax members) `(| 2 10 Nil)) (-> (, [a b c]) _ (|> (== ((. syntax show) a) \"10\") (& (-> (, True) _ value) (-> (, False) _ ((. fail raise) ((. syntax SyntaxError) (= message \"wrong member order\") (= at value)))))))))",
     );
     checked(&m, "(m = app/macros)\nmain = () { m.m(1) }").unwrap();
 }
@@ -443,7 +443,7 @@ fn typed_macro_members_give_each_closed_data_member_once() {
     // it is no longer one record graph.
     let m = declared(
         "m (-> [A] (, A) A)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax members) t) (| (-> (, [one two]) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"closed data members not one per shape\") (= at value))))))})",
+        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax members) t) (& (-> (, [one two]) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"closed data members not one per shape\") (= at value))))))})",
     );
     checked(
         &m,
@@ -468,7 +468,7 @@ fn typed_macro_frozen_variable_is_legal_in_output_annotation() {
 fn typed_macro_members_accept_symbolic_difference_without_new_bounds() {
     let m = declared(
         "m (-> [A] (, A) A)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) (= difference `(- ~t Int)) (|> ((. syntax members) difference) (| (-> (, [one]) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"symbolic difference split\") (= at value))))))})",
+        "(-> (, value) _ {(= t ((. syntax type_of) value)) (= difference `(- ~t Int)) (|> ((. syntax members) difference) (& (-> (, [one]) _ value) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"symbolic difference split\") (= at value))))))})",
     );
     checked(
         &m,
@@ -485,7 +485,7 @@ fn typed_macro_forwarding_keeps_original_value_type_reads() {
 fn typed_macro_argument_binder_cannot_escape() {
     let m = declared(
         "m (-> (, (-> (, Int) Int)) Int)",
-        "(-> (, value) _ (|> value (| (-> (, `(-> (, ~parameter) ~ret ~body)) _ body) (-> (, _) _ value))))",
+        "(-> (, value) _ (|> value (& (-> (, `(-> (, ~parameter) ~ret ~body)) _ body) (-> (, _) _ value))))",
     );
     reject(
         &m,
@@ -497,7 +497,7 @@ fn typed_macro_argument_binder_cannot_escape() {
 fn typed_macro_partial_argument_rebuild_retains_original_binders() {
     let m = declared(
         "m (-> (, (-> (, Int) Int)) (-> (, Int) Int))",
-        "(-> (, value) _ (|> value (| (-> (, `(-> (, ~parameter) ~ret ~body)) _ `(-> (, ~parameter) ~ret ~body)) (-> (, _) _ value))))",
+        "(-> (, value) _ (|> value (& (-> (, `(-> (, ~parameter) ~ret ~body)) _ `(-> (, ~parameter) ~ret ~body)) (-> (, _) _ value))))",
     );
     checked(
         &m,
@@ -526,7 +526,7 @@ fn typed_macro_nested_queries_keep_parent_type_handles() {
 fn typed_macro_generic_choice_reports_restriction() {
     let m = declared(
         "m (-> [A] (, A) Int)",
-        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax subtype) t `Int) (| (-> (, (. syntax Yes)) _ `7) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"no choice\") (= at value))))))})",
+        "(-> (, value) _ {(= t ((. syntax type_of) value)) (|> ((. syntax subtype) t `Int) (& (-> (, (. syntax Yes)) _ `7) (-> (, _) _ ((. fail raise) ((. syntax SyntaxError) (= message \"no choice\") (= at value))))))})",
     );
     reject(
         &m,
@@ -678,7 +678,7 @@ fn typed_macro_shape_contracts_resolve_aliases_before_comparing_them() {
         .replace("probe/macros", "app/macros");
     checked(&aliased, &source).unwrap();
     let missing = aliased.replace(
-        "(| (-> (, x) _ x) (-> (, x y) _ `(+ ~x ~y)))",
+        "(& (-> (, x) _ x) (-> (, x y) _ `(+ ~x ~y)))",
         "(-> (, x) _ x)",
     );
     assert_ne!(missing, aliased);

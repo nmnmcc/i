@@ -30,7 +30,7 @@ Order = Less | Equal | Greater
 /// order.negate(Less)  // Greater
 /// ```
 negate = (order : Order) -> Order {
-	order |> (Less) { Greater } | (Equal) { Equal } | (Greater) { Less }
+	order |> (Less) { Greater } & (Equal) { Equal } & (Greater) { Less }
 }
 
 /// Gives a compare function that orders values the other way round.
@@ -44,7 +44,7 @@ reverse = <A, N>(orderer : (A, A) <- N -> Order) -> (A, A) <- N -> Order {
 
 /// `-1` for `Less`, `0` for `Equal`, and `1` for `Greater`.
 to_int = (order : Order) -> Int {
-	order |> (Less) { -1 } | (Equal) { 0 } | (Greater) { 1 }
+	order |> (Less) { -1 } & (Equal) { 0 } & (Greater) { 1 }
 }
 
 /// Compares two orders, with `Less < Equal < Greater`.
@@ -53,17 +53,17 @@ compare = (a : Order, with : Order) -> Order {
 	y = to_int(with)
 	{ x == y } |>
 		(True) { Equal }
-		| (False) { { x < y } |> (True) { Less } | (False) { Greater } }
+		& (False) { { x < y } |> (True) { Less } & (False) { Greater } }
 }
 
 /// The greater of two orders, with `Less < Equal < Greater`.
 max = (a : Order, b : Order) -> Order {
-	compare(a, b) |> (Less) { b } | (_) { a }
+	compare(a, b) |> (Less) { b } & (_) { a }
 }
 
 /// The smaller of two orders, with `Less < Equal < Greater`.
 min = (a : Order, b : Order) -> Order {
-	compare(a, b) |> (Greater) { b } | (_) { a }
+	compare(a, b) |> (Greater) { b } & (_) { a }
 }
 
 /// Gives `with` when `order` is `Equal`, and `order` when not. It puts
@@ -74,12 +74,12 @@ min = (a : Order, b : Order) -> Order {
 /// order.break_tie(int.compare(1, 1), Less)  // Less
 /// ```
 break_tie = (in : Order, with : Order) -> Order {
-	in |> (Equal) { with } | (_) { in }
+	in |> (Equal) { with } & (_) { in }
 }
 
 /// Like `break_tie`, but `with` is only called when it is needed.
 lazy_break_tie = <N>(in : Order, with : () <- N -> Order) -> Order {
-	in |> (Equal) { with() } | (_) { in }
+	in |> (Equal) { with() } & (_) { in }
 }
 
 /// `True` for `Less`.

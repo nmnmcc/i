@@ -9,11 +9,11 @@ run = <A, N>(body : () <- N -> A) { body() }
 tell = (x : Int) {
 	x |>
 		(0) { "zero" }
-		| (1) { "one" }
-		| (2) { "two" }
-		| (3) { "three" }
-		| (4) { "four" }
-		| (_) { "many" }
+		& (1) { "one" }
+		& (2) { "two" }
+		& (3) { "three" }
+		& (4) { "four" }
+		& (_) { "many" }
 }
 
 fw1 = <N>() <- (s : S(N)) -> Int { run(() { use() }) }

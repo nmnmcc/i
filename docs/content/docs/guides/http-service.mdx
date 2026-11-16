@@ -53,7 +53,7 @@ handle = (req : http.Request) {
 		((http.Method("GET"), "/health")) {
 			reply(200, json.Object([("status", json.Text("ok"))]))
 		}
-		| ((http.Method("POST"), "/users")) {
+		& ((http.Method("POST"), "/users")) {
 			fail.catch(() {
 				text = bit_array.to_string(req.body)
 				schema.parse(user_schema(), text)
@@ -64,9 +64,9 @@ handle = (req : http.Request) {
 						schema.encode(user_schema(), user),
 					)
 				}
-				| (Error(_)) { invalid() }
+				& (Error(_)) { invalid() }
 		}
-		| (_) { reply(404, json.Object([("error", json.Text("not found"))])) }
+		& (_) { reply(404, json.Object([("error", json.Text("not found"))])) }
 }
 ```
 

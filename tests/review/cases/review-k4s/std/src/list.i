@@ -99,7 +99,7 @@ ContinueOrStop(A) = Continue(A) | Stop(A)
 /// list.length([1, 2, 3])  // 3
 /// ```
 length = <A>(of : List(A)) -> Int {
-	go = (rest, n) { rest |> ([]) { n } | ([_, ..xs]) { go(xs, n + 1) } }
+	go = (rest, n) { rest |> ([]) { n } & ([_, ..xs]) { go(xs, n + 1) } }
 	go(of, 0)
 }
 
@@ -108,8 +108,8 @@ count = <A, N>(list : List(A), where : (A) <- N -> Bool) -> Int {
 	go = (rest, n) {
 		rest |>
 			([]) { n }
-			| ([x, ..xs]) {
-				where(x) |> (True) { go(xs, n + 1) } | (False) { go(xs, n) }
+			& ([x, ..xs]) {
+				where(x) |> (True) { go(xs, n + 1) } & (False) { go(xs, n) }
 			}
 	}
 	go(list, 0)
@@ -124,7 +124,7 @@ reverse = <A>(list : List(A)) -> List(A) { reverse_onto(list, []) }
 
 // Puts the elements of `list`, last first, in front of `acc`.
 reverse_onto = <A>(list : List(A), acc : List(A)) -> List(A) {
-	list |> ([]) { acc } | ([x, ..xs]) { reverse_onto(xs, [x, ..acc]) }
+	list |> ([]) { acc } & ([x, ..xs]) { reverse_onto(xs, [x, ..acc]) }
 }
 
 /// `True` for the empty list. It takes one step.
@@ -136,22 +136,22 @@ is_empty = <A>(list : List(A)) -> Bool { list == [] }
 /// list.contains([1, 2], 2)  // True
 /// ```
 contains = <A>(list : List(A), any : A) -> Bool {
-	list |> ([]) { False } | ([x, ..xs]) { x == any || contains(xs, any) }
+	list |> ([]) { False } & ([x, ..xs]) { x == any || contains(xs, any) }
 }
 
 /// The first element, or `None` for the empty list.
 first = <A>(list : List(A)) -> Option(A) {
-	list |> ([]) { None } | ([x, ..]) { Some(x) }
+	list |> ([]) { None } & ([x, ..]) { Some(x) }
 }
 
 /// The list without its first element, or `None` for the empty list.
 rest = <A>(list : List(A)) -> Option(List(A)) {
-	list |> ([]) { None } | ([_, ..xs]) { Some(xs) }
+	list |> ([]) { None } & ([_, ..xs]) { Some(xs) }
 }
 
 /// The last element, or `None` for the empty list.
 last = <A>(list : List(A)) -> Option(A) {
-	list |> ([]) { None } | ([x]) { Some(x) } | ([_, ..xs]) { last(xs) }
+	list |> ([]) { None } & ([x]) { Some(x) } & ([_, ..xs]) { last(xs) }
 }
 
 /// The element at an index, counting from 0, or `None` when the index is
@@ -163,11 +163,11 @@ last = <A>(list : List(A)) -> Option(A) {
 at = <A>(list : List(A), index : Int) -> Option(A) {
 	{ index < 0 } |>
 		(True) { None }
-		| (False) {
+		& (False) {
 			list |>
 				([]) { None }
-				| ([x, ..xs]) {
-					index |> (0) { Some(x) } | (_) { at(xs, index - 1) }
+				& ([x, ..xs]) {
+					index |> (0) { Some(x) } & (_) { at(xs, index - 1) }
 				}
 		}
 }
@@ -178,8 +178,8 @@ index_of = <A>(list : List(A), item : A) -> Option(Int) {
 	go = (rest, i) {
 		rest |>
 			([]) { None }
-			| ([x, ..xs]) {
-				{ x == item } |> (True) { Some(i) } | (False) { go(xs, i + 1) }
+			& ([x, ..xs]) {
+				{ x == item } |> (True) { Some(i) } & (False) { go(xs, i + 1) }
 			}
 	}
 	go(list, 0)
@@ -204,10 +204,10 @@ filter = <A, N>(list : List(A), keeping : (A) <- N -> Bool) -> List(A) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				keeping(x) |>
 					(True) { go(xs, [x, ..acc]) }
-					| (False) { go(xs, acc) }
+					& (False) { go(xs, acc) }
 			}
 	}
 	go(list, [])
@@ -225,10 +225,10 @@ filter_map = <A, B, N>(list : List(A), with : (A) <- N -> Option(B)) -> List(
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				with(x) |>
 					(Some(y)) { go(xs, [y, ..acc]) }
-					| (None) { go(xs, acc) }
+					& (None) { go(xs, acc) }
 			}
 	}
 	go(list, [])
@@ -241,7 +241,7 @@ filter_map = <A, B, N>(list : List(A), with : (A) <- N -> Option(B)) -> List(
 /// ```
 map = <A, B, N>(list : List(A), with : (A) <- N -> B) -> List(B) {
 	go = (rest, acc) {
-		rest |> ([]) { reverse(acc) } | ([x, ..xs]) { go(xs, [with(x), ..acc]) }
+		rest |> ([]) { reverse(acc) } & ([x, ..xs]) { go(xs, [with(x), ..acc]) }
 	}
 	go(list, [])
 }
@@ -260,7 +260,7 @@ map2 = <A, B, C, N>(
 	go = (xs, ys, acc) {
 		(xs, ys) |>
 			(([x, ..xs], [y, ..ys])) { go(xs, ys, [with(x, y), ..acc]) }
-			| (_) { reverse(acc) }
+			& (_) { reverse(acc) }
 	}
 	go(list1, list2, [])
 }
@@ -280,7 +280,7 @@ map_fold = <A, Acc, B, N>(
 	go = (rest, acc, out) {
 		rest |>
 			([]) { (acc, reverse(out)) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				(next, y) = with(acc, x)
 				go(xs, next, [y, ..out])
 			}
@@ -294,7 +294,7 @@ index_map = <A, B, N>(list : List(A), with : (A, Int) <- N -> B) -> List(B) {
 	go = (rest, i, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([x, ..xs]) { go(xs, i + 1, [with(x, i), ..acc]) }
+			& ([x, ..xs]) { go(xs, i + 1, [with(x, i), ..acc]) }
 	}
 	go(list, 0, [])
 }
@@ -313,10 +313,10 @@ try_map = <A, B, F, N>(
 	go = (rest, acc) {
 		rest |>
 			([]) { Ok(reverse(acc)) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				with(x) |>
 					(Ok(y)) { go(xs, [y, ..acc]) }
-					| (Error(error)) { Error(error) }
+					& (Error(error)) { Error(error) }
 			}
 	}
 	go(over, [])
@@ -331,7 +331,7 @@ try_map = <A, B, F, N>(
 drop = <A>(from : List(A), up_to : Int) -> List(A) {
 	{ up_to <= 0 } |>
 		(True) { from }
-		| (False) { from |> ([]) { [] } | ([_, ..xs]) { drop(xs, up_to - 1) } }
+		& (False) { from |> ([]) { [] } & ([_, ..xs]) { drop(xs, up_to - 1) } }
 }
 
 /// The first `up_to` elements. When the list is shorter, the whole list.
@@ -343,10 +343,10 @@ take = <A>(from : List(A), up_to : Int) -> List(A) {
 	go = (rest, n, acc) {
 		{ n <= 0 } |>
 			(True) { reverse(acc) }
-			| (False) {
+			& (False) {
 				rest |>
 					([]) { reverse(acc) }
-					| ([x, ..xs]) { go(xs, n - 1, [x, ..acc]) }
+					& ([x, ..xs]) { go(xs, n - 1, [x, ..acc]) }
 			}
 	}
 	go(from, up_to, [])
@@ -379,7 +379,7 @@ concat = <A>(lists : List(List(A))) -> List(A) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([xs, ..more]) { go(more, reverse_onto(xs, acc)) }
+			& ([xs, ..more]) { go(more, reverse_onto(xs, acc)) }
 	}
 	go(lists, [])
 }
@@ -393,7 +393,7 @@ flat_map = <A, B, N>(over : List(A), with : (A) <- N -> List(B)) -> List(B) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				go(
 					xs,
 					reverse_onto(with(x), acc),
@@ -413,7 +413,7 @@ fold = <A, Acc, N>(
 	from : Acc,
 	with : (Acc, A) <- N -> Acc
 ) -> Acc {
-	over |> ([]) { from } | ([x, ..xs]) { fold(xs, with(from, x), with) }
+	over |> ([]) { from } & ([x, ..xs]) { fold(xs, with(from, x), with) }
 }
 
 /// Combines the elements with an accumulator, from the last to the first.
@@ -434,7 +434,7 @@ index_fold = <A, Acc, N>(
 	with : (Acc, A, Int) <- N -> Acc
 ) -> Acc {
 	go = (rest, acc, i) {
-		rest |> ([]) { acc } | ([x, ..xs]) { go(xs, with(acc, x, i), i + 1) }
+		rest |> ([]) { acc } & ([x, ..xs]) { go(xs, with(acc, x, i), i + 1) }
 	}
 	go(over, from, 0)
 }
@@ -452,10 +452,10 @@ try_fold = <A, Acc, F, N>(
 ) -> Result(Acc, F) {
 	over |>
 		([]) { Ok(from) }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			with(from, x) |>
 				(Ok(next)) { try_fold(xs, next, with) }
-				| (Error(error)) { Error(error) }
+				& (Error(error)) { Error(error) }
 		}
 }
 
@@ -474,10 +474,10 @@ fold_until = <A, Acc, N>(
 ) -> Acc {
 	over |>
 		([]) { from }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			with(from, x) |>
 				(Continue(next)) { fold_until(xs, next, with) }
-				| (Stop(last)) { last }
+				& (Stop(last)) { last }
 		}
 }
 
@@ -489,8 +489,8 @@ fold_until = <A, Acc, N>(
 find = <A, N>(in : List(A), one_that : (A) <- N -> Bool) -> Option(A) {
 	in |>
 		([]) { None }
-		| ([x, ..xs]) {
-			one_that(x) |> (True) { Some(x) } | (False) { find(xs, one_that) }
+		& ([x, ..xs]) {
+			one_that(x) |> (True) { Some(x) } & (False) { find(xs, one_that) }
 		}
 }
 
@@ -498,21 +498,21 @@ find = <A, N>(in : List(A), one_that : (A) <- N -> Bool) -> Option(A) {
 find_map = <A, B, N>(in : List(A), with : (A) <- N -> Option(B)) -> Option(B) {
 	in |>
 		([]) { None }
-		| ([x, ..xs]) {
-			with(x) |> (Some(y)) { Some(y) } | (None) { find_map(xs, with) }
+		& ([x, ..xs]) {
+			with(x) |> (Some(y)) { Some(y) } & (None) { find_map(xs, with) }
 		}
 }
 
 /// `True` when the function gives `True` for every element. It stops at the
 /// first `False`. `True` for the empty list.
 all = <A, N>(in : List(A), satisfying : (A) <- N -> Bool) -> Bool {
-	in |> ([]) { True } | ([x, ..xs]) { satisfying(x) && all(xs, satisfying) }
+	in |> ([]) { True } & ([x, ..xs]) { satisfying(x) && all(xs, satisfying) }
 }
 
 /// `True` when the function gives `True` for some element. It stops at the
 /// first `True`. `False` for the empty list.
 any = <A, N>(in : List(A), satisfying : (A) <- N -> Bool) -> Bool {
-	in |> ([]) { False } | ([x, ..xs]) { satisfying(x) || any(xs, satisfying) }
+	in |> ([]) { False } & ([x, ..xs]) { satisfying(x) || any(xs, satisfying) }
 }
 
 /// Pairs of the elements of two lists at the same places. When one list is
@@ -525,7 +525,7 @@ zip = <A, B>(list : List(A), with : List(B)) -> List((A, B)) {
 	go = (xs, ys, acc) {
 		(xs, ys) |>
 			(([x, ..xs], [y, ..ys])) { go(xs, ys, [(x, y), ..acc]) }
-			| (_) { reverse(acc) }
+			& (_) { reverse(acc) }
 	}
 	go(list, with, [])
 }
@@ -538,8 +538,8 @@ strict_zip = <A, B>(list : List(A), with : List(B)) -> Result(
 	go = (xs, ys, acc) {
 		(xs, ys) |>
 			(([], [])) { Ok(reverse(acc)) }
-			| (([x, ..xs], [y, ..ys])) { go(xs, ys, [(x, y), ..acc]) }
-			| (_) { Error(Nil) }
+			& (([x, ..xs], [y, ..ys])) { go(xs, ys, [(x, y), ..acc]) }
+			& (_) { Error(Nil) }
 	}
 	go(list, with, [])
 }
@@ -553,7 +553,7 @@ unzip = <A, B>(input : List((A, B))) -> (List(A), List(B)) {
 	go = (rest, xs, ys) {
 		rest |>
 			([]) { (reverse(xs), reverse(ys)) }
-			| ([(x, y), ..more]) { go(more, [x, ..xs], [y, ..ys]) }
+			& ([(x, y), ..more]) { go(more, [x, ..xs], [y, ..ys]) }
 	}
 	go(input, [], [])
 }
@@ -566,11 +566,11 @@ unzip = <A, B>(input : List((A, B))) -> (List(A), List(B)) {
 intersperse = <A>(list : List(A), with : A) -> List(A) {
 	list |>
 		([]) { [] }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			go = (rest, acc) {
 				rest |>
 					([]) { reverse(acc) }
-					| ([y, ..ys]) { go(ys, [y, with, ..acc]) }
+					& ([y, ..ys]) { go(ys, [y, with, ..acc]) }
 			}
 			go(xs, [x])
 		}
@@ -586,10 +586,10 @@ unique = <A>(list : List(A)) -> List(A) {
 	go = (rest, seen, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				dict.has(seen, x) |>
 					(True) { go(xs, seen, acc) }
-					| (False) { go(xs, dict.insert(seen, x, Nil), [x, ..acc]) }
+					& (False) { go(xs, dict.insert(seen, x, Nil), [x, ..acc]) }
 			}
 	}
 	go(list, dict.new(), [])
@@ -603,7 +603,7 @@ unique = <A>(list : List(A)) -> List(A) {
 /// list.sort([3, 1, 2], int.compare)  // [1, 2, 3]
 /// ```
 sort = <A, N>(list : List(A), by : (A, A) <- N -> Order) -> List(A) {
-	list |> ([] | [_]) { list } | (_) { merge_all(runs(list, by, []), by) }
+	list |> ([] | [_]) { list } & (_) { merge_all(runs(list, by, []), by) }
 }
 
 // Cuts a list into runs that are in order. A run that goes down strictly is
@@ -616,11 +616,11 @@ runs = <A, N>(
 ) -> List(List(A)) {
 	list |>
 		([]) { reverse(acc) }
-		| ([x]) { reverse([[x], ..acc]) }
-		| ([x, y, ..rest]) {
+		& ([x]) { reverse([[x], ..acc]) }
+		& ([x, y, ..rest]) {
 			by(x, y) |>
 				(Greater) { descending(rest, y, [x], by, acc) }
-				| (_) { ascending(rest, y, [x], by, acc) }
+				& (_) { ascending(rest, y, [x], by, acc) }
 		}
 }
 
@@ -634,10 +634,10 @@ ascending = <A, N>(
 ) -> List(List(A)) {
 	list |>
 		([]) { reverse([reverse([last, ..run]), ..acc]) }
-		| ([x, ..rest]) {
+		& ([x, ..rest]) {
 			by(last, x) |>
 				(Greater) { runs(list, by, [reverse([last, ..run]), ..acc]) }
-				| (_) { ascending(rest, x, [last, ..run], by, acc) }
+				& (_) { ascending(rest, x, [last, ..run], by, acc) }
 		}
 }
 
@@ -652,18 +652,18 @@ descending = <A, N>(
 ) -> List(List(A)) {
 	list |>
 		([]) { reverse([[last, ..run], ..acc]) }
-		| ([x, ..rest]) {
+		& ([x, ..rest]) {
 			by(last, x) |>
 				(Greater) { descending(rest, x, [last, ..run], by, acc) }
-				| (_) { runs(list, by, [[last, ..run], ..acc]) }
+				& (_) { runs(list, by, [[last, ..run], ..acc]) }
 		}
 }
 
 merge_all = <A, N>(runs : List(List(A)), by : (A, A) <- N -> Order) -> List(A) {
 	runs |>
 		([]) { [] }
-		| ([run]) { run }
-		| (_) { merge_all(merge_pairs(runs, by, []), by) }
+		& ([run]) { run }
+		& (_) { merge_all(merge_pairs(runs, by, []), by) }
 }
 
 merge_pairs = <A, N>(
@@ -673,8 +673,8 @@ merge_pairs = <A, N>(
 ) -> List(List(A)) {
 	runs |>
 		([]) { reverse(acc) }
-		| ([run]) { reverse([run, ..acc]) }
-		| ([a, b, ..rest]) {
+		& ([run]) { reverse([run, ..acc]) }
+		& ([a, b, ..rest]) {
 			merge_pairs(rest, by, [merge(a, b, by, []), ..acc])
 		}
 }
@@ -688,13 +688,13 @@ merge = <A, N>(
 ) -> List(A) {
 	xs |>
 		([]) { reverse_onto(acc, ys) }
-		| ([x, ..xs2]) {
+		& ([x, ..xs2]) {
 			ys |>
 				([]) { reverse_onto(acc, xs) }
-				| ([y, ..ys2]) {
+				& ([y, ..ys2]) {
 					by(x, y) |>
 						(Greater) { merge(xs, ys2, by, [y, ..acc]) }
-						| (_) { merge(xs2, ys, by, [x, ..acc]) }
+						& (_) { merge(xs2, ys, by, [x, ..acc]) }
 				}
 		}
 }
@@ -710,10 +710,10 @@ range = (from : Int, to : Int) -> List(Int) {
 	go = (i, acc) {
 		{ i == from } |>
 			(True) { [i, ..acc] }
-			| (False) {
+			& (False) {
 				{ i < from } |>
 					(True) { go(i + 1, [i, ..acc]) }
-					| (False) { go(i - 1, [i, ..acc]) }
+					& (False) { go(i - 1, [i, ..acc]) }
 			}
 	}
 	go(to, [])
@@ -726,7 +726,7 @@ range = (from : Int, to : Int) -> List(Int) {
 /// ```
 repeat = <A>(item : A, times : Int) -> List(A) {
 	go = (n, acc) {
-		{ n <= 0 } |> (True) { acc } | (False) { go(n - 1, [item, ..acc]) }
+		{ n <= 0 } |> (True) { acc } & (False) { go(n - 1, [item, ..acc]) }
 	}
 	go(times, [])
 }
@@ -740,10 +740,10 @@ split = <A>(list : List(A), at : Int) -> (List(A), List(A)) {
 	go = (rest, n, acc) {
 		{ n <= 0 } |>
 			(True) { (reverse(acc), rest) }
-			| (False) {
+			& (False) {
 				rest |>
 					([]) { (reverse(acc), []) }
-					| ([x, ..xs]) { go(xs, n - 1, [x, ..acc]) }
+					& ([x, ..xs]) { go(xs, n - 1, [x, ..acc]) }
 			}
 	}
 	go(list, at, [])
@@ -757,10 +757,10 @@ split_while = <A, N>(list : List(A), satisfying : (A) <- N -> Bool) -> (
 	go = (rest, acc) {
 		rest |>
 			([]) { (reverse(acc), []) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				satisfying(x) |>
 					(True) { go(xs, [x, ..acc]) }
-					| (False) { (reverse(acc), rest) }
+					& (False) { (reverse(acc), rest) }
 			}
 	}
 	go(list, [])
@@ -775,10 +775,10 @@ split_while = <A, N>(list : List(A), satisfying : (A) <- N -> Bool) -> (
 key_find = <K, V>(in : List((K, V)), find : K) -> Option(V) {
 	in |>
 		([]) { None }
-		| ([(k, v), ..rest]) {
+		& ([(k, v), ..rest]) {
 			{ k == find } |>
 				(True) { Some(v) }
-				| (False) { key_find(rest, find) }
+				& (False) { key_find(rest, find) }
 		}
 }
 
@@ -787,10 +787,10 @@ key_filter = <K, V>(in : List((K, V)), find : K) -> List(V) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([(k, v), ..xs]) {
+			& ([(k, v), ..xs]) {
 				{ k == find } |>
 					(True) { go(xs, [v, ..acc]) }
-					| (False) { go(xs, acc) }
+					& (False) { go(xs, acc) }
 			}
 	}
 	go(in, [])
@@ -806,10 +806,10 @@ key_pop = <K, V>(list : List((K, V)), key : K) -> Option((V, List((K, V)))) {
 	go = (rest, acc) {
 		rest |>
 			([]) { None }
-			| ([(k, v), ..xs]) {
+			& ([(k, v), ..xs]) {
 				{ k == key } |>
 					(True) { Some((v, reverse_onto(acc, xs))) }
-					| (False) { go(xs, [(k, v), ..acc]) }
+					& (False) { go(xs, [(k, v), ..acc]) }
 			}
 	}
 	go(list, [])
@@ -821,10 +821,10 @@ key_set = <K, V>(list : List((K, V)), key : K, value : V) -> List((K, V)) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse([(key, value), ..acc]) }
-			| ([(k, v), ..xs]) {
+			& ([(k, v), ..xs]) {
 				{ k == key } |>
 					(True) { reverse_onto(acc, [(key, value), ..xs]) }
-					| (False) { go(xs, [(k, v), ..acc]) }
+					& (False) { go(xs, [(k, v), ..acc]) }
 			}
 	}
 	go(list, [])
@@ -834,7 +834,7 @@ key_set = <K, V>(list : List((K, V)), key : K, value : V) -> List((K, V)) {
 each = <A, B, N>(list : List(A), with : (A) <- N -> B) -> Nil {
 	list |>
 		([]) { Nil }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			with(x)
 			each(xs, with)
 		}
@@ -848,10 +848,10 @@ try_each = <A, B, F, N>(
 ) -> Result(Nil, F) {
 	over |>
 		([]) { Ok(Nil) }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			with(x) |>
 				(Ok(_)) { try_each(xs, with) }
-				| (Error(error)) { Error(error) }
+				& (Error(error)) { Error(error) }
 		}
 }
 
@@ -868,10 +868,10 @@ partition = <A, N>(list : List(A), with : (A) <- N -> Bool) -> (
 	go = (rest, yes, no) {
 		rest |>
 			([]) { (reverse(yes), reverse(no)) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				with(x) |>
 					(True) { go(xs, [x, ..yes], no) }
-					| (False) { go(xs, yes, [x, ..no]) }
+					& (False) { go(xs, yes, [x, ..no]) }
 			}
 	}
 	go(list, [], [])
@@ -888,12 +888,12 @@ partition = <A, N>(list : List(A), with : (A) <- N -> Bool) -> (
 permutations = <A>(list : List(A)) -> List(List(A)) {
 	list |>
 		([]) { [[]] }
-		| (_) {
+		& (_) {
 			// Each element in turn, with the others in order.
 			picks = (before, after, acc) {
 				after |>
 					([]) { reverse(acc) }
-					| ([x, ..xs]) {
+					& ([x, ..xs]) {
 						picks(
 							[x, ..before],
 							xs,
@@ -916,16 +916,16 @@ permutations = <A>(list : List(A)) -> List(List(A)) {
 window = <A>(list : List(A), by : Int) -> List(List(A)) {
 	{ by <= 0 } |>
 		(True) { [] }
-		| (False) {
+		& (False) {
 			go = (rest, acc) {
 				w = take(rest, by)
 				{ length(w) == by } |>
 					(True) {
 						rest |>
 							([_, ..xs]) { go(xs, [w, ..acc]) }
-							| ([]) { reverse(acc) }
+							& ([]) { reverse(acc) }
 					}
-					| (False) { reverse(acc) }
+					& (False) { reverse(acc) }
 			}
 			go(list, [])
 		}
@@ -937,7 +937,7 @@ window = <A>(list : List(A), by : Int) -> List(List(A)) {
 /// list.window_by_2([1, 2, 3])  // [(1, 2), (2, 3)]
 /// ```
 window_by_2 = <A>(list : List(A)) -> List((A, A)) {
-	list |> ([]) { [] } | ([_, ..xs]) { zip(list, xs) }
+	list |> ([]) { [] } & ([_, ..xs]) { zip(list, xs) }
 }
 
 /// The list without its first elements for which the function gives
@@ -945,10 +945,10 @@ window_by_2 = <A>(list : List(A)) -> List((A, A)) {
 drop_while = <A, N>(in : List(A), satisfying : (A) <- N -> Bool) -> List(A) {
 	in |>
 		([]) { [] }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			satisfying(x) |>
 				(True) { drop_while(xs, satisfying) }
-				| (False) { in }
+				& (False) { in }
 		}
 }
 
@@ -957,10 +957,10 @@ take_while = <A, N>(in : List(A), satisfying : (A) <- N -> Bool) -> List(A) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				satisfying(x) |>
 					(True) { go(xs, [x, ..acc]) }
-					| (False) { reverse(acc) }
+					& (False) { reverse(acc) }
 			}
 	}
 	go(in, [])
@@ -976,15 +976,15 @@ take_while = <A, N>(in : List(A), satisfying : (A) <- N -> Bool) -> List(A) {
 chunk = <A, K, N>(in : List(A), by : (A) <- N -> K) -> List(List(A)) {
 	in |>
 		([]) { [] }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			go = (rest, key, current, acc) {
 				rest |>
 					([]) { reverse([reverse(current), ..acc]) }
-					| ([y, ..ys]) {
+					& ([y, ..ys]) {
 						k = by(y)
 						{ k == key } |>
 							(True) { go(ys, key, [y, ..current], acc) }
-							| (False) {
+							& (False) {
 								go(ys, k, [y], [reverse(current), ..acc])
 							}
 					}
@@ -1002,15 +1002,15 @@ chunk = <A, K, N>(in : List(A), by : (A) <- N -> K) -> List(List(A)) {
 sized_chunk = <A>(in : List(A), into : Int) -> List(List(A)) {
 	{ into <= 0 } |>
 		(True) { [] }
-		| (False) {
+		& (False) {
 			go = (rest, n, current, acc) {
 				rest |>
 					([]) {
 						current |>
 							([]) { reverse(acc) }
-							| (_) { reverse([reverse(current), ..acc]) }
+							& (_) { reverse([reverse(current), ..acc]) }
 					}
-					| ([x, ..xs]) {
+					& ([x, ..xs]) {
 						{ n == 1 } |>
 							(True) {
 								go(
@@ -1020,7 +1020,7 @@ sized_chunk = <A>(in : List(A), into : Int) -> List(List(A)) {
 									[reverse([x, ..current]), ..acc],
 								)
 							}
-							| (False) { go(xs, n - 1, [x, ..current], acc) }
+							& (False) { go(xs, n - 1, [x, ..current], acc) }
 					}
 			}
 			go(in, into, [], [])
@@ -1034,7 +1034,7 @@ sized_chunk = <A>(in : List(A), into : Int) -> List(List(A)) {
 /// list.reduce([1, 2, 3], (a, b) { a + b })  // Some(6)
 /// ```
 reduce = <A, N>(over : List(A), with : (A, A) <- N -> A) -> Option(A) {
-	over |> ([]) { None } | ([x, ..xs]) { Some(fold(xs, x, with)) }
+	over |> ([]) { None } & ([x, ..xs]) { Some(fold(xs, x, with)) }
 }
 
 /// Like `fold`, but gives every accumulator after each element.
@@ -1050,7 +1050,7 @@ scan = <A, Acc, N>(
 	go = (rest, acc, out) {
 		rest |>
 			([]) { reverse(out) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				next = with(acc, x)
 				go(xs, next, [next, ..out])
 			}
@@ -1066,10 +1066,10 @@ scan = <A, Acc, N>(
 combinations = <A>(items : List(A), by : Int) -> List(List(A)) {
 	{ by <= 0 } |>
 		(True) { [[]] }
-		| (False) {
+		& (False) {
 			items |>
 				([]) { [] }
-				| ([x, ..xs]) {
+				& ([x, ..xs]) {
 					append(
 						map(combinations(xs, by - 1), (c) { [x, ..c] }),
 						combinations(xs, by),
@@ -1087,7 +1087,7 @@ combination_pairs = <A>(items : List(A)) -> List((A, A)) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([x, ..xs]) {
+			& ([x, ..xs]) {
 				go(
 					xs,
 					reverse_onto(map(xs, (y) { (x, y) }), acc),
@@ -1114,7 +1114,7 @@ transpose = <A>(list_of_lists : List(List(A))) -> List(List(A)) {
 		nonempty = filter(rows, (row) { row != [] })
 		nonempty |>
 			([]) { reverse(acc) }
-			| (_) {
+			& (_) {
 				heads = filter_map(nonempty, first)
 				tails = map(nonempty, (row) { drop(row, 1) })
 				go(tails, [heads, ..acc])
@@ -1128,10 +1128,10 @@ transpose = <A>(list_of_lists : List(List(A))) -> List(List(A)) {
 max = <A, N>(over : List(A), with : (A, A) <- N -> Order) -> Option(A) {
 	over |>
 		([]) { None }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			Some(
 				fold(xs, x, (best, y) {
-					with(y, best) |> (Greater) { y } | (_) { best }
+					with(y, best) |> (Greater) { y } & (_) { best }
 				}),
 			)
 		}
@@ -1142,10 +1142,10 @@ max = <A, N>(over : List(A), with : (A, A) <- N -> Order) -> Option(A) {
 min = <A, N>(over : List(A), with : (A, A) <- N -> Order) -> Option(A) {
 	over |>
 		([]) { None }
-		| ([x, ..xs]) {
+		& ([x, ..xs]) {
 			Some(
 				fold(xs, x, (best, y) {
-					with(y, best) |> (Less) { y } | (_) { best }
+					with(y, best) |> (Less) { y } & (_) { best }
 				}),
 			)
 		}

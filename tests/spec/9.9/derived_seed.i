@@ -11,7 +11,7 @@
 at = (seed : random.Generator, path : List(Int)) {
 	fail.catch(() { random.at_path(seed, path) }) |>
 		(Ok(generator)) { generator }
-		| (Error(_)) { panic("invalid expected path") }
+		& (Error(_)) { panic("invalid expected path") }
 }
 
 main = () {

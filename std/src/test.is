@@ -6,7 +6,7 @@
 (= text
   (-> (, x) _
     (|> ((. syntax node) x)
-        (| (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)
+        (& (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)
           (-> (, _) _ (panic "test name must be a string literal"))))))
 (= _entry
   (-> (, name body mode) (<- _ (, (: items (. syntax Items))))
@@ -32,26 +32,26 @@
 (= append
   (-> (, xs ys) _
     (|> xs
-        (| (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))
+        (& (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))
 (= statements_of
   (-> (, body) _
     (|> body
-        (| (-> (, `(-> (,) _ {~..statements})) _ statements)
+        (& (-> (, `(-> (,) _ {~..statements})) _ statements)
           (-> (, `(-> (,) _ ~statement)) _ [statement])
           (-> (, _) _ (panic "suite body must be a zero-argument function"))))))
 (= provide
   (-> (, target env) _
     (|> env
-        (| (-> (, []) _ target)
+        (& (-> (, []) _ target)
           (-> (, [services .. rest]) _
             (provide `(<- ~target ~services) rest))))))
 (= suite_statement
   (-> (, prefix statement env) _
     (|>
      statement
-     (| (-> (, `(<- ~target ~services)) _
+     (& (-> (, `(<- ~target ~services)) _
           (|> target
-              (| (-> (, `{~..children}) _
+              (& (-> (, `{~..children}) _
                    (suite_items prefix children [services .. env]))
                 (-> (, _) _
                   (suite_statement prefix target [services .. env])))))
@@ -83,7 +83,7 @@
 (= suite_items
   (-> (, prefix statements env) _
     (|> statements
-        (| (-> (, []) _ [])
+        (& (-> (, []) _ [])
           (-> (, [statement .. rest]) _
             (append (suite_statement prefix statement env)
                     (suite_items prefix rest env)))))))
@@ -94,10 +94,10 @@
 (= case_items
   (-> (, prefix cases body index) (<- _ (, (: items (. syntax Items))))
     (|> cases
-        (| (-> (, []) _ [])
+        (& (-> (, []) _ [])
           (-> (, [case .. rest]) _
             (|> case
-                (| (-> (, `(, ~name ~value)) _
+                (& (-> (, `(, ~name ~value)) _
                      {(= full
                         ((. syntax make)
                          ((. syntax Node)
@@ -123,6 +123,6 @@
   (= each
     (-> (, name cases body) (<- _ (, (: items (. syntax Items))))
       (|> cases
-          (| (-> (, `[~..values]) _
+          (& (-> (, `[~..values]) _
                `{~..(case_items (text name) values body 0)})
             (-> (, _) _ (panic "each expects a list of cases")))))))

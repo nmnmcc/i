@@ -11,7 +11,7 @@ loop = (x) { x(x) }
 
 pong = (n : Int) { ping(n) + uset(1) }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 run = <A, N>(body : () <- N -> A) { body() }
 

@@ -434,8 +434,8 @@ test("cli_error_order", () {
 	) -> Result(Int, String) {
 		value |>
 			("1") { Ok(1) }
-			| ("bad") { Error("stop") }
-			| (_) { panic("later occurrence called") }
+			& ("bad") { Error("stop") }
+			& (_) { panic("later occurrence called") }
 	})
 	assert(
 		cli.parse(failing_many, ["--num=1", "--num=bad", "--num=never"]) ==
@@ -474,7 +474,7 @@ test("cli_allocation", () {
 	)
 	assert(cli.parse(o, []) == Ok(None))
 	assert(cli.parse(o, ["-j", "2"]) == Ok(Some(2)))
-	defaults = cli.map(o, (value) { value |> (None) { 4 } | (Some(n)) { n } })
+	defaults = cli.map(o, (value) { value |> (None) { 4 } & (Some(n)) { n } })
 	assert(cli.parse(defaults, []) == Ok(4))
 	assert(cli.parse(defaults, ["--jobs=2"]) == Ok(2))
 	p = cli.map2(cli.argument("first", "", cli.text), cli.rest(
@@ -688,7 +688,7 @@ test("cli_long_inputs", () {
 		cli.parse(name(), ["--name=" <> value]) == Ok(value),
 	)
 	values = list.map(list.range(0, 1000), (n) {
-		"--name=" <> { n % 2 |> (0) { "a" } | (_) { "é" } }
+		"--name=" <> { n % 2 |> (0) { "a" } & (_) { "é" } }
 	})
 	assert(
 		cli.parse(
@@ -697,7 +697,7 @@ test("cli_long_inputs", () {
 		) ==
 			Ok(
 				list.map(list.range(0, 1000), (n) {
-					n % 2 |> (0) { "a" } | (_) { "é" }
+					n % 2 |> (0) { "a" } & (_) { "é" }
 				}),
 			),
 	)

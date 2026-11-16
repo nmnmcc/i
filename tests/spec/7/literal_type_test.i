@@ -7,19 +7,19 @@
 )
 
 strings = (v : { Int | String }) {
-	v |> (x : { "a" | "b" }) { True } | (_) { False }
+	v |> (x : { "a" | "b" }) { True } & (_) { False }
 }
 
 except_string = (v : { Int | String }) {
-	v |> (x : String - "a") { True } | (_) { False }
+	v |> (x : String - "a") { True } & (_) { False }
 }
 
 except_int = (v : { Int | String }) {
-	v |> (x : Int - 5) { True } | (_) { False }
+	v |> (x : Int - 5) { True } & (_) { False }
 }
 
 boxed = (v : { Int | String }) {
-	v |> (x : 1073741824) { True } | (_) { False }
+	v |> (x : 1073741824) { True } & (_) { False }
 }
 
 equal = (a, b) { a == b }

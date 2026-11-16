@@ -1822,7 +1822,7 @@
       ],
       [
         "{}",
-        "\t\t| (C1(a, r)) { a + f0(r) }"
+        "\t\t& (C1(a, r)) { a + f0(r) }"
       ]
     ],
     "reason": "Render the source template; the test still exercises the generator"
@@ -1911,7 +1911,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -1928,7 +1928,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -2460,7 +2460,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -2482,7 +2482,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -2533,7 +2533,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
@@ -2550,7 +2550,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t| (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -2701,46 +2701,6 @@
       "E0002: this string is not closed"
     ]
   },
-  "crates/ilang-macro/src/prepare.rs:79c665abf746d180": {
-    "substitutions": [
-      [
-        "{items}",
-        ""
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{}",
-        "app/macros"
-      ],
-      [
-        "{parameters}",
-        "arg0: syntax.Syntax"
-      ],
-      [
-        "{item_service}",
-        ""
-      ],
-      [
-        "{item_row}",
-        ""
-      ],
-      [
-        "target.app/macros",
-        "target.expand"
-      ],
-      [
-        "{arguments}",
-        "arg0"
-      ]
-    ]
-  },
   "crates/ilang-package/tests/git.rs:2571ce03d469bbde": {
     "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
   },
@@ -2814,12 +2774,6 @@
     ]
   },
   "tests/review/cases/review-std1/factory/src/main.i:9083dc65664c46cf": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
-  "tests/review/cases/review-std1/tree/src/main.i:066350f997d0a19e": {
     "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
@@ -3016,14 +2970,6 @@
     ],
     "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate."
   },
-  "tests/spec/4.6/written_poly_union_arity.i:c57418d50290abcb": {
-    "track": true,
-    "diagnostics": [
-      "E0101: a function type with type parameters must be the type of a binding",
-      "E0101: a function type with type parameters must be the type of a binding"
-    ],
-    "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate."
-  },
   "tests/spec/7/keyed_data_order.i:e5cf9ef0b4293e28": {
     "diagnostics": [
       "E0110: an item by position may not come after an item by label",
@@ -3048,5 +2994,61 @@
   },
   "crates/ilang-cli/tests/fmt_to_safety.rs:3efda719859a84ab": {
     "not_source": "Rust format template for generated i source; the runtime test converts the generated module"
+  },
+  "crates/ilang-macro/src/prepare.rs:2fcb7ceb39847144": {
+    "substitutions": [
+      [
+        "{items}",
+        ""
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{}",
+        "app/macros"
+      ],
+      [
+        "{parameters}",
+        "arg0: syntax.Syntax"
+      ],
+      [
+        "{item_service}",
+        ""
+      ],
+      [
+        "{item_row}",
+        ""
+      ],
+      [
+        "target.app/macros",
+        "target.expand"
+      ],
+      [
+        "{arguments}",
+        "arg0"
+      ]
+    ]
+  },
+  "tests/review/cases/review-std1/tree/src/main.i:a94708754e53b03e": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ],
+    "substitutions": []
+  },
+  "tests/spec/4.6/written_poly_union_arity.i:003471a33db290d6": {
+    "track": true,
+    "diagnostics": [
+      "E0101: a function type with type parameters must be the type of a binding",
+      "E0101: a function type with type parameters must be the type of a binding"
+    ],
+    "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate.",
+    "substitutions": []
   }
 }

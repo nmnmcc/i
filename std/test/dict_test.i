@@ -273,7 +273,7 @@ test("delete_test", () {
 test("upsert_existing_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
-	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } | (None) { 0 } }
+	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None) { 0 } }
 
 	assert(
 		dict.upsert(d, "a", inc_or_zero) ==
@@ -285,7 +285,7 @@ test("upsert_existing_test", () {
 test("upsert_existing_b_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
-	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } | (None) { 0 } }
+	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None) { 0 } }
 
 	assert(
 		dict.upsert(d, "b", inc_or_zero) ==
@@ -297,7 +297,7 @@ test("upsert_existing_b_test", () {
 test("upsert_new_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
-	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } | (None) { 0 } }
+	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None) { 0 } }
 
 	assert(
 		dict.upsert(d, "z", inc_or_zero) ==
@@ -343,7 +343,7 @@ test("each_test", () {
 		dict.each(d, (k, v) {
 			True = (k, v) |>
 				(("a", 1) | ("b", 2) | ("c", 3) | ("d", 4)) { True }
-				| (_) { False }
+				& (_) { False }
 			Nil
 		}) ==
 			Nil,
@@ -354,7 +354,7 @@ test("each_test", () {
 range = (start, end, a) {
 	end - start |>
 		(n ? n < 1) { a }
-		| (_) { range(start, end - 1, [end - 1, ..a]) }
+		& (_) { range(start, end - 1, [end - 1, ..a]) }
 }
 
 list_to_map = (xs) { xs |> list.map((n) { (n, n) }) |> dict.from_list }
@@ -829,7 +829,7 @@ test_random_operations_loop = (
 ) -> Nil {
 	{ remaining > 0 } |>
 		(False) { assert_dict_matches_proplist(d, proplist, initial_seed) }
-		| (True) {
+		& (True) {
 			seed1 = prng(seed)
 			op_choice = seed1 % 2
 			seed2 = prng(seed1)
@@ -847,10 +847,10 @@ test_random_operations_loop = (
 					)
 				}
 				// Delete
-				| (_) {
+				& (_) {
 					new_proplist = list.key_pop(proplist, key) |>
 						(Some((_, rest))) { rest }
-						| (None) { proplist }
+						& (None) { proplist }
 					test_random_operations_loop(
 						initial_seed,
 						seed2,
@@ -872,7 +872,7 @@ run_many_random_tests = (
 	go = (n, seed) {
 		n |>
 			(0) { Nil }
-			| (_) {
+			& (_) {
 				test_random_operations(seed, ops_per_test, key_space, initial)
 				go(n - 1, prng(seed + n))
 			}
@@ -907,7 +907,7 @@ assert_dict_matches_proplist = <K, V>(
 ) -> Nil {
 	{ dict.size(d) == list.length(proplist) } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			panic(
 				"Size mismatch with seed " <>
 					int.to_string(seed) <>
@@ -922,7 +922,7 @@ assert_dict_matches_proplist = <K, V>(
 		got = dict.get(d, key)
 		{ got == Some(value) } |>
 			(True) { Nil }
-			| (False) {
+			& (False) {
 				panic(
 					"Get mismatch with seed " <>
 						int.to_string(seed) <>
@@ -937,7 +937,7 @@ assert_dict_matches_proplist = <K, V>(
 	})
 	{ d == dict.from_list(proplist) } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			panic(
 				"Structural equality failed with seed " <> int.to_string(seed),
 			)
@@ -998,7 +998,7 @@ test("many_keys_test", () {
 		list.all(list.range(1, n), (i) { dict.get(d, i) == Some(i * i) }),
 	)
 	d2 = list.fold(list.range(1, n), d, (d, i) {
-		i % 2 |> (0) { dict.delete(d, i) } | (_) { d }
+		i % 2 |> (0) { dict.delete(d, i) } & (_) { d }
 	})
 	assert(dict.size(d2) == n / 2)
 	assert(dict.get(d2, 2) == None)
@@ -1046,7 +1046,7 @@ test("zero_keys_test", () {
 test("upsert_update_test", () {
 	count = (words) {
 		list.fold(words, dict.new(), (d, w) {
-			dict.upsert(d, w, (x) { x |> (Some(n)) { n + 1 } | (None) { 1 } })
+			dict.upsert(d, w, (x) { x |> (Some(n)) { n + 1 } & (None) { 1 } })
 		})
 	}
 	d = count(["a", "b", "a", "c", "a"])

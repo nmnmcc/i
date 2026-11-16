@@ -2,4 +2,4 @@
 	word
 )
 
-word = (n) { n |> (0) { "zero" } | (1) { "one" } }
+word = (n) { n |> (0) { "zero" } & (1) { "one" } }

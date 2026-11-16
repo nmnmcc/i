@@ -10,11 +10,11 @@
     (-> (, value) _
       {(= t ((. syntax type_of) value))
        (|> ((. syntax subtype) t `Int)
-           (| (-> (, (. syntax Yes)) _ `(int_text ~value))
+           (& (-> (, (. syntax Yes)) _ `(int_text ~value))
              (-> (, _) _
                (|>
                 ((. syntax subtype) t `String)
-                (| (-> (, (. syntax Yes)) _ value)
+                (& (-> (, (. syntax Yes)) _ value)
                   (-> (, (. syntax NotKnown)) _
                     ((. fail raise)
                      ((. syntax SyntaxError)

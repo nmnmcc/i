@@ -14,5 +14,5 @@ main = () {
 			() { panic("final") },
 		)
 	})
-	r |> (1) { Nil } | (_) { panic("not the value of f") }
+	r |> (1) { Nil } & (_) { panic("not the value of f") }
 }

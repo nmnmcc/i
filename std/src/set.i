@@ -80,7 +80,7 @@ to_list = <A>(set : Set(A)) -> List(A) {
 /// ```
 from_list = <A>(members : List(A)) -> Set(A) {
 	go = (rest, d) {
-		rest |> ([]) { Set(d) } | ([x, ..xs]) { go(xs, dict.insert(d, x, Nil)) }
+		rest |> ([]) { Set(d) } & ([x, ..xs]) { go(xs, dict.insert(d, x, Nil)) }
 	}
 	go(members, dict.new())
 }
@@ -161,5 +161,5 @@ is_disjoint = <A>(first : Set(A), from : Set(A)) -> Bool {
 }
 
 by_size = <X>(a : Set(X), b : Set(X)) -> (Set(X), Set(X)) {
-	{ size(a) <= size(b) } |> (True) { (a, b) } | (False) { (b, a) }
+	{ size(a) <= size(b) } |> (True) { (a, b) } & (False) { (b, a) }
 }

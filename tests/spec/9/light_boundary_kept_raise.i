@@ -11,5 +11,5 @@ main = () {
 	r : Result((Int) -> Nil, Int) = fail.catch(() <- (active : Fail(Int)) {
 		(x : Int) { active.raise(x) }
 	})
-	r |> (Ok(k)) { k(1) } | (Error(_)) { Nil }
+	r |> (Ok(k)) { k(1) } & (Error(_)) { Nil }
 }

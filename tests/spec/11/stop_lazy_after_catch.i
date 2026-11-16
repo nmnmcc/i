@@ -12,7 +12,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -51,6 +51,6 @@ main = () {
 		outer(b)
 		Done
 	})
-	p |> (Paused(k)) { control.resume(k, Nil) } | (Done) { panic("not paused") }
+	p |> (Paused(k)) { control.resume(k, Nil) } & (Done) { panic("not paused") }
 	Nil
 }

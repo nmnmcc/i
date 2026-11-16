@@ -12,7 +12,7 @@ ub = <N>(d : Int) <- (s : B(N)) {
 	f(d)
 }
 tell = (x : Int) {
-	x |> (0) { "zero" } | (1) { "one" } | (2) { "two" } | (_) { "many" }
+	x |> (0) { "zero" } & (1) { "one" } & (2) { "two" } & (_) { "many" }
 }
 
 main = () <- (io : Io) {
@@ -26,7 +26,7 @@ main = () <- (io : Io) {
 		io.print("in A")
 		d |>
 			(0) { "str" }
-			| (_) {
+			& (_) {
 				ub(d)
 				"str"
 			}

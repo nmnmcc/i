@@ -2009,7 +2009,7 @@ keys = [
 ]
 
 last = (xs : List(String)) {
-	xs |> ([]) { panic("empty") } | ([x]) { x } | ([_, ..rest]) { last(rest) }
+	xs |> ([]) { panic("empty") } & ([x]) { x } & ([_, ..rest]) { last(rest) }
 }
 
 test("wide keys survive resolution", () {

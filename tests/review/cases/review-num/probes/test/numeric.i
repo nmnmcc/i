@@ -5,7 +5,7 @@
 	i/resource
 )
 
-check = (b : Bool) { b |> (True) { Nil } | (False) { panic("wrong") } }
+check = (b : Bool) { b |> (True) { Nil } & (False) { panic("wrong") } }
 
 id = <A>(a : A) -> A { a }
 
@@ -56,7 +56,7 @@ work = (b, x : Float, n : Int) -> ResultStep {
 }
 
 advance = (s : ResultStep, x : Float) -> ResultStep {
-	s |> (More(k)) { control.resume(k, x) } | (other) { other }
+	s |> (More(k)) { control.resume(k, x) } & (other) { other }
 }
 
 test("lazy_two_resumes", () {
@@ -69,7 +69,7 @@ test("lazy_two_resumes", () {
 			check(n == 9223372036854775809)
 			check(y == 3.25)
 		}
-		| (_) { panic("not done") }
+		& (_) { panic("not done") }
 })
 
 make = (x : Float) { () { x } }
@@ -88,7 +88,7 @@ test("identity_and_capture", () {
 })
 
 relay = (f : (Float) -> Float, n : Int, x : Float) -> Float {
-	{ n == 0 } |> (True) { f(x) } | (False) { relay(f, n - 1, x) }
+	{ n == 0 } |> (True) { f(x) } & (False) { relay(f, n - 1, x) }
 }
 
 test("tail_million", () {

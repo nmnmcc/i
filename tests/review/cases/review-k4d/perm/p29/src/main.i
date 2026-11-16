@@ -24,7 +24,7 @@ use = <N>() <- (s : S(N)) {
 	f()
 }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 Dep = (v = Int)
 

@@ -44,7 +44,7 @@ _parse_result = (text : String) -> Result(Json, JsonError) {
 		(tail, end) = whitespace(rest, at)
 		tail |>
 			([]) { value }
-			| (_) {
+			& (_) {
 				fail.raise(JsonError(offset = end, reason = "trailing data"))
 			}
 	})
@@ -55,30 +55,30 @@ whitespace = (xs : List(Int), at : Int) -> (List(Int), Int) {
 		([x, ..tail] ? x == 32 || x == 9 || x == 10 || x == 13) {
 			whitespace(tail, at + 1)
 		}
-		| (_) { (xs, at) }
+		& (_) { (xs, at) }
 }
 
 value = (input : List(Int), offset : Int) -> (Json, List(Int), Int) {
 	(xs, at) = whitespace(input, offset)
 	xs |>
 		([110, 117, 108, 108, ..rest]) { (Null, rest, at + 4) }
-		| ([116, 114, 117, 101, ..rest]) { (Boolean(True), rest, at + 4) }
-		| ([102, 97, 108, 115, 101, ..rest]) { (Boolean(False), rest, at + 5) }
-		| ([34, ..rest]) {
+		& ([116, 114, 117, 101, ..rest]) { (Boolean(True), rest, at + 4) }
+		& ([102, 97, 108, 115, 101, ..rest]) { (Boolean(False), rest, at + 5) }
+		& ([34, ..rest]) {
 			(s, tail, end) = read_string(rest, at + 1, [])
 			(Text(s), tail, end)
 		}
-		| ([91, ..rest]) { array_start(rest, at + 1) }
-		| ([123, ..rest]) { object_start(rest, at + 1) }
-		| ([x, .._] ? x == 45 || digit(x)) { number(xs, at) }
-		| (_) { fail.raise(JsonError(offset = at, reason = "expected value")) }
+		& ([91, ..rest]) { array_start(rest, at + 1) }
+		& ([123, ..rest]) { object_start(rest, at + 1) }
+		& ([x, .._] ? x == 45 || digit(x)) { number(xs, at) }
+		& (_) { fail.raise(JsonError(offset = at, reason = "expected value")) }
 }
 
 array_start = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 	(rest, pos) = whitespace(xs, at)
 	rest |>
 		([93, ..tail]) { (Array([]), tail, pos + 1) }
-		| (_) { array_items(rest, pos, []) }
+		& (_) { array_items(rest, pos, []) }
 }
 
 array_items = (xs : List(Int), at : Int, acc : List(Json)) -> (
@@ -90,8 +90,8 @@ array_items = (xs : List(Int), at : Int, acc : List(Json)) -> (
 	(tail, end) = whitespace(rest, pos)
 	tail |>
 		([93, ..after]) { (Array(list.reverse([v, ..acc])), after, end + 1) }
-		| ([44, ..after]) { array_items(after, end + 1, [v, ..acc]) }
-		| (_) {
+		& ([44, ..after]) { array_items(after, end + 1, [v, ..acc]) }
+		& (_) {
 			fail.raise(
 				JsonError(
 					offset = end,
@@ -105,7 +105,7 @@ object_start = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 	(rest, pos) = whitespace(xs, at)
 	rest |>
 		([125, ..tail]) { (Object([]), tail, pos + 1) }
-		| (_) { object_items(rest, pos, []) }
+		& (_) { object_items(rest, pos, []) }
 }
 
 object_items = (xs : List(Int), at : Int, acc : List((String, Json))) -> (
@@ -133,10 +133,10 @@ object_items = (xs : List(Int), at : Int, acc : List((String, Json))) -> (
 								end + 1,
 							)
 						}
-						| ([44, ..after]) {
+						& ([44, ..after]) {
 							object_items(after, end + 1, [(key, v), ..acc])
 						}
-						| (_) {
+						& (_) {
 							fail.raise(
 								JsonError(
 									offset = end,
@@ -145,13 +145,13 @@ object_items = (xs : List(Int), at : Int, acc : List((String, Json))) -> (
 							)
 						}
 				}
-				| (_) {
+				& (_) {
 					fail.raise(
 						JsonError(offset = colon_at, reason = "expected colon"),
 					)
 				}
 		}
-		| (_) {
+		& (_) {
 			fail.raise(JsonError(offset = pos, reason = "expected object key"))
 		}
 }
@@ -165,23 +165,23 @@ read_string = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 		([]) {
 			fail.raise(JsonError(offset = at, reason = "unterminated string"))
 		}
-		| ([34, ..tail]) {
+		& ([34, ..tail]) {
 			{
 				e4_call_arg_0 = bit_array.concat(list.reverse(acc))
 				fail.catch(() { bit_array.to_string(e4_call_arg_0) })
 			} |>
 				(Ok(s)) { (s, tail, at + 1) }
-				| (Error(_)) {
+				& (Error(_)) {
 					fail.raise(JsonError(offset = at, reason = "invalid UTF-8"))
 				}
 		}
-		| ([92, ..tail]) { escape(tail, at + 1, acc) }
-		| ([x, .._] ? x < 32) {
+		& ([92, ..tail]) { escape(tail, at + 1, acc) }
+		& ([x, .._] ? x < 32) {
 			fail.raise(
 				JsonError(offset = at, reason = "control character in string"),
 			)
 		}
-		| ([x, ..tail]) { read_string(tail, at + 1, [<<x>>, ..acc]) }
+		& ([x, ..tail]) { read_string(tail, at + 1, [<<x>>, ..acc]) }
 }
 
 escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
@@ -213,7 +213,7 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 										],
 									)
 								}
-								| (False) {
+								& (False) {
 									fail.raise(
 										JsonError(
 											offset = end,
@@ -222,7 +222,7 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 									)
 								}
 						}
-						| (_) {
+						& (_) {
 							fail.raise(
 								JsonError(
 									offset = end,
@@ -231,7 +231,7 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 							)
 						}
 				}
-				| (False) {
+				& (False) {
 					{ n >= 56320 && n <= 57343 } |>
 						(True) {
 							fail.raise(
@@ -241,31 +241,31 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 								),
 							)
 						}
-						| (False) {
+						& (False) {
 							read_string(after, end, [scalar(n), ..acc])
 						}
 				}
 		}
-		| ([x, ..tail]) {
+		& ([x, ..tail]) {
 			code = x |>
 				(34) { 34 }
-				| (92) { 92 }
-				| (47) { 47 }
-				| (98) { 8 }
-				| (102) { 12 }
-				| (110) { 10 }
-				| (114) { 13 }
-				| (116) { 9 }
-				| (_) { -1 }
+				& (92) { 92 }
+				& (47) { 47 }
+				& (98) { 8 }
+				& (102) { 12 }
+				& (110) { 10 }
+				& (114) { 13 }
+				& (116) { 9 }
+				& (_) { -1 }
 			{ code < 0 } |>
 				(True) {
 					fail.raise(
 						JsonError(offset = at, reason = "invalid escape"),
 					)
 				}
-				| (False) { read_string(tail, at + 1, [<<code>>, ..acc]) }
+				& (False) { read_string(tail, at + 1, [<<code>>, ..acc]) }
 		}
-		| (_) {
+		& (_) {
 			fail.raise(JsonError(offset = at, reason = "unterminated escape"))
 		}
 }
@@ -278,7 +278,7 @@ hex4 = (xs : List(Int), at : Int) -> (Int, List(Int), Int) {
 				(True) {
 					(list.fold(digits, 0, (n, x) { n * 16 + x }), tail, at + 4)
 				}
-				| (False) {
+				& (False) {
 					fail.raise(
 						JsonError(
 							offset = at,
@@ -287,7 +287,7 @@ hex4 = (xs : List(Int), at : Int) -> (Int, List(Int), Int) {
 					)
 				}
 		}
-		| (_) {
+		& (_) {
 			fail.raise(JsonError(offset = at, reason = "short Unicode escape"))
 		}
 }
@@ -295,15 +295,15 @@ hex4 = (xs : List(Int), at : Int) -> (Int, List(Int), Int) {
 hex = (x : Int) -> Int {
 	x |>
 		(n ? n >= 48 && n <= 57) { n - 48 }
-		| (n ? n >= 65 && n <= 70) { n - 55 }
-		| (n ? n >= 97 && n <= 102) { n - 87 }
-		| (_) { -1 }
+		& (n ? n >= 65 && n <= 70) { n - 55 }
+		& (n ? n >= 97 && n <= 102) { n - 87 }
+		& (_) { -1 }
 }
 
 scalar = (n : Int) -> BitArray {
 	core.int_to_codepoint(n) |>
 		(Ok(c)) { <<core.from_codepoints([c]):utf8>> }
-		| (Error(_)) { panic("json: invalid scalar") }
+		& (Error(_)) { panic("json: invalid scalar") }
 }
 
 digit = (x : Int) -> Bool { x >= 48 && x <= 57 }
@@ -311,7 +311,7 @@ digit = (x : Int) -> Bool { x >= 48 && x <= 57 }
 number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 	(negative, start, pos) = xs |>
 		([45, ..tail]) { (True, tail, at + 1) }
-		| (_) { (False, xs, at) }
+		& (_) { (False, xs, at) }
 	(whole, after, end) = start |>
 		([48, ..tail]) {
 			tail |>
@@ -320,10 +320,10 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 						JsonError(offset = pos + 1, reason = "leading zero"),
 					)
 				}
-				| (_) { ([48], tail, pos + 1) }
+				& (_) { ([48], tail, pos + 1) }
 		}
-		| ([x, ..tail] ? x >= 49 && x <= 57) { digits(tail, pos + 1, [x]) }
-		| (_) { fail.raise(JsonError(offset = pos, reason = "expected digit")) }
+		& ([x, ..tail] ? x >= 49 && x <= 57) { digits(tail, pos + 1, [x]) }
+		& (_) { fail.raise(JsonError(offset = pos, reason = "expected digit")) }
 	(fraction, rest, finish, floating) = after |>
 		([46, ..tail]) {
 			(ds, rem, p) = digits(tail, end + 1, [])
@@ -336,14 +336,14 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 						),
 					)
 				}
-				| (False) { ([46, ..ds], rem, p, True) }
+				& (False) { ([46, ..ds], rem, p, True) }
 		}
-		| (_) { ([], after, end, False) }
+		& (_) { ([], after, end, False) }
 	(exponent, remaining, final, is_float) = rest |>
 		([e, ..tail] ? e == 101 || e == 69) {
 			(sign, start_exp, exp_at) = tail |>
 				([s, ..t] ? s == 43 || s == 45) { ([s], t, finish + 2) }
-				| (_) { ([], tail, finish + 1) }
+				& (_) { ([], tail, finish + 1) }
 			(ds, rem, p) = digits(start_exp, exp_at, [])
 			{ ds == [] } |>
 				(True) {
@@ -354,10 +354,10 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 						),
 					)
 				}
-				| (False) { (list.append([e, ..sign], ds), rem, p, True) }
+				& (False) { (list.append([e, ..sign], ds), rem, p, True) }
 		}
-		| (_) { ([], rest, finish, floating) }
-	prefix = negative |> (True) { [45, ..whole] } | (False) { whole }
+		& (_) { ([], rest, finish, floating) }
+	prefix = negative |> (True) { [45, ..whole] } & (False) { whole }
 	num = text_bytes(
 		list.append(list.append(prefix, fraction), exponent),
 	)
@@ -365,23 +365,23 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 		(False) {
 			fail.catch(() { int.parse(num) }) |>
 				(Ok(n)) { Integer(n) }
-				| (Error(_)) {
+				& (Error(_)) {
 					fail.raise(
 						JsonError(offset = at, reason = "number out of range"),
 					)
 				}
 		}
-		| (True) {
+		& (True) {
 			float_text = { fraction == [] } |>
 				(True) {
 					text_bytes(
 						list.append(list.append(prefix, [46, 48]), exponent),
 					)
 				}
-				| (False) { num }
+				& (False) { num }
 			fail.catch(() { float.parse(float_text) }) |>
 				(Ok(n)) { Number(n) }
-				| (Error(_)) {
+				& (Error(_)) {
 					fail.raise(
 						JsonError(offset = at, reason = "number out of range"),
 					)
@@ -397,14 +397,14 @@ digits = (xs : List(Int), at : Int, acc : List(Int)) -> (
 ) {
 	xs |>
 		([x, ..tail] ? digit(x)) { digits(tail, at + 1, [x, ..acc]) }
-		| (_) { (list.reverse(acc), xs, at) }
+		& (_) { (list.reverse(acc), xs, at) }
 }
 
 octets = (bits : BitArray) -> List(Int) {
 	go = (rest, acc) {
 		rest |>
 			(<<x, tail:bytes>>) { go(tail, [x, ..acc]) }
-			| (_) { list.reverse(acc) }
+			& (_) { list.reverse(acc) }
 	}
 	go(bits, [])
 }
@@ -415,7 +415,7 @@ text_bytes = (xs : List(Int)) -> String {
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
 	} |>
 		(Ok(s)) { s }
-		| (Error(_)) { panic("json: invalid internal text") }
+		& (Error(_)) { panic("json: invalid internal text") }
 }
 
 field = (json : Json, key : String) -> Option(Json) {
@@ -423,38 +423,38 @@ field = (json : Json, key : String) -> Option(Json) {
 		(Object(xs)) {
 			list.find_map(xs, (pair) {
 				(k, v) = pair
-				{ k == key } |> (True) { Some(v) } | (False) { None }
+				{ k == key } |> (True) { Some(v) } & (False) { None }
 			})
 		}
-		| (_) { None }
+		& (_) { None }
 }
 
 index = (json : Json, at : Int) -> Option(Json) {
-	json |> (Array(xs)) { list.at(xs, at) } | (_) { None }
+	json |> (Array(xs)) { list.at(xs, at) } & (_) { None }
 }
 
 as_bool = (json : Json) -> Option(Bool) {
-	json |> (Boolean(x)) { Some(x) } | (_) { None }
+	json |> (Boolean(x)) { Some(x) } & (_) { None }
 }
 
 as_int = (json : Json) -> Option(Int) {
-	json |> (Integer(x)) { Some(x) } | (_) { None }
+	json |> (Integer(x)) { Some(x) } & (_) { None }
 }
 
 as_float = (json : Json) -> Option(Float) {
-	json |> (Number(x)) { Some(x) } | (_) { None }
+	json |> (Number(x)) { Some(x) } & (_) { None }
 }
 
 as_string = (json : Json) -> Option(String) {
-	json |> (Text(x)) { Some(x) } | (_) { None }
+	json |> (Text(x)) { Some(x) } & (_) { None }
 }
 
 as_array = (json : Json) -> Option(List(Json)) {
-	json |> (Array(x)) { Some(x) } | (_) { None }
+	json |> (Array(x)) { Some(x) } & (_) { None }
 }
 
 as_object = (json : Json) -> Option(List((String, Json))) {
-	json |> (Object(x)) { Some(x) } | (_) { None }
+	json |> (Object(x)) { Some(x) } & (_) { None }
 }
 
 print = (json : Json) -> String { render(json, "", 0, False) }
@@ -471,12 +471,12 @@ render = (
 ) -> String {
 	json |>
 		(Null) { "null" }
-		| (Boolean(True)) { "true" }
-		| (Boolean(False)) { "false" }
-		| (Integer(x)) { int.to_string(x) }
-		| (Number(x)) { float.to_string(x) }
-		| (Text(x)) { quote(x) }
-		| (Array(xs)) {
+		& (Boolean(True)) { "true" }
+		& (Boolean(False)) { "false" }
+		& (Integer(x)) { int.to_string(x) }
+		& (Number(x)) { float.to_string(x) }
+		& (Text(x)) { quote(x) }
+		& (Array(xs)) {
 			collection(
 				"[",
 				"]",
@@ -486,7 +486,7 @@ render = (
 				formatted,
 			)
 		}
-		| (Object(xs)) {
+		& (Object(xs)) {
 			collection(
 				"{",
 				"}",
@@ -495,7 +495,7 @@ render = (
 					string.concat(
 						[
 							quote(k),
-							{ formatted } |> (True) { ": " } | (False) { ":" },
+							{ formatted } |> (True) { ": " } & (False) { ":" },
 							render(v, indent, depth + 1, formatted),
 						],
 					)
@@ -517,7 +517,7 @@ collection = (
 ) -> String {
 	{ xs == [] || formatted == False } |>
 		(True) { string.concat([open, string.join(xs, ","), close]) }
-		| (False) {
+		& (False) {
 			pad = string.repeat(indent, depth + 1)
 			string.concat(
 				[
@@ -538,13 +538,13 @@ quote = (s : String) -> String {
 		x = core.codepoint_to_int(cp)
 		x |>
 			(34) { #"\""# }
-			| (92) { #"\\"# }
-			| (8) { #"\b"# }
-			| (9) { #"\t"# }
-			| (10) { #"\n"# }
-			| (12) { #"\f"# }
-			| (13) { #"\r"# }
-			| (n ? n < 32) {
+			& (92) { #"\\"# }
+			& (8) { #"\b"# }
+			& (9) { #"\t"# }
+			& (10) { #"\n"# }
+			& (12) { #"\f"# }
+			& (13) { #"\r"# }
+			& (n ? n < 32) {
 				string.concat(
 					[
 						#"\u00"#,
@@ -552,13 +552,13 @@ quote = (s : String) -> String {
 					],
 				)
 			}
-			| (_) { core.from_codepoints([cp]) }
+			& (_) { core.from_codepoints([cp]) }
 	})
 	string.concat(["\"", string.concat(pieces), "\""])
 }
 
 hex_char = (n : Int) -> Int {
-	{ n < 10 } |> (True) { n + 48 } | (False) { n + 87 }
+	{ n < 10 } |> (True) { n + 48 } & (False) { n + 87 }
 }
 
 /// Reports failure through `Fail(JsonError)`.

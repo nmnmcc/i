@@ -117,7 +117,7 @@ sample = <A>(gen : Gen(A), size : Int, random : random.Generator) -> Option(
 	draw(nonnegative(size), random)
 }
 
-nonnegative = (n : Int) -> Int { { n < 0 } |> (True) { 0 } | (False) { n } }
+nonnegative = (n : Int) -> Int { { n < 0 } |> (True) { 0 } & (False) { n } }
 
 /// The root is computed now; children are deferred until requested.
 tree = <A>(value : A, children : () -> List(Tree(A))) -> Tree(A) {
@@ -141,7 +141,7 @@ map = <A, B>(gen : Gen(A), with : (A) -> B) -> Gen(B) {
 	Gen((s, g) {
 		sample(gen, s, g) |>
 			(None) { None }
-			| (Some(t)) { Some(map_tree(t, with)) }
+			& (Some(t)) { Some(map_tree(t, with)) }
 	})
 }
 
@@ -174,7 +174,7 @@ bind_outer = <A, B>(
 ) -> Option(Tree(B)) {
 	sample(with(outer.value), size, right) |>
 		(None) { None }
-		| (Some(inner)) { Some(bind_node(outer, inner, with, size, right)) }
+		& (Some(inner)) { Some(bind_node(outer, inner, with, size, right)) }
 }
 
 /// Splits once. Outer shrinks regenerate the dependent tree on the same right
@@ -185,7 +185,7 @@ flat_map = <A, B>(gen : Gen(A), with : (A) -> Gen(B)) -> Gen(B) {
 		(left, right) = random.split(g)
 		sample(gen, s, left) |>
 			(None) { None }
-			| (Some(t)) { bind_outer(t, with, s, right) }
+			& (Some(t)) { bind_outer(t, with, s, right) }
 	})
 }
 
@@ -197,7 +197,7 @@ pair = <A, B>(first : Gen(A), second : Gen(B)) -> Gen((A, B)) {
 filter_tree = <A>(t : Tree(A), keeping : (A) -> Bool) -> Option(Tree(A)) {
 	keeping(t.value) |>
 		(False) { None }
-		| (True) {
+		& (True) {
 			Some(
 				Tree(
 					value = t.value,
@@ -216,7 +216,7 @@ filter = <A>(gen : Gen(A), keeping : (A) -> Bool) -> Gen(A) {
 	Gen((s, g) {
 		sample(gen, s, g) |>
 			(None) { None }
-			| (Some(t)) { filter_tree(t, keeping) }
+			& (Some(t)) { filter_tree(t, keeping) }
 	})
 }
 
@@ -235,13 +235,13 @@ resize = <A>(gen : Gen(A), size : Int) -> Gen(A) {
 draw_int = (g : random.Generator, below : Int) -> Option(Int) {
 	fail.catch(() { random.int(g, below) }) |>
 		(Ok((value, _))) { Some(value) }
-		| (Error(_)) { None }
+		& (Error(_)) { None }
 }
 
 at_path = (g : random.Generator, path : List(Int)) -> Option(random.Generator) {
 	fail.catch(() { random.at_path(g, path) }) |>
 		(Ok(next)) { Some(next) }
-		| (Error(_)) { None }
+		& (Error(_)) { None }
 }
 
 integer_tree = (x : Int, target : Int) -> Tree(Int) {
@@ -250,11 +250,11 @@ integer_tree = (x : Int, target : Int) -> Tree(Int) {
 		children = () {
 			{ x == target } |>
 				(True) { [] }
-				| (False) {
+				& (False) {
 					halves = (q : Int, acc : List(Int)) -> List(Int) {
 						q |>
 							(0) { lists.reverse(acc) }
-							| (_) { halves(q / 2, [x - q, ..acc]) }
+							& (_) { halves(q / 2, [x - q, ..acc]) }
 					}
 					values = lists.unique(
 						[target, ..halves({ x - target } / 2, [])],
@@ -268,15 +268,15 @@ integer_tree = (x : Int, target : Int) -> Tree(Int) {
 _int_result = (min : Int, max : Int) -> Result(Gen(Int), BuildError) {
 	{ min > max } |>
 		(True) { Error(InvalidRange(min, max)) }
-		| (False) {
+		& (False) {
 			target = { min > 0 } |>
 				(True) { min }
-				| (False) { { max < 0 } |> (True) { max } | (False) { 0 } }
+				& (False) { { max < 0 } |> (True) { max } & (False) { 0 } }
 			Ok(
 				Gen((_, g) {
 					draw_int(g, max - min + 1) |>
 						(None) { None }
-						| (Some(value)) {
+						& (Some(value)) {
 							Some(integer_tree(min + value, target))
 						}
 				}),
@@ -288,7 +288,7 @@ _int_result = (min : Int, max : Int) -> Result(Gen(Int), BuildError) {
 range = (min : Int, max : Int) -> Gen(Int) {
 	_int_result(min, max) |>
 		(Ok(gen)) { gen }
-		| (Error(_)) { Gen((_, _) { None }) }
+		& (Error(_)) { Gen((_, _) { None }) }
 }
 
 /// True shrinks to False.
@@ -297,14 +297,14 @@ bool = () -> Gen(Bool) { map(range(0, 1), (n) { n == 1 }) }
 _element_result = <A>(choices : List(A)) -> Result(Gen(A), BuildError) {
 	choices |>
 		([]) { Error(EmptyChoice) }
-		| ([first, .._]) {
+		& ([first, .._]) {
 			Ok(
 				map(
 					range(0, lists.length(choices) - 1),
 					(index) {
 						lists.at(choices, index) |>
 							(Some(value)) { value }
-							| (None) { first }
+							& (None) { first }
 					},
 				),
 			)
@@ -321,14 +321,14 @@ list_tree = <A>(items : List(Tree(A)), min : Int) -> Tree(List(A)) {
 			) {
 				{ k == 0 } |>
 					(True) { lists.reverse(acc) }
-					| (False) {
+					& (False) {
 						starts = (
 							start : Int,
 							out : List(Tree(List(A)))
 						) -> List(Tree(List(A))) {
 							{ start + k > n || n - k < min } |>
 								(True) { out }
-								| (False) {
+								& (False) {
 									starts(
 										start + k,
 										[
@@ -355,7 +355,7 @@ list_tree = <A>(items : List(Tree(A)), min : Int) -> Tree(List(A)) {
 			) {
 				rest |>
 					([]) { [] }
-					| ([t, ..tail]) {
+					& ([t, ..tail]) {
 						lists.append(
 							lists.map(t.children(), (c) {
 								list_tree(
@@ -385,13 +385,13 @@ draw_items = <A>(
 ) -> Option(List(Tree(A))) {
 	{ index == n } |>
 		(True) { Some(lists.reverse(acc)) }
-		| (False) {
+		& (False) {
 			at_path(g, [index + 1]) |>
 				(None) { None }
-				| (Some(next)) {
+				& (Some(next)) {
 					sample(of, size, next) |>
 						(None) { None }
-						| (Some(t)) {
+						& (Some(t)) {
 							draw_items(of, n, size, g, index + 1, [t, ..acc])
 						}
 				}
@@ -404,21 +404,21 @@ _list_result = <A>(of : Gen(A), min : Int, max : Int) -> Result(
 ) {
 	{ min < 0 || max < min } |>
 		(True) { Error(InvalidLength(min, max)) }
-		| (False) {
+		& (False) {
 			Ok(
 				Gen((s, g) {
 					upper = { s < min } |>
 						(True) { min }
-						| (False) {
-							{ s > max } |> (True) { max } | (False) { s }
+						& (False) {
+							{ s > max } |> (True) { max } & (False) { s }
 						}
 					(left, right) = random.split(g)
 					draw_int(left, upper - min + 1) |>
 						(None) { None }
-						| (Some(n)) {
+						& (Some(n)) {
 							draw_items(of, n + min, s, right, 0, []) |>
 								(None) { None }
-								| (Some(items)) { Some(list_tree(items, min)) }
+								& (Some(items)) { Some(list_tree(items, min)) }
 						}
 				}),
 			)
@@ -442,17 +442,17 @@ utf_codepoint = () -> Gen(UtfCodepoint) {
 	Gen((s, g) {
 		sample(range(0, 0x10f7ff), s, g) |>
 			(None) { None }
-			| (Some(t)) {
+			& (Some(t)) {
 				convert = (rank : Int) -> UtfCodepoint {
 					n = { rank >= 0xd800 } |>
 						(True) { rank + 0x800 }
-						| (False) { rank }
+						& (False) { rank }
 					core.int_to_codepoint(n) |>
 						(Ok(c)) { c }
-						| (Error(_)) {
+						& (Error(_)) {
 							core.int_to_codepoint(0) |>
 								(Ok(c)) { c }
-								| (Error(_)) { convert(0) }
+								& (Error(_)) { convert(0) }
 						}
 				}
 				Some(map_tree(t, convert))
@@ -463,7 +463,7 @@ utf_codepoint = () -> Gen(UtfCodepoint) {
 _string_result = (max_length : Int) -> Result(Gen(String), BuildError) {
 	_list_result(utf_codepoint(), 0, max_length) |>
 		(Error(e)) { Error(e) }
-		| (Ok(gen)) { Ok(map(gen, core.from_codepoints)) }
+		& (Ok(gen)) { Ok(map(gen, core.from_codepoints)) }
 }
 
 shrink = <A>(
@@ -476,7 +476,7 @@ shrink = <A>(
 ) -> (Tree(A), String, List(Int), Int, Bool) {
 	{ left == 0 } |>
 		(True) { (current, reason, lists.reverse(path), checked, True) }
-		| (False) {
+		& (False) {
 			scan(
 				current,
 				reason,
@@ -502,10 +502,10 @@ scan = <A>(
 ) -> (Tree(A), String, List(Int), Int, Bool) {
 	{ left == 0 } |>
 		(True) { (current, reason, lists.reverse(path), checked, True) }
-		| (False) {
+		& (False) {
 			children |>
 				([]) { (current, reason, lists.reverse(path), checked, False) }
-				| ([c, ..rest]) {
+				& ([c, ..rest]) {
 					property(c.value) |>
 						(Fail(next_reason)) {
 							shrink(
@@ -517,7 +517,7 @@ scan = <A>(
 								property,
 							)
 						}
-						| (_) {
+						& (_) {
 							scan(
 								current,
 								reason,
@@ -544,14 +544,14 @@ attempts = <A>(
 ) -> Report(A) {
 	{ successes == config.cases } |>
 		(True) { Passed(successes = successes, discards = discards) }
-		| (False) {
+		& (False) {
 			{ discards > config.max_discards } |>
 				(True) { GaveUp(successes = successes, discards = discards) }
-				| (False) {
+				& (False) {
 					size = attempt % { config.max_size + 1 }
 					drawn = at_path(random.from_seed(seed), [attempt + 1]) |>
 						(None) { None }
-						| (Some(g)) { sample(gen, size, g) }
+						& (Some(g)) { sample(gen, size, g) }
 					drawn |>
 						(None) {
 							attempts(
@@ -564,7 +564,7 @@ attempts = <A>(
 								discards + 1,
 							)
 						}
-						| (Some(t)) {
+						& (Some(t)) {
 							property(t.value) |>
 								(Pass) {
 									attempts(
@@ -577,7 +577,7 @@ attempts = <A>(
 										discards,
 									)
 								}
-								| (Discard) {
+								& (Discard) {
 									attempts(
 										gen,
 										config,
@@ -588,7 +588,7 @@ attempts = <A>(
 										discards + 1,
 									)
 								}
-								| (Fail(reason)) {
+								& (Fail(reason)) {
 									(
 										small,
 										why,
@@ -631,22 +631,22 @@ check = <A>(gen : Gen(A), config : Config, property : (A) -> Verdict) -> Report(
 ) {
 	{ config.cases <= 0 } |>
 		(True) { InvalidConfig("cases must be positive") }
-		| (False) {
+		& (False) {
 			{ config.max_size < 0 } |>
 				(True) { InvalidConfig("max_size must be nonnegative") }
-				| (False) {
+				& (False) {
 					{ config.max_discards < 0 } |>
 						(True) {
 							InvalidConfig("max_discards must be nonnegative")
 						}
-						| (False) {
+						& (False) {
 							{ config.max_shrinks < 0 } |>
 								(True) {
 									InvalidConfig(
 										"max_shrinks must be nonnegative",
 									)
 								}
-								| (False) {
+								& (False) {
 									attempts(
 										gen,
 										config,
@@ -668,10 +668,10 @@ check = <A>(gen : Gen(A), config : Config, property : (A) -> Verdict) -> Report(
 follow = <A>(t : Tree(A), path : List(Int)) -> Option(A) {
 	path |>
 		([]) { Some(t.value) }
-		| ([index, ..rest]) {
+		& ([index, ..rest]) {
 			lists.at(t.children(), index) |>
 				(None) { None }
-				| (Some(c)) { follow(c, rest) }
+				& (Some(c)) { follow(c, rest) }
 		}
 }
 
@@ -686,13 +686,13 @@ replay = <A>(
 ) -> Option(A) {
 	{ attempt < 0 || size < 0 || lists.any(path, (i) { i < 0 }) } |>
 		(True) { None }
-		| (False) {
+		& (False) {
 			at_path(random.from_seed(seed), [attempt + 1]) |>
 				(None) { None }
-				| (Some(g)) {
+				& (Some(g)) {
 					sample(gen, size, g) |>
 						(None) { None }
-						| (Some(t)) { follow(t, path) }
+						& (Some(t)) { follow(t, path) }
 				}
 		}
 }
@@ -708,16 +708,16 @@ format = <A>(report : Report(A), show : (A) -> String) -> String {
 				"; discards: " <>
 				core.inspect(d)
 		}
-		| (GaveUp(successes = n, discards = d)) {
+		& (GaveUp(successes = n, discards = d)) {
 			"std/property v1: gave up; successes: " <>
 				core.inspect(n) <>
 				"; discards: " <>
 				core.inspect(d)
 		}
-		| (InvalidConfig(message)) {
+		& (InvalidConfig(message)) {
 			"std/property v1: invalid config; " <> message
 		}
-		| (Falsified(f)) {
+		& (Falsified(f)) {
 			core.concat(
 				[
 					"std/property v1: falsified\nseed: ",
@@ -755,11 +755,11 @@ test = <A>(
 	report = check(gen, config, (value) {
 		assertion.catch(() { property(value) }) |>
 			(Ok(Nil)) { Pass }
-			| (Error(failure)) { Fail(failure.message) }
+			& (Error(failure)) { Fail(failure.message) }
 	})
 	report |>
 		(Passed(..)) { Nil }
-		| (_) { a.fail(AssertionFailure(message = format(report, show))) }
+		& (_) { a.fail(AssertionFailure(message = format(report, show))) }
 }
 
 /// Uniform inclusive range under the uniform-word model. Shrinks toward zero

@@ -130,10 +130,10 @@ cancel : (Ticket) -> Nil
 state = <A>(r : Request(A)) -> RequestState(A) {
 	read_state(r) |>
 		(Ok(value)) { Ready(value) }
-		| (Error(0)) { Waiting }
-		| (Error(1)) { Cancelled }
-		| (Error(2)) { Taken }
-		| (Error(_)) { panic("request: invalid state") }
+		& (Error(0)) { Waiting }
+		& (Error(1)) { Cancelled }
+		& (Error(2)) { Taken }
+		& (Error(_)) { panic("request: invalid state") }
 }
 
 /// Borrows the producer; cancelling this waiter does not cancel its work.
@@ -141,7 +141,7 @@ await = (r) <- (waiter : Await) {
 	waiter.wait(ticket(r))
 	state(r) |>
 		(Waiting) { panic("request: wait returned early") }
-		| (_) { take(r) }
+		& (_) { take(r) }
 }
 
 /// Owns a non-resource-producing operation through all exits.
@@ -178,20 +178,20 @@ _entry = (body) {
 _provider_root = (seeds : List(Root), key : Key(Nil)) -> Root {
 	seeds |>
 		([root]) { root }
-		| ([]) { Root(key = key) }
-		| (_) { panic("provider: invalid root seed") }
+		& ([]) { Root(key = key) }
+		& (_) { panic("provider: invalid root seed") }
 }
 
 _provider_owner = (seeds : List(Owner)) <- (root : Root) -> Owner {
 	seeds |>
 		([owner]) { owner }
-		| ([]) { Owner(key = new_owner(root.key), root = root) }
-		| (_) { panic("provider: invalid owner seed") }
+		& ([]) { Owner(key = new_owner(root.key), root = root) }
+		& (_) { panic("provider: invalid owner seed") }
 }
 
 _provider_await = (seeds : List(Await)) -> Await {
 	seeds |>
 		([waiter]) { waiter }
-		| ([]) { Await(wait = (r) { wait_any([r]) }) }
-		| (_) { panic("provider: invalid await seed") }
+		& ([]) { Await(wait = (r) { wait_any([r]) }) }
+		& (_) { panic("provider: invalid await seed") }
 }

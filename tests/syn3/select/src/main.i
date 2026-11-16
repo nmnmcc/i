@@ -15,26 +15,26 @@ Option(A) = Some(A) | None
 
 show =
 	(n : Int) -> String { core.inspect(n) }
-	| (s : String) -> Int { 7 }
-	| (a : Int, b : Int) -> Bool { a == b }
-	| (host : String, port = p : Int) -> Conn { Conn(host = host, port = p) }
+	& (s : String) -> Int { 7 }
+	& (a : Int, b : Int) -> Bool { a == b }
+	& (host : String, port = p : Int) -> Conn { Conn(host = host, port = p) }
 
-gcd = (a : Int, 0) -> Int { a } | (a : Int, b : Int) -> Int { gcd(b, a % b) }
+gcd = (a : Int, 0) -> Int { a } & (a : Int, b : Int) -> Int { gcd(b, a % b) }
 
 /// `None` has a branch because the transition checker reads `Some(A)` and
 /// `None` as the constructors of `Option(A)`, which a group must cover.
-f = (Some(0)) { "zero" } | (Some(n)) { n } | (None) { "none" }
+f = (Some(0)) { "zero" } & (Some(n)) { n } & (None) { "none" }
 
-first = (x : Int) { "a" } | (x : { Int | String }) { 1 }
+first = (x : Int) { "a" } & (x : { Int | String }) { 1 }
 
-guarded = (x : Int ? x > 0) { "a" } | (x : { Int | String }) { 1 }
+guarded = (x : Int ? x > 0) { "a" } & (x : { Int | String }) { 1 }
 
 /// One branch with a type parameter: each shape group is generalized by
 /// itself.
-pick = <A>(x : A) { x } | (x : Int, y : Int) { y }
+pick = <A>(x : A) { x } & (x : Int, y : Int) { y }
 
 map = <A, B>(xs : List(A), g : (A) -> B) -> List(B) {
-	xs |> ([]) { [] } | ([x, ..rest]) { [g(x), ..map(rest, g)] }
+	xs |> ([]) { [] } & ([x, ..rest]) { [g(x), ..map(rest, g)] }
 }
 
 apply = <A, B>(g : (A) -> B, x : A) -> B { g(x) }

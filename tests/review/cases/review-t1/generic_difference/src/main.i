@@ -1,5 +1,5 @@
 drop = <A>(x : { A | 0 }) -> A - 0 {
-	x |> (0) { panic("zero") } | (rest) { rest }
+	x |> (0) { panic("zero") } & (rest) { rest }
 }
 f = (x : Int) { drop(x) }
 g = (x : { "a" | "b" }) { drop(x) }

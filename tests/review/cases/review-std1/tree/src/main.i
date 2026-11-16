@@ -16,10 +16,10 @@ map_node = (node : Node(a), with : (a) <- (Fail(e)) -> b) -> Node(b) {
 	case
 	node
 	(Leaf(x)) { Leaf(with(x)) }
-		| (Branch2(m, x, y)) {
+		& (Branch2(m, x, y)) {
 			Branch2(m, map_node(x, with), map_node(y, with))
 		}
-		| (Branch3(m, x, y, z)) {
+		& (Branch3(m, x, y, z)) {
 			Branch3(m, map_node(x, with), map_node(y, with), map_node(z, with))
 		}
 }
@@ -27,11 +27,11 @@ map_digit = (digit : Digit(a), with : (a) <- (Fail(e)) -> b) -> Digit(b) {
 	case
 	digit
 	(One(x)) { One(map_node(x, with)) }
-		| (Two(x, y)) { Two(map_node(x, with), map_node(y, with)) }
-		| (Three(x, y, z)) {
+		& (Two(x, y)) { Two(map_node(x, with), map_node(y, with)) }
+		& (Three(x, y, z)) {
 			Three(map_node(x, with), map_node(y, with), map_node(z, with))
 		}
-		| (Four(w, x, y, z)) {
+		& (Four(w, x, y, z)) {
 			Four(
 				map_node(w, with),
 				map_node(x, with),
@@ -44,8 +44,8 @@ map_tree = (tree : Tree(a), with : (a) <- (Fail(e)) -> b) -> Tree(b) {
 	case
 	tree
 	(EmptyTree) { EmptyTree }
-		| (Single(x)) { Single(map_node(x, with)) }
-		| (Deep(m, l, mid, r)) {
+		& (Single(x)) { Single(map_node(x, with)) }
+		& (Deep(m, l, mid, r)) {
 			Deep(m, map_digit(l, with), map_tree(mid, with), map_digit(r, with))
 		}
 }

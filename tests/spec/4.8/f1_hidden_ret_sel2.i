@@ -5,7 +5,7 @@
 (i/stdio, core = i/core)
 (main)
 make = <S>(start: S) -> ((S) -> S) -> S { (step) { step(start) } }
-choose = (x: String) { "wrong" } | (x: { Int | String }) { 1 }
+choose = (x: String) { "wrong" } & (x: { Int | String }) { 1 }
 main = () {
   m = make(0)
   n: Int = choose(m((x) { "s" }))

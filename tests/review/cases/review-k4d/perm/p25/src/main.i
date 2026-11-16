@@ -22,7 +22,7 @@ S(N) = (f = () <- N -> Int)
 
 loop = (x) { x(x) }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 run = <A, N>(body : () <- N -> A) { body() }
 

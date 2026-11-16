@@ -13,11 +13,11 @@ open = (host : String, port : Int) -> Conn { Conn(host = host, port = port) }
 
 connect =
 	(host : String) -> Conn { connect(host, port = 80) }
-	| (host : String, port = p : Int) -> Conn { open(host, p) }
+	& (host : String, port = p : Int) -> Conn { open(host, p) }
 
 area =
 	(r : Float) -> Float { 3.0 *. r *. r }
-	| (w : Float, h : Float) -> Float { w *. h }
+	& (w : Float, h : Float) -> Float { w *. h }
 
 /// One shape with a label: the label is part of the shape.
 scale = (x : Int, by = k : Int) -> Int { x * k }
@@ -25,9 +25,9 @@ scale = (x : Int, by = k : Int) -> Int { x * k }
 /// Groups are kept apart by shape; inside a group the first match wins.
 describe =
 	(0) { "zero" }
-	| (a : Int, b : Int) { "pair \(core.inspect(a + b))" }
-	| (n : Int) { "one \(core.inspect(n))" }
-	| () { "none" }
+	& (a : Int, b : Int) { "pair \(core.inspect(a + b))" }
+	& (n : Int) { "one \(core.inspect(n))" }
+	& () { "none" }
 
 show = (c : Conn) -> String { "\(c.host):\(core.inspect(c.port))" }
 
@@ -62,7 +62,7 @@ main = () <- (io : Io) {
 		show(c("c.com", port = 1)),
 	)
 	// A local chain.
-	twice = (x : Int) { x * 2 } | (x : Int, y : Int) { { x + y } * 2 }
+	twice = (x : Int) { x * 2 } & (x : Int, y : Int) { { x + y } * 2 }
 	io.print(
 		core.inspect(twice(4) + twice(1, 2)),
 	)

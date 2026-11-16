@@ -14,7 +14,7 @@ use = <N>() <- (s : S(N)) {
 	f()
 }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 both : <N>() <- (Fail(Never), S(N), T(Int, N), ..N) -> Int = () <- (
 	fail : Fail(Never),

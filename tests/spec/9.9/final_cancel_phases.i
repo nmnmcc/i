@@ -52,14 +52,14 @@ probe = (phase : Int, typed : Bool) {
 									task.send(started, Nil)
 									task.receive(never)
 								}
-								| (_) { Nil }
+								& (_) { Nil }
 							typed |>
 								(True) { fail.raise("child") }
-								| (False) { Nil }
+								& (False) { Nil }
 						},
 						() {
 							print("start")
-							phase |> (1) { task.send(gate, Nil) } | (_) { Nil }
+							phase |> (1) { task.send(gate, Nil) } & (_) { Nil }
 							resource.ensure(
 								() { task.yield() },
 								() {
@@ -78,8 +78,8 @@ probe = (phase : Int, typed : Bool) {
 			// cancellation"; the child says it started before the parent fails.
 			phase |>
 				(0) { task.receive(started) }
-				| (1) { task.receive(gate) }
-				| (_) { task.join(child) }
+				& (1) { task.receive(gate) }
+				& (_) { task.join(child) }
 			fail.raise("parent")
 		})
 	})

@@ -3,7 +3,7 @@ Schema(A) = (decode = () -> A)
 make = (c : Bool) {
 	c |>
 		(True) { Schema(decode = () { (a = 1) }) }
-		| (False) { Schema(decode = () { (a = "x") }) }
+		& (False) { Schema(decode = () { (a = "x") }) }
 }
 schema = make(True)
 Schema(Row) = schema

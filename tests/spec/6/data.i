@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -74,7 +74,7 @@ test("fields_on_unions", () {
 			check(show(r.width), "2.0")
 			check(show(s.width), "4.0")
 		}
-		| (_) { panic("no") }
+		& (_) { panic("no") }
 })
 
 Small = (size = Int)
@@ -85,7 +85,7 @@ sizes = (xs : List(Sized)) -> List(Int) {
 	xs |>
 		([]) { [] }
 		// `size` is field 0 of `Small` and field 1 of `Big`.
-		| ([x, ..rest]) { [x.size, ..sizes(rest)] }
+		& ([x, ..rest]) { [x.size, ..sizes(rest)] }
 }
 
 test("fields_by_constructor", () {
@@ -103,8 +103,8 @@ test("known_constructor", () {
 	s = Rect(width = 1.0, height = 2.0)
 	s |>
 		(Rect(..)) { check(show(Rect(..s, height = 9.0)), "Rect(height = 9.0, width = 1.0)") }
-		| (_) { panic("no") }
+		& (_) { panic("no") }
 	Circle(radius = 1.5) |>
 		(Circle(..) = c) { check(show(c.radius), "1.5") }
-		| (_) { panic("no") }
+		& (_) { panic("no") }
 })

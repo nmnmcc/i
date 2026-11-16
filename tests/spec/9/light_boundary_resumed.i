@@ -21,5 +21,5 @@ main = () {
 			fail.raise(1)
 		})
 	})
-	r |> (Ok(later)) { later() } | (Error(_)) { Nil }
+	r |> (Ok(later)) { later() } & (Error(_)) { Nil }
 }

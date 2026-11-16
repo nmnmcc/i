@@ -14,7 +14,7 @@ bind = (x : { Box(Int) | Nil } & Box(Int)) {
 field = (x : { Box(Int) | Nil } & Box(Int)) { x.item }
 
 with_var = <A>(x : A & { Box(Int) | Nil }) {
-	x |> (Box(item = item)) { item } | (Nil) { 0 }
+	x |> (Box(item = item)) { item } & (Nil) { 0 }
 }
 
 empty = (x : { Box(Int) | Nil } & String) { x }

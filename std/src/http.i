@@ -156,16 +156,16 @@ header = (hs : AnyHeaders, name : String) -> Option(String) {
 				(Some(value)) {
 					fail.catch(() { bit_array.to_string(value) }) |>
 						(Ok(text)) { Some(text) }
-						| (Error(_)) { None }
+						& (Error(_)) { None }
 				}
-				| (None) { None }
+				& (None) { None }
 		}
-		| (Headers(xs)) {
+		& (Headers(xs)) {
 			list.find_map(xs, (pair) {
 				(k, v) = pair
 				{ lowercase(k) == lowercase(name) } |>
 					(True) { Some(v) }
-					| (False) { None }
+					& (False) { None }
 			})
 		}
 }
@@ -177,15 +177,15 @@ header_bytes = (hs : AnyHeaders, name : String) -> Option(BitArray) {
 				(k, v) = pair
 				{ lowercase(k) == lowercase(name) } |>
 					(True) { Some(<<v:utf8>>) }
-					| (False) { None }
+					& (False) { None }
 			})
 		}
-		| (RawHeaders(xs)) {
+		& (RawHeaders(xs)) {
 			list.find_map(xs, (pair) {
 				(k, v) = pair
 				{ lowercase(k) == lowercase(name) } |>
 					(True) { Some(v) }
-					| (False) { None }
+					& (False) { None }
 			})
 		}
 }
@@ -199,12 +199,12 @@ headers = (hs : AnyHeaders, name : String) -> List(String) {
 					(True) {
 						fail.catch(() { bit_array.to_string(v) }) |>
 							(Ok(value)) { Some(value) }
-							| (Error(_)) { None }
+							& (Error(_)) { None }
 					}
-					| (False) { None }
+					& (False) { None }
 			})
 		}
-		| (Headers(xs)) {
+		& (Headers(xs)) {
 			list.map(list.filter(xs, (pair) {
 				(k, _) = pair
 				lowercase(k) == lowercase(name)
@@ -218,7 +218,7 @@ headers = (hs : AnyHeaders, name : String) -> List(String) {
 add_header = (hs : AnyHeaders, name : String, value : String) -> AnyHeaders {
 	hs |>
 		(Headers(xs)) { Headers(list.append(xs, [(name, value)])) }
-		| (RawHeaders(xs)) {
+		& (RawHeaders(xs)) {
 			RawHeaders(list.append(xs, [(name, <<value:utf8>>)]))
 		}
 }
@@ -236,16 +236,16 @@ feed_request = (buffer : BitArray, bytes : BitArray) -> Progress(Request) {
 	input = bit_array.concat([buffer, bytes])
 	fail.catch(() { parse_request(octets(input)) }) |>
 		(Ok((message, rest))) { Complete(message, bits(rest)) }
-		| (Error(NeedMore)) { More(input) }
-		| (Error(BadMessage(why))) { Invalid(why) }
+		& (Error(NeedMore)) { More(input) }
+		& (Error(BadMessage(why))) { Invalid(why) }
 }
 
 feed_response = (buffer : BitArray, bytes : BitArray) -> Progress(Response) {
 	input = bit_array.concat([buffer, bytes])
 	fail.catch(() { parse_response(octets(input)) }) |>
 		(Ok((message, rest))) { Complete(message, bits(rest)) }
-		| (Error(NeedMore)) { More(input) }
-		| (Error(BadMessage(why))) { Invalid(why) }
+		& (Error(NeedMore)) { More(input) }
+		& (Error(BadMessage(why))) { Invalid(why) }
 }
 
 /// Parse a response with its request method and whether the connection ended.
@@ -262,8 +262,8 @@ feed_response_for = (
 		parse_response_for(octets(input), method, eof)
 	}) |>
 		(Ok((message, rest))) { Complete(message, bits(rest)) }
-		| (Error(NeedMore)) { More(input) }
-		| (Error(BadMessage(why))) { Invalid(why) }
+		& (Error(NeedMore)) { More(input) }
+		& (Error(BadMessage(why))) { Invalid(why) }
 }
 
 feed_request_limit = (
@@ -277,21 +277,21 @@ feed_request_limit = (
 		parse_request(octets(input))
 	}) |>
 		(Ok((message, rest))) { Complete(message, bits(rest)) }
-		| (Error(NeedMore)) { More(input) }
-		| (Error(BadMessage(why))) { Invalid(why) }
+		& (Error(NeedMore)) { More(input) }
+		& (Error(BadMessage(why))) { Invalid(why) }
 }
 
 check_head = (xs : List(Int), limit : Int) -> Nil {
 	go = (rest : List(Int), count : Int) -> Nil {
 		{ count > limit } |>
 			(True) { fail.raise(BadMessage("head too large")) }
-			| (False) {
+			& (False) {
 				rest |>
 					([13, 10, 13, 10, .._]) {
 						require(count + 4 <= limit, "head too large")
 					}
-					| ([_, ..tail]) { go(tail, count + 1) }
-					| ([]) { Nil }
+					& ([_, ..tail]) { go(tail, count + 1) }
+					& ([]) { Nil }
 			}
 	}
 	go(xs, 0)
@@ -332,7 +332,7 @@ parse_request_head = (xs : List(Int)) -> (Request, List(Int)) {
 				after,
 			)
 		}
-		| (_) { fail.raise(BadMessage("invalid request line")) }
+		& (_) { fail.raise(BadMessage("invalid request line")) }
 }
 
 parse_response = (xs : List(Int)) -> (Response, List(Int)) {
@@ -349,7 +349,7 @@ parse_response_for = (xs : List(Int), method : Method, eof : Bool) -> (
 			[72, 84, 84, 80, 47, 49, 46, 49, 32, a, b, c, 32, ..phrase]
 			? digit(a) && digit(b) && digit(c)
 		) { (a, b, c, phrase) }
-		| (_) { fail.raise(BadMessage("invalid status line")) }
+		& (_) { fail.raise(BadMessage("invalid status line")) }
 	(a, b, c, phrase) = raw
 	require(list.all(phrase, field_value), "invalid reason phrase")
 	(hs, after) = read_headers(rest, [])
@@ -364,7 +364,7 @@ parse_response_for = (xs : List(Int), method : Method, eof : Bool) -> (
 			verb == "CONNECT" && code >= 200 && code < 300
 	} |>
 		(True) { (<<>>, Headers([]), after) }
-		| (False) {
+		& (False) {
 			{
 				headers(hs, "content-length") == [] &&
 					list.last(transfer_codings(hs)) != Some("chunked")
@@ -372,9 +372,9 @@ parse_response_for = (xs : List(Int), method : Method, eof : Bool) -> (
 				(True) {
 					eof |>
 						(True) { (bits(after), Headers([]), []) }
-						| (False) { fail.raise(NeedMore) }
+						& (False) { fail.raise(NeedMore) }
 				}
-				| (False) { read_body(hs, after) }
+				& (False) { read_body(hs, after) }
 		}
 	(
 		Response(
@@ -395,7 +395,7 @@ read_headers = (xs : List(Int), acc : List((String, BitArray))) -> (
 	(head, rest) = line(xs)
 	head |>
 		([]) { (make_headers(list.reverse(acc)), rest) }
-		| (_) {
+		& (_) {
 			(name, value, found) = cut(head, 58)
 			require(
 				found && name != [] && list.all(name, token),
@@ -414,11 +414,11 @@ make_headers = (xs : List((String, BitArray))) -> AnyHeaders {
 		(name, value) = pair
 		fail.catch(() { bit_array.to_string(value) }) |>
 			(Ok(text)) { Some((name, text)) }
-			| (Error(_)) { None }
+			& (Error(_)) { None }
 	})
 	{ list.all(values, (x) { x != None }) } |>
 		(True) { Headers(list.filter_map(values, (x) { x })) }
-		| (False) { RawHeaders(xs) }
+		& (False) { RawHeaders(xs) }
 }
 
 text_unchecked = (xs : List(Int)) -> String {
@@ -427,7 +427,7 @@ text_unchecked = (xs : List(Int)) -> String {
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
 	} |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("http: invalid internal text") }
+		& (Error(_)) { panic("http: invalid internal text") }
 }
 
 validate_framing = (hs : AnyHeaders) -> Nil {
@@ -455,11 +455,11 @@ validate_framing = (hs : AnyHeaders) -> Nil {
 				require(
 					fail.catch(() { bit_array.to_string(value) }) |>
 						(Ok(_)) { True }
-						| (Error(_)) { False },
+						& (Error(_)) { False },
 					"invalid framing field",
 				)
 			}
-			| (False) { Nil }
+			& (False) { Nil }
 	})
 	lengths = list.concat(
 		list.map(headers(hs, "content-length"), (value) {
@@ -474,7 +474,7 @@ validate_framing = (hs : AnyHeaders) -> Nil {
 	)
 	lengths |>
 		([]) { Nil }
-		| ([first, ..others]) {
+		& ([first, ..others]) {
 			require(
 				list.all(others, (x) { x == first }),
 				"differing content-length",
@@ -504,7 +504,7 @@ read_body = (hs : AnyHeaders, xs : List(Int)) -> (
 		([]) {
 			lengths |>
 				([]) { (<<>>, Headers([]), xs) }
-				| ([n, ..others]) {
+				& ([n, ..others]) {
 					size = parse_length(n)
 					list.each(others, (value) {
 						require(
@@ -516,7 +516,7 @@ read_body = (hs : AnyHeaders, xs : List(Int)) -> (
 					(bits(part), Headers([]), rest)
 				}
 		}
-		| (_) {
+		& (_) {
 			codings = transfer_codings(hs)
 			require(
 				list.last(codings) == Some("chunked"),
@@ -559,7 +559,7 @@ parse_length = (value : String) -> Int {
 	require(raw != [] && list.all(raw, digit), "invalid content-length")
 	fail.catch(() { int.parse(value) }) |>
 		(Ok(size)) { size }
-		| (Error(_)) { fail.raise(BadMessage("invalid content-length")) }
+		& (Error(_)) { fail.raise(BadMessage("invalid content-length")) }
 }
 
 chunks = (xs : List(Int), acc : List(BitArray)) -> (
@@ -575,13 +575,13 @@ chunks = (xs : List(Int), acc : List(BitArray)) -> (
 			valid_trailers(trailers)
 			(bit_array.concat(list.reverse(acc)), trailers, tail)
 		}
-		| (False) {
+		& (False) {
 			(part, tail) = take(rest, size, [])
 			tail |>
 				([13, 10, ..after]) { chunks(after, [bits(part), ..acc]) }
-				| ([]) { fail.raise(NeedMore) }
-				| ([13]) { fail.raise(NeedMore) }
-				| (_) { fail.raise(BadMessage("invalid chunk terminator")) }
+				& ([]) { fail.raise(NeedMore) }
+				& ([13]) { fail.raise(NeedMore) }
+				& (_) { fail.raise(BadMessage("invalid chunk terminator")) }
 		}
 }
 
@@ -593,7 +593,7 @@ chunk_size = (size_line : List(Int)) -> Int {
 	require(has_extension || size_bytes == size_raw, "invalid chunk size")
 	{ has_extension } |>
 		(True) { validate_extensions(extension) }
-		| (False) { Nil }
+		& (False) { Nil }
 	require(
 		size_bytes != [] && list.all(size_bytes, (x) { hex(x) >= 0 }),
 		"invalid chunk size",
@@ -615,7 +615,7 @@ valid_trailers = (trailers : AnyHeaders) -> Nil {
 token_prefix = (xs : List(Int), acc : List(Int)) -> (List(Int), List(Int)) {
 	xs |>
 		([x, ..tail] ? token(x)) { token_prefix(tail, [x, ..acc]) }
-		| (_) { (list.reverse(acc), xs) }
+		& (_) { (list.reverse(acc), xs) }
 }
 
 validate_extensions = (xs : List(Int)) -> Nil {
@@ -624,41 +624,41 @@ validate_extensions = (xs : List(Int)) -> Nil {
 	require(name != [], "invalid chunk extension")
 	rest |>
 		([]) { require(rest == after_name, "invalid chunk extension") }
-		| ([59, ..tail]) { validate_extensions(tail) }
-		| ([61, ..raw]) {
+		& ([59, ..tail]) { validate_extensions(tail) }
+		& ([61, ..raw]) {
 			tail = list.drop_while(raw, space)
 			after_value = tail |>
 				([34, ..quoted]) { extension_quoted(quoted) }
-				| (_) {
+				& (_) {
 					(value, remaining) = token_prefix(tail, [])
 					require(value != [], "invalid chunk extension")
 					remaining
 				}
 			list.drop_while(after_value, space) |>
 				([]) { require(after_value == [], "invalid chunk extension") }
-				| ([59, ..next]) { validate_extensions(next) }
-				| (_) { fail.raise(BadMessage("invalid chunk extension")) }
+				& ([59, ..next]) { validate_extensions(next) }
+				& (_) { fail.raise(BadMessage("invalid chunk extension")) }
 		}
-		| (_) { fail.raise(BadMessage("invalid chunk extension")) }
+		& (_) { fail.raise(BadMessage("invalid chunk extension")) }
 }
 
 extension_quoted = (xs : List(Int)) -> List(Int) {
 	xs |>
 		([34, ..tail]) { tail }
-		| ([92, x, ..tail] ? field_value(x)) { extension_quoted(tail) }
-		| ([x, ..tail] ? field_value(x) && x != 92) { extension_quoted(tail) }
-		| (_) { fail.raise(BadMessage("invalid chunk extension")) }
+		& ([92, x, ..tail] ? field_value(x)) { extension_quoted(tail) }
+		& ([x, ..tail] ? field_value(x) && x != 92) { extension_quoted(tail) }
+		& (_) { fail.raise(BadMessage("invalid chunk extension")) }
 }
 
 line = (xs : List(Int)) -> (List(Int), List(Int)) {
 	go = (rest : List(Int), acc : List(Int)) -> (List(Int), List(Int)) {
 		rest |>
 			([]) { fail.raise(NeedMore) }
-			| ([13]) { fail.raise(NeedMore) }
-			| ([13, 10, ..tail]) { (list.reverse(acc), tail) }
-			| ([13, .._]) { fail.raise(BadMessage("invalid line ending")) }
-			| ([10, .._]) { fail.raise(BadMessage("invalid line ending")) }
-			| ([x, ..tail]) { go(tail, [x, ..acc]) }
+			& ([13]) { fail.raise(NeedMore) }
+			& ([13, 10, ..tail]) { (list.reverse(acc), tail) }
+			& ([13, .._]) { fail.raise(BadMessage("invalid line ending")) }
+			& ([10, .._]) { fail.raise(BadMessage("invalid line ending")) }
+			& ([x, ..tail]) { go(tail, [x, ..acc]) }
 	}
 	go(xs, [])
 }
@@ -666,10 +666,10 @@ line = (xs : List(Int)) -> (List(Int), List(Int)) {
 take = (xs : List(Int), n : Int, acc : List(Int)) -> (List(Int), List(Int)) {
 	{ n == 0 } |>
 		(True) { (list.reverse(acc), xs) }
-		| (False) {
+		& (False) {
 			xs |>
 				([x, ..tail]) { take(tail, n - 1, [x, ..acc]) }
-				| ([]) { fail.raise(NeedMore) }
+				& ([]) { fail.raise(NeedMore) }
 		}
 }
 
@@ -677,8 +677,8 @@ cut = (xs : List(Int), separator : Int) -> (List(Int), List(Int), Bool) {
 	go = (rest, acc) {
 		rest |>
 			([]) { (list.reverse(acc), [], False) }
-			| ([x, ..tail] ? x == separator) { (list.reverse(acc), tail, True) }
-			| ([x, ..tail]) { go(tail, [x, ..acc]) }
+			& ([x, ..tail] ? x == separator) { (list.reverse(acc), tail, True) }
+			& ([x, ..tail]) { go(tail, [x, ..acc]) }
 	}
 	go(xs, [])
 }
@@ -701,9 +701,9 @@ digit = (x : Int) -> Bool { x >= 48 && x <= 57 }
 hex = (x : Int) -> Int {
 	x |>
 		(n ? n >= 48 && n <= 57) { n - 48 }
-		| (n ? n >= 65 && n <= 70) { n - 55 }
-		| (n ? n >= 97 && n <= 102) { n - 87 }
-		| (_) { -1 }
+		& (n ? n >= 65 && n <= 70) { n - 55 }
+		& (n ? n >= 97 && n <= 102) { n - 87 }
+		& (_) { -1 }
 }
 
 token = (x : Int) -> Bool {
@@ -717,14 +717,14 @@ token = (x : Int) -> Bool {
 }
 
 require = (ok : Bool, why : String) -> Nil {
-	ok |> (True) { Nil } | (False) { fail.raise(BadMessage(why)) }
+	ok |> (True) { Nil } & (False) { fail.raise(BadMessage(why)) }
 }
 
 octets = (bits : BitArray) -> List(Int) {
 	go = (rest, acc) {
 		rest |>
 			(<<x, tail:bytes>>) { go(tail, [x, ..acc]) }
-			| (_) { list.reverse(acc) }
+			& (_) { list.reverse(acc) }
 	}
 	go(bits, [])
 }
@@ -739,7 +739,7 @@ text = (xs : List(Int)) -> String {
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
 	} |>
 		(Ok(s)) { s }
-		| (Error(_)) { fail.raise(BadMessage("invalid UTF-8")) }
+		& (Error(_)) { fail.raise(BadMessage("invalid UTF-8")) }
 }
 
 serialize_request = (req : Request) -> BitArray {
@@ -784,7 +784,7 @@ serialize = (
 			) ==
 				Some("chunked")
 		}
-		| (None) { False }
+		& (None) { False }
 	with_length = {
 		chunked == False &&
 			header(hs, "content-length") == None &&
@@ -801,15 +801,15 @@ serialize = (
 				],
 			)
 		}
-		| (False) { xs }
+		& (False) { xs }
 	lines = header_lines(with_length)
 	data = chunked |>
 		(False) { body }
-		| (True) {
+		& (True) {
 			end = header_lines(raw_pairs(trailers))
 			prefix = { bit_array.bit_size(body) == 0 } |>
 				(True) { <<>> }
-				| (False) {
+				& (False) {
 					bit_array.concat(
 						[
 							<<hex_string(bit_array.bit_size(body) / 8):utf8>>,
@@ -832,7 +832,7 @@ raw_pairs = (hs : AnyHeaders) -> List((String, BitArray)) {
 				(k, <<v:utf8>>)
 			})
 		}
-		| (RawHeaders(xs)) { xs }
+		& (RawHeaders(xs)) { xs }
 }
 
 header_lines = (xs : List((String, BitArray))) -> BitArray {
@@ -847,66 +847,66 @@ header_lines = (xs : List((String, BitArray))) -> BitArray {
 reason = (status : Int) -> String {
 	status |>
 		(100) { "Continue" }
-		| (101) { "Switching Protocols" }
-		| (102) { "Processing" }
-		| (103) { "Early Hints" }
-		| (200) { "OK" }
-		| (201) { "Created" }
-		| (202) { "Accepted" }
-		| (203) { "Non-Authoritative Information" }
-		| (204) { "No Content" }
-		| (205) { "Reset Content" }
-		| (206) { "Partial Content" }
-		| (207) { "Multi-Status" }
-		| (208) { "Already Reported" }
-		| (226) { "IM Used" }
-		| (300) { "Multiple Choices" }
-		| (301) { "Moved Permanently" }
-		| (302) { "Found" }
-		| (303) { "See Other" }
-		| (304) { "Not Modified" }
-		| (307) { "Temporary Redirect" }
-		| (308) { "Permanent Redirect" }
-		| (400) { "Bad Request" }
-		| (401) { "Unauthorized" }
-		| (402) { "Payment Required" }
-		| (403) { "Forbidden" }
-		| (404) { "Not Found" }
-		| (405) { "Method Not Allowed" }
-		| (406) { "Not Acceptable" }
-		| (407) { "Proxy Authentication Required" }
-		| (408) { "Request Timeout" }
-		| (409) { "Conflict" }
-		| (410) { "Gone" }
-		| (411) { "Length Required" }
-		| (412) { "Precondition Failed" }
-		| (413) { "Content Too Large" }
-		| (414) { "URI Too Long" }
-		| (415) { "Unsupported Media Type" }
-		| (416) { "Range Not Satisfiable" }
-		| (417) { "Expectation Failed" }
-		| (421) { "Misdirected Request" }
-		| (422) { "Unprocessable Content" }
-		| (423) { "Locked" }
-		| (424) { "Failed Dependency" }
-		| (425) { "Too Early" }
-		| (426) { "Upgrade Required" }
-		| (428) { "Precondition Required" }
-		| (429) { "Too Many Requests" }
-		| (431) { "Request Header Fields Too Large" }
-		| (451) { "Unavailable For Legal Reasons" }
-		| (500) { "Internal Server Error" }
-		| (501) { "Not Implemented" }
-		| (502) { "Bad Gateway" }
-		| (503) { "Service Unavailable" }
-		| (504) { "Gateway Timeout" }
-		| (505) { "HTTP Version Not Supported" }
-		| (506) { "Variant Also Negotiates" }
-		| (507) { "Insufficient Storage" }
-		| (508) { "Loop Detected" }
-		| (510) { "Not Extended" }
-		| (511) { "Network Authentication Required" }
-		| (_) { "" }
+		& (101) { "Switching Protocols" }
+		& (102) { "Processing" }
+		& (103) { "Early Hints" }
+		& (200) { "OK" }
+		& (201) { "Created" }
+		& (202) { "Accepted" }
+		& (203) { "Non-Authoritative Information" }
+		& (204) { "No Content" }
+		& (205) { "Reset Content" }
+		& (206) { "Partial Content" }
+		& (207) { "Multi-Status" }
+		& (208) { "Already Reported" }
+		& (226) { "IM Used" }
+		& (300) { "Multiple Choices" }
+		& (301) { "Moved Permanently" }
+		& (302) { "Found" }
+		& (303) { "See Other" }
+		& (304) { "Not Modified" }
+		& (307) { "Temporary Redirect" }
+		& (308) { "Permanent Redirect" }
+		& (400) { "Bad Request" }
+		& (401) { "Unauthorized" }
+		& (402) { "Payment Required" }
+		& (403) { "Forbidden" }
+		& (404) { "Not Found" }
+		& (405) { "Method Not Allowed" }
+		& (406) { "Not Acceptable" }
+		& (407) { "Proxy Authentication Required" }
+		& (408) { "Request Timeout" }
+		& (409) { "Conflict" }
+		& (410) { "Gone" }
+		& (411) { "Length Required" }
+		& (412) { "Precondition Failed" }
+		& (413) { "Content Too Large" }
+		& (414) { "URI Too Long" }
+		& (415) { "Unsupported Media Type" }
+		& (416) { "Range Not Satisfiable" }
+		& (417) { "Expectation Failed" }
+		& (421) { "Misdirected Request" }
+		& (422) { "Unprocessable Content" }
+		& (423) { "Locked" }
+		& (424) { "Failed Dependency" }
+		& (425) { "Too Early" }
+		& (426) { "Upgrade Required" }
+		& (428) { "Precondition Required" }
+		& (429) { "Too Many Requests" }
+		& (431) { "Request Header Fields Too Large" }
+		& (451) { "Unavailable For Legal Reasons" }
+		& (500) { "Internal Server Error" }
+		& (501) { "Not Implemented" }
+		& (502) { "Bad Gateway" }
+		& (503) { "Service Unavailable" }
+		& (504) { "Gateway Timeout" }
+		& (505) { "HTTP Version Not Supported" }
+		& (506) { "Variant Also Negotiates" }
+		& (507) { "Insufficient Storage" }
+		& (508) { "Loop Detected" }
+		& (510) { "Not Extended" }
+		& (511) { "Network Authentication Required" }
+		& (_) { "" }
 }
 
 hex_string = (n : Int) -> String {
@@ -914,22 +914,22 @@ hex_string = (n : Int) -> String {
 	go = (x : Int, acc : String) -> String {
 		c = string.at(chars, x % 16) |>
 			(Some(v)) { v }
-			| (None) { panic("http: invalid hex digit") }
-		{ x < 16 } |> (True) { c <> acc } | (False) { go(x / 16, c <> acc) }
+			& (None) { panic("http: invalid hex digit") }
+		{ x < 16 } |> (True) { c <> acc } & (False) { go(x / 16, c <> acc) }
 	}
 	go(n, "")
 }
 
 lowercase = (s : String) -> String {
 	raw = list.map(octets(<<s:utf8>>), (x) {
-		{ x >= 65 && x <= 90 } |> (True) { x + 32 } | (False) { x }
+		{ x >= 65 && x <= 90 } |> (True) { x + 32 } & (False) { x }
 	})
 	{
 		e4_call_arg_0 = bits(raw)
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
 	} |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("http: invalid internal text") }
+		& (Error(_)) { panic("http: invalid internal text") }
 }
 
 /// Buffered request handler, built on the incremental body reader.
@@ -965,15 +965,15 @@ connection_loop = (stream, handler, buffer) {
 		parse_request_head(octets(buffer))
 	}) |>
 		(Ok((req, rest))) { Complete(req, bits(rest)) }
-		| (Error(NeedMore)) { More(buffer) }
-		| (Error(BadMessage(why))) { Invalid(why) }
+		& (Error(NeedMore)) { More(buffer) }
+		& (Error(BadMessage(why))) { Invalid(why) }
 	progress |>
 		(Invalid(_)) { write_server_reply(stream, response(Status(400)), True) }
-		| (More(_)) {
+		& (More(_)) {
 			bytes = net.read(stream, 65536)
 			{ bit_array.bit_size(bytes) == 0 } |>
 				(True) { Nil }
-				| (False) {
+				& (False) {
 					connection_loop(
 						stream,
 						handler,
@@ -981,7 +981,7 @@ connection_loop = (stream, handler, buffer) {
 					)
 				}
 		}
-		| (Complete(req, rest)) {
+		& (Complete(req, rest)) {
 			result = fail.catch(() {
 				task.scope((_) {
 					cursor = task.ref(
@@ -1008,13 +1008,13 @@ connection_loop = (stream, handler, buffer) {
 								<<"HTTP/1.1 100 Continue\r\n\r\n":utf8>>,
 							)
 						}
-						| (False) { Nil }
+						& (False) { Nil }
 					res : Response = fail.catch(() { handler(req, reader) }) |>
 						(Ok(res)) { res }
-						| (Error(BadMessage(why))) {
+						& (Error(BadMessage(why))) {
 							fail.raise(BadMessage(why))
 						}
-						| (Error(_)) { response(Status(500)) }
+						& (Error(_)) { response(Status(500)) }
 					drain_body(reader.read)
 					tail = task.update(cursor, (state) {
 						(state, state.buffer)
@@ -1026,14 +1026,14 @@ connection_loop = (stream, handler, buffer) {
 				(Error(BadMessage(_))) {
 					write_server_reply(stream, response(Status(400)), True)
 				}
-				| (Error(error)) { fail.raise(error) }
-				| (Ok((res, tail))) {
+				& (Error(error)) { fail.raise(error) }
+				& (Ok((res, tail))) {
 					closing = has_token(req.headers, "connection", "close") ||
 						has_token(res.headers, "connection", "close")
 					write_server_reply(stream, res, closing)
 					{ closing } |>
 						(True) { Nil }
-						| (False) { connection_loop(stream, handler, tail) }
+						& (False) { connection_loop(stream, handler, tail) }
 				}
 		}
 }
@@ -1041,10 +1041,10 @@ connection_loop = (stream, handler, buffer) {
 write_server_reply = (stream, res : Response, closing : Bool) {
 	hs = header(res.headers, "content-length") |>
 		(Some(_)) { res.headers }
-		| (None) {
+		& (None) {
 			header(res.headers, "transfer-encoding") |>
 				(Some(_)) { res.headers }
-				| (None) {
+				& (None) {
 					add_header(
 						res.headers,
 						"Content-Length",
@@ -1054,7 +1054,7 @@ write_server_reply = (stream, res : Response, closing : Bool) {
 		}
 	hs = { closing } |>
 		(True) { add_header(hs, "Connection", "close") }
-		| (False) { hs }
+		& (False) { hs }
 	net.write(
 		stream,
 		serialize_response(
@@ -1090,7 +1090,7 @@ request_framing = (hs : AnyHeaders) -> BodyFraming {
 		([]) {
 			header(hs, "content-length") |>
 				(None) { Remaining(0) }
-				| (Some(value)) {
+				& (Some(value)) {
 					string.split(value, ",") |>
 						([first, .._]) {
 							Remaining(
@@ -1101,10 +1101,10 @@ request_framing = (hs : AnyHeaders) -> BodyFraming {
 								),
 							)
 						}
-						| (_) { panic("http: empty length split") }
+						& (_) { panic("http: empty length split") }
 				}
 		}
-		| (codings) {
+		& (codings) {
 			require(
 				list.last(codings) == Some("chunked"),
 				"invalid transfer-encoding",
@@ -1130,29 +1130,29 @@ body_more = (stream, state : BodyCursor) {
 body_piece = (stream, state : BodyCursor, max : Int) {
 	state.framing |>
 		(BodyDone) { (<<>>, state) }
-		| (Remaining(0)) { (<<>>, BodyCursor(..state, framing = BodyDone)) }
-		| (Remaining(n) | ChunkData(n)) {
+		& (Remaining(0)) { (<<>>, BodyCursor(..state, framing = BodyDone)) }
+		& (Remaining(n) | ChunkData(n)) {
 			{ bit_array.bit_size(state.buffer) == 0 } |>
 				(True) { body_piece(stream, body_more(stream, state), max) }
-				| (False) {
+				& (False) {
 					available = bit_array.byte_size(state.buffer)
 					count = int.min(int.min(n, max), available)
 					(part, rest) = split_bytes(state.buffer, count)
 					framing = state.framing |>
 						(Remaining(_)) { Remaining(n - count) }
-						| (ChunkData(_)) {
+						& (ChunkData(_)) {
 							{ n == count } |>
 								(True) { ChunkEnd }
-								| (False) { ChunkData(n - count) }
+								& (False) { ChunkData(n - count) }
 						}
-						| (_) { panic("http: invalid body data state") }
+						& (_) { panic("http: invalid body data state") }
 					(
 						part,
 						BodyCursor(..state, buffer = rest, framing = framing),
 					)
 				}
 		}
-		| (ChunkSize) {
+		& (ChunkSize) {
 			fail.catch(() { line(octets(state.buffer)) }) |>
 				(Error(NeedMore)) {
 					require(
@@ -1161,12 +1161,12 @@ body_piece = (stream, state : BodyCursor, max : Int) {
 					)
 					body_piece(stream, body_more(stream, state), max)
 				}
-				| (Error(error)) { fail.raise(error) }
-				| (Ok((line, rest))) {
+				& (Error(error)) { fail.raise(error) }
+				& (Ok((line, rest))) {
 					size = chunk_size(line)
 					framing = { size == 0 } |>
 						(True) { ChunkTrailers }
-						| (False) { ChunkData(size) }
+						& (False) { ChunkData(size) }
 					body_piece(
 						stream,
 						BodyCursor(
@@ -1178,10 +1178,10 @@ body_piece = (stream, state : BodyCursor, max : Int) {
 					)
 				}
 		}
-		| (ChunkEnd) {
+		& (ChunkEnd) {
 			{ bit_array.byte_size(state.buffer) < 2 } |>
 				(True) { body_piece(stream, body_more(stream, state), max) }
-				| (False) {
+				& (False) {
 					state.buffer |>
 						(<<13, 10, rest:bits>>) {
 							body_piece(
@@ -1194,19 +1194,19 @@ body_piece = (stream, state : BodyCursor, max : Int) {
 								max,
 							)
 						}
-						| (_) {
+						& (_) {
 							fail.raise(BadMessage("invalid chunk terminator"))
 						}
 				}
 		}
-		| (ChunkTrailers) {
+		& (ChunkTrailers) {
 			fail.catch(() { read_headers(octets(state.buffer), []) }) |>
 				(Error(NeedMore)) {
 					check_head(octets(state.buffer), 32768)
 					body_piece(stream, body_more(stream, state), max)
 				}
-				| (Error(error)) { fail.raise(error) }
-				| (Ok((trailers, rest))) {
+				& (Error(error)) { fail.raise(error) }
+				& (Ok((trailers, rest))) {
 					valid_trailers(trailers)
 					(
 						<<>>,
@@ -1223,20 +1223,20 @@ body_piece = (stream, state : BodyCursor, max : Int) {
 split_bytes = (buffer : BitArray, count : Int) -> (BitArray, BitArray) {
 	buffer |>
 		(<<part:bytes(count), rest:bits>>) { (part, rest) }
-		| (_) { panic("http: invalid body slice") }
+		& (_) { panic("http: invalid body slice") }
 }
 
 collect_body = (read, acc : List(BitArray)) {
 	piece = read(65536)
 	{ bit_array.bit_size(piece) == 0 } |>
 		(True) { bit_array.concat(list.reverse(acc)) }
-		| (False) { collect_body(read, [piece, ..acc]) }
+		& (False) { collect_body(read, [piece, ..acc]) }
 }
 
 drain_body = (read) {
 	{ bit_array.bit_size(read(65536)) == 0 } |>
 		(True) { Nil }
-		| (False) { drain_body(read) }
+		& (False) { drain_body(read) }
 }
 
 // Target providers capture transport services; callers retain one principal type.
@@ -1330,17 +1330,17 @@ native_client = () <- (n : net.Net, t : tls.Tls) {
 											Protocol("invalid read size"),
 										)
 									}
-									| (False) { Nil }
+									& (False) { Nil }
 								task.update(cursor, (body) {
 									size = bit_array.byte_size(body)
 									count = { max < size } |>
 										(True) { max }
-										| (False) { size }
+										& (False) { size }
 									body |>
 										(<<part:bytes(count), rest:bits>>) {
 											(rest, part)
 										}
-										| (_) {
+										& (_) {
 											panic(
 												"http: invalid buffered body extent",
 											)
@@ -1382,8 +1382,8 @@ send = (req : Request) -> Response {
 fetch_error = (code : String) {
 	string.split(code, ":") |>
 		(["dns", .._]) { fail.raise(Dns(code)) }
-		| (["protocol", .._]) { fail.raise(Protocol(code)) }
-		| (_) { fail.raise(Connect(code)) }
+		& (["protocol", .._]) { fail.raise(Protocol(code)) }
+		& (_) { fail.raise(Connect(code)) }
 }
 
 fetch_reply : <A, N>(() <- (Fail(String), ..N) -> A) <- (
@@ -1392,27 +1392,27 @@ fetch_reply : <A, N>(() <- (Fail(String), ..N) -> A) <- (
 ) -> A = (body) {
 	fail.catch(body) |>
 		(Ok(value)) { value }
-		| (Error(code)) { fetch_error(code) }
+		& (Error(code)) { fetch_error(code) }
 }
 
 fetch_headers = (pairs : List(String)) -> List((String, String)) {
 	pairs |>
 		([name, value, ..rest]) { [(name, value), ..fetch_headers(rest)] }
-		| (_) { [] }
+		& (_) { [] }
 }
 
 fetch_open = (req : Request) {
 	Method(method) = req.method
 	hs = req.headers |>
 		(Headers(pairs)) { pairs }
-		| (RawHeaders(pairs)) {
+		& (RawHeaders(pairs)) {
 			list.map(pairs, (pair) {
 				(name, value) = pair
 				(
 					name,
 					fail.catch(() { bit_array.to_string(value) }) |>
 						(Ok(text)) { text }
-						| (Error(_)) {
+						& (Error(_)) {
 							fail.raise(Protocol("invalid header UTF-8"))
 						},
 				)
@@ -1518,7 +1518,7 @@ PeerClosed = ()
 close_connection = (connection : Connection) {
 	connection |>
 		(Plain(stream)) { net.close_stream(stream) }
-		| (Secure(stream)) { tls.close(stream) }
+		& (Secure(stream)) { tls.close(stream) }
 }
 
 close_client = (pool : task.Ref(Pool)) {
@@ -1534,14 +1534,14 @@ pool_take = (idle : List(Idle), secure : Bool, host : String, port : Int) -> (
 ) {
 	idle |>
 		([]) { ([], None) }
-		| ([entry, ..rest]) {
+		& ([entry, ..rest]) {
 			{
 				entry.secure == secure &&
 					entry.host == host &&
 					entry.port == port
 			} |>
 				(True) { (rest, Some(entry)) }
-				| (False) {
+				& (False) {
 					(next, found) = pool_take(rest, secure, host, port)
 					([entry, ..next], found)
 				}
@@ -1569,7 +1569,7 @@ _body_text_result = (res : Response) -> Result(String, Nil) {
 follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 	{ count > 10 } |>
 		(True) { fail.raise(Protocol("too many redirects")) }
-		| (False) {
+		& (False) {
 			res = send_once(pool, req)
 			Status(code) = res.status
 			(header(res.headers, "location"), code) |>
@@ -1579,15 +1579,15 @@ follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 				) {
 					base = fail.catch(() { uri.parse(req.target) }) |>
 						(Ok(value)) { value }
-						| (Error(_)) { fail.raise(Protocol("invalid URL")) }
+						& (Error(_)) { fail.raise(Protocol("invalid URL")) }
 					next = fail.catch(() { uri.parse(location) }) |>
 						(Ok(value)) { value }
-						| (Error(_)) {
+						& (Error(_)) {
 							fail.raise(Protocol("invalid redirect"))
 						}
 					url = fail.catch(() { uri.resolve(base, next) }) |>
 						(Ok(value)) { uri.to_string(value) }
-						| (Error(_)) {
+						& (Error(_)) {
 							fail.raise(Protocol("invalid redirect"))
 						}
 					Method(method) = req.method
@@ -1612,7 +1612,7 @@ follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 								count + 1,
 							)
 						}
-						| (False) {
+						& (False) {
 							follow(
 								pool,
 								Request(
@@ -1626,16 +1626,16 @@ follow = (pool : task.Ref(Pool), req : Request, count : Int) {
 									),
 									body = { drop_body } |>
 										(True) { <<>> }
-										| (False) { req.body },
+										& (False) { req.body },
 									trailers = { drop_body } |>
 										(True) { Headers([]) }
-										| (False) { req.trailers },
+										& (False) { req.trailers },
 								),
 								count + 1,
 							)
 						}
 				}
-				| (_) { res }
+				& (_) { res }
 		}
 }
 
@@ -1647,7 +1647,7 @@ redirect_headers = (
 ) -> AnyHeaders {
 	resolved = fail.catch(() { uri.resolve(base, next) }) |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("http: invalid resolved redirect") }
+		& (Error(_)) { panic("http: invalid resolved redirect") }
 	changed = uri.parts(base).authority != uri.parts(resolved).authority
 	RawHeaders(
 		list.filter(raw_pairs(hs), (pair) {
@@ -1679,33 +1679,33 @@ redirect_headers = (
 send_once = (pool : task.Ref(Pool), req : Request) {
 	u = fail.catch(() { uri.parse(req.target) }) |>
 		(Ok(value)) { value }
-		| (Error(_)) { fail.raise(Protocol("invalid URL")) }
+		& (Error(_)) { fail.raise(Protocol("invalid URL")) }
 	parts = uri.parts(u)
 	secure = parts.scheme |>
 		(Some("http")) { False }
-		| (Some("https")) { True }
-		| (_) { fail.raise(Protocol("invalid URL scheme")) }
+		& (Some("https")) { True }
+		& (_) { fail.raise(Protocol("invalid URL scheme")) }
 	authority = parts.authority |>
 		(Some(value)) { value }
-		| (None) { fail.raise(Protocol("missing host")) }
+		& (None) { fail.raise(Protocol("missing host")) }
 	hostname = authority.host |>
 		(uri.RegName(value)) { value }
-		| (uri.IpLiteral(value)) { value }
+		& (uri.IpLiteral(value)) { value }
 	port = authority.port |>
 		(Some(value)) {
 			fail.catch(() { int.parse(value) }) |>
 				(Ok(number) ? number > 0 && number < 65536) { number }
-				| (_) { fail.raise(Protocol("invalid port")) }
+				& (_) { fail.raise(Protocol("invalid port")) }
 		}
-		| (None) { secure |> (True) { 443 } | (False) { 80 } }
-	path = { parts.path == "" } |> (True) { "/" } | (False) { parts.path }
-	target = parts.query |> (Some(q)) { "\(path)?\(q)" } | (None) { path }
+		& (None) { secure |> (True) { 443 } & (False) { 80 } }
+	path = { parts.path == "" } |> (True) { "/" } & (False) { parts.path }
+	target = parts.query |> (Some(q)) { "\(path)?\(q)" } & (None) { path }
 	host_header = authority.port |>
 		(Some(p)) { "\(hostname):\(p)" }
-		| (None) { hostname }
+		& (None) { hostname }
 	hs = header(req.headers, "host") |>
 		(Some(_)) { req.headers }
-		| (None) { add_header(req.headers, "Host", host_header) }
+		& (None) { add_header(req.headers, "Host", host_header) }
 	wire = serialize_request(
 		Request(
 			method = req.method,
@@ -1736,7 +1736,7 @@ send_once = (pool : task.Ref(Pool), req : Request) {
 				)
 			})
 		}
-		| (Some(entry)) {
+		& (Some(entry)) {
 			fail.catch(() { exchange(pool, entry, req, wire) }) |>
 				(Error(PeerClosed) | Error(Connect(_)) | Error(Tls(_))) {
 					fail.catch(() {
@@ -1754,20 +1754,20 @@ send_once = (pool : task.Ref(Pool), req : Request) {
 						)
 					})
 				}
-				| (other) { other }
+				& (other) { other }
 		}
 	result |>
 		(Ok(res)) { res }
-		| (Error(PeerClosed)) {
+		& (Error(PeerClosed)) {
 			fail.raise(Protocol("unexpected end of response"))
 		}
-		| (Error(error)) { fail.raise(error) }
+		& (Error(error)) { fail.raise(error) }
 }
 
 dial = (secure : Bool, hostname : String, port : Int) {
 	fail.catch(() { net.resolve(hostname) }) |>
 		(Ok(_)) { Nil }
-		| (
+		& (
 			Error(
 				net.NetError(
 					operation = operation,
@@ -1778,7 +1778,7 @@ dial = (secure : Bool, hostname : String, port : Int) {
 		) { fail.raise(Dns(code)) }
 	stream = fail.catch(() { net.connect(hostname, port) }) |>
 		(Ok(value)) { value }
-		| (
+		& (
 			Error(
 				net.NetError(
 					operation = operation,
@@ -1789,7 +1789,7 @@ dial = (secure : Bool, hostname : String, port : Int) {
 		) { fail.raise(Connect(code)) }
 	secure |>
 		(False) { Plain(stream) }
-		| (True) {
+		& (True) {
 			fail.catch(() {
 				tls.connect(
 					stream,
@@ -1798,7 +1798,7 @@ dial = (secure : Bool, hostname : String, port : Int) {
 				)
 			}) |>
 				(Ok(value)) { Secure(value) }
-				| (Error(tls.TlsError(stage = stage, reason = reason))) {
+				& (Error(tls.TlsError(stage = stage, reason = reason))) {
 					net.close_stream(stream)
 					fail.raise(Tls(reason))
 				}
@@ -1816,7 +1816,7 @@ exchange = (
 		() {
 			transport : (read = _, write = _) = entry.connection |>
 				(Plain(stream)) { net_transport(stream) }
-				| (Secure(stream)) { tls_transport(stream) }
+				& (Secure(stream)) { tls_transport(stream) }
 			transport.write(wire)
 			(res, rest, eof) = read_reply(transport, req.method, entry.buffer)
 			Status(code) = res.status
@@ -1841,7 +1841,7 @@ exchange = (
 						)
 					})
 				}
-				| (False) { Nil }
+				& (False) { Nil }
 			res
 		},
 		() {
@@ -1858,7 +1858,7 @@ exchange = (
 			})
 			{ released } |>
 				(True) { Nil }
-				| (False) { close_connection(entry.connection) }
+				& (False) { close_connection(entry.connection) }
 		},
 	)
 }
@@ -1873,19 +1873,19 @@ read_progress = (transport : (read = _, write = _), method, buffer, eof) {
 			Status(code) = res.status
 			{ code >= 100 && code < 200 && code != 101 } |>
 				(True) { read_progress(transport, method, rest, eof) }
-				| (False) { (res, rest, eof) }
+				& (False) { (res, rest, eof) }
 		}
-		| (Invalid(why)) { fail.raise(Protocol(why)) }
-		| (More(next)) {
+		& (Invalid(why)) { fail.raise(Protocol(why)) }
+		& (More(next)) {
 			eof |>
 				(True) {
 					{ bit_array.bit_size(next) == 0 } |>
 						(True) { fail.raise(PeerClosed) }
-						| (False) {
+						& (False) {
 							fail.raise(Protocol("unexpected end of response"))
 						}
 				}
-				| (False) {
+				& (False) {
 					bytes = transport.read(65536)
 					read_progress(
 						transport,
@@ -1905,10 +1905,10 @@ BodyError = InvalidText | InvalidJson | InvalidSchema
 _body_json_result = (res : Response) -> Result(json.Json, BodyError) {
 	_body_text_result(res) |>
 		(Error(_)) { Error(InvalidText) }
-		| (Ok(text)) {
+		& (Ok(text)) {
 			fail.catch(() { json.parse(text) }) |>
 				(Ok(value)) { Ok(value) }
-				| (Error(error)) { Error(InvalidJson(error)) }
+				& (Error(error)) { Error(InvalidJson(error)) }
 		}
 }
 
@@ -1918,10 +1918,10 @@ _body_decode_result = <A>(
 ) -> Result(A, BodyError) {
 	_body_json_result(res) |>
 		(Error(error)) { Error(error) }
-		| (Ok(value)) {
+		& (Ok(value)) {
 			fail.catch(() { schema.decode(codec, value) }) |>
 				(Ok(decoded)) { Ok(decoded) }
-				| (Error(error)) { Error(InvalidSchema(error)) }
+				& (Error(error)) { Error(InvalidSchema(error)) }
 		}
 }
 
@@ -1952,10 +1952,10 @@ route = (method : Method, pattern : String, req : Request) -> Option(
 ) {
 	{ method == req.method } |>
 		(False) { None }
-		| (True) {
+		& (True) {
 			path = string.split(req.target, "?") |>
 				([first, .._]) { first }
-				| ([]) { panic("http: split returned no segments") }
+				& ([]) { panic("http: split returned no segments") }
 			match_segments(string.split(pattern, "/"), string.split(path, "/"))
 		}
 }
@@ -1965,22 +1965,22 @@ match_segments = (pattern : List(String), path : List(String)) -> Option(
 ) {
 	(pattern, path) |>
 		(([], [])) { Some([]) }
-		| (([p, ..ps], [v, ..vs])) {
+		& (([p, ..ps], [v, ..vs])) {
 			string.starts_with(p, ":") |>
 				(True) {
 					match_segments(ps, vs) |>
 						(Some(rest)) {
 							Some([(string.drop_start(p, 1), v), ..rest])
 						}
-						| (None) { None }
+						& (None) { None }
 				}
-				| (False) {
+				& (False) {
 					{ p == v } |>
 						(True) { match_segments(ps, vs) }
-						| (False) { None }
+						& (False) { None }
 				}
 		}
-		| (_) { None }
+		& (_) { None }
 }
 
 net_transport = (stream) {
@@ -1988,7 +1988,7 @@ net_transport = (stream) {
 		read = (max) {
 			fail.catch(() { net.read(stream, max) }) |>
 				(Ok(value)) { value }
-				| (
+				& (
 					Error(
 						net.NetError(
 							operation = operation,
@@ -2001,7 +2001,7 @@ net_transport = (stream) {
 		write = (bytes) {
 			fail.catch(() { net.write(stream, bytes) }) |>
 				(Ok(value)) { value }
-				| (
+				& (
 					Error(
 						net.NetError(
 							operation = operation,
@@ -2019,14 +2019,14 @@ tls_transport = (stream) {
 		read = (max) {
 			fail.catch(() { tls.read(stream, max) }) |>
 				(Ok(value)) { value }
-				| (Error(tls.TlsError(stage = stage, reason = reason))) {
+				& (Error(tls.TlsError(stage = stage, reason = reason))) {
 					fail.raise(Tls(reason))
 				}
 		},
 		write = (bytes) {
 			fail.catch(() { tls.write(stream, bytes) }) |>
 				(Ok(value)) { value }
-				| (Error(tls.TlsError(stage = stage, reason = reason))) {
+				& (Error(tls.TlsError(stage = stage, reason = reason))) {
 					fail.raise(Tls(reason))
 				}
 		},

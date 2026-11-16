@@ -11,7 +11,7 @@ walk = (t : pbt.Tree((Int, Int)), depth : Int) -> Nil {
 	assert(k >= 0 && k <= n)
 	{ depth > 0 } |>
 		(True) { list.each(t.children(), (c) { walk(c, depth - 1) }) }
-		| (False) { Nil }
+		& (False) { Nil }
 }
 
 test("dependent", () {
@@ -25,7 +25,7 @@ test("dependent", () {
 				walk(t, 4)
 				go(seed + 1)
 			}
-			| (False) { Nil }
+			& (False) { Nil }
 	}
 	go(0)
 })

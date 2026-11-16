@@ -17,4 +17,4 @@ main = () <- (io : Io) {
 		int_text(ua()),
 	) <- (_syn3_0, _syn3_1)
 }
-int_text = (n : Int) { n |> (2) { "two" } | (_) { "other" } }
+int_text = (n : Int) { n |> (2) { "two" } & (_) { "other" } }

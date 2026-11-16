@@ -43,7 +43,7 @@ use = <N>() <- (s : S(N)) {
 
 S(N) = (f = () <- N -> Int)
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 fw = () { use() }
 

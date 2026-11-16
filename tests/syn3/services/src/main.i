@@ -24,7 +24,7 @@ find_user = (id : String) <- (db : Db, log : Log) -> User {
 }
 
 map = <A, B, N>(xs : List(A), f : (A) <- N -> B) -> List(B) {
-	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] }
+	xs |> ([]) { [] } & ([x, ..rest]) { [f(x), ..map(rest, f)] }
 }
 
 /// The closed form of `catch` over the library function: the body needs
@@ -34,7 +34,7 @@ attempt = <A, E, N>(body : () <- (..N, Fail(E)) -> A) -> Result(A, E) {
 }
 
 must = (id : String) -> String {
-	id |> ("") { fail.raise(NotFound(id = "empty")) } | (_) { id }
+	id |> ("") { fail.raise(NotFound(id = "empty")) } & (_) { id }
 }
 
 offset = (x : Int) <- (base : Base) -> Int { base.value + x }
@@ -42,18 +42,18 @@ offset = (x : Int) <- (base : Base) -> Int { base.value + x }
 show = (r : Result(String, NotFound)) -> String {
 	r |>
 		(Ok(name)) { "ok \(name)" }
-		| (Error(NotFound(id = id))) { "not found \(id)" }
+		& (Error(NotFound(id = id))) { "not found \(id)" }
 }
 
 sum = (xs : List(Int)) -> Int {
-	xs |> ([]) { 0 } | ([x, ..rest]) { x + sum(rest) }
+	xs |> ([]) { 0 } & ([x, ..rest]) { x + sum(rest) }
 }
 
 fake_db = Db(
 	find = (id) {
 		id |>
 			("1") { User(name = "ada", age = 36) }
-			| (_) { fail.raise(NotFound(id = id)) }
+			& (_) { fail.raise(NotFound(id = id)) }
 	},
 )
 

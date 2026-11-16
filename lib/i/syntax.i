@@ -218,7 +218,7 @@ build_metadata = (
 ) -> ItemMetadata {
 	data |>
 		([]) { result }
-		| ([(key, value), ..rest]) {
+		& ([(key, value), ..rest]) {
 			build_metadata(rest, raw_metadata_push(result, key, value))
 		}
 }
@@ -226,7 +226,7 @@ build_metadata = (
 item_result = (result : ItemResult) -> Nil {
 	raw_items_ok(result) |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			fail.raise(
 				SyntaxError(
 					message = raw_items_message(result),
@@ -278,7 +278,7 @@ _definitions = () -> Definitions {
 			result = raw_definition(of)
 			raw_definition_ok(result) |>
 				(True) { raw_definition_value(result) }
-				| (False) {
+				& (False) {
 					fail.raise(
 						SyntaxError(
 							message = raw_definition_message(result),
@@ -383,7 +383,7 @@ raw_text_error_at : (TextResult) -> Syntax
 reverse = (items : List(Syntax), result : List(Syntax)) -> List(Syntax) {
 	items |>
 		([]) { result }
-		| ([first, ..rest]) { reverse(rest, [first, ..result]) }
+		& ([first, ..rest]) { reverse(rest, [first, ..result]) }
 }
 
 match_children = (
@@ -395,7 +395,7 @@ match_children = (
 ) -> List(Syntax) {
 	{ index == end } |>
 		(True) { reverse(result, []) }
-		| (False) {
+		& (False) {
 			match_children(
 				match,
 				capture,
@@ -416,7 +416,7 @@ prepend_reversed = (items : List(Syntax), result : List(Syntax)) -> List(
 ) {
 	items |>
 		([]) { result }
-		| ([first, ..rest]) { prepend_reversed(rest, [first, ..result]) }
+		& ([first, ..rest]) { prepend_reversed(rest, [first, ..result]) }
 }
 
 /// Appends syntax lists while preserving the identity and order of each item.
@@ -432,7 +432,7 @@ children = (
 ) -> List(Syntax) {
 	{ index == end } |>
 		(True) { reverse(result, []) }
-		| (False) {
+		& (False) {
 			children(
 				syntax,
 				index + 1,
@@ -446,27 +446,27 @@ children = (
 node = (syntax : Syntax) -> Node {
 	raw_kind(syntax) |>
 		(0) { Node(Name(raw_text(syntax))) }
-		| (1) { Node(Discard(raw_text(syntax))) }
-		| (2) { Node(Up(raw_text(syntax))) }
-		| (3) { Node(Symbol(raw_text(syntax))) }
-		| (4) { Node(raw_int(syntax)) }
-		| (5) { Node(raw_float(syntax)) }
-		| (6) { Node(Text(raw_text(syntax))) }
-		| (7) { Node(Round(children(syntax, 0, raw_length(syntax), []))) }
-		| (8) { Node(Square(children(syntax, 0, raw_length(syntax), []))) }
-		| (9) { Node(Curly(children(syntax, 0, raw_length(syntax), []))) }
-		| (10) { Node(Bits(children(syntax, 0, raw_length(syntax), []))) }
-		| (11) { Node(Quote(raw_child(syntax, 0))) }
-		| (12) { Node(Unquote(raw_child(syntax, 0))) }
-		| (13) { Node(Splice(raw_child(syntax, 0))) }
-		| (14) { Node(TypeView(raw_type_handle(syntax))) }
-		| (_) { panic("syntax: invalid node kind") }
+		& (1) { Node(Discard(raw_text(syntax))) }
+		& (2) { Node(Up(raw_text(syntax))) }
+		& (3) { Node(Symbol(raw_text(syntax))) }
+		& (4) { Node(raw_int(syntax)) }
+		& (5) { Node(raw_float(syntax)) }
+		& (6) { Node(Text(raw_text(syntax))) }
+		& (7) { Node(Round(children(syntax, 0, raw_length(syntax), []))) }
+		& (8) { Node(Square(children(syntax, 0, raw_length(syntax), []))) }
+		& (9) { Node(Curly(children(syntax, 0, raw_length(syntax), []))) }
+		& (10) { Node(Bits(children(syntax, 0, raw_length(syntax), []))) }
+		& (11) { Node(Quote(raw_child(syntax, 0))) }
+		& (12) { Node(Unquote(raw_child(syntax, 0))) }
+		& (13) { Node(Splice(raw_child(syntax, 0))) }
+		& (14) { Node(TypeView(raw_type_handle(syntax))) }
+		& (_) { panic("syntax: invalid node kind") }
 }
 
 build_list = (items : List(Syntax), result : SyntaxList) -> SyntaxList {
 	items |>
 		([]) { result }
-		| ([first, ..rest]) { build_list(rest, raw_list_push(result, first)) }
+		& ([first, ..rest]) { build_list(rest, raw_list_push(result, first)) }
 }
 
 /// Rebuilds one quoted template node with its evaluated children.
@@ -491,50 +491,50 @@ make = (node : Node, like : Syntax) -> Syntax {
 				),
 			)
 		}
-		| (_) { Nil }
+		& (_) { Nil }
 	result = node |>
 		(Node(Name(value))) { raw_make_text(0, value, like) }
-		| (Node(Discard(value))) { raw_make_text(1, value, like) }
-		| (Node(Up(value))) { raw_make_text(2, value, like) }
-		| (Node(Symbol(value))) { raw_make_text(3, value, like) }
-		| (Node(value : Int)) { raw_make_int(value, like) }
-		| (Node(value : Float)) { raw_make_float(value, like) }
-		| (Node(Text(value))) { raw_make_text(6, value, like) }
-		| (Node(Round(items))) {
+		& (Node(Discard(value))) { raw_make_text(1, value, like) }
+		& (Node(Up(value))) { raw_make_text(2, value, like) }
+		& (Node(Symbol(value))) { raw_make_text(3, value, like) }
+		& (Node(value : Int)) { raw_make_int(value, like) }
+		& (Node(value : Float)) { raw_make_float(value, like) }
+		& (Node(Text(value))) { raw_make_text(6, value, like) }
+		& (Node(Round(items))) {
 			raw_make_list(
 				7,
 				build_list(items, raw_list_new()),
 				like,
 			)
 		}
-		| (Node(Square(items))) {
+		& (Node(Square(items))) {
 			raw_make_list(
 				8,
 				build_list(items, raw_list_new()),
 				like,
 			)
 		}
-		| (Node(Curly(items))) {
+		& (Node(Curly(items))) {
 			raw_make_list(
 				9,
 				build_list(items, raw_list_new()),
 				like,
 			)
 		}
-		| (Node(Bits(items))) {
+		& (Node(Bits(items))) {
 			raw_make_list(
 				10,
 				build_list(items, raw_list_new()),
 				like,
 			)
 		}
-		| (Node(Quote(item))) { raw_make_one(11, item, like) }
-		| (Node(Unquote(item))) { raw_make_one(12, item, like) }
-		| (Node(Splice(item))) { raw_make_one(13, item, like) }
-		| (Node(TypeView(_))) { panic("TypeView make invariant") }
+		& (Node(Quote(item))) { raw_make_one(11, item, like) }
+		& (Node(Unquote(item))) { raw_make_one(12, item, like) }
+		& (Node(Splice(item))) { raw_make_one(13, item, like) }
+		& (Node(TypeView(_))) { panic("TypeView make invariant") }
 	raw_syntax_ok(result) |>
 		(True) { raw_syntax_value(result) }
-		| (False) {
+		& (False) {
 			fail.raise(
 				SyntaxError(message = raw_syntax_error(result), at = like),
 			)
@@ -550,19 +550,19 @@ show = (syntax : Syntax) -> String { raw_show(syntax) }
 position_id = (position : Position) -> Int {
 	position |>
 		(ImportItem) { 0 }
-		| (ExportItem) { 1 }
-		| (Item) { 2 }
-		| (Attribute) { 3 }
-		| (Type) { 4 }
-		| (TypeItem) { 5 }
-		| (FunctionResult) { 6 }
-		| (Expression) { 7 }
-		| (ValueItem) { 8 }
-		| (Statement) { 9 }
-		| (Pattern) { 10 }
-		| (PatternItem) { 11 }
-		| (Segment) { 12 }
-		| (Format) { 13 }
+		& (ExportItem) { 1 }
+		& (Item) { 2 }
+		& (Attribute) { 3 }
+		& (Type) { 4 }
+		& (TypeItem) { 5 }
+		& (FunctionResult) { 6 }
+		& (Expression) { 7 }
+		& (ValueItem) { 8 }
+		& (Statement) { 9 }
+		& (Pattern) { 10 }
+		& (PatternItem) { 11 }
+		& (Segment) { 12 }
+		& (Format) { 13 }
 }
 
 /// Writes syntax in the normal surface at the requested position.
@@ -570,7 +570,7 @@ show_as = (syntax : Syntax, position : Position) -> String {
 	result = raw_show_as(syntax, position_id(position))
 	raw_text_ok(result) |>
 		(True) { raw_text_value(result) }
-		| (False) {
+		& (False) {
 			fail.raise(
 				SyntaxError(
 					message = raw_text_error(result),
@@ -634,7 +634,7 @@ raw_type_at : (TypeResult) -> Syntax
 type_result = (r : TypeResult) -> Syntax {
 	raw_type_ok(r) |>
 		(True) { raw_type_value(r) }
-		| (False) {
+		& (False) {
 			fail.raise(
 				SyntaxError(message = raw_type_message(r), at = raw_type_at(r)),
 			)
@@ -644,7 +644,7 @@ type_result = (r : TypeResult) -> Syntax {
 type_members = (r : TypeResult, index : Int, count : Int) -> List(Syntax) {
 	{ index >= count } |>
 		(True) { [] }
-		| (False) {
+		& (False) {
 			[raw_type_child(r, index), ..type_members(r, index + 1, count)]
 		}
 }
@@ -664,11 +664,11 @@ _types = () -> Types {
 						),
 					)
 				}
-				| (True) {
+				& (True) {
 					raw_type_truth(r) |>
 						(0) { Yes }
-						| (1) { No }
-						| (_) { NotKnown }
+						& (1) { No }
+						& (_) { NotKnown }
 				}
 		},
 		members = (s) -> List(Syntax) {
@@ -682,7 +682,7 @@ _types = () -> Types {
 						),
 					)
 				}
-				| (True) { type_members(r, 0, raw_type_len(r)) }
+				& (True) { type_members(r, 0, raw_type_len(r)) }
 		},
 	)
 }

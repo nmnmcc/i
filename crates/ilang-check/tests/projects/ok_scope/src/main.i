@@ -14,7 +14,7 @@ wrapped = Wrap(f = (n) { wrapped })
 Wrap = (f = (Int) -> Wrap)
 
 local = () {
-	fact = (n) { n |> (0) { 1 } | (_) { n * fact(n - 1) } }
+	fact = (n) { n |> (0) { 1 } & (_) { n * fact(n - 1) } }
 	grouped = { (n) { grouped(n) } }
 	x = 1
 	x = x + 1

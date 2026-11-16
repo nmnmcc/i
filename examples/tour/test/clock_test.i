@@ -11,7 +11,7 @@ Late = (by = Int)
 remaining = (deadline) <- (clock : Clock) {
 	deadline - clock.now() |>
 		(left ? left < 0) { fail.raise(Late(by = 0 - left)) }
-		| (left) { left }
+		& (left) { left }
 }
 
 test("a test gives its own clock", () {

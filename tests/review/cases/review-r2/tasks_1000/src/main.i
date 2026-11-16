@@ -11,7 +11,7 @@
 many = (s, n : Int) {
 	{ n == 0 } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			task.go(s, () { Nil })
 			many(s, n - 1)
 		}

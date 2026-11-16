@@ -28,7 +28,7 @@ allowed = () {
 				(secret.OpenCase(..) = v) {
 					secret.OpenCase(..v, value = 29).value
 				}
-				| (_) { 0 }
+				& (_) { 0 }
 		} ==
 			29,
 	)
@@ -43,7 +43,7 @@ allowed = () {
 		{
 			facade.open |>
 				(secret.OpenCase(value = value)) { value }
-				| (secret.Other(value = value)) { value }
+				& (secret.Other(value = value)) { value }
 		} ==
 			11,
 	)

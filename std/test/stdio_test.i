@@ -21,21 +21,21 @@ test("stdio_fake", () {
 				request.ready(
 					{ n > 0 } |>
 						(True) { Ok(<<>>) }
-						| (False) { Error("invalid") },
+						& (False) { Error("invalid") },
 				)
 			},
 			write = (bytes) {
 				request.ready(
 					{ bytes == <<"hello\n":utf8>> } |>
 						(True) { Ok(Nil) }
-						| (False) { Error("wrong_bytes") },
+						& (False) { Error("wrong_bytes") },
 				)
 			},
 			write_error = (bytes) {
 				request.ready(
 					{ bytes == <<"error\n":utf8>> } |>
 						(True) { Ok(Nil) }
-						| (False) { Error("wrong_bytes") },
+						& (False) { Error("wrong_bytes") },
 				)
 			},
 			flush = () { request.ready(Ok(Nil)) },

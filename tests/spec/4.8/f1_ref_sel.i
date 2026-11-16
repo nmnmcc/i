@@ -4,7 +4,7 @@
 // F1: hidden-input matches cannot exclude a feasible branch.
 (i/stdio, core = i/core, i/task)
 (main)
-choose = (x: String) { "wrong" } | (x: { Int | String }) { 1 }
+choose = (x: String) { "wrong" } & (x: { Int | String }) { 1 }
 main = () {
   r = task.ref(0)
   _ = task.update(r, (v) { ("s", 0) })

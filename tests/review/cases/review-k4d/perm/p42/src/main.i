@@ -19,7 +19,7 @@ both : <N>() <- (Fail(Never), S(N), T(Int, N), ..N) -> Int = () <- (
 
 run = <A, N>(body : () <- N -> A) { body() }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 bad : <N>() <- (Fail(Never), ..N) -> Int = () <- (
 	s : S(N),

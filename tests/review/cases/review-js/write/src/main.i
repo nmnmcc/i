@@ -11,7 +11,7 @@ more = (fd : Int, address : Int, count : Int, io : Int) <- (w : Wasi) -> Nil {
 	case
 	count
 	(0) { Nil }
-		| (_) {
+		& (_) {
 			w.store(io, <<address:u32le, count:u32le>>)
 			case
 			w.fd_write(fd, io, 1, io + 8)
@@ -20,9 +20,9 @@ more = (fd : Int, address : Int, count : Int, io : Int) <- (w : Wasi) -> Nil {
 				case
 				written
 				(0) { Nil }
-					| (_) { more(fd, address + written, count - written, io) }
+					& (_) { more(fd, address + written, count - written, io) }
 			}
-				| (_) { Nil }
+				& (_) { Nil }
 		}
 }
 write = (fd : Int, bytes : BitArray) <- (w : Wasi) {

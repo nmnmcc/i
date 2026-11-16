@@ -8,7 +8,7 @@
 check = (got : BitArray, want : BitArray) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			panic(core.inspect(got) <> " is not " <> core.inspect(want))
 		}
 }
@@ -16,7 +16,7 @@ check = (got : BitArray, want : BitArray) {
 same = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 test("whole_bytes", () {
@@ -62,5 +62,5 @@ test("slices", () {
 				<<rest:bits, middle:bits>>,
 			)
 		}
-		| (_) { panic("no") }
+		& (_) { panic("no") }
 })

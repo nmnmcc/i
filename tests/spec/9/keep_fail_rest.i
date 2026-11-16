@@ -33,7 +33,7 @@ main = () {
 		(Ok(Paused(k))) {
 			assert(catch(() { control.resume(k, Nil) }) == Error("resumed"))
 		}
-		| (_) { panic("expected a paused kept call") }
+		& (_) { panic("expected a paused kept call") }
 	// §9.5: a final function may not raise errors. Observe cancellation by
 	// an error-free escape, then check the later caller's Fail separately.
 	cancelled = control.boundary((finished) {
@@ -52,7 +52,7 @@ main = () {
 				control.cancel(k)
 				panic("the cancelled final did not run")
 			}
-			| (_) { panic("expected a paused kept final") }
+			& (_) { panic("expected a paused kept final") }
 	})
 	assert(cancelled == "cancelled")
 	assert(catch(() { raise(cancelled) }) == Error("cancelled"))
@@ -64,12 +64,12 @@ main = () {
 		})
 		answer |>
 			(Error("inside")) { Done }
-			| (_) { panic("lost the inner handler") }
+			& (_) { panic("lost the inner handler") }
 	})
 	third = catch(() { control.boundary((b) { inner_catch(b) }) })
 	third |>
 		(Ok(Paused(k))) {
 			assert(catch(() { control.resume(k, Nil) }) == Ok(Done))
 		}
-		| (_) { panic("expected a paused inner catch") }
+		& (_) { panic("expected a paused inner catch") }
 }

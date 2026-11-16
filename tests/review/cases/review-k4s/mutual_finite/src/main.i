@@ -4,8 +4,8 @@ use = <N>() <- (s : S(N)) {
 	f()
 }
 first = <N>(b : Bool) <- (s : S(N)) {
-	b |> (True) { second(False) } | (False) { use() }
+	b |> (True) { second(False) } & (False) { use() }
 }
 second = <N>(b : Bool) <- (s : S(N)) {
-	b |> (True) { first(False) } | (False) { use() }
+	b |> (True) { first(False) } & (False) { use() }
 }

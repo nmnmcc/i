@@ -205,10 +205,10 @@ test("all_long_test", () {
 	assert(option.all(xs) == Some(build_plain(1_000_000, [])))
 })
 
-build = (n, acc) { n |> (0) { acc } | (_) { build(n - 1, [Some(n), ..acc]) } }
+build = (n, acc) { n |> (0) { acc } & (_) { build(n - 1, [Some(n), ..acc]) } }
 
 build_plain = (n, acc) {
-	n |> (0) { acc } | (_) { build_plain(n - 1, [n, ..acc]) }
+	n |> (0) { acc } & (_) { build_plain(n - 1, [n, ..acc]) }
 }
 
 test("known_types_test", () {
@@ -217,7 +217,7 @@ test("known_types_test", () {
 	assert(option.map(user, (u) { u.name }) == Some("ann"))
 	assert(
 		option.then(user, (u) {
-			{ u.age > 18 } |> (True) { Some(u.age) } | (False) { None }
+			{ u.age > 18 } |> (True) { Some(u.age) } & (False) { None }
 		}) ==
 			Some(30),
 	)

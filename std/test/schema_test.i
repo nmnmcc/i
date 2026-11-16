@@ -34,7 +34,7 @@ user_schema = () {
 				schema.map(schema.object(()), (_) { Member }, (_) { () }),
 			),
 		],
-		(r) { r |> (Admin) { "admin" } | (Member) { "member" } },
+		(r) { r |> (Admin) { "admin" } & (Member) { "member" } },
 	)
 	address = schema.field(
 		schema.object(Address(city = "")),
@@ -347,7 +347,7 @@ test("parse_bad_syntax", () {
 	assert(
 		fail.catch(() { schema.parse(schema.int, "[") }) |>
 			(Error(schema.Syntax(_))) { True }
-			| (_) { False },
+			& (_) { False },
 	)
 })
 

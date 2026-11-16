@@ -5,7 +5,7 @@ use = <N>() <- (s : S(N)) {
 }
 run = (f) { f() }
 id = (x) { x }
-f = () -> Nil { True |> (True) { use() } | (False) { use() } }
+f = () -> Nil { True |> (True) { use() } & (False) { use() } }
 
 main = () {
 	_syn3_0 : S(Never) = S(() { Nil }, (_ : Never) { Nil })

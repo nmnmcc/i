@@ -67,14 +67,14 @@ Parser = (
 bump = (p : Parser) -> Parser {
 	p.rest |>
 		([_, ..tail]) { Parser(..p, rest = tail, position = p.position + 1) }
-		| ([]) { panic("regex: parser advance at end") }
+		& ([]) { panic("regex: parser advance at end") }
 }
 
 syntax_error = (p : Parser, reason : String) -> Never {
 	fail.raise(RegexError(position = p.position, reason = reason))
 }
 
-peek = (p : Parser) -> Int { p.rest |> ([]) { -1 } | ([c, .._]) { c } }
+peek = (p : Parser) -> Int { p.rest |> ([]) { -1 } & ([c, .._]) { c } }
 
 digit = (c : Int) -> Bool { c >= 48 && c <= 57 }
 
@@ -85,7 +85,7 @@ name_char = (c : Int) -> Bool {
 scalar = (n : Int) -> String {
 	<<n:u(32)>> |>
 		(<<c:utf32be_codepoint>>) { core.from_codepoints([c]) }
-		| (_) { panic("regex: scalar invariant") }
+		& (_) { panic("regex: scalar invariant") }
 }
 
 parse_alternation = (p : Parser) -> (Ast, Parser) {
@@ -95,13 +95,13 @@ parse_alternation = (p : Parser) -> (Ast, Parser) {
 			(right, end) = parse_alternation(bump(tail))
 			(Alternate(left, right), end)
 		}
-		| (False) { (left, tail) }
+		& (False) { (left, tail) }
 }
 
 parse_sequence = (p : Parser, acc : List(Ast)) -> (Ast, Parser) {
 	peek(p) |>
 		(-1 | 41 | 124) { (Sequence(list.reverse(acc)), p) }
-		| (_) {
+		& (_) {
 			(a, tail) = parse_atom(p)
 			(b, end) = parse_repeat(a, tail)
 			parse_sequence(end, [b, ..acc])
@@ -113,51 +113,51 @@ parse_atom = (p : Parser) -> (Ast, Parser) {
 	tail = bump(p)
 	c |>
 		(46) { (Atom(Any(p.flags.dotall), False), tail) }
-		| (94) {
-			(Look(p.flags.multiline |> (True) { 2 } | (False) { 0 }), tail)
+		& (94) {
+			(Look(p.flags.multiline |> (True) { 2 } & (False) { 0 }), tail)
 		}
-		| (36) {
-			(Look(p.flags.multiline |> (True) { 3 } | (False) { 1 }), tail)
+		& (36) {
+			(Look(p.flags.multiline |> (True) { 3 } & (False) { 1 }), tail)
 		}
-		| (91) {
+		& (91) {
 			(cls, end) = parse_class(tail)
 			(Atom(cls, p.flags.insensitive), end)
 		}
-		| (92) { escape_atom(tail) }
-		| (40) { parse_group(tail) }
-		| (42 | 43 | 63 | 123) {
+		& (92) { escape_atom(tail) }
+		& (40) { parse_group(tail) }
+		& (42 | 43 | 63 | 123) {
 			syntax_error(p, "repetition has no expression")
 		}
-		| (_) { (Atom(Literal(c), p.flags.insensitive), tail) }
+		& (_) { (Atom(Literal(c), p.flags.insensitive), tail) }
 }
 
 escape_class = (p : Parser) -> (Class, Parser) {
 	c = peek(p)
 	{ c == -1 } |>
 		(True) { syntax_error(p, "trailing escape") }
-		| (False) {
+		& (False) {
 			tail = bump(p)
 			c |>
 				(100) { (Digit, tail) }
-				| (68) { (Negate(Digit), tail) }
-				| (119) { (Word, tail) }
-				| (87) { (Negate(Word), tail) }
-				| (115) { (Space, tail) }
-				| (83) { (Negate(Space), tail) }
-				| (110) { (Literal(10), tail) }
-				| (114) { (Literal(13), tail) }
-				| (116) { (Literal(9), tail) }
-				| (102) { (Literal(12), tail) }
-				| (118) { (Literal(11), tail) }
-				| (97) { (Literal(7), tail) }
-				| (120 | 117) { hex_escape(tail, c) }
-				| (49 | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 107 | 103) {
+				& (68) { (Negate(Digit), tail) }
+				& (119) { (Word, tail) }
+				& (87) { (Negate(Word), tail) }
+				& (115) { (Space, tail) }
+				& (83) { (Negate(Space), tail) }
+				& (110) { (Literal(10), tail) }
+				& (114) { (Literal(13), tail) }
+				& (116) { (Literal(9), tail) }
+				& (102) { (Literal(12), tail) }
+				& (118) { (Literal(11), tail) }
+				& (97) { (Literal(7), tail) }
+				& (120 | 117) { hex_escape(tail, c) }
+				& (49 | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 107 | 103) {
 					syntax_error(p, "backreferences are not supported")
 				}
-				| (_) {
+				& (_) {
 					name_char(c) |>
 						(True) { syntax_error(p, "unknown escape") }
-						| (False) { (Literal(c), tail) }
+						& (False) { (Literal(c), tail) }
 				}
 		}
 }
@@ -165,13 +165,13 @@ escape_class = (p : Parser) -> (Class, Parser) {
 hex_value = (c : Int) -> Int {
 	{ c >= 48 && c <= 57 } |>
 		(True) { c - 48 }
-		| (False) {
+		& (False) {
 			{ c >= 65 && c <= 70 } |>
 				(True) { c - 55 }
-				| (False) {
+				& (False) {
 					{ c >= 97 && c <= 102 } |>
 						(True) { c - 87 }
-						| (False) { -1 }
+						& (False) { -1 }
 				}
 		}
 }
@@ -185,18 +185,18 @@ hex_digits = (p : Parser, n : Int, value : Int, braced : Bool, seen : Bool) -> (
 		(True) {
 			{ value > 1114111 || { value >= 55296 && value <= 57343 } } |>
 				(True) { syntax_error(p, "escape is not a Unicode scalar") }
-				| (False) {
+				& (False) {
 					(
 						Literal(value),
-						braced |> (True) { bump(p) } | (False) { p },
+						braced |> (True) { bump(p) } & (False) { p },
 					)
 				}
 		}
-		| (False) {
+		& (False) {
 			h = hex_value(c)
 			{ h < 0 || n == 0 } |>
 				(True) { syntax_error(p, "invalid hex escape") }
-				| (False) {
+				& (False) {
 					hex_digits(bump(p), n - 1, value * 16 + h, braced, True)
 				}
 		}
@@ -205,20 +205,20 @@ hex_digits = (p : Parser, n : Int, value : Int, braced : Bool, seen : Bool) -> (
 hex_escape = (p : Parser, kind : Int) -> (Class, Parser) {
 	{ peek(p) == 123 } |>
 		(True) { hex_digits(bump(p), 6, 0, True, False) }
-		| (False) {
+		& (False) {
 			{ kind == 120 } |>
 				(True) { hex_digits(p, 2, 0, False, False) }
-				| (False) { syntax_error(p, "Unicode escape requires braces") }
+				& (False) { syntax_error(p, "Unicode escape requires braces") }
 		}
 }
 
 escape_atom = (p : Parser) -> (Ast, Parser) {
 	peek(p) |>
 		(98) { (Look(4), bump(p)) }
-		| (66) { (Look(5), bump(p)) }
-		| (65) { (Look(0), bump(p)) }
-		| (122) { (Look(1), bump(p)) }
-		| (_) {
+		& (66) { (Look(5), bump(p)) }
+		& (65) { (Look(0), bump(p)) }
+		& (122) { (Look(1), bump(p)) }
+		& (_) {
 			(c, tail) = escape_class(p)
 			(Atom(c, p.flags.insensitive), tail)
 		}
@@ -227,19 +227,19 @@ escape_atom = (p : Parser) -> (Ast, Parser) {
 class_item = (p : Parser) -> (Class, Parser) {
 	peek(p) |>
 		(-1) { syntax_error(p, "unclosed character class") }
-		| (92) { escape_class(bump(p)) }
-		| (c) { (Literal(c), bump(p)) }
+		& (92) { escape_class(bump(p)) }
+		& (c) { (Literal(c), bump(p)) }
 }
 
 class_items = (p : Parser, acc : List(Class)) -> (Class, Parser) {
 	peek(p) |>
 		(-1) { syntax_error(p, "unclosed character class") }
-		| (93) {
+		& (93) {
 			acc |>
 				([]) { syntax_error(p, "empty character class") }
-				| (_) { (Union(list.reverse(acc)), bump(p)) }
+				& (_) { (Union(list.reverse(acc)), bump(p)) }
 		}
-		| (_) {
+		& (_) {
 			(first, tail) = class_item(p)
 			tail.rest |>
 				([45, next, .._] ? next != 93) {
@@ -248,9 +248,9 @@ class_items = (p : Parser, acc : List(Class)) -> (Class, Parser) {
 						((Literal(a), Literal(b)) ? a <= b) {
 							class_items(end, [Range(a, b), ..acc])
 						}
-						| (_) { syntax_error(tail, "invalid character range") }
+						& (_) { syntax_error(tail, "invalid character range") }
 				}
-				| (_) { class_items(tail, [first, ..acc]) }
+				& (_) { class_items(tail, [first, ..acc]) }
 		}
 }
 
@@ -260,7 +260,7 @@ parse_class = (p : Parser) -> (Class, Parser) {
 			(c, tail) = class_items(bump(p), [])
 			(Negate(c), tail)
 		}
-		| (False) { class_items(p, []) }
+		& (False) { class_items(p, []) }
 }
 
 read_name = (p : Parser, acc : List(String)) -> (String, Parser) {
@@ -268,12 +268,12 @@ read_name = (p : Parser, acc : List(String)) -> (String, Parser) {
 		(62) {
 			acc |>
 				([]) { syntax_error(p, "empty capture name") }
-				| (_) { (core.concat(list.reverse(acc)), bump(p)) }
+				& (_) { (core.concat(list.reverse(acc)), bump(p)) }
 		}
-		| (c) {
+		& (c) {
 			name_char(c) |>
 				(True) { read_name(bump(p), [scalar(c), ..acc]) }
-				| (False) { syntax_error(p, "invalid capture name") }
+				& (False) { syntax_error(p, "invalid capture name") }
 		}
 }
 
@@ -281,8 +281,8 @@ finish_group = (p : Parser, outer : Flags, id : Int) -> (Ast, Parser) {
 	(body, tail) = parse_alternation(p)
 	{ peek(tail) == 41 } |>
 		(False) { syntax_error(tail, "unclosed group") }
-		| (True) {
-			a = { id < 0 } |> (True) { body } | (False) { Capture(id, body) }
+		& (True) {
+			a = { id < 0 } |> (True) { body } & (False) { Capture(id, body) }
 			(a, Parser(..bump(tail), flags = outer))
 		}
 }
@@ -303,7 +303,7 @@ flag_group = (p : Parser, outer : Flags, enabled : Bool, seen : Bool) -> (
 				True,
 			)
 		}
-		| (109) {
+		& (109) {
 			flag_group(
 				Parser(
 					..bump(p),
@@ -314,7 +314,7 @@ flag_group = (p : Parser, outer : Flags, enabled : Bool, seen : Bool) -> (
 				True,
 			)
 		}
-		| (115) {
+		& (115) {
 			flag_group(
 				Parser(..bump(p), flags = Flags(..p.flags, dotall = enabled)),
 				outer,
@@ -322,10 +322,10 @@ flag_group = (p : Parser, outer : Flags, enabled : Bool, seen : Bool) -> (
 				True,
 			)
 		}
-		| (45) { flag_group(bump(p), outer, False, seen) }
-		| (41 ? seen) { (Empty, bump(p)) }
-		| (58 ? seen) { finish_group(bump(p), outer, -1) }
-		| (_) {
+		& (45) { flag_group(bump(p), outer, False, seen) }
+		& (41 ? seen) { (Empty, bump(p)) }
+		& (58 ? seen) { finish_group(bump(p), outer, -1) }
+		& (_) {
 			syntax_error(
 				p,
 				"unknown group or flag; lookaround is not supported",
@@ -338,17 +338,17 @@ parse_group = (p : Parser) -> (Ast, Parser) {
 		(False) {
 			finish_group(Parser(..p, count = p.count + 1), p.flags, p.count + 1)
 		}
-		| (True) {
+		& (True) {
 			tail = bump(p)
 			peek(tail) |>
 				(58) { finish_group(bump(tail), p.flags, -1) }
-				| (60) {
+				& (60) {
 					start = bump(tail)
 					{ peek(start) == 61 || peek(start) == 33 } |>
 						(True) {
 							syntax_error(start, "lookaround is not supported")
 						}
-						| (False) {
+						& (False) {
 							(name, end) = read_name(start, [])
 							{ digit(peek(start)) || dict.has(p.names, name) } |>
 								(True) {
@@ -357,7 +357,7 @@ parse_group = (p : Parser) -> (Ast, Parser) {
 										"duplicate or invalid capture name",
 									)
 								}
-								| (False) {
+								& (False) {
 									finish_group(
 										Parser(
 											..end,
@@ -374,7 +374,7 @@ parse_group = (p : Parser) -> (Ast, Parser) {
 								}
 						}
 				}
-				| (_) { flag_group(tail, p.flags, True, False) }
+				& (_) { flag_group(tail, p.flags, True, False) }
 		}
 }
 
@@ -384,14 +384,14 @@ number = (p : Parser, value : Int, seen : Bool) -> (Int, Parser) {
 		(True) {
 			{ value > 1000 } |>
 				(True) { syntax_error(p, "repetition count exceeds 1000") }
-				| (False) { number(bump(p), value * 10 + c - 48, True) }
+				& (False) { number(bump(p), value * 10 + c - 48, True) }
 		}
-		| (False) {
+		& (False) {
 			{ core.not(seen) || value > 1000 } |>
 				(True) {
 					syntax_error(p, "invalid repetition count (maximum 1000)")
 				}
-				| (False) { (value, p) }
+				& (False) { (value, p) }
 		}
 }
 
@@ -399,20 +399,20 @@ bounds = (p : Parser) -> (Int, Int, Parser) {
 	(low, tail) = number(p, 0, False)
 	peek(tail) |>
 		(125) { (low, low, bump(tail)) }
-		| (44) {
+		& (44) {
 			after = bump(tail)
 			{ peek(after) == 125 } |>
 				(True) { (low, -1, bump(after)) }
-				| (False) {
+				& (False) {
 					(high, end) = number(after, 0, False)
 					{ peek(end) == 125 && high >= low } |>
 						(True) { (low, high, bump(end)) }
-						| (False) {
+						& (False) {
 							syntax_error(end, "invalid repetition bounds")
 						}
 				}
 		}
-		| (_) { syntax_error(tail, "unclosed repetition") }
+		& (_) { syntax_error(tail, "unclosed repetition") }
 }
 
 parse_repeat = (a : Ast, p : Parser) -> (Ast, Parser) {
@@ -420,18 +420,18 @@ parse_repeat = (a : Ast, p : Parser) -> (Ast, Parser) {
 		(42 | 43 | 63 | 123) {
 			(low, high, tail) = peek(p) |>
 				(42) { (0, -1, bump(p)) }
-				| (43) { (1, -1, bump(p)) }
-				| (63) { (0, 1, bump(p)) }
-				| (_) { bounds(bump(p)) }
+				& (43) { (1, -1, bump(p)) }
+				& (63) { (0, 1, bump(p)) }
+				& (_) { bounds(bump(p)) }
 			lazy = peek(tail) == 63
-			end = lazy |> (True) { bump(tail) } | (False) { tail }
+			end = lazy |> (True) { bump(tail) } & (False) { tail }
 			peek(end) |>
 				(42 | 43 | 63 | 123) {
 					syntax_error(end, "nested repetition operator")
 				}
-				| (_) { (Repeat(a, low, high, lazy), end) }
+				& (_) { (Repeat(a, low, high, lazy), end) }
 		}
-		| (_) { (a, p) }
+		& (_) { (a, p) }
 }
 
 Accept = ()
@@ -456,7 +456,7 @@ emit = (inst : Inst, b : Build) -> (Int, Build) {
 sequence_code = (xs : List(Ast), next : Int, b : Build) -> (Int, Build) {
 	xs |>
 		([]) { (next, b) }
-		| ([a, ..tail]) {
+		& ([a, ..tail]) {
 			(pc, end) = lower(a, next, b)
 			sequence_code(tail, pc, end)
 		}
@@ -468,11 +468,11 @@ optional_code = (a : Ast, n : Int, lazy : Bool, next : Int, b : Build) -> (
 ) {
 	{ n == 0 } |>
 		(True) { (next, b) }
-		| (False) {
+		& (False) {
 			(body, tail) = lower(a, next, b)
 			fork = lazy |>
 				(True) { Fork(next, body) }
-				| (False) { Fork(body, next) }
+				& (False) { Fork(body, next) }
 			(pc, end) = emit(fork, tail)
 			optional_code(a, n - 1, lazy, pc, end)
 		}
@@ -481,7 +481,7 @@ optional_code = (a : Ast, n : Int, lazy : Bool, next : Int, b : Build) -> (
 required_code = (a : Ast, n : Int, next : Int, b : Build) -> (Int, Build) {
 	{ n == 0 } |>
 		(True) { (next, b) }
-		| (False) {
+		& (False) {
 			(pc, end) = lower(a, next, b)
 			required_code(a, n - 1, pc, end)
 		}
@@ -490,11 +490,11 @@ required_code = (a : Ast, n : Int, next : Int, b : Build) -> (Int, Build) {
 nullable = (a : Ast) -> Bool {
 	a |>
 		(Empty | Look(_)) { True }
-		| (Atom(_, _)) { False }
-		| (Sequence(xs)) { list.all(xs, nullable) }
-		| (Alternate(a, b)) { nullable(a) || nullable(b) }
-		| (Capture(_, body)) { nullable(body) }
-		| (Repeat(body, low, _, _)) { low == 0 || nullable(body) }
+		& (Atom(_, _)) { False }
+		& (Sequence(xs)) { list.all(xs, nullable) }
+		& (Alternate(a, b)) { nullable(a) || nullable(b) }
+		& (Capture(_, body)) { nullable(body) }
+		& (Repeat(body, low, _, _)) { low == 0 || nullable(body) }
 }
 
 at_least_code = (body : Ast, low : Int, lazy : Bool, next : Int, b : Build) -> (
@@ -503,42 +503,42 @@ at_least_code = (body : Ast, low : Int, lazy : Bool, next : Int, b : Build) -> (
 ) {
 	loop = b.size
 	(child, end) = lower(body, loop, Build(code = b.code, size = b.size + 1))
-	fork = lazy |> (True) { Fork(next, child) } | (False) { Fork(child, next) }
+	fork = lazy |> (True) { Fork(next, child) } & (False) { Fork(child, next) }
 	tail = Build(..end, code = dict.insert(end.code, loop, fork))
 	{ low > 0 } |>
 		(True) { required_code(body, low - 1, child, tail) }
-		| (False) {
+		& (False) {
 			nullable(body) |>
 				// Rust regex compiler c_at_least: nullable x* must be (x+)? to
 				// preserve first-path priority when an epsilon loop is deduplicated.
 				(True) { emit(fork, tail) }
-				| (False) { (loop, tail) }
+				& (False) { (loop, tail) }
 		}
 }
 
 lower = (a : Ast, next : Int, b : Build) -> (Int, Build) {
 	a |>
 		(Empty) { (next, b) }
-		| (Atom(c, i)) {
-			folded = i |> (True) { fold_class(c) } | (False) { c }
+		& (Atom(c, i)) {
+			folded = i |> (True) { fold_class(c) } & (False) { c }
 			emit(Eat(folded, False, next), b)
 		}
-		| (Look(k)) { emit(Check(k, next), b) }
-		| (Sequence(xs)) { sequence_code(list.reverse(xs), next, b) }
-		| (Alternate(left, right)) {
+		& (Look(k)) { emit(Check(k, next), b) }
+		& (Sequence(xs)) { sequence_code(list.reverse(xs), next, b) }
+		& (Alternate(left, right)) {
 			(l, tail) = lower(left, next, b)
 			(r, end) = lower(right, next, tail)
 			emit(Fork(l, r), end)
 		}
-		| (Capture(id, body)) {
+		& (Capture(id, body)) {
 			(end, tail) = emit(Save(id * 2 + 1, next), b)
 			(pc, more) = lower(body, end, tail)
 			emit(Save(id * 2, pc), more)
 		}
-		| (Repeat(body, low, high, lazy)) {
+		& (Repeat(body, low, high, lazy)) {
 			{ high == -1 } |>
 				(True) { at_least_code(body, low, lazy, next, b) }
-				| (False) {
+				& (False) {
 					(pc, tail) = optional_code(body, high - low, lazy, next, b)
 					required_code(body, low, pc, tail)
 				}
@@ -561,7 +561,7 @@ _compile_result = (pattern : String) -> Result(Regex, RegexError) {
 		(a, end) = parse_alternation(p)
 		{ peek(end) != -1 } |>
 			(True) { syntax_error(end, "unexpected closing group") }
-			| (False) { Nil }
+			& (False) { Nil }
 		(accept, b) = emit(Accept, Build(code = dict.new(), size = 0))
 		(pc, tail) = lower(Capture(0, a), accept, b)
 		Regex(code = tail.code, start = pc, names = end.names)
@@ -574,19 +574,19 @@ in_ranges = (table : BitArray, c : Int) -> Bool {
 	go = (low, high) {
 		{ low >= high } |>
 			(True) { False }
-			| (False) {
+			& (False) {
 				mid = { low + high } / 2
 				table |>
 					(<<_:bytes(mid * 6), a:u(24), b:u(24), _:bits>>) {
 						{ c < a } |>
 							(True) { go(low, mid) }
-							| (False) {
+							& (False) {
 								{ c > b } |>
 									(True) { go(mid + 1, high) }
-									| (False) { True }
+									& (False) { True }
 							}
 					}
-					| (_) { panic("regex: property table index") }
+					& (_) { panic("regex: property table index") }
 			}
 	}
 	go(0, core.bit_size(table) / 48)
@@ -595,13 +595,13 @@ in_ranges = (table : BitArray, c : Int) -> Bool {
 class_has = (cls : Class, c : Int) -> Bool {
 	cls |>
 		(Literal(n)) { n == c }
-		| (Range(low, high)) { c >= low && c <= high }
-		| (Digit) { in_ranges(unicode_digit, c) }
-		| (Word) { in_ranges(unicode_word, c) }
-		| (Space) { in_ranges(unicode_space, c) }
-		| (Any(dotall)) { dotall || c != 10 }
-		| (Union(xs)) { list.any(xs, (x) { class_has(x, c) }) }
-		| (Negate(x)) { core.not(class_has(x, c)) }
+		& (Range(low, high)) { c >= low && c <= high }
+		& (Digit) { in_ranges(unicode_digit, c) }
+		& (Word) { in_ranges(unicode_word, c) }
+		& (Space) { in_ranges(unicode_space, c) }
+		& (Any(dotall)) { dotall || c != 10 }
+		& (Union(xs)) { list.any(xs, (x) { class_has(x, c) }) }
+		& (Negate(x)) { core.not(class_has(x, c)) }
 }
 
 // Fold classes at compile time, before applying their negation. This matters
@@ -609,20 +609,20 @@ class_has = (cls : Class, c : Int) -> Bool {
 fold_class = (cls : Class) -> Class {
 	cls |>
 		(Negate(x)) { Negate(fold_class(x)) }
-		| (Union(xs)) { Union(list.map(xs, fold_class)) }
-		| (_) {
+		& (Union(xs)) { Union(list.map(xs, fold_class)) }
+		& (_) {
 			collect = (table, acc) {
 				table |>
 					(<<>>) { list.reverse(acc) }
-					| (<<c:u(24), a:u(24), b:u(24), d:u(24), tail:bits>>) {
+					& (<<c:u(24), a:u(24), b:u(24), d:u(24), tail:bits>>) {
 						has = class_has(cls, a) ||
 							{ b != 16777215 && class_has(cls, b) } ||
 							{ d != 16777215 && class_has(cls, d) }
 						has |>
 							(True) { collect(tail, [Literal(c), ..acc]) }
-							| (False) { collect(tail, acc) }
+							& (False) { collect(tail, acc) }
 					}
-					| (_) { panic("regex: simple fold table") }
+					& (_) { panic("regex: simple fold table") }
 			}
 			extras = collect(fold_pairs, [])
 			Union([cls, ..extras])
@@ -653,17 +653,17 @@ input = (text : String) -> Input {
 byte_width = (c : Int) -> Int {
 	{ c < 128 } |>
 		(True) { 1 }
-		| (False) {
+		& (False) {
 			{ c < 2048 } |>
 				(True) { 2 }
-				| (False) { { c < 65536 } |> (True) { 3 } | (False) { 4 } }
+				& (False) { { c < 65536 } |> (True) { 3 } & (False) { 4 } }
 		}
 }
 
 advance = (i : Input) -> Input {
 	i.rest |>
 		([]) { panic("regex: advance after end") }
-		| ([c, ..tail]) {
+		& ([c, ..tail]) {
 			Input(
 				text = i.text,
 				rest = tail,
@@ -681,21 +681,21 @@ at_end = (i : Input) -> Bool { i.rest == [] }
 word_at = (c : Int) -> Bool { c >= 0 && in_ranges(unicode_word, c) }
 
 assertion = (kind : Int, i : Input) -> Bool {
-	following = i.rest |> ([]) { -1 } | ([c, .._]) { c }
+	following = i.rest |> ([]) { -1 } & ([c, .._]) { c }
 	kind |>
 		(0) { i.at.scalar == 0 }
-		| (1) { at_end(i) }
-		| (2) { i.at.scalar == 0 || i.previous == 10 }
-		| (3) { following == -1 || following == 10 }
-		| (4) { word_at(i.previous) != word_at(following) }
-		| (5) { word_at(i.previous) == word_at(following) }
-		| (_) { panic("regex: assertion opcode") }
+		& (1) { at_end(i) }
+		& (2) { i.at.scalar == 0 || i.previous == 10 }
+		& (3) { following == -1 || following == 10 }
+		& (4) { word_at(i.previous) != word_at(following) }
+		& (5) { word_at(i.previous) == word_at(following) }
+		& (_) { panic("regex: assertion opcode") }
 }
 
 instruction = (re : Regex, pc : Int) -> Inst {
 	dict.get(re.code, pc) |>
 		(Some(i)) { i }
-		| (None) { panic("regex: instruction address") }
+		& (None) { panic("regex: instruction address") }
 }
 
 // Priority-ordered depth-first epsilon closure. Mark before following a Fork
@@ -709,11 +709,11 @@ closure = (
 ) -> List(Thread) {
 	pending |>
 		([]) { list.reverse(acc) }
-		| ([thread, ..rest]) {
+		& ([thread, ..rest]) {
 			Thread(pc, slots) = thread
 			dict.has(seen, pc) |>
 				(True) { closure(re, rest, i, seen, acc) }
-				| (False) {
+				& (False) {
 					visited = dict.insert(seen, pc, True)
 					instruction(re, pc) |>
 						(Fork(a, b)) {
@@ -725,7 +725,7 @@ closure = (
 								acc,
 							)
 						}
-						| (Save(slot, next)) {
+						& (Save(slot, next)) {
 							closure(
 								re,
 								[
@@ -740,7 +740,7 @@ closure = (
 								acc,
 							)
 						}
-						| (Check(kind, next)) {
+						& (Check(kind, next)) {
 							assertion(kind, i) |>
 								(True) {
 									closure(
@@ -751,9 +751,9 @@ closure = (
 										acc,
 									)
 								}
-								| (False) { closure(re, rest, i, visited, acc) }
+								& (False) { closure(re, rest, i, visited, acc) }
 						}
-						| (_) { closure(re, rest, i, visited, [thread, ..acc]) }
+						& (_) { closure(re, rest, i, visited, [thread, ..acc]) }
 				}
 		}
 }
@@ -767,7 +767,7 @@ step_threads = (
 ) -> (List(Thread), Option(Captures)) {
 	threads |>
 		([]) { (list.reverse(acc), best) }
-		| ([thread, ..tail]) {
+		& ([thread, ..tail]) {
 			Thread(pc, slots) = thread
 			instruction(re, pc) |>
 				(Accept) {
@@ -782,7 +782,7 @@ step_threads = (
 						),
 					)
 				}
-				| (Eat(cls, _, next)) {
+				& (Eat(cls, _, next)) {
 					i.rest |>
 						([c, .._] ? class_has(cls, c)) {
 							step_threads(
@@ -793,9 +793,9 @@ step_threads = (
 								best,
 							)
 						}
-						| (_) { step_threads(re, tail, i, acc, best) }
+						& (_) { step_threads(re, tail, i, acc, best) }
 				}
-				| (_) { panic("regex: epsilon instruction in terminal set") }
+				& (_) { panic("regex: epsilon instruction in terminal set") }
 		}
 }
 
@@ -807,18 +807,18 @@ search_loop = (
 ) -> Option(Captures) {
 	active = best |>
 		(None) { list.append(threads, [Thread(re.start, dict.new())]) }
-		| (Some(_)) { threads }
+		& (Some(_)) { threads }
 	expanded = closure(re, active, i, dict.new(), [])
 	(next, found) = step_threads(re, expanded, i, [], best)
 	{ at_end(i) || { next == [] && found != None } } |>
 		(True) { found }
-		| (False) { search_loop(re, advance(i), next, found) }
+		& (False) { search_loop(re, advance(i), next, found) }
 }
 
 bytes = (text : String, start : Int, end : Int) -> String {
 	core.byte_slice(text, start, end - start) |>
 		(Ok(s)) { s }
-		| (Error(_)) { panic("regex: capture byte boundaries") }
+		& (Error(_)) { panic("regex: capture byte boundaries") }
 }
 
 /// Capture by index; zero is the full match. An unmatched group is None.
@@ -826,7 +826,7 @@ bytes = (text : String, start : Int, end : Int) -> String {
 group = (captures : Captures, index : Int) -> Option(Match) {
 	{ index < 0 } |>
 		(True) { None }
-		| (False) {
+		& (False) {
 			(
 				dict.get(captures.slots, index * 2),
 				dict.get(captures.slots, index * 2 + 1),
@@ -840,7 +840,7 @@ group = (captures : Captures, index : Int) -> Option(Match) {
 						),
 					)
 				}
-				| (_) { None }
+				& (_) { None }
 		}
 }
 
@@ -848,13 +848,13 @@ group = (captures : Captures, index : Int) -> Option(Match) {
 named = (captures : Captures, name : String) -> Option(Match) {
 	dict.get(captures.names, name) |>
 		(None) { None }
-		| (Some(id)) { group(captures, id) }
+		& (Some(id)) { group(captures, id) }
 }
 
 whole = (captures : Captures) -> Match {
 	group(captures, 0) |>
 		(Some(m)) { m }
-		| (None) { panic("regex: full match capture") }
+		& (None) { panic("regex: full match capture") }
 }
 
 /// The leftmost-first capture set, including all participating groups.
@@ -866,7 +866,7 @@ regex_input = input
 
 /// Finds the leftmost-first match: `regex.find(re, "abc")`.
 find = (regex : Regex, input : String) -> Option(Match) {
-	captures(regex, input) |> (None) { None } | (Some(c)) { Some(whole(c)) }
+	captures(regex, input) |> (None) { None } & (Some(c)) { Some(whole(c)) }
 }
 
 /// Whether any match exists, including an empty match.
@@ -877,7 +877,7 @@ is_match = (regex : Regex, input : String) -> Bool {
 move_to = (i : Input, scalar : Int) -> Input {
 	{ i.at.scalar == scalar } |>
 		(True) { i }
-		| (False) { move_to(advance(i), scalar) }
+		& (False) { move_to(advance(i), scalar) }
 }
 
 // Rust's empty-match iteration rule: suppress an empty match immediately
@@ -890,7 +890,7 @@ scan_all = (
 ) -> List(Captures) {
 	search_loop(re, i, [], None) |>
 		(None) { list.reverse(acc) }
-		| (Some(c)) {
+		& (Some(c)) {
 			m = whole(c)
 			empty = m.start == m.end
 			end = move_to(i, m.end)
@@ -898,14 +898,14 @@ scan_all = (
 				(True) {
 					at_end(end) |>
 						(True) { list.reverse(acc) }
-						| (False) { scan_all(re, advance(end), last_end, acc) }
+						& (False) { scan_all(re, advance(end), last_end, acc) }
 				}
-				| (False) {
+				& (False) {
 					empty |>
 						(True) {
 							at_end(end) |>
 								(True) { list.reverse([c, ..acc]) }
-								| (False) {
+								& (False) {
 									scan_all(
 										re,
 										advance(end),
@@ -914,7 +914,7 @@ scan_all = (
 									)
 								}
 						}
-						| (False) { scan_all(re, end, m.end, [c, ..acc]) }
+						& (False) { scan_all(re, end, m.end, [c, ..acc]) }
 				}
 		}
 }
@@ -930,14 +930,14 @@ find_all = (regex : Regex, input : String) -> List(Match) {
 slot = (c : Captures, n : Int) -> Offset {
 	dict.get(c.slots, n) |>
 		(Some(x)) { x }
-		| (None) { panic("regex: whole capture slot") }
+		& (None) { panic("regex: whole capture slot") }
 }
 
 replacement_value = (c : Captures, name : String) -> String {
 	m = fail.catch(() { int.parse(name) }) |>
 		(Ok(n)) { group(c, n) }
-		| (Error(_)) { named(c, name) }
-	m |> (Some(v)) { v.text } | (None) { "" }
+		& (Error(_)) { named(c, name) }
+	m |> (Some(v)) { v.text } & (None) { "" }
 }
 
 replacement_name = (xs : List(Int), braced : Bool, acc : List(String)) -> (
@@ -949,10 +949,10 @@ replacement_name = (xs : List(Int), braced : Bool, acc : List(String)) -> (
 		([125, ..tail] ? braced) {
 			(core.concat(list.reverse(acc)), tail, True)
 		}
-		| ([c, ..tail] ? name_char(c)) {
+		& ([c, ..tail] ? name_char(c)) {
 			replacement_name(tail, braced, [scalar(c), ..acc])
 		}
-		| (_) { (core.concat(list.reverse(acc)), xs, core.not(braced)) }
+		& (_) { (core.concat(list.reverse(acc)), xs, core.not(braced)) }
 }
 
 expand_replacement = (
@@ -962,10 +962,10 @@ expand_replacement = (
 ) -> String {
 	xs |>
 		([]) { core.concat(list.reverse(acc)) }
-		| ([36, 36, ..tail]) { expand_replacement(tail, c, ["$", ..acc]) }
-		| ([36, ..tail]) {
-			braced = tail |> ([123, .._]) { True } | (_) { False }
-			start = braced |> (True) { list.drop(tail, 1) } | (False) { tail }
+		& ([36, 36, ..tail]) { expand_replacement(tail, c, ["$", ..acc]) }
+		& ([36, ..tail]) {
+			braced = tail |> ([123, .._]) { True } & (_) { False }
+			start = braced |> (True) { list.drop(tail, 1) } & (False) { tail }
 			(name, end, closed) = replacement_name(start, braced, [])
 			{ name != "" && closed } |>
 				(True) {
@@ -975,9 +975,9 @@ expand_replacement = (
 						[replacement_value(c, name), ..acc],
 					)
 				}
-				| (False) { expand_replacement(tail, c, ["$", ..acc]) }
+				& (False) { expand_replacement(tail, c, ["$", ..acc]) }
 		}
-		| ([x, ..tail]) { expand_replacement(tail, c, [scalar(x), ..acc]) }
+		& ([x, ..tail]) { expand_replacement(tail, c, [scalar(x), ..acc]) }
 }
 
 replace_captures = (
@@ -995,7 +995,7 @@ replace_captures = (
 				),
 			)
 		}
-		| ([c, ..tail]) {
+		& ([c, ..tail]) {
 			replace_captures(
 				tail,
 				text,
@@ -1013,7 +1013,7 @@ replace_captures = (
 /// Replaces the first match; `$1`, `${name}`, and `$$` expand captures/dollar.
 /// Missing groups expand to empty text. `$1x` names group `1x`; use `${1}x`.
 replace = (regex : Regex, input : String, with : String) -> String {
-	matches = captures(regex, input) |> (None) { [] } | (Some(c)) { [c] }
+	matches = captures(regex, input) |> (None) { [] } & (Some(c)) { [c] }
 	replace_captures(
 		matches,
 		input,
@@ -1043,7 +1043,7 @@ split = (regex : Regex, input : String) -> List(String) {
 					[bytes(input, at, core.byte_size(input)), ..acc],
 				)
 			}
-			| ([c, ..tail]) {
+			& ([c, ..tail]) {
 				go(
 					tail,
 					slot(c, 1).byte,
@@ -1078,7 +1078,7 @@ fold_pairs = table(
 table = (hex : String) -> BitArray {
 	fail.catch(() { bit_array.base16_decode(hex) }) |>
 		(Ok(bytes)) { bytes }
-		| (Error(_)) { panic("regex: Unicode table encoding") }
+		& (Error(_)) { panic("regex: Unicode table encoding") }
 }
 
 /// Compiles to an immutable NFA, or an error at a scalar position.

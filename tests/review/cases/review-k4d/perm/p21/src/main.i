@@ -50,7 +50,7 @@ bad : <N>() <- (Fail(Never), ..N) -> Int = () <- (
 	f()
 }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 use = <N>() <- (s : S(N)) {
 	S(f = f) = s

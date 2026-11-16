@@ -6,7 +6,7 @@ fr = () { run(() { use() }) }
 
 T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 bad : <N>() <- (Fail(Never), ..N) -> Int = () <- (
 	s : S(N),

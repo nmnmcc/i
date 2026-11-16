@@ -36,7 +36,7 @@ uset : <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x : A) <- (
 
 get = () <- (d : Dep) { d.v }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 bad : <N>() <- (Fail(Never), ..N) -> Int = () <- (
 	s : S(N),

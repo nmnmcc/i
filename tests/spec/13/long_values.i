@@ -8,7 +8,7 @@
 // `core.inspect` and `core.hash` are linear in the size of the value, so
 // long lists take little time.
 build = (n : Int, acc : List(Int)) -> List(Int) {
-	n |> (0) { acc } | (_) { build(n - 1, [n % 10, ..acc]) }
+	n |> (0) { acc } & (_) { build(n - 1, [n % 10, ..acc]) }
 }
 
 test("inspect_long_list", () {
@@ -17,17 +17,17 @@ test("inspect_long_list", () {
 		core.inspect(build(100000, [])),
 	) |>
 		(300000) { Nil }
-		| (n) { panic(core.inspect(n)) }
+		& (n) { panic(core.inspect(n)) }
 })
 
 test("hash_long_list", () {
 	{ core.hash(build(300000, [])) == core.hash(build(300000, [])) } |>
 		(True) { Nil }
-		| (False) { panic("hash") }
+		& (False) { panic("hash") }
 })
 
 test("inspect_nested", () {
 	core.inspect([(1, "a\n"), (-2, "b")]) |>
 		("[(1, \"a\\n\"), (-2, \"b\")]") { Nil }
-		| (s) { panic(s) }
+		& (s) { panic(s) }
 })

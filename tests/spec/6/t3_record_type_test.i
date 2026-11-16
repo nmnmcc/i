@@ -4,7 +4,7 @@
 	main
 )
 f = (value : { Record | Int }) -> Int {
-	value |> (_ : Record) { 1 } | (_ : Int) { 2 }
+	value |> (_ : Record) { 1 } & (_ : Int) { 2 }
 }
 
 main = () {

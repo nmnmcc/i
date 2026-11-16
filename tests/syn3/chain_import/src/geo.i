@@ -10,6 +10,6 @@
 
 area =
 	(r : Float) -> Float { 3.0 *. r *. r }
-	| (w : Float, h : Float) -> Float { w *. h }
+	& (w : Float, h : Float) -> Float { w *. h }
 
-show = (n : Int) -> String { core.inspect(n) } | (s : String) -> Int { 7 }
+show = (n : Int) -> String { core.inspect(n) } & (s : String) -> Int { 7 }

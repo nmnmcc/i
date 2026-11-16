@@ -3,7 +3,7 @@ main = () {
 	Nil
 }
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 fr = () { run(() { use() }) }
 

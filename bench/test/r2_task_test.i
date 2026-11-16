@@ -11,7 +11,7 @@ rounds = 1_000
 spawns = (n : Int, total : Int) -> Int {
 	n |>
 		(0) { total }
-		| (_) {
+		& (_) {
 			value = task.scope((s) { task.join(task.go(s, () { 1 })) })
 			spawns(n - 1, total + value)
 		}
@@ -20,7 +20,7 @@ spawns = (n : Int, total : Int) -> Int {
 switches = (n : Int, total : Int) -> Int {
 	n |>
 		(0) { total }
-		| (_) {
+		& (_) {
 			task.yield()
 			switches(n - 1, total + 1)
 		}
@@ -29,7 +29,7 @@ switches = (n : Int, total : Int) -> Int {
 sends = (c : task.Channel(Int), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			task.send(c, n)
 			sends(c, n - 1)
 		}
@@ -38,7 +38,7 @@ sends = (c : task.Channel(Int), n : Int) -> Nil {
 receives = (c : task.Channel(Int), n : Int, total : Int) -> Int {
 	n |>
 		(0) { total }
-		| (_) {
+		& (_) {
 			value = task.receive(c)
 			receives(c, n - 1, total + value)
 		}

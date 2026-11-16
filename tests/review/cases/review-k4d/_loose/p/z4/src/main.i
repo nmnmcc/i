@@ -3,7 +3,7 @@
 )
 Svc(A) = (f = () -> A, m = (A) -> Nil)
 ask = <A>() <- (s : Svc(A)) { s.f() }
-tell = (x : Int) { x |> (2) { "two" } | (_) { "other" } }
+tell = (x : Int) { x |> (2) { "two" } & (_) { "other" } }
 
 main = () <- (io : Io) {
 	_syn3_0 : Svc(Int) = Svc(f = () { 1 }, m = (_ : Int) { Nil })

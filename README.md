@@ -16,8 +16,8 @@ Expr = Num | Add | Mul
 // Inferred: (Expr) -> Int
 eval =
 	(Num(n)) { n }
-	| (Add(a, b)) { eval(a) + eval(b) }
-	| (Mul(a, b)) { eval(a) * eval(b) }
+	& (Add(a, b)) { eval(a) + eval(b) }
+	& (Mul(a, b)) { eval(a) * eval(b) }
 
 main = () {
 	sum = Add(Num(1), Num(5))
@@ -26,7 +26,7 @@ main = () {
 }
 ```
 
-`i run` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `|` are one function that matches its argument. No type is written, and every type is checked.
+`i run` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `&` are one function that matches its argument. No type is written, and every type is checked.
 
 A function type has three parts, `(P) <- (S) -> R`: the parameters, the services the function needs, and the result. An error is a service too, `Fail(E)`. All of it is inferred. A service is an ordinary value: a function takes it with `<-` in its head, and the caller gives it with `<-` after an expression, so a test gives its own:
 
@@ -44,7 +44,7 @@ Late = (by = Int)
 remaining = (deadline) <- (clock: Clock) {
 	deadline - clock.now() |>
 		(left ? left < 0) { fail.raise(Late(by = 0 - left)) }
-		| (left) { left }
+		& (left) { left }
 }
 
 test("a test gives its own clock", () {
@@ -61,7 +61,7 @@ test("a test gives its own clock", () {
 
 ```text
 (, if)
-(= _branches (-> (, then else) _ `(| (-> (, True) _ ~then) (-> (, False) _ ~else))))
+(= _branches (-> (, then else) _ `(& (-> (, True) _ ~then) (-> (, False) _ ~else))))
 (@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
 ```
 
@@ -82,7 +82,7 @@ echo = (stream) {
 	bytes = net.read(stream, 65536)
 	core.bit_size(bytes) |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			net.write(stream, bytes)
 			echo(stream)
 		}
@@ -154,7 +154,7 @@ Every command takes `--help`. Editor support is in [editors](editors): a VS Code
 
 The language is defined in one document, [docs/spec.md](docs/spec.md). The library modules `i/…` are in [lib/i](lib/i) and the standard library `std/…` is in [std/src](std/src); each module is documented in its source. The reasons for the design are in [docs/design](docs/design).
 
-The examples above are written in the language's new syntax, which is landing now; until it has landed, the files under `examples` are in the syntax before it. i is in development and has no release: the spec comes first, the compiler does not yet do everything in it, and the language still changes.
+The examples above and the files under `examples` join branch chains with `&`; a value-level `|` separator is a compile error that asks for `&`. i is in development and has no release: the spec comes first, the compiler does not yet do everything in it, and the language still changes.
 
 ## License
 

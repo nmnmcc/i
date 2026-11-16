@@ -32,10 +32,10 @@ Handle = Opaque
 // Host exports: parameters, value, and errors that the host can take.
 add = (a : Int, b : Int) { a + b }
 
-opaque = (h : Handle, flag : Bool) { flag |> (True) { h } | (False) { h } }
+opaque = (h : Handle, flag : Bool) { flag |> (True) { h } & (False) { h } }
 
 errors = (x : Int) -> Nil {
-	x |> (0) { fail.raise(1) } | (1) { fail.raise("one") } | (_) { Nil }
+	x |> (0) { fail.raise(1) } & (1) { fail.raise("one") } & (_) { Nil }
 }
 
 // `Never` is not a type that the host can take (§10.3).

@@ -19,7 +19,7 @@ seven = add(3, 4)
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 apply = (f : (Int, Int) -> Int, a : Int, b : Int) { f(a, b) }

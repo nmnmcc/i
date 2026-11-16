@@ -35,12 +35,12 @@
 
 /// `True` for `Ok`.
 is_ok = <A, E>(result : Result(A, E)) -> Bool {
-	result |> (Ok(_)) { True } | (Error(_)) { False }
+	result |> (Ok(_)) { True } & (Error(_)) { False }
 }
 
 /// `True` for `Error`.
 is_error = <A, E>(result : Result(A, E)) -> Bool {
-	result |> (Ok(_)) { False } | (Error(_)) { True }
+	result |> (Ok(_)) { False } & (Error(_)) { True }
 }
 
 /// Changes the value of an `Ok` with a function. An `Error` stays.
@@ -49,14 +49,14 @@ is_error = <A, E>(result : Result(A, E)) -> Bool {
 /// result.map(Ok(1), (x) { x + 1 })  // Ok(2)
 /// ```
 map = <A, E, B, N>(over : Result(A, E), with : (A) <- N -> B) -> Result(B, E) {
-	over |> (Ok(value)) { Ok(with(value)) } | (Error(error)) { Error(error) }
+	over |> (Ok(value)) { Ok(with(value)) } & (Error(error)) { Error(error) }
 }
 
 /// Changes the error of an `Error` with a function. An `Ok` stays.
 map_error = <A, E, F, N>(over : Result(A, E), with : (E) <- N -> F) -> Result(
 	A,
 	F,
-) { over |> (Ok(value)) { Ok(value) } | (Error(error)) { Error(with(error)) } }
+) { over |> (Ok(value)) { Ok(value) } & (Error(error)) { Error(with(error)) } }
 
 /// Calls a function that gives a result on the value of an `Ok`. An `Error`
 /// stays. This puts together steps that may each fail.
@@ -68,45 +68,45 @@ then = <A, E, B, N>(
 	result : Result(A, E),
 	apply : (A) <- N -> Result(B, E)
 ) -> Result(B, E) {
-	result |> (Ok(value)) { apply(value) } | (Error(error)) { Error(error) }
+	result |> (Ok(value)) { apply(value) } & (Error(error)) { Error(error) }
 }
 
 /// Takes away one level of `Result`.
 flatten = <A, E>(result : Result(Result(A, E), E)) -> Result(A, E) {
-	result |> (Ok(inner)) { inner } | (Error(error)) { Error(error) }
+	result |> (Ok(inner)) { inner } & (Error(error)) { Error(error) }
 }
 
 /// The value of an `Ok`, or `or` for an `Error`.
 unwrap = <A, E>(result : Result(A, E), or : A) -> A {
-	result |> (Ok(value)) { value } | (Error(_)) { or }
+	result |> (Ok(value)) { value } & (Error(_)) { or }
 }
 
 /// The value of an `Ok`, or the value of `or()` for an `Error`.
 lazy_unwrap = <A, E, N>(result : Result(A, E), or : () <- N -> A) -> A {
-	result |> (Ok(value)) { value } | (Error(_)) { or() }
+	result |> (Ok(value)) { value } & (Error(_)) { or() }
 }
 
 /// The error of an `Error`, or `or` for an `Ok`.
 unwrap_error = <A, E>(result : Result(A, E), or : E) -> E {
-	result |> (Ok(_)) { or } | (Error(error)) { error }
+	result |> (Ok(_)) { or } & (Error(error)) { error }
 }
 
 /// The value of an `Ok` or the error of an `Error`, when they have the same
 /// type.
 unwrap_both = <A>(result : Result(A, A)) -> A {
-	result |> (Ok(value)) { value } | (Error(error)) { error }
+	result |> (Ok(value)) { value } & (Error(error)) { error }
 }
 
 /// The first result when it is `Ok`, and the second when not.
 or = <A, E>(first : Result(A, E), second : Result(A, E)) -> Result(A, E) {
-	first |> (Ok(_)) { first } | (Error(_)) { second }
+	first |> (Ok(_)) { first } & (Error(_)) { second }
 }
 
 /// The first result when it is `Ok`, and the value of `second()` when not.
 lazy_or = <A, E, N>(
 	first : Result(A, E),
 	second : () <- N -> Result(A, E)
-) -> Result(A, E) { first |> (Ok(_)) { first } | (Error(_)) { second() } }
+) -> Result(A, E) { first |> (Ok(_)) { first } & (Error(_)) { second() } }
 
 /// `Ok` with all the values when every result is `Ok`, or the first `Error`.
 ///
@@ -118,8 +118,8 @@ all = <A, E>(results : List(Result(A, E))) -> Result(List(A), E) {
 	go = (rest, acc) {
 		rest |>
 			([]) { Ok(reverse(acc)) }
-			| ([Ok(x), ..xs]) { go(xs, [x, ..acc]) }
-			| ([Error(error), ..]) { Error(error) }
+			& ([Ok(x), ..xs]) { go(xs, [x, ..acc]) }
+			& ([Error(error), ..]) { Error(error) }
 	}
 	go(results, [])
 }
@@ -134,8 +134,8 @@ partition = <A, E>(results : List(Result(A, E))) -> (List(A), List(E)) {
 	go = (rest, oks, errors) {
 		rest |>
 			([]) { (reverse(oks), reverse(errors)) }
-			| ([Ok(x), ..xs]) { go(xs, [x, ..oks], errors) }
-			| ([Error(x), ..xs]) { go(xs, oks, [x, ..errors]) }
+			& ([Ok(x), ..xs]) { go(xs, [x, ..oks], errors) }
+			& ([Error(x), ..xs]) { go(xs, oks, [x, ..errors]) }
 	}
 	go(results, [], [])
 }
@@ -145,20 +145,20 @@ values = <A, E>(results : List(Result(A, E))) -> List(A) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([Ok(x), ..xs]) { go(xs, [x, ..acc]) }
-			| ([Error(_), ..xs]) { go(xs, acc) }
+			& ([Ok(x), ..xs]) { go(xs, [x, ..acc]) }
+			& ([Error(_), ..xs]) { go(xs, acc) }
 	}
 	go(results, [])
 }
 
 /// Puts `value` in the place of the value of an `Ok`.
 replace = <A, E, B>(result : Result(A, E), value : B) -> Result(B, E) {
-	result |> (Ok(_)) { Ok(value) } | (Error(error)) { Error(error) }
+	result |> (Ok(_)) { Ok(value) } & (Error(error)) { Error(error) }
 }
 
 /// Puts `error` in the place of the error of an `Error`.
 replace_error = <A, E, F>(result : Result(A, E), error : F) -> Result(A, F) {
-	result |> (Ok(value)) { Ok(value) } | (Error(_)) { Error(error) }
+	result |> (Ok(value)) { Ok(value) } & (Error(_)) { Error(error) }
 }
 
 /// Calls a function on the error of an `Error`, which may give a new
@@ -167,17 +167,17 @@ recover = <A, E, F, N>(
 	result : Result(A, E),
 	with : (E) <- N -> Result(A, F)
 ) -> Result(A, F) {
-	result |> (Ok(value)) { Ok(value) } | (Error(error)) { with(error) }
+	result |> (Ok(value)) { Ok(value) } & (Error(error)) { with(error) }
 }
 
 /// `Ok` with the value of a `Some`, or `Error(error)` for `None`.
 from_option = <A, E>(option : Option(A), error : E) -> Result(A, E) {
-	option |> (Some(value)) { Ok(value) } | (None) { Error(error) }
+	option |> (Some(value)) { Ok(value) } & (None) { Error(error) }
 }
 
 /// `Some` with the value of an `Ok`, or `None` for an `Error`.
 to_option = <A, E>(result : Result(A, E)) -> Option(A) {
-	result |> (Ok(value)) { Some(value) } | (Error(_)) { None }
+	result |> (Ok(value)) { Some(value) } & (Error(_)) { None }
 }
 
 /// The value of an `Ok`. For `Error(x)`, the computation ends with the
@@ -196,7 +196,7 @@ catch : <A, E, N>(() <- (Fail(E), ..N) -> A) <- N -> Result(A, E) = (body) {
 
 reverse = (list) {
 	go = (rest, acc) {
-		rest |> ([]) { acc } | ([x, ..xs]) { go(xs, [x, ..acc]) }
+		rest |> ([]) { acc } & ([x, ..xs]) { go(xs, [x, ..acc]) }
 	}
 	go(list, [])
 }

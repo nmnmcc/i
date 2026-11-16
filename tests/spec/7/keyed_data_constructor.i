@@ -8,7 +8,7 @@ read = (Wrapper(data = (name = n, age = _))) { n }
 choose = (wrapped : Wrapper) {
 	wrapped |>
 		(Wrapper(data = whole = (age = 0, name = n))) { n <> " baby" <> whole.name }
-		| (Wrapper(data = (name = n, age = _))) { n }
+		& (Wrapper(data = (name = n, age = _))) { n }
 }
 
 main = () {

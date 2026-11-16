@@ -27,7 +27,7 @@ broken = () -> stream.Stream(Int, String, Never) {
 }
 
 head = <A, E, N>(s : stream.Stream(A, E, N)) -> option.Option(A) {
-	stream.pull(s) |> (stream.Done) { None } | (stream.Next(x, _)) { Some(x) }
+	stream.pull(s) |> (stream.Done) { None } & (stream.Next(x, _)) { Some(x) }
 }
 
 // Finite-observation laws, with distinct functions for composition.
@@ -164,7 +164,7 @@ test("stream_examples", () {
 	assert(
 		stream.to_list(
 			stream.filter_map(source([1, 2, 3]), (x) {
-				{ x == 2 } |> (True) { Some(20) } | (False) { None }
+				{ x == 2 } |> (True) { Some(20) } & (False) { None }
 			}),
 		) ==
 			[20],
@@ -232,7 +232,7 @@ test("stream_examples", () {
 			(acc, x) {
 				{ x == 2 } |>
 					(True) { list.Stop(acc + x) }
-					| (False) { list.Continue(acc + x) }
+					& (False) { list.Continue(acc + x) }
 			},
 		) ==
 			3,
@@ -277,7 +277,7 @@ traced = (xs : List(Int)) -> stream.Stream(Int, Never, Trace) {
 				visit(0)
 				None
 			}
-			| ([x, ..tail]) {
+			& ([x, ..tail]) {
 				visit(x)
 				Some((x, tail))
 			}
@@ -360,7 +360,7 @@ test("stream_replay_and_services", () {
 	assert(head(a) == Some(1))
 	stream.pull(a) |>
 		(stream.Done) { panic("missing first step") }
-		| (stream.Next(_, tail)) { assert(stream.to_list(tail) == [2]) }
+		& (stream.Next(_, tail)) { assert(stream.to_list(tail) == [2]) }
 	// Runner supplies Bias for each attempted input pull, including Done.
 	run = (
 		body : () <- (Fail(Never), Bias) -> stream.Step(Int, Never, Bias)
@@ -407,7 +407,7 @@ test("stream_error_positions", () {
 				stream.map(source([1, 2, 3]), (x) {
 					{ x == 2 } |>
 						(True) { fail.raise(CallbackError) }
-						| (False) { x }
+						& (False) { x }
 				}),
 			)
 		}) ==
@@ -417,7 +417,7 @@ test("stream_error_positions", () {
 	f = (x : Int) -> stream.Stream(Int, InnerError, Never) {
 		{ x < 0 } |>
 			(True) { fail.raise(CallbackError) }
-			| (False) { stream.from_results([Ok(x), Error(InnerError)]) }
+			& (False) { stream.from_results([Ok(x), Error(InnerError)]) }
 	}
 	assert(
 		stream.to_list(
@@ -482,7 +482,7 @@ test("stream_long_searches", () {
 				stream.flat_map(numbers, (n) {
 					{ n < 1000000 } |>
 						(True) { source([]) }
-						| (False) { source([n]) }
+						& (False) { source([n]) }
 				}),
 				1,
 			),
@@ -538,7 +538,7 @@ test("stream_runner_demand", () {
 })
 
 reject = (x : Int) -> Int {
-	{ x == 2 } |> (True) { fail.raise("callback") } | (False) { x }
+	{ x == 2 } |> (True) { fail.raise("callback") } & (False) { x }
 }
 
 test("stream_callback_failures", () {
@@ -674,7 +674,7 @@ test("stream_resource_scope", () {
 		})
 		stream.to_list(stream.attempt(s))
 	})
-	assert(result |> (Error(_)) { True } | (Ok(_)) { False })
+	assert(result |> (Error(_)) { True } & (Ok(_)) { False })
 	Nil
 })
 
@@ -707,7 +707,7 @@ test("stream_nominal_callbacks", () {
 							),
 						)
 					}
-					| (False) { None }
+					& (False) { None }
 			}),
 		) ==
 			[Item(value = 0), Item(value = 1), Item(value = 2)],
@@ -727,7 +727,7 @@ test("stream_factory_demand", () {
 			})
 			u = stream.unfold(0, (n : Int) -> option.Option((Int, Int)) {
 				visit(n)
-				{ n < 2 } |> (True) { Some((n, n + 1)) } | (False) { None }
+				{ n < 2 } |> (True) { Some((n, n + 1)) } & (False) { None }
 			})
 			failing = stream.make(() -> stream.Step(Int, String, Trace) {
 				visit(88)

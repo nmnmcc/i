@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 // `total` needs `double` and `base`, which come later in the source.
@@ -28,7 +28,7 @@ later = 10
 (first, second) = (base + 1, "two")
 
 apply_all = (fs, x) {
-	fs |> ([]) { [] } | ([f, ..rest]) { [f(x), ..apply_all(rest, x)] }
+	fs |> ([]) { [] } & ([f, ..rest]) { [f(x), ..apply_all(rest, x)] }
 }
 
 test("values", () {

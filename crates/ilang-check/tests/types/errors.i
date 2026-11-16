@@ -19,7 +19,7 @@ bad_arg = () { add("a") }
 
 bad_op = () { 1 + "a" }
 
-bad_guard = (x) { x |> (y ? 1) { y } | (_) { 2 } }
+bad_guard = (x) { x |> (y ? 1) { y } & (_) { 2 } }
 
 // E0502: the number of parameters.
 arity = () { add(1, 2) }

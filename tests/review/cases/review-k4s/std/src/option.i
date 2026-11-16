@@ -30,12 +30,12 @@ Option(A) = Some(A) | None
 
 /// `True` when the option is `Some`.
 is_some = <A>(option : Option(A)) -> Bool {
-	option |> (Some(_)) { True } | (None) { False }
+	option |> (Some(_)) { True } & (None) { False }
 }
 
 /// `True` when the option is `None`.
 is_none = <A>(option : Option(A)) -> Bool {
-	option |> (Some(_)) { False } | (None) { True }
+	option |> (Some(_)) { False } & (None) { True }
 }
 
 /// Changes the value in a `Some` with a function. `None` stays `None`.
@@ -44,7 +44,7 @@ is_none = <A>(option : Option(A)) -> Bool {
 /// option.map(Some(1), (x) { x + 1 })  // Some(2)
 /// ```
 map = <A, B, N>(over : Option(A), with : (A) <- N -> B) -> Option(B) {
-	over |> (Some(value)) { Some(with(value)) } | (None) { None }
+	over |> (Some(value)) { Some(with(value)) } & (None) { None }
 }
 
 /// Calls a function that gives an option on the value in a `Some`. `None`
@@ -55,41 +55,41 @@ map = <A, B, N>(over : Option(A), with : (A) <- N -> B) -> Option(B) {
 /// ```
 then = <A, B, N>(option : Option(A), apply : (A) <- N -> Option(B)) -> Option(
 	B,
-) { option |> (Some(value)) { apply(value) } | (None) { None } }
+) { option |> (Some(value)) { apply(value) } & (None) { None } }
 
 /// Takes away one level of `Option`.
 flatten = <A>(option : Option(Option(A))) -> Option(A) {
-	option |> (Some(inner)) { inner } | (None) { None }
+	option |> (Some(inner)) { inner } & (None) { None }
 }
 
 /// The value in a `Some`, or `default` for `None`.
 unwrap = <A>(option : Option(A), or : A) -> A {
-	option |> (Some(value)) { value } | (None) { or }
+	option |> (Some(value)) { value } & (None) { or }
 }
 
 /// The value in a `Some`, or the value of `default()` for `None`.
 lazy_unwrap = <A, N>(option : Option(A), or : () <- N -> A) -> A {
-	option |> (Some(value)) { value } | (None) { or() }
+	option |> (Some(value)) { value } & (None) { or() }
 }
 
 /// The first option when it is `Some`, and the second when not.
 or = <A>(first : Option(A), second : Option(A)) -> Option(A) {
-	first |> (Some(_)) { first } | (None) { second }
+	first |> (Some(_)) { first } & (None) { second }
 }
 
 /// The first option when it is `Some`, and the value of `second()` when not.
 lazy_or = <A, N>(first : Option(A), second : () <- N -> Option(A)) -> Option(
 	A,
-) { first |> (Some(_)) { first } | (None) { second() } }
+) { first |> (Some(_)) { first } & (None) { second() } }
 
 /// `Ok` with the value of a `Some`, or `Error(error)` for `None`.
 to_result = <A, E>(option : Option(A), error : E) -> Result(A, E) {
-	option |> (Some(value)) { Ok(value) } | (None) { Error(error) }
+	option |> (Some(value)) { Ok(value) } & (None) { Error(error) }
 }
 
 /// `Some` with the value of an `Ok`, or `None` for an `Error`.
 from_result = <A, E>(result : Result(A, E)) -> Option(A) {
-	result |> (Ok(value)) { Some(value) } | (Error(_)) { None }
+	result |> (Ok(value)) { Some(value) } & (Error(_)) { None }
 }
 
 /// `Some` with all the values when every option is `Some`, and `None` when
@@ -103,8 +103,8 @@ all = <A>(options : List(Option(A))) -> Option(List(A)) {
 	go = (rest, acc) {
 		rest |>
 			([]) { Some(reverse(acc)) }
-			| ([Some(x), ..xs]) { go(xs, [x, ..acc]) }
-			| ([None, ..]) { None }
+			& ([Some(x), ..xs]) { go(xs, [x, ..acc]) }
+			& ([None, ..]) { None }
 	}
 	go(options, [])
 }
@@ -118,8 +118,8 @@ values = <A>(options : List(Option(A))) -> List(A) {
 	go = (rest, acc) {
 		rest |>
 			([]) { reverse(acc) }
-			| ([Some(x), ..xs]) { go(xs, [x, ..acc]) }
-			| ([None, ..xs]) { go(xs, acc) }
+			& ([Some(x), ..xs]) { go(xs, [x, ..acc]) }
+			& ([None, ..xs]) { go(xs, acc) }
 	}
 	go(options, [])
 }
@@ -127,8 +127,8 @@ values = <A>(options : List(Option(A))) -> List(A) {
 /// Keeps a `Some` only when its value passes the test.
 filter = <A, N>(option : Option(A), keeping : (A) <- N -> Bool) -> Option(A) {
 	option |>
-		(Some(value)) { keeping(value) |> (True) { option } | (False) { None } }
-		| (None) { None }
+		(Some(value)) { keeping(value) |> (True) { option } & (False) { None } }
+		& (None) { None }
 }
 
 /// Puts the values of two options together when both are `Some`.
@@ -137,12 +137,12 @@ map2 = <A, B, C, N>(
 	b : Option(B),
 	with : (A, B) <- N -> C
 ) -> Option(C) {
-	(a, b) |> ((Some(x), Some(y))) { Some(with(x, y)) } | (_) { None }
+	(a, b) |> ((Some(x), Some(y))) { Some(with(x, y)) } & (_) { None }
 }
 
 reverse = (list) {
 	go = (rest, acc) {
-		rest |> ([]) { acc } | ([x, ..xs]) { go(xs, [x, ..acc]) }
+		rest |> ([]) { acc } & ([x, ..xs]) { go(xs, [x, ..acc]) }
 	}
 	go(list, [])
 }

@@ -8,7 +8,7 @@ Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
 list_map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
-	xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..list_map(rest, f)] }
+	xs |> ([]) { [] } & ([x, ..rest]) { [f(x), ..list_map(rest, f)] }
 }
 
 main = () {
@@ -17,7 +17,7 @@ main = () {
 		None,
 		Some(User(name = "Bob")),
 	]
-	names = list_map(opts, (Some(u)) { u.name } | (None) { "" })
+	names = list_map(opts, (Some(u)) { u.name } & (None) { "" })
 	assert(names == ["Ada", "", "Bob"])
 	Nil
 }

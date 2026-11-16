@@ -41,11 +41,11 @@ check = (q, total, n, pt) {
 		(Pair(1 = left, right = right) | Pair(1 = right, left = left)) {
 			core.inspect((left, right, total))
 		}
-		| (Pair(left = left, right = right) ? left > right) { core.inspect(n) }
-		| (_) { core.inspect(pt) }
+		& (Pair(left = left, right = right) ? left > right) { core.inspect(n) }
+		& (_) { core.inspect(pt) }
 }
 
-safe = (x) { f.catch(() { x }) |> (Ok(v)) { v } | (Error(v)) { v } }
+safe = (x) { f.catch(() { x }) |> (Ok(v)) { v } & (Error(v)) { v } }
 
 // A local name may cover a module name and a built-in name (§2.3, §5).
 covers = (shapes, core) {

@@ -15,7 +15,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -50,10 +50,10 @@ first_over = (xs : List(Int), limit : Int) -> Int {
 		each = (ys : List(Int)) -> Int {
 			ys |>
 				([]) { -1 }
-				| ([y, ..rest]) {
+				& ([y, ..rest]) {
 					{ y > limit } |>
 						(True) { b |> control.escape(y) }
-						| (False) { each(rest) }
+						& (False) { each(rest) }
 				}
 		}
 		each(xs)
@@ -102,7 +102,7 @@ test("a raise through the service agrees with its value", () {
 	t : Result(Int, Int) = fail.catch(() {
 		f : Fail(Int) = the_fail()
 		inner : Result(Nil, Int) = fail.catch(() { fail.raise(8) })
-		inner |> (Ok(_)) { 0 } | (Error(e)) { f.raise(e + 1) }
+		inner |> (Ok(_)) { 0 } & (Error(e)) { f.raise(e + 1) }
 	})
 	check(show(t), "Error(9)")
 })
@@ -217,7 +217,7 @@ test("a catch inside a generator is active again after resume", () {
 			emit(2)
 			fail.raise(9)
 		})
-		r |> (Ok(_)) { emit(0) } | (Error(e)) { emit(e) }
+		r |> (Ok(_)) { emit(0) } & (Error(e)) { emit(e) }
 	})
 	check(show(xs), "[1, 2, 9]")
 })
@@ -226,12 +226,12 @@ test("many catches in a row", () {
 	loop = (i : Int, acc : Int) -> Int {
 		i |>
 			(0) { acc }
-			| (_) {
+			& (_) {
 				r = fail.catch(() {
-					{ i % 2 == 0 } |> (True) { fail.raise(i) } | (False) { i }
+					{ i % 2 == 0 } |> (True) { fail.raise(i) } & (False) { i }
 				}) |>
 					(Ok(v)) { v }
-					| (Error(e)) { e * 10 }
+					& (Error(e)) { e * 10 }
 				loop(i - 1, acc + r)
 			}
 	}

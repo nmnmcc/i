@@ -102,7 +102,7 @@ enabled = <E, N>(level : Level) <- (sink : Sink(E, N)) -> Bool {
 // Inferred returns retain the exact public error and environment rows.
 write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(accept, send, _) = sink
-	accept(entry.level) |> (True) { send(entry) } | (False) { Nil }
+	accept(entry.level) |> (True) { send(entry) } & (False) { Nil }
 }
 
 lazy = <E, F, N>(level : Level, message : () <- (Fail(F), ..N) -> String) <- (
@@ -120,13 +120,13 @@ lazy = <E, F, N>(level : Level, message : () <- (Fail(F), ..N) -> String) <- (
 				),
 			)
 		}
-		| (False) { Nil }
+		& (False) { Nil }
 }
 
 format = (entry : Entry) -> String {
 	stamp = entry.at |>
 		(None) { [] }
-		| (Some(t)) { [" @", int.to_string(time.unix_nanoseconds(t))] }
+		& (Some(t)) { [" @", int.to_string(time.unix_nanoseconds(t))] }
 	fields = list.flat_map(entry.fields, (field) {
 		(key, value) = field
 		[" ", quote(key), "=", quote(value)]
@@ -140,15 +140,15 @@ format = (entry : Entry) -> String {
 }
 
 rank = (level : Level) -> Int {
-	level |> (Debug) { 0 } | (Info) { 1 } | (Warning) { 2 } | (Failure) { 3 }
+	level |> (Debug) { 0 } & (Info) { 1 } & (Warning) { 2 } & (Failure) { 3 }
 }
 
 level_text = (level : Level) -> String {
 	level |>
 		(Debug) { "debug" }
-		| (Info) { "info" }
-		| (Warning) { "warning" }
-		| (Failure) { "failure" }
+		& (Info) { "info" }
+		& (Warning) { "warning" }
+		& (Failure) { "failure" }
 }
 
 quote = (text : String) -> String {
@@ -166,16 +166,16 @@ quote = (text : String) -> String {
 escape = (codepoint : UtfCodepoint) -> String {
 	core.codepoint_to_int(codepoint) |>
 		(34) { "\\\"" }
-		| (92) { "\\\\" }
-		| (10) { "\\n" }
-		| (13) { "\\r" }
-		| (9) { "\\t" }
-		| (n ? n < 32 || { n >= 127 && n <= 159 } || n == 8232 || n == 8233) {
+		& (92) { "\\\\" }
+		& (10) { "\\n" }
+		& (13) { "\\r" }
+		& (9) { "\\t" }
+		& (n ? n < 32 || { n >= 127 && n <= 159 } || n == 8232 || n == 8233) {
 			core.concat(
 				["\\u{", core.to_lower(int.to_base16(n)), "}"],
 			)
 		}
-		| (_) { core.from_codepoints([codepoint]) }
+		& (_) { core.from_codepoints([codepoint]) }
 }
 
 /// A sink that writes each formatted entry to standard error.

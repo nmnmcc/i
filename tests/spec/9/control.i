@@ -12,12 +12,12 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-length = (xs, n) { xs |> ([]) { n } | ([_, ..rest]) { length(rest, n + 1) } }
+length = (xs, n) { xs |> ([]) { n } & ([_, ..rest]) { length(rest, n + 1) } }
 
 // The example of §9.4.
 Yield(A) = (emit = (A) -> Nil)
@@ -42,7 +42,7 @@ emit = <A>(x) <- (y : Yield(A)) { y.emit(x) }
 count = (from, to) {
 	{ from > to } |>
 		(True) { Nil }
-		| (False) {
+		& (False) {
 			emit(from)
 			count(from + 1, to)
 		}
@@ -251,7 +251,7 @@ numbers = (from, to) {
 		each = (n) {
 			{ n > to } |>
 				(True) { Done }
-				| (False) {
+				& (False) {
 					control.suspend(b, (k) { More(n, k) })
 					each(n + 1)
 				}
@@ -263,10 +263,10 @@ numbers = (from, to) {
 take = (step, n, acc) {
 	n |>
 		(0) { acc }
-		| (_) {
+		& (_) {
 			step |>
 				(Done) { acc }
-				| (More(v, k)) {
+				& (More(v, k)) {
 					take(control.resume(k, Nil), n - 1, [v, ..acc])
 				}
 		}
@@ -275,7 +275,7 @@ take = (step, n, acc) {
 sum = (step, acc) {
 	step |>
 		(Done) { acc }
-		| (More(v, k)) { sum(control.resume(k, Nil), acc + v) }
+		& (More(v, k)) { sum(control.resume(k, Nil), acc + v) }
 }
 
 test("pulled", () {
@@ -299,10 +299,10 @@ test("pulled", () {
 				"Nil",
 			)
 		}
-		| (Done) { panic("no value") }
+		& (Done) { panic("no value") }
 })
 
-loop = (n, acc) { n |> (0) { acc } | (_) { loop(n - 1, acc + 1) } }
+loop = (n, acc) { n |> (0) { acc } & (_) { loop(n - 1, acc + 1) } }
 
 // Tail calls stay tail calls inside a boundary, and in a resumed
 // computation (§11.6). A million calls do not fit on the stack.
@@ -341,13 +341,13 @@ test("in_branches", () {
 	r = control.boundary((b) {
 		x = 1 |>
 			(1) { control.suspend(b, (k) { control.resume(k, 10) }) }
-			| (_) { 0 }
+			& (_) { 0 }
 		y = x |>
 			(n ? control.suspend(b, (k) { control.resume(k, n == 10) })) {
 				z = control.suspend(b, (k) { control.resume(k, 20) })
 				z + 1
 			}
-			| (_) { 0 }
+			& (_) { 0 }
 		w = x == 10 && control.suspend(b, (k) { control.resume(k, True) })
 		(x, y, w)
 	})
@@ -355,7 +355,7 @@ test("in_branches", () {
 	// Closures made before a suspend, and functions that call themselves.
 	s = control.boundary((b) {
 		add = (n) { n + 1 }
-		fact = (n) { n |> (0) { 1 } | (_) { n * fact(n - 1) } }
+		fact = (n) { n |> (0) { 1 } & (_) { n * fact(n - 1) } }
 		x = control.suspend(b, (k) { control.resume(k, 4) })
 		add(fact(x))
 	})
@@ -399,7 +399,7 @@ test("paused_again", () {
 walk = (n) {
 	n |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			walk(n - 1)
 			emit(n)
 			walk(n - 1)

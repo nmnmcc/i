@@ -7,7 +7,7 @@
 
 area =
 	(r : Float) -> Float { 3.0 *. r *. r }
-	| (w : Float, h : Float) -> Float { w *. h }
+	& (w : Float, h : Float) -> Float { w *. h }
 
 fs = [area]
 

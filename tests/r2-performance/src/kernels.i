@@ -9,12 +9,12 @@
 	channel_pair
 )
 
-spin = (n : Int) -> Nil { n |> (0) { Nil } | (_) { spin(n - 1) } }
+spin = (n : Int) -> Nil { n |> (0) { Nil } & (_) { spin(n - 1) } }
 
 spawns = (s : Scope(Never), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			task.join(task.go(s, () { Nil }))
 			spawns(s, n - 1)
 		}
@@ -23,7 +23,7 @@ spawns = (s : Scope(Never), n : Int) -> Nil {
 yields = (n : Int) -> Nil {
 	n |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			task.yield()
 			yields(n - 1)
 		}
@@ -32,7 +32,7 @@ yields = (n : Int) -> Nil {
 sends = (c : Channel(Nil), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			task.send(c, Nil)
 			sends(c, n - 1)
 		}
@@ -41,7 +41,7 @@ sends = (c : Channel(Nil), n : Int) -> Nil {
 receives = (c : Channel(Nil), n : Int) -> Nil {
 	n |>
 		(0) { Nil }
-		| (_) {
+		& (_) {
 			task.receive(c)
 			receives(c, n - 1)
 		}

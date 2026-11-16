@@ -60,9 +60,9 @@ main = () {
 	portable = catch(() { keep((x: Int) { x }) })
 	portable |>
 		(Ok(f)) { assert(core.portable(f)) }
-		| (_) { panic("keep raised at creation") }
+		& (_) { panic("keep raised at creation") }
 	raised = catch(() { keep((_: Nil) { raise("later") }) })
 	raised |>
 		(Ok(f)) { assert(catch(() { f(Nil) }) == Error("later")) }
-		| (_) { panic("keep raised at creation") }
+		& (_) { panic("keep raised at creation") }
 }

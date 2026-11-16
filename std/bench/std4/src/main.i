@@ -73,7 +73,7 @@ main = () {
 	})
 	re = fail.catch(() { regex.compile("^a+b$") }) |>
 		(Ok(re)) { re }
-		| (Error(_)) { panic("benchmark regex") }
+		& (Error(_)) { panic("benchmark regex") }
 	haystack = message <> "b"
 	measure("regex_literal_repeat", 1000001, () {
 		assert(regex.is_match(re, haystack))
@@ -81,7 +81,7 @@ main = () {
 	})
 	nested = fail.catch(() { regex.compile("(a*)*b") }) |>
 		(Ok(re)) { re }
-		| (Error(_)) { panic("benchmark regex") }
+		& (Error(_)) { panic("benchmark regex") }
 	adversarial = string.repeat("a", 5000)
 	measure("regex_nested_repeat", 5000, () {
 		assert(regex.is_match(nested, adversarial) == False)

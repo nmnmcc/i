@@ -5,7 +5,7 @@
 (i/stdio, core = i/core)
 (main)
 repeat = <S>(start: S, step: (S) -> S) -> S { step(step(start)) }
-choose = (x: String) { "wrong" } | (x: { Int | String }) { 1 }
+choose = (x: String) { "wrong" } & (x: { Int | String }) { 1 }
 main = () {
   n: Int = choose(repeat(0, (x) { "s" }))
   stdio.print(core.inspect(n + 1))

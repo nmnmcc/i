@@ -15,5 +15,5 @@ work = (x : Float) <- (pause : Pause) -> Float {
 	// Both x and y must survive the host handoff; return exact zero sign.
 	{ core.float_to_bits(x) == core.float_to_bits(y) } |>
 		(True) { x }
-		| (False) { y +. z }
+		& (False) { y +. z }
 }

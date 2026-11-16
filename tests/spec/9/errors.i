@@ -9,7 +9,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -28,7 +28,7 @@ test("raise_and_catch", () {
 		"Error(2)",
 	)
 	// The error goes out through the calls until it is taken.
-	inner = (n) { n |> (0) { fail.raise("bottom") } | (_) { n + inner(n - 1) } }
+	inner = (n) { n |> (0) { fail.raise("bottom") } & (_) { n + inner(n - 1) } }
 	check(
 		show(fail.catch(() { inner(100) })),
 		"Error(\"bottom\")",
@@ -43,7 +43,7 @@ test("raise_and_catch", () {
 	again = fail.catch(() {
 		fail.catch(() { fail.raise("x") }) |>
 			(Ok(_)) { "no" }
-			| (Error(e)) { fail.raise(e <> "y") }
+			& (Error(e)) { fail.raise(e <> "y") }
 	})
 	check(show(again), "Error(\"xy\")")
 })
@@ -74,10 +74,10 @@ test("map_error", () { map_error() })
 retry = <A, N>(times : Int, body : () <- N -> A) -> A {
 	fail.catch(body) |>
 		(Ok(value)) { value }
-		| (Error(error)) {
+		& (Error(error)) {
 			{ times > 1 } |>
 				(True) { retry(times - 1, body) }
-				| (False) { fail.raise(error) }
+				& (False) { fail.raise(error) }
 		}
 }
 
@@ -108,7 +108,7 @@ http_get = (id : String) <- (http : Http) { http.get(id) }
 parse_user = (text : String) {
 	text |>
 		("user " <> name) { User(name = name) }
-		| (_) { fail.raise(ParseError(at = 0)) }
+		& (_) { fail.raise(ParseError(at = 0)) }
 }
 
 load = (id) { parse_user(http_get(id)) }
@@ -116,16 +116,16 @@ load = (id) { parse_user(http_get(id)) }
 safe = (id) {
 	fail.catch(() { load(id) }) |>
 		(Ok(user)) { user }
-		| (Error(_ : ParseError)) { default_user }
-		| (Error(other)) { fail.raise(other) }
+		& (Error(_ : ParseError)) { default_user }
+		& (Error(other)) { fail.raise(other) }
 }
 
 fake = Http(
 	get = (id) {
 		id |>
 			("1") { "user ann" }
-			| ("2") { "garbage" }
-			| (_) { fail.raise(HttpError(status = 404)) }
+			& ("2") { "garbage" }
+			& (_) { fail.raise(HttpError(status = 404)) }
 	},
 )
 
@@ -148,11 +148,11 @@ test("safe_example", () {
 
 // A deep error goes out through many frames, and the frames are gone.
 test("deep_unwinding", () {
-	down = (n) { n |> (0) { fail.raise(n) } | (_) { 1 + down(n - 1) } }
+	down = (n) { n |> (0) { fail.raise(n) } & (_) { 1 + down(n - 1) } }
 	each = (k) {
 		k |>
 			(0) { Nil }
-			| (_) {
+			& (_) {
 				check(
 					show(fail.catch(() { down(1000) })),
 					"Error(0)",

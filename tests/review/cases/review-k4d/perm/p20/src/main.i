@@ -20,7 +20,7 @@ uset : <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x : A) <- (
 
 Dep = (v = Int)
 
-ping = (n : Int) { n |> (0) { use() } | (_) { pong(n - 1) } }
+ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
 fr = () { run(() { use() }) }
 

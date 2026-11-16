@@ -5,7 +5,7 @@
 (i/stdio, core = i/core)
 (main)
 repeat = <S, N>(start: S, step: (S) <- N -> S) -> S { step(step(start)) }
-choose = (x: String) { "wrong" } | (x: { Int | String }) { 1 }
+choose = (x: String) { "wrong" } & (x: { Int | String }) { 1 }
 apply = <A, B, N>(x: A, f: (A) <- N -> B) { f(x) }
 main = () {
   _ = repeat(0, (x) {

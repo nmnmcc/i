@@ -17,7 +17,7 @@ main = () {
 	reply = tls.read(stream, 65536)
 	text = core.bit_array_to_string(reply) |>
 		(Ok(value)) { value }
-		| (Error(_)) { panic("invalid response") }
+		& (Error(_)) { panic("invalid response") }
 	assert(core.byte_slice(text, 0, 12) == Ok("HTTP/1.1 200"))
 	tls.close(stream)
 	stdio.print("tls ok")

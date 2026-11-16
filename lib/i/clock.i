@@ -24,7 +24,7 @@ Clock = (
 monotonic_ns = () <- (clock : Clock) {
 	request.await_owned(clock.monotonic_ns()) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ClockError(operation = "monotonic_ns", code = code))
 		}
 }
@@ -32,7 +32,7 @@ monotonic_ns = () <- (clock : Clock) {
 unix_ns = () <- (clock : Clock) {
 	request.await_owned(clock.unix_ns()) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ClockError(operation = "unix_ns", code = code))
 		}
 }
@@ -40,7 +40,7 @@ unix_ns = () <- (clock : Clock) {
 sleep_ns = (duration : Int) <- (clock : Clock) {
 	request.await_owned(clock.sleep_ns(duration)) |>
 		(Ok(value)) { value }
-		| (Error(code)) {
+		& (Error(code)) {
 			fail.raise(ClockError(operation = "sleep_ns", code = code))
 		}
 }

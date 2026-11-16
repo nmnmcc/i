@@ -12,8 +12,8 @@ Expr = Num | Add | Mul
 eval = (e) {
 	e |>
 		(Num(n)) { n }
-		| (Add(a, b)) { eval(a) + eval(b) }
-		| (Mul(a, b)) { eval(a) * eval(b) }
+		& (Add(a, b)) { eval(a) + eval(b) }
+		& (Mul(a, b)) { eval(a) * eval(b) }
 }
 
 main = () {

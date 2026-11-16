@@ -45,6 +45,6 @@ main = () {
 			x = control.resume(k, Nil)
 			x
 		}
-		| (Done) { panic("not paused") }
+		& (Done) { panic("not paused") }
 	Nil
 }

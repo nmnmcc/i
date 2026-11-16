@@ -100,8 +100,8 @@ to_string = (x : Float) -> String { core.inspect(x) }
 _parse_result = (text : String) -> Result(Float, Nil) {
 	<<text:utf8>> |>
 		(<<45, rest:bytes>>) { whole(rest, True, 0, 0, 0) }
-		| (<<43, rest:bytes>>) { whole(rest, False, 0, 0, 0) }
-		| (bytes) { whole(bytes, False, 0, 0, 0) }
+		& (<<43, rest:bytes>>) { whole(rest, False, 0, 0, 0) }
+		& (bytes) { whole(bytes, False, 0, 0, 0) }
 }
 
 is_digit = (byte : Int) -> Bool { byte >= 48 && byte <= 57 }
@@ -124,10 +124,10 @@ whole = (
 				count + 1,
 			)
 		}
-		| (<<46, rest:bytes>> ? count > 0) {
+		& (<<46, rest:bytes>> ? count > 0) {
 			fraction(rest, negative, coefficient, significant, 0)
 		}
-		| (_) { Error(Nil) }
+		& (_) { Error(Nil) }
 }
 
 // The digits after the point.
@@ -148,31 +148,31 @@ fraction = (
 				digits + 1,
 			)
 		}
-		| (<<>> ? digits > 0) {
+		& (<<>> ? digits > 0) {
 			decimal(negative, coefficient, significant, -digits)
 		}
-		| (
+		& (
 			<<marker, rest:bytes>>
 			? digits > 0 && { marker == 69 || marker == 101 }
 		) {
 			(exponent_negative, after) = rest |>
 				(<<45, tail:bytes>>) { (True, tail) }
-				| (<<43, tail:bytes>>) { (False, tail) }
-				| (_) { (False, rest) }
+				& (<<43, tail:bytes>>) { (False, tail) }
+				& (_) { (False, rest) }
 			limit = significant + digits + 400
 			exponent(after, 0, 0, limit) |>
 				(Error(_)) { Error(Nil) }
-				| (Ok(e)) {
-					signed = exponent_negative |> (True) { -e } | (False) { e }
+				& (Ok(e)) {
+					signed = exponent_negative |> (True) { -e } & (False) { e }
 					decimal(negative, coefficient, significant, signed - digits)
 				}
 		}
-		| (_) { Error(Nil) }
+		& (_) { Error(Nil) }
 }
 
 // The number of significant digits, not counting zeros at the start.
 count_significant = (previous : Int, digit : Int) -> Int {
-	{ previous == 0 && digit == 0 } |> (True) { 0 } | (False) { previous + 1 }
+	{ previous == 0 && digit == 0 } |> (True) { 0 } & (False) { previous + 1 }
 }
 
 // When an exponent is greater than any digits could make up for, its exact
@@ -186,11 +186,11 @@ exponent = (bytes : BitArray, value : Int, count : Int, limit : Int) -> Result(
 		(<<d, rest:bytes>> ? is_digit(d)) {
 			next = { value > limit } |>
 				(True) { limit + 1 }
-				| (False) { value * 10 + d - 48 }
+				& (False) { value * 10 + d - 48 }
 			exponent(rest, next, count + 1, limit)
 		}
-		| (<<>> ? count > 0) { Ok(value) }
-		| (_) { Error(Nil) }
+		& (<<>> ? count > 0) { Ok(value) }
+		& (_) { Error(Nil) }
 }
 
 // The Float nearest to `coefficient` × 10^`exponent`.
@@ -200,29 +200,29 @@ decimal = (
 	digits : Int,
 	exponent : Int
 ) -> Result(Float, Nil) {
-	sign = negative |> (True) { sign_mask } | (False) { 0 }
+	sign = negative |> (True) { sign_mask } & (False) { 0 }
 	magnitude = digits + exponent - 1
 	{ coefficient == 0 } |>
 		(True) { Ok(core.float_from_bits(sign)) }
-		| (False) {
+		& (False) {
 			{ magnitude > 308 } |>
 				(True) { Error(Nil) }
-				| (False) {
+				& (False) {
 					{ magnitude < -324 } |>
 						(True) { Ok(core.float_from_bits(sign)) }
-						| (False) {
+						& (False) {
 							(numerator, denominator) = { exponent >= 0 } |>
 								(True) {
 									(coefficient * int_power(10, exponent), 1)
 								}
-								| (False) {
+								& (False) {
 									(coefficient, int_power(10, -exponent))
 								}
 							ratio_bits(numerator, denominator) |>
 								(Ok(bits)) {
 									Ok(core.float_from_bits(sign + bits))
 								}
-								| (Error(_)) { Error(Nil) }
+								& (Error(_)) { Error(Nil) }
 						}
 				}
 		}
@@ -234,12 +234,12 @@ ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
 	e = radix_order(numerator, denominator, 2)
 	{ e > 1023 } |>
 		(True) { Error(Nil) }
-		| (False) {
+		& (False) {
 			{ e < -1022 } |>
 				(True) {
 					Ok(round_ratio(numerator * int_power(2, 1074), denominator))
 				}
-				| (False) {
+				& (False) {
 					shift = 52 - e
 					significand = { shift >= 0 } |>
 						(True) {
@@ -248,7 +248,7 @@ ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
 								denominator,
 							)
 						}
-						| (False) {
+						& (False) {
 							round_ratio(
 								numerator,
 								denominator * int_power(2, -shift),
@@ -258,9 +258,9 @@ ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
 						(True) {
 							{ e == 1023 } |>
 								(True) { Error(Nil) }
-								| (False) { Ok({ e + 1024 } * fraction_unit) }
+								& (False) { Ok({ e + 1024 } * fraction_unit) }
 						}
-						| (False) {
+						& (False) {
 							Ok(
 								{ e + 1023 } * fraction_unit +
 									significand -
@@ -277,9 +277,9 @@ ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
 radix_order = (numerator : Int, denominator : Int, radix : Int) -> Int {
 	{ numerator >= denominator } |>
 		(True) { order_factors(numerator, denominator, radix, 1, []).0 }
-		| (False) {
+		& (False) {
 			(o, scaled) = order_factors(denominator, numerator, radix, 1, [])
-			{ denominator == scaled } |> (True) { -o } | (False) { -o - 1 }
+			{ denominator == scaled } |> (True) { -o } & (False) { -o - 1 }
 		}
 }
 
@@ -300,7 +300,7 @@ order_factors = (
 				[(factor, e), ..factors],
 			)
 		}
-		| (False) { order_search(numerator, denominator, factors, 0) }
+		& (False) { order_search(numerator, denominator, factors, 0) }
 }
 
 order_search = (
@@ -311,11 +311,11 @@ order_search = (
 ) -> (Int, Int) {
 	factors |>
 		([]) { (o, denominator) }
-		| ([(factor, e), ..rest]) {
+		& ([(factor, e), ..rest]) {
 			scaled = denominator * factor
 			{ numerator >= scaled } |>
 				(True) { order_search(numerator, scaled, rest, o + e) }
-				| (False) { order_search(numerator, denominator, rest, o) }
+				& (False) { order_search(numerator, denominator, rest, o) }
 		}
 }
 
@@ -325,17 +325,17 @@ round_ratio = (numerator : Int, denominator : Int) -> Int {
 	twice = { numerator % denominator } * 2
 	{ twice > denominator || { twice == denominator && q % 2 == 1 } } |>
 		(True) { q + 1 }
-		| (False) { q }
+		& (False) { q }
 }
 
 int_power = (base : Int, e : Int) -> Int {
 	go = (base, e, acc) {
 		e |>
 			(0) { acc }
-			| (_) {
+			& (_) {
 				e % 2 |>
 					(0) { go(base * base, e / 2, acc) }
-					| (_) { go(base * base, e / 2, acc * base) }
+					& (_) { go(base * base, e / 2, acc * base) }
 			}
 	}
 	go(base, e, 1)
@@ -345,7 +345,7 @@ int_power = (base : Int, e : Int) -> Int {
 compare = (a : Float, with : Float) -> Order {
 	{ a == with } |>
 		(True) { Equal }
-		| (False) { { a <. with } |> (True) { Less } | (False) { Greater } }
+		& (False) { { a <. with } |> (True) { Less } & (False) { Greater } }
 }
 
 /// Compares two Floats, and gives `Equal` when they are no more than
@@ -353,7 +353,7 @@ compare = (a : Float, with : Float) -> Order {
 loosely_compare = (a : Float, with : Float, tolerating : Float) -> Order {
 	loosely_equals(a, with, tolerating) |>
 		(True) { Equal }
-		| (False) { compare(a, with) }
+		& (False) { compare(a, with) }
 }
 
 /// `True` when the two Floats are no more than `tolerating` apart.
@@ -365,17 +365,17 @@ loosely_equals = (a : Float, with : Float, tolerating : Float) -> Bool {
 	// `a -. with` is not finite when they are far apart, so it is not used.
 	{ a >=. with } |>
 		(True) { a -. tolerating <=. with }
-		| (False) { with -. tolerating <=. a }
+		& (False) { with -. tolerating <=. a }
 }
 
 /// The smaller of two Floats.
 min = (a : Float, b : Float) -> Float {
-	{ a <. b } |> (True) { a } | (False) { b }
+	{ a <. b } |> (True) { a } & (False) { b }
 }
 
 /// The greater of two Floats.
 max = (a : Float, b : Float) -> Float {
-	{ a >. b } |> (True) { a } | (False) { b }
+	{ a >. b } |> (True) { a } & (False) { b }
 }
 
 /// The Float, but not less than `min` and not greater than `max`. When
@@ -383,14 +383,14 @@ max = (a : Float, b : Float) -> Float {
 clamp = (x : Float, min : Float, max : Float) -> Float {
 	(low, high) = { min <=. max } |>
 		(True) { (min, max) }
-		| (False) { (max, min) }
+		& (False) { (max, min) }
 	{ x <. low } |>
 		(True) { low }
-		| (False) { { x >. high } |> (True) { high } | (False) { x } }
+		& (False) { { x >. high } |> (True) { high } & (False) { x } }
 }
 
 /// The Float without its sign.
-abs = (x : Float) -> Float { { x <. 0.0 } |> (True) { -.x } | (False) { x } }
+abs = (x : Float) -> Float { { x <. 0.0 } |> (True) { -.x } & (False) { x } }
 
 /// The Float with the other sign.
 negate = (x : Float) -> Float { -.x }
@@ -410,7 +410,7 @@ floor = (x : Float) -> Float { core.floor(x) }
 round = (x : Float) -> Int {
 	{ x <. 0.0 } |>
 		(True) { -round_positive(-.x) }
-		| (False) { round_positive(x) }
+		& (False) { round_positive(x) }
 }
 
 round_positive = (x : Float) -> Int {
@@ -418,7 +418,7 @@ round_positive = (x : Float) -> Int {
 	// `x -. f` is exact for `x >= 0`.
 	{ x -. f >=. 0.5 } |>
 		(True) { core.truncate(f) + 1 }
-		| (False) { core.truncate(f) }
+		& (False) { core.truncate(f) }
 }
 
 /// The Float without its fraction, as an Int, rounded toward zero.
@@ -441,7 +441,7 @@ to_precision = (x : Float, precision : Int) -> Float {
 			factor = core.to_float(int_power(10, -precision))
 			core.to_float(round(x /. factor)) *. factor
 		}
-		| (False) {
+		& (False) {
 			factor = core.to_float(int_power(10, precision))
 			core.to_float(round(x *. factor)) /. factor
 		}
@@ -450,50 +450,50 @@ to_precision = (x : Float, precision : Int) -> Float {
 _power_result = (base : Float, of : Int) -> Result(Float, Nil) {
 	{ base == 0.0 && of < 0 } |>
 		(True) { Error(Nil) }
-		| (False) {
+		& (False) {
 			// Beyond 2^62 only the sign and the parity of the exponent matter.
 			limit = 4611686018427387904
 			e = { of > limit } |>
 				(True) { limit + of % 2 }
-				| (False) {
+				& (False) {
 					{ of < -limit } |>
 						(True) { -limit + of % 2 }
-						| (False) { of }
+						& (False) { of }
 				}
 			{ base == -.1.0 } |>
 				(True) {
-					{ e % 2 == 0 } |> (True) { Ok(1.0) } | (False) { Ok(-.1.0) }
+					{ e % 2 == 0 } |> (True) { Ok(1.0) } & (False) { Ok(-.1.0) }
 				}
-				| (False) { pow(base, core.to_float(e)) }
+				& (False) { pow(base, core.to_float(e)) }
 		}
 }
 
 _square_root_result = (x : Float) -> Result(Float, Nil) {
-	{ x <. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(core.sqrt(x)) }
+	{ x <. 0.0 } |> (True) { Error(Nil) } & (False) { Ok(core.sqrt(x)) }
 }
 
 /// The sum of the Floats. The sum of no Floats is `0.0`. A sum that is not
 /// finite stops the program.
 sum = (numbers : List(Float)) -> Float {
-	go = (rest, acc) { rest |> ([]) { acc } | ([x, ..xs]) { go(xs, acc +. x) } }
+	go = (rest, acc) { rest |> ([]) { acc } & ([x, ..xs]) { go(xs, acc +. x) } }
 	go(numbers, 0.0)
 }
 
 /// The product of the Floats. The product of no Floats is `1.0`. A product
 /// that is not finite stops the program.
 product = (numbers : List(Float)) -> Float {
-	go = (rest, acc) { rest |> ([]) { acc } | ([x, ..xs]) { go(xs, acc *. x) } }
+	go = (rest, acc) { rest |> ([]) { acc } & ([x, ..xs]) { go(xs, acc *. x) } }
 	go(numbers, 1.0)
 }
 
 _divide_result = (a : Float, by : Float) -> Result(Float, Nil) {
-	{ by == 0.0 } |> (True) { Error(Nil) } | (False) { Ok(a /. by) }
+	{ by == 0.0 } |> (True) { Error(Nil) } & (False) { Ok(a /. by) }
 }
 
 _modulo_result = (a : Float, by : Float) -> Result(Float, Nil) {
 	{ by == 0.0 } |>
 		(True) { Error(Nil) }
-		| (False) { Ok(a -. core.floor(a /. by) *. by) }
+		& (False) { Ok(a -. core.floor(a /. by) *. by) }
 }
 
 /// `a +. b`, as a function.
@@ -508,26 +508,26 @@ multiply = (a : Float, b : Float) -> Float { a *. b }
 _exponential_result = (x : Float) -> Result(Float, Nil) {
 	{ x >. 7.09782712893383973096e2 } |>
 		(True) { Error(Nil) }
-		| (False) {
+		& (False) {
 			{ x <. -.7.4513321910194110842e2 } |>
 				(True) { Ok(0.0) }
-				| (False) {
+				& (False) {
 					{ x == 1.0 } |>
 						(True) { Ok(2.71828182845904523536) }
-						| (False) { Ok(exp_finite(x)) }
+						& (False) { Ok(exp_finite(x)) }
 				}
 		}
 }
 
 _logarithm_result = (x : Float) -> Result(Float, Nil) {
-	{ x <=. 0.0 } |> (True) { Error(Nil) } | (False) { Ok(log_positive(x)) }
+	{ x <=. 0.0 } |> (True) { Error(Nil) } & (False) { Ok(log_positive(x)) }
 }
 
 _real_power_result = (base : Float, of : Float) -> Result(Float, Nil) {
 	fractional = core.ceiling(of) -. of >. 0.0
 	{ { base <. 0.0 && fractional } || { base == 0.0 && of <. 0.0 } } |>
 		(True) { Error(Nil) }
-		| (False) { pow(base, of) }
+		& (False) { pow(base, of) }
 }
 
 // The algorithms of `exponential`, `logarithm`, and `real_power` are those
@@ -571,12 +571,12 @@ two_power = (e : Int) -> Float { from_bits({ e + 1023 } * mantissa_unit) }
 scale = (value : Float, e : Int) -> Float {
 	{ e > 1023 } |>
 		(True) { value *. 2.0 *. two_power(e - 1) }
-		| (False) {
+		& (False) {
 			{ e < -1021 } |>
 				(True) {
 					value *. two_power(e + 1000) *. 9.3326361850321887899e-302
 				}
-				| (False) { value *. two_power(e) }
+				& (False) { value *. two_power(e) }
 		}
 }
 
@@ -607,13 +607,13 @@ exp_finite = (value : Float) -> Float {
 	hx = positive_high(value)
 	{ hx < 0x3e30_0000 } |>
 		(True) { 1.0 +. value }
-		| (False) {
+		& (False) {
 			(e, hi, lo) = { hx > 0x3fd6_2e42 } |>
 				(False) { (0, value, 0.0) }
-				| (True) {
+				& (True) {
 					direction = { value <. 0.0 } |>
 						(True) { -.1.0 }
-						| (False) { 1.0 }
+						& (False) { 1.0 }
 					{ hx < 0x3ff0_a2b2 } |>
 						(True) {
 							(
@@ -622,7 +622,7 @@ exp_finite = (value : Float) -> Float {
 								direction *. ln2_lo,
 							)
 						}
-						| (False) {
+						& (False) {
 							k = core.truncate(
 								inverse_ln2 *. value +. direction *. 0.5,
 							)
@@ -634,7 +634,7 @@ exp_finite = (value : Float) -> Float {
 			c = exp_polynomial(x)
 			e |>
 				(0) { 1.0 -. { x *. c /. { c -. 2.0 } -. x } }
-				| (k) {
+				& (k) {
 					scale(1.0 -. { { lo -. x *. c /. { 2.0 -. c } } -. hi }, k)
 				}
 		}
@@ -643,12 +643,12 @@ exp_finite = (value : Float) -> Float {
 log_positive = (input : Float) -> Float {
 	(value, correction) = { positive_high(input) < 0x0010_0000 } |>
 		(True) { (input *. 1.8014398509481984e16, -54) }
-		| (False) { (input, 0) }
+		& (False) { (input, 0) }
 	high_word = high(value)
 	fraction = high_word % 0x0010_0000
 	half = { fraction + 0x0009_5f64 >= 0x0010_0000 } |>
 		(True) { 1 }
-		| (False) { 0 }
+		& (False) { 0 }
 	e = correction + high_word / 0x0010_0000 - 1023 + half
 	x = with_high(value, fraction + 0x3ff0_0000 - half * 0x0010_0000)
 	f = x -. 1.0
@@ -657,14 +657,14 @@ log_positive = (input : Float) -> Float {
 		(True) {
 			{ f == 0.0 } |>
 				(True) { k *. ln2_hi +. k *. ln2_lo }
-				| (False) {
+				& (False) {
 					r = f *. f *. { 0.5 -. 0.33333333333333333 *. f }
 					e |>
 						(0) { f -. r }
-						| (_) { k *. ln2_hi -. { { r -. k *. ln2_lo } -. f } }
+						& (_) { k *. ln2_hi -. { { r -. k *. ln2_lo } -. f } }
 				}
 		}
-		| (False) {
+		& (False) {
 			s = f /. { 2.0 +. f }
 			z = s *. s
 			w = z *. z
@@ -698,7 +698,7 @@ log_positive = (input : Float) -> Float {
 						(0) {
 							f -. { half_square -. s *. { half_square +. r } }
 						}
-						| (_) {
+						& (_) {
 							k *. ln2_hi -.
 								{
 									{
@@ -712,10 +712,10 @@ log_positive = (input : Float) -> Float {
 								}
 						}
 				}
-				| (False) {
+				& (False) {
 					e |>
 						(0) { f -. s *. { f -. r } }
-						| (_) {
+						& (_) {
 							k *. ln2_hi -.
 								{ { s *. { f -. r } -. k *. ln2_lo } -. f }
 						}
@@ -728,21 +728,21 @@ log_positive = (input : Float) -> Float {
 log2_split = (input : Float) -> (Float, Float) {
 	(value, correction) = { high(input) < 0x0010_0000 } |>
 		(True) { (input *. 9007199254740992.0, -53) }
-		| (False) { (input, 0) }
+		& (False) { (input, 0) }
 	hx0 = high(value)
 	fraction = hx0 % 0x0010_0000
 	n0 = correction + hx0 / 0x0010_0000 - 1023
 	(interval, n, hx) = { fraction <= 0x0003_988e } |>
 		(True) { (0, n0, fraction + 0x3ff0_0000) }
-		| (False) {
+		& (False) {
 			{ fraction < 0x000b_b67a } |>
 				(True) { (1, n0, fraction + 0x3ff0_0000) }
-				| (False) { (0, n0 + 1, fraction + 0x3fe0_0000) }
+				& (False) { (0, n0 + 1, fraction + 0x3fe0_0000) }
 		}
 	x = with_high(value, hx)
 	(bp, dp_hi, dp_lo) = interval |>
 		(0) { (1.0, 0.0, 0.0) }
-		| (_) { (1.5, 5.84962487220764160156e-1, 1.35003920212974897128e-8) }
+		& (_) { (1.5, 5.84962487220764160156e-1, 1.35003920212974897128e-8) }
 	u = x -. bp
 	v = 1.0 /. { x +. bp }
 	ss = u *. v
@@ -807,20 +807,20 @@ log2_close_to_one = (x : Float) -> (Float, Float) {
 pow = (base : Float, exponent : Float) -> Result(Float, Nil) {
 	exponent |>
 		(0.0) { Ok(1.0) }
-		| (1.0) { Ok(base) }
-		| (_) {
+		& (1.0) { Ok(base) }
+		& (_) {
 			negative = bits_of(base) >= sign_mask
 			odd = negative && is_odd_whole(exponent)
-			direction = odd |> (True) { -.1.0 } | (False) { 1.0 }
+			direction = odd |> (True) { -.1.0 } & (False) { 1.0 }
 			x = abs_bits(base)
 			ix = high(x)
 			iy = positive_high(exponent)
 			{ x == 0.0 } |>
 				(True) { Ok(direction *. 0.0) }
-				| (False) {
+				& (False) {
 					{ x == 1.0 } |>
 						(True) { Ok(direction) }
-						| (False) {
+						& (False) {
 							{ iy > 0x41e0_0000 } |>
 								(True) {
 									{
@@ -831,7 +831,7 @@ pow = (base : Float, exponent : Float) -> Result(Float, Nil) {
 										(True) {
 											pow_extreme(x, exponent, direction)
 										}
-										| (False) {
+										& (False) {
 											(hi, lo) = log2_close_to_one(x)
 											pow_exp2(
 												exponent,
@@ -841,7 +841,7 @@ pow = (base : Float, exponent : Float) -> Result(Float, Nil) {
 											)
 										}
 								}
-								| (False) {
+								& (False) {
 									(hi, lo) = log2_split(x)
 									pow_exp2(exponent, hi, lo, direction)
 								}
@@ -855,7 +855,7 @@ is_odd_whole = (x : Float) -> Bool {
 	y = abs(x)
 	{ y >=. 9007199254740992.0 } |>
 		(True) { False }
-		| (False) { core.truncate(y) % 2 != 0 }
+		& (False) { core.truncate(y) % 2 != 0 }
 }
 
 pow_extreme = (base : Float, exponent : Float, direction : Float) -> Result(
@@ -866,7 +866,7 @@ pow_extreme = (base : Float, exponent : Float, direction : Float) -> Result(
 		{ base >. 1.0 && exponent >. 0.0 } || { base <. 1.0 && exponent <. 0.0 }
 	} |>
 		(True) { Error(Nil) }
-		| (False) { Ok(direction *. 0.0) }
+		& (False) { Ok(direction *. 0.0) }
 }
 
 pow_exp2 = (
@@ -884,16 +884,16 @@ pow_exp2 = (
 			{ z0 == 1024.0 && p_lo +. 8.0085662595372944372e-17 >. z0 -. p_hi0 }
 	} |>
 		(True) { Error(Nil) }
-		| (False) {
+		& (False) {
 			{ z0 <. -.1075.0 || { z0 == -.1075.0 && p_lo <=. z0 -. p_hi0 } } |>
 				(True) { Ok(direction *. 0.0) }
-				| (False) {
+				& (False) {
 					n = { z0 >. 0.5 } |>
 						(True) { core.truncate(z0 +. 0.5) }
-						| (False) {
+						& (False) {
 							{ z0 <. -.0.5 } |>
 								(True) { core.truncate(z0 -. 0.5) }
-								| (False) { 0 }
+								& (False) { 0 }
 						}
 					p_hi = p_hi0 -. core.to_float(n)
 					t = without_low(p_lo +. p_hi)
@@ -958,17 +958,17 @@ _asin_result = (x : Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a >. 1.0 } |>
 		(True) { Error(Nil) }
-		| (False) {
+		& (False) {
 			{ a == 1.0 } |>
 				(True) { Ok(copy_sign(1.5707963267948966, x)) }
-				| (False) {
+				& (False) {
 					{ a <. 0.5 } |>
 						(True) {
 							{ a <. 1.4901161193847656e-8 } |>
 								(True) { Ok(x) }
-								| (False) { Ok(x +. x *. asin_ratio(x *. x)) }
+								& (False) { Ok(x +. x *. asin_ratio(x *. x)) }
 						}
-						| (False) {
+						& (False) {
 							z = { 1.0 -. a } *. 0.5
 							s = core.sqrt(z)
 							r = asin_ratio(z)
@@ -980,7 +980,7 @@ _asin_result = (x : Float) -> Result(Float, Nil) {
 												6.123233995736766e-17
 										}
 								}
-								| (False) {
+								& (False) {
 									f = core.float_from_bits(
 										core.float_to_bits(s) /
 											4294967296 *
@@ -1010,17 +1010,17 @@ _acos_result = (x : Float) -> Result(Float, Nil) {
 	a = abs(x)
 	{ a >. 1.0 } |>
 		(True) { Error(Nil) }
-		| (False) {
+		& (False) {
 			{ a == 1.0 } |>
 				(True) {
-					{ x <. 0.0 } |> (True) { Ok(pi) } | (False) { Ok(0.0) }
+					{ x <. 0.0 } |> (True) { Ok(pi) } & (False) { Ok(0.0) }
 				}
-				| (False) {
+				& (False) {
 					{ a <. 0.5 } |>
 						(True) {
 							{ a <. 6.938893903907228e-18 } |>
 								(True) { Ok(1.5707963267948966) }
-								| (False) {
+								& (False) {
 									Ok(
 										1.5707963267948966 -.
 											{
@@ -1036,7 +1036,7 @@ _acos_result = (x : Float) -> Result(Float, Nil) {
 									)
 								}
 						}
-						| (False) {
+						& (False) {
 							{ x <. 0.0 } |>
 								(True) {
 									z = { 1.0 +. x } *. 0.5
@@ -1056,7 +1056,7 @@ _acos_result = (x : Float) -> Result(Float, Nil) {
 											},
 									)
 								}
-								| (False) {
+								& (False) {
 									z = { 1.0 -. x } *. 0.5
 									s = core.sqrt(z)
 									f = core.float_from_bits(
@@ -1123,7 +1123,7 @@ atan_kernel = (x : Float, hi : Float, lo : Float, reduced : Bool) -> Float {
 		}
 	{ reduced } |>
 		(True) { hi -. { x *. { s1 +. s2 } -. lo -. x } }
-		| (False) { x -. x *. { s1 +. s2 } }
+		& (False) { x -. x *. { s1 +. s2 } }
 }
 
 /// Arctangent in radians.
@@ -1131,10 +1131,10 @@ atan = (x : Float) -> Float {
 	a = abs(x)
 	{ a <. 7.450580596923828e-9 } |>
 		(True) { x }
-		| (False) {
+		& (False) {
 			{ a <. 0.4375 } |>
 				(True) { atan_kernel(x, 0.0, 0.0, False) }
-				| (False) {
+				& (False) {
 					value = { a <. 0.6875 } |>
 						(True) {
 							atan_kernel(
@@ -1144,7 +1144,7 @@ atan = (x : Float) -> Float {
 								True,
 							)
 						}
-						| (False) {
+						& (False) {
 							{ a <. 1.1875 } |>
 								(True) {
 									atan_kernel(
@@ -1154,7 +1154,7 @@ atan = (x : Float) -> Float {
 										True,
 									)
 								}
-								| (False) {
+								& (False) {
 									{ a <. 2.4375 } |>
 										(True) {
 											atan_kernel(
@@ -1165,10 +1165,10 @@ atan = (x : Float) -> Float {
 												True,
 											)
 										}
-										| (False) {
+										& (False) {
 											{ a >=. 73786976294838206464.0 } |>
 												(True) { 1.5707963267948966 }
-												| (False) {
+												& (False) {
 													atan_kernel(
 														-.1.0 /. a,
 														1.5707963267948966,
@@ -1188,26 +1188,26 @@ atan = (x : Float) -> Float {
 atan2 = (y : Float, x : Float) -> Float {
 	{ y == 0.0 } |>
 		(True) {
-			{ sign_bit(x) } |> (True) { copy_sign(pi, y) } | (False) { y }
+			{ sign_bit(x) } |> (True) { copy_sign(pi, y) } & (False) { y }
 		}
-		| (False) {
+		& (False) {
 			{ x == 0.0 } |>
 				(True) { copy_sign(1.5707963267948966, y) }
-				| (False) {
+				& (False) {
 					ax = abs(x)
 					ay = abs(y)
 					ex = core.float_to_bits(ax) / 4503599627370496
 					ey = core.float_to_bits(ay) / 4503599627370496
 					z = { ey > ex + 64 } |>
 						(True) { 1.5707963267948966 }
-						| (False) {
+						& (False) {
 							{ sign_bit(x) && ex > ey + 64 } |>
 								(True) { 0.0 }
-								| (False) { atan(ay /. ax) }
+								& (False) { atan(ay /. ax) }
 						}
 					result = { sign_bit(x) } |>
 						(True) { pi -. { z -. 1.2246467991473532e-16 } }
-						| (False) { z }
+						& (False) { z }
 					copy_sign(result, y)
 				}
 		}
@@ -1219,7 +1219,7 @@ radians = (degrees : Float) -> Float { degrees *. 0.017453292519943295 }
 _degrees_result = (radians : Float) -> Result(Float, Nil) {
 	{ abs(radians) >. 3.1375664143845866e306 } |>
 		(True) { Error(Nil) }
-		| (False) { Ok(radians *. 57.29577951308232) }
+		& (False) { Ok(radians *. 57.29577951308232) }
 }
 
 // Compensated squares and scaling from FreeBSD msun hypot.c.
@@ -1239,7 +1239,7 @@ _hypot_result = (x : Float, y : Float) -> Result(Float, Nil) {
 	ey = core.float_to_bits(b) / mantissa_unit
 	{ b == 0.0 || ex - ey > 64 } |>
 		(True) { Ok(a) }
-		| (False) {
+		& (False) {
 			(sx, sy, factor) = { ex > 1533 } |>
 				(True) {
 					(
@@ -1248,7 +1248,7 @@ _hypot_result = (x : Float, y : Float) -> Result(Float, Nil) {
 						5.260135901548374e210,
 					)
 				}
-				| (False) {
+				& (False) {
 					{ ey < 573 } |>
 						(True) {
 							(
@@ -1257,14 +1257,14 @@ _hypot_result = (x : Float, y : Float) -> Result(Float, Nil) {
 								1.90109156629516e-211,
 							)
 						}
-						| (False) { (a, b, 1.0) }
+						& (False) { (a, b, 1.0) }
 				}
 			(hx, lx) = hypot_square(sx)
 			(hy, ly) = hypot_square(sy)
 			root = core.sqrt(ly +. lx +. hy +. hx)
 			{ factor >. 1.0 && root >. max_finite /. factor } |>
 				(True) { Error(Nil) }
-				| (False) { Ok(factor *. root) }
+				& (False) { Ok(factor *. root) }
 		}
 }
 
@@ -1281,10 +1281,10 @@ trig_reduce = (x : Float) -> (Int, Float, Float) {
 	n = { product + denominator / 2 } / denominator
 	rem = product - n * denominator
 	negative = rem < 0
-	magnitude = { negative } |> (True) { -rem } | (False) { rem }
+	magnitude = { negative } |> (True) { -rem } & (False) { rem }
 	fbits = ratio_bits(magnitude, denominator) |>
 		(Ok(b)) { b }
-		| (Error(_)) { panic("trig: fractional reduction overflow") }
+		& (Error(_)) { panic("trig: fractional reduction overflow") }
 	f = core.float_from_bits(fbits)
 	// Recover the signed tail of the fraction after rounding the leading word.
 	fb = core.float_to_bits(f)
@@ -1293,21 +1293,21 @@ trig_reduce = (x : Float) -> (Int, Float, Float) {
 	shift = 1217 - exponent + fe
 	represented = { shift >= 0 } |>
 		(True) { fm * int_power(2, shift) }
-		| (False) { fm / int_power(2, -shift) }
+		& (False) { fm / int_power(2, -shift) }
 	tail = magnitude - represented
 	tail_negative = tail < 0
-	tail_magnitude = { tail_negative } |> (True) { -tail } | (False) { tail }
+	tail_magnitude = { tail_negative } |> (True) { -tail } & (False) { tail }
 	ft = { tail_magnitude == 0 } |>
 		(True) { 0.0 }
-		| (False) {
+		& (False) {
 			tb = ratio_bits(tail_magnitude, denominator) |>
 				(Ok(b)) { b }
-				| (Error(_)) { panic("trig: tail overflow") }
+				& (Error(_)) { panic("trig: tail overflow") }
 			core.float_from_bits(tb)
 		}
-	ft = { tail_negative } |> (True) { -.ft } | (False) { ft }
-	f = { negative } |> (True) { -.f } | (False) { f }
-	ft = { negative } |> (True) { -.ft } | (False) { ft }
+	ft = { tail_negative } |> (True) { -.ft } & (False) { ft }
+	f = { negative } |> (True) { -.f } & (False) { f }
+	ft = { negative } |> (True) { -.ft } & (False) { ft }
 	hi = f *. 1.5707963267948966
 	fh = without_low(f)
 	fl = f -. fh
@@ -1371,16 +1371,16 @@ sin = (x : Float) -> Float {
 		(True) {
 			{ a <. 1.4901161193847656e-8 } |>
 				(True) { x }
-				| (False) { trig_sin(x, 0.0) }
+				& (False) { trig_sin(x, 0.0) }
 		}
-		| (False) {
+		& (False) {
 			(n, hi, lo) = trig_reduce(a)
 			v = n |>
 				(0) { trig_sin(hi, lo) }
-				| (1) { trig_cos(hi, lo) }
-				| (2) { -.trig_sin(hi, lo) }
-				| (_) { -.trig_cos(hi, lo) }
-			{ sign_bit(x) } |> (True) { -.v } | (False) { v }
+				& (1) { trig_cos(hi, lo) }
+				& (2) { -.trig_sin(hi, lo) }
+				& (_) { -.trig_cos(hi, lo) }
+			{ sign_bit(x) } |> (True) { -.v } & (False) { v }
 		}
 }
 
@@ -1389,13 +1389,13 @@ cos = (x : Float) -> Float {
 	a = abs(x)
 	{ a <. 0.7853981633974483 } |>
 		(True) { trig_cos(a, 0.0) }
-		| (False) {
+		& (False) {
 			(n, hi, lo) = trig_reduce(a)
 			n |>
 				(0) { trig_cos(hi, lo) }
-				| (1) { -.trig_sin(hi, lo) }
-				| (2) { -.trig_cos(hi, lo) }
-				| (_) { trig_sin(hi, lo) }
+				& (1) { -.trig_sin(hi, lo) }
+				& (2) { -.trig_cos(hi, lo) }
+				& (_) { trig_sin(hi, lo) }
 		}
 }
 
@@ -1409,10 +1409,10 @@ trig_tan = (input : Float, tail : Float, odd : Bool) -> Float {
 	(x, y) = { big } |>
 		(True) {
 			a = abs(input)
-			b = { negative } |> (True) { -.tail } | (False) { tail }
+			b = { negative } |> (True) { -.tail } & (False) { tail }
 			(0.7853981633974483 -. a +. { 3.061616997868383e-17 -. b }, 0.0)
 		}
-		| (False) { (input, tail) }
+		& (False) { (input, tail) }
 	z = x *. x
 	w = z *. z
 	r = 1.33333333333201242699e-1 +.
@@ -1461,14 +1461,14 @@ trig_tan = (input : Float, tail : Float, odd : Bool) -> Float {
 	w = x +. r
 	{ big } |>
 		(True) {
-			s = { odd } |> (True) { -.1.0 } | (False) { 1.0 }
+			s = { odd } |> (True) { -.1.0 } & (False) { 1.0 }
 			v = s -. 2.0 *. { x +. { r -. w *. w /. { w +. s } } }
-			{ negative } |> (True) { -.v } | (False) { v }
+			{ negative } |> (True) { -.v } & (False) { v }
 		}
-		| (False) {
+		& (False) {
 			{ odd } |>
 				(False) { w }
-				| (True) {
+				& (True) {
 					w0 = without_low(w)
 					v = r -. { w0 -. x }
 					a = -.1.0 /. w
@@ -1484,16 +1484,16 @@ _tan_result = (x : Float) -> Result(Float, Nil) {
 		(True) {
 			{ a <. 1.4901161193847656e-8 } |>
 				(True) { Ok(x) }
-				| (False) { Ok(trig_tan(x, 0.0, False)) }
+				& (False) { Ok(trig_tan(x, 0.0, False)) }
 		}
-		| (False) {
+		& (False) {
 			(n, hi, lo) = trig_reduce(a)
 			odd = n % 2 == 1
 			{ odd && abs(hi +. lo) <=. 5.562684646268003e-309 } |>
 				(True) { Error(Nil) }
-				| (False) {
+				& (False) {
 					v = trig_tan(hi, lo, odd)
-					Ok({ sign_bit(x) } |> (True) { -.v } | (False) { v })
+					Ok({ sign_bit(x) } |> (True) { -.v } & (False) { v })
 				}
 		}
 }

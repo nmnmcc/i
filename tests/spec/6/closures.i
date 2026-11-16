@@ -8,7 +8,7 @@
 check = (got : String, want : String) {
 	{ got == want } |>
 		(True) { Nil }
-		| (False) { panic(got <> " is not " <> want) }
+		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -17,10 +17,10 @@ adder = (n) { (x) { x + n } }
 
 compose = (f, g) { (x) { g(f(x)) } }
 
-map = (xs, f) { xs |> ([]) { [] } | ([x, ..rest]) { [f(x), ..map(rest, f)] } }
+map = (xs, f) { xs |> ([]) { [] } & ([x, ..rest]) { [f(x), ..map(rest, f)] } }
 
 fold = (xs, acc, f) {
-	xs |> ([]) { acc } | ([x, ..rest]) { fold(rest, f(acc, x), f) }
+	xs |> ([]) { acc } & ([x, ..rest]) { fold(rest, f(acc, x), f) }
 }
 
 test("captures", () {
