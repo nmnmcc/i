@@ -66,6 +66,101 @@ fn build_writes_the_module() {
 }
 
 #[test]
+fn build_named_entries_write_distinct_wasm_artifacts() {
+    // The default output is named after the package for its default entry and
+    // after the entry NAME otherwise, for Wasm targets too, so that one
+    // selected entry does not overwrite the artifact of another.
+    let dir = package(&[
+        (
+            "i.toml",
+            "name = \"app\"\n\n[entries]\nother = \"main.other\"\n",
+        ),
+        ("src/main.i", "main = () { Nil }\n\nother = () { Nil }\n"),
+    ]);
+    for target in ["host", "nodejs"] {
+        let build = |entry: Option<&str>| {
+            let mut args = vec!["build", "--target", target];
+            if let Some(entry) = entry {
+                args.push(entry);
+            }
+            let out = i(&args, dir.path());
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        };
+        let plan = |path: &Path| -> serde_json::Value {
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+        };
+        let default_wasm = dir.path().join("build/app.wasm");
+        let default_plan = dir.path().join("build/app.bindings.json");
+        build(None);
+        let default_bytes = std::fs::read(&default_wasm).unwrap();
+        assert_eq!(
+            plan(&default_plan)["artifact_digest"],
+            ilang_host::bindings::artifact_digest(&default_bytes),
+            "{target}"
+        );
+
+        build(Some("other"));
+        let other_wasm = dir.path().join("build/other.wasm");
+        let other_bytes = std::fs::read(&other_wasm).unwrap();
+        assert_eq!(
+            plan(&dir.path().join("build/other.bindings.json"))["artifact_digest"],
+            ilang_host::bindings::artifact_digest(&other_bytes),
+            "{target}"
+        );
+        // The entry build left the default artifact and its plan alone.
+        assert_eq!(
+            std::fs::read(&default_wasm).unwrap(),
+            default_bytes,
+            "{target}"
+        );
+        assert_eq!(
+            plan(&default_plan)["artifact_digest"],
+            ilang_host::bindings::artifact_digest(&default_bytes),
+            "{target}"
+        );
+        assert_ne!(default_bytes, other_bytes, "{target}");
+        std::fs::remove_dir_all(dir.path().join("build")).unwrap();
+    }
+}
+
+#[test]
+fn wasi_build_removes_a_stale_bindings_plan() {
+    // WASI writes no binding plan. One left beside the module by an earlier
+    // build of another target would describe a module that was replaced.
+    let dir = package(&[
+        ("i.toml", "name = \"app\"\n"),
+        ("src/main.i", "main = () { Nil }\n"),
+    ]);
+    let wasm = dir.path().join("build/app.wasm");
+    let plan = dir.path().join("build/app.bindings.json");
+    let host = i(&["build", "--target", "host"], dir.path());
+    assert!(
+        host.status.success(),
+        "{}",
+        String::from_utf8_lossy(&host.stderr)
+    );
+    let host_digest: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&plan).unwrap()).unwrap();
+    assert_eq!(
+        host_digest["artifact_digest"],
+        ilang_host::bindings::artifact_digest(&std::fs::read(&wasm).unwrap())
+    );
+
+    let wasi = i(&["build", "--target", "wasi"], dir.path());
+    assert!(
+        wasi.status.success(),
+        "{}",
+        String::from_utf8_lossy(&wasi.stderr)
+    );
+    assert!(wasm.exists());
+    assert!(!plan.exists(), "a WASI build left a stale binding plan");
+}
+
+#[test]
 fn build_reports_errors() {
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),
