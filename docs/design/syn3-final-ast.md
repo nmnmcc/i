@@ -7,15 +7,18 @@ the work and §7 records the final state. Controlling sources:
 There is one surface and one tree. The compiler's production path parses
 with `crates/ilang-syntax/src/{lexer,parse}.rs` and stores the result as
 `ilang_syntax::ast::Module`. Every reader, the resolver, the macro passes,
-the queries and the back-ends read that tree. No compiler crate lowers it
-to another tree or keeps a second tree, including under `#[cfg(test)]`.
+the queries and the back-ends read that tree. No compiler crate has a
+second tree in its production or test code. A few unit tests use the frozen
+migration crate below as an independent old-tree oracle; that code runs only
+under `#[cfg(test)]` and is not part of a normal build.
 
 `crates/ilang-syntax/examples/legacy/` (crate `ilang-syntax-migration`) is a
 frozen copy of the old parser and representation. It is separate from the
-workspace (listed in the root `Cargo.toml` `exclude`). Only the migration
-tools (`migrate-syntax3*`, `migrate-tests`) use it, and a few tests use it as
-an independent oracle through `[dev-dependencies]`. It is not part of the
-normal build of the compiler crates and it is not a production path.
+workspace (listed in the root `Cargo.toml` `exclude`). The migration tools in
+that crate (`migrate-syntax3*`, `migrate-tests`) use it, and some unit tests
+of the compiler crates use it as
+an independent old-tree oracle through `[dev-dependencies]`. It is not part
+of the normal build of the compiler crates and it is not a production path.
 Production code must not depend on it.
 
 Sections 1 to 5 were written on Nov 13, before the work, and say "new tree"
