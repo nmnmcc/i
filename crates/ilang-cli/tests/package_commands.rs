@@ -74,8 +74,14 @@ impl World {
 
     /// Runs `i` in the world's directory, with its cache and URLs.
     fn i(&self, args: &[&str]) -> Output {
+        self.i_with(args, &[])
+    }
+
+    /// Runs `i` as [`World::i`] does, with `env` set as well.
+    fn i_with(&self, args: &[&str], env: &[(&str, &std::ffi::OsStr)]) -> Output {
         let remotes = self.path().join("remotes");
         git_env(&mut Command::new(env!("CARGO_BIN_EXE_i")))
+            .envs(env.iter().copied())
             .current_dir(self.path())
             .env("ILANG_CACHE", self.path().join("cache"))
             .env(
@@ -759,6 +765,46 @@ fn publish_tags_a_first_version() {
     assert!(err.contains("must be newer than every tag"), "{err}");
     let err = w.fails(&["publish", "0.9.0", "--project", &project]);
     assert!(err.contains("must be newer than every tag"), "{err}");
+}
+
+/// A `BrokenPipe` from writing to a child process is a failure, not a
+/// closed standard output: when `tar` exits without reading the earlier
+/// version, `i publish` fails and makes no tag.
+#[test]
+fn publish_fails_when_tar_does_not_read_the_earlier_version() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let w = World::new();
+    let dir = published(&w, API_1);
+    let project = dir.display().to_string();
+    // More than a pipe holds, so writing it to a `tar` that has gone gives
+    // `BrokenPipe` rather than filling the pipe's buffer.
+    write(&dir, &[("data.txt", &"x".repeat(1 << 20))]);
+    commit(&dir, "data");
+    w.ok(&["publish", "1.0.0", "--project", &project]);
+    write(&dir, &[("src/api.i", &format!("{API_1}\nhidden = 3\n"))]);
+    commit(&dir, "internal");
+
+    let bin = w.path().join("fake-bin");
+    fs::create_dir_all(&bin).unwrap();
+    let tar = bin.join("tar");
+    fs::write(&tar, "#!/bin/sh\nexit 2\n").unwrap();
+    fs::set_permissions(&tar, fs::Permissions::from_mode(0o755)).unwrap();
+    let path = std::env::join_paths(
+        std::iter::once(bin).chain(std::env::split_paths(&std::env::var_os("PATH").unwrap())),
+    )
+    .unwrap();
+    let out = w.i_with(
+        &["publish", "1.0.1", "--project", &project],
+        &[("PATH", &path)],
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !out.status.success(),
+        "publish should fail:\n{}{stderr}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert!(stderr.contains("tar"), "{stderr}");
+    assert_eq!(tags(&dir), "v1.0.0");
 }
 
 #[test]

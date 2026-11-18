@@ -7,21 +7,38 @@
 
 use std::io::{self, Write};
 
-/// Writes `text` to standard output, leaving the error to the caller, which
-/// recognises a closed pipe with [`is_broken_pipe`].
-pub(crate) fn write(text: &str) -> io::Result<()> {
-    let mut stdout = io::stdout().lock();
-    stdout.write_all(text.as_bytes())?;
-    stdout.flush()
+/// The error of a write to standard output whose reader has gone. Only this
+/// marks a closed pipe: a `BrokenPipe` from any other write, such as to a
+/// child process, is a real failure.
+#[derive(Debug)]
+pub(crate) struct Closed;
+
+impl std::fmt::Display for Closed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("standard output's reader went away")
+    }
 }
 
-/// Whether `error` was caused by writing to a pipe whose reader has gone.
+impl std::error::Error for Closed {}
+
+/// Writes `text` to standard output, leaving the error to the caller, which
+/// recognises a closed pipe with [`is_broken_pipe`].
+pub(crate) fn write(text: &str) -> anyhow::Result<()> {
+    let mut stdout = io::stdout().lock();
+    match stdout
+        .write_all(text.as_bytes())
+        .and_then(|()| stdout.flush())
+    {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::BrokenPipe => Err(Closed.into()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Whether `error` came from writing to a standard output whose reader has
+/// gone, as reported by [`write`].
 pub(crate) fn is_broken_pipe(error: &anyhow::Error) -> bool {
-    error.chain().any(|cause| {
-        cause
-            .downcast_ref::<io::Error>()
-            .is_some_and(|error| error.kind() == io::ErrorKind::BrokenPipe)
-    })
+    error.downcast_ref::<Closed>().is_some()
 }
 
 /// Ends the process after a failed write to standard output: quietly and
@@ -46,3 +63,23 @@ macro_rules! outln {
     }};
 }
 pub(crate) use outln;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_broken_pipe_from_another_write_is_a_failure() {
+        let error = anyhow::Error::new(io::Error::from(io::ErrorKind::BrokenPipe));
+        assert!(!is_broken_pipe(&error));
+        assert!(!is_broken_pipe(&error.context("writing to `tar`")));
+    }
+
+    #[test]
+    fn a_closed_standard_output_is_not_a_failure() {
+        assert!(is_broken_pipe(&anyhow::Error::new(Closed)));
+        assert!(is_broken_pipe(
+            &anyhow::Error::new(Closed).context("i spec")
+        ));
+    }
+}

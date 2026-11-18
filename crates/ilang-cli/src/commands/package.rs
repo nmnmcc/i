@@ -1146,7 +1146,9 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
     {
         use std::io::Write as _;
         let mut stdin = tar.stdin.take().expect("piped");
-        stdin.write_all(&archive.stdout)?;
+        stdin
+            .write_all(&archive.stdout)
+            .with_context(|| format!("the files of {tag} could not be given to `tar`"))?;
     }
     let out = tar.wait_with_output()?;
     if !out.status.success() {
