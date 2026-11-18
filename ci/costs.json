@@ -2778,7 +2778,7 @@
     "std@2"
    ]
   },
-  "value-type-cases": {
+  "value-type-recovery-cases": {
    "costs": {},
    "keys": [
     "1.1/binding_text_cr.i",

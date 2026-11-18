@@ -46,7 +46,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MAX_PARALLEL = 18
 
 # The ilang-check test binary that has a job of its own, sharded by case
-# (set value-type-cases); the shards of ilang-check-tests leave it out.
+# (set value-type-recovery-cases); the shards of ilang-check-tests leave it out.
 VALUE_TYPES_KEY = 'test:value_types'
 
 # Sharded jobs: output name, set, name prefix, display template, the filter
@@ -54,7 +54,7 @@ VALUE_TYPES_KEY = 'test:value_types'
 SHARDED = [
     # output          set                  prefix                       display          filter  package
     ('check_tests',   'ilang-check-tests', 'ilang-check',               'test ({name})', 'rust', 'ilang-check'),
-    ('value_types',   'value-type-cases',  'ilang-check, value types',  'test ({name})', 'rust', None),
+    ('value_types',   'value-type-recovery-cases',  'ilang-check, value types recovery cases',  'test ({name})', 'rust', None),
     # (value_types: CHECKS_TEST_TARGETS is ilang-check:test:value_types in every shard.)
     ('cli_tests',     'ilang-cli-tests',   'ilang-cli',                 'test ({name})', 'rust', 'ilang-cli'),
     ('spec',          'spec-cases',        'spec',                      'test ({name})', 'rust', None),
@@ -88,7 +88,7 @@ KINDS = {
     'ilang-cli-tests': ('test name', re.compile(r'^(lib|doc|bin:[^\s]+|test:[^\s]+)$')),
     'std-tests': ('project', re.compile(r'^[^\s@]+@[0-2]$')),
     'spec-cases': ('spec case path', re.compile(r'^\S+\.i$')),
-    'value-type-cases': ('spec case path', re.compile(r'^\S+\.i$')),
+    'value-type-recovery-cases': ('spec case path', re.compile(r'^\S+\.i$')),
     'corpus-cases': ('corpus case path', re.compile(r'^[^\s]+$')),
     'docs-examples': ('documentation page', re.compile(r'^docs/\S+\.(md|mdx)$')),
 }
@@ -119,7 +119,7 @@ def shard_tool(*args):
 
 def costs_without_value_types(costs, out):
     """The cost table with ilang-check's value_types left out of
-    ilang-check-tests: it is a job of its own (set value-type-cases)."""
+    ilang-check-tests: it is a job of its own (set value-type-recovery-cases)."""
     table = json.loads(costs.read_text())
     sets = table.get('sets', {})
     check = sets.get('ilang-check-tests')
@@ -146,7 +146,7 @@ def matrix(costs, set_name, prefix, display, package):
         e['display'] = display.format(name=e['name'])
         if package:
             e['targets'] = ' '.join(f'{package}:{k}' for k in keys)
-        elif set_name == 'value-type-cases':
+        elif set_name == 'value-type-recovery-cases':
             e['targets'] = f'ilang-check:{VALUE_TYPES_KEY}'
         elif set_name == 'std-tests':
             e['projects'] = ' '.join(keys)
