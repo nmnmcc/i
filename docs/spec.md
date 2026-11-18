@@ -222,7 +222,9 @@ with a non-zero exit and changes no file. Once all checks pass, if a write then
 fails, for example from an I/O error or a target that another process creates
 in the meantime, the files already converted stay converted and the command
 lists them; the remaining files are left as they were, not damaged or lost. A
-new file is fully written before its original is deleted.
+new file is fully written before its original is deleted. When `--to` names the
+surface a file already has, that file is formatted in place and is never
+removed or renamed.
 
 ## 2. Modules
 
@@ -497,7 +499,7 @@ The target-independent source checker keeps the entry shape and interface checks
 - `js` and `nodejs`: `build/<name>.wasm` with its loader `name.mjs` and `name.d.ts` (§B.6.1).
 - `host`, also written `ilang`: the module `build/<name>.wasm` of Appendix B, for an embedding host.
 
-A plain `i build` writes no `.wasm` module.
+A plain `i build` writes no `.wasm` module. `<name>` is the package name for the default entry and the entry `NAME` for `i build NAME`; building an entry whose `NAME` is the package name without `--out` is an error, since its artifact would replace the default entry's.
 
 **Native packages.** `i build` with the native target writes one executable file, `build/<name>`, where `<name>` is the package name or the entry `NAME` of `i build NAME` (`--out` chooses another path). It is the native runner — Wasmtime's runtime without a compiler, the standard host services and the reactor of `i run` — followed by a payload: a manifest, the program's `ilang.*` metadata and its code compiled ahead of time, sealed by a SHA-256 digest. The manifest records the contract the code was compiled for (Wasmtime version, target triple, CPU feature baseline, collector and engine settings), the digest of the module and its trusted binding plan; the runner loads nothing else, and refuses a missing, truncated or damaged payload and a payload whose contract is not its own. The executable runs the program entry with its arguments, environment and standard streams, and exits as `i run` does. On Linux the executable is statically linked and needs no shared library; on macOS it depends only on system libraries. Its code is compiled for the runner's target triple (on Linux the musl triple of the building machine's architecture); cross-target builds and signing are not specified. Building fails, with the namespace and label, for each required import the runner cannot supply, including a declaration it does not grant (§9.7); a service replaced by ordinary i code needs no import.
 

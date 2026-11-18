@@ -830,8 +830,11 @@ fn destination_created_during_conversion_is_not_overwritten() {
         )),
         "{err}"
     );
-    assert!(err.contains("already converted in this run:"), "{err}");
-    assert!(err.contains("0000.i -> 0000.is"), "{err}");
+    assert!(
+        err.contains("already converted in this run (destination written, source removed):"),
+        "{err}"
+    );
+    assert!(err.contains("src/0000.i -> src/0000.is"), "{err}");
 
     // The target the test created is byte for byte what the test wrote.
     assert_eq!(bytes(dir.path(), &last_target), &sentinel[..]);

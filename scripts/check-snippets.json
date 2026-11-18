@@ -29,6 +29,9 @@
   "crates/ilang-check/tests/codegen.rs:92052762dba09d34": {
     "not_source": "TOML manifest or manifest fragment"
   },
+  "crates/ilang-check/tests/resolve_deep.rs:30b0fe37fff13e45": {
+    "not_source": "Rust format string that builds a 20,000-deep i value"
+  },
   "crates/ilang-check/tests/common/mod.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
   },
@@ -104,6 +107,9 @@
   "crates/ilang-cli/tests/check.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
   },
+  "crates/ilang-cli/tests/check.rs:72d5e10ce2a4a30e": {
+    "not_source": "Rust format string for generated source"
+  },
   "crates/ilang-cli/tests/commands.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
   },
@@ -123,6 +129,12 @@
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/commands.rs:dc24981f7611b94d": {
+    "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-cli/tests/commands.rs:76df5d4e33397944": {
+    "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-cli/tests/commands.rs:dc52772e3779559a": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/fmt.rs:dbceb65de7aa8500": {
@@ -2420,61 +2432,8 @@
   "crates/ilang-check/src/resolve/three.rs:d942f64886578d87": {
     "not_source": "A name compared on the diagnostic path, not an i source"
   },
-  "crates/ilang-check/src/resolve/legacy.rs:d942f64886578d87": {
-    "not_source": "A name compared on the diagnostic path, not an i source"
-  },
   "crates/ilang-check/src/resolve/three.rs:d46aee08cc49f6d1": {
     "not_source": "A name compared on the diagnostic path, not an i source"
-  },
-  "crates/ilang-check/src/resolve/legacy.rs:d46aee08cc49f6d1": {
-    "not_source": "A name compared on the diagnostic path, not an i source"
-  },
-  "crates/ilang-check/src/resolve/differential.rs:7372e79824e15040": {
-    "not_source": "Rust TOML manifest format template, not i source"
-  },
-  "crates/ilang-check/src/resolve/differential.rs:7bf4286e23e784b2": {
-    "not_source": "Rust resolver-differential diagnostic format string, not i source"
-  },
-  "crates/ilang-check/src/resolve/differential.rs:c7d1290a9ba8bc14": {
-    "diagnostics": [
-      "E0101: a pattern inside a labelled field is not supported here; bind the field to a name and match the name"
-    ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
-  },
-  "crates/ilang-check/src/resolve/differential.rs:eb5cba8498c94b57": {
-    "diagnostics": [
-      "E0110: an item by position may not come after an item by label",
-      "E0101: data with labels has only labelled items after an optional first `..base`; mixed positional and labelled items are not supported here",
-      "E0101: `..` is the first item of a constructor call"
-    ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
-  },
-  "crates/ilang-check/src/resolve/differential.rs:ff4a2bc9c99582dc": {
-    "diagnostics": [
-      "E0101: provided services have no labels: each is keyed by its own type",
-      "E0101: a provided service has no label: it is keyed by its type"
-    ],
-    "reason": "Provided labels remain invalid (§2.10.2); E6 whole-environment capture, spread and provide forms now parse."
-  },
-  "crates/ilang-check/src/resolve/differential.rs:c67eeff3531f0976": {
-    "diagnostics": [
-      "E0101: a function literal with type parameters must be the value of a binding",
-      "E0110: an item by position may not come after an item by label",
-      "E0101: a data type with labels has only labelled items; mixed positional and labelled items are not supported here",
-      "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`",
-      "E0101: a need has no label: a service is keyed by its own type"
-    ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
-  },
-  "crates/ilang-check/src/resolve/differential.rs:3520187651d4a622": {
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters",
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
-  },
-  "crates/ilang-check/src/resolve/differential.rs:30b0fe37fff13e45": {
-    "not_source": "Rust deep-expression format template; the test inserts 20000 bracket pairs before parsing"
   },
   "crates/ilang-macro/src/item_phase3.rs:0acb225eff8aa24b": {
     "diagnostics": [
@@ -2539,14 +2498,6 @@
   "crates/ilang-cli/tests/diagnostic_repairs.rs:74282c580560b9e5": {
     "reason": "TOML manifest for the archived-program CLI tests, not i source.",
     "not_source": true
-  },
-  "crates/ilang-check/src/resolve/differential.rs:158a229e560736bb": {
-    "diagnostics": [
-      "E0101: a rest `..` in a data pattern is not supported here",
-      "E0101: a named rest `..name` in a pattern is not supported here",
-      "E0101: two patterns joined by `=` must both be names here"
-    ],
-    "reason": "§7.1 keyed data and nested constructor data now have spec tests. This remaining EXTRA program retains exactly the data-rest, named-rest and two-nonname-conjunction gates."
   },
   "crates/ilang-cli/tests/docfix_diagnostics.rs:498de9d34c9581c7": {
     "not_source": "Diagnostic-message assertion containing a filename and line/column; not i source."
@@ -2915,13 +2866,6 @@
       "E0106: a discard binds nothing, so it may not be used as a value",
       "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
     ]
-  },
-  "crates/ilang-check/src/resolve/differential.rs:2f8526a1e928be69": {
-    "diagnostics": [
-      "E0110: an item by position may not come after an item by label",
-      "E0101: a chain of branches with no parameter has nothing to choose by"
-    ],
-    "reason": "Intentionally invalid differential EXTRA program: compare the partial AST and every diagnostic, including unsupported stage forms"
   },
   "crates/ilang-syntax/src/lisp/expansion3.rs:5400e87bb5b8b130": {
     "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",

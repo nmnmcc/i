@@ -1,12 +1,14 @@
 //! The `i` command.
 
 mod commands;
+mod output;
 
 use clap::{Parser, Subcommand};
 use ilang_cli::{BuildOptions, level};
 use ilang_host::Outcome;
 use ilang_package::Diagnostic;
 use ilang_wasm::Target;
+use output::outln;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -60,7 +62,8 @@ enum Command {
     /// architecture of this machine only, with a baseline of CPU features
     /// (x86-64-v2 on x86-64); building for other targets and signing are not
     /// supported yet. `--target host` (or `ilang`), `js`, `nodejs` and `wasi`
-    /// write the Wasm module `build/<name>.wasm` instead.
+    /// write the Wasm module `build/<name>.wasm` instead, with the same
+    /// package name or entry NAME.
     Build {
         #[arg(long, default_value = ".")]
         project: PathBuf,
@@ -73,7 +76,8 @@ enum Command {
         /// Select a function declared in [entries].
         entry: Option<String>,
         /// The output file; by default `build/<name>` (native) or
-        /// `build/<name>.wasm` in the package.
+        /// `build/<name>.wasm` in the package, named after the package or
+        /// the selected entry.
         #[arg(long)]
         out: Option<PathBuf>,
         /// Provider column; ilang is an alias of host.
@@ -228,7 +232,7 @@ fn main() -> ExitCode {
         } => match ilang_cli::collections(&project, tests, offline) {
             Ok(manifest) => match serde_json::to_string_pretty(&manifest) {
                 Ok(json) => {
-                    println!("{json}");
+                    outln!("{json}");
                     Ok(ExitCode::SUCCESS)
                 }
                 Err(error) => Err(error.into()),
@@ -281,6 +285,9 @@ fn main() -> ExitCode {
 fn finish(result: anyhow::Result<ExitCode>) -> ExitCode {
     match result {
         Ok(code) => code,
+        // The reader of standard output has gone, as in `i spec | head`; the
+        // output was cut short on purpose, so this is not a failure.
+        Err(e) if output::is_broken_pipe(&e) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e:#}");
             ExitCode::FAILURE
@@ -358,12 +365,18 @@ fn cmd_build(
         return Ok(ExitCode::FAILURE);
     };
     let native = target == Target::Native;
-    let name = if native {
-        entry.unwrap_or(&b.name)
-    } else {
-        &b.name
-    };
+    // Name the artifact after the selected entry, as native packages do, so
+    // that entries (and the package default) do not overwrite each other.
+    let name = entry.unwrap_or(&b.name);
     let default_out = out.is_none();
+    if default_out && entry == Some(b.name.as_str()) {
+        // `build/<name>` of this entry is also the default entry's artifact;
+        // writing it would silently replace the other build.
+        eprintln!(
+            "error: the entry `{name}` has the package's name, so its default artifact would replace the default entry's; choose the path with --out"
+        );
+        return Ok(ExitCode::FAILURE);
+    }
     let out = out.unwrap_or_else(|| {
         project.join("build").join(if native {
             name.to_owned()
@@ -401,6 +414,16 @@ fn cmd_build(
         file.persist(&out)?;
     } else {
         std::fs::write(&out, &b.wasm)?;
+        if target == ilang_wasm::Target::Wasi && default_out {
+            // A WASI module has no binding plan. A plan left by an earlier
+            // non-WASI build of the same name in the generated `build/` would
+            // describe a module that is no longer there.
+            match std::fs::remove_file(out.with_extension("bindings.json")) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
     }
     if !native && target != ilang_wasm::Target::Wasi {
         std::fs::write(
@@ -592,7 +615,7 @@ fn cmd_test(
             }
             if mode == "skip" || (focused && mode != "only") {
                 skipped += 1;
-                println!("skip {name}");
+                outln!("skip {name}");
                 continue;
             }
             let index = entry
@@ -627,23 +650,23 @@ fn cmd_test(
             let success = matches!(outcome, Ok(Outcome::Ok(_)));
             if outcome.is_ok() && success != (mode == "fails") {
                 passed += 1;
-                println!("pass {name}{took}");
+                outln!("pass {name}{took}");
             } else {
                 failed += 1;
-                println!("FAIL {name}{took}");
+                outln!("FAIL {name}{took}");
                 match outcome {
-                    Ok(Outcome::Stop(stop)) => println!("  {stop}"),
-                    Ok(Outcome::Err(error)) => println!("  error: {:?}", error.0),
-                    Err(error) => println!("  {error:#}"),
-                    Ok(Outcome::Ok(_)) => println!("  expected failure"),
+                    Ok(Outcome::Stop(stop)) => outln!("  {stop}"),
+                    Ok(Outcome::Err(error)) => outln!("  error: {:?}", error.0),
+                    Err(error) => outln!("  {error:#}"),
+                    Ok(Outcome::Ok(_)) => outln!("  expected failure"),
                 }
             }
         }
     }
     if skipped == 0 {
-        println!("{passed} passed, {failed} failed");
+        outln!("{passed} passed, {failed} failed");
     } else {
-        println!("{passed} passed, {failed} failed, {skipped} skipped");
+        outln!("{passed} passed, {failed} failed, {skipped} skipped");
     }
     Ok(if failed == 0 {
         ExitCode::SUCCESS
@@ -691,7 +714,7 @@ fn check(project: &Path, offline: bool, types: bool, target: Option<Target>) -> 
             for (i, m) in program.modules.iter().enumerate() {
                 if Some(m.package) == graph.root {
                     for line in typed.lines(program, ilang_check::hir::ModuleId(i as u32)) {
-                        println!("{line}");
+                        outln!("{line}");
                     }
                 }
             }

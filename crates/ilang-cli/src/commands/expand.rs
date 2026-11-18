@@ -174,7 +174,7 @@ pub fn run(
             eprintln!("{}:{line}:{column}: {}", file.display, transaction.trace);
         }
     }
-    print!("{output}");
+    crate::output::write(&output)?;
     Ok(ExitCode::SUCCESS)
 }
 

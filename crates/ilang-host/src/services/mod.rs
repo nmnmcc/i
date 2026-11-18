@@ -89,8 +89,13 @@ pub fn stdout_with_args(args: Vec<String>) -> HostImports {
         |text| {
             use std::io::Write;
             let mut out = std::io::stdout().lock();
-            let _ = writeln!(out, "{text}");
-            let _ = out.flush();
+            // When standard output's reader went away (`i run | head -1`),
+            // stop quietly with status 0 like the CLI's own output
+            // (`crates/ilang-cli/src/output.rs`) instead of running on.
+            // Other write errors are still ignored.
+            if let Err(e) = writeln!(out, "{text}").and_then(|()| out.flush()) {
+                stdio::exit_if_stdout_closed(&e);
+            }
         },
         args,
     )
