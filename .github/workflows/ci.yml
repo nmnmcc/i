@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  # The daily run is the full gate, with both optimisation levels of spec.
+  schedule:
+    - cron: '0 3 * * *'
   push:
     branches: [main, redesign, 'ci/**']
   pull_request:
@@ -440,6 +443,8 @@ jobs:
     env:
       CHECKS_TEST_GROUP: spec-${{ matrix.shard }}
       I_SPEC_SHARD: ${{ matrix.shard }}
+      # The push/PR gate runs O0; the daily run compares O0 and O2.
+      CHECKS_SPEC_LEVELS: ${{ github.event_name == 'schedule' && '0,2' || '0' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
