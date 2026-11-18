@@ -14,15 +14,12 @@ on:
 permissions:
   contents: read
 
-# Three groups. A main push has its own group and is never cancelled, so no
-# pull request can hold up or replace the run that deploys. Every pull request
-# shares `pr`, so at most one pull request gate runs at a time and the 20
-# concurrent jobs of one run are not split with another run's; a newer pull
-# request replaces a pending one (GitHub cancels pending runs in a group
-# anyway), which keeps the gate that finally runs on the newest commit. The
-# daily run has its own group and is never cancelled.
+# One group per branch, plus main and schedule on their own. A newer commit on
+# a branch cancels that branch's older run; another branch can never cancel it,
+# so every pull request can still reach a finished gate. Main is never
+# cancelled (it deploys), and the daily run is never cancelled either.
 concurrency:
-  group: ${{ github.workflow }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'main' || (github.event_name == 'schedule' && 'schedule' || 'pr') }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'main' || (github.event_name == 'schedule' && 'schedule' || format('branch-{0}', github.head_ref || github.ref_name)) }}
   cancel-in-progress: ${{ github.event_name != 'schedule' && !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
 env:
