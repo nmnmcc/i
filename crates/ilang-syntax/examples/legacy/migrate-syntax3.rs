@@ -15,7 +15,7 @@
 //!     named in SYN3_FROM_OLD are read as old.
 //! migrate-syntax3 snippets [--ctors DIR]...
 //!     The same for length-prefixed texts on stdin (see `snippets_command`).
-//! migrate-syntax3 --verify [DIR...]
+//! migrate-syntax3 --check [DIR...]
 //!     For every `.i` and `.is` file under the DIRs (default: lib std
 //!     examples tests) that the current parser reads without an error:
 //!     parse3(print3(convert(parse_old(f)))) == convert(parse_old(f)),
@@ -157,7 +157,7 @@ fn convert_file(
     }
 }
 
-/// The checks of `--verify` on one converted file. Returns what failed.
+/// The checks of `--check` on one converted file. Returns what failed.
 fn check(path: &Path, c: &Converted) -> Option<String> {
     let reparse = |text: &str, what: &str| -> Option<String> {
         let (module, diags) = if is_lisp(path) {
@@ -235,7 +235,7 @@ fn ctor_table(files: &[PathBuf]) -> convert::Signatures {
     table
 }
 
-fn verify(dirs: &[String]) -> i32 {
+fn check_dirs(dirs: &[String]) -> i32 {
     let dirs: Vec<String> = if dirs.is_empty() {
         ["lib", "std", "examples", "tests"]
             .map(String::from)
@@ -492,11 +492,11 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let status = match args.first().map(String::as_str) {
         Some("convert") => convert_command(&args[1..]),
-        Some("--verify") => verify(&args[1..]),
+        Some("--check") => check_dirs(&args[1..]),
         Some("snippets") => snippets_command(&args[1..]),
         _ => {
             eprintln!(
-                "usage: migrate-syntax3 convert [--write] [--ctors DIR]... FILE...\n       migrate-syntax3 --verify [DIR...]"
+                "usage: migrate-syntax3 convert [--write] [--ctors DIR]... FILE...\n       migrate-syntax3 --check [DIR...]"
             );
             2
         }

@@ -1167,7 +1167,7 @@ fn located_source_links_cannot_escape_the_hashed_tree() {
 }
 
 #[test]
-fn cached_package_files_are_verified_on_every_load() {
+fn cached_package_files_are_checked_on_every_load() {
     for attack in ["edit", "manifest", "add", "remove", "forged-sidecar"] {
         let w = World::new();
         let r = w.repo("dep");

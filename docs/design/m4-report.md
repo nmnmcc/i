@@ -78,7 +78,7 @@ and item or type positions ("cannot make items", "cannot give a type"). Tests:
 `typed_macro_argument_completion_without_expansion` checks LSP completion in
 the argument of a macro whose expansion fails.
 
-## Verification
+## Checking
 
 - `cargo test -p ilang-cli --test typed_macros`: 35 passed.
 - `cargo test -p ilang-lsp --test protocol typed_macro`: 2 passed.
@@ -86,7 +86,7 @@ the argument of a macro whose expansion fails.
   `i/syntax` query functions.
 - `i test --project examples/macro-tests`: 9 passed, 0 failed, 1 skipped;
   `i expand --project examples/macro-tests` exits 0.
-- `scripts/dev-verify rust` was stopped by the coordinator while
+- `scripts/checks rust` was stopped by the coordinator while
   `ilang-check --test value_types` ran `spec_corpus_reverse_order_and_recovery`
   for a long time under machine load. Watching the corpus directory it read,
   that test advanced through `tests/spec` at the same pace on this lane and on
@@ -94,6 +94,6 @@ the argument of a macro whose expansion fails.
   overhead on code without typed macros: every inference group walked all
   schemes for the T2 fixed set, and every expression stored its known type.
   Both now run only when a typed call is present.
-  `cargo test -p ilang-cli --test value_types`: 1 passed. `scripts/dev-verify i`
+  `cargo test -p ilang-cli --test value_types`: 1 passed. `scripts/checks i`
   was not run at the end: the coordinator asked workers not to run it under the
   current machine load; it runs at merge.

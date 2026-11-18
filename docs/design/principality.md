@@ -981,7 +981,7 @@ $H ./target/release/i check --types --project target/principality-probes/01-base
 # Repeat the second command for each probe ID above, one at a time.
 ```
 
-Verification on 2026-11-14 used the worktree's release binary without
+Checking on 2026-11-14 used the worktree's release binary without
 copying it. The first wrapped release build exited 101 because the pinned
 Binaryen submodule was missing. A reference clone could not use the shallow
 local reference; `git submodule update --init --depth 1
@@ -1057,7 +1057,7 @@ paragraph also says “inference still finds principal types”; its scalar
 closure argument should be read with this limitation. This lane's spec
 edit is deliberately confined to §4.7.
 
-### Historical correction verification (2026-11-14)
+### Historical correction checking (2026-11-14)
 
 This ledger predates Owner Decision 1 and the merge of `a02d34100`. Its
 method-only rejection claims and older corpus interpretations are historical;
@@ -1198,7 +1198,7 @@ unchanged alias criterion. This baseline comparison establishes the scope of
 pfix; it does not re-record those outputs or declare that criterion passed.
 
 The full workspace, unfiltered spec suite, unfiltered corpus and
-`scripts/dev-verify` are reserved for the coordinator and were not run here.
+`scripts/checks` are reserved for the coordinator and were not run here.
 
 ## Unproven parts
 
@@ -1258,7 +1258,7 @@ relative to main remain in `std/`, `lib/`, or `examples/`: all 75 exported
 Fail conversions in `effects-e4.md` and their adapted callers are unchanged.
 The first merged focused `deferred` row-scheme run passes both tests,
 including method-only acceptance and required-field rejection locally and
-across modules. Final merged verification is recorded separately below.
+across modules. Final merged checking is recorded separately below.
 
 
 The merged checker gate passes **363 tests**, with four existing stress tests

@@ -52,7 +52,7 @@ Interpretations:
   designed public Wasi root/token interface. temp_dir selects /tmp or the first
   preopen, because preview 1 has no ambient cwd or temporary-directory query.
 
-Verification before the full acceptance run:
+Checking before the full acceptance run:
 
 - Heavy-wrapper cargo check for ilang-check/package/wasm/cli and macro with
   --all-targets: passed.
@@ -126,5 +126,5 @@ Not finished: nothing in the requested step. Native send_stream is buffered;
 JS fetch streams incrementally, as required by this step. The public Wasi root
 interface remains a separate design item, as explained in the interpretation.
 
-Branch: lane/js. Verified implementation: 7a8c7fe1; the final commit only
-records these verification results.
+Branch: lane/js. Checked implementation: 7a8c7fe1; the final commit only
+records these checking results.

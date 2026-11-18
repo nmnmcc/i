@@ -47,7 +47,7 @@ Follow their socket/resource approach rather than adding a task or channel API.
 - The worktree's existing branch is lane/io. The task's mention of redesign is
   interpreted as its base, since the shared rules forbid editing that branch.
 
-## Verification
+## Checking
 
 - `cargo check -p ilang-host -p ilang-cli --all-targets`: passed, twice.
 - `cargo build --locked -p ilang-cli`: passed.
@@ -72,5 +72,5 @@ Follow their socket/resource approach rather than adding a task or channel API.
   expectation to match the specified API.
 
 The full acceptance check passed: release build, UDP example, WASI rejection,
-`scripts/dev-verify rust`, `scripts/dev-verify i`, `scripts/old-syntax-check`, and
-`scripts/dev-verify js`. No feature remains unimplemented.
+`scripts/checks rust`, `scripts/checks i`, `scripts/old-syntax-check`, and
+`scripts/checks js`. No feature remains unimplemented.

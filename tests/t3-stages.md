@@ -42,7 +42,7 @@ entry when the record parser lands.
 Checks and incidents:
 
 - Cargo metadata: workspace_root is /home/agent/Programming/i/.rd/a.
-- First full dev-verify: failed in format_properties because the new pending
+- First full checks: failed in format_properties because the new pending
   example changed the exact unparsable-source inventory.
 - Two full runs with the future fence passed, including all 224 spec cases
   at O0/O2, workspace tests, i tests at O0/O2, the WASI smoke check, JavaScript
@@ -59,7 +59,7 @@ Checks and incidents:
   checks the pending record example's errors, including E0114.
 - Final full gate on the restored future fence: passed (exit 0), through
   `/home/agent/Programming/i/.rd/cache/heavy direnv exec
-  /home/agent/Programming/i env ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`.
+  /home/agent/Programming/i env ILANG_BROWSER_PORT=4181 ./scripts/checks`.
   Both spec-block parsing and formatter properties passed. All 224 existing
   spec cases passed at O0/O2, as did the library/bench/example tests, WASI
   smoke, JavaScript SDK checks, and 51 browser tests.
@@ -68,7 +68,7 @@ Checks and incidents:
 - `git diff --exit-code -- crates/ilang-syntax/tests/format_skip.txt` passed:
   the generated inventory is back at baseline. No golden change remains,
   so this checkpoint needs no derived-files commit.
-- `git diff --check` passed. Verification left only ordinary lane build and
+- `git diff --check` passed. Checking left only ordinary lane build and
   npm dependency artifacts. UPDATE and ILANG_BROWSER_PORT were command-scoped;
   no persistent environment setting changed. No check was interrupted.
 
@@ -190,7 +190,7 @@ Reference code read before implementing these mechanisms:
 
 | File / function | Taken | Required difference in i |
 |---|---|---|
-| ilang-wasm runtime/values/strings.rs, string_compare and string_from_bytes | Byte comparison followed by length | Verify against Rust str order for all pairs of labels; record source order remains evaluation order |
+| ilang-wasm runtime/values/strings.rs, string_compare and string_from_bytes | Byte comparison followed by length | Check against Rust str order for all pairs of labels; record source order remains evaluation order |
 | ref/elixir/lib/elixir/lib/module/types/descr.ex, bdd_node_new, bdd_union, bdd_intersection, bdd_difference, bdd_negation | Ternary decision meaning (p & C) union U union (not p & D), shallow hash-consing and completed apply results | Safe integer handles; iterative evaluation; no closed-map, gradual-type, recursive-type or library rules |
 | Same file, subtype_static?, map_bdd_empty?, init_map_line_empty?, map_line_meet_empty?, map_split_key_line, map_remove_negative | Uncovered-set emptiness, required-empty-field pruning, first-difference products and shared-witness projection | Map/field theory is a later integration stage; do not claim Boolean truth assignments establish record inclusion |
 | ref/tsrs/crates/tsrs_checker/src/unioncache.rs, UnionCacheMode and cache contract | Cache-off/shadow validation; completed pure results only | No mutable-bound result cache; one demand budget charges distinct logical states independently of memo hits |
@@ -224,7 +224,7 @@ Stage checks, before merging W520:
   --test record_labels --locked`: exit 0, all 225 pair comparisons passed
   in the production runtime; Wasm validation and execution passed.
 - `heavy direnv exec /home/agent/Programming/i env
-  ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0. Formatting, Clippy
+  ILANG_BROWSER_PORT=4181 ./scripts/checks`: exit 0. Formatting, Clippy
   with warnings denied, workspace tests, all 239 existing spec cases at
   O0/O2, 1,465 std tests, two example tests and 12 bench tests at both levels,
   WASI smoke, SDK tests and 51 browser tests passed.
@@ -247,7 +247,7 @@ Stage checks, before merging W520:
   delayed checks; no slot settings or other worker's processes were changed.
   Environment variables were command-scoped; no persistent setting changed.
 
-Redesign moved from 1a8fee2 to 82375c0 (W520) during verification. The stage
+Redesign moved from 1a8fee2 to 82375c0 (W520) during checking. The stage
 checkpoint precedes that merge; the merged tree must pass the full gate
 again. No new test requires disjoint comparisons to be errors.
 
@@ -282,7 +282,7 @@ is a substitute interpretation check, not a compiler acceptance test and
 not an assignment of a diagnostic number. No production record compiler
 behavior has been chosen against the contradictory pass requirement.
 
-## Stage 2: merged verification and stop
+## Stage 2: merged checking and stop
 
 Checkpoint e2d5129 was merged with redesign 82375c0 in b6d2926. The merge
 was mechanical; no conflicts were resolved by changing either track's rules.
@@ -292,7 +292,7 @@ per-line rule audit in tests/w520.md. T3 produced no golden changes.
 On the merged tree:
 
 - `heavy direnv exec /home/agent/Programming/i env
-  ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0. Formatting, Clippy
+  ILANG_BROWSER_PORT=4181 ./scripts/checks`: exit 0. Formatting, Clippy
   with warnings denied, workspace tests, all 241 existing spec cases at
   O0/O2, the five Boolean kernel tests, the label-order runtime test,
   1,465 std tests, two example tests and 12 bench tests at both levels,
@@ -371,7 +371,7 @@ Stage 3 results:
   source construction/substitution cases. The Rust graph matches both.
   This is a graph-engine differential test, not yet a frontend test.
 - `heavy direnv exec /home/agent/Programming/i env
-  ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0. All 11 record-core
+  ILANG_BROWSER_PORT=4181 ./scripts/checks`: exit 0. All 11 record-core
   tests passed, along with formatting, Clippy -D warnings, workspace tests,
   241 existing spec cases O0/O2, the i O0/O2 suites, WASI smoke, SDK tests
   and 51 browser tests. No production record path is connected yet.
@@ -503,7 +503,7 @@ copies each surviving pair once into an exactly sized array. These runtime
 definitions add a WAT block under §9.3; any existing WAT export differences
 must be checked against that exact block, not accepted without comparison.
 
-Initial runtime verification failed first during WAT parsing (one extra
+Initial runtime checking failed first during WAT parsing (one extra
 closing parenthesis in record_remove), then during Wasm validation (a
 nondefaultable record_put destination assigned only inside conditional
 branches). Corrected both; record_put now has a dominating initialization

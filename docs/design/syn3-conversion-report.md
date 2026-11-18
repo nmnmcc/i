@@ -116,7 +116,7 @@ lane runs; the lists it names are the authority.
   and an error entry written only on a later branch.
 - `cargo check --workspace --all-targets --locked` passed. The initial
   `syn3_lower` run with `--features legacy` passed all 15 tests. Further
-  verification is in progress; command logs are in `target/conv-r2/`.
+  checking is in progress; command logs are in `target/conv-r2/`.
 - Removed 107 stale old-syntax inventory records: 61 for files removed by
   earlier commits (the former `parse.rs`, `syn2.rs` and `golden/` parser suite),
   and 46 for literal/file texts no longer present after conversion. These
@@ -149,7 +149,7 @@ against the printed actual output before updating its expectation:
   function variable collision, applied variable, missing type and lowercase
   value. No checker failure was removed to bless this output.
 
-### Recovery verification milestones
+### Recovery checking milestones
 
 - Syntax: the initial full run passed all but three targets. The focused
   retry passed `format` (2), `lisp_record` (6), `lisp_syntax` (46) and
@@ -393,7 +393,7 @@ its callback to need nothing. Preserve that open need with `<N>` and
 are unchanged. Formatting passes. The corrected std retry waited for a memory slot without
 producing compiler/test output; its own process group was stopped before the
 14:00 deadline so lighter crate checks could run. The corrected std run is
-unverified. The pre-main opt-0 run passed 2,169 tests.
+unchecked. The pre-main opt-0 run passed 2,169 tests.
 
 
 Final lightweight checks: the macro crate passes all nine tests. The full
@@ -452,7 +452,7 @@ inside the enclosing pipe, and uses the subject's known types for constructor
 snippets. Token delimiters exclude strings/comments and branch bodies. The
 new query regression checks Circle/Rect/Dot snippets and excludes the body;
 the formerly failing LSP protocol test passes. The 23 CLI binary unit tests
-pass, with the added correlation check verified separately.
+pass, with the added correlation check checked separately.
 
 The evening package-command run passed 24/27 initially. The three publication
 failures contained only source parameter names in expected displayed types:
@@ -509,7 +509,7 @@ initial old/new staging on a temporary document and byte-for-byte idempotence
 on the current spec. Restored the two future fence tags without changing
 their source or registered diagnostics. Removed one confirmed dead inventory
 identity for the formerly shown hover type with two row variables. Final
-formatter and exact-diagnostic inventory gates will verify this sweep.
+formatter and exact-diagnostic inventory gates will check this sweep.
 
 Reviewed all parked spec reasons and re-enabled two cases whose intent is
 already closed-data compatible: written item evaluation order and rejection
@@ -545,7 +545,7 @@ The detailed command/result ledger, including unsuccessful commands and
 their retries, is in the coordinator cache report-conv.txt. The 29 retained
 legacy spec cases each have their own written reason. Checker and CLI
 pending lists are empty. Whole-workspace tests, unfiltered spec/corpus and
-dev-verify remain coordinator-only. R2 opt-in measurements and the bigint
+checks remain coordinator-only. R2 opt-in measurements and the bigint
 baseline benchmark were not enabled.
 
 ### Tonight integration: batch2 E1 and multicore
@@ -576,7 +576,7 @@ incoming fixtures, all numeric differential helpers, 316 E1 review shown
 types and 42 exact requirement type fragments. Requirement outcomes and
 error-code lists are unchanged. The queued converter was stopped by its
 own process IDs and rerun using the already-built migrator; that source-only
-run performs no build or compiler/corpus verification.
+run performs no build or compiler/corpus checking.
 
 The E1 merge exposed two migration omissions. A bound ordinary Fail(E)
 service now uses the same transparent alias as ordinary Fail in a need;
@@ -594,7 +594,7 @@ uses inference for the same empty List(Never), since syntax-3 §2.16 puts
 type parameters only on function values/types. The host-export fixtures
 retain their written wider error types as binding annotations, preserving
 the original non-host-passable error checks. Guarded corpus observation and
-full checker verification are pending; no observation with a changed phase
+full checker checking are pending; no observation with a changed phase
 exit or error-code set may be recorded.
 
 E1 provider inference correction: syntax-three provision had selected the
@@ -612,7 +612,7 @@ need through a typed binding and kept literal callback result annotations.
 The new checker regressions pin all eight batch2 checker code sets. Seven
 golden outputs were translated after reviewing types and source positions;
 their diagnostic-code sets exactly equal batch2. Library/spec outputs still
-await fresh verification. Exact post-fix full gates and corpus run are pending.
+await fresh checking. Exact post-fix full gates and corpus run are pending.
 
 Keep handler callback types directly on function literals, rather than
 erasing them behind an outer binding annotation: the former shares the
@@ -657,7 +657,7 @@ spec §9.2's known provider form. The row algebra is named by a transparent
 alias before it is spread: the grammar permits a named spread, not a
 parenthesized algebra expression. Assertions and all three algebra operators
 remain; this changes the representation, not the intended accepted/rejected
-programs. Focused verification is recorded in the command ledger.
+programs. Focused checking is recorded in the command ledger.
 
 The last row-alias failure exposed a lowering bug: adjacent Bad = S(Never)
 was mistaken for a constructor group, absorbing generic S(N) and leaving N
@@ -668,10 +668,10 @@ a transparent alias, as today." A lowering unit test pins both definitions
 and S's N parameter; that focused lowering regression passes. The final
 checker row-algebra rerun and remaining gates are pending.
 
-All nine initial checker fixture failures now pass focused verification,
+All nine initial checker fixture failures now pass focused checking,
 including the row-algebra test after the alias correction. The complete
 compiler packages are being repeated for that lowering change. Formatted
-the edited library handler and verified its focused format check. The
+the edited library handler and checked its focused format check. The
 stopped first corpus recording finalized 92 observations (90 was the live
 checkpoint count); all 92 have source changes and batch2-equivalent phase
 exits/error-code sets. The eight refused observations remain unrecorded.
@@ -707,7 +707,7 @@ Spec 4.4/ and 4.5/ pass at both optimization levels. The 9/ batch completed
 fixtures now use the transparent alias for a bound ordinary Fail, and the
 unused wider Fail need in directed_rows uses the same alias. The collect
 examples in control/directed_rows/light_boundary keep callback and provider
-parameter A directly on the literals, as the already-verified spec type
+parameter A directly on the literals, as the already-checked spec type
 fixture does; Fail(Never) retains the original empty legacy error channel.
 A manually provided Fail value retains its written Int form and raise label.
 
@@ -718,14 +718,14 @@ not repeated. No compiler code changed. Two stop-fixture headers moved only
 by the inserted alias lines; positions were derived from the same f.raise,
 fail.raise and control.resume call anchors (§11.7), and the exact stop checks
 pass. The fixture format check also passes. Required 11/, release/std and
-full corpus verification remain.
+full corpus checking remain.
 
 Merged main 46a6d43b6; its benchmark grouping/format correction was already
 present in this lane, so the merge has no tree delta or new old-syntax text.
 Spec 11/ passes all 51 cases at O0/O2, and the fresh release build passes.
 The first std O0 run found the same erased generator callback/provider A
 in std/test/list_test.i. Kept those annotations directly on the literals,
-using the already-verified spec helper pattern. Entry compilation now
+using the already-checked spec helper pattern. Entry compilation now
 passes and the std O0 suite is executing; O2 and corpus remain pending.
 
 The complete K4 check-only audit found 53 conversion gaps. Of these, 51 now
@@ -762,7 +762,7 @@ changed, and their observations remain subject to the batch2 outcome guard.
 Merged main 29515fbfa native-test executable-busy retry without changing any
 embedded literal, compiler or runtime code. The requested latest-main std
 O0/O2 suites each pass 2,170 tests; workspace all-feature clippy, both format
-checks and the official normal/Lisp inventories pass. Native verification
+checks and the official normal/Lisp inventories pass. Native checking
 for the incoming test-harness change is queued behind the corpus.
 
 The first 100 complete K4 observations now pass the guarded recording and
@@ -825,7 +825,7 @@ Coordinator b15 item 2: E0523 is the entry-provider plan error, here
 its generator callback's direct parameter annotation during conversion,
 leaving A open at the native test entry. Restored the original callback type
 on the function literal and the emitter's x:A annotation, using the already
-verified repository std helper. At O0 and O2 the complete test bundle builds
+checked repository std helper. At O0 and O2 the complete test bundle builds
 before CLI runtime filtering, then generator_callbacks_test passes. This is
 not a full runtime run of the copied std suite. No bound or expectation was
 changed, and there is no longer an E0523 compilation failure.
@@ -949,7 +949,7 @@ retain their original empty error channel through the transition lowerer's
 `Fail(Never)` marker. The restored type spread follows §2.3: “A data type has
 no spread.” The old removed-library/type checks were split out, not dropped.
 
-Final item-6 verification also passes workspace all-target/all-feature clippy,
+Final item-6 checking also passes workspace all-target/all-feature clippy,
 normal snippet inventory (4,766 snippets, five unchanged future-track entries)
 and Lisp inventory (34 files and 89 CLI macro fragments). The inventory first
 exposed an unexpanded Rust format template in the new provider regression;

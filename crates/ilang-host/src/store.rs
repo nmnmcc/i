@@ -196,7 +196,7 @@ impl Store {
     pub fn get(&self, kind: &str, key: &str) -> Option<Vec<u8>> {
         let path = self.path(kind, key);
         let bytes = fs::read(&path).ok()?;
-        let content = match verified(&bytes) {
+        let content = match intact(&bytes) {
             Some(content) => content,
             None => {
                 let _ = fs::remove_file(&path);
@@ -463,7 +463,7 @@ pub fn write_cachedir_tag(dir: &Path) {
 }
 
 /// The content of an entry file whose digest matches, if any.
-fn verified(bytes: &[u8]) -> Option<&[u8]> {
+fn intact(bytes: &[u8]) -> Option<&[u8]> {
     if bytes.len() < HEADER || &bytes[..MAGIC.len()] != MAGIC {
         return None;
     }

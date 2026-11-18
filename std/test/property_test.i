@@ -120,18 +120,18 @@ test("integer_rules", () {
 	assert(
 		list.map(negative.children(), (c) { c.value }) == [0, -5, -8, -9],
 	)
-	verify = (node : property.Tree(Int), target : Int, depth : Int) -> Nil {
+	ensure = (node : property.Tree(Int), target : Int, depth : Int) -> Nil {
 		assert(node.value >= 0 && node.value <= 10)
 		{ depth == 0 } |>
 			(True) { Nil }
 			& (False) {
 				list.each(node.children(), (c) {
 					assert(c.value < node.value)
-					verify(c, target, depth - 1)
+					ensure(c, target, depth - 1)
 				})
 			}
 	}
-	verify(t, 0, 8)
+	ensure(t, 0, 8)
 	Ok(positive) = fail.catch(() { property.int(3, 10) })
 	p = root(positive, 0, 0)
 	{ p.value == 3 } |>
@@ -497,14 +497,14 @@ test("list_order_and_generated_bounds", () {
 	)
 	Ok(items) = fail.catch(() { property.int(-3, 3) })
 	Ok(lists) = fail.catch(() { property.list(items, 2, 5) })
-	verify = (t : property.Tree(List(Int)), depth : Int) -> Nil {
+	ensure = (t : property.Tree(List(Int)), depth : Int) -> Nil {
 		assert(list.length(t.value) >= 2 && list.length(t.value) <= 5)
 		assert(list.all(t.value, (x) { x >= -3 && x <= 3 }))
 		{ depth == 0 } |>
 			(True) { Nil }
-			& (False) { list.each(t.children(), (c) { verify(c, depth - 1) }) }
+			& (False) { list.each(t.children(), (c) { ensure(c, depth - 1) }) }
 	}
-	list.each(list.range(0, 19), (seed) { verify(root(lists, 5, seed), 3) })
+	list.each(list.range(0, 19), (seed) { ensure(root(lists, 5, seed), 3) })
 	assert(
 		list.length(root(lists, 0, 0).value) == 2,
 	)

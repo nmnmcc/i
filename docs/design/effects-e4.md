@@ -161,7 +161,7 @@ Follow-up changes and their basis:
 - `_body_text_result` explicitly retains `Result(String, Nil)`, its original
   inferred data contract; the migration script now produces that annotation.
 
-Verification checkpoints (2026-11-13):
+Checking checkpoints (2026-11-13):
 
 - Release builds pass through the final merged eff3 `d5d8e9042` base.
 - `i check --project std --types` passes on that base with two inherited HTTP
@@ -222,4 +222,4 @@ The 2026-11-14 follow-up merges main-integrated E3/E5/E6 and resolves both
 reported JavaScript traps. The full JS gate passes 117 Node and 60 browser
 checks; all final requested gates are green. See
 [the WAT investigation and validation record](effects-e4-js.md). The preceding
-verification section is the 2026-11-13 checkpoint, not the final JS outcome.
+checking section is the 2026-11-13 checkpoint, not the final JS outcome.

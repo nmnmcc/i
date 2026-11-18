@@ -90,7 +90,7 @@ runtime results to be False at both optimization levels.
 The later language question remains open and is not implemented: can rule
 13 take a tuple shape from inference without losing principal types?
 
-## Verification record
+## Checking record
 
 Before rebuilding, the prior release binary reproduced all four review
 failures (three E0318 and one E0320); raw output is in
@@ -107,19 +107,19 @@ repair fixture initially used unsupported unary `!`; its assertions now
 compare the runtime Bool with False. Its list-map case also needed a package fixture with an explicit std dependency; `i/list` is not a library module. No compiler check or test was
 weakened. The first old-syntax run also rejected eight Rust format templates before substitution; the templates now contain valid type-name placeholders and use string substitution, with no scanner exceptions added. Its next run parsed 1,330 snippets with exact expected diagnostics and the same 17 other-track futures. No check was interrupted; no global environment settings changed.
 
-## Final follow-up verification
+## Final follow-up checking
 
 The final implementation checkpoint is 3718ea0. Repeated
 `git merge refs/heads/redesign` calls reported “Already up to date”; the
 upstream ref remained 94789e6141d9d2213d3b909b07bcbac9bbcdb02d at final
-verification. The follow-up started clean and preserves the previous T1
+checking. The follow-up started clean and preserves the previous T1
 work. The earlier syntax-note escalation is resolved by this user's
 explicit request; no other controlling-source disagreement was found.
 
 The requested whole gate passed. Exact final command, from this lane:
 
 ```sh
-ILANG_BROWSER_PORT=4181 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i ./scripts/dev-verify
+ILANG_BROWSER_PORT=4181 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i ./scripts/checks
 ```
 
 Exit 0: fmt, Clippy with warnings denied, all workspace Rust tests,
@@ -206,6 +206,6 @@ the child completed, and the idle observer was terminated. No benchmark,
 implementation test, or external process was interrupted or signalled.
 Shared locks were released. Browser port and CPU affinity were local to
 the ended commands; no global environment or git configuration changed.
-The normal npm/build caches from verification are retained, with no
+The normal npm/build caches from checking are retained, with no
 tracked environment changes. No further implementation work is pending
 for the independent review finding.

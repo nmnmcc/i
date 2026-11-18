@@ -1,4 +1,4 @@
-# Effects landing verification, 2026-11-15
+# Effects landing checking, 2026-11-15
 
 Branch **lane/e4**. Production source is `7575ae5a5`, atop `e975c5e93`,
 with main through `7c0652fad` merged. **All requested final gates pass.**
@@ -7,7 +7,7 @@ are withdrawn. The cubic checker defect is repaired; all four wide cases
 have fresh passing check/O0/O2 observations at their saved bounds.
 
 The final report commit changes documentation and observation metadata;
-production source and release binary stay unchanged throughout verification.
+production source and release binary stay unchanged throughout checking.
 Release SHA256:
 `795bb7f8e15dbbd9369774cef5e898d0dec1e7b8c1eb13862ff1b118fdbb96f8`.
 No test or assertion is deleted or weakened, and no skip/ignore is added.
@@ -20,14 +20,14 @@ No test or assertion is deleted or weakened, and no skip/ignore is added.
 | Full workspace Rust tests | All 118 binaries pass, including all 31 value-types tests and the reverse-order/recovery properties |
 | Whole spec | 536/536 at both O0 and O2; 29 existing pending cases unchanged |
 | Std | 2171/2171 at O0 and O2 |
-| JavaScript verification | 123 Node and 69 browser checks, no new skip; Chromium/Firefox/WebKit |
+| JavaScript checking | 123 Node and 69 browser checks, no new skip; Chromium/Firefox/WebKit |
 | ABI fixture generation | Built and Wasm-validated from this same release compiler; ABI5 generated artifacts, hand-written ABI3 fixtures retained |
 | Short generation | 32 attempts, 20 accepted/12 model rejections; 64 permutations/32 annotation removals; no failures |
 | Documentation examples | All 110 pass exact type/output/error assertions; runner contracts 14/14 |
 | Macro examples and bench | Both language opts pass; one existing intentional macro-example skip remains |
 | Rust and i formatting | Pass; i checks bench/std/lib/examples |
 | Snippets | Direct script passes its exact diagnostic checks and existing future tracks |
-| Doctests and verification-script self-tests | Pass |
+| Doctests and checking-script self-tests | Pass |
 | Full corpus | All 1973 selected, 554 rejected checks/1419 accepted checks, no checker timeout, same two registered XFAILs |
 | Exact preservation against e975 | 1971 byte-identical outcomes plus only two corrected formerly carried check displays; no new acceptance/error/runtime difference |
 | Semantic and requirement guards | 34 exact semantic/Scheduler cases; all 395 applicable requirements, no new failure |
@@ -220,7 +220,7 @@ macros pass all 44, the macro oracle all 66, control-lazy all 17 and checker
 goldens all 5. At this checkpoint 115 Rust binaries have completed with no
 failures; the longest properties remain in progress.
 
-`python3 target/e4-exact-semantic-guard.py` independently verifies all 24
+`python3 target/e4-exact-semantic-guard.py` independently checks all 24
 semantic case code/count/site sets, all 31 original-plus-m3 verdicts and the
 three original Scheduler-leak programs: **34/34 pass**. In particular it pins
 all four b1 provider locations, both m3 provider sites, the surviving b10

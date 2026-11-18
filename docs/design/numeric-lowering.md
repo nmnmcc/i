@@ -395,7 +395,7 @@ available in lower.rs.
 
 Add explicit conversions and a result representation to the IR; distinguish
 F64, source SmallInt, and internal I64/I32. Existing LocalType lacks F64 and
-Func lacks a result-type field (`ir.rs:113–120,497–508`). Verify every operand,
+Func lacks a result-type field (`ir.rs:113–120,497–508`). Check every operand,
 call and branch assignment. Locals can have multiple definitions in this
 structured IR: use per-definition versions for analysis and convert on incoming
 edges; do not assume local numbers are SSA. T1 literal Int sets can give bounds,
@@ -570,7 +570,7 @@ Binaryen heap2local handles remaining allocations where its local proof succeeds
 
 Run separate abstract interpretation after inlining/scalar replacement. Float
 facts are intervals of **rounded binary64 values**, with signed-zero information.
-Unknown inputs cover the whole finite set. Bounds come from constants, verified
+Unknown inputs cover the whole finite set. Bounds come from constants, checked
 branch comparisons and proved transfers, not names or benchmark inputs. Join
 by hull; widen unproved loops/recursion to unknown. Unknown means retain checks.
 
@@ -701,7 +701,7 @@ Ordered pipeline:
 4. Aggregate replacement and immutable projection commoning (R5/R8).
 5. Recompute may-suspend; solve tail-result conventions; select representations;
    insert conversions, guarded Int regions and checks (R2/R4/R7).
-6. Range proof/check removal (R6); verify representation, dominance, sites and
+6. Range proof/check removal (R6); check representation, dominance, sites and
    tail conventions. Cold trace paths and captured logical frame chains are
    deferred, not part of this pipeline.
 7. Extended control splitting, emission, validation, unchanged Binaryen O2/O3,
@@ -778,7 +778,7 @@ Here `types/` is under `crates/ilang-check/src/`; new numeric modules are under
 
 | Step | Work/payoff | Files and regions to reserve |
 |---|---|---|
-| N0 | first try emission that exposes construction/consumption to default Binaryen; measure before custom passes; freeze kernels/counters and adversarial/verifier cases | new bench/test/numeric_test.i, bench driver, ilang-wasm/tests/numeric_lowering.rs, spec/control/host tests |
+| N0 | first try emission that exposes construction/consumption to default Binaryen; measure before custom passes; freeze kernels/counters and adversarial/checker cases | new bench/test/numeric_test.i, bench driver, ilang-wasm/tests/numeric_lowering.rs, spec/control/host tests |
 | N1 | R1/R2 scalar Float locals, checks/constants; first local box removal | after T1/T2: types/mod.rs:148–200; types/infer.rs:155–228 plus expression fact collection; new numeric modules; ir.rs:113–208,257–285,497–508; lower.rs:58–64,499–504,1352–1405,1549–1660,1802–1900; emit/mod.rs:284–295,482–554,1075–1081; conditional runtime helper at values.rs:52–59; CLI lib.rs:146–162, main.rs:214–228 |
 | N2 | R3 workers/inlining, R7 scalar capture, R9 logical sites; largest combined Float gain | lower.rs:1294–1405,1732–1758,1903–2015; ir.rs:249–275,499–552; control.rs:41–155,239–305,495–619 and use walkers; emit/mod.rs:300–460,554–599; emit/control.rs:625–888; new call-graph/worker modules |
 | N3 | R5 pairs/records, R8 projection commoning | new aggregate/commoning modules; field origins at lower.rs:1763–1798,1955–1977; emit/mod.rs:572–599; coordinate T3 shapes, no global layout change |
@@ -808,7 +808,7 @@ Update calling-convention comments when implemented (`ir.rs:9–19`,
 
 Acceptance gates:
 
-1. **Behavior:** full scripts/dev-verify green through cache/heavy, plus syntax
+1. **Behavior:** full scripts/checks green through cache/heavy, plus syntax
    check, at each landable stage. Numeric/control/ABI probes run at O0/O2/O3 on
    native, JS and WASI where supported. Keep O0 as the differential oracle and
    test equal results, effects, specified stops and complete stop traces at all
@@ -920,7 +920,7 @@ locals/arguments. A scalar signature is not proof that a tail adapter is safe.
 
 - **Cannot be built from current type output:** the shortcut of reading retained
   expression types was false (Typed locations in R1). Added post-solve fact
-  export/verifier; no printed-type parsing or re-inference.
+  export/checker; no printed-type parsing or re-inference.
 - **Cannot be built by adding only LocalType::F64:** continuation blocks/results
   are hardcoded eqref (`emit/control.rs:642–646,776–780`). R3/R7 retain that
   result protocol and explicitly save/restore live scalars.
@@ -1115,6 +1115,6 @@ Independent review permits N0 and conservative N1 after checker coordination.
 N0 must first expose construction and consumption to the existing Binaryen
 pipeline and measure, before deciding that a custom pass is needed.
 
-Not verified here: implementation speed/build-size targets, dev-verify after
+Not checked here: implementation speed/build-size targets, checks after
 compiler changes, T3 record integration, later R2 task/portability code,
 all-target execution of the proposed lowering, or the full-range Float gate.

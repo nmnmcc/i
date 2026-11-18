@@ -163,7 +163,7 @@ O2 run after the nullable-loop refinement:
 The hash implementation is intentionally plain scalar i. No native word,
 SIMD, hardware hash, or host crypto operation is introduced.
 
-## Compiler observations and verification
+## Compiler observations and checking
 
 A table represented as a 3,000-element unannotated list of numeric pairs
 caused type-check time/memory growth. The first module check was interrupted
@@ -195,7 +195,7 @@ Validation results are recorded below after the final acceptance run.
 
 Final acceptance run on 45c4972a: release CLI build passed; module counts
 were regex 130, CSV 107, crypto 88; std O0 and O2 each reported 2170 passed,
-0 failed. `scripts/dev-verify rust` failed in `ilang-package` test
+0 failed. `scripts/checks rust` failed in `ilang-package` test
 `standard_library_modules`: its exact expected module list omits the three
 new modules. The smallest reproduction is
 `cargo test -p ilang-package --test load standard_library_modules`; actual
@@ -206,11 +206,11 @@ diff, so the assertion is unchanged. The full acceptance gate cannot pass
 under both requirements until the coordinator updates that upstream test.
 
 Independent remaining checks: `scripts/old-syntax-check` passed (4,634
-extracted literals/blocks). `scripts/dev-verify i` failed its review corpus:
+extracted literals/blocks). `scripts/checks i` failed its review corpus:
 1,973 cases, two unclassified checker timeouts, and 20 listed comparison
 failures. Examples: `review-k4/perf/wide_generic_1024: unclassified checker
 timeout` and `review-k4s/std: unclassified checker timeout`; complete output
-is `/tmp/std4-dev-verify-i.log`. The run had concurrent heavy jobs; the cause
+is `/tmp/std4-checks-i.log`. The run had concurrent heavy jobs; the cause
 of the differences was not established. WASI smoke and the preceding std
-runs passed. The gate therefore remains unverified, independently of the
+runs passed. The gate therefore remains unchecked, independently of the
 module-list assertion above.

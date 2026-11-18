@@ -32,7 +32,7 @@ hashes for every payload file.
 
 ## Installation
 
-Verify the archive against its sidecar, then extract it into a versioned
+Check the archive against its sidecar, then extract it into a versioned
 directory and add its `bin` directory to `PATH`:
 
 ```sh
@@ -53,7 +53,7 @@ For Linux ELF artifacts, `--nix-runtime` adds the closure of store paths named i
 the binaries' loader and runtime library search paths. It uses `nix-store` to
 export those paths and their dependencies; it does not bundle the Rust compiler
 merely because its path occurs in debug information. On the destination host,
-install Nix, verify the archive, and run `./runtime/restore` from the extracted
+install Nix, check the archive, and run `./runtime/restore` from the extracted
 package to import the closure before starting i. Importing requires the
 destination Nix store's usual authorization. The package records every exported
 store path in `runtime/paths.txt` and its build manifest. This mode does not
@@ -70,5 +70,5 @@ archive reproducibility guarantee; it does not independently make native Rust
 builds reproducible.
 
 The packager fails if the `i` binary or any required package input is missing.
-It does not compile, run tests, or publish. Run the full verification workflow
+It does not compile, run tests, or publish. Run the full checking workflow
 before distributing a release.

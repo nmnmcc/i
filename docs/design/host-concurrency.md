@@ -638,7 +638,7 @@ The two existing async tests stay.
 
 ### 10.6 Gate
 
-`cargo test -p ilang-host -p ilang-cli -p ilang-wasm`; `npm test`; `npm run test:browser`; `dev-verify` rust and js; the WAT diff shows only the changes of section 6.6. C-RF runs T1 in a shell loop 200 times with `--test-threads=1`, as the plan's regression view asks.
+`cargo test -p ilang-host -p ilang-cli -p ilang-wasm`; `npm test`; `npm run test:browser`; `checks` rust and js; the WAT diff shows only the changes of section 6.6. C-RF runs T1 in a shell loop 200 times with `--test-threads=1`, as the plan's regression view asks.
 
 ## 11. Phases
 

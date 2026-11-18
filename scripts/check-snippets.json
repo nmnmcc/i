@@ -706,18 +706,6 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/cases/04_header_order/original/.invalid/src/main.i:bc7528f08f9c0a6a": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0115: the imports come before the exports"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/cases/05_empty_header/original/.invalid/src/main.i:33b9e0bcbbd4fa71": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0115: a file with nothing to import or export leaves the group out"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/cases/11_attributed_header/original/.invalid/src/main.i:b5e2e8844dc75630": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
@@ -739,29 +727,10 @@
       "E0105: a block ends with an expression"
     ]
   },
-  "tests/review/cases/review-a1/_loose/cases/25_old_guard_fn/original/.invalid/src/main.i:964f0e757bb34246": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/cases/29_param_shadow/original/.invalid/src/main.i:6fae0c21e165c75b": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/cases/33_lower_constructor_pattern/original/.invalid/src/main.i:ddb34885a030720f": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `=`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/cases/48_new_ungrouped_product/original/.invalid/src/main.i:695c23c607efd2ff": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
-      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/_loose/cases/53_new_tuple_clauses_joined/original/.invalid/src/main.i:5162b76efcb2dfae": {
@@ -769,20 +738,6 @@
     "diagnostics": [
       "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
       "E0102: expected the function body, a `{` on the same line, found `->`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/cases/56_old_guard_lines/original/.invalid/src/main.i:9160f49b02878079": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: `|` no longer joins function values: join the branches with `&`",
-      "E0101: expected an expression, found `->`",
-      "E0106: a discard binds nothing, so it may not be used as a value"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/cases/61_old_type_alias_join/original/.invalid/src/main.i:c78910db9cef477f": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
   },
   "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/once/.invalid/src/types.i:47b7331c670212b3": {
@@ -834,18 +789,6 @@
       "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
     ]
   },
-  "tests/review/cases/review-a1/cases/04_header_order/.invalid/src/main.i:bc7528f08f9c0a6a": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0115: the imports come before the exports"
-    ]
-  },
-  "tests/review/cases/review-a1/cases/05_empty_header/.invalid/src/main.i:33b9e0bcbbd4fa71": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0115: a file with nothing to import or export leaves the group out"
-    ]
-  },
   "tests/review/cases/review-a1/cases/11_attributed_header/.invalid/src/main.i:b5e2e8844dc75630": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
@@ -858,23 +801,10 @@
       "E0105: a block ends with an expression"
     ]
   },
-  "tests/review/cases/review-a1/cases/29_param_shadow/.invalid/src/main.i:6fae0c21e165c75b": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
-    ]
-  },
   "tests/review/cases/review-a1/cases/33_lower_constructor_pattern/.invalid/src/main.i:ddb34885a030720f": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `=`"
-    ]
-  },
-  "tests/review/cases/review-a1/cases/48_new_ungrouped_product/.invalid/src/main.i:695c23c607efd2ff": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
-      "E0101: expected an expression, found `->`"
     ]
   },
   "tests/review/cases/review-a1/cases/53_new_tuple_clauses_joined/.invalid/src/main.i:5162b76efcb2dfae": {
@@ -903,12 +833,6 @@
     "diagnostics": [
       "E0101: expected an expression, found `)`",
       "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`"
-    ]
-  },
-  "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace/.invalid/src/main.i:dfa83f0c5b10d2f3": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `x`"
     ]
   },
   "tests/review/cases/review-k4c/cases/plain_1/.invalid/src/main.i:bd5b9fa7651d1619": {
@@ -1163,30 +1087,6 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original/.invalid/src/main.i:112761caa62e7257": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `->`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once/.invalid/src/main.i:112761caa62e7257": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `->`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original/.invalid/src/main.i:112761caa62e7257": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `->`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original/.invalid/src/main.i:112761caa62e7257": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `->`"
-    ]
-  },
   "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:6100ddd868490a15": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
@@ -1208,26 +1108,6 @@
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0105: a block ends with an expression"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/25/original/.invalid/src/main.i:25e81878720e617c": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an expression, found `:`"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/56/original/.invalid/src/main.i:ea9bf08abd8374b6": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: `|` no longer joins function values: join the branches with `&`",
-      "E0101: expected an expression, found `->`",
-      "E0106: a discard binds nothing, so it may not be used as a value"
-    ]
-  },
-  "tests/review/cases/review-a1/_loose/runtime/61/original/.invalid/src/main.i:1de15bf30cc2d4ba": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
     ]
   },
   "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:b40bf9426d491496": {
@@ -1269,12 +1149,6 @@
   },
   "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:d1e513c0f4edab11": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
-  },
-  "tests/review/cases/review-native3/update/.invalid/src/main.i:ce5ff1a67fbb1ae9": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
-    ]
   },
   "tests/spec/1.7/a1_same_line_negative.i:13c31898de80a63a": {
     "reason": "Intentional negative syntax example.",
@@ -1962,14 +1836,6 @@
   },
   "crates/ilang-cli/tests/multicore.rs:7111383378a50a4c": {
     "not_source": "Delimiter used to split a fixture before its main declaration."
-  },
-  "tests/review/cases/review-k4s/mut_ord_tmp/.invalid/src/main.i:ee6bc6b74c40e304": {
-    "reason": "A typed binding occurs in a call argument, retaining the original statement-in-expression-position counterexample.",
-    "diagnostics": [
-      "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern",
-      "E0101: `|` no longer joins function values: join the branches with `&`",
-      "E0101: `|` no longer joins function values: join the branches with `&`"
-    ]
   },
   "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:dd5c2f037478d5e2": {
     "reason": "A provide operation has no expression on its left, retaining a service statement where an expression is required.",

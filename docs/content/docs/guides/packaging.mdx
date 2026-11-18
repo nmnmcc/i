@@ -124,7 +124,7 @@ test ! -f i.lock && echo 'no lock records'
 no lock records
 ```
 
-For located dependencies, commit `i.toml` and `i.lock` together: records contain location, version, commit, and a `sha256-` hash over sorted paths, lengths, and committed bytes. Records include every manifest reached in normal or test configuration, even if a higher version compiles. The loader verifies cached files and consumes that snapshot, rejecting changed tags or mismatches.
+For located dependencies, commit `i.toml` and `i.lock` together: records contain location, version, commit, and a `sha256-` hash over sorted paths, lengths, and committed bytes. Records include every manifest reached in normal or test configuration, even if a higher version compiles. The loader checks cached files and consumes that snapshot, rejecting changed tags or mismatches.
 
 ## Repeated builds
 
@@ -140,6 +140,6 @@ built build/second.wasm
 identical Wasm
 ```
 
-Identical local builds at one optimization level do not establish identical bytes across compiler versions, platforms, or levels. Macros have controlled compile-time services, fresh state per run, and portable `hash`; reuse requires identical inputs. Verified dependencies support repeatability without guaranteeing identical native executables across environments; release timestamps and archive normalization have separate rules in `docs/release.md`.
+Identical local builds at one optimization level do not establish identical bytes across compiler versions, platforms, or levels. Macros have controlled compile-time services, fresh state per run, and portable `hash`; reuse requires identical inputs. Checked dependencies support repeatability without guaranteeing identical native executables across environments; release timestamps and archive normalization have separate rules in `docs/release.md`.
 
 [Lock records](/docs/standard/generated/chapter-2#section-2-8) · [Macro inputs](/docs/standard/generated/chapter-14#section-14-9) · [Compiler development](/docs/contributing/building-and-testing)

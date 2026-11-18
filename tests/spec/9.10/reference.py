@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent integer model and vector generator for spec §9.10.
 
-Run with UPDATE=1 to regenerate vectors.i. Otherwise verify its generated tokens, ignoring layout and separators.
+Run with UPDATE=1 to regenerate vectors.i. Otherwise check its generated tokens, ignoring layout and separators.
 Constants and the first three seed-1337 words are from the pinned primary source:
 https://hackage-content.haskell.org/package/splitmix-0.1.3.1/docs/src/System.Random.SplitMix.html
 All other vectors are computed here from §9.10, not copied from i execution.

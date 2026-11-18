@@ -204,7 +204,7 @@ Stage gate:
 - 139/139 spec cases passed at both O0 and O2.
 - All 522 WAT outputs remained byte-equal to the provided `1df2fe0`
   export, with none added or removed.
-- The first full dev-verify stopped at Clippy's items_after_test_module:
+- The first full checks stopped at Clippy's items_after_test_module:
   the new solver tests preceded remaining helpers. Moving the test module
   to the end fixes the layout; the full gate must be rerun.
 - old-syntax-check passed: 1012 snippets, 20 explicit future entries.
@@ -239,7 +239,7 @@ merging `12d4637`; redesign was checked again before handoff.
 
 Final implementation checks:
 
-- `ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0. This includes
+- `ILANG_BROWSER_PORT=4181 ./scripts/checks`: exit 0. This includes
   Rust fmt, workspace Clippy with -D warnings, workspace tests, library
   formatting, std/hello/bench at O0/O2, WASI smoke, JavaScript SDK tests,
   and 33 actual browser tests. Std passed 1399 tests at each level.
@@ -252,14 +252,14 @@ Final implementation checks:
 - `WAT_DUMP=... cargo test -p ilang-cli --test wat_dump --locked`: 602
   outputs. Every byte equals the exact `12d4637` upstream baseline, with
   none added or removed. The archived baseline is under target/t1; all
-  848 tracked blobs were verified against git. The four std additions
+  848 tracked blobs were checked against git. The four std additions
   were installed before its test started; its Rust sources are identical
   to e1abcb6. The Binaryen gitlink uses this lane's submodule.
 - No type golden changed and no derived file remains changed.
 
-The full verification log is `target/t1/dev-verify-12d.log`; old syntax is
+The full checking log is `target/t1/checks-12d.log`; old syntax is
 `target/t1/old-syntax-12d.log`. WAT directories are `target/t1/wat-12d` and
-`target/t1/wat-upstream-e1abcb6` (the latter contains the verified 12d4637
+`target/t1/wat-upstream-e1abcb6` (the latter contains the checked 12d4637
 baseline, despite its original directory name). These are implementation
 comparisons, not substitute performance measurements or proof of the
 unfinished literal behavior. The interpretation checks and their source
@@ -321,7 +321,7 @@ One new known-type unit test initially found a raw difference under an
 intersection was skipped. Recursive member extraction fixed it. A syntax
 error in the first mechanical edit was fixed before further checks.
 
-Stage 5 gate: full dev-verify exited 0 (18 direct tests, unchanged type
+Stage 5 gate: full checks exited 0 (18 direct tests, unchanged type
 goldens, 159 spec cases at O0/O2, 1399 std tests per level, 33 browser
 tests). old-syntax-check passed 1078 snippets and 20 pending entries.
 The initial partial unit run failed the raw-difference regression above;
@@ -343,7 +343,7 @@ That expression first fails by calling a tuple. The regression instead
 uses `{ () { ... } }()`, following §6.10's brace-group rule. This corrects
 the example spelling and does not change tuple or binding semantics.
 
-Gate: full dev-verify exited 0, 169 spec cases at O0/O2, 1399 std tests
+Gate: full checks exited 0, 169 spec cases at O0/O2, 1399 std tests
 per level and 33 browser tests. All 10 new may_fail_group cases passed;
 old-syntax-check passed 1089 snippets. No existing golden changed.
 The new may_fail_group.out is generated and reserved for the last commit.
@@ -371,7 +371,7 @@ and their top-place-only fast path remain behind LITERAL_CANDIDATES=false.
 The known filter subtracts actual types rather than dropping their heads.
 No source inference creates restricted sets yet.
 
-Gate: full dev-verify exited 0 (19 direct checker tests, 169 spec cases at
+Gate: full checks exited 0 (19 direct checker tests, 169 spec cases at
 O0/O2, 1399 std tests per level, 33 browser tests). Existing type goldens
 are unchanged. old-syntax-check passed 1091 snippets and 20 future entries.
 The stage-6a generated output remains untracked for the last derived commit.
@@ -393,7 +393,7 @@ substitute are recorded in `tests/t1-blockers/README.md`. The user requires
 stopping when a controlling source must change. No amendment is assumed.
 
 Stage-7 work is preserved under target/t1/continued/stage7-work and removed
-from the branch's active sources. Stage 6b is the last verified feature
+from the branch's active sources. Stage 6b is the last checked feature
 checkpoint. No stage 8 work began and no check was weakened. Generated
 stage-7 output changes were regenerated back to the stage-6b state; the new
 stage-6a output alone is retained for the final derived-files commit.
@@ -449,15 +449,15 @@ No existing golden remains changed. The discarded experimental stage-7
 outputs are retained only in the ignored audit patch and are not accepted
 as expectations on this branch.
 
-Final verification of the committed checkpoint after merging redesign
+Final checking of the committed checkpoint after merging redesign
 1ce1a7e (stream/URI) into lane/a:
 
-- `ILANG_BROWSER_PORT=4181 ./scripts/dev-verify`: exit 0, including Rust
+- `ILANG_BROWSER_PORT=4181 ./scripts/checks`: exit 0, including Rust
   fmt/Clippy/workspace tests, 169/169 spec cases at both O0/O2, 1422 std
   tests per level, hello/bench, WASI smoke, JavaScript SDK and 33 browser
   tests. Log: target/t1/continued/source-conflict-final-full.log.
 - `scripts/old-syntax-check`: exit 0, 1096 snippets, exact diagnostics and
-  20 future entries. Log: source-conflict-verified-old-syntax.log in the
+  20 future entries. Log: source-conflict-checked-old-syntax.log in the
   same directory. T1 future entries remain because its parser is not on.
 - UPDATE=1 checker type generation: exit 0, five tests. No existing output
   remains changed; only the new deferred-Assert output is committed.
@@ -532,10 +532,10 @@ strings. The final scan passes 1122 snippets and 20 future entries. No i
 source was exempted. No check was interrupted. The first full stage-7 gate
 passed (174 spec cases); the expanded final gate includes the added tests.
 
-Final stage-7 gate: full dev-verify exit 0, 175 spec cases at O0/O2,
+Final stage-7 gate: full checks exit 0, 175 spec cases at O0/O2,
 1422 std tests per level and 33 browser tests. Clippy -D warnings, the K1
 fixtures, 13 interpretation tests and all existing Rust targets pass.
-Log: target/t1/continued/resumed-stage7-verified-full.log. Source stage 7
+Log: target/t1/continued/resumed-stage7-checked-full.log. Source stage 7
 is committed with all generated outputs held for the final derived commit.
 
 ### Stage 8: written literals and narrowing
@@ -594,7 +594,7 @@ the separate finite-string service test also runs. The next full gate passed
 184 cases, then two complete runs added the remaining finite/shared and
 written-bound cases (185 and 186). No check was interrupted.
 
-Final full dev-verify: exit 0, 186 spec cases at both O0/O2, 1422 std tests
+Final full checks: exit 0, 186 spec cases at both O0/O2, 1422 std tests
 per level, 33 browser tests; Clippy -D warnings and all Rust targets pass.
 Log: target/t1/continued/stage8-final-full.log. old-syntax-check: exit 0,
 1161 snippets, exact diagnostics, 17 future entries, none owned by T1.
@@ -633,7 +633,7 @@ type is part of the type, so a type test is written after the other
 choices”; the fixtures now put a literal before the test. Two focused
 runtime runs expected a caller position for a tail call. §11.7 says “Calls
 that were replaced by tail calls are gone”; the position fixture now makes
-the call non-tail to verify both the pattern position and caller position.
+the call non-tail to check both the pattern position and caller position.
 These were expectation errors; no compiler check was weakened.
 
 The old-syntax run also saw a concurrent dev-shell enterShell failure:
@@ -717,7 +717,7 @@ capacity an explicit measurement gate, an operational interpretation of
 §9's “quiet window”, separate from the unchanged timing ratios. A manual
 failed-warm-up check found an argparse percent-sign help-string error;
 the help now spells “percent”. A retry also found that `/bin/false` does
-not exist in the Nix environment; the verified run discovers the actual
+not exist in the Nix environment; the checked run discovers the actual
 executable in the dev-shell PATH. It returns nonzero and records the
 failed warm-up rather than timing it as a success. No system path or
 configuration was changed.
@@ -790,7 +790,7 @@ The final audit compares against source checkpoint 4472a97, and assigns a
 rule to every one of 419 changed lines across 33 outputs. The only parser
 recovery change is consuming literal 1 before expecting its arrow.
 
-Merged full dev-verify: exit 0, 219 spec cases at O0/O2, 1446 std tests
+Merged full checks: exit 0, 219 spec cases at O0/O2, 1446 std tests
 per level, 36 browser tests; fmt, Clippy -D warnings and all Rust targets
 pass. Logs: final-full.log, final-generated.log, final-old-syntax.log.
 old-syntax-check parses 1298 snippets with exact diagnostics and 17
@@ -803,7 +803,7 @@ and no actual test or WAT generation was interrupted.
 Final corpus audit: 316 cases, 265 kept, 50 new, one lost pre-existing
 checker fixture, types/spec.i's `assert(1 == 2)` (the required E0520).
 The actual before binary is the archived pre-stage-7 checkpoint. The
-four original runtime fixtures have their separately verified §8 E0520
+four original runtime fixtures have their separately checked §8 E0520
 changes; all parameter-based replacements run. The supplied 1df2fe0
 binary also checks the expanded current std, so the final performance
 comparison can keep the same source tree for both binaries.
@@ -815,7 +815,7 @@ accepted note wins under this task's source order. This design-note
 cleanup is outside T1's assigned implementation/spec paths and is left
 for its owner; it requires no compiler or normative-spec change.
 
-Upstream moved during final verification. Binding grants (99a030e) were
+Upstream moved during final checking. Binding grants (99a030e) were
 merged cleanly at 5f53999; its full gate passed 219 spec cases, 1446 std
 tests per level and 51 browser tests. Std/property and string additions
 (94789e6) then merged cleanly at dae12ce. The final full gate again passes:
@@ -851,7 +851,7 @@ is preserved. Its control `x = 1` shows Int (T1 is off) and it checks the
 same latest std. This borrowed build is an explicitly labelled substitute
 for 1865366/1df2fe0, not a build performed by this lane. It includes none
 of T1's latent representation changes, unlike the stage-6b binary.
-Provenance and verification are saved in borrowed-baseline-provenance.json
+Provenance and checking are saved in borrowed-baseline-provenance.json
 and final-compatible-baseline.log under the continuation target directory.
 
 The compatible-baseline corpus audit agrees: 316 cases, 265 kept, 50 new,
@@ -863,7 +863,7 @@ also rerun after integration and passed at peak two bounds/head/side.
 
 ### Final performance gate: met on the compatible pre-T1 baseline
 
-The unchanged aggregate gate passed on attempt 18, using the verified
+The unchanged aggregate gate passed on attempt 18, using the checked
 94789e6 before binary and the final T1 release binary, pinned equally to
 CPU 6. Each binary has one warm-up and eleven samples per case. The
 coordinator's quiet wrapper reserves all three heavy slots; the separate
@@ -881,13 +881,13 @@ explicit compatible substitute, for the reasons/provenance above.
 | pick 250 | 12.991 | 8.923 | recorded sample size |
 | pick 500 | 31.867 | 11.511 | recorded sample size |
 | pick 1000 | 106.633 | 20.714 | 0.194253× before, doubling 1.79951× |
-| local calls 2500 | 12.720 | 20.523 | shared monotype verified by counter test |
+| local calls 2500 | 12.720 | 20.523 | shared monotype checked by counter test |
 | local calls 5000 | 19.060 | 36.883 | doubling 1.79713×, within 2.5× |
 
 All four ignored tests then passed through the heavy wrapper, at peak
 two bounds per head per side. Complete samples, binary hashes, background
 measurements and test log are in
-`target/t1/continued/final-verified-performance-18/{std.json,stress.json,ignored.log}`.
+`target/t1/continued/final-checked-performance-18/{std.json,stress.json,ignored.log}`.
 The script command is `tests/t1/perf-gate.sh BEFORE AFTER REPORT_DIR 6`
 through the dev shell. It releases the quiet locks before the Rust tests.
 
@@ -901,7 +901,7 @@ is needed. A read-only before/during/after diagnostic was queued while
 investigating the background load; it changes no measurement condition.
 
 Every implementation stage is now complete, with full functional gates
-at its checkpoint, followed by latest-upstream verification. Final source
+at its checkpoint, followed by latest-upstream checking. Final source
 head before the report/derived commits is dae12ce, containing redesign
 94789e6. All stages keep their independent interpretation tests. The final
 coordinator follow-ups are the stale syntax.md example, the required later
@@ -913,7 +913,7 @@ The read-only load diagnostic completed: its before/during/after CPU
 fractions were about 8.1/7.2/7.0%, confirming that the surrounding workload
 varies between windows. It did not change the estimator or threshold.
 The accepted attempt 18 is a separate, actually quiet experiment. Final
-verification and generation sessions all returned exit 0. The final
+checking and generation sessions all returned exit 0. The final
 report-only old-syntax scan also checks the completed audit documents.
 No global environment changes remain; build/audit artifacts stay in the
 lane's ignored target directory, and upstream dependency changes stay as

@@ -284,6 +284,21 @@ pub fn build_tests(
         return Err(program_error(&graph, &diags));
     }
     let manifest = make_manifest(&graph, program, revision, &checked.collections);
+    // A collection name that no test declares is a misspelling, not an empty
+    // selection: refuse it instead of building and running nothing.
+    if let Some(name) = collection {
+        let declared = program.modules.iter().any(|module| {
+            module
+                .defs
+                .iter()
+                .any(|def| format!("{}.{}", module.path, def.name) == name)
+        });
+        if !declared {
+            return Err(BuildError::Selection(format!(
+                "there is no test collection {name:?}"
+            )));
+        }
+    }
     let selected: Vec<_> = manifest
         .entries
         .iter()
@@ -350,6 +365,45 @@ pub fn build_tests(
         },
         selected.into_iter().map(|(entry, _, _)| entry).collect(),
     ))
+}
+
+/// The `[test].collection` of a manifest: `None` when it is not there, and an
+/// error when it is there but is not a string, so that a mistyped value never
+/// selects some other set of tests.
+pub fn test_collection(manifest: &toml_edit::DocumentMut) -> Result<Option<String>, String> {
+    let Some(item) = manifest.get("test").and_then(|t| t.get("collection")) else {
+        return Ok(None);
+    };
+    match item.as_str() {
+        Some(name) => Ok(Some(name.to_string())),
+        None => Err(format!(
+            "`[test].collection` must be a string, not {}",
+            item.type_name()
+        )),
+    }
+}
+
+/// The message for the first two test entries with the same qualified name,
+/// with both source positions; `None` when the names are all different.
+pub fn duplicate_test_name(entries: &[CollectionEntry]) -> Option<String> {
+    let mut seen = std::collections::HashMap::new();
+    for entry in entries {
+        if let Some((_, name)) = entry.data.iter().find(|(key, _)| key == "name") {
+            let qualified = format!("{}.{name}", entry.module);
+            if let Some(previous) = seen.insert(qualified.clone(), &entry.at) {
+                return Some(format!(
+                    "duplicate test name {qualified:?}: {}:{}:{} and {}:{}:{}",
+                    previous.path,
+                    previous.line,
+                    previous.column,
+                    entry.at.path,
+                    entry.at.line,
+                    entry.at.column
+                ));
+            }
+        }
+    }
+    None
 }
 
 /// Persistable description of a checked collection. Handles identify one

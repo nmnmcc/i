@@ -1,7 +1,7 @@
 {
   "baseline_ref": "refs/remotes/origin/main",
   "baseline_commit": "1bdea69406471b72e6d1df3a5592c075688478b8",
-  "runtime_verified_commit": "1a6453d330ef45f8dd991a3ec4e9cbe6298a31aa",
+  "runtime_checked_commit": "1a6453d330ef45f8dd991a3ec4e9cbe6298a31aa",
   "fixtures": [
     {
       "path": "tests/spec/11/stop_tail_assert.i",

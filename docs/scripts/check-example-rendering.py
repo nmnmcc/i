@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify example fence titles, highlighted source, and hidden metadata in dist."""
+"""Check example fence titles, highlighted source, and hidden metadata in dist."""
 from html.parser import HTMLParser
 from pathlib import Path
 import sys

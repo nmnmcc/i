@@ -91,7 +91,7 @@ Artifacts and logs remain in this lane only:
 The source patch and archive were saved before restoring the branch to
 stage 6b. They retain the implementation, eight interpretation tests, and
 four runtime/error fixtures, including the failing acceptance example.
-They are unfinished work, not a verified stage-7 commit. Stage 8, fitted
+They are unfinished work, not a checked stage-7 commit. Stage 8, fitted
 choices, performance and final soundness review have not started.
 
 

@@ -67,7 +67,7 @@ selection. Branch bodies and shared needs remain checked (§9.2 Branches).
 
 | Case | Old | New | Controlling paragraph |
 | --- | --- | --- | --- |
-| `review-k4d/_loose/spec/tests_spec_11_equality` | Four scalar W0503 per phase. | Seven: add Some/None, Ok/Error, True/False at lines 57/59/62. Already recorded in `7a7d7df01`; verify again and restore fingerprint-only changes. | Syntax-three §2.8; spec §4.3, §4.5 rule 3, §6.9. |
+| `review-k4d/_loose/spec/tests_spec_11_equality` | Four scalar W0503 per phase. | Seven: add Some/None, Ok/Error, True/False at lines 57/59/62. Already recorded in `7a7d7df01`; check again and restore fingerprint-only changes. | Syntax-three §2.8; spec §4.3, §4.5 rule 3, §6.9. |
 | `review-t1/original-equality` | Four scalar W0503 per phase. | The same three added warnings at lines 57/59/62; all five equality tests still pass at both optimizations. | Same. |
 
 Spec §6.9: “When both sides of `==` or `!=` have known types (§4.8), and
@@ -90,7 +90,7 @@ case list/diff has been requested because the coordinator worktrees now
 contain restored observations; these cases must be enumerated and explained
 before updating their records.
 
-## Verification of the eight named cases
+## Checking of the eight named cases
 
 A fresh `cargo build -p ilang-cli --release --locked` passed through the
 heavy wrapper. Its own-worktree binary has SHA-256
@@ -114,6 +114,6 @@ passing test output, but both test phases exceeded their unchanged 10-second
 bounds. Those observations were restored, not recorded. The fresh release
 run above passed those same bounds. An earlier filter-selection mistake
 selected no cases and changed no observations. These failed attempts are
-preserved in the lane's verification logs. The 39 display-only records and
-their group explanations remain unverified because their case list/diff is
+preserved in the lane's checking logs. The 39 display-only records and
+their group explanations remain unchecked because their case list/diff is
 missing; this audit is not yet the complete landing gate.

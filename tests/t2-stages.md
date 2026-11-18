@@ -72,9 +72,9 @@ E0501. No library or type name receives compiler treatment.
 The user's later WAT ruling supersedes the original
 1df2fe0 reference. Baseline builds and dumps live under this lane's target/.
 
-## Verification commands
+## Checking commands
 
-Every cargo/dev-verify command uses
+Every cargo/checks command uses
 `/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i`.
 `old-syntax-check` uses that wrapper internally for its parser build.
 
@@ -82,7 +82,7 @@ Every cargo/dev-verify command uses
 - `cargo test -p ilang-cli value_type_interfaces --locked`
 - `cargo test -p ilang-cli --test value_types --locked`
 - `cargo test -p ilang-cli --test spec --locked`
-- `ILANG_BROWSER_PORT=4182 ./scripts/dev-verify`
+- `ILANG_BROWSER_PORT=4182 ./scripts/checks`
 - `./scripts/old-syntax-check`
 - `WAT_DUMP=<dir> cargo test -p ilang-cli --test wat_dump --locked`, both at
   the exact upstream baseline (detached target/ worktree) and the lane head.
@@ -130,14 +130,14 @@ reported with the actual result, not assumed to be a quiet coordinator window.
   and counts those seven authored parser rejections. Old-syntax extraction also
   rejected a capitalized inventory log message as source; the message is now
   ordinary lowercase prose, with no exemption added.
-- Two verification retries overlapped in the same log. That log is not the
-  final evidence; a separate serialized head verification log supersedes it.
+- Two checking retries overlapped in the same log. That log is not the
+  final evidence; a separate serialized head checking log supersedes it.
 - The first timing check measured 219.85 ms baseline / 243.62 ms candidate
-  (+10.81%) during overlapping verification runs and failed its threshold.
+  (+10.81%) during overlapping checking runs and failed its threshold.
   Retained raw samples: target/t2-time-std.json. Investigation found unnecessary
   provenance traversals without Of sites; those now return immediately, as does
   the second dependency graph when no value reads exist. The measurement
-  was repeated after the verification jobs finished. At the intervening f8ba920
+  was repeated after the checking jobs finished. At the intervening f8ba920
   baseline it measured +5.52%; that measurement is superseded by the final
   baseline result below.
 - The opaque-alias runtime fixture first used two import groups and a
@@ -153,7 +153,7 @@ No checks were weakened to accept a compiler mismatch. No stash, config change,
 push, dependency update or write to another lane was used. Detached baseline
 worktrees, logs and build caches are intentionally retained under target/.
 
-## Verification before the independent review
+## Checking before the independent review
 
 The compiler source at c7d7e3c contains all T2 changes and the upstream baseline
 7b3cea3. The final documentation and derived-file commits change no compiler
@@ -165,8 +165,8 @@ uncommitted earlier worker code at the start of the continuation.
 | Semantic rules, recovery, immutable completion, ordering | Met: 24 integration families and 5 solver tests in the full Rust gate. All required review variants compare full alias results, schemes and diagnostics in normal/reversed recovery. |
 | Complete corpus accounting | Met: the discovered spec inventory is fully accounted for; only authored compile-error cases may stop before inference. Every remaining case is checked in both orders, and std's canonical types, needs and init are unchanged. |
 | Package/query/export consumers | Met: three package-interface unit tests, query/navigation/outline tests, hidden export rejections and opaque-alias constructor privacy checks. |
-| Rust gate | Met: `./scripts/dev-verify rust`, included in `target/t2-7b3cea3-verify.log`: fmt, clippy -D warnings, workspace tests, locked dependencies. |
-| Runtime gates | Met: `ILANG_BROWSER_PORT=4182 ./scripts/dev-verify`: std 1422, hello 2 and bench 12 tests pass at each of O0/O2; WASI smoke passes; Node tests and all 36 browser tests pass. |
+| Rust gate | Met: `./scripts/checks rust`, included in `target/t2-7b3cea3-check.log`: fmt, clippy -D warnings, workspace tests, locked dependencies. |
+| Runtime gates | Met: `ILANG_BROWSER_PORT=4182 ./scripts/checks`: std 1422, hello 2 and bench 12 tests pass at each of O0/O2; WASI smoke passes; Node tests and all 36 browser tests pass. |
 | Spec suite | Met: `cargo test -p ilang-cli --test spec --locked`: 179/179 cases at both O0/O2 (`target/t2-7b3cea3-spec.log`). |
 | Old-syntax gate | Met: `./scripts/old-syntax-check`: 1280 snippets, exact diagnostics, 19 remaining future-track entries and no T2 future entries (`target/t2-7b3cea3-old-syntax.log`). |
 | Existing WAT | Met: baseline 636 files, candidate 670, missing 0, changed 0. All 34 additions belong to T2 cases. The comparison asserts byte equality for every baseline file (`target/t2-7b3cea3-wat-comparison.json`). |
@@ -311,7 +311,7 @@ The chain generator also covers the review's earlier 64/128/256-size probes,
 in addition to the four mandatory sizes. All 68 project reproducers are thus
 retained directly or generated in full by repository tests.
 
-## Verification after the independent review
+## Checking after the independent review
 
 Compiler checkpoint: 1804086; redesign merge: 245f518, containing exactly
 94789e6141d9d2213d3b909b07bcbac9bbcdb02d as its upstream parent. The detached
@@ -322,7 +322,7 @@ was exported again. Binaryen still resolves to the recorded fba5005 commit.
 | Criterion | Final command and result |
 | --- | --- |
 | Review semantics, transactional completion and query recovery | `cargo test -p ilang-check --test value_types --lib -p ilang-lsp --test protocol --locked`: 31 integration families, 6 solver checks and 14 LSP protocol checks pass. All 56 checked-in projects, 120 declaration permutations and the generated scale cases run from repository sources. The full Rust gate repeats these checks. |
-| Rust, package and interface consumers | `ILANG_BROWSER_PORT=4182 ./scripts/dev-verify`: fmt, clippy -D warnings and locked workspace tests pass, including all three value-type interface tests (`target/t2-review-verify2.log`). |
+| Rust, package and interface consumers | `ILANG_BROWSER_PORT=4182 ./scripts/checks`: fmt, clippy -D warnings and locked workspace tests pass, including all three value-type interface tests (`target/t2-review-check2.log`). |
 | Runtime and hosts | The same full command passes std 1465, hello 2 and bench 12 tests at each of O0/O2, WASI smoke, 76 Node tests and 51 browser tests. |
 | Spec | `cargo test -p ilang-cli --test spec --locked`: 180/180 cases pass at O0/O2, including the four review runtime tests (`target/t2-review-spec.log`). |
 | Syntax | `./scripts/old-syntax-check`: 1409 snippets parsed, exact diagnostics match, 19 future-track entries and no T2 entry (`target/t2-review-old-syntax2.log`). No exemption was added. |
@@ -421,13 +421,13 @@ an explicitly literal result supplies the negative test. No weak local is
 frozen to make the probe pass.
 
 A CLI test invocation with --lib selected zero package-interface tests; it was
-not counted as verification. The corrected --bin i invocation runs all four
+not counted as checking. The corrected --bin i invocation runs all four
 interface tests. The first syntax-data merge restored two entries deliberately
 removed by T1; a three-way merge now preserves both tracks' deletions and exact
 diagnostics. No syntax check exemption was added. All these checks have passing
 focused reruns; full-gate results are recorded below when complete.
 
-### Final combined verification
+### Final combined checking
 
 This replaces the earlier waiting-for-T1 status. The T1 merge is ac8e1c6;
 the subsequent upstream merge is b02ca81. Redesign moved to
@@ -442,7 +442,7 @@ assertion checks exact String/Only members instead of a diagnostic substring.
 | --- | --- |
 | Combined inference, exact reads, ordering, K1 and recovery | `cargo test --workspace --locked` in the full Rust gate passes 25 T1, 31 T2 and 9 joint integration families; 29 checker unit tests, all four completed-interface tests, LSP protocol and the existing invariant/service/contra/bivariant/stream fixtures pass. |
 | Scalar-bound fusion | `cargo test -p ilang-check --lib --locked t1_stress_ -- --ignored --nocapture --test-threads=1`: all four separately gated tests pass. Alias 1000, calls 2500/5000, match 2000 and nested 50x50 retain peak concrete bounds/head/side=2 (`target/t2-t1-stress-counters-optimized.log`). These were initially ignored by the ordinary workspace command, then explicitly executed. |
-| Whole gate | `ILANG_BROWSER_PORT=4182 ./scripts/dev-verify`: fmt, clippy -D warnings, workspace tests, std 1465/hello 2/bench 12 at both O0/O2, WASI smoke, 76 Node tests and 51 browser tests pass (`target/t2-t1-verify-optimized.log`). |
+| Whole gate | `ILANG_BROWSER_PORT=4182 ./scripts/checks`: fmt, clippy -D warnings, workspace tests, std 1465/hello 2/bench 12 at both O0/O2, WASI smoke, 76 Node tests and 51 browser tests pass (`target/t2-t1-check-optimized.log`). |
 | Spec and runtime aliases | `cargo test -p ilang-cli --test spec --locked`: 239/239 cases pass at O0/O2, including the new cross-package literal-field program and labelled/pipe argument-order cases (`target/t2-t1-spec-optimized.log`). |
 | Syntax inventory | `./scripts/old-syntax-check`: 1603 snippets parsed, exact diagnostics match, 17 future-track entries (`target/t2-t1-old-syntax-optimized.log`); the final documentation snippets are checked again before reporting. |
 | WAT against exact merged upstream | `WAT_DUMP=... cargo test -p ilang-cli --test wat_dump --locked` at baseline and candidate: 848 baseline files, 898 candidate files, missing 0, changed 0; every baseline byte matches (`target/t2-t1-optimized-wat-comparison.json`). The 50 additions belong to T2/joint cases. |
@@ -495,7 +495,7 @@ change; the earlier successful full run is not substituted for them.
 
 ### Final timing and handoff after the copy investigation
 
-The final full rerun is target/t2-t1-verify-optimized.log (exit 0). The explicit
+The final full rerun is target/t2-t1-check-optimized.log (exit 0). The explicit
 spec, WAT, syntax, stress-counter and release-chain reruns also pass. The normal
 debug chain comparison passes in the workspace suite. Final release medians
 from target/t2-t1-chain-optimized.log, milliseconds:

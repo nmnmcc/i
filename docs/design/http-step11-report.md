@@ -15,7 +15,7 @@ Implemented on `lane/io`.
 - `http_stream_request_body` echoes a 1 MiB upload in reads of at most 4096
   bytes, for both chunked and Content-Length framing. It waits for the handler
   to read the first piece before sending the remainder, checks trailers, and
-  verifies draining an unread body preserves the next pipelined request.
+  checks draining an unread body preserves the next pipelined request.
 - `i run --project examples/http-get --opt 0`: prints `http ok` over HTTPS.
 - `i fmt --check lib std examples`: passes.
 - `i test --project std --opt 0`: 1839 passed, 0 failed.

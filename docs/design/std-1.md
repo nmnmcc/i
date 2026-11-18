@@ -363,7 +363,7 @@ Checked independently with the cached `i-1e0d910` compiler, using a lane-local
 copy of the review's baseline-syntax probe: new becomes
 `() -> Stream(Never, Never, Never)` and needs_bias fails with E0501 because Bias
 is not a subtype of Never. The review's concrete unsafe Sink coercion probe also
-still fails with E0501. These runs reproduce the blocker; they do not verify a
+still fails with E0501. These runs reproduce the blocker; they do not check a
 fix or the migrated parser. Temporary probe copies were removed.
 
 Source inspection confirms why the prerequisite is material:
@@ -524,7 +524,7 @@ source remains observationally equal to its old list after any descendant edit.
 | Callback raises at 2; callback at 3 would panic | First error, no panic | Q3 |
 | Same elements built by append and repeated end insertion | equal gives True; no assertion about `==` | Q4 |
 
-Private tests verify ranks, cached sizes and nonempty bounded digits after every
+Private tests check ranks, cached sizes and nonempty bounded digits after every
 edit. Exercise lengths 0–20 exhaustively, then powers of 2 and 3 and their
 neighbors through 100,000, splits at every boundary of small trees, unequal
 height joins, middle borrowing and collapse, and alternating ends. A fixed-seed
@@ -947,7 +947,7 @@ defect is reported with a minimal ordinary-language witness, not patched in std.
   without list conversion. Inspect touched-node counts before claiming costs.
 - [ ] Add Q1–Q4 tests, deterministic list models with branched versions, shared
   joins, empty/single/deep transitions, bounds, effects and nominal callbacks.
-- [ ] Verify equal ignores shape; document raw equality and dict key behavior.
+- [ ] Check equal ignores shape; document raw equality and dict key behavior.
   Keep invariant checks private; run them inside the defining module if they
   need private constructors, using temporary development probes and removing
   probes before shipping. External std tests cover public observations.
@@ -980,7 +980,7 @@ defect is reported with a minimal ordinary-language witness, not patched in std.
 - [ ] Implement skipping/empty-inner searches with tail-recursive state loops.
 - [ ] Add S1–S8 tests, long filtering/collection, late services, distinct error
   types, nominal field inference, and new() used independently at two types.
-- [ ] Check inferred exported interfaces; verify no construction needs services.
+- [ ] Check inferred exported interfaces; check no construction needs services.
   Put compile-fail client probes in temporary packages, not failing std tests.
 
 For each writer, use the coordinator's prebuilt migrated compiler:
@@ -1264,7 +1264,7 @@ that no spec addition or weaker service rule remains. No further serious issue
 was found in these two passes. The compiler prerequisite is still open; these
 checks do not claim its fix or an execution of std/uri.
 
-## 10. Risks, coordinator decisions, and verification limits
+## 10. Risks, coordinator decisions, and checking limits
 
 Main implementation risks are the finger tree's private rank/count invariants,
 strict linear string construction, complete IP-literal validation, correct
@@ -1294,7 +1294,7 @@ Checked here: source baseline and branch, cited std/compiler regions, accepted
 syntax and scoped type notes, plan/ledger decisions, reference API documents,
 the initial manual counterexample passes, and the independent-review corrections
 with two further clean reading passes. No new modules exist yet, so their compile/run behavior, exported inferred signatures, Wasm stack use,
-node-count bounds and performance remain unverified. Executed separate Python
+node-count bounds and performance remain unchecked. Executed separate Python
 models of P1/P5 and U6/U7: clean idempotence on 130 paths; 8,734 successful
 relative/join laws; 144 ordered form-pair round trips including empty keys, plus,
 Unicode and NUL; and round-trip encoding all 256 byte values. These check the
@@ -1309,4 +1309,4 @@ and two standard dot-removal examples. These are baseline compiler failures and
 model results, not passing std implementations. Do not report the design
 witnesses or proposed test tables as passing implementation tests. The cached
 baseline compiler predates the accepted syntax migration; full new-syntax
-verification belongs to the four implementation writers and integration.
+checking belongs to the four implementation writers and integration.

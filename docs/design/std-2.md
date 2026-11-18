@@ -1,7 +1,7 @@
 # Design: time, calendar, command arguments, and logging
 
 Status: accepted API and implementation contract. The pure implementation and
-its verification are recorded in §12. Generic sink clients retain the §7 gate.
+its checking are recorded in §12. Generic sink clients retain the §7 gate.
 Source baseline: `b9173ce013405fd3a055ffa34edf3b8829672104`. Repository line
 references below mean that commit, unless another revision is named. The spec
 in this checkout already has the syntax migration; all examples use that syntax.
@@ -893,7 +893,7 @@ for later authorized implementation, not permission to modify other lanes.
    coordinator’s responsibility. Any cargo command must use the shared heavy
    wrapper; this design work ran no cargo command.
 
-## 10. Self-attack and actual verification
+## 10. Self-attack and actual checking
 
 ### 10.1 First pass: concrete defects found and repaired
 
@@ -1058,7 +1058,7 @@ linear CLI option lookup are documented costs, not measurements.
 
 The sink service decision, separation of time values from clock observation,
 and Gregorian UTC/fixed-offset scope are already given by the task; they need
-no reconfirmation. Real IO remains unverified until the accepted runtime and
+no reconfirmation. Real IO remains unchecked until the accepted runtime and
 provider APIs land. Recheck the five IO signatures against that landed surface;
 local stand-in type checks are not a substitute.
 
@@ -1166,7 +1166,7 @@ std/log.lazy : (level: Level, message: () -> String ^ E ! N) -> Nil ^ E | E2 ! N
 std/log.format : (entry: Entry) -> String
 ```
 
-### 12.3 Compiler gate and verification
+### 12.3 Compiler gate and checking
 
 Five positive checker cases remain waiting for K4, each with E0505: the full
 annotated logging body, the review's smaller annotated service body, an ordinary
@@ -1192,14 +1192,14 @@ conformance defect, not permission to change Sink or weaken service equality.
 No conflict between the controlling design contracts was found.
 
 All commands below run from this lane through
-`direnv exec /home/agent/Programming/i`. Cargo and dev-verify use the shared
+`direnv exec /home/agent/Programming/i`. Cargo and checks use the shared
 `/home/agent/Programming/i/.rd/cache/heavy` wrapper.
 
 | Command/check | Final result |
 |---|---|
 | `cargo build --release --locked -p ilang-cli` | Passed; exact lane compiler built with the pinned Binaryen submodule. |
-| `./scripts/dev-verify i` | Passed: formatting of lib/std/bench/examples; std 1446 passed at both optimization levels; hello 2 and bench 12 passed at each level; WASI smoke passed. |
-| `target/release/i test --project std --opt 0` and `--opt 2`, as invoked by dev-verify | Both passed, 1446 tests each. These are the runtime acceptance checks. |
+| `./scripts/checks i` | Passed: formatting of lib/std/bench/examples; std 1446 passed at both optimization levels; hello 2 and bench 12 passed at each level; WASI smoke passed. |
+| `target/release/i test --project std --opt 0` and `--opt 2`, as invoked by checks | Both passed, 1446 tests each. These are the runtime acceptance checks. |
 | `target/release/i fmt --check std` | Passed. |
 | `./scripts/old-syntax-check` | Passed: 1181 snippets, exact expected diagnostics, 19 unchanged future-track entries. |
 | `target/release/i check --project std --types` | Passed; all 55 measured interfaces are listed above. |
@@ -1224,7 +1224,7 @@ Development checks that failed or were superseded:
   required private bucket checks without changing the production API.
 - One earlier full opt-2 run overlapped that temporary CLI test copy and ran
   1437 tests. That is a substitute measurement, not the acceptance result.
-  The final dev-verify run used the restored suite and passed all 1446 twice.
+  The final checks run used the restored suite and passed all 1446 twice.
 - Cached-compiler module runs were substitutes during the exact compiler build.
   They do not replace the final lane-built results. Formatter-sensitive edit
   attempts that failed to match made no file change and were retried against

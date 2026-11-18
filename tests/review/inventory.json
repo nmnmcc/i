@@ -58,30 +58,6 @@
       "case": "review-a1/cases/03_mixed_headers"
     },
     {
-      "origin": "/tmp/review-a1/cases/04_header_order/original.i",
-      "sha256": "bc7528f08f9c0a6ac1e256e61860b46d796e8983ac70b8ccf30f47e358047f4a",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/cases/04_header_order/original"
-    },
-    {
-      "origin": "/tmp/review-a1/cases/04_header_order/src/main.i",
-      "sha256": "bc7528f08f9c0a6ac1e256e61860b46d796e8983ac70b8ccf30f47e358047f4a",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/cases/04_header_order"
-    },
-    {
-      "origin": "/tmp/review-a1/cases/05_empty_header/original.i",
-      "sha256": "33b9e0bcbbd4fa71f35ffe917eac0f24a4b94776d97ab9613b2604b0bb3f6911",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/cases/05_empty_header/original"
-    },
-    {
-      "origin": "/tmp/review-a1/cases/05_empty_header/src/main.i",
-      "sha256": "33b9e0bcbbd4fa71f35ffe917eac0f24a4b94776d97ab9613b2604b0bb3f6911",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/cases/05_empty_header"
-    },
-    {
       "origin": "/tmp/review-a1/cases/06_old_empty_headers/original.i",
       "sha256": "f77d5abaa92d06a7ce6879501ca37fdba57b1a1c25a0df2a8b6773b4aaeadb92",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
@@ -310,12 +286,6 @@
       "case": "review-a1/cases/24_guard_fn_grouped"
     },
     {
-      "origin": "/tmp/review-a1/cases/25_old_guard_fn/original.i",
-      "sha256": "964f0e757bb3424686f7bfb14642dfa4818fd007faf23ca979e32e4e812d7a25",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/cases/25_old_guard_fn/original"
-    },
-    {
       "origin": "/tmp/review-a1/cases/25_old_guard_fn/src/main.i",
       "sha256": "9df2b936afd5cf812abcefda29e1fdaea1a6de18a8e5323b3d93368f44f146ec",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
@@ -356,18 +326,6 @@
       "sha256": "20ebeb0a9a7f1c41e3ec092e8607f41699841139ce01c561f6470f39a2b660c2",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
       "case": "review-a1/cases/28_param_later"
-    },
-    {
-      "origin": "/tmp/review-a1/cases/29_param_shadow/original.i",
-      "sha256": "6fae0c21e165c75bd318fc7c4b3bdf771e691220adb622a8e32d7212c6722a70",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/cases/29_param_shadow/original"
-    },
-    {
-      "origin": "/tmp/review-a1/cases/29_param_shadow/src/main.i",
-      "sha256": "6fae0c21e165c75bd318fc7c4b3bdf771e691220adb622a8e32d7212c6722a70",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/cases/29_param_shadow"
     },
     {
       "origin": "/tmp/review-a1/cases/30_param_type_collision/original.i",
@@ -586,18 +544,6 @@
       "case": "review-a1/cases/47_old_match_named_field"
     },
     {
-      "origin": "/tmp/review-a1/cases/48_new_ungrouped_product/original.i",
-      "sha256": "695c23c607efd2ff2963cba22d854cad220ca34854e2f56f76bad194e3bc44a9",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/cases/48_new_ungrouped_product/original"
-    },
-    {
-      "origin": "/tmp/review-a1/cases/48_new_ungrouped_product/src/main.i",
-      "sha256": "695c23c607efd2ff2963cba22d854cad220ca34854e2f56f76bad194e3bc44a9",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/cases/48_new_ungrouped_product"
-    },
-    {
       "origin": "/tmp/review-a1/cases/49_new_grouped_product/original.i",
       "sha256": "20597f9342d6c3b391bebfbf0eda08b8572ce78e3247f8487e2b28e2a82c3c74",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
@@ -682,12 +628,6 @@
       "case": "review-a1/cases/55_minus_continued"
     },
     {
-      "origin": "/tmp/review-a1/cases/56_old_guard_lines/original.i",
-      "sha256": "9160f49b02878079a23346d2e97ed27da4b98ee40acee39e07bb3863f765c861",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/cases/56_old_guard_lines/original"
-    },
-    {
       "origin": "/tmp/review-a1/cases/56_old_guard_lines/src/main.i",
       "sha256": "1e0c7e584dbef0a69f96ab2ebf6b54bc566b3076f5832dc3d68595672df2754c",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
@@ -740,12 +680,6 @@
       "sha256": "da63abb7de8579c429abcddbb796d1e7d0b8b2adfead0c22abbdf3dd840b22c6",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
       "case": "review-a1/cases/60_mixed_capture_outer"
-    },
-    {
-      "origin": "/tmp/review-a1/cases/61_old_type_alias_join/original.i",
-      "sha256": "c78910db9cef477face430f3728b34e2fbff3a0943691e9b608a07e4906608e5",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/cases/61_old_type_alias_join/original"
     },
     {
       "origin": "/tmp/review-a1/cases/61_old_type_alias_join/src/main.i",
@@ -892,28 +826,10 @@
       "case": "review-a1/_loose/confirmed/idempotence-from-old/once"
     },
     {
-      "origin": "/tmp/review-a1/confirmed/idempotence-from-old/original.i",
-      "sha256": "112761caa62e72573526a3d43406f6bcc48360c15ada0c363a66790e95d5337a",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/confirmed/idempotence-from-old/original"
-    },
-    {
       "origin": "/tmp/review-a1/confirmed/idempotence-from-old/src/main.i",
       "sha256": "1c7231c37f3ca0039d0ef49cbde30a18ab1d376d9399b3a680974c79cb67da60",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
       "case": "review-a1/confirmed/idempotence-from-old"
-    },
-    {
-      "origin": "/tmp/review-a1/confirmed/idempotence-keep-layout/once.i",
-      "sha256": "112761caa62e72573526a3d43406f6bcc48360c15ada0c363a66790e95d5337a",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/confirmed/idempotence-keep-layout/once"
-    },
-    {
-      "origin": "/tmp/review-a1/confirmed/idempotence-keep-layout/original.i",
-      "sha256": "112761caa62e72573526a3d43406f6bcc48360c15ada0c363a66790e95d5337a",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/confirmed/idempotence-keep-layout/original"
     },
     {
       "origin": "/tmp/review-a1/confirmed/idempotence-keep-layout/src/main.i",
@@ -926,12 +842,6 @@
       "sha256": "3da1d5e162972eb7cacc89fa70686ce2b2485cbf4a951fcee9565035bb1d6d62",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
       "case": "review-a1/_loose/confirmed/idempotence-plain/once"
-    },
-    {
-      "origin": "/tmp/review-a1/confirmed/idempotence-plain/original.i",
-      "sha256": "112761caa62e72573526a3d43406f6bcc48360c15ada0c363a66790e95d5337a",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/confirmed/idempotence-plain/original"
     },
     {
       "origin": "/tmp/review-a1/confirmed/idempotence-plain/src/main.i",
@@ -1090,12 +1000,6 @@
       "case": "review-a1/runtime/21"
     },
     {
-      "origin": "/tmp/review-a1/runtime/25/original.i",
-      "sha256": "25e81878720e617cfaf8850fbc8aedd2a1409bc4b4a59266694f536e2c0fb5e5",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/runtime/25/original"
-    },
-    {
       "origin": "/tmp/review-a1/runtime/25/src/main.i",
       "sha256": "b96dbd1b2add3277ba8ea679aac7a30a5e885d3aa22e6cdfae49d75d7ed36c0d",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
@@ -1246,12 +1150,6 @@
       "case": "review-a1/runtime/55"
     },
     {
-      "origin": "/tmp/review-a1/runtime/56/original.i",
-      "sha256": "ea9bf08abd8374b64f9dcc3fefc7477aae4f827b6af9982ae0b0112f5a19dcbe",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/runtime/56/original"
-    },
-    {
       "origin": "/tmp/review-a1/runtime/56/src/main.i",
       "sha256": "b41fb7668d0e11ef0c32313661ecf9b20426bc8b7e41d426be0dc133c7e65ada",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
@@ -1268,12 +1166,6 @@
       "sha256": "fb24038c927f313323e5f3b4e1c817c5f8f2f30ad424d042b3e2b1b5dd51575e",
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
       "case": "review-a1/runtime/58"
-    },
-    {
-      "origin": "/tmp/review-a1/runtime/61/original.i",
-      "sha256": "1de15bf30cc2d4bab05cb447b68f5314514f4714ceef3a7007defe11067721b8",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "case": "review-a1/_loose/runtime/61/original"
     },
     {
       "origin": "/tmp/review-a1/runtime/61/src/main.i",
@@ -1766,20 +1658,6 @@
       "existing": [
         "crates/ilang-syntax/tests/golden/declaration.i"
       ]
-    },
-    {
-      "origin": "/tmp/review-c/mutation/crates/ilang-syntax/tests/golden/err_case_brace.i",
-      "sha256": "dfa83f0c5b10d2f33217580aed983c7947ec543fcd094c7c005c0bfb370f2333",
-      "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "snapshot": true,
-      "case": "review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace"
-    },
-    {
-      "origin": "/tmp/review-c/mutation/crates/ilang-syntax/tests/golden/err_module_path.i",
-      "sha256": "5ed5f09ff3035208786ad674ba3e00de40ff38acb40cff6e13f48db92f3b3e3b",
-      "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "snapshot": true,
-      "case": "review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_module_path"
     },
     {
       "origin": "/tmp/review-c/mutation/crates/ilang-syntax/tests/golden/fn_vs_tuple.i",
@@ -16904,12 +16782,6 @@
       "case": "review-k4s/mixed_recursive_1_17"
     },
     {
-      "origin": "/tmp/review-k4s/mut_ord_tmp/src/main.i",
-      "sha256": "36b001eec0ad49d6c43b6428b7a4ef0f17f3b0cf1e3b14e6d1a94c42db1dc50b",
-      "source": "docs/spec.md §§4.5 rule 4, 4.7, 9.2: equal service arguments and principal inference",
-      "case": "review-k4s/mut_ord_tmp"
-    },
-    {
       "origin": "/tmp/review-k4s/mutual_finite/src/main.i",
       "sha256": "52d8864a5d221ec7e7d69593eb75b4be5c1f03aa811149f34660a9b74049b436",
       "source": "docs/spec.md §§4.5 rule 4, 4.7, 9.2: equal service arguments and principal inference",
@@ -17670,18 +17542,6 @@
       "sha256": "8df7a98fd3ae4ef0e56f697060671b98cd0e410f3fbd1895b8a52e652be20058",
       "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
       "case": "review-native3/raw_ctor"
-    },
-    {
-      "origin": "/tmp/review-native3/update/src/main.i",
-      "sha256": "ce5ff1a67fbb1ae9087248e736246115d163ae4765b2bb2b741ef88ff7204051",
-      "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "case": "review-native3/update"
-    },
-    {
-      "origin": "/tmp/review-native3/update/src/resource.i",
-      "sha256": "8df7a98fd3ae4ef0e56f697060671b98cd0e410f3fbd1895b8a52e652be20058",
-      "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "case": "review-native3/update"
     },
     {
       "origin": "/tmp/review-num/probes/test/numeric.i",

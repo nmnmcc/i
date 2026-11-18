@@ -7,7 +7,7 @@ Only this note is committed. No reference source is copied into i.
 The main result is that `numeric-lowering.md` has the right architecture.
 Worker/wrapper, local unboxing, bounded specialization, and scalar products all
 have direct precedents below. The missing emphasis is on profitable joins and
-call boundaries, worker argument count, and independently verified math tables.
+call boundaries, worker argument count, and independently checked math tables.
 For full-range mathematics, start from CORE-MATH's reduction and certification
 methods. A literal C-to-i translation would invalidate important assumptions.
 
@@ -61,7 +61,7 @@ measured work removed; implementation effort; code size and proof burden.
 |---|---|---|
 | A. Expose local boxes and let Binaryen do all optimization | Smallest first experiment; reuse Heap2Local | Surviving reference calls still require boxes; reference-type refinement is not a scalar ABI conversion (§5) |
 | B. Adopt a full native functional compiler architecture now | Demand, result-shape and specialization analyses are well studied | GHC's laziness machinery and OCaml's native stack layouts solve problems i does not have (§§2–3) |
-| C. Keep the accepted scalar-worker plan and adopt specific proven analyses | Changes only internal encodings; incremental and measurable | Requires explicit join, call, suspension and trace verification (§§2–5) |
+| C. Keep the accepted scalar-worker plan and adopt specific proven analyses | Changes only internal encodings; incremental and measurable | Requires explicit join, call, suspension and trace checking (§§2–5) |
 
 Choose C, starting with A as N0 already requires. Take B's worker argument
 budget, result summaries and benefit accounting, without introducing source
@@ -142,7 +142,7 @@ polymorphism”, explains why compulsory internal unfoldings are checked after
 expansion; binder lint at :1838–1842 requires a fixed runtime representation
 apart from stated exceptions. A raw Double representation cannot simply be
 substituted into every erased polymorphic entry. Take an internal representation
-verifier. Do not add GHC-style representation kinds or unboxed source types:
+checker. Do not add GHC-style representation kinds or unboxed source types:
 those would be a separate language proposal, unnecessary for this work.
 
 ### 2.2 Comparison and ordered recommendations
@@ -267,7 +267,7 @@ values, environments, identity and stop positions is forced by §§9.4 and 11.
 
 **Recommended, highest gain per effort first:**
 
-1. Make joins and conversions explicit in N1's representation verifier. Count
+1. Make joins and conversions explicit in N1's representation checker. Count
    eliminated allocations and newly inserted boxes per branch/loop, borrowing
    `transl_let` and Flambda2's benefit check. Amend R1/R2 implementation guidance;
    change the future numeric pass, not source inference.
@@ -340,7 +340,7 @@ exclusion and logical trace requirements remain binding (R3/R9, spec §11.7).
 **Recommended, highest gain per effort first:**
 
 1. Record a pass contract: solved facts → known-call selection and legal
-   inlining → representation/escape repair → control split → verification →
+   inlining → representation/escape repair → control split → checking →
    emission → Binaryen. Refresh invalidated facts explicitly. Reserve
    `W:lower.rs:494–504` and `W:control.rs` for the numeric implementation owner.
 2. For N4, use branch-scoped integer interval/known-bit facts with exact generic
@@ -803,7 +803,7 @@ existing ownership dependencies.
 | 4 | Judge inlining by eliminated work and cap scalar arity | GHC `tryUnfolding`, `finaliseArgBoxities`; OCaml `Benefit.evaluate` | R3; worker selector and general diagnostics |
 | 5 | Replace repeated high-precision pi evaluation with bounded table reduction | CORE-MATH `reduce_large_acc`; Go `trigReduce` | Std-3 F7; `F:std/src/float.i:1144–1251` |
 | 6 | Port math proof/data generation with the algorithm | CORE-MATH `cr_sin_moderate`, `computeT`, fpminimax scripts | Std-3 F6–F9; regenerated tables, operation-specific bounds |
-| 7 | Validate every representation edge, including saved locals | OCaml `transl_let`; Flambda2 `make_decisions`; native `scan_stack_frames` | R1/R7; checker facts, control saves and verifier |
+| 7 | Validate every representation edge, including saved locals | OCaml `transl_let`; Flambda2 `make_decisions`; native `scan_stack_frames` | R1/R7; checker facts, control saves and checker |
 | 8 | Optimize small Int regions, keeping exact promotion | GHC `integerAdd`/`integerMul`; Zarith `add`/`ml_z_reduce` | N4/R4; guards and existing big fallback |
 | 9 | Follow simplification with cleanup and scoped facts | Go `passes`, `factsTable.restore` | Numeric pass ordering; `lower_with_bindings`, control split |
 | 10 | Tune Binaryen only on residual measured work | GUFA `visitExpression`; wasm_of_ocaml `optimization_options` | N6; retain observable traps; no blind flag copying |
@@ -967,14 +967,14 @@ exact Int/masks first and measured, proved limb lowering afterward. No new
 serious hole found in the corrected proposals. These two clean passes are
 self-review, not independent approval or a proof of a future implementation.
 
-## 10. Coordinator questions and verification limits
+## 10. Coordinator questions and checking limits
 
 1. **Should NUM keep its sequence?** Recommend yes: N0, conservative N1, N2,
    N3, then N4/N5 by measured survivors. Out-of-line product returns remain
    deferred. Add benefit accounting and an arity budget before product expansion;
    do not require a full demand solver, full CPR, speculative simplifier or
    new heap layout before first gains. Keep the transitive may-suspend ban.
-2. **Should std/float follow CORE-MATH?** Recommend yes, method and verified
+2. **Should std/float follow CORE-MATH?** Recommend yes, method and checked
    data generation, one function at a time. First fix full-range reduction;
    retain the existing certified interval path until each replacement has a
    complete no-FMA proof. Acquire matching proof artifacts before adoption.
@@ -983,7 +983,7 @@ self-review, not independent approval or a proof of a future implementation.
    no-FMA/table path first; revisit as separate general proposals if it cannot
    meet the gate. Do not weaken rounding or special-case a library.
 
-Not verified: the proposed compiler changes, their cross-target output and
+Not checked: the proposed compiler changes, their cross-target output and
 speed; a rewritten CORE-MATH library; complete hard-case searches; missing
 sine proof artifacts; all mathematical functions beyond the sin/cos/tan/atan
 source slices read here; Kotlin, Dart or Scala WasmGC backends; GHC/OCaml kernel

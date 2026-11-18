@@ -32,22 +32,29 @@ built from source with CMake and linked into `i` as a library, so users need
 nothing else installed. Its first build takes a few minutes; later builds
 reuse it.
 
-## Verification
+## Checks
 
-`devenv test` runs `scripts/dev-verify`, which has three independent parts:
+`devenv test` runs `scripts/checks`, the local entry to what CI runs. It has
+four independent parts:
 
-- `rust`: the Rust formatting, Clippy, and the workspace tests.
+- `rust`: the Rust formatting, Clippy, the snippet checks, and the workspace
+  tests (`rust-lint` and `rust-test` run the two halves).
 - `i`: builds the release `i`, checks the formatting of the i sources
   (`i fmt --check lib std bench examples`), runs the tests of `std`,
-  `examples/hello`, and `bench` with `i test` at `--opt 0` and `--opt 2`, and
-  runs `scripts/wasi-smoke`, which runs WASI-target builds in Wasmtime and in
-  Node's `node:wasi`.
+  `examples/hello`, and `bench` with `i test` at `--opt 0` and `--opt 2`,
+  and runs `scripts/wasi-smoke` (WASI-target builds in Wasmtime and in Node's
+  `node:wasi`), the review corpus, and the generated programs.
 - `js`: the tests of the JavaScript SDK, and the browser tests in Chromium,
   Firefox, and WebKit. The browsers come from Nix; npm does not download them.
+- `editors`: the VS Code extension tests, the tree-sitter grammar tests, and
+  a build of the Zed extension.
 
-`./scripts/dev-verify rust` runs one part. CI (`.github/workflows/ci.yml`)
-runs the three parts as parallel jobs, each in the Devenv shell, with Devenv
-installed from nixpkgs and the Cargo output kept between runs.
+`./scripts/checks rust` runs one part. CI (`.github/workflows/ci.yml`) runs
+the parts as parallel jobs, each in the Devenv shell, with Devenv installed
+from nixpkgs and the Cargo output kept between runs. The Rust tests are split
+into groups (`CHECKS_TEST_GROUP`) and the review corpus into shards, so a run
+has about 24 jobs, each named by what it runs: `build (…)`, `lint (…)`,
+`test (…)`, `run (…)`, `corpus (…)`, and `docs (…)`.
 
 Release archives are built with `./scripts/dev-release`; see
 [release packaging](release.md).

@@ -163,7 +163,7 @@ upstream snapshots read on 2026-11-11, not pinned historical evidence.
   alternative shape parsers and postpones string fallback. Take the explicit
   pipe/logical-or diagnostic, not type-driven expression parsing.
 
-I found no verified reference in these reads that combines all three of i's
+I found no checked reference in these reads that combines all three of i's
 proposed uses with i's keyword-free clause blocks and longest-type rule.
 That is a limit of this search, not a claim that no such language exists.
 The concrete trouble here is established by i's parser experiment, not by an
@@ -919,7 +919,7 @@ record formatter must land together with T3's syntax consumers.
 | `print.rs:29–38,530–572,650–670,796–900` | Same rules without source comments; remove obsolete match grouping helpers where no longer needed; print only parseable records. |
 | `ilang-syntax/tests/{lex,parse,golden,format,spec}.rs` and fixture directories | New boundary matrix; reparse/canonical-tree and idempotence properties; reviewed new diagnostic goldens. Current properties are in `tests/format.rs:1–9` and `tests/spec.rs:29–54`. |
 | `crates/ilang-check/src/hir.rs:221–260`, `resolve.rs:810,1418,1795,2514`; `types/display.rs:1357` and T3's shown types | Normal `Record` name, no empty tuple surface, record display, preserved single-clause lowering, and scoped pipe/or diagnostic. Use T3's existing structural type representation. |
-| `crates/ilang-wasm/src/lower.rs:1562–1580,2289,2342`; T3 runtime record inspector | Verify tuple arity removal at the source boundary; retain existing Case lowering; print record delimiters. Existing nominal `Record` names are unrelated. |
+| `crates/ilang-wasm/src/lower.rs:1562–1580,2289,2342`; T3 runtime record inspector | Check tuple arity removal at the source boundary; retain existing Case lowering; print record delimiters. Existing nominal `Record` names are unrelated. |
 | `scripts/old-syntax-check : 105–125,143–185`, its JSON, tests and docs; `scripts/a2-meaning`; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
 | `docs/spec.md`, `docs/design/{syntax,records,meta}.md` | Apply §5 together. Do not leave two accepted contradictory grammars. |
 | `editors/vscode`, package templates, Rust/JS embedded sources, all changed `.i`, comments and text/type expectations | Inventory by source role; update highlighting for caret, bar and match dot; preserve CR/CRLF and layout-sensitive tests. |
@@ -1090,7 +1090,7 @@ formatter or runtime tests passed.
 9. **Retain list-rest and export uses of bare `..`?** Recommendation: yes; amend
    the “always followed” claim rather than remove those unrelated features.
 
-## 11. What is not verified
+## 11. What is not checked
 
 No production compiler or T3 code was changed. I did not run Wasm execution,
 WAT comparison, code-size or parser-throughput benchmarks, full development

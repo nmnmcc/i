@@ -542,8 +542,8 @@ impl Git {
             .map(|(path, hash, _)| (path, hash))
     }
 
-    /// Verify the materialization and retain exactly the bytes that were
-    /// verified. The loader consumes this snapshot, without reopening paths.
+    /// Check the materialization and retain exactly the bytes that were
+    /// checked. The loader consumes this snapshot, without reopening paths.
     pub(crate) fn package_snapshot(
         &self,
         repository: &str,
@@ -585,10 +585,10 @@ impl Git {
         let snapshot = read_files(&target).map_err(|e| {
             GitError::new(
                 code::LOCK_MISMATCH,
-                format!("cached package `{place}` could not be verified: {e}"),
+                format!("cached package `{place}` could not be checked: {e}"),
             )
         })?;
-        // A sidecar authenticates neither bytes nor the set of paths. Verify
+        // A sidecar authenticates neither bytes nor the set of paths. Check
         // against the Git objects even when the sidecar claims the right hash.
         if crate::lock::hash(&snapshot) != hash {
             return Err(GitError::new(

@@ -3,7 +3,7 @@
 Status: implementation design, 2026-11-11. This retains the rules from
 lane/note-meta at 44021cc, aligned with redesign and the user's SYN2 decisions.
 The collection contract (§4.5) and conservative typed-result rule (§7.3) are
-the implementation choices; their behavior is verified by implementation tests.
+the implementation choices; their behavior is checked by implementation tests.
 
 Sources, in order: spec.md; syntax.md as amended by the user's confirmed SYN2
 decisions; literal-types.md, value-types.md, types-joint.md, records.md at the

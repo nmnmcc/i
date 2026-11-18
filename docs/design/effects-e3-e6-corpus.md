@@ -32,7 +32,7 @@ zero failures, the same two registered XFAILs. All **34 exact semantic and
 Scheduler guards** pass. Existing baseline resource observations remain exactly
 e975; they are not claimed as new passing phases. See
 [the performance repair and complete commands](effects-e4-performance.md) and
-[the landing verification](effects-e3-e6-validation.md).
+[the landing checking](effects-e3-e6-validation.md).
 
 ## Owner decisions and repaired defects
 

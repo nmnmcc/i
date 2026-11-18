@@ -2,7 +2,7 @@
 
 Status: reconciliation for G3. This note changes no compiler code and does not replace the three accepted designs. It supplies their shared contracts and corrections. Only this file belongs to this lane.
 
-The source tree read here is `143c1c42fb0c2f8b22b5b190573f454db9dfd50b`. Code references without another revision mean that tree; paths beginning `types/` mean `crates/ilang-check/src/types/`. Bare solver filenames also refer to that directory; bare `hir.rs`, `resolve.rs`, `order.rs`, and `query.rs` refer to `crates/ilang-check/src/`; `package.rs` and `lower.rs` refer to the full paths in §2.3. Rebase by function name as well as line number. A1 and K1 are not in this tree. The macro draft was read with `git show lane/note-meta:docs/design/meta.md`, at `44021cc52e7fc0d3b3c6646067d29f81157c577d`. K1 was read, not executed, at `lane/k1` head `6b1c1ebebd07b95b7b8b200e4d391be7737eb2fc`, including its implementation commit `dc4ce6c`. A final ledger read reports K1 landed at `578a17d`, with coordinator-run Rust/i verification and equal WAT; those runs were not repeated here.
+The source tree read here is `143c1c42fb0c2f8b22b5b190573f454db9dfd50b`. Code references without another revision mean that tree; paths beginning `types/` mean `crates/ilang-check/src/types/`. Bare solver filenames also refer to that directory; bare `hir.rs`, `resolve.rs`, `order.rs`, and `query.rs` refer to `crates/ilang-check/src/`; `package.rs` and `lower.rs` refer to the full paths in §2.3. Rebase by function name as well as line number. A1 and K1 are not in this tree. The macro draft was read with `git show lane/note-meta:docs/design/meta.md`, at `44021cc52e7fc0d3b3c6646067d29f81157c577d`. K1 was read, not executed, at `lane/k1` head `6b1c1ebebd07b95b7b8b200e4d391be7737eb2fc`, including its implementation commit `dc4ce6c`. A final ledger read reports K1 landed at `578a17d`, with coordinator-run Rust/i checking and equal WAT; those runs were not repeated here.
 
 Sources, in precedence order: `docs/spec.md`; accepted `syntax.md`; accepted `literal-types.md` (T1), `value-types.md` (T2), `records.md` (T3), and `a1-front-end.md`; the plan `/home/agent/.claude/plans/twinkling-swinging-perlis.md`, “已定的设计”, D-types, and wave 2; the binding coordinator ledger `/home/agent/Programming/i/.rd/cache/ledger.md`. The ledger resolves choices left by those texts, including closed-only foreign reads and K1 before T1. The macro draft cannot override an accepted syntax rule.
 
@@ -597,7 +597,7 @@ For type-only changes, compare WAT under the existing dump policy. T2 demands do
 4. Implement snapshot closure and full solver trial/rollback `[shared: solve, infer, display]`. Gate: pure-variable SCCs, reverse links, invariant variables, earlier-open-variable rejection, failed-trial state equality. T1 bound fusion must remain observed; no replacement-variable semantics.
 5. Wire ordinary annotation instances/local sharing, exact permanent reads, R7 whole-source gate, safe known-shape conversion, and whole-expanded place checks `[shared: infer, known, pattern]`. Gate: T-B/T-F/T-G, no local alias escape, no hidden Of under union/intersection.
 6. Complete aliases eagerly and defer exports correctly; publish full alias_types and query/interface consumers `[shared: mod, shown, query, package]`. Gate: private nominal leaks rejected, private source rename stable, >12 literal change detected, failed/Pending aliases never serialized as holes.
-7. Run T2 suite with T1 enabled, reverse tie order and error recovery; K1 tests and ordinary corpus checks. Gate: full verification plus T2 RF; no WAT evaluation from type dependencies. T2’s scalar Codec fixture proves scheduling; the actual record builder remains T3’s gate.
+7. Run T2 suite with T1 enabled, reverse tie order and error recovery; K1 tests and ordinary corpus checks. Gate: full checking plus T2 RF; no WAT evaluation from type dependencies. T2’s scalar Codec fixture proves scheduling; the actual record builder remains T3’s gate.
 8. Hand T3 one closure extension point, fixed-form/provenance visitor, reusable context checker and resolved Of references. Gate: no partial-shape API promised to foreign readers; M4 readiness tests documented, not prematurely enabled.
 
 ### T3
@@ -650,7 +650,7 @@ These are instructions for the owning tracks after acceptance, not edits made by
 
 Two corrections are handoffs to other owners: A1's `TypeArg` enum collapses to Type when T1 lands, and the macro draft must take §5's answers, especially syntactic alias classification, qualified constructor bindings, and empty attribute calls. Do not edit accepted syntax to match the older macro draft. The built-in attribute distinction is a syntactic attribute rule, not a privileged library name.
 
-## 11. Self-attack and verification record
+## 11. Self-attack and checking record
 
 These are my own reviews, not independent RF. New-language program outcomes below were derived from the accepted rules and the cited code. They were not run through an implementation of T1–T3.
 
@@ -703,7 +703,7 @@ Recheck the full grammar against syntax §3, T1 §6, T2 P1–P5, T3 §§8.1–8.
 - Ran an in-memory Python set model over all nine records with optional a/b fields taking 0 or 1, and all 16 choices of the two field-value subsets. It reproduced open E4's empty-field counterexample; every closed case obeyed the guarded rewrite. This finite model is evidence for the counterexample and guard, not a full language model.
 - Ran a small canonicalization model with K/J versus Z/A, reversed field order, and renamed ordinary field variables. The corrected ordering produced identical canonical forms; fixed and parameter labels remained distinct.
 - Checked 20 quoted old-text fragments against the three actual note files; all matched after whitespace normalization. The two declaration/code fragments were read directly. Checked Markdown fences, named files/anchors, reserved error ranges, whitespace, and the final changed-file list.
-- No Rust implementation, new-language compilation, Wasm execution, full verification suite, performance run, or external review was performed. K1's landed verification is the coordinator's report in the ledger, not a run by this lane. Every expected compiler diagnostic/runtime value in §8 is a gate for the implementing track.
+- No Rust implementation, new-language compilation, Wasm execution, full checking suite, performance run, or external review was performed. K1's landed checking is the coordinator's report in the ledger, not a run by this lane. Every expected compiler diagnostic/runtime value in §8 is a gate for the implementing track.
 
 ## 12. Risks and coordinator question
 
@@ -713,4 +713,4 @@ There is no remaining language-choice question here about Of versus known facts,
 
 The principal remaining risks are implementation size and conservative rejection. Retained Without can make some previously promised simplifications unavailable, including a closed nominal discarded field that the small inhabitation predicate cannot prove nonempty. The forms remain exact, but T3's incomplete subtyping may reject more correct programs; its tests must measure that effect. T2's transaction must cover T1's fused bounds and T3's label/record propagation without weakening ownership checks. Full type trees and canonical ordering must be shared by tooling; limited hover output cannot serve as a cache or interface. Existing T1 known-type limitations for callbacks that change the entire constructor family stay in its RF scope; extending record traversal does not solve that separate problem.
 
-Acceptance of this note establishes the shared contracts and the correction list. It does not claim that all three implementations exist or that their combined principal inference, runtime correctness, scale, or diagnostics have been verified. The ordered gates in §9 remain necessary.
+Acceptance of this note establishes the shared contracts and the correction list. It does not claim that all three implementations exist or that their combined principal inference, runtime correctness, scale, or diagnostics have been checked. The ordered gates in §9 remain necessary.

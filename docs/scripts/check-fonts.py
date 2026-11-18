@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that built web fonts are local, allowlisted DM Sans and DM Mono assets."""
+"""Check that built web fonts are local, allowlisted DM Sans and DM Mono assets."""
 import argparse
 import hashlib
 from html.parser import HTMLParser

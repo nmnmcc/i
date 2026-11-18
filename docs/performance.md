@@ -229,7 +229,7 @@ still needed for the performance acceptance gate, especially for the short
 Horner and tuple kernels. These measurements do not establish the std/float
 release gates or a full-range worst case. Raw batch medians from a new
 quiet run, std check/build cost and benchmark Wasm size acceptance also
-remain to be verified. See [the step-3 report](design/numeric-step3-report.md)
+remain to be checked. See [the step-3 report](design/numeric-step3-report.md)
 for the per-step measurements, fuel counts and surviving allocations.
 
 ### Numeric follow-up: list-cell cast reuse
@@ -311,7 +311,7 @@ Targets still not met:
 
 The other five kernels meet their thresholds in the retained-tree pair. A quiet
 timing acceptance run, std check/build cost, and benchmark Wasm-size acceptance
-remain unverified; this loaded-machine run does not close those gates.
+remain unchecked; this loaded-machine run does not close those gates.
 
 ## Garbage collection
 
@@ -672,7 +672,7 @@ At the end of the first investigation, no 12 GB fix had been validated. A Linux/
 `malloc_trim(0)` after Binaryen and after Wasmtime compilation built
 successfully, but its timed std run waited 8 minutes 37 seconds for the
 shared wrapper's memory slot and was cancelled before the executable
-started, to leave time for verification before the lane deadline.
+started, to leave time for checking before the lane deadline.
 There is no RSS or test result for that variant.
 
 A further test-module-only variant was prepared with
@@ -914,12 +914,12 @@ system) falls from 320.78 to 265.34 seconds at O0 and from 436.58 to
 promise of the same timing on other machines. The bounded emission was
 first committed at `3bb591db` after the O2 run passed.
 
-The 4097-note metadata regression passes. Final compatibility verification
+The 4097-note metadata regression passes. Final compatibility checking
 also passes. Every heavy command below ran through `$H`; Cargo commands
 used `direnv exec /home/agent/Programming/i`, and standard Rust test
 harnesses used `RUST_TEST_THREADS=2`.
 
-| Verification | Result |
+| Checking | Result |
 |---|---|
 | `cargo test --release -p ilang-host -p ilang-wasm --locked` | 165 passed |
 | `cargo test --release -p ilang-cli --test many_tests --test compile_time_tests --test native --test compile_cache --test determinism --test commands --test macro_budget --locked` | 48 passed |

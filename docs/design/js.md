@@ -180,7 +180,7 @@ A supported JS environment must supply the declared runtime feature profile
 (WasmGC, tail calls, exception handling, console, clocks/timers and, at the IO
 milestone, secure entropy). This is not a claim about every JS engine or every
 browser context. The generated loader checks its required profile before
-starting. No insecure random fallback. Deno/Bun compatibility is unverified;
+starting. No insecure random fallback. Deno/Bun compatibility is unchecked;
 Node compatibility is not inferred from their names. Preview 2 is outside
 this note. `--target ilang` remains an alias of `--target host` with no removal
 scheduled; emitted legacy host artifacts keep the current Appendix B format.
@@ -1317,7 +1317,7 @@ Io factory captures Wasi and makes a closure that writes the UTF-8 text, then se
 an IO error, as legacy Io requires. Stdio's error-reporting API stays distinct.
 This moves encoding, looping and output policy into i, while W2 keeps unsafe
 layout construction inside the kernel. The review's raw-iovec prototype is
-evidence for the loop, not verification of this checked adapter.
+evidence for the loop, not checking of this checked adapter.
 
 **W4 — Runtime stops and custom imports stay. [J4, J6]** Keep the independent
 runtime fd_write/proc_exit stop path, including startup stops, source positions,
@@ -1428,7 +1428,7 @@ or missing Fs before artifact emission, not during instantiation.
 These are **read-code facts**, not observations of the proposed implementation.
 Every implementation statement in this note refers to the following anchors.
 Historical review-3 probe reproduction is recorded in §10; review-4 probes
-are read evidence unless explicitly listed in revision 8 verification below.
+are read evidence unless explicitly listed in revision 8 checking below.
 
 | Fact checked in this lane | File and lines |
 |---|---|
@@ -1681,7 +1681,7 @@ Status sentences saying amendments await another owner or remain entirely uninst
 
 **Installation checks and attacks.** The CLI spec suite passed all 168 cases at O0/O2; the syntax spec test passed parsing and print round trips. The old-syntax checker passed with its 19 future-track expectations unchanged. No new snippet needed a future-parser entry, and no check was weakened. The first CLI suite attempt stopped before tests because Binaryen was absent; initializing this lane's pinned submodule fixed it. No remaining suite failure was found.
 
-The new capture example was run and its assertion of (1, 2) passed. A probe comparing `(t)` with t was rejected as disjoint with E0520, confirming the grouping conflict. Current source-only checking of a State entry still gives E0522 (`crates/ilang-check/src/types/infer.rs:405–429`), and the @js probe gives E0301/E0308/E0315 (`crates/ilang-check/src/resolve.rs:500–551` handles the attribute list); these are verified implementation gaps, not failures of installed target behavior. No provider/foreign implementation was added.
+The new capture example was run and its assertion of (1, 2) passed. A probe comparing `(t)` with t was rejected as disjoint with E0520, confirming the grouping conflict. Current source-only checking of a State entry still gives E0522 (`crates/ilang-check/src/types/infer.rs:405–429`), and the @js probe gives E0301/E0308/E0315 (`crates/ilang-check/src/resolve.rs:500–551` handles the attribute list); these are checked implementation gaps, not failures of installed target behavior. No provider/foreign implementation was added.
 
 Reading the current `$wasi_line` showed it always tries LF after the text write (`crates/ilang-wasm/src/runtime/mod.rs:298–304`); W3's sentence and spec B.7 now preserve that behavior. The short-write loop is at `:282–297`. The ordinary printer and checked table remain future work, so their memory/error behavior is checked against W1/W2 by inspection, not claimed executed.
 
@@ -2137,18 +2137,18 @@ fallback, a Native root or public raw factory would reopen N9; K3's ordinary
 application provider avoids both. Criteria remain §1's generality, principal
 inference, predictable acceptance and buildability.
 
-### Verification and final attacks
+### Checking and final attacks
 
 The revision-6 memory-model results remain historical evidence, not validation
 of the new provider/link rules. For revision 7, the review's existing
 `/tmp/review-js3/opaque.mjs` probe was run against its cached Wasm fixture and
 this lane's SDK. It reproduced True for the same object under A/B, False for
-different objects, and True for null under A/B. This verifies the P1 defect;
+different objects, and True for null under A/B. This checks the P1 defect;
 it does not test a fix. No compiler rebuild or new JS/R2 implementation was run.
 
 All 16 i blocks parsed with cached accepted-syntax compiler i-1df2fe0, using
 fmt --check on in-memory files (formatting differences allowed). TOML and JSON
-blocks parsed, and fence/table/citation/diff checks passed. This verifies
+blocks parsed, and fence/table/citation/diff checks passed. This checks
 syntax, not future provider keys or API types. An abstract provider model
 checked the same closure rule on three differently named bundles and all
 five Settings target selections. A separate six-order model checked
@@ -2176,7 +2176,7 @@ The K1/B.7 conflict remains explicitly flagged for the coordinator. No further
 serious defect was found by manual analysis. Neither pass is a soundness proof
 or an execution of the unimplemented provider/linker/nominal-provenance changes.
 
-### Revision 8: attacks, fixes and verification
+### Revision 8: attacks, fixes and checking
 
 The first attack used T10's Config-dependent Await and T11's Config override.
 A prefix wrapper leaves Config unsupplied; blindly binding an adapter's Config
@@ -2227,7 +2227,7 @@ After these fixes, two further passes found no serious issue:
 1. Soundness/build pass: traced T10 with no seed, T11 with a required seed,
    an override ignoring its seed, same/different adapters, outer versus inner
    Runner, missing outer seeds, duplicate instantiated services and expanding
-   type arguments. Verified each factory's arguments/remaining environment and
+   type arguments. Checked each factory's arguments/remaining environment and
    the resulting wrapper's empty environment. Traced suspension and error
    exits against the single-call guard; no scope can fetch an inner prerequisite
    before adapter entry. Rechecked that constructor recursion is rejected even
@@ -2269,7 +2269,7 @@ track order and region ownership; P1 and field privacy already have owners.
 No additional language decision is requested. General callback re-entry and
 future adapter composition remain outside this handoff, not hidden blockers.
 
-Unverified: future provider-plan/checker/link implementations, full type-checking
+Unchecked: future provider-plan/checker/link implementations, full type-checking
 of request-era fixtures, generated artifacts, browser profiles, real request/
 resource cleanup and performance. The complete packages above target the
 specified new schema; today's manifest reader does not implement it. Primitive

@@ -102,62 +102,6 @@
       }
     },
     {
-      "id": "review-a1/cases/04_header_order",
-      "project": "tests/review/cases/review-a1/cases/04_header_order",
-      "origin": "/tmp/review-a1/cases/04_header_order",
-      "context": null,
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "04_header_order",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-a1/_loose/cases/04_header_order/original",
-      "project": "tests/review/cases/review-a1/_loose/cases/04_header_order/original",
-      "origin": "/tmp/review-a1/cases/04_header_order/original.i",
-      "context": "/tmp/review-a1/cases/04_header_order",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-a1/cases/05_empty_header",
-      "project": "tests/review/cases/review-a1/cases/05_empty_header",
-      "origin": "/tmp/review-a1/cases/05_empty_header",
-      "context": null,
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "05_empty_header",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-a1/_loose/cases/05_empty_header/original",
-      "project": "tests/review/cases/review-a1/_loose/cases/05_empty_header/original",
-      "origin": "/tmp/review-a1/cases/05_empty_header/original.i",
-      "context": "/tmp/review-a1/cases/05_empty_header",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
       "id": "review-a1/cases/06_old_empty_headers",
       "project": "tests/review/cases/review-a1/cases/06_old_empty_headers",
       "origin": "/tmp/review-a1/cases/06_old_empty_headers",
@@ -617,20 +561,6 @@
       ]
     },
     {
-      "id": "review-a1/_loose/cases/25_old_guard_fn/original",
-      "project": "tests/review/cases/review-a1/_loose/cases/25_old_guard_fn/original",
-      "origin": "/tmp/review-a1/cases/25_old_guard_fn/original.i",
-      "context": "/tmp/review-a1/cases/25_old_guard_fn",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
       "id": "review-a1/cases/26_guard_fn_ungrouped",
       "project": "tests/review/cases/review-a1/cases/26_guard_fn_ungrouped",
       "origin": "/tmp/review-a1/cases/26_guard_fn_ungrouped",
@@ -695,34 +625,6 @@
       "files": [
         "src/main.i"
       ]
-    },
-    {
-      "id": "review-a1/cases/29_param_shadow",
-      "project": "tests/review/cases/review-a1/cases/29_param_shadow",
-      "origin": "/tmp/review-a1/cases/29_param_shadow",
-      "context": null,
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "29_param_shadow",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-a1/_loose/cases/29_param_shadow/original",
-      "project": "tests/review/cases/review-a1/_loose/cases/29_param_shadow/original",
-      "origin": "/tmp/review-a1/cases/29_param_shadow/original.i",
-      "context": "/tmp/review-a1/cases/29_param_shadow",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
     },
     {
       "id": "review-a1/cases/30_param_type_collision",
@@ -1127,34 +1029,6 @@
       ]
     },
     {
-      "id": "review-a1/cases/48_new_ungrouped_product",
-      "project": "tests/review/cases/review-a1/cases/48_new_ungrouped_product",
-      "origin": "/tmp/review-a1/cases/48_new_ungrouped_product",
-      "context": null,
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "48_new_ungrouped_product",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-a1/_loose/cases/48_new_ungrouped_product/original",
-      "project": "tests/review/cases/review-a1/_loose/cases/48_new_ungrouped_product/original",
-      "origin": "/tmp/review-a1/cases/48_new_ungrouped_product/original.i",
-      "context": "/tmp/review-a1/cases/48_new_ungrouped_product",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
       "id": "review-a1/cases/49_new_grouped_product",
       "project": "tests/review/cases/review-a1/cases/49_new_grouped_product",
       "origin": "/tmp/review-a1/cases/49_new_grouped_product",
@@ -1326,20 +1200,6 @@
       ]
     },
     {
-      "id": "review-a1/_loose/cases/56_old_guard_lines/original",
-      "project": "tests/review/cases/review-a1/_loose/cases/56_old_guard_lines/original",
-      "origin": "/tmp/review-a1/cases/56_old_guard_lines/original.i",
-      "context": "/tmp/review-a1/cases/56_old_guard_lines",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
       "id": "review-a1/cases/57_new_guard_lines",
       "project": "tests/review/cases/review-a1/cases/57_new_guard_lines",
       "origin": "/tmp/review-a1/cases/57_new_guard_lines",
@@ -1437,20 +1297,6 @@
       "files": [
         "src/main.i"
       ]
-    },
-    {
-      "id": "review-a1/_loose/cases/61_old_type_alias_join/original",
-      "project": "tests/review/cases/review-a1/_loose/cases/61_old_type_alias_join/original",
-      "origin": "/tmp/review-a1/cases/61_old_type_alias_join/original.i",
-      "context": "/tmp/review-a1/cases/61_old_type_alias_join",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
     },
     {
       "id": "review-a1/cases/62_new_record_reserved",
@@ -1730,20 +1576,6 @@
       ]
     },
     {
-      "id": "review-a1/_loose/confirmed/idempotence-from-old/original",
-      "project": "tests/review/cases/review-a1/_loose/confirmed/idempotence-from-old/original",
-      "origin": "/tmp/review-a1/confirmed/idempotence-from-old/original.i",
-      "context": "/tmp/review-a1/confirmed/idempotence-from-old",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
       "id": "review-a1/confirmed/idempotence-keep-layout",
       "project": "tests/review/cases/review-a1/confirmed/idempotence-keep-layout",
       "origin": "/tmp/review-a1/confirmed/idempotence-keep-layout",
@@ -1753,34 +1585,6 @@
       "files": [
         "src/main.i"
       ]
-    },
-    {
-      "id": "review-a1/_loose/confirmed/idempotence-keep-layout/once",
-      "project": "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/once",
-      "origin": "/tmp/review-a1/confirmed/idempotence-keep-layout/once.i",
-      "context": "/tmp/review-a1/confirmed/idempotence-keep-layout",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "once",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-a1/_loose/confirmed/idempotence-keep-layout/original",
-      "project": "tests/review/cases/review-a1/_loose/confirmed/idempotence-keep-layout/original",
-      "origin": "/tmp/review-a1/confirmed/idempotence-keep-layout/original.i",
-      "context": "/tmp/review-a1/confirmed/idempotence-keep-layout",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
     },
     {
       "id": "review-a1/confirmed/idempotence-plain",
@@ -1803,20 +1607,6 @@
       "files": [
         "src/main.i"
       ]
-    },
-    {
-      "id": "review-a1/_loose/confirmed/idempotence-plain/original",
-      "project": "tests/review/cases/review-a1/_loose/confirmed/idempotence-plain/original",
-      "origin": "/tmp/review-a1/confirmed/idempotence-plain/original.i",
-      "context": "/tmp/review-a1/confirmed/idempotence-plain",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
     },
     {
       "id": "review-a1/corrected29",
@@ -2588,20 +2378,6 @@
       ]
     },
     {
-      "id": "review-a1/_loose/runtime/25/original",
-      "project": "tests/review/cases/review-a1/_loose/runtime/25/original",
-      "origin": "/tmp/review-a1/runtime/25/original.i",
-      "context": "/tmp/review-a1/runtime/25",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
       "id": "review-a1/runtime/37",
       "project": "tests/review/cases/review-a1/runtime/37",
       "origin": "/tmp/review-a1/runtime/37",
@@ -2877,20 +2653,6 @@
       ]
     },
     {
-      "id": "review-a1/_loose/runtime/56/original",
-      "project": "tests/review/cases/review-a1/_loose/runtime/56/original",
-      "origin": "/tmp/review-a1/runtime/56/original.i",
-      "context": "/tmp/review-a1/runtime/56",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
       "id": "review-a1/runtime/58",
       "project": "tests/review/cases/review-a1/runtime/58",
       "origin": "/tmp/review-a1/runtime/58",
@@ -2919,45 +2681,6 @@
       "context": null,
       "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
       "finding": "61",
-      "files": [
-        "src/main.i"
-      ]
-    },
-    {
-      "id": "review-a1/_loose/runtime/61/original",
-      "project": "tests/review/cases/review-a1/_loose/runtime/61/original",
-      "origin": "/tmp/review-a1/runtime/61/original.i",
-      "context": "/tmp/review-a1/runtime/61",
-      "source": "docs/design/syntax.md §§2.2, 4.8, 6.1, 6.12",
-      "finding": "original",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace",
-      "project": "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_case_brace",
-      "origin": "/tmp/review-c/mutation/crates/ilang-syntax/tests/golden/err_case_brace.i",
-      "context": null,
-      "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "finding": "err_case_brace",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_module_path",
-      "project": "tests/review/cases/review-c/_loose/mutation/crates/ilang-syntax/tests/golden/err_module_path",
-      "origin": "/tmp/review-c/mutation/crates/ilang-syntax/tests/golden/err_module_path.i",
-      "context": null,
-      "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "finding": "err_module_path",
       "files": [
         "src/main.i"
       ]
@@ -15130,20 +14853,6 @@
       ]
     },
     {
-      "id": "review-k4s/mut_ord_tmp",
-      "project": "tests/review/cases/review-k4s/mut_ord_tmp",
-      "origin": "/tmp/review-k4s/mut_ord_tmp",
-      "context": null,
-      "source": "docs/spec.md §§4.5 rule 4, 4.7, 9.2: equal service arguments and principal inference",
-      "finding": "mut_ord_tmp",
-      "files": [
-        "src/main.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
       "id": "review-k4s/mutual_finite",
       "project": "tests/review/cases/review-k4s/mutual_finite",
       "origin": "/tmp/review-k4s/mutual_finite",
@@ -15941,21 +15650,6 @@
       "context": null,
       "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
       "finding": "raw_ctor",
-      "files": [
-        "src/main.i",
-        "src/resource.i"
-      ],
-      "stored": {
-        "src/main.i": ".invalid/src/main.i"
-      }
-    },
-    {
-      "id": "review-native3/update",
-      "project": "tests/review/cases/review-native3/update",
-      "origin": "/tmp/review-native3/update",
-      "context": null,
-      "source": "docs/spec.md §§10–11; review criteria preserved under tools/",
-      "finding": "update",
       "files": [
         "src/main.i",
         "src/resource.i"

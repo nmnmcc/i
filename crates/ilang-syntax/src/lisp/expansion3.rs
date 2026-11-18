@@ -57,7 +57,7 @@ fn has_hole(ty: &Type) -> bool {
 }
 
 /// Find and validate source macro definitions. The type checker subsequently
-/// verifies the Syntax argument, result, error, and environment types.
+/// checks the Syntax argument, result, error, and environment types.
 pub fn definitions(module: &Module, lisp: bool) -> Result<Vec<MacroDefinition>, Vec<SyntaxError>> {
     let mut found = Vec::new();
     let mut errors = Vec::new();

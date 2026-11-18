@@ -55,7 +55,7 @@ deleted or locally rerecorded.
   with the supplied jsonmerge-snip.py after reading it, retaining both
   branches' additions and main's intended deletions.
 
-## Verification record
+## Checking record
 
 All builds/tests use /home/agent/Programming/i/.rd/cache/heavy; one heavy
 command at a time. Check-snippets is direct and owns its internal wrapper.

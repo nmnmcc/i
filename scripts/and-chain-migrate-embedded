@@ -33,7 +33,7 @@ the reason. Nothing is dropped silently.
 
 Modes: --dry-run (default), --write, --check. --check exits 1 while any
 rewritable separator remains, so it is the idempotence gate after --write.
---verify-extraction checks the readers here against the owner readers.
+--check-extraction checks the readers here against the owner readers.
 """
 import argparse
 import importlib.machinery
@@ -147,7 +147,7 @@ CHAR = re.compile(r"'(?:\\(?:[nrt0\\'\"]|x[0-9a-fA-F]{2}|u\{[0-9a-fA-F_]+\})|[^'
 
 
 def rust_strings(text, path):
-    """scripts/check-snippets.rust_strings with origins; see --verify-extraction."""
+    """scripts/check-snippets.rust_strings with origins; see --check-extraction."""
     i = 0
     while i < len(text):
         if text.startswith("//", i):
@@ -303,7 +303,7 @@ def json_strings(text, path):
 
 
 def fence_blocks(text, path):
-    """docs/scripts/example_fences.fences with origins; see --verify-extraction."""
+    """docs/scripts/example_fences.fences with origins; see --check-extraction."""
     lines = text.splitlines(keepends=True)
     offsets = []
     at = 0
@@ -740,7 +740,7 @@ def report(assemblies, listed, fragments, unaccounted, edits, mode, manifest_pat
     return total
 
 
-def verify_extraction():
+def check_extraction():
     """The readers here must agree with the owner readers, byte for byte."""
     problems = 0
     for path in tracked("*.rs"):
@@ -778,7 +778,7 @@ def verify_extraction():
         if mine != flat:
             print(f"json reader differs: {rel}")
             problems += 1
-    print(f"verify-extraction: {'ok' if not problems else str(problems) + ' difference(s)'}")
+    print(f"check-extraction: {'ok' if not problems else str(problems) + ' difference(s)'}")
     return problems
 
 
@@ -791,12 +791,12 @@ def main():
     parser.add_argument("--manifest", metavar="PATH", help="write the full per-source report as JSON")
     parser.add_argument("--include-design", action="store_true",
                         help="also migrate fences in docs/design (design notes are listed, not rewritten)")
-    parser.add_argument("--verify-extraction", action="store_true",
+    parser.add_argument("--check-extraction", action="store_true",
                         help="check the readers here against the owner readers and exit")
     args = parser.parse_args()
 
-    if args.verify_extraction:
-        raise SystemExit(verify_extraction())
+    if args.check_extraction:
+        raise SystemExit(check_extraction())
     if not separator_driver().is_file():
         raise SystemExit(f"separator driver not found: {separator_driver()} (set I_CHAIN_SEPARATORS)")
 

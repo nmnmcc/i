@@ -63,7 +63,7 @@ The full raw snapshot has all 1973 observations from the same release digest; th
 
 Release SHA256: `795bb7f8e15dbbd9369774cef5e898d0dec1e7b8c1eb13862ff1b118fdbb96f8`. Production source stays byte-identical to `7575ae5a5` throughout all final gates.
 
-## Verification commands and results
+## Checking commands and results
 
 `H=/home/agent/Programming/i/.rd/cache/heavy`; Cargo/tooling uses `direnv exec /home/agent/Programming/i`. One heavy command runs or waits at a time. Defaults: `CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_INCREMENTAL=0 RUST_TEST_THREADS=2 BINARYEN_CORES=1`. The snippet script is direct because it acquires H internally. Static observation audits do not launch a compiler.
 
@@ -97,7 +97,7 @@ The orchestrator was held between steps while its running Rust suite completed, 
 | `/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i python3 docs/scripts/check-placeholders-test` | exit 0 | `target/e4-gate-perf-docs-placeholders-test-perf.log` |
 | `/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i python3 docs/scripts/check-spec-links-test` | exit 0 | `target/e4-gate-perf-docs-citation-test-perf.log` |
 | `I=/home/agent/Programming/i/.rd/e4/target/release/i /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i bash scripts/build-abi-fixture.sh` | exit 0 | `target/e4-gate-perf-abi.log` |
-| `DEV_VERIFY_SKIP_CORPUS=1 ILANG_BROWSER_PORT=4194 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i scripts/dev-verify js` | exit 0 | `target/e4-gate-perf-js.log` |
+| `CHECKS_SKIP_CORPUS=1 ILANG_BROWSER_PORT=4194 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i scripts/checks js` | exit 0 | `target/e4-gate-perf-js.log` |
 | `/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i cargo test --doc -p ilang-check -p ilang-wasm -p ilang-host -p ilang-cli --locked` | exit 0 | `target/e4-gate-perf-doctests.log` |
 | `BINARYEN_CORES=1 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i python3 -u target/e4-perf/isolate-keys.py` | exit 0 | `target/e4-perf/keys-isolated.log` |
 

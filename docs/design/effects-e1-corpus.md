@@ -1,6 +1,6 @@
 # E1 corpus review
 
-One full update-mode run observed 1,973 cases with the existing bounds retained. After compiler repairs, a 197-case run without update mode verified every substantive changed observation, the protected missing-service cases, and related service diagnostics against commit `572ae24c`. That audit had no semantic requirement or cast failures; its observation differences were reviewed before recording. No source fixture or semantic requirement was weakened. Compiler/binary metadata-only changes and removed transition annotations were restored. Phase exits and error-code sets determine the classification; duplicate diagnostics can coalesce without changing a code set.
+One full update-mode run observed 1,973 cases with the existing bounds retained. After compiler repairs, a 197-case run without update mode checked every substantive changed observation, the protected missing-service cases, and related service diagnostics against commit `572ae24c`. That audit had no semantic requirement or cast failures; its observation differences were reviewed before recording. No source fixture or semantic requirement was weakened. Compiler/binary metadata-only changes and removed transition annotations were restored. Phase exits and error-code sets determine the classification; duplicate diagnostics can coalesce without changing a code set.
 
 | Kind | Cases | Meaning |
 |---|---:|---|

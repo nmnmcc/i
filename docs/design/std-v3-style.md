@@ -548,7 +548,7 @@ test("parse_port rejects invalid input", () {
 
 Provide one complete example per module family under `examples/`. Keep docs and
 examples linked to the same contract tests. A future documentation runner can
-extract examples, but the audit did not verify such a runner exists. The model
+extract examples, but the audit did not check such a runner exists. The model
 of checked examples comes from `go/src/testing/example.go`; rich unit-test and
 fuzzing documentation appears in `go/src/testing/testing.go`.
 
@@ -700,7 +700,7 @@ in this review (`docs/spec.md` introduction, §9.7 and Appendix B).
 3. Apply naming, argument-order and shape-group conventions while still
    unstable. Split pure protocol/data modules from provider adapters where
    imports otherwise carry unwanted host authority.
-4. Complete scoped timeout/retry/pacing and application examples. Verify the
+4. Complete scoped timeout/retry/pacing and application examples. Check the
    whole task paths from §3.3, including early exit and cancellation.
 5. Add maturity metadata, behavior review and CI access to the existing
    interface comparison. Stabilize modules only after these contracts and

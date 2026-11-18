@@ -164,7 +164,7 @@ devenv shell
 cargo build --release
 ```
 
-The compiler, the optimizer, the library, the formatter and the language server are the one file `target/release/i`. [docs/development.md](docs/development.md) has the verification commands, and [docs/release.md](docs/release.md) the release archive.
+The compiler, the optimizer, the library, the formatter and the language server are the one file `target/release/i`. [docs/development.md](docs/development.md) has the checking commands, and [docs/release.md](docs/release.md) the release archive.
 
 ## Commands
 

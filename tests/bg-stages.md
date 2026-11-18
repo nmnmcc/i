@@ -106,7 +106,7 @@ The lane was clean at b9173ce. There was no interrupted uncommitted work.
   request-table implementation, opaque lowering or equality changes were made.
 - The stage-2 SHA-256 dependency updated Cargo.lock through `cargo check`, without
   cargo update. This generated lock change is held for the required final derived
-  commit; it remains in the working tree during verification.
+  commit; it remains in the working tree during checking.
 
 ## Stage 4 results
 
@@ -115,15 +115,15 @@ The lane was clean at b9173ce. There was no interrupted uncommitted work.
   both complete sets and the incoming opaque-import setup. No opaque lowering
   or equality implementation was edited by BG.
 - Merge incident: a guarded helper stopped, but the shell continued and committed
-  unresolved markers. The first full verification stopped at formatting/parsing.
-  Corrected the file, verified both test sets, and amended that merge to 68a4040.
+  unresolved markers. The first full checking stopped at formatting/parsing.
+  Corrected the file, checked both test sets, and amended that merge to 68a4040.
   No conflict markers remain in the branch.
-- Heavy-wrapped `ILANG_BROWSER_PORT=4184 ./scripts/dev-verify`: exit 0 (rust, i,
+- Heavy-wrapped `ILANG_BROWSER_PORT=4184 ./scripts/checks`: exit 0 (rust, i,
   js); 67 Rust host tests, 60 Node tests, 42 browser tests. The spec suite reported
   168/168 cases passing at both --opt 0 and --opt 2. No tests were ignored or
   assertions weakened. The dev shell's pre-existing Playwright host-requirement
   validation setting was inherited unchanged; all three engines ran their tests.
-- Additional final `./scripts/dev-verify rust`: exit 0 after adding the CLI
+- Additional final `./scripts/checks rust`: exit 0 after adding the CLI
   library-content grant regression; both CLI provenance tests passed. Full
   formatting, Clippy -D warnings and workspace tests passed again.
 - `scripts/old-syntax-check`: exit 0; 1163 extracted literals/blocks, exact
@@ -143,7 +143,7 @@ The lane was clean at b9173ce. There was no interrupted uncommitted work.
 - `I=.../target/release/i ./scripts/build-abi-fixture.sh` generated the compiler
   binding-plan sidecar. Existing Wasm fixtures and the feature probe are
   byte-unchanged. The JS integration test loads that real compiler plan through
-  restricted context callbacks and verifies fresh invocation ownership.
+  restricted context callbacks and checks fresh invocation ownership.
 - Initialization interpretation: Appendix B.1 permits synchronous imports during
   ilang_start; native N9.1 requires fresh entry/export invocations. Initialization
   therefore has a separate context, torn down before the first SDK invocation
@@ -202,7 +202,7 @@ run waited for a heavy slot and compiled after repairs were present, so it is
 not a pre-fix measurement. One additional Rust regression build failed because
 its boxed test future omitted Send; corrected the test type without weakening an
 assertion. Existing tests and all new paired controls pass. Full post-merge
-verification follows this checkpoint.
+checking follows this checkpoint.
 
 The final cancellation audit also found that JS Set membership used the callback
 itself as its key, so two registrations of the same callback could collapse or
@@ -229,7 +229,7 @@ covers this final Rust payload test after merging the newer documentation.
   and runtime ownership/target text; no BG conflict was found. No merge conflict
   occurred in this repair. The main checkout and other lanes were not edited.
 - After the final merge, heavy/devshell `ILANG_BROWSER_PORT=4184
-  ./scripts/dev-verify` exited 0: formatting, Clippy -D warnings and all workspace
+  ./scripts/checks` exited 0: formatting, Clippy -D warnings and all workspace
   tests; 77 Rust host tests; all i tests and WASI smoke checks; 76 Node tests;
   51 browser tests across Chromium, Firefox and WebKit. The spec harness reported
   168/168 cases at both --opt 0 and --opt 2. No assertion or gate was weakened.

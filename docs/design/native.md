@@ -427,7 +427,7 @@ I read the independent revision-1 report and its probes under /tmp/review-native
 including wasmtime-probe/src/main.rs and wasmtime-results.txt. That reviewer ran
 runtime-only .cwasm loading, actual i start/main, idle-Store transfer and negative
 shared-GC probes. I did not rerun those builds. Neither that report nor this reading
-verifies N12, grants, real IO or the future scheduler. The concrete programs below are
+checks N12, grants, real IO or the future scheduler. The concrete programs below are
 required implementation fixtures; they cannot execute on the still-empty IO/task
 modules. Only the small abstract sequence model described below was run in this
 adoption.
@@ -630,7 +630,7 @@ Owner escape. No further serious defect was found in the revised rules. Pass 2
 independently varied two concurrent contexts, sequential export/test reuse, allocator
 exhaustion, synchronous blocked imports, local-scope complete records and cancellation/
 commit ordering. No further serious defect was found. These are manual sequence and
-code-reading attacks, not executable IO/multicore/OS-cleanup verification.
+code-reading attacks, not executable IO/multicore/OS-cleanup checking.
 
 An abstract Python sequence model was run through stdin in this lane: 1,154 reachable
 lifecycle states and 3,652 transitions passed the invariants of unique numbers, no
@@ -957,7 +957,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > no implementation. Examples use the accepted syntax, including
 > capital type parameters, imports in parentheses, and clause blocks.
 
-- Reason: Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C002 — docs/design/runtime.md, base lines 177–181
 
@@ -985,7 +985,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > (native.md §3.1). Stdio keeps i:stdio/v1; legacy i/io keeps its contract.
 > Reason: adopted native N9, spec §4.3/§9.7/§10.3, ledger adoption decision.
 
-- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C003 — docs/design/runtime.md, base lines 708–713
 
@@ -1096,7 +1096,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | process / Process (type only) / `i:process/v1` | Child, constructor private; `ProcessError { ProcessError(operation : String, code : String) }` |
 > | stdio / Stdio / `i:stdio/v1` | `StdioError { StdioError(operation : String, code : String) }` |
 
-- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C005 — docs/design/runtime.md, base lines 913–937
 
@@ -1390,7 +1390,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > close = (Child(number), raw ! Process) { request.await(raw.close(number)) }
 > ```
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C009 — docs/design/runtime.md, base lines 1032–1047
 
@@ -1424,7 +1424,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > Service ownership of request futures remains in requests.rs, not tokio::spawn.
 > Before Fs, enforce general nominal field privacy (§7), then implement native.md
 > §3.1's general binding grants, including external
-> aliases, trusted compiler provenance and JS manifest verification. The standard
+> aliases, trusted compiler provenance and JS manifest checking. The standard
 > factory grants raw bindings to their resolved declarations. Ordinary i service
 > substitutions need no host binding; resource fixtures that override raw host
 > functions receive that authority explicitly.
@@ -1469,7 +1469,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > Request cancellation drops its future and registration immediately. OS side effects already committed may
 > remain; no error or cancellation promises rollback.
 
-- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C010 — docs/design/runtime.md, base lines 1075–1101
 
@@ -1487,7 +1487,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > termination cannot be delivered and natural exit must be awaited. Merely dropping
 > a default tokio Child does not implement this contract. Abandoning host work
 > never promises that the OS has already completed reaping when the instance
-> returns status 0. Verify this supervisor in the process phase before claiming
+> returns status 0. Check this supervisor in the process phase before claiming
 > that cancelled spawn leaves no orphan. Host shutdown does not wait for detached
 > blocking work, as C requires.
 >
@@ -1523,7 +1523,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > termination cannot be delivered and natural exit must be awaited. Merely dropping
 > a default tokio Child does not implement this contract. Abandoning host work
 > never promises that the OS has already completed reaping when the instance
-> returns status 0. Verify this supervisor in the process phase before claiming
+> returns status 0. Check this supervisor in the process phase before claiming
 > that cancelled spawn leaves no orphan. Host shutdown does not wait for unrelated detached blocking work, as C requires;
 > the native executable specifically waits for registered spawn/reaping jobs before
 > process exit, so it cannot kill its cleanup owner.
@@ -1541,7 +1541,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > removing the context's teardown ownership. A forgotten decoded Ready answer
 > stays in the table until explicit close or teardown; no i GC timing is involved.
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C011 — docs/design/runtime.md, base lines 1124–1137
 
@@ -1594,7 +1594,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > survives sequential tests. Integer resources have no GC finalizers. Request-slot
 > generations and ABI H13's late-callback prohibition still apply independently.
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C012 — docs/design/runtime.md, base lines 1141–1173
 
@@ -1676,7 +1676,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > static linking (§B.7); switching from externref does not make plain --preload
 > sufficient. No resource wrapper becomes a host-export type.
 
-- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C013 — docs/design/runtime.md, base lines 1177–1240
 
@@ -1907,7 +1907,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > > results may change between runs or worker counts. Tests must either avoid
 > > that dependence or list the allowed outcomes. No task API observes workers.
 
-- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C017 — docs/design/runtime.md, base lines 1440–1442
 
@@ -1949,7 +1949,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > produce the same v3 async signature; metadata lists the unwrapped signature and
 > derives each entry's async flag from its inferred environment as §10.2 says. A completed cell is not an outstanding id.
 
-- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C019 — docs/design/runtime.md, base lines 1491–1492
 
@@ -2024,7 +2024,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 > | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
-- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C022 — docs/design/runtime.md, base lines 1639–1651
 
@@ -2042,7 +2042,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >    legacy i/io compatibility; register all services and finish spec lists/B.7.
 > 6. [ ] Run permission/error/resource/security and concurrency reviews; include
 >    unsupported browser/preview-1 behavior and user-supplied host fakes.
-> 7. [ ] Run end-to-end echo, then combined verification in the integration lane.
+> 7. [ ] Run end-to-end echo, then combined checking in the integration lane.
 
 - New sentence(s):
 
@@ -2064,9 +2064,9 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >    and B.7 with blocking Int adapters, not fd/externref shortcuts.
 > 6. [ ] Run permission/error/resource/security and concurrency reviews; include
 >    unsupported browser/preview-1 behavior and user-supplied host fakes.
-> 7. [ ] Run end-to-end echo, then combined verification in the integration lane.
+> 7. [ ] Run end-to-end echo, then combined checking in the integration lane.
 
-- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C023 — docs/design/runtime.md, base lines 1662–1707
 
@@ -2173,7 +2173,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | program entry needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 > | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
-- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C024 — docs/design/runtime.md, base lines 1736–1747
 
@@ -2231,7 +2231,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > must not keep the run waiting for abandoned work. Those are explicit host gates,
 > not an inference that cancellation stops all OS activity.
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C026 — docs/design/runtime.md, base lines 1902–1909
 
@@ -2265,7 +2265,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > The proposed i scheduler, request/Root primitives, revised source programs,
 > O0/O2 WAT, JS callback fixture, OS cleanup and real echo fixture remain unrun in
-> this design lane. The statistical gate remains unverified. Reading the existing
+> this design lane. The statistical gate remains unchecked. Reading the existing
 > entry/host code establishes the baseline and needed edit regions, not that the
 > new implementation exists. No implementation or other note is changed here. No cargo or host integration
 > tests were run for this documentation-only revision.
@@ -2274,13 +2274,13 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > The proposed i scheduler, request/Root primitives, revised source programs,
 > O0/O2 WAT, JS callback fixture, OS cleanup and real echo fixture remain unrun in
-> this design lane. The statistical gate remains unverified. Reading the existing
+> this design lane. The statistical gate remains unchecked. Reading the existing
 > entry/host code establishes the baseline and needed edit regions, not that the
 > new implementation exists. That earlier runtime revision changed no implementation. This native adoption
 > also reconciles native.md and multicore.md; new checks are recorded in native §11. No cargo or host integration
 > tests were run for this documentation-only revision.
 
-- Reason: Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C028 — docs/design/multicore.md, base lines 3–3
 
@@ -2294,7 +2294,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > with native.md N7/N8/N11/N12. Runtime.md supplies the accepted request, join and
 > Runner refinements. Other rules remain. Code facts are from commit c69515c. Line numbers are at that commit.
 
-- Reason: Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C029 — docs/design/multicore.md, base lines 11–14
 
@@ -2348,7 +2348,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > **D2. Portable values, checked at run time, on every worker count.** A value is **portable** when nothing it holds is a boundary, a continuation, a host reference, a host request or a `Syntax` value (part 3.1). Portable send/result/error/share paths check this, also on one worker, and stop with `panic: task: value is not portable` on failure. Go publication instead silently classifies the complete task record and pins on failure (D8/P1). *Reason:* a static rule cannot work (hard part 3). A check that only ran on N workers would make placement visible. A check that runs always gives the same stop everywhere.
 
-- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C032 — docs/design/multicore.md, base lines 48–48
 
@@ -2466,7 +2466,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > cancel and drop has the single owner/transition rule of D8. On one worker the
 > same pinning outcome follows from using only the original, with no encoding.
 
-- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C037 — docs/design/multicore.md, base lines 114–114
 
@@ -2601,7 +2601,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > All shared mutable scheduler state (the published queue, channel state, wake-ups, cancel requests and stop cell) is behind the one `Scheduler` service. Worker-local values of many types are kept as Keyed (D13); shared transport carries encoded bytes/stable ids, never another worker's GC Keyed objects (N8). In the M:1 version it is written in i on `i/control`. The multicore wave replaces its implementation without changing the `i/task` API.
 
-- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C044 — docs/design/multicore.md, base lines 212–218
 
@@ -2665,7 +2665,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >   - A native worker with no requests may park in the host queue wait; a browser worker may use memory.atomic.wait32, except browser worker 0, which never blocks: it idles like a worker with requests, with only the wake request outstanding.
 >   - A one-worker run never uses the wake request: on one worker, idle means status 1 with the run's own requests (C-D's "wait for any"), and with none it is a deadlock.
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C046 — docs/design/multicore.md, base lines 240–244
 
@@ -2710,7 +2710,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > status or host-called export is assumed. Changing that requires an ABI version
 > review under host-concurrency.md. One worker retains runtime §6.4's FIFO commit.
 
-- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C047 — docs/design/multicore.md, base lines 248–252
 
@@ -2768,7 +2768,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - **Imports.** JS functions cannot be posted to a Web Worker, so the main-thread `imports` object of today cannot serve worker k > 0. The SDK gets a new option for multicore runs: an **imports module URL**, an ES module that each Web Worker imports to build its own imports object. A host function that needs the main thread (the DOM, for example) is written there as an async function that posts to the main thread and waits for the answer as a host request; it is never synchronous. A synchronous `@external` that requires main-thread execution is not proxied by this design; use an async service or one worker. All synchronous imports, host future polls and destructors must satisfy native N12's stop-aware host rule. So a host that gives only main-thread functions, with no imports module URL, runs one worker. A host reference made on one thread stays there (H), so it never needs to cross as an `externref`.
 > - **Worker 0 never blocks.** It never uses `Atomics.wait`. Its scheduler idles only by returning status 1 with an outstanding request (part 6, Idle), so it returns to the event loop.
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C049 — docs/design/multicore.md, base lines 294–298
 
@@ -2817,7 +2817,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - memory-control and custom page sizes, to give `scope.share` memory back;
 > - COOP/COEP `credentialless`, which makes isolation easier to deploy.
 
-- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C051 — docs/design/multicore.md, base lines 419–419
 
@@ -2829,7 +2829,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > *(multicore wave)* Browser modules import shared memory; native keeps private linear memory. Worker entry and the top-level portability probe are MC-D interfaces; `ilang_start` still runs on every worker. The earlier `ilang_worker(index: i32)`/`ilang_toplevel_portable` export sketch is not an addition to ABI v3: new runtime exports require a reviewed version bump (native N3). Prefer ordinary configured host exports/services if they suffice; settle this before MC-I.
 
-- Reason: Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C052 — docs/design/multicore.md, base lines 433–446
 
@@ -2867,7 +2867,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - `lib/i/task.i`, `lib/i/random.i`: following part 18.
 > - `docs/performance.md`: channel state kept until the channel's scope ends (part 7), the cost of `portable` checks (also on DAGs, part 3.6), pinned tasks under boundary services (part 4), the start-up conditions of part 3.5, and the distinction between portable IO wrappers and pinned arbitrary host references (part 12).
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C053 — docs/design/multicore.md, base lines 452–458
 
@@ -2891,7 +2891,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - `bindings/javascript/ilang.mjs`: the isolation check, Workers, the imports module URL, worker 0 rules, the wake request.
 > - `tests/browser`: COOP/COEP headers and a fallback test.
 
-- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C054 — docs/design/multicore.md, base lines 464–481
 
@@ -2937,7 +2937,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - **T20** Track R: `scope((s) { c = channel.new()  s.go(() { c.receive() }) })` stops with `panic: task: deadlock`, and the module never returns status 1 with no request outstanding. The same in a macro program.
 > - **T21** Track R: keys: `unwrap` with the key that made a `Keyed` gives `Found`, with another key `Missing`; `k = key.new()` is not generalized: after `a = key.wrap(k, 1)` and `b = key.wrap(k, "x")`, `key.unwrap(k, b) |> { Found(n) -> n + 1  Missing -> 0 }` is a compile error (the found value is `Int | String`), and a control line with a second key `k2 = key.new()` used only at `Int` (`key.unwrap(k2, key.wrap(k2, 1)) |> { Found(n) -> n + 1  Missing -> 0 }`) compiles and gives 2, so the error comes from the type check, not from the parser; `Key` is invariant: a `Key(Int)` given where a `Key(Int | String)` is wanted is a compile error, and a checker unit test reads the `Key: [Inv]` row; a `Keyed` is portable when its value is; `g = (f) { control.keep_env(f) }` gives `g(h) == g(h)` False.
 
-- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C055 — docs/design/multicore.md, base lines 485–493
 
@@ -2965,7 +2965,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - **T22** Start-up: a module with a top-level host reference (`counter` of part 3.5) runs one worker and gives 100; a module whose start-up calls a host external that the host has not declared pure runs one worker; a module that only uses `i/core` externals at start-up runs 4, and so does a module whose host externals are called only from the body of `main`.
 > - **T23** Deadlock and idle on 4 workers: T20 gives the same stop; a run where worker 0 has nothing to do while workers 1 to 3 work ends normally, and in a browser worker 0 waits only with the wake request outstanding; on wasmtime, a remotely claimed task on worker 1 that sleeps 10 ms while worker 0 runs a long pure loop wakes after about 10 ms (worker 1 returns status 1 and does not park in Wasm), and a cancel or a queue publication from worker 0 still reaches worker 1 while it waits (the wake request).
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C056 — docs/design/multicore.md, base lines 497–510
 
@@ -3003,7 +3003,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - **Field 1 and field 2 move.** If other work reads field 1 or 2 of closures before MC-I, the move breaks it. T7 and the tag-table note guard it.
 > - **Left to MC.** The typed locked-state interface, browser allocator, mark or table of D9, quiescence proof and transport memory model remain MC-D work. A long computation delays cooperative task cancellation and local started tasks; it cannot delay remote queue claims, and run stop uses native N12.
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C057 — docs/design/multicore.md, base lines 514–521
 
@@ -3029,7 +3029,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > 7. Does G2 accept keys (D13) as a public primitive in a new library module `i/key`? Without them, or another safe way to keep values of many types in one service, the scheduler cannot be written in i, and rules 12 and 15 cannot hold.
 > 8. Should `Syntax` later get ids and become portable, so that tests and tools can pass code between tasks of a portable scope (part 11)?
 
-- Reason: Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C058 — docs/design/multicore.md, base lines 525–549
 
@@ -3089,7 +3089,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > 24. `s.go` and joins check the chain, channels and `Shared` values are freed with their scope, and handles check their run, all in M:1 already, so that the multicore wave changes no program.
 > 25. Only `==` reads function and key ids. The text form of a function, a key, a `Keyed` value or any task/scope/channel/event/share handle never shows an id, a worker index or anything else that depends on placement, and no `i/task` API gives one out.
 
-- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ### C059 — docs/design/native.md, base lines 1–135
 
@@ -3646,7 +3646,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > including wasmtime-probe/src/main.rs and wasmtime-results.txt. That reviewer ran
 > runtime-only .cwasm loading, actual i start/main, idle-Store transfer and negative
 > shared-GC probes. I did not rerun those builds. Neither that report nor this reading
-> verifies N12, grants, real IO or the future scheduler. The concrete programs below are
+> checks N12, grants, real IO or the future scheduler. The concrete programs below are
 > required implementation fixtures; they cannot execute on the still-empty IO/task
 > modules. Only the small abstract sequence model described below was run in this
 > adoption.
@@ -3849,7 +3849,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > independently varied two concurrent contexts, sequential export/test reuse, allocator
 > exhaustion, synchronous blocked imports, local-scope complete records and cancellation/
 > commit ordering. No further serious defect was found. These are manual sequence and
-> code-reading attacks, not executable IO/multicore/OS-cleanup verification.
+> code-reading attacks, not executable IO/multicore/OS-cleanup checking.
 >
 > An abstract Python sequence model was run through stdin in this lane: 1,154 reachable
 > lifecycle states and 3,652 transitions passed the invariants of unique numbers, no
@@ -3904,7 +3904,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > itself. It includes native's adoption/status corrections as well as runtime/multicore
 > changes.
 
-- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and verification limits separately from implementation claims.
+- Reason: Honor spec §2.4 for exported environments and nominal privacy, using one general field-visibility fix before Fs. Close N9’s forged-Int paths with general declaration grants and no public raw-number injection; ordinary accessible service fakes stay legal. Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Complete N12: first-stop gates, independent host teardown, native exit after child cleanup and isolated interruption in continuing hosts. Adopt N7: encode/classify the complete task record at go, pin silently, and serialize publication/claim/cancel ownership. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Adopt N11: native uses runner byte storage/private memories; only the browser transport needs shared Wasm memory. Reconcile already-accepted runtime D5/R4a/Root–Owner and SplitMix rules; do not reopen their public semantics. Adopt N1–N4 and the reviewed artifact/loading constraints, keeping explicit ilang/WASI and rejecting only required unsupplied imports. Make the implementation/spec handoff explicit: prerequisites now, packaging and MC mechanisms in their own stages. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
 
 ## 14. Revision-4 sentence change ledger
 
@@ -4035,7 +4035,7 @@ New sentence(s)/block:
 > combined with explicitly borrowed local tickets (§6.4), without enumerating
 > foreign tickets. Its observation/check/subscription must be atomic too.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-003 — docs/design/runtime.md, 60f37f2 line 385
 
@@ -4161,7 +4161,7 @@ New sentence(s)/block:
 > dependencies for progress, never itself (§5.1). Language operations use the cell, and
 > compare slot generation before cancel; they never act on a new occupant.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-006 — docs/design/runtime.md, 60f37f2 line 495
 
@@ -4253,7 +4253,7 @@ New sentence(s)/block:
 > can monopolize M:1; a go-only loop may postpone children. No bounded wall-time
 > guarantee is made for final functions.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-008 — docs/design/runtime.md, 60f37f2 line 992
 
@@ -4492,7 +4492,7 @@ New sentence(s)/block:
 > > results may change between runs or worker counts. Tests must either avoid
 > > that dependence or list the allowed outcomes. No task API observes workers.
 
-Reason: N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-014 — docs/design/runtime.md, 60f37f2 line 1612
 
@@ -4567,14 +4567,14 @@ New sentence(s)/block:
 >    closing a group coordinates home-worker cleanup without exporting Tickets.
 >    Driver control roots remain separate from the program waitable set (§6.4).
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-016 — docs/design/runtime.md, 60f37f2 line 1836
 
 Old sentence(s)/block:
 
 > 1. [ ] Commit R2 replacement spec text; merge S7 primitive text, preserving §9.8.
-> 2. [ ] Verify K1's invariant-generalization repair, then implement keys/variance/
+> 2. [ ] Check K1's invariant-generalization repair, then implement keys/variance/
 >    value restriction, portable including cycles, and
 >    keep_env with retained environment frames; run all S7 single-worker tests.
 > 3. [ ] Implement Request/Ticket cells, Root/group registries and table replacement together with
@@ -4593,12 +4593,12 @@ Old sentence(s)/block:
 >    tests J/E/O, nested subgroup and borrowed-ticket cases, root poll fairness,
 >    and synchronous callback/first-turn no-yield tests. Audit the host/control seam.
 > 9. [ ] Run deadlock/cancel/fairness/alias/IO stress cases 200 times on Rust and JS,
->    related spec tests and full required verification; inspect WAT changes.
+>    related spec tests and full required checking; inspect WAT changes.
 
 New sentence(s)/block:
 
 > 1. [ ] Commit R2 replacement spec text; merge S7 primitive text, preserving §9.8.
-> 2. [ ] Verify K1's invariant-generalization repair, then implement keys/variance/
+> 2. [ ] Check K1's invariant-generalization repair, then implement keys/variance/
 >    value restriction, portable including cycles, and
 >    keep_env with retained environment frames; run all S7 single-worker tests.
 > 3. [ ] Implement Request/Ticket cells, Root/group registries and table replacement together with
@@ -4620,9 +4620,9 @@ New sentence(s)/block:
 >    tests J/E/O, native §11.1 N-R1–N-R6, nested subgroup and borrowed-ticket cases, root poll fairness,
 >    and synchronous callback/first-turn no-yield tests. Audit the host/control seam.
 > 9. [ ] Run deadlock/cancel/fairness/alias/IO stress cases 200 times on Rust and JS,
->    related spec tests and full required verification; inspect WAT changes.
+>    related spec tests and full required checking; inspect WAT changes.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-017 — docs/design/runtime.md, 60f37f2 line 1861
 
@@ -4646,7 +4646,7 @@ Old sentence(s)/block:
 >    and B.7 with blocking Int adapters, not fd/externref shortcuts.
 > 6. [ ] Run permission/error/resource/security and concurrency reviews; include
 >    unsupported browser/preview-1 behavior and user-supplied host fakes.
-> 7. [ ] Run end-to-end echo, then combined verification in the integration lane.
+> 7. [ ] Run end-to-end echo, then combined checking in the integration lane.
 
 New sentence(s)/block:
 
@@ -4657,7 +4657,7 @@ New sentence(s)/block:
 > 2. [ ] Fs: codecs/errors, whole-byte validation, all-byte writes, explicit flush,
 >    private File(Int) codecs, raw Int wrappers, no number-injection exports, closed/busy leases,
 >    await_owned on non-creators, cancelled blocking-file state, safe detached work
->    and context teardown; verify the cancelled File alias gives closed.
+>    and context teardown; check the cancelled File alias gives closed.
 > 3. [ ] Net: numeric endpoints, ephemeral bind, read/write/half-close, busy leases,
 >    private Listener/Stream(Int) codecs, provisional ownership, close-vs-wait
 >    across workers, the race-then-read lease test (native §11.1), and a
@@ -4670,9 +4670,9 @@ New sentence(s)/block:
 >    and B.7 with blocking Int adapters, not fd/externref shortcuts.
 > 6. [ ] Run permission/error/resource/security and concurrency reviews; include
 >    unsupported browser/preview-1 behavior and user-supplied host fakes.
-> 7. [ ] Run end-to-end echo, then combined verification in the integration lane.
+> 7. [ ] Run end-to-end echo, then combined checking in the integration lane.
 
-Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-018 — docs/design/runtime.md, 60f37f2 line 1890
 
@@ -4784,7 +4784,7 @@ New sentence(s)/block:
 > | program entry needs user State with no binding vs standard Scheduler/Runner/Await/Root/Owner | State is an entry compile error; standard needs are provisioned without changing the type; async classification follows D5, not mere use of any request helper |
 > | Existing async user service, not an IO namespace, used in two children | Overlap via Await, same request table as IO; D3, no namespace rule |
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-019 — docs/design/runtime.md, 60f37f2 line 2029
 
@@ -4888,7 +4888,7 @@ New sentence(s)/block:
 >    the callable type `(P...) -> Request(T) ! request.Owner` before inference;
 >    ordinary field-function copying/display therefore sees the same effect.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-022 — docs/design/runtime.md, 60f37f2 line 2304
 
@@ -4982,7 +4982,7 @@ New sentence(s)/block:
 >   - **Boundaries.** A nested run inside a generator body at the top (`collect(() { task.run(() { scope((s) { s.go(() { yield(1) }) }) }) })`) runs inside that boundary body, so by §9.4 rule 1 a `yield` from its tasks succeeds and pauses the whole nested run. That is the same on every host, because that run is not the entry run and uses one worker. A kept function that an outer task made (D4), called inside its own nested run, suspends the outer task with the nested run inside it, which is also the same everywhere. Track R documents both.
 > - Host services given at an entry point are records of constant functions (static ids), so they are portable, and a remotely claimed task uses the remote claimant's own imports. The root environment's `Assert` closure must be a constant with a static id too (part 3.4); at c69515c it is not. §9.7 gets the rule that a host service behaves the same whichever worker calls it.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-026 — docs/design/multicore.md, 60f37f2 line 244
 
@@ -5006,7 +5006,7 @@ New sentence(s)/block:
 > - **Split and paths never meet.** A generator is a key and a **stream**: a list of steps, where a step is either a path step `P(i)` or a split step `S(i)`, and a path step is never equal to a split step. `task.random()` at path `[i1, …, in]` gives the stream `[P(i1), …, P(in)]`; `random.split(g)` gives the streams of `g` followed by `S(1)` and by `S(2)`; numbers come from the pinned published SplitMix split tree in runtime.md §4, which replaces the earlier counter-based PRF sketch. So the first half of `random.split(task.random())` in the task at path `[]` is the stream `[S(1)]`, and the child at path `[1]` has `[P(1)]`: they differ. Different tagged derivation addresses remain distinct histories; no promise of disjoint outputs or perfect statistical independence is made. Runtime.md §4 fixes the exact algorithm and encoding.
 > - Channel, scope and task handles are made of a path-based id (the path of the task that made them and a counter in that task) and the keys that type their state (D13). So `==` on handles is "the same channel" and survives copies, and nothing in them depends on the worker except key ids, which only `==` sees.
 
-Reason: N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-027 — docs/design/multicore.md, 60f37f2 line 254
 
@@ -5047,7 +5047,7 @@ New sentence(s)/block:
 >   - A native worker with no requests may park in the host queue wait; a browser worker may use memory.atomic.wait32, except browser worker 0, which never blocks: it idles like a worker with requests, with only the wake request outstanding.
 >   - A one-worker run never uses the wake request: on one worker, idle waits on the owned-plus-borrowed program set from part 4, and an empty set with no pending program delivery means deadlock.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-028 — docs/design/multicore.md, 60f37f2 line 601
 
@@ -5065,7 +5065,7 @@ New sentence(s)/block:
 > program/control quiescence snapshot through the one Scheduler boundary before
 > MC-I. These are fixed semantics, not choices left to that prototype.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-029 — docs/design/multicore.md, 60f37f2 line 603
 
@@ -5125,7 +5125,7 @@ New sentence(s)/block:
 > 24. `s.go` and joins check the chain, channels and `Shared` values are freed with their scope, and handles check their run, all in M:1 already, so that the multicore wave changes no program.
 > 25. Only `==` reads function and key ids. The text form of a function, a key, a `Keyed` value or any task/scope/channel/event/share handle never shows an id, a worker index or anything else that depends on placement, and no `i/task` API gives one out.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-030 — docs/design/native.md, 60f37f2 line 3
 
@@ -5146,7 +5146,7 @@ New sentence(s)/block:
 > review of 60f37f2; §11.1 records the repairs and regression cases. It changes no implementation. Performance targets are acceptance goals, not
 > measurements.
 
-Reason: Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-031 — docs/design/native.md, 60f37f2 line 128
 
@@ -5207,7 +5207,7 @@ New sentence(s)/block:
 > (runtime §5.4); a borrowed request.await does not cancel its producer. Creators
 > retain the separate await_resource guard.
 
-Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-033 — docs/design/native.md, 60f37f2 line 351
 
@@ -5237,7 +5237,7 @@ New sentence(s)/block:
 > | Native packaging after R2/IO | Split compile/load host configuration; compiler-free runner, authenticated payload/plan, exact artifact manifest, N4 validation and default build | Cross-target distribution/signing choices must be fixed before release |
 > | MC after MC-D/G5 | N7 queue, N8 typed locked transactions, identity/cycle-safe codec, host transport/wake, claim/cancel reclamation, N12 domains/controller, program/control quiescence and browser stop-safe entry | Started-task migration, lock-free optimization, shared GC |
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-034 — docs/design/native.md, 60f37f2 line 630
 
@@ -5487,7 +5487,7 @@ New sentence(s)/block:
 > No unresolved contradiction among these three active contracts was found in the
 > revision-4 passes; historical old/new quotes are not active rules.
 
-Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. N-R6: use the shared go/nested-run counter for paths and random derivation. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
 ### R4-035 — docs/design/native.md, 60f37f2 line 665
 
@@ -5509,4 +5509,4 @@ New sentence(s)/block:
 > ledger itself; the appended revision-4 ledger records subsequent changes. It includes native's adoption/status corrections as well as runtime/multicore
 > changes.
 
-Reason: Record the review source, exact regression expectations, phase/spec handoff and verification limits; preserve revision-3 history.
+Reason: Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.

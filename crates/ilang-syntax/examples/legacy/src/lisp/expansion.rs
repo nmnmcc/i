@@ -3,7 +3,7 @@ pub use syntax3::lisp::expansion::{
     ExpansionSession, MacroArgument, MacroDefinition, MacroVariant,
 };
 /// Find and validate source macro definitions. The type checker subsequently
-/// verifies the Syntax argument, result, error, and environment types.
+/// checks the Syntax argument, result, error, and environment types.
 pub fn definitions(
     module: &crate::ast::Module,
     lisp: bool,

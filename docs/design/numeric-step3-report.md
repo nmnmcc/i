@@ -252,7 +252,7 @@ integer kernel is now 3.2x faster than N3's.
   and doing it per function would need a second pipeline.
 - `perf` is not installed; fuel is reported instead of `instructions:u`.
 
-## Verification
+## Checking
 
 The previous worker recorded after each step:
 `cargo test -p ilang-cli --locked --test numeric_lowering`
@@ -286,7 +286,7 @@ the earlier worker's measurements; the reboot recovery does not claim a
 new quiet baseline/candidate comparison. The historical before/after Wasm
 artifacts are absent from this worktree's `target/`, so that paired run
 cannot be repeated directly. The fast-sine targets and the quiet timing,
-std check/build cost and Wasm-size acceptance gates remain unverified or
+std check/build cost and Wasm-size acceptance gates remain unchecked or
 unmet as described there. No source acceptance, runtime meaning, reported
 error or test expectation was changed during recovery.
 
@@ -310,11 +310,11 @@ All commands exited 0. `git diff --check` passed, as did
 compiler, library, examples and test files unchanged from `cc73cf90`.
 
 The fresh five batch medians and counts are in `docs/performance.md`;
-raw samples and modules are under `target/num3-measure-current/`. Verification
-logs are `target/num3-*-verification.log`.
+raw samples and modules are under `target/num3-measure-current/`. Checking
+logs are `target/num3-*-checking.log`.
 
 The full workspace test run, unfiltered spec suite, review corpus and
-`scripts/dev-verify` were left to the coordinator as requested. Recovery
+`scripts/checks` were left to the coordinator as requested. Recovery
 did not rerun std O2, JS/WASI probes, the independent rounding corpus or
 byte comparisons against the pre-lane compiler. The representation-mode
 byte-equality test passed, but it is not a substitute for those historical

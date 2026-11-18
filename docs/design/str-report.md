@@ -18,7 +18,7 @@ Implemented cooked/raw/multi-line interpolation before the core tree, literal-on
 - Prefix and suffix must not overlap: `"ab" <> r <> "ba"` does not match `"aba"`. This follows concatenation semantics, Swift-style literal values and the task's single-binder rule. Empty prefix/suffix covers String. Known/inferred binder types remain String (§4.8).
 - Tree-sitter uses a serialized delimiter stack and ordinary expression grammar inside interpolation. LSP semantic tokens use the compiler lexer, including exact hash counts and nested expressions. TextMate recognizes arbitrary raw delimiters; the LSP supplies expression highlighting inside raw strings.
 
-## Verification
+## Checking
 
 - `cargo check -p ilang-syntax -p ilang-check -p ilang-wasm -p ilang-lsp --all-targets`: passed (through the shared heavy wrapper and development shell).
 - `cargo test -p ilang-syntax --test string_forms --test lisp_encode_deep`: passed, 14 tests, including nested interpolation, canonical/formatter/Lisp round trips, source encoding and exact macro syntax charges.

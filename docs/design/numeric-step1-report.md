@@ -215,7 +215,7 @@ $R/.rd/cache/heavy direnv exec $R cargo build --locked -p ilang-cli --example nu
 $R/.rd/cache/quiet direnv exec $R target/debug/examples/numeric_measure target/numeric-step1/reproduce
 ```
 
-## Verification
+## Checking
 
 The generated corpus currently contains 111 numeric programs, each with normative
 expected values, Float bits or stop reasons, plus final-effect expectations.
@@ -229,7 +229,7 @@ closures, records, loops, factorial, finals, cancellation, two suspensions and
 three transitively suspending helper frames. Nonfinite bit patterns and unused
 operations still stop. O0 emitted bytes and nonnumeric O2/O3 WAT/bytes are checked.
 
-Final verification (all Cargo commands used the shared heavy wrapper and
+Final checking (all Cargo commands used the shared heavy wrapper and
 `direnv exec /home/agent/Programming/i`):
 
 - `cargo check -p ilang-check -p ilang-wasm -p ilang-cli --all-targets`: passed;

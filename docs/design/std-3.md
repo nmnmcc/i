@@ -809,7 +809,7 @@ Order and gates:
 4. `i check --project std --types`: compare every public label/type/effect.
    `i test --project std`, then changed modules with `--opt 2`. Repeat signatures
    and nominal-callback cases after T1 rebase.
-5. Integration runs cross-engine vectors, old-syntax-check and full verification.
+5. Integration runs cross-engine vectors, old-syntax-check and full checking.
    Expect old shared WAT exports unchanged except new reachable std code;
    explain ID/metadata shifts under the coordinator's existing K3 issue, rather
    than allowing arbitrary differences. No ABI/host changes.
@@ -821,7 +821,7 @@ implementation work, not waived by design acceptance.
 ## 8. Rule-based tests
 
 Expected results follow numbered rules. Catch intentional adapter failures so
-std tests stay green; use a separate intentionally failing fixture to verify
+std tests stay green; use a separate intentionally failing fixture to check
 CLI failure count, report text and exit status.
 
 | Test | Expected result/rule |
@@ -1056,16 +1056,16 @@ Code citations remain pinned to this note's b9173ce baseline.
 The mechanical signature probe extracts each inventory entry and checks the
 ordinary binding `witness_name(A, B) = (f : { signature }) -> { signature } { f }`,
 with that entry's actual type parameters, imports and public type definitions.
-This verifies type syntax, labels and effects, **not** an implementation body.
+This checks type syntax, labels and effects, **not** an implementation body.
 The separately implemented kernels are stronger evidence for the difficult
 generic/representation paths. The client example using final property.int/list/
 test is still an implementation acceptance test, not a passed full-library test.
 
-Not verified: complete property checker/replay/format implementation, full new
+Not checked: complete property checker/replay/format implementation, full new
 string module, i implementations of transcendental functions, inverse-trig/unit
 models beyond the reasoning above, cross-engine runs, full mathematical proof
 of a future port, or production performance. No complete std suite/full project
-verification was warranted for this note-only commit. The two existing module
+checking was warranted for this note-only commit. The two existing module
 suites and temporary kernels are not substitutes for §7's implementation gates.
 
 ## 10. Risks and coordinator questions
@@ -1083,14 +1083,14 @@ suites and temporary kernels are not substitutes for §7's implementation gates.
    effectful/state-machine execution belongs in an explicit later harness.
 
 These are coordinator design choices, not permission requests blocking this
-note. No deliberate source conflict remains. Section 9 records verification
+note. No deliberate source conflict remains. Section 9 records checking
 limits separately from the proposed implementation gates.
 
 ## 11. Implementation evidence and remaining gate
 
 Historical evidence for candidate 403a0be, preserved on lane/std3-float. The
 current landable branch contains only the property and string additions; its
-verification is recorded in section 12. The float candidate is withheld.
+checking is recorded in section 12. The float candidate is withheld.
 
 This section supersedes section 9's note-only evidence limits. Section 9 remains
 historical evidence, not a claim about the finished implementation. No interrupted
@@ -1182,7 +1182,7 @@ mutable counter or hidden service is present in the production library.
   made the same cases pass at both optimization levels; no engine setting was
   changed or left behind.
 - The first quiet-window benchmark was interrupted while waiting for a slot,
-  before Python or any timing sample started, to serialize final verification
+  before Python or any timing sample started, to serialize final checking
   and measurement. It supplied no reported measurement. The final quiet run is
   described below.
 - A directly executed Python syntax check for the development scripts passed.
@@ -1269,7 +1269,7 @@ their unchanged inventories. The intentionally failing property adapter fixture
 checks one ordinary failure at O0 and O2; float stop probes belong to the
 withheld candidate. No property/string requirement or check is weakened.
 
-Verification after withholding float (all through the dev shell):
+Checking after withholding float (all through the dev shell):
 
 | Command | Result |
 |---|---|

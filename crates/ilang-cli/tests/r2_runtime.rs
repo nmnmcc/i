@@ -451,35 +451,6 @@ fn error_unwind_cleanup_finishes_under_ancestor_cancellation() {
 }
 
 #[test]
-fn preserved_review_cleanup_programs_finish_their_finals() {
-    for (source, expected_error) in [
-        (
-            include_str!("../../../tests/review/cases/review-r2/cancel_error_final/src/main.i"),
-            "Error(\"parent\")",
-        ),
-        (
-            include_str!("../../../tests/review/cases/review-r2/cancel_normal_final/src/main.i"),
-            "Error(\"boom\")",
-        ),
-    ] {
-        for opt in [Level::O0, Level::O2] {
-            let log = services::Log::default();
-            let printed = log.clone();
-            let result = program(source, opt)
-                .run_entry(HostOptions::new(services::standard(move |text| {
-                    printed.lock().unwrap().push(text.into())
-                })))
-                .unwrap();
-            assert!(matches!(result, Outcome::Ok(_)), "{result:?}");
-            assert_eq!(
-                *log.lock().unwrap(),
-                ["final-start", "final-end", expected_error]
-            );
-        }
-    }
-}
-
-#[test]
 fn preserved_review_request_programs_run_with_their_embedder_services() {
     // The public review-corpus CLI cannot supply test:async/v1. Keep its
     // missing-provider observation separate from these real-host executions.

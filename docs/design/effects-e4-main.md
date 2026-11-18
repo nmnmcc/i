@@ -5,7 +5,7 @@ rulings supersede universal-entry removal (Decision 2) and the ban on finals
 raising (Decision 9); Decision 15 still forbids releases on a stop. Their
 current implementation and full gate results are in
 [the corpus audit](effects-e3-e6-corpus.md) and
-[the landing verification](effects-e3-e6-validation.md). The old removal
+[the landing checking](effects-e3-e6-validation.md). The old removal
 sentence quoted below is not a current justification for dropping a key.
 
 Current base: origin/main `e44514d46690ea9e25486c95a34d616fcf86f6a8`.
@@ -166,7 +166,7 @@ fixtures already pass in the checker, CLI and requested spec runs.
 No other parser diagnostic expectation is changed, and no expectations are
 blindly regenerated.
 
-## Verification on the merged tree
+## Checking on the merged tree
 
 All heavy jobs use the shared wrapper, one job at a time. Cargo uses the main
 checkout's direnv environment, with `CARGO_PROFILE_DEV_DEBUG=0` and
@@ -185,7 +185,7 @@ both i optimization levels. The checker skip is exactly
 - Std O0 and O2: each 2,171 passed, zero failures.
 - ABI regeneration, R2 conformance fixture generation and Wasm validation: pass;
   every generated artifact is unchanged.
-- `DEV_VERIFY_SKIP_CORPUS=1 scripts/dev-verify js`: 117 Node tests and 60
+- `CHECKS_SKIP_CORPUS=1 scripts/checks js`: 117 Node tests and 60
   browser tests pass (Chromium, Firefox, WebKit). No JS tests skipped.
 - Release CLI build: pass.
 - Macro expansion and macro example tests O0/O2: pass.
@@ -259,7 +259,7 @@ done
 ./target/release/i test --project std --opt 0
 ./target/release/i test --project std --opt 2
 I="$PWD/target/release/i" bash scripts/build-abi-fixture.sh
-DEV_VERIFY_SKIP_CORPUS=1 ILANG_BROWSER_PORT=4184 scripts/dev-verify js
+CHECKS_SKIP_CORPUS=1 ILANG_BROWSER_PORT=4184 scripts/checks js
 scripts/test-generation --mode short --binary ./target/release/i --output target/e4-main-generation.json
 cargo clippy --workspace --all-targets --locked -- -D warnings
 ```
@@ -280,7 +280,7 @@ batch was cancelled before any checks started to correct its wrapper slot
 classification, then requeued as a regular heavy job with a std memory
 reservation. The later wait was 23 minutes; no slot limit was bypassed.
 
-Read-only audits also verify that every edited Rust test name remains,
+Read-only audits also check that every edited Rust test name remains,
 assertion counts stay the same or increase, the soundness diagnostic lines
 match main, b1/r6 match main exactly, and all active parser diagnostic registrations are retained, except the
 five explicitly retired E6 implementation guards described above. `git diff --check` passes throughout. No unfiltered corpus,
@@ -321,7 +321,7 @@ rules above. ABI §B.2 says: “An inline `Int` has no buffer and its second
 `i32` is never checked as an address or freed.” Generated fixtures must be
 ABI 5; the hand-written legacy fixtures remain ABI 3, and hosts read 3–5.
 
-Verification on this new base: workspace all-targets check, release build,
+Checking on this new base: workspace all-targets check, release build,
 and the complete checker/Wasm/host tests pass. The checker run skips only
 `spec_corpus_reverse_order_and_recovery`, as previously directed; four existing
 ignored checker tests remain ignored. The fixture script regenerates and
@@ -340,7 +340,7 @@ The parser build waited about 35 minutes in the shared wrapper after the
 preceding batch released its slot; no resource limit was bypassed.
 Previous-base O2/browser/generation results above are historical and are not
 claimed as reruns of this merge. No requested affected gate remains
-unverified; the explicitly skipped reverse-order corpus test and four existing
+unchecked; the explicitly skipped reverse-order corpus test and four existing
 ignored checker tests remain outside this validation.
 
 The affected-gate commands are below. Every cargo command and std test runs
