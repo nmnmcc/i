@@ -558,12 +558,6 @@ fn cmd_test(
     for warning in &b.warnings {
         eprintln!("{warning}");
     }
-    if let Some(name) = &collection
-        && entries.is_empty()
-    {
-        eprintln!("error: there is no test collection {name:?} in this package");
-        return Ok(ExitCode::FAILURE);
-    }
     let focused = entries
         .iter()
         .any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));

@@ -284,6 +284,21 @@ pub fn build_tests(
         return Err(program_error(&graph, &diags));
     }
     let manifest = make_manifest(&graph, program, revision, &checked.collections);
+    // A collection name that no test declares is a misspelling, not an empty
+    // selection: refuse it instead of building and running nothing.
+    if let Some(name) = collection {
+        let declared = program.modules.iter().any(|module| {
+            module
+                .defs
+                .iter()
+                .any(|def| format!("{}.{}", module.path, def.name) == name)
+        });
+        if !declared {
+            return Err(BuildError::Selection(format!(
+                "there is no test collection {name:?}"
+            )));
+        }
+    }
     let selected: Vec<_> = manifest
         .entries
         .iter()

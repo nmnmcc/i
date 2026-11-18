@@ -963,11 +963,6 @@ fn check_and_test(project: &Path) -> Result<()> {
     };
     let (built, entries) = ilang_cli::build_tests(project, options, collection.as_deref())
         .map_err(|e| anyhow!("{e}").context("the package does not check"))?;
-    if let Some(name) = &collection
-        && entries.is_empty()
-    {
-        bail!("there is no test collection {name:?} in this package");
-    }
     if let Some(message) = ilang_cli::duplicate_test_name(&entries) {
         bail!("{message}");
     }
