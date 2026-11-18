@@ -606,7 +606,7 @@ fn sync_dir(_dir: &Path) -> std::io::Result<()> {
 /// Known limits: this compares syntax, not evaluation, so a construct that
 /// prints the same but means something different to a later stage would not be
 /// caught; and it is a check of this printer's round trip, not a proof about
-/// ILang semantics.
+/// i semantics.
 fn round_trip_diff(is_lisp: bool, _source: &str, rendered: &str) -> Result<(), (u32, u32, String)> {
     // Convert the rendered text back to the source surface and then to the
     // target surface once more; the second rendering must equal the first.

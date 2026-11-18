@@ -55,6 +55,8 @@ These commands are defined in [checks](https://github.com/nmnmcc/i/blob/main/scr
 
 The whole workflow is called CI; each of its jobs is named only by what it runs (`build (…)`, `lint (…)`, `test (…)`, `run (…)`, `corpus (…)`, `docs (…)`); the local entry is `scripts/checks`; and the smallest runnable unit (one Cargo target, one shard) is called a test set. Do not use one word for more than one of these layers.
 
+Product name: `The i Programming Language` when it stands alone (title, start of sentence, name fields); `the i Programming Language` mid-sentence; otherwise `i`, always lowercase. Check with `git grep -in 'i programming language'`: every hit must be one of those two forms.
+
 | Change | Command or part |
 | --- | --- |
 | Checker | `cargo test -p ilang-check --locked` |

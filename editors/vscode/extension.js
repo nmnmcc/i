@@ -1,4 +1,4 @@
-// VS Code client for the i programming language.
+// VS Code client for the i Programming Language.
 //
 // Starts `<ilang.path> lsp` as a stdio language server for documents with the
 // language id `i`. Plain JavaScript on purpose: there is no build step.
@@ -59,7 +59,7 @@ function createClient() {
     outputChannel,
   };
 
-  return new LanguageClient("ilang", "i Language Server", serverOptions, clientOptions);
+  return new LanguageClient("ilang", "i LSP", serverOptions, clientOptions);
 }
 
 async function startClient() {
@@ -70,7 +70,7 @@ async function startClient() {
     const message = error instanceof Error ? error.message : String(error);
     vscode.window
       .showErrorMessage(
-        `Failed to start the i language server using "${serverPath()} lsp": ${message}. ` +
+        `Failed to start the language server of i using "${serverPath()} lsp": ${message}. ` +
           "Install the i compiler or set `ilang.path`.",
         "Open Settings",
       )
@@ -102,7 +102,7 @@ async function restartClient() {
 
 /** @param {vscode.ExtensionContext} context */
 async function activate(context) {
-  outputChannel = vscode.window.createOutputChannel("i Language Server");
+  outputChannel = vscode.window.createOutputChannel("i LSP");
   context.subscriptions.push(outputChannel);
 
   context.subscriptions.push(

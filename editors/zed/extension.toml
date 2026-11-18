@@ -1,13 +1,13 @@
 id = "ilang"
 name = "i"
-description = "The i programming language: syntax highlighting and i lsp."
+description = "The i Programming Language: syntax highlighting and i lsp."
 version = "0.1.0"
 schema_version = 1
 authors = ["i contributors"]
 repository = "https://github.com/nmnmcc/i"
 
 [language_servers.ilang]
-name = "i Language Server"
+name = "i LSP"
 languages = ["i"]
 
 [grammars.i]
