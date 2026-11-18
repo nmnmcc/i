@@ -10,4 +10,4 @@
 @host("test:kv/v1")
 Kv = (get = (List(String)) -> String)
 
-test("t", () { Nil })
+test("t", () { () })

@@ -8,4 +8,4 @@
 /// to the standard output. `i run`, `i test`, and the WASI target give it;
 /// any other host gives it like any host service.
 @host("i:io/v1")
-Io = (print = (String) -> Nil)
+Io = (print = (String) -> ())

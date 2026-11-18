@@ -11,7 +11,7 @@ event = task.always(1)
 main = () {
 	task.run(() { assert(task.sync(event) == 1) })
 	control.boundary((b) {
-		e = task.map(task.always(Nil), (_) { b })
+		e = task.map(task.always(()), (_) { b })
 		assert(core.not(core.portable(e)))
 	})
 }

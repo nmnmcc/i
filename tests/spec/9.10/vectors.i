@@ -32,7 +32,7 @@ test("words_0", () {
 	assert(u6 == 0xf6aed82ade90db7f)
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0xcb358522e017f69f)
-	Nil
+	()
 })
 
 test("words_1", () {
@@ -53,7 +53,7 @@ test("words_1", () {
 	assert(u6 == 0x8712f355cd285f91)
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0x59853d1343651e17)
-	Nil
+	()
 })
 
 test("words_2", () {
@@ -74,7 +74,7 @@ test("words_2", () {
 	assert(u6 == 0x96d4c409d3617b3a)
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0x1133d31d01e3294b)
-	Nil
+	()
 })
 
 test("words_3", () {
@@ -95,7 +95,7 @@ test("words_3", () {
 	assert(u6 == 0x803945c3d0f47d9e)
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0xb635a23579d0573e)
-	Nil
+	()
 })
 
 test("words_4", () {
@@ -118,7 +118,7 @@ test("words_4", () {
 	assert(u6 == 0xa53fcbf8558772d1)
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0x7ba3fe61550385e3)
-	Nil
+	()
 })
 
 test("words_5", () {
@@ -139,7 +139,7 @@ test("words_5", () {
 	assert(u6 == 0xd069cdfcd44978eb)
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0x98c29ffdb1b5f766)
-	Nil
+	()
 })
 
 test("words_6", () {
@@ -160,7 +160,7 @@ test("words_6", () {
 	assert(u6 == 0x715983f4da92df25)
 	(u7, g8) = random.word(g7)
 	assert(u7 == 0xfcfb942820f2f06d)
-	Nil
+	()
 })
 
 test("tree_s1", () {
@@ -174,7 +174,7 @@ test("tree_s1", () {
 	assert(u2 == 0xc055a1e10867a29c)
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x9cfd728563402f02)
-	Nil
+	()
 })
 
 test("tree_s2", () {
@@ -188,7 +188,7 @@ test("tree_s2", () {
 	assert(u2 == 0xb0c89b4e750c40d6)
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0xf67b3a1c20bfee2b)
-	Nil
+	()
 })
 
 test("tree_p1", () {
@@ -202,7 +202,7 @@ test("tree_p1", () {
 	assert(u2 == 0x455d64fa2429be17)
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x6e33f1757366b224)
-	Nil
+	()
 })
 
 test("tree_p2", () {
@@ -216,7 +216,7 @@ test("tree_p2", () {
 	assert(u2 == 0xbfeb8cd962377935)
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x2d7f0d49269a03ab)
-	Nil
+	()
 })
 
 test("tree_p3", () {
@@ -230,7 +230,7 @@ test("tree_p3", () {
 	assert(u2 == 0xdf08980332f01fc2)
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x71efd03352840d1f)
-	Nil
+	()
 })
 
 test("tree_mixed", () {
@@ -244,7 +244,7 @@ test("tree_mixed", () {
 	assert(u2 == 0x41fb503dfe5a085c)
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0x8d2242d7f41e9383)
-	Nil
+	()
 })
 
 test("tree_drawn", () {
@@ -258,7 +258,7 @@ test("tree_drawn", () {
 	assert(u2 == 0xd8c8d98d5d7f72a7)
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0xec222548e8e94523)
-	Nil
+	()
 })
 
 test("tree_large", () {
@@ -275,7 +275,7 @@ test("tree_large", () {
 	assert(u2 == 0xccfa84fd454e3322)
 	(u3, h4) = random.word(h3)
 	assert(u3 == 0xedbee6c66ce7298f)
-	Nil
+	()
 })
 
 test("bounded_0", () {
@@ -292,7 +292,7 @@ test("bounded_0", () {
 	(u3, g4) = random.int(g3, 1)
 	assert(u3 == 0)
 	assert(g4 == advance(g3, 1))
-	Nil
+	()
 })
 
 test("bounded_1", () {
@@ -309,7 +309,7 @@ test("bounded_1", () {
 	(u3, g4) = random.int(g3, 3)
 	assert(u3 == 1)
 	assert(g4 == advance(g3, 1))
-	Nil
+	()
 })
 
 test("bounded_2", () {
@@ -326,7 +326,7 @@ test("bounded_2", () {
 	(u3, g4) = random.int(g3, 18446744073709551615)
 	assert(u3 == 8417835797766134635)
 	assert(g4 == advance(g3, 1))
-	Nil
+	()
 })
 
 test("bounded_3", () {
@@ -343,7 +343,7 @@ test("bounded_3", () {
 	(u3, g4) = random.int(g3, 18446744073709551616)
 	assert(u3 == 8417835797766134635)
 	assert(g4 == advance(g3, 1))
-	Nil
+	()
 })
 
 test("bounded_4", () {
@@ -360,7 +360,7 @@ test("bounded_4", () {
 	(u3, g4) = random.int(g3, 18446744073709551617)
 	assert(u3 == 3132626309612102880)
 	assert(g4 == advance(g3, 2))
-	Nil
+	()
 })
 
 test("bounded_5", () {
@@ -377,7 +377,7 @@ test("bounded_5", () {
 	(u3, g4) = random.int(g3, 9223372036854775809)
 	assert(u3 == 2148765519230078135)
 	assert(g4 == advance(g3, 3))
-	Nil
+	()
 })
 
 test("bounded_6", () {
@@ -394,7 +394,7 @@ test("bounded_6", () {
 	(u3, g4) = random.int(g3, 170141183460469231731687303715884105729)
 	assert(u3 == 82371065690874325537675670535210007912)
 	assert(g4 == advance(g3, 2))
-	Nil
+	()
 })
 
 test("bounded_7", () {
@@ -423,5 +423,5 @@ test("bounded_7", () {
 	)
 	assert(u3 == 9797747885538933057562846062264665699895629081307663015611)
 	assert(g4 == advance(g3, 4))
-	Nil
+	()
 })

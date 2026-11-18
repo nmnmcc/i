@@ -7,4 +7,4 @@
 )
 
 // The final function runs, then the error comes to the program entry.
-main = () { resource.ensure(() { fail.raise(1) }, () { Nil }) }
+main = () { resource.ensure(() { fail.raise(1) }, () { () }) }

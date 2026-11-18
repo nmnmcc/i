@@ -749,16 +749,16 @@ format = <A>(report : Report(A), show : (A) -> String) -> String {
 test = <A>(
 	gen : Gen(A),
 	config : Config,
-	property : (A) <- (Assert) -> Nil,
+	property : (A) <- (Assert) -> (),
 	show : (A) -> String
-) <- (a : Assert) -> Nil {
+) <- (a : Assert) -> () {
 	report = check(gen, config, (value) {
 		assertion.catch(() { property(value) }) |>
-			(Ok(Nil)) { Pass }
+			(Ok(())) { Pass }
 			& (Error(failure)) { Fail(failure.message) }
 	})
 	report |>
-		(Passed(..)) { Nil }
+		(Passed(..)) { () }
 		& (_) { a.fail(AssertionFailure(message = format(report, show))) }
 }
 

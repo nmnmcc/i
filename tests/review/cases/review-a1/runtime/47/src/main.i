@@ -6,5 +6,5 @@ f = (n : Int) {
 
 main = () {
 	assert(f(0) == "yes" && f(1) == "no")
-	Nil
+	()
 }

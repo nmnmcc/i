@@ -3,7 +3,7 @@
 // output: hello
 // output: i
 // output: no x
-// output: Error(Nil) Error(200) Error("negative") Ok(42)
+// output: Error(()) Error(200) Error("negative") Ok(42)
 (
 	testlib = (test) = std/test
 	i/core
@@ -13,12 +13,12 @@
 // Host services that the host gives (`ilang_host::services::testing`): every
 // field is the import `label` of the module `namespace`.
 @host("test:io/v1")
-Io = (print = (String) -> Nil)
+Io = (print = (String) -> ())
 
 @host("test:kv/v1")
 Kv = (
 	get = (String) <- (Fail(String)) -> String,
-	check = (Int) <- (Fail(Nil | Int | String)) -> Int,
+	check = (Int) <- (Fail(() | Int | String)) -> Int,
 )
 
 say = (text : String) <- (io : Io) { io.print(text) }
@@ -48,5 +48,5 @@ main = () <- (kv : Kv) {
 // A service is a normal value (§9.2).
 test("services_are_values", () <- (kv : Kv) {
 	get = kv.get
-	get("lang") |> ("i language") { Nil } & (other) { panic(other) }
+	get("lang") |> ("i language") { () } & (other) { panic(other) }
 })

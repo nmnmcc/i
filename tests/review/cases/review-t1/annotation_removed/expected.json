@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.mk : (A) -> Cell(A)\nprobe/main.f : () -> 0 | 1\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.mk : (A) -> Cell(A)\nprobe/main.f : () -> 0 | 1\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

@@ -14,5 +14,5 @@ main = () {
 			() { control.escape(b, 2) },
 		)
 	})
-	Nil
+	()
 }

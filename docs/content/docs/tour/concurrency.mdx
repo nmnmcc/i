@@ -39,7 +39,7 @@ The entry provides the scheduler; tasks use library services and control operati
 main = () <- (io : Io) {
 	task.scope((s) {
 		task.go(s, () { io.print("child") })
-		Nil
+		()
 	})
 	io.print("scope finished")
 }
@@ -132,7 +132,7 @@ main = () <- (io : Io) {
 	answer = fail.catch(() {
 		task.scope((s) {
 			task.go(s, () { fail.raise("child failed") })
-			Nil
+			()
 		})
 	})
 	io.print(core.inspect(answer))
@@ -159,11 +159,11 @@ A body or child error cancels the scope’s other work, even without a join. If 
 main = () <- (io : Io) {
 	answer = fail.catch(() {
 		task.scope((s) {
-			ready : task.Channel(Nil) = task.channel()
+			ready : task.Channel(()) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
-						task.send(ready, Nil)
+						task.send(ready, ())
 						task.sync(task.never())
 					},
 					() { io.print("release child") },
@@ -171,7 +171,7 @@ main = () <- (io : Io) {
 			})
 			task.receive(ready)
 			task.go(s, () { fail.raise("child failed") })
-			Nil
+			()
 		})
 	})
 	io.print(core.inspect(answer))

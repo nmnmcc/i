@@ -7,5 +7,5 @@ Schema = make(Int, 2, "name")
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

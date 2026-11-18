@@ -35,7 +35,7 @@
 Gates = (wait = (Int) -> Request(Int))
 
 @host("r2:control/v1")
-Control = (release = (Int) -> Nil, check = (Int) -> Nil)
+Control = (release = (Int) -> (), check = (Int) -> ())
 
 // These exports cannot raise. Decision 2 requires an actual Fail(Never)
 // provider, rather than the old universal-entry-removal filter.
@@ -81,7 +81,7 @@ go_progress = () <- (gates : Gates, control : Control) {
 			waiter = task.go(s, () { request.await_owned(gates.wait(10)) })
 			task.yield()
 			control.release(10)
-			task.go(s, () { Nil })
+			task.go(s, () { () })
 			control.check(5)
 			task.join(waiter)
 		})
@@ -92,9 +92,9 @@ cancel_probe = (owned : Bool) <- (gates : Gates, control : Control) {
 	r = gates.wait(1)
 	answer = fail.catch(() {
 		task.scope((s) {
-			armed : task.Channel(Nil) = task.channel()
+			armed : task.Channel(()) = task.channel()
 			task.go(s, () {
-				task.send(armed, Nil)
+				task.send(armed, ())
 				{ owned } |>
 					(True) { request.await_owned(r) }
 					& (False) { request.await(r) }
@@ -194,7 +194,7 @@ owned_idle = () <- (gates : Gates) {
 		{
 			gates.wait(9)
 			task.sync(task.never())
-			Nil
+			()
 		} <- (request.open_owner())
 	})
 }
@@ -206,7 +206,7 @@ unrelated_idle = () <- (gates : Gates) {
 		{
 			gates.wait(9)
 			task.sync(task.never())
-			Nil
+			()
 		} <- (request.open_owner()) <- (unrelated)
 	})
 }

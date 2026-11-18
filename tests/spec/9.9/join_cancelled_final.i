@@ -10,17 +10,17 @@
 
 main = () {
 	task.scope((s) {
-		gate : task.Channel(Nil) = task.channel()
+		gate : task.Channel(()) = task.channel()
 		task.go(s, () {
 			resource.ensure(
 				() {
-					task.send(gate, Nil)
+					task.send(gate, ())
 					task.sync(task.never())
 				},
 				() {
-					t = task.go(s, () { Nil })
+					t = task.go(s, () { () })
 					fail.catch(() { task.join(t) })
-					Nil
+					()
 				},
 			)
 		})

@@ -11,7 +11,7 @@ main = () {
 		carrier : task.Channel(task.Group(Never)) = task.channel()
 		task.go(outer, () {
 			scope = task.receive(carrier)
-			task.go(scope, () { Nil })
+			task.go(scope, () { () })
 		})
 		task.scope((inner) { task.send(carrier, inner) })
 	})

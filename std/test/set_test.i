@@ -11,12 +11,12 @@ test("size_empty_test", () {
 	assert(
 		set.size(set.new()) == 0,
 	)
-	Nil
+	()
 })
 
 test("size_with_elements_test", () {
 	assert({ set.new() |> set.insert(1) |> set.insert(2) |> set.size } == 2)
-	Nil
+	()
 })
 
 test("size_with_duplicates_test", () {
@@ -30,31 +30,31 @@ test("size_with_duplicates_test", () {
 		} ==
 			2,
 	)
-	Nil
+	()
 })
 
 test("is_empty_new_test", () {
 	assert(
 		set.is_empty(set.new()),
 	)
-	Nil
+	()
 })
 
 test("is_empty_with_element_test", () {
 	assert(
 		core.not(set.new() |> set.insert(1) |> set.is_empty()),
 	)
-	Nil
+	()
 })
 
 test("is_empty_after_delete_test", () {
 	assert(set.new() |> set.insert(1) |> set.delete(1) |> set.is_empty())
-	Nil
+	()
 })
 
 test("contains_present_test", () {
 	assert(set.new() |> set.insert(1) |> set.contains(1))
-	Nil
+	()
 })
 
 test("contains_absent_test", () {
@@ -63,7 +63,7 @@ test("contains_absent_test", () {
 			set.contains(set.new(), 1),
 		),
 	)
-	Nil
+	()
 })
 
 test("delete_test", () {
@@ -72,7 +72,7 @@ test("delete_test", () {
 			set.new() |> set.insert(1) |> set.delete(1) |> set.contains(1),
 		),
 	)
-	Nil
+	()
 })
 
 test("to_list_test", () {
@@ -87,7 +87,7 @@ test("to_list_test", () {
 		} ==
 			[2, 3, 4],
 	)
-	Nil
+	()
 })
 
 test("from_list_test", () {
@@ -100,14 +100,14 @@ test("from_list_test", () {
 		} ==
 			[1, 2, 3, 4],
 	)
-	Nil
+	()
 })
 
 test("fold_test", () {
 	assert(
 		{ [1, 3, 9] |> set.from_list |> set.fold(0, (m, a) { m + a }) } == 13,
 	)
-	Nil
+	()
 })
 
 test("map_test", () {
@@ -115,7 +115,7 @@ test("map_test", () {
 		{ [1, 2, 3, 4] |> set.from_list |> set.map(int.to_string) } ==
 			set.from_list(["1", "2", "3", "4"]),
 	)
-	Nil
+	()
 })
 
 test("filter_test", () {
@@ -129,7 +129,7 @@ test("filter_test", () {
 		} ==
 			[4, 6, 44],
 	)
-	Nil
+	()
 })
 
 test("take_test", () {
@@ -137,7 +137,7 @@ test("take_test", () {
 		{ [1, 2, 3] |> set.from_list |> set.take([1, 3, 5]) } ==
 			set.from_list([1, 3]),
 	)
-	Nil
+	()
 })
 
 test("drop_test", () {
@@ -145,7 +145,7 @@ test("drop_test", () {
 		{ ["a", "b", "c"] |> set.from_list |> set.drop(["a", "b", "d"]) } ==
 			set.from_list(["c"]),
 	)
-	Nil
+	()
 })
 
 test("union_test", () {
@@ -157,7 +157,7 @@ test("union_test", () {
 		} ==
 			[1, 2, 3],
 	)
-	Nil
+	()
 })
 
 test("intersection_test", () {
@@ -167,7 +167,7 @@ test("intersection_test", () {
 		) ==
 			[2],
 	)
-	Nil
+	()
 })
 
 test("difference_test", () {
@@ -177,7 +177,7 @@ test("difference_test", () {
 		) ==
 			[1],
 	)
-	Nil
+	()
 })
 
 test("is_subset_false_superset_test", () {
@@ -186,14 +186,14 @@ test("is_subset_false_superset_test", () {
 			set.is_subset(set.from_list([1, 2, 3, 4]), set.from_list([2, 4])),
 		),
 	)
-	Nil
+	()
 })
 
 test("is_subset_true_test", () {
 	assert(
 		set.is_subset(set.from_list([2, 4]), set.from_list([1, 2, 3, 4])),
 	)
-	Nil
+	()
 })
 
 test("is_subset_disjoint_test", () {
@@ -202,7 +202,7 @@ test("is_subset_disjoint_test", () {
 			set.is_subset(set.from_list([1, 2, 3]), set.from_list([4, 5, 6])),
 		),
 	)
-	Nil
+	()
 })
 
 test("is_subset_partial_overlap_test", () {
@@ -211,14 +211,14 @@ test("is_subset_partial_overlap_test", () {
 			set.is_subset(set.from_list([1, 2]), set.from_list([2, 3, 4])),
 		),
 	)
-	Nil
+	()
 })
 
 test("is_disjoint_true_test", () {
 	assert(
 		set.is_disjoint(set.from_list([1, 2, 3]), set.from_list([4, 5, 6])),
 	)
-	Nil
+	()
 })
 
 test("is_disjoint_false_test", () {
@@ -227,7 +227,7 @@ test("is_disjoint_false_test", () {
 			set.is_disjoint(set.from_list([1, 2]), set.from_list([2, 3, 4])),
 		),
 	)
-	Nil
+	()
 })
 
 test("symmetric_difference_test", () {
@@ -238,7 +238,7 @@ test("symmetric_difference_test", () {
 		) ==
 			set.from_list([1, 2, 4]),
 	)
-	Nil
+	()
 })
 
 test("each_test", () {
@@ -248,13 +248,13 @@ test("each_test", () {
 				|> set.from_list
 				|> set.each((member) {
 					member |>
-						(1 | 2 | 3) { Nil }
+						(1 | 2 | 3) { () }
 						& (_) { panic("unexpected value") }
 				})
 		} ==
-			Nil,
+			(),
 	)
-	Nil
+	()
 })
 
 test("set_equality_test", () {

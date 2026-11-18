@@ -7,4 +7,4 @@
 Read(A) = (read = () -> A)
 Pending(A) = (event = task.Event(Int, Never, Read(A)))
 up = (x : Pending(Int)) -> Pending(Int | String) { x }
-main = () { Nil }
+main = () { () }

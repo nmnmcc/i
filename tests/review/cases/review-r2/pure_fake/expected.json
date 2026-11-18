@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.main : () <- (Assert, request.Await, request.Owner, request.Root) -> Nil\n",
+      "stdout": "app/main.main : () <- (Assert, request.Await, request.Owner, request.Root) -> ()\n",
       "stderr": ""
     },
     "test0": {

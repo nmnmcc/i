@@ -14,5 +14,5 @@ example = () {
 
 main = () {
 	example()
-	Nil
+	()
 }

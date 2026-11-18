@@ -21,6 +21,6 @@ main = () {
 	_syn3_0 : S(D, Never) = S(() { read() }, () { 3 })
 	{
 		assert(wrap() == 10)
-		Nil
+		()
 	} <- (D(7), _syn3_0)
 }

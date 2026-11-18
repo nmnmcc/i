@@ -3,4 +3,4 @@
 works = () { assert(True) }
 
 @test
-args = (n) { Nil }
+args = (n) { () }

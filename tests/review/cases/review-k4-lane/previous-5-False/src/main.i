@@ -1,4 +1,4 @@
-S(N) = (() <- N -> Nil)
+S(N) = (() <- N -> ())
 
 use = <N>() <- (s : S(N)) {
 	S(f) = s
@@ -6,7 +6,7 @@ use = <N>() <- (s : S(N)) {
 }
 
 example = <N>() {
-	local : () <- (S(N), ..N) -> Nil = () { use() }
+	local : () <- (S(N), ..N) -> () = () { use() }
 	local()
 }
 

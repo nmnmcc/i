@@ -577,7 +577,7 @@ as finished; i/record, interface graph round trips, and the remaining written
 rules and tests are outstanding. The source-level t3_record spec cases pass at
 O0 and O2, the 29 graph tests pass, and record_ir passes at both optimization
 levels. Existing syntax goldens for the removed empty tuple were adjusted under
-the user's SYN2 rule; pattern coverage uses Nil where it had an empty tuple.
+the user's SYN2 rule; pattern coverage uses () where it had an empty tuple.
 
 Label parameter source work: syntax now retains the difference between quoted
 labels and declared parameters; record types resolve parameter identity and

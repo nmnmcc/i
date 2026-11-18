@@ -34,8 +34,8 @@ add = (a : Int, b : Int) { a + b }
 
 opaque = (h : Handle, flag : Bool) { flag |> (True) { h } & (False) { h } }
 
-errors = (x : Int) -> Nil {
-	x |> (0) { fail.raise(1) } & (1) { fail.raise("one") } & (_) { Nil }
+errors = (x : Int) -> () {
+	x |> (0) { fail.raise(1) } & (1) { fail.raise("one") } & (_) { () }
 }
 
 // `Never` is not a type that the host can take (§10.3).
@@ -66,7 +66,7 @@ with_clock = () <- (c : Clock) { c.now() }
 
 main = () <- (s : Storage, c : Clock) {
 	s.read(c.now() |> core_text)
-	Nil
+	()
 }
 
 core_text = (n : Int) { "x" }

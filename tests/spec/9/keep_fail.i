@@ -8,11 +8,11 @@
 )
 
 Done = ()
-Paused = (Continuation(Nil, Step, Fail(String)))
+Paused = (Continuation((), Step, Fail(String)))
 Step = Done | Paused
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 print = (text: String) <- (out: Out) { out.print(text) }
 
@@ -26,7 +26,7 @@ main = () {
 	first |>
 		(Ok(Paused(k))) {
 			assert(
-				fail.catch(() { control.resume(k, Nil) }) == Error("resumed"),
+				fail.catch(() { control.resume(k, ()) }) == Error("resumed"),
 			)
 		}
 		& (_) { panic("expected a paused kept call") }
@@ -65,7 +65,7 @@ main = () {
 	third = fail.catch(() { control.boundary((b) { inner_catch(b) }) })
 	third |>
 		(Ok(Paused(k))) {
-			assert(fail.catch(() { control.resume(k, Nil) }) == Ok(Done))
+			assert(fail.catch(() { control.resume(k, ()) }) == Ok(Done))
 		}
 		& (_) { panic("expected a paused inner catch") }
 }

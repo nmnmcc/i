@@ -11,7 +11,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -20,9 +20,9 @@ show = (x) { core.inspect(x) }
 length = (xs, n) { xs |> ([]) { n } & ([_, ..rest]) { length(rest, n + 1) } }
 
 // The example of §9.4.
-Yield(A) = (emit = (A) -> Nil)
+Yield(A) = (emit = (A) -> ())
 
-collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> ()) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
@@ -30,7 +30,7 @@ collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 		} <- (
 			Yield(
 				emit = (x : A) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -41,7 +41,7 @@ emit = <A>(x) <- (y : Yield(A)) { y.emit(x) }
 
 count = (from, to) {
 	{ from > to } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			emit(from)
 			count(from + 1, to)
@@ -60,7 +60,7 @@ test("generator", () {
 		"[1, 2, 3]",
 	)
 	check(
-		show(collect(() { Nil })),
+		show(collect(() { () })),
 		"[]",
 	)
 	check(
@@ -132,13 +132,13 @@ test("nested_boundaries", () {
 	check(show(s), "4")
 })
 
-// §9.4 rule 4: `cancel` gives `Nil`.
+// §9.4 rule 4: `cancel` gives `()`.
 cancel = () {
 	r = control.boundary((b) {
 		x = control.suspend(b, (k) { show(control.cancel(k)) <> "!" })
 		"not " <> x
 	})
-	check(r, "Nil!")
+	check(r, "()!")
 }
 
 test("cancel", () { cancel() })
@@ -158,7 +158,7 @@ test("cancel_runs_final_functions", () {
 				},
 				() {
 					control.suspend(outer, (k) {
-						"final, " <> control.resume(k, Nil)
+						"final, " <> control.resume(k, ())
 					})
 				},
 			)
@@ -172,7 +172,7 @@ test("cancel_runs_final_functions", () {
 				() { control.suspend(b, (k) { control.resume(k, "resumed") }) },
 				() {
 					control.suspend(outer, (k) {
-						"final, " <> control.resume(k, Nil)
+						"final, " <> control.resume(k, ())
 					})
 				},
 			)
@@ -190,7 +190,7 @@ name = () <- (n : Name) { n.text }
 deep = (b) {
 	{
 		control.suspend(b, (k) {
-			control.resume(k, Nil) <- (Name(text = "resumer"))
+			control.resume(k, ()) <- (Name(text = "resumer"))
 		})
 		name()
 	} <- (Name(text = "deep"))
@@ -203,7 +203,7 @@ test("environment", () {
 			inner = {
 				{
 					control.suspend(b, (k) {
-						control.resume(k, Nil) <- (Name(text = "resumer"))
+						control.resume(k, ()) <- (Name(text = "resumer"))
 					})
 					name()
 				} <- (Name(text = "inside"))
@@ -241,7 +241,7 @@ test("errors", () {
 })
 
 Done = ()
-More = (Int, Continuation(Nil, Step, Never))
+More = (Int, Continuation((), Step, Never))
 // A generator that is pulled one value at a time: the continuation is a
 // value, and it is resumed later from other places.
 Step = Done | More
@@ -267,7 +267,7 @@ take = (step, n, acc) {
 			step |>
 				(Done) { acc }
 				& (More(v, k)) {
-					take(control.resume(k, Nil), n - 1, [v, ..acc])
+					take(control.resume(k, ()), n - 1, [v, ..acc])
 				}
 		}
 }
@@ -275,7 +275,7 @@ take = (step, n, acc) {
 sum = (step, acc) {
 	step |>
 		(Done) { acc }
-		& (More(v, k)) { sum(control.resume(k, Nil), acc + v) }
+		& (More(v, k)) { sum(control.resume(k, ()), acc + v) }
 }
 
 test("pulled", () {
@@ -296,7 +296,7 @@ test("pulled", () {
 		(More(_, k)) {
 			check(
 				show(control.cancel(k)),
-				"Nil",
+				"()",
 			)
 		}
 		& (Done) { panic("no value") }
@@ -380,7 +380,7 @@ test("paused_again", () {
 				y = control.suspend(b, (k) { control.resume(k, x + 1) })
 				x + y
 			},
-			() { Nil },
+			() { () },
 		)
 	})
 	check(show(e), "3")
@@ -398,7 +398,7 @@ test("paused_again", () {
 // A producer that is not tail recursive: the paused part has many frames.
 walk = (n) {
 	n |>
-		(0) { Nil }
+		(0) { () }
 		& (_) {
 			walk(n - 1)
 			emit(n)

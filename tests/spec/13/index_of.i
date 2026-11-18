@@ -5,9 +5,9 @@
 	i/core
 )
 
-check = (got : Result(Int, Nil), want : Result(Int, Nil)) {
+check = (got : Result(Int, ()), want : Result(Int, ())) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			panic(core.inspect(got) <> " is not " <> core.inspect(want))
 		}
@@ -23,10 +23,10 @@ test("found", () {
 })
 
 test("not_found", () {
-	check(core.index_of("hello", "l", 4), Error(Nil))
-	check(core.index_of("hello", "hello!", 0), Error(Nil))
-	check(core.index_of("hello", "x", 0), Error(Nil))
-	check(core.index_of("", "a", 0), Error(Nil))
+	check(core.index_of("hello", "l", 4), Error(()))
+	check(core.index_of("hello", "hello!", 0), Error(()))
+	check(core.index_of("hello", "x", 0), Error(()))
+	check(core.index_of("", "a", 0), Error(()))
 })
 
 test("empty_find", () {
@@ -37,21 +37,21 @@ test("empty_find", () {
 
 test("from_at_the_end", () {
 	check(core.index_of("hello", "", 5), Ok(5))
-	check(core.index_of("hello", "o", 5), Error(Nil))
+	check(core.index_of("hello", "o", 5), Error(()))
 })
 
 test("from_outside_the_string", () {
-	check(core.index_of("hello", "", 6), Error(Nil))
-	check(core.index_of("hello", "h", -1), Error(Nil))
-	check(core.index_of("hello", "", 100000000000000000000), Error(Nil))
+	check(core.index_of("hello", "", 6), Error(()))
+	check(core.index_of("hello", "h", -1), Error(()))
+	check(core.index_of("hello", "", 100000000000000000000), Error(()))
 })
 
 test("from_inside_a_character", () {
 	// é is bytes 1 and 2.
 	check(core.index_of("héé", "é", 0), Ok(1))
-	check(core.index_of("héé", "é", 2), Error(Nil))
-	check(core.index_of("héé", "", 2), Error(Nil))
+	check(core.index_of("héé", "é", 2), Error(()))
+	check(core.index_of("héé", "", 2), Error(()))
 	check(core.index_of("héé", "é", 3), Ok(3))
-	check(core.index_of("😀😀", "😀", 1), Error(Nil))
+	check(core.index_of("😀😀", "😀", 1), Error(()))
 	check(core.index_of("😀😀", "😀", 4), Ok(4))
 })

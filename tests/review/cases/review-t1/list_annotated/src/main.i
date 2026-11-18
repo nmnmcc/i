@@ -4,5 +4,5 @@ f = (xs : List("a" | "b")) {
 
 main = () {
 	assert(f(["b", "a"]) == 2)
-	Nil
+	()
 }

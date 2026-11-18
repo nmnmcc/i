@@ -39,7 +39,7 @@
 	map_environment
 )
 
-Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> Nil)
+Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> ())
 
 Done = ()
 Next(A, E, N) = (A, Stream(A, E, N))
@@ -47,7 +47,7 @@ Step(A, E, N) = Done | Next(A, E, N)
 
 /// An empty stream in any chosen common environment.
 new = <A, N>() -> Stream(A, Never, N) {
-	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { Nil })
+	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { () })
 }
 
 /// One item, followed by an empty tail.
@@ -65,7 +65,7 @@ make = <A, E, N>(step : () <- (Fail(E), ..N) -> Step(A, E, N)) -> Stream(
 	A,
 	E,
 	N,
-) { Stream(step, (_ : N) { Nil }) }
+) { Stream(step, (_ : N) { () }) }
 
 /// Defers both construction and the first pull until demand.
 defer = <A, E, N>(body : () <- (Fail(E), ..N) -> Stream(A, E, N)) -> Stream(
@@ -238,10 +238,10 @@ fold_until = <A, Acc, E, F, N>(
 each = <A, B, E, F, N>(
 	over : Stream(A, E, N),
 	with : (A) <- (Fail(F), ..N) -> B
-) -> Nil {
-	fold(over, Nil, (_, x) {
+) -> () {
+	fold(over, (), (_, x) {
 		with(x)
-		Nil
+		()
 	})
 }
 

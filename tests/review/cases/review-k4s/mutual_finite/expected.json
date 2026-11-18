@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.first : (Bool) <- (S(N), ..N) -> Nil\napp/main.second : (Bool) <- (S(N), ..N) -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\napp/main.first : (Bool) <- (S(N), ..N) -> ()\napp/main.second : (Bool) <- (S(N), ..N) -> ()\n",
       "stderr": ""
     },
     "test0": {

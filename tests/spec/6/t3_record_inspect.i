@@ -19,5 +19,5 @@ main = () {
 	)
 	assert((a = 1) != (a = 1, b = 2))
 	assert((a = 1) != (b = 1))
-	Nil
+	()
 }

@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> Nil\napp/main.helper : () <- (Dep) -> Nil\napp/main.main : () <- (Dep) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> ()\napp/main.run : (() <- N -> ()) <- N -> ()\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> ()\napp/main.helper : () <- (Dep) -> ()\napp/main.main : () <- (Dep) -> ()\n",
       "stderr": ""
     },
     "test0": {

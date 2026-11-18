@@ -1,13 +1,13 @@
 literals : Bool
 typed : (String) -> Bool
-with_nil : (Int | Nil) -> Bool
+with_nil : (Int | ()) -> Bool
 lists : Bool
 type_var : (A, B) -> Bool
 type_var_literal : (A) -> Bool
 untyped : (A) -> Bool
 not_equal : Bool
-shared : (Int | String, String | Nil) -> Bool
-apart : (Int | String, Float | Nil) -> Bool
+shared : (Int | String, String | ()) -> Bool
+apart : (Int | String, Float | ()) -> Bool
 sizes : Bool
 same_size : Bool
 function : ((Int) -> Int) -> Bool
@@ -15,7 +15,7 @@ holes : (A) -> Bool
 6:12: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
 8:24: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
 22:13: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `!=` is always `True`
-27:55: warning[W0503]: the two sides have the known types `Int | String` and `Float | Nil`, which can never be equal, so `!=` is always `True`
+27:55: warning[W0503]: the two sides have the known types `Int | String` and `Float | ()`, which can never be equal, so `!=` is always `True`
 30:9: warning[W0503]: the two sides have the known types `(1, 2)` and `(1, 2, 3)`, which can never be equal, so `==` is always `False`
 35:33: warning[W0503]: the two sides have the known types `(Int) -> Int` and `1`, which can never be equal, so `==` is always `False`
 38:15: warning[W0503]: the two sides have the known types `(_, 1)` and `"a"`, which can never be equal, so `==` is always `False`

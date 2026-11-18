@@ -6,5 +6,5 @@ test("force expansion", () {
     underscored = (r) { r.1_2 }
     field = (r) { r.missing }
     method = (r) { r.missing(1) }
-    Nil
+    ()
 })

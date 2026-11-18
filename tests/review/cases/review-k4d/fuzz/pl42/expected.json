@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.twice : (() <- N -> Int) <- N -> Int\napp/main.with_int : (() <- N -> A) <- (N - Svc(Int)) -> A\napp/main.with_dep : (() <- N -> A) <- (N - Dep) -> A\napp/main.with_cov : (() <- N -> A, B) <- (N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () <- (Dep) -> Int\napp/main.h1 : () <- (Cov(A & Int)) -> A\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.twice : (() <- N -> Int) <- N -> Int\napp/main.with_int : (() <- N -> A) <- (N - Svc(Int)) -> A\napp/main.with_dep : (() <- N -> A) <- (N - Dep) -> A\napp/main.with_cov : (() <- N -> A, B) <- (N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () <- (Dep) -> Int\napp/main.h1 : () <- (Cov(A & Int)) -> A\napp/main.main : () -> ()\n",
       "stderr": "src/main.i:39:7: error[E0501]: `Dep` is not a subtype of `Never` (the type at 38:23 needs it)\nsrc/main.i:43:7: error[E0501]: `Svc(_)` is not a subtype of `Never` (the type at 42:23 needs it)\nsrc/main.i:47:31: error[E0501]: `Dep` is not a subtype of `Never` (the type at 47:23 needs it)\nsrc/main.i:51:8: error[E0225]: two explicit services or two spreads in provided data have one service key\nsrc/main.i:51:17: error[E0225]: two explicit services or two spreads in provided data have one service key\n5 errors\n"
     }
   }

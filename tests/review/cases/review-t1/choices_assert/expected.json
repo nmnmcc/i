@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.f : (Int) <- (Assert) -> \"yes\"\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.f : (Int) <- (Assert) -> \"yes\"\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

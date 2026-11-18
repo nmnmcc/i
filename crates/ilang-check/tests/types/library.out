@@ -1,5 +1,5 @@
 i/prelude.panic : (String) -> Never
-i/prelude.assert : (Bool) <- (Assert) -> Nil
+i/prelude.assert : (Bool) <- (Assert) -> ()
 i/fail.raise : (A) <- (Fail(A)) -> Never
 i/fail.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
 i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
@@ -8,55 +8,55 @@ i/control.boundary : ((Boundary(A, B)) <- B -> A) <- B -> A
 i/control.suspend : (Boundary(A, B), (Continuation(C, A, B)) <- B -> A) -> C
 i/control.escape : (Boundary(A, B), A) -> Never
 i/control.resume : (Continuation(A, B, C), A) <- C -> B
-i/control.cancel : (Continuation(A, B, C)) <- C -> Nil
+i/control.cancel : (Continuation(A, B, C)) <- C -> ()
 i/control.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B
-i/resource.ensure : (() <- N -> A, () <- N -> Nil) <- N -> A
-i/resource.acquire : (() <- (Fail(B), ..N) -> A, (A) <- N -> Nil, (A) <- (Fail(B), ..N) -> C) <- (Fail(B), ..N) -> C
+i/resource.ensure : (() <- N -> A, () <- N -> ()) <- N -> A
+i/resource.acquire : (() <- (Fail(B), ..N) -> A, (A) <- N -> (), (A) <- (Fail(B), ..N) -> C) <- (Fail(B), ..N) -> C
 i/assertion.catch : (() <- N -> A) <- (N - Assert) -> Result(A, AssertionFailure)
-i/request.new_root : (Key(Nil)) -> Key(Nil)
-i/request.end_root : (Key(Nil)) -> Nil
-i/request.new_owner : (Key(Nil)) -> Key(Nil)
-i/request.end_owner : (Key(Nil)) -> Nil
-i/request.group_count : (Key(Nil)) -> Int
-i/request.root_count : (Key(Nil)) -> Int
-i/request.cancel_group : (Key(Nil)) -> Nil
-i/request.cancel_root : (Key(Nil)) -> Nil
-i/request.observe_owner : (Key(Nil)) -> Request(Nil)
-i/request.observe_root : (Key(Nil)) -> Request(Nil)
+i/request.new_root : (Key(())) -> Key(())
+i/request.end_root : (Key(())) -> ()
+i/request.new_owner : (Key(())) -> Key(())
+i/request.end_owner : (Key(())) -> ()
+i/request.group_count : (Key(())) -> Int
+i/request.root_count : (Key(())) -> Int
+i/request.cancel_group : (Key(())) -> ()
+i/request.cancel_root : (Key(())) -> ()
+i/request.observe_owner : (Key(())) -> Request(())
+i/request.observe_root : (Key(())) -> Request(())
 i/request.open_root : () <- (Root) -> Root
-i/request.close_root : (Root) -> Nil
+i/request.close_root : (Root) -> ()
 i/request.open_owner : () <- (Root) -> Owner
-i/request.close_owner : (Owner) -> Nil
+i/request.close_owner : (Owner) -> ()
 i/request.count : (Owner) -> Int
 i/request.count_root : (Root) -> Int
 i/request.settled_owner : (Owner) -> Bool
 i/request.settled_root : (Root) -> Bool
-i/request.cancel_all : (Owner) -> Nil
-i/request.cancel_all_root : (Root) -> Nil
+i/request.cancel_all : (Owner) -> ()
+i/request.cancel_all_root : (Root) -> ()
 i/request.retain : (A) -> A
 i/request.within : (() <- N -> A) <- (N - Owner, Root) -> A
-i/request.wait_none : (Owner) <- (Await) -> Nil
-i/request.wait_none_root : (Root) <- (Await) -> Nil
+i/request.wait_none : (Owner) <- (Await) -> ()
+i/request.wait_none_root : (Root) <- (Await) -> ()
 i/request.ready : (A) -> Request(A)
 i/request.ticket : (Request(A)) -> Ticket
 i/request.read_state : (Request(A)) -> Result(A, Int)
 i/request.take : (Request(A)) -> A
 i/request.settled : (Ticket) -> Bool
-i/request.cancel : (Ticket) -> Nil
+i/request.cancel : (Ticket) -> ()
 i/request.state : (Request(A)) -> RequestState(A)
 i/request.await : (Request(A)) <- (Await) -> A
 i/request.await_owned : (Request(A)) <- (Await) -> A
-i/request.wait_any : (List(Ticket)) -> Nil
-i/request.poll : () -> Nil
-i/request.entry_root : () -> Key(Nil)
-i/request.entry_end : () -> Nil
+i/request.wait_any : (List(Ticket)) -> ()
+i/request.poll : () -> ()
+i/request.entry_root : () -> Key(())
+i/request.entry_end : () -> ()
 i/request._entry : (() <- N -> A) <- (N - Await - Owner - Root) -> A
-i/request._provider_root : (List(Root), Key(Nil)) -> Root
+i/request._provider_root : (List(Root), Key(())) -> Root
 i/request._provider_owner : (List(Owner)) <- (Root) -> Owner
 i/request._provider_await : (List(Await)) -> Await
 i/key.new : () -> Key(A)
 i/key.wrap : (Key(A), A) -> Keyed
-i/key.read : (Key(A), Keyed) -> Result(A, Nil)
+i/key.read : (Key(A), Keyed) -> Result(A, ())
 i/key.unwrap : (Key(A), Keyed) -> Lookup(A)
 i/core.not : (Bool) -> Bool
 i/core.to_float : (Int) -> Float
@@ -74,16 +74,16 @@ i/core.shift_left : (Int, Int) -> Int
 i/core.shift_right : (Int, Int) -> Int
 i/core.concat : (List(String)) -> String
 i/core.byte_size : (String) -> Int
-i/core.byte_slice : (String, Int, Int) -> Result(String, Nil)
+i/core.byte_slice : (String, Int, Int) -> Result(String, ())
 i/core.codepoints : (String) -> List(UtfCodepoint)
 i/core.from_codepoints : (List(UtfCodepoint)) -> String
 i/core.codepoint_to_int : (UtfCodepoint) -> Int
-i/core.int_to_codepoint : (Int) -> Result(UtfCodepoint, Nil)
+i/core.int_to_codepoint : (Int) -> Result(UtfCodepoint, ())
 i/core.to_upper : (String) -> String
 i/core.to_lower : (String) -> String
-i/core.index_of : (String, String, Int) -> Result(Int, Nil)
+i/core.index_of : (String, String, Int) -> Result(Int, ())
 i/core.bit_size : (BitArray) -> Int
-i/core.bit_array_to_string : (BitArray) -> Result(String, Nil)
+i/core.bit_array_to_string : (BitArray) -> Result(String, ())
 i/core.bit_array_concat : (List(BitArray)) -> BitArray
 i/core.inspect : (A) -> String
 i/core.hash : (A) -> Int
@@ -178,7 +178,7 @@ i/task.path_key : Key(List(Int))
 i/task.task_key : Key(Int)
 i/task.scope_key : Key(ScopeInfo)
 i/task.channel_key : Key(ChannelInfo)
-i/task.unit_key : Key(Nil)
+i/task.unit_key : Key(())
 i/task.scope_reply_key : Key(ScopeReply)
 i/task.selection_key : Key(Selection)
 i/task.read : (Key(A), Keyed) -> A
@@ -188,8 +188,8 @@ i/task.unit_value : Keyed
 i/task.unit : () -> Keyed
 i/task.answer : (StepAnswer) -> Keyed
 i/task.ask : (Scheduler, Command) -> Keyed
-i/task.check_run : (Key(Nil), Key(Nil)) -> Nil
-i/task.portable : (A) -> Nil
+i/task.check_run : (Key(()), Key(())) -> ()
+i/task.portable : (A) -> ()
 i/task.contains : (List(A), B) -> Bool
 i/task.append : (List(A), List(A)) -> List(A)
 i/task.reverse : (List(A), List(A)) -> List(A)
@@ -231,19 +231,19 @@ i/task.make_start : (() <- (Fail(B), N & { Fail(Never) | request.Await | Runner 
 i/task.worker_enabled : () -> Bool
 i/task.worker_publish : (Job) -> Int
 i/task.worker_claim : (Int) -> Bool
-i/task.worker_adopt : (Int, Int) -> Nil
+i/task.worker_adopt : (Int, Int) -> ()
 i/task.worker_placeholder : () -> Continuation(StepAnswer, Turn, Never)
 i/task.worker_away : (Continuation(StepAnswer, Turn, Never)) -> Bool
-i/task.worker_send : (Int, Resume) -> Nil
+i/task.worker_send : (Int, Resume) -> ()
 i/task.worker_inbox : () -> Int
 i/task.worker_message : () -> Remote
 i/task.worker_pending : () -> Bool
-i/task.worker_wait : () -> Nil
-i/task.worker_share_put : (Key(Nil), Address, Keyed) -> Nil
-i/task.worker_share_get : (Key(Nil), Address) -> List(Keyed)
-i/task.worker_share_drop : (Key(Nil), Address) -> Nil
-i/task.drop_shares : (State, List(Address)) -> Nil
-i/task.remote_turn : (Turn, List((Continuation(StepAnswer, Turn, Never)) -> Bool), Key(Nil)) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket))
+i/task.worker_wait : () -> ()
+i/task.worker_share_put : (Key(()), Address, Keyed) -> ()
+i/task.worker_share_get : (Key(()), Address) -> List(Keyed)
+i/task.worker_share_drop : (Key(()), Address) -> ()
+i/task.drop_shares : (State, List(Address)) -> ()
+i/task.remote_turn : (Turn, List((Continuation(StepAnswer, Turn, Never)) -> Bool), Key(())) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket))
 i/task.remote_begin : (Job) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket))
 i/task.remote_resume : ((Continuation(StepAnswer, Turn, Never), Resume)) -> (Remote, Continuation(StepAnswer, Turn, Never), List(Ticket))
 i/task.publish : (State, List(Int), Start) -> Start
@@ -253,17 +253,17 @@ i/task.apply_finals : (List(Frame), List(Bool)) -> List(Frame)
 i/task.pull : (State) -> State
 i/task.path : () <- (Scheduler) -> List(Int)
 i/task.random : () <- (Scheduler) -> rng.Generator
-i/task.yield : () <- (Scheduler) -> Nil
+i/task.yield : () <- (Scheduler) -> ()
 i/task.top : (rng.Generator) <- (Runner) -> Runner
-i/task.observe_change : (Key(Nil)) -> Request(Nil)
+i/task.observe_change : (Key(())) -> Request(())
 i/task.has_work : (Ticket) -> Bool
-i/task.wait_root : (Key(Nil), request.Root, List(Ticket)) -> ContinueRun
-i/task.root_poll : (Key(Nil), List(Ticket), Bool) -> ContinueRun
-i/task.root_forget : (Key(Nil)) -> Nil
+i/task.wait_root : (Key(()), request.Root, List(Ticket)) -> ContinueRun
+i/task.root_poll : (Key(()), List(Ticket), Bool) -> ContinueRun
+i/task.root_forget : (Key(())) -> ()
 i/task.root_allocate : () -> List(Int)
 i/task.initial : (request.Root) -> Runner
 i/task.run_control : (StepAnswer) -> RunControl
-i/task.make_scheduler : (Boundary(Turn, Never), List(Int), Int, Key(Nil), request.Root, Runner) -> Scheduler
+i/task.make_scheduler : (Boundary(Turn, Never), List(Int), Int, Key(()), request.Root, Runner) -> Scheduler
 i/task.list_map : (List(A), (A) -> B) -> List(B)
 i/task.any : (List(A), (A) -> Bool) -> Bool
 i/task.filter : (List(A), (A) -> Bool) -> List(A)
@@ -291,12 +291,12 @@ i/task.propagate : (State) -> State
 i/task.cancel_scope : (State, Address) -> State
 i/task.cancel_run : (State) -> State
 i/task.portable_witness : (Witness) -> Bool
-i/task.check_scope : (State, TaskState, ScopeInfo, String) -> Nil
+i/task.check_scope : (State, TaskState, ScopeInfo, String) -> ()
 i/task.find_channel : (TaskStore(ChannelState), Address) -> ChannelState
-i/task.check_channel : (State, ChannelInfo) -> Nil
-i/task.check_leaf_run : (State, Leaf) -> Nil
-i/task.check_leaf : (State, TaskState, Leaf) -> Nil
-i/task.check_leaves : (State, TaskState, List(Leaf)) -> Nil
+i/task.check_channel : (State, ChannelInfo) -> ()
+i/task.check_leaf_run : (State, Leaf) -> ()
+i/task.check_leaf : (State, TaskState, Leaf) -> ()
+i/task.check_leaves : (State, TaskState, List(Leaf)) -> ()
 i/task.leaf_at : (List(Leaf), Int) -> Leaf
 i/task.partner : (State, Leaf, Maybe(Request(Registration))) -> Partner
 i/task.commit_partner : (State, Waiter, Keyed) -> State
@@ -320,8 +320,8 @@ i/task.maintain : (State) -> State
 i/task.new_address : (TaskState) -> Address
 i/task.head_scope : (List(Address)) -> Maybe(Address)
 i/task.find_share : (TaskStore(ShareState), Address) -> Keyed
-i/task.prevalidate : (State, TaskState, Command) -> Nil
-i/task.add_forward : (List(Forward), Key(Nil), List(Ticket)) -> List(Forward)
+i/task.prevalidate : (State, TaskState, Command) -> ()
+i/task.add_forward : (List(Forward), Key(()), List(Ticket)) -> List(Forward)
 i/task.end_frame : (List(Frame), Address) -> List(Frame)
 i/task.do_command : (State, TaskState, Continuation(StepAnswer, Turn, Never), Command) -> State
 i/task.cancellation_reply : (TaskState) -> Bool
@@ -356,9 +356,9 @@ i/task.join_event : (Task(A, B)) -> Event(A, B, Never)
 i/task.join : (Task(A, B & C)) <- (Fail(C), Scheduler) -> A
 i/task.channel : () <- (Scheduler) -> Channel(A)
 i/task.local_channel : () <- (Scheduler) -> Channel(A)
-i/task.send_event : (Channel(A), A) -> Event(Nil, Never, Never)
+i/task.send_event : (Channel(A), A) -> Event((), Never, Never)
 i/task.receive_event : (Channel(A)) -> Event(A, Never, Never)
-i/task.send : (Channel(A), A) <- (Scheduler) -> Nil
+i/task.send : (Channel(A), A) <- (Scheduler) -> ()
 i/task.receive : (Channel(A)) <- (Fail(Never), Scheduler) -> A
 i/task.share : (Group(A), B) <- (Scheduler) -> Shared(B)
 i/task.get : (Shared(A)) <- (Scheduler) -> A
@@ -377,16 +377,16 @@ i/task._entry : (() <- (Runner, Scheduler, request.Await, request.Owner, request
 i/task.scope_call : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
 i/task.execute : (() <- (Fail(B), N & { Fail(B) | Scheduler | Runner | request.Await | request.Owner | request.Root | { Fail(B) | Scheduler | Runner | request.Await | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(Never) } } & { N2 | Fail(Never) } }, Runner, Scheduler, request.Await, request.Owner, request.Root) -> A, Runner, rng.Generator, Policy) <- (..N, ..N2) -> Result(Result(A, B), NotRunnable)
 i/task.sync : (Event(A, B, C | Fail(B))) <- (Fail(B), Scheduler, ..C) -> A
-i/task.root_active : (Key(Nil), Active) -> ContinueRun
+i/task.root_active : (Key(()), Active) -> ContinueRun
 i/task.cause_allowed : (State, TaskState, Cause) -> Bool
 i/task.frame_abort : (List(Frame)) -> Maybe(() -> Never)
 i/task.effective_active : (State, TaskState) -> Active
-i/task.put_nest : (List(Nest), Key(Nil), Maybe(Address), Active) -> List(Nest)
+i/task.put_nest : (List(Nest), Key(()), Maybe(Address), Active) -> List(Nest)
 i/task.register_driver : (State, Int, Command) -> State
 i/task.pending_frame : (List(Frame)) -> Maybe(Frame)
-i/task.older_shield : (List(Nest), Key(Nil)) -> Bool
+i/task.older_shield : (List(Nest), Key(())) -> Bool
 i/task.cancel_response : (State, TaskState, () -> Never) -> State
-i/task.notify_nested : (State, TaskState, Key(Nil)) -> State
+i/task.notify_nested : (State, TaskState, Key(())) -> State
 i/task.deliver_deferred : (State, Int, Command) -> State
 i/task.frame_owner : (List(Frame)) -> Maybe(Address)
 i/task.anchor_within : (List(Frame), Maybe(Address), Maybe(Address)) -> Bool
@@ -396,7 +396,7 @@ i/task.empty_relay : (ForeignNotice, Keyed, Bool) -> Keyed
 i/task.empty_active : Active
 i/task.foreign_active : (TaskState) -> Bool
 i/task.frame_epoch : (List(Frame)) -> Maybe(Cause)
-i/task.scope_token : (State, Maybe(Address)) -> Key(Nil)
+i/task.scope_token : (State, Maybe(Address)) -> Key(())
 i/task.notice_with : (ForeignNotice, List(Hop)) -> ForeignNotice
 i/task.current_relay : (TaskState) -> (ForeignNotice, Keyed, Bool) -> Keyed
 i/task.forward_response : (State, TaskState, ForeignNotice) -> State
@@ -418,7 +418,7 @@ i/task._provider_runner : (List(Runner)) <- (request.Root) -> Runner
 i/task._provider_scheduler : (List(Scheduler)) -> Scheduler
 i/clock.monotonic_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
 i/clock.unix_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
-i/clock.sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Nil
+i/clock.sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> ()
 i/random.word_size : () -> Int
 i/random.mask : (Int) -> Int
 i/random.xor_shift : (Int, Int) -> Int
@@ -443,7 +443,7 @@ i/random.follow : (State, List(Int)) -> State
 i/random.derive_path : (Generator, List(Int)) -> Generator
 i/random.at_path : (Generator, List(Int)) <- (Fail(InvalidPath)) -> Generator
 i/syntax.definition : (Syntax) <- (Definitions, Fail(SyntaxError)) -> Syntax
-i/syntax.raw_note : (String) -> Nil
+i/syntax.raw_note : (String) -> ()
 i/syntax._diagnostics : () -> Diagnostics
 i/syntax.raw_metadata_new : () -> ItemMetadata
 i/syntax.raw_metadata_push : (ItemMetadata, String, String) -> ItemMetadata
@@ -453,7 +453,7 @@ i/syntax.raw_items_ok : (ItemResult) -> Bool
 i/syntax.raw_items_message : (ItemResult) -> String
 i/syntax.raw_items_at : (ItemResult) -> Syntax
 i/syntax.build_metadata : (List((String, String)), ItemMetadata) -> ItemMetadata
-i/syntax.item_result : (ItemResult) <- (Fail(SyntaxError)) -> Nil
+i/syntax.item_result : (ItemResult) <- (Fail(SyntaxError)) -> ()
 i/syntax._items : () -> Items
 i/syntax._report_error : (String, Syntax) -> Syntax
 i/syntax.raw_definition : (Syntax) -> DefinitionResult
@@ -528,12 +528,12 @@ i/syntax.members : (Syntax) <- (Fail(SyntaxError), Types) -> List(Syntax)
 i/fs.mode_string : (OpenMode) -> "append" | "read" | "read_write" | "truncate"
 i/fs.open : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner) -> File
 i/fs.read : (File, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-i/fs.write : (File, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
-i/fs.flush : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
-i/fs.close : (File) <- (Fs, request.Await, request.Owner) -> Nil
-i/fs.remove : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
-i/fs.rename : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
-i/fs.mkdir : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
+i/fs.write : (File, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.flush : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.close : (File) <- (Fs, request.Await, request.Owner) -> ()
+i/fs.remove : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.rename : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.mkdir : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
 i/fs.slice : (String, Int, Int) -> String
 i/fs.list_parts : (String, Int) -> List(String)
 i/fs.list : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
@@ -541,7 +541,7 @@ i/fs.metadata : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) ->
 i/fs.temp_dir : () <- (Fail(FsError), Fs, request.Await, request.Owner) -> String
 i/fs.read_chunks : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
 i/fs.read_file : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-i/fs.write_file : (String, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
+i/fs.write_file : (String, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
 i/fs.line_parts : (String, Int) -> List(String)
 i/fs.read_lines : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
 i/process.length : (List(A)) -> Int
@@ -556,35 +556,35 @@ i/process.cwd : () <- (Fail(ProcessError), WorkingDirectory, request.Await, requ
 i/process.entropy : (Int) <- (Entropy, Fail(ProcessError), request.Await, request.Owner) -> BitArray
 i/process.spawn : (String, List(String)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
 i/process.wait : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Int
-i/process.terminate : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Nil
-i/process.close : (Child) <- (Process, request.Await, request.Owner) -> Nil
+i/process.terminate : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+i/process.close : (Child) <- (Process, request.Await, request.Owner) -> ()
 i/process.stdio_mode : (Stdio) -> "inherit" | "null" | "piped"
 i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
 i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
 i/process.read_stdout : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
 i/process.read_stderr : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Nil
-i/process.close_stdin : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Nil
+i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+i/process.close_stdin : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
 i/net.listen : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Listener
 i/net.connect : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
 i/net.accept : (Listener) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
 i/net.local_port : (Listener | Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> Int
 i/net.read : (Stream, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray
-i/net.write : (Stream, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil
-i/net.shutdown_write : (Stream) <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil
-i/net.close_stream : (Stream) <- (Net, request.Await, request.Owner) -> Nil
-i/net.close_listener : (Listener) <- (Net, request.Await, request.Owner) -> Nil
+i/net.write : (Stream, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
+i/net.shutdown_write : (Stream) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
+i/net.close_stream : (Stream) <- (Net, request.Await, request.Owner) -> ()
+i/net.close_listener : (Listener) <- (Net, request.Await, request.Owner) -> ()
 i/net.slice : (String, Int, Int) -> String
 i/net.parts : (String, Int) -> List(String)
 i/net.resolve : (String) <- (Fail(NetError), Net, request.Await, request.Owner) -> List(String)
 i/net.stream_number : (Stream) -> Int
-i/net.byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> Nil, read = (Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil, write = (BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil)
+i/net.byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> (), read = (Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(NetError), Net, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ())
 i/net.bind : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Datagram
-i/net.send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil
+i/net.send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
 i/net.receive_from : (Datagram, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> (address = String, data = BitArray, port = Int)
 i/net.decode_datagram : (A) -> (address = String, data = BitArray, port = Int)
 i/net.local_address : (Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> String
-i/net.close_datagram : (Datagram) <- (Net, request.Await, request.Owner) -> Nil
+i/net.close_datagram : (Datagram) <- (Net, request.Await, request.Owner) -> ()
 i/tls.options : () -> (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)
 i/tls.identity : (BitArray, BitArray) -> (cert = BitArray, key = BitArray)
 i/tls.join : (List(String)) -> String
@@ -596,19 +596,19 @@ i/tls.accept : (net.Stream, (cert = BitArray, key = BitArray), (alpn = List(Stri
 i/tls.dial : (String, Int, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(net.NetError | TlsError), Tls, net.Net, request.Await, request.Owner) -> Stream
 i/tls.alpn : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> String
 i/tls.read : (Stream, Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray
-i/tls.write : (Stream, BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil
-i/tls.shutdown_write : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil
-i/tls.close : (Stream) <- (Tls, request.Await, request.Owner) -> Nil
-i/tls.byte_stream : (Stream) -> (close = () <- (Tls, request.Await, request.Owner) -> Nil, read = (Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil, write = (BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil)
+i/tls.write : (Stream, BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ()
+i/tls.shutdown_write : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ()
+i/tls.close : (Stream) <- (Tls, request.Await, request.Owner) -> ()
+i/tls.byte_stream : (Stream) -> (close = () <- (Tls, request.Await, request.Owner) -> (), read = (Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(TlsError), Tls, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ())
 i/fetch.open : (String, String, String, BitArray) <- (Fail(String), Fetch, request.Await, request.Owner) -> Response
 i/fetch.status : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> Int
 i/fetch.headers : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> String
 i/fetch.read : (Response, Int) <- (Fail(String), Fetch, request.Await, request.Owner) -> BitArray
-i/fetch.close : (Response) <- (Fetch, request.Await, request.Owner) -> Nil
+i/fetch.close : (Response) <- (Fetch, request.Await, request.Owner) -> ()
 i/stdio.read : (Int) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> BitArray
-i/stdio.write : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-i/stdio.write_error : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-i/stdio.flush : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-i/stdio.flush_error : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-i/stdio.print : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-i/stdio.print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
+i/stdio.write : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.write_error : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.flush : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.flush_error : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.print : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()

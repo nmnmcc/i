@@ -8,5 +8,5 @@ main = () {
 		Box(get = () { acc.get() + x })
 	})
 	assert(b.get() == 6)
-	Nil
+	()
 }

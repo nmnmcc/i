@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.twice : (() <- N -> Int) <- N -> Int\napp/main.with_int : (() <- N -> A) <- (N - Svc(Int)) -> A\napp/main.with_dep : (() <- N -> A) <- (N - Dep) -> A\napp/main.with_cov : (() <- N -> A, B) <- (N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () -> Never\napp/main.h1 : () <- (Dep) -> Int\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.twice : (() <- N -> Int) <- N -> Int\napp/main.with_int : (() <- N -> A) <- (N - Svc(Int)) -> A\napp/main.with_dep : (() <- N -> A) <- (N - Dep) -> A\napp/main.with_cov : (() <- N -> A, B) <- (N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () -> Never\napp/main.h1 : () <- (Dep) -> Int\napp/main.main : () -> ()\n",
       "stderr": "src/main.i:4:1: warning[W0504]: top-level binding `ask` is not used\nsrc/main.i:6:1: warning[W0504]: top-level binding `askc` is not used\nsrc/main.i:13:1: warning[W0504]: top-level binding `twice` is not used\nsrc/main.i:14:1: warning[W0504]: top-level binding `with_int` is not used\nsrc/main.i:18:1: warning[W0504]: top-level binding `with_dep` is not used\nsrc/main.i:19:1: warning[W0504]: top-level binding `with_cov` is not used\nsrc/main.i:23:1: warning[W0504]: top-level binding `pick` is not used\nsrc/main.i:25:1: warning[W0504]: top-level binding `h1` is not used\n"
     },
     "test0": {

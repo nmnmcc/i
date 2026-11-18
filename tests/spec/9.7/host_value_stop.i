@@ -14,5 +14,5 @@ half = () <- (bad : Bad) {
 
 main = () {
 	half()
-	Nil
+	()
 }

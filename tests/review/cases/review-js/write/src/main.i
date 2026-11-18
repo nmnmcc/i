@@ -2,15 +2,15 @@ import(i / core, i / resource)
 @host("probe:wasi/v1")
 Wasi = (
 	alloc = (Int) -> Int,
-	free = (Int, Int) -> Nil,
-	store = (Int, BitArray) -> Nil,
+	free = (Int, Int) -> (),
+	store = (Int, BitArray) -> (),
 	load = (Int, Int) -> BitArray,
 	fd_write = (Int, Int, Int, Int) -> Int,
 )
-more = (fd : Int, address : Int, count : Int, io : Int) <- (w : Wasi) -> Nil {
+more = (fd : Int, address : Int, count : Int, io : Int) <- (w : Wasi) -> () {
 	case
 	count
-	(0) { Nil }
+	(0) { () }
 		& (_) {
 			w.store(io, <<address:u32le, count:u32le>>)
 			case
@@ -19,10 +19,10 @@ more = (fd : Int, address : Int, count : Int, io : Int) <- (w : Wasi) -> Nil {
 				<<written:u32le>> = w.load(io + 8, 4)
 				case
 				written
-				(0) { Nil }
+				(0) { () }
 					& (_) { more(fd, address + written, count - written, io) }
 			}
-				& (_) { Nil }
+				& (_) { () }
 		}
 }
 write = (fd : Int, bytes : BitArray) <- (w : Wasi) {

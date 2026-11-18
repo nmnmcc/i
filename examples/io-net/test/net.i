@@ -74,7 +74,7 @@ test("network", () {
 						),
 					),
 			)
-			Nil
+			()
 		})
 	})
 	assert(net.resolve("localhost") != [])
@@ -90,7 +90,7 @@ test("network", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("pending_accept_is_exclusive_and_closed", () {
@@ -122,10 +122,10 @@ test("pending_accept_is_exclusive_and_closed", () {
 						),
 					),
 			)
-			Nil
+			()
 		})
 	})
-	Nil
+	()
 })
 
 test("pending_read_allows_write_and_close_wakes_it", () {
@@ -161,10 +161,10 @@ test("pending_read_allows_write_and_close_wakes_it", () {
 						),
 					),
 			)
-			Nil
+			()
 		})
 	})
 	net.close_stream(peer)
 	net.close_listener(listener)
-	Nil
+	()
 })

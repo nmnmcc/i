@@ -1,5 +1,5 @@
 export(Scope, Task, Scheduler, Runner, go, local_scope)
-import_dummy = Nil
+import_dummy = ()
 Scope(e) = (witness = (e) -> e)
 Task(a, e) = (value = (a) -> a, error = (e) -> e)
 Scheduler = ()

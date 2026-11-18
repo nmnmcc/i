@@ -13,7 +13,7 @@ def source(part, n):
     if part == 'calls':
         # Two statements make the RHS indirect (§6.10). The returned
         # function is instantiated once; the local f has a shared monotype.
-        return 'calls = () {\nf = { g = (x) { Nil }\ng }\n' + ''.join(f'f({s})\n' for s in keys) + 'Nil\n}\n'
+        return 'calls = () {\nf = { g = (x) { () }\ng }\n' + ''.join(f'f({s})\n' for s in keys) + '()\n}\n'
     if part == 'alias':
         return 'Many = ' + ' | '.join(keys) + '\n' + ''.join(f'f{i} = (x: Many) {{ x }}\n' for i in range(100))
     if part == 'nested':

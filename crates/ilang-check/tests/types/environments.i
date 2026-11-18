@@ -4,17 +4,17 @@
 	i/control
 )
 
-Yield(A) = (emit = (A) -> Nil)
+Yield(A) = (emit = (A) -> ())
 
 // §4.1: a function-only Source(Never) is inhabited. A required value
 // retains this fixture's negative empty-intersection intent under Decision 1.
 Source(A) = (value = A, next = () -> A)
 
-collect : <A, N>(() <- (Yield(A), ..N) -> Nil) <- N -> List(A) = (body) {
+collect : <A, N>(() <- (Yield(A), ..N) -> ()) <- N -> List(A) = (body) {
 	control.boundary((b) {
 		_syn3_0 : Yield(A) = Yield(
 			emit = (x) {
-				control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+				control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 			},
 		)
 		{
@@ -36,12 +36,12 @@ numbers = () {
 inferred = <A>() { collect(() <- (y : Yield(A)) { y.emit("s") }) }
 
 // A function that needs `Yield(Int)` may not be given `Yield(Never)`.
-run_never = (body : () <- (Yield(Never)) -> Nil) { 1 }
+run_never = (body : () <- (Yield(Never)) -> ()) { 1 }
 
 bad_never = () { run_never(() <- (y : Yield(Int)) { y.emit(1) }) }
 
 // Equal arguments are fine.
-run_int = (body : () <- (Yield(Int)) -> Nil) { 1 }
+run_int = (body : () <- (Yield(Int)) -> ()) { 1 }
 
 good_int = () { run_int(() <- (y : Yield(Int)) { y.emit(1) }) }
 
@@ -69,18 +69,18 @@ both_sources = () {
 both_fns = [() { emit_int() }, () { emit_string() }]
 
 // In a written environment.
-written = () <- (y : Yield(Int), z : Source(Int)) -> Nil { y.emit(z.next()) }
+written = () <- (y : Yield(Int), z : Source(Int)) -> () { y.emit(z.next()) }
 
 // Provide: Yield(Int) cannot implement a need for Yield(Int | String);
 // Yield(Int | String) can implement that need.
 emit_any = () <- (y: Yield(Int | String)) { y.emit(1) }
 
 given_narrow = () {
-	_syn3_1 : Yield(Int) = Yield(emit = (x : Int) { Nil })
+	_syn3_1 : Yield(Int) = Yield(emit = (x : Int) { () })
 	emit_any() <- (_syn3_1)
 }
 
 given_same = () {
-	_syn3_2 : Yield(Int | String) = Yield(emit = (x : { Int | String }) { Nil })
+	_syn3_2 : Yield(Int | String) = Yield(emit = (x : { Int | String }) { () })
 	emit_any() <- (_syn3_2)
 }

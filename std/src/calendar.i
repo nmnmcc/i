@@ -270,8 +270,8 @@ to_instant = (civil : Civil, offset : Offset) -> time.Instant {
 
 // Every input check in the text profile maps to BadText, including constructor
 // failures. These helpers raise only within parse's enclosing pure catch.
-require_text = (valid : Bool) -> Nil {
-	valid |> (True) { Nil } & (False) { fail.raise(BadText) }
+require_text = (valid : Bool) -> () {
+	valid |> (True) { () } & (False) { fail.raise(BadText) }
 }
 
 expect = (chars : List(Int), wanted : Int) -> List(Int) {

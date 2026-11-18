@@ -10,5 +10,5 @@ main = () {
 	assert(make(4)(3) == 7)
 	assert(read(3) == 3)
 	assert(read("other") == 0)
-	Nil
+	()
 }

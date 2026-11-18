@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.get : () <- (Dep) -> Int\napp/main.make : (Int) -> () -> Nil\napp/main.example : () -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\napp/main.get : () <- (Dep) -> Int\napp/main.make : (Int) -> () -> ()\napp/main.example : () -> ()\n",
       "stderr": "src/main.i:20:1: warning[W0504]: top-level binding `example` is not used\n"
     },
     "test0": {

@@ -10,7 +10,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -18,13 +18,13 @@ show = (x) { core.inspect(x) }
 
 Bad = (Int)
 
-Paused = (Continuation(Nil, PausedSum, Never))
+Paused = (Continuation((), PausedSum, Never))
 Done = ()
 PausedSum = Paused | Done
 
 // Puts `text` in front of the value of the boundary `log`.
 note = (log, text) {
-	control.suspend(log, (k) { text <> " " <> control.resume(k, Nil) })
+	control.suspend(log, (k) { text <> " " <> control.resume(k, ()) })
 }
 
 // `n` frames that wait.
@@ -57,7 +57,7 @@ test("error_runs_finals_innermost_first", () {
 		e = fail.catch(() {
 			control.boundary((b) {
 				layer(log, 3, () {
-					control.suspend(b, (k) { control.resume(k, Nil) })
+					control.suspend(b, (k) { control.resume(k, ()) })
 					fail.raise(Bad(1))
 				})
 			})

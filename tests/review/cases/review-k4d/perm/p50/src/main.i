@@ -4,11 +4,11 @@ both : <N>() <- (Fail(Never), S(N), T(Int, N), ..N) -> Int = () <- (
 
 fr = () { run(() { use() }) }
 
-T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
+T(A, N) = (g = (A) <- N -> A, m = (N) -> ())
 
 main = () {
 	closed()
-	Nil
+	()
 }
 
 pong = (n : Int) { ping(n) + uset(1) }
@@ -51,7 +51,7 @@ run = <A, N>(body : () <- N -> A) { body() }
 closed = () {
 	_syn3_0 : T(Int, Dep) = T(
 		g = (x : Int) { x + get() },
-		m = (_ : Dep) { Nil },
+		m = (_ : Dep) { () },
 	)
 	_syn3_1 : S(Dep) = S(f = () { get() })
 	both() <- (Dep(v = 1), _syn3_0, _syn3_1)

@@ -73,7 +73,7 @@ def literal_case(seed, *, value_types, rng=None):
     declarations.append(literal_match(domain, rows))
     if covered:
         assertions = '\n'.join(f'  assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items())
-        declarations.append('main = () {\n' + assertions + '\n  Nil\n}')
+        declarations.append('main = () {\n' + assertions + '\n  ()\n}')
     return {'name': ('literal-value-guard-' if value_types else 't1-finite-') + str(seed),
             'declarations': declarations, 'accept': covered, 'rows': rows,
             'model': [{'string': v, 'bool': b, 'result': i} for (v, b), i in expected.items()],
@@ -85,7 +85,7 @@ def alias_case(seed):
     n = rng.randint(3, 20)
     declarations = ["value : Int = 1", 'A0 = value']
     declarations += [f'A{i} = A{i-1}' for i in range(1, n)]
-    declarations += [f'pass = (x : A{n-1}) -> Int {{ x }}', 'main = () { assert(pass(2) == 2) Nil }']
+    declarations += [f'pass = (x : A{n-1}) -> Int {{ x }}', 'main = () { assert(pass(2) == 2) () }']
     return {'name': f't2-alias-{seed}', 'declarations': declarations, 'accept': True,
             'annotation': (f'pass = (x : A{n-1}) -> Int {{ x }}', 'pass = (x) { x }')}
 
@@ -93,14 +93,14 @@ def alias_case(seed):
 def service_case(seed):
     # The positive service family in K4 reviews, with closed equal arguments.
     n = random.Random(seed).randint(1, 8)
-    declarations = ['Svc(A) = (f = () -> A, m = (A) -> Nil)',
+    declarations = ['Svc(A) = (f = () -> A, m = (A) -> ())',
                     "ask = <A>() <- (s : Svc(A)) { s.f() }",
                     "run = <A, N>(body : () <- N -> A) { body() }",
                     "pass = (x : Int) -> Int { x }",
                     'h0 = () { ask() }']
     declarations += [f'h{i} = () {{ run(() {{ h{i-1}() }}) }}' for i in range(1, n)]
     # Retain the old provider's explicit closed Svc(Int) contract (§9.2).
-    declarations += [f'main = () {{\n service : Svc(Int) = Svc(f = () {{ 7 }}, m = (_ : Int) {{ Nil }})\n assert(pass(h{n-1}()) == 7) <- (service)\n Nil\n}}']
+    declarations += [f'main = () {{\n service : Svc(Int) = Svc(f = () {{ 7 }}, m = (_ : Int) {{ () }})\n assert(pass(h{n-1}()) == 7) <- (service)\n ()\n}}']
     return {'name': f'k4-services-{seed}', 'declarations': declarations, 'accept': True,
             'annotation': ("pass = (x : Int) -> Int { x }", 'pass = (x) { x }')}
 
@@ -180,7 +180,7 @@ def rebuild(case, rows):
     domain = 'Input' if any(d == 'Input = domain' for d in declarations) else '("a" | "ab" | "b" | "c" | "", Bool)'
     declarations.append(literal_match(domain, rows))
     if candidate['accept']:
-        declarations.append('main = () {\n' + '\n'.join(f' assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items()) + '\n Nil\n}')
+        declarations.append('main = () {\n' + '\n'.join(f' assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items()) + '\n ()\n}')
     candidate['declarations'] = declarations
     return candidate
 

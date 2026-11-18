@@ -85,4 +85,4 @@ part = (t : { (Int, String) | (Float, Bool, Int) }) { t.1 }
 
 short = (t : { (Int) | (Int, Int) }) { t.1 }
 
-not_tuple = (t : { (Int, Int) | Nil }) { t.0 }
+not_tuple = (t : { (Int, Int) | () }) { t.0 }

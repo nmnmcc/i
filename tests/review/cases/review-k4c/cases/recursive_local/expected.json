@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.bad : () -> Nil\n",
+      "stdout": "app/main.bad : () -> ()\n",
       "stderr": "src/main.i:2:2: error[E0505]: this type has itself inside it, through a type variable\n1 error\n"
     }
   }

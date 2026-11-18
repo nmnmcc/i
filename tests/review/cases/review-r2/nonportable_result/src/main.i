@@ -13,7 +13,7 @@ main = () <- (io : Io) {
 	control.boundary((b) {
 		task.scope((s) {
 			task.go(s, () { b })
-			Nil
+			()
 		})
 	})
 }

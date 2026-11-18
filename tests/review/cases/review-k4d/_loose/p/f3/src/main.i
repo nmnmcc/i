@@ -23,5 +23,5 @@ bad = () {
 
 main = () {
 	bad()
-	Nil
+	()
 }

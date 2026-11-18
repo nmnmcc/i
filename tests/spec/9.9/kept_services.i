@@ -32,13 +32,13 @@ main = () {
 			assert(task.join(t) == ("saved", [1], 7))
 		})
 		assert(read_name() == "saved")
-		pure = task.keep((_ : Nil) { 1 })
+		pure = task.keep((_ : ()) { 1 })
 		assert(core.portable(pure))
 		control.boundary((b) {
 			task.scope((s) {
 				t = task.go(s, () {
 					task.yield()
-					saved = task.keep((_ : Nil) { 1 })
+					saved = task.keep((_ : ()) { 1 })
 					core.not(core.portable(saved))
 				})
 				assert(core.portable(t))
@@ -48,4 +48,4 @@ main = () {
 	} <- (Name(value = "saved"))
 }
 
-Marker = (Boundary(Nil, task.Scheduler | Assert | request.Root | Fail(Never)))
+Marker = (Boundary((), task.Scheduler | Assert | request.Root | Fail(Never)))

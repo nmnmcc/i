@@ -8,14 +8,14 @@
 )
 
 // U3 and §6.3: every successful route to Uri preserves raw spelling.
-round_trip = (u : uri.Uri) -> Nil {
+round_trip = (u : uri.Uri) -> () {
 	assert(
 		uri.parse(uri.to_string(u)) == Ok(u),
 	)
 	assert(
 		uri.build(uri.parts(u)) == Ok(u),
 	)
-	Nil
+	()
 }
 
 parse_good = (s : String) -> uri.Uri {
@@ -92,7 +92,7 @@ test("uri_raw_parts", () {
 		) ==
 			Error(uri.InvalidUtf8),
 	)
-	Nil
+	()
 })
 
 // U1/U8 selection and translation, including byte counts rather than codepoints.
@@ -295,7 +295,7 @@ test("uri_parse_errors", () {
 		(text, expected) = pair
 		assert(uri.parse(text) == Error(expected))
 	})
-	Nil
+	()
 })
 
 test("uri_build_errors", () {
@@ -514,7 +514,7 @@ test("uri_build_errors", () {
 		(p, expected) = pair
 		assert(uri.build(p) == Error(expected))
 	})
-	Nil
+	()
 })
 
 // RFC 3986 §5.4 normal and abnormal examples; strict http:g behavior.
@@ -581,7 +581,7 @@ test("uri_rfc_resolution", () {
 	Ok(v) = uri.resolve(parse_good("x:a#old"), parse_good(""))
 	assert(uri.to_string(v) == "x:a")
 	round_trip(v)
-	Nil
+	()
 })
 
 test("uri_resolution_validation", () {
@@ -617,7 +617,7 @@ test("uri_resolution_validation", () {
 	Ok(u) = uri.resolve(parse_good("x://host/a"), parse_good("/.//h"))
 	assert(uri.to_string(u) == "x://host//h")
 	round_trip(u)
-	Nil
+	()
 })
 
 test("uri_ip_literals", () {
@@ -671,7 +671,7 @@ test("uri_ip_literals", () {
 				),
 		)
 	})
-	Nil
+	()
 })
 
 test("uri_codecs", () {
@@ -707,7 +707,7 @@ test("uri_codecs", () {
 			uri.decode_component(uri.encode_component(s)) == Ok(s),
 		)
 	})
-	Nil
+	()
 })
 
 test("uri_forms", () {
@@ -738,7 +738,7 @@ test("uri_forms", () {
 			)
 		})
 	})
-	Nil
+	()
 })
 
 // Generated valid Parts use U4's preservation law; short arbitrary ASCII
@@ -808,7 +808,7 @@ test("uri_generated_round_trips", () {
 				assert(uri.to_string(u) == s)
 				round_trip(u)
 			}
-			& (Error(_)) { Nil }
+			& (Error(_)) { () }
 	}
 	list.each(list.range(0, 127), (n) {
 		Ok(cp) = string.utf_codepoint(n)
@@ -819,7 +819,7 @@ test("uri_generated_round_trips", () {
 			list.each(alphabet, (c) { check(string.concat([a, b, c])) })
 		})
 	})
-	Nil
+	()
 })
 
 test("uri_long_inputs", () {
@@ -850,5 +850,5 @@ test("uri_long_inputs", () {
 	assert(
 		uri.parse_query(uri.build_query(pairs)) == Ok(pairs),
 	)
-	Nil
+	()
 })

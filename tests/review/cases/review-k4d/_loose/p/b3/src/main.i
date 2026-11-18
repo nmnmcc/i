@@ -10,5 +10,5 @@ run = <A, N>(body : () <- N -> A) { body() }
 main = () {
 	local = () { use() }
 	local()
-	Nil
+	()
 }

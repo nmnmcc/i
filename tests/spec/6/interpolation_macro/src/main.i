@@ -7,5 +7,5 @@ main = () {
 	assert(
 		"before \(m.pass("inside \(name)")) after" == "before inside i after",
 	)
-	Nil
+	()
 }

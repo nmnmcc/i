@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.use : () <- (S(N), ..N) -> Nil\nprobe/main.closed : () <- (S(Never)) -> Nil\nprobe/main.example : () -> Nil\n",
+      "stdout": "probe/main.use : () <- (S(N), ..N) -> ()\nprobe/main.closed : () <- (S(Never)) -> ()\nprobe/main.example : () -> ()\n",
       "stderr": ""
     },
     "test0": {

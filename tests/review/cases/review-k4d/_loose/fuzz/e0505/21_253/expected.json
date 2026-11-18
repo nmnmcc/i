@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (S(N), T(N2), ..N, ..N2) -> Int\napp/main.h1 : () <- (S(N), ..N) -> Int\napp/main.main : () <- (Dep) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (S(N), T(N2), ..N, ..N2) -> Int\napp/main.h1 : () <- (S(N), ..N) -> Int\napp/main.main : () <- (Dep) -> ()\n",
       "stderr": "src/main.i:24:7: error[E0515]: `S(_)` and `S(T(Dep))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 22:27 needs it)\n1 error\n"
     }
   }

@@ -1,7 +1,7 @@
 (
 	(Io) = i/io
 )
-Svc(A) = (f = () -> A, m = (A) -> Nil)
+Svc(A) = (f = () -> A, m = (A) -> ())
 ask = <A>() <- (s : Svc(A)) { s.f() }
 wrap : <N>(() <- N -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (
 	body,
@@ -13,12 +13,12 @@ wrap : <N>(() <- N -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (
 tell = (x : Int) { x |> (2) { "two" } & (_) { "other" } }
 
 main = () <- (io : Io) {
-	_syn3_1 : Svc(Int) = Svc(f = () { 1 }, m = (_ : Int) { Nil })
+	_syn3_1 : Svc(Int) = Svc(f = () { 1 }, m = (_ : Int) { () })
 	io.print(
 		tell(
 			wrap(
 				() { ask() + 1 },
-				Svc(f = () { "s" }, m = (_ : String) { Nil }),
+				Svc(f = () { "s" }, m = (_ : String) { () }),
 			),
 		),
 	) <- (_syn3_1)

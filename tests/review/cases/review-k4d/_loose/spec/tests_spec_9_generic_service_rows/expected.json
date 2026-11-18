@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/generic_service_rows.use : () <- (S(N), ..N) -> Nil\nspec/generic_service_rows.annotated : () <- (S(N), ..N) -> Nil\nspec/generic_service_rows.run : (() <- N -> A) <- N -> A\nspec/generic_service_rows.generated_test : () <- (Assert) -> Nil\nspec/generic_service_rows.get : () <- (Dependency) -> Int\nspec/generic_service_rows.read : () <- (Inner(N), ..N) -> Int\nspec/generic_service_rows.read_outer : () <- (Outer(N), ..N) -> Int\nspec/generic_service_rows.generated_test : () <- (Assert) -> Nil\nspec/generic_service_rows.make : ((Entry) <- (Fail(A), ..N) -> Nil) -> Sink(A, N)\nspec/generic_service_rows.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> Nil\nspec/generic_service_rows.write_annotated : (Entry) <- (Fail(A), Sink(A, N), ..N) -> Nil\nspec/generic_service_rows.generated_test : () <- (Assert) -> Nil\n",
+      "stdout": "spec/generic_service_rows.use : () <- (S(N), ..N) -> ()\nspec/generic_service_rows.annotated : () <- (S(N), ..N) -> ()\nspec/generic_service_rows.run : (() <- N -> A) <- N -> A\nspec/generic_service_rows.generated_test : () <- (Assert) -> ()\nspec/generic_service_rows.get : () <- (Dependency) -> Int\nspec/generic_service_rows.read : () <- (Inner(N), ..N) -> Int\nspec/generic_service_rows.read_outer : () <- (Outer(N), ..N) -> Int\nspec/generic_service_rows.generated_test : () <- (Assert) -> ()\nspec/generic_service_rows.make : ((Entry) <- (Fail(A), ..N) -> ()) -> Sink(A, N)\nspec/generic_service_rows.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> ()\nspec/generic_service_rows.write_annotated : (Entry) <- (Fail(A), Sink(A, N), ..N) -> ()\nspec/generic_service_rows.generated_test : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

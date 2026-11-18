@@ -9,7 +9,7 @@
 main = () {
 	control.boundary((b) {
 		c = task.channel()
-		task.choose([task.always(Nil), task.send_event(c, b)])
-		Nil
+		task.choose([task.always(()), task.send_event(c, b)])
+		()
 	})
 }

@@ -25,7 +25,7 @@
     "line": 6,
     "hash": "70b3d01bf6a0123c0557a286eb65dae117988cedc287b3df11f51f6350df652b",
     "old": "//! module that holds the node (`Module::source`).\n//!\n//! §2.4 for the inferred type of an exported binding, and the rules of\n//! §10.2 and §10.3 that need the inferred type of an entry point, are\n//! checked by type inference (`types/infer.rs`); resolution checks the\n//! written types.\n",
-    "new": "//! module that holds the node (`Module::source`).\n//!\n//! The rule that the inferred type of an exported binding may use only exported\n//! types, and the rules that an entry point has a type its kind allows (a test\n//! gives `Nil`; a host export takes and gives only types the host can take), are\n//! checked by type inference (`types/infer.rs`); resolution checks the\n//! written types.\n"
+    "new": "//! module that holds the node (`Module::source`).\n//!\n//! The rule that the inferred type of an exported binding may use only exported\n//! types, and the rules that an entry point has a type its kind allows (a test\n//! gives `()`; a host export takes and gives only types the host can take), are\n//! checked by type inference (`types/infer.rs`); resolution checks the\n//! written types.\n"
   },
   {
     "file": "crates/ilang-check/src/hir.rs",
@@ -857,8 +857,8 @@
     "file": "crates/ilang-check/src/resolve/differential.rs",
     "line": 515,
     "hash": "77512a18d42106f07f34228dd4082e51abf3f0da5a053c8331a420546bec507b",
-    "old": "const EXTRA: &[&str] = &[\n    // Written branch result unions and ordinary Fail service patterns use\n    // the single need, including several forms of the same Fail key (E3).\n    \"f = (x: Int) -> Int { x } | (x: Float) -> Float { x }\\ng = (x: Int) -> Int { x } | (x: Float) -> Float { x } | (x: String) { x }\\nh = () <- (failure: Fail(Int)) { 1 }\\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } | (x: Float) <- (failure: Fail(Int)) -> Float { x }\\n\",\n    // A finite callback need captured by a local annotation, then handled.\n    \"S(N) = (() <- N -> Nil)\\nDependency = ()\\nread = () <- (d: Dependency) { Nil }\\nuse = <N>() <- (s: S(N)) { S(f) = s  f() }\\napply = <N>() { local: () <- N -> Nil = () { use() }  local() }\\nmain = () { apply() <- (S(() { read() })) }\\ntyped = () { provided: S(Dependency) = S(() { read() })  apply() <- (provided) }\\n\",\n    // Stages 9/10: named and inline groups, aliases, canonical key order,\n    // recursion and missing/duplicate shape diagnostics.\n    \"(f, alias)\\nf = (0) { 0 } | (n: Int) { f(n - 1) } | (x: Int, y: Int) { x + y }\\nalias = f\\na = alias(1, 2)\\nb = 1 |> alias(2)\\nc = f()\\nlocal = () { g = (a = x: Int, z = y: Int) { x + y } | (x: Int) { x }  g(z = 2, a = 1) }\\ninline = [(x: Int) { x } | (x: Int, y: Int) { x + y }]\\n\",\n",
-    "new": "const EXTRA: &[&str] = &[\n    // Written branch result unions and ordinary Fail service patterns use\n    // the single need, including several forms of the same Fail key.\n    \"f = (x: Int) -> Int { x } | (x: Float) -> Float { x }\\ng = (x: Int) -> Int { x } | (x: Float) -> Float { x } | (x: String) { x }\\nh = () <- (failure: Fail(Int)) { 1 }\\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } | (x: Float) <- (failure: Fail(Int)) -> Float { x }\\n\",\n    // A finite callback need captured by a local annotation, then handled.\n    \"S(N) = (() <- N -> Nil)\\nDependency = ()\\nread = () <- (d: Dependency) { Nil }\\nuse = <N>() <- (s: S(N)) { S(f) = s  f() }\\napply = <N>() { local: () <- N -> Nil = () { use() }  local() }\\nmain = () { apply() <- (S(() { read() })) }\\ntyped = () { provided: S(Dependency) = S(() { read() })  apply() <- (provided) }\\n\",\n    // Shape dispatch must agree for named and inline groups, aliases, key order,\n    // recursion and missing/duplicate shape diagnostics.\n    \"(f, alias)\\nf = (0) { 0 } | (n: Int) { f(n - 1) } | (x: Int, y: Int) { x + y }\\nalias = f\\na = alias(1, 2)\\nb = 1 |> alias(2)\\nc = f()\\nlocal = () { g = (a = x: Int, z = y: Int) { x + y } | (x: Int) { x }  g(z = 2, a = 1) }\\ninline = [(x: Int) { x } | (x: Int, y: Int) { x + y }]\\n\",\n"
+    "old": "const EXTRA: &[&str] = &[\n    // Written branch result unions and ordinary Fail service patterns use\n    // the single need, including several forms of the same Fail key (E3).\n    \"f = (x: Int) -> Int { x } | (x: Float) -> Float { x }\\ng = (x: Int) -> Int { x } | (x: Float) -> Float { x } | (x: String) { x }\\nh = () <- (failure: Fail(Int)) { 1 }\\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } | (x: Float) <- (failure: Fail(Int)) -> Float { x }\\n\",\n    // A finite callback need captured by a local annotation, then handled.\n    \"S(N) = (() <- N -> ())\\nDependency = ()\\nread = () <- (d: Dependency) { () }\\nuse = <N>() <- (s: S(N)) { S(f) = s  f() }\\napply = <N>() { local: () <- N -> () = () { use() }  local() }\\nmain = () { apply() <- (S(() { read() })) }\\ntyped = () { provided: S(Dependency) = S(() { read() })  apply() <- (provided) }\\n\",\n    // Stages 9/10: named and inline groups, aliases, canonical key order,\n    // recursion and missing/duplicate shape diagnostics.\n    \"(f, alias)\\nf = (0) { 0 } | (n: Int) { f(n - 1) } | (x: Int, y: Int) { x + y }\\nalias = f\\na = alias(1, 2)\\nb = 1 |> alias(2)\\nc = f()\\nlocal = () { g = (a = x: Int, z = y: Int) { x + y } | (x: Int) { x }  g(z = 2, a = 1) }\\ninline = [(x: Int) { x } | (x: Int, y: Int) { x + y }]\\n\",\n",
+    "new": "const EXTRA: &[&str] = &[\n    // Written branch result unions and ordinary Fail service patterns use\n    // the single need, including several forms of the same Fail key.\n    \"f = (x: Int) -> Int { x } | (x: Float) -> Float { x }\\ng = (x: Int) -> Int { x } | (x: Float) -> Float { x } | (x: String) { x }\\nh = () <- (failure: Fail(Int)) { 1 }\\nduplicate = () <- (a: Fail(Int), b: Fail(Float)) { 0 }\\nk = (x: Int) <- (failure: Fail(Int)) -> Int { x } | (x: Float) <- (failure: Fail(Int)) -> Float { x }\\n\",\n    // A finite callback need captured by a local annotation, then handled.\n    \"S(N) = (() <- N -> ())\\nDependency = ()\\nread = () <- (d: Dependency) { () }\\nuse = <N>() <- (s: S(N)) { S(f) = s  f() }\\napply = <N>() { local: () <- N -> () = () { use() }  local() }\\nmain = () { apply() <- (S(() { read() })) }\\ntyped = () { provided: S(Dependency) = S(() { read() })  apply() <- (provided) }\\n\",\n    // Shape dispatch must agree for named and inline groups, aliases, key order,\n    // recursion and missing/duplicate shape diagnostics.\n    \"(f, alias)\\nf = (0) { 0 } | (n: Int) { f(n - 1) } | (x: Int, y: Int) { x + y }\\nalias = f\\na = alias(1, 2)\\nb = 1 |> alias(2)\\nc = f()\\nlocal = () { g = (a = x: Int, z = y: Int) { x + y } | (x: Int) { x }  g(z = 2, a = 1) }\\ninline = [(x: Int) { x } | (x: Int, y: Int) { x + y }]\\n\",\n"
   },
   {
     "file": "crates/ilang-check/src/resolve/differential.rs",
@@ -2033,8 +2033,8 @@
     "file": "crates/ilang-check/src/types/infer.rs",
     "line": 1013,
     "hash": "af1e7c18531bc1a1405937ea4a65bb4e4888bcf14b9860f58d8daddb5b29a88e",
-    "old": "    }\n\n    /// §10.2 and §10.3 for one entry point, with its inferred type: a test\n    /// gives `Nil`; a host export takes and gives types that the host can\n    /// take. The platform check of the target (`platform.rs`) reads its need.\n",
-    "new": "    }\n\n    /// Entry checks use the inferred type: a test\n    /// gives `Nil`; a host export takes and gives types that the host can\n    /// take. The platform check of the target (`platform.rs`) reads its need.\n"
+    "old": "    }\n\n    /// §10.2 and §10.3 for one entry point, with its inferred type: a test\n    /// gives `()`; a host export takes and gives types that the host can\n    /// take. The platform check of the target (`platform.rs`) reads its need.\n",
+    "new": "    }\n\n    /// Entry checks use the inferred type: a test\n    /// gives `()`; a host export takes and gives types that the host can\n    /// take. The platform check of the target (`platform.rs`) reads its need.\n"
   },
   {
     "file": "crates/ilang-check/src/types/infer.rs",
@@ -2831,8 +2831,8 @@
     "file": "crates/ilang-check/src/types/mod.rs",
     "line": 670,
     "hash": "6a051e06db3930c258156e46e81942690bd46da6d865d553964715612fde09df",
-    "old": "}\n\n/// The types of a host export (B.2): its parameters, its value, and the\n/// members of its errors in the canonical order (`Nil`, `Bool`, `Int`,\n/// `Float`, `String`, `BitArray`).\n",
-    "new": "}\n\n/// The types of a host export: its parameters, its value, and the\n/// members of its errors in the canonical order (`Nil`, `Bool`, `Int`,\n/// `Float`, `String`, `BitArray`).\n"
+    "old": "}\n\n/// The types of a host export (B.2): its parameters, its value, and the\n/// members of its errors in the canonical order (`()`, `Bool`, `Int`,\n/// `Float`, `String`, `BitArray`).\n",
+    "new": "}\n\n/// The types of a host export: its parameters, its value, and the\n/// members of its errors in the canonical order (`()`, `Bool`, `Int`,\n/// `Float`, `String`, `BitArray`).\n"
   },
   {
     "file": "crates/ilang-check/src/types/mod.rs",
@@ -3657,50 +3657,50 @@
     "file": "crates/ilang-check/tests/coalescing.rs",
     "line": 22,
     "hash": "c6c725055922833b677486ba0e7b58beb611b09a4d093929ff2be820fe8ee539",
-    "old": "#[test]\nfn annotated_local_keeps_the_missing_service() {\n    // §4.8 rules 4–5 retain S(N); §10.2 requires it before entry.\n    let source = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\\n\\tlocal()\\n}\";\n    entry(source);\n",
-    "new": "#[test]\nfn annotated_local_keeps_the_missing_service() {\n    // The typing rules retain S(N), which must be provided before entry.\n    let source = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\\n\\tlocal()\\n}\";\n    entry(source);\n"
+    "old": "#[test]\nfn annotated_local_keeps_the_missing_service() {\n    // §4.8 rules 4–5 retain S(N); §10.2 requires it before entry.\n    let source = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> () = () { use() }\\n\\tlocal()\\n}\";\n    entry(source);\n",
+    "new": "#[test]\nfn annotated_local_keeps_the_missing_service() {\n    // The typing rules retain S(N), which must be provided before entry.\n    let source = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> () = () { use() }\\n\\tlocal()\\n}\";\n    entry(source);\n"
   },
   {
     "file": "crates/ilang-check/tests/coalescing.rs",
     "line": 30,
     "hash": "ac804e54c17f4a05ffc599e555158995ca7e2a44723f6621e388b1daa371c1f1",
-    "old": "#[test]\nfn local_scheme_is_shown_without_an_entry() {\n    // §4.7: the finite principal scheme may not disappear from --types.\n    let source = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\\n\\tlocal()\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/other.i\", source)]);\n",
-    "new": "#[test]\nfn local_scheme_is_shown_without_an_entry() {\n    // The finite principal scheme may not disappear from --types.\n    let source = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\\n\\tlocal()\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/other.i\", source)]);\n"
+    "old": "#[test]\nfn local_scheme_is_shown_without_an_entry() {\n    // §4.7: the finite principal scheme may not disappear from --types.\n    let source = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> () = () { use() }\\n\\tlocal()\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/other.i\", source)]);\n",
+    "new": "#[test]\nfn local_scheme_is_shown_without_an_entry() {\n    // The finite principal scheme may not disappear from --types.\n    let source = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> () = () { use() }\\n\\tlocal()\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/other.i\", source)]);\n"
   },
   {
     "file": "crates/ilang-check/tests/coalescing.rs",
     "line": 53,
     "hash": "0a876e96b21b2f8313652b522d2c8bf4280e485cfab60407085b8ca2767d24a0",
-    "old": "fn annotation_positions_retain_the_service() {\n    let base = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> Nil) { body() }\";\n    // §4.7 and §4.8: annotations, local generalization and calls cannot\n    // remove a requirement. Every case is a finite scheme needing S(N).\n    for body in [\n",
-    "new": "fn annotation_positions_retain_the_service() {\n    let base = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> Nil) { body() }\";\n    // Annotations, local generalization and calls cannot\n    // remove a requirement. Every case is a finite scheme needing S(N).\n    for body in [\n"
+    "old": "fn annotation_positions_retain_the_service() {\n    let base = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> ()) { body() }\";\n    // §4.7 and §4.8: annotations, local generalization and calls cannot\n    // remove a requirement. Every case is a finite scheme needing S(N).\n    for body in [\n",
+    "new": "fn annotation_positions_retain_the_service() {\n    let base = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> ()) { body() }\";\n    // Annotations, local generalization and calls cannot\n    // remove a requirement. Every case is a finite scheme needing S(N).\n    for body in [\n"
   },
   {
     "file": "crates/ilang-check/tests/coalescing.rs",
     "line": 98,
     "hash": "099bde90c10372d416f76c69b6bba12a3bbbf7e0a3312b14c9286ebee0120a33",
-    "old": "    let source = \"S(A, B) = (() <- A -> Nil, () <- B -> Nil)\\nuse = <A, B>() <- (s : S(A, B)) {\\n\\tS(f, g) = s\\n\\tf()\\n\\tg()\\n}\\n\\nmain = <A, B>() {\\n\\tlocal = () { use() }\\n\\tlocal()\\n}\";\n    // The old annotation `() -> Nil ! A | B | S(A, B)` has two row variables,\n    // which syntax three cannot write (one `..N` per need list); only the\n    // inferred form is checked.\n    entry(source);\n",
-    "new": "    let source = \"S(A, B) = (() <- A -> Nil, () <- B -> Nil)\\nuse = <A, B>() <- (s : S(A, B)) {\\n\\tS(f, g) = s\\n\\tf()\\n\\tg()\\n}\\n\\nmain = <A, B>() {\\n\\tlocal = () { use() }\\n\\tlocal()\\n}\";\n    // The old annotation `() -> Nil ! A | B | S(A, B)` has two row variables,\n    // which the source syntax cannot write (one `..N` per need list); only the\n    // inferred form is checked.\n    entry(source);\n"
+    "old": "    let source = \"S(A, B) = (() <- A -> (), () <- B -> ())\\nuse = <A, B>() <- (s : S(A, B)) {\\n\\tS(f, g) = s\\n\\tf()\\n\\tg()\\n}\\n\\nmain = <A, B>() {\\n\\tlocal = () { use() }\\n\\tlocal()\\n}\";\n    // The old annotation `() -> () ! A | B | S(A, B)` has two row variables,\n    // which syntax three cannot write (one `..N` per need list); only the\n    // inferred form is checked.\n    entry(source);\n",
+    "new": "    let source = \"S(A, B) = (() <- A -> (), () <- B -> ())\\nuse = <A, B>() <- (s : S(A, B)) {\\n\\tS(f, g) = s\\n\\tf()\\n\\tg()\\n}\\n\\nmain = <A, B>() {\\n\\tlocal = () { use() }\\n\\tlocal()\\n}\";\n    // The old annotation `() -> () ! A | B | S(A, B)` has two row variables,\n    // which the source syntax cannot write (one `..N` per need list); only the\n    // inferred form is checked.\n    entry(source);\n"
   },
   {
     "file": "crates/ilang-check/tests/coalescing.rs",
     "line": 105,
     "hash": "785cab35bd44e70865f3e78b4dbbcf811f553f1104917ce5d8bf4e099963b1e4",
-    "old": "#[test]\nfn a_captured_row_annotation_can_contain_the_service() {\n    // E3 removes the old error channel. 73f725713 inserted Fail(Never)\n    // only to suppress its synthetic carrier; Decision 2 makes that a real\n    // key, so restore the pre-conversion annotation rather than erase it.\n    // §4.7 allows N to become the more exact finite row A | S(A).\n    // Merely making an unused function needs nothing (§4.8 rule 4).\n    let source = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- N -> Nil = () { use() }\\n\\tlocal()\\n}\";\n    entry(source);\n",
-    "new": "#[test]\nfn a_captured_row_annotation_can_contain_the_service() {\n    // An explicit Fail(Never) still requires its service key. This case\n    // isolates the inferred row without adding that separate requirement.\n    // Inference allows N to become the more exact finite row A | S(A).\n    // Merely making an unused function needs nothing.\n    let source = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- N -> Nil = () { use() }\\n\\tlocal()\\n}\";\n    entry(source);\n"
+    "old": "#[test]\nfn a_captured_row_annotation_can_contain_the_service() {\n    // E3 removes the old error channel. 73f725713 inserted Fail(Never)\n    // only to suppress its synthetic carrier; Decision 2 makes that a real\n    // key, so restore the pre-conversion annotation rather than erase it.\n    // §4.7 allows N to become the more exact finite row A | S(A).\n    // Merely making an unused function needs nothing (§4.8 rule 4).\n    let source = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- N -> () = () { use() }\\n\\tlocal()\\n}\";\n    entry(source);\n",
+    "new": "#[test]\nfn a_captured_row_annotation_can_contain_the_service() {\n    // An explicit Fail(Never) still requires its service key. This case\n    // isolates the inferred row without adding that separate requirement.\n    // Inference allows N to become the more exact finite row A | S(A).\n    // Merely making an unused function needs nothing.\n    let source = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- N -> () = () { use() }\\n\\tlocal()\\n}\";\n    entry(source);\n"
   },
   {
     "file": "crates/ilang-check/tests/coalescing.rs",
     "line": 125,
     "hash": "86abf0e3231785d932aaf7eb3ad4364c47c20b437cc1d6ac4d7e5853ce2ca140",
-    "old": "        );\n    }\n    // §9.2 fits the provided service by ordinary value subtyping.\n    // Supplying S(Dependency) does not supply its callback's Dependency.\n    let dependency = \"S(N) = (() <- N -> Nil)\\nDependency = ()\\nread = () <- (d : Dependency) { Nil }\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\napply = <N>() {\\n\\tlocal : () <- N -> Nil = () { use() }\\n\\tlocal()\\n}\\n\\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }\";\n    entry(dependency);\n    // An empty `Dependency = ()` is not a keyed service type in syntax three\n    // (E0225), so the supplied variant gives it a field.\n    let supplied = dependency\n        .replace(\"Dependency = ()\", \"Dependency = (value = Int)\")\n",
-    "new": "        );\n    }\n    // A provided service fits by ordinary value subtyping.\n    // Supplying S(Dependency) does not supply its callback's Dependency.\n    let dependency = \"S(N) = (() <- N -> Nil)\\nDependency = ()\\nread = () <- (d : Dependency) { Nil }\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\napply = <N>() {\\n\\tlocal : () <- N -> Nil = () { use() }\\n\\tlocal()\\n}\\n\\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }\";\n    entry(dependency);\n    // The supplied variant carries a field so the service has an explicit\n    // construction value as well as a constructor key.\n    let supplied = dependency\n        .replace(\"Dependency = ()\", \"Dependency = (value = Int)\")\n"
+    "old": "        );\n    }\n    // §9.2 fits the provided service by ordinary value subtyping.\n    // Supplying S(Dependency) does not supply its callback's Dependency.\n    let dependency = \"S(N) = (() <- N -> ())\\nDependency = ()\\nread = () <- (d : Dependency) { () }\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\napply = <N>() {\\n\\tlocal : () <- N -> () = () { use() }\\n\\tlocal()\\n}\\n\\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }\";\n    entry(dependency);\n    // An empty `Dependency = ()` is not a keyed service type in syntax three\n    // (E0225), so the supplied variant gives it a field.\n    let supplied = dependency\n        .replace(\"Dependency = ()\", \"Dependency = (value = Int)\")\n",
+    "new": "        );\n    }\n    // A provided service fits by ordinary value subtyping.\n    // Supplying S(Dependency) does not supply its callback's Dependency.\n    let dependency = \"S(N) = (() <- N -> ())\\nDependency = ()\\nread = () <- (d : Dependency) { () }\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\napply = <N>() {\\n\\tlocal : () <- N -> () = () { use() }\\n\\tlocal()\\n}\\n\\nmain = () { provided : S(Dependency) = S(() { read() }) apply() <- (provided) }\";\n    entry(dependency);\n    // The supplied variant carries a field so the service has an explicit\n    // construction value as well as a constructor key.\n    let supplied = dependency\n        .replace(\"Dependency = ()\", \"Dependency = (value = Int)\")\n"
   },
   {
     "file": "crates/ilang-check/tests/coalescing.rs",
     "line": 156,
     "hash": "11e26fed664a4bae771ff1fb9efc95a968bda8c8a682491c25100d47438de04a",
-    "old": "#[test]\nfn finite_exported_schemes_survive_module_boundaries() {\n    // §2.4 and §4.7: the text and interface tree must both contain the\n    // complete scheme. Reading it in another module must retain S(N).\n    let source = \"(\\n\\tS(..)\\n\\thelper\\n)\\nS(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nhelper = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\\n\\tlocal()\\n}\";\n",
-    "new": "#[test]\nfn finite_exported_schemes_survive_module_boundaries() {\n    // The text and interface tree must both contain the\n    // complete scheme. Reading it in another module must retain S(N).\n    let source = \"(\\n\\tS(..)\\n\\thelper\\n)\\nS(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nhelper = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\\n\\tlocal()\\n}\";\n"
+    "old": "#[test]\nfn finite_exported_schemes_survive_module_boundaries() {\n    // §2.4 and §4.7: the text and interface tree must both contain the\n    // complete scheme. Reading it in another module must retain S(N).\n    let source = \"(\\n\\tS(..)\\n\\thelper\\n)\\nS(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nhelper = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> () = () { use() }\\n\\tlocal()\\n}\";\n",
+    "new": "#[test]\nfn finite_exported_schemes_survive_module_boundaries() {\n    // The text and interface tree must both contain the\n    // complete scheme. Reading it in another module must retain S(N).\n    let source = \"(\\n\\tS(..)\\n\\thelper\\n)\\nS(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\nhelper = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> () = () { use() }\\n\\tlocal()\\n}\";\n"
   },
   {
     "file": "crates/ilang-check/tests/codegen.rs",
@@ -3867,8 +3867,8 @@
     "file": "crates/ilang-check/tests/front_end.rs",
     "line": 198,
     "hash": "7a4688ed3ec01597f7a280a6fb87fd35abe0460d02843f5082fb55acc82cb453",
-    "old": "        ),\n        (\"@a.main\\nf = () { Nil }\", \"E0301\", \"kept for macros\"),\n        // Syntax three removed the head with type parameters (§3.2).\n        (\"f(A): (A) -> String\", \"E0101\", \"written on the function\"),\n    ] {\n",
-    "new": "        ),\n        (\"@a.main\\nf = () { Nil }\", \"E0301\", \"kept for macros\"),\n        // Type parameters belong on function values, so a binding head cannot carry them.\n        (\"f(A): (A) -> String\", \"E0101\", \"written on the function\"),\n    ] {\n"
+    "old": "        ),\n        (\"@a.main\\nf = () { () }\", \"E0301\", \"kept for macros\"),\n        // Syntax three removed the head with type parameters (§3.2).\n        (\"f(A): (A) -> String\", \"E0101\", \"written on the function\"),\n    ] {\n",
+    "new": "        ),\n        (\"@a.main\\nf = () { () }\", \"E0301\", \"kept for macros\"),\n        // Type parameters belong on function values, so a binding head cannot carry them.\n        (\"f(A): (A) -> String\", \"E0101\", \"written on the function\"),\n    ] {\n"
   },
   {
     "file": "crates/ilang-check/tests/front_end.rs",
@@ -3902,22 +3902,22 @@
     "file": "crates/ilang-check/tests/generic_services.rs",
     "line": 59,
     "hash": "a47b0ddaad59e767d3177d02784d1eddb6dd7601b65db79889aa838e84782117",
-    "old": "#[test]\nfn annotated_and_inferred_service_rows() {\n    // Rule 4 unions the callback's N with S(N). Writing that same union\n    // must not change the finite principal type (§4.7).\n    for annotation in [\"{\", \"-> Nil {\"] {\n        accepts(\n",
-    "new": "#[test]\nfn annotated_and_inferred_service_rows() {\n    // Function inference unions the callback's N with S(N). Writing that same union\n    // must not change the finite principal type.\n    for annotation in [\"{\", \"-> Nil {\"] {\n        accepts(\n"
+    "old": "#[test]\nfn annotated_and_inferred_service_rows() {\n    // Rule 4 unions the callback's N with S(N). Writing that same union\n    // must not change the finite principal type (§4.7).\n    for annotation in [\"{\", \"-> () {\"] {\n        accepts(\n",
+    "new": "#[test]\nfn annotated_and_inferred_service_rows() {\n    // Function inference unions the callback's N with S(N). Writing that same union\n    // must not change the finite principal type.\n    for annotation in [\"{\", \"-> () {\"] {\n        accepts(\n"
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
     "line": 74,
     "hash": "26d0b476a3ab333b68a21d0787ef33e4de1d9519fb201a7044e49d8f4e1f6002",
-    "old": "#[test]\nfn generic_service_through_a_helper() {\n    // Rules 3 and 5 instantiate use with N=Never; rule 9 removes S(Never).\n    accepts(\n        \"S(N) = (() <- N -> Nil, (N) -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> Nil) { body() }\\nexample = () { run(() { use() }) <- (S(() { Nil }, (_ : Never) { Nil })) }\",\n",
-    "new": "#[test]\nfn generic_service_through_a_helper() {\n    // Instantiation with N=Never lets provision remove S(Never).\n    accepts(\n        \"S(N) = (() <- N -> Nil, (N) -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> Nil) { body() }\\nexample = () { run(() { use() }) <- (S(() { Nil }, (_ : Never) { Nil })) }\",\n"
+    "old": "#[test]\nfn generic_service_through_a_helper() {\n    // Rules 3 and 5 instantiate use with N=Never; rule 9 removes S(Never).\n    accepts(\n        \"S(N) = (() <- N -> (), (N) -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> ()) { body() }\\nexample = () { run(() { use() }) <- (S(() { () }, (_ : Never) { () })) }\",\n",
+    "new": "#[test]\nfn generic_service_through_a_helper() {\n    // Instantiation with N=Never lets provision remove S(Never).\n    accepts(\n        \"S(N) = (() <- N -> (), (N) -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> ()) { body() }\\nexample = () { run(() { use() }) <- (S(() { () }, (_ : Never) { () })) }\",\n"
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
     "line": 85,
     "hash": "c9a8900ad8458d3a83940f59bb9412d075087d603e4c22b28fcb197845cb865e",
-    "old": "#[test]\nfn open_service_row_through_helpers() {\n    // Rule 5 carries both requirements through calls; no closed service\n    // annotation is needed to make the row finite.\n    for annotation in [\"{\", \"-> Nil {\"] {\n",
-    "new": "#[test]\nfn open_service_row_through_helpers() {\n    // Calls carry both requirements through calls; no closed service\n    // annotation is needed to make the row finite.\n    for annotation in [\"{\", \"-> Nil {\"] {\n"
+    "old": "#[test]\nfn open_service_row_through_helpers() {\n    // Rule 5 carries both requirements through calls; no closed service\n    // annotation is needed to make the row finite.\n    for annotation in [\"{\", \"-> () {\"] {\n",
+    "new": "#[test]\nfn open_service_row_through_helpers() {\n    // Calls carry both requirements through calls; no closed service\n    // annotation is needed to make the row finite.\n    for annotation in [\"{\", \"-> () {\"] {\n"
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
@@ -3937,15 +3937,15 @@
     "file": "crates/ilang-check/tests/generic_services.rs",
     "line": 141,
     "hash": "62e9af79af422dc205a4d93c82fe91822321ee8eed92635fe194342506df5be6",
-    "old": "#[test]\nfn logging_example() {\n    // Std-2 §7: E=String, N=Never. fail.catch reifies the error (§9.3),\n    // and rule 9 removes Sink(String, Never).\n    for annotation in [\"{\", \"-> Nil {\"] {\n        accepts(\n",
-    "new": "#[test]\nfn logging_example() {\n    // E=String, N=Never. fail.catch reifies the error,\n    // and provision removes Sink(String, Never).\n    for annotation in [\"{\", \"-> Nil {\"] {\n        accepts(\n"
+    "old": "#[test]\nfn logging_example() {\n    // Std-2 §7: E=String, N=Never. fail.catch reifies the error (§9.3),\n    // and rule 9 removes Sink(String, Never).\n    for annotation in [\"{\", \"-> () {\"] {\n        accepts(\n",
+    "new": "#[test]\nfn logging_example() {\n    // E=String, N=Never. fail.catch reifies the error,\n    // and provision removes Sink(String, Never).\n    for annotation in [\"{\", \"-> () {\"] {\n        accepts(\n"
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
     "line": 165,
     "hash": "b398a3fa5c248db8c7fd5ad4dfe99e2b3cc2b3ed07e7a7658f16289e898fd7f4",
-    "old": "#[test]\nfn recursive_types_still_fail() {\n    // §4.7: \"A type that has itself inside it, through a type variable,\n    // is a compile error.\" These require an actual constructor cycle,\n    // rather than the tautology N <: N | S(N) (§4.5 rule 2).\n    for source in [\n        \"bad = (x) { x(x) }\",\n        // The old case `bad(N) = (s ! S(N)) -> Nil ! N { … f() }` (the whole\n        // environment is exactly N) needs `..env: N` in the service pattern,\n        // which waits for stage E6 of syntax three; it is left out until then.\n        \"S(N) = (() <- N -> Nil, (N) -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nbad = <N>() { use() <- (S(() { use() }, (_ : N) { Nil })) }\",\n    ] {\n",
-    "new": "#[test]\nfn recursive_types_still_fail() {\n    // \"A type that has itself inside it, through a type variable,\n    // is a compile error.\" These require an actual constructor cycle,\n    // rather than the tautology N <: N | S(N).\n    for source in [\n        \"bad = (x) { x(x) }\",\n        // Constructor cycles must still fail when callback requirements\n        // pass through explicitly supplied services.\n        \"S(N) = (() <- N -> Nil, (N) -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nbad = <N>() { use() <- (S(() { use() }, (_ : N) { Nil })) }\",\n    ] {\n"
+    "old": "#[test]\nfn recursive_types_still_fail() {\n    // §4.7: \"A type that has itself inside it, through a type variable,\n    // is a compile error.\" These require an actual constructor cycle,\n    // rather than the tautology N <: N | S(N) (§4.5 rule 2).\n    for source in [\n        \"bad = (x) { x(x) }\",\n        // The old case `bad(N) = (s ! S(N)) -> () ! N { … f() }` (the whole\n        // environment is exactly N) needs `..env: N` in the service pattern,\n        // which waits for stage E6 of syntax three; it is left out until then.\n        \"S(N) = (() <- N -> (), (N) -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nbad = <N>() { use() <- (S(() { use() }, (_ : N) { () })) }\",\n    ] {\n",
+    "new": "#[test]\nfn recursive_types_still_fail() {\n    // \"A type that has itself inside it, through a type variable,\n    // is a compile error.\" These require an actual constructor cycle,\n    // rather than the tautology N <: N | S(N).\n    for source in [\n        \"bad = (x) { x(x) }\",\n        // Constructor cycles must still fail when callback requirements\n        // pass through explicitly supplied services.\n        \"S(N) = (() <- N -> (), (N) -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nbad = <N>() { use() <- (S(() { use() }, (_ : N) { () })) }\",\n    ] {\n"
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
@@ -3958,15 +3958,15 @@
     "file": "crates/ilang-check/tests/generic_services.rs",
     "line": 187,
     "hash": "25d4118124526cc9850e84e638d348d7ad692821a0c4fa96f9274ff654de0f6b",
-    "old": "        \"E0515\",\n    );\n    // Decision 1: Sink's covariant E can meet at Never because its stored\n    // callback is inhabited. Adding a required E value makes that same\n    // intersection empty (§4.1); retain both direct and helper forms.\n    for source in [\n        \"Sink(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)\\none = () <- (s : Sink(String, Never)) { Nil }\\ntwo = () <- (s : Sink(Int, Never)) { Nil }\\nbad = () {\\n\\tone()\\n\\ttwo()\\n}\",\n",
-    "new": "        \"E0515\",\n    );\n    // Sink's covariant E can meet at Never because its stored\n    // callback is inhabited. Adding a required E value makes that same\n    // intersection empty; retain both direct and helper forms.\n    for source in [\n        \"Sink(E, N) = (() <- (Fail(E), ..N) -> Nil, (N) -> Nil)\\none = () <- (s : Sink(String, Never)) { Nil }\\ntwo = () <- (s : Sink(Int, Never)) { Nil }\\nbad = () {\\n\\tone()\\n\\ttwo()\\n}\",\n"
+    "old": "        \"E0515\",\n    );\n    // Decision 1: Sink's covariant E can meet at Never because its stored\n    // callback is inhabited. Adding a required E value makes that same\n    // intersection empty (§4.1); retain both direct and helper forms.\n    for source in [\n        \"Sink(E, N) = (() <- (Fail(E), ..N) -> (), (N) -> ())\\none = () <- (s : Sink(String, Never)) { () }\\ntwo = () <- (s : Sink(Int, Never)) { () }\\nbad = () {\\n\\tone()\\n\\ttwo()\\n}\",\n",
+    "new": "        \"E0515\",\n    );\n    // Sink's covariant E can meet at Never because its stored\n    // callback is inhabited. Adding a required E value makes that same\n    // intersection empty; retain both direct and helper forms.\n    for source in [\n        \"Sink(E, N) = (() <- (Fail(E), ..N) -> (), (N) -> ())\\none = () <- (s : Sink(String, Never)) { () }\\ntwo = () <- (s : Sink(Int, Never)) { () }\\nbad = () {\\n\\tone()\\n\\ttwo()\\n}\",\n"
   },
   {
     "file": "crates/ilang-check/tests/generic_services.rs",
     "line": 221,
     "hash": "e6556bb623f3b6010a625fced708f5b5bdbec80ee76c6d856762485bc900bb5b",
-    "old": "fn repeated_helpers_keep_a_finite_principal_row() {\n    // Repeated rule-3 instantiation and rule-5 forwarding add no service\n    // and must preserve the same principal scheme (§4.7).\n    let mut source = String::from(\n        \"S(N) = (() <- N -> Nil, (N) -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> Nil) { body() }\\nforward_0 = () { run(() { use() }) }\\n\",\n",
-    "new": "fn repeated_helpers_keep_a_finite_principal_row() {\n    // Repeated rule-3 instantiation and rule-5 forwarding add no service\n    // and must preserve the same principal scheme.\n    let mut source = String::from(\n        \"S(N) = (() <- N -> Nil, (N) -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> Nil) { body() }\\nforward_0 = () { run(() { use() }) }\\n\",\n"
+    "old": "fn repeated_helpers_keep_a_finite_principal_row() {\n    // Repeated rule-3 instantiation and rule-5 forwarding add no service\n    // and must preserve the same principal scheme (§4.7).\n    let mut source = String::from(\n        \"S(N) = (() <- N -> (), (N) -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> ()) { body() }\\nforward_0 = () { run(() { use() }) }\\n\",\n",
+    "new": "fn repeated_helpers_keep_a_finite_principal_row() {\n    // Repeated rule-3 instantiation and rule-5 forwarding add no service\n    // and must preserve the same principal scheme.\n    let mut source = String::from(\n        \"S(N) = (() <- N -> (), (N) -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f, _) = s\\n\\tf()\\n}\\nrun = <N>(body : () <- N -> ()) { body() }\\nforward_0 = () { run(() { use() }) }\\n\",\n"
   },
   {
     "file": "crates/ilang-check/tests/hir.rs",
@@ -4182,8 +4182,8 @@
     "file": "crates/ilang-check/tests/literal_types.rs",
     "line": 397,
     "hash": "0971264afa6d844142751f50a3d779fa4c4dbf445e41a7658fa154a8e0c07d81",
-    "old": "#[test]\nfn host_directions_expand_aliases_and_same_scalar_unions() {\n    // Decision 9/§5.8: i may send literal sets; host values must be whole.\n    let (ds, _) = check(\n        \"Level = \\\"info\\\" | \\\"warn\\\"\\n@external(\\\"test\\\", \\\"log\\\")\\nlog : (Level | \\\"error\\\") -> Nil\\n\",\n",
-    "new": "#[test]\nfn host_directions_expand_aliases_and_same_scalar_unions() {\n    // i may send literal sets; host values must be whole.\n    let (ds, _) = check(\n        \"Level = \\\"info\\\" | \\\"warn\\\"\\n@external(\\\"test\\\", \\\"log\\\")\\nlog : (Level | \\\"error\\\") -> Nil\\n\",\n"
+    "old": "#[test]\nfn host_directions_expand_aliases_and_same_scalar_unions() {\n    // Decision 9/§5.8: i may send literal sets; host values must be whole.\n    let (ds, _) = check(\n        \"Level = \\\"info\\\" | \\\"warn\\\"\\n@external(\\\"test\\\", \\\"log\\\")\\nlog : (Level | \\\"error\\\") -> ()\\n\",\n",
+    "new": "#[test]\nfn host_directions_expand_aliases_and_same_scalar_unions() {\n    // i may send literal sets; host values must be whole.\n    let (ds, _) = check(\n        \"Level = \\\"info\\\" | \\\"warn\\\"\\n@external(\\\"test\\\", \\\"log\\\")\\nlog : (Level | \\\"error\\\") -> ()\\n\",\n"
   },
   {
     "file": "crates/ilang-check/tests/literal_types.rs",
@@ -4217,8 +4217,8 @@
     "file": "crates/ilang-check/tests/literal_types.rs",
     "line": 558,
     "hash": "f91d478ddaf03f662c3db78416e2bb0d8f5a8b4e13b0435321486e4535c21fae",
-    "old": "#[test]\nfn whole_known_bounds_keep_non_covariant_literal_parts_as_holes() {\n    // Decision 7/rule 13: copying a known function, invariant cell or\n    // contravariant sink must not impose whole String in the wrong direction.\n    let source = r#\"Sink(A) = (put = (A) -> Nil)\n",
-    "new": "#[test]\nfn whole_known_bounds_keep_non_covariant_literal_parts_as_holes() {\n    // Copying a known function, invariant cell or\n    // contravariant sink must not impose whole String in the wrong direction.\n    let source = r#\"Sink(A) = (put = (A) -> Nil)\n"
+    "old": "#[test]\nfn whole_known_bounds_keep_non_covariant_literal_parts_as_holes() {\n    // Decision 7/rule 13: copying a known function, invariant cell or\n    // contravariant sink must not impose whole String in the wrong direction.\n    let source = r#\"Sink(A) = (put = (A) -> ())\n",
+    "new": "#[test]\nfn whole_known_bounds_keep_non_covariant_literal_parts_as_holes() {\n    // Copying a known function, invariant cell or\n    // contravariant sink must not impose whole String in the wrong direction.\n    let source = r#\"Sink(A) = (put = (A) -> ())\n"
   },
   {
     "file": "crates/ilang-check/tests/literal_types.rs",
@@ -4231,8 +4231,8 @@
     "file": "crates/ilang-check/tests/literal_types.rs",
     "line": 590,
     "hash": "bb1e819c2a9cf13f779793de23b5cbe70962d72bda748572da85735603c798e6",
-    "old": "        \"{lines:?}\"\n    );\n    // §7.5: fitting does not narrow the original subject to a constructor.\n    let (ds, _) = check(\n        \"Yes = (value = Int)\\nNo = ()\\nT = Yes | No\\nf = (r : T) { r |> (Yes(_) | Yes(_)) { r.value } }\\n\",\n    );\n    assert!(ds.iter().any(|d| d.0 == \"E0512\"), \"{ds:?}\");\n    // §4.8 / §6.12: opaque tests still constrain all values of that head.\n    let (ds, _) = check(\n        \"Box(A) = (A)\\nf = (r : { Box(Int | String) | Int }) { r |> (0 | _ : Box(Int)) { Nil } }\\n\",\n    );\n    assert!(ds.iter().any(|d| d.0 == \"E0501\"), \"{ds:?}\");\n    // §6.12: fitting binds a monotype, without the binding's generalization.\n    let (ds, _) = check(\n        \"id = <A>(x : A) { x }\\nf = () { id |> (g | g) { (g(1) + 1, g(\\\"a\\\") <> \\\"b\\\") } }\\n\",\n",
-    "new": "        \"{lines:?}\"\n    );\n    // Fitting does not narrow the original subject to a constructor.\n    let (ds, _) = check(\n        \"Yes = (value = Int)\\nNo = ()\\nT = Yes | No\\nf = (r : T) { r |> (Yes(_) | Yes(_)) { r.value } }\\n\",\n    );\n    assert!(ds.iter().any(|d| d.0 == \"E0512\"), \"{ds:?}\");\n    // Opaque tests still constrain all values of that head.\n    let (ds, _) = check(\n        \"Box(A) = (A)\\nf = (r : { Box(Int | String) | Int }) { r |> (0 | _ : Box(Int)) { Nil } }\\n\",\n    );\n    assert!(ds.iter().any(|d| d.0 == \"E0501\"), \"{ds:?}\");\n    // Fitting binds a monotype, without the binding's generalization.\n    let (ds, _) = check(\n        \"id = <A>(x : A) { x }\\nf = () { id |> (g | g) { (g(1) + 1, g(\\\"a\\\") <> \\\"b\\\") } }\\n\",\n"
+    "old": "        \"{lines:?}\"\n    );\n    // §7.5: fitting does not narrow the original subject to a constructor.\n    let (ds, _) = check(\n        \"Yes = (value = Int)\\nNo = ()\\nT = Yes | No\\nf = (r : T) { r |> (Yes(_) | Yes(_)) { r.value } }\\n\",\n    );\n    assert!(ds.iter().any(|d| d.0 == \"E0512\"), \"{ds:?}\");\n    // §4.8 / §6.12: opaque tests still constrain all values of that head.\n    let (ds, _) = check(\n        \"Box(A) = (A)\\nf = (r : { Box(Int | String) | Int }) { r |> (0 | _ : Box(Int)) { () } }\\n\",\n    );\n    assert!(ds.iter().any(|d| d.0 == \"E0501\"), \"{ds:?}\");\n    // §6.12: fitting binds a monotype, without the binding's generalization.\n    let (ds, _) = check(\n        \"id = <A>(x : A) { x }\\nf = () { id |> (g | g) { (g(1) + 1, g(\\\"a\\\") <> \\\"b\\\") } }\\n\",\n",
+    "new": "        \"{lines:?}\"\n    );\n    // Fitting does not narrow the original subject to a constructor.\n    let (ds, _) = check(\n        \"Yes = (value = Int)\\nNo = ()\\nT = Yes | No\\nf = (r : T) { r |> (Yes(_) | Yes(_)) { r.value } }\\n\",\n    );\n    assert!(ds.iter().any(|d| d.0 == \"E0512\"), \"{ds:?}\");\n    // Opaque tests still constrain all values of that head.\n    let (ds, _) = check(\n        \"Box(A) = (A)\\nf = (r : { Box(Int | String) | Int }) { r |> (0 | _ : Box(Int)) { () } }\\n\",\n    );\n    assert!(ds.iter().any(|d| d.0 == \"E0501\"), \"{ds:?}\");\n    // Fitting binds a monotype, without the binding's generalization.\n    let (ds, _) = check(\n        \"id = <A>(x : A) { x }\\nf = () { id |> (g | g) { (g(1) + 1, g(\\\"a\\\") <> \\\"b\\\") } }\\n\",\n"
   },
   {
     "file": "crates/ilang-check/tests/literal_types.rs",
@@ -4392,8 +4392,8 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 98,
     "hash": "7b0eda9817cd007a524e63b71c54d4e69d5e89044e95ce2b22a138497c2e7c4c",
-    "old": "#[test]\nfn a_hidden_handler_obligation_is_rejected_at_the_definition() {\n    // §4.4: “When the parameter does not change, Ai and Bi must be equal”.\n    // An invariant service still retains a hidden same-form obligation.\n    let source = \"Svc(A) = (A, (A) -> Nil)\\nwrap : <N>(() <- (Fail(Never), ..N) -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (body, svc) { body() <- (svc) }\";\n",
-    "new": "#[test]\nfn a_hidden_handler_obligation_is_rejected_at_the_definition() {\n    // “When the parameter does not change, Ai and Bi must be equal”.\n    // An invariant service still retains a hidden same-form obligation.\n    let source = \"Svc(A) = (A, (A) -> Nil)\\nwrap : <N>(() <- (Fail(Never), ..N) -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (body, svc) { body() <- (svc) }\";\n"
+    "old": "#[test]\nfn a_hidden_handler_obligation_is_rejected_at_the_definition() {\n    // §4.4: “When the parameter does not change, Ai and Bi must be equal”.\n    // An invariant service still retains a hidden same-form obligation.\n    let source = \"Svc(A) = (A, (A) -> ())\\nwrap : <N>(() <- (Fail(Never), ..N) -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (body, svc) { body() <- (svc) }\";\n",
+    "new": "#[test]\nfn a_hidden_handler_obligation_is_rejected_at_the_definition() {\n    // “When the parameter does not change, Ai and Bi must be equal”.\n    // An invariant service still retains a hidden same-form obligation.\n    let source = \"Svc(A) = (A, (A) -> ())\\nwrap : <N>(() <- (Fail(Never), ..N) -> Int, Svc(String)) <- (Fail(Never), ..N) -> Int = (body, svc) { body() <- (svc) }\";\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4413,15 +4413,15 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 132,
     "hash": "9086920183816261006297022ba8ba028ed7d43c7143467a3dde97878139473c",
-    "old": "        types(&source.replace(\"S(Never) | S(Dep)\", \"S(Never)\"))\n    );\n    // Variance still applies to the row as a whole, as F2 explicitly says.\n    types(\n        \"Other = ()\\nS(A) = (A)\\nT(N) = (() <- N -> Nil)\\nwiden = (x : T(S(Int))) -> T(S(Int) | Other) { x }\",\n",
-    "new": "        types(&source.replace(\"S(Never) | S(Dep)\", \"S(Never)\"))\n    );\n    // Variance still applies to the row as a whole, for directed subtyping.\n    types(\n        \"Other = ()\\nS(A) = (A)\\nT(N) = (() <- N -> Nil)\\nwiden = (x : T(S(Int))) -> T(S(Int) | Other) { x }\",\n"
+    "old": "        types(&source.replace(\"S(Never) | S(Dep)\", \"S(Never)\"))\n    );\n    // Variance still applies to the row as a whole, as F2 explicitly says.\n    types(\n        \"Other = ()\\nS(A) = (A)\\nT(N) = (() <- N -> ())\\nwiden = (x : T(S(Int))) -> T(S(Int) | Other) { x }\",\n",
+    "new": "        types(&source.replace(\"S(Never) | S(Dep)\", \"S(Never)\"))\n    );\n    // Variance still applies to the row as a whole, for directed subtyping.\n    types(\n        \"Other = ()\\nS(A) = (A)\\nT(N) = (() <- N -> ())\\nwiden = (x : T(S(Int))) -> T(S(Int) | Other) { x }\",\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 140,
     "hash": "8b998d6f12dd2fff518d033a10a4c0ea76e141b9fa9e045d4a252372e398793e",
-    "old": "#[test]\nfn equivalent_nested_row_orders_do_not_change_handler_acceptance() {\n    // §4.4 defines unions as sets. F1's proof must use type equality,\n    // including alias equality and union order, rather than source text.\n    let base = \"Dep = ()\\nExtra = ()\\nSvc(R) = (() <- R -> Nil)\\nwrap : <N>(\\n\\t() <- (Svc(Extra | Dep), ..N) -> Nil,\\n\\tSvc(Dep | Extra),\\n) <- N -> Nil = (body, svc) {\\n    provided : Svc(Extra | Dep) = svc\\n    body() <- (provided)\\n}\";\n",
-    "new": "#[test]\nfn equivalent_nested_row_orders_do_not_change_handler_acceptance() {\n    // Unions are sets. The proof must use type equality,\n    // including alias equality and union order, rather than source text.\n    let base = \"Dep = ()\\nExtra = ()\\nSvc(R) = (() <- R -> Nil)\\nwrap : <N>(\\n\\t() <- (Svc(Extra | Dep), ..N) -> Nil,\\n\\tSvc(Dep | Extra),\\n) <- N -> Nil = (body, svc) {\\n    provided : Svc(Extra | Dep) = svc\\n    body() <- (provided)\\n}\";\n"
+    "old": "#[test]\nfn equivalent_nested_row_orders_do_not_change_handler_acceptance() {\n    // §4.4 defines unions as sets. F1's proof must use type equality,\n    // including alias equality and union order, rather than source text.\n    let base = \"Dep = ()\\nExtra = ()\\nSvc(R) = (() <- R -> ())\\nwrap : <N>(\\n\\t() <- (Svc(Extra | Dep), ..N) -> (),\\n\\tSvc(Dep | Extra),\\n) <- N -> () = (body, svc) {\\n    provided : Svc(Extra | Dep) = svc\\n    body() <- (provided)\\n}\";\n",
+    "new": "#[test]\nfn equivalent_nested_row_orders_do_not_change_handler_acceptance() {\n    // Unions are sets. The proof must use type equality,\n    // including alias equality and union order, rather than source text.\n    let base = \"Dep = ()\\nExtra = ()\\nSvc(R) = (() <- R -> ())\\nwrap : <N>(\\n\\t() <- (Svc(Extra | Dep), ..N) -> (),\\n\\tSvc(Dep | Extra),\\n) <- N -> () = (body, svc) {\\n    provided : Svc(Extra | Dep) = svc\\n    body() <- (provided)\\n}\";\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4455,8 +4455,8 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 242,
     "hash": "4e495ae7cc19893b7fc17ae538046172e26b8d093ae006443a2ce6a9a1891d0a",
-    "old": "            format!(\"T({row})\"),\n            format!(\"Alias({row})\"),\n            // The old `() -> Nil ! {row}` has no syntax-three form: a need\n            // list holds named service types only (syntax-3 §3.1).\n            format!(\"() <- (Fail({row})) -> Nil\"),\n        ] {\n",
-    "new": "            format!(\"T({row})\"),\n            format!(\"Alias({row})\"),\n            // Need lists require named service types, so algebra over error\n            // values belongs inside the ordinary Fail argument.\n            format!(\"() <- (Fail({row})) -> Nil\"),\n        ] {\n"
+    "old": "            format!(\"T({row})\"),\n            format!(\"Alias({row})\"),\n            // The old `() -> () ! {row}` has no syntax-three form: a need\n            // list holds named service types only (syntax-3 §3.1).\n            format!(\"() <- (Fail({row})) -> ()\"),\n        ] {\n",
+    "new": "            format!(\"T({row})\"),\n            format!(\"Alias({row})\"),\n            // Need lists require named service types, so algebra over error\n            // values belongs inside the ordinary Fail argument.\n            format!(\"() <- (Fail({row})) -> ()\"),\n        ] {\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4476,8 +4476,8 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 288,
     "hash": "baa48092549aaad1f42670ad4617fbbfc413c238b8657cb5fecd44cca1aaf487",
-    "old": "#[test]\nfn instantiated_output_rows_are_checked_even_when_unused() {\n    // §9.2 forbids two S forms in the returned callback's environment,\n    // whether it is invoked or left unused. §4.8 unions the two rows.\n    let source = \"S(A) = (A)\\nT(N) = (f = () <- N -> Nil)\\nmerge = <N, M>(a : T(N), b : T(M)) {\\n\\tT(\\n\\t\\tf = () {\\n\\t\\t\\ta.f()\\n\\t\\t\\tb.f()\\n\\t\\t},\\n\\t)\\n}\\none = () <- (s : S(Int)) { Nil }\\ntwo = () <- (s : S(String)) { Nil }\\n\\nmain = () {\\n\\tunused = merge(T(f = one), T(f = two))\\n\\tNil\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/main.i\", source)]);\n",
-    "new": "#[test]\nfn instantiated_output_rows_are_checked_even_when_unused() {\n    // Two S forms are forbidden in the returned callback's environment,\n    // whether it is invoked or left unused. The two rows are unioned.\n    let source = \"S(A) = (A)\\nT(N) = (f = () <- N -> Nil)\\nmerge = <N, M>(a : T(N), b : T(M)) {\\n\\tT(\\n\\t\\tf = () {\\n\\t\\t\\ta.f()\\n\\t\\t\\tb.f()\\n\\t\\t},\\n\\t)\\n}\\none = () <- (s : S(Int)) { Nil }\\ntwo = () <- (s : S(String)) { Nil }\\n\\nmain = () {\\n\\tunused = merge(T(f = one), T(f = two))\\n\\tNil\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/main.i\", source)]);\n"
+    "old": "#[test]\nfn instantiated_output_rows_are_checked_even_when_unused() {\n    // §9.2 forbids two S forms in the returned callback's environment,\n    // whether it is invoked or left unused. §4.8 unions the two rows.\n    let source = \"S(A) = (A)\\nT(N) = (f = () <- N -> ())\\nmerge = <N, M>(a : T(N), b : T(M)) {\\n\\tT(\\n\\t\\tf = () {\\n\\t\\t\\ta.f()\\n\\t\\t\\tb.f()\\n\\t\\t},\\n\\t)\\n}\\none = () <- (s : S(Int)) { () }\\ntwo = () <- (s : S(String)) { () }\\n\\nmain = () {\\n\\tunused = merge(T(f = one), T(f = two))\\n\\tNil\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/main.i\", source)]);\n",
+    "new": "#[test]\nfn instantiated_output_rows_are_checked_even_when_unused() {\n    // Two S forms are forbidden in the returned callback's environment,\n    // whether it is invoked or left unused. The two rows are unioned.\n    let source = \"S(A) = (A)\\nT(N) = (f = () <- N -> ())\\nmerge = <N, M>(a : T(N), b : T(M)) {\\n\\tT(\\n\\t\\tf = () {\\n\\t\\t\\ta.f()\\n\\t\\t\\tb.f()\\n\\t\\t},\\n\\t)\\n}\\none = () <- (s : S(Int)) { () }\\ntwo = () <- (s : S(String)) { () }\\n\\nmain = () {\\n\\tunused = merge(T(f = one), T(f = two))\\n\\tNil\\n}\";\n    let (graph, _, _) = common::check_files(&[(\"src/main.i\", source)]);\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4504,8 +4504,8 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 331,
     "hash": "73d90fd96f510b20e3e58463601db470910fe853769f322a4ec49b466b8564de",
-    "old": "#[test]\nfn a_function_union_shows_the_intersection_of_its_service_needs() {\n    // §4.4 puts function environments together by the need merge of §9.2.\n    let shown = types(\n        \"Yield(A) = ((A) -> Nil)\\none = () <- (s : Yield(Int)) { Nil }\\ntwo = () <- (s : Yield(String)) { Nil }\\nfns = [one, two]\",\n",
-    "new": "#[test]\nfn a_function_union_shows_the_intersection_of_its_service_needs() {\n    // Function environments combine by merging their service needs.\n    let shown = types(\n        \"Yield(A) = ((A) -> Nil)\\none = () <- (s : Yield(Int)) { Nil }\\ntwo = () <- (s : Yield(String)) { Nil }\\nfns = [one, two]\",\n"
+    "old": "#[test]\nfn a_function_union_shows_the_intersection_of_its_service_needs() {\n    // §4.4 puts function environments together by the need merge of §9.2.\n    let shown = types(\n        \"Yield(A) = ((A) -> ())\\none = () <- (s : Yield(Int)) { () }\\ntwo = () <- (s : Yield(String)) { () }\\nfns = [one, two]\",\n",
+    "new": "#[test]\nfn a_function_union_shows_the_intersection_of_its_service_needs() {\n    // Function environments combine by merging their service needs.\n    let shown = types(\n        \"Yield(A) = ((A) -> ())\\none = () <- (s : Yield(Int)) { () }\\ntwo = () <- (s : Yield(String)) { () }\\nfns = [one, two]\",\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4546,15 +4546,15 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 463,
     "hash": "7a45eb15522931b7f3cc97faf66a9267d4629d77a5f7e0560892b2c47b60655e",
-    "old": "#[test]\nfn catch_cannot_split_a_fail_entry_into_the_residual_row() {\n    // §2.10.4 Q1-B: choosing E = Int and N = Fail(String) would allow\n    // an Error(String) to escape with the claimed Result(Nil, Int) type.\n    let source = \"(i/fail)\\nsplit: (() <- (Fail(Int | String)) -> Nil) <- (Fail(String)) -> Result(Nil, Int) = (body) { fail.catch(body) }\\n\";\n",
-    "new": "#[test]\nfn catch_cannot_split_a_fail_entry_into_the_residual_row() {\n    // Choosing E = Int and N = Fail(String) would allow\n    // an Error(String) to escape with the claimed Result(Nil, Int) type.\n    let source = \"(i/fail)\\nsplit: (() <- (Fail(Int | String)) -> Nil) <- (Fail(String)) -> Result(Nil, Int) = (body) { fail.catch(body) }\\n\";\n"
+    "old": "#[test]\nfn catch_cannot_split_a_fail_entry_into_the_residual_row() {\n    // §2.10.4 Q1-B: choosing E = Int and N = Fail(String) would allow\n    // an Error(String) to escape with the claimed Result((), Int) type.\n    let source = \"(i/fail)\\nsplit: (() <- (Fail(Int | String)) -> ()) <- (Fail(String)) -> Result((), Int) = (body) { fail.catch(body) }\\n\";\n",
+    "new": "#[test]\nfn catch_cannot_split_a_fail_entry_into_the_residual_row() {\n    // Choosing E = Int and N = Fail(String) would allow\n    // an Error(String) to escape with the claimed Result((), Int) type.\n    let source = \"(i/fail)\\nsplit: (() <- (Fail(Int | String)) -> ()) <- (Fail(String)) -> Result((), Int) = (body) { fail.catch(body) }\\n\";\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 496,
     "hash": "9ea901a28a590f65c94c7d738c423fa8672bcb272c143a5dc5a68afc716f5e9e",
-    "old": "#[test]\nfn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {\n    // Decision 2 (EF03/T4) removes universal-entry erasure. Preserve the\n    // original unused-head source as a negative case beside a real raise;\n    // a provider, not choosing E = Never, makes the pure callback valid.\n    let unused = \"unused = <E>() <- (handler: Fail(E)) { Nil }\\nrun = (f: () -> Nil) { f() }\\nmain = () { run(() { unused() }) }\\n\";\n    let provided = unused.replace(\n",
-    "new": "#[test]\nfn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {\n    // An unused Fail entry still requires its provider; choosing E = Never\n    // must not erase the service key. Check both unused and raised entries.\n    let unused = \"unused = <E>() <- (handler: Fail(E)) { Nil }\\nrun = (f: () -> Nil) { f() }\\nmain = () { run(() { unused() }) }\\n\";\n    let provided = unused.replace(\n"
+    "old": "#[test]\nfn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {\n    // Decision 2 (EF03/T4) removes universal-entry erasure. Preserve the\n    // original unused-head source as a negative case beside a real raise;\n    // a provider, not choosing E = Never, makes the pure callback valid.\n    let unused = \"unused = <E>() <- (handler: Fail(E)) { () }\\nrun = (f: () -> ()) { f() }\\nmain = () { run(() { unused() }) }\\n\";\n    let provided = unused.replace(\n",
+    "new": "#[test]\nfn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {\n    // An unused Fail entry still requires its provider; choosing E = Never\n    // must not erase the service key. Check both unused and raised entries.\n    let unused = \"unused = <E>() <- (handler: Fail(E)) { () }\\nrun = (f: () -> ()) { f() }\\nmain = () { run(() { unused() }) }\\n\";\n    let provided = unused.replace(\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4567,8 +4567,8 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 760,
     "hash": "4846a78c91967c12e7133cffdb0066264ffbc9c9aa7f8a38ebb5d9327ead867a",
-    "old": "#[test]\nfn a_filtered_callback_does_not_vacate_an_unused_fail_need() {\n    // Decision 2: excluding Fail excludes its key even when E = Never.\n    // Keep both old sources: an unused head and a real raise must reject.\n    let source = \"(i/fail)\\nNoError(N) = N - Fail(Never)\\nrun = <N>(f: () <- (NoError(N)) -> Nil) { f() }\\npure = <E>() <- (unused: Fail(E)) { Nil }\\nmain = () { run(pure) }\\n\";\n",
-    "new": "#[test]\nfn a_filtered_callback_does_not_vacate_an_unused_fail_need() {\n    // excluding Fail excludes its key even when E = Never.\n    // Keep both old sources: an unused head and a real raise must reject.\n    let source = \"(i/fail)\\nNoError(N) = N - Fail(Never)\\nrun = <N>(f: () <- (NoError(N)) -> Nil) { f() }\\npure = <E>() <- (unused: Fail(E)) { Nil }\\nmain = () { run(pure) }\\n\";\n"
+    "old": "#[test]\nfn a_filtered_callback_does_not_vacate_an_unused_fail_need() {\n    // Decision 2: excluding Fail excludes its key even when E = Never.\n    // Keep both old sources: an unused head and a real raise must reject.\n    let source = \"(i/fail)\\nNoError(N) = N - Fail(Never)\\nrun = <N>(f: () <- (NoError(N)) -> ()) { f() }\\npure = <E>() <- (unused: Fail(E)) { () }\\nmain = () { run(pure) }\\n\";\n",
+    "new": "#[test]\nfn a_filtered_callback_does_not_vacate_an_unused_fail_need() {\n    // excluding Fail excludes its key even when E = Never.\n    // Keep both old sources: an unused head and a real raise must reject.\n    let source = \"(i/fail)\\nNoError(N) = N - Fail(Never)\\nrun = <N>(f: () <- (NoError(N)) -> ()) { f() }\\npure = <E>() <- (unused: Fail(E)) { () }\\nmain = () { run(pure) }\\n\";\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4609,8 +4609,8 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 1086,
     "hash": "558aecc5379e27ee50d8eafd66b59c0efa86841f1c73cf113cee7b974d8ad8e9",
-    "old": "#[test]\nfn a_two_parameter_method_meet_depends_on_required_data() {\n    // Decision 1 and §4.1: a function that stops inhabits () -> Never.\n    // This is the exact constructor shape of the b1 corpus summaries.\n    let source = \"S(A, N) = (() <- N -> A)\\nleft = () <- (s: S(String, Never)) { Nil }\\nright = () <- (s: S(Int, S(String, Never))) { Nil }\\nboth = () { left() right() }\\n\";\n    let shown = types(source);\n    assert!(shown[\"app/main.both\"].contains(\"S(Never,\"), \"{shown:?}\");\n    // Decision 2: being inhabited does not provide the constructor key.\n    let provided = format!(\"{source}main = () {{ both() <- (S(() {{ panic(\\\"bottom\\\") }})) }}\");\n    types(&provided);\n",
-    "new": "#[test]\nfn a_two_parameter_method_meet_depends_on_required_data() {\n    // A stopping function inhabits () -> Never.\n    // This is the exact constructor shape of the b1 corpus summaries.\n    let source = \"S(A, N) = (() <- N -> A)\\nleft = () <- (s: S(String, Never)) { Nil }\\nright = () <- (s: S(Int, S(String, Never))) { Nil }\\nboth = () { left() right() }\\n\";\n    let shown = types(source);\n    assert!(shown[\"app/main.both\"].contains(\"S(Never,\"), \"{shown:?}\");\n    // being inhabited does not provide the constructor key.\n    let provided = format!(\"{source}main = () {{ both() <- (S(() {{ panic(\\\"bottom\\\") }})) }}\");\n    types(&provided);\n"
+    "old": "#[test]\nfn a_two_parameter_method_meet_depends_on_required_data() {\n    // Decision 1 and §4.1: a function that stops inhabits () -> Never.\n    // This is the exact constructor shape of the b1 corpus summaries.\n    let source = \"S(A, N) = (() <- N -> A)\\nleft = () <- (s: S(String, Never)) { () }\\nright = () <- (s: S(Int, S(String, Never))) { () }\\nboth = () { left() right() }\\n\";\n    let shown = types(source);\n    assert!(shown[\"app/main.both\"].contains(\"S(Never,\"), \"{shown:?}\");\n    // Decision 2: being inhabited does not provide the constructor key.\n    let provided = format!(\"{source}main = () {{ both() <- (S(() {{ panic(\\\"bottom\\\") }})) }}\");\n    types(&provided);\n",
+    "new": "#[test]\nfn a_two_parameter_method_meet_depends_on_required_data() {\n    // A stopping function inhabits () -> Never.\n    // This is the exact constructor shape of the b1 corpus summaries.\n    let source = \"S(A, N) = (() <- N -> A)\\nleft = () <- (s: S(String, Never)) { () }\\nright = () <- (s: S(Int, S(String, Never))) { () }\\nboth = () { left() right() }\\n\";\n    let shown = types(source);\n    assert!(shown[\"app/main.both\"].contains(\"S(Never,\"), \"{shown:?}\");\n    // being inhabited does not provide the constructor key.\n    let provided = format!(\"{source}main = () {{ both() <- (S(() {{ panic(\\\"bottom\\\") }})) }}\");\n    types(&provided);\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -4777,15 +4777,15 @@
     "file": "crates/ilang-check/tests/unused.rs",
     "line": 127,
     "hash": "873513042228eaeb5ccd1a0ec2a28e90fc69b3bb80ab4aa4131e2adf58de7418",
-    "old": "#[test]\nfn hint_requires_test_module_no_value_parameters_and_exact_nil() {\n    // Rule 5: only a function that could be passed to the test macro gets the hint.\n    let ws = warnings(&[\n        (\"src/main.i\", \"ordinary = () { Nil }\"),\n",
-    "new": "#[test]\nfn hint_requires_test_module_no_value_parameters_and_exact_nil() {\n    // Only a function that could be passed to the test macro gets the hint.\n    let ws = warnings(&[\n        (\"src/main.i\", \"ordinary = () { Nil }\"),\n"
+    "old": "#[test]\nfn hint_requires_test_module_no_value_parameters_and_exact_nil() {\n    // Rule 5: only a function that could be passed to the test macro gets the hint.\n    let ws = warnings(&[\n        (\"src/main.i\", \"ordinary = () { () }\"),\n",
+    "new": "#[test]\nfn hint_requires_test_module_no_value_parameters_and_exact_nil() {\n    // Only a function that could be passed to the test macro gets the hint.\n    let ws = warnings(&[\n        (\"src/main.i\", \"ordinary = () { () }\"),\n"
   },
   {
     "file": "crates/ilang-check/tests/unused.rs",
     "line": 174,
     "hash": "887e4793b0aa44249aa200d8419fc186195d5040a48167ec42dba2870f8cf2f7",
-    "old": "#[test]\nfn a_type_spelled_nil_is_not_the_prelude_nil() {\n    // Rule 5 says Nil, the nominal prelude type, rather than its spelling.\n    assert_eq!(\n        warnings(&[(\"test/check.i\", \"Local = ()\\nNil = Local\\nf = () { Local }\")]),\n",
-    "new": "#[test]\nfn a_type_spelled_nil_is_not_the_prelude_nil() {\n    // The test hint requires Nil, the nominal prelude type, rather than its spelling.\n    assert_eq!(\n        warnings(&[(\"test/check.i\", \"Local = ()\\nNil = Local\\nf = () { Local }\")]),\n"
+    "old": "#[test]\nfn a_type_spelled_nil_is_not_the_prelude_nil() {\n    // Rule 5 says (), the nominal prelude type, rather than its spelling.\n    assert_eq!(\n        warnings(&[(\"test/check.i\", \"Local = ()\\nNil = Local\\nf = () { Local }\")]),\n",
+    "new": "#[test]\nfn a_type_spelled_nil_is_not_the_prelude_nil() {\n    // The test hint requires (), the nominal prelude type, rather than its spelling.\n    assert_eq!(\n        warnings(&[(\"test/check.i\", \"Local = ()\\nNil = Local\\nf = () { Local }\")]),\n"
   },
   {
     "file": "crates/ilang-check/tests/unused.rs",
@@ -4910,15 +4910,15 @@
     "file": "crates/ilang-check/tests/value_types.rs",
     "line": 393,
     "hash": "1e9326490b1a42bc952617f074c997584d77d8b9f0fa60858d08a5aebdcad382",
-    "old": "#[test]\nfn a_consumer_cannot_fix_the_library() {\n    // R3/X3: adding only a consumer Of demand leaves the library interface intact.\n    let lib = \"(\\n\\tCell\\n\\tr\\n\\treset\\n)\\nCell(A) = (get = () -> A, set = (A) -> Nil)\\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\\nr = cell(1)\\nput = <A>(c : Cell(A), value : A) { c.set(value) }\\nreset = () { put(r, \\\"s\\\") }\";\n    let (g, base) = checked(&[(\"src/lib.i\", lib)]);\n",
-    "new": "#[test]\nfn a_consumer_cannot_fix_the_library() {\n    // adding only a consumer Of demand leaves the library interface intact.\n    let lib = \"(\\n\\tCell\\n\\tr\\n\\treset\\n)\\nCell(A) = (get = () -> A, set = (A) -> Nil)\\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\\nr = cell(1)\\nput = <A>(c : Cell(A), value : A) { c.set(value) }\\nreset = () { put(r, \\\"s\\\") }\";\n    let (g, base) = checked(&[(\"src/lib.i\", lib)]);\n"
+    "old": "#[test]\nfn a_consumer_cannot_fix_the_library() {\n    // R3/X3: adding only a consumer Of demand leaves the library interface intact.\n    let lib = \"(\\n\\tCell\\n\\tr\\n\\treset\\n)\\nCell(A) = (get = () -> A, set = (A) -> ())\\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }\\nr = cell(1)\\nput = <A>(c : Cell(A), value : A) { c.set(value) }\\nreset = () { put(r, \\\"s\\\") }\";\n    let (g, base) = checked(&[(\"src/lib.i\", lib)]);\n",
+    "new": "#[test]\nfn a_consumer_cannot_fix_the_library() {\n    // adding only a consumer Of demand leaves the library interface intact.\n    let lib = \"(\\n\\tCell\\n\\tr\\n\\treset\\n)\\nCell(A) = (get = () -> A, set = (A) -> ())\\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }\\nr = cell(1)\\nput = <A>(c : Cell(A), value : A) { c.set(value) }\\nreset = () { put(r, \\\"s\\\") }\";\n    let (g, base) = checked(&[(\"src/lib.i\", lib)]);\n"
   },
   {
     "file": "crates/ilang-check/tests/value_types.rs",
     "line": 437,
     "hash": "b7db665f6efb8cb3c1227c95610bb67a74c9a8f1c44ba117df89fe1fd50e5ef8",
-    "old": "#[test]\nfn fixation_keeps_constraints_and_rejects_earlier_weak_parts() {\n    // R5: an ordinary generic helper avoids a narrowed known-field fact.\n    let prefix = \"Cell(A) = (get = () -> A, set = (A) -> Nil)\\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\\nput = <A>(c : Cell(A), value : A) { c.set(value) }\\nr = cell(1)\\n\";\n    good(&[prefix, \"later = () {put(r,\\\"s\\\")}\"].concat());\n",
-    "new": "#[test]\nfn fixation_keeps_constraints_and_rejects_earlier_weak_parts() {\n    // an ordinary generic helper avoids a narrowed known-field fact.\n    let prefix = \"Cell(A) = (get = () -> A, set = (A) -> Nil)\\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\\nput = <A>(c : Cell(A), value : A) { c.set(value) }\\nr = cell(1)\\n\";\n    good(&[prefix, \"later = () {put(r,\\\"s\\\")}\"].concat());\n"
+    "old": "#[test]\nfn fixation_keeps_constraints_and_rejects_earlier_weak_parts() {\n    // R5: an ordinary generic helper avoids a narrowed known-field fact.\n    let prefix = \"Cell(A) = (get = () -> A, set = (A) -> ())\\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }\\nput = <A>(c : Cell(A), value : A) { c.set(value) }\\nr = cell(1)\\n\";\n    good(&[prefix, \"later = () {put(r,\\\"s\\\")}\"].concat());\n",
+    "new": "#[test]\nfn fixation_keeps_constraints_and_rejects_earlier_weak_parts() {\n    // an ordinary generic helper avoids a narrowed known-field fact.\n    let prefix = \"Cell(A) = (get = () -> A, set = (A) -> ())\\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }\\nput = <A>(c : Cell(A), value : A) { c.set(value) }\\nr = cell(1)\\n\";\n    good(&[prefix, \"later = () {put(r,\\\"s\\\")}\"].concat());\n"
   },
   {
     "file": "crates/ilang-check/tests/value_types.rs",
@@ -4966,8 +4966,8 @@
     "file": "crates/ilang-check/tests/value_types.rs",
     "line": 848,
     "hash": "e0427dfd7fc049c07a5212934c82bd8a12e529e4e056d933c31496bb4e1ba1c9",
-    "old": "    ]);\n    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));\n    // P4 cannot discard the Nil alternative to find a convenient named head.\n    bad(\n        \"Box(A) = (A)\\nv : { Box(Int) | Nil } = Box(1)\\nBox(_) = v\",\n",
-    "new": "    ]);\n    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));\n    // Completion cannot discard the Nil alternative to find a convenient named head.\n    bad(\n        \"Box(A) = (A)\\nv : { Box(Int) | Nil } = Box(1)\\nBox(_) = v\",\n"
+    "old": "    ]);\n    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));\n    // P4 cannot discard the () alternative to find a convenient named head.\n    bad(\n        \"Box(A) = (A)\\nv : { Box(Int) | () } = Box(1)\\nBox(_) = v\",\n",
+    "new": "    ]);\n    assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));\n    // Completion cannot discard the () alternative to find a convenient named head.\n    bad(\n        \"Box(A) = (A)\\nv : { Box(Int) | () } = Box(1)\\nBox(_) = v\",\n"
   },
   {
     "file": "crates/ilang-check/tests/value_types.rs",
@@ -5267,43 +5267,43 @@
     "file": "crates/ilang-cli/tests/check.rs",
     "line": 90,
     "hash": "b77f4a658f33114248c6df11483df0c653917b47ee4c640c7b373290374a64d7",
-    "old": "#[test]\nfn a_local_annotation_cannot_hide_an_entry_service() {\n    // §4.8 retains the service through the local binding; §10.2 requires\n    // a provider before entry. Both annotations have the same finite type.\n    let annotated = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\\n\\tlocal()\\n}\";\n",
-    "new": "#[test]\nfn a_local_annotation_cannot_hide_an_entry_service() {\n    // A local binding retains the service in its type, and the program requires\n    // a provider before entry. Both annotations have the same finite type.\n    let annotated = \"S(N) = (() <- N -> Nil)\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\\n\\tlocal()\\n}\";\n"
+    "old": "#[test]\nfn a_local_annotation_cannot_hide_an_entry_service() {\n    // §4.8 retains the service through the local binding; §10.2 requires\n    // a provider before entry. Both annotations have the same finite type.\n    let annotated = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> () = () { use() }\\n\\tlocal()\\n}\";\n",
+    "new": "#[test]\nfn a_local_annotation_cannot_hide_an_entry_service() {\n    // A local binding retains the service in its type, and the program requires\n    // a provider before entry. Both annotations have the same finite type.\n    let annotated = \"S(N) = (() <- N -> ())\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\n\\nmain = <N>() {\\n\\tlocal : () <- (S(N), ..N) -> () = () { use() }\\n\\tlocal()\\n}\";\n"
   },
   {
     "file": "crates/ilang-cli/tests/check.rs",
     "line": 109,
     "hash": "7baa94f5259060e924199e2e0e7731f780355a9903183216610dcbb8db57b2b9",
-    "old": "        );\n        assert!(\n            // Syntax three prints a need as `<- (…)` (spec §6.8 table, \"Function\n            // type with a need\": `(T) <- (Db, Log) -> R`).\n            String::from_utf8_lossy(&out.stdout)\n                .contains(\"app/main.main : () <- (S(N), ..N) -> Nil\"),\n",
-    "new": "        );\n        assert!(\n            // A need is printed as `<- (…)`, as in `(T) <- (Db, Log) -> R`.\n            String::from_utf8_lossy(&out.stdout)\n                .contains(\"app/main.main : () <- (S(N), ..N) -> Nil\"),\n"
+    "old": "        );\n        assert!(\n            // Syntax three prints a need as `<- (…)` (spec §6.8 table, \"Function\n            // type with a need\": `(T) <- (Db, Log) -> R`).\n            String::from_utf8_lossy(&out.stdout)\n                .contains(\"app/main.main : () <- (S(N), ..N) -> ()\"),\n",
+    "new": "        );\n        assert!(\n            // A need is printed as `<- (…)`, as in `(T) <- (Db, Log) -> R`.\n            String::from_utf8_lossy(&out.stdout)\n                .contains(\"app/main.main : () <- (S(N), ..N) -> ()\"),\n"
   },
   {
     "file": "crates/ilang-cli/tests/check.rs",
     "line": 134,
     "hash": "5e4411ff60c325e36bdb142fff10ef5111ce33a980580c9f26cc13a01cf0111d",
-    "old": "#[test]\nfn a_captured_service_row_keeps_callback_dependencies() {\n    // §9.2 checks the supplied S(Dependency) by directed subtyping;\n    // §4.8 rule 5b removes S, leaving the callback's Dependency need.\n    // Keep the old fixture's explicit provider contract: `! S(Dependency)\n    // = S(...)` migrates to a typed local before the provide (syntax-3 §7.3).\n    let source = \"S(N) = (() <- N -> Nil)\\nDependency = ()\\nread = () <- (d : Dependency) { Nil }\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\napply = <N>() {\\n\\tlocal : () <- N -> Nil = () { use() }\\n\\tlocal()\\n}\\n\\nmain = () {\\n\\tprovided : S(Dependency) = S(() { read() })\\n\\tapply() <- (provided)\\n}\";\n    for supplied in [false, true] {\n        let source = if supplied {\n            // `Dependency = ()` makes the value `Dependency` (syntax-3.md\n            // §5.2.3: \"when `D` is `()`, the value `T`\").\n            source.replace(\"apply() <- (provided)\", \"apply() <- (Dependency, provided)\")\n        } else {\n",
-    "new": "#[test]\nfn a_captured_service_row_keeps_callback_dependencies() {\n    // Directed subtyping checks the supplied S(Dependency); removing S must\n    // leave the callback's Dependency need unsatisfied.\n    // Keep the old fixture's explicit provider contract: `! S(Dependency)\n    // = S(...)` migrates to a typed local before the provide.\n    let source = \"S(N) = (() <- N -> Nil)\\nDependency = ()\\nread = () <- (d : Dependency) { Nil }\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\napply = <N>() {\\n\\tlocal : () <- N -> Nil = () { use() }\\n\\tlocal()\\n}\\n\\nmain = () {\\n\\tprovided : S(Dependency) = S(() { read() })\\n\\tapply() <- (provided)\\n}\";\n    for supplied in [false, true] {\n        let source = if supplied {\n            // `Dependency = ()` makes the value `Dependency`.\n            source.replace(\"apply() <- (provided)\", \"apply() <- (Dependency, provided)\")\n        } else {\n"
+    "old": "#[test]\nfn a_captured_service_row_keeps_callback_dependencies() {\n    // §9.2 checks the supplied S(Dependency) by directed subtyping;\n    // §4.8 rule 5b removes S, leaving the callback's Dependency need.\n    // Keep the old fixture's explicit provider contract: `! S(Dependency)\n    // = S(...)` migrates to a typed local before the provide (syntax-3 §7.3).\n    let source = \"S(N) = (() <- N -> ())\\nDependency = ()\\nread = () <- (d : Dependency) { () }\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\napply = <N>() {\\n\\tlocal : () <- N -> () = () { use() }\\n\\tlocal()\\n}\\n\\nmain = () {\\n\\tprovided : S(Dependency) = S(() { read() })\\n\\tapply() <- (provided)\\n}\";\n    for supplied in [false, true] {\n        let source = if supplied {\n            // `Dependency = ()` makes the value `Dependency` (syntax-3.md\n            // §5.2.3: \"when `D` is `()`, the value `T`\").\n            source.replace(\"apply() <- (provided)\", \"apply() <- (Dependency, provided)\")\n        } else {\n",
+    "new": "#[test]\nfn a_captured_service_row_keeps_callback_dependencies() {\n    // Directed subtyping checks the supplied S(Dependency); removing S must\n    // leave the callback's Dependency need unsatisfied.\n    // Keep the old fixture's explicit provider contract: `! S(Dependency)\n    // = S(...)` migrates to a typed local before the provide.\n    let source = \"S(N) = (() <- N -> ())\\nDependency = ()\\nread = () <- (d : Dependency) { () }\\nuse = <N>() <- (s : S(N)) {\\n\\tS(f) = s\\n\\tf()\\n}\\napply = <N>() {\\n\\tlocal : () <- N -> () = () { use() }\\n\\tlocal()\\n}\\n\\nmain = () {\\n\\tprovided : S(Dependency) = S(() { read() })\\n\\tapply() <- (provided)\\n}\";\n    for supplied in [false, true] {\n        let source = if supplied {\n            // `Dependency = ()` makes the value `Dependency`.\n            source.replace(\"apply() <- (provided)\", \"apply() <- (Dependency, provided)\")\n        } else {\n"
   },
   {
     "file": "crates/ilang-cli/tests/check.rs",
     "line": 156,
     "hash": "600982d2b56bf5bb2b09bfeb56641dcf2fd623f71f388f37ee59405ecfa4e3df",
-    "old": "            \"app/main.main : () -> Nil\\n\"\n        } else {\n            // spec §6.8 table, \"Function type with a need\": `(T) <- (Db, Log) -> R`.\n            \"app/main.main : () <- (Dependency) -> Nil\\n\"\n        };\n",
-    "new": "            \"app/main.main : () -> Nil\\n\"\n        } else {\n            // Function type with a need: `(T) <- (Db, Log) -> R`.\n            \"app/main.main : () <- (Dependency) -> Nil\\n\"\n        };\n"
+    "old": "            \"app/main.main : () -> ()\\n\"\n        } else {\n            // spec §6.8 table, \"Function type with a need\": `(T) <- (Db, Log) -> R`.\n            \"app/main.main : () <- (Dependency) -> ()\\n\"\n        };\n",
+    "new": "            \"app/main.main : () -> ()\\n\"\n        } else {\n            // Function type with a need: `(T) <- (Db, Log) -> R`.\n            \"app/main.main : () <- (Dependency) -> ()\\n\"\n        };\n"
   },
   {
     "file": "crates/ilang-cli/tests/check.rs",
     "line": 189,
     "hash": "4fb105098d8e770f7dc314e3e703e882575fec281d4bcbde40a1998abaf74a0f",
-    "old": "#[test]\nfn lowering_rejects_an_uncoalesced_partial_result() {\n    // §4.7 prohibits recursive types even when a caller of the compiler\n    // API accidentally ignores the checker diagnostics.\n    let dir = front_end_project(\"bad = (x) { x(x) }\\n\\nmain = () { Nil }\");\n",
-    "new": "#[test]\nfn lowering_rejects_an_uncoalesced_partial_result() {\n    // Type inference prohibits recursive types even when a caller of the compiler\n    // API accidentally ignores the checker diagnostics.\n    let dir = front_end_project(\"bad = (x) { x(x) }\\n\\nmain = () { Nil }\");\n"
+    "old": "#[test]\nfn lowering_rejects_an_uncoalesced_partial_result() {\n    // §4.7 prohibits recursive types even when a caller of the compiler\n    // API accidentally ignores the checker diagnostics.\n    let dir = front_end_project(\"bad = (x) { x(x) }\\n\\nmain = () { () }\");\n",
+    "new": "#[test]\nfn lowering_rejects_an_uncoalesced_partial_result() {\n    // Type inference prohibits recursive types even when a caller of the compiler\n    // API accidentally ignores the checker diagnostics.\n    let dir = front_end_project(\"bad = (x) { x(x) }\\n\\nmain = () { () }\");\n"
   },
   {
     "file": "crates/ilang-cli/tests/check.rs",
     "line": 219,
     "hash": "ab5d6c1cb1a9e68e0b283d0f06a239882177a037f232a1c9e9230edd70910130",
-    "old": "#[test]\nfn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {\n    // A1 §3.9 / spec §6.12: a top-level clause block is a known function,\n    // and a failing one-clause match reports at p, adding no match frame.\n    let source = \"f = (0) { 1 } | (_) { 2 }\\nget = (o) { o |> (Ok(x)) { x } }\\n\\nmain = () {\\n\\tassert(f(1) == 2)\\n\\tget(Error(Nil))\\n\\tNil\\n}\\n\";\n",
-    "new": "#[test]\nfn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {\n    // A top-level clause block is a known function,\n    // and a failing one-clause match reports at p, adding no match frame.\n    let source = \"f = (0) { 1 } | (_) { 2 }\\nget = (o) { o |> (Ok(x)) { x } }\\n\\nmain = () {\\n\\tassert(f(1) == 2)\\n\\tget(Error(Nil))\\n\\tNil\\n}\\n\";\n"
+    "old": "#[test]\nfn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {\n    // A1 §3.9 / spec §6.12: a top-level clause block is a known function,\n    // and a failing one-clause match reports at p, adding no match frame.\n    let source = \"f = (0) { 1 } | (_) { 2 }\\nget = (o) { o |> (Ok(x)) { x } }\\n\\nmain = () {\\n\\tassert(f(1) == 2)\\n\\tget(Error(()))\\n\\tNil\\n}\\n\";\n",
+    "new": "#[test]\nfn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {\n    // A top-level clause block is a known function,\n    // and a failing one-clause match reports at p, adding no match frame.\n    let source = \"f = (0) { 1 } | (_) { 2 }\\nget = (o) { o |> (Ok(x)) { x } }\\n\\nmain = () {\\n\\tassert(f(1) == 2)\\n\\tget(Error(()))\\n\\tNil\\n}\\n\";\n"
   },
   {
     "file": "crates/ilang-cli/tests/check.rs",
@@ -5701,8 +5701,8 @@
     "file": "crates/ilang-cli/tests/spec_update.rs",
     "line": 4,
     "hash": "0528eb84f453a70641e51bca8f83d4ceeb09be12bf92d95836cd11203adb76ec",
-    "old": "#[test]\nfn regeneration_preserves_crlf_and_every_byte_after_the_header() {\n    // A1 §8: keep CRLF and the bare CR in the program; only stop/at lines change.\n    let header = \"// spec: 11.7\\r\\n// expect: stop \\\"old\\\"\\r\\n// at: spec/main:5:1\\r\\n// output: unchanged\\r\\n\";\n    let body = \"\\r\\nmain = () { 1\\r+ 2  Nil }\\r\\n// at: this is outside the header\\r\\n\";\n",
-    "new": "#[test]\nfn regeneration_preserves_crlf_and_every_byte_after_the_header() {\n    // Keep CRLF and the bare CR in the program; only stop/at lines change.\n    let header = \"// spec: 11.7\\r\\n// expect: stop \\\"old\\\"\\r\\n// at: spec/main:5:1\\r\\n// output: unchanged\\r\\n\";\n    let body = \"\\r\\nmain = () { 1\\r+ 2  Nil }\\r\\n// at: this is outside the header\\r\\n\";\n"
+    "old": "#[test]\nfn regeneration_preserves_crlf_and_every_byte_after_the_header() {\n    // A1 §8: keep CRLF and the bare CR in the program; only stop/at lines change.\n    let header = \"// spec: 11.7\\r\\n// expect: stop \\\"old\\\"\\r\\n// at: spec/main:5:1\\r\\n// output: unchanged\\r\\n\";\n    let body = \"\\r\\nmain = () { 1\\r+ 2  () }\\r\\n// at: this is outside the header\\r\\n\";\n",
+    "new": "#[test]\nfn regeneration_preserves_crlf_and_every_byte_after_the_header() {\n    // Keep CRLF and the bare CR in the program; only stop/at lines change.\n    let header = \"// spec: 11.7\\r\\n// expect: stop \\\"old\\\"\\r\\n// at: spec/main:5:1\\r\\n// output: unchanged\\r\\n\";\n    let body = \"\\r\\nmain = () { 1\\r+ 2  () }\\r\\n// at: this is outside the header\\r\\n\";\n"
   },
   {
     "file": "crates/ilang-cli/tests/spec_update.rs",
@@ -6877,8 +6877,8 @@
     "file": "crates/ilang-syntax/examples/legacy/src/lisp/source_syntax.rs",
     "line": 432,
     "hash": "1fa5fd7b4e23f0ca3e0dc414a639ee7c29519049b46c71a76dda170bde89b724",
-    "old": "    #[test]\n    fn accepted_lisp_item_uses_its_parsed_kind() {\n        // Syntax-three empty data is `(,)`; the legacy item reader rejects\n        // this function head, so the accepted item must not be reparsed there.\n        let source = \"(test \\\"quote\\\" (-> (,) _ { Nil }))\";\n",
-    "new": "    #[test]\n    fn accepted_lisp_item_uses_its_parsed_kind() {\n        // Empty data is `(,)`; the legacy item reader rejects\n        // this function head, so the accepted item must not be reparsed there.\n        let source = \"(test \\\"quote\\\" (-> (,) _ { Nil }))\";\n"
+    "old": "    #[test]\n    fn accepted_lisp_item_uses_its_parsed_kind() {\n        // Syntax-three empty data is `(,)`; the legacy item reader rejects\n        // this function head, so the accepted item must not be reparsed there.\n        let source = \"(test \\\"quote\\\" (-> (,) _ { () }))\";\n",
+    "new": "    #[test]\n    fn accepted_lisp_item_uses_its_parsed_kind() {\n        // Empty data is `(,)`; the legacy item reader rejects\n        // this function head, so the accepted item must not be reparsed there.\n        let source = \"(test \\\"quote\\\" (-> (,) _ { () }))\";\n"
   },
   {
     "file": "crates/ilang-syntax/examples/legacy/src/lisp/source_syntax.rs",
@@ -8263,8 +8263,8 @@
     "file": "crates/ilang-syntax/src/lisp/source_syntax.rs",
     "line": 333,
     "hash": "1fa5fd7b4e23f0ca3e0dc414a639ee7c29519049b46c71a76dda170bde89b724",
-    "old": "    #[test]\n    fn accepted_lisp_item_uses_its_parsed_kind() {\n        // Syntax-three empty data is `(,)`; the legacy item reader rejects\n        // this function head, so the accepted item must not be reparsed there.\n        let source = \"(test \\\"quote\\\" (-> (,) _ { Nil }))\";\n",
-    "new": "    #[test]\n    fn accepted_lisp_item_uses_its_parsed_kind() {\n        // Empty data is `(,)`; the legacy item reader rejects\n        // this function head, so the accepted item must not be reparsed there.\n        let source = \"(test \\\"quote\\\" (-> (,) _ { Nil }))\";\n"
+    "old": "    #[test]\n    fn accepted_lisp_item_uses_its_parsed_kind() {\n        // Syntax-three empty data is `(,)`; the legacy item reader rejects\n        // this function head, so the accepted item must not be reparsed there.\n        let source = \"(test \\\"quote\\\" (-> (,) _ { () }))\";\n",
+    "new": "    #[test]\n    fn accepted_lisp_item_uses_its_parsed_kind() {\n        // Empty data is `(,)`; the legacy item reader rejects\n        // this function head, so the accepted item must not be reparsed there.\n        let source = \"(test \\\"quote\\\" (-> (,) _ { () }))\";\n"
   },
   {
     "file": "crates/ilang-syntax/src/lisp/source_syntax.rs",
@@ -8837,8 +8837,8 @@
     "file": "crates/ilang-syntax/tests/lisp_syntax.rs",
     "line": 1297,
     "hash": "fdbc57a54a6e2739b45808275a1a3f7ef368dbfc5690d6538992c24bbf3e7998",
-    "old": "fn show_as_attribute_item_uses_only_required_line_breaks() {\n    let item = root(\"(@ custom (= f (-> (,) _ Nil)))\");\n    // An attribute is on a line of its own in the layout of syntax three.\n    assert_eq!(\n        item.show_as(Position::Item).unwrap(),\n",
-    "new": "fn show_as_attribute_item_uses_only_required_line_breaks() {\n    let item = root(\"(@ custom (= f (-> (,) _ Nil)))\");\n    // An attribute is on a line of its own in the layout of the source syntax.\n    assert_eq!(\n        item.show_as(Position::Item).unwrap(),\n"
+    "old": "fn show_as_attribute_item_uses_only_required_line_breaks() {\n    let item = root(\"(@ custom (= f (-> (,) _ ())))\");\n    // An attribute is on a line of its own in the layout of syntax three.\n    assert_eq!(\n        item.show_as(Position::Item).unwrap(),\n",
+    "new": "fn show_as_attribute_item_uses_only_required_line_breaks() {\n    let item = root(\"(@ custom (= f (-> (,) _ ())))\");\n    // An attribute is on a line of its own in the layout of the source syntax.\n    assert_eq!(\n        item.show_as(Position::Item).unwrap(),\n"
   },
   {
     "file": "crates/ilang-syntax/tests/lisp_syntax.rs",
@@ -9075,8 +9075,8 @@
     "file": "crates/ilang-syntax/tests/syn3.rs",
     "line": 1219,
     "hash": "ca32050c18e114033c8bac8973ef70bd5bc8dacb47fa48113bc50ab4b0b52c23",
-    "old": "#[test]\nfn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {\n    // §4.3 aliases keep nominal identity. The transition syntax reserves\n    // bare Fail(E) for ^ E; an ordinary ! Fail(E) remains a service.\n    let text = converted(\"Use(E) = () -> Nil ! Fail(E)\\n\");\n",
-    "new": "#[test]\nfn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {\n    // Aliases keep nominal identity. The parser reserves\n    // bare Fail(E) for ^ E; an ordinary ! Fail(E) remains a service.\n    let text = converted(\"Use(E) = () -> Nil ! Fail(E)\\n\");\n"
+    "old": "#[test]\nfn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {\n    // §4.3 aliases keep nominal identity. The transition syntax reserves\n    // bare Fail(E) for ^ E; an ordinary ! Fail(E) remains a service.\n    let text = converted(\"Use(E) = () -> () ! Fail(E)\\n\");\n",
+    "new": "#[test]\nfn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {\n    // Aliases keep nominal identity. The parser reserves\n    // bare Fail(E) for ^ E; an ordinary ! Fail(E) remains a service.\n    let text = converted(\"Use(E) = () -> () ! Fail(E)\\n\");\n"
   },
   {
     "file": "crates/ilang-syntax/tests/syn3.rs",
@@ -10069,8 +10069,8 @@
     "file": "crates/ilang-wasm/src/lower.rs",
     "line": 3037,
     "hash": "b0ac2a22c81dc69e34ca426ed72c6c39f64a9b6f0448e9dbb0961318ae60bd0f",
-    "old": "            }\n        }\n        // A block always ends with an expression (§6.10).\n        finish(out, tail, Atom::Nil)\n    }\n\n    /// A binding in a block (§6.10). The names of a direct value may be used\n    /// in the function bodies of the value: those closures are made first and\n    /// their captures are filled when the names are bound.\n",
-    "new": "            }\n        }\n        // A block always ends with an expression.\n        finish(out, tail, Atom::Nil)\n    }\n\n    /// A binding in a block. The names of a direct value may be used\n    /// in the function bodies of the value: those closures are made first and\n    /// their captures are filled when the names are bound.\n"
+    "old": "            }\n        }\n        // A block always ends with an expression (§6.10).\n        finish(out, tail, Atom::())\n    }\n\n    /// A binding in a block (§6.10). The names of a direct value may be used\n    /// in the function bodies of the value: those closures are made first and\n    /// their captures are filled when the names are bound.\n",
+    "new": "            }\n        }\n        // A block always ends with an expression.\n        finish(out, tail, Atom::())\n    }\n\n    /// A binding in a block. The names of a direct value may be used\n    /// in the function bodies of the value: those closures are made first and\n    /// their captures are filled when the names are bound.\n"
   },
   {
     "file": "crates/ilang-wasm/src/lower.rs",
@@ -10216,8 +10216,8 @@
     "file": "crates/ilang-wasm/src/lower.rs",
     "line": 4520,
     "hash": "973243de2ab8d809f8c110f30854ff59fbeb4e3f1e2b5ada789fc086642447cd",
-    "old": "}\n\n/// The ABI type of a type that the host can take (§10.3, B.2). `Never`\n/// has no values, so it is passed as nothing, like `Nil`.\nfn abi_type(t: HostType) -> AbiType {\n",
-    "new": "}\n\n/// The ABI type of a type that the host can take. `Never`\n/// has no values, so it is passed as nothing, like `Nil`.\nfn abi_type(t: HostType) -> AbiType {\n"
+    "old": "}\n\n/// The ABI type of a type that the host can take (§10.3, B.2). `Never`\n/// has no values, so it is passed as nothing, like `()`.\nfn abi_type(t: HostType) -> AbiType {\n",
+    "new": "}\n\n/// The ABI type of a type that the host can take. `Never`\n/// has no values, so it is passed as nothing, like `()`.\nfn abi_type(t: HostType) -> AbiType {\n"
   },
   {
     "file": "crates/ilang-wasm/src/lower.rs",
@@ -10790,8 +10790,8 @@
     "file": "lib/i/control.i",
     "line": 29,
     "hash": "ec5c371a19dac52097b6a37fe76993ff552f694778fac9bfbe65adc4497354ac",
-    "old": "resume : <A, R, N>(Continuation(A, R, N), A) <- N -> R\n\n/// Unwinds the paused computation (§9.5).\n@external(\"ilang:control\", \"cancel\")\ncancel : <A, R, N>(Continuation(A, R, N)) <- N -> Nil\n",
-    "new": "resume : <A, R, N>(Continuation(A, R, N), A) <- N -> R\n\n/// Unwinds the paused computation.\n@external(\"ilang:control\", \"cancel\")\ncancel : <A, R, N>(Continuation(A, R, N)) <- N -> Nil\n"
+    "old": "resume : <A, R, N>(Continuation(A, R, N), A) <- N -> R\n\n/// Unwinds the paused computation (§9.5).\n@external(\"ilang:control\", \"cancel\")\ncancel : <A, R, N>(Continuation(A, R, N)) <- N -> ()\n",
+    "new": "resume : <A, R, N>(Continuation(A, R, N), A) <- N -> R\n\n/// Unwinds the paused computation.\n@external(\"ilang:control\", \"cancel\")\ncancel : <A, R, N>(Continuation(A, R, N)) <- N -> ()\n"
   },
   {
     "file": "lib/i/control.i",
@@ -10937,7 +10937,7 @@
     "file": "lib/prelude.i",
     "line": 29,
     "hash": "6bcfd2093803d50b7cfe8519b199865894b72b35f59e3f5182a5da9371a6a638",
-    "old": "Assert = (fail = (AssertionFailure) -> Never)\n\n/// The service that ends a computation with an error of type `E` (§9.3).\nFail(E) = (raise = (E) -> Never)\n\n/// Stops the program with `panic: ` and the message (§11.7).\n@external(\"ilang:prelude\", \"panic\")\npanic : (String) -> Never\n\n/// Reports a failure to `Assert` when `c` is `False` (§9.6).\n/// type: (c: Bool) -> Nil ! Assert\nassert = (c : Bool) <- (a : Assert) {\n\tc |>\n",
+    "old": "Assert = (fail = (AssertionFailure) -> Never)\n\n/// The service that ends a computation with an error of type `E` (§9.3).\nFail(E) = (raise = (E) -> Never)\n\n/// Stops the program with `panic: ` and the message (§11.7).\n@external(\"ilang:prelude\", \"panic\")\npanic : (String) -> Never\n\n/// Reports a failure to `Assert` when `c` is `False` (§9.6).\n/// type: (c: Bool) -> () ! Assert\nassert = (c : Bool) <- (a : Assert) {\n\tc |>\n",
     "new": "Assert = (fail = (AssertionFailure) -> Never)\n\n/// The service that ends a computation with an error of type `E`.\nFail(E) = (raise = (E) -> Never)\n\n/// Stops the program with `panic: ` and the message.\n@external(\"ilang:prelude\", \"panic\")\npanic : (String) -> Never\n\n/// Reports a failure to `Assert` when `c` is `False`.\nassert = (c : Bool) <- (a : Assert) {\n\tc |>\n"
   },
   {
@@ -11000,8 +11000,8 @@
     "file": "std/src/float.i",
     "line": 1,
     "hash": "357b1320f8ce4f705a78541f2243d4537082dc609d205b2240e8bed6385f22dd",
-    "old": "//// Functions for `Float`, the type of finite IEEE 754 binary64 numbers.\n////\n//// A Float operation whose result is not finite stops the program\n//// (§11.3), so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;\n//// `divide` raises `Nil` for a zero divisor instead. Functions here\n//// that could give a result that is not finite, such as `power`, raise\n",
-    "new": "//// Functions for `Float`, the type of finite IEEE 754 binary64 numbers.\n////\n//// A Float operation whose result is not finite stops the program,\n//// so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;\n//// `divide` raises `Nil` for a zero divisor instead. Functions here\n//// that could give a result that is not finite, such as `power`, raise\n"
+    "old": "//// Functions for `Float`, the type of finite IEEE 754 binary64 numbers.\n////\n//// A Float operation whose result is not finite stops the program\n//// (§11.3), so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;\n//// `divide` raises `()` for a zero divisor instead. Functions here\n//// that could give a result that is not finite, such as `power`, raise\n",
+    "new": "//// Functions for `Float`, the type of finite IEEE 754 binary64 numbers.\n////\n//// A Float operation whose result is not finite stops the program,\n//// so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;\n//// `divide` raises `()` for a zero divisor instead. Functions here\n//// that could give a result that is not finite, such as `power`, raise\n"
   },
   {
     "file": "std/src/float.i",
@@ -11028,8 +11028,8 @@
     "file": "std/src/int.i",
     "line": 1,
     "hash": "d5b26515b08d6d0ac93f88f016acecef7890124247005a650e1985d818005d11",
-    "old": "//// Functions for `Int`, the type of whole numbers of any size.\n////\n//// Ints never overflow (§11.2). `a / b` rounds toward zero, `a % b` has the\n//// sign of `a`, and both are `0` when `b` is `0`. The functions `divide`,\n//// `remainder`, `modulo`, and `floor_divide` raise `Nil` for `0`\n",
-    "new": "//// Functions for `Int`, the type of whole numbers of any size.\n////\n//// Ints never overflow. `a / b` rounds toward zero, `a % b` has the\n//// sign of `a`, and both are `0` when `b` is `0`. The functions `divide`,\n//// `remainder`, `modulo`, and `floor_divide` raise `Nil` for `0`\n"
+    "old": "//// Functions for `Int`, the type of whole numbers of any size.\n////\n//// Ints never overflow (§11.2). `a / b` rounds toward zero, `a % b` has the\n//// sign of `a`, and both are `0` when `b` is `0`. The functions `divide`,\n//// `remainder`, `modulo`, and `floor_divide` raise `()` for `0`\n",
+    "new": "//// Functions for `Int`, the type of whole numbers of any size.\n////\n//// Ints never overflow. `a / b` rounds toward zero, `a % b` has the\n//// sign of `a`, and both are `0` when `b` is `0`. The functions `divide`,\n//// `remainder`, `modulo`, and `floor_divide` raise `()` for `0`\n"
   },
   {
     "file": "std/src/list.i",
@@ -11042,7 +11042,7 @@
     "file": "std/src/log.i",
     "line": 1,
     "hash": "26e9cdc16b6f85904ee4d985093f9c79a4316850bd7d351662571a3d5819367e",
-    "old": "//// Structured entries and call-time sink services. See std-2.md §6/§7.\n//// Level(..), Entry(..) export constructors; Sink(E,N) hides its constructor.\n//// Level { Debug Info Warning Failure }\n//// Entry { Entry(level: Level, message: String, fields: List((String,String)),\n////               at: Option(time.Instant)) }\n//// Sink(E,N) { Sink((Level)->Bool, (Entry)->Nil ? E ! N, (N)->Nil) }\n//// Interface:\n//// make(E,N): (accept: (Level)->Bool, send: (Entry)->Nil ? E ! N)->Sink(E,N)\n//// silent(N): ()->Sink(Never,N)\n//// filter(E,N): (sink: Sink(E,N), accept: (Level)->Bool)->Sink(E,N)\n//// minimum(E,N): (sink: Sink(E,N), level: Level)->Sink(E,N)\n//// enabled(E,N): (level: Level)->Bool ! Sink(E,N)\n//// write(E,N): (entry: Entry)->Nil ? E ! N | Sink(E,N)\n//// lazy(E,F,N): (level: Level, message: ()->String ? F ! N)->Nil ? E | F ! N | Sink(E,N)\n//// format: (entry: Entry)->String\n//// stderr/stdout: () -> Sink for the corresponding stream\n//// file: (path: String) -> Sink appending formatted lines\n//// timestamped: (entry: Entry) -> Entry, reading the Unix clock\n////\n//// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;\n",
+    "old": "//// Structured entries and call-time sink services. See std-2.md §6/§7.\n//// Level(..), Entry(..) export constructors; Sink(E,N) hides its constructor.\n//// Level { Debug Info Warning Failure }\n//// Entry { Entry(level: Level, message: String, fields: List((String,String)),\n////               at: Option(time.Instant)) }\n//// Sink(E,N) { Sink((Level)->Bool, (Entry)->() ? E ! N, (N)->()) }\n//// Interface:\n//// make(E,N): (accept: (Level)->Bool, send: (Entry)->() ? E ! N)->Sink(E,N)\n//// silent(N): ()->Sink(Never,N)\n//// filter(E,N): (sink: Sink(E,N), accept: (Level)->Bool)->Sink(E,N)\n//// minimum(E,N): (sink: Sink(E,N), level: Level)->Sink(E,N)\n//// enabled(E,N): (level: Level)->Bool ! Sink(E,N)\n//// write(E,N): (entry: Entry)->() ? E ! N | Sink(E,N)\n//// lazy(E,F,N): (level: Level, message: ()->String ? F ! N)->() ? E | F ! N | Sink(E,N)\n//// format: (entry: Entry)->String\n//// stderr/stdout: () -> Sink for the corresponding stream\n//// file: (path: String) -> Sink appending formatted lines\n//// timestamped: (entry: Entry) -> Entry, reading the Unix clock\n////\n//// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;\n",
     "new": "//// Structured entries and call-time sink services.\n//// Sink constructors stay private so delivery goes through the service laws.\n////\n//// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;\n"
   },
   {
@@ -11231,7 +11231,7 @@
     "file": "std/test/cli_test.i",
     "line": 1013,
     "hash": "a62398ef1937c80df66a88745c6698b555fe635facb7a76d0a0afacd741fa3fb",
-    "old": "\tNil\n})\n// §5.4: check the private decoder by compiling the production source as this\n// test module, with an internal test appended. This verifies supplied empty\n// buckets and the exact unused suffix. Restore this file even if a check fails.\n// Run from the lane after building target/release/i:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/cli_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/cli_test.i')\n//| original = path.read_text()\n//| implementation = Path('std/src/cli.i').read_text()\n//| case = '''\n//| @test\n//| cli_bucket_contract = () {\n//|   p = map2(pure(2), map2(flag(Names(\"verbose\", None), \"\"), optional(Names(\"jobs\", None), \"\", integer), (v, n) { (v, n) }), (a, pair: (Bool, Option(Int))) { (a, pair.0, pair.1) })\n//|   Parser(fields, decode) = p\n//|   assert(list.length(fields) == 2)\n//|   assert(decode([[], []]) == Ok(((2, False, None), [])))\n//|   sentinel = [Token(9, \"unused\")]\n//|   assert(decode([[Token(0, \"--verbose\")], [Token(1, \"4\")], sentinel]) == Ok(((2, True, Some(4)), [sentinel])))\n//|   assert(parse(p, []) == Ok((2, False, None)))\n//|   Nil\n//| }\n//| '''\n//| try:\n//|     path.write_text(implementation + '\\n' + case)\n//|     for level in ('0', '2'):\n//|         result = subprocess.run(['target/release/i', 'test', '--project', 'std', '--opt', level, 'cli_bucket_contract'], capture_output=True, text=True)\n//|         print('bucket contract opt ' + level, result.returncode, result.stdout, result.stderr, flush=True)\n//|         assert result.returncode == 0 and '1 passed, 0 failed' in result.stdout\n//| finally:\n//|     path.write_text(original)\n",
+    "old": "\tNil\n})\n// §5.4: check the private decoder by compiling the production source as this\n// test module, with an internal test appended. This verifies supplied empty\n// buckets and the exact unused suffix. Restore this file even if a check fails.\n// Run from the lane after building target/release/i:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/cli_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/cli_test.i')\n//| original = path.read_text()\n//| implementation = Path('std/src/cli.i').read_text()\n//| case = '''\n//| @test\n//| cli_bucket_contract = () {\n//|   p = map2(pure(2), map2(flag(Names(\"verbose\", None), \"\"), optional(Names(\"jobs\", None), \"\", integer), (v, n) { (v, n) }), (a, pair: (Bool, Option(Int))) { (a, pair.0, pair.1) })\n//|   Parser(fields, decode) = p\n//|   assert(list.length(fields) == 2)\n//|   assert(decode([[], []]) == Ok(((2, False, None), [])))\n//|   sentinel = [Token(9, \"unused\")]\n//|   assert(decode([[Token(0, \"--verbose\")], [Token(1, \"4\")], sentinel]) == Ok(((2, True, Some(4)), [sentinel])))\n//|   assert(parse(p, []) == Ok((2, False, None)))\n//|   ()\n//| }\n//| '''\n//| try:\n//|     path.write_text(implementation + '\\n' + case)\n//|     for level in ('0', '2'):\n//|         result = subprocess.run(['target/release/i', 'test', '--project', 'std', '--opt', level, 'cli_bucket_contract'], capture_output=True, text=True)\n//|         print('bucket contract opt ' + level, result.returncode, result.stdout, result.stderr, flush=True)\n//|         assert result.returncode == 0 and '1 passed, 0 failed' in result.stdout\n//| finally:\n//|     path.write_text(original)\n",
     "new": "\tNil\n})\n// Bucket consumption must preserve heterogeneous values without leaking needs.\n"
   },
   {
@@ -11245,15 +11245,15 @@
     "file": "std/test/list_test.i",
     "line": 1867,
     "hash": "40fd95c2d60fca2437bc48bba0e45026d8ba46a505f8fbe95174ba6b54db603a",
-    "old": "Yield(A) = (emit = (A) -> Nil)\n\n// A generator made with `i/control` (§9.4).\ncollect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {\n\tcontrol.boundary((b) {\n",
-    "new": "Yield(A) = (emit = (A) -> Nil)\n\n// A generator made with `i/control`.\ncollect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {\n\tcontrol.boundary((b) {\n"
+    "old": "Yield(A) = (emit = (A) -> ())\n\n// A generator made with `i/control` (§9.4).\ncollect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> ()) -> List(A) {\n\tcontrol.boundary((b) {\n",
+    "new": "Yield(A) = (emit = (A) -> ())\n\n// A generator made with `i/control`.\ncollect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> ()) -> List(A) {\n\tcontrol.boundary((b) {\n"
   },
   {
     "file": "std/test/log_test.i",
     "line": 19,
     "hash": "436436aa75dde189ab5d91d8dd1a1a2f56766d0ab1ec11ec3c307e51e4af89ce",
-    "old": "record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }\n\n// std-2 §7: finite, closed instantiations retain service and error types.\ndeliver : (log.Entry) <- (\n\tFail(String),\n",
-    "new": "record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }\n\n// Finite, closed instantiations retain service and error types.\ndeliver : (log.Entry) <- (\n\tFail(String),\n"
+    "old": "record = (event : Event) <- (capture : Capture) -> () { capture.record(event) }\n\n// std-2 §7: finite, closed instantiations retain service and error types.\ndeliver : (log.Entry) <- (\n\tFail(String),\n",
+    "new": "record = (event : Event) <- (capture : Capture) -> () { capture.record(event) }\n\n// Finite, closed instantiations retain service and error types.\ndeliver : (log.Entry) <- (\n\tFail(String),\n"
   },
   {
     "file": "std/test/log_test.i",
@@ -11287,8 +11287,8 @@
     "file": "std/test/log_test.i",
     "line": 227,
     "hash": "6643cff66b9f9928b89bdd42989504764ff160f1259b39068308600b8371fb0d",
-    "old": ") -> Nil = log.write\n\n// L2/L5: a custom error is preserved, with no retry or swallowed failure.\ntest(\"log_errors\", () {\n\ttrace = control.boundary((b) {\n",
-    "new": ") -> Nil = log.write\n\n// a custom error is preserved, with no retry or swallowed failure.\ntest(\"log_errors\", () {\n\ttrace = control.boundary((b) {\n"
+    "old": ") -> () = log.write\n\n// L2/L5: a custom error is preserved, with no retry or swallowed failure.\ntest(\"log_errors\", () {\n\ttrace = control.boundary((b) {\n",
+    "new": ") -> () = log.write\n\n// a custom error is preserved, with no retry or swallowed failure.\ntest(\"log_errors\", () {\n\ttrace = control.boundary((b) {\n"
   },
   {
     "file": "std/test/log_test.i",
@@ -11336,8 +11336,8 @@
     "file": "std/test/sequence_test.i",
     "line": 57,
     "hash": "ad346049eaee76cf3f539daf96b6e6b198d07151ec16d23e15b28ae1d52296f6",
-    "old": "})\n\n// §4.3 laws compare observable elements, never private representation equality.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {\n\ta = sequence.from_list(xs)\n",
-    "new": "})\n\n// Sequence laws compare observable elements, never private representation equality.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {\n\ta = sequence.from_list(xs)\n"
+    "old": "})\n\n// §4.3 laws compare observable elements, never private representation equality.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {\n\ta = sequence.from_list(xs)\n",
+    "new": "})\n\n// Sequence laws compare observable elements, never private representation equality.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {\n\ta = sequence.from_list(xs)\n"
   },
   {
     "file": "std/test/sequence_test.i",
@@ -11357,7 +11357,7 @@
     "file": "std/test/sequence_test.i",
     "line": 499,
     "hash": "1426810195013331a34bf8b78b7092d3509263f929e805680f99201664ee2197",
-    "old": "\tNil\n})\n// Development checks for std-1 §4.3. The Python program below temporarily adds\n// private rank/cache audits, then counts helper entries as node work. It restores\n// both owned files in finally, even when a check fails. No production exports or\n// costs change. Counts are deterministic operation counts, not timings.\n// Run from this lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/sequence_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import os, re, subprocess\n//| from pathlib import Path\n//| src = Path('std/src/sequence.i')\n//| test = Path('std/test/sequence_test.i')\n//| original_src, original_test = src.read_text(), test.read_text()\n//| compiler = '/home/agent/Programming/i/.rd/cache/bin/i-1df2fe0'\n//| header = re.compile(r'(?m)^([a-z_]\\w*(?:\\([^\\n]*\\))? = \\([\\s\\S]*?\\) -> [^\\n{]+) \\{')\n//| def effect(h, service):\n//|     if ' ! ' in h.rsplit(') -> ', 1)[-1]:\n//|         return h + ' | ' + service\n//|     return h + ' ! ' + service\n//| def exports(s, extra):\n//|     return s.replace('\\n\\tSequence\\n', '\\n\\tSequence\\n\\t' + extra + '\\n', 1)\n//| def run(filter):\n//|     subprocess.run([compiler, 'test', '--project', 'std', '--opt', '0', filter], check=True)\n//| audit = '''\n//| audit(A) = (s: Sequence(A)) -> Nil ! Assert {\n//|   Sequence(t) = s\n//|   audit_tree(t, 0)\n//|   Nil\n//| }\n//| audit_node(A) = (x: Node(A), rank: Int) -> Int ! Assert {\n//|   x |> {\n//|     Leaf(_) -> { assert(rank == 0) 1 }\n//|     Branch2(n, a, b) -> {\n//|       assert(rank > 0)\n//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|     Branch3(n, a, b, c) -> {\n//|       assert(rank > 0)\n//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1) + audit_node(c, rank - 1)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|   }\n//| }\n//| audit_digit(A) = (xs: List(Node(A)), rank: Int) -> Int ! Assert {\n//|   n = list.length(xs)\n//|   assert(n >= 1 && n <= 4)\n//|   list.fold(xs, 0, (acc, x) { acc + audit_node(x, rank) })\n//| }\n//| audit_tree(A) = (t: Tree(A), rank: Int) -> Int ! Assert {\n//|   t |> {\n//|     EmptyTree -> 0\n//|     Single(x) -> audit_node(x, rank)\n//|     Deep(n, left, middle, right) -> {\n//|       actual = audit_digit(left, rank) + audit_tree(middle, rank + 1) + audit_digit(right, rank)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|   }\n//| }\n//| '''\n//| edit_args = {\n//|   'new': '', 'wrap': 'item', 'from_list': 'items', 'push_front': 'to, item',\n//|   'push_back': 'to, item', 'pop_front': 'from', 'pop_back': 'from',\n//|   'set': 'in, index, value', 'append': 'first, second', 'split': 'sequence, at',\n//|   'take': 'from, up_to', 'drop': 'from, up_to', 'reverse': 'sequence', 'map': 'over, with'\n//| }\n//| def audit_edit(match):\n//|     h = match[1]\n//|     name = h.split('(', 1)[0]\n//|     h = effect(h, 'Assert')\n//|     if name not in edit_args:\n//|         return h + ' {'\n//|     checks = 'audit(result)'\n//|     if name == 'set':\n//|         checks = 'result |> { None -> Nil Some(s) -> audit(s) }'\n//|     elif name.startswith('pop_'):\n//|         checks = 'result |> { None -> Nil Some((_, s)) -> audit(s) }'\n//|     elif name == 'split':\n//|         checks = '(a, b) = result\\n audit(a)\\n audit(b)'\n//|     wrappers.append(h + ' {\\n result = unchecked_' + name + '(' + edit_args[name] + ')\\n ' + checks + '\\n result\\n}\\n')\n//|     return h.replace(name, 'unchecked_' + name, 1) + ' {'\n//| try:\n//|     wrappers = []\n//|     variant = header.sub(audit_edit, original_src)\n//|     src.write_text(exports(variant, 'audit') + audit + '\\n'.join(wrappers))\n//|     # All generated/edit results are audited, including every small/model edit.\n//|     # Large drains already run in the normal suite; omit their quadratic audits.\n//|     test.write_text(original_test.replace('drain(s, 0, n)', '{ n <= 257 } |> { True -> drain(s, 0, n) False -> Nil }'))\n//|     print('Private invariant audit: ranks, cached leaf counts, bounded nonempty digits', flush=True)\n//|     run('sequence')\n//|     def meter(match):\n//|         return effect(match[1], 'Meter') + ' {\\n touch()'\n//|     variant = header.sub(meter, original_src)\n//|     # Count the unbounded local loops too, so a flattening regression is visible.\n//|     variant = re.sub(r'(go = \\([^\\n]*\\) \\{)', r'\\1\\n touch()', variant)\n//|     src.write_text(exports(variant, 'Meter(..)') + '''\n//| Meter { Meter(touch: () -> Nil) }\n//| touch = (meter ! Meter) -> Nil ! Meter { meter.touch() }\n//| ''')\n//|     test.write_text('''\n//| (i/control, i/core, (Io) = i/io, sequence = std/sequence, list = std/list)\n//| count = (body: () -> Nil ! sequence.Meter) -> Int {\n//|   control.boundary((b) {\n//|     ! sequence.Meter = sequence.Meter(() {\n//|       control.suspend(b, (k) { 1 + control.resume(k, Nil) })\n//|     })\n//|     body()\n//|     0\n//|   })\n//| }\n//| height = (n: Int) -> Int { { n <= 1 } |> { True -> 1 False -> 1 + height(n / 2) } }\n//| @test\n//| sequence_node_counts = (io ! Io) {\n//|   ! sequence.Meter = sequence.Meter(() { Nil })\n//|   list.each([16, 64, 256, 1024, 4096, 16384, 65536, 100000], (n) {\n//|     s = sequence.from_list(list.range(0, n - 1))\n//|     small = sequence.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9])\n//|     list.each([0, n / 4, n / 2, n - 1], (i) {\n//|       a = count(() { sequence.at(s, i) Nil })\n//|       b = count(() { sequence.set(s, i, -1) Nil })\n//|       c = count(() { sequence.split(s, i) Nil })\n//|       // §4.3 requires height work, not these particular implementation constants.\n//|       assert(a <= 80 * height(n))\n//|       assert(b <= 80 * height(n))\n//|       assert(c <= 160 * height(n))\n//|       io.print(core.inspect((n, i, a, b, c)))\n//|     })\n//|     alias = count(() { sequence.append(s, s) Nil })\n//|     left = count(() { sequence.append(s, small) Nil })\n//|     right = count(() { sequence.append(small, s) Nil })\n//|     assert(alias <= 160 * height(n))\n//|     assert(left <= 160 * height(n))\n//|     assert(right <= 160 * height(n))\n//|     io.print(core.inspect((n, alias, left, right)))\n//|   })\n//|   Nil\n//| }\n//| ''')\n//|     print('Counts: (length, index, at, set, split); (length, append_alias, append_short_right, append_short_left)', flush=True)\n//|     run('sequence_node_counts')\n//| finally:\n//|     src.write_text(original_src)\n//|     test.write_text(original_test)\n",
+    "old": "\tNil\n})\n// Development checks for std-1 §4.3. The Python program below temporarily adds\n// private rank/cache audits, then counts helper entries as node work. It restores\n// both owned files in finally, even when a check fails. No production exports or\n// costs change. Counts are deterministic operation counts, not timings.\n// Run from this lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/sequence_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import os, re, subprocess\n//| from pathlib import Path\n//| src = Path('std/src/sequence.i')\n//| test = Path('std/test/sequence_test.i')\n//| original_src, original_test = src.read_text(), test.read_text()\n//| compiler = '/home/agent/Programming/i/.rd/cache/bin/i-1df2fe0'\n//| header = re.compile(r'(?m)^([a-z_]\\w*(?:\\([^\\n]*\\))? = \\([\\s\\S]*?\\) -> [^\\n{]+) \\{')\n//| def effect(h, service):\n//|     if ' ! ' in h.rsplit(') -> ', 1)[-1]:\n//|         return h + ' | ' + service\n//|     return h + ' ! ' + service\n//| def exports(s, extra):\n//|     return s.replace('\\n\\tSequence\\n', '\\n\\tSequence\\n\\t' + extra + '\\n', 1)\n//| def run(filter):\n//|     subprocess.run([compiler, 'test', '--project', 'std', '--opt', '0', filter], check=True)\n//| audit = '''\n//| audit(A) = (s: Sequence(A)) -> () ! Assert {\n//|   Sequence(t) = s\n//|   audit_tree(t, 0)\n//|   ()\n//| }\n//| audit_node(A) = (x: Node(A), rank: Int) -> Int ! Assert {\n//|   x |> {\n//|     Leaf(_) -> { assert(rank == 0) 1 }\n//|     Branch2(n, a, b) -> {\n//|       assert(rank > 0)\n//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|     Branch3(n, a, b, c) -> {\n//|       assert(rank > 0)\n//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1) + audit_node(c, rank - 1)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|   }\n//| }\n//| audit_digit(A) = (xs: List(Node(A)), rank: Int) -> Int ! Assert {\n//|   n = list.length(xs)\n//|   assert(n >= 1 && n <= 4)\n//|   list.fold(xs, 0, (acc, x) { acc + audit_node(x, rank) })\n//| }\n//| audit_tree(A) = (t: Tree(A), rank: Int) -> Int ! Assert {\n//|   t |> {\n//|     EmptyTree -> 0\n//|     Single(x) -> audit_node(x, rank)\n//|     Deep(n, left, middle, right) -> {\n//|       actual = audit_digit(left, rank) + audit_tree(middle, rank + 1) + audit_digit(right, rank)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|   }\n//| }\n//| '''\n//| edit_args = {\n//|   'new': '', 'wrap': 'item', 'from_list': 'items', 'push_front': 'to, item',\n//|   'push_back': 'to, item', 'pop_front': 'from', 'pop_back': 'from',\n//|   'set': 'in, index, value', 'append': 'first, second', 'split': 'sequence, at',\n//|   'take': 'from, up_to', 'drop': 'from, up_to', 'reverse': 'sequence', 'map': 'over, with'\n//| }\n//| def audit_edit(match):\n//|     h = match[1]\n//|     name = h.split('(', 1)[0]\n//|     h = effect(h, 'Assert')\n//|     if name not in edit_args:\n//|         return h + ' {'\n//|     checks = 'audit(result)'\n//|     if name == 'set':\n//|         checks = 'result |> { None -> () Some(s) -> audit(s) }'\n//|     elif name.startswith('pop_'):\n//|         checks = 'result |> { None -> () Some((_, s)) -> audit(s) }'\n//|     elif name == 'split':\n//|         checks = '(a, b) = result\\n audit(a)\\n audit(b)'\n//|     wrappers.append(h + ' {\\n result = unchecked_' + name + '(' + edit_args[name] + ')\\n ' + checks + '\\n result\\n}\\n')\n//|     return h.replace(name, 'unchecked_' + name, 1) + ' {'\n//| try:\n//|     wrappers = []\n//|     variant = header.sub(audit_edit, original_src)\n//|     src.write_text(exports(variant, 'audit') + audit + '\\n'.join(wrappers))\n//|     # All generated/edit results are audited, including every small/model edit.\n//|     # Large drains already run in the normal suite; omit their quadratic audits.\n//|     test.write_text(original_test.replace('drain(s, 0, n)', '{ n <= 257 } |> { True -> drain(s, 0, n) False -> () }'))\n//|     print('Private invariant audit: ranks, cached leaf counts, bounded nonempty digits', flush=True)\n//|     run('sequence')\n//|     def meter(match):\n//|         return effect(match[1], 'Meter') + ' {\\n touch()'\n//|     variant = header.sub(meter, original_src)\n//|     # Count the unbounded local loops too, so a flattening regression is visible.\n//|     variant = re.sub(r'(go = \\([^\\n]*\\) \\{)', r'\\1\\n touch()', variant)\n//|     src.write_text(exports(variant, 'Meter(..)') + '''\n//| Meter { Meter(touch: () -> ()) }\n//| touch = (meter ! Meter) -> () ! Meter { meter.touch() }\n//| ''')\n//|     test.write_text('''\n//| (i/control, i/core, (Io) = i/io, sequence = std/sequence, list = std/list)\n//| count = (body: () -> () ! sequence.Meter) -> Int {\n//|   control.boundary((b) {\n//|     ! sequence.Meter = sequence.Meter(() {\n//|       control.suspend(b, (k) { 1 + control.resume(k, ()) })\n//|     })\n//|     body()\n//|     0\n//|   })\n//| }\n//| height = (n: Int) -> Int { { n <= 1 } |> { True -> 1 False -> 1 + height(n / 2) } }\n//| @test\n//| sequence_node_counts = (io ! Io) {\n//|   ! sequence.Meter = sequence.Meter(() { () })\n//|   list.each([16, 64, 256, 1024, 4096, 16384, 65536, 100000], (n) {\n//|     s = sequence.from_list(list.range(0, n - 1))\n//|     small = sequence.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9])\n//|     list.each([0, n / 4, n / 2, n - 1], (i) {\n//|       a = count(() { sequence.at(s, i) () })\n//|       b = count(() { sequence.set(s, i, -1) () })\n//|       c = count(() { sequence.split(s, i) () })\n//|       // §4.3 requires height work, not these particular implementation constants.\n//|       assert(a <= 80 * height(n))\n//|       assert(b <= 80 * height(n))\n//|       assert(c <= 160 * height(n))\n//|       io.print(core.inspect((n, i, a, b, c)))\n//|     })\n//|     alias = count(() { sequence.append(s, s) () })\n//|     left = count(() { sequence.append(s, small) () })\n//|     right = count(() { sequence.append(small, s) () })\n//|     assert(alias <= 160 * height(n))\n//|     assert(left <= 160 * height(n))\n//|     assert(right <= 160 * height(n))\n//|     io.print(core.inspect((n, alias, left, right)))\n//|   })\n//|   ()\n//| }\n//| ''')\n//|     print('Counts: (length, index, at, set, split); (length, append_alias, append_short_right, append_short_left)', flush=True)\n//|     run('sequence_node_counts')\n//| finally:\n//|     src.write_text(original_src)\n//|     test.write_text(original_test)\n",
     "new": "\tNil\n})\n// Cached sizes, ranks and bounded digits are the private sequence invariants.\n"
   },
   {
@@ -11371,8 +11371,8 @@
     "file": "std/test/stream_test.i",
     "line": 31,
     "hash": "04dd9cf9c8c95e560566eb8fa0359b674be1121c9262478460e342e811c61d33",
-    "old": "}\n\n// §3.3's finite-observation laws, with distinct functions for composition.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {\n\ta = source(xs)\n",
-    "new": "}\n\n// Finite-observation laws, with distinct functions for composition.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {\n\ta = source(xs)\n"
+    "old": "}\n\n// §3.3's finite-observation laws, with distinct functions for composition.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {\n\ta = source(xs)\n",
+    "new": "}\n\n// Finite-observation laws, with distinct functions for composition.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {\n\ta = source(xs)\n"
   },
   {
     "file": "std/test/stream_test.i",
@@ -11399,7 +11399,7 @@
     "file": "std/test/stream_test.i",
     "line": 716,
     "hash": "c675de135cfabe41c268e69a6bb535c137a89f494e451c575253f70a3691f500",
-    "old": "})\n\n// Checker cases required by std-1 §3.3/§3.4 and §9. They are temporary additions\n// to this owned test file, never failing std tests. Each must report E0501;\n// restore the original file even if checking fails. Run from the lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/stream_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/stream_test.i')\n//| original = path.read_text()\n//| cases = {\n//|     'invariant environment (§3.4)': '''\n//| Sink(A) { Sink(put: (A) -> Nil) }\n//| bad_coerce = (source: stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(Int, Never, Sink(Never)) {\n//|   source\n//| }\n//| ''',\n//|     'pull requires Bias (S2)': 'bad = () -> List(Int) { stream.to_list(positive()) }',\n//|     'runner cannot erase Bias (§3.3)': '''\n//| bad_runner = (body: () -> stream.Step(Int, Never, Bias) ! Bias) -> stream.Step(Int, Never, Bias) {\n//|   body()\n//| }\n//| ''',\n//|     'pull exposes errors (S7)': 'bad = () -> List(Int) { stream.to_list(broken()) }',\n//| }\n//| try:\n//|     for name, source in cases.items():\n//|         path.write_text(original + '\\n' + source + '\\n')\n//|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)\n//|         print(name, result.returncode, result.stderr, flush=True)\n//|         assert result.returncode == 1 and 'error[E0501]' in result.stderr\n//| finally:\n//|     path.write_text(original)\n\n// S1/S2/S7: defer and unfold run only on pulls; retry explicitly repeats work.\ntest(\"stream_factory_demand\", () {\n\ttrace = control.boundary((b) {\n",
+    "old": "})\n\n// Checker cases required by std-1 §3.3/§3.4 and §9. They are temporary additions\n// to this owned test file, never failing std tests. Each must report E0501;\n// restore the original file even if checking fails. Run from the lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/stream_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/stream_test.i')\n//| original = path.read_text()\n//| cases = {\n//|     'invariant environment (§3.4)': '''\n//| Sink(A) { Sink(put: (A) -> ()) }\n//| bad_coerce = (source: stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(Int, Never, Sink(Never)) {\n//|   source\n//| }\n//| ''',\n//|     'pull requires Bias (S2)': 'bad = () -> List(Int) { stream.to_list(positive()) }',\n//|     'runner cannot erase Bias (§3.3)': '''\n//| bad_runner = (body: () -> stream.Step(Int, Never, Bias) ! Bias) -> stream.Step(Int, Never, Bias) {\n//|   body()\n//| }\n//| ''',\n//|     'pull exposes errors (S7)': 'bad = () -> List(Int) { stream.to_list(broken()) }',\n//| }\n//| try:\n//|     for name, source in cases.items():\n//|         path.write_text(original + '\\n' + source + '\\n')\n//|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)\n//|         print(name, result.returncode, result.stderr, flush=True)\n//|         assert result.returncode == 1 and 'error[E0501]' in result.stderr\n//| finally:\n//|     path.write_text(original)\n\n// S1/S2/S7: defer and unfold run only on pulls; retry explicitly repeats work.\ntest(\"stream_factory_demand\", () {\n\ttrace = control.boundary((b) {\n",
     "new": "})\n\n// Stream runners retain their service needs and failure channel through pulls.\n\n// defer and unfold run only on pulls; retry explicitly repeats work.\ntest(\"stream_factory_demand\", () {\n\ttrace = control.boundary((b) {\n"
   },
   {
@@ -11448,8 +11448,8 @@
     "file": "std/test/uri_test.i",
     "line": 9,
     "hash": "5852d14bbf480fb90656e72759422abd8bc1979c92684b4d1ead8aa95c83d156",
-    "old": ")\n\n// U3 and §6.3: every successful route to Uri preserves raw spelling.\nround_trip = (u : uri.Uri) -> Nil {\n\tassert(\n",
-    "new": ")\n\n// Every successful route to Uri preserves raw spelling.\nround_trip = (u : uri.Uri) -> Nil {\n\tassert(\n"
+    "old": ")\n\n// U3 and §6.3: every successful route to Uri preserves raw spelling.\nround_trip = (u : uri.Uri) -> () {\n\tassert(\n",
+    "new": ")\n\n// Every successful route to Uri preserves raw spelling.\nround_trip = (u : uri.Uri) -> () {\n\tassert(\n"
   },
   {
     "file": "std/test/uri_test.i",

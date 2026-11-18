@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.helper : () <- (S(N), ..N) -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\napp/main.run : (() <- N -> ()) <- N -> ()\napp/main.helper : () <- (S(N), ..N) -> ()\n",
       "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:4:1: warning[W0504]: top-level binding `helper` is not used\n"
     },
     "test0": {

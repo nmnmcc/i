@@ -19,7 +19,7 @@ catch: <A, E, N>(() <- (..N, Fail(E)) -> A) <- N -> Result(A, E) = (body) {
 keep = control.keep
 
 Done = ()
-Paused = (Continuation(Nil, Step, Fail(String)))
+Paused = (Continuation((), Step, Fail(String)))
 Step = Done | Paused
 
 main = () {
@@ -31,7 +31,7 @@ main = () {
 	first = catch(() { control.boundary((b) { kept(b) }) })
 	first |>
 		(Ok(Paused(k))) {
-			assert(catch(() { control.resume(k, Nil) }) == Error("resumed"))
+			assert(catch(() { control.resume(k, ()) }) == Error("resumed"))
 		}
 		& (_) { panic("expected a paused kept call") }
 	// §9.5: a final function may not raise errors. Observe cancellation by
@@ -69,7 +69,7 @@ main = () {
 	third = catch(() { control.boundary((b) { inner_catch(b) }) })
 	third |>
 		(Ok(Paused(k))) {
-			assert(catch(() { control.resume(k, Nil) }) == Ok(Done))
+			assert(catch(() { control.resume(k, ()) }) == Ok(Done))
 		}
 		& (_) { panic("expected a paused inner catch") }
 }

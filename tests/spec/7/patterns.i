@@ -7,7 +7,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -102,7 +102,7 @@ test("constructors", () {
 	Point(1, 2, label = "p") |> (Point(x, y, label = label)) {
 		check(show((x, y, label)), "(1, 2, \"p\")")
 	}
-	Point(1, 2, label = "p") |> (Point(1, _, ..)) { Nil } & (_) { panic("no") }
+	Point(1, 2, label = "p") |> (Point(1, _, ..)) { () } & (_) { panic("no") }
 	Some(Some(3)) |>
 		(Some(None)) { panic("no") }
 		& (Some(Some(n))) { check(show(n), "3") }
@@ -113,9 +113,9 @@ test("constructors", () {
 		& (Ok([])) { panic("no") }
 		& (Ok([x])) { check(show(x), "1") }
 		& (Ok(_)) { panic("no") }
-	(True, False, Nil) |>
+	(True, False, ()) |>
 		((True, True, _)) { panic("no") }
-		& ((True, False, Nil)) { Nil }
+		& ((True, False, ())) { () }
 		& (_) { panic("no") }
 })
 
@@ -123,16 +123,16 @@ test("named_and_tuples", () {
 	(1, (2, 3)) |> ((a, (b, c) = inner)) {
 		check(show((a, inner, b, c)), "(1, (2, 3), 2, 3)")
 	}
-	(Nil, (1)) |> ((Nil, (x))) { check(show(x), "1") }
+	((), (1)) |> (((), (x))) { check(show(x), "1") }
 })
 
-kind = (v : { Int | String | List(Int) | (Int, Int) | Nil | Bool | Float }) {
+kind = (v : { Int | String | List(Int) | (Int, Int) | () | Bool | Float }) {
 	v |>
 		(i : Int) { "int " <> show(i) }
 		& (s : String) { "string " <> s }
 		& (_ : List(_)) { "list" }
 		& ((a, b)) { "pair " <> show(a + b) }
-		& (Nil) { "nil" }
+		& (()) { "nil" }
 		& (b : Bool) { "bool " <> show(b) }
 		& (f : Float) { "float " <> show(f) }
 }
@@ -144,7 +144,7 @@ test("type_tests", () {
 	check(kind([1]), "list")
 	check(kind([]), "list")
 	check(kind((1, 2)), "pair 3")
-	check(kind(Nil), "nil")
+	check(kind(()), "nil")
 	check(kind(False), "bool False")
 	check(kind(1.5), "float 1.5")
 })
@@ -214,16 +214,16 @@ test("guards", () {
 	check(guarded(None), "none")
 })
 
-either = (v : Result(Int, String | Nil)) {
+either = (v : Result(Int, String | ())) {
 	v |>
 		(Ok(n)) { show(n) }
-		& (Error(_ : Nil)) { "nil" }
+		& (Error(_ : ())) { "nil" }
 		& (Error(other)) { "error " <> other }
 }
 
 test("narrowing", () {
 	check(either(Ok(1)), "1")
-	check(either(Error(Nil)), "nil")
+	check(either(Error(())), "nil")
 	check(either(Error("bad")), "error bad")
 })
 

@@ -9,7 +9,7 @@
 echo = (stream) {
 	bytes = net.read(stream, 65536)
 	core.bit_size(bytes) |>
-		(0) { Nil }
+		(0) { () }
 		& (_) {
 			net.write(stream, bytes)
 			echo(stream)

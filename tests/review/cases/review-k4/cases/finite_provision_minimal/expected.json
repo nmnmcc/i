@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.make : (() <- N -> Nil) <- (N - S(N)) -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\napp/main.make : (() <- N -> ()) <- (N - S(N)) -> ()\n",
       "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `make` is not used\n"
     },
     "test0": {

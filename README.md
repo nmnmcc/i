@@ -114,7 +114,7 @@ Concurrency is structured: a task belongs to a scope, and a scope ends only when
 echo = (stream) {
 	bytes = net.read(stream, 65536)
 	core.bit_size(bytes) |>
-		(0) { Nil }
+		(0) { () }
 		& (_) {
 			net.write(stream, bytes)
 			echo(stream)

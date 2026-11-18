@@ -1,5 +1,5 @@
 (m = probe/macros)
-worker = () { Nil }
+worker = () { () }
 target = worker
 m.register(target)
-main = () { Nil }
+main = () { () }

@@ -10,7 +10,7 @@
 
 Name = (text = String)
 // Decision 2: the returned kept callback retains its genuine Fail(Never) key.
-Paused = (Continuation(Nil, Hop, Fail(Never)))
+Paused = (Continuation((), Hop, Fail(Never)))
 Done = (String)
 Hop = Paused | Done
 name = () <- (value : Name) { value.text }
@@ -41,13 +41,13 @@ main = () {
 		})
 		{
 			Paused(k1) = control.boundary((boundary) { kept(boundary) })
-			Paused(k2) = control.resume(k1, Nil)
-			Paused(k3) = control.resume(k2, Nil)
-			assert(control.resume(k3, Nil) == Done("kept"))
+			Paused(k2) = control.resume(k1, ())
+			Paused(k3) = control.resume(k2, ())
+			assert(control.resume(k3, ()) == Done("kept"))
 			Paused(ki1) = control.boundary((boundary) { inner(boundary) })
-			Paused(ki2) = control.resume(ki1, Nil)
-			Paused(ki3) = control.resume(ki2, Nil)
-			assert(control.resume(ki3, Nil) == Done("inner"))
+			Paused(ki2) = control.resume(ki1, ())
+			Paused(ki3) = control.resume(ki2, ())
+			assert(control.resume(ki3, ()) == Done("inner"))
 			{
 				with_final = control.keep((boundary) {
 					resource.ensure(
@@ -64,7 +64,7 @@ main = () {
 					})
 					control.cancel(k4)
 					control.boundary((boundary) {
-						extra : Extra(Nil, Assert) = Extra(boundary)
+						extra : Extra((), Assert) = Extra(boundary)
 						{
 							f = control.keep(pure)
 							assert(

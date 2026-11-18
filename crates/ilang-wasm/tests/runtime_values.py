@@ -254,7 +254,7 @@ TESTS = """
   (local.set $a(call $tuple(array.new_fixed $values 3(ref.i31(i32.const 0))(call $float_new(f64.const 5))(ref.i31(i32.const 999)))))
   (local.set $b(call $tuple(array.new_fixed $values 3(ref.i31(i32.const 0))(call $float_new(f64.const 6))(ref.i31(i32.const -999)))))
   (call $test_less(local.get $a)(local.get $b))
-  ;; Empty arrays compare equal but precede nonempty arrays with a Nil field.
+  ;; Empty arrays compare equal but precede nonempty arrays with a () field.
   (local.set $a(call $tuple(array.new_fixed $values 0)))
   (local.set $b(call $tuple(array.new_fixed $values 0)))
   (call $test_equal_and_hash(local.get $a)(local.get $b))

@@ -21,10 +21,10 @@ StdioError = (operation = String, code = String)
 @host("i:stdio/v1", "request")
 Stdio = (
 	read = (Int) -> Request(Result(BitArray, String)),
-	write = (BitArray) -> Request(Result(Nil, String)),
-	write_error = (BitArray) -> Request(Result(Nil, String)),
-	flush = () -> Request(Result(Nil, String)),
-	flush_error = () -> Request(Result(Nil, String)),
+	write = (BitArray) -> Request(Result((), String)),
+	write_error = (BitArray) -> Request(Result((), String)),
+	flush = () -> Request(Result((), String)),
+	flush_error = () -> Request(Result((), String)),
 )
 
 read = (max_bytes : Int) <- (io : Stdio) {

@@ -13,5 +13,5 @@ the_fail = () <- (f : Syn3ServiceFail(Int)) { f }
 
 main = () {
 	r = fail.catch(() { the_fail() })
-	r |> (Ok(f)) { f.raise(1) } & (Error(_)) { Nil }
+	r |> (Ok(f)) { f.raise(1) } & (Error(_)) { () }
 }

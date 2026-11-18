@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.cycle : (Int) <- (Assert, Later, request.Await, request.Root) -> Nil\napp/main.main : () <- (Assert, Later, request.Await, request.Root) -> Nil\n",
+      "stdout": "app/main.cycle : (Int) <- (Assert, Later, request.Await, request.Root) -> ()\napp/main.main : () <- (Assert, Later, request.Await, request.Root) -> ()\n",
       "stderr": ""
     },
     "test0": {

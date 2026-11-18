@@ -10,5 +10,5 @@ big = (x : Float) {
 
 main = () {
 	big(1.0e300)
-	Nil
+	()
 }

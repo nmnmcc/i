@@ -1,4 +1,4 @@
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
@@ -10,9 +10,9 @@ make = (n : Int) {
 		_syn3_0 : S(Dep) = S(
 			() {
 				get()
-				Nil
+				()
 			},
-			(_ : Dep) { Nil },
+			(_ : Dep) { () },
 		)
 		use() <- (Dep(value = n), _syn3_0)
 	}

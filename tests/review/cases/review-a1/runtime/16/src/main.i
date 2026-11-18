@@ -4,5 +4,5 @@ f = () { make(40)(2) }
 
 main = () {
 	assert(f() == 42)
-	Nil
+	()
 }

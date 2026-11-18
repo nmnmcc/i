@@ -9,7 +9,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -22,7 +22,7 @@ Bad = (Int)
 down = (b, n) {
 	n |>
 		(0) {
-			control.suspend(b, (k) { control.resume(k, Nil) })
+			control.suspend(b, (k) { control.resume(k, ()) })
 			fail.raise(Bad(7))
 		}
 		& (_) {

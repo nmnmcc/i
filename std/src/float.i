@@ -2,9 +2,9 @@
 ////
 //// A Float operation whose result is not finite stops the program,
 //// so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;
-//// `divide` raises `Nil` for a zero divisor instead. Functions here
+//// `divide` raises `()` for a zero divisor instead. Functions here
 //// that could give a result that is not finite, such as `power`, raise
-//// `Nil` in its place; handle these errors with `fail.catch`.
+//// `()` in its place; handle these errors with `fail.catch`.
 (
 	i/fail
 	i/core
@@ -97,7 +97,7 @@ significand_limit = 9007199254740992
 /// ```
 to_string = (x : Float) -> String { core.inspect(x) }
 
-_parse_result = (text : String) -> Result(Float, Nil) {
+_parse_result = (text : String) -> Result(Float, ()) {
 	<<text:utf8>> |>
 		(<<45, rest:bytes>>) { whole(rest, True, 0, 0, 0) }
 		& (<<43, rest:bytes>>) { whole(rest, False, 0, 0, 0) }
@@ -113,7 +113,7 @@ whole = (
 	coefficient : Int,
 	significant : Int,
 	count : Int
-) -> Result(Float, Nil) {
+) -> Result(Float, ()) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
 			whole(
@@ -127,7 +127,7 @@ whole = (
 		& (<<46, rest:bytes>> ? count > 0) {
 			fraction(rest, negative, coefficient, significant, 0)
 		}
-		& (_) { Error(Nil) }
+		& (_) { Error(()) }
 }
 
 // The digits after the point.
@@ -137,7 +137,7 @@ fraction = (
 	coefficient : Int,
 	significant : Int,
 	digits : Int
-) -> Result(Float, Nil) {
+) -> Result(Float, ()) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
 			fraction(
@@ -161,13 +161,13 @@ fraction = (
 				& (_) { (False, rest) }
 			limit = significant + digits + 400
 			exponent(after, 0, 0, limit) |>
-				(Error(_)) { Error(Nil) }
+				(Error(_)) { Error(()) }
 				& (Ok(e)) {
 					signed = exponent_negative |> (True) { -e } & (False) { e }
 					decimal(negative, coefficient, significant, signed - digits)
 				}
 		}
-		& (_) { Error(Nil) }
+		& (_) { Error(()) }
 }
 
 // The number of significant digits, not counting zeros at the start.
@@ -180,7 +180,7 @@ count_significant = (previous : Int, digit : Int) -> Int {
 // so that bad text after it is still found.
 exponent = (bytes : BitArray, value : Int, count : Int, limit : Int) -> Result(
 	Int,
-	Nil,
+	(),
 ) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
@@ -190,7 +190,7 @@ exponent = (bytes : BitArray, value : Int, count : Int, limit : Int) -> Result(
 			exponent(rest, next, count + 1, limit)
 		}
 		& (<<>> ? count > 0) { Ok(value) }
-		& (_) { Error(Nil) }
+		& (_) { Error(()) }
 }
 
 // The Float nearest to `coefficient` × 10^`exponent`.
@@ -199,14 +199,14 @@ decimal = (
 	coefficient : Int,
 	digits : Int,
 	exponent : Int
-) -> Result(Float, Nil) {
+) -> Result(Float, ()) {
 	sign = negative |> (True) { sign_mask } & (False) { 0 }
 	magnitude = digits + exponent - 1
 	{ coefficient == 0 } |>
 		(True) { Ok(core.float_from_bits(sign)) }
 		& (False) {
 			{ magnitude > 308 } |>
-				(True) { Error(Nil) }
+				(True) { Error(()) }
 				& (False) {
 					{ magnitude < -324 } |>
 						(True) { Ok(core.float_from_bits(sign)) }
@@ -222,7 +222,7 @@ decimal = (
 								(Ok(bits)) {
 									Ok(core.float_from_bits(sign + bits))
 								}
-								& (Error(_)) { Error(Nil) }
+								& (Error(_)) { Error(()) }
 						}
 				}
 		}
@@ -230,10 +230,10 @@ decimal = (
 
 // The bits of the Float nearest to `numerator / denominator`, which is more
 // than 0.
-ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
+ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, ()) {
 	e = radix_order(numerator, denominator, 2)
 	{ e > 1023 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ e < -1022 } |>
 				(True) {
@@ -257,7 +257,7 @@ ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
 					{ significand == significand_limit } |>
 						(True) {
 							{ e == 1023 } |>
-								(True) { Error(Nil) }
+								(True) { Error(()) }
 								& (False) { Ok({ e + 1024 } * fraction_unit) }
 						}
 						& (False) {
@@ -447,9 +447,9 @@ to_precision = (x : Float, precision : Int) -> Float {
 		}
 }
 
-_power_result = (base : Float, of : Int) -> Result(Float, Nil) {
+_power_result = (base : Float, of : Int) -> Result(Float, ()) {
 	{ base == 0.0 && of < 0 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			// Beyond 2^62 only the sign and the parity of the exponent matter.
 			limit = 4611686018427387904
@@ -468,8 +468,8 @@ _power_result = (base : Float, of : Int) -> Result(Float, Nil) {
 		}
 }
 
-_square_root_result = (x : Float) -> Result(Float, Nil) {
-	{ x <. 0.0 } |> (True) { Error(Nil) } & (False) { Ok(core.sqrt(x)) }
+_square_root_result = (x : Float) -> Result(Float, ()) {
+	{ x <. 0.0 } |> (True) { Error(()) } & (False) { Ok(core.sqrt(x)) }
 }
 
 /// The sum of the Floats. The sum of no Floats is `0.0`. A sum that is not
@@ -486,13 +486,13 @@ product = (numbers : List(Float)) -> Float {
 	go(numbers, 1.0)
 }
 
-_divide_result = (a : Float, by : Float) -> Result(Float, Nil) {
-	{ by == 0.0 } |> (True) { Error(Nil) } & (False) { Ok(a /. by) }
+_divide_result = (a : Float, by : Float) -> Result(Float, ()) {
+	{ by == 0.0 } |> (True) { Error(()) } & (False) { Ok(a /. by) }
 }
 
-_modulo_result = (a : Float, by : Float) -> Result(Float, Nil) {
+_modulo_result = (a : Float, by : Float) -> Result(Float, ()) {
 	{ by == 0.0 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) { Ok(a -. core.floor(a /. by) *. by) }
 }
 
@@ -505,9 +505,9 @@ subtract = (a : Float, b : Float) -> Float { a -. b }
 /// `a *. b`, as a function.
 multiply = (a : Float, b : Float) -> Float { a *. b }
 
-_exponential_result = (x : Float) -> Result(Float, Nil) {
+_exponential_result = (x : Float) -> Result(Float, ()) {
 	{ x >. 7.09782712893383973096e2 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ x <. -.7.4513321910194110842e2 } |>
 				(True) { Ok(0.0) }
@@ -519,14 +519,14 @@ _exponential_result = (x : Float) -> Result(Float, Nil) {
 		}
 }
 
-_logarithm_result = (x : Float) -> Result(Float, Nil) {
-	{ x <=. 0.0 } |> (True) { Error(Nil) } & (False) { Ok(log_positive(x)) }
+_logarithm_result = (x : Float) -> Result(Float, ()) {
+	{ x <=. 0.0 } |> (True) { Error(()) } & (False) { Ok(log_positive(x)) }
 }
 
-_real_power_result = (base : Float, of : Float) -> Result(Float, Nil) {
+_real_power_result = (base : Float, of : Float) -> Result(Float, ()) {
 	fractional = core.ceiling(of) -. of >. 0.0
 	{ { base <. 0.0 && fractional } || { base == 0.0 && of <. 0.0 } } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) { pow(base, of) }
 }
 
@@ -804,7 +804,7 @@ log2_close_to_one = (x : Float) -> (Float, Float) {
 }
 
 // `base` to the power `exponent`. A negative base has a whole exponent.
-pow = (base : Float, exponent : Float) -> Result(Float, Nil) {
+pow = (base : Float, exponent : Float) -> Result(Float, ()) {
 	exponent |>
 		(0.0) { Ok(1.0) }
 		& (1.0) { Ok(base) }
@@ -860,12 +860,12 @@ is_odd_whole = (x : Float) -> Bool {
 
 pow_extreme = (base : Float, exponent : Float, direction : Float) -> Result(
 	Float,
-	Nil,
+	(),
 ) {
 	{
 		{ base >. 1.0 && exponent >. 0.0 } || { base <. 1.0 && exponent <. 0.0 }
 	} |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) { Ok(direction *. 0.0) }
 }
 
@@ -874,7 +874,7 @@ pow_exp2 = (
 	log_hi : Float,
 	log_lo : Float,
 	direction : Float
-) -> Result(Float, Nil) {
+) -> Result(Float, ()) {
 	y_hi = without_low(exponent)
 	p_lo = { exponent -. y_hi } *. log_hi +. exponent *. log_lo
 	p_hi0 = y_hi *. log_hi
@@ -883,7 +883,7 @@ pow_exp2 = (
 		z0 >. 1024.0 ||
 			{ z0 == 1024.0 && p_lo +. 8.0085662595372944372e-17 >. z0 -. p_hi0 }
 	} |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ z0 <. -.1075.0 || { z0 == -.1075.0 && p_lo <=. z0 -. p_hi0 } } |>
 				(True) { Ok(direction *. 0.0) }
@@ -954,10 +954,10 @@ asin_ratio = (z : Float) -> Float {
 	p /. q
 }
 
-_asin_result = (x : Float) -> Result(Float, Nil) {
+_asin_result = (x : Float) -> Result(Float, ()) {
 	a = abs(x)
 	{ a >. 1.0 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ a == 1.0 } |>
 				(True) { Ok(copy_sign(1.5707963267948966, x)) }
@@ -1006,10 +1006,10 @@ _asin_result = (x : Float) -> Result(Float, Nil) {
 		}
 }
 
-_acos_result = (x : Float) -> Result(Float, Nil) {
+_acos_result = (x : Float) -> Result(Float, ()) {
 	a = abs(x)
 	{ a >. 1.0 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ a == 1.0 } |>
 				(True) {
@@ -1216,9 +1216,9 @@ atan2 = (y : Float, x : Float) -> Float {
 /// Convert degrees to radians.
 radians = (degrees : Float) -> Float { degrees *. 0.017453292519943295 }
 
-_degrees_result = (radians : Float) -> Result(Float, Nil) {
+_degrees_result = (radians : Float) -> Result(Float, ()) {
 	{ abs(radians) >. 3.1375664143845866e306 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) { Ok(radians *. 57.29577951308232) }
 }
 
@@ -1232,7 +1232,7 @@ hypot_square = (x : Float) -> (Float, Float) {
 	(hi, lo)
 }
 
-_hypot_result = (x : Float, y : Float) -> Result(Float, Nil) {
+_hypot_result = (x : Float, y : Float) -> Result(Float, ()) {
 	a = max(abs(x), abs(y))
 	b = min(abs(x), abs(y))
 	ex = core.float_to_bits(a) / mantissa_unit
@@ -1263,7 +1263,7 @@ _hypot_result = (x : Float, y : Float) -> Result(Float, Nil) {
 			(hy, ly) = hypot_square(sy)
 			root = core.sqrt(ly +. lx +. hy +. hx)
 			{ factor >. 1.0 && root >. max_finite /. factor } |>
-				(True) { Error(Nil) }
+				(True) { Error(()) }
 				& (False) { Ok(factor *. root) }
 		}
 }
@@ -1478,7 +1478,7 @@ trig_tan = (input : Float, tail : Float, odd : Bool) -> Float {
 		}
 }
 
-_tan_result = (x : Float) -> Result(Float, Nil) {
+_tan_result = (x : Float) -> Result(Float, ()) {
 	a = abs(x)
 	{ a <. 0.7853981633974483 } |>
 		(True) {
@@ -1490,7 +1490,7 @@ _tan_result = (x : Float) -> Result(Float, Nil) {
 			(n, hi, lo) = trig_reduce(a)
 			odd = n % 2 == 1
 			{ odd && abs(hi +. lo) <=. 5.562684646268003e-309 } |>
-				(True) { Error(Nil) }
+				(True) { Error(()) }
 				& (False) {
 					v = trig_tan(hi, lo, odd)
 					Ok({ sign_bit(x) } |> (True) { -.v } & (False) { v })
@@ -1502,21 +1502,21 @@ _tan_result = (x : Float) -> Result(Float, Nil) {
 /// more digits, and then an optional exponent: `e` or `E`, an optional `-`
 /// or `+`, and one or more digits. The result is the nearest Float, with
 /// ties to even, worked out with exact integers. Text that is not in this
-/// form, or a number too big for a Float, raises `Nil`. A number too
+/// form, or a number too big for a Float, raises `()`. A number too
 /// small for a Float gives `0.0` with its sign.
 ///
 /// ```i
 /// fail.catch(() { float.parse("1.5") })      // Ok(1.5)
 /// fail.catch(() { float.parse("-2.0e-3") })  // Ok(-0.002)
-/// fail.catch(() { float.parse("1") })        // Error(Nil)
+/// fail.catch(() { float.parse("1") })        // Error(())
 /// ```
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 parse = (text : String) -> Float { fail.from_result(_parse_result(text)) }
 
 /// `base` to the power of a whole number. A negative exponent gives the
 /// inverse: `power(2.0, -1)` is `0.5`. `0.0` with a negative exponent, and a
-/// result too big for a Float, raise `Nil`. The result is within one
+/// result too big for a Float, raise `()`. The result is within one
 /// unit in the last place of the exact power, and exact when the exact power
 /// is a Float.
 ///
@@ -1525,101 +1525,101 @@ parse = (text : String) -> Float { fail.from_result(_parse_result(text)) }
 /// fail.catch(() { float.power(-.2.0, -1) })  // Ok(-.0.5)
 /// ```
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 power = (base : Float, of : Int) -> Float {
 	fail.from_result(_power_result(base, of))
 }
 
-/// The square root. A negative number raises `Nil`.
+/// The square root. A negative number raises `()`.
 ///
 /// ```i
 /// fail.catch(() { float.square_root(4.0) })   // Ok(2.0)
-/// fail.catch(() { float.square_root(-1.0) })  // Error(Nil)
+/// fail.catch(() { float.square_root(-1.0) })  // Error(())
 /// ```
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 square_root = (x : Float) -> Float { fail.from_result(_square_root_result(x)) }
 
-/// `a /. by`, raising `Nil` when `by` is `0.0`.
+/// `a /. by`, raising `()` when `by` is `0.0`.
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 divide = (a : Float, by : Float) -> Float {
 	fail.from_result(_divide_result(a, by))
 }
 
 /// The remainder of `a` divided by `by`, rounded down, with the sign of
-/// `by`, raising `Nil` when `by` is `0.0`.
+/// `by`, raising `()` when `by` is `0.0`.
 ///
 /// ```i
 /// fail.catch(() { float.modulo(13.3, 3.3) })  // Ok(0.10000000000000053)
 /// ```
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 modulo = (a : Float, by : Float) -> Float {
 	fail.from_result(_modulo_result(a, by))
 }
 
-/// `e` to the power `x`. A result too big for a Float raises `Nil`;
+/// `e` to the power `x`. A result too big for a Float raises `()`;
 /// that is for `x` greater than about 709.78.
 ///
 /// ```i
 /// fail.catch(() { float.exponential(1.0) })  // Ok(2.718281828459045)
 /// ```
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 exponential = (x : Float) -> Float { fail.from_result(_exponential_result(x)) }
 
 /// The natural logarithm (base `e`). `0.0` and negative numbers raise
-/// `Nil`.
+/// `()`.
 ///
 /// ```i
 /// fail.catch(() { float.logarithm(1.0) })  // Ok(0.0)
-/// fail.catch(() { float.logarithm(0.0) })  // Error(Nil)
+/// fail.catch(() { float.logarithm(0.0) })  // Error(())
 /// ```
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 logarithm = (x : Float) -> Float { fail.from_result(_logarithm_result(x)) }
 
 /// `base` to the power `of`, for any Float exponent. A negative base with
 /// an exponent that is not a whole number, `0.0` with a negative exponent,
-/// and a result too big for a Float raise `Nil`. The result is within
+/// and a result too big for a Float raise `()`. The result is within
 /// one unit in the last place of the exact power.
 ///
 /// ```i
 /// fail.catch(() { float.real_power(16.0, 0.5) })  // Ok(4.0)
-/// fail.catch(() { float.real_power(-.8.0, 1.0 /. 3.0) })  // Error(Nil)
+/// fail.catch(() { float.real_power(-.8.0, 1.0 /. 3.0) })  // Error(())
 /// ```
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 real_power = (base : Float, of : Float) -> Float {
 	fail.from_result(_real_power_result(base, of))
 }
 
-/// The arcsine in radians; inputs outside [-1, 1] raise Nil.
+/// The arcsine in radians; inputs outside [-1, 1] raise ().
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 asin = (x : Float) -> Float { fail.from_result(_asin_result(x)) }
 
-/// The arccosine in radians; inputs outside [-1, 1] raise Nil.
+/// The arccosine in radians; inputs outside [-1, 1] raise ().
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 acos = (x : Float) -> Float { fail.from_result(_acos_result(x)) }
 
 /// Convert radians to degrees, returning an error if the result overflows.
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 degrees = (radians : Float) -> Float {
 	fail.from_result(_degrees_result(radians))
 }
 
 /// The Euclidean length of (x, y), returning an error on overflow.
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 hypot = (x : Float, y : Float) -> Float {
 	fail.from_result(_hypot_result(x, y))
 }
 
 /// Tangent of an angle in radians.
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 tan = (x : Float) -> Float { fail.from_result(_tan_result(x)) }

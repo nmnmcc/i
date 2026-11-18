@@ -9,5 +9,5 @@ run = <A, N>(body : () <- N -> A) { body() }
 
 main = () {
 	use()
-	Nil
+	()
 }

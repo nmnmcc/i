@@ -30,7 +30,7 @@ main = () {
 					json.parse(text) |>
 						(Ok(json.Array(items))) {
 							lock = root <> "/.lock"
-							owned = fail.catch(() { fs.mkdir(lock) }) == Ok(Nil)
+							owned = fail.catch(() { fs.mkdir(lock) }) == Ok(())
 							{ owned } |>
 								(True) {
 									journal = root <> "/journal"

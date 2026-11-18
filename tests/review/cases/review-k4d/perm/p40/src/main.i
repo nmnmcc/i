@@ -4,7 +4,7 @@ loop = (x) { x(x) }
 
 fr = () { run(() { use() }) }
 
-T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
+T(A, N) = (g = (A) <- N -> A, m = (N) -> ())
 
 ping = (n : Int) { n |> (0) { use() } & (_) { pong(n - 1) } }
 
@@ -45,13 +45,13 @@ uset : <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x : A) <- (
 
 main = () {
 	closed()
-	Nil
+	()
 }
 
 closed = () {
 	_syn3_0 : T(Int, Dep) = T(
 		g = (x : Int) { x + get() },
-		m = (_ : Dep) { Nil },
+		m = (_ : Dep) { () },
 	)
 	_syn3_1 : S(Dep) = S(f = () { get() })
 	both() <- (Dep(v = 1), _syn3_0, _syn3_1)

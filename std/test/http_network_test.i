@@ -56,7 +56,7 @@ test("network_client", () {
 					http.post(url <> "/post", <<"hello":utf8>>).body ==
 						<<"hello":utf8>>,
 				)
-				Nil
+				()
 			},
 		)
 	}) <- (http.native_client())

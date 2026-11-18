@@ -10,7 +10,7 @@ uset : <A, N>(A) <- (Fail(Never), T(A, N), ..N) -> A = (x : A) <- (
 	g(x)
 }
 
-T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
+T(A, N) = (g = (A) <- N -> A, m = (N) -> ())
 
 Dep = (v = Int)
 
@@ -33,7 +33,7 @@ bad : <N>() <- (Fail(Never), ..N) -> Int = () <- (
 
 main = () {
 	closed()
-	Nil
+	()
 }
 
 S(N) = (f = () <- N -> Int)
@@ -41,7 +41,7 @@ S(N) = (f = () <- N -> Int)
 closed = () {
 	_syn3_0 : T(Int, Dep) = T(
 		g = (x : Int) { x + get() },
-		m = (_ : Dep) { Nil },
+		m = (_ : Dep) { () },
 	)
 	_syn3_1 : S(Dep) = S(f = () { get() })
 	both() <- (Dep(v = 1), _syn3_0, _syn3_1)

@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.id : (A) -> A\napp/main.f : () -> (42, \"s\")\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.id : (A) -> A\napp/main.f : () -> (42, \"s\")\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

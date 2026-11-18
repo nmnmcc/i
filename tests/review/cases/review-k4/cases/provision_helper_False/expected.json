@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.read : () <- (S(String)) -> String\napp/main.read_int : () <- (S(Int)) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.with : (A, () <- N -> B) <- (N - S(A)) -> B\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.read : () <- (S(String)) -> String\napp/main.read_int : () <- (S(Int)) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.with : (A, () <- N -> B) <- (N - S(A)) -> B\napp/main.main : () -> ()\n",
       "stderr": "src/main.i:11:10: error[E0515]: `S(String)` and `S(1)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 11:2 needs it)\n1 error\n"
     },
     "run0": {

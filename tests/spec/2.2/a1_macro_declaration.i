@@ -7,5 +7,5 @@ inspect : <A>(A) -> String
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

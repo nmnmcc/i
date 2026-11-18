@@ -2,14 +2,14 @@ Dependency = (value = Int)
 
 get = () <- (d : Dependency) { d.value }
 
-Inner(N) = (() <- N -> Int, (N) -> Nil)
+Inner(N) = (() <- N -> Int, (N) -> ())
 
 read = <N>() <- (s : Inner(N)) {
 	Inner(f, _) = s
 	f()
 }
 
-Outer(N) = (() <- N -> Int, (N) -> Nil)
+Outer(N) = (() <- N -> Int, (N) -> ())
 
 use = <N>() <- (s : Outer(N)) {
 	Outer(f, _) = s

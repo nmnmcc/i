@@ -37,7 +37,7 @@ test("time_units", () {
 	assert(
 		time.to_nanoseconds(time.seconds(-2)) == -2000000000,
 	)
-	Nil
+	()
 })
 
 // T2 explicitly uses truncating division, for either sign of the divisor.
@@ -94,7 +94,7 @@ test("time_arithmetic", () {
 	assert(
 		time.compare(time.seconds(1), time.nanoseconds(1)) == Greater,
 	)
-	Nil
+	()
 })
 
 // T3's epoch and inverse laws apply to negative and arbitrarily large counts.
@@ -137,7 +137,7 @@ test("time_instants", () {
 	assert(
 		time.compare_instants(time.from_unix_nanoseconds(1), epoch) == Greater,
 	)
-	Nil
+	()
 })
 
 // §3.4 specifically requires hours(10^100), and spec §11.2 forbids overflow.
@@ -168,7 +168,7 @@ test("time_huge_counts", () {
 		) ==
 			9223372036854775808,
 	)
-	Nil
+	()
 })
 // T1/T3 nominal separation and §3.2 hidden constructors. These negative cases
 // are temporarily appended to this owned file; each must fail checking, and

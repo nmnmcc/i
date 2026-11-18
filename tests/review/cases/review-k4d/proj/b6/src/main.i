@@ -11,6 +11,6 @@ main = () {
 	_syn3_0 : S(Dep) = S(() { get() })
 	{
 		use()
-		Nil
+		()
 	} <- (_syn3_0)
 }

@@ -31,7 +31,7 @@ head = <A, E, N>(s : stream.Stream(A, E, N)) -> option.Option(A) {
 }
 
 // §3.3's finite-observation laws, with distinct functions for composition.
-check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
+check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {
 	a = source(xs)
 	b = source(ys)
 	c = source(zs)
@@ -106,7 +106,7 @@ check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
 			)
 		},
 	)
-	Nil
+	()
 }
 
 test("stream_laws", () {
@@ -129,7 +129,7 @@ test("stream_laws", () {
 		) ==
 			["x"],
 	)
-	Nil
+	()
 })
 
 // S1-S7 example table: failure is distinct from end, with no tail prefetch.
@@ -223,7 +223,7 @@ test("stream_examples", () {
 		stream.fold(source([1, 2, 3]), 0, (acc, x) { acc + x }) == 6,
 	)
 	assert(
-		stream.each(source([1, 2]), (x) { x * 2 }) == Nil,
+		stream.each(source([1, 2]), (x) { x * 2 }) == (),
 	)
 	assert(
 		stream.fold_until(
@@ -263,12 +263,12 @@ test("stream_examples", () {
 		) ==
 			[Error("bad")],
 	)
-	Nil
+	()
 })
 
-Trace = (visit = (Int) -> Nil)
+Trace = (visit = (Int) -> ())
 
-visit = (x : Int) <- (trace : Trace) -> Nil { trace.visit(x) }
+visit = (x : Int) <- (trace : Trace) -> () { trace.visit(x) }
 
 traced = (xs : List(Int)) -> stream.Stream(Int, Never, Trace) {
 	stream.unfold(xs, (rest : List(Int)) {
@@ -322,7 +322,7 @@ test("stream_demand", () {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -341,13 +341,13 @@ test("stream_demand", () {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
 	})
 	assert(zip_trace == [1, 9, 2, 0])
-	Nil
+	()
 })
 
 test("stream_replay_and_services", () {
@@ -369,7 +369,7 @@ test("stream_replay_and_services", () {
 	assert(stream.to_list(adapted) == [10])
 	assert(head(adapted) == Some(10))
 	assert(head(adapted) == Some(10))
-	Nil
+	()
 })
 
 Scale = (value = Int)
@@ -384,7 +384,7 @@ test("stream_common_environment", () {
 	s = stream.map(common(), (x : Int) <- (scale : Scale) { x * scale.value })
 	{
 		assert(stream.to_list(s) == [30])
-		Nil
+		()
 	} <- (Bias(value = 10), Scale(value = 3))
 })
 
@@ -456,7 +456,7 @@ test("stream_error_positions", () {
 		) ==
 			[Error("runner")],
 	)
-	Nil
+	()
 })
 
 test("stream_long_searches", () {
@@ -503,7 +503,7 @@ test("stream_long_searches", () {
 		) ==
 			[0, 1, 2],
 	)
-	Nil
+	()
 })
 
 // S2: each attempted pull, including Done and repeated positions, reruns runner.
@@ -528,13 +528,13 @@ test("stream_runner_demand", () {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
 	})
 	assert(trace == [99, 99, 99, 99])
-	Nil
+	()
 })
 
 reject = (x : Int) -> Int {
@@ -614,7 +614,7 @@ test("stream_callback_failures", () {
 		) ==
 			[Error("source")],
 	)
-	Nil
+	()
 })
 
 // S3/S6: callbacks run in order, and no callback after a failing one is called.
@@ -632,13 +632,13 @@ test("stream_callback_order", () {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
 	})
 	assert(trace == [1, 11, 2, 12])
-	Nil
+	()
 })
 
 // S8: the caller keeps the scope through consumption; early termination does
@@ -661,7 +661,7 @@ test("stream_resource_scope", () {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -675,7 +675,7 @@ test("stream_resource_scope", () {
 		stream.to_list(stream.attempt(s))
 	})
 	assert(result |> (Error(_)) { True } & (Ok(_)) { False })
-	Nil
+	()
 })
 
 Item = (value = Int)
@@ -712,7 +712,7 @@ test("stream_nominal_callbacks", () {
 		) ==
 			[Item(value = 0), Item(value = 1), Item(value = 2)],
 	)
-	Nil
+	()
 })
 
 // Checker cases required by std-1 §3.3/§3.4 and §9. They are temporary additions
@@ -725,7 +725,7 @@ test("stream_nominal_callbacks", () {
 //| original = path.read_text()
 //| cases = {
 //|     'invariant environment (§3.4)': '''
-//| Sink(A) { Sink(put: (A) -> Nil) }
+//| Sink(A) { Sink(put: (A) -> ()) }
 //| bad_coerce = (source: stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(Int, Never, Sink(Never)) {
 //|   source
 //| }
@@ -772,11 +772,11 @@ test("stream_factory_demand", () {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
 	})
 	assert(trace == [99, 99, 0, 1, 2, 88, 88])
-	Nil
+	()
 })

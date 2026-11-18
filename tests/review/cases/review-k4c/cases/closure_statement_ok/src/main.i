@@ -14,6 +14,6 @@ main = () {
 			run(() { use() }) <- (_syn3_0)
 		}
 		local()
-		Nil
+		()
 	} <- (Dep(value = 42))
 }

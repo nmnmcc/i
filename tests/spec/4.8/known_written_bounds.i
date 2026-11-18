@@ -6,9 +6,9 @@
 	testlib = (test) = std/test
 )
 
-Sink(A) = (put = (A) -> Nil)
+Sink(A) = (put = (A) -> ())
 
-Cell(A) = (get = () -> A, set = (A) -> Nil)
+Cell(A) = (get = () -> A, set = (A) -> ())
 
 State(A) = (get = () -> A)
 
@@ -19,9 +19,9 @@ read = (c : Cell("a")) { c.get() }
 stored = () <- (st : State("a")) { st.get() }
 
 test("noncovariant", () {
-	s = Sink(put = (m : { "GET" | "POST" }) { Nil })
+	s = Sink(put = (m : { "GET" | "POST" }) { () })
 	s.put("GET")
-	c = Cell(get = () { "a" }, set = (x : "a") { Nil })
+	c = Cell(get = () { "a" }, set = (x : "a") { () })
 	assert(read(c) == "a")
 	assert((cofinite, 0).1 == 0)
 	{

@@ -6,7 +6,7 @@ guard_not_counted : (Bool) -> 1 | 2 | 3
 prefixes : (A) -> 1 | 2 | 3 | 4
 no_values : (Int) -> 1 | 2
 choices : (Result(A, B)) -> 1 | 2
-nested : (Result(Bool, Nil)) -> 1 | 2 | 3 | 4
+nested : (Result(Bool, ())) -> 1 | 2 | 3 | 4
 lists : (List(A)) -> 0 | 1
 bits : (A) -> Int
 dead : (A) -> 1

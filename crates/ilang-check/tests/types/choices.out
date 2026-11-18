@@ -1,6 +1,6 @@
 either : (Result(Int, String)) -> Int | String
 small : (A) -> "big" | "small"
-mixed : (Int | String | Nil) -> "one or text" | "other"
+mixed : (Int | String | ()) -> "one or text" | "other"
 tuple_choice : ((Int, Int)) -> Int
 nested_choice : (Result(Result(A, A), A)) -> A
 shared : (Result(1 | "a", A)) -> A | 0 | 1

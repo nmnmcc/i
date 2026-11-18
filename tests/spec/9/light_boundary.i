@@ -14,7 +14,7 @@
 // boundary go through it, and finals run on the way.
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -24,9 +24,9 @@ Syn3ServiceFail(E) = Fail(E)
 
 the_fail = <E>() <- (f : Syn3ServiceFail(E)) { f }
 
-Yield(A) = (emit = (A) -> Nil)
+Yield(A) = (emit = (A) -> ())
 
-collect = <A, N>(body : () <- (Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Yield(A), ..N) -> ()) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
@@ -34,7 +34,7 @@ collect = <A, N>(body : () <- (Yield(A), ..N) -> Nil) -> List(A) {
 		} <- (
 			Yield(
 				emit = (x : A) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -84,7 +84,7 @@ test("a lazy service keeps its value and function identities", () {
 })
 
 test("a raise through the service agrees with its value", () {
-	r : Result(Nil, Int) = fail.catch(() {
+	r : Result((), Int) = fail.catch(() {
 		f : Fail(Int) = the_fail()
 		check(
 			show(f == the_fail()),
@@ -93,7 +93,7 @@ test("a raise through the service agrees with its value", () {
 		fail.raise(5)
 	})
 	check(show(r), "Error(5)")
-	s : Result(Nil, Int) = fail.catch(() {
+	s : Result((), Int) = fail.catch(() {
 		fail.raise(6)
 		f : Fail(Int) = the_fail()
 		f.raise(7)
@@ -101,7 +101,7 @@ test("a raise through the service agrees with its value", () {
 	check(show(s), "Error(6)")
 	t : Result(Int, Int) = fail.catch(() {
 		f : Fail(Int) = the_fail()
-		inner : Result(Nil, Int) = fail.catch(() { fail.raise(8) })
+		inner : Result((), Int) = fail.catch(() { fail.raise(8) })
 		inner |> (Ok(_)) { 0 } & (Error(e)) { f.raise(e + 1) }
 	})
 	check(show(t), "Error(9)")
@@ -129,10 +129,10 @@ test("a later lazy service does not change an already kept environment", () {
 		outer = Raising(raise = outer_fail.raise)
 		{
 			control.boundary((b) {
-				kept = control.keep((x : Nil) { the_raising() })
+				kept = control.keep((x : ()) { the_raising() })
 				{
 					check(
-						show(kept(Nil) == outer),
+						show(kept(()) == outer),
 						"True",
 					)
 					inner : Raising(Int) = the_raising()
@@ -152,30 +152,30 @@ test("a later lazy service does not change an already kept environment", () {
 })
 
 test("an inner catch of another E does not take the outer error", () {
-	r : Result(Result(Nil, String), Int) = fail.catch(() {
+	r : Result(Result((), String), Int) = fail.catch(() {
 		outer : Fail(Int) = the_fail()
-		inner : Result(Nil, String) = fail.catch(() { outer.raise(7) })
+		inner : Result((), String) = fail.catch(() { outer.raise(7) })
 		inner
 	})
 	check(show(r), "Error(7)")
 })
 
 test("an inner catch of the same E does not take the outer error", () {
-	r : Result(Result(Nil, Int), Int) = fail.catch(() {
+	r : Result(Result((), Int), Int) = fail.catch(() {
 		outer : Fail(Int) = the_fail()
 		fail.catch(() { outer.raise(1) })
 	})
 	check(show(r), "Error(1)")
-	s : Result(Result(Nil, Int), Int) = fail.catch(() {
+	s : Result(Result((), Int), Int) = fail.catch(() {
 		fail.catch(() { fail.raise(2) })
 	})
 	check(show(s), "Ok(Error(2))")
 })
 
 test("a catch inside an ensure", () {
-	r : Result(Nil, Int) = resource.ensure(
+	r : Result((), Int) = resource.ensure(
 		() { fail.catch(() { fail.raise(1) }) },
-		() { Nil },
+		() { () },
 	)
 	check(show(r), "Error(1)")
 })
@@ -185,7 +185,7 @@ test("a catch inside the final function of an ensure", () {
 		resource.ensure(
 			() { fail.raise(1) },
 			() {
-				inner : Result(Nil, Int) = fail.catch(() { fail.raise(2) })
+				inner : Result((), Int) = fail.catch(() { fail.raise(2) })
 				check(show(inner), "Error(2)")
 			},
 		)
@@ -212,7 +212,7 @@ test("a generator inside a catch: captures go through it", () {
 
 test("a catch inside a generator is active again after resume", () {
 	xs = collect(() {
-		r : Result(Nil, Int) = fail.catch(() {
+		r : Result((), Int) = fail.catch(() {
 			emit(1)
 			emit(2)
 			fail.raise(9)

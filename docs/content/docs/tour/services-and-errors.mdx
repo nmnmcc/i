@@ -121,10 +121,10 @@ main = () <- (io : Io) {
 
 ```text
 42
-Error(Nil)
+Error(())
 ```
 
-`int.parse` returns an integer and raises `Nil` through `Fail(Nil)` for invalid input. `fail.catch` turns success or failure into a built-in `Result` value.
+`int.parse` returns an integer and raises `()` through `Fail(())` for invalid input. `fail.catch` turns success or failure into a built-in `Result` value.
 
 ## Missing values
 

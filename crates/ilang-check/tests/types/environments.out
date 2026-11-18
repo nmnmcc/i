@@ -1,21 +1,21 @@
-collect : (() <- (N & { Yield(A) | N2 }, Yield(A)) -> Nil) <- (..N, ..N2) -> List(A)
+collect : (() <- (N & { Yield(A) | N2 }, Yield(A)) -> ()) <- (..N, ..N2) -> List(A)
 numbers : () -> List(Int)
 inferred : () -> List("s")
-run_never : (() <- (Yield(Never)) -> Nil) -> 1
+run_never : (() <- (Yield(Never)) -> ()) -> 1
 bad_never : () -> 1
-run_int : (() <- (Yield(Int)) -> Nil) -> 1
+run_int : (() <- (Yield(Int)) -> ()) -> 1
 good_int : () -> 1
-emit_int : () <- (Yield(Int)) -> Nil
-emit_string : () <- (Yield(String)) -> Nil
-both_yields : () <- (Yield(Int | String)) -> Nil
+emit_int : () <- (Yield(Int)) -> ()
+emit_string : () <- (Yield(String)) -> ()
+both_yields : () <- (Yield(Int | String)) -> ()
 next_int : () <- (Source(Int)) -> Int
 next_string : () <- (Source(String)) -> String
 both_sources : () <- (Source(Never)) -> String
-both_fns : List(() <- (Yield(Int | String)) -> Nil)
-written : () <- (Source(Int), Yield(Int)) -> Nil
-emit_any : () <- (Yield(Int | String)) -> Nil
-given_narrow : () -> Nil
-given_same : () -> Nil
+both_fns : List(() <- (Yield(Int | String)) -> ())
+written : () <- (Source(Int), Yield(Int)) -> ()
+emit_any : () <- (Yield(Int | String)) -> ()
+given_narrow : () -> ()
+given_same : () -> ()
 41:28: error[E0515]: `Yield(Int)` and `Yield(Never)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 41:18 needs it)
 63:16: error[E0515]: the service requirements `Source(Int)` and `Source(String)` have an empty intersection and cannot be satisfied
 80:17: error[E0515]: `Yield(Int | String)` and `Yield(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal

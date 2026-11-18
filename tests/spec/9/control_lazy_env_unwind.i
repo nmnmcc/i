@@ -10,7 +10,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -22,14 +22,14 @@ name = () <- (n : Name) { n.text }
 
 Bad = (Int)
 
-Paused = (Continuation(Nil, PausedSum, Name))
+Paused = (Continuation((), PausedSum, Name))
 Done = (String)
 PausedSum = Paused | Done
 
 // The final function gives the name it sees to the value of `outer`.
 final = (outer) {
 	seen = name()
-	control.suspend(outer, (k) { seen <> ", " <> control.resume(k, Nil) })
+	control.suspend(outer, (k) { seen <> ", " <> control.resume(k, ()) })
 }
 
 // The call of `resource.ensure` is under `! Name = Name("in")`, and is not
@@ -82,7 +82,7 @@ test("error_keeps_inner_environment", () {
 			})
 			p |>
 				(Paused(k)) {
-					{ control.resume(k, Nil) } |>
+					{ control.resume(k, ()) } |>
 						(Done(s)) { s }
 						& (Paused(_)) { "paused again" } <- (Name(text = "out"))
 				}

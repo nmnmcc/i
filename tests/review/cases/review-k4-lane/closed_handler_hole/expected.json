@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (Svc(Int)) -> Int\napp/main.wrap : (() <- (Svc(Int), ..N) -> Int, Svc(Int)) <- N -> Int\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.use : () <- (Svc(Int)) -> Int\napp/main.wrap : (() <- (Svc(Int), ..N) -> Int, Svc(Int)) <- N -> Int\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

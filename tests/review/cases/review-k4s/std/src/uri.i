@@ -335,10 +335,10 @@ validated = (p : Parts, parsing : Bool) -> Result(Uri, UriError) {
 
 // Parse validates complete components in order after its whole-input scan.
 // Build scans all fields, then checks their grammar, then cross-field rules.
-validate = (p : Parts, parsing : Bool) -> Nil {
+validate = (p : Parts, parsing : Bool) -> () {
 	scan_option(p.scheme, SchemePart)
 	p.authority |>
-		(None) { Nil }
+		(None) { () }
 		& (Some(a)) {
 			scan_option(a.userinfo, UserInfoPart)
 			lexical(
@@ -351,7 +351,7 @@ validate = (p : Parts, parsing : Bool) -> Nil {
 	scan_option(p.query, QueryPart)
 	scan_option(p.fragment, FragmentPart)
 	p.scheme |>
-		(None) { Nil }
+		(None) { () }
 		& (Some(s)) {
 			xs = bytes(s)
 			xs |>
@@ -362,7 +362,7 @@ validate = (p : Parts, parsing : Bool) -> Nil {
 				}
 		}
 	p.authority |>
-		(None) { Nil }
+		(None) { () }
 		& (Some(a)) {
 			grammar_option(a.userinfo, UserInfoPart, BadAuthority, user_char)
 			a.host |>
@@ -372,28 +372,28 @@ validate = (p : Parts, parsing : Bool) -> Nil {
 				& (IpLiteral(h)) { require(valid_ip(h), HostPart, 0, BadHost) }
 			grammar_option(a.port, PortPart, BadPort, digit)
 		}
-	parsing |> (True) { path_constraints(p) } & (False) { Nil }
+	parsing |> (True) { path_constraints(p) } & (False) { () }
 	grammar(bytes(p.path), PathPart, BadPath, path_char, 0)
 	grammar_option(p.query, QueryPart, BadCharacter, query_char)
 	grammar_option(p.fragment, FragmentPart, BadCharacter, query_char)
-	parsing |> (True) { Nil } & (False) { path_constraints(p) }
+	parsing |> (True) { () } & (False) { path_constraints(p) }
 }
 
-path_constraints = (p : Parts) -> Nil {
+path_constraints = (p : Parts) -> () {
 	path_bytes = bytes(p.path)
 	p.authority |>
 		(Some(_)) {
 			path_bytes |>
-				([]) { Nil }
-				& ([47, .._]) { Nil }
+				([]) { () }
+				& ([47, .._]) { () }
 				& (_) { problem(PathPart, 0, BadPath) }
 		}
 		& (None) {
 			path_bytes |>
 				([47, 47, .._]) { problem(PathPart, 0, BadPath) }
-				& (_) { Nil }
+				& (_) { () }
 			p.scheme |>
-				(Some(_)) { Nil }
+				(Some(_)) { () }
 				& (None) {
 					(first, _, _) = cut(path_bytes, 47)
 					grammar(first, PathPart, BadPath, no_colon, 0)
@@ -405,18 +405,18 @@ problem = (part : UriPart, offset : Int, why : UriProblem) -> Never {
 	fail.raise(UriError(part = part, offset = offset, problem = why))
 }
 
-require = (ok : Bool, part : UriPart, offset : Int, why : UriProblem) -> Nil {
-	ok |> (True) { Nil } & (False) { problem(part, offset, why) }
+require = (ok : Bool, part : UriPart, offset : Int, why : UriProblem) -> () {
+	ok |> (True) { () } & (False) { problem(part, offset, why) }
 }
 
-scan_option = (s : Option(String), part : UriPart) -> Nil {
-	s |> (None) { Nil } & (Some(text)) { lexical(bytes(text), part) }
+scan_option = (s : Option(String), part : UriPart) -> () {
+	s |> (None) { () } & (Some(text)) { lexical(bytes(text), part) }
 }
 
-lexical = (xs : List(Int), part : UriPart) -> Nil {
-	go = (rest : List(Int), at : Int) -> Nil {
+lexical = (xs : List(Int), part : UriPart) -> () {
+	go = (rest : List(Int), at : Int) -> () {
 		rest |>
-			([]) { Nil }
+			([]) { () }
 			& ([x, ..tail]) {
 				{ x == 37 } |>
 					(True) {
@@ -446,9 +446,9 @@ grammar_option = (
 	part : UriPart,
 	why : UriProblem,
 	allowed : (Int) -> Bool
-) -> Nil {
+) -> () {
 	text |>
-		(None) { Nil }
+		(None) { () }
 		& (Some(s)) { grammar(bytes(s), part, why, allowed, 0) }
 }
 
@@ -458,9 +458,9 @@ grammar = (
 	why : UriProblem,
 	allowed : (Int) -> Bool,
 	at : Int
-) -> Nil {
+) -> () {
 	xs |>
-		([]) { Nil }
+		([]) { () }
 		& ([x, ..tail]) {
 			require(allowed(x), part, at, why)
 			{ x == 37 } |>

@@ -10,10 +10,10 @@
 main = () {
 	control.boundary((b) {
 		control.suspend(b, (k) {
-			control.resume(k, Nil)
-			control.resume(k, Nil)
-			Nil
+			control.resume(k, ())
+			control.resume(k, ())
+			()
 		})
 	})
-	Nil
+	()
 }

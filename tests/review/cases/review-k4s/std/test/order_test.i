@@ -9,136 +9,136 @@
 
 test("negate_lt_test", () {
 	assert(order.negate(Less) == Greater)
-	Nil
+	()
 })
 
 test("negate_eq_test", () {
 	assert(order.negate(Equal) == Equal)
-	Nil
+	()
 })
 
 test("negate_gt_test", () {
 	assert(order.negate(Greater) == Less)
-	Nil
+	()
 })
 
 test("to_int_lt_test", () {
 	assert(order.to_int(Less) == -1)
-	Nil
+	()
 })
 
 test("to_int_eq_test", () {
 	assert(order.to_int(Equal) == 0)
-	Nil
+	()
 })
 
 test("to_int_gt_test", () {
 	assert(order.to_int(Greater) == 1)
-	Nil
+	()
 })
 
 test("compare_lt_lt_test", () {
 	assert(order.compare(Less, Less) == Equal)
-	Nil
+	()
 })
 
 test("compare_lt_eq_test", () {
 	assert(order.compare(Less, Equal) == Less)
-	Nil
+	()
 })
 
 test("compare_lt_gt_test", () {
 	assert(order.compare(Less, Greater) == Less)
-	Nil
+	()
 })
 
 test("compare_eq_lt_test", () {
 	assert(order.compare(Equal, Less) == Greater)
-	Nil
+	()
 })
 
 test("compare_eq_eq_test", () {
 	assert(order.compare(Equal, Equal) == Equal)
-	Nil
+	()
 })
 
 test("compare_eq_gt_test", () {
 	assert(order.compare(Equal, Greater) == Less)
-	Nil
+	()
 })
 
 test("compare_gt_lt_test", () {
 	assert(order.compare(Greater, Less) == Greater)
-	Nil
+	()
 })
 
 test("compare_gt_eq_test", () {
 	assert(order.compare(Greater, Equal) == Greater)
-	Nil
+	()
 })
 
 test("compare_gt_gt_test", () {
 	assert(order.compare(Greater, Greater) == Equal)
-	Nil
+	()
 })
 
 test("reverse_test", () {
 	assert(
 		list.sort([4, 5, 1], order.reverse(int.compare)) == [5, 4, 1],
 	)
-	Nil
+	()
 })
 
 test("break_tie_eq_lt_test", () {
 	assert(order.break_tie(Equal, Less) == Less)
-	Nil
+	()
 })
 
 test("break_tie_eq_gt_test", () {
 	assert(order.break_tie(Equal, Greater) == Greater)
-	Nil
+	()
 })
 
 test("break_tie_eq_eq_test", () {
 	assert(order.break_tie(Equal, Equal) == Equal)
-	Nil
+	()
 })
 
 test("break_tie_gt_lt_test", () {
 	assert(order.break_tie(Greater, Less) == Greater)
-	Nil
+	()
 })
 
 test("break_tie_lt_gt_test", () {
 	assert(order.break_tie(Less, Greater) == Less)
-	Nil
+	()
 })
 
 test("lazy_break_tie_eq_lt_test", () {
 	assert(order.lazy_break_tie(Equal, () { Less }) == Less)
-	Nil
+	()
 })
 
 test("lazy_break_tie_eq_gt_test", () {
 	assert(order.lazy_break_tie(Equal, () { Greater }) == Greater)
-	Nil
+	()
 })
 
 test("lazy_break_tie_eq_eq_test", () {
 	assert(order.lazy_break_tie(Equal, () { Equal }) == Equal)
-	Nil
+	()
 })
 
 test("lazy_break_tie_gt_lazy_test", () {
 	assert(
 		order.lazy_break_tie(Greater, () { panic("unreachable") }) == Greater,
 	)
-	Nil
+	()
 })
 
 test("lazy_break_tie_lt_lazy_test", () {
 	assert(order.lazy_break_tie(Less, () { panic("unreachable") }) == Less)
-	Nil
+	()
 })
 
 test("min_max_test", () {

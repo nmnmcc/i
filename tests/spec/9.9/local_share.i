@@ -13,6 +13,6 @@ main = () {
 		assert(core.portable(value))
 		assert(task.get(value) == "shared")
 		task.go(s, () { assert(task.get(value) == "shared") })
-		Nil
+		()
 	})
 }

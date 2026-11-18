@@ -10,5 +10,5 @@ lookup = (key : String) <- (kv : Kv) { kv.get(key) }
 
 main = () {
 	lookup("missing")
-	Nil
+	()
 }

@@ -8,5 +8,5 @@ main = () {
 	y = "nested"
 	y
 })" == "nested")
-	Nil
+	()
 }

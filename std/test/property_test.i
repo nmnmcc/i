@@ -120,10 +120,10 @@ test("integer_rules", () {
 	assert(
 		list.map(negative.children(), (c) { c.value }) == [0, -5, -8, -9],
 	)
-	ensure = (node : property.Tree(Int), target : Int, depth : Int) -> Nil {
+	ensure = (node : property.Tree(Int), target : Int, depth : Int) -> () {
 		assert(node.value >= 0 && node.value <= 10)
 		{ depth == 0 } |>
-			(True) { Nil }
+			(True) { () }
 			& (False) {
 				list.each(node.children(), (c) {
 					assert(c.value < node.value)
@@ -145,10 +145,10 @@ test("integer_rules", () {
 		}
 })
 
-valid_dependent = (t : property.Tree((Int, Int)), depth : Int) -> Nil {
+valid_dependent = (t : property.Tree((Int, Int)), depth : Int) -> () {
 	assert(t.value.1 >= 0 && t.value.1 <= t.value.0)
 	{ depth == 0 } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			list.each(t.children(), (c) { valid_dependent(c, depth - 1) })
 		}
@@ -497,11 +497,11 @@ test("list_order_and_generated_bounds", () {
 	)
 	Ok(items) = fail.catch(() { property.int(-3, 3) })
 	Ok(lists) = fail.catch(() { property.list(items, 2, 5) })
-	ensure = (t : property.Tree(List(Int)), depth : Int) -> Nil {
+	ensure = (t : property.Tree(List(Int)), depth : Int) -> () {
 		assert(list.length(t.value) >= 2 && list.length(t.value) <= 5)
 		assert(list.all(t.value, (x) { x >= -3 && x <= 3 }))
 		{ depth == 0 } |>
-			(True) { Nil }
+			(True) { () }
 			& (False) { list.each(t.children(), (c) { ensure(c, depth - 1) }) }
 	}
 	list.each(list.range(0, 19), (seed) { ensure(root(lists, 5, seed), 3) })
@@ -701,7 +701,7 @@ test("budget_prefixes_and_discarded_children", () {
 		assert(f.checked == index + 1 && f.limited)
 		assert((f.path, f.smallest) == pair)
 	})
-	Nil
+	()
 })
 
 test("dependent_branch_pruning_and_inner_alternatives", () {

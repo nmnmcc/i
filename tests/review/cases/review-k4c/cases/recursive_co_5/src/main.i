@@ -1,10 +1,10 @@
-S(N) = (() <- N -> Nil)
+S(N) = (() <- N -> ())
 use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
 }
-run = <N>(f : () <- N -> Nil) { f() }
-bad : <N>() <- (Fail(Never), ..N) -> Nil = () <- (s : S(N)) -> Nil {
+run = <N>(f : () <- N -> ()) { f() }
+bad : <N>() <- (Fail(Never), ..N) -> () = () <- (s : S(N)) -> () {
 	local = () { use() }
 	local()
 }

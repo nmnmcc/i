@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.make : ((Entry) <- (Fail(A), ..N) -> Nil) -> Sink(A, N)\nprobe/main.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> Nil\nprobe/main.example : () -> Result(Nil, String)\n",
+      "stdout": "probe/main.make : ((Entry) <- (Fail(A), ..N) -> ()) -> Sink(A, N)\nprobe/main.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> ()\nprobe/main.example : () -> Result((), String)\n",
       "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `example` is not used\n"
     },
     "test0": {

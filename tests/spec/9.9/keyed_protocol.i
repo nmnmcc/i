@@ -36,7 +36,7 @@ identity = (x) { x }
 send = (c, value) <- (scheduler : Scheduler) {
 	Channel(k) = c
 	scheduler.step(Send(key.wrap(k, value)))
-	Nil
+	()
 }
 
 receive = (c) <- (scheduler : Scheduler) {
@@ -101,12 +101,12 @@ main = () {
 	Step(Send(text), b2) = control.resume(b1, Proceed(number))
 	Step(Receive, a2) = control.resume(
 		a1,
-		Proceed(key.wrap(key.new(), Nil)),
+		Proceed(key.wrap(key.new(), ())),
 	)
 	Done(ar) = control.resume(a2, Proceed(text))
 	Done(br) = control.resume(
 		b2,
-		Proceed(key.wrap(key.new(), Nil)),
+		Proceed(key.wrap(key.new(), ())),
 	)
 	assert(read(int_result, ar) == Ok(41))
 	assert(read(string_result, br) == Ok("done"))

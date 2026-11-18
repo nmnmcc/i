@@ -10,16 +10,16 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 main = () <- (out : Out) {
 	control.boundary((b) {
 		task.scope((s) {
-			armed : task.Channel(Nil) = task.channel()
+			armed : task.Channel(()) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
-						task.send(armed, Nil)
+						task.send(armed, ())
 						task.sync(task.never())
 					},
 					() {

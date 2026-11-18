@@ -1,7 +1,7 @@
 (
 	i/fail
 )
-S(E, N) = (() <- (Fail(E), ..N) -> Nil)
+S(E, N) = (() <- (Fail(E), ..N) -> ())
 use = <E, N>() <- (s : S(E, N)) {
 	S(f) = s
 	f()

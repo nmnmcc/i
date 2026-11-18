@@ -33,13 +33,13 @@
 from_string = (string : String) -> BitArray { <<string:utf8>> }
 
 /// The string, when the bits are whole bytes of correct UTF-8, or
-/// `Error(Nil)`.
+/// `Error(())`.
 ///
 /// ```i
 /// bit_array.to_string(<<104, 105>>)  // Ok("hi")
-/// bit_array.to_string(<<255>>)       // Error(Nil)
+/// bit_array.to_string(<<255>>)       // Error(())
 /// ```
-to_string = (bits : BitArray) -> Result(String, Nil) {
+to_string = (bits : BitArray) -> Result(String, ()) {
 	core.bit_array_to_string(bits)
 }
 
@@ -81,23 +81,23 @@ reverse = <A>(list : List(A)) -> List(A) {
 }
 
 /// `take` bytes from byte `position`, counting from 0. A negative `take`
-/// takes the bytes before `position`. `Error(Nil)` when they are not all in
+/// takes the bytes before `position`. `Error(())` when they are not all in
 /// the bit array.
 ///
 /// ```i
 /// bit_array.slice(<<1, 2, 3, 4>>, 1, 2)   // Ok(<<2, 3>>)
 /// bit_array.slice(<<1, 2, 3, 4>>, 3, -2)  // Ok(<<2, 3>>)
 /// ```
-slice = (from : BitArray, at : Int, take : Int) -> Result(BitArray, Nil) {
+slice = (from : BitArray, at : Int, take : Int) -> Result(BitArray, ()) {
 	(start, length) = { take < 0 } |>
 		(True) { (at + take, -take) }
 		& (False) { (at, take) }
 	{ start < 0 || { start + length } * 8 > core.bit_size(from) } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			from |>
 				(<<_:bytes(start), part:bytes(length), _:bits>>) { Ok(part) }
-				& (_) { Error(Nil) }
+				& (_) { Error(()) }
 		}
 }
 
@@ -197,12 +197,12 @@ hex_value = (byte : Int) -> Int {
 }
 
 /// Reads base 16 text: two hex digits, upper or lower case, for each byte.
-/// Any other text gives `Error(Nil)`.
+/// Any other text gives `Error(())`.
 ///
 /// ```i
 /// bit_array.base16_decode("ff01")  // Ok(<<255, 1>>)
 /// ```
-base16_decode = (input : String) -> Result(BitArray, Nil) {
+base16_decode = (input : String) -> Result(BitArray, ()) {
 	go = (rest, acc) {
 		rest |>
 			(<<>>) { Ok(concat(reverse(acc))) }
@@ -211,9 +211,9 @@ base16_decode = (input : String) -> Result(BitArray, Nil) {
 				y = hex_value(b)
 				{ x >= 0 && y >= 0 } |>
 					(True) { go(more, [<<{ x * 16 + y }>>, ..acc]) }
-					& (False) { Error(Nil) }
+					& (False) { Error(()) }
 			}
-			& (_) { Error(Nil) }
+			& (_) { Error(()) }
 	}
 	go(<<input:utf8>>, [])
 }
@@ -285,7 +285,7 @@ value64 = (byte : Int, c62 : Int, c63 : Int) -> Int {
 		}
 }
 
-decode64 = (input : String, c62 : Int, c63 : Int) -> Result(BitArray, Nil) {
+decode64 = (input : String, c62 : Int, c63 : Int) -> Result(BitArray, ()) {
 	v = (byte) { value64(byte, c62, c63) }
 	ok = (a, b) { a >= 0 && b >= 0 }
 	go = (rest, acc) {
@@ -295,38 +295,38 @@ decode64 = (input : String, c62 : Int, c63 : Int) -> Result(BitArray, Nil) {
 				(w, x, y, z) = (v(a), v(b), v(c), v(d))
 				{ ok(w, x) && ok(y, z) } |>
 					(True) { go(more, [<<w:u6, x:u6, y:u6, z:u6>>, ..acc]) }
-					& (False) { Error(Nil) }
+					& (False) { Error(()) }
 			}
 			// The end, with or without `=`: 3 or 2 characters for 2 or 1 bytes.
 			& (<<a, b, c>> | <<a, b, c, 61>> ? c != 61) {
 				(w, x, y) = (v(a), v(b), v(c))
 				{ ok(w, x) && y >= 0 } |>
 					(True) { go(<<>>, [<<w:u6, x:u6, { y / 4 }:u4>>, ..acc]) }
-					& (False) { Error(Nil) }
+					& (False) { Error(()) }
 			}
 			& (<<a, b>> | <<a, b, 61, 61>>) {
 				(w, x) = (v(a), v(b))
 				ok(w, x) |>
 					(True) { go(<<>>, [<<w:u6, { x / 16 }:u2>>, ..acc]) }
-					& (False) { Error(Nil) }
+					& (False) { Error(()) }
 			}
-			& (_) { Error(Nil) }
+			& (_) { Error(()) }
 	}
 	go(<<input:utf8>>, [])
 }
 
 /// Reads base 64 text (RFC 4648), with `+` and `/`. The `=` padding at the
-/// end may be there or not. Any other text gives `Error(Nil)`.
+/// end may be there or not. Any other text gives `Error(())`.
 ///
 /// ```i
 /// bit_array.base64_decode("aGk=")  // Ok(<<104, 105>>)
 /// bit_array.base64_decode("aGk")   // Ok(<<104, 105>>)
 /// ```
-base64_decode = (encoded : String) -> Result(BitArray, Nil) {
+base64_decode = (encoded : String) -> Result(BitArray, ()) {
 	decode64(encoded, 43, 47)
 }
 
 /// Like `base64_decode`, with `-` and `_` in the place of `+` and `/`.
-base64_url_decode = (encoded : String) -> Result(BitArray, Nil) {
+base64_url_decode = (encoded : String) -> Result(BitArray, ()) {
 	decode64(encoded, 45, 95)
 }

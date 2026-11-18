@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "probe/main.f : (\"a\" | \"b\") -> 1 | 2\n",
-      "stderr": "src/main.i:4:1: error[E0521]: `f` is a host export, so a parameter must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors, but it is `\"a\" | \"b\"`; the host gives this value, so it must be all of `String`, not `\"a\" | \"b\"`\n1 error\n"
+      "stderr": "src/main.i:4:1: error[E0521]: `f` is a host export, so a parameter must be a type that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors, but it is `\"a\" | \"b\"`; the host gives this value, so it must be all of `String`, not `\"a\" | \"b\"`\n1 error\n"
     }
   }
 }

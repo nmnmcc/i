@@ -6,5 +6,5 @@
 
 main = () {
 	core.never(1)
-	Nil
+	()
 }

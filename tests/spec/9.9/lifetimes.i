@@ -9,14 +9,14 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
 main = () {
 	assert(
 		task.scope((s) {
-			ready : task.Channel(Nil) = task.channel()
+			ready : task.Channel(()) = task.channel()
 			task.go(s, () {
 				task.receive(ready)
 				task.yield()
@@ -24,7 +24,7 @@ main = () {
 			})
 			print("body")
 			// Order the log while retaining the no-join structured exit check.
-			task.send(ready, Nil)
+			task.send(ready, ())
 			42
 		}) ==
 			42,

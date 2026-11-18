@@ -22,6 +22,6 @@ main = () {
 	{
 		wrapped = make(() { use() })
 		assert(wrapped(run) == 11)
-		Nil
+		()
 	} <- (Dep(11), _syn3_0)
 }

@@ -3,15 +3,15 @@
 //// Level { Debug Info Warning Failure }
 //// Entry { Entry(level: Level, message: String, fields: List((String,String)),
 ////               at: Option(time.Instant)) }
-//// Sink(E,N) retains invariant N through the unused (N)->Nil marker.
+//// Sink(E,N) retains invariant N through the unused (N)->() marker.
 //// Interface:
-//// make(E,N): (accept: (Level)->Bool, send: (Entry)->Nil ? E ! N)->Sink(E,N)
+//// make(E,N): (accept: (Level)->Bool, send: (Entry)->() ? E ! N)->Sink(E,N)
 //// silent(N): ()->Sink(Never,N)
 //// filter(E,N): (sink: Sink(E,N), accept: (Level)->Bool)->Sink(E,N)
 //// minimum(E,N): (sink: Sink(E,N), level: Level)->Sink(E,N)
 //// enabled(E,N): (level: Level)->Bool ! Sink(E,N)
-//// write(E,N): (entry: Entry)->Nil ? E ! N | Sink(E,N)
-//// lazy(E,F,N): (level: Level, message: ()->String ? F ! N)->Nil ? E | F ! N | Sink(E,N)
+//// write(E,N): (entry: Entry)->() ? E ! N | Sink(E,N)
+//// lazy(E,F,N): (level: Level, message: ()->String ? F ! N)->() ? E | F ! N | Sink(E,N)
 //// format: (entry: Entry)->String
 ////
 //// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;
@@ -20,7 +20,7 @@
 ////
 //// make stores callbacks without calling them. enabled checks accept once.
 //// write checks the current sink once, then sends the original entry once only
-//// if accepted. False returns Nil. Delivery preserves the original error, with
+//// if accepted. False returns (). Delivery preserves the original error, with
 //// no retry, buffering, deduplication, task spawn, or failure suppression.
 //// lazy checks once, then calls message once and sends an entry with no fields
 //// or timestamp. Rejection calls neither callback; a message error skips send.
@@ -29,7 +29,7 @@
 //// filter checks the new predicate before the old predicate; send is unchanged.
 //// minimum accepts levels at or above its threshold. silent always rejects.
 //// These factories are pure. enabled followed by write performs two checks.
-//// Sink's E is covariant and its stored N invariant. The unused (N)->Nil marker
+//// Sink's E is covariant and its stored N invariant. The unused (N)->() marker
 //// is never called. Replacements need equal service arguments; N cannot contain
 //// the same Sink(E,N) recursively. Capture a concrete downstream sink instead.
 ////
@@ -79,15 +79,15 @@ Entry = (
 	at = Option(time.Instant),
 )
 
-Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> (), (N) -> ())
 
 make = <E, N>(
 	accept : (Level) -> Bool,
-	send : (Entry) <- (Fail(E), ..N) -> Nil
-) -> Sink(E, N) { Sink(accept, send, (_ : N) { Nil }) }
+	send : (Entry) <- (Fail(E), ..N) -> ()
+) -> Sink(E, N) { Sink(accept, send, (_ : N) { () }) }
 
 silent = <N>() -> Sink(Never, N) {
-	make((_ : Level) { False }, (_ : Entry) { Nil })
+	make((_ : Level) { False }, (_ : Entry) { () })
 }
 
 filter = <E, N>(sink : Sink(E, N), accept : (Level) -> Bool) -> Sink(E, N) {
@@ -107,7 +107,7 @@ enabled = <E, N>(level : Level) <- (sink : Sink(E, N)) -> Bool {
 // Inferred returns retain the exact public error and environment rows (§7).
 write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(accept, send, _) = sink
-	accept(entry.level) |> (True) { send(entry) } & (False) { Nil }
+	accept(entry.level) |> (True) { send(entry) } & (False) { () }
 }
 
 lazy = <E, F, N>(level : Level, message : () <- (Fail(F), ..N) -> String) <- (
@@ -125,7 +125,7 @@ lazy = <E, F, N>(level : Level, message : () <- (Fail(F), ..N) -> String) <- (
 				),
 			)
 		}
-		& (False) { Nil }
+		& (False) { () }
 }
 
 format = (entry : Entry) -> String {

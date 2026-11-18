@@ -7,5 +7,5 @@ f = () { send(Stop) }
 
 main = () {
 	assert(f() == Stop)
-	Nil
+	()
 }

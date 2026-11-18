@@ -6,13 +6,13 @@
 	rng = i/random
 )
 
-only_runner: (() <- (task.Scheduler) -> Nil) <- (task.Runner) -> Nil = (
+only_runner: (() <- (task.Scheduler) -> ()) <- (task.Runner) -> () = (
 	body
 ) <- (runner: task.Runner) { task.run(body) }
 
-only_runner_test: (rng.Generator, () <- (task.Scheduler) -> Nil) <- (
+only_runner_test: (rng.Generator, () <- (task.Scheduler) -> ()) <- (
 	Fail(task.ScheduleError),
 	task.Runner,
-) -> Nil = (seed, body) <- (runner: task.Runner) { task.test(seed, [], body) }
+) -> () = (seed, body) <- (runner: task.Runner) { task.test(seed, [], body) }
 
-main = () { Nil }
+main = () { () }

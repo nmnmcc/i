@@ -4,4 +4,4 @@
 P = (x = Int, y = Int)
 k = (P(x = (a, b))) { _ = b
 	a }
-main = () { Nil }
+main = () { () }

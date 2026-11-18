@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (S(N), T(N2), ..N, ..N2) -> Int\napp/main.h1 : () <- (S(N), ..N) -> Int\napp/main.main : () <- (Dep) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (S(N), T(N2), ..N, ..N2) -> Int\napp/main.h1 : () <- (S(N), ..N) -> Int\napp/main.main : () <- (Dep) -> ()\n",
       "stderr": "src/main.i:18:1: warning[W0504]: top-level binding `h0` is not used\n"
     },
     "test0": {

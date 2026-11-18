@@ -31,7 +31,7 @@ test("path_clean_examples", () {
 	assert(path.join(["", ""]) == "")
 	assert(path.join(["a", "/b", "..", "c"]) == "a/c")
 	assert(path.join(["", "/", "", "a"]) == "/a")
-	Nil
+	()
 })
 
 test("path_parts_examples", () {
@@ -53,7 +53,7 @@ test("path_parts_examples", () {
 	assert(path.is_absolute("//"))
 	assert(path.is_absolute("C:/a") == False)
 	assert(path.is_absolute("") == False)
-	Nil
+	()
 })
 
 test("path_relative_examples", () {
@@ -67,7 +67,7 @@ test("path_relative_examples", () {
 	assert(path.relative("", "") == Ok("."))
 	assert(path.relative(".", "../é") == Ok("../é"))
 	assert(path.relative("../../a", "../a") == Error(path.UnknownParent))
-	Nil
+	()
 })
 
 short_paths = (depth : Int) -> List(String) {
@@ -96,7 +96,7 @@ test("path_exhaustive_laws", () {
 	list.each(short_paths(3), (from) {
 		list.each(short_paths(3), (to) {
 			path.relative(from, to) |>
-				(Error(_)) { Nil }
+				(Error(_)) { () }
 				& (Ok(r)) {
 					assert(
 						path.clean(
@@ -107,7 +107,7 @@ test("path_exhaustive_laws", () {
 				}
 		})
 	})
-	Nil
+	()
 })
 
 // §5.3 calls for 100,000 segments, multibyte names, and long dot/parent runs.
@@ -137,5 +137,5 @@ test("path_long_inputs", () {
 	assert(path.clean(name) == name)
 	assert(path.split(name) == ("", name))
 	assert(path.relative(long, long) == Ok("."))
-	Nil
+	()
 })

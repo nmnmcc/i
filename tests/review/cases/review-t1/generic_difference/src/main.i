@@ -7,5 +7,5 @@ g = (x : { "a" | "b" }) { drop(x) }
 main = () {
 	assert(f(3) == 3)
 	assert(g("b") == "b")
-	Nil
+	()
 }

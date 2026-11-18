@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(A, N), ..N) -> A\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.use : () <- (S(A, N), ..N) -> A\napp/main.main : () -> ()\n",
       "stderr": ""
     },
     "test0": {

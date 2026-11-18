@@ -5,5 +5,5 @@ outer = (x : b) {
 
 main = () {
 	assert(outer("s") == "s")
-	Nil
+	()
 }

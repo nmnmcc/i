@@ -4,4 +4,4 @@
 
 // Test attributes have no built-in meaning, including on the default entry.
 @test
-main = () { Nil }
+main = () { () }

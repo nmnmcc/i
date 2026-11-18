@@ -4,7 +4,7 @@
 )
 
 // Arguments that do not change.
-Ref(A) = (get = () -> A, set = (A) -> Nil)
+Ref(A) = (get = () -> A, set = (A) -> ())
 
 read = <A>(r : Ref(A)) { r.get() }
 
@@ -17,12 +17,12 @@ make_int = (x) {
 		get = () { x },
 		set = (y) {
 			y + 1
-			Nil
+			()
 		},
 	)
 }
 
-make_any = (x) { Ref(get = () { x }, set = (y) { Nil }) }
+make_any = (x) { Ref(get = () { x }, set = (y) { () }) }
 
 // Written variables on one side only are taken out.
 one_side = <A>(x : A) -> Int { x }
@@ -35,7 +35,7 @@ empty_list = () {
 }
 
 // Intersections of unions.
-inter_unions = <A>(x : A & { Int | String } & { Int | Nil }) { x }
+inter_unions = <A>(x : A & { Int | String } & { Int | () }) { x }
 
 // Only the type constructors of `H` are shown.
 rest = (v) {

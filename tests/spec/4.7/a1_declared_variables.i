@@ -21,5 +21,5 @@ main = () {
 	assert(outer("kept") == "kept")
 	assert(unbox(Box(3)) == 3)
 	assert(unbox(Box("value")) == "value")
-	Nil
+	()
 }

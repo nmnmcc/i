@@ -1,6 +1,6 @@
 // old-syntax-check: E0101,E0101,E0101,E0101
-S(N) = (() <- N -> Nil, (N) -> Nil)
-T(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
+T(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s: S(N)) {
 	S(f, _) = s
 	f()
@@ -11,7 +11,7 @@ tuse = <N>() <- (s: T(N)) {
 }
 run = <A, N>(body: () <- N -> A) { body() }
 D = ()
-f2 = <N>(b: Bool) <- (s: S(N)) -> Nil {
+f2 = <N>(b: Bool) <- (s: S(N)) -> () {
 	b |>
 		(True) {
             <- (D)
@@ -22,7 +22,7 @@ f2 = <N>(b: Bool) <- (s: S(N)) -> Nil {
 		}
 		| (False) { tuse() }
 }
-f1 = <N>(b: Bool) <- (t: T(N)) -> Nil {
+f1 = <N>(b: Bool) <- (t: T(N)) -> () {
 	b |>
 		(True) {
 			run(() {

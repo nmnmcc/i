@@ -3,4 +3,4 @@
 // expect: compile-error E0115
 (main)
 (i/core)
-main = () { Nil }
+main = () { () }

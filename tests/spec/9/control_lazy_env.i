@@ -8,7 +8,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -18,7 +18,7 @@ Name = (text = String)
 
 name = () <- (n : Name) { n.text }
 
-Paused = (Continuation(Nil, PausedSum, Name))
+Paused = (Continuation((), PausedSum, Name))
 Done = (String)
 PausedSum = Paused | Done
 
@@ -60,7 +60,7 @@ test("environment_of_frames_that_wait", () {
 	{
 		p = control.boundary((b) { Done(plain(b)) })
 		k = p |> (Paused(k)) { k } & (Done(_)) { panic("not paused") }
-		{ control.resume(k, Nil) } |>
+		{ control.resume(k, ()) } |>
 			(Done(s)) { check(s, "twice/twice/one/two/resumer") }
 			& (Paused(_)) { panic("paused again") } <- (Name(text = "resumer"))
 	} <- (Name(text = "start"))
@@ -76,10 +76,10 @@ test("two_places", () {
 		})
 		k = p |> (Paused(k)) { k } & (Done(_)) { panic("not paused") }
 		{
-			k2 = { control.resume(k, Nil) } |>
+			k2 = { control.resume(k, ()) } |>
 				(Paused(k2)) { k2 }
 				& (Done(_)) { panic("not paused again") }
-			{ control.resume(k2, Nil) } |>
+			{ control.resume(k2, ()) } |>
 				(Done(s)) { check(s, "first,second") }
 				& (Paused(_)) { panic("paused again") } <- (
 				Name(text = "second"),

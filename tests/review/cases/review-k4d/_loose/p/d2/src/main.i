@@ -15,5 +15,5 @@ outer = () {
 
 main = () {
 	outer()
-	Nil
+	()
 }

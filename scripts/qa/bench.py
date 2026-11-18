@@ -32,7 +32,7 @@ def workloads():
         defs = '\n'.join(f'T{i} {{ T{i} }}' for i in range(n))
         union = ' | '.join(f'T{i}' for i in range(n))
         yield f'wide-union-{n}', defs + f'\nf = (x: {union}) {{ x }}\n'
-    head = "S(N) { S(f : () -> Int ! N, m : (N) -> Nil) }\nuse(N) = (s ! S(N)) { s.f() }\n"
+    head = "S(N) { S(f : () -> Int ! N, m : (N) -> ()) }\nuse(N) = (s ! S(N)) { s.f() }\n"
     defs = '\n'.join(f'f{i} = (k: Int) {{ k |> {{ 0 -> use() _ -> f{(i+1)%100}(k - 1) }} }}' for i in range(100))
     yield 'service-ring-100', head + defs + '\n'
 

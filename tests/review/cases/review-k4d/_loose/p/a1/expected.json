@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\n",
       "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\n"
     },
     "test0": {

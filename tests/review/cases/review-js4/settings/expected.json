@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.read_file : () <- (Await, Fail(FsError), Fs, Owner) -> BitArray\napp/main.filesystem : () <- (Fs) -> Settings\napp/main.fallback : () -> Settings\napp/main.use : () <- (Await, Fail(FsError), Owner, Settings) -> BitArray\napp/main.main : () <- (Assert, Fail(FsError)) -> Nil\n",
+      "stdout": "app/main.read_file : () <- (Await, Fail(FsError), Fs, Owner) -> BitArray\napp/main.filesystem : () <- (Fs) -> Settings\napp/main.fallback : () -> Settings\napp/main.use : () <- (Await, Fail(FsError), Owner, Settings) -> BitArray\napp/main.main : () <- (Assert, Fail(FsError)) -> ()\n",
       "stderr": ""
     },
     "test0": {

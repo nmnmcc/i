@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.make : () -> Cell(A)\nprobe/main.ci : Cell(Int)\nprobe/main.cs : Cell(String)\nprobe/main.id : (A) -> A\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.make : () -> Cell(A)\nprobe/main.ci : Cell(Int)\nprobe/main.cs : Cell(String)\nprobe/main.id : (A) -> A\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

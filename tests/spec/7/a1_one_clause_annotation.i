@@ -7,5 +7,5 @@ read = (v : { Int | String }) { v |> (x : Int) { x } }
 
 main = () {
 	read("other")
-	Nil
+	()
 }

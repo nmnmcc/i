@@ -12,8 +12,8 @@
 // of the place of `resume`.
 step = (b) {
 	control.suspend(b, (k) {
-		control.resume(k, Nil)
-		Nil
+		control.resume(k, ())
+		()
 	})
 	panic("after")
 }
@@ -21,7 +21,7 @@ step = (b) {
 main = () {
 	control.boundary((b) {
 		step(b)
-		Nil
+		()
 	})
-	Nil
+	()
 }

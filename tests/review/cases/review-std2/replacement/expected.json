@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "probe/main.use : () <- (Fail(A), S(A)) -> Nil\nprobe/main.first : () <- (Fail(String), S(String)) -> Nil\nprobe/main.second : () <- (Fail(Int), S(Int)) -> Nil\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.use : () <- (Fail(A), S(A)) -> ()\nprobe/main.first : () <- (Fail(String), S(String)) -> ()\nprobe/main.second : () <- (Fail(Int), S(Int)) -> ()\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": "src/main.i:19:8: error[E0515]: `S(Int)` and `S(\"s\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\n1 error\n"
     }
   }

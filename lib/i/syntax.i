@@ -173,22 +173,22 @@ definition = (of : Syntax) <- (service : Definitions) -> Syntax {
 	service.definition(of)
 }
 
-Diagnostics = (note = (String) -> Nil)
+Diagnostics = (note = (String) -> ())
 
 @external("i:compiler/syntax/v1", "note")
-raw_note : (String) -> Nil
+raw_note : (String) -> ()
 
 /// Constructs the compiler's transactional diagnostic service.
 _diagnostics = () -> Diagnostics {
-	notify = (message : String) -> Nil { raw_note(message) }
+	notify = (message : String) -> () { raw_note(message) }
 	Diagnostics(note = notify)
 }
 
 Items = (
 	add = (Syntax, Syntax, List((String, String)), Syntax) <- (
 		Fail(SyntaxError),
-	) -> Nil,
-	expose = (Syntax) <- (Fail(SyntaxError)) -> Nil,
+	) -> (),
+	expose = (Syntax) <- (Fail(SyntaxError)) -> (),
 )
 
 @external("i:compiler/syntax/v1", "metadata_new")
@@ -223,9 +223,9 @@ build_metadata = (
 		}
 }
 
-item_result = (result : ItemResult) -> Nil {
+item_result = (result : ItemResult) -> () {
 	raw_items_ok(result) |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			fail.raise(
 				SyntaxError(
@@ -239,7 +239,7 @@ item_result = (result : ItemResult) -> Nil {
 /// Constructs the compiler's transactional item service for one macro run.
 _items = () -> Items {
 	Items(
-		add = (collection, target, data, at) -> Nil {
+		add = (collection, target, data, at) -> () {
 			item_result(
 				raw_items_add(
 					collection,
@@ -249,7 +249,7 @@ _items = () -> Items {
 				),
 			)
 		},
-		expose = (name) -> Nil { item_result(raw_items_expose(name)) },
+		expose = (name) -> () { item_result(raw_items_expose(name)) },
 	)
 }
 
@@ -491,7 +491,7 @@ make = (node : Node, like : Syntax) -> Syntax {
 				),
 			)
 		}
-		& (_) { Nil }
+		& (_) { () }
 	result = node |>
 		(Node(Name(value))) { raw_make_text(0, value, like) }
 		& (Node(Discard(value))) { raw_make_text(1, value, like) }

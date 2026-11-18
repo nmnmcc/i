@@ -22,6 +22,6 @@ main = () {
 	_syn3_0 : S(Dep) = S(f = () { get() })
 	{
 		fw() + fr()
-		Nil
+		()
 	} <- (_syn3_0)
 }

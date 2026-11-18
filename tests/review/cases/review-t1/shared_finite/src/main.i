@@ -10,5 +10,5 @@ f = (x : Pair("a" | "b")) {
 main = () {
 	assert(f(Pair("a", "b")) == 1)
 	assert(f(Pair("b", "a")) == 2)
-	Nil
+	()
 }

@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.main : () <- (Fail(Never)) -> Nil\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.ping : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.both : () <- (Fail(Never), S(N), T(Int, N), ..N) -> Int\napp/main.get : () <- (Dep) -> Int\napp/main.closed : () <- (Fail(Never)) -> Int\napp/main.uset : (A) <- (Fail(Never), T(A, N), ..N) -> A\napp/main.run : (() <- N -> A) <- N -> A\napp/main.pong : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\n",
+      "stdout": "app/main.main : () <- (Fail(Never)) -> ()\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.ping : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\napp/main.both : () <- (Fail(Never), S(N), T(Int, N), ..N) -> Int\napp/main.get : () <- (Dep) -> Int\napp/main.closed : () <- (Fail(Never)) -> Int\napp/main.uset : (A) <- (Fail(Never), T(A, N), ..N) -> A\napp/main.run : (() <- N -> A) <- N -> A\napp/main.pong : (Int) <- (Fail(Never), S(N), T(A & Int, N2), ..N, ..N2) -> Int\n",
       "stderr": "src/main.i:1:1: error[E0505]: this type has itself inside it, through a type variable\nsrc/main.i:14:1: error[E0505]: this type has itself inside it, through a type variable\n2 errors\n"
     }
   }

@@ -7,7 +7,7 @@ x = 1
 @a.main
 x2 = 2
 
-x3 = () { Nil }
+x3 = () { () }
 @external("env" <> "", "f")
 ext : () -> Int
 @external(module = "env", function = "f")

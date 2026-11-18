@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.write : (1) -> Nil\n",
+      "stdout": "probe/main.write : (1) -> ()\n",
       "stderr": ""
     },
     "test0": {

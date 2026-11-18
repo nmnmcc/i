@@ -1,10 +1,10 @@
 Dep = ()
-get = () <- (d : Dep) { Nil }
-run = <N>(body : () <- N -> Nil) { body() }
-S(N) = (f = () <- N -> Nil)
+get = () <- (d : Dep) { () }
+run = <N>(body : () <- N -> ()) { body() }
+S(N) = (f = () <- N -> ())
 use = <N>() <- (s : S(N)) { s.f() }
 
 main = <N>() {
 	_syn3_0 : S(Dep) = S(f = () { get() })
-	run(() -> Nil { use() }) <- (_syn3_0)
+	run(() -> () { use() }) <- (_syn3_0)
 }

@@ -4,7 +4,7 @@
 	main
 )
 S(A) = (A)
-Bad = { (f = () <- (S(Int), S(String)) -> Nil) }
+Bad = { (f = () <- (S(Int), S(String)) -> ()) }
 use = (x : Bad) { x }
 
-main = () { Nil }
+main = () { () }

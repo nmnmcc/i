@@ -71,7 +71,7 @@ scheme_local = () {
 // A constructor has its function type, with labels.
 ctor_fn = () { Box == 1 }
 
-ctor_value = () { Nil == 1 }
+ctor_value = () { () == 1 }
 
 // A function expression: its labels, the written types or `_`, and the
 // written `->` part or else the known type of its body.
@@ -113,11 +113,11 @@ call_ctor = () { Box(value = 1) == 1 }
 
 // Matching a union: the type variable gets what the other members do not
 // take. `_` matches nothing.
-unwrap = <A>(x : { A | Nil }) -> A { x |> (Nil) { panic("nil") } & (y) { y } }
+unwrap = <A>(x : { A | () }) -> A { x |> (()) { panic("nil") } & (y) { y } }
 
-call_union = (u : { User | Nil }) { unwrap(u) == 1 }
+call_union = (u : { User | () }) { unwrap(u) == 1 }
 
-call_union_field = (u : { User | Nil }) { unwrap(u).name }
+call_union_field = (u : { User | () }) { unwrap(u).name }
 
 first = <A, B>(p : (A, B)) -> A { p.0 }
 
@@ -130,9 +130,9 @@ call_join = () { either(1, "a") == 1.0 }
 
 // Differences and intersections in a scheme: the types are put in, and the
 // result is worked out again (§4.4).
-drop_nil = (x) { x |> (Nil) { panic("nil") } & (y) { y } }
+drop_nil = (x) { x |> (()) { panic("nil") } & (y) { y } }
 
-call_diff = (u : { User | Nil }) { drop_nil(u) == 1 }
+call_diff = (u : { User | () }) { drop_nil(u) == 1 }
 
 inc = (x) {
 	x + 1
@@ -189,10 +189,10 @@ pattern_case_part = (b : Box(Int | String)) {
 }
 
 // A catch-all gets `B` less the members that rule 12 takes out.
-pattern_narrowed = (x : { Int | String | Nil }) {
+pattern_narrowed = (x : { Int | String | () }) {
 	x |>
-		(_ : Nil) { 0 }
-		& (other) { { other == Nil } |> (True) { 1 } & (False) { 2 } }
+		(_ : ()) { 0 }
+		& (other) { { other == () } |> (True) { 1 } & (False) { 2 } }
 }
 
 // A name that is not generalized gets its known type from its value.

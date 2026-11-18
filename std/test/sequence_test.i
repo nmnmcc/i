@@ -7,13 +7,13 @@
 	option = (Some, None) = std/option
 )
 
-check = (s : sequence.Sequence(Int), xs : List(Int)) -> Nil {
+check = (s : sequence.Sequence(Int), xs : List(Int)) -> () {
 	assert(sequence.to_list(s) == xs)
 	assert(sequence.length(s) == list.length(xs))
 	assert(sequence.is_empty(s) == list.is_empty(xs))
 	assert(sequence.first(s) == list.first(xs))
 	assert(sequence.last(s) == list.last(xs))
-	Nil
+	()
 }
 
 // The example table of the sequence documentation, including saved source versions.
@@ -53,11 +53,11 @@ test("sequence_examples", () {
 		),
 		[3, 2, 1],
 	)
-	Nil
+	()
 })
 
 // Sequence laws compare observable elements, never private representation equality.
-check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
+check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {
 	a = sequence.from_list(xs)
 	b = sequence.from_list(ys)
 	c = sequence.from_list(zs)
@@ -121,7 +121,7 @@ check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
 			check(a, xs)
 		},
 	)
-	Nil
+	()
 }
 
 test("sequence_small_exhaustive", () {
@@ -134,13 +134,13 @@ test("sequence_small_exhaustive", () {
 			)
 		})
 	})
-	Nil
+	()
 })
 
 // A service observes callback order without putting mutable state in sequences.
-Trace = (visit = (Int) -> Nil)
+Trace = (visit = (Int) -> ())
 
-visit = (x : Int) <- (trace : Trace) -> Nil { trace.visit(x) }
+visit = (x : Int) <- (trace : Trace) -> () { trace.visit(x) }
 
 test("sequence_walks", () {
 	source = sequence.from_list([1, 2, 3])
@@ -149,7 +149,7 @@ test("sequence_walks", () {
 	)
 	assert(sequence.fold(source, 0, (a, x) { a + x }) == 6)
 	assert(sequence.fold(source, [], (a, x) { [x, ..a] }) == [3, 2, 1])
-	assert(sequence.each(source, (x) { x * 2 }) == Nil)
+	assert(sequence.each(source, (x) { x * 2 }) == ())
 	check(source, [1, 2, 3])
 	// Nested boundaries record a trace through a pure supplied service.
 	trace = control.boundary((b) {
@@ -159,13 +159,13 @@ test("sequence_walks", () {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
 	})
 	assert(trace == [1, 2, 3])
-	Nil
+	()
 })
 
 reject_two = (x : Int) -> Int {
@@ -184,7 +184,7 @@ test("sequence_callback_errors", () {
 	)
 	assert(fail.catch(() { sequence.each(s, reject_two) }) == Error("two"))
 	check(s, [1, 2, 3])
-	Nil
+	()
 })
 
 // A fixed generator branches from retained versions, which must stay unchanged.
@@ -194,7 +194,7 @@ model = (
 	seed : Int,
 	remaining : Int,
 	versions : List((sequence.Sequence(Int), List(Int)))
-) -> Nil {
+) -> () {
 	remaining |>
 		(0) {
 			list.each(versions, (v) {
@@ -274,11 +274,11 @@ test("sequence_persistent_model", () {
 			],
 		)
 	})
-	Nil
+	()
 })
 
 // Traverse all the way through middle borrowing/collapse, alternating ends.
-drain = (s : sequence.Sequence(Int), low : Int, high : Int) -> Nil {
+drain = (s : sequence.Sequence(Int), low : Int, high : Int) -> () {
 	{ low >= high } |>
 		(True) { assert(sequence.is_empty(s)) }
 		& (False) {
@@ -395,7 +395,7 @@ test("sequence_large_boundaries", () {
 		check(sequence.append(s, s), list.append(xs, xs))
 		check(s, xs)
 	})
-	Nil
+	()
 })
 
 numbers = (n : Int) -> List(Int) {
@@ -404,7 +404,7 @@ numbers = (n : Int) -> List(Int) {
 
 Box = (value = Int)
 
-observe = (body : () <- (Trace, Assert) -> Nil) -> List(Int) {
+observe = (body : () <- (Trace, Assert) -> ()) -> List(Int) {
 	control.boundary((b) {
 		{
 			body()
@@ -412,7 +412,7 @@ observe = (body : () <- (Trace, Assert) -> Nil) -> List(Int) {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -464,7 +464,7 @@ test("sequence_callback_types_and_order", () {
 		fail.catch(() { sequence.map(sequence.wrap(2), union_error) }) ==
 			Error("other"),
 	)
-	Nil
+	()
 })
 
 // Unrelated shapes compare by elements. Both repeated insertion
@@ -496,6 +496,6 @@ test("sequence_independent_histories", () {
 		(s, model) = v
 		check(s, model)
 	})
-	Nil
+	()
 })
 // Cached sizes, ranks and bounded digits are the private sequence invariants.

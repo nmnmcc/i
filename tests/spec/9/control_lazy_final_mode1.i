@@ -10,7 +10,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -24,11 +24,11 @@ test("final_suspends_during_an_error", () {
 			fail.catch(() {
 				resource.ensure(
 					() {
-						control.suspend(b, (k) { control.resume(k, Nil) })
+						control.suspend(b, (k) { control.resume(k, ()) })
 						fail.raise(1)
 					},
 					() {
-						control.suspend(outer, (k2) { control.resume(k2, Nil) })
+						control.suspend(outer, (k2) { control.resume(k2, ()) })
 					},
 				)
 			})

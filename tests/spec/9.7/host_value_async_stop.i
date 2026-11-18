@@ -14,5 +14,5 @@ half = () <- (later : Later) {
 
 main = () {
 	half()
-	Nil
+	()
 }

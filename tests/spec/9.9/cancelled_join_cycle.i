@@ -16,12 +16,12 @@ waiter = (inbox, armed) {
 		other = task.receive(inbox)
 		resource.ensure(
 			() {
-				task.send(armed, Nil)
+				task.send(armed, ())
 				task.sync(task.never())
 			},
 			() {
 				fail.catch(() { task.join(other) })
-				Nil
+				()
 			},
 		)
 	}
@@ -29,9 +29,9 @@ waiter = (inbox, armed) {
 
 main = () {
 	task.scope((s) {
-		a : task.Channel(task.Task(Nil, String)) = task.channel()
-		b : task.Channel(task.Task(Nil, String)) = task.channel()
-		armed : task.Channel(Nil) = task.channel()
+		a : task.Channel(task.Task((), String)) = task.channel()
+		b : task.Channel(task.Task((), String)) = task.channel()
+		armed : task.Channel(()) = task.channel()
 		left = task.go(s, waiter(a, armed))
 		right = task.go(s, waiter(b, armed))
 		task.send(a, right)

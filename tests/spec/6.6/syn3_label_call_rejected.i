@@ -8,5 +8,5 @@ t9 = (first : Int, second : Int) -> Int { first - second }
 
 main = () {
 	t9(second = 1, first = 5)
-	Nil
+	()
 }

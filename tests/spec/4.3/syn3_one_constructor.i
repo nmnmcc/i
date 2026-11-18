@@ -10,5 +10,5 @@ Shape = Circle(Float) | Square(Float)
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

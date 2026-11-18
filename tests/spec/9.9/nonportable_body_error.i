@@ -10,6 +10,6 @@
 main = () {
 	control.boundary((b) {
 		fail.catch(() { task.scope((_) { fail.raise(b) }) })
-		Nil
+		()
 	})
 }

@@ -15,28 +15,28 @@ entries match the corresponding source-table row.
 | i/request binding | Inferred scheme |
 | --- | --- |
 | open_root | `() -> Root ! Root` |
-| close_root | `(Root) -> Nil` |
+| close_root | `(Root) -> ()` |
 | open_owner | `() -> Owner ! Root` |
-| close_owner | `(Owner) -> Nil` |
+| close_owner | `(Owner) -> ()` |
 | count | `(Owner) -> Int` |
 | count_root | `(Root) -> Int` |
 | settled_owner | `(Owner) -> Bool` |
 | settled_root | `(Root) -> Bool` |
-| cancel_all | `(Owner) -> Nil` |
-| cancel_all_root | `(Root) -> Nil` |
-| wait_none | `(Owner) -> Nil ! Await` |
-| wait_none_root | `(Root) -> Nil ! Await` |
+| cancel_all | `(Owner) -> ()` |
+| cancel_all_root | `(Root) -> ()` |
+| wait_none | `(Owner) -> () ! Await` |
+| wait_none_root | `(Root) -> () ! Await` |
 | within | `(() -> A ? E ! N) -> A ? E ! Root | N - Owner` |
 | ready | `(A) -> Request(A)` |
 | ticket | `(Request(A)) -> Ticket` |
 | state | `(Request(A)) -> RequestState(A)` |
 | take | `(Request(A)) -> A` |
 | settled | `(Ticket) -> Bool` |
-| cancel | `(Ticket) -> Nil` |
+| cancel | `(Ticket) -> ()` |
 | await | `(Request(A)) -> A ! Await` |
 | await_owned | `(Request(A)) -> A ! Await` |
-| wait_any | `(List(Ticket)) -> Nil` |
-| poll | `() -> Nil` |
+| wait_any | `(List(Ticket)) -> ()` |
+| poll | `() -> ()` |
 
 Root, Owner, Await and RequestState export the constructors in §5.1.
 Request/Ticket and Key/Keyed remain primitive types, not module re-exports.
@@ -50,15 +50,15 @@ Request/Ticket and Key/Keyed remain primitive types, not module re-exports.
 | local_scope | `((Scope(E)) -> A ? E ! N) -> A ? E ! N | Scheduler` |
 | go | `(Scope(E), () -> A ? E ! N) -> Task(A,E) ! Scheduler | N - Scheduler - Runner - request.Await` |
 | join | `(Task(A,E)) -> A ? E ! Scheduler` |
-| yield | `() -> Nil ! Scheduler` |
+| yield | `() -> () ! Scheduler` |
 | path | `() -> List(Int) ! Scheduler` |
 | random | `() -> random.Generator ! Scheduler` |
 | keep | `((S) -> A ? E ! N) -> { (S) -> A ? E ! Scheduler } ! Scheduler | N - Scheduler - Runner - request.Await` |
 | channel | `() -> Channel(A) ! Scheduler` |
 | local_channel | `() -> Channel(A) ! Scheduler` |
-| send | `(Channel(A), A) -> Nil ! Scheduler` |
+| send | `(Channel(A), A) -> () ! Scheduler` |
 | receive | `(Channel(A)) -> A ! Scheduler` |
-| send_event | `(Channel(A), A) -> Event(Nil,Never,Never)` |
+| send_event | `(Channel(A), A) -> Event((),Never,Never)` |
 | receive_event | `(Channel(A)) -> Event(A,Never,Never)` |
 | join_event | `(Task(A,E)) -> Event(A,E,Never)` |
 | always | `(A) -> Event(A,Never,Never)` |

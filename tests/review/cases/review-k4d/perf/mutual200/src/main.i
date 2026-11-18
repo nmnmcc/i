@@ -1,4 +1,4 @@
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
 	f()

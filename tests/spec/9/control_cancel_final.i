@@ -17,12 +17,12 @@ main = () {
 			() {
 				control.suspend(b, (k) {
 					control.cancel(k)
-					Nil
+					()
 				})
 			},
 			() { panic("final") },
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 }

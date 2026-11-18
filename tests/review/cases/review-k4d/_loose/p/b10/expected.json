@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.main : () <- (Fail(Never)) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.main : () <- (Fail(Never)) -> ()\n",
       "stderr": "src/main.i:10:1: error[E0505]: this type has itself inside it, through a type variable\nsrc/main.i:20:8: error[E0515]: `S(_)` and `S(Dep)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\n2 errors\n"
     }
   }

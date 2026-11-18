@@ -7,7 +7,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -160,19 +160,19 @@ test("strings", () {
 	)
 	check(
 		show(core.byte_slice("héllo", 1, 1)),
-		"Error(Nil)",
+		"Error(())",
 	)
 	check(
 		show(core.byte_slice("héllo", 2, 1)),
-		"Error(Nil)",
+		"Error(())",
 	)
 	check(
 		show(core.byte_slice("abc", 2, 5)),
-		"Error(Nil)",
+		"Error(())",
 	)
 	check(
 		show(core.byte_slice("abc", -1, 1)),
-		"Error(Nil)",
+		"Error(())",
 	)
 	check(
 		show(core.byte_slice("abc", 3, 0)),
@@ -200,15 +200,15 @@ test("strings", () {
 	)
 	check(
 		show(core.int_to_codepoint(55296)),
-		"Error(Nil)",
+		"Error(())",
 	)
 	check(
 		show(core.int_to_codepoint(1114112)),
-		"Error(Nil)",
+		"Error(())",
 	)
 	check(
 		show(core.int_to_codepoint(-1)),
-		"Error(Nil)",
+		"Error(())",
 	)
 })
 
@@ -227,11 +227,11 @@ test("bit_arrays", () {
 	)
 	check(
 		show(core.bit_array_to_string(<<255>>)),
-		"Error(Nil)",
+		"Error(())",
 	)
 	check(
 		show(core.bit_array_to_string(<<104, 1:u1>>)),
-		"Error(Nil)",
+		"Error(())",
 	)
 })
 

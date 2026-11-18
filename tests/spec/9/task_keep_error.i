@@ -10,7 +10,7 @@ name = () <- (n: Name) { n.text }
 
 main = () {
 	made = fail.catch(() {
-		task.keep((_: Nil) {
+		task.keep((_: ()) {
 			task.yield()
 			fail.raise(name())
 		})
@@ -18,7 +18,7 @@ main = () {
 	made |>
 		(Ok(callback)) {
 			assert(
-				fail.catch(() { callback(Nil) <- (Name(text = "caller")) }) ==
+				fail.catch(() { callback(()) <- (Name(text = "caller")) }) ==
 					Error("saved"),
 			)
 		}

@@ -6,6 +6,6 @@ f = (0 | 1) { "yes" }
 main = () {
 	assert(f(0) == "yes")
 	assertion.catch(() { f(2) }) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("missed Assert") }
 }

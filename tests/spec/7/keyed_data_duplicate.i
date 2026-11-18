@@ -2,5 +2,5 @@
 // expect: compile-error E0510
 main = () {
 	(name = _, name = _) = (name = "Ada")
-	Nil
+	()
 }

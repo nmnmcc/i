@@ -7,13 +7,13 @@
 	option = (Some, None) = std/option
 )
 
-check = (s : sequence.Sequence(Int), xs : List(Int)) -> Nil {
+check = (s : sequence.Sequence(Int), xs : List(Int)) -> () {
 	assert(sequence.to_list(s) == xs)
 	assert(sequence.length(s) == list.length(xs))
 	assert(sequence.is_empty(s) == list.is_empty(xs))
 	assert(sequence.first(s) == list.first(xs))
 	assert(sequence.last(s) == list.last(xs))
-	Nil
+	()
 }
 
 // std-1 §4.3's example table, Q1 and Q2, including saved source versions.
@@ -53,11 +53,11 @@ test("sequence_examples", () {
 		),
 		[3, 2, 1],
 	)
-	Nil
+	()
 })
 
 // §4.3 laws compare observable elements, never private representation equality.
-check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
+check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {
 	a = sequence.from_list(xs)
 	b = sequence.from_list(ys)
 	c = sequence.from_list(zs)
@@ -121,7 +121,7 @@ check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {
 			check(a, xs)
 		},
 	)
-	Nil
+	()
 }
 
 test("sequence_small_exhaustive", () {
@@ -134,13 +134,13 @@ test("sequence_small_exhaustive", () {
 			)
 		})
 	})
-	Nil
+	()
 })
 
 // A service observes callback order without putting mutable state in sequences.
-Trace = (visit = (Int) -> Nil)
+Trace = (visit = (Int) -> ())
 
-visit = (x : Int) <- (trace : Trace) -> Nil { trace.visit(x) }
+visit = (x : Int) <- (trace : Trace) -> () { trace.visit(x) }
 
 test("sequence_walks", () {
 	source = sequence.from_list([1, 2, 3])
@@ -149,7 +149,7 @@ test("sequence_walks", () {
 	)
 	assert(sequence.fold(source, 0, (a, x) { a + x }) == 6)
 	assert(sequence.fold(source, [], (a, x) { [x, ..a] }) == [3, 2, 1])
-	assert(sequence.each(source, (x) { x * 2 }) == Nil)
+	assert(sequence.each(source, (x) { x * 2 }) == ())
 	check(source, [1, 2, 3])
 	// Nested boundaries record a trace through a pure supplied service.
 	trace = control.boundary((b) {
@@ -159,13 +159,13 @@ test("sequence_walks", () {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
 	})
 	assert(trace == [1, 2, 3])
-	Nil
+	()
 })
 
 reject_two = (x : Int) -> Int {
@@ -184,7 +184,7 @@ test("sequence_callback_errors", () {
 	)
 	assert(fail.catch(() { sequence.each(s, reject_two) }) == Error("two"))
 	check(s, [1, 2, 3])
-	Nil
+	()
 })
 
 // A fixed generator branches from retained versions, as required by §4.3.
@@ -194,7 +194,7 @@ model = (
 	seed : Int,
 	remaining : Int,
 	versions : List((sequence.Sequence(Int), List(Int)))
-) -> Nil {
+) -> () {
 	remaining |>
 		(0) {
 			list.each(versions, (v) {
@@ -274,11 +274,11 @@ test("sequence_persistent_model", () {
 			],
 		)
 	})
-	Nil
+	()
 })
 
 // Traverse all the way through middle borrowing/collapse, alternating ends.
-drain = (s : sequence.Sequence(Int), low : Int, high : Int) -> Nil {
+drain = (s : sequence.Sequence(Int), low : Int, high : Int) -> () {
 	{ low >= high } |>
 		(True) { assert(sequence.is_empty(s)) }
 		& (False) {
@@ -395,7 +395,7 @@ test("sequence_large_boundaries", () {
 		check(sequence.append(s, s), list.append(xs, xs))
 		check(s, xs)
 	})
-	Nil
+	()
 })
 
 numbers = (n : Int) -> List(Int) {
@@ -404,7 +404,7 @@ numbers = (n : Int) -> List(Int) {
 
 Box = (value = Int)
 
-observe = (body : () <- (Trace, Assert) -> Nil) -> List(Int) {
+observe = (body : () <- (Trace, Assert) -> ()) -> List(Int) {
 	control.boundary((b) {
 		{
 			body()
@@ -412,7 +412,7 @@ observe = (body : () <- (Trace, Assert) -> Nil) -> List(Int) {
 		} <- (
 			Trace(
 				visit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -464,7 +464,7 @@ test("sequence_callback_types_and_order", () {
 		fail.catch(() { sequence.map(sequence.wrap(2), union_error) }) ==
 			Error("other"),
 	)
-	Nil
+	()
 })
 
 // Q4 and §4.3: unrelated shapes compare by elements. Both repeated insertion
@@ -496,7 +496,7 @@ test("sequence_independent_histories", () {
 		(s, model) = v
 		check(s, model)
 	})
-	Nil
+	()
 })
 // Development checks for std-1 §4.3. The Python program below temporarily adds
 // private rank/cache audits, then counts helper entries as node work. It restores
@@ -520,10 +520,10 @@ test("sequence_independent_histories", () {
 //| def run(filter):
 //|     subprocess.run([compiler, 'test', '--project', 'std', '--opt', '0', filter], check=True)
 //| audit = '''
-//| audit(A) = (s: Sequence(A)) -> Nil ! Assert {
+//| audit(A) = (s: Sequence(A)) -> () ! Assert {
 //|   Sequence(t) = s
 //|   audit_tree(t, 0)
-//|   Nil
+//|   ()
 //| }
 //| audit_node(A) = (x: Node(A), rank: Int) -> Int ! Assert {
 //|   x |> {
@@ -573,9 +573,9 @@ test("sequence_independent_histories", () {
 //|         return h + ' {'
 //|     checks = 'audit(result)'
 //|     if name == 'set':
-//|         checks = 'result |> { None -> Nil Some(s) -> audit(s) }'
+//|         checks = 'result |> { None -> () Some(s) -> audit(s) }'
 //|     elif name.startswith('pop_'):
-//|         checks = 'result |> { None -> Nil Some((_, s)) -> audit(s) }'
+//|         checks = 'result |> { None -> () Some((_, s)) -> audit(s) }'
 //|     elif name == 'split':
 //|         checks = '(a, b) = result\n audit(a)\n audit(b)'
 //|     wrappers.append(h + ' {\n result = unchecked_' + name + '(' + edit_args[name] + ')\n ' + checks + '\n result\n}\n')
@@ -586,7 +586,7 @@ test("sequence_independent_histories", () {
 //|     src.write_text(exports(variant, 'audit') + audit + '\n'.join(wrappers))
 //|     # All generated/edit results are audited, including every small/model edit.
 //|     # Large drains already run in the normal suite; omit their quadratic audits.
-//|     test.write_text(original_test.replace('drain(s, 0, n)', '{ n <= 257 } |> { True -> drain(s, 0, n) False -> Nil }'))
+//|     test.write_text(original_test.replace('drain(s, 0, n)', '{ n <= 257 } |> { True -> drain(s, 0, n) False -> () }'))
 //|     print('Private invariant audit: ranks, cached leaf counts, bounded nonempty digits', flush=True)
 //|     run('sequence')
 //|     def meter(match):
@@ -595,15 +595,15 @@ test("sequence_independent_histories", () {
 //|     # Count the unbounded local loops too, so a flattening regression is visible.
 //|     variant = re.sub(r'(go = \([^\n]*\) \{)', r'\1\n touch()', variant)
 //|     src.write_text(exports(variant, 'Meter(..)') + '''
-//| Meter { Meter(touch: () -> Nil) }
-//| touch = (meter ! Meter) -> Nil ! Meter { meter.touch() }
+//| Meter { Meter(touch: () -> ()) }
+//| touch = (meter ! Meter) -> () ! Meter { meter.touch() }
 //| ''')
 //|     test.write_text('''
 //| (i/control, i/core, (Io) = i/io, sequence = std/sequence, list = std/list)
-//| count = (body: () -> Nil ! sequence.Meter) -> Int {
+//| count = (body: () -> () ! sequence.Meter) -> Int {
 //|   control.boundary((b) {
 //|     ! sequence.Meter = sequence.Meter(() {
-//|       control.suspend(b, (k) { 1 + control.resume(k, Nil) })
+//|       control.suspend(b, (k) { 1 + control.resume(k, ()) })
 //|     })
 //|     body()
 //|     0
@@ -612,29 +612,29 @@ test("sequence_independent_histories", () {
 //| height = (n: Int) -> Int { { n <= 1 } |> { True -> 1 False -> 1 + height(n / 2) } }
 //| @test
 //| sequence_node_counts = (io ! Io) {
-//|   ! sequence.Meter = sequence.Meter(() { Nil })
+//|   ! sequence.Meter = sequence.Meter(() { () })
 //|   list.each([16, 64, 256, 1024, 4096, 16384, 65536, 100000], (n) {
 //|     s = sequence.from_list(list.range(0, n - 1))
 //|     small = sequence.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9])
 //|     list.each([0, n / 4, n / 2, n - 1], (i) {
-//|       a = count(() { sequence.at(s, i) Nil })
-//|       b = count(() { sequence.set(s, i, -1) Nil })
-//|       c = count(() { sequence.split(s, i) Nil })
+//|       a = count(() { sequence.at(s, i) () })
+//|       b = count(() { sequence.set(s, i, -1) () })
+//|       c = count(() { sequence.split(s, i) () })
 //|       // §4.3 requires height work, not these particular implementation constants.
 //|       assert(a <= 80 * height(n))
 //|       assert(b <= 80 * height(n))
 //|       assert(c <= 160 * height(n))
 //|       io.print(core.inspect((n, i, a, b, c)))
 //|     })
-//|     alias = count(() { sequence.append(s, s) Nil })
-//|     left = count(() { sequence.append(s, small) Nil })
-//|     right = count(() { sequence.append(small, s) Nil })
+//|     alias = count(() { sequence.append(s, s) () })
+//|     left = count(() { sequence.append(s, small) () })
+//|     right = count(() { sequence.append(small, s) () })
 //|     assert(alias <= 160 * height(n))
 //|     assert(left <= 160 * height(n))
 //|     assert(right <= 160 * height(n))
 //|     io.print(core.inspect((n, alias, left, right)))
 //|   })
-//|   Nil
+//|   ()
 //| }
 //| ''')
 //|     print('Counts: (length, index, at, set, split); (length, append_alias, append_short_right, append_short_left)', flush=True)

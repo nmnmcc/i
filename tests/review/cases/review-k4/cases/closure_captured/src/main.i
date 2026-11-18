@@ -1,4 +1,4 @@
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
@@ -11,6 +11,6 @@ make = <N>(s : S(N)) {
 }
 
 main = () {
-	f = make(S(() { Nil }, (_ : Never) { Nil }))
+	f = make(S(() { () }, (_ : Never) { () }))
 	f()
 }

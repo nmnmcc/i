@@ -1,7 +1,7 @@
 Dep = (v = Int)
 get = () <- (d : Dep) { d.v }
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
-T(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
+T(N) = (f = () <- N -> Int, m = (N) -> ())
 us = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
 	f()
@@ -19,5 +19,5 @@ run = <A, N>(body : () <- N -> A) { body() }
 main = () {
 	l0_0 = () { us() + 1 <- (Dep(v = 1)) }
 	1 + 1 + usa()
-	Nil
+	()
 }

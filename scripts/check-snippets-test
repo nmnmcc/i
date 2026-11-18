@@ -25,11 +25,11 @@ let a = "x = \"a\"\n"; let b = r##"f = { x -> x }"##;'''
         self.assertEqual([s for _, _, s in check.rust_strings(text)], ['x = "a"\n', 'f = { x -> x }'])
 
     def test_js_decodes_source_strings_and_templates(self):
-        text = '// "wrong = old"\nconst a = "f = () { Nil }\\n"; const b = `x = ${value}`;'
-        self.assertEqual([s for _, _, s in check.js_strings(text)], ['f = () { Nil }\n', 'x = ${value}'])
+        text = '// "wrong = old"\nconst a = "f = () { () }\\n"; const b = `x = ${value}`;'
+        self.assertEqual([s for _, _, s in check.js_strings(text)], ['f = () { () }\n', 'x = ${value}'])
 
     def test_source_templates_are_candidates(self):
-        for text in ['f = () { Nil }', '  a{i} = {{ a{p} }}\n', '(i/core)\nx = 1', '@main\nf = () { Nil }']:
+        for text in ['f = () { () }', '  a{i} = {{ a{p} }}\n', '(i/core)\nx = 1', '@main\nf = () { () }']:
             self.assertTrue(check.candidate(text), text)
         self.assertFalse(check.candidate('A message about import and case.'))
 
@@ -58,7 +58,7 @@ let a = "x = \"a\"\n"; let b = r##"f = { x -> x }"##;'''
             root = Path(scratch)
             fixture = root / 'docs/scripts/run-examples-fixtures/failing-syntax.mdx'
             page = root / 'docs/content/docs/example.mdx'
-            for file, source in ((fixture, '='), (page, 'main = () { Nil }')):
+            for file, source in ((fixture, '='), (page, 'main = () { () }')):
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.write_text('```i\n' + source + '\n```\n')
             registry = root / 'registry.json'

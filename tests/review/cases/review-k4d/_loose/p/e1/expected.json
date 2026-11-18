@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.read : () <- (State(A)) -> A\napp/main.outer : ((() <- (State(A)) -> A) <- N -> B) <- N -> (Int, String)\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.read : () <- (State(A)) -> A\napp/main.outer : ((() <- (State(A)) -> A) <- N -> B) <- N -> (Int, String)\napp/main.main : () -> ()\n",
       "stderr": ""
     },
     "test0": {

@@ -79,15 +79,15 @@ Process = (
 		String,
 		String,
 	) -> Request(Result(Int, String)),
-	own = (Int) -> Request(Nil),
+	own = (Int) -> Request(()),
 	read_stdout = (Int, Int) -> Request(Result(BitArray, String)),
 	read_stderr = (Int, Int) -> Request(Result(BitArray, String)),
-	write_stdin = (Int, BitArray) -> Request(Result(Nil, String)),
-	close_stdin = (Int) -> Request(Result(Nil, String)),
+	write_stdin = (Int, BitArray) -> Request(Result((), String)),
+	close_stdin = (Int) -> Request(Result((), String)),
 	spawn = (String, BitArray) -> Request(Result(Int, String)),
 	wait = (Int) -> Request(Result(Int, String)),
-	terminate = (Int) -> Request(Result(Nil, String)),
-	close = (Int) -> Request(Nil),
+	terminate = (Int) -> Request(Result((), String)),
+	close = (Int) -> Request(()),
 )
 
 length = ([]) { 0 } & ([_, ..rest]) { 1 + length(rest) }
@@ -100,7 +100,7 @@ encode_items =
 		bytes = <<s:utf8>>
 		n = core.bit_size(bytes) / 8
 		{ n <= 4294967295 } |>
-			(True) { Nil }
+			(True) { () }
 			& (False) {
 				fail.raise(ProcessError(operation = "spawn", code = "invalid"))
 			}
@@ -110,7 +110,7 @@ encode_items =
 encode_args = (values) {
 	n = length(values)
 	{ n <= 4294967295 } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			fail.raise(ProcessError(operation = "spawn", code = "invalid"))
 		}
@@ -187,7 +187,7 @@ spawn = (program, values) <- (raw : Process) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -238,7 +238,7 @@ spawn_piped = (program, values, input, output, errors) <- (raw : Process) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -287,7 +287,7 @@ spawn_config = (
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)

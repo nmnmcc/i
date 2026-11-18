@@ -8,7 +8,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -21,7 +21,7 @@ count = (n, acc) { n |> (0) { acc } & (_) { count(n - 1, acc + 1) } }
 down = (b, n) {
 	n |>
 		(0) {
-			control.suspend(b, (k) { control.resume(k, Nil) })
+			control.suspend(b, (k) { control.resume(k, ()) })
 			count(1000000, 0)
 		}
 		& (_) {

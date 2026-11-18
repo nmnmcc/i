@@ -6,5 +6,5 @@ f = () { p + q }
 
 main = () {
 	assert(f() == 42)
-	Nil
+	()
 }

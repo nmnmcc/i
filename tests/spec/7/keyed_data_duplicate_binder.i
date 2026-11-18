@@ -2,5 +2,5 @@
 // expect: compile-error E0217
 main = () {
 	(name = x, age = x) = (name = "Ada", age = 36)
-	Nil
+	()
 }

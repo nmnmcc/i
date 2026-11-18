@@ -16,7 +16,7 @@ main = () {
 				n = outer() / 10
 				entry = stamp(Entry(at = n))
 				assert(entry.at == read())
-				Nil
+				()
 			} <- (
 				Inner(
 					get = () {

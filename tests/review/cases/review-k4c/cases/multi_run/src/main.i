@@ -20,5 +20,5 @@ texts = () {
 main = () {
 	assert(ints() == 2)
 	assert(texts() == "a!")
-	Nil
+	()
 }

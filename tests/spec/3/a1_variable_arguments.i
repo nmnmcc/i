@@ -7,5 +7,5 @@ bad = <A>(x : A(Int)) { x }
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

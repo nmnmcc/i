@@ -3,7 +3,7 @@ use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
 }
-S(N) = (() <- N -> Nil)
+S(N) = (() <- N -> ())
 b = (x : Bool) { x |> (True) { use() } & (False) { a(True) } }
 wrap = () { run(() { a(True) }) }
-run = <N>(body : () <- N -> Nil) { body() }
+run = <N>(body : () <- N -> ()) { body() }

@@ -1,10 +1,10 @@
 Dep = ()
-get = () <- (d : Dep) { Nil }
-run = <N>(body : () <- N -> Nil) { body() }
-S(N) = (f = () <- N -> Nil, mark = (N) -> Nil)
+get = () <- (d : Dep) { () }
+run = <N>(body : () <- N -> ()) { body() }
+S(N) = (f = () <- N -> (), mark = (N) -> ())
 use = <N>() <- (s : S(N)) { s.f() }
 helper = <N>() {
-	local : () <- (S(N), ..N) -> Nil = () { use() }
+	local : () <- (S(N), ..N) -> () = () { use() }
 	local()
 }
 

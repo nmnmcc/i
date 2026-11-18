@@ -67,7 +67,8 @@
 "->"  keyword.operator.arrow.i
 "A"  entity.name.type.i
 "|"  keyword.operator.choice.i
-"Nil"  constant.language.i
+"("  punctuation.brackets.round.i
+")"  punctuation.brackets.round.i
 "@"  storage.type.annotation.i punctuation.definition.annotation.i
 "host"  storage.type.annotation.i
 "("  punctuation.brackets.round.i
@@ -84,7 +85,8 @@
 "String"  support.type.builtin.i
 ")"  punctuation.brackets.round.i
 "->"  keyword.operator.arrow.i
-"Nil"  constant.language.i
+"("  punctuation.brackets.round.i
+")"  punctuation.brackets.round.i
 ")"  punctuation.brackets.round.i
 "@"  storage.type.annotation.i punctuation.definition.annotation.i
 "external"  storage.type.annotation.i

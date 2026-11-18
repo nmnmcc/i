@@ -7,4 +7,4 @@
 @host("test:records/v1")
 Records = (get = () -> (name = String))
 
-test("check", () { Nil })
+test("check", () { () })

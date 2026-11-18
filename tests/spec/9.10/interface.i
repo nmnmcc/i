@@ -30,5 +30,5 @@ test("public_api", () {
 	assert(float(initial).1 == first.1)
 	assert(split(initial).0 != split(initial).1)
 	assert(at_path(initial, []) == initial)
-	Nil
+	()
 })

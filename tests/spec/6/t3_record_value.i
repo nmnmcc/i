@@ -14,5 +14,5 @@ main = () {
 	assert(updated.age == 37)
 	assert(updated == (name = "Ada", age = 37))
 	assert((name = "Ada", age = 37) == updated)
-	Nil
+	()
 }

@@ -11,5 +11,5 @@ value = () { core.to_float(core.shift_left(1, 1024)) }
 
 main = () {
 	value()
-	Nil
+	()
 }

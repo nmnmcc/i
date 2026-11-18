@@ -1,12 +1,12 @@
 Dep = ()
-get = () <- (d : Dep) { Nil }
-run = <N>(body : () <- N -> Nil) { body() }
-S(E, N) = (f = () <- (Fail(E), ..N) -> Nil)
+get = () <- (d : Dep) { () }
+run = <N>(body : () <- N -> ()) { body() }
+S(E, N) = (f = () <- (Fail(E), ..N) -> ())
 use = <E, N>() <- (s : S(E, N)) { s.f() }
 helper = <E, N>() {
 	_syn3_0 : S(Never, Dep) = S(f = () { get() })
 	{
-		local : () <- (Fail(E), S(E, N), ..N) -> Nil = () { use() }
+		local : () <- (Fail(E), S(E, N), ..N) -> () = () { use() }
 		local()
 	} <- (_syn3_0)
 }

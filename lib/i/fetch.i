@@ -23,7 +23,7 @@ Fetch = (
 	status = (Int) -> Request(Result(Int, String)),
 	headers = (Int) -> Request(Result(String, String)),
 	read = (Int, Int) -> Request(Result(BitArray, String)),
-	close = (Int) -> Request(Nil),
+	close = (Int) -> Request(()),
 )
 
 open = (method, url, headers, body) <- (raw : Fetch) {
@@ -39,7 +39,7 @@ open = (method, url, headers, body) <- (raw : Fetch) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)

@@ -69,7 +69,7 @@ main = () {
 					0xd0,
 				>>,
 		)
-		Nil
+		()
 	})
 	re = fail.catch(() { regex.compile("^a+b$") }) |>
 		(Ok(re)) { re }
@@ -77,7 +77,7 @@ main = () {
 	haystack = message <> "b"
 	measure("regex_literal_repeat", 1000001, () {
 		assert(regex.is_match(re, haystack))
-		Nil
+		()
 	})
 	nested = fail.catch(() { regex.compile("(a*)*b") }) |>
 		(Ok(re)) { re }
@@ -85,16 +85,16 @@ main = () {
 	adversarial = string.repeat("a", 5000)
 	measure("regex_nested_repeat", 5000, () {
 		assert(regex.is_match(nested, adversarial) == False)
-		Nil
+		()
 	})
 	rows = list.repeat(["hello", "quoted,field", "é🦀"], 10000)
 	text = csv.print(rows)
 	measure("csv_parse", string.byte_size(text), () {
 		assert(fail.catch(() { csv.parse(text) }) == Ok(rows))
-		Nil
+		()
 	})
 	measure("csv_print", string.byte_size(text), () {
 		assert(csv.print(rows) == text)
-		Nil
+		()
 	})
 }

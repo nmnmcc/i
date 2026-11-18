@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "probe/main.example : () -> Nil\n",
+      "stdout": "probe/main.example : () -> ()\n",
       "stderr": "src/main.i:2:24: error[E0225]: two explicit services or two spreads in provided data have one service key\n1 error\n"
     }
   }

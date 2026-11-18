@@ -144,7 +144,7 @@ F2 also applies when a function alias has no algebraic operators. Alias
 instantiation's early return previously bypassed the parameter modes already
 computed from its definition. `instantiate_alias` now marks each actual
 argument before applying the template. The environment and error regressions
-use concrete Svc(Int) and Svc(Nil) parameters to constrain one row variable;
+use concrete Svc(Int) and Svc(()) parameters to constrain one row variable;
 rule 4 requires equal arguments, so both must give E0515. An earlier test
 used unannotated constructors with unconstrained callback results; those can
 share a wider result type and were correctly accepted. That expectation was
@@ -217,7 +217,7 @@ same at opt 0 and opt 2.
 | r2 | Cast failure | E0522: the entry retains an unprovided service. |
 | r3 | Cast failure | E0522: the entry retains an unprovided service. |
 | row_alias | Pure unused-code entry returns normally | E0515: a closed alias contains incompatible S forms. Invalid under F2; no runtime failure claimed for its unused code. |
-| alias_kind_env | Pure unused-code entry returns normally | E0515: the function alias makes N an environment row; concrete Svc(Int) and Svc(Nil) cannot inhabit that row. |
+| alias_kind_env | Pure unused-code entry returns normally | E0515: the function alias makes N an environment row; concrete Svc(Int) and Svc(()) cannot inhabit that row. |
 | alias_kind_error | Pure unused-code entry returns normally | E0515: the same contract applies to an error-row parameter. |
 | direct_row | Pure unused-code entry returns normally | E0515: a directly written row argument contains incompatible S forms. |
 | effect_row_alias | Pure unused-code entry returns normally | E0515: using the closed alias as a function environment must retain its row comparison. |
@@ -361,7 +361,7 @@ measurement and full gate are repeated for these changes.
 
 The CLI boundary tests additionally run the first review's exact annotated
 `@main main(N)` reproducer and its unannotated twin. Both must give E0522.
-Replacing the call with Nil must succeed at both optimization levels: 4.8
+Replacing the call with () must succeed at both optimization levels: 4.8
 rule 4 says that merely creating the unused function needs no service.
 
 A final F3 probe found a correct concrete handler annotation still rejected:
@@ -407,7 +407,7 @@ environment parameters/statements, and alias expansion. Row unions,
 intersections and differences use the same solver normalizer; ordinary
 value unions keep rule 6. The two new unused-code regressions (`direct_row`
 and `effect_row_alias`) must fail E0515 at check and both run optimization
-levels. Their base mains simply return Nil; no runtime failure is claimed
+levels. Their base mains simply return (); no runtime failure is claimed
 for unused code. The named corpus now has 77 cases. The previous queued
 quiet run was stopped for this correctness change and is not final evidence.
 

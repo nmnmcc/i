@@ -1,5 +1,5 @@
-Cell(A) = (A, (A) -> Nil)
+Cell(A) = (A, (A) -> ())
 bad = (x) {
 	y : Cell(_) = x
-	Cell(y, (_) { Nil }) |> bad
+	Cell(y, (_) { () }) |> bad
 }

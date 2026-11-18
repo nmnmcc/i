@@ -25,7 +25,7 @@ main = () <- (io : Io) {
 
 ```i error E0506 package=roadmap title="src/main.i"
 get = (record) { record.a }
-main = () { Nil }
+main = () { () }
 ```
 
 ```text
@@ -42,7 +42,7 @@ The checker uses `Head::Shape`; the proposed `Head::Record`, `Ty::Rec`, and `Ty:
 get = (record : (a = Int)) { record.a }
 main = () {
 	get((a = 1, b = 2))
-	Nil
+	()
 }
 ```
 

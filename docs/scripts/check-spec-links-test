@@ -113,7 +113,7 @@ class ReferenceTests(unittest.TestCase):
                     page.write_text('<article id="nd-page">' + 'word ' * words + '</article>')
                     source = content / 'docs' / group / 'index.mdx'
                     source.parent.mkdir(parents=True, exist_ok=True)
-                    source.write_text('```i run\nmain = () { Nil }\n```\n```text\n```\n' * examples)
+                    source.write_text('```i run\nmain = () { () }\n```\n```text\n```\n' * examples)
                     result = measure(page, dist, content)
                     self.assertFalse(result['failed'])
                     self.assertEqual(result['examples'], examples)
@@ -130,7 +130,7 @@ class ReferenceTests(unittest.TestCase):
                 source = content / 'docs' / group / 'index.mdx'
                 source.parent.mkdir(parents=True, exist_ok=True)
                 for count in counts:
-                    source.write_text('```i test\nmain = () { Nil }\n```\n' * count)
+                    source.write_text('```i test\nmain = () { () }\n```\n' * count)
                     result = measure(page, dist, content, [group])
                     self.assertEqual(result['failed'], count < (6 if group == 'tour' else 3) or (group != 'tour' and count > 5))
 
@@ -150,7 +150,7 @@ class ReferenceTests(unittest.TestCase):
             source.write_text('<div hidden>\n```i expand title="src/main.i"\n(answer)\nanswer = 42\n```\n'
                               '</div>\n```text title="expansion"\nanswer = 42\n```\n'
                               '```i types\n(answer)\nanswer = 42\n```\n```text\nanswer : 42\n```\n'
-                              '```i run hosts=native,wasi,javascript\nmain = () { Nil }\n```\n```text\n```\n')
+                              '```i run hosts=native,wasi,javascript\nmain = () { () }\n```\n```text\n```\n')
             self.assertEqual(example_count(Path('index.html'), content), 3)
             self.assertEqual(example_count(Path('docs/index.html'), content), 0)
 

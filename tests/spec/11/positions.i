@@ -24,7 +24,7 @@ outer = (s) {
 
 each = (xs, f) {
 	xs |>
-		([]) { Nil }
+		([]) { () }
 		& ([x, ..rest]) {
 			// A call through a value.
 			f(x)
@@ -35,5 +35,5 @@ each = (xs, f) {
 
 main = () {
 	each(["a", "b"], (s) { outer(s) })
-	Nil
+	()
 }

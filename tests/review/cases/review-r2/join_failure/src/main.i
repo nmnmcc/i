@@ -12,13 +12,13 @@
 main = () <- (io : Io) {
 	r = fail.catch(() {
 		task.scope((s) {
-			armed : task.Channel(Nil) = task.channel()
-			joining : task.Channel(Nil) = task.channel()
-			parent : task.Channel(Nil) = task.channel()
+			armed : task.Channel(()) = task.channel()
+			joining : task.Channel(()) = task.channel()
+			parent : task.Channel(()) = task.channel()
 			t = task.go(s, () {
 				resource.ensure(
 					() {
-						task.send(armed, Nil)
+						task.send(armed, ())
 						task.sync(task.never())
 					},
 					() {
@@ -34,12 +34,12 @@ main = () <- (io : Io) {
 			})
 			resource.ensure(
 				() {
-					task.send(joining, Nil)
+					task.send(joining, ())
 					task.join(t)
 				},
 				() {
 					io.print("parent-final")
-					task.send(parent, Nil)
+					task.send(parent, ())
 				},
 			)
 		})

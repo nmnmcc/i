@@ -339,16 +339,16 @@ valid_short = (name : String) -> Bool {
 
 positional = (kind : Kind) -> Bool { kind == Positional || kind == Remaining }
 
-validate = (fields : List(Field)) -> Result(Nil, DefinitionError) {
+validate = (fields : List(Field)) -> Result((), DefinitionError) {
 	go = (
 		remaining : List(Field),
 		longs : List(String),
 		shorts : List(String),
 		positions : List(String),
 		had_rest : Bool
-	) -> Result(Nil, DefinitionError) {
+	) -> Result((), DefinitionError) {
 		remaining |>
-			([]) { Ok(Nil) }
+			([]) { Ok(()) }
 			& ([field, ..tail]) {
 				short_error = field.short |>
 					(Some(name)) {
@@ -801,7 +801,7 @@ _help_result = <A>(parser : Parser(A), program : String) -> Result(
 _read_result = <A>(parser : Parser(A)) { _parse_result(parser, process.args()) }
 
 /// Runs a command after parsing its arguments, reporting failures on stderr.
-run = <A, N>(parser : Parser(A), program : String, body : (A) <- N -> Nil) {
+run = <A, N>(parser : Parser(A), program : String, body : (A) <- N -> ()) {
 	_read_result(parser) |>
 		(Ok(value)) { body(value) }
 		& (Error(error)) {

@@ -9,23 +9,23 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-Paused = (Continuation(Nil, PausedSum, Never))
+Paused = (Continuation((), PausedSum, Never))
 Done = ()
 PausedSum = Paused | Done
 
-Held = (Continuation(Nil, HeldSum, Never))
+Held = (Continuation((), HeldSum, Never))
 Over = ()
 HeldSum = Held | Over
 
 // Puts `text` in front of the value of the boundary `log`.
 note = (log, text) {
-	control.suspend(log, (k) { text <> " " <> control.resume(k, Nil) })
+	control.suspend(log, (k) { text <> " " <> control.resume(k, ()) })
 }
 
 // 100 frames, with a `resource.ensure` at depths 10, 50 and 90. The final
@@ -74,7 +74,7 @@ test("cancel_deep", () {
 		held |>
 			(Held(k2)) {
 				note(log, "resume")
-				{ control.resume(k2, Nil) } |>
+				{ control.resume(k2, ()) } |>
 					(Over) { "end" }
 					& (Held(_)) { "held again" }
 			}

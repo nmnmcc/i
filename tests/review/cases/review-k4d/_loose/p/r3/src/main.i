@@ -24,6 +24,6 @@ main = () {
 		h = () { run(fr) }
 		k = () { run(h) + fw() }
 		k()
-		Nil
+		()
 	} <- (_syn3_0)
 }

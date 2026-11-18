@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.read : () <- (D) -> Int\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> Int\napp/main.run : (() <- N -> Int) <- N -> Int\napp/main.wrap : () <- (Fail(Never), S(N, N2), ..N, ..N2) -> Int\napp/main.main : () <- (Assert, Fail(Never)) -> Nil\n",
+      "stdout": "app/main.read : () <- (D) -> Int\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> Int\napp/main.run : (() <- N -> Int) <- N -> Int\napp/main.wrap : () <- (Fail(Never), S(N, N2), ..N, ..N2) -> Int\napp/main.main : () <- (Assert, Fail(Never)) -> ()\n",
       "stderr": ""
     },
     "test0": {

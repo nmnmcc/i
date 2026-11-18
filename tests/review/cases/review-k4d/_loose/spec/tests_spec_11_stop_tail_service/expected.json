@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/stop_tail_service.check : (Bool) <- (Assert) -> Nil\nspec/stop_tail_service.apply : ((A) <- N -> B, A) <- N -> List(B)\nspec/stop_tail_service.main : () <- (Assert) -> Nil\n",
+      "stdout": "spec/stop_tail_service.check : (Bool) <- (Assert) -> ()\nspec/stop_tail_service.apply : ((A) <- N -> B, A) <- N -> List(B)\nspec/stop_tail_service.main : () <- (Assert) -> ()\n",
       "stderr": "test/stop_tail_service.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\n"
     },
     "test0": {

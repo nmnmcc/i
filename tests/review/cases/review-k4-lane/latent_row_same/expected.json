@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.merge : (T(A), T(B)) -> T(A | B)\napp/main.one : () <- (S(Int)) -> Nil\napp/main.two : () <- (S(Int)) -> Nil\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.merge : (T(A), T(B)) -> T(A | B)\napp/main.one : () <- (S(Int)) -> ()\napp/main.two : () <- (S(Int)) -> ()\napp/main.main : () -> ()\n",
       "stderr": ""
     },
     "test0": {

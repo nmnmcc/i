@@ -3,9 +3,9 @@ load_user : (String) <- (Fail(404)) -> String
 user : () <- (Fail(404)) -> String
 elapsed : (Int) <- (Clock) -> Int
 fixed : () -> Int
-collect : (() <- (Yield(A), ..N) -> Nil) <- N -> List(A)
+collect : (() <- (Yield(A), ..N) -> ()) <- N -> List(A)
 numbers : () -> List(Int)
-my_assert : (Bool) <- (Assert) -> Nil
+my_assert : (Bool) <- (Assert) -> ()
 catch : (() <- N -> A) <- (N - Assert) -> Result(A, AssertionFailure)
 checked : () -> Result(1, AssertionFailure)
 checked_library : () -> Result("x", AssertionFailure)

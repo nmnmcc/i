@@ -9,5 +9,5 @@ s : "é" = "\u{e9}"
 main = () {
 	assert(a == 3)
 	assert(b == "ab")
-	Nil
+	()
 }

@@ -19,6 +19,6 @@ main = () {
 	{
 		pong2(3)
 		pong(3)
-		Nil
+		()
 	} <- (_syn3_0)
 }

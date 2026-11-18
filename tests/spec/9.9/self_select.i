@@ -6,8 +6,8 @@
 )
 
 main = () {
-	c : task.Channel(Nil) = task.channel()
+	c : task.Channel(()) = task.channel()
 	task.sync(
-		task.choose([task.send_event(c, Nil), task.receive_event(c)]),
+		task.choose([task.send_event(c, ()), task.receive_event(c)]),
 	)
 }

@@ -51,7 +51,7 @@ pass guide_tests/count_test.adds one
 1 passed, 0 failed
 ```
 
-Each command prints this result. Imported `test` is a library macro taking a literal display name and a zero-argument body; the runner supplies `Assert` and starts a fresh instance for each selected test. Returning `Nil` passes; assertion failure, stop, or unhandled error fails.
+Each command prints this result. Imported `test` is a library macro taking a literal display name and a zero-argument body; the runner supplies `Assert` and starts a fresh instance for each selected test. Returning `()` passes; assertion failure, stop, or unhandled error fails.
 
 ## Name filters
 

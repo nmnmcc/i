@@ -3,7 +3,7 @@
 @external("r2:meter/v1", "now")
 now : () -> Float
 
-interval = (body : () <- (Scheduler) -> Nil) -> Float {
+interval = (body : () <- (Scheduler) -> ()) -> Float {
 	start = now()
 	body()
 	now() -. start
@@ -29,7 +29,7 @@ timed_switch_pair = (n : Int) -> Float {
 
 timed_channel_pair = (n : Int) -> Float {
 	task.scope((s) {
-		c : Channel(Nil) = task.channel()
+		c : Channel(()) = task.channel()
 		child = task.go(s, () { sends(c, n) })
 		interval(() {
 			receives(c, n)

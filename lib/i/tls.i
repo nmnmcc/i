@@ -36,9 +36,9 @@ Tls = (
 	accept = (Int, BitArray, BitArray, String) -> Request(Result(Int, String)),
 	alpn = (Int) -> Request(Result(String, String)),
 	read = (Int, Int) -> Request(Result(BitArray, String)),
-	write = (Int, BitArray) -> Request(Result(Nil, String)),
-	shutdown_write = (Int) -> Request(Result(Nil, String)),
-	close = (Int) -> Request(Nil),
+	write = (Int, BitArray) -> Request(Result((), String)),
+	shutdown_write = (Int) -> Request(Result((), String)),
+	close = (Int) -> Request(()),
 )
 
 options = () -> (
@@ -95,7 +95,7 @@ finish = (r : Request(Result(Int, String))) <- (raw : Tls) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)

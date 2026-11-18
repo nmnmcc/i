@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.a : (Bool) <- (S(N), ..N) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.wrap : () <- (S(N), ..N) -> Nil\napp/main.b : (Bool) <- (S(N), ..N) -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\napp/main.a : (Bool) <- (S(N), ..N) -> ()\napp/main.run : (() <- N -> ()) <- N -> ()\napp/main.wrap : () <- (S(N), ..N) -> ()\napp/main.b : (Bool) <- (S(N), ..N) -> ()\n",
       "stderr": "src/main.i:8:1: warning[W0504]: top-level binding `wrap` is not used\n"
     },
     "test0": {

@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- N -> A) <- N -> A\napp/main.forward : () <- (S(N), ..N) -> Nil\napp/main.f : () -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\napp/main.run : (() <- N -> A) <- N -> A\napp/main.forward : () <- (S(N), ..N) -> ()\napp/main.f : () -> ()\n",
       "stderr": "src/main.i:9:1: warning[W0504]: top-level binding `f` is not used\n"
     },
     "test0": {

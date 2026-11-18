@@ -1,13 +1,13 @@
 Dep = ()
-get = () <- (d : Dep) { Nil }
-run = <N>(body : () <- N -> Nil) { body() }
-S(A, B) = (f = () <- A -> Nil, g = () <- B -> Nil)
+get = () <- (d : Dep) { () }
+run = <N>(body : () <- N -> ()) { body() }
+S(A, B) = (f = () <- A -> (), g = () <- B -> ())
 use = <A, B>() <- (s : S(A, B)) {
 	s.f()
 	s.g()
 }
 
 main = <A, B>() {
-	local2 = () { run(() -> Nil { use() }) }
+	local2 = () { run(() -> () { use() }) }
 	run(local2)
 }

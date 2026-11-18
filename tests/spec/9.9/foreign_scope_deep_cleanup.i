@@ -12,7 +12,7 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
@@ -22,21 +22,21 @@ without_fail = <A, N>(body : () <- (Fail(Never), ..N) -> A) -> A {
 }
 
 main = () {
-	callback = control.keep((work : (() -> Nil) -> Nil) {
+	callback = control.keep((work : (() -> ()) -> ()) {
 		task.scope((s) {
-			gate : task.Channel(Nil) = task.channel()
+			gate : task.Channel(()) = task.channel()
 			task.go(s, () {
 				task.receive(gate)
 				fail.raise("callback")
 			})
-			signal = control.keep((_ : Nil) { task.send(gate, Nil) })
-			work(() { without_fail(() { signal(Nil) }) })
+			signal = control.keep((_ : ()) { task.send(gate, ()) })
+			work(() { without_fail(() { signal(()) }) })
 		})
 	})
 	assert(
 		task.run(() {
 			task.run(() {
-				work = control.keep((notify : () -> Nil) {
+				work = control.keep((notify : () -> ()) {
 					task.scope((inner) {
 						task.go(inner, () {
 							resource.ensure(

@@ -7,5 +7,5 @@ id = <Int>(x : Int) { x }
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

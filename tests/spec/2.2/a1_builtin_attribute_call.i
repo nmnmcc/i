@@ -6,4 +6,4 @@
 )
 
 @test()
-main = () { Nil }
+main = () { () }

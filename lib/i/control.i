@@ -30,7 +30,7 @@ resume : <A, R, N>(Continuation(A, R, N), A) <- N -> R
 
 /// Unwinds the paused computation.
 @external("ilang:control", "cancel")
-cancel : <A, R, N>(Continuation(A, R, N)) <- N -> Nil
+cancel : <A, R, N>(Continuation(A, R, N)) <- N -> ()
 
 /// Keeps the rest of the current environment; Fail comes from the later caller.
 keep = <S, A, E, N>(f : (S) <- (..N, Fail(E)) -> A) <- (..env : N) -> (S) <- (

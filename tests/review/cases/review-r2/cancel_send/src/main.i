@@ -13,13 +13,13 @@ main = () <- (io : Io) {
 	r = fail.catch(() {
 		task.scope((s) {
 			c : task.Channel(Int) = task.channel()
-			armed : task.Channel(Nil) = task.channel()
+			armed : task.Channel(()) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
 						resource.ensure(
 							() {
-								task.send(armed, Nil)
+								task.send(armed, ())
 								task.send(c, 1)
 							},
 							() {

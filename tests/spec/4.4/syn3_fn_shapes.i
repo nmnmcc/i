@@ -13,7 +13,7 @@ xs = [(a) { a }, (a, b) { a }]
 
 main = () {
 	assert(list_length(xs) == 2)
-	Nil
+	()
 }
 
 list_length = <A>(l : List(A)) -> Int {

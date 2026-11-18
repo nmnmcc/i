@@ -533,13 +533,13 @@ zip = <A, B>(list : List(A), with : List(B)) -> List((A, B)) {
 
 _strict_zip_result = <A, B>(list : List(A), with : List(B)) -> Result(
 	List((A, B)),
-	Nil,
+	(),
 ) {
 	go = (xs, ys, acc) {
 		(xs, ys) |>
 			(([], [])) { Ok(reverse(acc)) }
 			& (([x, ..xs], [y, ..ys])) { go(xs, ys, [(x, y), ..acc]) }
-			& (_) { Error(Nil) }
+			& (_) { Error(()) }
 	}
 	go(list, with, [])
 }
@@ -589,7 +589,7 @@ unique = <A>(list : List(A)) -> List(A) {
 			& ([x, ..xs]) {
 				dict.has(seen, x) |>
 					(True) { go(xs, seen, acc) }
-					& (False) { go(xs, dict.insert(seen, x, Nil), [x, ..acc]) }
+					& (False) { go(xs, dict.insert(seen, x, ()), [x, ..acc]) }
 			}
 	}
 	go(list, dict.new(), [])
@@ -831,9 +831,9 @@ key_set = <K, V>(list : List((K, V)), key : K, value : V) -> List((K, V)) {
 }
 
 /// Calls a function on every element, in order, for its effects.
-each = <A, B, N>(list : List(A), with : (A) <- N -> B) -> Nil {
+each = <A, B, N>(list : List(A), with : (A) <- N -> B) -> () {
 	list |>
-		([]) { Nil }
+		([]) { () }
 		& ([x, ..xs]) {
 			with(x)
 			each(xs, with)
@@ -845,9 +845,9 @@ each = <A, B, N>(list : List(A), with : (A) <- N -> B) -> Nil {
 try_each = <A, B, F, N>(
 	over : List(A),
 	with : (A) <- N -> Result(B, F)
-) -> Result(Nil, F) {
+) -> Result((), F) {
 	over |>
-		([]) { Ok(Nil) }
+		([]) { Ok(()) }
 		& ([x, ..xs]) {
 			with(x) |>
 				(Ok(_)) { try_each(xs, with) }
@@ -1151,9 +1151,9 @@ min = <A, N>(over : List(A), with : (A, A) <- N -> Order) -> Option(A) {
 		}
 }
 
-/// Like `zip`, but Raises `Nil` when the lists have different lengths.
+/// Like `zip`, but Raises `()` when the lists have different lengths.
 ///
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 strict_zip = <A, B>(list : List(A), with : List(B)) -> List((A, B)) {
 	fail.from_result(_strict_zip_result(list, with))
 }

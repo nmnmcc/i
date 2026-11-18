@@ -4,5 +4,5 @@ f = (p : (String, Int)) {
 
 main = () {
 	assert(f(("ab", 5)) == 6)
-	Nil
+	()
 }

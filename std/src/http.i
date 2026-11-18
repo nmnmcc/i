@@ -281,8 +281,8 @@ feed_request_limit = (
 		& (Error(BadMessage(why))) { Invalid(why) }
 }
 
-check_head = (xs : List(Int), limit : Int) -> Nil {
-	go = (rest : List(Int), count : Int) -> Nil {
+check_head = (xs : List(Int), limit : Int) -> () {
+	go = (rest : List(Int), count : Int) -> () {
 		{ count > limit } |>
 			(True) { fail.raise(BadMessage("head too large")) }
 			& (False) {
@@ -291,7 +291,7 @@ check_head = (xs : List(Int), limit : Int) -> Nil {
 						require(count + 4 <= limit, "head too large")
 					}
 					& ([_, ..tail]) { go(tail, count + 1) }
-					& ([]) { Nil }
+					& ([]) { () }
 			}
 	}
 	go(xs, 0)
@@ -430,7 +430,7 @@ text_unchecked = (xs : List(Int)) -> String {
 		& (Error(_)) { panic("http: invalid internal text") }
 }
 
-validate_framing = (hs : AnyHeaders) -> Nil {
+validate_framing = (hs : AnyHeaders) -> () {
 	length = header_bytes(hs, "content-length")
 	transfer = header_bytes(hs, "transfer-encoding")
 	require(
@@ -459,7 +459,7 @@ validate_framing = (hs : AnyHeaders) -> Nil {
 					"invalid framing field",
 				)
 			}
-			& (False) { Nil }
+			& (False) { () }
 	})
 	lengths = list.concat(
 		list.map(headers(hs, "content-length"), (value) {
@@ -473,7 +473,7 @@ validate_framing = (hs : AnyHeaders) -> Nil {
 		}),
 	)
 	lengths |>
-		([]) { Nil }
+		([]) { () }
 		& ([first, ..others]) {
 			require(
 				list.all(others, (x) { x == first }),
@@ -481,7 +481,7 @@ validate_framing = (hs : AnyHeaders) -> Nil {
 			)
 		}
 	transfer_codings(hs)
-	Nil
+	()
 }
 
 read_body = (hs : AnyHeaders, xs : List(Int)) -> (
@@ -593,7 +593,7 @@ chunk_size = (size_line : List(Int)) -> Int {
 	require(has_extension || size_bytes == size_raw, "invalid chunk size")
 	{ has_extension } |>
 		(True) { validate_extensions(extension) }
-		& (False) { Nil }
+		& (False) { () }
 	require(
 		size_bytes != [] && list.all(size_bytes, (x) { hex(x) >= 0 }),
 		"invalid chunk size",
@@ -603,7 +603,7 @@ chunk_size = (size_line : List(Int)) -> Int {
 	size
 }
 
-valid_trailers = (trailers : AnyHeaders) -> Nil {
+valid_trailers = (trailers : AnyHeaders) -> () {
 	require(
 		header_bytes(trailers, "content-length") == None &&
 			header_bytes(trailers, "transfer-encoding") == None &&
@@ -618,7 +618,7 @@ token_prefix = (xs : List(Int), acc : List(Int)) -> (List(Int), List(Int)) {
 		& (_) { (list.reverse(acc), xs) }
 }
 
-validate_extensions = (xs : List(Int)) -> Nil {
+validate_extensions = (xs : List(Int)) -> () {
 	(name, after_name) = token_prefix(list.drop_while(xs, space), [])
 	rest = list.drop_while(after_name, space)
 	require(name != [], "invalid chunk extension")
@@ -716,8 +716,8 @@ token = (x : Int) -> Bool {
 		)
 }
 
-require = (ok : Bool, why : String) -> Nil {
-	ok |> (True) { Nil } & (False) { fail.raise(BadMessage(why)) }
+require = (ok : Bool, why : String) -> () {
+	ok |> (True) { () } & (False) { fail.raise(BadMessage(why)) }
 }
 
 octets = (bits : BitArray) -> List(Int) {
@@ -951,7 +951,7 @@ accept_loop = (listener, handler, scope) {
 		resource.ensure(
 			() {
 				fail.catch(() { connection_loop(stream, handler, <<>>) })
-				Nil
+				()
 			},
 			() { net.close_stream(stream) },
 		)
@@ -972,7 +972,7 @@ connection_loop = (stream, handler, buffer) {
 		& (More(_)) {
 			bytes = net.read(stream, 65536)
 			{ bit_array.bit_size(bytes) == 0 } |>
-				(True) { Nil }
+				(True) { () }
 				& (False) {
 					connection_loop(
 						stream,
@@ -1008,7 +1008,7 @@ connection_loop = (stream, handler, buffer) {
 								<<"HTTP/1.1 100 Continue\r\n\r\n":utf8>>,
 							)
 						}
-						& (False) { Nil }
+						& (False) { () }
 					res : Response = fail.catch(() { handler(req, reader) }) |>
 						(Ok(res)) { res }
 						& (Error(BadMessage(why))) {
@@ -1032,7 +1032,7 @@ connection_loop = (stream, handler, buffer) {
 						has_token(res.headers, "connection", "close")
 					write_server_reply(stream, res, closing)
 					{ closing } |>
-						(True) { Nil }
+						(True) { () }
 						& (False) { connection_loop(stream, handler, tail) }
 				}
 		}
@@ -1117,7 +1117,7 @@ read_request_piece = (stream, cursor : task.Ref(BodyCursor), max : Int) {
 	require(max > 0, "body read size must be positive")
 	state = task.update(cursor, (state) { (state, state) })
 	(piece, next) = body_piece(stream, state, max)
-	task.update(cursor, (_) { (next, Nil) })
+	task.update(cursor, (_) { (next, ()) })
 	piece
 }
 
@@ -1235,7 +1235,7 @@ collect_body = (read, acc : List(BitArray)) {
 
 drain_body = (read) {
 	{ bit_array.bit_size(read(65536)) == 0 } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { drain_body(read) }
 }
 
@@ -1254,7 +1254,7 @@ ResponseStream = { (
 		requests.Owner,
 		task.Scheduler,
 		task.Runner,
-	) -> Nil,
+	) -> (),
 ) }
 
 ClientFunctions = { (
@@ -1277,7 +1277,7 @@ ClientFunctions = { (
 		requests.Owner,
 		task.Scheduler,
 		task.Runner,
-	) -> Nil,
+	) -> (),
 ) }
 
 Transport = (
@@ -1300,7 +1300,7 @@ Transport = (
 		requests.Owner,
 		task.Scheduler,
 		task.Runner,
-	) -> Nil,
+	) -> (),
 )
 
 Client = (
@@ -1330,7 +1330,7 @@ native_client = () <- (n : net.Net, t : tls.Tls) {
 											Protocol("invalid read size"),
 										)
 									}
-									& (False) { Nil }
+									& (False) { () }
 								task.update(cursor, (body) {
 									size = bit_array.byte_size(body)
 									count = { max < size } |>
@@ -1347,7 +1347,7 @@ native_client = () <- (n : net.Net, t : tls.Tls) {
 										}
 								})
 							},
-							close = () { Nil },
+							close = () { () },
 						)
 					} <- (n, t)
 				},
@@ -1482,7 +1482,7 @@ fetch_client = () <- (f : fetch.Fetch) {
 						)
 					} <- (f)
 				},
-				close = () { Nil },
+				close = () { () },
 			)
 		},
 	)
@@ -1511,7 +1511,7 @@ Idle = (
 	buffer = BitArray,
 )
 
-Pool = (idle = List(Idle), released = List(Key(Nil)))
+Pool = (idle = List(Idle), released = List(Key(())))
 
 PeerClosed = ()
 
@@ -1562,7 +1562,7 @@ post = (url : String, body : BitArray) -> Response {
 	)
 }
 
-_body_text_result = (res : Response) -> Result(String, Nil) {
+_body_text_result = (res : Response) -> Result(String, ()) {
 	fail.catch(() { bit_array.to_string(res.body) })
 }
 
@@ -1766,7 +1766,7 @@ send_once = (pool : task.Ref(Pool), req : Request) {
 
 dial = (secure : Bool, hostname : String, port : Int) {
 	fail.catch(() { net.resolve(hostname) }) |>
-		(Ok(_)) { Nil }
+		(Ok(_)) { () }
 		& (
 			Error(
 				net.NetError(
@@ -1811,7 +1811,7 @@ exchange = (
 	req : Request,
 	wire : BitArray
 ) {
-	lease : Key(Nil) = key.new()
+	lease : Key(()) = key.new()
 	resource.ensure(
 		() {
 			transport : (read = _, write = _) = entry.connection |>
@@ -1837,11 +1837,11 @@ exchange = (
 								],
 								released = [lease, ..state.released],
 							),
-							Nil,
+							(),
 						)
 					})
 				}
-				& (False) { Nil }
+				& (False) { () }
 			res
 		},
 		() {
@@ -1857,7 +1857,7 @@ exchange = (
 				)
 			})
 			{ released } |>
-				(True) { Nil }
+				(True) { () }
 				& (False) { close_connection(entry.connection) }
 		},
 	)
@@ -2051,7 +2051,7 @@ parse_query = (query : String) -> List((String, String)) {
 	fail.from_result(_parse_query_result(query))
 }
 
-/// Reports failure through `Fail(Nil)`.
+/// Reports failure through `Fail(())`.
 body_text = (res : Response) -> String {
 	fail.from_result(_body_text_result(res))
 }

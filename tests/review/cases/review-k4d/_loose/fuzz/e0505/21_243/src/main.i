@@ -1,7 +1,7 @@
 Dep = (v = Int)
 get = () <- (d : Dep) { d.v }
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
-T(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
+T(N) = (f = () <- N -> Int, m = (N) -> ())
 us = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
 	f()
@@ -22,7 +22,7 @@ main = () {
 	a = h1()
 	{
 		a + ut() + run(() { ut() })
-		Nil
+		()
 	} <- (Dep(v = 3))
 }
 // src/main.i:24:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)

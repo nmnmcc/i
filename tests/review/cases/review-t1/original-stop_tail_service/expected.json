@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "spec/main_test.check : (Bool) <- (Assert) -> Nil\nspec/main_test.apply : ((A) <- N -> B, A) <- N -> List(B)\nspec/main_test.main : () <- (Assert) -> Nil\n",
+      "stdout": "spec/main_test.check : (Bool) <- (Assert) -> ()\nspec/main_test.apply : ((A) <- N -> B, A) <- N -> List(B)\nspec/main_test.main : () <- (Assert) -> ()\n",
       "stderr": "test/main_test.i:16:20: warning[W0503]: both sides are constants, `1` and `0`, which can never be equal, so `==` is always `False`\n"
     },
     "test0": {

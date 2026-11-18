@@ -20,5 +20,5 @@ tell = (x : Int) {
 
 main = () {
 	fw()
-	Nil
+	()
 }

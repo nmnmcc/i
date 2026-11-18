@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.c : Cell(A & Int)\nprobe/main.f : () -> Nil\n",
+      "stdout": "probe/main.c : Cell(A & Int)\nprobe/main.f : () -> ()\n",
       "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `f` is not used\n"
     },
     "test0": {

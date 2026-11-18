@@ -15,7 +15,7 @@
 Later = (nan = () -> Float, echo = (String) -> String)
 
 @host("test:io/v1")
-Io = (print = (String) -> Nil)
+Io = (print = (String) -> ())
 
 take = () <- (later : Later, io : Io) {
 	io.print(later.echo("before"))
@@ -30,5 +30,5 @@ twice = () <- (later : Later) {
 main = () <- (io : Io) {
 	io.print(twice())
 	take()
-	Nil
+	()
 }

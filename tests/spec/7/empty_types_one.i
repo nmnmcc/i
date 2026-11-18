@@ -19,5 +19,5 @@ both = (h : { Window | Socket | Int }) {
 }
 
 test("t", () {
-	(kind(1), both(2)) |> (("other", "other")) { Nil } & (_) { panic("no") }
+	(kind(1), both(2)) |> (("other", "other")) { () } & (_) { panic("no") }
 })

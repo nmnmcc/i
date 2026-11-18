@@ -24,5 +24,5 @@ main = () {
 			() { panic("outer") },
 		)
 	})
-	Nil
+	()
 }

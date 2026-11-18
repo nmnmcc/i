@@ -11,5 +11,5 @@ value = () { core.float_from_bits(9218868437227405312) }
 
 main = () {
 	value()
-	Nil
+	()
 }

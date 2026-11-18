@@ -1,8 +1,8 @@
-two = () <- (s : S(String)) { Nil }
-run = <N>(body : () <- N -> Nil) { body() }
+two = () <- (s : S(String)) { () }
+run = <N>(body : () <- N -> ()) { body() }
 bad = () {
 	run(() { one() })
 	run(() { two() })
 }
 S(A) = (A)
-one = () <- (s : S(Int)) { Nil }
+one = () <- (s : S(Int)) { () }

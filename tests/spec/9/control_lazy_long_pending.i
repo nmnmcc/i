@@ -9,13 +9,13 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-More = (Continuation(Nil, Gen, Never))
+More = (Continuation((), Gen, Never))
 End = ()
 Gen = More | End
 
@@ -31,11 +31,11 @@ g = (b, i) {
 // Resumes `n` times from a loop, then cancels.
 drive = (step, n) {
 	step |>
-		(End) { Nil }
+		(End) { () }
 		& (More(k)) {
 			n |>
 				(0) { control.cancel(k) }
-				& (_) { drive(control.resume(k, Nil), n - 1) }
+				& (_) { drive(control.resume(k, ()), n - 1) }
 		}
 }
 
@@ -45,11 +45,11 @@ test("cancel_long_pending", () {
 		show(
 			drive(control.boundary((b) { g(b, 0) }), 10000),
 		),
-		"Nil",
+		"()",
 	)
 })
 
-Step = (Continuation(Nil, StepSum, Fail(Int)))
+Step = (Continuation((), StepSum, Fail(Int)))
 Fin = ()
 StepSum = Step | Fin
 
@@ -66,7 +66,7 @@ deep = (b, n, left) {
 }
 
 run = (step) {
-	step |> (Fin) { Fin } & (Step(k)) { run(control.resume(k, Nil)) }
+	step |> (Fin) { Fin } & (Step(k)) { run(control.resume(k, ())) }
 }
 
 // 50 steps of 200 frames each: the error goes through 10,000 frames that

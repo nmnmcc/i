@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.twice : (() <- N -> Int) <- N -> Int\napp/main.with_int : (() <- N -> A) <- (N - Svc(Int)) -> A\napp/main.with_dep : (() <- N -> A) <- (N - Dep) -> A\napp/main.with_cov : (() <- N -> A, B) <- (N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () -> Never\napp/main.h1 : () -> 1\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.ask : () <- (Svc(A)) -> A\napp/main.askc : () <- (Cov(A)) -> A\napp/main.call : (Cb(A)) <- A -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.twice : (() <- N -> Int) <- N -> Int\napp/main.with_int : (() <- N -> A) <- (N - Svc(Int)) -> A\napp/main.with_dep : (() <- N -> A) <- (N - Dep) -> A\napp/main.with_cov : (() <- N -> A, B) <- (N - Cov(B)) -> A\napp/main.pick : (A, A) -> List(A)\napp/main.h0 : () -> Never\napp/main.h1 : () -> 1\napp/main.main : () -> ()\n",
       "stderr": "src/main.i:28:31: error[E0501]: `Dep` is not a subtype of `Never` (the type at 28:23 needs it)\n1 error\n"
     }
   }

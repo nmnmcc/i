@@ -8,5 +8,5 @@ classify = (0) { 0 } & (n) { n }
 
 main = () {
 	assert(classify(x = 1) == 1)
-	Nil
+	()
 }

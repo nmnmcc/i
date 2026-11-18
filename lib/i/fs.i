@@ -44,12 +44,12 @@ Metadata = (size = Int, kind = String)
 Fs = (
 	open = (String, String) -> Request(Result(Int, String)),
 	read = (Int, Int) -> Request(Result(BitArray, String)),
-	write = (Int, BitArray) -> Request(Result(Nil, String)),
-	flush = (Int) -> Request(Result(Nil, String)),
-	close = (Int) -> Request(Nil),
-	remove = (String) -> Request(Result(Nil, String)),
-	rename = (String, String) -> Request(Result(Nil, String)),
-	mkdir = (String) -> Request(Result(Nil, String)),
+	write = (Int, BitArray) -> Request(Result((), String)),
+	flush = (Int) -> Request(Result((), String)),
+	close = (Int) -> Request(()),
+	remove = (String) -> Request(Result((), String)),
+	rename = (String, String) -> Request(Result((), String)),
+	mkdir = (String) -> Request(Result((), String)),
 	list = (String) -> Request(Result(String, String)),
 	size = (String) -> Request(Result(Int, String)),
 	kind = (String) -> Request(Result(String, String)),
@@ -79,7 +79,7 @@ open = (path, mode) <- (raw : Fs) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)

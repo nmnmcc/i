@@ -12,7 +12,7 @@ scalar = (s : String) { s |> ("a") { 0 } & (t) { g(t) } }
 
 choices = (s : String) { s |> ("a" | "b") { 0 } & (t) { g(t) } }
 
-nested = (r : Result(String, Nil)) {
+nested = (r : Result(String, ())) {
 	r |> (Ok("a")) { 0 } & (Ok(rest)) { g(rest) } & (Error(_)) { 1 }
 }
 
@@ -43,7 +43,7 @@ test("narrowing_runs", () {
 	assert(scalar("b") == 7)
 	assert(choices("c") == 7)
 	assert(nested(Ok("b")) == 7)
-	assert(nested(Error(Nil)) == 1)
+	assert(nested(Error(())) == 1)
 	assert(tuple(("b", False)) == 7)
 	assert(list(["b", "a"]) == 7)
 	assert(except("a") == 8)

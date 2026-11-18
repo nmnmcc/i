@@ -8,7 +8,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -151,7 +151,7 @@ test("deep_unwinding", () {
 	down = (n) { n |> (0) { fail.raise(n) } & (_) { 1 + down(n - 1) } }
 	each = (k) {
 		k |>
-			(0) { Nil }
+			(0) { () }
 			& (_) {
 				check(
 					show(fail.catch(() { down(1000) })),

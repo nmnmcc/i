@@ -1,99 +1,99 @@
-S0(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S0(N) = (f = () <- N -> Int, m = (N) -> ())
 u0 = <N>() <- (s : S0(N)) {
 	S0(f = f, ..) = s
 	f()
 }
-S1(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S1(N) = (f = () <- N -> Int, m = (N) -> ())
 u1 = <N>() <- (s : S1(N)) {
 	S1(f = f, ..) = s
 	f()
 }
-S2(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S2(N) = (f = () <- N -> Int, m = (N) -> ())
 u2 = <N>() <- (s : S2(N)) {
 	S2(f = f, ..) = s
 	f()
 }
-S3(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S3(N) = (f = () <- N -> Int, m = (N) -> ())
 u3 = <N>() <- (s : S3(N)) {
 	S3(f = f, ..) = s
 	f()
 }
-S4(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S4(N) = (f = () <- N -> Int, m = (N) -> ())
 u4 = <N>() <- (s : S4(N)) {
 	S4(f = f, ..) = s
 	f()
 }
-S5(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S5(N) = (f = () <- N -> Int, m = (N) -> ())
 u5 = <N>() <- (s : S5(N)) {
 	S5(f = f, ..) = s
 	f()
 }
-S6(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S6(N) = (f = () <- N -> Int, m = (N) -> ())
 u6 = <N>() <- (s : S6(N)) {
 	S6(f = f, ..) = s
 	f()
 }
-S7(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S7(N) = (f = () <- N -> Int, m = (N) -> ())
 u7 = <N>() <- (s : S7(N)) {
 	S7(f = f, ..) = s
 	f()
 }
-S8(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S8(N) = (f = () <- N -> Int, m = (N) -> ())
 u8 = <N>() <- (s : S8(N)) {
 	S8(f = f, ..) = s
 	f()
 }
-S9(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S9(N) = (f = () <- N -> Int, m = (N) -> ())
 u9 = <N>() <- (s : S9(N)) {
 	S9(f = f, ..) = s
 	f()
 }
-S10(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S10(N) = (f = () <- N -> Int, m = (N) -> ())
 u10 = <N>() <- (s : S10(N)) {
 	S10(f = f, ..) = s
 	f()
 }
-S11(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S11(N) = (f = () <- N -> Int, m = (N) -> ())
 u11 = <N>() <- (s : S11(N)) {
 	S11(f = f, ..) = s
 	f()
 }
-S12(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S12(N) = (f = () <- N -> Int, m = (N) -> ())
 u12 = <N>() <- (s : S12(N)) {
 	S12(f = f, ..) = s
 	f()
 }
-S13(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S13(N) = (f = () <- N -> Int, m = (N) -> ())
 u13 = <N>() <- (s : S13(N)) {
 	S13(f = f, ..) = s
 	f()
 }
-S14(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S14(N) = (f = () <- N -> Int, m = (N) -> ())
 u14 = <N>() <- (s : S14(N)) {
 	S14(f = f, ..) = s
 	f()
 }
-S15(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S15(N) = (f = () <- N -> Int, m = (N) -> ())
 u15 = <N>() <- (s : S15(N)) {
 	S15(f = f, ..) = s
 	f()
 }
-S16(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S16(N) = (f = () <- N -> Int, m = (N) -> ())
 u16 = <N>() <- (s : S16(N)) {
 	S16(f = f, ..) = s
 	f()
 }
-S17(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S17(N) = (f = () <- N -> Int, m = (N) -> ())
 u17 = <N>() <- (s : S17(N)) {
 	S17(f = f, ..) = s
 	f()
 }
-S18(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S18(N) = (f = () <- N -> Int, m = (N) -> ())
 u18 = <N>() <- (s : S18(N)) {
 	S18(f = f, ..) = s
 	f()
 }
-S19(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S19(N) = (f = () <- N -> Int, m = (N) -> ())
 u19 = <N>() <- (s : S19(N)) {
 	S19(f = f, ..) = s
 	f()

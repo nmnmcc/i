@@ -7,5 +7,5 @@
 
 main = () {
 	(b = panic("first"), a = panic("second"))
-	Nil
+	()
 }

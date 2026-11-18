@@ -26,8 +26,8 @@ randoms = (n : Int) -> List(Int) {
 	go(n, 1, [])
 }
 
-check = (ok : Bool, what : String) -> Nil {
-	ok |> (True) { Nil } & (False) { panic(what) }
+check = (ok : Bool, what : String) -> () {
+	ok |> (True) { () } & (False) { panic(what) }
 }
 
 test("list_build", () {

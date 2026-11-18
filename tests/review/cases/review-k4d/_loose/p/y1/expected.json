@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.f : (A & { List(Int) | B - List(Int) }) -> A\napp/main.g : (A) -> A\napp/main.h : (A | Nil) -> A\napp/main.k : (A & { List(Int) | B - List(Int) } | List(Int)) -> A\napp/main.a : () -> List(\"a\")\napp/main.b : () -> Box(\"s\")\napp/main.c : () -> Never\napp/main.d : () -> Box(1)\n",
+      "stdout": "app/main.f : (A & { List(Int) | B - List(Int) }) -> A\napp/main.g : (A) -> A\napp/main.h : (A | ()) -> A\napp/main.k : (A & { List(Int) | B - List(Int) } | List(Int)) -> A\napp/main.a : () -> List(\"a\")\napp/main.b : () -> Box(\"s\")\napp/main.c : () -> Never\napp/main.d : () -> Box(1)\n",
       "stderr": "src/main.i:8:12: error[E0501]: `\"a\"` is not a subtype of `Int` (the type at 8:10 needs it)\nsrc/main.i:10:12: error[E0501]: `\"a\"` is not a subtype of `Int` (the type at 10:10 needs it)\n2 errors\n"
     }
   }

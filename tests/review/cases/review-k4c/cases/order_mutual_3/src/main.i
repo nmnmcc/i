@@ -1,4 +1,4 @@
-run = <N>(body : () <- N -> Nil) { body() }
+run = <N>(body : () <- N -> ()) { body() }
 a = (x : Bool) { x |> (True) { use() } & (False) { b(True) } }
 b = (x : Bool) { x |> (True) { use() } & (False) { a(True) } }
 use = <N>() <- (s : S(N)) {
@@ -6,4 +6,4 @@ use = <N>() <- (s : S(N)) {
 	f()
 }
 wrap = () { run(() { a(True) }) }
-S(N) = (() <- N -> Nil)
+S(N) = (() <- N -> ())

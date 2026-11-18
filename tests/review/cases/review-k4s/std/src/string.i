@@ -452,9 +452,9 @@ to_codepoint_strings = (string : String) -> List(String) {
 	list.map(core.codepoints(string), (c) { core.from_codepoints([c]) })
 }
 
-/// The codepoint with this number, or `Error(Nil)` when it is not a Unicode
+/// The codepoint with this number, or `Error(())` when it is not a Unicode
 /// scalar value (0 to 0x10FFFF, but not 0xD800 to 0xDFFF).
-utf_codepoint = (value : Int) -> Result(UtfCodepoint, Nil) {
+utf_codepoint = (value : Int) -> Result(UtfCodepoint, ()) {
 	core.int_to_codepoint(value)
 }
 

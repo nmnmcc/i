@@ -9,5 +9,5 @@ with = <A>(x : A, f) {
 
 main = () {
 	with("ok", read)
-	Nil
+	()
 }

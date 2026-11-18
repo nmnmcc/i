@@ -9,5 +9,5 @@
 main = () {
 	assert(left == 1)
 	assert(right == 2)
-	Nil
+	()
 }

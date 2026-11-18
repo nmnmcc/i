@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (Dep, S(N), ..N) -> Int\napp/main.h1 : () <- (N - Dep, S(N)) -> Int\napp/main.main : () <- (N - Dep - T(S(Never)), S(N)) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (Dep, S(N), ..N) -> Int\napp/main.h1 : () <- (N - Dep, S(N)) -> Int\napp/main.main : () <- (N - Dep - T(S(Never)), S(N)) -> ()\n",
       "stderr": "src/main.i:37:8: error[E0515]: `T(_)` and `T(S(Never))` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\n1 error\n"
     }
   }

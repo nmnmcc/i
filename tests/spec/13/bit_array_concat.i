@@ -7,7 +7,7 @@
 
 check = (got : BitArray, want : BitArray) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			panic(core.inspect(got) <> " is not " <> core.inspect(want))
 		}
@@ -15,7 +15,7 @@ check = (got : BitArray, want : BitArray) {
 
 same = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 

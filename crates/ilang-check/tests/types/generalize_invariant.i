@@ -15,9 +15,9 @@ written_int = () -> Cell(Int) { written() }
 written_string = () -> Cell(String) { written() }
 
 // Invariance also matters in an input place and inside a covariant type.
-ignore = <A>(x : Cell(A)) { Nil }
+ignore = <A>(x : Cell(A)) { () }
 
-ignore_inferred = (Cell(run = run)) { Nil }
+ignore_inferred = (Cell(run = run)) { () }
 
 ignored = () { (ignore(int_cell()), ignore(string_cell())) }
 

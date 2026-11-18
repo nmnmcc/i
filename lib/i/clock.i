@@ -18,7 +18,7 @@ ClockError = (operation = String, code = String)
 Clock = (
 	monotonic_ns = () -> Request(Result(Int, String)),
 	unix_ns = () -> Request(Result(Int, String)),
-	sleep_ns = (Int) -> Request(Result(Nil, String)),
+	sleep_ns = (Int) -> Request(Result((), String)),
 )
 
 monotonic_ns = () <- (clock : Clock) {

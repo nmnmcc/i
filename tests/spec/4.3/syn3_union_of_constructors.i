@@ -27,5 +27,5 @@ main = () {
 	assert(area(Circle(1.0)) == 3.0)
 	r : Result(Int, String) = Ok(1)
 	r |> (Ok(n)) { assert(n == 1) } & (Error(_)) { assert(False) }
-	Nil
+	()
 }

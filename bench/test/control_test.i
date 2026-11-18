@@ -10,13 +10,13 @@
 rounds = 100_000
 
 Done = (Int)
-More = (Int, Continuation(Nil, Step, Never))
+More = (Int, Continuation((), Step, Never))
 // What the paused computation gives: each number, and at the end the
 // number of frames it went back through.
 Step = Done | More
 
-check = (ok : Bool, what : String) -> Nil {
-	ok |> (True) { Nil } & (False) { panic(what) }
+check = (ok : Bool, what : String) -> () {
+	ok |> (True) { () } & (False) { panic(what) }
 }
 
 // Suspends once for each number from `n` down to 1. The call after the
@@ -46,7 +46,7 @@ sum = (step, acc, depth) {
 			check(d == depth, "a frame was lost or ran twice")
 			acc
 		}
-		& (More(v, k)) { sum(control.resume(k, Nil), acc + v, depth) }
+		& (More(v, k)) { sum(control.resume(k, ()), acc + v, depth) }
 }
 
 run = (depth) {

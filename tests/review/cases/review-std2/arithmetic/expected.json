@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "arithmetic/main_test.fd : (Int, Int) -> Int\narithmetic/main_test.day : (Int, Int, Int) -> Int\narithmetic/main_test.civil : (Int) -> (Int, Int, Int)\narithmetic/main_test.generated_test : () <- (Assert) -> Nil\n",
+      "stdout": "arithmetic/main_test.fd : (Int, Int) -> Int\narithmetic/main_test.day : (Int, Int, Int) -> Int\narithmetic/main_test.civil : (Int) -> (Int, Int, Int)\narithmetic/main_test.generated_test : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

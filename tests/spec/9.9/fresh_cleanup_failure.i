@@ -12,28 +12,28 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
-			armed : task.Channel(Nil) = task.channel()
+			armed : task.Channel(()) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
-						task.send(armed, Nil)
+						task.send(armed, ())
 						task.sync(task.never())
 					},
 					() {
 						inner = fail.catch(() {
 							task.scope((cleanup) {
-								ready : task.Channel(Nil) = task.channel()
+								ready : task.Channel(()) = task.channel()
 								target = task.go(cleanup, () {
 									resource.ensure(
 										() {
-											task.send(ready, Nil)
+											task.send(ready, ())
 											task.sync(task.never())
 										},
 										() {

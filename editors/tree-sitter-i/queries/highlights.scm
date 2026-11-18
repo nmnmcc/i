@@ -30,7 +30,7 @@
 (module_path) @type
 (import alias: (identifier) @type)
 ((type_identifier) @constant.builtin
- (#match? @constant.builtin "^(True|False|Nil)$"))
+ (#match? @constant.builtin "^(True|False)$"))
 ((type_identifier) @type.builtin
  (#match? @type.builtin "^(Record|Int|Float|String|List|BitArray|UtfCodepoint|Never|Bool|Result|Boundary|Continuation|Assert|AssertionFailure)$"))
 ["=" "->" "<-" "?" "|" "&" ".." "|>" "||" "&&" "==" "!=" "<" "<=" ">" ">=" "<." "<=." ">." ">=." "<>" "+" "-" "+." "-." "*" "/" "%" "*." "/."] @operator

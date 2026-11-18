@@ -1,10 +1,10 @@
-S(N) = (() <- N -> Nil)
+S(N) = (() <- N -> ())
 use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
 }
 
 main = <N>() <- (s : S(N)) {
-	local : () <- (S(N), ..N) -> Nil = () { Nil }
+	local : () <- (S(N), ..N) -> () = () { () }
 	local()
 }

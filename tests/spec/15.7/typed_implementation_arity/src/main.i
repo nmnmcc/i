@@ -2,4 +2,4 @@
 (
 	m = spec/macros
 )
-main = () { Nil }
+main = () { () }

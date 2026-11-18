@@ -9,5 +9,5 @@ main = () {
 	a = (user = User(name = "Ada"))
 	b = (..a, age = 36)
 	assert(b.user.name == "Ada")
-	Nil
+	()
 }

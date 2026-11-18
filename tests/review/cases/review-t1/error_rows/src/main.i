@@ -14,5 +14,5 @@ g = (b : Bool) {
 
 main = () {
 	assert(g(False) == 2)
-	Nil
+	()
 }

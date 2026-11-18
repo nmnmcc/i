@@ -17,7 +17,7 @@
 )
 
 @host("app:console/v1")
-Console = (print = (String) -> Nil)
+Console = (print = (String) -> ())
 
 @host("app:storage/v1")
 Storage = (read = (String) <- (Fail(String)) -> String)

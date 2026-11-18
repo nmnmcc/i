@@ -4,7 +4,7 @@
 
 Entry = (message = String)
 
-Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> (), (N) -> ())
 
 write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(send, _) = sink

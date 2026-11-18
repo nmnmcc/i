@@ -1,5 +1,5 @@
 // §4.4: members with one type constructor are put together.
-State(S) = (get = () -> S, set = (S) -> Nil)
+State(S) = (get = () -> S, set = (S) -> ())
 
 use_int = () <- (st : State(Int)) { 1 }
 

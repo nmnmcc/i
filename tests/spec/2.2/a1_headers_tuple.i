@@ -13,5 +13,5 @@ main = () {
 	assert(c.not(False))
 	assert(even(10))
 	assert(odd(9))
-	Nil
+	()
 }

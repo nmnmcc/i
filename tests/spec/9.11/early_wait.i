@@ -8,5 +8,5 @@
 Later = (echo = (String) -> Request(String))
 
 main = () <- (later : Later) {
-	request.await(later.echo("pending")) <- (request.Await(wait = (_) { Nil }))
+	request.await(later.echo("pending")) <- (request.Await(wait = (_) { () }))
 }

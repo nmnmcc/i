@@ -7,7 +7,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -24,7 +24,7 @@ test("shadowing", () {
 	}
 	check(show((x, y)), "(2, 21)")
 	check = "a local name may cover a top-level name"
-	{ check == "" } |> (True) { panic("no") } & (False) { Nil }
+	{ check == "" } |> (True) { panic("no") } & (False) { () }
 })
 
 test("values_in_every_place", () {

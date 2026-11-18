@@ -1,4 +1,4 @@
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
@@ -6,6 +6,6 @@ use = <N>() <- (s : S(N)) {
 run = <A, N>(f : () <- N -> A) { f() }
 forward = <N>() <- (s : S(N)) { run(() { use() }) }
 f = () {
-	_syn3_0 : S(Never) = S(() { Nil }, (_ : Never) { Nil })
+	_syn3_0 : S(Never) = S(() { () }, (_ : Never) { () })
 	forward() <- (_syn3_0)
 }

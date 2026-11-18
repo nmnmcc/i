@@ -6,5 +6,5 @@ f = (v : Int) {
 
 main = () {
 	assert(f(42) == 42)
-	Nil
+	()
 }

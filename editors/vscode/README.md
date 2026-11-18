@@ -14,8 +14,7 @@ Editor support for **the i Programming Language**, as defined in
     and declared type parameters;
   - the attributes `@external`, `@host`, and
     `@deprecated`;
-  - types and constructors (`UpName`s), built-in types, `True`, `False`, and
-    `Nil`;
+  - types and constructors (`UpName`s), built-in types, `True`, and `False`;
   - the operators, also the Float ones (`+.`, `-.`, `*.`, `/.`, `<.`,
     `<=.`, `>.`, `>=.`), `?`, `!`, `->`, `&`, `|`, `|>`, `..`, and bit arrays
     `<< … >>` with their formats (`u16be`, `utf8`, …);

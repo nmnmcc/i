@@ -7,5 +7,5 @@ take = (first : method, last : port) { (first, last) }
 
 main = () {
 	_ = panic("pipe value") |> take(panic("argument"))
-	Nil
+	()
 }

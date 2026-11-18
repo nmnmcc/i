@@ -3,4 +3,4 @@ g = (p: (Int, Int)) { case p { t = (a, b) -> (x) { a + b + x } } }
 f = () { g((20, 21))(1) }
 
 
-main = () { assert(f() == 42) Nil }
+main = () { assert(f() == 42) () }

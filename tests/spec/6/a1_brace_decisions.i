@@ -52,5 +52,5 @@ main = () {
 	assert(take_tuple((0, 9)) == (0, 9))
 	assert(take_result(Ok(9)) == 9)
 	assert(take_prefix("abcd") == "abcd")
-	Nil
+	()
 }

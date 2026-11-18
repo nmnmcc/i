@@ -14,9 +14,9 @@
 ////
 //// A Float operation whose result is not finite stops the program
 //// (§11.3), so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;
-//// `divide` gives `Error(Nil)` for a zero divisor instead. Functions here
+//// `divide` gives `Error(())` for a zero divisor instead. Functions here
 //// that could give a result that is not finite, such as `power`, give
-//// `Error(Nil)` in its place, so they never stop the program.
+//// `Error(())` in its place, so they never stop the program.
 (
 	i/core
 	(Option, Some, None) = std/option
@@ -97,15 +97,15 @@ to_string = (x : Float) -> String { core.inspect(x) }
 /// more digits, and then an optional exponent: `e` or `E`, an optional `-`
 /// or `+`, and one or more digits. The result is the nearest Float, with
 /// ties to even, worked out with exact integers. Text that is not in this
-/// form, or a number too big for a Float, gives `Error(Nil)`. A number too
+/// form, or a number too big for a Float, gives `Error(())`. A number too
 /// small for a Float gives `0.0` with its sign.
 ///
 /// ```i
 /// float.parse("1.5")      // Ok(1.5)
 /// float.parse("-2.0e-3")  // Ok(-0.002)
-/// float.parse("1")        // Error(Nil)
+/// float.parse("1")        // Error(())
 /// ```
-parse = (text : String) -> Result(Float, Nil) {
+parse = (text : String) -> Result(Float, ()) {
 	<<text:utf8>> |>
 		(<<45, rest:bytes>>) { whole(rest, True, 0, 0, 0) }
 		& (<<43, rest:bytes>>) { whole(rest, False, 0, 0, 0) }
@@ -121,7 +121,7 @@ whole = (
 	coefficient : Int,
 	significant : Int,
 	count : Int
-) -> Result(Float, Nil) {
+) -> Result(Float, ()) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
 			whole(
@@ -135,7 +135,7 @@ whole = (
 		& (<<46, rest:bytes>> ? count > 0) {
 			fraction(rest, negative, coefficient, significant, 0)
 		}
-		& (_) { Error(Nil) }
+		& (_) { Error(()) }
 }
 
 // The digits after the point.
@@ -145,7 +145,7 @@ fraction = (
 	coefficient : Int,
 	significant : Int,
 	digits : Int
-) -> Result(Float, Nil) {
+) -> Result(Float, ()) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
 			fraction(
@@ -169,13 +169,13 @@ fraction = (
 				& (_) { (False, rest) }
 			limit = significant + digits + 400
 			exponent(after, 0, 0, limit) |>
-				(Error(_)) { Error(Nil) }
+				(Error(_)) { Error(()) }
 				& (Ok(e)) {
 					signed = exponent_negative |> (True) { -e } & (False) { e }
 					decimal(negative, coefficient, significant, signed - digits)
 				}
 		}
-		& (_) { Error(Nil) }
+		& (_) { Error(()) }
 }
 
 // The number of significant digits, not counting zeros at the start.
@@ -188,7 +188,7 @@ count_significant = (previous : Int, digit : Int) -> Int {
 // so that bad text after it is still found.
 exponent = (bytes : BitArray, value : Int, count : Int, limit : Int) -> Result(
 	Int,
-	Nil,
+	(),
 ) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
@@ -198,7 +198,7 @@ exponent = (bytes : BitArray, value : Int, count : Int, limit : Int) -> Result(
 			exponent(rest, next, count + 1, limit)
 		}
 		& (<<>> ? count > 0) { Ok(value) }
-		& (_) { Error(Nil) }
+		& (_) { Error(()) }
 }
 
 // The Float nearest to `coefficient` × 10^`exponent`.
@@ -207,14 +207,14 @@ decimal = (
 	coefficient : Int,
 	digits : Int,
 	exponent : Int
-) -> Result(Float, Nil) {
+) -> Result(Float, ()) {
 	sign = negative |> (True) { sign_mask } & (False) { 0 }
 	magnitude = digits + exponent - 1
 	{ coefficient == 0 } |>
 		(True) { Ok(core.float_from_bits(sign)) }
 		& (False) {
 			{ magnitude > 308 } |>
-				(True) { Error(Nil) }
+				(True) { Error(()) }
 				& (False) {
 					{ magnitude < -324 } |>
 						(True) { Ok(core.float_from_bits(sign)) }
@@ -230,7 +230,7 @@ decimal = (
 								(Ok(bits)) {
 									Ok(core.float_from_bits(sign + bits))
 								}
-								& (Error(_)) { Error(Nil) }
+								& (Error(_)) { Error(()) }
 						}
 				}
 		}
@@ -238,10 +238,10 @@ decimal = (
 
 // The bits of the Float nearest to `numerator / denominator`, which is more
 // than 0.
-ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
+ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, ()) {
 	e = radix_order(numerator, denominator, 2)
 	{ e > 1023 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ e < -1022 } |>
 				(True) {
@@ -265,7 +265,7 @@ ratio_bits = (numerator : Int, denominator : Int) -> Result(Int, Nil) {
 					{ significand == significand_limit } |>
 						(True) {
 							{ e == 1023 } |>
-								(True) { Error(Nil) }
+								(True) { Error(()) }
 								& (False) { Ok({ e + 1024 } * fraction_unit) }
 						}
 						& (False) {
@@ -457,7 +457,7 @@ to_precision = (x : Float, precision : Int) -> Float {
 
 /// `base` to the power of a whole number. A negative exponent gives the
 /// inverse: `power(2.0, -1)` is `0.5`. `0.0` with a negative exponent, and a
-/// result too big for a Float, give `Error(Nil)`. The result is within one
+/// result too big for a Float, give `Error(())`. The result is within one
 /// unit in the last place of the exact power, and exact when the exact power
 /// is a Float.
 ///
@@ -465,9 +465,9 @@ to_precision = (x : Float, precision : Int) -> Float {
 /// float.power(2.0, 10)  // Ok(1024.0)
 /// float.power(-.2.0, -1)  // Ok(-.0.5)
 /// ```
-power = (base : Float, of : Int) -> Result(Float, Nil) {
+power = (base : Float, of : Int) -> Result(Float, ()) {
 	{ base == 0.0 && of < 0 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			// Beyond 2^62 only the sign and the parity of the exponent matter.
 			limit = 4611686018427387904
@@ -486,14 +486,14 @@ power = (base : Float, of : Int) -> Result(Float, Nil) {
 		}
 }
 
-/// The square root. A negative number gives `Error(Nil)`.
+/// The square root. A negative number gives `Error(())`.
 ///
 /// ```i
 /// float.square_root(4.0)   // Ok(2.0)
-/// float.square_root(-1.0)  // Error(Nil)
+/// float.square_root(-1.0)  // Error(())
 /// ```
-square_root = (x : Float) -> Result(Float, Nil) {
-	{ x <. 0.0 } |> (True) { Error(Nil) } & (False) { Ok(core.sqrt(x)) }
+square_root = (x : Float) -> Result(Float, ()) {
+	{ x <. 0.0 } |> (True) { Error(()) } & (False) { Ok(core.sqrt(x)) }
 }
 
 /// The sum of the Floats. The sum of no Floats is `0.0`. A sum that is not
@@ -510,20 +510,20 @@ product = (numbers : List(Float)) -> Float {
 	go(numbers, 1.0)
 }
 
-/// `a /. by`, or `Error(Nil)` when `by` is `0.0`.
-divide = (a : Float, by : Float) -> Result(Float, Nil) {
-	{ by == 0.0 } |> (True) { Error(Nil) } & (False) { Ok(a /. by) }
+/// `a /. by`, or `Error(())` when `by` is `0.0`.
+divide = (a : Float, by : Float) -> Result(Float, ()) {
+	{ by == 0.0 } |> (True) { Error(()) } & (False) { Ok(a /. by) }
 }
 
 /// The remainder of `a` divided by `by`, rounded down, with the sign of
-/// `by`, or `Error(Nil)` when `by` is `0.0`.
+/// `by`, or `Error(())` when `by` is `0.0`.
 ///
 /// ```i
 /// float.modulo(13.3, 3.3)  // Ok(0.10000000000000053)
 /// ```
-modulo = (a : Float, by : Float) -> Result(Float, Nil) {
+modulo = (a : Float, by : Float) -> Result(Float, ()) {
 	{ by == 0.0 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) { Ok(a -. core.floor(a /. by) *. by) }
 }
 
@@ -536,15 +536,15 @@ subtract = (a : Float, b : Float) -> Float { a -. b }
 /// `a *. b`, as a function.
 multiply = (a : Float, b : Float) -> Float { a *. b }
 
-/// `e` to the power `x`. A result too big for a Float gives `Error(Nil)`;
+/// `e` to the power `x`. A result too big for a Float gives `Error(())`;
 /// that is for `x` greater than about 709.78.
 ///
 /// ```i
 /// float.exponential(1.0)  // Ok(2.718281828459045)
 /// ```
-exponential = (x : Float) -> Result(Float, Nil) {
+exponential = (x : Float) -> Result(Float, ()) {
 	{ x >. 7.09782712893383973096e2 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ x <. -.7.4513321910194110842e2 } |>
 				(True) { Ok(0.0) }
@@ -557,29 +557,29 @@ exponential = (x : Float) -> Result(Float, Nil) {
 }
 
 /// The natural logarithm (base `e`). `0.0` and negative numbers give
-/// `Error(Nil)`.
+/// `Error(())`.
 ///
 /// ```i
 /// float.logarithm(1.0)  // Ok(0.0)
-/// float.logarithm(0.0)  // Error(Nil)
+/// float.logarithm(0.0)  // Error(())
 /// ```
-logarithm = (x : Float) -> Result(Float, Nil) {
-	{ x <=. 0.0 } |> (True) { Error(Nil) } & (False) { Ok(log_positive(x)) }
+logarithm = (x : Float) -> Result(Float, ()) {
+	{ x <=. 0.0 } |> (True) { Error(()) } & (False) { Ok(log_positive(x)) }
 }
 
 /// `base` to the power `of`, for any Float exponent. A negative base with
 /// an exponent that is not a whole number, `0.0` with a negative exponent,
-/// and a result too big for a Float give `Error(Nil)`. The result is within
+/// and a result too big for a Float give `Error(())`. The result is within
 /// one unit in the last place of the exact power.
 ///
 /// ```i
 /// float.real_power(16.0, 0.5)  // Ok(4.0)
-/// float.real_power(-.8.0, 1.0 /. 3.0)  // Error(Nil)
+/// float.real_power(-.8.0, 1.0 /. 3.0)  // Error(())
 /// ```
-real_power = (base : Float, of : Float) -> Result(Float, Nil) {
+real_power = (base : Float, of : Float) -> Result(Float, ()) {
 	fractional = core.ceiling(of) -. of >. 0.0
 	{ { base <. 0.0 && fractional } || { base == 0.0 && of <. 0.0 } } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) { pow(base, of) }
 }
 
@@ -857,7 +857,7 @@ log2_close_to_one = (x : Float) -> (Float, Float) {
 }
 
 // `base` to the power `exponent`. A negative base has a whole exponent.
-pow = (base : Float, exponent : Float) -> Result(Float, Nil) {
+pow = (base : Float, exponent : Float) -> Result(Float, ()) {
 	exponent |>
 		(0.0) { Ok(1.0) }
 		& (1.0) { Ok(base) }
@@ -913,12 +913,12 @@ is_odd_whole = (x : Float) -> Bool {
 
 pow_extreme = (base : Float, exponent : Float, direction : Float) -> Result(
 	Float,
-	Nil,
+	(),
 ) {
 	{
 		{ base >. 1.0 && exponent >. 0.0 } || { base <. 1.0 && exponent <. 0.0 }
 	} |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) { Ok(direction *. 0.0) }
 }
 
@@ -927,7 +927,7 @@ pow_exp2 = (
 	log_hi : Float,
 	log_lo : Float,
 	direction : Float
-) -> Result(Float, Nil) {
+) -> Result(Float, ()) {
 	y_hi = without_low(exponent)
 	p_lo = { exponent -. y_hi } *. log_hi +. exponent *. log_lo
 	p_hi0 = y_hi *. log_hi
@@ -936,7 +936,7 @@ pow_exp2 = (
 		z0 >. 1024.0 ||
 			{ z0 == 1024.0 && p_lo +. 8.0085662595372944372e-17 >. z0 -. p_hi0 }
 	} |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ z0 <. -.1075.0 || { z0 == -.1075.0 && p_lo <=. z0 -. p_hi0 } } |>
 				(True) { Ok(direction *. 0.0) }
@@ -1259,12 +1259,12 @@ fixed_sqrt_ratio = (n : Int, d : Int, p : Int) -> Fixed {
 	)
 }
 
-signed_bits = (n : Int, p : Int) -> Result(Int, Nil) {
+signed_bits = (n : Int, p : Int) -> Result(Int, ()) {
 	{ n == 0 } |>
 		(True) { Ok(0) }
 		& (False) {
 			ratio_bits(int_abs(n), core.shift_left(1, p)) |>
-				(Error(_)) { Error(Nil) }
+				(Error(_)) { Error(()) }
 				& (Ok(bits)) {
 					Ok(
 						bits +
@@ -1278,11 +1278,11 @@ signed_bits = (n : Int, p : Int) -> Result(Int, Nil) {
 		}
 }
 
-certify = (bounds : Fixed, p : Int) -> Option(Result(Float, Nil)) {
+certify = (bounds : Fixed, p : Int) -> Option(Result(Float, ())) {
 	(signed_bits(bounds.lo, p), signed_bits(bounds.hi, p)) |>
 		((Ok(a), Ok(b)) ? a == b) { Some(Ok(core.float_from_bits(a))) }
 		& ((Error(_), Error(_)) ? bounds.lo > 0 || bounds.hi < 0) {
-			Some(Error(Nil))
+			Some(Error(()))
 		}
 		& (_) { None }
 }
@@ -1760,7 +1760,7 @@ math_bounds = (operation : Math, x : Float, y : Float, p : Int) -> Option(
 
 refine_math = (operation : Math, x : Float, y : Float, p : Int) -> Result(
 	Float,
-	Nil,
+	(),
 ) {
 	math_bounds(operation, x, y, p) |>
 		(None) { refine_math(operation, x, y, p * 2) }
@@ -1773,7 +1773,7 @@ refine_math = (operation : Math, x : Float, y : Float, p : Int) -> Result(
 
 // The real functions here are bounded; Error is unreachable by F3/F4. Keep
 // this exhaustive rather than adding an Assert effect or constructing infinity.
-unbounded_result = (result : Result(Float, Nil)) -> Float {
+unbounded_result = (result : Result(Float, ())) -> Float {
 	result |>
 		(Ok(value)) { value }
 		& (Error(_)) { panic("bounded real function overflowed") }
@@ -1803,7 +1803,7 @@ cos = (x : Float) -> Float {
 
 /// Real tangent, rounded once, rather than a quotient of rounded sin/cos.
 /// Binary-rational angles are never exact poles; rounded overflow gives Error.
-tan = (x : Float) -> Result(Float, Nil) {
+tan = (x : Float) -> Result(Float, ()) {
 	{ abs(x) <=. 7.450580596923828e-9 } |>
 		(True) { Ok(x) }
 		& (False) {
@@ -1814,9 +1814,9 @@ tan = (x : Float) -> Result(Float, Nil) {
 }
 
 /// Real arcsine; outside [-1,1] gives Error before arithmetic. Keeps zero sign.
-asin = (x : Float) -> Result(Float, Nil) {
+asin = (x : Float) -> Result(Float, ()) {
 	{ abs(x) >. 1.0 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			{ abs(x) == 1.0 } |>
 				(True) { Ok(copy_sign(pi /. 2.0, x)) }
@@ -1833,9 +1833,9 @@ asin = (x : Float) -> Result(Float, Nil) {
 }
 
 /// Real arccosine; outside [-1,1] gives Error; +1 gives +0 and -1 gives pi.
-acos = (x : Float) -> Result(Float, Nil) {
+acos = (x : Float) -> Result(Float, ()) {
 	{ abs(x) >. 1.0 } |>
-		(True) { Error(Nil) }
+		(True) { Error(()) }
 		& (False) {
 			x |>
 				(1.0) { Ok(0.0) }
@@ -1888,11 +1888,11 @@ atan2 = (y : Float, x : Float) -> Float {
 
 /// Rounded sqrt(x*x+y*y), without intermediate Float overflow. Exact square
 /// comparisons resolve midpoint ties. Both zeros give +0, independently of sign.
-hypot = (x : Float, y : Float) -> Result(Float, Nil) {
+hypot = (x : Float, y : Float) -> Result(Float, ()) {
 	fast_norm(x, y) |> (Some(value)) { Ok(value) } & (None) { exact_norm(x, y) }
 }
 
-exact_norm = (x : Float, y : Float) -> Result(Float, Nil) {
+exact_norm = (x : Float, y : Float) -> Result(Float, ()) {
 	a = dyadic(x)
 	b = dyadic(y)
 	sum = a * a + b * b
@@ -1903,7 +1903,7 @@ exact_norm = (x : Float, y : Float) -> Result(Float, Nil) {
 			maximum = dyadic(max_finite)
 			threshold = maximum + core.shift_left(1, 2044)
 			{ sum >= threshold * threshold } |>
-				(True) { Error(Nil) }
+				(True) { Error(()) }
 				& (False) {
 					{ sum >= maximum * maximum } |>
 						(True) { Ok(max_finite) }
@@ -1944,7 +1944,7 @@ exact_norm = (x : Float, y : Float) -> Result(Float, Nil) {
 		}
 }
 
-ratio_bits_positive_zero = (n : Int, d : Int) -> Result(Int, Nil) {
+ratio_bits_positive_zero = (n : Int, d : Int) -> Result(Int, ()) {
 	{ n == 0 } |> (True) { Ok(0) } & (False) { ratio_bits(n, d) }
 }
 
@@ -1962,7 +1962,7 @@ radians = (degrees : Float) -> Float {
 }
 
 /// Rounded real radians*180/pi. Preserves zero signs; rounded overflow is Error.
-degrees = (radians : Float) -> Result(Float, Nil) {
+degrees = (radians : Float) -> Result(Float, ()) {
 	{ radians == 0.0 } |>
 		(True) { Ok(radians) }
 		& (False) {

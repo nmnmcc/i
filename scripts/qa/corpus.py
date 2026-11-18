@@ -273,7 +273,7 @@ def observe_in(binary, case, bound, runtime):
             name += '_again'
         entry = project / 'test' / (name + '.i')
         entry.parent.mkdir(parents=True, exist_ok=True)
-        entry.write_text('(testlib = (test) = std/test)\ntest("qa_startup", () { Nil })\n')
+        entry.write_text('(testlib = (test) = std/test)\ntest("qa_startup", () { () })\n')
         manifest_path = project / 'i.toml'
         manifest = manifest_path.read_text()
         data = tomllib.loads(manifest)
@@ -687,7 +687,7 @@ def audit_w520(args):
                 startup.append(case['id'])
             else:
                 failures.append(case['id'] + ': unrelated full outcome changed')
-    dump(CORPUS / 'w520-audit.json', {'source': 'docs/spec.md §6.9: the compiler gives warning W0503, showing both types; the comparison is well defined and has type Bool; literal types are not widened; the warning adds no narrowing fact', 'changes': changes, 'censored_changes': censored, 'startup_harness_changes': startup, 'startup_source': 'docs/spec.md §2.5: Its value is worked out once, when the program starts, before any entry point runs. An added Nil test now exercises startup; this is a harness change, not a W520 runtime-equivalence assertion.', 'failures': failures})
+    dump(CORPUS / 'w520-audit.json', {'source': 'docs/spec.md §6.9: the compiler gives warning W0503, showing both types; the comparison is well defined and has type Bool; literal types are not widened; the warning adds no narrowing fact', 'changes': changes, 'censored_changes': censored, 'startup_harness_changes': startup, 'startup_source': 'docs/spec.md §2.5: Its value is worked out once, when the program starts, before any entry point runs. An added () test now exercises startup; this is a harness change, not a W520 runtime-equivalence assertion.', 'failures': failures})
     print(f'W520: {len(changes)} marked cases, {len(censored)} censored changes, {len(startup)} startup harness changes, {len(failures)} unexplained changes')
     if failures:
         raise SystemExit(1)

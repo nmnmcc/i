@@ -13,7 +13,7 @@ warned = (x : Int, y : Float) {
 	x + 1 == 2 && x > 0
 	"a" <> "b"
 	y <. 1.0
-	Nil
+	()
 }
 
 // A call, `|>`, a match, a block, a bit array, and a Float operator, which
@@ -29,5 +29,5 @@ not_warned = (x : Int, y : Float) {
 	<<x>>
 	y +. 1.0
 	-.y
-	Nil
+	()
 }

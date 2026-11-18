@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Int\napp/main.wrap : (() <- N -> A, S(B)) <- (N - S(B)) -> A\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> Int\napp/main.wrap : (() <- N -> A, S(B)) <- (N - S(B)) -> A\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

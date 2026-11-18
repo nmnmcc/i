@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.f : () -> -2\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.f : () -> -2\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": "src/main.i:2:2: warning[W0502]: this value is not used, and working it out does nothing\n"
     },
     "test0": {

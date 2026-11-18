@@ -5,7 +5,7 @@
 	i/resource
 )
 
-check = (b : Bool) { b |> (True) { Nil } & (False) { panic("wrong") } }
+check = (b : Bool) { b |> (True) { () } & (False) { panic("wrong") } }
 
 id = <A>(a : A) -> A { a }
 
@@ -130,5 +130,5 @@ test("cancel_final_values", () {
 			},
 		)
 	})
-	Nil
+	()
 })

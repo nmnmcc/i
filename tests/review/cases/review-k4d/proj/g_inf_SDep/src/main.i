@@ -16,6 +16,6 @@ main = () {
 	_syn3_1 : T(S(Dep)) = T(() { use() })
 	{
 		uset()
-		Nil
+		()
 	} <- (_syn3_0, _syn3_1)
 }

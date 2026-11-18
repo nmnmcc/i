@@ -1,4 +1,4 @@
-Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> Nil)
+Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> ())
 
 Outer(A, E, N) = (Inner(A, E, N))
 

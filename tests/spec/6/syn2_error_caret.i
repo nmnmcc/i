@@ -6,5 +6,5 @@
 value = () -> Int { 1 }
 main = () {
 	assert(value() == 1)
-	Nil
+	()
 }

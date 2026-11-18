@@ -9,7 +9,7 @@
   (import "ilang:host/v1" "panic" (func $panic (param i32 i32)))
   (import "ilang:host/v1" "reference_id" (func $reference_id (param externref) (result i64)))
   (import "ilang:host/v1" "cancel" (func $cancel (param i32)))
-  ;; Host services (spec §9.7): print(text: String) -> Nil,
+  ;; Host services (spec §9.7): print(text: String) -> (),
   ;; read(key: String) -> String ? String, and the async later(x: Float) -> Float ? String,
   ;; which takes the request id first (B.4).
   (import "app:console/v1" "print" (func $print (param i32 i32)))
@@ -117,7 +117,7 @@
   (func (export "same_reference") (param $a externref) (param $b externref) (result i32)
     (i64.eq (call $reference_id (local.get $a)) (call $reference_id (local.get $b))))
 
-  ;; (selector: Float) -> String ? Nil | Bool | Int | Float | String | BitArray.
+  ;; (selector: Float) -> String ? () | Bool | Int | Float | String | BitArray.
   ;; Results: tag, the String, then every error member in canonical order.
   (func (export "choose") (param $selector f64)
     (result i32 i32 i32 i32 i32 i32 i32 f64 i32 i32 i32 i32)

@@ -9,7 +9,7 @@
 )
 
 // Every successful route to Uri preserves raw spelling.
-round_trip = (u : uri.Uri) -> Nil {
+round_trip = (u : uri.Uri) -> () {
 	assert(
 		{
 			e4_call_arg_0 = uri.to_string(u)
@@ -24,7 +24,7 @@ round_trip = (u : uri.Uri) -> Nil {
 		} ==
 			Ok(u),
 	)
-	Nil
+	()
 }
 
 parse_good = (s : String) -> uri.Uri {
@@ -102,7 +102,7 @@ test("uri_raw_parts", () {
 		} ==
 			Error(uri.InvalidUtf8),
 	)
-	Nil
+	()
 })
 
 // Selection and translation count bytes rather than Unicode scalars.
@@ -305,7 +305,7 @@ test("uri_parse_errors", () {
 		(text, expected) = pair
 		assert(fail.catch(() { uri.parse(text) }) == Error(expected))
 	})
-	Nil
+	()
 })
 
 test("uri_build_errors", () {
@@ -525,7 +525,7 @@ test("uri_build_errors", () {
 		(p, expected) = pair
 		assert(fail.catch(() { uri.build(p) }) == Error(expected))
 	})
-	Nil
+	()
 })
 
 // RFC 3986, section 5.4: normal and abnormal resolution examples; strict http:g behavior.
@@ -604,7 +604,7 @@ test("uri_rfc_resolution", () {
 	}
 	assert(uri.to_string(v) == "x:a")
 	round_trip(v)
-	Nil
+	()
 })
 
 test("uri_resolution_validation", () {
@@ -657,7 +657,7 @@ test("uri_resolution_validation", () {
 	}
 	assert(uri.to_string(u) == "x://host//h")
 	round_trip(u)
-	Nil
+	()
 })
 
 test("uri_ip_literals", () {
@@ -714,7 +714,7 @@ test("uri_ip_literals", () {
 				),
 		)
 	})
-	Nil
+	()
 })
 
 test("uri_codecs", () {
@@ -773,7 +773,7 @@ test("uri_codecs", () {
 				Ok(s),
 		)
 	})
-	Nil
+	()
 })
 
 test("uri_forms", () {
@@ -822,7 +822,7 @@ test("uri_forms", () {
 			)
 		})
 	})
-	Nil
+	()
 })
 
 // Generated valid Parts use the component preservation law; short arbitrary ASCII
@@ -893,7 +893,7 @@ test("uri_generated_round_trips", () {
 				assert(uri.to_string(u) == s)
 				round_trip(u)
 			}
-			& (Error(_)) { Nil }
+			& (Error(_)) { () }
 	}
 	list.each(list.range(0, 127), (n) {
 		Ok(cp) = fail.catch(() { string.utf_codepoint(n) })
@@ -904,7 +904,7 @@ test("uri_generated_round_trips", () {
 			list.each(alphabet, (c) { check(string.concat([a, b, c])) })
 		})
 	})
-	Nil
+	()
 })
 
 test("uri_long_inputs", () {
@@ -947,5 +947,5 @@ test("uri_long_inputs", () {
 		} ==
 			Ok(pairs),
 	)
-	Nil
+	()
 })

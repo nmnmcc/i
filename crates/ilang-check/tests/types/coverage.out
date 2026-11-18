@@ -1,6 +1,6 @@
 covered : (Shape) -> 1 | 2 | 3
 missing_ctor : (Shape) -> 1 | 2
-missing_nested : (Result(Bool, Nil)) -> 1 | 2
+missing_nested : (Result(Bool, ())) -> 1 | 2
 missing_member : (Int | String) -> 1 | 2
 missing_label : (Flags) -> 1 | 2
 inferred : (Result(1, A)) -> 1 | 2

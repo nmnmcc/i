@@ -9,5 +9,5 @@ with = <A, R, N>(x : A, f : () <- (S(A), ..N) -> R) {
 
 main = () {
 	with(1, read)
-	Nil
+	()
 }

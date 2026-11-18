@@ -9,5 +9,5 @@ get = () <- (a : Assert) { a }
 // The `Assert` of `assertion.catch` is used after `catch` has ended.
 main = () {
 	r = assertion.catch(() { get() })
-	r |> (Ok(a)) { assert(False) <- (a) } & (Error(_)) { Nil }
+	r |> (Ok(a)) { assert(False) <- (a) } & (Error(_)) { () }
 }
