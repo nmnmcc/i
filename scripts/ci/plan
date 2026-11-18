@@ -67,18 +67,15 @@ SHARDED = [
 JOBS = {
     'changes': ('changes', 'always'),
     'plan': ('plan', 'always'),
-    'release': ('build (release i)', 'rust|docs'),
-    'lint': ('lint (rust)', 'always'),
-    'js': ('test (javascript)', 'rust'),
-    'editors': ('test (editors)', 'editors'),
-    'rest': ('test (workspace, other crates)', 'rust'),
+    'release': ('build (release i)', 'rust|docs|editors'),
+    'misc': ('lint and test (rust, other crates)', 'always'),
+    'web': ('test (javascript, editors, docs)', 'rust|docs|editors'),
     'check_tests': 'check_tests',
     'value_types': 'value_types',
     'cli_tests': 'cli_tests',
     'spec': 'spec',
     'corpus': 'corpus',
     'std': 'std',
-    'docs': 'docs',
 }
 
 FILTERS = ('rust', 'docs', 'editors')
