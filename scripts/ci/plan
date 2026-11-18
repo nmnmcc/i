@@ -87,8 +87,8 @@ KINDS = {
     'ilang-check-tests': ('test name', re.compile(r'^(lib|doc|bin:[^\s]+|test:[^\s]+)$')),
     'ilang-cli-tests': ('test name', re.compile(r'^(lib|doc|bin:[^\s]+|test:[^\s]+)$')),
     'std-tests': ('project', re.compile(r'^[^\s@]+@[0-2]$')),
-    'spec-cases': ('spec case path', re.compile(r'^\S+\.i$')),
-    'value-type-recovery-cases': ('spec case path', re.compile(r'^\S+\.i$')),
+    'spec-cases': ('spec case path', re.compile(r'^[^:\s]+$')),
+    'value-type-recovery-cases': ('spec case path', re.compile(r'^[^:\s]+$')),
     'corpus-cases': ('corpus case path', re.compile(r'^[^\s]+$')),
     'docs-examples': ('documentation page', re.compile(r'^docs/\S+\.(md|mdx)$')),
 }
