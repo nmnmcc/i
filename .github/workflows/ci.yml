@@ -14,15 +14,16 @@ on:
 permissions:
   contents: read
 
-# Three groups, and no run cancels another. A main push has its own group, so
-# no pull request can cancel or delay the run that deploys. Every pull request
-# shares `pr`, so at most one pull request gate runs at a time and the rest
-# queue: the 20 concurrent jobs of one run are not split with another run's.
-# The daily run has its own group, so it is neither delayed by nor delays a
-# pull request.
+# Three groups. A main push has its own group and is never cancelled, so no
+# pull request can hold up or replace the run that deploys. Every pull request
+# shares `pr`, so at most one pull request gate runs at a time and the 20
+# concurrent jobs of one run are not split with another run's; a newer pull
+# request replaces a pending one (GitHub cancels pending runs in a group
+# anyway), which keeps the gate that finally runs on the newest commit. The
+# daily run has its own group and is never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'main' || (github.event_name == 'schedule' && 'schedule' || 'pr') }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name != 'schedule' && !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
 env:
   # No debug information in the dev and test builds (smaller target, faster
