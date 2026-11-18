@@ -704,7 +704,7 @@ test("cli_long_inputs", () {
 	Nil
 })
 // §5.4: check the private decoder by compiling the production source as this
-// test module, with an internal test appended. This verifies supplied empty
+// test module, with an internal test appended. This checks supplied empty
 // buckets and the exact unused suffix. Restore this file even if a check fails.
 // Run from the lane after building target/release/i:
 // direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec("\n".join(x[4:] for x in Path("std/test/cli_test.i").read_text().splitlines() if x.startswith("//| ")))'

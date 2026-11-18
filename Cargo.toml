@@ -32,6 +32,7 @@ ilang-host = { path = "crates/ilang-host" }
 ilang-binaryen = { path = "crates/ilang-binaryen" }
 ilang-lsp = { path = "crates/ilang-lsp" }
 ilang-macro = { path = "crates/ilang-macro" }
+ilang-shard = { path = "crates/ilang-shard" }
 
 [profile.dev]
 debug = 1

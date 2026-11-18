@@ -900,6 +900,7 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
         .with_context(|| format!("there is no directory `{}`", project.display()))?;
 
     // 1. The working tree is clean.
+    // This is git's own option name, not a name of this project.
     git_in(project, &["rev-parse", "--verify", "--quiet", "HEAD"])
         .context("the package must be in a git repository with a commit")?;
     check_clean(project)?;

@@ -7,8 +7,11 @@
 --logs reads CI logs (a directory is read recursively, every regular file)
 and replaces the costs of the units it finds a time for. Other costs, every
 key list, and every set this script does not know stay as they are.
---sync-keys rewrites the key lists of the sets below from the repository and
-drops the costs of keys that no longer exist.
+--sync-keys rewrites the key lists of the sets it knows from the repository
+and drops the costs of keys that no longer exist. It knows ilang-check-tests,
+ilang-cli-tests, std-tests, spec-cases, corpus-cases, docs-examples and
+value-type-cases (the spec cases again, which ilang-check's value_types walks);
+any other set of the table is left as it is.
 
 A log is either GitHub's combined run log (`job<TAB>step<TAB>timestamp text`)
 or one job's log (`timestamp text`, or bare text). Lines are grouped by job
@@ -84,6 +87,8 @@ def repository_keys():
         'ilang-check-tests': ['doc', 'lib'] + ['test:' + s for s in stems('ilang-check')],
         'ilang-cli-tests': ['bin:i'] + ['test:' + s for s in stems('ilang-cli') if s != 'spec'],
         'spec-cases': spec,
+        # value_types' spec_corpus_reverse_order_and_recovery walks the same cases.
+        'value-type-cases': spec,
         'corpus-cases': corpus,
         'std-tests': [f'{p}@{level}' for p in sorted(PROJECTS.values()) for level in LEVELS],
         'docs-examples': docs,

@@ -16,5 +16,6 @@ serde_json.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+ilang-shard.workspace = true
 
 migration-syntax = { package = "ilang-syntax-migration", path = "../ilang-syntax/examples/legacy" }

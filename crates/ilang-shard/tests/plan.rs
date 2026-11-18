@@ -1,5 +1,6 @@
-use ilang_shard::{Unit, plan, plan_json, with_median_missing};
+use ilang_shard::{Unit, plan, plan_cases, plan_json, with_median_missing};
 use std::collections::BTreeSet;
+use std::path::Path;
 use std::process::Command;
 
 /// 200 units with uneven costs (0.1 s to about 40 s) and one of 400 s.
@@ -201,4 +202,66 @@ fn bad_input_is_rejected_with_a_message() {
     assert!(code == 1 && err.contains("cannot read the cost table"), "{err}");
     let (code, _, err) = shard(&["keys", "--costs", &costs, "--set", "s"]);
     assert!(code == 2 && err.contains("--shard is required"), "{err}");
+}
+
+fn strings(keys: &[&str]) -> Vec<String> {
+    keys.iter().map(|k| k.to_string()).collect()
+}
+
+#[test]
+fn a_runner_plans_its_own_cases_with_the_table_costs() {
+    let costs = table("cases");
+    // `e` is not in the table and takes the median of 2, 2 and 1; 7 s at a
+    // budget of 3 s is 3 shards, whatever the fallback count.
+    let keys = strings(&["c", "e", "a", "b"]);
+    let planned = plan_cases(Path::new(&costs), "s", &keys, 7);
+    assert_eq!(planned.fallback, None);
+    assert_eq!(planned.budget_seconds, 3.0);
+    let shards: Vec<Vec<String>> = planned.plan.shards.iter().map(|s| s.keys.clone()).collect();
+    assert_eq!(shards, vec![strings(&["a", "c"]), strings(&["b"]), strings(&["e"])]);
+    assert_eq!(planned.plan.missing_costs, strings(&["e"]));
+    assert_eq!(planned.unlisted, strings(&["e"]));
+    assert_eq!(planned.absent, strings(&["d"]));
+    assert!(planned.partition_errors(&keys).is_empty());
+    assert_eq!(planned.shard_keys(1, 3, "test"), strings(&["b"]).as_slice());
+    assert_eq!(planned.notes("test").len(), 2, "{:?}", planned.notes("test"));
+}
+
+#[test]
+#[should_panic(expected = "but 4 were asked for")]
+fn a_runner_asked_for_another_count_fails() {
+    let costs = table("count");
+    let planned = plan_cases(Path::new(&costs), "s", &strings(&["a", "b", "c", "d"]), 4);
+    planned.shard_keys(0, 4, "test");
+}
+
+#[test]
+fn without_the_table_the_cases_are_equal_and_the_count_is_asked() {
+    let costs = format!("{}/no-such-table.json", env!("CARGO_TARGET_TMPDIR"));
+    let keys = strings(&["e", "d", "c", "b", "a"]);
+    let planned = plan_cases(Path::new(&costs), "s", &keys, 2);
+    assert!(planned.fallback.is_some());
+    assert_eq!(planned.notes("test").len(), 1, "{:?}", planned.notes("test"));
+    assert_eq!(planned.plan.shards.len(), 2);
+    assert!(planned.partition_errors(&keys).is_empty());
+    assert_eq!(planned.shard_keys(1, 2, "test"), strings(&["b", "d"]).as_slice());
+    // Never more shards than cases.
+    assert_eq!(plan_cases(Path::new(&costs), "s", &keys, 9).plan.shards.len(), 5);
+}
+
+#[test]
+fn partition_errors_name_the_keys() {
+    let costs = table("partition");
+    let keys = strings(&["a", "b", "c", "d"]);
+    let mut planned = plan_cases(Path::new(&costs), "s", &keys, 1);
+    planned.plan.shards[1].keys.push("a".into());
+    let errors = planned.partition_errors(&strings(&["a", "b", "c", "x"]));
+    assert_eq!(
+        errors,
+        vec![
+            "a is in shard 0 and in shard 1".to_string(),
+            "d is in a shard but is not a case".to_string(),
+            "x is in no shard".to_string(),
+        ]
+    );
 }

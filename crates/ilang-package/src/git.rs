@@ -357,6 +357,7 @@ impl Git {
         let mut cmd = self.command(Some(&dir));
         cmd.args([
             "rev-parse",
+            // This is git's own option name, not a name of this project.
             "--verify",
             "--quiet",
             &format!("refs/tags/v{version}^{{commit}}"),

@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""Plan the jobs of one CI run: the shard matrices and the expected job list.
+
+    scripts/ci/plan --changed <json> --out <dir>
+                    [--costs ci/costs.json] [--github-output <file>]
+
+--changed is the output of the job `changes` (scripts/ci/changes), for
+example {"rust": true, "docs": false, "editors": false}; that job already
+sets every filter for any event but pull_request.
+
+For each sharded job it runs `cargo run -q -p ilang-shard -- matrix` on its
+set of the cost table, and `keys` for every shard, and writes one GitHub
+Actions output per job: a JSON array of matrix entries
+    {"index": 0, "of": N, "k": 1, "shard": "1/N", "name": "<prefix>, 1/N",
+     "display": "<job display name>", "targets": "..."}
+(`index` is 0-based, `k` 1-based.) `targets` is set for the Rust test
+shards: space-separated words `<crate>:<key>`, where <key> is a key of the
+cost table (`lib`, `doc`, `bin:<name>`, `test:<name>`); scripts/checks
+runs them for CHECKS_TEST_GROUP=targets from CHECKS_TEST_TARGETS. `projects` is set for the std shards: the keys
+(`<project>@<opt>`) separated by spaces, for CHECKS_I_PROJECTS.
+
+It also writes <out>/expected.json: every job of ci.yml but the summary, by
+job id, with its display names and whether it runs in this run (the path
+filters). The summary job compares it with the markers the jobs upload
+(scripts/ci/summary). A new job in ci.yml needs an entry in JOBS below;
+otherwise the summary fails, naming it.
+
+Any failing ilang-shard command (such as a set missing from the cost table)
+or an empty matrix stops the script with status 1: the run is red, never
+planned with an empty matrix.
+"""
+
+import argparse
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+
+# The highest number of jobs of one matrix that run at the same time. GitHub
+# has no limit for a whole workflow; every matrix job takes this one value
+# from the plan output `max_parallel`.
+MAX_PARALLEL = 18
+
+# The ilang-check test binary that has a job of its own, sharded by case
+# (set value-type-cases); the shards of ilang-check-tests leave it out.
+VALUE_TYPES_KEY = 'test:value_types'
+
+# Sharded jobs: output name, set, name prefix, display template, the filter
+# that decides whether it runs, and the package of its Rust test targets.
+SHARDED = [
+    # output          set                  prefix                       display          filter  package
+    ('check_tests',   'ilang-check-tests', 'ilang-check',               'test ({name})', 'rust', 'ilang-check'),
+    ('value_types',   'value-type-cases',  'ilang-check, value types',  'test ({name})', 'rust', None),
+    # (value_types: CHECKS_TEST_TARGETS is ilang-check:test:value_types in every shard.)
+    ('cli_tests',     'ilang-cli-tests',   'ilang-cli',                 'test ({name})', 'rust', 'ilang-cli'),
+    ('spec',          'spec-cases',        'spec',                      'test ({name})', 'rust', None),
+    ('corpus',        'corpus-cases',      'review',                    'corpus ({name})', 'rust', None),
+    ('std',           'std-tests',         'i, std',                    'run ({name})',  'rust', None),
+    ('docs',          'docs-examples',     'site',                      'docs ({name})', 'rust|docs', None),
+]
+
+# Every job id of ci.yml but `summary`: the output of a sharded job above,
+# or a display name and filter of a single job. `always` runs on every event.
+JOBS = {
+    'changes': ('changes', 'always'),
+    'plan': ('plan', 'always'),
+    'release': ('build (release i)', 'rust|docs'),
+    'lint': ('lint (rust)', 'always'),
+    'js': ('test (javascript)', 'rust'),
+    'editors': ('test (editors)', 'editors'),
+    'rest': ('test (workspace, other crates)', 'rust'),
+    'check_tests': 'check_tests',
+    'value_types': 'value_types',
+    'cli_tests': 'cli_tests',
+    'spec': 'spec',
+    'corpus': 'corpus',
+    'std': 'std',
+    'docs': 'docs',
+}
+
+FILTERS = ('rust', 'docs', 'editors')
+
+
+def runs(rule, changed):
+    return rule == 'always' or any(changed[f] for f in rule.split('|'))
+
+
+def shard_tool(*args):
+    cmd = ['cargo', 'run', '-q', '--locked', '-p', 'ilang-shard', '--', *args]
+    done = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
+    sys.stderr.write(done.stderr)
+    if done.returncode != 0:
+        sys.exit(f'plan: {" ".join(cmd)} exited with {done.returncode}')
+    return done.stdout
+
+
+def costs_without_value_types(costs, out):
+    """The cost table with ilang-check's value_types left out of
+    ilang-check-tests: it is a job of its own (set value-type-cases)."""
+    table = json.loads(costs.read_text())
+    sets = table.get('sets', {})
+    check = sets.get('ilang-check-tests')
+    if not check or VALUE_TYPES_KEY not in check.get('keys', []):
+        sys.exit(f'plan: {costs}: ilang-check-tests has no key {VALUE_TYPES_KEY}')
+    check['keys'] = [k for k in check['keys'] if k != VALUE_TYPES_KEY]
+    check.get('costs', {}).pop(VALUE_TYPES_KEY, None)
+    path = (out / 'costs.json').resolve()
+    path.write_text(json.dumps(table, indent=1) + '\n')
+    return path
+
+
+def matrix(costs, set_name, prefix, display, package):
+    entries = json.loads(shard_tool('matrix', '--costs', str(costs), '--set', set_name, '--name-prefix', prefix))
+    if not isinstance(entries, list) or not entries:
+        sys.exit(f'plan: set {set_name} gave an empty matrix')
+    for e in entries:
+        keys = shard_tool('keys', '--costs', str(costs), '--set', set_name, '--shard', str(e['index'])).split()
+        if not keys:
+            sys.exit(f'plan: shard {e["index"]} of set {set_name} has no keys')
+        e['k'] = e['index'] + 1
+        e['shard'] = f'{e["k"]}/{e["of"]}'
+        e['display'] = display.format(name=e['name'])
+        if package:
+            e['targets'] = ' '.join(f'{package}:{k}' for k in keys)
+        elif set_name == 'value-type-cases':
+            e['targets'] = f'ilang-check:{VALUE_TYPES_KEY}'
+        elif set_name == 'std-tests':
+            e['projects'] = ' '.join(keys)
+        # Spec cases, corpus cases and pages: the shard takes the k-th of N
+        # by its own rule, so only N is used; the planned keys go to the log.
+        print(f'{e["display"]}: {len(keys)} unit(s): {" ".join(keys[:8])}{" ..." if len(keys) > 8 else ""}')
+    return entries
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--changed', required=True)
+    parser.add_argument('--out', required=True, type=Path)
+    parser.add_argument('--costs', default='ci/costs.json', type=Path)
+    parser.add_argument('--github-output', type=Path)
+    a = parser.parse_args()
+
+    started = time.monotonic()
+    changed = json.loads(a.changed)
+    missing = [f for f in FILTERS if not isinstance(changed.get(f), bool)]
+    if missing:
+        sys.exit(f'plan: --changed has no boolean {", ".join(missing)}: {a.changed}')
+
+    a.out.mkdir(parents=True, exist_ok=True)
+    costs = (ROOT / a.costs) if not a.costs.is_absolute() else a.costs
+    planned_costs = costs_without_value_types(costs, a.out)
+
+    outputs = {'max_parallel': str(MAX_PARALLEL), 'changed': json.dumps(changed, separators=(',', ':'))}
+    sharded = {}
+    for output, set_name, prefix, display, rule, package in SHARDED:
+        entries = matrix(planned_costs, set_name, prefix, display, package)
+        sharded[output] = (entries, rule)
+        outputs[output] = json.dumps(entries, separators=(',', ':'))
+
+    expected = []
+    for job, spec in JOBS.items():
+        if isinstance(spec, str):
+            entries, rule = sharded[spec]
+            names = [e['display'] for e in entries]
+        else:
+            names, rule = [spec[0]], spec[1]
+        expected.append({'job': job, 'runs': runs(rule, changed), 'names': names})
+    unlisted = set(sharded) - set(JOBS)
+    if unlisted:
+        sys.exit(f'plan: sharded outputs without a job: {", ".join(sorted(unlisted))}')
+    (a.out / 'expected.json').write_text(json.dumps(expected, indent=1) + '\n')
+
+    for job in expected:
+        state = 'runs' if job['runs'] else 'skipped by the path filters'
+        print(f'{job["job"]}: {len(job["names"])} job(s), {state}')
+        for name in job['names']:
+            print(f'  {name}')
+    print(f'plan: changed {outputs["changed"]}; planned in {time.monotonic() - started:.1f} s')
+
+    if a.github_output:
+        with a.github_output.open('a') as f:
+            for key, value in outputs.items():
+                f.write(f'{key}={value}\n')
+
+
+if __name__ == '__main__':
+    main()

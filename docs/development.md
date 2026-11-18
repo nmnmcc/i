@@ -51,10 +51,43 @@ four independent parts:
 
 `./scripts/checks rust` runs one part. CI (`.github/workflows/ci.yml`) runs
 the parts as parallel jobs, each in the Devenv shell, with Devenv installed
-from nixpkgs and the Cargo output kept between runs. The Rust tests are split
-into groups (`CHECKS_TEST_GROUP`) and the review corpus into shards, so a run
-has about 24 jobs, each named by what it runs: `build (…)`, `lint (…)`,
-`test (…)`, `run (…)`, `corpus (…)`, and `docs (…)`.
+from nixpkgs and the Cargo output kept between runs. Each job is named by what
+it runs: `build (…)`, `lint (…)`, `test (…)`, `run (…)`, `corpus (…)`, and
+`docs (…)`.
+
+`scripts/checks` reads these variables, which CI sets for its shards:
+
+- `CHECKS_TEST_GROUP` splits `rust-test`. With `targets`, it runs exactly
+  the Cargo targets in `CHECKS_TEST_TARGETS`, a list of `<crate>:<target>`
+  (crate `ilang-check` or `ilang-cli`; target `lib`, `bin`, `doc`, or the
+  name of a file of the crate's `tests/`), one `cargo test --no-fail-fast`
+  per crate in the order given; an unknown crate or an empty list stops it
+  with exit status 2. The hand-written groups (`check-heavy`, `check`,
+  `spec`, `spec-K/N`, `cli-heavy`, `cli`, `rest`) still work.
+- `CHECKS_SHARD=K/N` makes the `i` part run shard K of N of the review
+  corpus (`scripts/review-corpus run --shard K/N --jobs 4`) instead of the
+  whole corpus; `CHECKS_SKIP_CORPUS=1` leaves the corpus out.
+- `CHECKS_I_BINARY` gives the `i` part a built `i` instead of building one.
+- `CHECKS_BUDGET` is the budget of one shard in seconds, for the shard
+  tooling; it defaults to 270.
+
+### CI on pull requests and on main
+
+Every push to main runs the full gate. A pull request runs the same gate except for the jobs whose inputs did not change (Rust, docs, editors); the run summary names what ran and what was skipped, and `summary (required)` fails if a planned job did not report. The wall time of
+a run is in its job summary. When a run fails, open the first red job in the
+summary and start there.
+
+The slow sets are split into shards by `i-shard` (`crates/ilang-shard`), so
+no shard list is written by hand. The units of a set (test targets, spec
+cases, corpus cases, projects) are its sorted keys, and their costs come from
+`ci/costs.json`; a unit without a cost takes the median of its set. The shard
+count is `ceil(total / budget)`, raised one at a time while a shard without
+an over-budget unit would still go over the budget, and the units are packed
+longest first onto the least loaded shard (LPT). The plan prints every unit
+that is over the budget on its own and every unit that took the median. A
+stale table changes only how evenly the shards are loaded, never which units
+run. Refresh it from CI logs with `scripts/ci/refresh-costs --logs <dir>`, and
+with `--sync-keys` after adding or removing units.
 
 Release archives are built with `./scripts/dev-release`; see
 [release packaging](release.md).

@@ -12,6 +12,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
+use std::path::Path;
 
 /// One unit of work and its cost in seconds (greater than zero).
 #[derive(Debug, Clone, PartialEq)]
@@ -112,6 +113,171 @@ pub fn with_median_missing(units: &[(String, Option<f64>)]) -> Vec<Unit> {
         .iter()
         .map(|(key, cost)| Unit { key: key.clone(), cost: cost.unwrap_or(median) })
         .collect()
+}
+
+/// The plan of the cases that a test runner found, and where its costs came
+/// from.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CasePlan {
+    pub plan: Plan,
+    pub budget_seconds: f64,
+    /// Why every case costs 1 s, when the cost table could not be read.
+    pub fallback: Option<String>,
+    /// Cases that the runner found and the set does not list, sorted.
+    pub unlisted: Vec<String>,
+    /// Keys of the set that the runner did not find, sorted.
+    pub absent: Vec<String>,
+}
+
+/// Plans the cases `keys` that a test runner found, with the costs of the set
+/// `set_name` of the cost table at `costs_path` and the table's budget.
+///
+/// The keys are sorted first, so the plan does not depend on the order in
+/// which the runner found them. A case without a measured cost takes the
+/// median of the measured ones, as in [`with_median_missing`].
+///
+/// When the table cannot be read (a checkout without it), every case costs
+/// 1 s and the plan has `fallback_shards` shards (or one per case, when there
+/// are fewer cases), and `fallback` says why.
+///
+/// # Panics
+///
+/// When the table can be read but is not valid, has no set `set_name` or no
+/// `budget_seconds`; when `fallback_shards` is 0; when a key is given twice.
+pub fn plan_cases(costs_path: &Path, set_name: &str, keys: &[String], fallback_shards: usize) -> CasePlan {
+    assert!(fallback_shards > 0, "a plan has at least one shard");
+    let mut keys = keys.to_vec();
+    keys.sort();
+    if let Some(pair) = keys.windows(2).find(|pair| pair[0] == pair[1]) {
+        panic!("the case {:?} is found twice", pair[0]);
+    }
+    let text = match std::fs::read_to_string(costs_path) {
+        Ok(text) => text,
+        Err(error) => {
+            let units: Vec<Unit> = keys.iter().map(|key| Unit { key: key.clone(), cost: 1.0 }).collect();
+            let order: Vec<&Unit> = units.iter().collect();
+            let count = fallback_shards.min(units.len()).max(1);
+            let shards = assign(&order, count);
+            // The largest shard, so that no unit is over this budget.
+            let budget_seconds = shards.iter().map(|s| s.seconds).fold(1.0, f64::max);
+            return CasePlan {
+                plan: Plan { shards, over_budget: Vec::new(), missing_costs: keys.clone() },
+                budget_seconds,
+                fallback: Some(format!(
+                    "cannot read the cost table {}: {error}; every case costs 1 s, in {count} shard(s)",
+                    costs_path.display()
+                )),
+                unlisted: Vec::new(),
+                absent: Vec::new(),
+            };
+        }
+    };
+    let table = CostTable::parse(&text).unwrap_or_else(|e| panic!("{}: {e}", costs_path.display()));
+    let set = table.sets.get(set_name).unwrap_or_else(|| {
+        let known: Vec<&str> = table.sets.keys().map(String::as_str).collect();
+        panic!("{}: no set {set_name:?}; the sets are: {}", costs_path.display(), known.join(", "))
+    });
+    let budget_seconds = table
+        .budget_seconds
+        .unwrap_or_else(|| panic!("{} has no budget_seconds", costs_path.display()));
+    let pairs: Vec<(String, Option<f64>)> =
+        keys.iter().map(|key| (key.clone(), set.costs.get(key).copied())).collect();
+    let mut planned = plan(&with_median_missing(&pairs), budget_seconds);
+    planned.missing_costs = pairs.iter().filter(|(_, cost)| cost.is_none()).map(|(key, _)| key.clone()).collect();
+    let listed: BTreeSet<&str> = set.keys.iter().map(String::as_str).collect();
+    let found: BTreeSet<&str> = keys.iter().map(String::as_str).collect();
+    let unlisted = keys.iter().filter(|key| !listed.contains(key.as_str())).cloned().collect();
+    let mut absent: Vec<String> = set.keys.iter().filter(|key| !found.contains(key.as_str())).cloned().collect();
+    absent.sort();
+    CasePlan { plan: planned, budget_seconds, fallback: None, unlisted, absent }
+}
+
+impl CasePlan {
+    /// The keys of shard `index` (0-based) when the runner was asked for
+    /// `count` shards.
+    ///
+    /// # Panics
+    ///
+    /// When the plan does not have exactly `count` shards (the CI matrix and
+    /// the runner then read different tables or budgets), or when `index` is
+    /// not below `count`. `what` names the runner in the message.
+    pub fn shard_keys(&self, index: usize, count: usize, what: &str) -> &[String] {
+        assert_eq!(
+            self.plan.shards.len(),
+            count,
+            "{what}: the cost table plans {} shard(s) at a budget of {} s, but {count} were asked for; \
+             the CI matrix must come from the same table (i-shard matrix)",
+            self.plan.shards.len(),
+            seconds_json(self.budget_seconds),
+        );
+        assert!(index < count, "{what}: shard {index} is out of range; the shards are 0 to {}", count - 1);
+        &self.plan.shards[index].keys
+    }
+
+    /// What is wrong with the shards as a partition of `keys`: a key in two
+    /// shards, a key in no shard, or a shard key that is not one of `keys`.
+    /// Empty when every key is in exactly one shard.
+    pub fn partition_errors(&self, keys: &[String]) -> Vec<String> {
+        let mut errors = Vec::new();
+        let mut shard_of: BTreeMap<&str, usize> = BTreeMap::new();
+        for shard in &self.plan.shards {
+            for key in &shard.keys {
+                if let Some(other) = shard_of.insert(key.as_str(), shard.index) {
+                    errors.push(format!("{key} is in shard {other} and in shard {}", shard.index));
+                }
+            }
+        }
+        let wanted: BTreeSet<&str> = keys.iter().map(String::as_str).collect();
+        for key in shard_of.keys() {
+            if !wanted.contains(key) {
+                errors.push(format!("{key} is in a shard but is not a case"));
+            }
+        }
+        for key in &wanted {
+            if !shard_of.contains_key(key) {
+                errors.push(format!("{key} is in no shard"));
+            }
+        }
+        errors
+    }
+
+    /// One line for standard error about each thing that a developer should
+    /// know: the fallback, cases over the budget, and cases that the runner
+    /// and the table disagree on.
+    pub fn notes(&self, what: &str) -> Vec<String> {
+        let few = |keys: &[String]| {
+            let shown: Vec<&str> = keys.iter().take(5).map(String::as_str).collect();
+            let more = if keys.len() > 5 { format!(" and {} more", keys.len() - 5) } else { String::new() };
+            format!("{}{more}", shown.join(", "))
+        };
+        let mut notes = Vec::new();
+        if let Some(fallback) = &self.fallback {
+            notes.push(format!("{what}: {fallback}"));
+        }
+        for unit in &self.plan.over_budget {
+            notes.push(format!(
+                "{what}: the case {} costs {} s, over the budget of {} s",
+                unit.key,
+                seconds_json(unit.cost),
+                seconds_json(self.budget_seconds)
+            ));
+        }
+        if !self.unlisted.is_empty() {
+            notes.push(format!(
+                "{what}: {} case(s) are not in the cost table and take the median: {}",
+                self.unlisted.len(),
+                few(&self.unlisted)
+            ));
+        }
+        if !self.absent.is_empty() {
+            notes.push(format!(
+                "{what}: {} key(s) of the cost table are not cases: {}",
+                self.absent.len(),
+                few(&self.absent)
+            ));
+        }
+        notes
+    }
 }
 
 /// A number of seconds as JSON, rounded to milliseconds.

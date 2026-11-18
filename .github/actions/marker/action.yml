@@ -1,0 +1,32 @@
+name: Job marker
+description: >-
+  Uploads the artifact marker-<id>, a file that holds the job's display name.
+  The summary job of ci.yml (scripts/ci/summary) compares these markers with
+  the plan's expected list. Make it the last step of a job, so that only a
+  job that ran every step leaves one.
+inputs:
+  name:
+    description: The job's display name, exactly as scripts/ci/plan writes it.
+    required: true
+  id:
+    description: Unique in the run; ci.yml passes <job id>-<strategy.job-index>.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Write the marker
+      shell: bash
+      env:
+        NAME: ${{ inputs.name }}
+        FILE: ${{ runner.temp }}/marker/${{ inputs.id }}.txt
+      run: |
+        mkdir -p "$(dirname "$FILE")"
+        printf '%s\n' "$NAME" > "$FILE"
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: marker-${{ inputs.id }}
+        path: ${{ runner.temp }}/marker/${{ inputs.id }}.txt
+        if-no-files-found: error
+        # A re-run of a job replaces its marker instead of failing on the name.
+        overwrite: true
+        retention-days: 3

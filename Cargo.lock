@@ -783,6 +783,7 @@ name = "ilang-check"
 version = "0.1.0"
 dependencies = [
  "ilang-package",
+ "ilang-shard",
  "ilang-syntax",
  "ilang-syntax-migration",
  "num-bigint 0.5.1",

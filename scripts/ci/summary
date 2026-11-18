@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""The required check of ci.yml: every planned job ran and passed.
+
+    NEEDS='${{ toJSON(needs) }}' scripts/ci/summary --expected <file> --markers <dir>
+
+--expected is expected.json of the plan job (scripts/ci/plan): every job id
+of ci.yml but the summary, its display names, and whether it runs in this
+run. --markers is the directory of the marker artifacts: one file per job
+that ran to its end, holding its display name. NEEDS is the `needs` context
+of the summary job as JSON ({"<job id>": {"result": ...}, ...}).
+
+It fails, printing every problem, when
+  - a job of `needs` has a result other than success or skipped;
+  - a job id of `needs` is not in the expected list, or the reverse (a job
+    added to ci.yml without scripts/ci/plan knowing it, or left out of the
+    summary's `needs`);
+  - a name the plan expects to run has no marker (missing);
+  - a marker names no expected job, or one the path filters skipped (extra);
+  - a job skipped by GitHub was expected to run, or a job expected to be
+    skipped did not end as skipped.
+A skipped job counts as present only when the plan listed it as skipped.
+"""
+
+import argparse
+import json
+import os
+import sys
+from collections import Counter
+from pathlib import Path
+
+PASSING = {'success', 'skipped'}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--expected', required=True, type=Path)
+    parser.add_argument('--markers', required=True, type=Path)
+    a = parser.parse_args()
+
+    problems = []
+    try:
+        needs = json.loads(os.environ['NEEDS'])
+    except (KeyError, json.JSONDecodeError) as e:
+        sys.exit(f'summary: NEEDS is not the needs context as JSON: {e}')
+    if not a.expected.is_file():
+        print('summary: no expected list: the plan job did not finish')
+        for job, value in sorted(needs.items()):
+            print(f'  {job}: {value.get("result")}')
+        sys.exit(1)
+    expected = json.loads(a.expected.read_text())
+
+    markers = Counter()
+    if a.markers.is_dir():
+        for path in sorted(a.markers.rglob('*')):
+            if path.is_file():
+                markers[path.read_text().strip()] += 1
+
+    results = {job: value.get('result') for job, value in needs.items()}
+    for job, result in sorted(results.items()):
+        if result not in PASSING:
+            problems.append(f'job {job}: result {result}')
+
+    listed = {e['job'] for e in expected}
+    for job in sorted(set(results) - listed):
+        problems.append(f'job {job}: in needs but not in the plan (add it to JOBS in scripts/ci/plan)')
+    for job in sorted(listed - set(results)):
+        problems.append(f'job {job}: planned but not in the needs of the summary job')
+
+    to_run, to_skip = set(), set()
+    for e in expected:
+        (to_run if e['runs'] else to_skip).update(e['names'])
+        result = results.get(e['job'])
+        if result is None:
+            continue
+        if e['runs'] and result == 'skipped':
+            problems.append(f'job {e["job"]}: skipped, but the plan runs it')
+        if not e['runs'] and result != 'skipped':
+            problems.append(f'job {e["job"]}: {result}, but the path filters skip it')
+
+    for name in sorted(to_run - set(markers)):
+        problems.append(f'missing: {name}')
+    for name in sorted(set(markers) - to_run):
+        why = 'skipped by the path filters' if name in to_skip else 'not planned'
+        problems.append(f'extra: {name} ({why})')
+    for name, count in sorted(markers.items()):
+        if count > 1:
+            problems.append(f'extra: {name} has {count} markers')
+
+    print(f'summary: {len(to_run)} job(s) planned to run, {len(to_skip)} skipped by the path filters, '
+          f'{sum(markers.values())} marker(s)')
+    for name in sorted(to_skip):
+        print(f'  skipped: {name}')
+    if problems:
+        print(f'summary: {len(problems)} problem(s):')
+        for p in problems:
+            print(f'  {p}')
+        sys.exit(1)
+    print('summary: every planned job ran and passed')
+
+
+if __name__ == '__main__':
+    main()
