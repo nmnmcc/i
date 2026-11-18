@@ -4,7 +4,7 @@
 # uploaded the archive for that platform: copy the `url` and the SRI `hash`
 # from the run's summary (or its `i-bin-fragment.nix` artifact) here. Until
 # then `i-bin` is a broken package that says which line is missing, and
-# `nix/build .#i` (from source) still works.
+# `nix build .#i` (from source) still works.
 #
 # `version` must be the version in Cargo.toml; `nix flake check` runs both
 # binaries and fails if the archive is stale.

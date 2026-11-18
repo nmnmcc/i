@@ -16,13 +16,13 @@ on:
   pull_request:
     paths:
       - '.github/workflows/release.yml'
+      - 'nix/package.py'
       - 'nix/release.nix'
   workflow_dispatch:
 
-# Needed to create the release. Pull-request runs from forks get a read-only
-# token regardless, and the publish job only runs for tags.
+# Read only for the build jobs; `publish` raises it for the tag run.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -33,6 +33,9 @@ jobs:
     name: build (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
+    # macOS runners are unavailable in this repository's runner configuration;
+    # the Darwin leg stays data and runs once NIX_MACOS is true.
+    if: matrix.system == 'x86_64-linux' || vars.NIX_MACOS == 'true'
     strategy:
       fail-fast: false
       # Adding a platform is adding an entry here.
@@ -101,6 +104,7 @@ jobs:
           url="https://github.com/${{ github.repository }}/releases/download/$tag/$name"
           printf 'version=%s\nurl=%s\nhash=%s\n' "$VERSION" "$url" "$sri" > "dist/i-bin-${{ matrix.platform }}.txt"
           echo "NAME=$name" >> "$GITHUB_ENV"
+          echo "URL=$url" >> "$GITHUB_ENV"
           { echo "### ${{ matrix.platform }}"; echo '```'; cat "dist/i-bin-${{ matrix.platform }}.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Verify the archive as i-bin
         shell: bash
@@ -110,11 +114,13 @@ jobs:
           mkdir -p "$extracted"
           tar -xzf "dist/$NAME" -C "$extracted"
           test "$("$extracted/bin/i" --version)" = "i $VERSION"
-          store=$(nix store add-file "dist/$NAME")
+          # The fetchurl output path is the hash and the file name, so the
+          # add-file copy resolves the release url without a download.
+          nix store add-file "dist/$NAME" >/dev/null
           sri=$(nix hash file --type sha256 --sri "dist/$NAME")
           grep -qx "hash=$sri" "dist/i-bin-${{ matrix.platform }}.txt"
           # --impure only for builtins.getFlake on the local checkout.
-          nix build --impure -L --out-link result-i-bin --expr "let f = builtins.getFlake (toString ./.); in (f.packages.\"${{ matrix.system }}\".i-bin).override { artifact = { version = \"$VERSION\"; path = \"$store\"; hash = \"$sri\"; }; }"
+          nix build --impure -L --out-link result-i-bin --expr "let f = builtins.getFlake (toString ./.); in (f.packages.\"${{ matrix.system }}\".i-bin).override { artifact = { version = \"$VERSION\"; url = \"$URL\"; hash = \"$sri\"; }; }"
           test "$(./result-i-bin/bin/i --version)" = "i $VERSION"
           test "$(./result-i-bin/bin/i --version)" = "$(./result-i/bin/i --version)"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -131,7 +137,10 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Runs even when the optional Darwin leg was skipped.
+    if: always() && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

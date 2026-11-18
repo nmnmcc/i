@@ -43,6 +43,8 @@ let
     RANLIB_x86_64_unknown_linux_musl = "${muslCC}/bin/${muslPrefix}ranlib";
   };
 in
+assert lib.assertMsg (!stdenv.hostPlatform.isLinux || stdenv.hostPlatform.isx86_64)
+  "nix/i.nix: the nested musl runner build is wired for x86_64 Linux; add the aarch64 musl cross compiler before enabling aarch64-linux";
 rustPlatform.buildRustPackage {
   pname = "i";
   inherit version;
@@ -52,12 +54,15 @@ rustPlatform.buildRustPackage {
   cargoLock.lockFile = ../Cargo.lock;
 
   nativeBuildInputs = [ cmake ];
+  # `cmake` is for the Binaryen build script, not for `configurePhase`.
+  dontUseCmakeConfigure = true;
 
   # Binaryen is a submodule in a checkout; a flake source has only the
   # gitlink, so its pinned archive takes its place.
   postPatch = ''
     rm -rf crates/ilang-binaryen/binaryen
     cp -a ${binaryenSrc} crates/ilang-binaryen/binaryen
+    chmod -R u+w crates/ilang-binaryen/binaryen
   '';
 
   cargoBuildFlags = [ "-p" "ilang-cli" "--bin" "i" ];
@@ -66,11 +71,23 @@ rustPlatform.buildRustPackage {
   # has to produce the compiler.
   doCheck = false;
 
+  # The nixpkgs Cargo hook passes `--target`, so the binary is under the
+  # target's directory; the fallback keeps this working without it. The
+  # release profile is the one in Cargo.toml (thin LTO, one codegen unit).
   installPhase = ''
     runHook preInstall
-    install -Dm755 target/release/i "$out/bin/i"
+    binary="target/${stdenv.hostPlatform.rust.cargoShortTarget}/release/i"
+    if [ ! -e "$binary" ]; then
+      binary="target/release/i"
+    fi
+    install -Dm755 "$binary" "$out/bin/i"
     runHook postInstall
   '';
+
+  # The nested build of the musl runner inherits this. nixpkgs sets the Cargo
+  # strip setting to false for the outer build; this keeps the runner like a
+  # release `cargo build` makes it.
+  RUSTFLAGS = "-C strip=debuginfo";
 
   env = muslEnv;
 

@@ -2,9 +2,9 @@
 # `i-<version>-<system>.tar.gz` and contains `bin/i`; see `nix/package.py`.
 #
 # `artifact` is `null` until the first archive for a platform is published
-# (and recorded in `nix/release.nix`). CI passes an archive from the current
-# run through `.override { artifact = ...; }`, so this path is tested before
-# any release exists.
+# (and recorded in `nix/release.nix`). CI overrides it with the archive of the
+# current run (`...i-bin.override { artifact = ...; }`), so this path is tested
+# before any release exists.
 { pkgs, version, artifact }:
 
 let
@@ -21,35 +21,32 @@ if artifact == null then
     exit 1
   ''
 else
+  assert lib.assertMsg (artifact ? version)
+    "i-bin: the nix/release.nix entry for ${pkgs.stdenv.hostPlatform.system} has no version";
   pkgs.stdenv.mkDerivation {
     pname = "i-bin";
     inherit version;
 
-    src =
-      if artifact ? path then
-        artifact.path
-      else
-        pkgs.fetchurl {
-          inherit (artifact) url hash;
-        };
+    src = pkgs.fetchurl {
+      inherit (artifact) url hash;
+    };
 
-    # A release archive is built by Nix on the machine of the release
-    # workflow, so its ELF interpreter and RPATH name that machine's store.
-    # Rewriting them against this machine's libraries is what makes the same
-    # archive installable from any store.
+    # The archive is built by Nix on the release machine, so its ELF
+    # interpreter and RPATH (or its Mach-O install names) name that
+    # machine's store. Rewriting them against this machine's libraries is
+    # what makes the archive installable from another store.
     nativeBuildInputs =
-      lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ]
-      ++ lib.optionals pkgs.stdenv.isDarwin [ pkgs.fixDarwinDylibNames ];
+      lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.autoPatchelfHook ]
+      ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [ pkgs.fixDarwinDylibNames ];
 
     buildInputs =
-      lib.optionals pkgs.stdenv.isLinux [
+      lib.optionals pkgs.stdenv.hostPlatform.isLinux [
         pkgs.glibc
         pkgs.zlib
         pkgs.stdenv.cc.cc.lib
       ]
-      ++ lib.optionals pkgs.stdenv.isDarwin [
+      ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
         pkgs.libcxx
-        pkgs.libcxxabi
       ];
 
     unpackPhase = ''
@@ -60,14 +57,18 @@ else
 
     installPhase = ''
       runHook preInstall
-      # The archive is named after a version. A fragment copied from a
-      # different release must not install here as if it were this version.
-      test "${artifact.version or version}" = "${version}" || {
-        echo "i-bin: archive is for ${artifact.version or version}, flake is ${version}" >&2
-        exit 1
-      }
       install -Dm755 bin/i "$out/bin/i"
       runHook postInstall
+    '';
+
+    # Runs after autoPatchelf/fixDarwinDylibNames. The archive must be the
+    # version the flake says it is, and it must run on this machine; this is
+    # what a stale release entry would break.
+    postFixup = ''
+      test "$("$out/bin/i" --version)" = "i ${version}" || {
+        echo "i-bin: the archive from ${artifact.url} does not report i ${version}" >&2
+        exit 1
+      }
     '';
 
     meta = {

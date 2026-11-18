@@ -7,7 +7,6 @@ name: Nix
 
 on:
   pull_request:
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -89,25 +88,30 @@ jobs:
           archive=$(ls dist/i-*.tar.gz)
           name=$(basename "$archive")
           hash=$(nix hash file --type sha256 --sri "$archive")
-          store=$(nix store add-file "$archive")
-          echo "archive: $name ($hash)" | tee -a "$GITHUB_STEP_SUMMARY"
+          # The fetchurl output path is the hash and the file name, so adding
+          # the file to the store lets Nix resolve the url below without a
+          # download. A published release resolves it from GitHub instead.
+          nix store add-file "$archive" >/dev/null
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/v$version/$name"
+          echo "archive: $url ($hash)" | tee -a "$GITHUB_STEP_SUMMARY"
 
-          # Pin the archive exactly as a published one would be pinned, then
-          # install it. `path` names the store-copied archive; a published
-          # entry names a url and hash instead.
+          # Pin the archive exactly as a published one is pinned, then install
+          # it through the same fetchurl path a user gets.
           cat > nix/release.nix <<EOF
           {
             artifacts = {
               x86_64-linux = {
                 version = "$version";
-                path = "$store";
+                url = "$url";
                 hash = "$hash";
               };
             };
           }
           EOF
 
-          nix build .#i-bin -L
+          start=$(date +%s)
+          nix build .#i-bin -L --out-link result-i-bin
+          echo "build .#i-bin: $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
           ./result-i-bin/bin/i --version
           test "$(./result-i-bin/bin/i --version)" = "$(./result/bin/i --version)"
           echo "i and i-bin report the same version: $(./result/bin/i --version)" \
@@ -121,7 +125,12 @@ jobs:
       # With the archive pinned above, this also builds the same-version
       # check that `nix flake check` runs after a real release.
       - name: Check the flake
-        run: nix flake check -L
+        shell: bash
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          nix flake check -L
+          echo "nix flake check: $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -130,8 +139,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # A macOS runner is not available in this repository's runner
+  # configuration (`macos-14` jobs are cancelled before they start), so this
+  # job is kept for the platform but only runs when the repository variable
+  # NIX_MACOS is set to `true`. Enabling it is a setting, not a code change.
   darwin:
     name: build and verify (aarch64-darwin)
+    if: vars.NIX_MACOS == 'true'
     runs-on: macos-14
     timeout-minutes: 180
     steps:
