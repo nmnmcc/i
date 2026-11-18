@@ -1,7 +1,4 @@
 //! The syntax of i: tokens, the line rule, the parser, the AST, and a printer.
-//!
-//! The `legacy` feature adds the parser and formatter of the older syntax,
-//! which the migration tools read.
 
 pub mod ast;
 pub mod deep;

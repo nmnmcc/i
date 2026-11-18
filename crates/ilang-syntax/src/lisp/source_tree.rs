@@ -140,8 +140,8 @@ impl SourceTree {
         }))
     }
 
-    /// Visibility before the transition lowering absorbs sum members and
-    /// their exports into the sum's legacy item.
+    /// Visibility before sum members and their exports are absorbed into
+    /// the sum item.
     pub fn definition_visibility(&self, name: &str) -> Option<(bool, bool)> {
         use crate::ast::{ItemKind, TypeKind, TypeRhs};
         let module = self.module.lock().expect("the source tree is not poisoned");

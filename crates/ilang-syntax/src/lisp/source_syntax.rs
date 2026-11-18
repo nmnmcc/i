@@ -331,8 +331,8 @@ mod tests {
 
     #[test]
     fn accepted_lisp_item_uses_its_parsed_kind() {
-        // Empty data is `(,)`; the legacy item reader rejects
-        // this function head, so the accepted item must not be reparsed there.
+        // Empty data is `(,)`; the migration item reader rejects this
+        // function head, so the accepted item must not be reparsed there.
         let source = "(test \"quote\" (-> (,) _ { Nil }))";
         let (module, errors) = migration_syntax::lisp::parse_source(source);
         assert!(errors.is_empty(), "{errors:?}");

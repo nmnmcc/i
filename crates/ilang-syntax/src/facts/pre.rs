@@ -186,9 +186,8 @@ pub fn attribute_call(a: &n::Attribute) -> bool {
     a.args.is_some() && attribute_strings(a).is_none()
 }
 
-/// The parts of `p1 = p2 = …` as the legacy chain of names around one
-/// pattern. With a label, the chain ends in the label of a constructor
-/// field.
+/// The parts of `p1 = p2 = …` as the chain of names around one pattern.
+/// With a label, the chain ends in the label of a constructor field.
 pub struct AndPlan<'t> {
     /// The names around the inner pattern, the outermost first.
     pub names: Vec<(String, Span)>,

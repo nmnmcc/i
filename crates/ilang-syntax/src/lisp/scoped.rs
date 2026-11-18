@@ -96,8 +96,8 @@ impl ScopedSource {
     }
 
     /// The complete generated definition that owns a constructor name.
-    /// The legacy representation can absorb this item into a sum, but every
-    /// virtual occurrence still has its original scoped datum.
+    /// Sum members are absorbed into the sum item, but every virtual
+    /// occurrence still has its original scoped datum.
     pub fn definition_origin(&self, at: Span, name: &str) -> Option<(Syntax, Span)> {
         fn head_name(syntax: &Syntax) -> Option<&str> {
             let mut syntax = syntax;
