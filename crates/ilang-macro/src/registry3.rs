@@ -1,6 +1,6 @@
 //! The part of `registry` that reads the tree, on the tree of syntax
 //! three: the value names that a module defines. The macro definitions are
-//! `ilang_syntax::lisp::expansion3::definitions`; imports and exports have
+//! `ilang_syntax::lisp::expansion::definitions`; imports and exports have
 //! the same fields in both trees.
 use ilang_syntax::ast::{ItemKind, Module};
 use ilang_syntax::span::Span;

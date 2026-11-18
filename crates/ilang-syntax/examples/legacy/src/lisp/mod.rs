@@ -1,6 +1,14 @@
 use crate::token::{Token, TokenKind as T};
 use crate::{Code, Diagnostic};
 pub use syntax3::lisp::*;
+// The native modules under the names this crate's callers use.
+pub use syntax3::lisp::{expansion as expansion3, quote_lower as quote_lower3};
+/// The native syntax module with this crate's row-mode switch, which the
+/// native crate no longer has: the source rows are always selected.
+pub mod syntax {
+    pub use syntax3::lisp::syntax::*;
+    pub const ROWS3: bool = true;
+}
 pub mod comments;
 pub mod encode;
 pub mod encode_charge;

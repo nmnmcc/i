@@ -3,7 +3,7 @@
 use ilang_syntax::ast::{
     Attribute, Binding, Expr, ExprKind, Item, ItemKind, Module, Pattern, PatternKind,
 };
-use ilang_syntax::lisp::{expansion::MacroDefinition, quote_lower3, syntax::Syntax};
+use ilang_syntax::lisp::{expansion::MacroDefinition, quote_lower, syntax::Syntax};
 
 fn is_macro(attribute: &Attribute) -> bool {
     attribute.module.is_none() && attribute.name.name == "macro"
@@ -62,7 +62,7 @@ pub fn compiler_module(
             for variant in &definition.variants {
                 let mut fs: Vec<_> = functions
                     .iter()
-                    .filter(|f| ilang_syntax::lisp::expansion3::function_shape(f) == variant.labels)
+                    .filter(|f| ilang_syntax::lisp::expansion::function_shape(f) == variant.labels)
                     .cloned()
                     .collect();
                 for f in &mut fs {
@@ -115,7 +115,7 @@ pub fn compiler_module(
         }
     }
     module.items.extend(groups);
-    quote_lower3::lower_expression_quotes(module, module_id, templates)
+    quote_lower::lower_expression_quotes(module, module_id, templates)
 }
 
 fn canonical(function: &mut ilang_syntax::ast::Function) {
@@ -140,7 +140,7 @@ mod tests {
         let (mut module, errors) = ilang_syntax::rows::from_lisp(source);
         assert!(errors.is_empty(), "{errors:?}");
         assert!(defines_macro(&module));
-        let definitions = ilang_syntax::lisp::expansion3::definitions(&module, true).unwrap();
+        let definitions = ilang_syntax::lisp::expansion::definitions(&module, true).unwrap();
         let mut templates = Vec::new();
         let errors = compiler_module(&mut module, 0, &definitions, &mut templates);
         assert!(errors.is_empty(), "{errors:?}");

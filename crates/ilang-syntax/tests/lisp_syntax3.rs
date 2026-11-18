@@ -23,13 +23,13 @@ fn root(source: &str) -> Syntax {
 
 fn shown(source: &str, position: Position) -> String {
     root(source)
-        .show_as_rows3(position)
+        .show_as(position)
         .unwrap_or_else(|e| panic!("{source} as {position:?}: {e:?}"))
 }
 
 fn refused(source: &str, position: Position) {
     assert!(
-        root(source).show_as_rows3(position).is_err(),
+        root(source).show_as(position).is_err(),
         "{source} as {position:?} must not be written"
     );
 }
@@ -85,10 +85,10 @@ fn show_as_checks_the_requested_syntactic_position() {
 #[test]
 fn show_as_reports_the_offending_part() {
     let syntax = root("(f (g ()))");
-    let error = syntax.show_as_rows3(Position::Expression).unwrap_err();
+    let error = syntax.show_as(Position::Expression).unwrap_err();
     assert_eq!(syntax.at_span(error.span).unwrap().show(), "()");
     let syntax = root("(, a `b)");
-    let error = syntax.show_as_rows3(Position::Expression).unwrap_err();
+    let error = syntax.show_as(Position::Expression).unwrap_err();
     assert_eq!(syntax.at_span(error.span).unwrap().show(), "`b");
 }
 
@@ -139,8 +139,8 @@ fn show_as_deep_trees_use_bounded_host_stack() {
             };
             let tree = nest(Syntax::make(Node::Up("T".into()), &like).unwrap());
             let expected = format!("{}x{}", "T(".repeat(10000), ")".repeat(10000));
-            assert_eq!(tree.show_as_rows3(Position::Type).unwrap(), expected);
-            assert_eq!(tree.show_as_rows3(Position::Pattern).unwrap(), expected);
+            assert_eq!(tree.show_as(Position::Type).unwrap(), expected);
+            assert_eq!(tree.show_as(Position::Pattern).unwrap(), expected);
             // Lists, as an expression, an item of data, a statement and the
             // value of an item. (A nested call costs the printer the square
             // of its depth, `call_depth` at every level, so calls are not
@@ -150,24 +150,24 @@ fn show_as_deep_trees_use_bounded_host_stack() {
                 list = Syntax::make(Node::Square(vec![list]), &like).unwrap();
             }
             let expected = format!("{}x{}", "[".repeat(10000), "]".repeat(10000));
-            assert_eq!(list.show_as_rows3(Position::Expression).unwrap(), expected);
-            assert_eq!(list.show_as_rows3(Position::ValueItem).unwrap(), expected);
-            assert_eq!(list.show_as_rows3(Position::Statement).unwrap(), expected);
-            assert_eq!(list.show_as_rows3(Position::Pattern).unwrap(), expected);
+            assert_eq!(list.show_as(Position::Expression).unwrap(), expected);
+            assert_eq!(list.show_as(Position::ValueItem).unwrap(), expected);
+            assert_eq!(list.show_as(Position::Statement).unwrap(), expected);
+            assert_eq!(list.show_as(Position::Pattern).unwrap(), expected);
             let value = Syntax::make(Node::Name("value".into()), &like).unwrap();
             let eq = Syntax::make(Node::Symbol("=".into()), &like).unwrap();
             let item = Syntax::make(Node::Round(vec![eq, value, list]), &like).unwrap();
             assert_eq!(
-                item.show_as_rows3(Position::Item).unwrap(),
+                item.show_as(Position::Item).unwrap(),
                 format!("value = {expected}")
             );
             // An error deep in the tree comes back to the caller.
             let bad = nest(Syntax::make(Node::Symbol("?".into()), &like).unwrap());
-            assert!(bad.show_as_rows3(Position::Expression).is_err());
+            assert!(bad.show_as(Position::Expression).is_err());
             // Negations: every level is a group.
             let negated = nest(Syntax::make(Node::Symbol("-".into()), &like).unwrap());
             assert_eq!(
-                negated.show_as_rows3(Position::Expression).unwrap(),
+                negated.show_as(Position::Expression).unwrap(),
                 format!("{}-x{}", "-{ ".repeat(9999), " }".repeat(9999))
             );
         })
@@ -196,7 +196,7 @@ fn show_as_only_breaks_lines_where_the_layout_always_does() {
 #[test]
 fn show_as_attribute_item_uses_only_required_line_breaks() {
     let item = root("(@ custom (= f (-> (,) _ Nil)))");
-    let text = item.show_as_rows3(Position::Item).unwrap();
+    let text = item.show_as(Position::Item).unwrap();
     assert_eq!(text, "@custom\nf = () { Nil }");
     let (module, errors) = ilang_syntax::syn3::parse_module(&format!("{text}\n"));
     assert!(errors.is_empty(), "{errors:?}");
@@ -204,7 +204,7 @@ fn show_as_attribute_item_uses_only_required_line_breaks() {
     assert_eq!(module.items[0].attributes.len(), 1);
 
     let data = root("(@ (custom \"a\" (= k 1)) (= (, x y) (, 1 2)))");
-    let text = data.show_as_rows3(Position::Item).unwrap();
+    let text = data.show_as(Position::Item).unwrap();
     assert_eq!(text, "@custom(\"a\", k = 1)\n(x, y) = (1, 2)");
     let (module, errors) = ilang_syntax::syn3::parse_module(&format!("{text}\n"));
     assert!(errors.is_empty(), "{errors:?}");
@@ -261,13 +261,13 @@ fn show_as_accepts_expressions_already_written_in_normal_surface() {
             let datum = ilang_syntax::syn3::lisp::expr_datum(&expr);
             let syntax = Syntax::from_datum(&datum, &scope());
             let text = syntax
-                .show_as_rows3(Position::Expression)
+                .show_as(Position::Expression)
                 .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
             // The text is read as the same datum.
             let back = ilang_syntax::syn3::parse_expr(&text)
                 .unwrap_or_else(|error| panic!("{source:?} -> {text:?}: {error:?}"));
             let again = Syntax::from_datum(&ilang_syntax::syn3::lisp::expr_datum(&back), &scope())
-                .show_as_rows3(Position::Expression)
+                .show_as(Position::Expression)
                 .unwrap();
             assert_eq!(text, again, "{source:?}");
             checked += 1;
@@ -286,11 +286,11 @@ fn typed_macro_type_view_has_no_text() {
         },
         &like,
     );
-    assert!(view.show_as_rows3(Position::Type).is_err());
+    assert!(view.show_as(Position::Type).is_err());
     let nested = Syntax::make(Node::Round(vec![root("List"), view.clone()]), &like).unwrap();
-    let error = nested.show_as_rows3(Position::Type).unwrap_err();
+    let error = nested.show_as(Position::Type).unwrap_err();
     assert!(error.message.contains("TypeView"), "{error:?}");
-    assert!(nested.show_as_rows3(Position::Expression).is_err());
+    assert!(nested.show_as(Position::Expression).is_err());
 }
 
 /// Every datum form must round-trip in each supported grammar position.
@@ -587,15 +587,12 @@ fn quotes_and_expansion_checks_work_on_the_rows_of_syntax_three() {
     let Substitution::Many(items) = &captures[0].value else {
         panic!()
     };
-    assert_eq!(
-        items[1].show_as_rows3(Position::PatternItem).unwrap(),
-        "k = y"
-    );
+    assert_eq!(items[1].show_as(Position::PatternItem).unwrap(), "k = y");
     let Substitution::One(result) = &captures[1].value else {
         panic!()
     };
     assert_eq!(
-        result.show_as_rows3(Position::FunctionResult).unwrap(),
+        result.show_as(Position::FunctionResult).unwrap(),
         "<- (log : Log)"
     );
     // A pattern of the legacy rows takes the `,` as a parameter.

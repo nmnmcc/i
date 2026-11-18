@@ -50,16 +50,6 @@ pub fn lex_lisp(source: &str) -> Lexed {
     lex_surface(source, true)
 }
 
-/// The compatibility entry uses the normal lexer so tokenization stays identical.
-pub fn lex3(source: &str) -> Lexed {
-    lex(source)
-}
-
-/// Compatibility name for the Lisp-surface lexer.
-pub fn lex3_lisp(source: &str) -> Lexed {
-    lex_lisp(source)
-}
-
 fn lex_surface(source: &str, lisp: bool) -> Lexed {
     let mut lexer = Lexer {
         src: source.as_bytes(),

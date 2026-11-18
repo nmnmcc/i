@@ -2867,7 +2867,7 @@
       "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
     ]
   },
-  "crates/ilang-syntax/src/lisp/expansion3.rs:5400e87bb5b8b130": {
+  "crates/ilang-syntax/src/lisp/expansion.rs:5400e87bb5b8b130": {
     "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
     "diagnostics": [
       "E0101: a data type with labels has only labelled items; mixed positional and labelled items are not supported here"

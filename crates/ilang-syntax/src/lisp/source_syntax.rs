@@ -40,8 +40,7 @@ fn lisp_source(span: Span, scope: &Scope, source: &str) -> Syntax {
         }
     }
     let datum = datum.expect("AST node belongs to a Lisp datum");
-    // Keep the written rows and occurrence spans when macro syntax uses
-    // the source encoding. The legacy path needs its row adapter.
+    // Keep the written rows and occurrence spans.
     Syntax::from_datum(datum, scope)
 }
 fn symbol(s: &Syntax, expected: &str) -> bool {
@@ -57,7 +56,7 @@ fn symbol(s: &Syntax, expected: &str) -> bool {
 /// whose right side is a data type, which is part of the item form.
 #[derive(Clone, Copy)]
 #[doc(hidden)]
-pub enum Mode3 {
+pub enum Mode {
     /// An expression; a function body and a branch of a chain are ones.
     Expr,
     /// An item of data or of a call: `e`, `(= label e)`.
@@ -120,29 +119,29 @@ fn rhs_keeps_curly(mut inner: &Syntax) -> bool {
 /// A written expression of the source rows as a macro sees it:
 /// without its groups.
 pub fn normalize_expression(s: &Syntax) -> Syntax {
-    normalize3(s, Mode3::Expr)
+    normalize(s, Mode::Expr)
 }
 /// A written type of the source rows without its groups.
 pub fn normalize_type(s: &Syntax) -> Syntax {
-    normalize3(s, Mode3::Type)
+    normalize(s, Mode::Type)
 }
 /// A written pattern of the source rows without the groups of the
 /// types and expressions in it.
 pub fn normalize_pattern(s: &Syntax) -> Syntax {
-    normalize3(s, Mode3::Pattern)
+    normalize(s, Mode::Pattern)
 }
 /// A written item of the source rows without its groups. The kind
 /// of the item is read from its form, as the reader of the source syntax does.
 pub fn normalize_item(s: &Syntax) -> Syntax {
-    normalize3(s, Mode3::Item)
+    normalize(s, Mode::Item)
 }
 
 // Normalize source datums of the source rows without consuming the
 // host stack on nested input.
 #[doc(hidden)]
-pub fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
+pub fn normalize(root: &Syntax, mode: Mode) -> Syntax {
     enum Task {
-        Enter(Syntax, Mode3),
+        Enter(Syntax, Mode),
         Finish(Syntax, usize, bool),
     }
     let mut work = vec![Task::Enter(root.clone(), mode)];
@@ -171,137 +170,137 @@ pub fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
                 continue;
             }
         };
-        let mut modes = vec![Mode3::Keep; xs.len()];
+        let mut modes = vec![Mode::Keep; xs.len()];
         let mut unwrap = false;
         // Another reading of the same datum.
         let mut again = None;
         match mode {
-            Mode3::Keep => {
+            Mode::Keep => {
                 built.push(node);
                 continue;
             }
-            Mode3::Type => {
+            Mode::Type => {
                 unwrap = curly && xs.len() == 1;
                 if round && head_is(xs, "->") {
                     // `(-> [A] P R)`: the parameter part and the result.
-                    modes.fill(Mode3::Type);
+                    modes.fill(Mode::Type);
                     if let Some(last) = modes.last_mut() {
-                        *last = Mode3::Result;
+                        *last = Mode::Result;
                     }
                 } else {
-                    modes.fill(Mode3::Type);
+                    modes.fill(Mode::Type);
                 }
             }
-            Mode3::Result => {
+            Mode::Result => {
                 // `(<- R needs)` holds types only, as every other result.
-                again = Some(Mode3::Type);
+                again = Some(Mode::Type);
             }
-            Mode3::TypeRhs => {
+            Mode::TypeRhs => {
                 if curly && xs.len() == 1 && rhs_keeps_curly(&xs[0]) {
-                    modes[0] = Mode3::Type;
+                    modes[0] = Mode::Type;
                 } else {
-                    again = Some(Mode3::Type);
+                    again = Some(Mode::Type);
                 }
             }
-            Mode3::Pattern => {
+            Mode::Pattern => {
                 if round && xs.len() == 3 && head_is(xs, ":") {
-                    modes[2] = Mode3::Type;
+                    modes[2] = Mode::Type;
                 } else if bits {
-                    modes.fill(Mode3::SegmentPattern);
+                    modes.fill(Mode::SegmentPattern);
                 } else {
-                    modes.fill(Mode3::Pattern);
+                    modes.fill(Mode::Pattern);
                 }
             }
-            Mode3::Params => {
+            Mode::Params => {
                 if round && xs.len() == 3 && head_is(xs, "?") {
-                    modes[1] = Mode3::Pattern;
-                    modes[2] = Mode3::Expr;
+                    modes[1] = Mode::Pattern;
+                    modes[2] = Mode::Expr;
                 } else {
                     // The items, their keys and their alternatives hold
                     // patterns only.
-                    again = Some(Mode3::Pattern);
+                    again = Some(Mode::Pattern);
                 }
             }
-            Mode3::SegmentExpr | Mode3::SegmentPattern => {
-                let value = if matches!(mode, Mode3::SegmentExpr) {
-                    Mode3::Expr
+            Mode::SegmentExpr | Mode::SegmentPattern => {
+                let value = if matches!(mode, Mode::SegmentExpr) {
+                    Mode::Expr
                 } else {
-                    Mode3::Pattern
+                    Mode::Pattern
                 };
                 if round && xs.len() == 3 && head_is(xs, ":") {
                     modes[1] = value;
                     // `f` or `(f e)`.
-                    modes[2] = Mode3::Expr;
+                    modes[2] = Mode::Expr;
                 } else {
                     again = Some(value);
                 }
             }
-            Mode3::ValueItem => {
+            Mode::ValueItem => {
                 if round && xs.len() == 3 && head_is(xs, "=") {
-                    modes[2] = Mode3::Expr;
+                    modes[2] = Mode::Expr;
                 } else {
-                    again = Some(Mode3::Expr);
+                    again = Some(Mode::Expr);
                 }
             }
-            Mode3::Statement => {
+            Mode::Statement => {
                 if round && xs.len() == 3 && head_is(xs, "=") {
-                    modes[1] = Mode3::Pattern;
-                    modes[2] = Mode3::Expr;
+                    modes[1] = Mode::Pattern;
+                    modes[2] = Mode::Expr;
                 } else {
-                    again = Some(Mode3::Expr);
+                    again = Some(Mode::Expr);
                 }
             }
-            Mode3::Item => {
+            Mode::Item => {
                 if round && xs.len() == 3 && head_is(xs, "@") {
                     // `name`, `(. m name)` or `(name items…)`: a call.
-                    modes[1] = Mode3::Expr;
-                    modes[2] = Mode3::Item;
+                    modes[1] = Mode::Expr;
+                    modes[2] = Mode::Item;
                 } else if round && xs.len() == 3 && head_is(xs, "=") {
                     if is_type_head(&xs[1]) {
-                        modes[1] = Mode3::Type;
-                        modes[2] = Mode3::TypeRhs;
+                        modes[1] = Mode::Type;
+                        modes[2] = Mode::TypeRhs;
                     } else {
-                        modes[1] = Mode3::Pattern;
-                        modes[2] = Mode3::Expr;
+                        modes[1] = Mode::Pattern;
+                        modes[2] = Mode::Expr;
                     }
                 } else if round && xs.len() == 3 && head_is(xs, ":") {
-                    modes[2] = Mode3::Type;
+                    modes[2] = Mode::Type;
                 } else {
                     // A macro call.
-                    again = Some(Mode3::Expr);
+                    again = Some(Mode::Expr);
                 }
             }
-            Mode3::Expr => {
+            Mode::Expr => {
                 if curly {
                     if is_group(xs) {
                         unwrap = true;
-                        modes[0] = Mode3::Expr;
+                        modes[0] = Mode::Expr;
                     } else {
-                        modes.fill(Mode3::Statement);
+                        modes.fill(Mode::Statement);
                     }
                 } else if bits {
-                    modes.fill(Mode3::SegmentExpr);
+                    modes.fill(Mode::SegmentExpr);
                 } else if !round {
                     // A list.
-                    modes.fill(Mode3::Expr);
+                    modes.fill(Mode::Expr);
                 } else if head_is(xs, ",") {
-                    modes.fill(Mode3::ValueItem);
+                    modes.fill(Mode::ValueItem);
                 } else if head_is(xs, "->") {
                     // `(-> [A] params R body)`; the Square holds names.
                     let n = xs.len();
                     if n >= 4 {
-                        modes[n - 3] = Mode3::Params;
-                        modes[n - 2] = Mode3::Result;
-                        modes[n - 1] = Mode3::Expr;
+                        modes[n - 3] = Mode::Params;
+                        modes[n - 2] = Mode::Result;
+                        modes[n - 1] = Mode::Expr;
                     }
                 } else if matches!(xs.first().map(Syntax::node), Some(Node::Symbol(_))) {
                     // A chain, a pipe, a provide, a member, an operator.
-                    modes.fill(Mode3::Expr);
+                    modes.fill(Mode::Expr);
                 } else {
                     // A call: the callee and the items of its data.
-                    modes.fill(Mode3::ValueItem);
+                    modes.fill(Mode::ValueItem);
                     if let Some(first) = modes.first_mut() {
-                        *first = Mode3::Expr;
+                        *first = Mode::Expr;
                     }
                 }
             }
@@ -321,11 +320,11 @@ pub fn normalize3(root: &Syntax, mode: Mode3) -> Syntax {
 #[cfg(test)]
 mod tests {
     use migration_syntax::lisp::source_syntax::source_item_syntax;
-    use migration_syntax::lisp::source_syntax::*;
+    // The migration crate keeps the native normalizer under its old names.
+    use migration_syntax::lisp::source_syntax::{Mode3 as Mode, normalize3 as normalize};
     use migration_syntax::lisp::source_syntax::{
         normalize_expression as expr, normalize_type as ty,
     };
-    use migration_syntax::lisp::syntax::ROWS3;
     use migration_syntax::lisp::syntax::{Node, Scope, Syntax};
     use migration_syntax::span::Span;
     use std::collections::BTreeSet;
@@ -342,14 +341,7 @@ mod tests {
             marks: BTreeSet::new(),
         };
         let syntax = source_item_syntax(&module.items[0], &scope, source, true);
-        assert_eq!(
-            syntax.show(),
-            if ROWS3 {
-                "(test \"quote\" (-> (,) _ Nil))"
-            } else {
-                "(test \"quote\" (-> () _ {Nil}))"
-            }
-        );
+        assert_eq!(syntax.show(), "(test \"quote\" (-> (,) _ Nil))");
     }
 
     #[test]
@@ -397,139 +389,139 @@ mod tests {
         }
     }
 
-    fn normal3(source: &str, mode: Mode3) -> String {
+    fn normal(source: &str, mode: Mode) -> String {
         let datum = migration_syntax::lisp::parse(source).unwrap();
         assert_eq!(datum.len(), 1, "{source}");
-        normalize3(&Syntax::from_datum(&datum[0], &scope()), mode).show()
+        normalize(&Syntax::from_datum(&datum[0], &scope()), mode).show()
     }
 
     #[test]
     fn groups_of_syntax_three_are_removed_by_position() {
-        let cases: &[(Mode3, &str, &str)] = &[
+        let cases: &[(Mode, &str, &str)] = &[
             // Expressions: a Curly with one expression is a group.
-            (Mode3::Expr, "{ x }", "x"),
-            (Mode3::Expr, "{ { x } }", "x"),
-            (Mode3::Expr, "(f { x } (= l { y }))", "(f x (= l y))"),
-            (Mode3::Expr, "({ f } x)", "(f x)"),
+            (Mode::Expr, "{ x }", "x"),
+            (Mode::Expr, "{ { x } }", "x"),
+            (Mode::Expr, "(f { x } (= l { y }))", "(f x (= l y))"),
+            (Mode::Expr, "({ f } x)", "(f x)"),
             (
-                Mode3::Expr,
+                Mode::Expr,
                 "(, { x } .. { y } (= l { z }))",
                 "(, x .. y (= l z))",
             ),
-            (Mode3::Expr, "[{ x } .. { y }]", "[x .. y]"),
-            (Mode3::Expr, "(+ { a } (* { b } c))", "(+ a (* b c))"),
-            (Mode3::Expr, "(|> { e } { f })", "(|> e f)"),
+            (Mode::Expr, "[{ x } .. { y }]", "[x .. y]"),
+            (Mode::Expr, "(+ { a } (* { b } c))", "(+ a (* b c))"),
+            (Mode::Expr, "(|> { e } { f })", "(|> e f)"),
             (
-                Mode3::Expr,
+                Mode::Expr,
                 "(<- { e } (, { s } .. { env }))",
                 "(<- e (, s .. env))",
             ),
-            (Mode3::Expr, "(. { a } b)", "(. a b)"),
+            (Mode::Expr, "(. { a } b)", "(. a b)"),
             // A block stays; its statements are read.
-            (Mode3::Expr, "{ (= x { 1 }) { x } }", "{(= x 1) x}"),
-            (Mode3::Expr, "{ { a b } }", "{a b}"),
-            (Mode3::Expr, "{ (f) { g } }", "{(f) g}"),
+            (Mode::Expr, "{ (= x { 1 }) { x } }", "{(= x 1) x}"),
+            (Mode::Expr, "{ { a b } }", "{a b}"),
+            (Mode::Expr, "{ (f) { g } }", "{(f) g}"),
             // A function: the body is one expression, a block or not.
-            (Mode3::Expr, "(-> (, x) _ { x })", "(-> (, x) _ x)"),
+            (Mode::Expr, "(-> (, x) _ { x })", "(-> (, x) _ x)"),
             (
-                Mode3::Expr,
+                Mode::Expr,
                 "(-> (, x) _ { (= y x) y })",
                 "(-> (, x) _ {(= y x) y})",
             ),
-            (Mode3::Expr, "(-> (, x) _ (f { x }))", "(-> (, x) _ (f x))"),
+            (Mode::Expr, "(-> (, x) _ (f { x }))", "(-> (, x) _ (f x))"),
             (
-                Mode3::Expr,
+                Mode::Expr,
                 "(-> (, (: x { Int }) (= k (: y { T }))) { R } e)",
                 "(-> (, (: x Int) (= k (: y T))) R e)",
             ),
             (
-                Mode3::Expr,
+                Mode::Expr,
                 "(-> [A N] (, (: x { A })) (<- { A } (, (: db { Db }) .. (: env { N }))) { x })",
                 "(-> [A N] (, (: x A)) (<- A (, (: db Db) .. (: env N))) x)",
             ),
             (
-                Mode3::Expr,
+                Mode::Expr,
                 "(-> (? (, p (| 0 1)) { (> p 0) }) _ { p })",
                 "(-> (? (, p (| 0 1)) (> p 0)) _ p)",
             ),
             (
-                Mode3::Expr,
+                Mode::Expr,
                 "(|> e (& (-> (, (Some v)) _ { v }) (-> (, None) _ { 0 })))",
                 "(|> e (& (-> (, (Some v)) _ v) (-> (, None) _ 0)))",
             ),
             (
-                Mode3::Expr,
+                Mode::Expr,
                 "<<(: { x } (size { 8 })) { y }>>",
                 "<< (: x (size 8)) y >>",
             ),
             // A quote is given as it is written.
-            (Mode3::Expr, "(f `(g { x }))", "(f `(g {x}))"),
+            (Mode::Expr, "(f `(g { x }))", "(f `(g {x}))"),
             // Types: a Curly with one type is a group.
-            (Mode3::Type, "{ Int }", "Int"),
-            (Mode3::Type, "(List { Int })", "(List Int)"),
-            (Mode3::Type, "(, { A } (= x { B }))", "(, A (= x B))"),
+            (Mode::Type, "{ Int }", "Int"),
+            (Mode::Type, "(List { Int })", "(List Int)"),
+            (Mode::Type, "(, { A } (= x { B }))", "(, A (= x B))"),
             (
-                Mode3::Type,
+                Mode::Type,
                 "(| { A } { (-> (, { B }) { C }) })",
                 "(| A (-> (, B) C))",
             ),
             (
-                Mode3::Type,
+                Mode::Type,
                 "(-> [A] (| (, { A }) (, A A)) (<- { R } (, { Db } .. { N })))",
                 "(-> [A] (| (, A) (, A A)) (<- R (, Db .. N)))",
             ),
             // Patterns have no groups; the types in them do.
             (
-                Mode3::Pattern,
+                Mode::Pattern,
                 "(, (: x { Int }) (= k p (C (: y { T }))) ..)",
                 "(, (: x Int) (= k p (C (: y T))) ..)",
             ),
             (
-                Mode3::Pattern,
+                Mode::Pattern,
                 "<<(: x (size { n }))>>",
                 "<< (: x (size n)) >>",
             ),
             // Items.
-            (Mode3::Item, "(= x { 1 })", "(= x 1)"),
+            (Mode::Item, "(= x { 1 })", "(= x 1)"),
             (
-                Mode3::Item,
+                Mode::Item,
                 "(= (, a (: b { Int })) { e })",
                 "(= (, a (: b Int)) e)",
             ),
             (
-                Mode3::Item,
+                Mode::Item,
                 "(: f { (-> (, { Int }) Int) })",
                 "(: f (-> (, Int) Int))",
             ),
             (
-                Mode3::Item,
+                Mode::Item,
                 "(= U (, { T1 } (= x { T2 })))",
                 "(= U (, T1 (= x T2)))",
             ),
             (
-                Mode3::Item,
+                Mode::Item,
                 "(= (U A) { (List { A }) })",
                 "(= (U A) (List A))",
             ),
-            (Mode3::Item, "(= U Opaque)", "(= U Opaque)"),
+            (Mode::Item, "(= U Opaque)", "(= U Opaque)"),
             // The Curly of a name whose right side is a data type stays.
-            (Mode3::Item, "(= U { (, { T1 } T2) })", "(= U {(, T1 T2)})"),
-            (Mode3::Item, "(= U { Opaque })", "(= U {Opaque})"),
-            (Mode3::Item, "(= U { { (, T) } })", "(= U {(, T)})"),
-            (Mode3::Item, "(= U { (| A B) })", "(= U (| A B))"),
+            (Mode::Item, "(= U { (, { T1 } T2) })", "(= U {(, T1 T2)})"),
+            (Mode::Item, "(= U { Opaque })", "(= U {Opaque})"),
+            (Mode::Item, "(= U { { (, T) } })", "(= U {(, T)})"),
+            (Mode::Item, "(= U { (| A B) })", "(= U (| A B))"),
             (
-                Mode3::Item,
+                Mode::Item,
                 "(@ (custom { 1 } (= k { 2 })) (@ macro (= m (-> (, x) _ { x }))))",
                 "(@ (custom 1 (= k 2)) (@ macro (= m (-> (, x) _ x))))",
             ),
             (
-                Mode3::Item,
+                Mode::Item,
                 "(test \"name\" { (-> (,) _ { Nil }) })",
                 "(test \"name\" (-> (,) _ Nil))",
             ),
         ];
         for (mode, source, expected) in cases {
-            assert_eq!(&normal3(source, *mode), expected, "{source}");
+            assert_eq!(&normal(source, *mode), expected, "{source}");
         }
     }
 
@@ -537,7 +529,7 @@ mod tests {
     fn written_atoms_keep_their_spans_and_removed_groups_their_content() {
         let source = "(-> (, x) _ { (+ { x } 1) })";
         let datum = migration_syntax::lisp::parse(source).unwrap();
-        let syntax = normalize3(&Syntax::from_datum(&datum[0], &scope()), Mode3::Expr);
+        let syntax = normalize(&Syntax::from_datum(&datum[0], &scope()), Mode::Expr);
         let Node::Round(parts) = syntax.node() else {
             panic!()
         };
@@ -594,7 +586,7 @@ mod tests {
                 let expected = migration_syntax::lisp::show(&lisp::item_datum(&module.items[0]));
                 let syntax = Syntax::from_datum(datum, &scope());
                 assert_eq!(
-                    normalize3(&syntax, Mode3::Item).show(),
+                    normalize(&syntax, Mode::Item).show(),
                     expected,
                     "{}",
                     path.display()
@@ -615,8 +607,8 @@ mod tests {
                 for _ in 0..20_000 {
                     value = Syntax::make(Node::Curly(vec![value.clone()]), &value).unwrap();
                 }
-                for mode in [Mode3::Expr, Mode3::Type, Mode3::Statement, Mode3::ValueItem] {
-                    assert_eq!(normalize3(&value, mode).show(), "x");
+                for mode in [Mode::Expr, Mode::Type, Mode::Statement, Mode::ValueItem] {
+                    assert_eq!(normalize(&value, mode).show(), "x");
                 }
                 let f =
                     Syntax::from_datum(&migration_syntax::lisp::parse("f").unwrap()[0], &scope());
@@ -624,7 +616,7 @@ mod tests {
                 for _ in 0..20_000 {
                     call = Syntax::make(Node::Round(vec![f.clone(), call]), &f).unwrap();
                 }
-                let shown = normalize3(&call, Mode3::Expr).show();
+                let shown = normalize(&call, Mode::Expr).show();
                 assert_eq!(
                     shown,
                     format!("{}x{}", "(f ".repeat(20_000), ")".repeat(20_000))

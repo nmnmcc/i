@@ -229,13 +229,10 @@ impl DefinitionWorld {
                             .exports
                             .iter()
                             .any(|e| e.name.name == binder.name && e.constructors);
-                    let (exported, constructors_visible) = if ilang_syntax::lisp::syntax::ROWS3 {
-                        self.source_tree(p)
-                            .definition_visibility(&binder.name)
-                            .unwrap_or((exported, constructors_visible))
-                    } else {
-                        (exported, constructors_visible)
-                    };
+                    let (exported, constructors_visible) = self
+                        .source_tree(p)
+                        .definition_visibility(&binder.name)
+                        .unwrap_or((exported, constructors_visible));
                     let override_syntax = if current {
                         snapshot.item_overrides.get(&item.span.0)
                     } else {
@@ -281,14 +278,9 @@ impl DefinitionWorld {
                 let Some(target) = self.target(p, import) else {
                     continue;
                 };
-                let Some(target_parsed) = self.source_module(target) else {
+                if self.source_module(target).is_none() {
                     continue;
-                };
-                let target_ast = if target == snapshot.source {
-                    &snapshot.module
-                } else {
-                    &target_parsed.ast
-                };
+                }
                 let alias = import
                     .alias
                     .as_ref()
@@ -297,14 +289,10 @@ impl DefinitionWorld {
                     .names
                     .iter()
                     .filter_map(|name| {
-                        let exported = if ilang_syntax::lisp::syntax::ROWS3 {
-                            index.modules[&target]
-                                .own
-                                .get(&name.name)
-                                .is_some_and(|id| index.entries[*id].exported)
-                        } else {
-                            target_ast.exports.iter().any(|e| e.name.name == name.name)
-                        };
+                        let exported = index.modules[&target]
+                            .own
+                            .get(&name.name)
+                            .is_some_and(|id| index.entries[*id].exported);
                         exported
                             .then(|| index.modules[&target].own.get(&name.name).copied())
                             .flatten()
@@ -333,10 +321,7 @@ fn text(s: &Syntax) -> &str {
 }
 fn builtin(name: &str) -> bool {
     BuiltinType::ALL.into_iter().any(|b| b.name() == name)
-        || ilang_syntax::lisp::definitions::builtin_definition_names(
-            ilang_syntax::lisp::definitions::NEW_ROWS,
-        )
-        .contains(&name)
+        || ilang_syntax::lisp::definitions::builtin_definition_names().contains(&name)
 }
 fn error_id(query: &Syntax, kind: &str) -> DefinitionIdentity {
     DefinitionIdentity {

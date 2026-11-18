@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use ilang_check::{Parsed, hygiene};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, SourceId};
 use ilang_syntax::lisp::{
+    expansion,
     expansion::MacroDefinition,
-    expansion3 as expansion,
     syntax::{Node, Syntax},
 };
 

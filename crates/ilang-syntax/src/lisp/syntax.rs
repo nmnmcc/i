@@ -137,10 +137,6 @@ pub enum Substitution {
     Many(Vec<Syntax>),
 }
 
-/// Row selection must agree between [`Syntax::show_as`] and `source_syntax`
-/// so a datum is interpreted in the same position by both readers.
-pub const ROWS3: bool = true;
-
 /// Position numbers are shared with the host, so their order is stable. The number of a
 /// position ([`Position::id`]) is the one that `lib/i/syntax.i`
 /// (`position_id`) and the host share.
@@ -577,10 +573,15 @@ impl Syntax {
         }
         super::show_tree(self)
     }
-    /// The code in the normal surface, read for `position`: in the rows of
-    /// source encoding when [`ROWS3`] is on, otherwise in the legacy encoding.
+    /// The code in the normal surface, read for `position`: the datum is
+    /// read for `position` by the reader of the source syntax and written by
+    /// its printer. The tree may be of any depth.
     pub fn show_as(&self, position: Position) -> Result<String, SyntaxError> {
-        self.show_as_rows3(position)
+        self.no_type_view()?;
+        super::to_source::show_as(&self.to_datum(), position).map_err(|e| SyntaxError {
+            message: e.message,
+            span: e.span,
+        })
     }
 
     fn no_type_view(&self) -> Result<(), SyntaxError> {
@@ -598,17 +599,6 @@ impl Syntax {
             }
         }
         Ok(())
-    }
-
-    /// [`Syntax::show_as`] in the source rows: the datum is
-    /// read for `position` by the reader of the source syntax and written by its
-    /// printer. The tree may be of any depth.
-    pub fn show_as_rows3(&self, position: Position) -> Result<String, SyntaxError> {
-        self.no_type_view()?;
-        super::to_source::show_as3(&self.to_datum(), position).map_err(|e| SyntaxError {
-            message: e.message,
-            span: e.span,
-        })
     }
 
     /// Construct a node with the origin and scope of `like`.

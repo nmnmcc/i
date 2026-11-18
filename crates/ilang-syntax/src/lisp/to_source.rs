@@ -3,9 +3,6 @@ use super::{Datum, DatumKind as K, Document};
 use crate::span::Span;
 use crate::{Code, Diagnostic};
 type Result<T> = std::result::Result<T, Diagnostic>;
-pub fn normal_source(document: &Document) -> Result<String> {
-    normal_source3(document)
-}
 /// The depth up to which a datum is read and printed on the caller's stack.
 const DIRECT_DEPTH: usize = 64;
 
@@ -30,15 +27,15 @@ fn deeper_than(d: &Datum, limit: usize) -> bool {
 /// A datum of the source rows as
 /// normal-surface text, read for a grammar position. The reader and
 /// the printer recurse, so a deep datum is handled on a deep stack.
-pub(super) fn show_as3(d: &Datum, position: super::syntax::Position) -> Result<String> {
+pub(super) fn show_as(d: &Datum, position: super::syntax::Position) -> Result<String> {
     if deeper_than(d, DIRECT_DEPTH) {
-        crate::deep::deep(|| show3(d, position))
+        crate::deep::deep(|| show(d, position))
     } else {
-        show3(d, position)
+        show(d, position)
     }
 }
 
-fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
+fn show(d: &Datum, position: super::syntax::Position) -> Result<String> {
     use super::syntax::Position::*;
     use crate::ast::{self, ItemKind, Module};
     use crate::group;
@@ -210,7 +207,8 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
     }
 }
 
-pub fn normal_source3(document: &Document) -> Result<String> {
+/// Print a document of the source rows as normal-surface text.
+pub fn normal_source(document: &Document) -> Result<String> {
     crate::deep::deep(|| {
         let (module, errors) = crate::rows::from_document(document);
         if let Some(error) = errors.into_iter().next() {
@@ -510,7 +508,7 @@ pub fn normal_with_comments(source: &str, document: &Document) -> Result<(String
         if let Some(error) = errors.into_iter().next() {
             return Err(error);
         }
-        let output = normal_source3(document)?;
+        let output = normal_source(document)?;
         Ok(crate::surface::module_comments(
             source, &module, output, true, false,
         ))

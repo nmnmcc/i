@@ -13,10 +13,8 @@ pub mod definition_schedule;
 pub mod definition_table;
 pub mod definitions;
 pub mod expansion;
-pub mod expansion3;
 mod format;
 pub mod quote_lower;
-pub mod quote_lower3;
 pub mod scoped;
 pub mod source_syntax;
 pub mod source_tree;
@@ -214,14 +212,10 @@ impl IntoIterator for Document {
     }
 }
 
-/// Read all datums, ignoring the normal surface's line break rule.
+/// Read all datums of a Lisp file, where `<-` is one symbol and the normal
+/// surface's line break rule does not apply.
 pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
-    parse3(source)
-}
-
-/// Read all datums of a current Lisp file, where `<-` is one symbol.
-pub fn parse3(source: &str) -> Result<Document, Vec<Diagnostic>> {
-    parse_lexed(crate::lexer::lex3_lisp(source))
+    parse_lexed(crate::lexer::lex_lisp(source))
 }
 
 fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> {

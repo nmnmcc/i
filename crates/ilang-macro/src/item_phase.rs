@@ -95,7 +95,7 @@ impl BodyEngine<'_> {
                     u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let mut items = self
                     .scoped
-                    .items3_metered(&result, &call, |work, words| {
+                    .items_metered(&result, &call, |work, words| {
                         budget.charge(work, words).map_err(|e| Box::new(e) as _)
                     })
                     .map_err(|error| {
@@ -164,7 +164,7 @@ impl BodyEngine<'_> {
                     u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
                 let items = self
                     .scoped
-                    .items3_metered(&result, &call, |work, words| {
+                    .items_metered(&result, &call, |work, words| {
                         budget.charge(work, words).map_err(|e| Box::new(e) as _)
                     })
                     .map_err(|error| {

@@ -21,7 +21,7 @@ use std::rc::Rc;
 
 pub(super) fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     let document = super::parse(source)?;
-    let lexed = crate::lexer::lex3_lisp(source);
+    let lexed = crate::lexer::lex_lisp(source);
     let mut builder = Builder {
         source,
         comments: &lexed.comments,

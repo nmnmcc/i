@@ -122,14 +122,7 @@ test("exercise", () -> Nil {
 	} <- (syntax.Definitions(definition = (of) { of }))
 })
 "#
-        .replace(
-            "BAD",
-            if ilang_syntax::lisp::syntax::ROWS3 {
-                "[]"
-            } else {
-                "[comma]"
-            },
-        ),
+        .replace("BAD", "[]"),
     )
     .unwrap();
     let source = Syntax::from_datum(

@@ -185,7 +185,7 @@ fn expression_quote_is_compiled_and_keeps_unquote_identity() {
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let mut templates = Vec::new();
     for (id, module) in parsed.iter_mut().enumerate() {
-        ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
             &mut module.ast,
             id as u32,
             &mut templates,
@@ -220,7 +220,7 @@ fn quote_splice_preserves_order_and_reuses_original_syntax() {
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let mut templates = Vec::new();
     for (id, module) in parsed.iter_mut().enumerate() {
-        ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+        ilang_syntax::lisp::quote_lower::lower_expression_quotes(
             &mut module.ast,
             id as u32,
             &mut templates,
@@ -845,7 +845,7 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
     module
         .ast
         .items
-        .extend(scoped.items3(&generated, &exported).unwrap());
+        .extend(scoped.items(&generated, &exported).unwrap());
     module.scoped = Some(scoped);
     let registry = ilang_macro::registry::Registry::new(&graph, &expanded).unwrap();
     assert!(registry.resolve(caller, None, &exported, &[]).is_some());

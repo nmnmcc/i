@@ -343,7 +343,7 @@ mod expansion_source_tests {
             },
         );
         let mut scoped = ScopedSource::new(source.into());
-        let expanded = scoped.expression3(&result, &call).unwrap();
+        let expanded = scoped.expression(&result, &call).unwrap();
         scoped.inherit_call_chain(expanded.span.0, last.span.0, "fake");
         *last = expanded;
         graph.sources.set_text(id, scoped.text().into());

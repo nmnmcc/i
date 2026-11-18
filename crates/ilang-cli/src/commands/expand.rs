@@ -38,7 +38,7 @@ pub fn run(
     for module in &mut for_check {
         diags.extend(
             ilang_syntax::deep::deep(|| {
-                ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+                ilang_syntax::lisp::quote_lower::lower_expression_quotes(
                     &mut module.ast,
                     module.source.0,
                     &mut templates,

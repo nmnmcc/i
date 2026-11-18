@@ -257,7 +257,7 @@ impl Hook for BodyEngine<'_> {
         let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
         let expression = self
             .scoped
-            .expression3_metered(&result, &call, |work, words| {
+            .expression_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
             .map_err(|error| metered_error(error, &mac.definition.name, &call, invocation_span))?;
@@ -296,7 +296,7 @@ impl Hook for BodyEngine<'_> {
         let start = u32::try_from(self.scoped.text().len() + 1).expect("source span overflow");
         let ty = self
             .scoped
-            .ty3_metered(&result, &call, |work, words| {
+            .ty_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
             .map_err(|error| metered_error(error, &mac.definition.name, &call, old_span))?;

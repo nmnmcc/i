@@ -39,7 +39,7 @@ use ilang_syntax::ast::{
     Binding, Block, DItem, DPItem, Expr, ExprKind, Function, Ident, ItemKind, Module, Pattern,
     PatternKind, Stmt, TItem, Type, TypeDef, TypeKind, TypeRhs,
 };
-use ilang_syntax::lisp::expansion3::{clause_block, plain};
+use ilang_syntax::lisp::expansion::{clause_block, plain};
 use ilang_syntax::span::Span;
 use std::collections::HashSet;
 

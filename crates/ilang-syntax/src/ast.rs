@@ -143,7 +143,7 @@ impl PartialEq for Quoted {
 pub struct QuotePattern {
     pub datum: Quoted,
     /// Template table slot, filled when a compiler program is prepared
-    /// (`lisp::quote_lower3`).
+    /// (`lisp::quote_lower`).
     pub template: Option<u32>,
     /// Capture patterns in matcher order; the flag marks a splice.
     pub captures: Vec<(bool, Pattern)>,

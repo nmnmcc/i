@@ -13,7 +13,7 @@ struct Annotations<'a> {
 
 impl Annotations<'_> {
     fn annotation(&mut self, name_end: usize, end: usize) {
-        let lex = ilang_syntax::lexer::lex3(&self.source[name_end..end]);
+        let lex = ilang_syntax::lexer::lex(&self.source[name_end..end]);
         if lex.tokens.len() < 3 || lex.tokens[0].kind != T::Colon {
             return;
         }
@@ -92,7 +92,7 @@ fn main() {
                 };
             }
             if !lisp {
-                let lex = ilang_syntax::lexer::lex3(source);
+                let lex = ilang_syntax::lexer::lex(source);
                 let mut groups: Vec<(usize, T)> = Vec::new();
                 for (i, token) in lex.tokens.iter().enumerate() {
                     while groups.last().is_some_and(|(end, _)| *end <= i) {

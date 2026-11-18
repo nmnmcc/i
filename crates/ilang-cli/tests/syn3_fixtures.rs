@@ -8,7 +8,7 @@
 //! - `types.txt`: lines that `i check --types` prints (others may be there);
 //! - `errors.txt`: `i check` fails, and each line is in its output.
 
-use ilang_syntax::lexer::lex3;
+use ilang_syntax::lexer::lex;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -46,7 +46,7 @@ fn round_trip_library() {
         })
         .collect();
     for (path, source, module) in &parsed {
-        let lexed = lex3(source);
+        let lexed = lex(source);
         let text = ilang_syntax::print::print_with_comments(module, source, &lexed.comments);
         let (round_trip, diags) = ilang_syntax::parse::parse_module(&text);
         assert!(diags.is_empty(), "{}: {diags:?}", path.display());

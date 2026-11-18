@@ -56,9 +56,9 @@ fn ranges(tokens: &[Token], out: &mut Vec<(Span, u32)>) {
 
 pub(crate) fn tokens(text: &str, lisp: bool) -> SemanticTokens {
     let lexed = if lisp {
-        lexer::lex3_lisp(text)
+        lexer::lex_lisp(text)
     } else {
-        lexer::lex3(text)
+        lexer::lex(text)
     };
     let mut spans = Vec::new();
     ranges(&lexed.tokens, &mut spans);

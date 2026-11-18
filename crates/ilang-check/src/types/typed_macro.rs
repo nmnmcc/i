@@ -521,11 +521,12 @@ impl TypedMacroQuery {
             module: s.program.module(s.module).source.0,
             marks: Default::default(),
         };
-        self.syntax_rows(s, t, &scope, ilang_syntax::lisp::definitions::NEW_ROWS)
+        self.syntax_rows(s, t, &scope, true)
     }
-    /// Type syntax must follow `new_rows` so the selected encoder agrees
-    /// with the decoder. The encodings differ for function types, for
-    /// records with named fields and for the empty tuple.
+    /// Type syntax in the source rows (`new_rows`), which the decoder reads.
+    /// `false` gives the earlier encoding that the row tests below compare
+    /// against; the encodings differ for function types, for records with
+    /// named fields and for the empty tuple.
     fn syntax_rows(&self, s: &mut QueryState, t: &Ty, scope: &Scope, new_rows: bool) -> Syntax {
         let atom = |kind| {
             Syntax::from_datum(

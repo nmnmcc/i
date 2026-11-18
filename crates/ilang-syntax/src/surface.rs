@@ -5,7 +5,7 @@
 
 use super::ast::*;
 use super::walk::{self, Visitor};
-use crate::lexer::{Lexed, lex3, lex3_lisp};
+use crate::lexer::{Lexed, lex, lex_lisp};
 use crate::span::Span;
 use crate::{Code, Diagnostic};
 
@@ -184,9 +184,9 @@ pub fn normal_to_lisp(source: &str) -> Converted {
     if module != back {
         return Err(unrepresentable());
     }
-    let lexed = lex3(source);
+    let lexed = lex(source);
     let from = anchors(&module, &lexed);
-    let to = anchors(&back, &lex3_lisp(&output));
+    let to = anchors(&back, &lex_lisp(&output));
     Ok(transfer(source, &lexed, output, &from, &to))
 }
 
@@ -214,9 +214,9 @@ pub fn lisp_to_normal(source: &str) -> Converted {
         // The text of a quote is Lisp; the normal surface has no place for it.
         return Err(unrepresentable());
     }
-    let lexed = lex3_lisp(source);
+    let lexed = lex_lisp(source);
     let from = anchors(&module, &lexed);
-    let to = anchors(&back, &lex3(&output));
+    let to = anchors(&back, &lex(&output));
     Ok(transfer(source, &lexed, output, &from, &to))
 }
 
@@ -230,9 +230,9 @@ pub(crate) fn module_comments(
     output_lisp: bool,
 ) -> (String, Vec<Span>) {
     let input = if input_lisp {
-        lex3_lisp(source)
+        lex_lisp(source)
     } else {
-        lex3(source)
+        lex(source)
     };
     let (back, _) = if output_lisp {
         crate::rows::from_lisp(&output)
@@ -240,9 +240,9 @@ pub(crate) fn module_comments(
         crate::parse::parse_module(&output)
     };
     let printed = if output_lisp {
-        lex3_lisp(&output)
+        lex_lisp(&output)
     } else {
-        lex3(&output)
+        lex(&output)
     };
     let from = anchors(module, &input);
     let to = anchors(&back, &printed);

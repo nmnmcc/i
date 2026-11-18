@@ -33,7 +33,7 @@ impl Expanded {
     fn lower_quotes_here(&mut self) {
         for module in &mut self.parsed {
             self.diagnostics.extend(
-                ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+                ilang_syntax::lisp::quote_lower::lower_expression_quotes(
                     &mut module.ast,
                     module.source.0,
                     &mut self.templates,
@@ -229,7 +229,7 @@ fn expand_here(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         }
     }
     if parsed.iter().any(|p| {
-        ilang_syntax::lisp::expansion3::definitions(&p.ast, true)
+        ilang_syntax::lisp::expansion::definitions(&p.ast, true)
             .is_ok_and(|ds| ds.iter().any(|d| d.signature.is_some()))
     }) {
         let driver = Arc::new(crate::typed::Driver::new(graph, &parsed));

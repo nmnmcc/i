@@ -205,7 +205,7 @@ impl Driver {
                             .clone(),
                     )
                 });
-            let ty = scoped.ty3(syntax, &parser_call).map_err(|e| e.message)?;
+            let ty = scoped.ty(syntax, &parser_call).map_err(|e| e.message)?;
             let expr = crate::typed3::output_type_function(ty);
             let resolved = with_scoped(&parser_scratch, &parser_parsed, index, scoped, |parsed| {
                 ilang_check::resolve::typed_output(
@@ -279,7 +279,7 @@ impl Driver {
         let name = &program.def(definition).name;
         let target_source = program.module(definition.module).source;
         let target = &self.parsed[definition.module.0 as usize];
-        let definitions = ilang_syntax::lisp::expansion3::definitions(&target.ast, true)
+        let definitions = ilang_syntax::lisp::expansion::definitions(&target.ast, true)
             .expect("typed definition validated");
         let mac = crate::registry::Macro {
             source: target_source,
@@ -330,7 +330,7 @@ impl Driver {
             })?;
         let mut syntax = engine
             .scoped
-            .expression3_metered(&result, &call, |work, words| {
+            .expression_metered(&result, &call, |work, words| {
                 budget.charge(work, words).map_err(|e| Box::new(e) as _)
             })
             .map_err(|e| {

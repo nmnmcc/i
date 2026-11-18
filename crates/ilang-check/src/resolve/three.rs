@@ -489,7 +489,7 @@ fn is_macro(a: &n::Attribute) -> bool {
 /// Definition expansion must retain source-node identities.
 type MacroDefinitions = Result<Vec<(String, bool)>, Vec<(Span, String)>>;
 fn definitions(module: &n::Module, pre: &Pre) -> MacroDefinitions {
-    ilang_syntax::lisp::expansion3::definitions(module, pre.lisp)
+    ilang_syntax::lisp::expansion::definitions(module, pre.lisp)
         .map(|ds| {
             ds.into_iter()
                 .map(|d| (d.name, d.signature.is_some()))
@@ -588,7 +588,7 @@ impl<'a, 't> R3<'a, 't> {
         }
         let placeholder_var = VarId(u32::MAX);
         let typed_definitions: HashMap<_, _> =
-            ilang_syntax::lisp::expansion3::definitions(ast, pre.lisp)
+            ilang_syntax::lisp::expansion::definitions(ast, pre.lisp)
                 .unwrap_or_default()
                 .into_iter()
                 .filter(|d| d.signature.is_some())

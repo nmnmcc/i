@@ -54,7 +54,7 @@ fn insert_expression(
     let text = graph.sources.get(module.source).text.clone();
     let mut scoped = ScopedSource::new(text);
     let call = syntax("x", caller, &[]);
-    let expr = scoped.expression3(expression, &call).unwrap();
+    let expr = scoped.expression(expression, &call).unwrap();
     tree::set_statement(&mut module.ast, 0, 0, expr);
     graph
         .sources
@@ -130,7 +130,7 @@ fn append_items(
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
     let call = syntax("x", caller, &[]);
     for set in sets {
-        module.ast.items.extend(scoped.items3(set, &call).unwrap());
+        module.ast.items.extend(scoped.items(set, &call).unwrap());
     }
     graph
         .sources
@@ -219,9 +219,7 @@ fn builtin_identity_bypasses_caller_type_shadow() {
     let root = root.replace_children(vec![fun, call[1].clone()]);
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
-    let expr = scoped
-        .expression3(&root, &syntax("f", caller, &[]))
-        .unwrap();
+    let expr = scoped.expression(&root, &syntax("f", caller, &[])).unwrap();
     tree::set_statement(&mut module.ast, 1, 0, expr);
     graph
         .sources
@@ -357,7 +355,7 @@ fn an_exported_inferred_type_cannot_leak_a_foreign_private_type() {
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
     let expr = scoped
-        .expression3(&syntax("Secret", template, &[3]), &syntax("f", caller, &[]))
+        .expression(&syntax("Secret", template, &[3]), &syntax("f", caller, &[]))
         .unwrap();
     tree::set_statement(&mut module.ast, 0, 0, expr);
     graph
@@ -615,7 +613,7 @@ fn an_exported_written_type_cannot_leak_a_foreign_private_type() {
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
     let ty = scoped
-        .ty3(&syntax("Secret", template, &[3]), &syntax("f", caller, &[]))
+        .ty(&syntax("Secret", template, &[3]), &syntax("f", caller, &[]))
         .unwrap();
     *tree::written_type(&mut module.ast, 0) = ty;
     graph
@@ -651,7 +649,7 @@ fn fixed_type_identity_never_falls_back_to_a_same_named_alias() {
     });
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
-    let ty = scoped.ty3(&fixed, &syntax("f", caller, &[])).unwrap();
+    let ty = scoped.ty(&fixed, &syntax("f", caller, &[])).unwrap();
     *tree::written_type(&mut module.ast, 1) = ty;
     graph
         .sources
@@ -686,9 +684,7 @@ fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
     let root = root.replace_children(vec![builtin, parts[1].clone()]);
     let module = parsed.iter_mut().find(|p| p.source.0 == caller).unwrap();
     let mut scoped = ScopedSource::new(graph.sources.get(module.source).text.clone());
-    let expr = scoped
-        .expression3(&root, &syntax("f", caller, &[]))
-        .unwrap();
+    let expr = scoped.expression(&root, &syntax("f", caller, &[])).unwrap();
     // Native sums retain their member items; locate the same f binding
     // instead of relying on the transition's absorbed member count.
     let function = module.ast.items.iter().position(|item| {

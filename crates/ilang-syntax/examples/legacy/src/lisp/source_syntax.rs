@@ -298,7 +298,8 @@ fn expr(s: &Syntax) -> Syntax {
 
 // Native normalization is shared with the production reader.
 pub use syntax3::lisp::source_syntax::{
-    Mode3, normalize_expression, normalize_item, normalize_pattern, normalize_type, normalize3,
+    Mode as Mode3, normalize as normalize3, normalize_expression, normalize_item,
+    normalize_pattern, normalize_type,
 };
 
 fn item(s: &Syntax, kind: &crate::ast::ItemKind) -> Syntax {

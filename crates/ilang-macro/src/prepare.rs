@@ -1,7 +1,7 @@
 //! Prepares a macro module's parsed import closure for compiler execution.
 use ilang_check::Parsed;
 use ilang_package::{Diagnostic, PackageGraph};
-use ilang_syntax::lisp::{expansion3 as expansion, syntax::Syntax};
+use ilang_syntax::lisp::{expansion, syntax::Syntax};
 
 /// One source macro and its written argument names.
 #[derive(Clone, Debug)]

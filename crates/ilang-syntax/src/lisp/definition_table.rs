@@ -9,7 +9,7 @@ use std::hash::Hash;
 #[derive(Clone)]
 pub enum Definition {
     /// A written definition in the source tree, answered in the
-    /// source rows regardless of `NEW_ROWS`. Made by
+    /// source rows. Made by
     /// [`Definition::tree`] or [`Definition::tree_with_datum`]; this is the
     /// form used by the engine when it reads source nodes.
     Tree {
@@ -274,9 +274,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                 .as_answer()
             }
             Definition::Builtin { name } => {
-                if super::definitions::builtin_definition_names(super::definitions::NEW_ROWS)
-                    .contains(&name.as_str())
-                {
+                if super::definitions::builtin_definition_names().contains(&name.as_str()) {
                     preflight(DefinitionCost::Builtin(name))?;
                 }
                 match builtin_definition(name, parsed.name.scope(), parsed.name.span(), answer) {

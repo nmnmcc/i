@@ -213,7 +213,7 @@ pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagn
     let mut templates = Vec::new();
     for module in &mut parsed {
         diags.extend(
-            ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+            ilang_syntax::lisp::quote_lower::lower_expression_quotes(
                 &mut module.ast,
                 module.source.0,
                 &mut templates,

@@ -1055,14 +1055,9 @@ mod tests {
 
     #[test]
     fn show_as_reports_the_offending_nested_syntax() {
-        // The empty data `(,)` is not an expression of the rows before
-        // the legacy encoding; in the source rows it is one, and the empty
-        // Round is not.
-        let (source, offending) = if ilang_syntax::lisp::syntax::ROWS3 {
-            ("(f ())", "()")
-        } else {
-            ("(f (,))", "(,)")
-        };
+        // The empty data `(,)` is an expression of the source rows; the
+        // empty Round is not.
+        let (source, offending) = ("(f ())", "()");
         let parsed = parse(source).unwrap();
         let syntax = Syntax::from_datum(
             &parsed[0],

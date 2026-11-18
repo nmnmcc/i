@@ -78,7 +78,7 @@ fn template_stop_keeps_call_and_template_locations() {
         },
     );
     let mut scoped = ScopedSource::new(main.into());
-    let expanded = scoped.expression3(&generated, &call).unwrap();
+    let expanded = scoped.expression(&generated, &call).unwrap();
     scoped.inherit_call_chain(expanded.span.0, call_span, "fake");
     *last = expanded;
     graph.sources.set_text(ms, scoped.text().into());

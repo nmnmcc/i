@@ -445,12 +445,12 @@ impl ScopedSource {
         }
     }
 
-    // ---- The same conversions to the source tree ----
+    // ---- Conversions to the source tree ----
     //
     // The datum is read in the source rows by plain
     // recursive readers: the caller is on a deep stack (`crate::deep`).
 
-    pub fn expression3_metered(
+    pub fn expression_metered(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
@@ -458,10 +458,10 @@ impl ScopedSource {
     ) -> Result<crate::ast::Expr, MeteredError> {
         self.preflight(syntax, &mut charge)
             .map_err(MeteredError::Resource)?;
-        self.expression3(syntax, call_site)
+        self.expression(syntax, call_site)
             .map_err(MeteredError::Syntax)
     }
-    pub fn pattern3_metered(
+    pub fn pattern_metered(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
@@ -469,10 +469,10 @@ impl ScopedSource {
     ) -> Result<crate::ast::Pattern, MeteredError> {
         self.preflight(syntax, &mut charge)
             .map_err(MeteredError::Resource)?;
-        self.pattern3(syntax, call_site)
+        self.pattern(syntax, call_site)
             .map_err(MeteredError::Syntax)
     }
-    pub fn ty3_metered(
+    pub fn ty_metered(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
@@ -480,9 +480,9 @@ impl ScopedSource {
     ) -> Result<crate::ast::Type, MeteredError> {
         self.preflight(syntax, &mut charge)
             .map_err(MeteredError::Resource)?;
-        self.ty3(syntax, call_site).map_err(MeteredError::Syntax)
+        self.ty(syntax, call_site).map_err(MeteredError::Syntax)
     }
-    pub fn items3_metered(
+    pub fn items_metered(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
@@ -490,9 +490,9 @@ impl ScopedSource {
     ) -> Result<Vec<crate::ast::Item>, MeteredError> {
         self.preflight(syntax, &mut charge)
             .map_err(MeteredError::Resource)?;
-        self.items3(syntax, call_site).map_err(MeteredError::Syntax)
+        self.items(syntax, call_site).map_err(MeteredError::Syntax)
     }
-    pub fn expression3(
+    pub fn expression(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
@@ -505,7 +505,7 @@ impl ScopedSource {
             .map_err(|error| self.error(error))?;
         Ok(tree)
     }
-    pub fn pattern3(
+    pub fn pattern(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
@@ -518,7 +518,7 @@ impl ScopedSource {
             .map_err(|error| self.error(error))?;
         Ok(tree)
     }
-    pub fn ty3(
+    pub fn ty(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
@@ -530,7 +530,7 @@ impl ScopedSource {
         self.transition.ty(tree.span.0);
         Ok(tree)
     }
-    pub fn items3(
+    pub fn items(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
@@ -542,14 +542,6 @@ impl ScopedSource {
             .capture_items(&tree)
             .map_err(|error| self.error(error))?;
         Ok(tree)
-    }
-
-    pub fn expression(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-    ) -> Result<crate::ast::Expr, ScopedError> {
-        self.expression3(syntax, call_site)
     }
 }
 
@@ -660,7 +652,7 @@ mod tests {
         let syntax = Syntax::from_datum(&parsed[0], &scope);
         let mut source = ScopedSource::new("original".into());
         let mut remaining = 2;
-        let result = source.expression3_metered(&syntax, &syntax, |_, _| {
+        let result = source.expression_metered(&syntax, &syntax, |_, _| {
             if remaining == 0 {
                 return Err(Box::new(std::io::Error::other("resource limit")));
             }
