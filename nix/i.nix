@@ -49,7 +49,21 @@ rustPlatform.buildRustPackage {
   pname = "i";
   inherit version;
 
-  src = ../.;
+  # Only what the build reads: the workspace, the embedded `lib` and `std`
+  # sources, and the spec that `i spec` embeds. A README or CI change does not
+  # rebuild the compiler.
+  src = lib.fileset.toSource {
+    root = ../.;
+    fileset = lib.fileset.unions [
+      ../Cargo.toml
+      ../Cargo.lock
+      ../rust-toolchain.toml
+      ../crates
+      ../lib
+      ../std
+      ../docs/spec.md
+    ];
+  };
 
   cargoLock.lockFile = ../Cargo.lock;
 

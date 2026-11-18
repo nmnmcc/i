@@ -33,16 +33,15 @@ jobs:
     name: build (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
-    # macOS runners are unavailable in this repository's runner configuration;
-    # the Darwin leg stays data and runs once NIX_MACOS is true.
-    if: matrix.system == 'x86_64-linux' || vars.NIX_MACOS == 'true'
     strategy:
       fail-fast: false
-      # Adding a platform is adding an entry here.
+      # Adding a platform is adding an entry to the NIX_RELEASE_MATRIX
+      # repository variable (JSON, same keys); the default is the Linux leg.
+      # The Darwin entry is
+      #   {"platform":"aarch64-darwin","system":"aarch64-darwin","runner":"macos-14"}
+      # and needs a macOS runner, which this repository does not have yet.
       matrix:
-        include:
-          - { platform: x86_64-linux, system: x86_64-linux, runner: ubuntu-24.04 }
-          - { platform: aarch64-darwin, system: aarch64-darwin, runner: macos-14 }
+        include: ${{ fromJSON(vars.NIX_RELEASE_MATRIX || '[{"platform":"x86_64-linux","system":"x86_64-linux","runner":"ubuntu-24.04"}]') }}
     steps:
       - name: Free disk space
         if: runner.os == 'Linux'
