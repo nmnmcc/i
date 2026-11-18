@@ -1,4 +1,4 @@
-# i
+# The i Programming Language
 
 i is a small, statically typed functional language that compiles to WebAssembly GC and runs natively, in JavaScript hosts and on WASI.
 

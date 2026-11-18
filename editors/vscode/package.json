@@ -1,7 +1,7 @@
 {
   "name": "ilang",
   "displayName": "i",
-  "description": "Syntax highlighting and language server support for the i programming language.",
+  "description": "Syntax highlighting and language server support for the i Programming Language.",
   "version": "0.1.0",
   "publisher": "ilang",
   "license": "Apache-2.0",
@@ -60,7 +60,7 @@
             "verbose"
           ],
           "default": "off",
-          "description": "Traces the communication between VS Code and the i language server."
+          "description": "Traces the communication between VS Code and the language server of i."
         }
       }
     },

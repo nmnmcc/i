@@ -1,7 +1,7 @@
 {
   "name": "tree-sitter-i",
   "version": "0.1.0",
-  "description": "Tree-sitter grammar for the i programming language",
+  "description": "Tree-sitter grammar for the i Programming Language",
   "license": "Apache-2.0",
   "files": [
     "grammar.js",

@@ -1,9 +1,9 @@
-# The i Language
+# The i Programming Language
 
 Version: 1.0; Date: 2026-11-14
 
 
-This document is the definition of the i programming language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
+This document is the definition of the i Programming Language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
 
 This document is complete in itself, except that the principality argument (§4.7), the contract of `resource.ensure`'s final callback (§9.5), and the contracts of the library operations in §9.12 are still being completed; this qualification is to be removed when all three are complete. It defines:
 
