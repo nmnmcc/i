@@ -2,7 +2,7 @@
 mod common;
 
 // Parsed.ast holds the source tree (source nodes retain their identities).
-use common::tree::new as tree;
+use common::tree::source as tree;
 
 #[test]
 fn checks_transformed_modules_without_reparsing_the_source() {

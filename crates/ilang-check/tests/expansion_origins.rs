@@ -2,7 +2,7 @@
 mod common;
 
 // Parsed.ast holds the source tree (source nodes retain their identities).
-use common::tree::new as tree;
+use common::tree::source as tree;
 
 use ilang_check::query::{Query, check_parsed_for_queries};
 use ilang_syntax::lisp::{

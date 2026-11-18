@@ -1,7 +1,7 @@
 //! Expanded syntax must resolve through the ordinary checker without capture.
 mod common;
 // Parsed.ast holds the source tree (source nodes retain their identities).
-use common::tree::new as tree;
+use common::tree::source as tree;
 use ilang_syntax::lisp::{
     parse,
     scoped::ScopedSource,
