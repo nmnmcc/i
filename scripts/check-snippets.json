@@ -29,6 +29,9 @@
   "crates/ilang-check/tests/codegen.rs:92052762dba09d34": {
     "not_source": "TOML manifest or manifest fragment"
   },
+  "crates/ilang-check/tests/resolve_deep.rs:30b0fe37fff13e45": {
+    "not_source": "Rust format string that builds a 20,000-deep i value"
+  },
   "crates/ilang-check/tests/common/mod.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
   },
