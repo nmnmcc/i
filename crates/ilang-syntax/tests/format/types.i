@@ -1,4 +1,4 @@
-Alias(A) = (A) <- (Assert, ()) -> (Int) -> Int
+Alias(A) = (A) <- (Assert) -> (Int) -> Int
 
 Wide(A, B) = (List(A), Dict(A, B), Int) -> Bool
 
