@@ -13,6 +13,17 @@ fn error(e: std::io::Error) -> Value {
     Value::String(code.into())
 }
 
+/// Ends the process quietly with status 0 when a write or flush to standard
+/// output failed because its reader went away (`i run | head -1`). This is
+/// the conventional SIGPIPE-like behavior of a CLI and matches the CLI's own
+/// output (`crates/ilang-cli/src/output.rs`); a program has no useful way to
+/// continue once nobody reads what it prints.
+pub(super) fn exit_if_stdout_closed(e: &std::io::Error) {
+    if e.kind() == std::io::ErrorKind::BrokenPipe {
+        std::process::exit(0);
+    }
+}
+
 pub(super) fn register(imports: &mut HostImports) {
     let input = Arc::new(Mutex::new(tokio::io::stdin()));
     imports
@@ -51,7 +62,7 @@ pub(super) fn register(imports: &mut HostImports) {
     let stdout = Arc::new(Mutex::new(tokio::io::stdout()));
     let stderr = Arc::new(Mutex::new(tokio::io::stderr()));
     macro_rules! stream {
-        ($stream:expr, $write:literal, $flush:literal) => {{
+        ($stream:expr, $write:literal, $flush:literal, $quiet_on_closed:literal) => {{
             let stream = $stream.clone();
             imports
                 .async_service("i:stdio/v1", $write, move |args| {
@@ -71,7 +82,12 @@ pub(super) fn register(imports: &mut HostImports) {
                             .write_all(&bits.bytes)
                             .await
                             .map(|()| Value::Nil)
-                            .map_err(error))
+                            .map_err(|e| {
+                                if $quiet_on_closed {
+                                    exit_if_stdout_closed(&e);
+                                }
+                                error(e)
+                            }))
                     }
                 })
                 .expect(super::ONE);
@@ -83,12 +99,19 @@ pub(super) fn register(imports: &mut HostImports) {
                         let Ok(mut stream) = stream.try_lock() else {
                             return Ok(Err(Value::String("busy".into())));
                         };
-                        Ok(stream.flush().await.map(|()| Value::Nil).map_err(error))
+                        Ok(stream.flush().await.map(|()| Value::Nil).map_err(|e| {
+                            if $quiet_on_closed {
+                                exit_if_stdout_closed(&e);
+                            }
+                            error(e)
+                        }))
                     }
                 })
                 .expect(super::ONE);
         }};
     }
-    stream!(stdout, "write", "flush");
-    stream!(stderr, "write_error", "flush_error");
+    // Only standard output stops the process when its reader goes away;
+    // standard error keeps reporting `"closed"` to the program.
+    stream!(stdout, "write", "flush", true);
+    stream!(stderr, "write_error", "flush_error", false);
 }
