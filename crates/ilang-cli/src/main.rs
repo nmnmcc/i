@@ -537,15 +537,18 @@ fn cmd_test(
     }
     let manifest_text = std::fs::read_to_string(project.join("i.toml"))?;
     let manifest: toml_edit::DocumentMut = manifest_text.parse()?;
-    let collection = manifest
-        .get("test")
-        .and_then(|t| t.get("collection"))
-        .and_then(|v| v.as_str());
+    let collection = match ilang_cli::test_collection(&manifest) {
+        Ok(collection) => collection,
+        Err(message) => {
+            eprintln!("error: {message}");
+            return Ok(ExitCode::FAILURE);
+        }
+    };
     let options = BuildOptions {
         target,
         ..options(opt, true, offline)?
     };
-    let (b, entries) = match ilang_cli::build_tests(project, options, collection) {
+    let (b, entries) = match ilang_cli::build_tests(project, options, collection.as_deref()) {
         Ok(value) => value,
         Err(error) => {
             eprintln!("{error}");
@@ -555,26 +558,18 @@ fn cmd_test(
     for warning in &b.warnings {
         eprintln!("{warning}");
     }
+    if let Some(name) = &collection
+        && entries.is_empty()
+    {
+        eprintln!("error: there is no test collection {name:?} in this package");
+        return Ok(ExitCode::FAILURE);
+    }
     let focused = entries
         .iter()
         .any(|e| e.data.iter().any(|(k, v)| k == "mode" && v == "only"));
-    let mut seen = std::collections::HashMap::new();
-    for entry in &entries {
-        if let Some((_, name)) = entry.data.iter().find(|(key, _)| key == "name") {
-            let qualified = format!("{}.{name}", entry.module);
-            if let Some(previous) = seen.insert(qualified.clone(), &entry.at) {
-                eprintln!(
-                    "duplicate test name {qualified:?}: {}:{}:{} and {}:{}:{}",
-                    previous.path,
-                    previous.line,
-                    previous.column,
-                    entry.at.path,
-                    entry.at.line,
-                    entry.at.column
-                );
-                return Ok(ExitCode::FAILURE);
-            }
-        }
+    if let Some(message) = ilang_cli::duplicate_test_name(&entries) {
+        eprintln!("{message}");
+        return Ok(ExitCode::FAILURE);
     }
     let stage = ilang_syntax::trace::stage("Wasmtime compile");
     let program = b.host_program()?;

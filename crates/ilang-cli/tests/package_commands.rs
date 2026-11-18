@@ -1796,3 +1796,87 @@ fn publish_compares_interfaces_after_macro_generated_exports() {
     assert!(!ok, "{out}");
     assert!(out.contains("changed value api.answer"), "{out}");
 }
+
+/// The `i.toml` of `dir` with `[test].collection` set to `value`.
+fn with_collection(dir: &Path, value: toml_edit::Item) -> String {
+    let mut manifest: toml_edit::DocumentMut = read(&dir.join("i.toml")).parse().unwrap();
+    manifest["test"]["collection"] = value;
+    manifest.to_string()
+}
+
+#[test]
+fn publish_a_missing_collection_is_an_error_not_zero_tests() {
+    let w = World::new();
+    let dir = published(&w, API_1);
+    let manifest = with_collection(&dir, toml_edit::value("std/test.nothing"));
+    let (ok, out) = try_publish(&w, &dir, &[("i.toml", &manifest)], "1.0.0");
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("there is no test collection \"std/test.nothing\""),
+        "{out}"
+    );
+    assert!(!out.contains("tests passed"), "{out}");
+    assert_eq!(tags(&dir), "");
+}
+
+#[test]
+fn publish_rejects_a_non_string_collection() {
+    let w = World::new();
+    let dir = published(&w, API_1);
+    let manifest = with_collection(&dir, toml_edit::value(1));
+    let (ok, out) = try_publish(&w, &dir, &[("i.toml", &manifest)], "1.0.0");
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("`[test].collection` must be a string, not integer"),
+        "{out}"
+    );
+    assert!(!out.contains("passed"), "{out}");
+}
+
+#[test]
+fn publish_rejects_duplicate_test_names() {
+    let w = World::new();
+    let dir = published(&w, API_1);
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[(
+            "test/dup_test.i",
+            "(\n\ttestlib = (test) = std/test\n)\n\ntest(\"same\", () { Nil })\n\ntest(\"same\", () { Nil })\n",
+        )],
+        "1.0.0",
+    );
+    assert!(!ok, "{out}");
+    assert!(
+        out.contains("duplicate test name \"pub/dup_test.same\": "),
+        "{out}"
+    );
+    assert!(!out.contains("passed"), "{out}");
+}
+
+#[test]
+fn publish_does_not_panic_on_an_unnamed_test() {
+    let w = World::new();
+    let dir = published(&w, API_1);
+    // A collection of the package's own whose macro gives no "name".
+    let manifest = with_collection(&dir, toml_edit::value("pub/unnamed.tests"));
+    let (ok, out) = try_publish(
+        &w,
+        &dir,
+        &[
+            ("i.toml", &manifest),
+            (
+                "src/unnamed.is",
+                "(, (= syntax (/ i syntax)))\n(, tests unnamed)\n(= tests Nil)\n(@ macro\n  (= unnamed\n    (-> (, body) (<- _ (, (: items (. syntax Items))))\n      {(= target `generated_test)\n       ((. items add) `tests target [(, \"mode\" \"test\")] body)\n       `(= ~target (-> (,) _ {(~body)}))})))\n",
+            ),
+            (
+                "test/unnamed_test.i",
+                "(u = pub/unnamed)\nu.unnamed(() { Nil })\n",
+            ),
+        ],
+        "1.0.0",
+    );
+    assert!(ok, "{out}");
+    assert!(!out.contains("panicked"), "{out}");
+    assert!(out.contains("its 1 test passed"), "{out}");
+}

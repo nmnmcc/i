@@ -352,6 +352,45 @@ pub fn build_tests(
     ))
 }
 
+/// The `[test].collection` of a manifest: `None` when it is not there, and an
+/// error when it is there but is not a string, so that a mistyped value never
+/// selects some other set of tests.
+pub fn test_collection(manifest: &toml_edit::DocumentMut) -> Result<Option<String>, String> {
+    let Some(item) = manifest.get("test").and_then(|t| t.get("collection")) else {
+        return Ok(None);
+    };
+    match item.as_str() {
+        Some(name) => Ok(Some(name.to_string())),
+        None => Err(format!(
+            "`[test].collection` must be a string, not {}",
+            item.type_name()
+        )),
+    }
+}
+
+/// The message for the first two test entries with the same qualified name,
+/// with both source positions; `None` when the names are all different.
+pub fn duplicate_test_name(entries: &[CollectionEntry]) -> Option<String> {
+    let mut seen = std::collections::HashMap::new();
+    for entry in entries {
+        if let Some((_, name)) = entry.data.iter().find(|(key, _)| key == "name") {
+            let qualified = format!("{}.{name}", entry.module);
+            if let Some(previous) = seen.insert(qualified.clone(), &entry.at) {
+                return Some(format!(
+                    "duplicate test name {qualified:?}: {}:{}:{} and {}:{}:{}",
+                    previous.path,
+                    previous.line,
+                    previous.column,
+                    entry.at.path,
+                    entry.at.line,
+                    entry.at.column
+                ));
+            }
+        }
+    }
+    None
+}
+
 /// Persistable description of a checked collection. Handles identify one
 /// contribution in this exact source snapshot; they do not expose compiler IDs.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]

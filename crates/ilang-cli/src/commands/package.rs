@@ -953,18 +953,24 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
 fn check_and_test(project: &Path) -> Result<()> {
     let manifest: toml_edit::DocumentMut =
         std::fs::read_to_string(project.join("i.toml"))?.parse()?;
-    let collection = manifest
-        .get("test")
-        .and_then(|t| t.get("collection"))
-        .and_then(|v| v.as_str());
+    let collection = ilang_cli::test_collection(&manifest)
+        .map_err(|e| anyhow!("{e}").context("the package's i.toml is not valid"))?;
     let options = ilang_cli::BuildOptions {
         tests: true,
         opt: ilang_cli::Level::O0,
         offline: false,
         target: Default::default(),
     };
-    let (built, entries) = ilang_cli::build_tests(project, options, collection)
+    let (built, entries) = ilang_cli::build_tests(project, options, collection.as_deref())
         .map_err(|e| anyhow!("{e}").context("the package does not check"))?;
+    if let Some(name) = &collection
+        && entries.is_empty()
+    {
+        bail!("there is no test collection {name:?} in this package");
+    }
+    if let Some(message) = ilang_cli::duplicate_test_name(&entries) {
+        bail!("{message}");
+    }
     let program = built.host_program()?;
     let focused = entries
         .iter()
@@ -984,7 +990,11 @@ fn check_and_test(project: &Path) -> Result<()> {
             continue;
         }
         count += 1;
-        let name = format!("{}.{}", entry.module, get("name").expect("test name"));
+        let name = format!(
+            "{}.{}",
+            entry.module,
+            get("name").unwrap_or(&entry.target.path)
+        );
         let index = entry
             .handle
             .rsplit(':')
