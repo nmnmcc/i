@@ -2435,7 +2435,7 @@
   "crates/ilang-check/src/resolve/three.rs:d46aee08cc49f6d1": {
     "not_source": "A name compared on the diagnostic path, not an i source"
   },
-  "crates/ilang-macro/src/item_phase3.rs:0acb225eff8aa24b": {
+  "crates/ilang-macro/src/item_phase.rs:0acb225eff8aa24b": {
     "diagnostics": [
       "E0301: removed @main attribute"
     ],

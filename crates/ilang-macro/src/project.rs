@@ -1,7 +1,7 @@
 //! Project-wide, dependency-ordered syntax expansion.
 use crate::{
     body_engine::BodyEngine,
-    body_walk3 as body_walk, collections,
+    body_walk, collections,
     definition_world::DefinitionWorld,
     diagnostics,
     item_phase::{self, PhaseError},
