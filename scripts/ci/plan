@@ -32,6 +32,7 @@ planned with an empty matrix.
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -79,6 +80,29 @@ JOBS = {
 
 FILTERS = ('rust', 'docs', 'editors')
 
+# What a key of each set is. A plan that mixes two kinds (spec `.i` paths in
+# the value-types test set, say) is a wrong list, not a wrong count: fail and
+# name the set and the offending key.
+KINDS = {
+    'ilang-check-tests': ('test name', re.compile(r'^(lib|doc|bin:[^\s]+|test:[^\s]+)$')),
+    'ilang-cli-tests': ('test name', re.compile(r'^(lib|doc|bin:[^\s]+|test:[^\s]+)$')),
+    'std-tests': ('project', re.compile(r'^[^\s@]+@[0-2]$')),
+    'spec-cases': ('spec case path', re.compile(r'^\S+\.i$')),
+    'value-type-cases': ('spec case path', re.compile(r'^\S+\.i$')),
+    'corpus-cases': ('corpus case path', re.compile(r'^[^\s]+$')),
+    'docs-examples': ('documentation page', re.compile(r'^docs/\S+\.(md|mdx)$')),
+}
+
+
+def check_kinds(set_name, keys):
+    kind, pattern = KINDS[set_name]
+    bad = [k for k in keys if not pattern.match(k)]
+    if bad:
+        sys.exit(
+            f'plan: set {set_name} must hold {kind}s, but {len(bad)} key(s) are not: '
+            + ', '.join(repr(k) for k in bad[:3])
+        )
+
 
 def runs(rule, changed):
     return rule == 'always' or any(changed[f] for f in rule.split('|'))
@@ -114,6 +138,7 @@ def matrix(costs, set_name, prefix, display, package):
         sys.exit(f'plan: set {set_name} gave an empty matrix')
     for e in entries:
         keys = shard_tool('keys', '--costs', str(costs), '--set', set_name, '--shard', str(e['index'])).split()
+        check_kinds(set_name, keys)
         if not keys:
             sys.exit(f'plan: shard {e["index"]} of set {set_name} has no keys')
         e['k'] = e['index'] + 1
