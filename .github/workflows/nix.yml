@@ -1,0 +1,167 @@
+name: Nix
+
+# The flake installation path: `packages.i` built from source, and
+# `packages.i-bin` installed from a prebuilt archive. Binaryen is fetched by
+# the flake, so the checkout does not need submodules. Nothing here is
+# published; the `release` workflow owns tags and releases.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: build and verify (x86_64-linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      # The Rust toolchain, Wasmtime and the Cargo builds do not fit in the
+      # free space of the runner.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
+            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
+            /usr/local/share/chromium /usr/lib/jvm
+          df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: false
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      # Keeps the Nix store paths built in CI in the GitHub Actions cache, so
+      # a later run builds only what changed.
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+
+      - name: Show the flake outputs
+        run: nix flake show
+
+      - name: Build i from source
+        shell: bash
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          nix build --print-out-paths .#i -L | tee i-path
+          elapsed=$(( $(date +%s) - start ))
+          echo "build .#i: ${elapsed}s" | tee -a "$GITHUB_STEP_SUMMARY"
+          ./result/bin/i --version
+
+      - name: Run a package with the compiler that was built
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/home"
+          mkdir -p "$HOME"
+          cd "$RUNNER_TEMP"
+          i="$GITHUB_WORKSPACE/result/bin/i"
+          "$i" --version
+          "$i" new demo
+          output=$("$i" run --project demo)
+          test "$output" = "Hello, demo!"
+          echo "i new + i run: $output"
+
+      # `i-bin` needs an archive. This run has no published release, so build
+      # the same archive the release workflow would upload, pin it in
+      # nix/release.nix, and then build `.#i-bin` through the production path.
+      - name: Package the archive and verify i-bin installs it
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(nix eval --raw .#packages.x86_64-linux.i.version)
+          python3 nix/package.py \
+            --binary result/bin/i \
+            --version "$version" \
+            --platform x86_64-linux \
+            --output dist
+          archive=$(ls dist/i-*.tar.gz)
+          name=$(basename "$archive")
+          hash=$(nix hash file --type sha256 --sri "$archive")
+          store=$(nix store add-file "$archive")
+          echo "archive: $name ($hash)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # Pin the archive exactly as a published one would be pinned, then
+          # install it. `path` names the store-copied archive; a published
+          # entry names a url and hash instead.
+          cat > nix/release.nix <<EOF
+          {
+            artifacts = {
+              x86_64-linux = {
+                version = "$version";
+                path = "$store";
+                hash = "$hash";
+              };
+            };
+          }
+          EOF
+
+          nix build .#i-bin -L
+          ./result-i-bin/bin/i --version
+          test "$(./result-i-bin/bin/i --version)" = "$(./result/bin/i --version)"
+          echo "i and i-bin report the same version: $(./result/bin/i --version)" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Run both packages through nix run
+        run: |
+          test "$(nix run .#i -- --version)" = "i $(nix eval --raw .#packages.x86_64-linux.i.version)"
+          test "$(nix run .#i-bin -- --version)" = "i $(nix eval --raw .#packages.x86_64-linux.i.version)"
+
+      # With the archive pinned above, this also builds the same-version
+      # check that `nix flake check` runs after a real release.
+      - name: Check the flake
+        run: nix flake check -L
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: i-x86_64-linux
+          path: dist/i-*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  darwin:
+    name: build and verify (aarch64-darwin)
+    runs-on: macos-14
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: false
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Build i from source
+        shell: bash
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          nix build --print-out-paths .#i -L | tee i-path
+          echo "build .#i: $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
+          ./result/bin/i --version
+      - name: Run a package with the compiler that was built
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/home"
+          mkdir -p "$HOME"
+          cd "$RUNNER_TEMP"
+          i="$GITHUB_WORKSPACE/result/bin/i"
+          "$i" new demo
+          test "$("$i" run --project demo)" = "Hello, demo!"

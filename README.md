@@ -156,6 +156,22 @@ These programs are [examples/tour](examples/tour) and [examples/echo](examples/e
 
 ## Install
 
+i installs with [Nix](https://nixos.org) flakes.
+
+```sh
+nix run github:nmnmcc/i
+nix build .#i
+nix build .#i-bin
+```
+
+`i` builds the compiler from the source in the flake, so `github:nmnmcc/i` follows the repository's current commit and `nix build .#i` in a local clone follows that checkout. It needs the pinned Rust toolchain, CMake and the vendored Binaryen, all supplied by the flake.
+
+`i-bin` downloads the prebuilt archive of the pinned version from the GitHub release (`i-<version>-<platform>.tar.gz`), so it needs no compiler toolchain and is fixed to the version recorded in [nix/release.nix](nix/release.nix); it lags a source change until a release is published. Both `i` and `i-bin` report the same version for the same release; `nix flake check` asserts that once an archive is pinned.
+
+`nix run .#i` and `nix run .#i-bin` run either package without installing it.
+
+### Build from source (development)
+
 i is built from source, with [Nix](https://nixos.org) and [devenv](https://devenv.sh) 2.4.0:
 
 ```sh
