@@ -11,7 +11,10 @@ fn units() -> Vec<Unit> {
             cost: 0.1 + ((i * 7919) % 401) as f64 / 10.0,
         })
         .collect();
-    units.push(Unit { key: "huge".into(), cost: 400.0 });
+    units.push(Unit {
+        key: "huge".into(),
+        cost: 400.0,
+    });
     units
 }
 
@@ -21,7 +24,11 @@ const BUDGET: f64 = 270.0;
 fn the_union_is_every_unit_exactly_once() {
     let units = units();
     let planned = plan(&units, BUDGET);
-    let mut all: Vec<&str> = planned.shards.iter().flat_map(|s| s.keys.iter().map(String::as_str)).collect();
+    let mut all: Vec<&str> = planned
+        .shards
+        .iter()
+        .flat_map(|s| s.keys.iter().map(String::as_str))
+        .collect();
     all.sort();
     let mut expected: Vec<&str> = units.iter().map(|u| u.key.as_str()).collect();
     expected.sort();
@@ -47,27 +54,51 @@ fn every_shard_is_within_budget_unless_the_unit_is_reported() {
     let units = units();
     let planned = plan(&units, BUDGET);
     let over: Vec<&str> = planned.over_budget.iter().map(|u| u.key.as_str()).collect();
-    assert_eq!(over, ["huge"], "the over-budget units are exactly those costing more than the budget");
+    assert_eq!(
+        over,
+        ["huge"],
+        "the over-budget units are exactly those costing more than the budget"
+    );
     for shard in &planned.shards {
         let sum: f64 = shard
             .keys
             .iter()
             .map(|k| units.iter().find(|u| &u.key == k).unwrap().cost)
             .sum();
-        assert!((sum - shard.seconds).abs() < 1e-6, "shard {} reports {} for {sum}", shard.index, shard.seconds);
+        assert!(
+            (sum - shard.seconds).abs() < 1e-6,
+            "shard {} reports {} for {sum}",
+            shard.index,
+            shard.seconds
+        );
         if shard.seconds > BUDGET {
-            assert_eq!(shard.keys, ["huge"], "shard {} is over budget with {:?}", shard.index, shard.keys);
+            assert_eq!(
+                shard.keys,
+                ["huge"],
+                "shard {} is over budget with {:?}",
+                shard.index,
+                shard.keys
+            );
         }
     }
     assert!(
-        planned.shards.iter().any(|s| s.keys.iter().any(|k| k == "huge")),
+        planned
+            .shards
+            .iter()
+            .any(|s| s.keys.iter().any(|k| k == "huge")),
         "an over-budget unit is still assigned"
     );
 }
 
 #[test]
 fn the_shard_count_is_ceiling_total_over_budget() {
-    let units: Vec<Unit> = ["a", "b", "c"].iter().map(|k| Unit { key: k.to_string(), cost: 0.6 }).collect();
+    let units: Vec<Unit> = ["a", "b", "c"]
+        .iter()
+        .map(|k| Unit {
+            key: k.to_string(),
+            cost: 0.6,
+        })
+        .collect();
     assert_eq!(plan(&units, 1.0).shards.len(), 2);
     assert_eq!(plan(&units, 0.5).shards.len(), 3);
     assert_eq!(plan(&units, 10.0).shards.len(), 1);
@@ -76,12 +107,20 @@ fn the_shard_count_is_ceiling_total_over_budget() {
 #[test]
 fn every_shard_fits_the_budget_when_no_unit_is_over() {
     let units: Vec<Unit> = (0..100)
-        .map(|i| Unit { key: format!("u{i:03}"), cost: 1.0 })
+        .map(|i| Unit {
+            key: format!("u{i:03}"),
+            cost: 1.0,
+        })
         .collect();
     let planned = plan(&units, 10.0);
     assert_eq!(planned.shards.len(), 10);
     for shard in &planned.shards {
-        assert!(shard.seconds <= 10.0, "shard {} has {} s", shard.index, shard.seconds);
+        assert!(
+            shard.seconds <= 10.0,
+            "shard {} has {} s",
+            shard.index,
+            shard.seconds
+        );
     }
     assert!(planned.over_budget.is_empty());
 }
@@ -89,11 +128,19 @@ fn every_shard_fits_the_budget_when_no_unit_is_over() {
 #[test]
 fn over_budget_units_are_reported_with_the_plan() {
     let mut units = units();
-    units.push(Unit { key: "over".into(), cost: 300.0 });
+    units.push(Unit {
+        key: "over".into(),
+        cost: 300.0,
+    });
     let planned = plan(&units, 270.0);
     let reported: Vec<&str> = planned.over_budget.iter().map(|u| u.key.as_str()).collect();
     assert!(reported.contains(&"over"), "{reported:?}");
-    assert!(planned.shards.iter().any(|s| s.keys.iter().any(|k| k == "over")));
+    assert!(
+        planned
+            .shards
+            .iter()
+            .any(|s| s.keys.iter().any(|k| k == "over"))
+    );
     let json = plan_json(&planned, 270.0);
     assert!(json.contains("{\"key\":\"over\",\"cost\":300}"), "{json}");
 }
@@ -110,10 +157,22 @@ fn the_same_input_gives_the_same_plan() {
 
 #[test]
 fn ties_go_by_key_and_then_to_the_lowest_shard() {
-    let units: Vec<Unit> = ["d", "c", "b", "a"].iter().map(|k| Unit { key: k.to_string(), cost: 1.0 }).collect();
+    let units: Vec<Unit> = ["d", "c", "b", "a"]
+        .iter()
+        .map(|k| Unit {
+            key: k.to_string(),
+            cost: 1.0,
+        })
+        .collect();
     let planned = plan(&units, 2.0);
     let keys: Vec<Vec<String>> = planned.shards.iter().map(|s| s.keys.clone()).collect();
-    assert_eq!(keys, [vec!["a".to_string(), "c".into()], vec!["b".into(), "d".into()]]);
+    assert_eq!(
+        keys,
+        [
+            vec!["a".to_string(), "c".into()],
+            vec!["b".into(), "d".into()]
+        ]
+    );
 }
 
 #[test]
@@ -124,8 +183,18 @@ fn a_missing_cost_uses_the_set_median() {
         ("c".into(), Some(9.0)),
         ("d".into(), Some(4.0)),
     ]);
-    assert_eq!(units[1], Unit { key: "b".into(), cost: 4.0 });
-    let even = with_median_missing(&[("a".into(), Some(1.0)), ("b".into(), Some(3.0)), ("c".into(), None)]);
+    assert_eq!(
+        units[1],
+        Unit {
+            key: "b".into(),
+            cost: 4.0
+        }
+    );
+    let even = with_median_missing(&[
+        ("a".into(), Some(1.0)),
+        ("b".into(), Some(3.0)),
+        ("c".into(), None),
+    ]);
     assert_eq!(even[2].cost, 2.0);
     let none = with_median_missing(&[("a".into(), None), ("b".into(), None)]);
     assert!(none.iter().all(|u| u.cost == 1.0));
@@ -157,7 +226,10 @@ fn table(name: &str) -> String {
 }
 
 fn shard(args: &[&str]) -> (i32, String, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_i-shard")).args(args).output().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_i-shard"))
+        .args(args)
+        .output()
+        .unwrap();
     (
         out.status.code().unwrap_or(-1),
         String::from_utf8(out.stdout).unwrap(),
@@ -176,19 +248,39 @@ fn the_cli_prints_the_plan_keys_and_matrix() {
         "{\"budget_seconds\":3,\"shards\":[{\"index\":0,\"seconds\":3,\"keys\":[\"a\",\"c\"]},\
          {\"index\":1,\"seconds\":2,\"keys\":[\"b\"]},{\"index\":2,\"seconds\":2,\"keys\":[\"d\"]}],\"over_budget\":[],\"missing_costs\":[\"d\"]}\n"
     );
-    let (code, out, _) = shard(&["keys", "--costs", &costs, "--set", "s", "--shard", "0", "--budget", "3"]);
+    let (code, out, _) = shard(&[
+        "keys", "--costs", &costs, "--set", "s", "--shard", "0", "--budget", "3",
+    ]);
     assert_eq!((code, out.as_str()), (0, "a\nc\n"));
-    let (code, out, _) = shard(&["matrix", "--costs", &costs, "--set", "s", "--budget", "7", "--name-prefix", "test (s)"]);
-    assert_eq!((code, out.as_str()), (0, "[{\"index\":0,\"of\":1,\"name\":\"test (s), 1/1\"}]\n"));
+    let (code, out, _) = shard(&[
+        "matrix",
+        "--costs",
+        &costs,
+        "--set",
+        "s",
+        "--budget",
+        "7",
+        "--name-prefix",
+        "test (s)",
+    ]);
+    assert_eq!(
+        (code, out.as_str()),
+        (0, "[{\"index\":0,\"of\":1,\"name\":\"test (s), 1/1\"}]\n")
+    );
 }
 
 #[test]
 fn an_out_of_range_shard_is_rejected() {
     let costs = table("range");
-    let (code, out, err) = shard(&["keys", "--costs", &costs, "--set", "s", "--shard", "3", "--budget", "3"]);
+    let (code, out, err) = shard(&[
+        "keys", "--costs", &costs, "--set", "s", "--shard", "3", "--budget", "3",
+    ]);
     assert_eq!(code, 1);
     assert_eq!(out, "");
-    assert!(err.contains("shard 3 is out of range") && err.contains("3 shard(s)"), "{err}");
+    assert!(
+        err.contains("shard 3 is out of range") && err.contains("3 shard(s)"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -199,7 +291,10 @@ fn bad_input_is_rejected_with_a_message() {
     let (code, _, err) = shard(&["plan", "--costs", &costs, "--set", "s", "--budget", "0"]);
     assert!(code == 1 && err.contains("greater than 0"), "{err}");
     let (code, _, err) = shard(&["plan", "--costs", "/nonexistent/costs.json", "--set", "s"]);
-    assert!(code == 1 && err.contains("cannot read the cost table"), "{err}");
+    assert!(
+        code == 1 && err.contains("cannot read the cost table"),
+        "{err}"
+    );
     let (code, _, err) = shard(&["keys", "--costs", &costs, "--set", "s"]);
     assert!(code == 2 && err.contains("--shard is required"), "{err}");
 }
@@ -218,13 +313,21 @@ fn a_runner_plans_its_own_cases_with_the_table_costs() {
     assert_eq!(planned.fallback, None);
     assert_eq!(planned.budget_seconds, 3.0);
     let shards: Vec<Vec<String>> = planned.plan.shards.iter().map(|s| s.keys.clone()).collect();
-    assert_eq!(shards, vec![strings(&["a", "c"]), strings(&["b"]), strings(&["e"])]);
+    assert_eq!(
+        shards,
+        vec![strings(&["a", "c"]), strings(&["b"]), strings(&["e"])]
+    );
     assert_eq!(planned.plan.missing_costs, strings(&["e"]));
     assert_eq!(planned.unlisted, strings(&["e"]));
     assert_eq!(planned.absent, strings(&["d"]));
     assert!(planned.partition_errors(&keys).is_empty());
     assert_eq!(planned.shard_keys(1, 3, "test"), strings(&["b"]).as_slice());
-    assert_eq!(planned.notes("test").len(), 2, "{:?}", planned.notes("test"));
+    assert_eq!(
+        planned.notes("test").len(),
+        2,
+        "{:?}",
+        planned.notes("test")
+    );
 }
 
 #[test]
@@ -241,12 +344,26 @@ fn without_the_table_the_cases_are_equal_and_the_count_is_asked() {
     let keys = strings(&["e", "d", "c", "b", "a"]);
     let planned = plan_cases(Path::new(&costs), "s", &keys, 2);
     assert!(planned.fallback.is_some());
-    assert_eq!(planned.notes("test").len(), 1, "{:?}", planned.notes("test"));
+    assert_eq!(
+        planned.notes("test").len(),
+        1,
+        "{:?}",
+        planned.notes("test")
+    );
     assert_eq!(planned.plan.shards.len(), 2);
     assert!(planned.partition_errors(&keys).is_empty());
-    assert_eq!(planned.shard_keys(1, 2, "test"), strings(&["b", "d"]).as_slice());
+    assert_eq!(
+        planned.shard_keys(1, 2, "test"),
+        strings(&["b", "d"]).as_slice()
+    );
     // Never more shards than cases.
-    assert_eq!(plan_cases(Path::new(&costs), "s", &keys, 9).plan.shards.len(), 5);
+    assert_eq!(
+        plan_cases(Path::new(&costs), "s", &keys, 9)
+            .plan
+            .shards
+            .len(),
+        5
+    );
 }
 
 #[test]

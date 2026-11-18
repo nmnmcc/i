@@ -717,7 +717,9 @@ fn parse_shard(text: &str) -> Result<(usize, usize), String> {
             "--shard {text}: shard {k} is out of range; there are {n} shards, numbered 0 to {}",
             n - 1
         )),
-        Some(_) => Err(format!("--shard {text}: the number of shards must be positive")),
+        Some(_) => Err(format!(
+            "--shard {text}: the number of shards must be positive"
+        )),
         None => Err(format!("--shard {text}: expected K/N, two whole numbers")),
     }
 }
@@ -743,9 +745,9 @@ fn shard_entries(
             pair[0].0
         ));
     }
-    let path = std::env::var_os("CHECKS_COSTS").map(PathBuf::from).unwrap_or_else(|| {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ci/costs.json")
-    });
+    let path = std::env::var_os("CHECKS_COSTS")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ci/costs.json"));
     let table = std::fs::read_to_string(&path)
         .map_err(|e| e.to_string())
         .and_then(|text| ilang_shard::CostTable::parse(&text));
@@ -781,7 +783,10 @@ fn shard_entries(
             );
             let units = named
                 .iter()
-                .map(|(name, _)| ilang_shard::Unit { key: name.clone(), cost: 1.0 })
+                .map(|(name, _)| ilang_shard::Unit {
+                    key: name.clone(),
+                    cost: 1.0,
+                })
                 .collect();
             (units, SHARD_BUDGET_SECONDS)
         }

@@ -288,7 +288,7 @@ jobs:
   # ilang-check's test binaries but value_types, in the shards of the plan
   # (set ilang-check-tests).
   check_tests:
-    name: ${{ matrix.display }}
+    name: ${{ matrix.name }}
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -329,12 +329,12 @@ jobs:
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.display }}
+          name: ${{ matrix.name }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # ilang-check's value_types, sharded by case (set value-type-cases).
   value_types:
-    name: ${{ matrix.display }}
+    name: ${{ matrix.name }}
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -376,13 +376,13 @@ jobs:
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.display }}
+          name: ${{ matrix.name }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # ilang-cli's test binaries but spec, in the shards of the plan (set
   # ilang-cli-tests).
   cli_tests:
-    name: ${{ matrix.display }}
+    name: ${{ matrix.name }}
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -421,13 +421,13 @@ jobs:
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.display }}
+          name: ${{ matrix.name }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The spec suite (ilang-cli --test spec), k/N of its cases per shard; N
   # from the plan (set spec-cases). The group spec-K/N of scripts/checks.
   spec:
-    name: ${{ matrix.display }}
+    name: ${{ matrix.name }}
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -465,7 +465,7 @@ jobs:
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.display }}
+          name: ${{ matrix.name }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   js:
@@ -546,7 +546,7 @@ jobs:
   # shard runs the whole `i` part. (CHECKS_SHARD is the corpus shard there,
   # so it is not set here.)
   std:
-    name: ${{ matrix.display }}
+    name: ${{ matrix.name }}
     needs: [plan, release]
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -585,13 +585,13 @@ jobs:
         run: devenv shell -- ./scripts/checks i
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.display }}
+          name: ${{ matrix.name }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The review corpus, k/N of its cases per shard; N from the plan (set
   # corpus-cases).
   corpus:
-    name: ${{ matrix.display }}
+    name: ${{ matrix.name }}
     needs: [plan, release]
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -643,7 +643,7 @@ jobs:
           retention-days: 14
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.display }}
+          name: ${{ matrix.name }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The documentation site, with the release i for its examples. Shard 1
@@ -652,7 +652,7 @@ jobs:
   # k/N of the examples (CHECKS_SHARD; set docs-examples). On a push to main
   # shard 1 uploads docs/dist, which docs.yml deploys after a green run.
   docs:
-    name: ${{ matrix.display }}
+    name: ${{ matrix.name }}
     needs: [plan, release]
     if: fromJSON(needs.plan.outputs.changed).rust || fromJSON(needs.plan.outputs.changed).docs
     runs-on: ubuntu-24.04
@@ -717,7 +717,7 @@ jobs:
           retention-days: 3
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.display }}
+          name: ${{ matrix.name }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The one required check. See the comment at the top and scripts/ci/summary.

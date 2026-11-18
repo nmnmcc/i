@@ -719,7 +719,10 @@ fn spec_case_paths(root: &std::path::Path) -> Vec<std::path::PathBuf> {
 /// A case's key in the cost table: its path under `root`, as the spec suite
 /// names it (`<section>/<case>`).
 fn spec_case_key(root: &std::path::Path, path: &std::path::Path) -> String {
-    path.strip_prefix(root).unwrap().to_string_lossy().into_owned()
+    path.strip_prefix(root)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// The keys of `cases`, sorted as strings (the order of the cost table).
@@ -735,7 +738,9 @@ fn spec_case_keys(root: &std::path::Path, cases: &[std::path::PathBuf]) -> Vec<S
 fn value_type_plan(keys: &[String], fallback_shards: usize) -> ilang_shard::CasePlan {
     let costs = std::env::var_os("CHECKS_COSTS")
         .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ci/costs.json"));
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ci/costs.json")
+        });
     ilang_shard::plan_cases(&costs, "value-type-cases", keys, fallback_shards)
 }
 
@@ -745,7 +750,11 @@ fn value_type_shards_cover_every_case_once_within_the_budget() {
     let keys = spec_case_keys(&root, &spec_case_paths(&root));
     let planned = value_type_plan(&keys, 1);
     let errors = planned.partition_errors(&keys);
-    assert!(errors.is_empty(), "the value type shards are not a partition of the cases:\n{}", errors.join("\n"));
+    assert!(
+        errors.is_empty(),
+        "the value type shards are not a partition of the cases:\n{}",
+        errors.join("\n")
+    );
     let over: Vec<String> = planned
         .plan
         .over_budget
@@ -786,7 +795,10 @@ fn spec_corpus_reverse_order_and_recovery() {
     match (shard("VALUE_TYPES_SHARD"), shard("VALUE_TYPES_SHARD_OF")) {
         (None, None) => {}
         (Some(k), Some(n)) => {
-            assert!(k < n, "VALUE_TYPES_SHARD must be below VALUE_TYPES_SHARD_OF, not {k} of {n}");
+            assert!(
+                k < n,
+                "VALUE_TYPES_SHARD must be below VALUE_TYPES_SHARD_OF, not {k} of {n}"
+            );
             let keys = spec_case_keys(&root, &cases);
             let planned = value_type_plan(&keys, n);
             for note in planned.notes("value types") {

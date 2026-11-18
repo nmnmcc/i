@@ -150,17 +150,20 @@ fn cases(root: &Path) -> Vec<(String, Result<Case, String>)> {
             if path.is_dir() {
                 let text = std::fs::read_to_string(path.join("i.toml")).unwrap_or_default();
                 let key = name.clone();
-                out.push((key, header(&text, "#").map_err(|e| format!("{name}: {e}")).map(
-                    |(expect, output)| Case {
-                        name,
-                        header_path: path.join("i.toml"),
-                        comment: "#",
-                        project: path.clone(),
-                        expect,
-                        output,
-                        _temp: None,
-                    },
-                )));
+                out.push((
+                    key,
+                    header(&text, "#").map_err(|e| format!("{name}: {e}")).map(
+                        |(expect, output)| Case {
+                            name,
+                            header_path: path.join("i.toml"),
+                            comment: "#",
+                            project: path.clone(),
+                            expect,
+                            output,
+                            _temp: None,
+                        },
+                    ),
+                ));
             } else if path.extension().is_some_and(|e| e == "i") {
                 let text = std::fs::read_to_string(&path).unwrap();
                 let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
@@ -424,7 +427,11 @@ fn main() {
         eprintln!("{note}");
     }
     let errors = planned.partition_errors(&keys);
-    assert!(errors.is_empty(), "the spec shards are not a partition of the cases:\n{}", errors.join("\n"));
+    assert!(
+        errors.is_empty(),
+        "the spec shards are not a partition of the cases:\n{}",
+        errors.join("\n")
+    );
     if let Some((k, n)) = shard {
         let kept: std::collections::BTreeSet<&str> = planned
             .shard_keys(k - 1, n, "I_SPEC_SHARD")

@@ -34,11 +34,15 @@ struct Options {
 
 fn options(args: &[String]) -> Result<Options, Failure> {
     let usage = |m: String| Failure::Usage(m);
-    let command = args.first().ok_or_else(|| usage("no command".into()))?.clone();
+    let command = args
+        .first()
+        .ok_or_else(|| usage("no command".into()))?
+        .clone();
     if !matches!(command.as_str(), "plan" | "keys" | "matrix") {
         return Err(usage(format!("unknown command {command:?}")));
     }
-    let (mut costs, mut set, mut budget, mut shard, mut name_prefix) = (None, None, None, None, None);
+    let (mut costs, mut set, mut budget, mut shard, mut name_prefix) =
+        (None, None, None, None, None);
     let mut rest = args[1..].iter();
     while let Some(flag) = rest.next() {
         let slot = match flag.as_str() {
@@ -49,7 +53,9 @@ fn options(args: &[String]) -> Result<Options, Failure> {
             "--name-prefix" if command == "matrix" => &mut name_prefix,
             _ => return Err(usage(format!("{command}: unknown option {flag:?}"))),
         };
-        let value = rest.next().ok_or_else(|| usage(format!("{flag} needs a value")))?;
+        let value = rest
+            .next()
+            .ok_or_else(|| usage(format!("{flag} needs a value")))?;
         if slot.replace(value.clone()).is_some() {
             return Err(usage(format!("{flag} is given twice")));
         }
@@ -62,7 +68,14 @@ fn options(args: &[String]) -> Result<Options, Failure> {
     if command == "matrix" && name_prefix.is_none() {
         return Err(usage("matrix: --name-prefix is required".into()));
     }
-    Ok(Options { command, costs, set, budget, shard, name_prefix })
+    Ok(Options {
+        command,
+        costs,
+        set,
+        budget,
+        shard,
+        name_prefix,
+    })
 }
 
 fn run(args: &[String]) -> Result<String, Failure> {
@@ -73,18 +86,27 @@ fn run(args: &[String]) -> Result<String, Failure> {
     let table = CostTable::parse(&text).map_err(|e| error(format!("{}: {e}", o.costs)))?;
     let set = table.sets.get(&o.set).ok_or_else(|| {
         let known: Vec<&str> = table.sets.keys().map(String::as_str).collect();
-        error(format!("{}: unknown set {:?}; the sets are: {}", o.costs, o.set, known.join(", ")))
+        error(format!(
+            "{}: unknown set {:?}; the sets are: {}",
+            o.costs,
+            o.set,
+            known.join(", ")
+        ))
     })?;
     let budget = match &o.budget {
-        Some(text) => text
-            .parse::<f64>()
-            .map_err(|_| error(format!("--budget must be a number of seconds, not {text:?}")))?,
+        Some(text) => text.parse::<f64>().map_err(|_| {
+            error(format!(
+                "--budget must be a number of seconds, not {text:?}"
+            ))
+        })?,
         None => table
             .budget_seconds
             .ok_or_else(|| error(format!("{} has no budget_seconds; give --budget", o.costs)))?,
     };
     if !(budget.is_finite() && budget > 0.0) {
-        return Err(error(format!("the budget must be greater than 0 seconds, not {budget}")));
+        return Err(error(format!(
+            "the budget must be greater than 0 seconds, not {budget}"
+        )));
     }
     let mut planned = plan(&set.units(), budget);
     planned.missing_costs = set.missing();
@@ -92,11 +114,20 @@ fn run(args: &[String]) -> Result<String, Failure> {
         eprintln!(
             "i-shard: {} unit(s) have no measured cost and use the set median: {}",
             planned.missing_costs.len(),
-            planned.missing_costs.iter().take(5).cloned().collect::<Vec<_>>().join(", ")
+            planned
+                .missing_costs
+                .iter()
+                .take(5)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
         );
     }
     if table.measured_at.is_none() {
-        eprintln!("i-shard: {} has no measured_at; the costs may be stale, which affects balance only", o.costs);
+        eprintln!(
+            "i-shard: {} has no measured_at; the costs may be stale, which affects balance only",
+            o.costs
+        );
     }
     Ok(match o.command.as_str() {
         "plan" => plan_json(&planned, budget) + "\n",
@@ -104,7 +135,10 @@ fn run(args: &[String]) -> Result<String, Failure> {
             let text = o.shard.unwrap();
             let count = planned.shards.len();
             let k = text.parse::<usize>().map_err(|_| {
-                error(format!("--shard must be a shard index from 0 to {}, not {text:?}", count - 1))
+                error(format!(
+                    "--shard must be a shard index from 0 to {}, not {text:?}",
+                    count - 1
+                ))
             })?;
             let shard = planned.shards.get(k).ok_or_else(|| {
                 error(format!(

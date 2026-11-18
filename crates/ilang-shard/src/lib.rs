@@ -59,14 +59,22 @@ pub fn plan(units: &[Unit], budget_seconds: f64) -> Plan {
             unit.key,
             unit.cost
         );
-        assert!(seen.insert(unit.key.as_str()), "the key {:?} is given twice", unit.key);
+        assert!(
+            seen.insert(unit.key.as_str()),
+            "the key {:?} is given twice",
+            unit.key
+        );
     }
 
     let mut order: Vec<&Unit> = units.iter().collect();
     order.sort_by(|a, b| b.cost.total_cmp(&a.cost).then_with(|| a.key.cmp(&b.key)));
     let total: f64 = order.iter().map(|u| u.cost).sum();
 
-    let mut over_budget: Vec<Unit> = units.iter().filter(|u| u.cost > budget_seconds).cloned().collect();
+    let mut over_budget: Vec<Unit> = units
+        .iter()
+        .filter(|u| u.cost > budget_seconds)
+        .cloned()
+        .collect();
     over_budget.sort_by(|a, b| a.key.cmp(&b.key));
 
     let most = units.len().max(1);
@@ -81,7 +89,11 @@ pub fn plan(units: &[Unit], budget_seconds: f64) -> Plan {
 
 fn assign(order: &[&Unit], count: usize) -> Vec<Shard> {
     let mut shards: Vec<Shard> = (0..count)
-        .map(|index| Shard { index, seconds: 0.0, keys: Vec::new() })
+        .map(|index| Shard {
+            index,
+            seconds: 0.0,
+            keys: Vec::new(),
+        })
         .collect();
     for unit in order {
         let mut least = 0;
@@ -111,7 +123,10 @@ pub fn with_median_missing(units: &[(String, Option<f64>)]) -> Vec<Unit> {
     };
     units
         .iter()
-        .map(|(key, cost)| Unit { key: key.clone(), cost: cost.unwrap_or(median) })
+        .map(|(key, cost)| Unit {
+            key: key.clone(),
+            cost: cost.unwrap_or(median),
+        })
         .collect()
 }
 
@@ -144,7 +159,12 @@ pub struct CasePlan {
 ///
 /// When the table can be read but is not valid, has no set `set_name` or no
 /// `budget_seconds`; when `fallback_shards` is 0; when a key is given twice.
-pub fn plan_cases(costs_path: &Path, set_name: &str, keys: &[String], fallback_shards: usize) -> CasePlan {
+pub fn plan_cases(
+    costs_path: &Path,
+    set_name: &str,
+    keys: &[String],
+    fallback_shards: usize,
+) -> CasePlan {
     assert!(fallback_shards > 0, "a plan has at least one shard");
     let mut keys = keys.to_vec();
     keys.sort();
@@ -154,14 +174,24 @@ pub fn plan_cases(costs_path: &Path, set_name: &str, keys: &[String], fallback_s
     let text = match std::fs::read_to_string(costs_path) {
         Ok(text) => text,
         Err(error) => {
-            let units: Vec<Unit> = keys.iter().map(|key| Unit { key: key.clone(), cost: 1.0 }).collect();
+            let units: Vec<Unit> = keys
+                .iter()
+                .map(|key| Unit {
+                    key: key.clone(),
+                    cost: 1.0,
+                })
+                .collect();
             let order: Vec<&Unit> = units.iter().collect();
             let count = fallback_shards.min(units.len()).max(1);
             let shards = assign(&order, count);
             // The largest shard, so that no unit is over this budget.
             let budget_seconds = shards.iter().map(|s| s.seconds).fold(1.0, f64::max);
             return CasePlan {
-                plan: Plan { shards, over_budget: Vec::new(), missing_costs: keys.clone() },
+                plan: Plan {
+                    shards,
+                    over_budget: Vec::new(),
+                    missing_costs: keys.clone(),
+                },
                 budget_seconds,
                 fallback: Some(format!(
                     "cannot read the cost table {}: {error}; every case costs 1 s, in {count} shard(s)",
@@ -175,21 +205,46 @@ pub fn plan_cases(costs_path: &Path, set_name: &str, keys: &[String], fallback_s
     let table = CostTable::parse(&text).unwrap_or_else(|e| panic!("{}: {e}", costs_path.display()));
     let set = table.sets.get(set_name).unwrap_or_else(|| {
         let known: Vec<&str> = table.sets.keys().map(String::as_str).collect();
-        panic!("{}: no set {set_name:?}; the sets are: {}", costs_path.display(), known.join(", "))
+        panic!(
+            "{}: no set {set_name:?}; the sets are: {}",
+            costs_path.display(),
+            known.join(", ")
+        )
     });
     let budget_seconds = table
         .budget_seconds
         .unwrap_or_else(|| panic!("{} has no budget_seconds", costs_path.display()));
-    let pairs: Vec<(String, Option<f64>)> =
-        keys.iter().map(|key| (key.clone(), set.costs.get(key).copied())).collect();
+    let pairs: Vec<(String, Option<f64>)> = keys
+        .iter()
+        .map(|key| (key.clone(), set.costs.get(key).copied()))
+        .collect();
     let mut planned = plan(&with_median_missing(&pairs), budget_seconds);
-    planned.missing_costs = pairs.iter().filter(|(_, cost)| cost.is_none()).map(|(key, _)| key.clone()).collect();
+    planned.missing_costs = pairs
+        .iter()
+        .filter(|(_, cost)| cost.is_none())
+        .map(|(key, _)| key.clone())
+        .collect();
     let listed: BTreeSet<&str> = set.keys.iter().map(String::as_str).collect();
     let found: BTreeSet<&str> = keys.iter().map(String::as_str).collect();
-    let unlisted = keys.iter().filter(|key| !listed.contains(key.as_str())).cloned().collect();
-    let mut absent: Vec<String> = set.keys.iter().filter(|key| !found.contains(key.as_str())).cloned().collect();
+    let unlisted = keys
+        .iter()
+        .filter(|key| !listed.contains(key.as_str()))
+        .cloned()
+        .collect();
+    let mut absent: Vec<String> = set
+        .keys
+        .iter()
+        .filter(|key| !found.contains(key.as_str()))
+        .cloned()
+        .collect();
     absent.sort();
-    CasePlan { plan: planned, budget_seconds, fallback: None, unlisted, absent }
+    CasePlan {
+        plan: planned,
+        budget_seconds,
+        fallback: None,
+        unlisted,
+        absent,
+    }
 }
 
 impl CasePlan {
@@ -210,7 +265,11 @@ impl CasePlan {
             self.plan.shards.len(),
             seconds_json(self.budget_seconds),
         );
-        assert!(index < count, "{what}: shard {index} is out of range; the shards are 0 to {}", count - 1);
+        assert!(
+            index < count,
+            "{what}: shard {index} is out of range; the shards are 0 to {}",
+            count - 1
+        );
         &self.plan.shards[index].keys
     }
 
@@ -223,7 +282,10 @@ impl CasePlan {
         for shard in &self.plan.shards {
             for key in &shard.keys {
                 if let Some(other) = shard_of.insert(key.as_str(), shard.index) {
-                    errors.push(format!("{key} is in shard {other} and in shard {}", shard.index));
+                    errors.push(format!(
+                        "{key} is in shard {other} and in shard {}",
+                        shard.index
+                    ));
                 }
             }
         }
@@ -247,7 +309,11 @@ impl CasePlan {
     pub fn notes(&self, what: &str) -> Vec<String> {
         let few = |keys: &[String]| {
             let shown: Vec<&str> = keys.iter().take(5).map(String::as_str).collect();
-            let more = if keys.len() > 5 { format!(" and {} more", keys.len() - 5) } else { String::new() };
+            let more = if keys.len() > 5 {
+                format!(" and {} more", keys.len() - 5)
+            } else {
+                String::new()
+            };
             format!("{}{more}", shown.join(", "))
         };
         let mut notes = Vec::new();
@@ -295,7 +361,10 @@ fn string_json(text: &str) -> String {
 /// The plan as one line of JSON:
 /// `{"budget_seconds":N,"shards":[{"index":0,"seconds":S,"keys":[...]}],"over_budget":[{"key":K,"cost":C}],"missing_costs":[K]}`.
 pub fn plan_json(plan: &Plan, budget_seconds: f64) -> String {
-    let mut out = format!("{{\"budget_seconds\":{},\"shards\":[", seconds_json(budget_seconds));
+    let mut out = format!(
+        "{{\"budget_seconds\":{},\"shards\":[",
+        seconds_json(budget_seconds)
+    );
     for (i, shard) in plan.shards.iter().enumerate() {
         if i > 0 {
             out.push(',');
@@ -314,7 +383,12 @@ pub fn plan_json(plan: &Plan, budget_seconds: f64) -> String {
         if i > 0 {
             out.push(',');
         }
-        let _ = write!(out, "{{\"key\":{},\"cost\":{}}}", string_json(&unit.key), seconds_json(unit.cost));
+        let _ = write!(
+            out,
+            "{{\"key\":{},\"cost\":{}}}",
+            string_json(&unit.key),
+            seconds_json(unit.cost)
+        );
     }
     out.push_str("],\"missing_costs\":[");
     for (i, key) in plan.missing_costs.iter().enumerate() {
@@ -417,7 +491,9 @@ impl CostTable {
             .ok_or("sets is missing or not an object")?;
         let mut sets = BTreeMap::new();
         for (name, raw) in raw_sets {
-            let set = raw.as_object().ok_or_else(|| format!("set {name:?} is not an object"))?;
+            let set = raw
+                .as_object()
+                .ok_or_else(|| format!("set {name:?} is not an object"))?;
             let raw_keys = set
                 .get("keys")
                 .and_then(|k| k.as_array())
@@ -442,12 +518,18 @@ impl CostTable {
                     let cost = cost
                         .as_f64()
                         .filter(|c| c.is_finite() && *c > 0.0)
-                        .ok_or_else(|| format!("set {name:?}: the cost of {key:?} is not a positive number"))?;
+                        .ok_or_else(|| {
+                            format!("set {name:?}: the cost of {key:?} is not a positive number")
+                        })?;
                     costs.insert(key.clone(), cost);
                 }
             }
             sets.insert(name.clone(), CostSet { keys, costs });
         }
-        Ok(CostTable { budget_seconds, measured_at, sets })
+        Ok(CostTable {
+            budget_seconds,
+            measured_at,
+            sets,
+        })
     }
 }
