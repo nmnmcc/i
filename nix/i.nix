@@ -98,6 +98,14 @@ rustPlatform.buildRustPackage {
     runHook postInstall
   '';
 
+  # Rust's precompiled std embeds its source paths, which point into the
+  # `rust-src` of the pinned toolchain. They are only panic messages, but Nix
+  # counts them as references, so without this the i binary would pull the
+  # whole 1.7 GB toolchain at install time.
+  postFixup = ''
+    removeReferencesTo "$out/bin/i" ${rustToolchain}
+  '';
+
   # The nested build of the musl runner inherits this. nixpkgs sets the Cargo
   # strip setting to false for the outer build; this keeps the runner like a
   # release `cargo build` makes it.
