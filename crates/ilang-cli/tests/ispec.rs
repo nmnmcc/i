@@ -83,7 +83,11 @@ fn a_closed_reader_is_not_an_error() {
     let mut first = String::new();
     BufReader::new(stdout).read_line(&mut first).unwrap();
     let out = child.wait_with_output().unwrap();
-    assert_eq!(first, "# The i Language\n");
+    // Take the first line from the standard itself: this test is about a
+    // closed reader, not about the document's title.
+    let standard = std::fs::read_to_string(standard::PATH).unwrap();
+    let expected = format!("{}\n", standard.lines().next().unwrap());
+    assert_eq!(first, expected);
     assert!(
         out.status.success(),
         "status {:?}, standard error: {}",
