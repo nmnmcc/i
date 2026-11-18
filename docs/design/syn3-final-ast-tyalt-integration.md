@@ -83,7 +83,7 @@ Controlling paragraphs: syntax-3 §2.8 (one labelled type per data definition),
 a type, the grammar reads `Annot`, not `Type`”; spec §1.7 gives colons the same
 spacing/layout as equals. The compiler migration adds no further language rule.
 
-## Verification
+## Checking
 
 - Direct rustfmt on all94 changed Rust files: PASS; exact argv in
   target/fa-r3/tyalt-format-argv.json.
@@ -304,7 +304,7 @@ user-source spans. The primary16:1 and16:61 spans stay identical.
 All six/seven complete errors and all five/six provider errors remain pinned
 exactly; the four added exact correction entries preserve all other text.
 This is an explained, design-required representation change, not a new
-checker behavior or a normalization of the comparison. Focused verification
+checker behavior or a normalization of the comparison. Focused checking
 of both projects and the full fourteen-project assertion follows.
 
 The body-block difference in the same expansion is also specified by §6.8:
@@ -491,7 +491,7 @@ wrapped parser-driver build:5035 blocks,34 Lisp files,94 macro fragments,
 5 unchanged future-track entries, exact expected diagnostics. No heavy jobs
 remain in this lane. Final byte/deletion/ancestor/golden audits PASS. Latest
 tyalt c220 is unchanged and an ancestor. All steps2c/2d/3/4 are complete and
-the merged integration is fully green; no requested verification is pending.
+the merged integration is fully green; no requested checking is pending.
 
 ## Complete command ledger
 
@@ -528,6 +528,6 @@ H is `/home/agent/Programming/i/.rd/cache/heavy`. All builds, tests and clippy c
 | `scripts/check-snippets` | exit 1 at 10:50:20 |
 | `./target/debug/i fmt --check lib std bench examples` | exit 0 at 12:12:23 |
 
-Additional verification commands and failed attempts without separate command files are recorded in the narrative: workspace checks1/2/3, initial strict clippy, Rust formatting with its exact94-file argv JSON, the two Lisp suite-format commands, direct reused-parser snippets, all exact provider/stop/byte audits, and diff/ancestor/deletion audits. Initial failures are retained and explained; no expectation was silently recorded.
+Additional checking commands and failed attempts without separate command files are recorded in the narrative: workspace checks1/2/3, initial strict clippy, Rust formatting with its exact94-file argv JSON, the two Lisp suite-format commands, direct reused-parser snippets, all exact provider/stop/byte audits, and diff/ancestor/deletion audits. Initial failures are retained and explained; no expectation was silently recorded.
 
 <!-- End command ledger -->

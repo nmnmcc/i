@@ -97,7 +97,7 @@ warning: build failed, waiting for other jobs to finish...
 Both constructors are in `examples/legacy/support/legacy/parser.rs`; their
 executable tokens are unchanged from e4, as the source-token proof confirms.
 The coordinator's code-retention instruction prevents repairing these AST
-initializers in the comment lane. The adjusted verification tests all ten
+initializers in the comment lane. The adjusted checking tests all ten
 workspace packages with `--lib --bins` and separately tests the migration
 helper's library with `--lib`; the excluded helper binary is a reported
 baseline limitation, not a changed expectation or weakened test.
@@ -110,19 +110,19 @@ the cleaned tree. The exact replay map contains 1,640 entries in 245 files.
 
 Final validation completed on 2026-11-15 (HKT). Compiler/library
 source is frozen at `885b8a2f3`; the subsequent report commit changes this
-verification documentation only. All commands below ran sequentially through
+checking documentation only. All commands below ran sequentially through
 `H=/home/agent/Programming/i/.rd/cache/heavy` where shown. Test commands use
 `RUST_TEST_THREADS=2`. Outputs show each command's last nonempty line; an empty
 log is recorded as successful with no output.
 
-| Verification command | Result and last line |
+| Checking command | Result and last line |
 | --- | --- |
 | `git submodule status crates/ilang-binaryen/binaryen` | `fba5005a132d85d578be5bd010e0487ed8e2ce3e (version_133)` |
 | `"$H" direnv exec /home/agent/Programming/i cargo fmt --all` | Exit 0; `✓ Running devenv:enterShell in 68.2ms` |
 | `scripts/doc-comments scan --base e975c5e93` | JSON inventory: counts in the application procedure; last line `}` |
 | `scripts/doc-comments scan` | JSON inventory: zero reference/stale/TODO counts; last line `}` |
 | `scripts/doc-comments record --base e975c5e93 --output scripts/doc-comments-rewrites/final-tree.json` | `recorded 1640 contextual rewrites in 245 files` |
-| `scripts/doc-comments apply --all --verify-replay e975c5e93` | `replayed exactly 1640, refused 0` |
+| `scripts/doc-comments apply --all --check-replay e975c5e93` | `replayed exactly 1640, refused 0` |
 | `python3 -I scripts/test-doc-comments.py` | 9 tests; `OK` |
 | `scripts/doc-comments check --proof e975c5e93` | 439 existing sources, 245 changed, 0 beyond comments; `rustdoc proof: 7 fenced/indented example blocks, no changes` |
 | `"$H" direnv exec /home/agent/Programming/i cargo build --locked --release -p ilang-cli --bin i` | Initial: ``    Finished `release` profile [optimized] target(s) in 2m 05s``; refreshed after final comments: ``    Finished `release` profile [optimized] target(s) in 53.93s`` |

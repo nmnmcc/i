@@ -1,4 +1,4 @@
-# Verification and recovery notes
+# Checking and recovery notes
 
 The lane started clean. There was no interrupted worker's uncommitted work to
 keep or discard. Compiler and library changes in this branch come only from
@@ -7,16 +7,16 @@ change.
 
 The following unsuccessful checks and recovery steps are retained:
 
-- `verify.log`: the first full gate failed the formatter's fixed skip inventory
+- `checks.log`: the first full gate failed the formatter's fixed skip inventory
   after adding deliberately invalid review inputs. Parser-negative inputs now
   live in `.invalid`, with exact entries in the existing syntax registry. Valid
   inputs still take part in the original formatter properties. No formatter
   assertion or existing skip entry was weakened.
-- `verify-final.log`: the next full gate found that the copied K4s std package
+- `checks-final.log`: the next full gate found that the copied K4s std package
   had initially omitted modules whose bytes already existed in maintained
   tests. Import now keeps every module of a recovered package. The recaptured
   result matched the actual full-gate result (`std-recapture.log`).
-- `verify-complete.log`: the nested-50 stress program finished its O2 build
+- `checks-complete.log`: the nested-50 stress program finished its O2 build
   inside a three-second budget on a later run. Treating that as an unexpected
   semantic fix had introduced an accidental timing gate. Censored resource
   observations now report completion separately. Complete observations still
@@ -26,7 +26,7 @@ The following unsuccessful checks and recovery steps are retained:
   checks whether they still exist. A complete reimport restored its outputs.
 - `models.json`: the first optional model replay treated the historical
   forgetting-conflict witness as a passing model. Its own assertion documents
-  the old inconsistent rules and must fail. `model-control.json` verifies that
+  the old inconsistent rules and must fail. `model-control.json` checks that
   exact failure. The eager substitution model exceeded 120 seconds; it passed
   with a 600-second observation budget (`model-substitution.json`). BDD,
   demand and URI models passed in the initial replay.
@@ -53,7 +53,7 @@ The following unsuccessful checks and recovery steps are retained:
 - The first corpus runs compiled entryless libraries but executed zero tests.
   Accepted packages now receive a temporary ordinary Nil test so startup is
   exercised. The original source still supplies the shown-type baseline.
-  `verify-startup.log` is the full gate for this stronger runner.
+  `checks-startup.log` is the full gate for this stronger runner.
 - The first integrity probe assumed every standalone snapshot used src/main.i.
   Copied spec inputs correctly use test/<name>.i and the spec package identity.
   The importer now reproduces that convention. The permanent integrity command

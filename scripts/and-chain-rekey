@@ -15,7 +15,7 @@ differs from it in separator bytes only.  Nothing else is moved.
 
 A substitution's *replacement* is i source too.  Its chain separators are moved
 only where the OLD parser reports a separator of the assembled program
-(`--parser`), one byte at a time, each flip verified by re-reading; a `|` in a
+(`--parser`), one byte at a time, each flip checked by re-reading; a `|` in a
 type or in a pattern stays.
 
     scripts/and-chain-rekey --old TREE --dry-run  [--parser PATH] [--json FILE]
@@ -184,7 +184,7 @@ def separator_flips(source, limit=10):
 
 
 def rename_mode(args, registries):
-    """The rename's own edit, then the separator move, both verified by text.
+    """The rename's own edit, then the separator move, both checked by text.
 
     A key is mapped only when (1) some host text of the pre-rename tree hashes to
     it, (2) the rename tool's own `edits_for` turns that text into a text a host

@@ -244,21 +244,21 @@ Logs live under `target/k4d-checks` unless otherwise stated.
 | `row-schemes` | The test helper's tuple was mistaken for a Checked result. | Invoke the checker on its graph. |
 | `spec-first` | A constructor with one possible form was treated as a nontrivial hidden restriction. | Prove that obligation universally, without a type-name exception. |
 | `clippy-first`, `parameter-iteration` | Collapsible conditions and an owned-iterator lint. | Restructure conditions and make the necessary owned fallback explicit; no lint suppression. |
-| `dev-verify-head` | Formatting failed while the next iterator change was being prepared. | Format the final source; repeat the full gate. |
+| `checks-head` | Formatting failed while the next iterator change was being prepared. | Format the final source; repeat the full gate. |
 | `delivery-build`, `alias-kind-test` | The initial alias test demanded rejection of freely unifiable callback results. | Use concrete, incompatible annotated arguments; retain the alias mode fix. |
 | Initial generator adapter | No entry point because source construction stopped early. | Keep all source-building statements; discard that run. |
 | Initial Python audit script | `enum.py` shadowed Python's standard module. | Rename the local audit script; no global Python change. |
 | Initial snippet checks | Partial constructor, service, or entry-marker fragments were parsed as complete snippets. | Use complete source templates; keep the snippet checker unchanged. |
 | `timing-isolated` | The real redesign rejects the ring with E0505. | Label the pre-follow-up lane as a substitute ring baseline; keep redesign for std. |
 | Initial timing runs | Approximately 7–9%, then 3%, then 1.5% std CPU regressions. | Remove repeated row/occurrence allocation and copying; final measurement is separate. |
-| Initial archived baseline, `baseline-correct`, interrupted isolated build | Cargo target contamination, scratch working-directory mistakes, missing Binaryen source link, and a canceled cold build. | Discard invalid baseline results; rebuild all local crates in the isolated target and verify compiler identity. |
+| Initial archived baseline, `baseline-correct`, interrupted isolated build | Cargo target contamination, scratch working-directory mistakes, missing Binaryen source link, and a canceled cold build. | Discard invalid baseline results; rebuild all local crates in the isolated target and check compiler identity. |
 | Raw generator runtime checks | Two exact source-level recursive helpers time out in both binaries and both optimization levels. | Retain these results as source divergence; also measure the separately labeled bounded corpus. |
 
 No checks or lints were weakened. Temporary trace instrumentation was removed.
 No global configuration, PATH, package lock, shared source checkout, or other
 lane was changed. Scratch sources, dependencies and logs remain only under
 this lane's ignored target directory. Browser dependencies are installed by
-the normal dev-verify command.
+the normal checks command.
 
 The final original-helper runtime test initially used a Rust format string
 whose placeholders were extracted as an i snippet (`delivery-syntax-first`).
@@ -270,7 +270,7 @@ asserts the principal use/fw schemes for all twenty q spellings, from 4.8's
 union of the callback row N and service parameter S(N).
 
 One queued quiet measurement was canceled before collecting any samples:
-it held slots while the verification command was about to request its nested
+it held slots while the checking command was about to request its nested
 snippet-build slot. Only this lane's waiting quiet wrapper and its flock
 child were terminated, releasing the locks. The completed quiet measurement
 is started after the gates and comparisons finish.
@@ -278,7 +278,7 @@ is started after the gates and comparisons finish.
 The nested-slot issue also occurred when another lane's quiet measurement
 queued behind this lane's last snippet step. The already-completed Rust,
 i/JS, spec and WAT checks were retained, but that final snippet step was
-interrupted. The queued replacement verification had not started and was
+interrupted. The queued replacement checking had not started and was
 also replaced. The final command runs old-syntax-check outside the outer
 heavy wrapper, allowing its own wrapped Cargo build to acquire a slot. No
 other lane's process, source, or measurement was stopped or modified.
@@ -462,7 +462,7 @@ supersedes the original request to freeze all existing golden text. No
 previously accepted golden program becomes rejected.
 
 
-## Final verification on merged redesign 82375c0
+## Final checking on merged redesign 82375c0
 
 The compiler source is frozen at 78f942e for these checks. Subsequent commits
 record this evidence and generate expectations only. The initial lane was
@@ -473,7 +473,7 @@ Commands run from this lane, with H denoting
 
 - `H env UPDATE=1 cargo test -p ilang-check --test types --locked` generates
   exactly the four files listed above.
-- `H env ILANG_BROWSER_PORT=4185 ./scripts/dev-verify` passes formatting,
+- `H env ILANG_BROWSER_PORT=4185 ./scripts/checks` passes formatting,
   Clippy with warnings denied, the workspace Rust tests, 1,465 std tests,
   two hello tests and 12 benchmark tests at each optimization level, WASI
   smoke tests, the JS tests and all 51 browser tests.
@@ -569,7 +569,7 @@ All failed/interrupted checks and temporary environment incidents are listed
 in this record; discarded measurements are not final evidence. Trace code
 is removed, normal per-command environment variables have expired, no
 shared checkout/configuration was changed, and ignored scratch evidence and
-normal dev-verify browser dependencies are retained in this lane.
+normal checks browser dependencies are retained in this lane.
 
 
 ## Escalations and handoff
@@ -613,7 +613,7 @@ for every q21–q40 spelling are explicit requirements, including both original
 review copies and the runnable entry variants. Original review bytes remain
 unchanged. The old fixture copies, Rust corpus runner and three Python K4
 runners are removed; focused checker unit tests remain. The review runner
-now also calls run O0/O2 for source-rejected entry requirements and verifies
+now also calls run O0/O2 for source-rejected entry requirements and checks
 that all three commands reject before execution. Those additional phases
 are a harness change, recorded separately from compiler behavior changes.
 
@@ -841,18 +841,18 @@ with exactly the same three std row-order permutations and no missing or
 added bindings (types-qa-comparison.json).
 
 
-## QA verification and incidents
+## QA checking and incidents
 
 The complete pre-final replay passes at source head 14fa7651:
 H env UPDATE=1 cargo test -p ilang-check --test types --locked;
-H env ILANG_BROWSER_PORT=4185 ./scripts/dev-verify;
+H env ILANG_BROWSER_PORT=4185 ./scripts/checks;
 H cargo test -p ilang-cli --test spec --locked;
 H env WAT_DUMP=<lane scratch> cargo test -p ilang-cli --test wat_dump --locked;
 and old-syntax-check outside that outer wrapper. H is the heavy/dev-shell
 wrapper defined earlier. The gate includes all 1,935 corpus projects: 1,098
 accepted, 837 rejected, five explicit XFAIL entries (three T3 held and two
 T1 runtime observations), zero failed requirements and zero checker timeouts.
-The short model run passes inside dev-verify, alongside all Rust/i/JS/browser
+The short model run passes inside checks, alongside all Rust/i/JS/browser
 checks. All 242 spec cases pass at both optimization levels. The syntax sweep
 parses 3,683 extracted snippets with exact diagnostics and 20 inherited
 future-track entries.
@@ -867,7 +867,7 @@ Resource budgets are observation caps under docs/testing.md, not weakened
 performance checks. Successfully promoted K4 cases now require completion;
 none retains a known-failure exemption.
 
-The integrity command verifies 1,880 preserved payload occurrences, 1,456
+The integrity command checks 1,880 preserved payload occurrences, 1,456
 maintained mappings and 4,108 historical tools/evidence payloads with zero
 failures. Long-generation model counts, verdicts, permutations, annotations
 and report-only results are identical to the stored long run. Benchmark
@@ -893,7 +893,7 @@ New failed checks/incidents in this follow-up:
   landed statement. The immutable 3beae77 note and all requested reference
   functions were read directly; none was edited or built.
 
-No verification run was interrupted in this follow-up. No global config,
+No checking run was interrupted in this follow-up. No global config,
 lockfile, shared checkout, reference implementation or other lane changed.
 Per-command environment variables expired normally. Scratch logs and normal
 browser dependencies remain in this lane. The final-head replay is recorded

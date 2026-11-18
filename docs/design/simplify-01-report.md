@@ -23,7 +23,7 @@ The scheme wire tests retain their original text, with the enclosing module's in
  11 files changed, 1222 insertions(+), 4750 deletions(-)
 ```
 
-Verification: `scripts/dev-verify rust` and `scripts/old-syntax-check` pass. Two runs of `scripts/dev-verify i` failed in the review corpus, including `review-k4s/std: unclassified checker timeout` and output changes for several stress cases. The compiler implementation is unchanged. Small reproduction (after building the release CLI):
+Checking: `scripts/checks rust` and `scripts/old-syntax-check` pass. Two runs of `scripts/checks i` failed in the review corpus, including `review-k4s/std: unclassified checker timeout` and output changes for several stress cases. The compiler implementation is unchanged. Small reproduction (after building the release CLI):
 
 ```sh
 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i scripts/review-corpus run --binary "$PWD/target/release/i" --filter review-k4s/std

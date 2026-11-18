@@ -1,8 +1,8 @@
 # Applying the final-tree deletion
 
-Applied and fully verified (Nov14). The ordered notes below describe the
+Applied and fully checked (Nov14). The ordered notes below describe the
 original application. The driver performs the structural move; the later
-compilation/test-boundary repairs are recorded in the verification ledger.
+compilation/test-boundary repairs are recorded in the checking ledger.
 The completed source and ledger are the authoritative resulting state.
 The tools adapt lane/fa2 af804b08 to the native resolver, engine and final rows.
 The complete step-three gate is a prerequisite. The coordinator's latest

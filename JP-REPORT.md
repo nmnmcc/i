@@ -2,7 +2,7 @@ JP step 3: per-entry target provider graphs
 
 API: `ilang_check::providers::resolve_plans(&Checked, &PackageGraph, Target)` returns an entry-keyed map of resolved plans or diagnostics. Plans expose ordered service constructions, factory/host/constructor bindings, generated arguments and service positions, outer/body scope, adapter entry position, roles, request modes, primitive-key need and async classification. The shipped manifest supplies the implemented standard capabilities and ordinary private request/task factories.
 
-Verification uses `H="/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i"`.
+Checking uses `H="/home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i"`.
 
 - `$H cargo check --workspace --all-targets`: passed after both redesign merges.
 - `$H cargo check -p ilang-check --all-targets` and `$H cargo check -p ilang-package -p ilang-check --all-targets`: passed.

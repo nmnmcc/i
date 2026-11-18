@@ -36,7 +36,7 @@ head/guard/body parsing. Leave keywords and comma-based disambiguation.
 Gleam format/src/lib.rs pretty and Intermediate::from_extra separate comment
 positions from AST printing; retain i's existing equivalent structure.
 Go cmd/gofmt/rewrite.go rewriteFile matches trees and preserves comments;
-Cargo ops/cargo_fix/fix_edition.rs fix_edition verifies both source versions;
+Cargo ops/cargo_fix/fix_edition.rs fix_edition checks both source versions;
 Cargo crates/rustfix/src/lib.rs CodeFix applies bounded text edits. Take
 AST-directed edits and reparse checks, leave their language-specific rewrites.
 Gleam compiler-cli/src/fix.rs run collects compiler evidence before edits;
@@ -60,7 +60,7 @@ TypeKind::Record { base, fields, removed }. Both surfaces construct these
 nodes. The parser selects function suffixes first, preserves call and
 constructor contexts, and does not add a comma to disambiguate.
 
-## Verification
+## Checking
 
 Checks and migrations will be recorded below as they finish.
 
@@ -85,7 +85,7 @@ this checkpoint. The source compiler used by that run was built before the
 next stage; its release executable was saved as target/syn2/i-before.
 
 Stage 1 final results: heavy direnv exec /home/agent/Programming/i env
-ILANG_BROWSER_PORT=4188 ./scripts/dev-verify exited 0. Rust fmt, Clippy
+ILANG_BROWSER_PORT=4188 ./scripts/checks exited 0. Rust fmt, Clippy
 -D warnings, workspace tests (including spec O0/O2), i tests O0/O2, WASI,
 1,855 review projects under their existing policy, short generation, SDK
 and all 51 browser tests passed. old-syntax-check retry exited 0 with
@@ -191,7 +191,7 @@ R2 review programs retain their explicit effect annotations, extended with the
 Root and Owner services required by task operations (§9.2); all three pass
 their review checks and runs at O0/O2.
 
-Additional verification: the syntax inventory passed for 4,099 extracted
+Additional checking: the syntax inventory passed for 4,099 extracted
 snippets, with three exact future-track entries. The short generation run, the
 six editor tests, the 85 JavaScript tests, and the O0/O2 standard-library
 runs (1,836 tests each) passed. The first review regeneration reported the

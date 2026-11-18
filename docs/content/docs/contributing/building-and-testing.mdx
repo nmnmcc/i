@@ -51,7 +51,9 @@ CI builds with `cargo build --release --locked -p ilang-cli`. Shared redesign wo
 
 ## Check selection
 
-These commands are defined in [dev-verify](https://github.com/nmnmcc/i/blob/main/scripts/dev-verify) and [CI](https://github.com/nmnmcc/i/blob/main/.github/workflows/ci.yml).
+These commands are defined in [checks](https://github.com/nmnmcc/i/blob/main/scripts/checks) and [CI](https://github.com/nmnmcc/i/blob/main/.github/workflows/ci.yml).
+
+The whole workflow is called CI; each of its jobs is named only by what it runs (`build (…)`, `lint (…)`, `test (…)`, `run (…)`, `corpus (…)`, `docs (…)`); the local entry is `scripts/checks`; and the smallest runnable unit (one Cargo target, one shard) is called a test set. Do not use one word for more than one of these layers.
 
 | Change | Command or part |
 | --- | --- |
@@ -63,10 +65,10 @@ These commands are defined in [dev-verify](https://github.com/nmnmcc/i/blob/main
 | Runtime smoke | `./scripts/wasi-smoke "$I"` |
 | Generated models | `./scripts/test-generation --mode short --binary "$I"` |
 | Corpus shard | `./scripts/review-corpus run --binary target/release/i --shard 1/10 --jobs 4` |
-| SDK/browser checks | `./scripts/dev-verify js` |
-| Editor checks | `./scripts/dev-verify editors` |
+| SDK/browser checks | `./scripts/checks js` |
+| Editor checks | `./scripts/checks editors` |
 
-CI splits `rust-test` with `DEV_VERIFY_TEST_GROUP=check-heavy` (ilang-check's `value_types`), `check`, `spec-1/3` to `spec-3/3` (shards of `spec`, which also runs whole), `cli-heavy` (the slowest ilang-cli targets, listed in `scripts/dev-verify`), `cli`, or `rest`. `rust-lint` runs formatting, lint, and snippets; `rust` combines lint/tests. Other accepted parts are `snippets`, `i`, `js`, `editors`; no argument selects `rust i js editors`. The `i` part tests `std`, `examples/hello`, and `bench` at O0/O2, then smoke, corpus, and generated models. Smoke covers Wasmtime and Node; generated failures retain source/observations.
+CI splits `rust-test` into jobs with `CHECKS_TEST_GROUP=check-heavy` (ilang-check's `value_types`), `check`, `spec-1/3` to `spec-3/3` (shards of `spec`, which also runs whole), `cli-heavy` (the slowest ilang-cli targets, listed in `scripts/checks`), `cli`, or `rest`; for example, `CHECKS_TEST_GROUP=spec-2/3 ./scripts/checks rust-test` runs the job `test (spec, 2/3)`. `rust-lint` runs formatting, lint, and snippets; `rust` combines lint/tests. Other accepted parts are `snippets`, `i`, `js`, `editors`; no argument selects `rust i js editors`. The `i` part tests `std`, `examples/hello`, and `bench` at O0/O2, then smoke, corpus, and generated models. Smoke covers Wasmtime and Node; generated failures retain source/observations.
 
 ## Documentation checks
 
@@ -76,4 +78,4 @@ From `docs`, run `npm ci`, `npm run build`, `npm run check:placeholders`, `npm r
 
 Projects such as [review-native/fake](https://github.com/nmnmcc/i/blob/main/tests/review/cases/review-native/fake/i.toml) keep `i.toml`, `src/main.i`, and `expected.json` together. Observations include compiler identity, `check --types`, and test/main O0/O2 results. `manifest.json` records origins/rules; `inventory.json` accounts for occurrences; `requirements.json` independently records defects and required behavior. Resource caps are not performance guarantees; censored timeouts do not establish termination. Change expectations with the requiring spec paragraph, review semantic requirements independently, and promote fixed failures; [testing.md](https://github.com/nmnmcc/i/blob/main/docs/testing.md) documents regeneration.
 
-Full verification can be long; the repository gives no general memory estimate.
+Running every check can be long; the repository gives no general memory estimate.

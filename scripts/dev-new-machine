@@ -27,7 +27,7 @@
 # for a shell that is already root, as in a container; DEV_NEW_MACHINE_USER
 # names the user to run `i` as there.
 #
-# DEV_VERIFY_SKIP_NEW_MACHINE=1 skips the test loudly, for a computer without
+# CHECKS_SKIP_NEW_MACHINE=1 skips the test loudly, for a computer without
 # `unshare` (macOS). It is an error when CI is set: a skipped acceptance is not
 # a passed one.
 #
@@ -481,13 +481,13 @@ skip() {
   echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 }
 
-if [[ -n ${DEV_VERIFY_SKIP_NEW_MACHINE:-} ]]; then
+if [[ -n ${CHECKS_SKIP_NEW_MACHINE:-} ]]; then
   if [[ -n ${CI:-} || -n ${GITHUB_ACTIONS:-} ]]; then
-    echo "dev-new-machine: DEV_VERIFY_SKIP_NEW_MACHINE is set, but CI runs this test:" >&2
+    echo "dev-new-machine: CHECKS_SKIP_NEW_MACHINE is set, but CI runs this test:" >&2
     echo "dev-new-machine: it proves a copied \`i\` works without the source tree" >&2
     exit 2
   fi
-  skip "DEV_VERIFY_SKIP_NEW_MACHINE is set"
+  skip "CHECKS_SKIP_NEW_MACHINE is set"
   exit 0
 fi
 
@@ -594,7 +594,7 @@ printf '%s\n' "${masks[@]}" | sort -u > "$work/masked"
 
 # Only the least set is mounted: a path under another one is inside the tmpfs
 # of that one already, and mounting it again would fail, since it is not there
-# when the time comes. The full list stays, and is what the check verifies.
+# when the time comes. The full list stays, and is what the check checks.
 : > "$work/mounts"
 while IFS= read -r path; do
   covered=0
@@ -693,7 +693,7 @@ case $mode in
     echo "dev-new-machine:   sudo:         ${why_sudo:-not tried}" >&2
     if ! command -v unshare >/dev/null; then
       echo "dev-new-machine: unshare is not on this computer (macOS has none);" >&2
-      echo "dev-new-machine: set DEV_VERIFY_SKIP_NEW_MACHINE=1 to skip this test explicitly" >&2
+      echo "dev-new-machine: set CHECKS_SKIP_NEW_MACHINE=1 to skip this test explicitly" >&2
     fi
     exit 1
     ;;

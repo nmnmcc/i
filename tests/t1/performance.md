@@ -33,7 +33,7 @@ this with a quiet CPU/window. The supplied new-syntax baseline,
 check the later property module: its bundled i/random predates R1. The
 final baseline is `target/t1/continued/i-baseline-94789e6`, a copied
 pre-T1 upstream release build. All 910 tracked source blobs of its source
-tree were verified against 94789e6, its binary hash was preserved, and
+tree were checked against 94789e6, its binary hash was preserved, and
 its build timestamp is newer than those sources. A control reports
 `x = 1` as Int; it checks the same expanded std sources as T1. The build
 was performed by the other lane, not by this one. Provenance is recorded
@@ -111,5 +111,5 @@ The final compatible-baseline gate passes: std +8.401%; keys at 1000
 1.800× on doubling; monomorphic calls 1.797× on doubling. Every numerical
 limit and the independent quiet-window check passes, with all four
 ignored counter stresses green. The accepted experiment is attempt 18
-under `target/t1/continued/final-verified-performance-18`; earlier noisy
+under `target/t1/continued/final-checked-performance-18`; earlier noisy
 windows are retained and rejected, not averaged into that result.

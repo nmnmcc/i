@@ -3,7 +3,7 @@
 
 The wat-diff comparison is run unchanged on every baseline export. A second,
 explicitly diagnostic comparison identifies the six new constructor entries,
-their data strings, and the compiler's nominal ID changes. Removing verified
+their data strings, and the compiler's nominal ID changes. Removing checked
 additions in that diagnostic does not make the original comparison pass.
 Artifacts are written only under target/r1/wat-audit.
 """
@@ -202,7 +202,7 @@ def main():
         row['renumbering'] = dict(counts)
         row['only_renumbering'] = symbols(a) == symbols(inverse)
         summary['renumbering_only' if row['only_renumbering'] else 'has_nonrenumbering_additions'] += 1
-        # Diagnostic only: remove the individually verified additions to ask
+        # Diagnostic only: remove the individually checked additions to ask
         # whether any OTHER program operation changed. Not an acceptance pass.
         start, end, items, _ = install(inverse)
         kept = items[:1] + items[7:]

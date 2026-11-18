@@ -3,7 +3,7 @@
 Run the existing gates through the shared heavy slot in redesign worktrees:
 
 ```sh
-ILANG_BROWSER_PORT=4187 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i ./scripts/dev-verify
+ILANG_BROWSER_PORT=4187 /home/agent/Programming/i/.rd/cache/heavy direnv exec /home/agent/Programming/i ./scripts/checks
 ```
 
 The spec suite remains the language/runtime runner (`cargo test -p ilang-cli
@@ -88,7 +88,7 @@ commit. `UPDATE=1 scripts/review-corpus import` reimports review sources;
 requirements independently before accepting a new output. Import keeps only
 the review programs; review drivers, logs and compiler snapshots stay in git
 history. Reimporting is a recovery tool, not part of normal CI.
-`UPDATE=1 scripts/review-corpus integrity` verifies every preserved source
+`UPDATE=1 scripts/review-corpus integrity` checks every preserved source
 fingerprint and every link to the recorded maintained revision without `/tmp`.
 After a deliberate rewrite of the case files (a syntax conversion), `--refresh`
 records the new fingerprint of each rewritten file; it fails if a program no

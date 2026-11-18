@@ -1,4 +1,4 @@
-name: Verify
+name: CI
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: verify-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -21,8 +21,9 @@ env:
   # The number of shards of the review corpus; keep equal to the matrix below.
   CORPUS_SHARDS: 10
 
+# Each job is named by what it runs: build, lint, test, run, corpus or docs.
 # The release `i` is built once, in `release`; the jobs `i` and `corpus`
-# download it and run the parts of `scripts/dev-verify i` with it. The Rust
+# download it and run the parts of `scripts/checks i` with it. The Rust
 # formatting and Clippy (`lint`), the Rust tests (`test`), the JavaScript
 # tests (`js`) and the editor checks (`editors`) each build what they need, at
 # the same time as `release`.
@@ -98,7 +99,7 @@ jobs:
           retention-days: 3
 
   lint:
-    name: verify (rust-lint)
+    name: lint (rust)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -129,21 +130,30 @@ jobs:
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
-      - name: Verify rust-lint
-        run: devenv shell -- ./scripts/dev-verify rust-lint
+      - name: Run the Rust lint
+        run: devenv shell -- ./scripts/checks rust-lint
 
   test:
-    name: verify (rust-test, ${{ matrix.group }})
+    name: test (${{ matrix.name }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        # The groups of DEV_VERIFY_TEST_GROUP in scripts/dev-verify. The spec
-        # suite and ilang-cli's tests each took about 50 minutes in one job.
-        group: [check-heavy, check, spec-1/3, spec-2/3, spec-3/3, cli-heavy, cli, rest]
+        # Each group is a value of CHECKS_TEST_GROUP in scripts/checks, and
+        # the job is named by the test sets it runs. The spec suite and
+        # ilang-cli's tests each took about 50 minutes in one job.
+        include:
+          - { group: check-heavy, name: 'ilang-check, value types' }
+          - { group: check, name: 'ilang-check, other' }
+          - { group: spec-1/3, name: 'spec, 1/3' }
+          - { group: spec-2/3, name: 'spec, 2/3' }
+          - { group: spec-3/3, name: 'spec, 3/3' }
+          - { group: cli-heavy, name: 'ilang-cli, slow' }
+          - { group: cli, name: 'ilang-cli, other' }
+          - { group: rest, name: 'workspace, other crates' }
     env:
-      DEV_VERIFY_TEST_GROUP: ${{ matrix.group }}
+      CHECKS_TEST_GROUP: ${{ matrix.group }}
     steps:
       - name: Free disk space
         run: |
@@ -173,11 +183,11 @@ jobs:
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
-      - name: Verify rust-test
-        run: devenv shell -- ./scripts/dev-verify rust-test
+      - name: Run the Rust tests
+        run: devenv shell -- ./scripts/checks rust-test
 
   js:
-    name: verify (js)
+    name: test (javascript)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -199,8 +209,8 @@ jobs:
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
-      - name: Verify js
-        run: devenv shell -- ./scripts/dev-verify js
+      - name: Run the JavaScript tests
+        run: devenv shell -- ./scripts/checks js
       - name: Keep the browser test results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -214,7 +224,7 @@ jobs:
   # shell has (node and npm, a C compiler for tree-sitter, Rust), network access for `npm ci`,
   # and no release `i`. Without the wasm32-wasip1 target the Zed check runs for the host.
   editors:
-    name: verify (editors)
+    name: test (editors)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -230,13 +240,13 @@ jobs:
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
         run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
-      - name: Verify editors
-        run: devenv shell -- ./scripts/dev-verify editors
+      - name: Run the editor checks
+        run: devenv shell -- ./scripts/checks editors
 
-  # `scripts/dev-verify i` without the build and without the review corpus,
+  # `scripts/checks i` without the build and without the review corpus,
   # which the job `corpus` runs in shards.
   i:
-    name: verify (i)
+    name: run (i end to end)
     needs: release
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -260,11 +270,11 @@ jobs:
       # Artifacts do not keep the file mode.
       - name: Make i executable
         run: chmod +x target/release/i
-      - name: Verify i (without the review corpus)
+      - name: Run i end to end
         env:
-          DEV_VERIFY_I_BINARY: target/release/i
-          DEV_VERIFY_SKIP_CORPUS: 1
-        run: devenv shell -- ./scripts/dev-verify i
+          CHECKS_I_BINARY: target/release/i
+          CHECKS_SKIP_CORPUS: 1
+        run: devenv shell -- ./scripts/checks i
 
   corpus:
     name: corpus (${{ matrix.shard }}/10)
@@ -315,7 +325,7 @@ jobs:
           retention-days: 14
 
   docs:
-    name: verify (documentation site)
+    name: docs (site)
     needs: release
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -349,6 +359,9 @@ jobs:
         run: |
           devenv shell -- npm ci
           devenv shell -- npm run build
+      - name: Run the documentation site checks
+        working-directory: docs
+        run: |
           devenv shell -- npm run check:placeholders
           devenv shell -- npm run check:links
           devenv shell -- npm run check:rendering

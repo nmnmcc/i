@@ -76,7 +76,7 @@ tree" is what must exist before it can move. Sizes are lines of the file and
 | `src/shape.rs` | 164 | `shape`, `canon`, `equivalent` on the old tree | `ilang-cli` `fmt --to` (write check), `lisp/to_source.rs`, tests `common.rs`, `format`, `lisp_*`, `string_forms` | Replaced by `==` on the new tree (spans are not compared; a group is a `Block`, so the check needs the one-statement-block rule of `canonical`). |
 | `src/legacy/{parser,format}.rs` | 2155, 1789 | Old parser and formatter, feature `legacy` | examples `migrate-syntax3`, `migrate-syntax3-pipe`, `migrate-tests`; tests `syn3`, `syn3_lower`; scripts `syn3-convert-all`, `syn3-convert-embedded`, `old-syntax-check`, `test-macro-migrate`, `migrate-syntax3-labels-text` | Stays while the migrator must read old text; then moves under `examples/` with a private copy of `ast.rs`, `walk.rs`, `print.rs` and `syn3/convert.rs`. |
 | `src/syn3/convert.rs` | 2214 | Old tree to new tree (the migrator), and `syn3::print_current` | migrator; **`ilang-cli` `expand --to`** and **`ilang-check` `query.rs`:375** print an expanded old tree through it | The two compiler users go away when the expanded tree is the new tree; the file then belongs to the migrator only. |
-| `src/syn3/lower.rs` | 1429 | New tree to old tree | `syn3::parse_lowered` (= `ilang_syntax::parse_module`), `syn3::parse_lisp_lowered` (= `lisp::parse_source`), migrator `--verify` | Deleted when the resolver reads the new tree (step 3). |
+| `src/syn3/lower.rs` | 1429 | New tree to old tree | `syn3::parse_lowered` (= `ilang_syntax::parse_module`), `syn3::parse_lisp_lowered` (= `lisp::parse_source`), migrator `--check` | Deleted when the resolver reads the new tree (step 3). |
 
 ### 2.2 `ilang-syntax`: the Lisp surface (`src/lisp/`)
 
@@ -333,7 +333,7 @@ The other three fences remain unchanged: the formatter snapshot records
 existing lowering limitations, without adding any new skip in test code.
 Stages 9/E6 are outside this prefix.
 
-Verification of the additive prefix: workspace/all-targets check passed.
+Checking of the additive prefix: workspace/all-targets check passed.
 All syntax and macro test binaries passed across the broad diagnostic run
 and the targeted `format`/`spec` rerun after the documented fixture fixes.
 The four requested CLI binaries passed: `fmt` 6, `lisp` 5,
@@ -445,7 +445,7 @@ outside the sources used by this completed gate.
 
 Conversion final commit `9365b311f` is integrated after the green rows flip.
 Its four Rust-file changes are formatting only; its other changes document
-conversion verification and fix inventory extraction. Workspace/all-targets
+conversion checking and fix inventory extraction. Workspace/all-targets
 check passed again (`conv-final-check.log`).
 
 Step 2d implementation begins from green `9badcec8` (18:50). `Parsed.ast`
@@ -502,7 +502,7 @@ five-case fragment differential and item-result sum-boundary regression
 passed. Additional Wasm source-site 2, CLI source-site 1 and LSP suffix 1
 checks passed before the final boundary-metadata refinement. Complete
 commands, earlier explained failures and retries are in
-`target/fa-integration/evening-verification.txt`; final logs use `2d-final-*`.
+`target/fa-integration/evening-checking.txt`; final logs use `2d-final-*`.
 The initial queued std wrapper was cancelled by its own PID before starting,
 so the spec and boundary checks could run first; std then ran last through
 the wrapper. Step 3 is next; no deletion is authorized before its green gate.
@@ -584,7 +584,7 @@ canonical key order, selection tables and general parameter data, rather
 than normalizing IDs or weakening comparisons. The incomplete query branch
 is replaced by the final native metadata index with an old/native oracle.
 All 35 draft Rust files parse under rustfmt; compilation and behavioral
-verification remain pending until the conversion gate releases the slot.
+checking remain pending until the conversion gate releases the slot.
 
 23:25 checkpoint: temporary native preview passed workspace all-target
 check, all 677 files and 519 program comparisons of the resolver
@@ -745,8 +745,8 @@ the only landable hash. The scheduler is paused; the already-running std
 O2 check may finish, but no further queued heavy checks will start after
 the merge deadline. Compiler sources are frozen. Full final-source checker
 integration, LSP, examples, std O0, chapters 6/7/9/15.7 and final formatting/
-clippy repetition remain unverified; the exact matrix/commands are in
-syn3-final-ast-fa-verification.md. Step 4 is prepared only, not applied.
+clippy repetition remain unchecked; the exact matrix/commands are in
+syn3-final-ast-fa-checking.md. Step 4 is prepared only, not applied.
 
 Post-deadline read-only result (2026-11-14T02:01:53.534619+08:00): the already-running std O2
 finishes 2170/2170, including unchanged schema.null_round. Wrapper kernel
@@ -801,7 +801,7 @@ APIs and tests. The strict resolver comparison covers677 original files and
 and selection forms. Provider fusion is decided after alias/import expansion,
 and the closed-function generalization boundary is retained. Step four is
 still unapplied; the detailed command/result record is in
-`syn3-final-ast-fa-verification.md`. The historical fa2 null-round failure
+`syn3-final-ast-fa-checking.md`. The historical fa2 null-round failure
 does not reproduce; no guessed backend fix or expectation change is made.
 
 
@@ -842,7 +842,7 @@ the native tree; old-node assertions use dev-only private helpers. The
 migration package is absent from normal dependencies in all four consumers
 (syntax/check/macro/CLI), and the historical resolver is cfg(test) only.
 No diagnostic golden has changed. Initial all-target failures are explained
-in the verification ledger; private standalone checks and the complete
+in the checking ledger; private standalone checks and the complete
 deletion gate still follow. Green3 remains the landable prefix until they
 pass. Formatting and the private lockfile are next.
 
@@ -901,10 +901,10 @@ all39 CLI integration binaries plus library, examples13 (one existing
 skip), std2170 at O0/O2, spec6=80/7=104/9=139/15.7=28 at both levels,
 short generation and root/private/source formatting. Every exact command,
 initial failure and successful retry is recorded in
-[syn3-final-ast-fa-verification.md](syn3-final-ast-fa-verification.md).
+[syn3-final-ast-fa-checking.md](syn3-final-ast-fa-checking.md).
 The unchanged schema_test.null_round passes at both levels; the earlier
 fa2 failure is unreproduced, with no speculative patch or changed assertion.
-Unfiltered workspace/spec/corpus verification remains the coordinator's.
+Unfiltered workspace/spec/corpus checking remains the coordinator's.
 
 
 Nov14 10:43: the new coordinator integration merges lane/tyalt046550bd.
@@ -935,7 +935,7 @@ remain2170/2170. The complete fresh-backend CLI replay is active; complete
 four-crate Rust and direct snippets follow serially. Final full-green hash
 awaits those results. There has been no production change since e840c135b.
 
-Nov14 13:56:37 FINAL GREEN: latest tyalt c220161d5 is merged and verified.
+Nov14 13:56:37 FINAL GREEN: latest tyalt c220161d5 is merged and checked.
 Fresh all-target workspace check/strict clippy, Rust764/0 (4 existing ignored,
 requested recovery skip), complete CLI343/0 (2 existing ignored), Wasm27,
 private migration23/all-targets, examples13 (1 skip), std2170 at each of O0/O2,

@@ -56,10 +56,10 @@ another heavy command in this lane. It writes comment-free copies into a tempora
 directory, converts both revisions with `i fmt --to is`, compares every result,
 and removes the temporary directory. It never copies the binary.
 
-For a tree where the cleanup is already applied, verify replay without writing:
+For a tree where the cleanup is already applied, check replay without writing:
 
 ```sh
-scripts/doc-comments apply --all --verify-replay e975c5e93
+scripts/doc-comments apply --all --check-replay e975c5e93
 ```
 
 On a later tree, retain its pre-application revision. Run `apply --all`; inspect
@@ -70,7 +70,7 @@ reviewed edits are applied, regenerate the map from that revision:
 ```sh
 scripts/doc-comments record --base "$base" \
   --output scripts/doc-comments-rewrites/final-tree.json
-scripts/doc-comments apply --all --verify-replay "$base"
+scripts/doc-comments apply --all --check-replay "$base"
 scripts/doc-comments check --proof "$base" --i-bin target/release/i
 ```
 
@@ -86,7 +86,7 @@ remain in the audited sources. Library documentation's obsolete signature copies
 and dormant Python recipes were removed; registered tests and executable test
 bodies are unchanged. The map preserves the exact removed recipe text.
 
-These are the verification commands for the e4 merge. Heavy commands run
+These are the checking commands for the e4 merge. Heavy commands run
 sequentially. `check-snippets` acquires the wrapper for its own build and is run
 directly in the development environment. The submodule was initialized before
 the first build; it remains at the revision required by e4.
@@ -98,7 +98,7 @@ scripts/doc-comments scan --base e975c5e93
 scripts/doc-comments scan
 scripts/doc-comments record --base e975c5e93 \
   --output scripts/doc-comments-rewrites/final-tree.json
-scripts/doc-comments apply --all --verify-replay e975c5e93
+scripts/doc-comments apply --all --check-replay e975c5e93
 python3 -I scripts/test-doc-comments.py
 "$H" direnv exec /home/agent/Programming/i cargo build --locked --release -p ilang-cli --bin i
 "$H" direnv exec /home/agent/Programming/i env RUST_TEST_THREADS=2 cargo test --locked -p ilang-binaryen -p ilang-check -p ilang-cli -p ilang-host -p ilang-lsp -p ilang-macro -p ilang-package -p ilang-runner -p ilang-syntax -p ilang-wasm --lib --bins

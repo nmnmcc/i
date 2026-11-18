@@ -242,7 +242,7 @@ cases. This branch is not landable while these remain unresolved.
 The separately reviewed convfix `d67bcf7e` is merged at `62bc17079`: it
 restores the captured-row fixture's original provider annotation and adds a
 lowering comparison, changing no compiler code or expected result. Its
-own CLI/lowering verification on this branch is pending. The newer
+own CLI/lowering checking on this branch is pending. The newer
 conversion head remains unlandable because of its reported `p1` correctness
 blocker and has not been merged.
 
@@ -266,10 +266,10 @@ whose SHA-256 remains
 The earlier Wasm, macro and std O2 results therefore apply to that compiler.
 
 The two unchanged-bound resource retries pass every test/program phase;
-only type notation differs. The optional all-forwarder verification was
+only type notation differs. The optional all-forwarder checking was
 stopped before starting after 20 minutes in the shared queue. Its 11
 additional uncommitted backports were read and deliberately discarded;
-the verified `q35` stays. They remain available on the conversion branch.
+the checked `q35` stays. They remain available on the conversion branch.
 
 Two closed-callback probes did not restore the lost hidden E0515s; two
 provider-nesting variants did not restore `b1`'s expected two E0515s. No
@@ -304,11 +304,11 @@ The complete command/result ledger is in the shared coordinator cache,
 `gpt/r2/report-s3-landing.md`, with the raw logs and both corpus snapshots.
 
 The inherited record-field union solver limitation documented above was not
-investigated or reverified in this pass. The coordinator-owned workspace,
+investigated or rechecked in this pass. The coordinator-owned workspace,
 unfiltered spec and unfiltered corpus gates were not run here. The latest
 conversion status still reports unresolved anomaly groups and is not marked
 landable, so no newer full conversion head was merged. The isolated captured
-row fix and exact, verified fixture corrections were integrated separately;
+row fix and exact, checked fixture corrections were integrated separately;
 `syn3/lower.rs` still does not absorb members.
 
 ## Follow-up after conversion landed, 2026-11-14
@@ -355,7 +355,7 @@ passes 32 cases (20 accepted, 12 rejected by the model), 64 declaration
 permutations, and 32 annotation removals. Its one expected report-only
 annotation-removal difference cites spec §4.7; there are no failures.
 
-The exact verification commands, exits, and log paths are recorded in the
+The exact checking commands, exits, and log paths are recorded in the
 coordinator cache's `gpt/r2/report-s3-r3.md` and JSON command ledgers.
 All heavy commands are serial and wrapped. Formatting, clippy, and snippet
 checks are queued for a shared slot; this checkpoint awaits those gates.
@@ -388,7 +388,7 @@ passes both complete observations with no differences or requirement
 failures. `deadlock` retains its expected run exit 1; its test exits are 0.
 No observation, requirement, or bound is changed.
 
-All 198 reconciled complete observations are verified identical to the
+All 198 reconciled complete observations are checked identical to the
 first full run. Final remaining classifications are three shown types,
 two messages, and zero outcomes. The final audit preserves the failed
 bounded observations as well as the successful retries. All requested
@@ -417,7 +417,7 @@ changed projects, including their real manifests and macro expansion.
 Together they cover sixteen distinct cases. Each independently pins its
 total errors and E0515 count, then compares every complete error message
 and location.
-The fourteen source programs and expected observations are verified
+The fourteen source programs and expected observations are checked
 byte-for-byte identical to the fetched tip. No observation is re-recorded.
 The workspace check and fresh gate matrix are in progress; the old READY
 claim is not reused for this integration.
@@ -432,7 +432,7 @@ comparison; keep the original three-case checker guard. No expected error
 is changed to accommodate the missing test context. The fresh matrix is
 rerunning this focused coverage before its remaining gates.
 
-Focused verification now passes: all 32 row tests, including both sides'
+Focused checking now passes: all 32 row tests, including both sides'
 unchanged alias/named-helper regressions and the corrected 1/2/5 guard;
 the CLI guard checks all fourteen actual projects and matches every landed
 error message, location, total, and E0515 count. No stage-3 error deficit or
@@ -443,7 +443,7 @@ The remaining package/runtime/spec/corpus gates are still in progress.
 Reviewing the renamed snippet gate also identifies the exact registered
 fragment as `"\nIntReader = Reader(Int)\nwith_int"`, rather than its search
 needle. Its completion now applies the test's following annotation
-replacement too. The assembled fragment is verified byte-for-byte to be
+replacement too. The assembled fragment is checked byte-for-byte to be
 the actual constructed alias program's prefix. This changes no parser
 diagnostic expectation, exemption, or checker assertion.
 
@@ -461,7 +461,7 @@ alias-fragment context is included in that result. Std O0/O2 and the full
 
 Both fresh std runs now pass 2,170 tests each at O0 and O2. The remaining
 gate is the complete requested `review-k4d` selection: 365 projects, two
-jobs, with zero failures required. All verification commands remain serial
+jobs, with zero failures required. All checking commands remain serial
 and use the shared wrapper; the snippet gate uses its internal wrapped
 cargo build. No source or observation is changed during this final run.
 
@@ -505,7 +505,7 @@ The second **complete** `review-k4d` run passes: 365 selected projects,
 shared heavy wrapper; log `s3-r4-corpus-final.log`. The focused equality
 retry also passes. No runtime retry or changed bound is needed in this
 final complete run. All fourteen named-provider source/expected pairs are
-verified byte-identical to fetched `cc26b8d9` again after completion.
+checked byte-identical to fetched `cc26b8d9` again after completion.
 
 The first run's sole difference is classified strictly as one diagnostic
 outcome change (three new W0503 warnings in each check/O0/O2 phase), with
@@ -561,7 +561,7 @@ so only the constructors are hidden and the removed-value/interface/tag
 checks remain meaningful. The resolver's E0227 is retained. A complete
 whole-package retry follows; no expectation is changed to accept E0227.
 
-### Final package-interface follow-up verification
+### Final package-interface follow-up checking
 
 The whole `package_commands` binary passes **27/27**, including the exact
 four-item interface report, explicit type exports in the hiding fixture,
@@ -601,6 +601,6 @@ real package run's E0227 prompted the required explicit TYPE exports,
 without weakening compiler diagnostics or test assertions.
 
 The earlier std/corpus/generation/other-crate matrix remains historical on
-`cc26b8d9`; this latest brief asks for expanded CLI verification. The
+`cc26b8d9`; this latest brief asks for expanded CLI checking. The
 coordinator owns the complete merged-tree gate and main landing. Existing
 opt-in benchmark ignores are retained and not forced.

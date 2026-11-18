@@ -25,7 +25,7 @@ fn mappings() -> (BTreeMap<u32, u32>, BTreeMap<u32, u32>) {
     (upper, lower)
 }
 
-/// A module whose export `verify` maps every Unicode scalar value with
+/// A module whose export `check` maps every Unicode scalar value with
 /// `$case_map` and the table `table`, and compares it with `expected`. It
 /// gives 0, or the first wrong codepoint plus 1.
 fn exhaustive_module(table: &str, expected: &BTreeMap<u32, u32>) -> String {
@@ -41,7 +41,7 @@ fn exhaustive_module(table: &str, expected: &BTreeMap<u32, u32>) -> String {
     format!(
         r#"(module {TYPES} {STUB_HOST} {runtime}
 (data $expected "{data}")
-(func (export "verify") (result i32)
+(func (export "check") (result i32)
   (local $pairs (ref $case_ranges)) (local $next i32) (local $cp i32) (local $want i32)
   (local.set $pairs (array.new_data $case_ranges $expected (i32.const 0) (i32.const {words})))
   (block $done (loop $each
@@ -69,7 +69,7 @@ fn case_tables_give_every_simple_mapping_of_unicode_data() {
     assert_eq!(UNICODE_VERSION, "18.0.0");
     let (upper, lower) = mappings();
     for (table, expected) in [("case_upper_table", &upper), ("case_lower_table", &lower)] {
-        let failed = run_export(&exhaustive_module(table, expected), "verify");
+        let failed = run_export(&exhaustive_module(table, expected), "check");
         assert_eq!(
             failed,
             0,

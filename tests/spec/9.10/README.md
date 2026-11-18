@@ -87,7 +87,7 @@ schemes and the 17 private implementation schemes.
 ## Reproduction
 
 Run from lane b. All commands require the repository dev shell. Cargo and
-verification commands require the heavy wrapper specified in the lane brief.
+checking commands require the heavy wrapper specified in the lane brief.
 
 Generate vectors, then format with the built compiler:
 
@@ -194,7 +194,7 @@ The CLI rejects --renumber without an A1 may-fail migration report; no false
 report was fabricated. The audit separately classifies nominal IDs using the
 actual number_types order: constructor IDs at least 17 move by six, and program
 type IDs at least 22 move by four. String data references and nullary global
-names move consistently. A diagnostic removes only the individually verified
+names move consistently. A diagnostic removes only the individually checked
 new entries/data to check for any other code change. This is a substitute
 classification check, not a passing acceptance comparison.
 

@@ -542,19 +542,19 @@ def cmd_apply(args):
     entries = [entry for path in maps for entry in json.loads(path.read_text())]
     paths = sorted({e["file"] for e in entries})
     try:
-        sources = {p: revision(args.verify_replay, p) if args.verify_replay else read(p) for p in paths}
+        sources = {p: revision(args.check_replay, p) if args.check_replay else read(p) for p in paths}
         output = prepare(entries, sources)
-        if args.verify_replay:
+        if args.check_replay:
             mismatches = [p for p in paths if output[p] != read(p)]
             if mismatches:
                 raise ValueError(f"replay differs from working tree: {mismatches}")
     except (OSError, ValueError) as error:
         print(f"refused without writing: {error}")
         return 1
-    if not (args.dry_run or args.verify_replay):
+    if not (args.dry_run or args.check_replay):
         for path in paths:
             (ROOT / path).write_bytes(output[path].encode())
-    print(f"{'replayed exactly' if args.verify_replay else 'validated' if args.dry_run else 'applied'} {len(entries)}, refused 0")
+    print(f"{'replayed exactly' if args.check_replay else 'validated' if args.dry_run else 'applied'} {len(entries)}, refused 0")
     return 0
 
 
@@ -635,7 +635,7 @@ def main():
     maps.add_argument("--all", action="store_true")
     maps.add_argument("--rewrites")
     apply.add_argument("--dry-run", action="store_true")
-    apply.add_argument("--verify-replay", metavar="BASE", help="replay in memory from BASE and compare every result with the working tree")
+    apply.add_argument("--check-replay", metavar="BASE", help="replay in memory from BASE and compare every result with the working tree")
     apply.set_defaults(run=cmd_apply)
     check = commands.add_parser("check")
     check.add_argument("--proof")

@@ -134,8 +134,8 @@ The missing/mutual acceptance changes and all six sampled permutation
 error losses (O5/O6/O7) are therefore fixed by source-contract restoration,
 not by changing the compiler or approving weaker expectations. The other
 11 forwarder backports were reviewed and deferred to conversion after their
-optional verification waited 20 minutes without starting; those uncommitted
-copies were deliberately discarded. The verified, committed `q35` remains.
+optional checking waited 20 minutes without starting; those uncommitted
+copies were deliberately discarded. The checked, committed `q35` remains.
 
 Two isolated attempts to close callback error channels did not restore O3's
 hidden E0515. Two isolated provider-nesting variants for O4 produced four
@@ -387,7 +387,7 @@ as `s3-r3-corpus-outcomes.json`; the per-case machine classification and
 unified diffs are `s3-r3-corpus-diff.json` and `s3-r3-corpus-diff.txt`.
 The runner log is `s3-r3-corpus.log`.
 
-### Final post-format verification
+### Final post-format checking
 
 At `810df51bf`, after formatting the two stage-3 library lines and fixing
 the snippet search-needle context, the release rebuild passes with the
@@ -408,7 +408,7 @@ those exits and messages remain unchanged. No bound, requirement, source,
 or expectation is edited. The full first run, the first post-format run,
 and both retry observations remain available for review.
 
-After that retry, every one of the 198 complete observations is verified
+After that retry, every one of the 198 complete observations is checked
 identical to the first full run, not merely equal in checker acceptance.
 The final classification remains **three shown type, two message only,
 zero outcome**. No new diagnostic coordinate difference appears. The
@@ -463,7 +463,7 @@ The second **complete** `review-k4d` run passes: 365 selected projects,
 shared heavy wrapper; log `s3-r4-corpus-final.log`. The focused equality
 retry also passes. No runtime retry or changed bound is needed in this
 final complete run. All fourteen named-provider source/expected pairs are
-verified byte-identical to fetched `cc26b8d9` again after completion.
+checked byte-identical to fetched `cc26b8d9` again after completion.
 
 The first run's sole difference is classified strictly as one diagnostic
 outcome change (three new W0503 warnings in each check/O0/O2 phase), with

@@ -439,7 +439,7 @@ No-value-type programs bypass demand collection/closure/trial work. Do not promi
 
 ## 9. Ordered T2 checklist
 
-1. Rebase on A1/A3 and T1; map the cited regions to the new code. Verify UpName declaration/display migration and the AST value/head forms. Implement any missing prerequisite within the approved T2 integration scope; report a scope conflict to the coordinator.
+1. Rebase on A1/A3 and T1; map the cited regions to the new code. Check UpName declaration/display migration and the AST value/head forms. Implement any missing prerequisite within the approved T2 integration scope; report a scope conflict to the coordinator.
 2. Apply the coordinator's accepted E0530–E0537 allocation, wider scope, fixation semantics, early-context limit, M4 boundary and closed-only completed-source rule. Land §7 spec text first and carry the decisions into G3 integration.
 3. Add core/HIR representations, early binder collection and error states, including multi-binder slots. Give every exhaustive match a deliberate arm; no new silent fresh-variable fallback.
 4. Implement syntactic classification, lookup/pending scope, pattern validation, alias-cycle edges, forbidden contexts, summaries and the shared type visitor.
@@ -447,7 +447,7 @@ No-value-type programs bypass demand collection/closure/trial work. Do not promi
 6. Add trial state and provenance observation; implement closure/equality batches and shape checks on pre-batch snapshots. Test reverse links, pure-variable SCCs and preserved constraints before wiring alias reads.
 7. Wire annotation instance/sharing, definition reads, R7's closed-only gate and alias-use diagnostic, kconv's inferred-shape conversion, whole-annotation places, recovery and cache completion. Eagerly check unused definitions.
 8. Add deferred exports, Typed.alias_types, queries and canonical package comparison, including parameterized aliases containing a closed Of.
-9. Run the T2 tests in §10. With T1 integrated, run spec tests and `scripts/dev-verify rust`; compare existing checker/interface goldens. Use the coordinator's heavy wrapper for **every** cargo invocation. No Rust implementation or compiler run is part of this design-note commit.
+9. Run the T2 tests in §10. With T1 integrated, run spec tests and `scripts/checks rust`; compare existing checker/interface goldens. Use the coordinator's heavy wrapper for **every** cargo invocation. No Rust implementation or compiler run is part of this design-note commit.
 10. T3 adds record/Without closure and shape arms, label checks, shown-place checks and the §5.9 builder test. M1/M2 add or reconcile the Lisp/Definitions rows; M4 applies the expansion restrictions. Each track owns and runs its deferred tests.
 11. Run std/spec with reversed independent-group tie breaking and with recovery enabled. Measure std time with the accepted T1 measurement procedure; investigate any regression. Audit WAT for existing programs and for type-only changes, allowing only differences justified by changed inferred runtime tests.
 
@@ -609,4 +609,4 @@ The follow-up also accepts **closed-only post-completion reuse, option (a)**. A 
 
 The largest implementation risk is proving that trial batches preserve all prior relationships and roll back completely. Snapshot copies may be expensive for large sources; no timing or memory bound was measured here. Open-group rejection is deliberately coarse and can reject a disjoint read in a group that touches an earlier weak variable.
 
-Verified here: source/branch/status reads, the listed code paths, accepted note/ledger contracts, section/fence/path checks and git diff --check. Not verified: new-syntax compilation, proposed diagnostics, solver transactions, the T3 builder, macros, query recovery or package comparison under T2. Those facilities are not implemented by this note. No cargo build, runtime test, performance result or formal principal-type proof is claimed.
+Checked here: source/branch/status reads, the listed code paths, accepted note/ledger contracts, section/fence/path checks and git diff --check. Not checked: new-syntax compilation, proposed diagnostics, solver transactions, the T3 builder, macros, query recovery or package comparison under T2. Those facilities are not implemented by this note. No cargo build, runtime test, performance result or formal principal-type proof is claimed.

@@ -56,4 +56,4 @@ The observations change for these reasons:
 Observation updates retain every phase, saved time budget and input file.
 Independent requirements were strengthened for `b1`, `b10`, `r6`, `z3`, and
 `z5`. The complete before/after type diff and machine-checked exit/stdout audit
-are preserved with the lane's verification logs under `target/e6-main-merge`.
+are preserved with the lane's checking logs under `target/e6-main-merge`.

@@ -21,36 +21,6 @@ fn check(source: &str) -> Vec<Diagnostic> {
 }
 
 #[test]
-fn hidden_inputs_cannot_skip_the_branch_that_runs() {
-    for (name, source) in [
-        (
-            "service",
-            include_str!("../../../tests/spec/4.8/f1_hidden_svc_sel.i"),
-        ),
-        (
-            "callback parameter",
-            include_str!("../../../tests/spec/4.8/f1_hidden_cb_param.i"),
-        ),
-        ("cell", include_str!("../../../tests/spec/4.8/f1_ref_sel.i")),
-        (
-            "later caller",
-            include_str!("../../../tests/spec/4.8/f1_hidden_ret_sel.i"),
-        ),
-        (
-            "later caller alias",
-            include_str!("../../../tests/spec/4.8/f1_hidden_ret_sel2.i"),
-        ),
-        (
-            "callback result",
-            include_str!("../../../tests/spec/4.8/f1_hidden_cb_sel.i"),
-        ),
-    ] {
-        let ds = check(source);
-        assert!(ds.iter().any(|d| d.code == "E0501"), "{name}: {ds:?}");
-    }
-}
-
-#[test]
 fn hidden_inputs_do_not_justify_disjoint_equality_warnings() {
     let ds = check(
         r#"

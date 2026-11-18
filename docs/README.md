@@ -13,7 +13,7 @@ standard and library reference before building the static site in `dist/`.
 `npm run check:links` checks the built local links; `npm run check:examples`
 checks module-header blank lines, then fenced i examples with the repository's
 parser and snippet registry, then executes complete examples against the tree's compiler.
-`npm run check:rendering` verifies example and titled transcript blocks in the
+`npm run check:rendering` checks example and titled transcript blocks in the
 built site, including that execution metadata stays out of the displayed code.
 After building, `npm run check:placeholders` runs its negative-fixture tests
 and scans every HTML file in `dist`, including generated library pages.
@@ -87,7 +87,7 @@ The displayed deadline function and macro definitions must match their shared fi
   (one trailing newline is tolerated). Runs at `--opt 0` and `--opt 2`.
   Add `hosts=native,wasi,javascript` to compare stdout on all three hosts at
   both levels using `i run`, `i run --target wasi` and `i run --target nodejs`.
-  The runner adds `--offline` and `--opt` as hidden verification flags.
+  The runner adds `--offline` and `--opt` as hidden checking flags.
   WASI uses the CLI when Wasmtime is available (`WASMTIME` or `wasmtime` on PATH).
   Without it, the runner builds the WASI target and executes it with the local
   Node WASI driver; Node must then be on PATH. A present but failing runtime
@@ -225,7 +225,7 @@ choices, source limits of fourteen lines and sixty-four columns, and plain wordi
 `CHROMIUM_BIN=/path/to/chromium npm run check:home-layout` checks actual layout
 in headless Chromium using the repository's existing root Playwright dependency.
 It needs an existing browser and never downloads one. It measures four viewport
-sizes, verifies selection with and without JavaScript, keyboard navigation, source
+sizes, checks selection with and without JavaScript, keyboard navigation, source
 fit, output wrapping, the 120-word budget, sidebar separation, local DM font loads,
 and text contrast (at least 4.5:1 for home text and the dark desktop sidebar).
 It opens and closes the phone sidebar, follows a link from it, checks the static

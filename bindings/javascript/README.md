@@ -149,7 +149,7 @@ const sleep = (ms) => {
 A service that ignores the signal keeps running, and its side effects still
 happen; only its answer is ignored.
 
-## Verification
+## Checks
 
 From the Devenv shell:
 

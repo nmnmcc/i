@@ -1176,7 +1176,7 @@ In order, after A1 and T1 have landed, T2 has merged, and S3 is approved.
 9. **Inference.** Literals and spreads (with their known and expected types), `field()` in three rules, `has_no_effect`, `check_places` and `walk_variance` (part 8.2), the place check on the shown type of each binding (part 4.5), then label parameters in `call()`: the name rule and the one-string rule of L4, the known function type built with the label map (L4 step 3), `Typed.key_labels` filled in `call()` (9.3), E0541, L6, L9 in `entry_point` (E0320), and L8 in `level_of` and `extrude` (E0545), with the raised level kept in each `LabelParamId`. Then the occurs check with `Rec` fields and `Without` bases inside a type constructor (part 4.2), and E0512 for `FailKind::NoField`. Then accept the changed outputs with `UPDATE=1` and read each change. They come from rule 13b: the E0506 "`.name` needs a known type" expectations in `crates/ilang-check/tests/types/` (`errors`, `expected_types/expected`, `fields_union`, `known_general_vars`, `known_partial_schemes`, `known_pipe_left`, `known_types`, `labels`) become types, or E0501 or E0512 at another place. For each one, check that the new verdict is the one part 6 gives; for example `through_id = users |> map(id) |> map((v) { v.age })` in `known_general_vars.i`.
 10. **Run time.** Tag 14, `record.rs`, the inspect branch, IR, lowering, emit, `external_op`, the label globals in constant form, with the `FIXED_MAX` fallbacks for long labels and large literals, and the key arguments lowered to them from `key_labels` (part 9.3); `Stmt::Unreachable` for an empty `Access::Field` list in `Lowerer::field` (part 6). Gate: `scripts/wat-diff` shows no change in the generated code of programs with no records.
 11. **Library and packages.** `lib/i/record.i`, its registration, and the library tests (names, labels). The interface check of `package.rs` (`canonical_type` and `TypeShow::ty`, part 14), with the tests of 15.6.
-12. **Tests.** 15.1 to 15.6 at `-O0` and `-O2`, the spec test suite, and the full dev-verify.
+12. **Tests.** 15.1 to 15.6 at `-O0` and `-O2`, the spec test suite, and the full checks.
 13. **Docs.** `docs/performance.md` (9.7, with the micro-benchmark), syntax.md and meta.md (part 13), and `query.rs` hover and completion.
 
 ## 17. Risks
@@ -1555,7 +1555,7 @@ variable identity and invariant occurrences through these shared nodes (J7).
 | Read a field or prove a common requirement | Follow unions in conjunction, intersect relevant field requirements, preserve result unions as shared nodes. Inspect only that field and any requirements needed to prove a source branch empty. A proof of Records uses domain facts without enumerating shapes. |
 | Put/remove/forget | Build Without and field-intersection nodes; E2 may expose individual union operands only on demand. For an intersection base keep one existential witness; never forget conjuncts separately. |
 | Inclusion/equality and written-union checking | Try §20.3's structural proofs first. Otherwise use the lazy BDD map-emptiness algorithm in §21.3 for the uncovered set, memoizing shared subgoals. Equality is both inclusions, not a string or graph comparison. Stop a refuted inclusion at its first witnessed uncovered cell. |
-| Type tests, coverage, known summaries | Collect heads once per reachable node and verify relevant subtype obligations separately. Field facts are conservative U5 summaries. Never expand unrelated field combinations to collect the Record head. |
+| Type tests, coverage, known summaries | Collect heads once per reachable node and check relevant subtype obligations separately. Field facts are conservative U5 summaries. Never expand unrelated field combinations to collect the Record head. |
 | Full display, package/API identity and interface writing | Traverse the graph, not its alternative expansion. No semantic widening to shorten text. See the encoding below. |
 
 A full type may be larger than a source expression when expanded. Full output
@@ -1621,7 +1621,7 @@ The other scale family starts with r0 = `Record`; each next value branches
 between `( ..r_previous, ai : 1 )` and `( ..r_previous, bi : 1 )`, using fresh
 label pairs. It has 2^n incomparable record alternatives. Sharing retains
 both uses of r_previous without copying its graph. The mandatory scale gate
-constructs and checks 20 steps, verifies record-domain membership, serializes
+constructs and checks 20 steps, checks record-domain membership, serializes
 and decodes the exact graph, and does the same for Fan including A = Never.
 Each family must finish well under one second (target <0.1s model, <1s warmed
 compiler, excluding build/startup). Also demand an intentionally large
@@ -1980,7 +1980,7 @@ Questions for the coordinator, with recommendations:
    schema builders and fixed-schema maps for T3; arbitrary shape-preserving
    heterogeneous iteration is a separate general-feature design.
 
-Remaining proof/verification limits: no machine-checked proof; no theorem of
+Remaining proof/checking limits: no machine-checked proof; no theorem of
 principality for the whole checker or completeness for arbitrary nominal and
 function Boolean algebra; no complete implementation of the closed coverage
 procedure with existential forgetting, effects, invariant arguments and T2.

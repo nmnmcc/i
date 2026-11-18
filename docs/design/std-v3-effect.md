@@ -960,7 +960,7 @@ Ranks below refer back to the source evidence in §§3–17.
 |---|---|---|---|---|---|
 | G1 | Reconcile resource `Scope`, scoped acquisition, cleanup and task `Group` naming | P0: reliable application lifetimes | M–L | Needs/provide, control unwinding, non-failing finals, requests, tasks | E3 `Fail(E)` baseline; E5 resource/name work must be accounted for separately |
 | G2 | Publish one error API and explicit error/outcome/stop contracts | P0: stable composition and diagnostics | S–M | `Fail(E)`, unions, matching, Result, assertion service | E3; coordinate with G1, without changing stop/cancel rules |
-| G3 | Bounded task traversal and general computation timeout | P1: safe fan-out from day one | M | Groups, tasks, events, `Fail(E)`, clock | G1; use G5 to verify time behavior |
+| G3 | Bounded task traversal and general computation timeout | P1: safe fan-out from day one | M | Groups, tasks, events, `Fail(E)`, clock | G1; use G5 to check time behavior |
 | G4 | Queue, Deferred and Semaphore first; then PubSub and Latch | P1: shared foundation for pipelines and services | L | Immutable state, refs/owner tasks, events, scope | G1, G2; define cancellation and acquisition handoffs |
 | G5 | Scheduler-aware virtual clock and test recorders | P1: fast deterministic lifetime and policy tests | M–L | Clock/Await services, requests, task scheduling, immutable timer state | G1; may use G4; settle how fake pending sleeps are completed |
 | G6 | Schedule data/steps, retry/repeat, backoff, jitter and composition | P1: resilient network and polling programs | M | Ordinary computations, `Fail(E)`, Duration, Generator, clock | G2, G5; general timeout from G3 |

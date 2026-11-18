@@ -260,7 +260,7 @@ impl Checks {
 
     pub(crate) fn module(&self) -> String {
         format!(
-            "(module {TYPES} {STUB_HOST} {} {}\n(func (export \"verify\") (result i32)\n{}(i32.const 0)))",
+            "(module {TYPES} {STUB_HOST} {} {}\n(func (export \"check\") (result i32)\n{}(i32.const 0)))",
             wat(),
             self.functions,
             self.body
@@ -268,7 +268,7 @@ impl Checks {
     }
 
     pub(crate) fn run(self) {
-        let failed = run_export(&self.module(), "verify");
+        let failed = run_export(&self.module(), "check");
         assert_eq!(
             failed,
             0,

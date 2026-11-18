@@ -140,14 +140,14 @@ No language or library surface for state was added.
   `render`, `nest` implement the Wadler approach requested by this task.
   They are reused, with an optional indentation limit in that same renderer.
 
-## CLI, editor and verification integration
+## CLI, editor and checking integration
 
 The CLI already collected both extensions and the LSP already selected
 `lisp::format` for `.is`; replacing the flat implementation makes both use
 this layout. CLI help now names both extensions. `--to is` passes conversion
 output through this printer after the canonical-tree conversion check.
 
-`dev-verify i` invokes `i fmt --check lib std bench examples`. Its directory
+`checks i` invokes `i fmt --check lib std bench examples`. Its directory
 collection includes `.is` by default, confirmed by the CLI integration tests;
 no script change is necessary. All three tracked `.is` files were reformatted.
 
@@ -193,13 +193,13 @@ and LSP formatting/idempotence/syntax-error behavior.
 - The first whole syntax-crate run failed at
   `macro_quotes_are_core_nodes_and_can_be_formatted`; the obsolete
   AST-regeneration expectation was corrected as described above.
-- Initial acceptance: formatter checks passed; `dev-verify rust` failed at
+- Initial acceptance: formatter checks passed; `checks rust` failed at
   `an_error_stops_a_test` because formatting changed the macro source location
   from `std/test : 5 : 73` to `std/test : 21 : 15`. Updated the expected location.
 - Heavy-wrapped `cargo check -p ilang-cli --all-targets` and
   `cargo test -p ilang-cli --test commands an_error_stops_a_test`: passed.
-- Acceptance rerun: release build, formatter checks and `dev-verify rust` passed.
-  `dev-verify i` passed its format, standard library, benchmark and WASI checks,
+- Acceptance rerun: release build, formatter checks and `checks rust` passed.
+  `checks i` passed its format, standard library, benchmark and WASI checks,
   but its review corpus reported three timeouts and changed outputs in wide/stress
   cases. A second full acceptance attempt failed in the same review corpus:
   `review-k4d/perf/mutual200`, `mutual300`, and `review-k4s/std` timed out;
@@ -270,5 +270,5 @@ First 30 lines:
 
 ## Unfinished
 
-Full acceptance does not pass: `dev-verify i` fails in the review corpus as
+Full acceptance does not pass: `checks i` fails in the review corpus as
 described above. No formatter implementation behavior is deferred.

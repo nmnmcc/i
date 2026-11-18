@@ -1,6 +1,6 @@
 //! JSON-lines tree inventory and minimal annotation edits for the migration.
 //! Build against the old parser before applying the grammar change; rebuild
-//! against the new parser to verify saved trees (spans aside).
+//! against the new parser to check saved trees (spans aside).
 use ilang_syntax::syn3::{self, ast::*, walk};
 use ilang_syntax::token::TokenKind as T;
 use serde_json::json;

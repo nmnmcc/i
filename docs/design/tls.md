@@ -14,7 +14,7 @@ fails with `busy` if either has an operation in progress.
 Set `alpn` to an ordered list of protocol strings, `roots` to extra PEM trust
 roots, and `cert` and `key` to an optional PEM client identity.
 `identity(cert, key)` constructs a server identity. The system roots are included by default. The
-server name is used for certificate verification and SNI. Server options supply
+server name is used for certificate checking and SNI. Server options supply
 the ALPN list. The negotiated protocol is available on the encrypted stream;
 if no protocol was negotiated `alpn(stream)` returns the empty string. PEM inputs are bytes.
 

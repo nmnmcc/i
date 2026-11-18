@@ -1415,7 +1415,7 @@ support as needed, without changing the one-thread-per-run executor contract.
 Service ownership of request futures remains in requests.rs, not tokio::spawn.
 Before Fs, enforce general nominal field privacy (§7), then implement native.md
 §3.1's general binding grants, including external
-aliases, trusted compiler provenance and JS manifest verification. The standard
+aliases, trusted compiler provenance and JS manifest checking. The standard
 factory grants raw bindings to their resolved declarations. Ordinary i service
 substitutions need no host binding; resource fixtures that override raw host
 functions receive that authority explicitly.
@@ -1504,7 +1504,7 @@ tasks. Explicit close awaits the supervisor's reaping completion, including when
 termination cannot be delivered and natural exit must be awaited. Merely dropping
 a default tokio Child does not implement this contract. Abandoning host work
 never promises that the OS has already completed reaping when the instance
-returns status 0. Verify this supervisor in the process phase before claiming
+returns status 0. Check this supervisor in the process phase before claiming
 that cancelled spawn leaves no orphan. Host shutdown does not wait for unrelated detached blocking work, as C requires;
 the native executable specifically waits for registered spawn/reaping jobs before
 process exit, so it cannot kill its cleanup owner.
@@ -2071,13 +2071,13 @@ Ordered R1 checklist:
 3. [ ] Implement draw/split/path and arbitrary-bound rejection; no task dependency.
 4. [ ] Independently check published SplitMix vectors, prefix-code traversal,
    weak-gamma cases and rejection tests; retain the statistical review gate.
-5. [ ] Run spec tests and the appropriate i/Rust verification through heavy,
+5. [ ] Run spec tests and the appropriate i/Rust checking through heavy,
    at O0/O2; compare replay across targets; release to Std-3.
 
 Ordered R2 checklist:
 
 1. [ ] Commit R2 replacement spec text; merge S7 primitive text, preserving §9.8.
-2. [ ] Verify K1's invariant-generalization repair, then implement keys/variance/
+2. [ ] Check K1's invariant-generalization repair, then implement keys/variance/
    value restriction, portable including cycles, and
    keep_env with retained environment frames; run all S7 single-worker tests.
 3. [ ] Implement Request/Ticket cells, Root/group registries and table replacement together with
@@ -2099,7 +2099,7 @@ Ordered R2 checklist:
    tests J/E/O, native §11.1 N-R1–N-R6, nested subgroup and borrowed-ticket cases, root poll fairness,
    and synchronous callback/first-turn no-yield tests. Audit the host/control seam.
 9. [ ] Run deadlock/cancel/fairness/alias/IO stress cases 200 times on Rust and JS,
-   related spec tests and full required verification; inspect WAT changes.
+   related spec tests and full required checking; inspect WAT changes.
 
 Ordered IO checklist (each phase writes its i module and Rust service, compiles
 because lib/i is included, and adds matching target/JS cases):
@@ -2111,7 +2111,7 @@ because lib/i is included, and adds matching target/JS cases):
 2. [ ] Fs: codecs/errors, whole-byte validation, all-byte writes, explicit flush,
    private File(Int) codecs, raw Int wrappers, no number-injection exports, closed/busy leases,
    await_owned on non-creators, cancelled blocking-file state, safe detached work
-   and context teardown; verify the cancelled File alias gives closed.
+   and context teardown; check the cancelled File alias gives closed.
 3. [ ] Net: numeric endpoints, ephemeral bind, read/write/half-close, busy leases,
    private Listener/Stream(Int) codecs, provisional ownership, close-vs-wait
    across workers, the race-then-read lease test (native §11.1), and a
@@ -2124,9 +2124,9 @@ because lib/i is included, and adds matching target/JS cases):
    and B.7 with blocking Int adapters, not fd/externref shortcuts.
 6. [ ] Run permission/error/resource/security and concurrency reviews; include
    missing-default diagnostics on generated browser/preview-1 targets and explicitly selected Host stubs/fakes.
-7. [ ] Run end-to-end echo, then combined verification in the integration lane.
+7. [ ] Run end-to-end echo, then combined checking in the integration lane.
 
-## 12. Tests, counterexamples, and verification limits
+## 12. Tests, counterexamples, and checking limits
 
 Every expected value below follows the named rule; implementation tests should
 assert that rule, not snapshot private layouts. New-syntax examples below are
@@ -2393,7 +2393,7 @@ forgotten/provisional integer resources (§8.1), for host cleanup.
 
 This was the second initial clean assessment at aa20548, superseded by the
 independent review and the new attacks below. These are source/type/ownership arguments; the mandatory
-implementation prototype and OS tests remain unverified.
+implementation prototype and OS tests remain unchecked.
 
 ### 12.6 Independent review: findings checked and required examples
 
@@ -2609,7 +2609,7 @@ No serious new rule conflict found in this second consecutive clean pass.
 Read the full independent report and checked the four old-text/source findings
 as above. Read K1's first-parent patch at 578a17d without changing this lane's
 base. Earlier checks at aa20548 covered a Threefry model; those vectors are
-superseded and supply no verification of SplitMix. This revision's independent
+superseded and supply no checking of SplitMix. This revision's independent
 Python models passed:
 
 - The pinned source's first three seed-1337 words and seed-42 state, 64-bit
@@ -2633,7 +2633,7 @@ Python models passed:
 
 The proposed i scheduler, request/Root primitives, revised source programs,
 O0/O2 WAT, JS callback fixture, OS cleanup and real echo fixture remain unrun in
-this design lane. The statistical gate remains unverified. Reading the existing
+this design lane. The statistical gate remains unchecked. Reading the existing
 entry/host code establishes the baseline and needed edit regions, not that the
 new implementation exists. That earlier runtime revision changed no implementation. This native adoption
 also reconciles native.md and multicore.md; new checks are recorded in native §11. No cargo or host integration

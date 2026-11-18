@@ -24,7 +24,7 @@ There was no interrupted uncommitted work.
 
 ## Checkpoints
 
-Each implementation stage requires the full dev-verify gate before its checkpoint
+Each implementation stage requires the full checks gate before its checkpoint
 commit. The final audit also requires old-syntax-check. Generated expectations are checked separately
 against their source rules and regenerated only in the final derived-files commit.
 
@@ -39,10 +39,10 @@ against their source rules and regenerated only in the final derived-files commi
 ## Stage 1 validation
 
 `ILANG_BROWSER_PORT=4183 /home/agent/Programming/i/.rd/cache/heavy direnv exec
-/home/agent/Programming/i ./scripts/dev-verify` completed successfully: Rust fmt,
+/home/agent/Programming/i ./scripts/checks` completed successfully: Rust fmt,
 clippy and workspace tests; 1,422 std, 2 hello and 12 bench tests at each opt
 level; WASI smoke; 46 Node tests and 33 browser tests. Log:
-`target/r2-stage1-verify.log` (local, not committed).
+`target/r2-stage1-check.log` (local, not committed).
 
 The first syntax-check invocation was interrupted with SIGTERM (143) while
 waiting for a slot. Its outer heavy wrapper was redundant: the script already
@@ -118,7 +118,7 @@ Failed intermediate checks, all corrected:
   is not used as evidence for those contracts. A stage with changed derived
   files ends in a separate `Regenerate derived files` checkpoint commit.
 - The fourth full gate passed (exit 0), including Rust, O0/O2 i, 46 Node and
-  33 browser tests. An additional O0/O2 keep_env check verifies an inner Name
+  33 browser tests. An additional O0/O2 keep_env check checks an inner Name
   environment statement survives three resumes through the retained identity
   call required by runtime.md §6.3. The public unwrap parameter label is x,
   matching spec §9.8; a named-argument call tests that label independently.
@@ -127,8 +127,8 @@ Failed intermediate checks, all corrected:
 Stage-2 final gate after the public-label correction:
 
 `ILANG_BROWSER_PORT=4183 /home/agent/Programming/i/.rd/cache/heavy direnv exec
-/home/agent/Programming/i ./scripts/dev-verify` passed, exit 0, with 46 Node
-and 33 browser tests (`target/r2-stage2-verify5.log`). Its preceding golden
+/home/agent/Programming/i ./scripts/checks` passed, exit 0, with 46 Node
+and 33 browser tests (`target/r2-stage2-check5.log`). Its preceding golden
 update used the generation command above. `direnv exec
 /home/agent/Programming/i ./scripts/old-syntax-check` passed: 1,106 extracted
 blocks, exact diagnostics, 19 unchanged future-track entries. No R2 syntax
@@ -206,8 +206,8 @@ Validation:
 - `cargo test -p ilang-wasm --test control_lazy --locked`: initially 16/17;
   corrected runtime record classification passes the focused record_kinds
   check and the subsequent full gate.
-- Full heavy-wrapped `ILANG_BROWSER_PORT=4183 ./scripts/dev-verify`: exit 0
-  (`target/r2-stage3-verify2.log`), including 46 Node and 33 browser tests using
+- Full heavy-wrapped `ILANG_BROWSER_PORT=4183 ./scripts/checks`: exit 0
+  (`target/r2-stage3-check2.log`), including 46 Node and 33 browser tests using
   the regenerated compiled fixture.
 - `scripts/old-syntax-check`: 1,127 extracted blocks, exact diagnostics, 19
   unchanged future-track entries; exit 0.
@@ -331,8 +331,8 @@ Merge validation completed:
 - Heavy-wrapped `cargo test -p ilang-wasm --test codegen --locked`: 10/10,
   including the new out-of-order opaque request behavior and the existing
   synchronous P1 checks on both targets.
-- Heavy-wrapped `ILANG_BROWSER_PORT=4183 ./scripts/dev-verify`: exit 0
-  (`target/r2-merge-verify.log`). Rust fmt, clippy and workspace tests pass;
+- Heavy-wrapped `ILANG_BROWSER_PORT=4183 ./scripts/checks`: exit 0
+  (`target/r2-merge-check.log`). Rust fmt, clippy and workspace tests pass;
   the spec harness reports 195/195 at O0/O2. Each i optimization level passes
   1,446 std, 2 hello and 12 bench tests. WASI smoke passes. Node passes 47/47
   and the three browser engines pass 36/36.
@@ -388,7 +388,7 @@ its per-entry Root/Owner registry inside that host invocation. Entry retirement
 closes all remaining roots; host invocation teardown remains the final owner.
 
 R2 entry-specialization checkpoint: the full heavy-wrapped gate with port 4183
-passed, exit 0 (target/r2-entry-ruling-verify.log): 196 spec cases at O0/O2,
+passed, exit 0 (target/r2-entry-ruling-check.log): 196 spec cases at O0/O2,
 Rust checks, i tests, WASI smoke, 76 Node tests and 51 browser tests. The new
 manifest unit test checks both root and dependency manifests. Its TOML literals
 are recorded as non-i host data in the existing syntax-check inventory; the
@@ -476,7 +476,7 @@ Scheduler and Runner add two preceding service slots, so the exact representatio
 assertion is now 6. Behavioral environment cases remain unchanged. Local/portable
 paths query core.portable on the ordinary boundary witness; no compiler local flag
 or special-case portability operation was added.
-Stage-4 final gate passed, exit 0 (target/r2-stage4-verify2.log): Rust fmt,
+Stage-4 final gate passed, exit 0 (target/r2-stage4-check2.log): Rust fmt,
 clippy and workspace tests including the new real-host status-2 regression;
 228/228 spec cases at O0/O2; 1,446 std tests per level, hello and bench, WASI
 smoke, 76 Node and 51 browser tests. old-syntax-check passed 1,259 extracted
@@ -623,7 +623,7 @@ Performance measurement (substitute for an isolated primitive microbenchmark):
 release compiler and passed the three checked benchmarks. Then
 `heavy direnv exec /home/agent/Programming/i bash tests/r2-bench.sh` ran five
 samples with that executable at O2. Each reported duration excludes build time,
-as scripts/bench specifies. This shared machine was also running verification
+as scripts/bench specifies. This shared machine was also running checking
 and WAT analysis; these are busy-machine measurements, not quiet acceptance
 numbers. runtime.md supplies no numeric spawn/switch/channel latency target.
 
@@ -640,7 +640,7 @@ The source and five-sample script are retained for a coordinator quiet rerun.
 The immutable tables favor correctness and a small plain-i implementation;
 these measurements do not claim constant cost with arbitrary task population.
 
-Stage-5 full gate passed, exit 0 (target/r2-stage5-verify.log): Rust fmt/clippy
+Stage-5 full gate passed, exit 0 (target/r2-stage5-check.log): Rust fmt/clippy
 and workspace tests; 259 spec cases at O0/O2; 1,465 std tests per level, two
 hello tests and fifteen bench tests per level; WASI smoke; 78 Node tests and
 54 browser tests. The host stress test passed 200 iterations of each of nine
@@ -712,7 +712,7 @@ bodies and the added wrapper still parse normally; no future parser exception
 or expected error was removed. The fixture generator's real i wrapper is parsed
 again by conformance_fixture_sources_parse.
 
-Stage-6 checkpoint: target/r2-final-verify.log passed, exit 0: Rust fmt/clippy
+Stage-6 checkpoint: target/r2-final-check.log passed, exit 0: Rust fmt/clippy
 and all workspace tests; 263 spec cases at O0/O2; 1,465 std, two hello and
 fifteen bench tests per level; WASI smoke; 79 Node and 57 browser tests.
 The shared artifacts execute all 79 runnable request/task cases at both levels;
@@ -775,8 +775,8 @@ ownership ruling. The one-line diff is target/r2-pattern-fixture.patch.
 No test was skipped or weakened to obtain a green full-Rust claim.
 
 Independent post-merge checks completed: the full spec suite passed 322/322
-cases at O0/O2; dev-verify i passed 1,465 std, two hello and fifteen bench tests
-per level plus WASI smoke; dev-verify js passed 79 Node and 57 browser tests;
+cases at O0/O2; checks i passed 1,465 std, two hello and fifteen bench tests
+per level plus WASI smoke; checks js passed 79 Node and 57 browser tests;
 old-syntax-check passed 1,459 blocks with seventeen future parser entries after
 T1 consumed its entries; the complete ilang-wasm test package passed. These
 independent results are not a substitute for the currently failed full Rust
@@ -815,9 +815,9 @@ to compare and does not claim the 2% target. There is no prior i/task API at the
 The prepared pattern fixture fix was validated in an isolated git-archive copy
 under this lane's target/r2-pattern-probe: the exact formerly failing test passed
 with every assertion unchanged (target/r2-pattern-isolated.log). This is a
-substitute isolated verification of the proposed fix, not a green check of the
+substitute isolated checking of the proposed fix, not a green check of the
 unchanged repository file. No owned-path exception is assumed from silence.
-The final stronger JS artifact passed dev-verify js: 79 Node and 57 browser
+The final stronger JS artifact passed checks js: 79 Node and 57 browser
 tests, including all 81 runtime spec bodies at O0/O2 and the 200-run matrix.
 The O2 retention functions 70–72 were re-inspected in the final artifact; the
 restoring/non-tail-call and saved-base re-entry bodies remain byte-identical to
@@ -828,7 +828,7 @@ textual resolutions. Its early host-field skip for value-dependent types is
 retained before R2's function destructuring and wire normalization. T2's joint
 J6 sentence is “T2’s context check precedes host/service shape checks”; such
 signatures are rejected with E0531, not deferred accepted ABI declarations.
-The existing early-context provenance tests verify that distinction. The
+The existing early-context provenance tests check that distinction. The
 syntax inventory again uses a three-way key merge, so T2's consumed entries
 stay removed and R2's non-source strings remain classified.
 
@@ -851,7 +851,7 @@ post-T1 audit are byte-identical; T2 adds 50 exports. The 1df2fe0 comparison is
 unchanged for all 522 reference files. See r2-wat.md for the source attribution
 of every existing difference and the explicitly labeled diagnostic substitutes.
 
-Final post-T2 independent gates passed: dev-verify i/js, exit 0, with 1,465 std,
+Final post-T2 independent gates passed: checks i/js, exit 0, with 1,465 std,
 two hello and fifteen bench tests at each optimization level, WASI smoke, 79
 Node tests and 57 browser tests (target/r2-t2-i-js.log). The final fixture
 generation completed before the release build reached the JS tests; the shared
@@ -964,7 +964,7 @@ Intermediate failures and corrections in this follow-up:
   race. The commands still executed; later serialized entries succeeded. No
   persistent environment or shell configuration was changed.
 
-The preliminary full verification and WAT export began before the last path-index
+The preliminary full checking and WAT export began before the last path-index
 refinement. They provide intermediate evidence and are superseded by the final
 head's gates and fresh export, rather than being claimed as a consistent final
 checkpoint. All source changes are frozen before the final regeneration/commit.
@@ -1055,13 +1055,13 @@ in r2-wat.md.
 
 The latest user instruction supersedes the earlier precommit stopping point:
 commit the source/tests/audits and then the generated artifacts, and run both
-the complete dev-verify and old-syntax-check on that final committed head.
+the complete checks and old-syntax-check on that final committed head.
 The final report records those final-head commands and outcomes; preliminary
 passes and the interrupted exports are not substituted for them.
 
 Redesign then advanced again to 82375c0 (W0503). Merge 1c1f212 retains the
 approved Event fixture qualification and the R2 host-data inventory entry.
-The first final-head dev-verify was still waiting for a slot; its empty log
+The first final-head checks was still waiting for a slot; its empty log
 confirmed it had run no check. Its exact owned process group was stopped with
 SIGTERM (143) before this merge. This is an interrupted queued invocation,
 not a failed test or a passing gate. The syntax check on 8e262d7 had passed;
@@ -1149,7 +1149,7 @@ load, not quiet-window measurements; raw output is in target/r2-scale-current.
 
 The full spec suite passed 348/348 cases at O0 and O2; the 9.9 subset passed
 78/78, and all 38 imported review-r2 observations and requirements passed.
-A subsequent full dev-verify passed the Rust tests up through the spec suite,
+A subsequent full checks passed the Rust tests up through the spec suite,
 then was interrupted (exit 130) during value_type_performance to free capacity
 for integration's corpus run. It did not reach the i and browser phases and is
 not a completed gate. The integration gate must run on the merged source.
@@ -1269,7 +1269,7 @@ from before the already-landed syntax/default-entry decisions. The ledger's
 `src/main.i`'s main an entry, exempting it from unused-binding warnings. Only
 test expectations changed; the scoped LSP protocol rerun passes all 15 tests.
 
-JP verification commands (cargo commands use the shared heavy wrapper and the
+JP checking commands (cargo commands use the shared heavy wrapper and the
 configured direnv toolchain):
 
 - `cargo check -p ilang-wasm -p ilang-cli --all-targets`: passed after the

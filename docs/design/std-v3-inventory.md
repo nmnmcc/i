@@ -37,7 +37,7 @@ uses them. `lib/prelude.i` is outside this directory inventory.
 Function types for `i/` come from the checked-in
 `crates/ilang-check/tests/types/library.out`, filtered by the explicit export
 list. That file includes private helpers; they are not public API.
-It is evidence from this checkout, not a new verification run. It still has
+It is evidence from this checkout, not a new checking run. It still has
 transitional Boundary/Continuation E parameters and old union notation in
 some need rows. Those parameters are removed by E3; they must not become a
 second error mechanism. The E3 control types are listed in the migration

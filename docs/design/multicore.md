@@ -729,7 +729,7 @@ whose message was absent and whose trap was “the resource context has ended”
 After the fix all 400 four-worker runs passed. The default is again `auto`;
 explicit worker counts and the one-worker fast path are unchanged.
 
-Repeated chapter 9 verification also exposed spawn/yield ordering assumptions in
+Repeated chapter 9 checking also exposed spawn/yield ordering assumptions in
 `9.9/race_failure.i` and `9.9/channel_fifo.i`. The original R5 failure-first and
 success-first assertions, and the FIFO-partner/source-order assertions, now run
 under `task.test(seed, [], body)`. The spec requires its exhausted script to use

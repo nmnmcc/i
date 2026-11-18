@@ -208,7 +208,7 @@ fn all_value_presentations_match() {
 fn deep_aggregate_fixtures() -> String {
     let mut source = String::from(
         r#"
-(func $verify_deep_inspection
+(func $check_deep_inspection
   (param $value eqref) (param $prefix_value eqref) (param $suffix_value eqref)
   (param $depth i32) (result i32)
   (local $out (ref $bytes)) (local $prefix (ref $bytes)) (local $suffix (ref $bytes))
@@ -284,7 +284,7 @@ fn deep_aggregate_fixtures() -> String {
                  (local.set $value {value})\n\
                  (local.set $i (i32.add (local.get $i) (i32.const 1)))\n\
                  (br_if $build (i32.lt_u (local.get $i) (i32.const 10000))))\n\
-               (call $verify_deep_inspection (local.get $value) {} {} (i32.const 10000)))\n",
+               (call $check_deep_inspection (local.get $value) {} {} (i32.const 10000)))\n",
             install(),
             literal(prefix),
             literal(suffix)
