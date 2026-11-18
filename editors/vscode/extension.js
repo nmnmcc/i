@@ -59,7 +59,7 @@ function createClient() {
     outputChannel,
   };
 
-  return new LanguageClient("ilang", "i Language Server", serverOptions, clientOptions);
+  return new LanguageClient("ilang", "i LSP", serverOptions, clientOptions);
 }
 
 async function startClient() {
@@ -102,7 +102,7 @@ async function restartClient() {
 
 /** @param {vscode.ExtensionContext} context */
 async function activate(context) {
-  outputChannel = vscode.window.createOutputChannel("i Language Server");
+  outputChannel = vscode.window.createOutputChannel("i LSP");
   context.subscriptions.push(outputChannel);
 
   context.subscriptions.push(

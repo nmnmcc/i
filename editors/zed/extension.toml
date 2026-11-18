@@ -7,7 +7,7 @@ authors = ["i contributors"]
 repository = "https://github.com/nmnmcc/i"
 
 [language_servers.ilang]
-name = "i Language Server"
+name = "i LSP"
 languages = ["i"]
 
 [grammars.i]

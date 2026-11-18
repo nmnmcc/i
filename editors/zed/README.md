@@ -12,7 +12,7 @@
    and `path = "editors/tree-sitter-i"` in that copy's manifest.
 4. In Zed open Extensions, choose **Install Dev Extension** (command palette:
    **extensions: install dev extension**) and select the printed directory.
-5. Open the repository root and an `.i` file. Zed starts **i Language Server**
+5. Open the repository root and an `.i` file. Zed starts **i LSP**
    using `.zed/settings.json` and formats on save. Inspect Zed's language server
    logs if startup fails. `target/release/i lsp` must be executable.
 
