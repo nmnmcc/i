@@ -72,6 +72,19 @@ jobs:
           echo "build .#i: ${elapsed}s" | tee -a "$GITHUB_STEP_SUMMARY"
           ./result-i/bin/i --version
 
+      - name: Show the runtime closure of i
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix-store -qR ./result-i | sed 's|/nix/store/[a-z0-9]*-||' | sort > closure.txt
+          echo "runtime closure: $(wc -l < closure.txt) paths" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "toolchain-like paths:"
+          grep -E 'rustc|rust-std|cargo|rust-analyzer|rust-src|gcc-wrapper|binutils' closure.txt || true
+          rustc_path=$(nix-store -qR ./result-i | grep -m1 -- '-rustc-' || true)
+          if [ -n "$rustc_path" ]; then
+            nix why-depends ./result-i "$rustc_path" || true
+          fi
+
       - name: Run a package with the compiler that was built
         shell: bash
         run: |
@@ -193,6 +206,19 @@ jobs:
           nix build --print-out-paths --out-link result-i .#i -L
           echo "build .#i: $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
           ./result-i/bin/i --version
+      - name: Show the runtime closure of i
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix-store -qR ./result-i | sed 's|/nix/store/[a-z0-9]*-||' | sort > closure.txt
+          echo "runtime closure: $(wc -l < closure.txt) paths" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "toolchain-like paths:"
+          grep -E 'rustc|rust-std|cargo|rust-analyzer|rust-src|gcc-wrapper|binutils' closure.txt || true
+          rustc_path=$(nix-store -qR ./result-i | grep -m1 -- '-rustc-' || true)
+          if [ -n "$rustc_path" ]; then
+            nix why-depends ./result-i "$rustc_path" || true
+          fi
+
       - name: Run a package with the compiler that was built
         shell: bash
         run: |
