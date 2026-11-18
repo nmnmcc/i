@@ -806,6 +806,7 @@ dependencies = [
  "ilang-lsp",
  "ilang-macro",
  "ilang-package",
+ "ilang-shard",
  "ilang-syntax",
  "ilang-syntax-migration",
  "ilang-wasm",

@@ -147,6 +147,10 @@ enum Command {
         /// Print how long each test takes to run, without the build.
         #[arg(long)]
         time: bool,
+        /// Run only shard K of N (0 <= K < N), planned from measured costs;
+        /// the name filter applies within the shard.
+        #[arg(long, value_name = "K/N")]
+        shard: Option<String>,
     },
     #[command(flatten)]
     Package(commands::package::PackageCommand),
@@ -257,6 +261,7 @@ fn main() -> ExitCode {
             filter,
             time,
             target,
+            shard,
         } => cmd_test(
             &project,
             opt,
@@ -264,6 +269,7 @@ fn main() -> ExitCode {
             filter.as_deref(),
             time,
             target.into(),
+            shard.as_deref(),
         ),
         Command::Package(c) => commands::package::run(c),
         Command::Cache(c) => return finish(commands::cache::run(c)),
@@ -554,7 +560,15 @@ fn cmd_test(
     filter: Option<&str>,
     time: bool,
     target: Target,
+    shard: Option<&str>,
 ) -> anyhow::Result<ExitCode> {
+    let shard = match shard.map(parse_shard).transpose() {
+        Ok(shard) => shard,
+        Err(message) => {
+            eprintln!("error: {message}");
+            return Ok(ExitCode::FAILURE);
+        }
+    };
     if target == Target::Wasi {
         anyhow::bail!("the WASI target runs a command entry and does not compile tests");
     }
@@ -588,6 +602,16 @@ fn cmd_test(
         eprintln!("{message}");
         return Ok(ExitCode::FAILURE);
     }
+    let entries = match shard {
+        None => entries,
+        Some(shard) => match shard_entries(entries, shard) {
+            Ok(entries) => entries,
+            Err(message) => {
+                eprintln!("error: {message}");
+                return Ok(ExitCode::FAILURE);
+            }
+        },
+    };
     let stage = ilang_syntax::trace::stage("Wasmtime compile");
     let program = b.host_program()?;
     drop(stage);
@@ -604,11 +628,7 @@ fn cmd_test(
                     .find(|(k, _)| k == key)
                     .map(|(_, v)| v.as_str())
             };
-            let name = format!(
-                "{}.{}",
-                entry.module,
-                get("name").unwrap_or(&entry.target.path)
-            );
+            let name = test_name(&entry);
             let mode = get("mode").unwrap_or("test");
             if filter.is_some_and(|f| !name.contains(f)) {
                 continue;
@@ -673,6 +693,113 @@ fn cmd_test(
     } else {
         ExitCode::FAILURE
     })
+}
+
+/// The qualified name of a test entry: `module.name`.
+fn test_name(entry: &ilang_cli::CollectionEntry) -> String {
+    let name = entry
+        .data
+        .iter()
+        .find(|(k, _)| k == "name")
+        .map(|(_, v)| v.as_str())
+        .unwrap_or(&entry.target.path);
+    format!("{}.{name}", entry.module)
+}
+
+/// `K/N` of `--shard`: N positive and K below it.
+fn parse_shard(text: &str) -> Result<(usize, usize), String> {
+    let parsed = text
+        .split_once('/')
+        .and_then(|(k, n)| Some((k.parse::<usize>().ok()?, n.parse::<usize>().ok()?)));
+    match parsed {
+        Some((k, n)) if n > 0 && k < n => Ok((k, n)),
+        Some((k, n)) if n > 0 => Err(format!(
+            "--shard {text}: shard {k} is out of range; there are {n} shards, numbered 0 to {}",
+            n - 1
+        )),
+        Some(_) => Err(format!("--shard {text}: the number of shards must be positive")),
+        None => Err(format!("--shard {text}: expected K/N, two whole numbers")),
+    }
+}
+
+/// The shard budget when the cost table gives none.
+const SHARD_BUDGET_SECONDS: f64 = 270.0;
+/// The set of `ci/costs.json` that holds the costs of tests run by `i test`.
+const SHARD_COST_SET: &str = "ilang-cli-tests";
+
+/// The entries of shard `k` of `n`, sorted by qualified name. The shards are
+/// planned by `ilang_shard::plan` from the costs in `ci/costs.json` of the
+/// workspace (or `CHECKS_COSTS`); without a table every test costs the same.
+fn shard_entries(
+    entries: Vec<ilang_cli::CollectionEntry>,
+    (k, n): (usize, usize),
+) -> Result<Vec<ilang_cli::CollectionEntry>, String> {
+    let mut named: Vec<(String, ilang_cli::CollectionEntry)> =
+        entries.into_iter().map(|e| (test_name(&e), e)).collect();
+    named.sort_by(|a, b| a.0.cmp(&b.0));
+    if let Some(pair) = named.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+        return Err(format!(
+            "--shard {k}/{n}: two tests are named {:?}; a shard needs every name once",
+            pair[0].0
+        ));
+    }
+    let path = std::env::var_os("CHECKS_COSTS").map(PathBuf::from).unwrap_or_else(|| {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ci/costs.json")
+    });
+    let table = std::fs::read_to_string(&path)
+        .map_err(|e| e.to_string())
+        .and_then(|text| ilang_shard::CostTable::parse(&text));
+    let (units, budget) = match table {
+        Ok(table) if table.sets.contains_key(SHARD_COST_SET) => {
+            let set = &table.sets[SHARD_COST_SET];
+            // The tests first, then the other keys of the set, so that a
+            // test without a cost takes the median of the whole set.
+            let mut pairs: Vec<(String, Option<f64>)> = named
+                .iter()
+                .map(|(name, _)| (name.clone(), set.costs.get(name).copied()))
+                .collect();
+            let names: std::collections::BTreeSet<&str> =
+                named.iter().map(|(name, _)| name.as_str()).collect();
+            pairs.extend(
+                set.keys
+                    .iter()
+                    .filter(|key| !names.contains(key.as_str()))
+                    .map(|key| (key.clone(), set.costs.get(key).copied())),
+            );
+            let mut units = ilang_shard::with_median_missing(&pairs);
+            units.truncate(named.len());
+            (units, table.budget_seconds.unwrap_or(SHARD_BUDGET_SECONDS))
+        }
+        other => {
+            let reason = match other {
+                Ok(_) => format!("it has no set {SHARD_COST_SET:?}"),
+                Err(error) => error,
+            };
+            eprintln!(
+                "note: --shard: every test costs the same; no cost table at {} ({reason})",
+                path.display()
+            );
+            let units = named
+                .iter()
+                .map(|(name, _)| ilang_shard::Unit { key: name.clone(), cost: 1.0 })
+                .collect();
+            (units, SHARD_BUDGET_SECONDS)
+        }
+    };
+    let plan = ilang_shard::plan(&units, budget);
+    let count = plan.shards.len();
+    if count != n {
+        return Err(format!(
+            "--shard {k}/{n}: the {} tests make {count} shards, not {n}",
+            named.len()
+        ));
+    }
+    let keys: std::collections::BTreeSet<&String> = plan.shards[k].keys.iter().collect();
+    Ok(named
+        .into_iter()
+        .filter(|(name, _)| keys.contains(name))
+        .map(|(_, entry)| entry)
+        .collect())
 }
 
 /// The processor time of the process so far (user and system), where the
