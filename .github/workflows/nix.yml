@@ -37,13 +37,27 @@ jobs:
         with:
           extra-conf: |
             always-allow-substitutes = true
-      # Keeps the Nix store paths built in CI in the GitHub Actions cache, so
-      # a later run builds only what changed.
-      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+
+      # The store paths built by a run are exported and kept in the Actions
+      # cache. On the next run (the same commit, or after a rebase) they are
+      # imported before the build, so `nix build` only does the work whose
+      # inputs changed. An exact hit makes the build below a no-op.
+      - name: Restore the Nix store cache
+        id: nix-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          use-flakehub: disabled
-          use-gha-cache: enabled
-          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+          path: /tmp/nix-store-cache
+          key: nix-store-${{ runner.os }}-${{ github.sha }}-${{ hashFiles('flake.lock') }}
+          restore-keys: |
+            nix-store-${{ runner.os }}-${{ github.sha }}-
+            nix-store-${{ runner.os }}-
+      - name: Import the cached store paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f /tmp/nix-store-cache/store.nar ]; then
+            nix-store --import < /tmp/nix-store-cache/store.nar
+          fi
 
       - name: Show the flake outputs
         run: nix flake show
@@ -53,10 +67,10 @@ jobs:
         run: |
           set -euo pipefail
           start=$(date +%s)
-          nix build --print-out-paths .#i -L | tee i-path
+          nix build --print-out-paths --out-link result-i .#i -L | tee i-path
           elapsed=$(( $(date +%s) - start ))
           echo "build .#i: ${elapsed}s" | tee -a "$GITHUB_STEP_SUMMARY"
-          ./result/bin/i --version
+          ./result-i/bin/i --version
 
       - name: Run a package with the compiler that was built
         shell: bash
@@ -65,7 +79,7 @@ jobs:
           export HOME="$RUNNER_TEMP/home"
           mkdir -p "$HOME"
           cd "$RUNNER_TEMP"
-          i="$GITHUB_WORKSPACE/result/bin/i"
+          i="$GITHUB_WORKSPACE/result-i/bin/i"
           "$i" --version
           "$i" new demo
           output=$("$i" run --project demo)
@@ -81,7 +95,7 @@ jobs:
           set -euo pipefail
           version=$(nix eval --raw .#packages.x86_64-linux.i.version)
           python3 nix/package.py \
-            --binary result/bin/i \
+            --binary result-i/bin/i \
             --version "$version" \
             --platform x86_64-linux \
             --output dist
@@ -113,8 +127,8 @@ jobs:
           nix build .#i-bin -L --out-link result-i-bin
           echo "build .#i-bin: $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
           ./result-i-bin/bin/i --version
-          test "$(./result-i-bin/bin/i --version)" = "$(./result/bin/i --version)"
-          echo "i and i-bin report the same version: $(./result/bin/i --version)" \
+          test "$(./result-i-bin/bin/i --version)" = "$(./result-i/bin/i --version)"
+          echo "i and i-bin report the same version: $(./result-i/bin/i --version)" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run both packages through nix run
@@ -139,10 +153,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # A macOS runner is not available in this repository's runner
-  # configuration (`macos-14` jobs are cancelled before they start), so this
-  # job is kept for the platform but only runs when the repository variable
-  # NIX_MACOS is set to `true`. Enabling it is a setting, not a code change.
+      - name: Export the Nix store for the cache
+        if: success() && steps.nix-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nix-store-cache
+          nix-store --export $(nix-store -qR "$(readlink -f result-i)" "$(readlink -f result-i-bin)") \
+            > /tmp/nix-store-cache/store.nar
+          du -h /tmp/nix-store-cache/store.nar
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: success() && steps.nix-cache.outputs.cache-hit != 'true'
+        with:
+          path: /tmp/nix-store-cache
+          key: nix-store-${{ runner.os }}-${{ github.sha }}-${{ hashFiles('flake.lock') }}
+
+  # A macOS runner is not available in this repository's runner configuration
+  # (`macos-14` jobs are cancelled before they start), so this job is kept for
+  # the platform but only runs when the repository variable NIX_MACOS is
+  # `true`. Enabling it is a setting, not a code change.
   darwin:
     name: build and verify (aarch64-darwin)
     if: vars.NIX_MACOS == 'true'
@@ -156,19 +185,14 @@ jobs:
         with:
           extra-conf: |
             always-allow-substitutes = true
-      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
-        with:
-          use-flakehub: disabled
-          use-gha-cache: enabled
-          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Build i from source
         shell: bash
         run: |
           set -euo pipefail
           start=$(date +%s)
-          nix build --print-out-paths .#i -L | tee i-path
+          nix build --print-out-paths --out-link result-i .#i -L
           echo "build .#i: $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
-          ./result/bin/i --version
+          ./result-i/bin/i --version
       - name: Run a package with the compiler that was built
         shell: bash
         run: |
@@ -176,6 +200,6 @@ jobs:
           export HOME="$RUNNER_TEMP/home"
           mkdir -p "$HOME"
           cd "$RUNNER_TEMP"
-          i="$GITHUB_WORKSPACE/result/bin/i"
+          i="$GITHUB_WORKSPACE/result-i/bin/i"
           "$i" new demo
           test "$("$i" run --project demo)" = "Hello, demo!"
