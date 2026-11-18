@@ -128,6 +128,70 @@ fn build_named_entries_write_distinct_wasm_artifacts() {
 }
 
 #[test]
+fn build_refuses_an_entry_named_like_the_package() {
+    // The entry `app` and the default entry of the package `app` share the
+    // default path `build/app[.wasm]`; building the entry must not silently
+    // replace the default entry's artifact.
+    let dir = package(&[
+        (
+            "i.toml",
+            "name = \"app\"\n\n[entries]\napp = \"main.other\"\n",
+        ),
+        (
+            "src/main.i",
+            "main = () { 1 }\n\nother = () { \"other\" }\n",
+        ),
+    ]);
+    let build = dir.path().join("build");
+    std::fs::create_dir_all(&build).unwrap();
+    for (target, file) in [
+        ("native", "app"),
+        ("host", "app.wasm"),
+        ("nodejs", "app.wasm"),
+        ("wasi", "app.wasm"),
+    ] {
+        let artifact = build.join(file);
+        std::fs::write(&artifact, b"default entry").unwrap();
+        let out = i(&["build", "--target", target, "app"], dir.path());
+        assert!(!out.status.success(), "{target}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("--out"), "{target}: {stderr}");
+        assert_eq!(
+            std::fs::read(&artifact).unwrap(),
+            b"default entry",
+            "{target}"
+        );
+        assert!(!build.join("app.bindings.json").exists(), "{target}");
+    }
+    // An explicit path is the user's choice.
+    let entry_out = build.join("entry.wasm");
+    let out = i(
+        &[
+            "build",
+            "--target",
+            "host",
+            "app",
+            "--out",
+            entry_out.to_str().unwrap(),
+        ],
+        dir.path(),
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(entry_out.exists());
+    // The default entry still builds at its own path.
+    let out = i(&["build", "--target", "host"], dir.path());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
 fn wasi_build_removes_a_stale_bindings_plan() {
     // WASI writes no binding plan. One left beside the module by an earlier
     // build of another target would describe a module that was replaced.

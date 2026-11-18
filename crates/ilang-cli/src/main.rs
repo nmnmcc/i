@@ -369,6 +369,14 @@ fn cmd_build(
     // that entries (and the package default) do not overwrite each other.
     let name = entry.unwrap_or(&b.name);
     let default_out = out.is_none();
+    if default_out && entry == Some(b.name.as_str()) {
+        // `build/<name>` of this entry is also the default entry's artifact;
+        // writing it would silently replace the other build.
+        eprintln!(
+            "error: the entry `{name}` has the package's name, so its default artifact would replace the default entry's; choose the path with --out"
+        );
+        return Ok(ExitCode::FAILURE);
+    }
     let out = out.unwrap_or_else(|| {
         project.join("build").join(if native {
             name.to_owned()
