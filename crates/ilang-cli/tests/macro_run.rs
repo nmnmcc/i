@@ -859,7 +859,7 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
 #[test]
 fn body_engine_expands_real_imported_macro_before_checking_arguments() {
     use ilang_host::syntax::DefinitionReply;
-    use ilang_macro::{body_engine::BodyEngine, body_walk3, registry::Registry};
+    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
@@ -900,7 +900,7 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
         resolver,
         &mut session,
     );
-    body_walk3::expressions(&mut ast, &mut engine).unwrap();
+    body_walk::expressions(&mut ast, &mut engine).unwrap();
     let ilang_syntax::ast::ItemKind::Bind(binding) = &ast.items[0].kind else {
         panic!("binding expected")
     };
@@ -952,7 +952,7 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
 #[test]
 fn body_engine_expands_type_arguments_without_evaluating_them() {
     use ilang_host::syntax::DefinitionReply;
-    use ilang_macro::{body_engine::BodyEngine, body_walk3, registry::Registry};
+    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
@@ -989,7 +989,7 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
         resolver,
         &mut session,
     );
-    body_walk3::expressions(&mut ast, &mut engine).unwrap();
+    body_walk::expressions(&mut ast, &mut engine).unwrap();
     let ilang_syntax::ast::ItemKind::Decl { ty, .. } = &ast.items[0].kind else {
         panic!("declaration expected")
     };
@@ -1002,7 +1002,7 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
 #[test]
 fn body_engine_expands_pipe_left_operand_as_first_argument() {
     use ilang_host::syntax::DefinitionReply;
-    use ilang_macro::{body_engine::BodyEngine, body_walk3, registry::Registry};
+    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
     use ilang_syntax::lisp::scoped::ScopedSource;
     use std::sync::Arc;
     let dir = tempfile::tempdir().unwrap();
@@ -1039,7 +1039,7 @@ fn body_engine_expands_pipe_left_operand_as_first_argument() {
         resolver,
         &mut session,
     );
-    body_walk3::expressions(&mut ast, &mut engine).unwrap();
+    body_walk::expressions(&mut ast, &mut engine).unwrap();
     let ilang_syntax::ast::ItemKind::Bind(binding) = &ast.items[0].kind else {
         panic!("binding expected")
     };
@@ -1061,7 +1061,7 @@ fn body_engine_discards_notes_if_macro_result_is_not_an_expression() {
     use ilang_host::syntax::DefinitionReply;
     use ilang_macro::{
         body_engine::{BodyEngine, Error},
-        body_walk3,
+        body_walk,
         registry::Registry,
     };
     use ilang_syntax::lisp::scoped::ScopedSource;
@@ -1101,7 +1101,7 @@ fn body_engine_discards_notes_if_macro_result_is_not_an_expression() {
         &mut session,
     );
     assert!(matches!(
-        body_walk3::expressions(&mut ast, &mut engine),
+        body_walk::expressions(&mut ast, &mut engine),
         Err(Error::Conversion(_))
     ));
     assert!(engine.transactions.is_empty());
@@ -1112,7 +1112,7 @@ fn body_engine_reports_invalid_macro_signature_at_its_definition() {
     use ilang_host::syntax::DefinitionReply;
     use ilang_macro::{
         body_engine::{BodyEngine, Error},
-        body_walk3,
+        body_walk,
         registry::Registry,
     };
     use ilang_syntax::lisp::scoped::ScopedSource;
@@ -1160,7 +1160,7 @@ fn body_engine_reports_invalid_macro_signature_at_its_definition() {
         resolver,
         &mut session,
     );
-    let Err(Error::Compile(diagnostics)) = body_walk3::expressions(&mut ast, &mut engine) else {
+    let Err(Error::Compile(diagnostics)) = body_walk::expressions(&mut ast, &mut engine) else {
         panic!("bad macro must fail")
     };
     assert!(
@@ -2270,7 +2270,7 @@ fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
-            use ilang_macro::{body_engine::BodyEngine, body_walk3::Hook, registry::Registry};
+            use ilang_macro::{body_engine::BodyEngine, body_walk::Hook, registry::Registry};
             use ilang_syntax::{
                 ast::{DItem, Expr, ExprKind},
                 lisp::scoped::ScopedSource,
@@ -2361,7 +2361,7 @@ fn cli_runs_task_scope_inside_expanded_macro_argument() {
 #[test]
 fn body_engine_expands_real_macro_under_deep_mixed_body() {
     use ilang_host::syntax::DefinitionReply;
-    use ilang_macro::{body_engine::BodyEngine, body_walk3, registry::Registry};
+    use ilang_macro::{body_engine::BodyEngine, body_walk, registry::Registry};
     use ilang_syntax::{
         ast::{Block, DItem, Expr, ExprKind, ItemKind, Stmt},
         lisp::scoped::ScopedSource,
@@ -2434,7 +2434,7 @@ fn body_engine_expands_real_macro_under_deep_mixed_body() {
         resolver,
         &mut session,
     );
-    body_walk3::expressions(&mut ast, &mut engine).unwrap();
+    body_walk::expressions(&mut ast, &mut engine).unwrap();
     let ItemKind::Bind(binding) = &ast.items[0].kind else {
         panic!()
     };
@@ -2896,16 +2896,17 @@ fn type_macro_keeps_its_standalone_need_channel() {
                 let mut tree = module.ast.clone();
                 for item in &mut tree.items {
                     if let ilang_syntax::ast::ItemKind::TypeDef(def) = &mut item.kind {
-                        ilang_macro::body_walk3::type_definition(def, &mut engine).unwrap();
+                        ilang_macro::body_walk::type_definition(def, &mut engine).unwrap();
                     }
                 }
-                ilang_macro::body_walk3::expressions(&mut tree, &mut engine).unwrap();
+                ilang_macro::body_walk::expressions(&mut tree, &mut engine).unwrap();
+                let facts = ilang_syntax::facts::SourceFacts::capture_module(&module.ast, false).0;
                 migration_syntax::syn3::lower::lower_with_transition(
                     &tree,
                     false,
                     Some(engine.scoped.original_len()),
-                    &migration_syntax::syn3::lower::Transition::from_native(&module.lowering),
-                    Some(&migration_syntax::syn3::lower::Transition::from_native(engine.scoped.transition())),
+                    &migration_syntax::syn3::lower::Transition::from_native(&facts),
+                    Some(&migration_syntax::syn3::lower::Transition::from_native(engine.scoped.facts())),
                 )
                 .0
                     };
