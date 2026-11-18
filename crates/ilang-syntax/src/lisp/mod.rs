@@ -13,10 +13,8 @@ pub mod definition_schedule;
 pub mod definition_table;
 pub mod definitions;
 pub mod expansion;
-pub mod expansion3;
 mod format;
 pub mod quote_lower;
-pub mod quote_lower3;
 pub mod scoped;
 pub mod source_syntax;
 pub mod source_tree;
@@ -214,14 +212,10 @@ impl IntoIterator for Document {
     }
 }
 
-/// Read all datums, ignoring the normal surface's line break rule.
+/// Read all datums of a Lisp file, where `<-` is one symbol and the normal
+/// surface's line break rule does not apply.
 pub fn parse(source: &str) -> Result<Document, Vec<Diagnostic>> {
-    parse3(source)
-}
-
-/// Read all datums of a current Lisp file, where `<-` is one symbol.
-pub fn parse3(source: &str) -> Result<Document, Vec<Diagnostic>> {
-    parse_lexed(crate::lexer::lex3_lisp(source))
+    parse_lexed(crate::lexer::lex_lisp(source))
 }
 
 fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> {
@@ -253,8 +247,8 @@ fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> 
 
 /// Parse a Lisp-surface source file into the common core tree.
 pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
-    let (module, mut errors) = crate::syn3::lisp::from_lisp(source);
-    errors.extend(crate::syn3::facts::Transition::capture_module(&module, true).1);
+    let (module, mut errors) = crate::rows::from_lisp(source);
+    errors.extend(crate::facts::SourceFacts::capture_module(&module, true).1);
     errors.sort_by_key(|d| (d.span.start, d.span.end));
     (module, errors)
 }
@@ -263,7 +257,7 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     // The rows are checked by the source reader; the layout is the
     // source-preserving one of the Lisp convention, which keeps comments.
-    let (_, diagnostics) = crate::syn3::lisp::from_lisp(source);
+    let (_, diagnostics) = crate::rows::from_lisp(source);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
@@ -522,7 +516,7 @@ fn show_tree<T: Printable>(tree: &T) -> String {
             View::Atom(s) => out.push_str(s),
             View::Int(n) => write!(&mut out, "{n}").expect("writing to a String"),
             View::Float(n) => out.push_str(&float(n)),
-            View::String(s) => out.push_str(&crate::syn3::string_literal(s)),
+            View::String(s) => out.push_str(&crate::print::string_literal(s)),
             View::Prefix(prefix, child) => {
                 out.push_str(prefix);
                 pending.push(Task::Node(child));

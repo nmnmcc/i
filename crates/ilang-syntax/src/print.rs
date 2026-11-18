@@ -18,7 +18,7 @@
 
 use super::ast::*;
 use crate::Diagnostic;
-use crate::lexer::{Comment, lex3};
+use crate::lexer::{Comment, lex};
 use crate::span::Span;
 use crate::token::TokenKind as T;
 pub(crate) mod position;
@@ -56,7 +56,7 @@ pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     if !diags.is_empty() {
         return Err(diags);
     }
-    let lexed = lex3(source);
+    let lexed = lex(source);
     Ok(print_with_comments(&module, source, &lexed.comments))
 }
 
@@ -439,7 +439,7 @@ impl Printer<'_> {
         if slice.is_empty() || slice.contains('\n') {
             return None;
         }
-        let lexed = lex3(slice);
+        let lexed = lex(slice);
         (lexed.diagnostics.is_empty() && lexed.tokens.len() == 2 && same(&lexed.tokens[0].kind))
             .then(|| slice.to_string())
     }

@@ -8,8 +8,7 @@
 //! - `types.txt`: lines that `i check --types` prints (others may be there);
 //! - `errors.txt`: `i check` fails, and each line is in its output.
 
-use ilang_syntax::lexer::lex3;
-use ilang_syntax::syn3;
+use ilang_syntax::lexer::lex;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -41,15 +40,15 @@ fn round_trip_library() {
         .iter()
         .map(|path| {
             let source = std::fs::read_to_string(path).unwrap();
-            let (module, diags) = syn3::parse_module(&source);
+            let (module, diags) = ilang_syntax::parse::parse_module(&source);
             assert!(diags.is_empty(), "{}: {diags:?}", path.display());
             (path, source, module)
         })
         .collect();
     for (path, source, module) in &parsed {
-        let lexed = lex3(source);
-        let text = syn3::print_with_comments(module, source, &lexed.comments);
-        let (round_trip, diags) = syn3::parse_module(&text);
+        let lexed = lex(source);
+        let text = ilang_syntax::print::print_with_comments(module, source, &lexed.comments);
+        let (round_trip, diags) = ilang_syntax::parse::parse_module(&text);
         assert!(diags.is_empty(), "{}: {diags:?}", path.display());
         assert_eq!(&round_trip, module, "{}", path.display());
     }

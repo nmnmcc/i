@@ -1055,7 +1055,7 @@ fn line_before(text: &str, offset: u32) -> &str {
 /// from inventing a head, and the delimiter stack excludes branch bodies.
 fn in_source_branch_head(text: &str, offset: u32) -> bool {
     use ilang_syntax::token::TokenKind as T;
-    let lexed = ilang_syntax::lexer::lex3(text);
+    let lexed = ilang_syntax::lexer::lex(text);
     let mut stack = Vec::new();
     let mut previous = None;
     for token in &lexed.tokens {

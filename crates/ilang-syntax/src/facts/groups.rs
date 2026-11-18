@@ -1,8 +1,8 @@
 //! Shape grouping on the native tree. The reserved call is an internal form;
 //! it is resolved directly to HIR Multi, never reparsed or lowered.
-use super::Transition;
+use super::SourceFacts;
 use crate::span::Span;
-use crate::syn3::{ast as n, walk};
+use crate::{ast as n, walk};
 
 fn shape(f: &n::Function) -> (usize, Vec<String>) {
     let mut labels: Vec<_> = f
@@ -78,7 +78,7 @@ fn text(f: &n::Function) -> String {
     text
 }
 struct Normalize<'a> {
-    transition: &'a mut Transition,
+    transition: &'a mut SourceFacts,
 }
 impl Normalize<'_> {
     fn binding(&mut self, b: n::Binding) -> Vec<n::Binding> {
@@ -118,7 +118,7 @@ impl walk::Visitor for Normalize<'_> {
         if enter
             && let n::PatternKind::Quote(q) = &mut p.kind
             && q.captures.is_empty()
-            && let Ok(captures) = crate::syn3::lisp::quote_captures(&q.datum.0, true)
+            && let Ok(captures) = crate::rows::quote_captures(&q.datum.0, true)
         {
             q.captures = captures;
         }
@@ -159,7 +159,7 @@ impl walk::Visitor for Normalize<'_> {
         }
     }
 }
-pub fn module(module: &n::Module, transition: &mut Transition) -> n::Module {
+pub fn module(module: &n::Module, transition: &mut SourceFacts) -> n::Module {
     let mut module = module.clone();
     let mut normalize = Normalize { transition };
     let mut hidden = Vec::new();
@@ -244,14 +244,14 @@ pub fn module(module: &n::Module, transition: &mut Transition) -> n::Module {
     }
     module
 }
-pub fn expression(e: &n::Expr, transition: &mut Transition) -> n::Expr {
+pub fn expression(e: &n::Expr, transition: &mut SourceFacts) -> n::Expr {
     let mut e = e.clone();
     walk::expr(&mut e, &mut Normalize { transition });
     e
 }
 
 pub fn pattern(pattern: &mut n::Pattern) {
-    crate::syn3::walk::pattern(
+    crate::walk::pattern(
         pattern,
         &mut Normalize {
             transition: &mut Default::default(),

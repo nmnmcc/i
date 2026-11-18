@@ -60,7 +60,7 @@ pub fn lower_expanded(
 
 #[derive(Clone, Debug, Default)]
 pub struct Transition {
-    native: Option<syntax3::syn3::facts::Transition>,
+    native: Option<syntax3::facts::SourceFacts>,
     pub(crate) complete: bool,
     pub(crate) parameters: HashMap<(Span, Span), Vec<(String, Span)>>,
     pub(crate) sums: HashMap<Span, Vec<Span>>,
@@ -121,7 +121,7 @@ impl Transition {
             .or_else(|| self.native.as_ref().and_then(|n| n.sum_members(parent)))
     }
     /// Read-only native facts remain shared; old recording deltas stay private.
-    pub fn from_native(native: &syntax3::syn3::facts::Transition) -> Self {
+    pub fn from_native(native: &syntax3::facts::SourceFacts) -> Self {
         Self {
             native: Some(native.clone()),
             ..Self::default()

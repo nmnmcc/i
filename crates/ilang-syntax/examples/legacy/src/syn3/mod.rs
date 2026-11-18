@@ -1,4 +1,12 @@
-pub use syntax3::syn3::*;
+pub use syntax3::parse::{
+    ONE_BINDING_HINT, binding_line_traps, parse_expr, parse_module, parse_pattern, parse_type,
+    pipe_target,
+};
+pub use syntax3::print::{
+    MAX_CALL_DEPTH, WIDTH, call_depth, format, print_annotation, print_expr, print_module,
+    print_pattern, print_type, print_with_comments, record_label, string_literal,
+};
+pub use syntax3::{ast, deep, expression_module, facts, group, print, print_tree, surface, walk};
 pub mod convert;
 pub mod lisp;
 pub mod lower;

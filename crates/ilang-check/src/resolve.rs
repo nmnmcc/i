@@ -15,7 +15,7 @@ use crate::code;
 use crate::hir::*;
 use crate::types::{Head, HostType, ShapeId, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
-use ilang_syntax::syn3::ast::resolved::Ident;
+use ilang_syntax::ast::resolved::Ident;
 
 use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
 use ilang_syntax::span::Span;
@@ -36,40 +36,40 @@ struct SourceExport {
 }
 mod hints;
 pub use hints::missing_module_message;
-mod three;
-pub use three::lowering_errors;
-pub(crate) use three::source_facts;
+mod native;
+pub use native::lowering_errors;
+pub(crate) use native::source_facts;
 
 /// Resolve directly from the native tree. Source identity and origins are
 /// retained during resolution so later diagnostics map to written source.
 pub fn resolve(graph: &PackageGraph, parsed: &[crate::Parsed]) -> (Program, Vec<Diagnostic>) {
-    ilang_syntax::syn3::deep::deep(|| {
+    ilang_syntax::deep::deep(|| {
         let modules: Vec<_> = parsed.iter().map(|p| &p.ast).collect();
         resolve_native(graph, parsed, &modules, false)
     })
 }
 
-pub fn resolve3(
-    graph: &PackageGraph,
-    parsed: &[crate::Parsed],
-    modules: &[ilang_syntax::syn3::ast::Module],
-) -> (Program, Vec<Diagnostic>) {
-    let modules: Vec<_> = modules.iter().collect();
-    resolve_native(graph, parsed, &modules, true)
-}
 fn resolve_native(
     graph: &PackageGraph,
     parsed: &[crate::Parsed],
-    modules: &[&ilang_syntax::syn3::ast::Module],
+    modules: &[&ilang_syntax::ast::Module],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
-    ilang_syntax::syn3::deep::deep(|| {
+    ilang_syntax::deep::deep(|| {
         let mut transitions: Vec<_> = parsed
             .iter()
             .map(|p| {
-                let mut t = p.lowering.clone();
+                let mut t = if p.compiler_generated {
+                    ilang_syntax::facts::SourceFacts::default()
+                } else {
+                    ilang_syntax::facts::SourceFacts::capture_module(
+                        &p.ast,
+                        graph.sources.get(p.source).display.ends_with(".is"),
+                    )
+                    .0
+                };
                 if let Some(scoped) = &p.scoped {
-                    t.extend(scoped.transition());
+                    t.extend(scoped.facts());
                 }
                 t
             })
@@ -77,9 +77,9 @@ fn resolve_native(
         let modules: Vec<_> = modules
             .iter()
             .zip(&mut transitions)
-            .map(|(m, t)| three::normalize_module(m, t))
+            .map(|(m, t)| native::normalize_module(m, t))
             .collect();
-        three::resolve3(graph, parsed, &modules, &transitions, report_errors)
+        native::resolve(graph, parsed, &modules, &transitions, report_errors)
     })
 }
 
@@ -198,11 +198,11 @@ struct Resolver<'a> {
 /// The shape groups of a named chain and the binding of each group.
 type Table = std::rc::Rc<Vec<(ShapeId, ValueRef)>>;
 
-/// The reserved callee of the transition form of a multi-shape value: a
+/// The reserved callee of the normalized form of a multi-shape value: a
 /// call with one argument per shape group, labelled by the shape.
 const MULTI: &str = "%multi";
 
-/// The shape that a group label of the transition form writes: the number
+/// The shape that a group label of the normalized form writes: the number
 /// of positions, then each label after a comma.
 fn shape_of_text(text: &str) -> ShapeId {
     let mut parts = text.split(',');
@@ -1796,7 +1796,7 @@ impl<'a> Resolver<'a> {
             .items()
             .map(|v| {
                 if b == BuiltinType::String {
-                    ilang_syntax::syn3::ast::LitValue::Str(v.to_string()).text()
+                    ilang_syntax::ast::LitValue::Str(v.to_string()).text()
                 } else {
                     v.to_string()
                 }
@@ -2888,17 +2888,17 @@ pub fn typed_output(
     original: &Program,
     module: ModuleId,
     call: Span,
-    expression: &ilang_syntax::syn3::ast::Expr,
+    expression: &ilang_syntax::ast::Expr,
     var_count: u32,
     ty_var_count: u32,
     checked: &CheckedInputs,
 ) -> Result<(Expr, Program), Vec<Diagnostic>> {
-    // A multi-shape chain has a synthetic one-byte root in the transition
+    // A multi-shape chain has a synthetic one-byte root in the normalized
     // tree. Keep checked inputs at that root as well as their native span.
     struct Inputs<'a>(&'a mut CheckedInputs);
-    impl ilang_syntax::syn3::walk::Visitor for Inputs<'_> {
-        fn expr(&mut self, e: &mut ilang_syntax::syn3::ast::Expr, enter: bool) {
-            use ilang_syntax::syn3::ast::ExprKind;
+    impl ilang_syntax::walk::Visitor for Inputs<'_> {
+        fn expr(&mut self, e: &mut ilang_syntax::ast::Expr, enter: bool) {
+            use ilang_syntax::ast::ExprKind;
             // Only a multi-shape chain changes its root span. Computing
             // this from its head avoids lowering every forwarded subtree.
             if enter
@@ -2925,10 +2925,10 @@ pub fn typed_output(
         expressions: checked.expressions.clone(),
         binders: checked.binders.clone(),
     };
-    ilang_syntax::syn3::deep::deep(|| {
-        ilang_syntax::syn3::walk::expr(&mut expression.clone(), &mut Inputs(&mut forwarded))
+    ilang_syntax::deep::deep(|| {
+        ilang_syntax::walk::expr(&mut expression.clone(), &mut Inputs(&mut forwarded))
     });
-    three::typed_output3(
+    native::typed_output(
         graph,
         parsed,
         original,
@@ -2941,15 +2941,13 @@ pub fn typed_output(
         &parsed[module.0 as usize]
             .scoped
             .as_ref()
-            .map(|s| s.transition().clone())
+            .map(|s| s.facts().clone())
             .unwrap_or_default(),
     )
 }
 
-pub(crate) fn normalize_source(
-    module: &ilang_syntax::syn3::ast::Module,
-) -> ilang_syntax::syn3::ast::Module {
-    three::normalize_module(module, &mut Default::default())
+pub(crate) fn normalize_source(module: &ilang_syntax::ast::Module) -> ilang_syntax::ast::Module {
+    native::normalize_module(module, &mut Default::default())
 }
 
 /// The labelled types (custom types with constructors) that the type

@@ -7,7 +7,7 @@
 //! - a chain is a function over a match (`chain`);
 //! - a pipe into a chain is a match (`case`);
 //! - a provide evaluates its services before its body (`flatten_provide`);
-//! - needs become rows in one place ([`R3::needs_row`]).
+//! - needs become rows in one place ([`NativeResolver::needs_row`]).
 //!
 //! [`pre::pre`] reports unsupported forms before resolution, so invalid forms
 //! cannot leave partially resolved definitions.
@@ -16,20 +16,20 @@ mod groups;
 mod pre;
 
 use super::*;
-use ilang_syntax::syn3::ast as n;
-use ilang_syntax::syn3::ast::resolved as o;
-use ilang_syntax::syn3::walk as nwalk;
+use ilang_syntax::ast as n;
+use ilang_syntax::ast::resolved as o;
+use ilang_syntax::walk as nwalk;
 use pre::{
     AndPlan, ChainKind, Inner, Pre, addr, and_plan, attribute_call, attribute_strings, chain_kind,
     head_params, id, is_core_never, is_match, keyed_plan,
 };
 use std::ops::{Deref, DerefMut};
 
-/// The errors of a module that the lowering reported: the forms of syntax
-/// three that this compiler cannot type yet. `lisp` is set for a module
+/// The errors of a module that the lowering reported: the source forms
+/// that this compiler cannot type yet. `lisp` is set for a module
 /// read from the Lisp surface.
 pub fn lowering_errors(module: &n::Module, lisp: bool) -> Vec<ilang_syntax::Diagnostic> {
-    ilang_syntax::syn3::deep::deep(|| {
+    ilang_syntax::deep::deep(|| {
         let mut transition = Default::default();
         let module = groups::module(module, &mut transition);
         pre::pre(&module, lisp).errors
@@ -40,24 +40,22 @@ pub fn lowering_errors(module: &n::Module, lisp: bool) -> Vec<ilang_syntax::Diag
 /// gives the place of each module in the graph and its expansion origins;
 /// its `ast` is not read. The diagnostics start with the errors of
 /// [`lowering_errors`], module by module.
-pub fn resolve3(
+pub fn resolve(
     graph: &PackageGraph,
     parsed: &[Parsed],
     modules: &[n::Module],
-    transitions: &[ilang_syntax::syn3::facts::Transition],
+    transitions: &[ilang_syntax::facts::SourceFacts],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
     assert_eq!(parsed.len(), modules.len());
-    ilang_syntax::syn3::deep::deep(|| {
-        resolve_here(graph, parsed, modules, transitions, report_errors)
-    })
+    ilang_syntax::deep::deep(|| resolve_here(graph, parsed, modules, transitions, report_errors))
 }
 
 fn pres(
     graph: &PackageGraph,
     parsed: &[Parsed],
     modules: &[n::Module],
-    transitions: &[ilang_syntax::syn3::facts::Transition],
+    transitions: &[ilang_syntax::facts::SourceFacts],
 ) -> Vec<Pre> {
     parsed
         .iter()
@@ -78,7 +76,7 @@ fn resolve_here(
     graph: &PackageGraph,
     parsed: &[Parsed],
     modules: &[n::Module],
-    transitions: &[ilang_syntax::syn3::facts::Transition],
+    transitions: &[ilang_syntax::facts::SourceFacts],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
     let pre = pres(graph, parsed, modules, transitions);
@@ -90,7 +88,7 @@ fn resolve_here(
             }));
         }
     }
-    let mut r = R3 {
+    let mut r = NativeResolver {
         r: Resolver {
             graph,
             parsed,
@@ -180,11 +178,11 @@ fn resolve_here(
     (r.p, r.diags)
 }
 
-/// [`typed_output`] for an expression of the source tree. The
+/// [`super::typed_output`] for an expression of the source tree. The
 /// expression stands alone: it is a macro result, so it has no fresh names
 /// of a module and no binding around it.
 #[allow(clippy::too_many_arguments)]
-pub fn typed_output3(
+pub fn typed_output(
     graph: &PackageGraph,
     parsed: &[Parsed],
     original: &Program,
@@ -194,9 +192,9 @@ pub fn typed_output3(
     var_count: u32,
     ty_var_count: u32,
     checked: &CheckedInputs,
-    transition: &ilang_syntax::syn3::facts::Transition,
+    transition: &ilang_syntax::facts::SourceFacts,
 ) -> Result<(Expr, Program), Vec<Diagnostic>> {
-    ilang_syntax::syn3::deep::deep(|| {
+    ilang_syntax::deep::deep(|| {
         let mut transition = transition.clone();
         let expression = groups::expression(expression, &mut transition);
         typed_output_here(
@@ -225,7 +223,7 @@ fn typed_output_here(
     var_count: u32,
     ty_var_count: u32,
     checked: &CheckedInputs,
-    transition: &ilang_syntax::syn3::facts::Transition,
+    transition: &ilang_syntax::facts::SourceFacts,
 ) -> Result<(Expr, Program), Vec<Diagnostic>> {
     let names = original
         .expansion_names
@@ -255,7 +253,7 @@ fn typed_output_here(
     }
     pre[module.0 as usize] = own;
     let modules: Vec<n::Module> = Vec::new();
-    let mut r = R3 {
+    let mut r = NativeResolver {
         r: Resolver {
             graph,
             parsed,
@@ -304,20 +302,20 @@ fn typed_output_here(
 }
 
 /// The resolver, reading the source trees of the modules.
-struct R3<'a, 't> {
+struct NativeResolver<'a, 't> {
     r: Resolver<'a>,
     modules: &'t [n::Module],
     pre: &'t [Pre],
 }
 
-impl<'a> Deref for R3<'a, '_> {
+impl<'a> Deref for NativeResolver<'a, '_> {
     type Target = Resolver<'a>;
     fn deref(&self) -> &Resolver<'a> {
         &self.r
     }
 }
 
-impl DerefMut for R3<'_, '_> {
+impl DerefMut for NativeResolver<'_, '_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.r
     }
@@ -419,7 +417,7 @@ struct VFn<'x> {
 fn quote_captures(
     q: &n::QuotePattern,
 ) -> Result<std::borrow::Cow<'_, [(bool, n::Pattern)]>, ilang_syntax::Diagnostic> {
-    let parsed = ilang_syntax::syn3::lisp::quote_captures(&q.datum.0, true)?;
+    let parsed = ilang_syntax::rows::quote_captures(&q.datum.0, true)?;
     Ok(if q.captures.is_empty() {
         std::borrow::Cow::Owned(parsed)
     } else {
@@ -491,7 +489,7 @@ fn is_macro(a: &n::Attribute) -> bool {
 /// Definition expansion must retain source-node identities.
 type MacroDefinitions = Result<Vec<(String, bool)>, Vec<(Span, String)>>;
 fn definitions(module: &n::Module, pre: &Pre) -> MacroDefinitions {
-    ilang_syntax::lisp::expansion3::definitions(module, pre.lisp)
+    ilang_syntax::lisp::expansion::definitions(module, pre.lisp)
         .map(|ds| {
             ds.into_iter()
                 .map(|d| (d.name, d.signature.is_some()))
@@ -500,7 +498,7 @@ fn definitions(module: &n::Module, pre: &Pre) -> MacroDefinitions {
         .map_err(|es| es.into_iter().map(|e| (e.span, e.message)).collect())
 }
 
-impl<'a, 't> R3<'a, 't> {
+impl<'a, 't> NativeResolver<'a, 't> {
     fn pre(&self) -> &'t Pre {
         &self.pre[self.cur.0 as usize]
     }
@@ -590,7 +588,7 @@ impl<'a, 't> R3<'a, 't> {
         }
         let placeholder_var = VarId(u32::MAX);
         let typed_definitions: HashMap<_, _> =
-            ilang_syntax::lisp::expansion3::definitions(ast, pre.lisp)
+            ilang_syntax::lisp::expansion::definitions(ast, pre.lisp)
                 .unwrap_or_default()
                 .into_iter()
                 .filter(|d| d.signature.is_some())
@@ -1312,7 +1310,7 @@ impl<'a, 't> R3<'a, 't> {
             }
             let payload = args
                 .iter()
-                .map(ilang_syntax::syn3::print_type)
+                .map(ilang_syntax::print::print_type)
                 .collect::<Vec<_>>()
                 .join(", ");
             definitions.push(format!("`{} = ({payload})`", name.name));
@@ -1794,7 +1792,7 @@ impl<'a, 't> R3<'a, 't> {
     fn binding(&mut self, b: &n::Binding, top: bool) -> (Binding, Vec<Binder>) {
         let source = self.p.module(self.cur).source;
         let file = self.graph.sources.get(source);
-        for span in ilang_syntax::syn3::binding_line_traps(
+        for span in ilang_syntax::parse::binding_line_traps(
             &file.text,
             Span::new(b.pattern.span.0.start, b.value.span.0.start),
         ) {
@@ -1802,7 +1800,7 @@ impl<'a, 't> R3<'a, 't> {
                 code::ONE_LINE_BINDING,
                 Some(source),
                 span,
-                ilang_syntax::syn3::ONE_BINDING_HINT,
+                ilang_syntax::parse::ONE_BINDING_HINT,
             ));
         }
         let type_params = self
@@ -3266,7 +3264,7 @@ fn internal_multi(callee: &n::Expr) -> bool {
     matches!(&callee.kind,n::ExprKind::Name { module:None,name } if name.name==MULTI)
 }
 
-impl R3<'_, '_> {
+impl NativeResolver<'_, '_> {
     fn alias_target_native(&self, e: &n::Expr) -> Option<DefId> {
         use n::ExprKind as E;
         let in_module = |r: &Self, target: ModuleId, name: &n::Ident| {
@@ -3510,14 +3508,13 @@ impl R3<'_, '_> {
 
 pub(super) fn normalize_module(
     m: &n::Module,
-    t: &mut ilang_syntax::syn3::facts::Transition,
+    t: &mut ilang_syntax::facts::SourceFacts,
 ) -> n::Module {
     groups::module(m, t)
 }
 
 /// Source facts shared with editor queries while the HIR retains absorbed sums.
-/// This reads the native tree without constructing a legacy syntax tree;
-/// errors stay in the ordinary need and introduce no synthetic parameters.
+/// This reads the source tree directly; errors stay in the ordinary need and introduce no synthetic parameters.
 pub(crate) type SourceFacts = (
     HashMap<(Span, Span), Vec<n::resolved::Ident>>,
     HashMap<usize, usize>,

@@ -3,16 +3,10 @@ use super::syntax::{Node, Scope, ScopeIdentity, Syntax, SyntaxError};
 use super::{Datum, DatumKind, parse};
 use crate::span::Span;
 
-/// Row selection is shared with the typed-macro type
-/// syntax (`ilang-check`, `types/typed_macro.rs`): `false` answers in the rows
-/// for legacy encoding, `true` for source rows. Every function
-/// here that depends on the rows has a `_rows` form that takes the choice.
-pub const NEW_ROWS: bool = super::syntax::ROWS3;
-
 /// Mark only the original parameterized head of a query answer. A parameter
 /// taken out of it cannot bind in another head; copies of the whole head carry
 /// this identity and freshening changes it together with all its parameters.
-fn mark_definition_head(definition: Syntax, answer: u64, new_rows: bool) -> Syntax {
+fn mark_definition_head(definition: Syntax, answer: u64) -> Syntax {
     let mut cursor = definition;
     let mut wrappers = Vec::new();
     while let Node::Round(parts) = cursor.node() {
@@ -28,7 +22,6 @@ fn mark_definition_head(definition: Syntax, answer: u64, new_rows: bool) -> Synt
     if let Node::Round(parts) = cursor.node() {
         let head = match parts.as_slice() {
             [eq, _, _] if matches!(eq.node(), Node::Symbol(s) if s == "=") => Some(1),
-            [_, body] if !new_rows && matches!(body.node(), Node::Curly(_)) => Some(0),
             _ => None,
         };
         if let Some(index) = head && let Node::Round(head_parts) = parts[index].node()
@@ -48,75 +41,44 @@ fn mark_definition_head(definition: Syntax, answer: u64, new_rows: bool) -> Synt
     cursor
 }
 
-/// The names that [`builtin_definition_rows`] answers. In the source rows a
-/// member of a sum is a type of its own, so each needs a definition row.
-pub fn builtin_definition_names(new_rows: bool) -> &'static [&'static str] {
-    if new_rows {
-        &[
-            "Bool",
-            "True",
-            "False",
-            "Nil",
-            "Result",
-            "Ok",
-            "Error",
-            "AssertionFailure",
-            "Assert",
-        ]
-    } else {
-        &["Bool", "Nil", "Result", "AssertionFailure", "Assert"]
-    }
+/// The names that [`builtin_definition`] answers. A member of a sum is a type
+/// of its own, so each needs a definition row.
+pub fn builtin_definition_names() -> &'static [&'static str] {
+    &[
+        "Bool",
+        "True",
+        "False",
+        "Nil",
+        "Result",
+        "Ok",
+        "Error",
+        "AssertionFailure",
+        "Assert",
+    ]
 }
 
 /// The written definition of a queryable built-in type. `answer` is fresh for
 /// each query so the type parameters in separate answers cannot capture one
 /// another. Every node is located at the query that caused this answer.
-pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> Option<Syntax> {
-    builtin_definition_rows(name, scope, at, answer, NEW_ROWS)
-}
-
-/// [`builtin_definition`] in the chosen rows. In the source rows a sum
-/// answers `(= T (| C1 C2))` and each member answers its own item
+///
+/// A sum answers `(= T (| C1 C2))` and each member answers its own item
 /// `(= C (, …))`; a type with one constructor of its own name is one item.
-pub fn builtin_definition_rows(
-    name: &str,
-    scope: &Scope,
-    at: Span,
-    answer: u64,
-    new_rows: bool,
-) -> Option<Syntax> {
+pub fn builtin_definition(name: &str, scope: &Scope, at: Span, answer: u64) -> Option<Syntax> {
     // The item and its type parameters in the order of the head.
-    let (source, parameters): (&str, &[&str]) = if new_rows {
-        match name {
-            "Bool" => ("(= Bool (| True False))", &[]),
-            "True" => ("(= True (,))", &[]),
-            "False" => ("(= False (,))", &[]),
-            "Nil" => ("(= Nil (,))", &[]),
-            "Result" => ("(= (Result A E) (| (Ok A) (Error E)))", &["A", "E"]),
-            "Ok" => ("(= (Ok A) (, A))", &["A"]),
-            "Error" => ("(= (Error E) (, E))", &["E"]),
-            "AssertionFailure" => ("(= AssertionFailure (, (= message String)))", &[]),
-            "Assert" => (
-                "(= Assert (, (= fail (-> (, AssertionFailure) Never))))",
-                &[],
-            ),
-            _ => return None,
-        }
-    } else {
-        match name {
-            "Bool" => ("(Bool { True False })", &[]),
-            "Nil" => ("(Nil { Nil })", &[]),
-            "Result" => ("((Result A E) { (Ok A) (Error E) })", &["A", "E"]),
-            "AssertionFailure" => (
-                "(AssertionFailure { (AssertionFailure (: message String)) })",
-                &[],
-            ),
-            "Assert" => (
-                "(Assert { (Assert (: fail (-> ((: failure AssertionFailure)) Never))) })",
-                &[],
-            ),
-            _ => return None,
-        }
+    let (source, parameters): (&str, &[&str]) = match name {
+        "Bool" => ("(= Bool (| True False))", &[]),
+        "True" => ("(= True (,))", &[]),
+        "False" => ("(= False (,))", &[]),
+        "Nil" => ("(= Nil (,))", &[]),
+        "Result" => ("(= (Result A E) (| (Ok A) (Error E)))", &["A", "E"]),
+        "Ok" => ("(= (Ok A) (, A))", &["A"]),
+        "Error" => ("(= (Error E) (, E))", &["E"]),
+        "AssertionFailure" => ("(= AssertionFailure (, (= message String)))", &[]),
+        "Assert" => (
+            "(= Assert (, (= fail (-> (, AssertionFailure) Never))))",
+            &[],
+        ),
+        _ => return None,
     };
     fn convert(d: &Datum, scope: &Scope, at: Span, answer: u64, parameters: &[&str]) -> Syntax {
         let children = |xs: &[Datum]| {
@@ -149,7 +111,6 @@ pub fn builtin_definition_rows(
     Some(mark_definition_head(
         convert(&document[0], scope, at, answer, parameters).as_answer(),
         answer,
-        new_rows,
     ))
 }
 
@@ -157,14 +118,14 @@ pub fn builtin_definition_rows(
 /// in the source rows, with fresh identities for its type parameters. This is
 /// [`source_definition`] for the new `Item`; a sum is the item
 /// `(= T (| C1 C2))` and each member is its own item.
-pub fn tree_definition(item: &crate::syn3::ast::Item, scope: &Scope, answer: u64) -> Syntax {
-    tree_definition_from_datum(&crate::syn3::lisp::item_datum(item), scope, answer)
+pub fn tree_definition(item: &crate::ast::Item, scope: &Scope, answer: u64) -> Syntax {
+    tree_definition_from_datum(&crate::rows::item_datum(item), scope, answer)
 }
 
 /// [`tree_definition`] for an item that is already a datum of the source rows:
 /// the written datum of a Lisp file, or the builder's output.
 pub fn tree_definition_from_datum(datum: &Datum, scope: &Scope, answer: u64) -> Syntax {
-    expanded_definition_rows(&Syntax::from_datum(datum, scope), answer, true)
+    expanded_definition(&Syntax::from_datum(datum, scope), answer)
         .expect("a parsed type definition has valid syntax")
 }
 
@@ -278,7 +239,7 @@ pub fn type_query(of: &Syntax) -> Result<TypeQuery, super::syntax::SyntaxError> 
 /// distinct scopes of template and caller atoms. The item must already be
 /// syntactically valid; malformed items are reported at their source span.
 pub fn expanded_definition(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxError> {
-    expanded_definition_rows(item, answer, NEW_ROWS)
+    expanded_definition_new(item, answer)
 }
 
 fn is_symbol(s: &Syntax, text: &str) -> bool {
@@ -286,7 +247,7 @@ fn is_symbol(s: &Syntax, text: &str) -> bool {
 }
 
 /// Whether `root` is a type of the source rows, without recursion: the
-/// accepted shapes are those of the type reader of `syn3::lisp`. The error is
+/// accepted shapes are those of the type reader of `crate::rows`. The error is
 /// at the first part that is not a type.
 fn check_type_new(root: &Syntax) -> Result<(), SyntaxError> {
     let fail = |at: &Syntax, message: &str| {
@@ -430,7 +391,7 @@ fn check_type_new(root: &Syntax) -> Result<(), SyntaxError> {
     Ok(())
 }
 
-/// [`expanded_definition`] in the source rows. A type definition is
+/// The body of [`expanded_definition`]. A type definition is
 /// `(= Head Right)` under any number of `(@ attribute Item)`: `Head` is an
 /// upper name, or `(Name P…)`; the parts `P` are the type parameters when all
 /// are upper names, and an alias pattern (kept as written) when not. `Right`
@@ -623,11 +584,8 @@ fn expanded_definition_new(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
         }
         _ => ty(right, &binders, answer),
     };
-    let mut answered = mark_definition_head(
-        body.with_node(Node::Round(result)).as_answer(),
-        answer,
-        true,
-    );
+    let mut answered =
+        mark_definition_head(body.with_node(Node::Round(result)).as_answer(), answer);
     if wrappers.is_empty() {
         return Ok(answered);
     }
@@ -646,28 +604,16 @@ fn expanded_definition_new(item: &Syntax, answer: u64) -> Result<Syntax, SyntaxE
 
 /// Freshen repeated copies of a query-provided definition head within one
 /// item result. The caller supplies globally fresh answer identities.
-pub fn freshen_duplicate_heads(result: &Syntax, fresh: impl FnMut() -> u64) -> Syntax {
-    freshen_duplicate_heads_rows(result, NEW_ROWS, fresh)
-}
-
-/// [`freshen_duplicate_heads`] in the chosen rows: in the source rows the
-/// head of a type definition is always the second part of `(= head right)`.
-pub fn freshen_duplicate_heads_rows(
-    result: &Syntax,
-    new_rows: bool,
-    mut fresh: impl FnMut() -> u64,
-) -> Syntax {
+/// The head of a type definition is always the second part of `(= head right)`.
+pub fn freshen_duplicate_heads(result: &Syntax, mut fresh: impl FnMut() -> u64) -> Syntax {
     use std::collections::HashSet;
-    fn owner(item: &Syntax, new_rows: bool) -> Option<u64> {
+    fn owner(item: &Syntax) -> Option<u64> {
         let Node::Round(parts) = item.node() else {
             return None;
         };
         match parts.as_slice() {
             [marker, _, inner] if matches!(marker.node(), Node::Symbol(s) if s == "@") => {
-                owner(inner, new_rows)
-            }
-            [head, body] if !new_rows && matches!(body.node(), Node::Curly(_)) => {
-                head.definition_head()
+                owner(inner)
             }
             [marker, head, _] if matches!(marker.node(), Node::Symbol(s) if s == "=") => {
                 head.definition_head()
@@ -679,7 +625,6 @@ pub fn freshen_duplicate_heads_rows(
         Node::Curly(items) => items.clone(),
         _ => vec![result.clone()],
     };
-    let owner = |item: &Syntax| owner(item, new_rows);
     let mut reserved: HashSet<_> = items.iter().filter_map(owner).collect();
     let mut seen = HashSet::new();
     let mut out = Vec::with_capacity(items.len());
@@ -707,7 +652,7 @@ pub fn freshen_duplicate_heads_rows(
 
 /// Answer a written native type definition with fresh parameter identities.
 pub fn source_definition(
-    item: &crate::syn3::ast::Item,
+    item: &crate::ast::Item,
     source: &str,
     scope: &Scope,
     answer: u64,
@@ -721,18 +666,9 @@ pub fn source_definition(
     tree_definition_from_datum(&datum, scope, answer)
 }
 pub fn source_definition_from_syntax(
-    _item: &crate::syn3::ast::Item,
+    _item: &crate::ast::Item,
     syntax: &Syntax,
     answer: u64,
 ) -> Syntax {
     expanded_definition(syntax, answer).expect("a written type definition remains valid")
-}
-/// Definition answers use the final item rows. The obsolete flag remains only
-/// until callers of the Rust helper finish their API migration.
-pub fn expanded_definition_rows(
-    item: &Syntax,
-    answer: u64,
-    _new_rows: bool,
-) -> Result<Syntax, SyntaxError> {
-    expanded_definition_new(item, answer)
 }

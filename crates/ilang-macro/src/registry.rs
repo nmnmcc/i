@@ -1,13 +1,17 @@
-//! Scope-aware index of written macro bindings and module imports.
+//! Scope-aware index of written macro bindings and module imports, and the
+//! value names that a module defines. The macro definitions are
+//! `ilang_syntax::lisp::expansion::definitions`.
 use std::collections::HashMap;
 
 use ilang_check::{Parsed, hygiene};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, SourceId};
+use ilang_syntax::ast::{self, ItemKind};
 use ilang_syntax::lisp::{
+    expansion,
     expansion::MacroDefinition,
-    expansion3 as expansion,
     syntax::{Node, Syntax},
 };
+use ilang_syntax::span::Span;
 
 #[derive(Clone, Debug)]
 pub struct Macro {
@@ -279,7 +283,7 @@ fn own(graph: &PackageGraph, p: &Parsed) -> Result<Module, Vec<Diagnostic>> {
             .collect::<Vec<_>>()
     })?;
     let mut module = Module::default();
-    for (name, span) in crate::registry3::value_names(&p.ast) {
+    for (name, span) in value_names(&p.ast) {
         if let Some(origin) = p.scoped.as_ref().and_then(|scoped| scoped.origin(span))
             && !origin.syntax.scope().marks.is_empty()
         {
@@ -310,4 +314,61 @@ fn own(graph: &PackageGraph, p: &Parsed) -> Result<Module, Vec<Diagnostic>> {
         );
     }
     Ok(module)
+}
+
+/// The names of the value namespace that the items of a module define,
+/// with the span of each binder: these may shadow a macro or a module alias.
+pub fn value_names(module: &ast::Module) -> Vec<(&str, Span)> {
+    let mut names = Vec::new();
+    for item in &module.items {
+        match &item.kind {
+            ItemKind::Bind(binding) => {
+                crate::body_walk::for_each_binder(&binding.pattern, |name, span| {
+                    names.push((name, span))
+                })
+            }
+            ItemKind::Decl { name, .. } => names.push((name.name.as_str(), name.span.0)),
+            _ => {}
+        }
+    }
+    names
+}
+
+/// Whether the module exports the value or type `name`.
+pub fn exported(module: &ast::Module, name: &str) -> bool {
+    module.exports.iter().any(|e| e.name.name == name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn value_names_are_those_of_the_lowered_tree() {
+        let source = "T = (Int)\nx: Int\n(a, [b, ..c]) = f()\n[C(k = d)] = g()\ne: Int = 1";
+        let (module, errors) = ilang_syntax::parse::parse_module(source);
+        assert!(errors.is_empty(), "{errors:?}");
+        let (lowered, errors) = migration_syntax::syn3::lower::lower(&module);
+        assert!(errors.is_empty(), "{errors:?}");
+        let mut old = Vec::new();
+        for item in &lowered.items {
+            match &item.kind {
+                migration_syntax::ast::ItemKind::Binding(binding) => {
+                    migration_syntax::macro_body_walk::for_each_binder(
+                        &binding.pattern,
+                        |name, span| old.push((name, span)),
+                    )
+                }
+                migration_syntax::ast::ItemKind::Declaration { name, .. } => {
+                    old.push((name.name.as_str(), name.span))
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(value_names(&module), old);
+        assert_eq!(
+            old.iter().map(|(n, _)| *n).collect::<Vec<_>>(),
+            ["x", "a", "b", "c", "d", "k", "e"]
+        );
+    }
 }

@@ -31,7 +31,7 @@ pub struct TokenIndex {
 
 impl TokenIndex {
     pub fn new(source: &str) -> TokenIndex {
-        let lexed = crate::lexer::lex3(source);
+        let lexed = crate::lexer::lex(source);
         let mut pending: Vec<_> = lexed.tokens.iter().rev().collect();
         let mut tokens = Vec::new();
         while let Some(token) = pending.pop() {
@@ -709,7 +709,7 @@ fn err<X>(d: &Datum, msg: impl Into<String>) -> R<X> {
 
 /// Reads a current Lisp file.
 pub fn from_lisp(source: &str) -> (Module, Vec<Diagnostic>) {
-    let document = match crate::lisp::parse3(source) {
+    let document = match crate::lisp::parse(source) {
         Ok(d) => d,
         Err(diags) => return (Module::default(), diags),
     };
@@ -1596,7 +1596,7 @@ fn pattern_of(d: &Datum) -> R<Pattern> {
         },
         // Keep unread quotes intact so validation can report their original
         // source rather than an incomplete capture pattern.
-        K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower3::read_pattern_lenient(d)),
+        K::Quote(_) => PatternKind::Quote(crate::lisp::quote_lower::read_pattern_lenient(d)),
         K::Square(parts) => {
             let mut items = Vec::new();
             let mut rest = None;

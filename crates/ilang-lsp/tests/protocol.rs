@@ -999,9 +999,9 @@ struct Ws {
 }
 
 fn to_lisp(text: &str) -> String {
-    let (module, diags) = ilang_syntax::syn3::parse_module(text);
+    let (module, diags) = ilang_syntax::parse::parse_module(text);
     assert!(diags.is_empty(), "{diags:?}");
-    ilang_syntax::syn3::lisp::to_lisp(&module)
+    ilang_syntax::rows::to_lisp(&module)
 }
 
 fn workspace(lisp: bool) -> Ws {

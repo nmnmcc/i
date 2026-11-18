@@ -2,7 +2,7 @@
 //! remain attached to source forms so diagnostics and editor queries agree.
 
 use super::ast::*;
-use crate::lexer::{DocComment, generics_end, lex3, pair_brackets};
+use crate::lexer::{DocComment, generics_end, lex, pair_brackets};
 use crate::span::Span;
 use crate::token::{StringPart, Token, TokenKind as T};
 use crate::{Code, Diagnostic};
@@ -11,7 +11,7 @@ type PResult<X> = Result<X, Diagnostic>;
 
 /// Parses a source module. The diagnostics are sorted by position.
 pub fn parse_module(source: &str) -> (Module, Vec<Diagnostic>) {
-    let lexed = lex3(source);
+    let lexed = lex(source);
     let mut parser = Parser {
         source,
         toks: &lexed.tokens,
@@ -34,7 +34,7 @@ fn parse_with<X>(
     source: &str,
     f: impl FnOnce(&mut Parser) -> PResult<X>,
 ) -> Result<X, Vec<Diagnostic>> {
-    let lexed = lex3(source);
+    let lexed = lex(source);
     let mut parser = Parser {
         source,
         toks: &lexed.tokens,
@@ -1748,7 +1748,7 @@ pub fn binding_line_traps(source: &str, span: Span) -> Vec<Span> {
     if !text.contains("  (") {
         return Vec::new();
     }
-    let lexed = lex3(text);
+    let lexed = lex(text);
     let mut out = Vec::new();
     for (open, token) in lexed.tokens.iter().enumerate() {
         if token.kind != T::LParen || open < 2 {

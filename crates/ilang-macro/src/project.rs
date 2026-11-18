@@ -1,7 +1,7 @@
 //! Project-wide, dependency-ordered syntax expansion.
 use crate::{
     body_engine::BodyEngine,
-    body_walk3 as body_walk, collections,
+    body_walk, collections,
     definition_world::DefinitionWorld,
     diagnostics,
     item_phase::{self, PhaseError},
@@ -28,12 +28,12 @@ impl Expanded {
     /// expanded tree remains available to callers such as `i expand` until
     /// this method is called.
     pub fn lower_quotes(&mut self) {
-        ilang_syntax::syn3::deep::deep(|| self.lower_quotes_here())
+        ilang_syntax::deep::deep(|| self.lower_quotes_here())
     }
     fn lower_quotes_here(&mut self) {
         for module in &mut self.parsed {
             self.diagnostics.extend(
-                ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+                ilang_syntax::lisp::quote_lower::lower_expression_quotes(
                     &mut module.ast,
                     module.source.0,
                     &mut self.templates,
@@ -50,7 +50,7 @@ impl Expanded {
 /// Parses and expands each module after its dependencies. On failure the
 /// diagnostics are returned without publishing partial output to the checker.
 pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
-    ilang_syntax::syn3::deep::deep(|| expand_here(graph))
+    ilang_syntax::deep::deep(|| expand_here(graph))
 }
 
 fn expand_here(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
@@ -229,7 +229,7 @@ fn expand_here(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
         }
     }
     if parsed.iter().any(|p| {
-        ilang_syntax::lisp::expansion3::definitions(&p.ast, true)
+        ilang_syntax::lisp::expansion::definitions(&p.ast, true)
             .is_ok_and(|ds| ds.iter().any(|d| d.signature.is_some()))
     }) {
         let driver = Arc::new(crate::typed::Driver::new(graph, &parsed));

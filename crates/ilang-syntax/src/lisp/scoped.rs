@@ -46,7 +46,7 @@ pub type ChargeResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 pub struct ScopedSource {
     text: String,
     original_len: u32,
-    transition: crate::syn3::facts::Transition,
+    facts: crate::facts::SourceFacts,
     spans: HashMap<Span, Origin>,
     starts: HashMap<u32, Origin>,
     children: HashMap<Span, Vec<Span>>,
@@ -59,7 +59,7 @@ impl ScopedSource {
         Self {
             text: source,
             original_len,
-            transition: Default::default(),
+            facts: Default::default(),
             spans: HashMap::new(),
             starts: HashMap::new(),
             children: HashMap::new(),
@@ -69,8 +69,8 @@ impl ScopedSource {
     pub fn text(&self) -> &str {
         &self.text
     }
-    pub fn transition(&self) -> &crate::syn3::facts::Transition {
-        &self.transition
+    pub fn facts(&self) -> &crate::facts::SourceFacts {
+        &self.facts
     }
     pub fn original_len(&self) -> u32 {
         self.original_len
@@ -96,8 +96,8 @@ impl ScopedSource {
     }
 
     /// The complete generated definition that owns a constructor name.
-    /// The legacy representation can absorb this item into a sum, but every
-    /// virtual occurrence still has its original scoped datum.
+    /// Sum members are absorbed into the sum item, but every virtual
+    /// occurrence still has its original scoped datum.
     pub fn definition_origin(&self, at: Span, name: &str) -> Option<(Syntax, Span)> {
         fn head_name(syntax: &Syntax) -> Option<&str> {
             let mut syntax = syntax;
@@ -445,111 +445,103 @@ impl ScopedSource {
         }
     }
 
-    // ---- The same conversions to the source tree ----
+    // ---- Conversions to the source tree ----
     //
     // The datum is read in the source rows by plain
-    // recursive readers: the caller is on a deep stack (`syn3::deep`).
+    // recursive readers: the caller is on a deep stack (`crate::deep`).
 
-    pub fn expression3_metered(
+    pub fn expression_metered(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
         mut charge: impl FnMut(u64, u64) -> ChargeResult,
-    ) -> Result<crate::syn3::ast::Expr, MeteredError> {
+    ) -> Result<crate::ast::Expr, MeteredError> {
         self.preflight(syntax, &mut charge)
             .map_err(MeteredError::Resource)?;
-        self.expression3(syntax, call_site)
+        self.expression(syntax, call_site)
             .map_err(MeteredError::Syntax)
     }
-    pub fn pattern3_metered(
+    pub fn pattern_metered(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
         mut charge: impl FnMut(u64, u64) -> ChargeResult,
-    ) -> Result<crate::syn3::ast::Pattern, MeteredError> {
+    ) -> Result<crate::ast::Pattern, MeteredError> {
         self.preflight(syntax, &mut charge)
             .map_err(MeteredError::Resource)?;
-        self.pattern3(syntax, call_site)
+        self.pattern(syntax, call_site)
             .map_err(MeteredError::Syntax)
     }
-    pub fn ty3_metered(
+    pub fn ty_metered(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
         mut charge: impl FnMut(u64, u64) -> ChargeResult,
-    ) -> Result<crate::syn3::ast::Type, MeteredError> {
+    ) -> Result<crate::ast::Type, MeteredError> {
         self.preflight(syntax, &mut charge)
             .map_err(MeteredError::Resource)?;
-        self.ty3(syntax, call_site).map_err(MeteredError::Syntax)
+        self.ty(syntax, call_site).map_err(MeteredError::Syntax)
     }
-    pub fn items3_metered(
+    pub fn items_metered(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
         mut charge: impl FnMut(u64, u64) -> ChargeResult,
-    ) -> Result<Vec<crate::syn3::ast::Item>, MeteredError> {
+    ) -> Result<Vec<crate::ast::Item>, MeteredError> {
         self.preflight(syntax, &mut charge)
             .map_err(MeteredError::Resource)?;
-        self.items3(syntax, call_site).map_err(MeteredError::Syntax)
+        self.items(syntax, call_site).map_err(MeteredError::Syntax)
     }
-    pub fn expression3(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-    ) -> Result<crate::syn3::ast::Expr, ScopedError> {
-        let datum = self.append(syntax, call_site);
-        let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::expr_from_datum(&datum))
-            .map_err(|error| self.error(error))?;
-        self.transition
-            .capture_expression(&tree)
-            .map_err(|error| self.error(error))?;
-        Ok(tree)
-    }
-    pub fn pattern3(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-    ) -> Result<crate::syn3::ast::Pattern, ScopedError> {
-        let datum = self.append(syntax, call_site);
-        let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::pattern_from_datum(&datum))
-            .map_err(|error| self.error(error))?;
-        self.transition
-            .capture_pattern(&tree)
-            .map_err(|error| self.error(error))?;
-        Ok(tree)
-    }
-    pub fn ty3(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-    ) -> Result<crate::syn3::ast::Type, ScopedError> {
-        let datum = self.append(syntax, call_site);
-        let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::type_from_datum(&datum))
-            .map_err(|error| self.error(error))?;
-        crate::syn3::facts::Transition::validate_type(&tree).map_err(|error| self.error(error))?;
-        self.transition.ty(tree.span.0);
-        Ok(tree)
-    }
-    pub fn items3(
-        &mut self,
-        syntax: &Syntax,
-        call_site: &Syntax,
-    ) -> Result<Vec<crate::syn3::ast::Item>, ScopedError> {
-        let datum = self.append(syntax, call_site);
-        let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::items_from_datum(&datum))
-            .map_err(|error| self.error(error))?;
-        self.transition
-            .capture_items(&tree)
-            .map_err(|error| self.error(error))?;
-        Ok(tree)
-    }
-
     pub fn expression(
         &mut self,
         syntax: &Syntax,
         call_site: &Syntax,
-    ) -> Result<crate::syn3::ast::Expr, ScopedError> {
-        self.expression3(syntax, call_site)
+    ) -> Result<crate::ast::Expr, ScopedError> {
+        let datum = self.append(syntax, call_site);
+        let tree = crate::deep::deep(|| crate::rows::expr_from_datum(&datum))
+            .map_err(|error| self.error(error))?;
+        self.facts
+            .capture_expression(&tree)
+            .map_err(|error| self.error(error))?;
+        Ok(tree)
+    }
+    pub fn pattern(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+    ) -> Result<crate::ast::Pattern, ScopedError> {
+        let datum = self.append(syntax, call_site);
+        let tree = crate::deep::deep(|| crate::rows::pattern_from_datum(&datum))
+            .map_err(|error| self.error(error))?;
+        self.facts
+            .capture_pattern(&tree)
+            .map_err(|error| self.error(error))?;
+        Ok(tree)
+    }
+    pub fn ty(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+    ) -> Result<crate::ast::Type, ScopedError> {
+        let datum = self.append(syntax, call_site);
+        let tree = crate::deep::deep(|| crate::rows::type_from_datum(&datum))
+            .map_err(|error| self.error(error))?;
+        crate::facts::SourceFacts::validate_type(&tree).map_err(|error| self.error(error))?;
+        self.facts.ty(tree.span.0);
+        Ok(tree)
+    }
+    pub fn items(
+        &mut self,
+        syntax: &Syntax,
+        call_site: &Syntax,
+    ) -> Result<Vec<crate::ast::Item>, ScopedError> {
+        let datum = self.append(syntax, call_site);
+        let tree = crate::deep::deep(|| crate::rows::items_from_datum(&datum))
+            .map_err(|error| self.error(error))?;
+        self.facts
+            .capture_items(&tree)
+            .map_err(|error| self.error(error))?;
+        Ok(tree)
     }
 }
 
@@ -660,7 +652,7 @@ mod tests {
         let syntax = Syntax::from_datum(&parsed[0], &scope);
         let mut source = ScopedSource::new("original".into());
         let mut remaining = 2;
-        let result = source.expression3_metered(&syntax, &syntax, |_, _| {
+        let result = source.expression_metered(&syntax, &syntax, |_, _| {
             if remaining == 0 {
                 return Err(Box::new(std::io::Error::other("resource limit")));
             }

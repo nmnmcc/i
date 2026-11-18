@@ -1,6 +1,6 @@
 //! Round-trip `tests/syn3/block_nesting` through the Lisp surface and the
 //! source printer, then run both programs. Scope and order must agree.
-use ilang_syntax::{parse_module, print, syn3};
+use ilang_syntax::{parse_module, print};
 use std::path::{Path, PathBuf};
 
 fn fixture() -> PathBuf {
@@ -25,11 +25,11 @@ fn a_round_tripped_program_keeps_scope_and_order() {
     let source = std::fs::read_to_string(fixture().join("src/main.i")).unwrap();
     let (module, errors) = parse_module(&source);
     assert!(errors.is_empty(), "{errors:?}");
-    let lisp = syn3::lisp::to_lisp(&module);
-    let (read, errors) = syn3::lisp::from_lisp(&lisp);
+    let lisp = ilang_syntax::rows::to_lisp(&module);
+    let (read, errors) = ilang_syntax::rows::from_lisp(&lisp);
     assert!(errors.is_empty(), "{errors:?}");
     // One printing is a fixed point of the Lisp surface.
-    assert_eq!(syn3::lisp::to_lisp(&read), lisp);
+    assert_eq!(ilang_syntax::rows::to_lisp(&read), lisp);
     let converted = print::print_module(&read);
     let (again, errors) = parse_module(&converted);
     assert!(errors.is_empty(), "{errors:?}");

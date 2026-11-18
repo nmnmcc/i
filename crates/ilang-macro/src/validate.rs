@@ -5,7 +5,7 @@ use crate::{
 };
 use ilang_check::Parsed;
 use ilang_package::{Diagnostic, PackageGraph, SourceId};
-use ilang_syntax::lisp::expansion3 as expansion;
+use ilang_syntax::lisp::expansion;
 
 /// Checks all macro signatures and capabilities of one module under the full
 /// compiler environment available in item position. Dependencies must have

@@ -33,12 +33,12 @@ pub fn run(
             return Ok(ExitCode::FAILURE);
         }
     };
-    let mut for_check = ilang_syntax::syn3::deep::deep(|| expanded.parsed.clone());
+    let mut for_check = ilang_syntax::deep::deep(|| expanded.parsed.clone());
     let mut templates = Vec::new();
     for module in &mut for_check {
         diags.extend(
-            ilang_syntax::syn3::deep::deep(|| {
-                ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+            ilang_syntax::deep::deep(|| {
+                ilang_syntax::lisp::quote_lower::lower_expression_quotes(
                     &mut module.ast,
                     module.source.0,
                     &mut templates,
@@ -57,7 +57,7 @@ pub fn run(
         return Ok(ExitCode::FAILURE);
     }
     let typed = checked.types.expect("expanded program checked");
-    use ilang_syntax::syn3::walk::{self, Visitor};
+    use ilang_syntax::walk::{self, Visitor};
     struct Replace<'a> {
         source: u32,
         module: ilang_check::hir::ModuleId,
@@ -65,7 +65,7 @@ pub fn run(
         scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     }
     impl Visitor for Replace<'_> {
-        fn expr(&mut self, e: &mut ilang_syntax::syn3::ast::Expr, enter: bool) {
+        fn expr(&mut self, e: &mut ilang_syntax::ast::Expr, enter: bool) {
             if !enter {
                 return;
             }
@@ -97,7 +97,7 @@ pub fn run(
             .filter(|((m, _), _)| *m == id)
             .map(|(_, o)| o.scoped.clone())
             .max_by_key(|s| s.text().len());
-        ilang_syntax::syn3::deep::deep(|| {
+        ilang_syntax::deep::deep(|| {
             walk::module(
                 &mut module.ast,
                 &mut Replace {
@@ -154,11 +154,11 @@ pub fn run(
                 graph.sources.get(module.source).display
             );
         }
-        let text = ilang_syntax::syn3::deep::deep(|| {
+        let text = ilang_syntax::deep::deep(|| {
             if to == "is" {
-                ilang_syntax::syn3::lisp::to_lisp(&module.ast)
+                ilang_syntax::rows::to_lisp(&module.ast)
             } else {
-                ilang_syntax::syn3::print_module(&module.ast)
+                ilang_syntax::print::print_module(&module.ast)
             }
         });
         output.push_str(&format!("// {}\n{text}\n", module.path));
@@ -180,9 +180,9 @@ pub fn run(
 
 /// Whether a module has a quotation or a macro definition, which only the
 /// Lisp surface can write.
-fn lisp_only(module: &ilang_syntax::syn3::ast::Module) -> bool {
-    use ilang_syntax::syn3::ast::{Expr, ExprKind, Pattern, PatternKind};
-    use ilang_syntax::syn3::walk::{self, Visitor};
+fn lisp_only(module: &ilang_syntax::ast::Module) -> bool {
+    use ilang_syntax::ast::{Expr, ExprKind, Pattern, PatternKind};
+    use ilang_syntax::walk::{self, Visitor};
     struct Find(bool);
     impl Visitor for Find {
         fn expr(&mut self, e: &mut Expr, enter: bool) {
@@ -200,6 +200,6 @@ fn lisp_only(module: &ilang_syntax::syn3::ast::Module) -> bool {
         return true;
     }
     let mut find = Find(false);
-    ilang_syntax::syn3::deep::deep(|| walk::module(&mut module.clone(), &mut find));
+    ilang_syntax::deep::deep(|| walk::module(&mut module.clone(), &mut find));
     find.0
 }

@@ -30,8 +30,8 @@ pub(crate) fn binders(p: &Pattern, out: &mut Vec<VarId>) {
     crate::hir::pattern_binders(p, &mut |b| out.push(b.var));
 }
 
-/// The explicit label of a constructor part, or the last name in the legacy
-/// representation of its top-level `=` chain.
+/// The explicit label of a constructor part, or the last name of its
+/// top-level `=` chain.
 pub(crate) fn part_label(p: &Pattern) -> Option<&str> {
     match &p.kind {
         PatternKind::Keyed { label, .. } => Some(&label.name),

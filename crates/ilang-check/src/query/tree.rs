@@ -1,7 +1,7 @@
 //! Editor queries retain written-source facts without another expression or
 //! type tree, so the compiler's source nodes remain the authority for spans.
 use super::*;
-use ilang_syntax::syn3::{self, ast as n, ast::resolved::Ident};
+use ilang_syntax::{ast as n, ast::resolved::Ident};
 
 #[derive(Debug, PartialEq, Default)]
 pub struct Module {
@@ -67,7 +67,7 @@ fn id(i: &n::Ident) -> Ident {
     }
 }
 
-pub(super) fn from_new(tree: &n::Module, lisp: bool) -> Module {
+pub(super) fn from_ast(tree: &n::Module, lisp: bool) -> Module {
     let normalized = crate::resolve::normalize_source(tree);
     let tree = &normalized;
     let (type_params, member_of, absorbed) = crate::resolve::source_facts(tree, lisp);
@@ -182,7 +182,7 @@ pub(super) fn from_new(tree: &n::Module, lisp: bool) -> Module {
         });
     }
     struct Calls(Vec<Call>);
-    impl syn3::walk::Visitor for Calls {
+    impl ilang_syntax::walk::Visitor for Calls {
         fn expr(&mut self, e: &mut n::Expr, enter: bool) {
             if !enter {
                 return;
@@ -210,7 +210,7 @@ pub(super) fn from_new(tree: &n::Module, lisp: bool) -> Module {
         }
     }
     let mut calls = Calls(Vec::new());
-    syn3::walk::module(&mut tree.clone(), &mut calls);
+    ilang_syntax::walk::module(&mut tree.clone(), &mut calls);
     out.calls = calls.0;
     out
 }

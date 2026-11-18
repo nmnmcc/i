@@ -2,19 +2,19 @@
 //! `tests/body_walk.rs` on source trees, the forms that only the source tree has,
 //! and a comparison with the old walker on the lowered tree over every
 //! source file of the repository.
-use ilang_macro::body_walk3::{self, Hook, Local};
-use ilang_macro::{body_engine3, call3};
+use ilang_macro::body_walk::{self, Hook, Local};
+use ilang_macro::{body_engine, call};
 use ilang_syntax::{
-    span::Span,
-    syn3::ast::{
+    ast::{
         Block, DItem, DPItem, Expr, ExprKind, Function, ItemKind, Module, Pattern, PatternKind,
         Stmt, TItem, Type, TypeKind,
     },
+    span::Span,
 };
-use migration_syntax::{macro_body_walk as body_walk, macro_call as call};
+use migration_syntax::{macro_body_walk as old_body_walk, macro_call as old_call};
 
 fn module(source: &str) -> Module {
-    let (module, diags) = ilang_syntax::syn3::parse_module(source);
+    let (module, diags) = ilang_syntax::parse::parse_module(source);
     assert!(diags.is_empty(), "{source}: {diags:?}");
     module
 }
@@ -55,7 +55,7 @@ impl Hook for TestHook {
         let ExprKind::Name { module: None, name } = &callee.kind else {
             return Ok(false);
         };
-        if call3::is_update(args) {
+        if call::is_update(args) {
             return Ok(false);
         }
         if locals
@@ -100,7 +100,7 @@ impl Hook for TestHook {
 fn calls(source: &str) -> Vec<String> {
     let mut module = module(source);
     let mut hook = TestHook::default();
-    body_walk3::expressions(&mut module, &mut hook).unwrap();
+    body_walk::expressions(&mut module, &mut hook).unwrap();
     hook.calls
 }
 
@@ -126,10 +126,7 @@ fn nested_expansions_stop_before_running_the_257th_call() {
         loop_forever: true,
         ..Default::default()
     };
-    assert_eq!(
-        body_walk3::expressions(&mut module, &mut hook),
-        Err("depth")
-    );
+    assert_eq!(body_walk::expressions(&mut module, &mut hook), Err("depth"));
     assert_eq!(hook.calls.len(), 256);
 }
 
@@ -179,7 +176,7 @@ impl Hook for Types {
 fn type_calls(source: &str) -> Vec<String> {
     let mut module = module(source);
     let mut hook = Types::default();
-    body_walk3::expressions(&mut module, &mut hook).unwrap();
+    body_walk::expressions(&mut module, &mut hook).unwrap();
     hook.0
 }
 
@@ -259,7 +256,7 @@ fn deep_mixed_bodies_patterns_and_types_do_not_use_the_host_stack() {
         }
         *ty = nested;
         let mut hook = TestHook::default();
-        body_walk3::expressions(&mut module, &mut hook).unwrap();
+        body_walk::expressions(&mut module, &mut hook).unwrap();
         assert_eq!(hook.calls, ["m"]);
         module
     });
@@ -317,7 +314,7 @@ fn macro_result_is_traversed_without_the_host_stack() {
     }
     on_small_stack(|| {
         let mut module = module("f = () { m() }");
-        body_walk3::expressions(&mut module, &mut Generate).unwrap();
+        body_walk::expressions(&mut module, &mut Generate).unwrap();
         module
     });
 }
@@ -355,7 +352,7 @@ fn type_macro_result_is_traversed_without_the_host_stack() {
     on_small_stack(|| {
         let mut module = module("x: deep(Int)");
         let mut hook = GenerateType(0);
-        body_walk3::expressions(&mut module, &mut hook).unwrap();
+        body_walk::expressions(&mut module, &mut hook).unwrap();
         assert_eq!(hook.0, 1);
         module
     });
@@ -407,10 +404,10 @@ fn conjunction_and_key_patterns_bind_as_the_old_named_patterns() {
     assert_eq!(calls("f = (C(m = _)) { m(1) }"), Vec::<String>::new());
     assert_eq!(calls("f = (C(k = x)) { m(1) }"), ["m"]);
     let binders = |source: &str| {
-        let pattern =
-            ilang_syntax::syn3::parse_pattern(source).unwrap_or_else(|e| panic!("{source}: {e:?}"));
+        let pattern = ilang_syntax::parse::parse_pattern(source)
+            .unwrap_or_else(|e| panic!("{source}: {e:?}"));
         let mut out = Vec::new();
-        body_walk3::for_each_binder(&pattern, |name, _| out.push(name.to_owned()));
+        body_walk::for_each_binder(&pattern, |name, _| out.push(name.to_owned()));
         out
     };
     assert_eq!(
@@ -471,7 +468,7 @@ struct New {
 impl Hook for New {
     type Error = ();
     fn is_macro(&mut self, e: &Expr, locals: &[Local], depth: u32) -> Result<bool, ()> {
-        if let Some(call) = call3::expression(e) {
+        if let Some(call) = call::expression(e) {
             // `core.never(x)` has an empty match domain.
             let never = call.name.name == "never"
                 && call.module.is_some_and(|m| m.name == "core")
@@ -497,7 +494,7 @@ impl Hook for New {
         unreachable!()
     }
     fn is_type_macro(&mut self, t: &Type, locals: &[Local], depth: u32) -> Result<bool, ()> {
-        if let Some(call) = call3::ty(t) {
+        if let Some(call) = call::ty(t) {
             self.events.push((
                 "type".into(),
                 at(t.span.0),
@@ -517,7 +514,7 @@ impl Hook for New {
     }
     fn depth_error(&mut self, _: Span) {}
     fn is_direct(&mut self, e: &Expr, _: &[Local], _: u32) -> bool {
-        let direct = body_engine3::is_direct(e, |name| self.aliases.contains(&name.name));
+        let direct = body_engine::is_direct(e, |name| self.aliases.contains(&name.name));
         // Multi-shape values have a synthetic one-byte root in the
         // adapter representation. Compare their classification at that root.
         let span = if matches!(e.kind, ExprKind::Chain(_)) {
@@ -602,15 +599,15 @@ fn old_is_direct(expression: &migration_syntax::ast::Expr, aliases: &[String]) -
     }
     true
 }
-impl body_walk::Hook for Old {
+impl old_body_walk::Hook for Old {
     type Error = ();
     fn is_macro(
         &mut self,
         e: &migration_syntax::ast::Expr,
-        locals: &[body_walk::Local],
+        locals: &[old_body_walk::Local],
         depth: u32,
     ) -> Result<bool, ()> {
-        if let Some(call) = call::expression(e) {
+        if let Some(call) = old_call::expression(e) {
             // A shape-group closure is introduced by transition lowering;
             // it has no call in the source tree.
             if call.name.name.starts_with('%') {
@@ -634,7 +631,7 @@ impl body_walk::Hook for Old {
     fn expand(
         &mut self,
         _: &migration_syntax::ast::Expr,
-        _: &[body_walk::Local],
+        _: &[old_body_walk::Local],
         _: u32,
     ) -> Result<migration_syntax::ast::Expr, ()> {
         unreachable!()
@@ -642,10 +639,10 @@ impl body_walk::Hook for Old {
     fn is_type_macro(
         &mut self,
         t: &migration_syntax::ast::TypeExpr,
-        locals: &[body_walk::Local],
+        locals: &[old_body_walk::Local],
         depth: u32,
     ) -> Result<bool, ()> {
-        if let Some(call) = call::ty(t) {
+        if let Some(call) = old_call::ty(t) {
             self.events.push((
                 "type".into(),
                 at(t.span),
@@ -663,7 +660,7 @@ impl body_walk::Hook for Old {
     fn expand_type(
         &mut self,
         _: &migration_syntax::ast::TypeExpr,
-        _: &[body_walk::Local],
+        _: &[old_body_walk::Local],
         _: u32,
     ) -> Result<migration_syntax::ast::TypeExpr, ()> {
         unreachable!()
@@ -672,7 +669,7 @@ impl body_walk::Hook for Old {
     fn is_direct(
         &mut self,
         e: &migration_syntax::ast::Expr,
-        _: &[body_walk::Local],
+        _: &[old_body_walk::Local],
         _: u32,
     ) -> bool {
         let direct = old_is_direct(e, &self.aliases);
@@ -685,9 +682,9 @@ impl body_walk::Hook for Old {
 /// is not a program (it has syntax errors, or errors of the lowering).
 fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
     let (mut new, errors) = if lisp {
-        ilang_syntax::syn3::lisp::from_lisp(source)
+        ilang_syntax::rows::from_lisp(source)
     } else {
-        ilang_syntax::syn3::parse_module(source)
+        ilang_syntax::parse::parse_module(source)
     };
     if !errors.is_empty() {
         return false;
@@ -718,12 +715,12 @@ fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
         aliases: aliases.clone(),
         ..Default::default()
     };
-    body_walk3::expressions(&mut new, &mut new_hook).unwrap();
+    body_walk::expressions(&mut new, &mut new_hook).unwrap();
     let mut old_hook = Old {
         aliases,
         ..Default::default()
     };
-    body_walk::expressions(&mut old, &mut old_hook).unwrap();
+    old_body_walk::expressions(&mut old, &mut old_hook).unwrap();
     // Lowering groups multi-shape branches and may hoist their hidden
     // bindings. Compare source events in source order, retaining every
     // written call and its lexical environment on both sides.
@@ -793,7 +790,7 @@ fn snippets_walk_as_their_lowered_trees() {
             same_as_old_walker(case, case, false),
             "{case}: not a program"
         );
-        let text = ilang_syntax::syn3::lisp::to_lisp(&module(case));
+        let text = ilang_syntax::rows::to_lisp(&module(case));
         same_as_old_walker(&text, &text, true);
     }
 }
@@ -840,7 +837,7 @@ fn repository_sources_walk_as_their_lowered_trees() {
 }
 
 // The private oracle owns its walker locals. Compare the same source facts.
-fn visible_old(locals: &[body_walk::Local], depth: u32) -> Vec<(String, (u32, u32))> {
+fn visible_old(locals: &[old_body_walk::Local], depth: u32) -> Vec<(String, (u32, u32))> {
     let locals: Vec<_> = locals
         .iter()
         .map(|l| Local {

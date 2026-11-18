@@ -2429,13 +2429,13 @@
     ],
     "reason": "Intentional new Annot boundary counter-example, spec §3 and §7.1; preserve the unbraced pipe."
   },
-  "crates/ilang-check/src/resolve/three.rs:d942f64886578d87": {
+  "crates/ilang-check/src/resolve/native.rs:d942f64886578d87": {
     "not_source": "A name compared on the diagnostic path, not an i source"
   },
-  "crates/ilang-check/src/resolve/three.rs:d46aee08cc49f6d1": {
+  "crates/ilang-check/src/resolve/native.rs:d46aee08cc49f6d1": {
     "not_source": "A name compared on the diagnostic path, not an i source"
   },
-  "crates/ilang-macro/src/item_phase3.rs:0acb225eff8aa24b": {
+  "crates/ilang-macro/src/item_phase.rs:0acb225eff8aa24b": {
     "diagnostics": [
       "E0301: removed @main attribute"
     ],
@@ -2450,28 +2450,28 @@
   "crates/ilang-syntax/tests/lisp_datum.rs:6f00b960a1df6537": {
     "not_source": "String-builder prefix; the test appends 2000 statements and the closing function brace"
   },
-  "crates/ilang-syntax/tests/lisp_syntax3.rs:5c096acf951e25de": {
+  "crates/ilang-syntax/tests/lisp_syntax_rows.rs:5c096acf951e25de": {
     "prefix": "value = ",
     "reason": "A renderer grammar-position fragment, checked in its complete module context"
   },
-  "crates/ilang-syntax/tests/lisp_syntax3.rs:8102c2aebf844591": {
+  "crates/ilang-syntax/tests/lisp_syntax_rows.rs:8102c2aebf844591": {
     "suffix": "\nvalue = 0\n",
     "reason": "A renderer grammar-position fragment, checked in its complete module context"
   },
-  "crates/ilang-syntax/tests/lisp_syntax3.rs:a07c973a0f5ac738": {
+  "crates/ilang-syntax/tests/lisp_syntax_rows.rs:a07c973a0f5ac738": {
     "suffix": "\nvalue = 0\n",
     "reason": "A renderer grammar-position fragment, checked in its complete module context"
   },
-  "crates/ilang-syntax/tests/lisp_syntax3.rs:a65ba66a7b98e7b0": {
+  "crates/ilang-syntax/tests/lisp_syntax_rows.rs:a65ba66a7b98e7b0": {
     "prefix": "value = ",
     "reason": "A renderer grammar-position fragment, checked in its complete module context"
   },
-  "crates/ilang-syntax/tests/lisp_syntax3.rs:7008341f68f64862": {
+  "crates/ilang-syntax/tests/lisp_syntax_rows.rs:7008341f68f64862": {
     "prefix": "f = (",
     "suffix": ") { 0 }\n",
     "reason": "A renderer grammar-position fragment, checked in its complete module context"
   },
-  "crates/ilang-syntax/tests/lisp_syntax3.rs:47fd209da841119d": {
+  "crates/ilang-syntax/tests/lisp_syntax_rows.rs:47fd209da841119d": {
     "not_source": "Rust export-header format template; the test substitutes each concrete export before parsing"
   },
   "crates/ilang-check/tests/generic_services.rs:f1ca0fc31fd5ee01": {
@@ -2867,7 +2867,7 @@
       "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
     ]
   },
-  "crates/ilang-syntax/src/lisp/expansion3.rs:5400e87bb5b8b130": {
+  "crates/ilang-syntax/src/lisp/expansion.rs:5400e87bb5b8b130": {
     "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
     "diagnostics": [
       "E0101: a data type with labels has only labelled items; mixed positional and labelled items are not supported here"

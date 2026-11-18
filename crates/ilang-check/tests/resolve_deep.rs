@@ -1,14 +1,14 @@
 //! A value nested far deeper than a normal stack goes through the production
-//! resolver end to end: package load → parse → `resolve3`.
+//! resolver end to end: package load → parse → `resolve`.
 //!
 //! This replaces the deep-resolution coverage removed with the legacy
 //! differential tests. Unlike `hir_deep.rs`, which exercises HIR visitors on
 //! hand-built trees, it drives the real pipeline from source text.
 use ilang_check::hir::DefKind;
-use ilang_syntax::syn3::deep::deep;
+use ilang_syntax::deep::deep;
 
 #[test]
-fn resolve3_handles_a_20000_deep_value() {
+fn resolve_handles_a_20000_deep_value() {
     let depth = 20_000;
     let text = format!("x = {}1{}\n", "[".repeat(depth), "]".repeat(depth));
     let dir = tempfile::tempdir().unwrap();
@@ -22,7 +22,7 @@ fn resolve3_handles_a_20000_deep_value() {
     let parse_errors: Vec<_> = diags.into_iter().filter(|d| d.is_error()).collect();
     let modules: Vec<_> = deep(|| parsed.iter().map(|p| p.ast.clone()).collect());
 
-    let (program, diags) = ilang_check::resolve::resolve3(&graph, &parsed, &modules);
+    let (program, diags) = ilang_check::resolve::resolve(&graph, &parsed);
     let resolve_errors: Vec<_> = diags.into_iter().filter(|d| d.is_error()).collect();
 
     // Gather the facts first and drop the deep trees on a deep stack, so a

@@ -1,25 +1,36 @@
 # One tree: syntax three as the final AST
 
-Status: steps2c/2d/3/4 and integration with latest tyalt c220161d5 are
-fully GREEN at Nov14 13:56:37 (main/ABI5, stage3, annotation precedence,
-and continuation environment fix). The compiler has one production tree.
-The inventory below records the starting architecture (Nov13); §6 records
-the completed state. Controlling sources:
+Status: done. Steps 1 to 4 of §4 are complete; §6 keeps the dated log of
+the work and §7 records the final state. Controlling sources:
 `docs/design/syntax-3.md` §6, §6.7, §6.8 and §7.2 row 12.
 
-Today there is one surface and two trees. The syntax-three parser builds
-`crates/ilang-syntax/src/syn3/ast.rs` (the **new tree**), and
-`syn3/lower.rs` lowers it to `crates/ilang-syntax/src/ast.rs` (the **old
-tree**: clause blocks, `^ E ! N` rows, record forms, binding-head type
-parameters, multi-constructor type definitions). Everything after the
-parser reads the old tree. The goal is one tree: the new one.
+There is one surface and one tree. The compiler's production path parses
+with `crates/ilang-syntax/src/{lexer,parse}.rs` and stores the result as
+`ilang_syntax::ast::Module`. Every reader, the resolver, the macro passes,
+the queries and the back-ends read that tree. No compiler crate has a
+second tree in its production or test code. A few unit tests use the frozen
+migration crate below as an independent old-tree oracle; that code runs only
+under `#[cfg(test)]` and is not part of a normal build.
 
-This file lists every reader and writer of the old tree, what each needs,
-and the order in which they move. Line counts are of 9fd733b4.
+`crates/ilang-syntax/examples/legacy/` (crate `ilang-syntax-migration`) is a
+frozen copy of the old parser and representation. It is separate from the
+workspace (listed in the root `Cargo.toml` `exclude`). The migration tools in
+that crate (`migrate-syntax3*`, `migrate-tests`) use it, and some unit tests
+of the compiler crates use it as
+an independent old-tree oracle through `[dev-dependencies]`. It is not part
+of the normal build of the compiler crates and it is not a production path.
+Production code must not depend on it.
+
+Sections 1 to 5 were written on Nov 13, before the work, and say "new tree"
+for today's `ast` and "old tree" for the tree that was deleted.
 
 ## 1. The two trees, form by form
 
-What the lowering does today is what each consumer must do itself (or no
+The inventory in §1 and §2 records the starting architecture of Nov 13
+(line counts of 9fd733b4) and is kept as history; the lowering, the old tree
+and their readers it describes no longer exist in the compiler crates.
+
+What the lowering did then is what each consumer must do itself (or no
 longer need) once it reads the new tree.
 
 | New tree (`syn3::ast`) | Old tree (`ast`) made by `lower.rs` | Meaning that the lowering adds |
@@ -278,7 +289,7 @@ These are not mechanical, and each changes what a macro sees.
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
 | 3 resolver | GREEN at `6de9a39b655edc8fad9dd7e14a848e359df22915`: native resolver/query/lits/LSP/expand, full expanded Nov14 matrix passes |
-| 4 deletion | GREEN: S12 merged; compiler uses only the native root AST, old tree/lowerer/readers are private migration/test oracles; the full expanded matrix passes |
+| 4 deletion | done: S12 merged; the compiler uses only the native root AST. The old tree, lowerer and readers were deleted from the compiler crates, including the later test-only oracles (§7); only the frozen migration copy under `examples/legacy/` remains |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,
@@ -966,3 +977,23 @@ invalid mixed-signature cross-reader input now pins its unchanged E0101 in
 the snippet registry. No producer/assertion/main fixture changes. Compiler
 implementation stays at74dc0b2f; final report/registry commit hash follows in
 status-fa.txt with MERGED-MAIN. No required work is pending.
+
+## 7. Final state
+
+After the Nov 14 log above, the remaining transition scaffolding was removed:
+
+- The `ilang_syntax::syn3` compatibility namespace is deleted. Its items are
+  at the crate root (`ilang_syntax::ast`, `parse`, `lexer`, …); `rows` is the
+  Lisp/row module. References use the crate root.
+- The `*3` compatibility names and the modules that only forwarded to the
+  root items are removed.
+- `Parsed.lowering: Transition` is removed. The source facts are computed
+  where resolution needs them. Renames: `facts::Transition` is
+  `facts::SourceFacts`; `ScopedSource::transition()` is `facts()`.
+- `ilang-check`'s `resolve/three.rs` is now `resolve/native.rs`.
+- The test-only oracles `resolve/legacy.rs`, `resolve/differential.rs` and
+  `query/tree_legacy.rs` are deleted. The strict old/native resolver
+  comparison of §6 no longer exists in the compiler crates.
+- The frozen `ilang-syntax-migration` crate under
+  `crates/ilang-syntax/examples/legacy/` stays, outside the workspace, for the
+  migration tools and as a dev-only oracle.

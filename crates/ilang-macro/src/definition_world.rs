@@ -3,6 +3,13 @@
 //! Source modules already expanded by the project driver are immutable. The
 //! current module is rebuilt from its item snapshot for every attempt, so a
 //! deferred run cannot observe its own uncommitted output.
+//!
+//! Definition queries need to agree on what a type definition binds, whether
+//! its constructor is hidden outside its module, and the type parameters of
+//! an item. In the source tree a sum `T = C1 | C2` and its members
+//! `C1 = (…)`, `C2 = (…)` are three items, and each is a definition of its
+//! own, so definition queries must retain all three items. The table of the
+//! definitions and the rows of the answers are in `lisp::definition_table`.
 use crate::item_phase::{DefinitionIdentity, Definitions, Resolution, Snapshot};
 use ilang_check::{
     Parsed,
@@ -15,6 +22,9 @@ use ilang_host::{
 };
 use ilang_package::{ModuleKind, PackageGraph};
 use ilang_syntax::{
+    ast::{
+        self, ExprKind, Ident, Item, ItemKind, PatternKind, TItem, Type, TypeDef, TypeKind, TypeRhs,
+    },
     lisp::{
         Datum, DatumKind,
         definition_schedule::Mode,
@@ -23,7 +33,6 @@ use ilang_syntax::{
         syntax::{Node, Scope, ScopeIdentity, Syntax},
     },
     span::Span,
-    syn3::ast::ItemKind,
 };
 use std::collections::HashMap;
 use std::sync::{
@@ -139,7 +148,7 @@ impl DefinitionWorld {
             .find(|p| p.source.0 == source)
             .map(AsRef::as_ref)
     }
-    fn target(&self, p: &Parsed, import: &ilang_syntax::syn3::ast::Import) -> Option<u32> {
+    fn target(&self, p: &Parsed, import: &ilang_syntax::ast::Import) -> Option<u32> {
         let package = &self.graph.packages[p.package];
         let first = &import.path.first()?.name;
         let id = if first == "i" {
@@ -200,7 +209,7 @@ impl DefinitionWorld {
                 let ItemKind::TypeDef(def) = &item.kind else {
                     continue;
                 };
-                let binders = crate::definition_world3::type_binders(def);
+                let binders = type_binders(def);
                 let ready = !current || snapshot.ready[position];
                 for binder in binders {
                     let atom = scoped
@@ -224,18 +233,15 @@ impl DefinitionWorld {
                         builtin: false,
                     };
                     let exported = module.exports.iter().any(|e| e.name.name == binder.name);
-                    let constructors_visible = !crate::definition_world3::has_own_constructors(def)
+                    let constructors_visible = !has_own_constructors(def)
                         || module
                             .exports
                             .iter()
                             .any(|e| e.name.name == binder.name && e.constructors);
-                    let (exported, constructors_visible) = if ilang_syntax::lisp::syntax::ROWS3 {
-                        self.source_tree(p)
-                            .definition_visibility(&binder.name)
-                            .unwrap_or((exported, constructors_visible))
-                    } else {
-                        (exported, constructors_visible)
-                    };
+                    let (exported, constructors_visible) = self
+                        .source_tree(p)
+                        .definition_visibility(&binder.name)
+                        .unwrap_or((exported, constructors_visible));
                     let override_syntax = if current {
                         snapshot.item_overrides.get(&item.span.0)
                     } else {
@@ -281,14 +287,9 @@ impl DefinitionWorld {
                 let Some(target) = self.target(p, import) else {
                     continue;
                 };
-                let Some(target_parsed) = self.source_module(target) else {
+                if self.source_module(target).is_none() {
                     continue;
-                };
-                let target_ast = if target == snapshot.source {
-                    &snapshot.module
-                } else {
-                    &target_parsed.ast
-                };
+                }
                 let alias = import
                     .alias
                     .as_ref()
@@ -297,14 +298,10 @@ impl DefinitionWorld {
                     .names
                     .iter()
                     .filter_map(|name| {
-                        let exported = if ilang_syntax::lisp::syntax::ROWS3 {
-                            index.modules[&target]
-                                .own
-                                .get(&name.name)
-                                .is_some_and(|id| index.entries[*id].exported)
-                        } else {
-                            target_ast.exports.iter().any(|e| e.name.name == name.name)
-                        };
+                        let exported = index.modules[&target]
+                            .own
+                            .get(&name.name)
+                            .is_some_and(|id| index.entries[*id].exported);
                         exported
                             .then(|| index.modules[&target].own.get(&name.name).copied())
                             .flatten()
@@ -333,10 +330,7 @@ fn text(s: &Syntax) -> &str {
 }
 fn builtin(name: &str) -> bool {
     BuiltinType::ALL.into_iter().any(|b| b.name() == name)
-        || ilang_syntax::lisp::definitions::builtin_definition_names(
-            ilang_syntax::lisp::definitions::NEW_ROWS,
-        )
-        .contains(&name)
+        || ilang_syntax::lisp::definitions::builtin_definition_names().contains(&name)
 }
 fn error_id(query: &Syntax, kind: &str) -> DefinitionIdentity {
     DefinitionIdentity {
@@ -675,7 +669,7 @@ impl DefinitionWorld {
             if name.span().start < item.span.0.start || name.span().end > item.span.0.end {
                 return false;
             }
-            let params = crate::definition_world3::type_parameters(item);
+            let params = type_parameters(item);
             params.iter().any(|parameter| {
                 let scope = scoped
                     .and_then(|s| s.origin(parameter.span.0))
@@ -687,5 +681,173 @@ impl DefinitionWorld {
                 parameter.name == text(name) && scope == *name.scope()
             })
         })
+    }
+}
+
+/// `T(head) = value` where the right side is the type of a value and the
+/// head is not empty: an alias pattern, which binds the names of its head.
+pub fn alias_pattern(def: &TypeDef) -> bool {
+    def.alias_pattern
+}
+
+/// The type names that a definition binds: its own name, or for an alias
+/// pattern the plain names of its head.
+pub fn type_binders(def: &TypeDef) -> Vec<&Ident> {
+    let mut binders = Vec::new();
+    if alias_pattern(def) {
+        for part in &def.head {
+            pattern_binders(part, &mut binders);
+        }
+    } else {
+        binders.push(&def.name);
+    }
+    binders
+}
+
+/// The plain names of a type pattern: a name with no module and no
+/// argument, inside named types and positional data.
+pub fn pattern_binders<'a>(ty: &'a Type, output: &mut Vec<&'a Ident>) {
+    let mut pending = vec![ty];
+    while let Some(ty) = pending.pop() {
+        match &ty.kind {
+            TypeKind::Named {
+                module: None,
+                name,
+                args,
+            } if args.is_empty() => output.push(name),
+            TypeKind::Named { args, .. } => pending.extend(args.iter().rev()),
+            // Tuple handling requires positional data only, and
+            // at least one.
+            TypeKind::Data(items)
+                if !items.is_empty() && items.iter().all(|i| matches!(i, TItem::Pos(_))) =>
+            {
+                pending.extend(items.iter().rev().map(|i| match i {
+                    TItem::Pos(t) | TItem::Label(_, t) | TItem::Spread(t) => t,
+                }))
+            }
+            _ => {}
+        }
+    }
+}
+
+/// A definition with a constructor of its own (data, or opaque): its
+/// definition is given to another module only when the export shows the
+/// constructors, `T(..)`.
+pub fn has_own_constructors(def: &TypeDef) -> bool {
+    !matches!(def.rhs, TypeRhs::Type(_))
+}
+
+/// The plain names of a head: the type parameters of a definition that is
+/// not an alias pattern. `None` when a part is not a plain name.
+pub fn head_parameters(head: &[Type]) -> Option<Vec<&Ident>> {
+    head.iter()
+        .map(|t| match &t.kind {
+            TypeKind::Named {
+                module: None,
+                name,
+                args,
+            } if args.is_empty() => Some(name),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The type parameters of a binding: the `<A>` lists of the branches of
+/// its chain, each name once per list that adds it, then those of its
+/// function type.
+pub fn binding_type_parameters(binding: &ast::Binding) -> Vec<&Ident> {
+    let mut generics: Vec<&Ident> = Vec::new();
+    if let ExprKind::Chain(fs) = &binding.value.kind {
+        for f in fs {
+            let before = generics.len();
+            for g in &f.generics {
+                if !generics[..before].iter().any(|x| x.name == g.name) {
+                    generics.push(g);
+                }
+            }
+        }
+    }
+    if let PatternKind::Typed { ty, .. } = &binding.pattern.kind
+        && let TypeKind::Fn(f) = &ty.kind
+    {
+        for g in &f.generics {
+            if !generics.iter().any(|x| x.name == g.name) {
+                generics.push(g);
+            }
+        }
+    }
+    generics
+}
+
+/// The type parameters that an item declares.
+pub fn type_parameters(item: &Item) -> Vec<&Ident> {
+    match &item.kind {
+        ItemKind::TypeDef(def) if alias_pattern(def) => Vec::new(),
+        ItemKind::TypeDef(def) => head_parameters(&def.head).unwrap_or_default(),
+        ItemKind::Bind(binding) => binding_type_parameters(binding),
+        ItemKind::Decl { ty, .. } => match &ty.kind {
+            TypeKind::Fn(f) => f.generics.iter().collect(),
+            _ => Vec::new(),
+        },
+        ItemKind::Macro { .. } => Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use migration_syntax::ast as old;
+
+    /// The answers on the source tree and on its lowering.
+    #[test]
+    fn answers_agree_with_the_lowered_tree() {
+        let source = "\
+T(A, B) = (A, B)
+U = Opaque
+V(A) = List(A)
+W((A, List(B)), C) = value
+f = <A, B>(a: A) { a } & <B, C>(b: B) { b }
+g: <A, N>(A) <- N -> A = (a) { a }
+h: <A>(A) -> A
+k = 1
+";
+        let (module, errors) = ilang_syntax::parse::parse_module(source);
+        assert!(errors.is_empty(), "{errors:?}");
+        let (lowered, _) = migration_syntax::syn3::lower::lower(&module);
+        assert_eq!(module.items.len(), lowered.items.len());
+        let names = |ids: Vec<&Ident>| ids.iter().map(|i| i.name.clone()).collect::<Vec<_>>();
+        let old_names = |ids: &[old::Ident]| {
+            ids.iter()
+                .map(|i| i.name.clone())
+                // The row parameter that the lowering adds.
+                .filter(|n| !n.contains('%'))
+                .collect::<Vec<_>>()
+        };
+        for (new, old) in module.items.iter().zip(&lowered.items) {
+            let old_parameters = match &old.kind {
+                old::ItemKind::TypeDef(def) => old_names(&def.params),
+                old::ItemKind::Binding(b) => old_names(&b.type_params),
+                old::ItemKind::Declaration { type_params, .. } => old_names(type_params),
+                old::ItemKind::MacroItem { .. } => Vec::new(),
+            };
+            assert_eq!(names(type_parameters(new)), old_parameters);
+            if let (ItemKind::TypeDef(new), old::ItemKind::TypeDef(old)) = (&new.kind, &old.kind) {
+                assert_eq!(alias_pattern(new), old.alias_pattern, "{}", new.name.name);
+                assert_eq!(
+                    has_own_constructors(new),
+                    matches!(old.body, old::TypeBody::Custom(_)),
+                    "{}",
+                    new.name.name
+                );
+            }
+        }
+        let ItemKind::TypeDef(w) = &module.items[3].kind else {
+            panic!()
+        };
+        assert_eq!(names(type_binders(w)), ["A", "B", "C"]);
+        let ItemKind::TypeDef(t) = &module.items[0].kind else {
+            panic!()
+        };
+        assert_eq!(names(type_binders(t)), ["T"]);
     }
 }

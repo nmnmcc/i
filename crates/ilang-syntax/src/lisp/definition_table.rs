@@ -9,11 +9,11 @@ use std::hash::Hash;
 #[derive(Clone)]
 pub enum Definition {
     /// A written definition in the source tree, answered in the
-    /// source rows regardless of `NEW_ROWS`. Made by
+    /// source rows. Made by
     /// [`Definition::tree`] or [`Definition::tree_with_datum`]; this is the
     /// form used by the engine when it reads source nodes.
     Tree {
-        item: Box<crate::syn3::ast::Item>,
+        item: Box<crate::ast::Item>,
         /// The item in the source rows.
         datum: Box<super::Datum>,
         scope: Scope,
@@ -33,9 +33,9 @@ pub enum Definition {
 
 impl Definition {
     /// A written type definition of the source tree. Its rows are made by
-    /// `syn3::lisp::item_datum`.
-    pub fn tree(item: crate::syn3::ast::Item, scope: Scope, ready: bool) -> Self {
-        let datum = crate::syn3::lisp::item_datum(&item);
+    /// `crate::rows::item_datum`.
+    pub fn tree(item: crate::ast::Item, scope: Scope, ready: bool) -> Self {
+        let datum = crate::rows::item_datum(&item);
         Self::tree_with_datum(item, datum, scope, ready)
     }
 
@@ -43,7 +43,7 @@ impl Definition {
     /// written datum of a Lisp file, or the output of a builder that knows
     /// the tokens (so that the spans of symbols are those of the source).
     pub fn tree_with_datum(
-        item: crate::syn3::ast::Item,
+        item: crate::ast::Item,
         datum: super::Datum,
         scope: Scope,
         ready: bool,
@@ -108,7 +108,7 @@ impl Entry {
     fn new(definition: Definition) -> Self {
         if let Definition::Tree { item, .. } = &definition {
             assert!(
-                matches!(item.kind, crate::syn3::ast::ItemKind::TypeDef(_)),
+                matches!(item.kind, crate::ast::ItemKind::TypeDef(_)),
                 "definition table accepts type definitions only"
             );
         }
@@ -274,9 +274,7 @@ impl<Key: Eq + Hash> DefinitionTable<Key> {
                 .as_answer()
             }
             Definition::Builtin { name } => {
-                if super::definitions::builtin_definition_names(super::definitions::NEW_ROWS)
-                    .contains(&name.as_str())
-                {
+                if super::definitions::builtin_definition_names().contains(&name.as_str()) {
                     preflight(DefinitionCost::Builtin(name))?;
                 }
                 match builtin_definition(name, parsed.name.scope(), parsed.name.span(), answer) {

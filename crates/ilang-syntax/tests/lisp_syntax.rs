@@ -1238,7 +1238,7 @@ fn show_as_groups_a_binary_operand_under_negation() {
 #[test]
 fn show_as_distinguishes_postfix_and_standalone_clauses() {
     // Legacy clause blocks must stay invalid in both standalone and
-    // postfix positions; valid chain matches are covered in lisp_syntax3.rs.
+    // postfix positions; valid chain matches are covered in lisp_syntax_rows.rs.
     assert!(
         root("{ (-> (= a (, x)) (-> (y) Int y)) }")
             .show_as(Position::Expression)

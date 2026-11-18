@@ -612,11 +612,11 @@ impl Query<'_> {
 /// the printer of that surface writes it in an annotation.
 fn lisp_type(ty: &str) -> Option<String> {
     let (module, diags) =
-        ilang_syntax::syn3::parse_module(&format!("x : {} = 0\n", annotation_text(ty)));
+        ilang_syntax::parse::parse_module(&format!("x : {} = 0\n", annotation_text(ty)));
     if !diags.is_empty() {
         return None;
     }
-    let printed = ilang_syntax::syn3::lisp::to_lisp(&module);
+    let printed = ilang_syntax::rows::to_lisp(&module);
     let rest = printed.trim().strip_prefix("(= (: x ")?;
     Some(rest.strip_suffix(") 0)")?.to_string())
 }
@@ -624,13 +624,13 @@ fn lisp_type(ty: &str) -> Option<String> {
 /// A branch `(p) { e }` of a match, in the syntax of the Lisp surface, as its
 /// printer writes it.
 pub(crate) fn lisp_clause(pattern: &str, body: &str) -> Option<String> {
-    let (module, diags) = ilang_syntax::syn3::parse_module(&format!(
+    let (module, diags) = ilang_syntax::parse::parse_module(&format!(
         "f = (s) {{ s |> ({pattern}) {{ {body} }} & (_) {{ 0 }} }}\n"
     ));
     if !diags.is_empty() {
         return None;
     }
-    let printed = ilang_syntax::syn3::lisp::to_lisp(&module);
+    let printed = ilang_syntax::rows::to_lisp(&module);
     // The branches are the parts of the chain of the match:
     // `(|> s (& (-> (, p) _ e) …))`.
     let start = printed.find("(& (->")? + 3;

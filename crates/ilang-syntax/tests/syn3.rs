@@ -816,10 +816,10 @@ fn generics() {
 
 #[test]
 fn lexer() {
-    use ::ilang_syntax::lexer::{lex, lex3};
+    use ::ilang_syntax::lexer::lex;
     use ilang_syntax::token::TokenKind as T;
     let kinds = |s: &str| {
-        lex3(s)
+        lex(s)
             .tokens
             .into_iter()
             .map(|t| t.kind)

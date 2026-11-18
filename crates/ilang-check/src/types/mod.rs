@@ -108,7 +108,7 @@ pub(crate) struct FnTy {
 impl FnTy {
     /// A function type whose parameter is a tuple of these parts.
     pub fn new(params: Vec<(Option<String>, Ty)>, ret: Ty, env: Ty) -> FnTy {
-        // The transition tree writes a multi-shape function type as one
+        // The normalized tree writes a multi-shape function type as one
         // parameter with the reserved label `%data`: its type is the
         // parameter data type itself.
         if matches!(params.as_slice(), [(Some(l), _)] if l == groups::DATA) {

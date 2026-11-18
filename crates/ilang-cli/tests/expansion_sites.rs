@@ -43,14 +43,14 @@ fn template_stop_keeps_call_and_template_locations() {
         .source;
     let module = parsed.iter_mut().find(|p| p.path == "app/main").unwrap();
     let ms = module.source;
-    let ilang_syntax::syn3::ast::ItemKind::Bind(binding) = &mut module.ast.items[0].kind else {
+    let ilang_syntax::ast::ItemKind::Bind(binding) = &mut module.ast.items[0].kind else {
         panic!()
     };
-    let ilang_syntax::syn3::ast::ExprKind::Chain(functions) = &mut binding.value.kind else {
+    let ilang_syntax::ast::ExprKind::Chain(functions) = &mut binding.value.kind else {
         panic!()
     };
     let function = &mut functions[0];
-    let Some(ilang_syntax::syn3::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
+    let Some(ilang_syntax::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
         panic!()
     };
     let call_span = last.span.0;
@@ -78,7 +78,7 @@ fn template_stop_keeps_call_and_template_locations() {
         },
     );
     let mut scoped = ScopedSource::new(main.into());
-    let expanded = scoped.expression3(&generated, &call).unwrap();
+    let expanded = scoped.expression(&generated, &call).unwrap();
     scoped.inherit_call_chain(expanded.span.0, call_span, "fake");
     *last = expanded;
     graph.sources.set_text(ms, scoped.text().into());

@@ -18,7 +18,7 @@ pub mod types;
 mod unused;
 
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId, SourceId};
-use ilang_syntax::syn3::ast;
+use ilang_syntax::ast;
 
 /// The stable codes of the problems found by this crate.
 pub mod code {
@@ -139,8 +139,6 @@ pub struct Parsed {
     pub source: SourceId,
     pub kind: ModuleKind,
     pub ast: ast::Module,
-    /// Names and spans needed to interpret source forms during resolution.
-    pub lowering: ilang_syntax::syn3::facts::Transition,
     /// Origins of names introduced by expansion in this module.
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// This module was built by the compiler and may call compiler internals.
@@ -150,13 +148,12 @@ pub struct Parsed {
 
 impl Clone for Parsed {
     fn clone(&self) -> Self {
-        ilang_syntax::syn3::deep::deep(|| Self {
+        ilang_syntax::deep::deep(|| Self {
             package: self.package,
             path: self.path.clone(),
             source: self.source,
             kind: self.kind,
             ast: self.ast.clone(),
-            lowering: self.lowering.clone(),
             scoped: self.scoped.clone(),
             compiler_generated: self.compiler_generated,
             typed_macros: self.typed_macros.clone(),
@@ -173,12 +170,11 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             let source = graph.sources.get(m.source);
             let lisp = source.display.ends_with(".is");
             let (ast, mut errors) = if lisp {
-                ilang_syntax::syn3::lisp::from_lisp(&source.text)
+                ilang_syntax::rows::from_lisp(&source.text)
             } else {
-                ilang_syntax::syn3::parse_module(&source.text)
+                ilang_syntax::parse::parse_module(&source.text)
             };
-            let (lowering, more) =
-                ilang_syntax::syn3::facts::Transition::capture_module(&ast, lisp);
+            let (_, more) = ilang_syntax::facts::SourceFacts::capture_module(&ast, lisp);
             errors.extend(more);
             errors.sort_by_key(|d| (d.span.start, d.span.end));
             diags.extend(
@@ -192,7 +188,6 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
                 source: m.source,
                 kind: m.kind,
                 ast,
-                lowering,
                 scoped: None,
                 compiler_generated: false,
                 typed_macros: None,
@@ -214,7 +209,7 @@ pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagn
     let mut templates = Vec::new();
     for module in &mut parsed {
         diags.extend(
-            ilang_syntax::lisp::quote_lower3::lower_expression_quotes(
+            ilang_syntax::lisp::quote_lower::lower_expression_quotes(
                 &mut module.ast,
                 module.source.0,
                 &mut templates,
