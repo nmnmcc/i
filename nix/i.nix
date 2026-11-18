@@ -104,7 +104,7 @@ rustPlatform.buildRustPackage {
   # counts them as references, so without this the i binary would pull the
   # whole 1.7 GB toolchain at install time.
   postFixup = ''
-    remove-references-to "$out/bin/i" ${rustToolchain}
+    remove-references-to -t ${rustToolchain} "$out/bin/i"
   '';
 
   # The nested build of the musl runner inherits this. nixpkgs sets the Cargo
