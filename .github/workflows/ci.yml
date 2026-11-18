@@ -122,7 +122,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: plan-${{ hashFiles('Cargo.lock') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: true
       # A failing ilang-shard command fails this job, and with it the run:
       # no matrix is ever empty.
       - name: Plan the shards
@@ -183,7 +183,7 @@ jobs:
           cache-directories: ~/.cache/ccache
           # main and the long-lived work branches write the cache; every branch
           # reads it.
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
+          save-if: true
       - name: Build the release i
         run: |
           devenv shell -- cargo build --release --locked -p ilang-cli
@@ -236,7 +236,7 @@ jobs:
           key: lint-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
+          save-if: true
       # Without a rust change (docs or editors only), formatting and Clippy
       # cannot change; the snippets of the .md and .mdx files can.
       - name: Run the Rust lint
@@ -277,7 +277,7 @@ jobs:
           key: test-rest-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
+          save-if: true
       - name: Run the Rust tests
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
@@ -288,7 +288,7 @@ jobs:
   # ilang-check's test binaries but value_types, in the shards of the plan
   # (set ilang-check-tests).
   check_tests:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.display }}
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -324,17 +324,17 @@ jobs:
           key: test-check-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ matrix.index == 0 && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/')) }}
+          save-if: true
       - name: Run the Rust tests
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # ilang-check's value_types, sharded by case (set value-type-cases).
   value_types:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.display }}
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -371,18 +371,18 @@ jobs:
           key: test-value-types-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ matrix.index == 0 && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/')) }}
+          save-if: true
       - name: Run the Rust tests
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # ilang-cli's test binaries but spec, in the shards of the plan (set
   # ilang-cli-tests).
   cli_tests:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.display }}
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -416,18 +416,18 @@ jobs:
           key: test-cli-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ matrix.index == 0 && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/')) }}
+          save-if: true
       - name: Run the Rust tests
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The spec suite (ilang-cli --test spec), k/N of its cases per shard; N
   # from the plan (set spec-cases). The group spec-K/N of scripts/checks.
   spec:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.display }}
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -460,12 +460,12 @@ jobs:
           key: test-spec-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ matrix.index == 0 && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/')) }}
+          save-if: true
       - name: Run the spec suite
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   js:
@@ -492,7 +492,7 @@ jobs:
           key: js-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
+          save-if: true
       - name: Run the JavaScript tests
         run: devenv shell -- ./scripts/checks js
       - name: Keep the browser test results
@@ -546,7 +546,7 @@ jobs:
   # shard runs the whole `i` part. (CHECKS_SHARD is the corpus shard there,
   # so it is not set here.)
   std:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.display }}
     needs: [plan, release]
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -585,13 +585,13 @@ jobs:
         run: devenv shell -- ./scripts/checks i
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The review corpus, k/N of its cases per shard; N from the plan (set
   # corpus-cases).
   corpus:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.display }}
     needs: [plan, release]
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
@@ -643,7 +643,7 @@ jobs:
           retention-days: 14
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The documentation site, with the release i for its examples. Shard 1
@@ -652,7 +652,7 @@ jobs:
   # k/N of the examples (CHECKS_SHARD; set docs-examples). On a push to main
   # shard 1 uploads docs/dist, which docs.yml deploys after a green run.
   docs:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.display }}
     needs: [plan, release]
     if: fromJSON(needs.plan.outputs.changed).rust || fromJSON(needs.plan.outputs.changed).docs
     runs-on: ubuntu-24.04
@@ -717,7 +717,7 @@ jobs:
           retention-days: 3
       - uses: ./.github/actions/marker
         with:
-          name: ${{ matrix.name }}
+          name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The one required check. See the comment at the top and scripts/ci/summary.

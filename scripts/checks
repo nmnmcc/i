@@ -230,6 +230,7 @@ i() {
     ./scripts/test-generation --mode short --binary "$i"
   fi
 }
+
 js() {
   binaryen
   cargo build --locked -p ilang-cli
