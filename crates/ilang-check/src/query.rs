@@ -330,7 +330,7 @@ impl<'a> Query<'a> {
     }
 
     fn parse_ast(&self, m: ModuleId) -> tree::Module {
-        ilang_syntax::deep::deep(|| tree::from_new(&self.syntax(m), self.is_lisp(m)))
+        ilang_syntax::deep::deep(|| tree::from_ast(&self.syntax(m), self.is_lisp(m)))
     }
 
     // ---- type_at ----

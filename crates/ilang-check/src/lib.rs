@@ -139,8 +139,6 @@ pub struct Parsed {
     pub source: SourceId,
     pub kind: ModuleKind,
     pub ast: ast::Module,
-    /// Names and spans needed to interpret source forms during resolution.
-    pub lowering: ilang_syntax::facts::Transition,
     /// Origins of names introduced by expansion in this module.
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// This module was built by the compiler and may call compiler internals.
@@ -156,7 +154,6 @@ impl Clone for Parsed {
             source: self.source,
             kind: self.kind,
             ast: self.ast.clone(),
-            lowering: self.lowering.clone(),
             scoped: self.scoped.clone(),
             compiler_generated: self.compiler_generated,
             typed_macros: self.typed_macros.clone(),
@@ -177,7 +174,7 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             } else {
                 ilang_syntax::parse::parse_module(&source.text)
             };
-            let (lowering, more) = ilang_syntax::facts::Transition::capture_module(&ast, lisp);
+            let (_, more) = ilang_syntax::facts::SourceFacts::capture_module(&ast, lisp);
             errors.extend(more);
             errors.sort_by_key(|d| (d.span.start, d.span.end));
             diags.extend(
@@ -191,7 +188,6 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
                 source: m.source,
                 kind: m.kind,
                 ast,
-                lowering,
                 scoped: None,
                 compiler_generated: false,
                 typed_macros: None,

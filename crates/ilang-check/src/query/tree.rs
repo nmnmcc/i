@@ -67,7 +67,7 @@ fn id(i: &n::Ident) -> Ident {
     }
 }
 
-pub(super) fn from_new(tree: &n::Module, lisp: bool) -> Module {
+pub(super) fn from_ast(tree: &n::Module, lisp: bool) -> Module {
     let normalized = crate::resolve::normalize_source(tree);
     let tree = &normalized;
     let (type_params, member_of, absorbed) = crate::resolve::source_facts(tree, lisp);

@@ -2024,7 +2024,7 @@ impl Solver {
                 // Needs compare their service forms in reverse as values
                 // (need variance). Extrusion must follow that direction too;
                 // making every argument invariant can invent a row cycle.
-                // The legacy set-row mode still compares forms equally.
+                // Row mode still compares forms equally.
                 Ty::Con(
                     *h,
                     values.clone(),

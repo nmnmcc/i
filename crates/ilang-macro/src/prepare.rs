@@ -349,7 +349,6 @@ _entry = ({parameters}) -> syntax.Syntax {{
         source: source_id,
         kind: ilang_package::ModuleKind::Src,
         ast,
-        lowering: Default::default(),
         scoped: None,
         compiler_generated: true,
         typed_macros: None,

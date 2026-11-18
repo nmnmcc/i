@@ -30,7 +30,7 @@ pub use lexer::{Lexed, lex};
 /// was wrong, sorted by position.
 pub fn parse_module(source: &str) -> (ast::Module, Vec<Diagnostic>) {
     let (module, mut errors) = parse::parse_module(source);
-    errors.extend(facts::Transition::capture_module(&module, false).1);
+    errors.extend(facts::SourceFacts::capture_module(&module, false).1);
     errors.sort_by_key(|d| (d.span.start, d.span.end));
     (module, errors)
 }

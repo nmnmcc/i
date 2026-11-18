@@ -248,7 +248,7 @@ fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> 
 /// Parse a Lisp-surface source file into the common core tree.
 pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
     let (module, mut errors) = crate::rows::from_lisp(source);
-    errors.extend(crate::facts::Transition::capture_module(&module, true).1);
+    errors.extend(crate::facts::SourceFacts::capture_module(&module, true).1);
     errors.sort_by_key(|d| (d.span.start, d.span.end));
     (module, errors)
 }

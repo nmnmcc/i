@@ -46,7 +46,7 @@ pub type ChargeResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 pub struct ScopedSource {
     text: String,
     original_len: u32,
-    transition: crate::facts::Transition,
+    facts: crate::facts::SourceFacts,
     spans: HashMap<Span, Origin>,
     starts: HashMap<u32, Origin>,
     children: HashMap<Span, Vec<Span>>,
@@ -59,7 +59,7 @@ impl ScopedSource {
         Self {
             text: source,
             original_len,
-            transition: Default::default(),
+            facts: Default::default(),
             spans: HashMap::new(),
             starts: HashMap::new(),
             children: HashMap::new(),
@@ -69,8 +69,8 @@ impl ScopedSource {
     pub fn text(&self) -> &str {
         &self.text
     }
-    pub fn transition(&self) -> &crate::facts::Transition {
-        &self.transition
+    pub fn facts(&self) -> &crate::facts::SourceFacts {
+        &self.facts
     }
     pub fn original_len(&self) -> u32 {
         self.original_len
@@ -500,7 +500,7 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::deep::deep(|| crate::rows::expr_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        self.transition
+        self.facts
             .capture_expression(&tree)
             .map_err(|error| self.error(error))?;
         Ok(tree)
@@ -513,7 +513,7 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::deep::deep(|| crate::rows::pattern_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        self.transition
+        self.facts
             .capture_pattern(&tree)
             .map_err(|error| self.error(error))?;
         Ok(tree)
@@ -526,8 +526,8 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::deep::deep(|| crate::rows::type_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        crate::facts::Transition::validate_type(&tree).map_err(|error| self.error(error))?;
-        self.transition.ty(tree.span.0);
+        crate::facts::SourceFacts::validate_type(&tree).map_err(|error| self.error(error))?;
+        self.facts.ty(tree.span.0);
         Ok(tree)
     }
     pub fn items(
@@ -538,7 +538,7 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::deep::deep(|| crate::rows::items_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        self.transition
+        self.facts
             .capture_items(&tree)
             .map_err(|error| self.error(error))?;
         Ok(tree)

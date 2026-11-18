@@ -3,7 +3,7 @@
 //! Traversal order preserves diagnostic order and fresh-name numbering.
 //! Nodes are keyed by address, so the tree must not move during resolution.
 
-use super::Transition;
+use super::SourceFacts;
 use crate::ast as n;
 use crate::ast::resolved as o;
 use crate::span::Span;
@@ -306,7 +306,7 @@ fn typed_fn(b: &n::Binding) -> Option<&n::FnType> {
 }
 
 struct Cx {
-    transition: Transition,
+    transition: SourceFacts,
     fragment: Option<(u8, Span)>,
     generated_from: Option<u32>,
     out: Pre,
@@ -314,13 +314,13 @@ struct Cx {
 }
 
 pub fn pre(m: &n::Module, lisp: bool) -> Pre {
-    pre_with(m, lisp, None, &Transition::default())
+    pre_with(m, lisp, None, &SourceFacts::default())
 }
 pub fn pre_with(
     m: &n::Module,
     lisp: bool,
     generated_from: Option<u32>,
-    transition: &Transition,
+    transition: &SourceFacts,
 ) -> Pre {
     let mut cx = Cx {
         transition: transition.clone(),
@@ -340,9 +340,9 @@ pub fn pre_with(
 /// The same for an expression that stands alone (a macro result): no
 /// module around it, so `core.never` is not read as the empty match.
 pub fn pre_expr(e: &n::Expr) -> Pre {
-    pre_expr_with(e, &Transition::default())
+    pre_expr_with(e, &SourceFacts::default())
 }
-pub fn pre_expr_with(e: &n::Expr, transition: &Transition) -> Pre {
+pub fn pre_expr_with(e: &n::Expr, transition: &SourceFacts) -> Pre {
     let mut cx = Cx {
         transition: transition.clone(),
         fragment: None,

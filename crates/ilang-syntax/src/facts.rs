@@ -7,7 +7,7 @@ pub mod groups;
 pub mod pre;
 
 #[derive(Clone, Debug, Default)]
-pub struct Transition {
+pub struct SourceFacts {
     pub(crate) complete: bool,
     pub(crate) parameters: HashMap<(Span, Span), Vec<(String, Span)>>,
     pub(crate) sums: HashMap<Span, Vec<Span>>,
@@ -15,7 +15,7 @@ pub struct Transition {
     pub(crate) types: HashSet<Span>,
     pub(crate) patterns: HashSet<Span>,
 }
-impl Transition {
+impl SourceFacts {
     pub fn extend(&mut self, other: &Self) {
         self.complete |= other.complete;
         self.parameters.extend(other.parameters.clone());
@@ -175,7 +175,7 @@ impl Transition {
     }
 }
 struct Capture<'a> {
-    facts: &'a mut Transition,
+    facts: &'a mut SourceFacts,
     plan: &'a pre::Pre,
 }
 impl walk::Visitor for Capture<'_> {
