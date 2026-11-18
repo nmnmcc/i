@@ -6,10 +6,12 @@
   # toolchain, no CMake and no Binaryen submodule.
   #
   # Adding a platform is a change of data, not of the build logic:
-  #   1. add the system to `systems` below (its release archive is built by
-  #      the `release` workflow on the runner named in its matrix);
-  #   2. after the first archive for that platform is published, add its url
-  #      and hash to `nix/release.nix`.
+  #   1. add the system to `systems` below;
+  #   2. add its runner to the release matrix (the NIX_RELEASE_MATRIX
+  #      repository variable) and to the CI job for that runner;
+  #   3. after its first archive is published, add its url and hash to
+  #      `nix/release.nix`.
+  # x86_64-linux is the platform this repository has a runner for.
   inputs = {
     # nixpkgs is the package set; rust-overlay supplies exactly the toolchain
     # that rust-toolchain.toml pins (Nixpkgs' Rust is usually older).
@@ -24,7 +26,7 @@
     let
       inherit (nixpkgs) lib;
 
-      systems = [ "x86_64-linux" "aarch64-darwin" ];
+      systems = [ "x86_64-linux" ];
 
       forAllSystems = f: lib.genAttrs systems (system: f system);
 

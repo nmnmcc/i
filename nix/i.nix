@@ -119,6 +119,6 @@ rustPlatform.buildRustPackage {
     homepage = "https://i.nmnm.cc";
     license = lib.licenses.asl20;
     mainProgram = "i";
-    platforms = [ "x86_64-linux" "aarch64-darwin" ];
+    platforms = [ "x86_64-linux" ];
   };
 }
