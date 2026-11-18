@@ -507,7 +507,11 @@ fn main() {
             }
         }
     }
-    println!("\nspec: {passed} of {total} cases passed at --opt 0 and --opt 2");
+    if both_levels() {
+        println!("\nspec: {passed} of {total} cases passed at --opt 0 and --opt 2");
+    } else {
+        println!("\nspec: {passed} of {total} cases passed at --opt 0");
+    }
     if skipped > 0 {
         println!("spec: {skipped} cases skipped as pending (tests/spec/syn3-pending.txt)");
     }
@@ -520,19 +524,32 @@ fn main() {
     }
 }
 
+/// The levels to run. The gate runs O0; the daily run sets `0,2` so the two
+/// lowering paths are still compared with each other and with the headers.
+fn both_levels() -> bool {
+    std::env::var("CHECKS_SPEC_LEVELS")
+        .map(|levels| levels.split(',').any(|level| level.trim() == "2"))
+        .unwrap_or(true)
+}
+
 fn run_case(case: &Case) -> Result<(), String> {
     let trace = std::env::var_os("I_SPEC_TRACE").map(|_| case.name.as_str());
     let o0 = run(&case.project, Level::O0, trace).map_err(|e| format!("--opt 0: {e}"))?;
     if let Some(name) = trace {
         eprintln!("spec trace {name} O0: done");
     }
-    let o2 = run(&case.project, Level::O2, trace).map_err(|e| format!("--opt 2: {e}"))?;
-    if let Some(name) = trace {
-        eprintln!("spec trace {name} O2: done");
-    }
-    if o0 != o2 {
-        return Err(format!("--opt 0 and --opt 2 differ:\n{o0:#?}\n{o2:#?}"));
-    }
+    let o2 = if both_levels() {
+        let o2 = run(&case.project, Level::O2, trace).map_err(|e| format!("--opt 2: {e}"))?;
+        if let Some(name) = trace {
+            eprintln!("spec trace {name} O2: done");
+        }
+        if o0 != o2 {
+            return Err(format!("--opt 0 and --opt 2 differ:\n{o0:#?}\n{o2:#?}"));
+        }
+        Some(o2)
+    } else {
+        None
+    };
     let mut expect = case.expect.clone();
     let mut update = None;
     if std::env::var("UPDATE").as_deref() == Ok("1")
@@ -558,7 +575,9 @@ fn run_case(case: &Case) -> Result<(), String> {
         expect = Expect::Stop(first.to_string(), at);
     }
     check(case, &o0, &expect).map_err(|e| format!("--opt 0: {e}"))?;
-    check(case, &o2, &expect).map_err(|e| format!("--opt 2: {e}"))?;
+    if let Some(o2) = &o2 {
+        check(case, o2, &expect).map_err(|e| format!("--opt 2: {e}"))?;
+    }
     if let Some(updated) = update {
         std::fs::write(&case.header_path, updated).map_err(|e| e.to_string())?;
     }
