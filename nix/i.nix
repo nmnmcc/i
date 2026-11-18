@@ -9,6 +9,7 @@
   rustToolchain,
   cmake,
   fetchzip,
+  removeReferencesTo,
   pkgsCross,
   version,
   binaryenArchive ? {
@@ -67,7 +68,7 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ../Cargo.lock;
 
-  nativeBuildInputs = [ cmake ];
+  nativeBuildInputs = [ cmake removeReferencesTo ];
   # `cmake` is for the Binaryen build script, not for `configurePhase`.
   dontUseCmakeConfigure = true;
 
