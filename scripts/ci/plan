@@ -59,7 +59,6 @@ SHARDED = [
     ('spec',          'spec-cases',        'spec',                      'test ({name})', 'rust', None),
     ('corpus',        'corpus-cases',      'review',                    'corpus ({name})', 'rust', None),
     ('std',           'std-tests',         'i, std',                    'run ({name})',  'rust', None),
-    ('docs',          'docs-examples',     'site',                      'docs ({name})', 'rust|docs', None),
 ]
 
 # Every job id of ci.yml but `summary`: the output of a sharded job above,
